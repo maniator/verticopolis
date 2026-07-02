@@ -58,3 +58,9 @@ jobs:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          # The Pages backend queue sometimes backs up well past the action's
+          # 10-minute default (2026-07-02: an 8-minute wait on a SUCCESSFUL
+          # deploy, then four timeouts in a row). Wait up to 30 minutes before
+          # giving up so a slow queue doesn't fail otherwise-healthy deploys.
+          timeout: 1800000
