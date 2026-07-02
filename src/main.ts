@@ -2,7 +2,7 @@ import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
 import { FACILITIES, GRID, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "./engine/facilities";
 import { ECON, rentConfig, rentOf, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
-import type { FacilityKind, Unit } from "./engine/types";
+import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";
@@ -297,19 +297,22 @@ class GameApp {
     }
     if (this.tool.type !== "build") return;
     const kind = this.tool.kind;
-    if (kind === "floor" || kind === "lobby") {
-      this.paintBrush(kind, c.tile, c.floor);
-      this.announce(`Placed ${FACILITIES[kind].name} on floor ${c.floor}`);
+    const placed = this.placeSimpleBuild(kind, c.tile, c.floor);
+    if (placed) {
+      this.announce(
+        placed.what === "paint"
+          ? `Placed ${FACILITIES[kind].name} on floor ${c.floor}`
+          : placed.what === "flight"
+            ? placed.ok
+              ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}`
+              : placed.reason
+            : placed.ok
+              ? `Placed ${FACILITIES[kind].name}`
+              : `Can't place ${FACILITIES[kind].name} here`,
+      );
       this.refreshCursorPreview();
     } else if (this.isTransportTool()) {
-      if (isFixedSpanTransport(kind)) {
-        // Stairs/escalators are a fixed two-floor unit — one press places the
-        // flight from the cursor's floor to the one above, matching the
-        // pointer path (no anchor gesture).
-        const r = this.tryBuildTransport(kind, this.snapX(kind, c.tile), c.floor, c.floor + 1);
-        this.announce(r.ok ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}` : r.reason);
-        this.refreshCursorPreview();
-      } else if (!this.kbAnchor) {
+      if (!this.kbAnchor) {
         // Snap the anchor column like the mouse path, so a wide shaft near the
         // right edge places instead of failing.
         this.kbAnchor = { tile: this.snapX(kind, c.tile), floor: c.floor };
@@ -331,13 +334,6 @@ class GameApp {
         }
         this.refreshCursorPreview();
       }
-    } else {
-      const x = this.snapX(kind, c.tile);
-      const before = this.sim.tower.units.length;
-      this.tryBuild(kind, c.floor, x);
-      this.announce(
-        this.sim.tower.units.length > before ? `Placed ${FACILITIES[kind].name}` : `Can't place ${FACILITIES[kind].name} here`,
-      );
     }
   }
 
@@ -413,17 +409,12 @@ class GameApp {
       if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
       this.captureUndo(this.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[this.tool.kind].name}`);
       if (this.tool.type === "bulldoze") this.bulldozePicked(picked);
-      else if (this.tool.type === "build" && !this.isTransportTool()) {
-        if (this.tool.kind === "floor" || this.tool.kind === "lobby") {
-          this.paintBrush(this.tool.kind, tile, floor); // wider strip per tap
-        } else {
-          this.tryBuild(this.tool.kind, floor, this.snapX(this.tool.kind, tile));
-        }
-      } else if (this.tool.type === "build" && isFixedSpanTransport(this.tool.kind)) {
-        // Touch taps with the stairway/escalator tool land here (classifyDown
-        // routes them through the pan/tap gesture so a finger-down can still
-        // pan); the tap drops the whole two-floor flight.
-        this.tryBuildTransport(this.tool.kind, this.snapX(this.tool.kind, tile), floor, floor + 1);
+      else if (this.tool.type === "build") {
+        // Touch taps land here for every simple placement, including the
+        // stairway/escalator flight (classifyDown routes them through the
+        // pan/tap gesture so a finger-down can still pan). Drag-sized shafts
+        // return null — they never place on a tap.
+        this.placeSimpleBuild(this.tool.kind, tile, floor);
       }
       this.commitUndo();
     };
@@ -436,20 +427,11 @@ class GameApp {
       if (this.tool.type === "bulldoze") {
         this.bulldozePicked(picked);
       } else if (this.tool.type === "build") {
-        if (this.isTransportTool()) {
-          if (isFixedSpanTransport(this.tool.kind)) {
-            // Stairs/escalators are a fixed two-floor unit: one tap places it
-            // spanning the clicked floor and the one above (as in the
-            // original) — no drag-to-size gesture.
-            this.tryBuildTransport(this.tool.kind, this.snapX(this.tool.kind, tile), floor, floor + 1);
-          } else {
-            this.transportStart = { x: this.snapX(this.tool.kind, tile), floor };
-          }
-        } else if (this.tool.kind === "floor" || this.tool.kind === "lobby") {
-          // A click lays a wider strip; dragging then extends it.
-          this.paintBrush(this.tool.kind, tile, floor);
-        } else {
-          this.tryBuild(this.tool.kind, floor, this.snapX(this.tool.kind, tile));
+        // Simple placements (strip paint, two-floor flight, room) happen on
+        // the press; a drag-sized shaft instead anchors here and sizes with
+        // the drag.
+        if (this.placeSimpleBuild(this.tool.kind, tile, floor) === null) {
+          this.transportStart = { x: this.snapX(this.tool.kind, tile), floor };
         }
       }
     };
@@ -619,6 +601,29 @@ class GameApp {
     window.addEventListener("keydown", kick, { once: true });
   }
 
+  /** The gesture-independent placement cases shared by tap, click, and the
+   *  keyboard cursor: paint a structure strip, drop a fixed two-floor flight,
+   *  or place a room. Returns null for drag-sized shafts — that anchor
+   *  gesture belongs to the caller. */
+  private placeSimpleBuild(
+    kind: FacilityKind,
+    tile: number,
+    floor: number,
+  ): { what: "paint" | "flight" | "room"; ok: boolean; reason: string } | null {
+    if (kind === "floor" || kind === "lobby") {
+      this.paintBrush(kind, tile, floor);
+      return { what: "paint", ok: true, reason: "" };
+    }
+    if (isFixedSpanTransport(kind)) {
+      const r = this.tryBuildTransport(kind, this.snapX(kind, tile), floor, floor + 1);
+      return { what: "flight", ok: r.ok, reason: r.reason };
+    }
+    if (this.isTransportTool()) return null;
+    const before = this.sim.tower.units.length;
+    this.tryBuild(kind, floor, this.snapX(kind, tile));
+    return { what: "room", ok: this.sim.tower.units.length > before, reason: "" };
+  }
+
   private isTransportTool(): boolean {
     return this.tool.type === "build" && !!FACILITIES[this.tool.kind].transport;
   }
@@ -759,13 +764,13 @@ class GameApp {
     if (!this.selected) return null;
     let left: number, right: number, topFloor: number;
     if (this.selected.type === "unit") {
-      const u = this.sim.tower.units.find((x) => x.id === this.selected!.id);
+      const u = this.selectedUnit();
       if (!u) return null;
       left = u.x;
       right = u.x + u.width;
       topFloor = u.floor + facilityFloors(u.kind) - 1;
     } else {
-      const t = this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+      const t = this.selectedTransport();
       if (!t) return null;
       left = t.x;
       right = t.x + t.width;
@@ -791,6 +796,15 @@ class GameApp {
     this.refreshEditor();
   }
 
+  /** The currently selected unit/transport, re-looked-up from the live tower
+   *  (selection stores only an id — the entity may have been removed). */
+  private selectedUnit(): Unit | undefined {
+    return this.sim.tower.units.find((x) => x.id === this.selected?.id);
+  }
+  private selectedTransport(): Transport | undefined {
+    return this.sim.tower.transports.find((x) => x.id === this.selected?.id);
+  }
+
   private clearSelection(): void {
     this.selected = null;
     this.engine.selectedId = null;
@@ -805,7 +819,7 @@ class GameApp {
     // loses its price adjuster; a car button hits its disabled bound), so
     // rebuilds are rare and the buttons/input survive every stat tick.
     if (this.selected.type === "unit") {
-      const u = this.sim.tower.units.find((x) => x.id === this.selected!.id);
+      const u = this.selectedUnit();
       if (!u) return this.clearSelection();
       this.engine.selectedId = u.id;
       const adjuster = !!rentConfig(u.kind) && !(u.kind === "condo" && u.everOccupied);
@@ -814,7 +828,7 @@ class GameApp {
       const film = u.kind === "cinema" ? `:${u.filmPolicy ?? "auto"}` : "";
       this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}`, () => this.unitEditorHtml(u), this.unitEditorVolatile(u));
     } else {
-      const t = this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+      const t = this.selectedTransport();
       if (!t) return this.clearSelection();
       this.engine.selectedId = t.id; // outlines the shaft + shows extend arrows
       const maxCars = maxCarsFor(t.kind);
@@ -850,56 +864,65 @@ class GameApp {
   private editorTitleBar = (name: string): string =>
     `<h4 class="win-title">${escapeHtml(name)}<button type="button" class="ed-close btn xs" aria-label="Close">\u2715</button></h4>`;
 
+  /** One key/value stat row. `field` marks the value for volatile patching. */
+  private kvRow = (label: string, value: string, field?: string): string =>
+    `<span class="k">${label}</span><span class="v"${field ? ` data-field="${field}"` : ""}>${value}</span>`;
+
+  /** One action row of the editor card. */
+  private edRow = (inner: string): string => `<div class="ed-row">${inner}</div>`;
+
+  /** The shared editor-card frame: title bar + stat grid + action rows. */
+  private editorShell(name: string, rows: string[], actions: string[]): string {
+    return this.editorTitleBar(name) + `<div class="ed-stats kv">${rows.join("")}</div>` + actions.join("");
+  }
+
   private unitEditorHtml(u: import("./engine/types").Unit): string {
     const f = FACILITIES[u.kind];
     const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
     const canRename = u.kind === "office" || u.kind === "condo";
     const rcfg = rentConfig(u.kind);
     const vol = this.unitEditorVolatile(u);
-    const rows: string[] = [
-      `<span class="k">Location</span><span class="v">${floorLabel}</span>`,
-      `<span class="k">Status</span><span class="v" data-field="status">${vol.status}</span>`,
-    ];
-    if (f.population) rows.push(`<span class="k">Occupants</span><span class="v" data-field="occupants">${vol.occupants}</span>`);
-    rows.push(`<span class="k">Elevator access</span><span class="v" data-field="served">${vol.served}</span>`);
-    rows.push(`<span class="k">Eval</span><span class="v" data-field="eval">${vol.eval}</span>`);
+    const rows: string[] = [this.kvRow("Location", floorLabel), this.kvRow("Status", vol.status, "status")];
+    if (f.population) rows.push(this.kvRow("Occupants", vol.occupants, "occupants"));
+    rows.push(this.kvRow("Elevator access", vol.served, "served"));
+    rows.push(this.kvRow("Eval", vol.eval, "eval"));
     if (rcfg) {
       const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Quarterly rent";
-      rows.push(`<span class="k">${label}</span><span class="v" data-field="rent">${vol.rent}</span>`);
+      rows.push(this.kvRow(label, vol.rent, "rent"));
     }
     if (u.kind === "cinema" && isOperational(u)) {
       // A gutted/burning/under-construction cinema books no film — omit the row.
-      rows.push(`<span class="k">Now showing</span><span class="v" data-field="showing">${vol.showing}</span>`);
+      rows.push(this.kvRow("Now showing", vol.showing, "showing"));
     }
     if (u.state === "gutted") {
-      rows.push(`<span class="k">Scrap value</span><span class="v">$0</span>`);
-      rows.push(`<span class="k">⚠</span><span class="v">Gutted — bulldoze and rebuild.</span>`);
+      rows.push(this.kvRow("Scrap value", "$0"));
+      rows.push(this.kvRow("⚠", "Gutted — bulldoze and rebuild."));
     } else {
-      rows.push(`<span class="k">Resale value</span><span class="v">$${resaleRefund(f.kind).toLocaleString()}</span>`);
+      rows.push(this.kvRow("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
     }
 
-    let actions = "";
+    const actions: string[] = [];
     if (canRename) {
-      actions += `<div class="ed-row"><input class="field" data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button class="btn" data-edit="rename">Rename</button></div>`;
+      actions.push(
+        this.edRow(
+          `<input class="field" data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button class="btn" data-edit="rename">Rename</button>`,
+        ),
+      );
     }
     // Price adjuster: offices/hotels any time, condos only while still unsold.
     if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
       const what = u.kind === "condo" ? "price" : "rent";
-      actions += `<div class="ed-row"><button class="btn" data-edit="rentDown">– ${what}</button><button class="btn" data-edit="rentUp">+ ${what}</button></div>`;
+      actions.push(this.edRow(`<button class="btn" data-edit="rentDown">– ${what}</button><button class="btn" data-edit="rentUp">+ ${what}</button>`));
       // Batch-price every unit of this kind at once (no per-room grind).
-      actions += `<div class="ed-row"><button class="btn" data-edit="batchKind">Set all ${FACILITIES[u.kind].name.toLowerCase()}s…</button></div>`;
+      actions.push(this.edRow(`<button class="btn" data-edit="batchKind">Set all ${FACILITIES[u.kind].name.toLowerCase()}s…</button>`));
     }
     if (u.kind === "cinema") {
       const pol = { auto: "Auto", feature: "Feature", blockbuster: "Blockbuster" }[u.filmPolicy ?? "auto"];
-      actions += `<div class="ed-row"><button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button></div>`;
+      actions.push(this.edRow(`<button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button>`));
     }
-    actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
+    actions.push(this.edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-    return (
-      this.editorTitleBar(f.name) +
-      `<div class="ed-stats kv">${rows.join("")}</div>` +
-      actions
-    );
+    return this.editorShell(f.name, rows, actions);
   }
 
   private transportEditorVolatile(t: import("./engine/types").Transport): Record<string, string> {
@@ -923,40 +946,35 @@ class GameApp {
     const isEl = isElevatorKind(t.kind);
     const maxCars = maxCarsFor(t.kind);
     const vol = this.transportEditorVolatile(t);
-    const rows: string[] = [
-      `<span class="k">Serves floors</span><span class="v" data-field="serves">${vol.serves}</span>`,
-      `<span class="k">Height</span><span class="v" data-field="height">${vol.height}</span>`,
-    ];
+    const rows: string[] = [this.kvRow("Serves floors", vol.serves, "serves"), this.kvRow("Height", vol.height, "height")];
     if (isEl) {
-      rows.push(`<span class="k">Cars</span><span class="v" data-field="cars">${vol.cars}</span>`);
-      rows.push(`<span class="k">Capacity</span><span class="v" data-field="capacity">${vol.capacity}</span>`);
-      rows.push(`<span class="k">Stops</span><span class="v" data-field="stops">${vol.stops}</span>`);
+      rows.push(this.kvRow("Cars", vol.cars, "cars"));
+      rows.push(this.kvRow("Capacity", vol.capacity, "capacity"));
+      rows.push(this.kvRow("Stops", vol.stops, "stops"));
     }
-    rows.push(`<span class="k">Resale value</span><span class="v">$${resaleRefund(f.kind).toLocaleString()}</span>`);
+    rows.push(this.kvRow("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
 
-    let actions = "";
+    const actions: string[] = [];
     if (isEl) {
-      actions += `<div class="ed-row"><button class="btn" data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button class="btn" data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button></div>`;
-      actions += `<div class="ed-row"><button class="btn" data-edit="stops">Configure stops…</button></div>`;
-      actions += `<div class="ed-row"><button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button></div>`;
+      actions.push(
+        this.edRow(
+          `<button class="btn" data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button class="btn" data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button>`,
+        ),
+      );
+      actions.push(this.edRow(`<button class="btn" data-edit="stops">Configure stops…</button>`));
+      actions.push(this.edRow(`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`));
+      // Stairs/escalators span exactly two floors by rule — no extend buttons.
+      actions.push(this.edRow(`<button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button>`));
     }
-    // Stairs/escalators span exactly one floor by rule — no extend buttons.
-    if (isElevatorKind(t.kind)) {
-      actions += `<div class="ed-row"><button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button></div>`;
-    }
-    actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
+    actions.push(this.edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-    return (
-      this.editorTitleBar(f.name) +
-      `<div class="ed-stats kv">${rows.join("")}</div>` +
-      actions
-    );
+    return this.editorShell(f.name, rows, actions);
   }
 
   /** Open the per-floor stop-configuration dialog for the selected elevator. */
   private openStopsDialog(): void {
     if (!this.selected || this.selected.type !== "transport") return;
-    const t = this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+    const t = this.selectedTransport();
     if (!t) return;
     const lobbies = new Set(this.sim.tower.lobbyFloors());
     const floors: { floor: number; stop: boolean; lobby: boolean }[] = [];
@@ -978,7 +996,7 @@ class GameApp {
    *  (so dragging out and back doesn't bill twice). Shrinking is free. */
   private extendSelectedTo(end: "up" | "down", targetFloor: number): void {
     if (!this.selected || this.selected.type !== "transport") return;
-    const t = this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+    const t = this.selectedTransport();
     if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
     if (!this.extendHwm || this.extendHwm.id !== t.id) {
       this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom };
@@ -1054,7 +1072,7 @@ class GameApp {
     };
     this.captureUndo(UNDO_LABELS[action] ?? "Edit");
     if (this.selected.type === "unit") {
-      const u = this.sim.tower.units.find((x) => x.id === this.selected!.id);
+      const u = this.selectedUnit();
       if (!u) return this.clearSelection();
       if (action === "sell") {
         if (!this.tryRemoveUnit(u, "sell")) return;
@@ -1082,11 +1100,10 @@ class GameApp {
         this.openBatchPricing(u.kind);
       }
     } else {
-      const t = this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+      const t = this.selectedTransport();
       if (!t) return this.clearSelection();
       if (action === "sell") {
-        this.sim.tower.removeTransport(t.id);
-        this.sim.money += resaleRefund(t.kind);
+        this.removeTransportWithRefund(t);
         this.audio.sfx("sell");
         this.commitUndo();
         return this.clearSelection();
@@ -1095,11 +1112,7 @@ class GameApp {
         // Cap check first: at max cars the button is disabled anyway, but a
         // money toast here would blame the wrong constraint.
         if (t.cars >= maxCarsFor(t.kind)) return;
-        if (this.sim.money < ECON.addCarCost) {
-          this.audio.sfx("error");
-          this.ui.toast("Not enough money.", "bad");
-          return;
-        }
+        if (!this.canAfford(ECON.addCarCost)) return;
         if (this.sim.tower.setCars(t.id, t.cars + 1)) this.sim.money -= ECON.addCarCost;
         this.audio.sfx("build");
         this.refreshEditor();
@@ -1122,11 +1135,7 @@ class GameApp {
         const nb = action === "extendDown" ? t.bottom - 1 : t.bottom;
         const nt = action === "extendUp" ? t.top + 1 : t.top;
         const cost = ECON.transportFloorCost;
-        if (this.sim.money < cost) {
-          this.audio.sfx("error");
-          this.ui.toast("Not enough money.", "bad");
-          return;
-        }
+        if (!this.canAfford(cost)) return;
         const res = this.sim.tower.resizeTransport(t.id, nb, nt);
         if (res.ok) {
           this.sim.money -= cost;
@@ -1351,6 +1360,22 @@ class GameApp {
   /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
    *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
    *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
+  /** Tear out a shaft and pay its resale — the ONE refund path shared by the
+   *  editor's Sell and the bulldozer, so the payout can't drift. */
+  private removeTransportWithRefund(t: Transport): void {
+    this.sim.tower.removeTransport(t.id);
+    this.sim.money += resaleRefund(t.kind);
+  }
+
+  /** Charge guard for editor actions: false (with error sfx + toast) if the
+   *  player can't pay. */
+  private canAfford(cost: number): boolean {
+    if (this.sim.money >= cost) return true;
+    this.audio.sfx("error");
+    this.ui.toast("Not enough money.", "bad");
+    return false;
+  }
+
   private bulldozePicked(p: Picked | null, quiet = false): void {
     if (!p) return;
     if (p.type === "unit") {
@@ -1360,8 +1385,7 @@ class GameApp {
     } else {
       const t = this.sim.tower.transports.find((x) => x.id === p.id);
       if (!t) return;
-      this.sim.tower.removeTransport(t.id);
-      this.sim.money += resaleRefund(t.kind);
+      this.removeTransportWithRefund(t);
     }
     this.audio.sfx("sell");
     if (this.selected && this.selected.id === p.id) this.clearSelection();

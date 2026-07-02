@@ -1,5 +1,5 @@
 import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
-import { isOperational } from "./types";
+import { isOperational, isPresent } from "./types";
 import type {
   Facility,
   FacilityKind,
@@ -35,6 +35,9 @@ const NO_BASEMENT_KINDS = new Set<FacilityKind>([
 function coversGroundFloor(floor: number, hgt: number): boolean {
   return floor <= 1 && floor + hgt - 1 >= 1;
 }
+
+/** Shared placement/resize refusal — one string so the two paths can't drift. */
+const NEEDS_FLOORS = "Transport must run through built floors — lay floors first.";
 
 /**
  * The Tower owns the spatial model. Cells have two layers: a structural layer
@@ -108,20 +111,38 @@ export class Tower {
     return l;
   }
 
-  /** True if no room occupies any tile of the span. */
-  private roomSpanFree(floor: number, x: number, width: number): boolean {
+  /** True if `pred` holds for EVERY tile key of the span (short-circuits). */
+  private spanEvery(floor: number, x: number, width: number, pred: (k: string) => boolean): boolean {
     for (let i = 0; i < width; i++) {
-      if (this.rooms.has(this.key(floor, x + i))) return false;
+      if (!pred(this.key(floor, x + i))) return false;
     }
     return true;
   }
 
+  /** True if `pred` holds for SOME tile key of the span (short-circuits). */
+  private spanSome(floor: number, x: number, width: number, pred: (k: string) => boolean): boolean {
+    return !this.spanEvery(floor, x, width, (k) => !pred(k));
+  }
+
+  /** ANY-tile structure check for a shaft cell — a transport floor is valid
+   *  when at least one tile under the shaft is built (distinct from
+   *  {@link spanHasFloor}, which requires ALL tiles). */
+  private shaftHasStructureAt(floor: number, x: number, width: number): boolean {
+    return this.spanSome(floor, x, width, (k) => this.structure.has(k));
+  }
+
+  private transportById(id: number): Transport | undefined {
+    return this.transports.find((t) => t.id === id);
+  }
+
+  /** True if no room occupies any tile of the span. */
+  private roomSpanFree(floor: number, x: number, width: number): boolean {
+    return this.spanEvery(floor, x, width, (k) => !this.rooms.has(k));
+  }
+
   /** True if no structure occupies any tile of the span. */
   private structureSpanFree(floor: number, x: number, width: number): boolean {
-    for (let i = 0; i < width; i++) {
-      if (this.structure.has(this.key(floor, x + i))) return false;
-    }
-    return true;
+    return this.spanEvery(floor, x, width, (k) => !this.structure.has(k));
   }
 
   /** The structural kind occupying a tile ("floor" | "lobby"), if any. */
@@ -132,18 +153,12 @@ export class Tower {
   /** True if every occupied tile of the span is a plain floor (no lobbies) —
    *  i.e. a lobby placed here is an in-place upgrade, not a collision. */
   private spanUpgradeableToLobby(floor: number, x: number, width: number): boolean {
-    for (let i = 0; i < width; i++) {
-      if (this.structKind.get(this.key(floor, x + i)) === "lobby") return false;
-    }
-    return true;
+    return this.spanEvery(floor, x, width, (k) => this.structKind.get(k) !== "lobby");
   }
 
   /** True if structural floor exists across the whole span. */
   spanHasFloor(floor: number, x: number, width: number): boolean {
-    for (let i = 0; i < width; i++) {
-      if (!this.structure.has(this.key(floor, x + i))) return false;
-    }
-    return true;
+    return this.spanEvery(floor, x, width, (k) => this.structure.has(k));
   }
 
   private register(unit: Unit): void {
@@ -226,10 +241,7 @@ export class Tower {
 
   /** True if any tile of the span sits on a lobby (transit-only) concourse. */
   private spanHasLobby(floor: number, x: number, width: number): boolean {
-    for (let i = 0; i < width; i++) {
-      if (this.structKind.get(this.key(floor, x + i)) === "lobby") return true;
-    }
-    return false;
+    return this.spanSome(floor, x, width, (k) => this.structKind.get(k) === "lobby");
   }
 
   /**
@@ -337,6 +349,12 @@ export class Tower {
     return n;
   }
 
+  /** The shared "no floating overhangs" rule: every tile of an above-ground
+   *  span must rest on structure directly below it. */
+  private restsOnStoryBelow(floor: number, x: number, width: number): boolean {
+    return this.spanEvery(floor - 1, x, width, (k) => this.structure.has(k));
+  }
+
   /**
    * True if a room may be supported here. Above ground a room must sit fully on
    * the floor directly below it (no floating overhangs / diagonal stacking).
@@ -345,12 +363,7 @@ export class Tower {
    */
   spanConnects(floor: number, x: number, width: number, hgt: number): boolean {
     if (this.units.length === 0) return false;
-    if (floor >= 2) {
-      for (let i = 0; i < width; i++) {
-        if (!this.structure.has(this.key(floor - 1, x + i))) return false;
-      }
-      return true;
-    }
+    if (floor >= 2) return this.restsOnStoryBelow(floor, x, width);
     for (let fl = floor; fl < floor + hgt; fl++) {
       for (let i = -1; i <= width; i++) if (this.structure.has(this.key(fl, x + i))) return true;
     }
@@ -405,12 +418,7 @@ export class Tower {
     if (this.units.length === 0) {
       return floor === 1; // the founding strip must be the ground floor
     }
-    if (floor >= 2) {
-      for (let i = 0; i < width; i++) {
-        if (!this.structure.has(this.key(floor - 1, x + i))) return false;
-      }
-      return true;
-    }
+    if (floor >= 2) return this.restsOnStoryBelow(floor, x, width);
     for (let i = -1; i <= width; i++) {
       if (this.structure.has(this.key(floor, x + i))) return true;
     }
@@ -500,18 +508,11 @@ export class Tower {
     // Transports share the structural column but cannot collide with rooms or
     // other shafts — and every floor they serve must actually exist as built
     // structure at the shaft, so elevators can never float outside the tower.
+    // (Transport may share a cell with a room — the shaft simply draws in
+    // front of it, as in the original, where lifts overlap facilities.)
     for (let fl = bottom; fl <= top; fl++) {
-      let hasStructure = false;
-      for (let i = 0; i < f.width; i++) {
-        // Transport may share a cell with a room — the shaft simply draws in
-        // front of it (as in the original, where lifts overlap facilities).
-        if (this.structure.has(this.key(fl, x + i))) hasStructure = true;
-      }
-      if (!hasStructure) {
-        return {
-          ok: false,
-          reason: "Transport must run through built floors — lay floors first.",
-        };
+      if (!this.shaftHasStructureAt(fl, x, f.width)) {
+        return { ok: false, reason: NEEDS_FLOORS };
       }
       for (const t of this.transports) {
         if (this.transportOverlaps(t, x, f.width, fl)) {
@@ -620,7 +621,7 @@ export class Tower {
    * floors are validated against rooms and other shafts.
    */
   resizeTransport(id: number, newBottom: number, newTop: number): PlaceResult & { added?: number } {
-    const t = this.transports.find((x) => x.id === id);
+    const t = this.transportById(id);
     if (!t) return { ok: false, reason: "No such transport." };
     if (newTop <= newBottom) return { ok: false, reason: "Transport needs height." };
     if (newBottom < GRID.minFloor || newTop > GRID.maxFloor) {
@@ -637,12 +638,8 @@ export class Tower {
       // Every newly-served floor needs built structure under the shaft — the
       // same invariant validateTransport enforces — so an extend can't float
       // the shaft into empty sky. (Rooms no longer block; it draws in front.)
-      let hasStructure = false;
-      for (let i = 0; i < t.width; i++) {
-        if (this.structure.has(this.key(fl, t.x + i))) hasStructure = true;
-      }
-      if (!hasStructure) {
-        return { ok: false, reason: "Transport must run through built floors — lay floors first." };
+      if (!this.shaftHasStructureAt(fl, t.x, t.width)) {
+        return { ok: false, reason: NEEDS_FLOORS };
       }
       for (const other of this.transports) {
         if (other.id === t.id) continue;
@@ -689,7 +686,7 @@ export class Tower {
 
   /** Change the number of elevator cars (1..max for that elevator type). */
   setCars(id: number, cars: number): boolean {
-    const t = this.transports.find((x) => x.id === id);
+    const t = this.transportById(id);
     if (!t || !isElevatorKind(t.kind)) return false;
     cars = Math.max(1, Math.min(maxCarsFor(t.kind), cars));
     if (cars === t.cars) return false;
@@ -723,7 +720,7 @@ export class Tower {
    * silently ignored regardless of `stop`.
    */
   setStop(id: number, floor: number, stop: boolean): boolean {
-    const t = this.transports.find((x) => x.id === id);
+    const t = this.transportById(id);
     if (!t || floor < t.bottom || floor > t.top) return false;
     // Endpoints are always stops (a shaft can't disconnect from itself). Report
     // success — the request was valid and the endpoint is already stopping —
@@ -761,7 +758,7 @@ export class Tower {
 
   /** Configure an elevator to stop only at lobby floors (true express). */
   setExpressStops(id: number): boolean {
-    const t = this.transports.find((x) => x.id === id);
+    const t = this.transportById(id);
     if (!t) return false;
     const lobbies = new Set(this.lobbyFloors());
     const skip: number[] = [];
@@ -777,7 +774,7 @@ export class Tower {
 
   /** Make a transport stop at every floor again. */
   clearStops(id: number): boolean {
-    const t = this.transports.find((x) => x.id === id);
+    const t = this.transportById(id);
     if (!t) return false;
     t.skipFloors = [];
     this.revision++;
@@ -973,7 +970,7 @@ export class Tower {
   totalPopulation(): number {
     let pop = 0;
     for (const u of this.units) {
-      if (u.state === "occupied" || u.state === "asleep" || u.state === "moving_in") {
+      if (isPresent(u)) {
         pop += FACILITIES[u.kind].population;
       }
     }

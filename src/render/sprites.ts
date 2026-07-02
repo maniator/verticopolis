@@ -491,12 +491,26 @@ function drawPartyHall(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
   ctx.arc(x + w / 2, y + 7, 3, 0, Math.PI * 2);
   ctx.fill();
   // Dancers.
-  for (let px = x + 8; px < x + w - 5; px += 11) {
-    if (rand(px | 0) > 0.4) person(ctx, px, y + h - 3, 1.3, px | 0);
-  }
+  scatterPeople(ctx, x + 8, x + w - 5, 11, y + h - 3, 1.3);
 }
 
 // ---- Services -----------------------------------------------------------
+
+/** The 7px signage every service facility paints on its back wall; hidden
+ *  when the room is too narrow to fit it. */
+function serviceLabel(ctx: CanvasRenderingContext2D, text: string, sx: number, y: number, color: string, minW: number, w: number) {
+  ctx.fillStyle = color;
+  ctx.font = "7px system-ui, sans-serif";
+  if (w > minW) ctx.fillText(text, sx, y + 11);
+}
+
+/** Scatter standing people along a strip — the crowd idiom shared by the
+ *  party hall and the metro platform (same seeded density gate). */
+function scatterPeople(ctx: CanvasRenderingContext2D, startX: number, endX: number, step: number, footY: number, scale: number) {
+  for (let px = startX; px < endX; px += step) {
+    if (rand(px | 0) > 0.4) person(ctx, px, footY, scale, px | 0);
+  }
+}
 
 function serviceBack(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {
   ctx.fillStyle = shade(color, -45);
@@ -519,9 +533,7 @@ function drawSecurity(ctx: CanvasRenderingContext2D, x: number, y: number, w: nu
   person(ctx, x + 7, fy + 6, 1.2, x | 0, true);
   // Badge.
   star(ctx, x + 11, y + 9, 4, "#ffd24a");
-  ctx.fillStyle = "#dfe6f2";
-  ctx.font = "7px system-ui, sans-serif";
-  if (w > 44) ctx.fillText("SECURITY", x + 18, y + 11);
+  serviceLabel(ctx, "SECURITY", x + 18, y, "#dfe6f2", 44, w);
 }
 
 function drawMedical(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
@@ -542,9 +554,7 @@ function drawMedical(ctx: CanvasRenderingContext2D, x: number, y: number, w: num
     ctx.fillRect(bx + 8, y + h - 7, 2, 2); // patient head
     person(ctx, bx - 4, y + h - 3, 1.2, (bx + 3) | 0); // nurse
   }
-  ctx.fillStyle = "#2a3550";
-  ctx.font = "7px system-ui, sans-serif";
-  if (w > 60) ctx.fillText("CLINIC", x + 22, y + 11);
+  serviceLabel(ctx, "CLINIC", x + 22, y, "#2a3550", 60, w);
 }
 
 function drawHousekeeping(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
@@ -564,9 +574,7 @@ function drawHousekeeping(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.fillRect(x + 18, fy + 5, 5, 2);
   // A housekeeper by the cart.
   person(ctx, x + 24, y + h - 3, 1.2, (x + 9) | 0);
-  ctx.fillStyle = "#2a3a2a";
-  ctx.font = "7px system-ui, sans-serif";
-  if (w > 60) ctx.fillText("HOUSEKEEPING", x + 32, y + 11);
+  serviceLabel(ctx, "HOUSEKEEPING", x + 32, y, "#2a3a2a", 60, w);
 }
 
 function drawRecycling(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
@@ -624,9 +632,7 @@ function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number) {
   ctx.fillStyle = "#caa84a"; // safety line
   ctx.fillRect(x, platY, w, 1);
   // A few commuters waiting on the platform.
-  for (let px = x + 8; px < x + w - 6; px += 13) {
-    if (rand(px | 0) > 0.4) person(ctx, px, platY, 1.2, px | 0);
-  }
+  scatterPeople(ctx, x + 8, x + w - 6, 13, platY, 1.2);
   // Roundel "M" sign.
   ctx.fillStyle = "#d6342f";
   ctx.beginPath();

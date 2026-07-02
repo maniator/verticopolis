@@ -280,7 +280,7 @@ export class UI {
   showStats(html: string): void {
     const box = this.openModal(`<h2>Tower Statistics</h2>${html}
       <div class="modal-actions"><button class="btn primary" data-act="close">Close</button></div>`);
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
+    this.wireActions(box);
   }
 
   /** Saves manager: auto-save + numbered slots, plus export/import. */
@@ -328,9 +328,7 @@ export class UI {
         this.cb.onShowSaves();
       }),
     );
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
-    box.querySelector('[data-act="export"]')!.addEventListener("click", () => this.cb.onExport());
-    box.querySelector('[data-act="import"]')!.addEventListener("click", () => this.openImport());
+    this.wireActions(box, { export: () => this.cb.onExport(), import: () => this.openImport() });
   }
 
   setTowerName(name: string): void {
@@ -358,7 +356,7 @@ export class UI {
     box.querySelectorAll<HTMLInputElement>("input[data-floor]").forEach((cb) => {
       cb.addEventListener("change", () => onToggle(Number(cb.dataset.floor), cb.checked));
     });
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
+    this.wireActions(box);
   }
 
   selectTool(tool: Tool): void {
@@ -537,7 +535,7 @@ export class UI {
     });
     onlyEl.addEventListener("change", refresh);
     box.querySelectorAll('input[name="bp-mode"]').forEach((el) => el.addEventListener("change", refresh));
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
+    this.wireActions(box);
     applyBtn.addEventListener("click", () => {
       // A bulk reset clears everyone's custom price — require a confirming click.
       if (mode() === "default" && !resetArmed) {
@@ -592,6 +590,16 @@ export class UI {
     dialog.innerHTML = "";
   }
 
+  /** Bind click handlers to a dialog's [data-act] buttons. `close` defaults
+   *  to closeModal so every dialog doesn't rewire the same dismissal; missing
+   *  buttons are skipped (some dialogs have no explicit close action). */
+  private wireActions(box: HTMLElement, handlers: Record<string, () => void> = {}): void {
+    const all = { close: () => this.closeModal(), ...handlers };
+    for (const [act, fn] of Object.entries(all)) {
+      box.querySelector(`[data-act="${act}"]`)?.addEventListener("click", fn);
+    }
+  }
+
   /** The one way to build a title-bar ✕ (see docs/design-system.md): every
    * dismissible window's close button comes from here so they can't drift. */
   private titleBarClose(className: string, onClick: () => void): HTMLButtonElement {
@@ -609,10 +617,12 @@ export class UI {
       `<h2>${title}</h2><p>${body}</p>
        <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">Confirm</button></div>`,
     );
-    box.querySelector('[data-act="no"]')!.addEventListener("click", () => this.closeModal());
-    box.querySelector('[data-act="yes"]')!.addEventListener("click", () => {
-      this.closeModal();
-      onYes();
+    this.wireActions(box, {
+      no: () => this.closeModal(),
+      yes: () => {
+        this.closeModal();
+        onYes();
+      },
     });
   }
 
@@ -625,8 +635,8 @@ export class UI {
          <button class="btn" data-act="close">Close</button>
        </div>`,
     );
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
-    box.querySelector('[data-act="download"]')!.addEventListener("click", () => {
+    this.wireActions(box, {
+      download: () => {
       const blob = new Blob([json], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -634,6 +644,7 @@ export class UI {
       a.download = "tower.json";
       a.click();
       URL.revokeObjectURL(url);
+      },
     });
     box.querySelector("textarea")?.addEventListener("focus", (e) => (e.target as HTMLTextAreaElement).select());
   }
@@ -651,10 +662,11 @@ export class UI {
        </div>`,
     );
     const ta = box.querySelector("textarea")!;
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
-    box.querySelector('[data-act="load"]')!.addEventListener("click", () => {
-      this.closeModal();
-      this.cb.onImport(ta.value);
+    this.wireActions(box, {
+      load: () => {
+        this.closeModal();
+        this.cb.onImport(ta.value);
+      },
     });
     box.querySelector('[data-act="file"]')!.addEventListener("click", () => {
       const input = document.getElementById("import-file") as HTMLInputElement;
@@ -663,21 +675,17 @@ export class UI {
         const file = input.files?.[0];
         if (!file) return;
         // Binary .TWR legacy saves are read as bytes; JSON exports as text.
-        if (/\.twr$/i.test(file.name)) {
+        const read = (as: "buffer" | "text", done: (result: FileReader["result"]) => void) => {
           const reader = new FileReader();
           reader.onload = () => {
             this.closeModal();
-            this.cb.onImportLegacy(reader.result as ArrayBuffer, file.name);
+            done(reader.result);
           };
-          reader.readAsArrayBuffer(file);
-        } else {
-          const reader = new FileReader();
-          reader.onload = () => {
-            this.closeModal();
-            this.cb.onImport(String(reader.result));
-          };
-          reader.readAsText(file);
-        }
+          if (as === "buffer") reader.readAsArrayBuffer(file);
+          else reader.readAsText(file);
+        };
+        if (/\.twr$/i.test(file.name)) read("buffer", (r) => this.cb.onImportLegacy(r as ArrayBuffer, file.name));
+        else read("text", (r) => this.cb.onImport(String(r)));
       };
       input.click();
     });
@@ -724,7 +732,7 @@ export class UI {
     rm.disabled = osForced;
     label(document.documentElement.classList.contains("reduce-motion"));
     rm.addEventListener("click", () => label(this.cb.onToggleReducedMotion()));
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
+    this.wireActions(box);
     // Only wire replay when it can actually run (not while the splash is up).
     if (!onSplash) {
       box.querySelector('[data-act="replay-onboard"]')!.addEventListener("click", () => this.cb.onReplayOnboarding());
@@ -753,8 +761,7 @@ export class UI {
       this.closeModal();
       onResolve(opt);
     };
-    box.querySelector('[data-act="accept"]')!.addEventListener("click", () => finish("accept"));
-    box.querySelector('[data-act="decline"]')!.addEventListener("click", () => finish("decline"));
+    this.wireActions(box, { accept: () => finish("accept"), decline: () => finish("decline") });
     dialog.onclick = (e) => { if (e.target === dialog) finish("decline"); }; // backdrop
     dialog.oncancel = () => finish("decline"); // Esc
   }
@@ -765,7 +772,7 @@ export class UI {
       <p>Your skyscraper has earned the legendary <b>TOWER</b> rating. Wedding bells ring out over the city from the hall on the 100th floor. Congratulations, master builder!</p>
       <div class="modal-actions"><button class="btn primary" data-act="close">Continue</button></div>
     `);
-    box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
+    this.wireActions(box);
   }
 }
 

@@ -522,11 +522,18 @@ export class TowerEngine {
       }
       this.positionPerson(p, rec);
     }
-    for (const [id, rec] of this.crowdActors)
-      if (!seen.has(id)) {
-        rec.actor.kill();
-        this.crowdActors.delete(id);
-      }
+    this.reap(this.crowdActors, seen, (rec) => rec.actor.kill());
+  }
+
+  /** Retained-actor reconciliation tail: kill and forget every entry the
+   *  current pass didn't mark as seen. Each reconciler supplies its own
+   *  disposal (kill one actor, kill a pair, drop a parallel sig entry). */
+  private reap<K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V, k: K) => void): void {
+    for (const [k, v] of map) {
+      if (seen.has(k)) continue;
+      dispose(v, k);
+      map.delete(k);
+    }
   }
 
   private positionPerson(p: Person, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
@@ -800,6 +807,26 @@ export class TowerEngine {
     ctx.fill();
   }
 
+  /** The translucent placement ghost: gold when valid, red when not. The
+   *  stroke width differs per caller (unit 1.5, shaft 1) — pass it explicitly
+   *  so nothing inherits a stale context value. */
+  private drawGhostRect(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, valid: boolean, lineWidth: number): void {
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = valid ? "#ffd24a" : "#cc3333";
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = valid ? "#fff" : "#ff5555";
+    ctx.lineWidth = lineWidth;
+    ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+  }
+
+  /** The golden selection outline shared by units and shafts. */
+  private strokeSelection(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number): void {
+    ctx.strokeStyle = "#ffd24a";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(sx - 1, sy - 1, sw + 2, sh + 2);
+  }
+
   private drawPreview(ctx: CanvasRenderingContext2D): void {
     if (this.preview) {
       const p = this.preview;
@@ -811,13 +838,7 @@ export class TowerEngine {
       const sy = this.worldToScreenY(p.floor + hgt - 1);
       const sw = w * TILE * this.cam.zoom;
       const sh = hgt * FLOOR * this.cam.zoom;
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = p.valid ? "#ffd24a" : "#cc3333";
-      ctx.fillRect(sx, sy, sw, sh);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = p.valid ? "#fff" : "#ff5555";
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid, 1.5);
     }
     if (this.transportPreview) {
       const p = this.transportPreview;
@@ -826,12 +847,7 @@ export class TowerEngine {
       const sy = this.worldToScreenY(p.top);
       const sw = w * TILE * this.cam.zoom;
       const sh = (p.top - p.bottom + 1) * FLOOR * this.cam.zoom;
-      ctx.globalAlpha = 0.5;
-      ctx.fillStyle = p.valid ? "#ffd24a" : "#cc3333";
-      ctx.fillRect(sx, sy, sw, sh);
-      ctx.globalAlpha = 1;
-      ctx.strokeStyle = p.valid ? "#fff" : "#ff5555";
-      ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
+      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid, 1);
     }
   }
 
@@ -843,9 +859,7 @@ export class TowerEngine {
       const hgt = facilityFloors(u.kind);
       const sx = this.worldToScreenX(u.x);
       const sy = this.worldToScreenY(u.floor + hgt - 1);
-      ctx.strokeStyle = "#ffd24a";
-      ctx.lineWidth = 2;
-      ctx.strokeRect(sx - 1, sy - 1, u.width * TILE * this.cam.zoom + 2, hgt * FLOOR * this.cam.zoom + 2);
+      this.strokeSelection(ctx, sx, sy, u.width * TILE * this.cam.zoom, hgt * FLOOR * this.cam.zoom);
       return;
     }
     const t = this.sim.tower.transports.find((x) => x.id === this.selectedId);
@@ -860,9 +874,7 @@ export class TowerEngine {
     const sw = t.width * TILE * z;
     const top = this.worldToScreenY(t.top);
     const bottom = top + (t.top - t.bottom + 1) * FLOOR * z;
-    ctx.strokeStyle = "#ffd24a";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(sx - 1, top - 1, sw + 2, bottom - top + 2);
+    this.strokeSelection(ctx, sx, top, sw, bottom - top);
     if (!isElevatorKind(t.kind)) return; // only lifts extend by a tappable arrow
 
     // Small, subtle tabs centered on the shaft — discoverable without dominating
@@ -953,18 +965,21 @@ export class TowerEngine {
       );
     this.escGfx = { left: bakeEsc("left"), right: bakeEsc("right") };
 
-    for (const color of SHIRTS) {
-      this.personGfx.push(
-        new ex.Canvas({ width: 8, height: 14, cache: true, draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, color) }),
-      );
-    }
+    // ONE bake recipe for every 8px figure, so the magic person() args can't
+    // drift between the tenant/staff/fed-up variants.
+    const bakePerson = (color: string, height = 14, decorate?: (ctx: CanvasRenderingContext2D) => void): ex.Canvas =>
+      new ex.Canvas({
+        width: 8,
+        height,
+        cache: true,
+        draw: (ctx) => {
+          person(ctx, 2.5, 13, 1.1, 7, false, color);
+          decorate?.(ctx);
+        },
+      });
+    for (const color of SHIRTS) this.personGfx.push(bakePerson(color));
     // Housekeepers wear a single work uniform, so staff read at a glance.
-    this.personGfxStaff = new ex.Canvas({
-      width: 8,
-      height: 14,
-      cache: true,
-      draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, "#E8E4DA"),
-    });
+    this.personGfxStaff = bakePerson("#E8E4DA");
     // Fed-up figure carries BOTH the red tint AND a shape marker (a "!" with a
     // white halo above the head), so "this tenant is fed up" reads without color.
     this.personGfxRed = new ex.Canvas({
@@ -1050,17 +1065,11 @@ export class TowerEngine {
         }
       }
     }
-    for (const [id, a] of this.structActors)
-      if (!seenS.has(id)) {
-        a.kill();
-        this.structActors.delete(id);
-      }
-    for (const [id, rec] of this.roomActors)
-      if (!seenR.has(id)) {
-        rec.actor.kill();
-        this.roomActors.delete(id);
-        this.roomSig.delete(id);
-      }
+    this.reap(this.structActors, seenS, (a) => a.kill());
+    this.reap(this.roomActors, seenR, (rec, id) => {
+      rec.actor.kill();
+      this.roomSig.delete(id);
+    });
 
     const seenT = new Set<number>();
     for (const t of tower.transports) {
@@ -1077,12 +1086,10 @@ export class TowerEngine {
         this.transportSig.set(t.id, sig);
       }
     }
-    for (const [id, a] of this.transportActors)
-      if (!seenT.has(id)) {
-        a.kill();
-        this.transportActors.delete(id);
-        this.transportSig.delete(id);
-      }
+    this.reap(this.transportActors, seenT, (a, id) => {
+      a.kill();
+      this.transportSig.delete(id);
+    });
   }
 
   /**
@@ -1137,12 +1144,10 @@ export class TowerEngine {
       };
       this.escapeActors.set(floor, { l: hang(lx, "left"), r: hang(rx, "right"), sig });
     }
-    for (const [floor, rec] of this.escapeActors)
-      if (!edges.has(floor)) {
-        rec.l.kill();
-        rec.r.kill();
-        this.escapeActors.delete(floor);
-      }
+    this.reap(this.escapeActors, new Set(edges.keys()), (rec) => {
+      rec.l.kill();
+      rec.r.kill();
+    });
   }
 
   /** Keep the rooftop crane perched over the highest built floor's run. It
@@ -1185,18 +1190,19 @@ export class TowerEngine {
     }
   }
 
-  private addStruct(u: Unit): void {
-    const a = new ex.Actor({
-      pos: ex.vec(this.worldX(u.x), this.worldYTop(u.floor)),
-      width: TILE,
-      height: FLOOR,
-      anchor: ex.vec(0, 0),
-      z: -1,
-    });
-    a.graphics.use(u.kind === "lobby" ? this.lobbyTileGfx(u) : this.floorGfx);
-    a.collider.set(ex.Shape.Box(TILE, FLOOR, ex.vec(0, 0)));
+  /** The shared retained-actor ritual: top-left anchored, box collider the
+   *  size of the graphic, added to the engine. Callers keep their own maps. */
+  private addBoxActor(pos: ex.Vector, w: number, h: number, z: number, gfx: ex.Graphic): ex.Actor {
+    const a = new ex.Actor({ pos, width: w, height: h, anchor: ex.vec(0, 0), z });
+    a.graphics.use(gfx);
+    a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
     this.engine.add(a);
-    this.structActors.set(u.id, a);
+    return a;
+  }
+
+  private addStruct(u: Unit): void {
+    const gfx = u.kind === "lobby" ? this.lobbyTileGfx(u) : this.floorGfx;
+    this.structActors.set(u.id, this.addBoxActor(ex.vec(this.worldX(u.x), this.worldYTop(u.floor)), TILE, FLOOR, -1, gfx));
   }
 
   /** The shared lobby tile graphic for this unit's lighting, style and slot. */
@@ -1244,10 +1250,7 @@ export class TowerEngine {
         }
       },
     });
-    const a = new ex.Actor({ pos: ex.vec(this.worldX(u.x), this.worldYTop(u.floor, hgt)), width: w, height: h, anchor: ex.vec(0, 0), z: 0 });
-    a.graphics.use(cv);
-    a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
-    this.engine.add(a);
+    const a = this.addBoxActor(ex.vec(this.worldX(u.x), this.worldYTop(u.floor, hgt)), w, h, 0, cv);
     this.roomActors.set(u.id, { actor: a, cv, animated, live });
   }
 
@@ -1255,11 +1258,8 @@ export class TowerEngine {
     const w = t.width * TILE;
     const totalFloors = t.top - t.bottom + 1;
     const h = totalFloors * FLOOR;
-    const a = new ex.Actor({ pos: ex.vec(this.worldX(t.x), this.worldYTop(t.top)), width: w, height: h, anchor: ex.vec(0, 0), z: 1 });
-    a.graphics.use(this.transportGraphic(t, w, totalFloors));
-    a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
-    this.engine.add(a);
-    this.transportActors.set(t.id, a);
+    const gfx = this.transportGraphic(t, w, totalFloors);
+    this.transportActors.set(t.id, this.addBoxActor(ex.vec(this.worldX(t.x), this.worldYTop(t.top)), w, h, 1, gfx));
   }
 
   /**
