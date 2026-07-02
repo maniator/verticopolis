@@ -105,25 +105,34 @@ describe("SaveGame", () => {
     }
   });
 
-  it("repairs corrupt unit ids (NaN / duplicate) so ids stay finite and unique", () => {
+  it("repairs corrupt unit ids (NaN / duplicate / unsafe) so ids stay sane and unique", () => {
     const sim = sampleGame();
     const data = sim.serialize();
-    // One NaN id (would poison a raw Math.max over ids, and nextId with it)
-    // and one id duplicating another live unit's (would alias by-id lookups
-    // and the renderer's retained actors).
+    // NaN would poison a raw Math.max over ids (and nextId with it); a
+    // duplicate would alias by-id lookups and the renderer's retained actors;
+    // an id past 2^53 would make the ++ repair (and allocateId later) a
+    // precision no-op that re-mints the same id forever; negatives are out of
+    // contract. A forged huge nextId must not win the counter max either.
     (data.units[0] as { id: unknown }).id = NaN;
     (data.units[1] as { id: unknown }).id = data.units[2].id;
+    (data.units[3] as { id: unknown }).id = 2 ** 60;
+    (data.units[4] as { id: unknown }).id = -7;
+    (data as { nextId: unknown }).nextId = 1e308;
     const loaded = Simulation.deserialize(data);
     const ids = [
       ...loaded.tower.units.map((u) => u.id),
       ...loaded.tower.transports.map((t) => t.id),
     ];
-    expect(ids.every((id) => Number.isFinite(id))).toBe(true);
+    expect(ids.every((id) => Number.isSafeInteger(id) && id > 0)).toBe(true);
     expect(new Set(ids).size).toBe(ids.length);
-    // The counter must have landed above every repaired id too.
+    // The counter must have landed above every repaired id (and stayed in the
+    // range where ++ still increments).
     const res = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 12);
     expect(res.ok).toBe(true);
+    expect(Number.isSafeInteger(res.unitId)).toBe(true);
     expect(ids.includes(res.unitId!)).toBe(false);
+    const again = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 13);
+    expect(again.unitId).not.toBe(res.unitId);
   });
 
   it("recomputes the sky weather on load (not left stale)", () => {
