@@ -32,4 +32,9 @@ export interface SimContext {
   hasOperational(kind: FacilityKind): boolean;
   /** Human floor label: "floor 5" above ground, "B1"/"B2"… below. */
   floorLabel(floor: number): string;
+  /** Dispatch a staff member (housekeeper) from `from` to `to` over the staff
+   * network, walking to `destX` to service unit `cleanUnitId`. Returns false
+   * when no staff route exists (job stays queued). Optional so hand-rolled
+   * test contexts without a crowd can omit it. */
+  spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number): boolean;
 }

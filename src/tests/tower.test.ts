@@ -237,6 +237,28 @@ describe("Tower transport", () => {
     // A disconnected floor stays unserved.
     expect(tower.isFloorServed(50)).toBe(false);
   });
+
+  it("service elevators are staff-only: they never serve floors for tenants", () => {
+    tower.placeTransport("elevatorService", 4, 1, 10);
+    // Staff can travel the shaft, but the floors stay tenant-unserved.
+    expect(tower.isFloorServed(5)).toBe(false);
+    expect(tower.staffConnected(1, 5)).toBe(true);
+    // A passenger elevator serves the floors as usual.
+    tower.placeTransport("elevatorStandard", 12, 1, 10);
+    expect(tower.isFloorServed(5)).toBe(true);
+  });
+
+  it("staff travel by service elevator and stairs, never passenger lifts", () => {
+    // Passenger elevator 1..10: tenants ride it, staff don't.
+    tower.placeTransport("elevatorStandard", 4, 1, 10);
+    expect(tower.staffConnected(1, 5)).toBe(false);
+    expect(tower.staffConnected(3, 3)).toBe(true); // same floor always works
+    // Stairs 2..3 and a service elevator 3..8 chain into one staff network.
+    tower.placeTransport("stairs", 12, 2, 3);
+    tower.placeTransport("elevatorService", 16, 3, 8);
+    expect(tower.staffConnected(2, 8)).toBe(true);
+    expect(tower.staffConnected(2, 10)).toBe(false); // beyond the staff chain
+  });
 });
 
 describe("Express elevator sky-lobby stops", () => {

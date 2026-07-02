@@ -201,6 +201,7 @@ export class TowerEngine {
   private lobbyGfx!: ex.Canvas;
   private personGfx: ex.Canvas[] = [];
   private personGfxRed!: ex.Canvas;
+  private personGfxStaff!: ex.Canvas;
 
   private overlay!: ex.ScreenElement;
   private overlayCanvas!: ex.Canvas;
@@ -461,7 +462,7 @@ export class TowerEngine {
       seen.add(p.id);
       let rec = this.crowdActors.get(p.id);
       if (!rec) {
-        const gfx = this.personGfx[Math.abs(p.seed) % this.personGfx.length];
+        const gfx = p.staff ? this.personGfxStaff : this.personGfx[Math.abs(p.seed) % this.personGfx.length];
         const a = new ex.Actor({ pos: ex.vec(0, 0), width: 8, height: 14, anchor: ex.vec(0.5, 1), z: 3 });
         a.graphics.use(gfx);
         this.engine.add(a);
@@ -478,16 +479,20 @@ export class TowerEngine {
   }
 
   private positionPerson(p: Person, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
-    // While riding, the person is inside a car — the cab's own rider count shows
+    // While riding, a tenant is inside a car — the cab's own rider count shows
     // them, so we hide the standalone figure to avoid drawing them twice.
-    const riding = p.state === "riding";
-    if (rec.actor.graphics.visible !== !riding) rec.actor.graphics.visible = !riding;
-    if (riding) return;
+    // Staff stay visible while riding: a lone housekeeper in a 16-person
+    // service cab rounds to zero on the cab's load indicator, and watching
+    // them ride to the room floor is the whole point of the mechanic.
+    const hidden = p.state === "riding" && !p.staff;
+    if (rec.actor.graphics.visible !== !hidden) rec.actor.graphics.visible = !hidden;
+    if (hidden) return;
     // Use the continuous floor (fy) so a stair/escalator climber animates
     // smoothly between floors; for every other state fy equals the floor.
     rec.actor.pos = ex.vec(this.worldX(p.x), this.worldYTop(p.fy) + FLOOR - 3);
     // Long waits redden the figure, the original's "this tenant is fed up" cue.
-    const red = p.wait > 25;
+    // Staff never redden — they're on the clock, not an unhappy tenant.
+    const red = !p.staff && p.wait > 25;
     if (red !== rec.red) {
       rec.red = red;
       rec.actor.graphics.use(red ? this.personGfxRed : rec.gfx);
@@ -885,6 +890,13 @@ export class TowerEngine {
         new ex.Canvas({ width: 8, height: 14, cache: true, draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, color) }),
       );
     }
+    // Housekeepers wear a single work uniform, so staff read at a glance.
+    this.personGfxStaff = new ex.Canvas({
+      width: 8,
+      height: 14,
+      cache: true,
+      draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, "#E8E4DA"),
+    });
     // Fed-up figure carries BOTH the red tint AND a shape marker (a "!" with a
     // white halo above the head), so "this tenant is fed up" reads without color.
     this.personGfxRed = new ex.Canvas({

@@ -192,7 +192,9 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#4a4a52",
     transport: true,
-    description: "Carries staff and freight. Keeps service traffic off passenger elevators.",
+    staffOnly: true,
+    description:
+      "Staff-only: housekeepers ride it to reach hotel floors; tenants and visitors never do. Cheap way to link service floors.",
   },
   elevatorExpress: {
     kind: "elevatorExpress",
@@ -263,7 +265,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 2,
     population: 0,
     color: "#c0d0c0",
-    description: "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms.",
+    description:
+      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator, stairs or escalator — never passenger elevators.",
   },
   recycling: {
     kind: "recycling",
@@ -423,6 +426,21 @@ export function isElevatorKind(kind: FacilityKind): boolean {
     kind === "elevatorService" ||
     kind === "elevatorExpress"
   );
+}
+
+/** True for staff-only transports (no tenants/visitors ever ride them). The
+ *  single source of truth for every passenger-side exclusion — routing,
+ *  serving, capacity, dispatch demand. */
+export function isStaffOnlyTransport(kind: FacilityKind): boolean {
+  return FACILITIES[kind]?.staffOnly === true;
+}
+
+/** True for transports STAFF travel on: the staff-only elevators plus everything
+ *  walkable (stairs, escalators). The single source of truth for the staff
+ *  network, shared by Tower.staffConnected and Crowd's staff routing so the
+ *  two can never disagree about reachability. */
+export function isStaffTransportKind(kind: FacilityKind): boolean {
+  return isStaffOnlyTransport(kind) || kind === "stairs" || kind === "escalator";
 }
 
 /** Passengers a single car of each transport type holds per trip. */

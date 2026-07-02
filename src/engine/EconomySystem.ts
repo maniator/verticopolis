@@ -3,6 +3,16 @@ import { isOperational } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 
+/** Rooms one housekeeping crew can turn over per day. */
+const HK_ROOMS_PER_CREW = 20;
+/** Housekeepers a single crew keeps in transit at once (jobs queue behind). */
+const HK_MAX_IN_FLIGHT = 4;
+/** The housekeeping day shift: guests check out at its start and dispatch
+ *  keeps sending crews each hour through its end. The two hours are coupled —
+ *  checkout must open the shift — so they live side by side here. */
+export const HK_SHIFT_START = 8;
+export const HK_SHIFT_END = 19;
+
 /**
  * The money loop — rent, foot-traffic income, hotel revenue, housekeeping and
  * maintenance — pulled out of {@link Simulation} so the economy can be reasoned
@@ -104,8 +114,20 @@ export class EconomySystem {
     return Math.min(1, 0.35 + pop / 8000 + metro + recycling);
   }
 
-  /** Nightly hotel checkout: collect revenue, mark rooms dirty, then clean. */
+  /** Morning hotel checkout: collect revenue and mark rooms dirty. Cleaning is
+   *  NOT instant — housekeepers are dispatched through the day and a room only
+   *  turns over when one physically arrives (see {@link dispatchHousekeepers}). */
   hotelCheckout(): void {
+    // Yesterday's shift report, before today's ledger resets.
+    if (this.hkCleanedToday > 0) {
+      this.sim.emit(`Housekeeping cleaned ${this.hkCleanedToday} hotel room(s).`, "info");
+    }
+    this.hkCleanedToday = 0;
+    // Cockroaches breed in rooms left dirty overnight — spread BEFORE this
+    // morning's checkouts go dirty, so a hotel whose housekeeping kept up
+    // yesterday never seeds an infestation (and a tower with NO housekeeping
+    // is the worst case, not immune).
+    this.spreadCockroaches();
     let revenue = 0;
     for (const u of this.sim.tower.units) {
       if (!isHotelKind(u.kind)) continue;
@@ -121,34 +143,95 @@ export class EconomySystem {
       this.sim.money += revenue;
       this.sim.emit(`Hotel guests checked out: $${revenue.toLocaleString()} earned overnight.`, "money");
     }
-    this.runHousekeeping();
-    // Spread runs unconditionally — a tower with NO housekeeping is the WORST
-    // case for roaches, not immune to them (runHousekeeping early-returns when
-    // there are zero housekeeping units, so spread can't live inside it).
-    this.spreadCockroaches();
+    // Fresh shift: yesterday's ledger is dropped (its travelers have long
+    // since despawned); each crew re-seeds with full capacity on the first
+    // dispatch below (also how crews built mid-shift join the same day).
+    this.hkCapacity.clear();
+    this.hkAssignedRoom.clear();
+  }
+
+  // ---- Housekeeping dispatch ---------------------------------------------
+  // The daily shift ledger. Transient by design: crews (re-)seed with a full
+  // day's capacity on the first dispatch that sees them, so both a mid-day
+  // save load and a crew built at noon join the current shift.
+  /** Crew unit id → rooms it can still take on today. */
+  private hkCapacity = new Map<number, number>();
+  /** Dirty-room unit id → crew unit id handling it (avoids double dispatch;
+   *  a crew's in-flight count is derived from this map). */
+  private hkAssignedRoom = new Map<number, number>();
+  /** Rooms turned over so far today (reported at the next checkout). */
+  private hkCleanedToday = 0;
+  /** Day the "can't reach" nudge last fired, so it warns once per day. */
+  private hkNudgedDay = -1;
+
+  /** Housekeepers a crew currently has en route, derived from assignments. */
+  private hkInFlight(crewId: number): number {
+    let n = 0;
+    for (const c of this.hkAssignedRoom.values()) if (c === crewId) n++;
+    return n;
   }
 
   /**
-   * Each housekeeping facility services a fixed number of dirty rooms per day.
-   * Without enough housekeeping, dirty rooms pile up and cannot earn — exactly
-   * as in the original, where you scale housekeeping with your hotel.
+   * Send housekeepers to dirty rooms. Called each hour through the day shift:
+   * a room is cleaned only when its housekeeper ARRIVES (the crowd walks/rides
+   * them over the staff network — service elevators, stairs and escalators,
+   * never the passenger elevators), exactly like the original where you watch
+   * the staff work the hotel floors. Rooms with no staff-connected crew stay
+   * dirty and the player is told why, once a day.
    */
-  private runHousekeeping(): void {
-    const capacityPerUnit = 20;
-    let capacity =
-      this.sim.tower.units.filter((u) => u.kind === "housekeeping").length * capacityPerUnit;
-    if (capacity <= 0) return;
-    let cleaned = 0;
-    for (const u of this.sim.tower.units) {
-      if (capacity <= 0) break;
-      if (isHotelKind(u.kind) && u.state === "dirty" && this.sim.tower.isFloorServed(u.floor)) {
-        u.state = "empty";
-        u.satisfaction = 1;
-        capacity--;
-        cleaned++;
-      }
+  dispatchHousekeepers(): void {
+    const tower = this.sim.tower;
+    // Operational crews only — a burning or still-under-construction
+    // housekeeping room has no staff to send.
+    const crews = tower.units.filter((u) => u.kind === "housekeeping" && isOperational(u));
+    if (crews.length === 0) return;
+    for (const crew of crews) {
+      if (!this.hkCapacity.has(crew.id)) this.hkCapacity.set(crew.id, HK_ROOMS_PER_CREW);
     }
-    if (cleaned > 0) this.sim.emit(`Housekeeping cleaned ${cleaned} hotel room(s).`, "info");
+    let unreachable = 0;
+    for (const room of tower.units) {
+      if (!isHotelKind(room.kind) || room.state !== "dirty") continue;
+      if (this.hkAssignedRoom.has(room.id)) continue; // someone's already on it
+      let reachable = false;
+      for (const crew of crews) {
+        if (!tower.staffConnected(crew.floor, room.floor)) continue;
+        reachable = true;
+        const left = this.hkCapacity.get(crew.id) ?? 0;
+        if (left <= 0 || this.hkInFlight(crew.id) >= HK_MAX_IN_FLIGHT) continue;
+        const sent = this.sim.spawnStaffTrip?.(crew.floor, room.floor, room.x + room.width / 2, room.id) ?? false;
+        if (!sent) continue; // crowd is full of staff — retry next hour
+        this.hkAssignedRoom.set(room.id, crew.id);
+        this.hkCapacity.set(crew.id, left - 1);
+        break;
+      }
+      if (!reachable) unreachable++;
+    }
+    if (unreachable > 0 && this.hkNudgedDay !== this.sim.clock.day) {
+      this.hkNudgedDay = this.sim.clock.day;
+      this.sim.emit(
+        `🧹 Housekeeping can't reach ${unreachable} dirty room(s) — staff travel by service elevator, stairs or escalator, not passenger elevators.`,
+        "bad",
+      );
+    }
+  }
+
+  /**
+   * A dispatched housekeeper finished. Only an arrival that actually turns the
+   * room over consumes the crew's capacity — a failed trip (gave up, shaft
+   * bulldozed mid-ride) or a wasted one (the room burned down or was sold
+   * while they rode) refunds it so a later dispatch can retry real work.
+   */
+  onHousekeeperResult(roomId: number, ok: boolean): void {
+    const crewId = this.hkAssignedRoom.get(roomId);
+    this.hkAssignedRoom.delete(roomId);
+    const room = this.sim.tower.units.find((u) => u.id === roomId);
+    if (ok && room?.state === "dirty") {
+      room.state = "empty";
+      room.satisfaction = 1;
+      this.hkCleanedToday++;
+    } else if (crewId !== undefined) {
+      this.hkCapacity.set(crewId, (this.hkCapacity.get(crewId) ?? 0) + 1);
+    }
   }
 
   /** Rooms left dirty breed cockroaches that creep into the adjacent room along

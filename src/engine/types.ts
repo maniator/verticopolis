@@ -86,6 +86,10 @@ export interface Facility {
   color: string;
   /** True for vertical transport (occupies multiple floors). */
   transport?: boolean;
+  /** True for transports that carry only tower staff (housekeepers), never
+   * tenants or visitors — excluded from passenger routing, serving, capacity
+   * and dispatch demand. */
+  staffOnly?: boolean;
   /** True if the facility may only be built underground (basement floors). */
   basement?: boolean;
   description: string;

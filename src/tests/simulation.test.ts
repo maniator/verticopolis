@@ -276,9 +276,97 @@ describe("Hotel housekeeping", () => {
     sim.tower.place("housekeeping", 2, x0 + 8);
     const room = sim.tower.units.find((u) => u.id === r.unitId)!;
     room.state = "dirty";
-    // Trigger a day boundary so housekeeping runs.
-    for (let i = 0; i < 25; i++) sim.tick(60);
+    // Run past the 8:00 shift start (the clock opens at 7:00) into mid-day, so
+    // the housekeeper has walked over — but stop before the NEXT checkout
+    // re-dirties a re-let room.
+    for (let i = 0; i < 6; i++) sim.tick(60);
     expect(room.state).not.toBe("dirty");
+  });
+
+  it("rooms stay dirty until a housekeeper actually arrives — cleaning is never instant", () => {
+    const sim = hotelTower(12);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const r = sim.tower.place("hotelDouble", 2, x0);
+    sim.tower.place("housekeeping", 2, x0 + 8); // same floor: no ride needed
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // One tick reaches the 8:00 shift start (the clock opens at 7:00): dispatch
+    // sends a housekeeper, but the room is still dirty — nobody's arrived yet.
+    sim.tick(60);
+    expect(room.state).toBe("dirty");
+    expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
+    // The next hour of simulation walks them to the room; arrival cleans it.
+    sim.tick(60);
+    expect(room.state).toBe("empty");
+  });
+
+  it("a well-kept hotel never seeds cockroaches (spread only from overnight leftovers)", () => {
+    const sim = hotelTower(21);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const a = sim.tower.place("hotelSingle", 2, x0);
+    const b = sim.tower.place("hotelSingle", 2, x0 + 4); // adjacent
+    sim.tower.place("housekeeping", 2, x0 + 8);
+    for (const r of [a, b]) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
+    // Three full days: rooms go dirty each 8:00, housekeepers clean them the
+    // same morning — roaches must never spread from a hotel that keeps up.
+    for (let i = 0; i < 24 * 3; i++) sim.tick(60);
+    expect(sim.log.some((l) => l.text.includes("Cockroaches"))).toBe(false);
+  });
+
+  it("a crew built after the 8:00 checkout still works the same day", () => {
+    const sim = hotelTower(22);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const r = sim.tower.place("hotelDouble", 2, x0);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // Past the shift start with no crew anywhere: nothing can clean.
+    for (let i = 0; i < 3; i++) sim.tick(60); // 7:00 → 10:00
+    expect(room.state).toBe("dirty");
+    // Build housekeeping mid-shift; the next hourly dispatch picks it up.
+    sim.tower.place("housekeeping", 2, x0 + 8);
+    for (let i = 0; i < 3; i++) sim.tick(60);
+    expect(room.state).toBe("empty");
+  });
+
+  it("housekeepers need a staff route — a passenger elevator alone won't do", () => {
+    const sim = hotelTower(8);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    sim.tower.resizeTransport(sim.tower.transports[0].id, 1, 5); // passenger elevator to 5
+    const r = sim.tower.place("hotelDouble", 5, x0);
+    sim.tower.place("housekeeping", 2, x0 + 8); // crew stationed 3 floors below
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // Staff won't ride the passenger elevator: the room stays dirty and the
+    // player is told why.
+    for (let i = 0; i < 25; i++) sim.tick(60);
+    expect(room.state).toBe("dirty");
+    expect(sim.log.some((l) => l.text.includes("Housekeeping can't reach"))).toBe(true);
+    // A service elevator linking the crew's floor to the room's floor fixes it:
+    // the next day-shift dispatch rides a housekeeper up. (Stop mid-day, before
+    // the following checkout re-dirties a re-let room.)
+    sim.buildTransport("elevatorService", x0 + 14, 2, 5);
+    for (let i = 0; i < 20; i++) sim.tick(60);
+    expect(room.state).not.toBe("dirty");
+  });
+
+  it("tenants never route over service elevators", () => {
+    const sim = hotelTower(9);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    sim.star = 2;
+    sim.buildTransport("elevatorService", x0 + 14, 1, 5);
+    // The service shaft is not a passenger route and doesn't serve floors…
+    expect(sim.crowd.route(sim.tower, 1, 5)).toBeNull();
+    expect(sim.tower.isFloorServed(5)).toBe(false);
+    // …but the passenger elevator is.
+    sim.tower.resizeTransport(sim.tower.transports[0].id, 1, 5);
+    expect(sim.crowd.route(sim.tower, 1, 5)).not.toBeNull();
+    expect(sim.tower.isFloorServed(5)).toBe(true);
   });
 });
 

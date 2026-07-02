@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, maxCarsFor, maxSpanFor } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
 import { isOperational } from "./types";
 import type {
   Facility,
@@ -783,6 +783,14 @@ export class Tower {
     return !(t.skipFloors && t.skipFloors.includes(floor));
   }
 
+  /** The floors a transport actually stops at — the single stop-enumeration
+   *  every consumer (routing graphs, dispatch, staff components) shares. */
+  stopsOf(t: Transport): number[] {
+    const s: number[] = [];
+    for (let fl = t.bottom; fl <= t.top; fl++) if (this.stopsAt(t, fl)) s.push(fl);
+    return s;
+  }
+
   /** Cached reachable-floor set, keyed by {@link revision} so it is recomputed
    * only when transports/structure actually change (not every tick per unit). */
   private servedRev = -1;
@@ -796,6 +804,10 @@ export class Tower {
     while (changed) {
       changed = false;
       for (const t of this.transports) {
+        // Service elevators are staff-only (canon): tenants and visitors never
+        // ride them, so they don't make a floor reachable. Staff travel is the
+        // separate {@link staffConnected} network.
+        if (isStaffOnlyTransport(t.kind)) continue;
         let connects = false;
         for (let fl = t.bottom; fl <= t.top; fl++) {
           if (this.stopsAt(t, fl) && reachable.has(fl)) {
@@ -833,6 +845,54 @@ export class Tower {
    * view for the spatial congestion model. */
   servedFloorSet(): ReadonlySet<number> {
     return this.servedFloors();
+  }
+
+  /** Cached staff-network components, keyed by {@link revision}. */
+  private staffRev = -1;
+  private staffComp = new Map<number, number>();
+
+  /**
+   * Label every floor touched by a staff-capable transport (service elevators,
+   * stairs, escalators — never passenger elevators) with a connected-component id.
+   * Housekeepers travel this network to reach dirty rooms, exactly as in the
+   * original where staff ride the service elevator while guests take the
+   * passenger ones. Floors with no staff transport get no label: staff there
+   * can only work their own floor.
+   */
+  private staffComponents(): Map<number, number> {
+    if (this.staffRev === this.revision) return this.staffComp;
+    const comp = new Map<number, number>();
+    const relabel = (from: number, to: number) => {
+      for (const [f, c] of comp) if (c === from) comp.set(f, to);
+    };
+    let next = 0;
+    for (const t of this.transports) {
+      if (!isStaffTransportKind(t.kind)) continue;
+      const stops = this.stopsOf(t);
+      if (stops.length < 2) continue;
+      // Merge every component this transport touches into one.
+      let id: number | undefined;
+      for (const f of stops) {
+        const c = comp.get(f);
+        if (c === undefined) continue;
+        if (id === undefined) id = c;
+        else if (c !== id) relabel(c, id);
+      }
+      if (id === undefined) id = next++;
+      for (const f of stops) comp.set(f, id);
+    }
+    this.staffComp = comp;
+    this.staffRev = this.revision;
+    return comp;
+  }
+
+  /** True if staff stationed on floor `a` can reach floor `b` (same floor, or
+   *  connected through service elevators / stairs / escalators). */
+  staffConnected(a: number, b: number): boolean {
+    if (a === b) return true;
+    const comp = this.staffComponents();
+    const ca = comp.get(a);
+    return ca !== undefined && ca === comp.get(b);
   }
 
   /**

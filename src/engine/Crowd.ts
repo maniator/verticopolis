@@ -1,7 +1,7 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
 import type { FacilityKind, Transport, Unit } from "./types";
-import { isElevatorKind, isHotelKind, isOpenAt } from "./facilities";
+import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
 import { RNG } from "./rng";
 
 /**
@@ -44,6 +44,12 @@ export interface Person {
   age: number;
   /** Idle timer once arrived, before despawning. */
   linger: number;
+  /** True for tower staff (housekeepers): they route over the STAFF network
+   *  (service elevators / stairs / escalators), never count toward tenant
+   *  stress, and render in a work uniform. */
+  staff?: boolean;
+  /** Unit id this staffer is dispatched to service (a dirty hotel room). */
+  cleanUnitId?: number;
 }
 
 /** A transport route as a list of floors and the shaft used between each. */
@@ -55,6 +61,9 @@ interface Route {
 const WALK_SPEED = 6; // tiles per second
 const CAR_CAPACITY = 6; // visible riders per car
 const MAX_PEOPLE = 140;
+/** Staff travel outside the tenant cap (they must be able to work even in a
+ *  packed tower) but stay bounded so dispatch can't flood the screen. */
+const MAX_STAFF = 32;
 const STRESS_WAIT = 25; // seconds of waiting that counts as "fed up"
 /**
  * A commuter who hasn't reached their floor within this many real seconds gives
@@ -63,6 +72,10 @@ const STRESS_WAIT = 25; // seconds of waiting that counts as "fed up"
  * under them) silently consuming the on-screen population cap.
  */
 const GIVE_UP = 90;
+/** Staff are on the clock: they wait longer than a fed-up tenant before
+ *  abandoning a job (the failed room is handed back to dispatch and retried),
+ *  but not so long that stuck trips pin the staff pool for hours. */
+const STAFF_GIVE_UP = GIVE_UP * 3;
 
 export class Crowd {
   people: Person[] = [];
@@ -76,6 +89,12 @@ export class Crowd {
   /** Cached transport stop-graph, rebuilt only when the tower changes. */
   private adj: Map<number, { f: number; shaft: number }[]> | null = null;
   private adjRev = -1;
+  /** Cached STAFF stop-graph (service elevators / stairs / escalators). */
+  private staffAdj: Map<number, { f: number; shaft: number }[]> | null = null;
+  private staffAdjRev = -1;
+  /** Finished staff jobs since the last drain: unit id + whether the staffer
+   *  actually reached the destination (vs. gave up / lost their shaft). */
+  private staffDone: { unitId: number; ok: boolean }[] = [];
 
   constructor(seed = 1) {
     this.rng = new RNG(seed);
@@ -91,6 +110,10 @@ export class Crowd {
     this.nextId = 1;
     this.adj = null;
     this.adjRev = -1;
+    this.staffAdj = null;
+    this.staffAdjRev = -1;
+    this.staffDone = [];
+    this.staffCount = 0;
   }
 
   /** 0..1 — how stressed the current crowd is by elevator waits. */
@@ -100,12 +123,6 @@ export class Crowd {
 
   // ---- Routing ------------------------------------------------------------
 
-  /** Floors a transport actually stops at. */
-  private stopsOf(tower: Tower, t: Transport): number[] {
-    const s: number[] = [];
-    for (let f = t.bottom; f <= t.top; f++) if (tower.stopsAt(t, f)) s.push(f);
-    return s;
-  }
 
   /**
    * The floor → one-ride-reachable-floors graph, built from elevator stops.
@@ -114,21 +131,42 @@ export class Crowd {
    */
   private adjacency(tower: Tower): Map<number, { f: number; shaft: number }[]> {
     if (this.adj && this.adjRev === tower.revision) return this.adj;
+    // Staff-only transports (service elevators) carry no tenants or visitors:
+    // that's the whole point of building one.
+    this.adj = this.buildAdjacency(tower, (t) => !isStaffOnlyTransport(t.kind));
+    this.adjRev = tower.revision;
+    return this.adj;
+  }
+
+  /** The staff stop-graph: service elevators plus walkable links (stairs and
+   *  escalators) — never the passenger elevators. Housekeepers route over
+   *  this, using the SAME kind predicate as Tower.staffConnected so routing
+   *  and reachability can never disagree. */
+  private staffAdjacency(tower: Tower): Map<number, { f: number; shaft: number }[]> {
+    if (this.staffAdj && this.staffAdjRev === tower.revision) return this.staffAdj;
+    this.staffAdj = this.buildAdjacency(tower, (t) => isStaffTransportKind(t.kind));
+    this.staffAdjRev = tower.revision;
+    return this.staffAdj;
+  }
+
+  private buildAdjacency(
+    tower: Tower,
+    include: (t: Transport) => boolean,
+  ): Map<number, { f: number; shaft: number }[]> {
     const adj = new Map<number, { f: number; shaft: number }[]>();
     for (const t of tower.transports) {
+      if (!include(t)) continue;
       // Elevators carry riders in cars; stairs/escalators are walked (a
       // "climbing" leg, no car). Both are real routing edges now, so short
       // hops travel on foot and BFS still prefers a single long elevator ride
       // (one transfer) over many stair flights for tall trips.
-      const stops = this.stopsOf(tower, t);
+      const stops = tower.stopsOf(t);
       for (const a of stops) {
         let list = adj.get(a);
         if (!list) adj.set(a, (list = []));
         for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id });
       }
     }
-    this.adj = adj;
-    this.adjRev = tower.revision;
     return adj;
   }
 
@@ -140,14 +178,33 @@ export class Crowd {
    * so a badly-zoned tower's commuters give up rather than teleporting there.
    */
   private static readonly MAX_RIDES = 2;
+  /** Staff aren't bound by the two-ride comfort rule — a housekeeper chains
+   *  stairs and service elevators as far as the network reaches. Effectively
+   *  unbounded (the BFS `seen` set terminates it); the number only guards a
+   *  pathological tower, and it MUST stay above any reachable leg count so
+   *  routing agrees with Tower.staffConnected's component answer. */
+  private static readonly MAX_STAFF_RIDES = 99;
   route(tower: Tower, from: number, to: number): Route | null {
+    return this.bfsRoute(this.adjacency(tower), from, to, Crowd.MAX_RIDES);
+  }
+
+  /** Route over the STAFF network (service elevators / stairs / escalators). */
+  staffRoute(tower: Tower, from: number, to: number): Route | null {
+    return this.bfsRoute(this.staffAdjacency(tower), from, to, Crowd.MAX_STAFF_RIDES);
+  }
+
+  private bfsRoute(
+    adj: Map<number, { f: number; shaft: number }[]>,
+    from: number,
+    to: number,
+    maxRides: number,
+  ): Route | null {
     if (from === to) return { floors: [from], shafts: [] };
-    const adj = this.adjacency(tower);
     const prev = new Map<number, { f: number; shaft: number }>();
     const seen = new Set<number>([from]);
     let frontier = [from];
     let rides = 0;
-    while (frontier.length && rides < Crowd.MAX_RIDES) {
+    while (frontier.length && rides < maxRides) {
       rides++;
       const next: number[] = [];
       for (const f of frontier) {
@@ -233,27 +290,94 @@ export class Crowd {
     if (options.length) this.rng.pick(options)();
   }
 
-  private add(tower: Tower, from: number, to: number): void {
-    const r = this.route(tower, from, to);
-    if (!r || r.shafts.length === 0) return; // unreachable — no point spawning
+  /** Build a person on `route`, walking to `destX` at the end. Shared by
+   *  tenant and staff spawns so the two can never drift field-by-field. */
+  private makePerson(tower: Tower, route: Route, destX: number): Person {
+    const from = route.floors[0];
     const seed = (this.nextId * 2654435761) | 0;
-    this.people.push({
+    const person: Person = {
       id: this.nextId++,
       seed,
-      state: "toShaft",
+      // A route with no rides (same floor) goes straight to the stroll leg.
+      state: route.shafts.length === 0 ? "toDest" : "toShaft",
       floor: from,
       fy: from,
       x: this.pickX(tower, from, seed),
-      floors: r.floors,
-      shafts: r.shafts,
+      floors: route.floors,
+      shafts: route.shafts,
       leg: 0,
-      shaftId: r.shafts[0],
+      shaftId: route.shafts[0] ?? null,
       carIndex: null,
       wait: 0,
       age: 0,
       linger: 0,
-      destX: this.pickX(tower, to, seed),
-    });
+      destX,
+    };
+    this.people.push(person);
+    return person;
+  }
+
+  private add(tower: Tower, from: number, to: number): void {
+    const r = this.route(tower, from, to);
+    if (!r || r.shafts.length === 0) return; // unreachable — no point spawning
+    this.makePerson(tower, r, this.pickX(tower, to, (this.nextId * 2654435761) | 0));
+  }
+
+  /** Live staff members on shift (kept as a counter so the per-tick staffCalls
+   *  and the spawn cap never scan the whole crowd). */
+  private staffCount = 0;
+
+  /**
+   * Dispatch a staff member (housekeeper) from `from` to `to` over the STAFF
+   * network, walking to `destX` (the room being serviced). Returns false when
+   * no staff route exists or too many staff are already on shift; the caller
+   * keeps the job queued and retries later.
+   */
+  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number): boolean {
+    if (this.staffCount >= MAX_STAFF) return false;
+    const r = this.staffRoute(tower, from, to); // handles from === to (walk only)
+    if (!r) return false;
+    const p = this.makePerson(tower, r, destX);
+    p.staff = true;
+    p.cleanUnitId = cleanUnitId;
+    this.staffCount++;
+    return true;
+  }
+
+  private static readonly NO_CALLS: ReadonlyMap<number, number> = new Map();
+
+  /**
+   * Live elevator calls from staff, for the dispatcher: floors where staff
+   * stand waiting at a staff elevator OR are walking toward one (so the car
+   * pre-positions instead of retreating to idle just before they arrive),
+   * plus the destinations of staff already riding — so cars come for them and
+   * then deliver them. A walk toward stairs/escalators never calls a car.
+   * Rebuilt fresh each tick from the people themselves.
+   */
+  staffCalls(tower: Tower): ReadonlyMap<number, number> {
+    if (this.staffCount === 0) return Crowd.NO_CALLS;
+    const calls = new Map<number, number>();
+    const bump = (f: number) => calls.set(f, (calls.get(f) ?? 0) + 1);
+    for (const p of this.people) {
+      if (!p.staff) continue;
+      if (p.state === "waiting") bump(p.floor);
+      else if (p.state === "riding") bump(p.floors[p.leg + 1]);
+      else if (p.state === "toShaft") {
+        const shaft = this.shaftOf(tower, p.shaftId);
+        if (shaft && isStaffOnlyTransport(shaft.kind)) bump(p.floor);
+      }
+    }
+    return calls;
+  }
+
+  private static readonly NO_RESULTS: { unitId: number; ok: boolean }[] = [];
+
+  /** Drain the staff jobs that ended since the last call (arrived or failed). */
+  takeStaffResults(): { unitId: number; ok: boolean }[] {
+    if (this.staffDone.length === 0) return Crowd.NO_RESULTS;
+    const out = this.staffDone;
+    this.staffDone = [];
+    return out;
   }
 
   /** An actual built structural tile of a floor (so people stand on solid
@@ -291,14 +415,20 @@ export class Crowd {
       p.age += dtSec;
       // Give up if the journey drags on too long — a fed-up traveller who
       // leaves rather than riding forever toward a floor no car will serve.
-      if (p.age > GIVE_UP && p.state !== "toDest" && p.state !== "done") {
-        frustrated++;
-        travelling++;
+      // (Staff are on the clock and wait much longer; a failed job is handed
+      // back to housekeeping dispatch to retry.)
+      if (p.age > (p.staff ? STAFF_GIVE_UP : GIVE_UP) && p.state !== "toDest" && p.state !== "done") {
+        if (!p.staff) {
+          frustrated++;
+          travelling++;
+        }
         this.finish(p);
         continue;
       }
       this.step(p, dtSec, tower);
-      if (p.state === "waiting" || p.state === "riding" || p.state === "toShaft" || p.state === "climbing") {
+      // Staff never count toward tenant stress — a housekeeper waiting for the
+      // service elevator is payroll, not an unhappy customer.
+      if (!p.staff && (p.state === "waiting" || p.state === "riding" || p.state === "toShaft" || p.state === "climbing")) {
         travelling++;
         if (p.wait > STRESS_WAIT) frustrated++;
       }
@@ -435,6 +565,15 @@ export class Crowd {
 
   private finish(p: Person): void {
     this.releaseSeat(p);
+    // Report a staff job's outcome: it succeeded only if the staffer actually
+    // made it to the destination floor (state "toDest"); a give-up or a shaft
+    // vanishing mid-route hands the job back to dispatch as failed.
+    if (p.staff) {
+      this.staffCount = Math.max(0, this.staffCount - 1);
+      if (p.cleanUnitId !== undefined) {
+        this.staffDone.push({ unitId: p.cleanUnitId, ok: p.state === "toDest" });
+      }
+    }
     p.state = "done";
   }
 }

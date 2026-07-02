@@ -1,6 +1,6 @@
 import { Clock } from "./Clock";
 import { Crowd } from "./Crowd";
-import { EconomySystem } from "./EconomySystem";
+import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
 import { EventSystem } from "./EventSystem";
@@ -19,6 +19,7 @@ import {
   facilityFloors,
   isElevatorKind,
   isFacilityKind,
+  isStaffOnlyTransport,
   isHotelKind,
   maxCarsFor,
   transportCarCapacity,
@@ -392,12 +393,17 @@ export class Simulation implements SimContext {
    * fire the hour/day boundary handlers exactly once if crossed. */
   private advanceStep(dtMinutes: number): void {
     this.clock.advance(dtMinutes);
-    this.elevators.update(this.tower, dtMinutes, this.rushFactor());
+    this.elevators.update(this.tower, dtMinutes, this.rushFactor(), this.crowd.staffCalls(this.tower));
     // Advance the individually-routed crowd in lock-step with game time (after
     // the cars move, so people board their fresh positions). They run on the
     // crowd's own seconds — a few per game-minute — and a single huge tick is
     // capped so a day-long step can't teleport everyone at once.
     this.crowd.update(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), this.tower, this.clock);
+    // Housekeepers who reached (or abandoned) their room since the last step:
+    // the room is cleaned on ARRIVAL, never instantly — you can watch them go.
+    for (const job of this.crowd.takeStaffResults()) {
+      this.economy.onHousekeeperResult(job.unitId, job.ok);
+    }
     this.finishConstruction();
 
     const hour = this.clock.hour;
@@ -437,7 +443,12 @@ export class Simulation implements SimContext {
     this.updatePresence();
     // Guests check out in the morning (not at midnight), so overnight hotel
     // population is still present at the midnight TOWER/VIP evaluation.
-    if (this.clock.hour === 8) this.economy.hotelCheckout();
+    if (this.clock.hour === HK_SHIFT_START) this.economy.hotelCheckout();
+    // Housekeeping works a day shift: dispatch keeps sending crews to dirty
+    // rooms through the day (retrying jobs that failed or were over capacity).
+    if (this.clock.hour >= HK_SHIFT_START && this.clock.hour <= HK_SHIFT_END) {
+      this.economy.dispatchHousekeepers();
+    }
     this.updateSatisfaction();
     this.attemptMoveIns();
     this.economy.collectTrafficIncome();
@@ -632,6 +643,9 @@ export class Simulation implements SimContext {
     }
     let capacity = 0;
     for (const t of this.tower.transports) {
+      // Staff-only: a service elevator carries no tenants, so it adds nothing
+      // to passenger capacity (its payoff is the housekeeping staff network).
+      if (isStaffOnlyTransport(t.kind)) continue;
       const per = transportCarCapacity(t.kind);
       if (isElevatorKind(t.kind)) capacity += t.cars * per;
       else capacity += per; // stairs / escalator
@@ -706,6 +720,8 @@ export class Simulation implements SimContext {
     // Ground-connected shafts and the served floors each one stops at.
     const shaftsByFloor = new Map<number, { id: number; cap: number }[]>();
     for (const t of this.tower.transports) {
+      // Staff-only service elevators carry no passenger load.
+      if (isStaffOnlyTransport(t.kind)) continue;
       let active = false;
       for (let f = t.bottom; f <= t.top; f++) {
         if (this.tower.stopsAt(t, f) && served.has(f)) { active = true; break; }
@@ -1009,6 +1025,13 @@ export class Simulation implements SimContext {
 
   hasAny(kind: FacilityKind): boolean {
     return this.tower.units.some((u) => u.kind === kind);
+  }
+
+  /** Send a staff member (housekeeper) over the staff network — see
+   *  {@link Crowd.spawnStaff}. Exposed on the context so the economy subsystem
+   *  can dispatch crews without owning the crowd. */
+  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number): boolean {
+    return this.crowd.spawnStaff(this.tower, from, to, destX, cleanUnitId);
   }
 
   /** Whether hotel guests currently count toward the star rating (they stop at 3★). */
