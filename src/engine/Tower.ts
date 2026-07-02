@@ -505,11 +505,11 @@ export class Tower {
     }
 
 
-    // Transports share the structural column but cannot collide with rooms or
-    // other shafts — and every floor they serve must actually exist as built
-    // structure at the shaft, so elevators can never float outside the tower.
-    // (Transport may share a cell with a room — the shaft simply draws in
-    // front of it, as in the original, where lifts overlap facilities.)
+    // Transports may NOT overlap other shafts, and every floor they serve
+    // must exist as built structure at the shaft, so elevators can never
+    // float outside the tower. Rooms are deliberately NOT a collision: a
+    // shaft may share a cell with a room and simply draws in front of it,
+    // as in the original, where lifts overlap facilities.
     for (let fl = bottom; fl <= top; fl++) {
       if (!this.shaftHasStructureAt(fl, x, f.width)) {
         return { ok: false, reason: NEEDS_FLOORS };

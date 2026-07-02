@@ -592,8 +592,8 @@ export class UI {
 
   /** Bind click handlers to a dialog's [data-act] buttons. Every lookup is
    *  loud (non-null) so a template typo throws at open instead of shipping a
-   *  dead button — including the default close binding. The two dialogs that
-   *  genuinely render no close button (confirm, emergency) opt out by name. */
+   *  dead button — including the default close binding. Dialogs that render
+   *  no close button (confirm, emergency) disable it via opts.close: false. */
   private wireActions(box: HTMLElement, handlers: Record<string, () => void> = {}, opts: { close?: boolean } = {}): void {
     if (opts.close !== false && !("close" in handlers)) {
       box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());

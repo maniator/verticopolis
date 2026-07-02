@@ -304,7 +304,9 @@ class GameApp {
     if (placed) {
       this.announce(
         placed.what === "paint"
-          ? `Placed ${FACILITIES[kind].name} on floor ${c.floor}`
+          ? placed.ok
+            ? `Placed ${FACILITIES[kind].name} on floor ${c.floor}`
+            : `Can't place ${FACILITIES[kind].name} here`
           : placed.what === "flight"
             ? placed.ok
               ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}`
@@ -612,10 +614,9 @@ class GameApp {
     kind: FacilityKind,
     tile: number,
     floor: number,
-  ): { what: "paint" } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
+  ): { what: "paint"; ok: boolean } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
     if (kind === "floor" || kind === "lobby") {
-      this.paintBrush(kind, tile, floor);
-      return { what: "paint" }; // brush strips have no failure mode to report
+      return { what: "paint", ok: this.paintBrush(kind, tile, floor) > 0 };
     }
     if (isFixedSpanTransport(kind)) {
       const r = this.tryBuildTransport(kind, this.snapX(kind, tile), floor, floor + 1);
@@ -831,7 +832,13 @@ class GameApp {
       // The Booking button label lives in the built HTML, so fold the policy into
       // the key — cycling it bumps the key and rebuilds the button.
       const film = u.kind === "cinema" ? `:${u.filmPolicy ?? "auto"}` : "";
-      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}`, () => unitEditorHtml(this.sim, u), unitEditorVolatile(this.sim, u));
+      // Row SHAPE depends on state in two ways the volatile patcher can't
+      // handle (it only rewrites existing spans): the cinema's "Now showing"
+      // row exists only while operational, and gutted swaps the resale row
+      // for scrap/bulldoze rows. Fold exactly those two bits into the key so
+      // a construction finish, fire, or gut mid-view triggers a rebuild.
+      const op = isOperational(u) ? "" : u.state === "gutted" ? ":g" : ":x";
+      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}${op}`, () => unitEditorHtml(this.sim, u), unitEditorVolatile(this.sim, u));
     } else {
       const t = this.selectedTransport();
       if (!t) return this.clearSelection();
@@ -1087,8 +1094,11 @@ class GameApp {
     return tiles;
   }
 
-  private paintBrush(kind: FacilityKind, tile: number, floor: number): void {
+  /** Lay a brush strip; returns how many tiles were actually placed so
+   *  callers can report honestly (an unsupported strip lays zero). */
+  private paintBrush(kind: FacilityKind, tile: number, floor: number): number {
     const tiles = this.brushTiles(tile);
+    let placed = 0;
     let progress = true;
     while (progress) {
       progress = false;
@@ -1097,10 +1107,14 @@ class GameApp {
         // upgrade plain floor in place (the sky-lobby conversion).
         const existing = this.sim.tower.structureKindAt(floor, tx);
         if (existing === kind || (existing !== undefined && kind !== "lobby")) continue;
-        if (this.sim.build(kind, floor, tx).ok) progress = true;
+        if (this.sim.build(kind, floor, tx).ok) {
+          placed++;
+          progress = true;
+        }
       }
     }
     this.paint = { tile, floor };
+    return placed;
   }
 
   private paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
