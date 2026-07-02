@@ -807,16 +807,17 @@ export class TowerEngine {
     ctx.fill();
   }
 
-  /** The translucent placement ghost: gold when valid, red when not. The
-   *  stroke width differs per caller (unit 1.5, shaft 1) — pass it explicitly
-   *  so nothing inherits a stale context value. */
-  private drawGhostRect(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, valid: boolean, lineWidth: number): void {
+  /** The translucent placement ghost: gold when valid, red when not. One
+   *  explicit stroke width for both ghost kinds — the old transport ghost
+   *  never set its own and inherited whatever the overlay context last used
+   *  (1, 1.5, or 2 depending on rain/selection), a nondeterminism this pins. */
+  private drawGhostRect(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, valid: boolean): void {
     ctx.globalAlpha = 0.5;
     ctx.fillStyle = valid ? "#ffd24a" : "#cc3333";
     ctx.fillRect(sx, sy, sw, sh);
     ctx.globalAlpha = 1;
     ctx.strokeStyle = valid ? "#fff" : "#ff5555";
-    ctx.lineWidth = lineWidth;
+    ctx.lineWidth = 1.5;
     ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
   }
 
@@ -838,7 +839,7 @@ export class TowerEngine {
       const sy = this.worldToScreenY(p.floor + hgt - 1);
       const sw = w * TILE * this.cam.zoom;
       const sh = hgt * FLOOR * this.cam.zoom;
-      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid, 1.5);
+      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid);
     }
     if (this.transportPreview) {
       const p = this.transportPreview;
@@ -847,7 +848,7 @@ export class TowerEngine {
       const sy = this.worldToScreenY(p.top);
       const sw = w * TILE * this.cam.zoom;
       const sh = (p.top - p.bottom + 1) * FLOOR * this.cam.zoom;
-      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid, 1);
+      this.drawGhostRect(ctx, sx, sy, sw, sh, p.valid);
     }
   }
 
@@ -965,17 +966,15 @@ export class TowerEngine {
       );
     this.escGfx = { left: bakeEsc("left"), right: bakeEsc("right") };
 
-    // ONE bake recipe for every 8px figure, so the magic person() args can't
-    // drift between the tenant/staff/fed-up variants.
-    const bakePerson = (color: string, height = 14, decorate?: (ctx: CanvasRenderingContext2D) => void): ex.Canvas =>
+    // The tenant/staff bake recipe (one home for the magic person() args).
+    // The fed-up variant below is taller and shifts the figure to fit its
+    // marker, so it hand-rolls the same args — keep the two in step.
+    const bakePerson = (color: string): ex.Canvas =>
       new ex.Canvas({
         width: 8,
-        height,
+        height: 14,
         cache: true,
-        draw: (ctx) => {
-          person(ctx, 2.5, 13, 1.1, 7, false, color);
-          decorate?.(ctx);
-        },
+        draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, color),
       });
     for (const color of SHIRTS) this.personGfx.push(bakePerson(color));
     // Housekeepers wear a single work uniform, so staff read at a glance.

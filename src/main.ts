@@ -1357,9 +1357,6 @@ class GameApp {
     return true;
   }
 
-  /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
-   *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
-   *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
   /** Tear out a shaft and pay its resale — the ONE refund path shared by the
    *  editor's Sell and the bulldozer, so the payout can't drift. */
   private removeTransportWithRefund(t: Transport): void {
@@ -1376,6 +1373,9 @@ class GameApp {
     return false;
   }
 
+  /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
+   *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
+   *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
   private bulldozePicked(p: Picked | null, quiet = false): void {
     if (!p) return;
     if (p.type === "unit") {

@@ -590,13 +590,16 @@ export class UI {
     dialog.innerHTML = "";
   }
 
-  /** Bind click handlers to a dialog's [data-act] buttons. `close` defaults
-   *  to closeModal so every dialog doesn't rewire the same dismissal; missing
-   *  buttons are skipped (some dialogs have no explicit close action). */
+  /** Bind click handlers to a dialog's [data-act] buttons. A close button is
+   *  wired to closeModal by default when present (some dialogs have none);
+   *  explicitly passed actions keep the loud non-null lookup, so a template
+   *  typo still throws on open instead of shipping a dead button. */
   private wireActions(box: HTMLElement, handlers: Record<string, () => void> = {}): void {
-    const all = { close: () => this.closeModal(), ...handlers };
-    for (const [act, fn] of Object.entries(all)) {
-      box.querySelector(`[data-act="${act}"]`)?.addEventListener("click", fn);
+    if (!("close" in handlers)) {
+      box.querySelector('[data-act="close"]')?.addEventListener("click", () => this.closeModal());
+    }
+    for (const [act, fn] of Object.entries(handlers)) {
+      box.querySelector(`[data-act="${act}"]`)!.addEventListener("click", fn);
     }
   }
 
