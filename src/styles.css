@@ -1037,9 +1037,13 @@ dialog#modal {
 .stats-grid .col {
   padding: 0 2px;
 }
-/* Values echo the HUD: money green, stars gold. */
+/* Values echo the HUD: money green (red in debt), stars gold. */
 .stats-grid .v.money {
   color: var(--money);
+  font-weight: 700;
+}
+.stats-grid .v.loss {
+  color: var(--bad);
   font-weight: 700;
 }
 .stats-grid .v.stars {

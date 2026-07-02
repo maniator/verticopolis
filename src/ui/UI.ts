@@ -558,11 +558,15 @@ export class UI {
   private openModal(html: string): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
     dialog.innerHTML = `<div class="modal-box">${html}</div>`;
+    if (!dialog.open) dialog.showModal();
     // Win-style ✕ in the title bar (same affordance as the editor card) so
     // long dialogs can be dismissed without scrolling to the bottom button.
     // It routes through the dialog's cancel path (same as Esc) rather than
     // closeModal() directly, so modals that override oncancel to resolve a
-    // pending choice (e.g. the emergency modal) still resolve.
+    // pending choice (e.g. the emergency modal) still resolve. Appended AFTER
+    // showModal(): it must not be the first focusable element, or keyboard
+    // users would land on ✕ and Enter would dismiss (declining emergencies)
+    // instead of activating the primary action.
     const h2 = dialog.querySelector(".modal-box h2");
     if (h2) {
       const x = document.createElement("button");
@@ -575,7 +579,6 @@ export class UI {
       x.addEventListener("click", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
       h2.appendChild(x);
     }
-    if (!dialog.open) dialog.showModal();
     // Click outside the box (on the backdrop) closes the dialog.
     dialog.onclick = (e) => {
       if (e.target === dialog) this.closeModal();

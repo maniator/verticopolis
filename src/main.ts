@@ -1106,7 +1106,7 @@ class GameApp {
         <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
         ${ratingRow}
         <span class="k">Next star at</span><span class="v">${next ? fmt(next) : "—"}</span>
-        <span class="k">Funds</span><span class="v money">$${fmt(Math.round(this.sim.money))}</span>
+        <span class="k">Funds</span><span class="v ${this.sim.money < 0 ? "loss" : "money"}">$${fmt(Math.round(this.sim.money))}</span>
         <span class="k">Date</span><span class="v">${c.dayName}, day ${c.day + 1}</span>
       </div>
       <div class="col">
@@ -1165,7 +1165,7 @@ class GameApp {
             `<span class="v">${escapeAttr(m.desc)}</span>`,
         )
         .join("")}</div>`;
-    const pct = Math.round((mp.achieved / mp.total) * 100);
+    const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
     return (
       `<div class="stats-section">🏅 Milestones (${mp.achieved}/${mp.total})` +
       `<span class="evalbar"><span style="width:${pct}%"></span></span></div>` +
