@@ -65,6 +65,9 @@ abstraction · ⬜ not present.
 - ✅ Location-aware procedural soundtrack + SFX
 - ✅ Pan / zoom / pinch and collision-based picking, all via Excalibur
 - ✅ Animated people: lobby/corridor walkers, stair/escalator climbers, elevator riders, the metro train
+- ✅ Rooftop construction crane perched over the highest built floor (animated trolley, hook and night beacon) until the tower tops out at floor 100 — then it comes down, as in the original
+- ✅ Exterior escape stairs zigzagging down both sides of the tower silhouette
+- ✅ Grand lobbies: the ground concourse gets marble, gilded cornice, columns, red carpet and chandeliers that glow after dark; sky lobbies read as cooler stone with planters and framed prints
 
 ## Save / platform
 - ✅ Autosave + multiple save slots, JSON export/import (`localStorage`)

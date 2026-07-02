@@ -1335,26 +1335,40 @@ export class Simulation implements SimContext {
     const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
     sim.tower.units = (data.units ?? [])
       .filter((u) => isFacilityKind(u.kind))
-      .map((u) => ({
-        ...u,
-        // Coerce the free-form strings too: a forged `state` would flow into
-        // UI innerHTML (the inspector's "Status:" line) and state-machine
-        // compares; a non-string `label` would crash the escaping at render.
-        state: isUnitState(u.state) ? u.state : "empty",
-        label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
-        satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
-        occupants: Math.max(0, num(u.occupants, 0)),
-        pendingIncome: num(u.pendingIncome, 0),
-        // Coerce the optional player-set price too, so a corrupt save can't
-        // inject a non-number rent (which would poison income / rentOf math).
-        rent: u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0),
-        // Coerce the film policy so a hand-edited save can't inject a bad value
-        // (undefined ⇒ auto, the legacy behavior).
-        filmPolicy:
-          u.filmPolicy === "feature" || u.filmPolicy === "blockbuster" || u.filmPolicy === "auto"
-            ? u.filmPolicy
-            : undefined,
-      }));
+      .map((u) => {
+        // Coerce geometry to finite integers, and keep the whole FOOTPRINT on
+        // the lot (not just the origin): forged floor/x/width would otherwise
+        // flow into renderer math (silhouette edges, lobby variant indexing,
+        // actor positions) as NaN/Infinity, make a per-tile draw loop iterate
+        // an absurd width, or hang a span/multi-story room off the lot edge.
+        const stories = facilityFloors(u.kind);
+        const floor = Math.max(GRID.minFloor, Math.min(GRID.maxFloor - (stories - 1), Math.round(num(u.floor, 1))));
+        const x = Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0))));
+        const width = Math.max(1, Math.min(GRID.width - x, Math.round(num(u.width, FACILITIES[u.kind].width))));
+        return {
+          ...u,
+          floor,
+          x,
+          width,
+          // Coerce the free-form strings too: a forged `state` would flow into
+          // UI innerHTML (the inspector's "Status:" line) and state-machine
+          // compares; a non-string `label` would crash the escaping at render.
+          state: isUnitState(u.state) ? u.state : "empty",
+          label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
+          satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
+          occupants: Math.max(0, num(u.occupants, 0)),
+          pendingIncome: num(u.pendingIncome, 0),
+          // Coerce the optional player-set price too, so a corrupt save can't
+          // inject a non-number rent (which would poison income / rentOf math).
+          rent: u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0),
+          // Coerce the film policy so a hand-edited save can't inject a bad value
+          // (undefined ⇒ auto, the legacy behavior).
+          filmPolicy:
+            u.filmPolicy === "feature" || u.filmPolicy === "blockbuster" || u.filmPolicy === "auto"
+              ? u.filmPolicy
+              : undefined,
+        };
+      });
     sim.tower.transports = (data.transports ?? [])
       .filter((t) => isFacilityKind(t.kind))
       .map((t) => {
@@ -1363,16 +1377,23 @@ export class Simulation implements SimContext {
         // throw a RangeError (or OOM) on the very next tick.
         const maxCars = isElevatorKind(t.kind) ? maxCarsFor(t.kind) : 0;
         const cars = Math.max(0, Math.min(maxCars, Math.floor(num(t.cars, 0))));
-        const bottom = Math.round(num(t.bottom, 1));
+        // Clamp the span to the lot: an unbounded forged bottom/top would give
+        // the shaft an absurd height (its banded graphic loop scales with it).
+        // Bottom caps at maxFloor - 1 so the top > bottom rule below can't be
+        // forced past maxFloor by a forged bottom.
+        const bottom = Math.max(GRID.minFloor, Math.min(GRID.maxFloor - 1, Math.round(num(t.bottom, 1))));
         // A transport must have height (validateTransport requires top > bottom);
         // never deserialize a zero-height shaft from a corrupt save.
-        const top = Math.max(bottom + 1, Math.round(num(t.top, bottom + 1)));
+        const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
         const fixLen = (arr: unknown, fill: number) =>
           Array.from({ length: cars }, (_, i) =>
             Array.isArray(arr) ? num(arr[i], fill) : fill,
           );
         return {
           ...t,
+          // Same geometry hardening as units: keep the shaft's whole width on
+          // the lot (shaft width is fixed per kind, not save-controlled).
+          x: Math.max(0, Math.min(GRID.width - FACILITIES[t.kind].width, Math.round(num(t.x, 0)))),
           bottom,
           top,
           cars,

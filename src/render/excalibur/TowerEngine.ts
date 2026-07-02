@@ -2,7 +2,20 @@ import * as ex from "excalibur";
 import type { Simulation } from "../../engine/Simulation";
 import { GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
-import { drawCar, drawMetroTrain, drawTransport, drawUnit, type DrawCtx } from "../sprites";
+import {
+  CRANE_H,
+  CRANE_W,
+  drawCar,
+  drawCrane,
+  drawEscapeStairs,
+  drawMetroTrain,
+  drawTransport,
+  drawUnit,
+  ESCAPE_W,
+  LOBBY_VARIANTS,
+  lobbyVariant,
+  type DrawCtx,
+} from "../sprites";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
@@ -198,7 +211,17 @@ export class TowerEngine {
 
   // Shared graphics so thousands of tiles/people cost almost nothing.
   private floorGfx!: ex.Canvas;
-  private lobbyGfx!: ex.Canvas;
+  /** Lobby tile variants, baked per [lit][ground][variant] so the concourse
+   *  pattern (columns, chandeliers/planters) repeats and lights up at night. */
+  private lobbyGfx!: ex.Canvas[][][];
+  /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
+  private escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
+  /** Exterior escape-stair actors per above-ground floor, keyed by floor. */
+  private escapeActors = new Map<number, { l: ex.Actor; r: ex.Actor; sig: string }>();
+  /** The rooftop construction crane (present until the 100th floor tops out). */
+  private craneActor: ex.Actor | null = null;
+  /** The crane's canvas; tick() flags it dirty while the decorative clock runs. */
+  private craneGfx: ex.Canvas | null = null;
   private personGfx: ex.Canvas[] = [];
   private personGfxRed!: ex.Canvas;
   private personGfxStaff!: ex.Canvas;
@@ -245,6 +268,7 @@ export class TowerEngine {
     this.litState = this.d.lit;
     this.syncScene();
     this.syncMotion();
+    this.syncFacade();
     this.builtRev = this.sim.tower.revision;
     this.bindInput();
   }
@@ -428,11 +452,15 @@ export class TowerEngine {
     if (this.lastAnimWall === 0) this.lastAnimWall = nowWall;
     // Freeze the decorative clock when paused OR reduced-motion is on; functional
     // motion (cars, routed crowd) advances from sim state, not this clock.
-    if (!this.paused && !this.reducedMotion) this.animClock += nowWall - this.lastAnimWall;
+    const animating = !this.paused && !this.reducedMotion;
+    if (animating) this.animClock += nowWall - this.lastAnimWall;
     this.lastAnimWall = nowWall;
     this.d.anim = this.animClock;
     this.d.hour = c.hour;
     this.d.lit = c.isNight() || c.isEvening();
+    // The crane repaints while its inputs move: the decorative clock (trolley,
+    // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
+    if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
     this.engine.backgroundColor = ex.Color.fromHex(skyColor(c.hour));
     if (this.onUpdate) this.onUpdate(elapsed);
@@ -445,9 +473,11 @@ export class TowerEngine {
       this.lastSyncHour = this.d.hour;
       this.syncScene();
     }
-    // Motion actors only need rebuilding when the layout itself changes.
+    // Motion actors and the exterior facade (escape stairs, roof crane) only
+    // need reconciling when the layout itself changes.
     if (structuralChanged) {
       this.syncMotion();
+      this.syncFacade();
       this.builtRev = this.sim.tower.revision;
     }
     this.updateMotion();
@@ -872,18 +902,35 @@ export class TowerEngine {
   // ---- Shared graphics ----------------------------------------------------
 
   private bakeSharedGraphics(): void {
-    const mk = (kind: "floor" | "lobby") =>
+    // Structural tiles bake from a FIXED DrawCtx (not the live this.d): these
+    // canvases cache on first render, so baking from live state would freeze
+    // whatever lighting happened to be on screen at that moment into the tile.
+    const bake = (u: Unit, lit: boolean) =>
       new ex.Canvas({
         width: TILE,
         height: FLOOR,
         cache: true,
-        draw: (ctx) => {
-          this.d.ctx = ctx;
-          drawUnit(this.d, fakeStruct(kind), 0, 0, TILE, FLOOR);
-        },
+        draw: (ctx) => drawUnit({ ctx, lit, anim: 0, hour: lit ? 20 : 12 }, u, 0, 0, TILE, FLOOR),
       });
-    this.floorGfx = mk("floor");
-    this.lobbyGfx = mk("lobby");
+    this.floorGfx = bake(fakeStruct("floor"), false);
+    // Lobby variants: [lit 0/1][ground 0/1][variant]. The fake unit's floor
+    // selects the grand ground style (1) vs the sky-lobby style; x the variant.
+    this.lobbyGfx = [false, true].map((lit) =>
+      [false, true].map((ground) =>
+        Array.from({ length: LOBBY_VARIANTS }, (_, v) => bake(fakeStruct("lobby", ground ? 1 : 2, v), lit)),
+      ),
+    );
+    const bakeEsc = (side: "left" | "right") =>
+      [0, 1].map(
+        (p) =>
+          new ex.Canvas({
+            width: ESCAPE_W,
+            height: FLOOR,
+            cache: true,
+            draw: (ctx) => drawEscapeStairs(ctx, side, p as 0 | 1, FLOOR),
+          }),
+      );
+    this.escGfx = { left: bakeEsc("left"), right: bakeEsc("right") };
 
     for (const color of SHIRTS) {
       this.personGfx.push(
@@ -932,7 +979,15 @@ export class TowerEngine {
     for (const u of tower.units) {
       if (u.kind === "floor" || u.kind === "lobby") {
         seenS.add(u.id);
-        if (!this.structActors.has(u.id)) this.addStruct(u);
+        const a = this.structActors.get(u.id);
+        if (!a) this.addStruct(u);
+        else if (u.kind === "lobby") {
+          // Lobby tiles swap their shared graphic when the evening lights come
+          // on (chandeliers/sconces glow). Guarded: GraphicsComponent.use()
+          // reallocates bounds even for the same graphic, so skip when current.
+          const gfx = this.lobbyTileGfx(u);
+          if (a.graphics.current !== gfx) a.graphics.use(gfx);
+        }
       } else {
         seenR.add(u.id);
         // The signature must capture every input the room sprite draws from, so
@@ -995,6 +1050,106 @@ export class TowerEngine {
       }
   }
 
+  /**
+   * Reconcile the building's exterior dressing — escape stairs and the roof
+   * crane — to the tower silhouette. Runs only on structural changes (like
+   * syncMotion): the silhouette can't move on an hour tick or a lighting flip.
+   */
+  private syncFacade(): void {
+    // Above-ground silhouette: leftmost/rightmost built tile per floor row
+    // (every story of a multi-floor room counts, so a two-story cinema at the
+    // edge still gets stairs on its upper row).
+    const edges = new Map<number, { min: number; max: number }>();
+    for (const u of this.sim.tower.units) {
+      for (let f = Math.max(1, u.floor); f < u.floor + facilityFloors(u.kind); f++) {
+        const e = edges.get(f);
+        const right = u.x + u.width;
+        if (!e) edges.set(f, { min: u.x, max: right });
+        else {
+          if (u.x < e.min) e.min = u.x;
+          if (right > e.max) e.max = right;
+        }
+      }
+    }
+    this.syncEscapes(edges);
+    this.syncCrane(edges);
+  }
+
+  /** Reconcile the exterior escape-stair segments: one left + one right actor
+   *  per above-ground floor row, slid in place when the row's edge moves. */
+  private syncEscapes(edges: Map<number, { min: number; max: number }>): void {
+    for (const [floor, e] of edges) {
+      const sig = `${e.min}:${e.max}`;
+      const y = this.worldYTop(floor);
+      const lx = e.min * TILE - ESCAPE_W;
+      const rx = e.max * TILE;
+      const rec = this.escapeActors.get(floor);
+      if (rec) {
+        // Same graphic (parity is fixed per floor) — just follow the edge.
+        if (rec.sig !== sig) {
+          rec.l.pos = ex.vec(lx, y);
+          rec.r.pos = ex.vec(rx, y);
+          rec.sig = sig;
+        }
+        continue;
+      }
+      const parity = (floor % 2) as 0 | 1;
+      const hang = (x: number, side: "left" | "right"): ex.Actor => {
+        const a = new ex.Actor({ pos: ex.vec(x, y), width: ESCAPE_W, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
+        a.graphics.use(this.escGfx[side][parity]);
+        this.engine.add(a);
+        return a;
+      };
+      this.escapeActors.set(floor, { l: hang(lx, "left"), r: hang(rx, "right"), sig });
+    }
+    for (const [floor, rec] of this.escapeActors)
+      if (!edges.has(floor)) {
+        rec.l.kill();
+        rec.r.kill();
+        this.escapeActors.delete(floor);
+      }
+  }
+
+  /** Keep the rooftop crane perched over the highest built floor's run. It
+   *  comes down once the tower tops out at the 100th floor (and stays away
+   *  unless the top is demolished back below it — the crane is derived state,
+   *  not a latch). No above-ground floors → no crane (empty/basement lots). */
+  private syncCrane(edges: Map<number, { min: number; max: number }>): void {
+    const hi = this.sim.tower.highestFloor;
+    const e = edges.get(hi);
+    if (hi >= GRID.maxFloor || !e) {
+      if (this.craneActor) {
+        this.craneActor.kill();
+        this.craneActor = null;
+        this.craneGfx = null;
+      }
+      return;
+    }
+    const pos = ex.vec(((e.min + e.max) / 2) * TILE, this.worldYTop(hi));
+    if (!this.craneActor) {
+      // cache:true + flagDirty from tick(): the crane re-rasterizes only while
+      // the decorative clock advances, so pause/reduced-motion stops the
+      // per-frame canvas repaint AND the GPU re-upload, not just the motion.
+      this.craneGfx = new ex.Canvas({
+        width: CRANE_W,
+        height: CRANE_H,
+        cache: true,
+        draw: (ctx) => drawCrane(ctx, this.d.anim, this.d.lit),
+      });
+      this.craneActor = new ex.Actor({
+        pos,
+        width: CRANE_W,
+        height: CRANE_H,
+        anchor: ex.vec(0.5, 1),
+        z: -2,
+      });
+      this.craneActor.graphics.use(this.craneGfx);
+      this.engine.add(this.craneActor);
+    } else {
+      this.craneActor.pos = pos;
+    }
+  }
+
   private addStruct(u: Unit): void {
     const a = new ex.Actor({
       pos: ex.vec(this.worldX(u.x), this.worldYTop(u.floor)),
@@ -1003,10 +1158,15 @@ export class TowerEngine {
       anchor: ex.vec(0, 0),
       z: -1,
     });
-    a.graphics.use(u.kind === "lobby" ? this.lobbyGfx : this.floorGfx);
+    a.graphics.use(u.kind === "lobby" ? this.lobbyTileGfx(u) : this.floorGfx);
     a.collider.set(ex.Shape.Box(TILE, FLOOR, ex.vec(0, 0)));
     this.engine.add(a);
     this.structActors.set(u.id, a);
+  }
+
+  /** The shared lobby tile graphic for this unit's lighting, style and slot. */
+  private lobbyTileGfx(u: Unit): ex.Canvas {
+    return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][lobbyVariant(u.x)];
   }
 
   private addRoom(u: Unit, deadParking = false): void {
@@ -1326,6 +1486,16 @@ export class TowerEngine {
     for (const a of this.structActors.values()) a.kill();
     for (const a of this.roomActors.values()) a.kill();
     for (const a of this.transportActors.values()) a.kill();
+    for (const rec of this.escapeActors.values()) {
+      rec.l.kill();
+      rec.r.kill();
+    }
+    this.escapeActors.clear();
+    if (this.craneActor) {
+      this.craneActor.kill();
+      this.craneActor = null;
+      this.craneGfx = null;
+    }
     this.structActors.clear();
     this.roomActors.clear();
     this.roomSig.clear();
@@ -1380,12 +1550,12 @@ function buttonNum(ev: ex.PointerEvent): number {
   return 0;
 }
 
-function fakeStruct(kind: "floor" | "lobby"): Unit {
+function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {
   return {
     id: -1,
     kind,
-    floor: 1,
-    x: 0,
+    floor,
+    x,
     width: 1,
     state: "occupied",
     satisfaction: 1,

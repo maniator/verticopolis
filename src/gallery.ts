@@ -15,7 +15,9 @@ function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 
   return {
     id,
     kind,
-    floor: 5,
+    // Lobbies style by floor (1 = the grand ground concourse, else the sky-
+    // lobby look); show the ground lobby, the one the starter tower builds.
+    floor: kind === "lobby" ? 1 : 5,
     x: 0,
     width: f.width,
     state,
