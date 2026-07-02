@@ -1218,9 +1218,15 @@ html.reduce-motion *::after {
   #editor .ed-row .btn {
     min-height: 36px;
   }
-  /* Title-bar ✕s stay bar-height but gain width — a wider target without
-     inflating the navy bar. */
+  /* Title-bar ✕s keep their exact desktop look — stretching them reads
+     wrong in the bar — and instead grow an invisible tap halo, so the
+     effective target is ~34px without a pixel of visual change. */
   .btn.xs {
-    min-width: 28px;
+    position: relative;
+  }
+  .btn.xs::after {
+    content: "";
+    position: absolute;
+    inset: -8px;
   }
 }

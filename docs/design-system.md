@@ -49,9 +49,11 @@ buttons may not).
 - `:disabled` — classic GrayText (`--r-shadow`) on the same raised chrome,
   default cursor. Never hide a disabled button; show why it can't be pressed.
 - `.btn.xs` — title-bar size: the ✕ in window title bars, the coach's Skip
-  button. On coarse pointers it widens (`min-width: 28px`) but never grows
-  taller — a 36px ✕ inflates every navy bar (a shipped bug, since fixed). In
-  TS, build every ✕ via `UI.titleBarClose()` so they can't drift.
+  button. It NEVER grows on touch — a 36px ✕ inflates every navy bar and a
+  wider one stretches into a pill (both shipped bugs, since fixed). Instead,
+  coarse pointers get an invisible tap halo (`::after { inset: -8px }`) for a
+  ~34px effective target with zero visual change. In TS, build every ✕ via
+  `UI.titleBarClose()` so they can't drift.
 
 ### `.win` — a floating window
 Gray face + `--bevel-out` + `--win-shadow`. Applied to: the modal box, the
