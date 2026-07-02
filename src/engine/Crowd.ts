@@ -348,12 +348,13 @@ export class Crowd {
 
   /**
    * Live elevator calls from staff, for the dispatcher: floors where staff
-   * stand WAITING at a shaft, plus the destinations of staff already riding —
-   * so service cars come for them and then deliver them. Walkers heading to a
-   * shaft don't call yet (their leg may even be stairs); the call appears the
-   * moment they arrive and wait. Rebuilt fresh each tick from the people.
+   * stand waiting at a staff elevator OR are walking toward one (so the car
+   * pre-positions instead of retreating to idle just before they arrive),
+   * plus the destinations of staff already riding — so cars come for them and
+   * then deliver them. A walk toward stairs/escalators never calls a car.
+   * Rebuilt fresh each tick from the people themselves.
    */
-  staffCalls(): ReadonlyMap<number, number> {
+  staffCalls(tower: Tower): ReadonlyMap<number, number> {
     if (this.staffCount === 0) return Crowd.NO_CALLS;
     const calls = new Map<number, number>();
     const bump = (f: number) => calls.set(f, (calls.get(f) ?? 0) + 1);
@@ -361,6 +362,10 @@ export class Crowd {
       if (!p.staff) continue;
       if (p.state === "waiting") bump(p.floor);
       else if (p.state === "riding") bump(p.floors[p.leg + 1]);
+      else if (p.state === "toShaft") {
+        const shaft = this.shaftOf(tower, p.shaftId);
+        if (shaft && isStaffOnlyTransport(shaft.kind)) bump(p.floor);
+      }
     }
     return calls;
   }

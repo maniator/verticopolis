@@ -393,7 +393,7 @@ export class Simulation implements SimContext {
    * fire the hour/day boundary handlers exactly once if crossed. */
   private advanceStep(dtMinutes: number): void {
     this.clock.advance(dtMinutes);
-    this.elevators.update(this.tower, dtMinutes, this.rushFactor(), this.crowd.staffCalls());
+    this.elevators.update(this.tower, dtMinutes, this.rushFactor(), this.crowd.staffCalls(this.tower));
     // Advance the individually-routed crowd in lock-step with game time (after
     // the cars move, so people board their fresh positions). They run on the
     // crowd's own seconds — a few per game-minute — and a single huge tick is
