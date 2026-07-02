@@ -60,10 +60,12 @@ class GameApp {
   private inspectAnchor: { x: number; floor: number } | null = null;
   /** The facility the inspector card currently describes. */
   private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
-  /** ✕-dismissed target: stays hidden while the pointer keeps picking the same
-   *  facility (otherwise the next hover event would instantly re-open the
-   *  card). Cleared as soon as the pick moves to anything else — hovering the
-   *  facility afresh is new intent, like any tooltip. */
+  /** ✕-dismissed target: stays hidden while hover picks keep landing on the
+   *  same facility (otherwise the next hover event would instantly re-open
+   *  the card), and survives transient null/floor picks (pointer jitter).
+   *  Spent by picking a DIFFERENT facility, by an explicit tap/click
+   *  (fresh intent — the only re-arm available on touch), or by a tower
+   *  swap (ids restart, so a stale latch would mute an unrelated card). */
   private inspectDismissed: { type: "unit" | "transport"; id: number } | null = null;
   /** Cached so per-frame anchoring doesn't construct a MediaQueryList each tick. */
   private mobileMq = window.matchMedia("(max-width: 860px)");
