@@ -496,7 +496,9 @@ body {
   padding: 6px;
   font-size: 12px;
 }
-/* (hover feedback comes from the retro layer's :active bevel-in) */
+/* No hover state on purpose: period chrome gives press feedback only (the
+   retro layer's :active bevel-in). The old #d8d8d8 hover was a pre-retro
+   survivor. */
 
 /* ---- Modal (native <dialog>) ---- */
 #modal {
