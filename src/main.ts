@@ -140,9 +140,7 @@ class GameApp {
         // Latch the dismissal so the next hover pick over the same facility
         // doesn't instantly re-open the card the user just closed.
         this.inspectDismissed = this.inspectTarget;
-        this.inspectTarget = null;
-        this.inspectAnchor = null;
-        this.ui.showInspector(null);
+        this.hideInspector();
       },
       onShowSaves: () => this.ui.showSaves(SaveGame.listSlots()),
       onSaveSlot: (n) => {

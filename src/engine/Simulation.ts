@@ -25,7 +25,7 @@ import {
   transportCarCapacity,
 } from "./facilities";
 import type { FacilityKind, SerializedGame, Unit, WeatherKind } from "./types";
-import { isOperational } from "./types";
+import { isOperational, isUnitState } from "./types";
 
 /**
  * Current save-format version. `serialize()` always stamps this; `deserialize()`
@@ -1322,6 +1322,11 @@ export class Simulation implements SimContext {
       .filter((u) => isFacilityKind(u.kind))
       .map((u) => ({
         ...u,
+        // Coerce the free-form strings too: a forged `state` would flow into
+        // UI innerHTML (the inspector's "Status:" line) and state-machine
+        // compares; a non-string `label` would crash the escaping at render.
+        state: isUnitState(u.state) ? u.state : "empty",
+        label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
         satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
         occupants: Math.max(0, num(u.occupants, 0)),
         pendingIncome: num(u.pendingIncome, 0),
