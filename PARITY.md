@@ -29,7 +29,7 @@ abstraction · ⬜ not present.
 
 ## Transport
 - ✅ Stairs, Escalators (single-floor links, animated climbers)
-- ✅ Standard / Service / Express elevators with multiple cars (service lifts are staff-only: housekeepers ride them, passengers never do)
+- ✅ Standard / Service / Express elevators with multiple cars (service elevators are staff-only: housekeepers ride them, passengers never do)
 - ✅ Per-elevator car count and **per-floor stop configuration** (express / skip)
 - ✅ Demand-driven car dispatch (SCAN): cars serve waiting passengers, idle at the lobby when empty
 - ✅ Riders board to capacity and alight; cab shows its real load

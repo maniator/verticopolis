@@ -1,5 +1,5 @@
 import type { Tower } from "./Tower";
-import { isElevatorKind, transportCarCapacity } from "./facilities";
+import { isElevatorKind, isStaffOnlyTransport, transportCarCapacity } from "./facilities";
 
 /**
  * Demand-driven elevator dispatch — a simplified SCAN controller, lifted out of
@@ -39,16 +39,18 @@ export class ElevatorDispatch {
   update(tower: Tower, dt: number, rush: number, staffCalls?: ReadonlyMap<number, number>): void {
     this.pruneRemovedShafts(tower);
     this.accumulateWaiting(tower, dt, rush);
-    // Service elevators are staff-only, so they answer the REAL calls of staff
-    // currently travelling (passed in from the crowd each tick) instead of the
-    // aggregate tenant-demand estimate — no phantom passenger service. Copied
-    // so boarding decrements below can't mutate the caller's map.
-    const staffDemand = new Map(staffCalls ?? []);
+    // Staff-only shafts answer the REAL calls of staff currently traveling
+    // (passed in from the crowd each tick) instead of the aggregate
+    // tenant-demand estimate — no phantom passenger service. The mutable copy
+    // (boarding decrements it below) is made lazily on the first staff shaft,
+    // so towers without one pay nothing.
+    let staffDemand: Map<number, number> | null = null;
     for (const t of tower.transports) {
       if (!isElevatorKind(t.kind)) continue;
-      const demand = t.kind === "elevatorService" ? staffDemand : this.waiting;
-      const stops: number[] = [];
-      for (let fl = t.bottom; fl <= t.top; fl++) if (tower.stopsAt(t, fl)) stops.push(fl);
+      const demand = isStaffOnlyTransport(t.kind)
+        ? (staffDemand ??= new Map(staffCalls ?? []))
+        : this.waiting;
+      const stops = tower.stopsOf(t);
       if (stops.length === 0) continue;
       // Idle cars rest at the lowest LOBBY the shaft serves (the ground/sky lobby),
       // not merely its lowest stop — review F27.

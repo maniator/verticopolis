@@ -1,6 +1,6 @@
 import { Clock } from "./Clock";
 import { Crowd } from "./Crowd";
-import { EconomySystem } from "./EconomySystem";
+import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
 import { EventSystem } from "./EventSystem";
@@ -19,6 +19,7 @@ import {
   facilityFloors,
   isElevatorKind,
   isFacilityKind,
+  isStaffOnlyTransport,
   isHotelKind,
   maxCarsFor,
   transportCarCapacity,
@@ -442,10 +443,12 @@ export class Simulation implements SimContext {
     this.updatePresence();
     // Guests check out in the morning (not at midnight), so overnight hotel
     // population is still present at the midnight TOWER/VIP evaluation.
-    if (this.clock.hour === 8) this.economy.hotelCheckout();
+    if (this.clock.hour === HK_SHIFT_START) this.economy.hotelCheckout();
     // Housekeeping works a day shift: dispatch keeps sending crews to dirty
     // rooms through the day (retrying jobs that failed or were over capacity).
-    if (this.clock.hour >= 8 && this.clock.hour <= 19) this.economy.dispatchHousekeepers();
+    if (this.clock.hour >= HK_SHIFT_START && this.clock.hour <= HK_SHIFT_END) {
+      this.economy.dispatchHousekeepers();
+    }
     this.updateSatisfaction();
     this.attemptMoveIns();
     this.economy.collectTrafficIncome();
@@ -642,7 +645,7 @@ export class Simulation implements SimContext {
     for (const t of this.tower.transports) {
       // Staff-only: a service elevator carries no tenants, so it adds nothing
       // to passenger capacity (its payoff is the housekeeping staff network).
-      if (t.kind === "elevatorService") continue;
+      if (isStaffOnlyTransport(t.kind)) continue;
       const per = transportCarCapacity(t.kind);
       if (isElevatorKind(t.kind)) capacity += t.cars * per;
       else capacity += per; // stairs / escalator
@@ -718,7 +721,7 @@ export class Simulation implements SimContext {
     const shaftsByFloor = new Map<number, { id: number; cap: number }[]>();
     for (const t of this.tower.transports) {
       // Staff-only service elevators carry no passenger load.
-      if (t.kind === "elevatorService") continue;
+      if (isStaffOnlyTransport(t.kind)) continue;
       let active = false;
       for (let f = t.bottom; f <= t.top; f++) {
         if (this.tower.stopsAt(t, f) && served.has(f)) { active = true; break; }

@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, maxCarsFor, maxSpanFor } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
 import { isOperational } from "./types";
 import type {
   Facility,
@@ -783,6 +783,14 @@ export class Tower {
     return !(t.skipFloors && t.skipFloors.includes(floor));
   }
 
+  /** The floors a transport actually stops at — the single stop-enumeration
+   *  every consumer (routing graphs, dispatch, staff components) shares. */
+  stopsOf(t: Transport): number[] {
+    const s: number[] = [];
+    for (let fl = t.bottom; fl <= t.top; fl++) if (this.stopsAt(t, fl)) s.push(fl);
+    return s;
+  }
+
   /** Cached reachable-floor set, keyed by {@link revision} so it is recomputed
    * only when transports/structure actually change (not every tick per unit). */
   private servedRev = -1;
@@ -799,7 +807,7 @@ export class Tower {
         // Service elevators are staff-only (canon): tenants and visitors never
         // ride them, so they don't make a floor reachable. Staff travel is the
         // separate {@link staffConnected} network.
-        if (t.kind === "elevatorService") continue;
+        if (isStaffOnlyTransport(t.kind)) continue;
         let connects = false;
         for (let fl = t.bottom; fl <= t.top; fl++) {
           if (this.stopsAt(t, fl) && reachable.has(fl)) {
@@ -845,7 +853,7 @@ export class Tower {
 
   /**
    * Label every floor touched by a staff-capable transport (service elevators,
-   * stairs, escalators — never passenger lifts) with a connected-component id.
+   * stairs, escalators — never passenger elevators) with a connected-component id.
    * Housekeepers travel this network to reach dirty rooms, exactly as in the
    * original where staff ride the service elevator while guests take the
    * passenger ones. Floors with no staff transport get no label: staff there
@@ -859,9 +867,8 @@ export class Tower {
     };
     let next = 0;
     for (const t of this.transports) {
-      if (t.kind !== "elevatorService" && t.kind !== "stairs" && t.kind !== "escalator") continue;
-      const stops: number[] = [];
-      for (let fl = t.bottom; fl <= t.top; fl++) if (this.stopsAt(t, fl)) stops.push(fl);
+      if (!isStaffTransportKind(t.kind)) continue;
+      const stops = this.stopsOf(t);
       if (stops.length < 2) continue;
       // Merge every component this transport touches into one.
       let id: number | undefined;

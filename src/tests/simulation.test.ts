@@ -301,6 +301,36 @@ describe("Hotel housekeeping", () => {
     expect(room.state).toBe("empty");
   });
 
+  it("a well-kept hotel never seeds cockroaches (spread only from overnight leftovers)", () => {
+    const sim = hotelTower(21);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const a = sim.tower.place("hotelSingle", 2, x0);
+    const b = sim.tower.place("hotelSingle", 2, x0 + 4); // adjacent
+    sim.tower.place("housekeeping", 2, x0 + 8);
+    for (const r of [a, b]) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
+    // Three full days: rooms go dirty each 8:00, housekeepers clean them the
+    // same morning — roaches must never spread from a hotel that keeps up.
+    for (let i = 0; i < 24 * 3; i++) sim.tick(60);
+    expect(sim.log.some((l) => l.text.includes("Cockroaches"))).toBe(false);
+  });
+
+  it("a crew built after the 8:00 checkout still works the same day", () => {
+    const sim = hotelTower(22);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const r = sim.tower.place("hotelDouble", 2, x0);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // Past the shift start with no crew anywhere: nothing can clean.
+    for (let i = 0; i < 3; i++) sim.tick(60); // 7:00 → 10:00
+    expect(room.state).toBe("dirty");
+    // Build housekeeping mid-shift; the next hourly dispatch picks it up.
+    sim.tower.place("housekeeping", 2, x0 + 8);
+    for (let i = 0; i < 3; i++) sim.tick(60);
+    expect(room.state).toBe("empty");
+  });
+
   it("housekeepers need a staff route — a passenger elevator alone won't do", () => {
     const sim = hotelTower(8);
     sim.star = 2;

@@ -479,11 +479,14 @@ export class TowerEngine {
   }
 
   private positionPerson(p: Person, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
-    // While riding, the person is inside a car — the cab's own rider count shows
+    // While riding, a tenant is inside a car — the cab's own rider count shows
     // them, so we hide the standalone figure to avoid drawing them twice.
-    const riding = p.state === "riding";
-    if (rec.actor.graphics.visible !== !riding) rec.actor.graphics.visible = !riding;
-    if (riding) return;
+    // Staff stay visible while riding: a lone housekeeper in a 16-person
+    // service cab rounds to zero on the cab's load indicator, and watching
+    // them ride to the room floor is the whole point of the mechanic.
+    const hidden = p.state === "riding" && !p.staff;
+    if (rec.actor.graphics.visible !== !hidden) rec.actor.graphics.visible = !hidden;
+    if (hidden) return;
     // Use the continuous floor (fy) so a stair/escalator climber animates
     // smoothly between floors; for every other state fy equals the floor.
     rec.actor.pos = ex.vec(this.worldX(p.x), this.worldYTop(p.fy) + FLOOR - 3);
