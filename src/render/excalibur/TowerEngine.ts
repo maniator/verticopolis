@@ -217,6 +217,12 @@ export class TowerEngine {
       suppressPlayButton: true,
       suppressConsoleBootMessage: true,
       backgroundColor: ex.Color.fromHex("#7fb0e0"),
+      // No gameplay uses collisions — actors are positioned directly and picking
+      // goes through Actor.contains(), which reads collider geometry without the
+      // simulation. Left on, Excalibur's broadphase/narrowphase/solver dominates
+      // the frame once a tower reaches ~1000 actors (profiled at >25% of frame
+      // time on a big save), driving phones into a sub-2fps "freeze".
+      physics: false,
       handleContextLost: (e) => {
         e.preventDefault(); // spec: signals the browser we own recovery
         this.engine.clock.stop(); // every GL call is dead now — stop the loop
