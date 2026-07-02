@@ -352,6 +352,9 @@ export class Simulation implements SimContext {
       return true;
     }
     if (u) {
+      // A floor/lobby tile that holds up the story above can't be pulled out —
+      // that would leave the structure above hanging in midair.
+      if (this.tower.removalReason(u.id)) return false;
       this.tower.removeUnit(u.id);
       this.money += resaleRefund(u.kind);
       return true;

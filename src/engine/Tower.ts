@@ -528,6 +528,26 @@ export class Tower {
     return x < t.x + t.width && x + width > t.x;
   }
 
+  /**
+   * Why a unit may not be removed by the player, or undefined if removal is
+   * safe. Mirrors the placement invariant: above ground, structure must rest
+   * on the story below, so a floor/lobby tile can't be pulled out from under
+   * standing structure. (Internal callers like {@link ensureFloorUnder}'s
+   * rollback bypass this via {@link removeUnit} directly.)
+   */
+  removalReason(id: number): string | undefined {
+    const u = this.byId.get(id);
+    if (!u || !isStructural(u.kind)) return undefined;
+    if (u.floor >= 1) {
+      for (let i = 0; i < u.width; i++) {
+        if (this.structure.has(this.key(u.floor + 1, u.x + i))) {
+          return "Remove the story above first — floors can't hang in midair.";
+        }
+      }
+    }
+    return undefined;
+  }
+
   removeUnit(id: number): Unit | undefined {
     const idx = this.units.findIndex((u) => u.id === id);
     if (idx === -1) return undefined;

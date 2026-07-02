@@ -89,6 +89,19 @@ describe("Simulation economy", () => {
     expect(before - sim.money).toBe(cost);
   });
 
+  it("refuses to sell a floor that supports the story above", () => {
+    const sim = Simulation.newGame();
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("floor", 2, x0);
+    sim.build("floor", 3, x0);
+    const before = sim.money;
+    expect(sim.sellAt(2, x0)).toBe(false); // floor 3 rests on it — no refund
+    expect(sim.money).toBe(before);
+    // Top-down works: clear floor 3, then floor 2 sells fine.
+    expect(sim.sellAt(3, x0)).toBe(true);
+    expect(sim.sellAt(2, x0)).toBe(true);
+  });
+
   it("won't build a room floating in midair", () => {
     const sim = Simulation.newGame(7);
     const r = sim.build("office", 6, 5); // far from the starter lobby

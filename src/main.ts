@@ -1004,6 +1004,12 @@ class GameApp {
           this.ui.toast("You can't sell a burning unit — call fire rescue or let it burn out.", "bad");
           return;
         }
+        const reason = this.sim.tower.removalReason(u.id);
+        if (reason) {
+          this.audio.sfx("error");
+          this.ui.toast(reason, "bad");
+          return;
+        }
         this.sim.tower.removeUnit(u.id);
         // A gutted shell has no salvage value; everything else refunds half.
         this.sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
@@ -1261,6 +1267,12 @@ class GameApp {
       if (u.state === "fire") {
         this.audio.sfx("error");
         this.ui.toast("You can't bulldoze a burning unit — call fire rescue or let it burn out.", "bad");
+        return;
+      }
+      const reason = this.sim.tower.removalReason(u.id);
+      if (reason) {
+        this.audio.sfx("error");
+        this.ui.toast(reason, "bad");
         return;
       }
       this.sim.tower.removeUnit(u.id);

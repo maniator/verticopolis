@@ -93,6 +93,23 @@ describe("Tower placement", () => {
     expect(tower.canPlace("floor", 2, 20).ok).toBe(true);
   });
 
+  it("won't let a supporting floor be removed from under the story above", () => {
+    for (let i = 0; i < 5; i++) tower.place("lobby", 1, i);
+    const mid = tower.place("floor", 2, 0);
+    tower.place("floor", 3, 0);
+    // The lobby holds up floor 2, and floor 2 holds up floor 3.
+    expect(tower.removalReason(tower.unitAt(1, 0)!.id)).toBeDefined();
+    expect(tower.removalReason(mid.unitId!)).toBeDefined();
+    // The top floor holds nothing and may go; then floor 2 is free too.
+    expect(tower.removalReason(tower.unitAt(3, 0)!.id)).toBeUndefined();
+    tower.removeUnit(tower.unitAt(3, 0)!.id);
+    expect(tower.removalReason(mid.unitId!)).toBeUndefined();
+    // A basement tile hangs in the earth, not off the ground floor — removing
+    // B1 under the lobby stays legal.
+    tower.place("floor", 0, 0);
+    expect(tower.removalReason(tower.unitAt(0, 0)!.id)).toBeUndefined();
+  });
+
   it("enforces the buildable bounds", () => {
     tower.place("lobby", 1, 0);
     expect(tower.canPlace("floor", GRID.maxFloor + 1, 0).ok).toBe(false);
