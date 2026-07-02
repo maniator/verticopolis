@@ -338,11 +338,8 @@ body {
   cursor: pointer;
 }
 #editor button.danger {
-  background: #5a2a2a;
-  color: #fff;
-}
-#editor button.danger:hover {
-  background: #7a3535;
+  color: var(--bad-ink);
+  font-weight: 700;
 }
 #editor input {
   flex: 2;
