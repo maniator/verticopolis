@@ -92,8 +92,11 @@ interface RoomRec {
   /** Burning/under-construction rooms animate (cache:false, redrawn every
    *  frame); a transition into or out of an animated state still rebuilds. */
   animated: boolean;
-  /** Live "dead parking space" flag the draw closure reads (red X overlay). */
-  dead: boolean;
+  /** Mutable inputs the draw closure reads live — currently just the "dead
+   *  parking space" flag (red X overlay). A separate holder (not a field on
+   *  the record) so the closure can capture it before the actor/canvas exist
+   *  and the record stays fully typed with no placeholder casts. */
+  live: { dead: boolean };
 }
 
 /** A single engine-driven walking figure (lobby/corridor walker or climber). */
@@ -1031,7 +1034,7 @@ export class TowerEngine {
             // Repaint in place: the draw closure reads the unit's live state, so
             // flagging the canvas dirty re-bakes the SAME bitmap into the SAME
             // GPU texture. No actor churn, no new allocations — see RoomRec.
-            rec.dead = isDead;
+            rec.live.dead = isDead;
             rec.cv.flagDirty();
           } else {
             // Animated↔static flips the canvas cache mode, which is fixed at
@@ -1206,9 +1209,9 @@ export class TowerEngine {
     // baked once and only re-baked (in place — see RoomRec) when their state or
     // the lighting changes.
     const animated = u.state === "fire" || u.state === "construction";
-    // The draw closure reads `u` and `rec.dead` LIVE, so a later signature
+    // The draw closure reads `u` and `live.dead` LIVE, so a later signature
     // change repaints by flagging the canvas dirty instead of rebuilding it.
-    const rec: RoomRec = { actor: undefined as unknown as ex.Actor, cv: undefined as unknown as ex.Canvas, animated, dead: deadParking };
+    const live = { dead: deadParking };
     const cv = new ex.Canvas({
       width: w,
       height: h,
@@ -1219,9 +1222,9 @@ export class TowerEngine {
         // Canon "red X" on a parking space that isn't chained to a ramp (dead —
         // no relief). Baked into the sprite; the dead-bit participates in the room
         // signature, so this re-bakes when the signature changes (state/lighting/
-        // hour or the dead-bit). rec.dead is refreshed on each sync from the
+        // hour or the dead-bit). live.dead is refreshed on each sync from the
         // caller's single functionalParkingSet() read — no per-unit recompute.
-        if (rec.dead) {
+        if (live.dead) {
           // Dark under-stroke so the X reads as a SHAPE independent of hue
           // (color-blind cue), then the red X on top.
           for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
@@ -1241,9 +1244,7 @@ export class TowerEngine {
     a.graphics.use(cv);
     a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
     this.engine.add(a);
-    rec.actor = a;
-    rec.cv = cv;
-    this.roomActors.set(u.id, rec);
+    this.roomActors.set(u.id, { actor: a, cv, animated, live });
   }
 
   private addTransport(t: Transport): void {
