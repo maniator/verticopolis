@@ -13,6 +13,7 @@ import {
   drawUnit,
   ESCAPE_W,
   LOBBY_VARIANTS,
+  lobbyVariant,
   type DrawCtx,
 } from "../sprites";
 import { carIndicator, type CarIndicator } from "../carIndicator";
@@ -219,6 +220,8 @@ export class TowerEngine {
   private escapeActors = new Map<number, { l: ex.Actor; r: ex.Actor; sig: string }>();
   /** The rooftop construction crane (present until the 100th floor tops out). */
   private craneActor: ex.Actor | null = null;
+  /** The crane's canvas; tick() flags it dirty while the decorative clock runs. */
+  private craneGfx: ex.Canvas | null = null;
   private personGfx: ex.Canvas[] = [];
   private personGfxRed!: ex.Canvas;
   private personGfxStaff!: ex.Canvas;
@@ -265,6 +268,7 @@ export class TowerEngine {
     this.litState = this.d.lit;
     this.syncScene();
     this.syncMotion();
+    this.syncFacade();
     this.builtRev = this.sim.tower.revision;
     this.bindInput();
   }
@@ -448,11 +452,15 @@ export class TowerEngine {
     if (this.lastAnimWall === 0) this.lastAnimWall = nowWall;
     // Freeze the decorative clock when paused OR reduced-motion is on; functional
     // motion (cars, routed crowd) advances from sim state, not this clock.
-    if (!this.paused && !this.reducedMotion) this.animClock += nowWall - this.lastAnimWall;
+    const animating = !this.paused && !this.reducedMotion;
+    if (animating) this.animClock += nowWall - this.lastAnimWall;
     this.lastAnimWall = nowWall;
     this.d.anim = this.animClock;
     this.d.hour = c.hour;
     this.d.lit = c.isNight() || c.isEvening();
+    // The crane repaints while its inputs move: the decorative clock (trolley,
+    // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
+    if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
     this.engine.backgroundColor = ex.Color.fromHex(skyColor(c.hour));
     if (this.onUpdate) this.onUpdate(elapsed);
@@ -465,9 +473,11 @@ export class TowerEngine {
       this.lastSyncHour = this.d.hour;
       this.syncScene();
     }
-    // Motion actors only need rebuilding when the layout itself changes.
+    // Motion actors and the exterior facade (escape stairs, roof crane) only
+    // need reconciling when the layout itself changes.
     if (structuralChanged) {
       this.syncMotion();
+      this.syncFacade();
       this.builtRev = this.sim.tower.revision;
     }
     this.updateMotion();
@@ -904,32 +914,23 @@ export class TowerEngine {
       });
     this.floorGfx = bake(fakeStruct("floor"), false);
     // Lobby variants: [lit 0/1][ground 0/1][variant]. The fake unit's floor
-    // selects the grand ground style vs the sky-lobby style; its x the variant.
+    // selects the grand ground style (1) vs the sky-lobby style; x the variant.
     this.lobbyGfx = [false, true].map((lit) =>
-      [15, 1].map((floor) =>
-        Array.from({ length: LOBBY_VARIANTS }, (_, v) => bake(fakeStruct("lobby", floor, v), lit)),
+      [false, true].map((ground) =>
+        Array.from({ length: LOBBY_VARIANTS }, (_, v) => bake(fakeStruct("lobby", ground ? 1 : 2, v), lit)),
       ),
     );
-    this.escGfx = {
-      left: [0, 1].map(
+    const bakeEsc = (side: "left" | "right") =>
+      [0, 1].map(
         (p) =>
           new ex.Canvas({
             width: ESCAPE_W,
             height: FLOOR,
             cache: true,
-            draw: (ctx) => drawEscapeStairs(ctx, "left", p as 0 | 1, FLOOR),
+            draw: (ctx) => drawEscapeStairs(ctx, side, p as 0 | 1, FLOOR),
           }),
-      ),
-      right: [0, 1].map(
-        (p) =>
-          new ex.Canvas({
-            width: ESCAPE_W,
-            height: FLOOR,
-            cache: true,
-            draw: (ctx) => drawEscapeStairs(ctx, "right", p as 0 | 1, FLOOR),
-          }),
-      ),
-    };
+      );
+    this.escGfx = { left: bakeEsc("left"), right: bakeEsc("right") };
 
     for (const color of SHIRTS) {
       this.personGfx.push(
@@ -975,26 +976,18 @@ export class TowerEngine {
     const parkingOK = tower.functionalParkingSet();
     const seenS = new Set<number>();
     const seenR = new Set<number>();
-    // Above-ground silhouette (leftmost/rightmost built tile per floor row),
-    // accumulated in this same pass — it hangs the exterior escape stairs.
-    const edges = new Map<number, { min: number; max: number }>();
     for (const u of tower.units) {
-      for (let f = Math.max(1, u.floor); f < u.floor + facilityFloors(u.kind); f++) {
-        const e = edges.get(f);
-        const right = u.x + u.width;
-        if (!e) edges.set(f, { min: u.x, max: right });
-        else {
-          if (u.x < e.min) e.min = u.x;
-          if (right > e.max) e.max = right;
-        }
-      }
       if (u.kind === "floor" || u.kind === "lobby") {
         seenS.add(u.id);
         const a = this.structActors.get(u.id);
         if (!a) this.addStruct(u);
-        // Lobby tiles swap their shared graphic when the evening lights come on
-        // (chandeliers/sconces glow) — a pointer swap, not a re-bake.
-        else if (u.kind === "lobby") a.graphics.use(this.lobbyTileGfx(u));
+        else if (u.kind === "lobby") {
+          // Lobby tiles swap their shared graphic when the evening lights come
+          // on (chandeliers/sconces glow). Guarded: GraphicsComponent.use()
+          // reallocates bounds even for the same graphic, so skip when current.
+          const gfx = this.lobbyTileGfx(u);
+          if (a.graphics.current !== gfx) a.graphics.use(gfx);
+        }
       } else {
         seenR.add(u.id);
         // The signature must capture every input the room sprite draws from, so
@@ -1055,47 +1048,59 @@ export class TowerEngine {
         this.transportActors.delete(id);
         this.transportSig.delete(id);
       }
-
-    this.syncEscapes(edges);
-    this.syncCrane();
   }
 
-  /** Reconcile the exterior escape-stair segments to the tower silhouette:
-   *  one left + one right actor per above-ground floor row, re-hung only when
-   *  that row's outermost edge actually moves. */
+  /**
+   * Reconcile the building's exterior dressing — escape stairs and the roof
+   * crane — to the tower silhouette. Runs only on structural changes (like
+   * syncMotion): the silhouette can't move on an hour tick or a lighting flip.
+   */
+  private syncFacade(): void {
+    // Above-ground silhouette: leftmost/rightmost built tile per floor row
+    // (every story of a multi-floor room counts, so a two-story cinema at the
+    // edge still gets stairs on its upper row).
+    const edges = new Map<number, { min: number; max: number }>();
+    for (const u of this.sim.tower.units) {
+      for (let f = Math.max(1, u.floor); f < u.floor + facilityFloors(u.kind); f++) {
+        const e = edges.get(f);
+        const right = u.x + u.width;
+        if (!e) edges.set(f, { min: u.x, max: right });
+        else {
+          if (u.x < e.min) e.min = u.x;
+          if (right > e.max) e.max = right;
+        }
+      }
+    }
+    this.syncEscapes(edges);
+    this.syncCrane(edges);
+  }
+
+  /** Reconcile the exterior escape-stair segments: one left + one right actor
+   *  per above-ground floor row, slid in place when the row's edge moves. */
   private syncEscapes(edges: Map<number, { min: number; max: number }>): void {
     for (const [floor, e] of edges) {
       const sig = `${e.min}:${e.max}`;
-      let rec = this.escapeActors.get(floor);
-      if (rec && rec.sig !== sig) {
-        rec.l.kill();
-        rec.r.kill();
-        rec = undefined;
-        this.escapeActors.delete(floor);
+      const y = this.worldYTop(floor);
+      const lx = e.min * TILE - ESCAPE_W;
+      const rx = e.max * TILE;
+      const rec = this.escapeActors.get(floor);
+      if (rec) {
+        // Same graphic (parity is fixed per floor) — just follow the edge.
+        if (rec.sig !== sig) {
+          rec.l.pos = ex.vec(lx, y);
+          rec.r.pos = ex.vec(rx, y);
+          rec.sig = sig;
+        }
+        continue;
       }
-      if (!rec) {
-        const parity = (floor % 2) as 0 | 1;
-        const y = this.worldYTop(floor);
-        const l = new ex.Actor({
-          pos: ex.vec(e.min * TILE - ESCAPE_W, y),
-          width: ESCAPE_W,
-          height: FLOOR,
-          anchor: ex.vec(0, 0),
-          z: -2,
-        });
-        l.graphics.use(this.escGfx.left[parity]);
-        const r = new ex.Actor({
-          pos: ex.vec(e.max * TILE, y),
-          width: ESCAPE_W,
-          height: FLOOR,
-          anchor: ex.vec(0, 0),
-          z: -2,
-        });
-        r.graphics.use(this.escGfx.right[parity]);
-        this.engine.add(l);
-        this.engine.add(r);
-        this.escapeActors.set(floor, { l, r, sig });
-      }
+      const parity = (floor % 2) as 0 | 1;
+      const hang = (x: number, side: "left" | "right"): ex.Actor => {
+        const a = new ex.Actor({ pos: ex.vec(x, y), width: ESCAPE_W, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
+        a.graphics.use(this.escGfx[side][parity]);
+        this.engine.add(a);
+        return a;
+      };
+      this.escapeActors.set(floor, { l: hang(lx, "left"), r: hang(rx, "right"), sig });
     }
     for (const [floor, rec] of this.escapeActors)
       if (!edges.has(floor)) {
@@ -1105,33 +1110,30 @@ export class TowerEngine {
       }
   }
 
-  /** Keep the rooftop crane perched over the highest built floor; it comes
-   *  down for good once the tower tops out at the 100th floor. */
-  private syncCrane(): void {
-    const tower = this.sim.tower;
-    const hi = tower.highestFloor;
-    if (hi >= GRID.maxFloor) {
+  /** Keep the rooftop crane perched over the highest built floor's run. It
+   *  comes down once the tower tops out at the 100th floor (and stays away
+   *  unless the top is demolished back below it — the crane is derived state,
+   *  not a latch). No above-ground floors → no crane (empty/basement lots). */
+  private syncCrane(edges: Map<number, { min: number; max: number }>): void {
+    const hi = this.sim.tower.highestFloor;
+    const e = edges.get(hi);
+    if (hi >= GRID.maxFloor || !e) {
       if (this.craneActor) {
         this.craneActor.kill();
         this.craneActor = null;
+        this.craneGfx = null;
       }
       return;
     }
-    // Center the crane over the top floor's built run.
-    let min = Infinity;
-    let max = -Infinity;
-    for (const u of tower.units) {
-      if (u.floor + facilityFloors(u.kind) - 1 !== hi) continue;
-      if (u.x < min) min = u.x;
-      if (u.x + u.width > max) max = u.x + u.width;
-    }
-    const cx = min <= max ? ((min + max) / 2) * TILE : (GRID.width / 2) * TILE;
-    const pos = ex.vec(cx, this.worldYTop(hi));
+    const pos = ex.vec(((e.min + e.max) / 2) * TILE, this.worldYTop(hi));
     if (!this.craneActor) {
-      const cv = new ex.Canvas({
+      // cache:true + flagDirty from tick(): the crane re-rasterizes only while
+      // the decorative clock advances, so pause/reduced-motion stops the
+      // per-frame canvas repaint AND the GPU re-upload, not just the motion.
+      this.craneGfx = new ex.Canvas({
         width: CRANE_W,
         height: CRANE_H,
-        cache: false, // animated: trolley/hook/beacon ride the decorative clock
+        cache: true,
         draw: (ctx) => drawCrane(ctx, this.d.anim, this.d.lit),
       });
       this.craneActor = new ex.Actor({
@@ -1141,7 +1143,7 @@ export class TowerEngine {
         anchor: ex.vec(0.5, 1),
         z: -2,
       });
-      this.craneActor.graphics.use(cv);
+      this.craneActor.graphics.use(this.craneGfx);
       this.engine.add(this.craneActor);
     } else {
       this.craneActor.pos = pos;
@@ -1164,7 +1166,7 @@ export class TowerEngine {
 
   /** The shared lobby tile graphic for this unit's lighting, style and slot. */
   private lobbyTileGfx(u: Unit): ex.Canvas {
-    return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][u.x % LOBBY_VARIANTS];
+    return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][lobbyVariant(u.x)];
   }
 
   private addRoom(u: Unit, deadParking = false): void {
@@ -1492,6 +1494,7 @@ export class TowerEngine {
     if (this.craneActor) {
       this.craneActor.kill();
       this.craneActor = null;
+      this.craneGfx = null;
     }
     this.structActors.clear();
     this.roomActors.clear();

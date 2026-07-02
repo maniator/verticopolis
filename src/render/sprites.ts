@@ -125,19 +125,29 @@ function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
 
 /** The lobby pattern repeats on this many structural tiles: column, plain,
  *  centerpiece (chandelier / planter), plain. The engine bakes one shared
- *  graphic per variant and picks by `x % LOBBY_VARIANTS`, so adjacent tiles
+ *  graphic per variant and picks by {@link lobbyVariant}, so adjacent tiles
  *  always line up into one continuous concourse. */
 export const LOBBY_VARIANTS = 4;
-/** Width in px of one lobby pattern tile (the engine's structural TILE). */
-const LOBBY_TILE = 11;
+
+/** Which pattern slot a lobby tile at grid x occupies. Hardened against
+ *  hostile saves (deserialize doesn't validate unit x): a fractional,
+ *  negative or non-finite x still lands on a real variant instead of
+ *  indexing the engine's baked-graphics array out of bounds. */
+export function lobbyVariant(x: number): number {
+  const t = Math.trunc(Number.isFinite(x) ? x : 0) % LOBBY_VARIANTS;
+  return t < 0 ? t + LOBBY_VARIANTS : t;
+}
 
 function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
-  // The engine bakes lobbies one structural tile at a time; wider spans (the
-  // sprite gallery, previews) tile the same pattern, keyed by absolute tile x
-  // so runs stay aligned however they're sliced.
-  for (let t = 0; t * LOBBY_TILE < w; t++) {
-    const tw = Math.min(LOBBY_TILE, w - t * LOBBY_TILE);
-    drawLobbyTile(d, x + t * LOBBY_TILE, y, tw, h, (((u.x + t) % LOBBY_VARIANTS) + LOBBY_VARIANTS) % LOBBY_VARIANTS, u.floor === 1);
+  // One pattern slice per structural tile of the unit, scaled to whatever the
+  // caller renders a tile as (the engine bakes at TILE px; the gallery draws
+  // bigger). Keyed by absolute tile x so runs stay aligned however sliced.
+  const tiles = Math.max(1, Math.round(u.width) || 1);
+  const pitch = w / tiles;
+  for (let t = 0; t < tiles; t++) {
+    const x0 = x + t * pitch;
+    const tw = t === tiles - 1 ? x + w - x0 : pitch;
+    drawLobbyTile(d, x0, y, tw, h, lobbyVariant(u.x + t), u.floor === 1);
   }
 }
 
@@ -179,7 +189,10 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
     ctx.fillRect(x, y + h - 5, w, 1);
   }
 
-  const cx = x + 5;
+  // Decorations center on the slice and stay inside it, whatever the caller's
+  // tile scale — in-engine each slice is its own 11px baked canvas, so anything
+  // painted past the edge would be clipped into a visible seam.
+  const cx = x + Math.floor(w / 2);
   if (variant === 0) {
     // Fluted column, cornice to floor, with gold capital and base.
     ctx.fillStyle = ground ? "#f1e8ce" : "#e4eaf2";
@@ -203,7 +216,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
     if (lit) {
       ctx.fillStyle = "rgba(255,214,110,0.28)";
       ctx.beginPath();
-      ctx.arc(cx + 0.5, y + 9, 6.5, 0, Math.PI * 2);
+      ctx.arc(cx + 0.5, y + 9, Math.min(6.5, w / 2 - 0.5), 0, Math.PI * 2);
       ctx.fill();
     }
   } else if (variant === 2) {
