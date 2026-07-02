@@ -124,6 +124,20 @@ export class Tower {
     return true;
   }
 
+  /** The structural kind occupying a tile ("floor" | "lobby"), if any. */
+  structureKindAt(floor: number, x: number): "floor" | "lobby" | undefined {
+    return this.structKind.get(this.key(floor, x));
+  }
+
+  /** True if every occupied tile of the span is a plain floor (no lobbies) —
+   *  i.e. a lobby placed here is an in-place upgrade, not a collision. */
+  private spanUpgradeableToLobby(floor: number, x: number, width: number): boolean {
+    for (let i = 0; i < width; i++) {
+      if (this.structKind.get(this.key(floor, x + i)) === "lobby") return false;
+    }
+    return true;
+  }
+
   /** True if structural floor exists across the whole span. */
   spanHasFloor(floor: number, x: number, width: number): boolean {
     for (let i = 0; i < width; i++) {
@@ -278,7 +292,15 @@ export class Tower {
         return { ok: false, reason: "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)." };
       }
       if (!this.structureSpanFree(floor, x, f.width)) {
-        return { ok: false, reason: "Structure already here." };
+        // A lobby may upgrade plain floor tiles in place (the sky-lobby
+        // conversion): the lobby is structural too, so support for the story
+        // above is preserved without ever passing through a hanging state.
+        if (kind !== "lobby" || !this.spanUpgradeableToLobby(floor, x, f.width)) {
+          return { ok: false, reason: "Structure already here." };
+        }
+        if (!this.roomSpanFree(floor, x, f.width)) {
+          return { ok: false, reason: "Lobbies are transit-only — clear the rooms here first." };
+        }
       }
       if (!this.isSupported(floor, x, f.width)) {
         return {
@@ -407,6 +429,15 @@ export class Tower {
     const check = this.canPlace(kind, floor, x);
     if (!check.ok) return check;
     const f = FACILITIES[kind];
+    // In-place floor→lobby upgrade: clear the plain floor tiles being replaced
+    // before registering the lobby, so the structure index never goes stale.
+    // (canPlace guaranteed any structure in the span is plain floor.)
+    if (kind === "lobby") {
+      for (let i = 0; i < f.width; i++) {
+        const sid = this.structure.get(this.key(floor, x + i));
+        if (sid !== undefined) this.removeUnit(sid);
+      }
+    }
     const unit: Unit = {
       id: this.nextId++,
       kind,
@@ -526,6 +557,22 @@ export class Tower {
   private transportOverlaps(t: Transport, x: number, width: number, floor: number): boolean {
     if (floor < t.bottom || floor > t.top) return false;
     return x < t.x + t.width && x + width > t.x;
+  }
+
+  /**
+   * Why a unit may not be removed by the player, or undefined if removal is
+   * safe. Mirrors the placement invariant: above ground, structure must rest
+   * on the story below, so a floor/lobby tile can't be pulled out from under
+   * standing structure. (Internal callers like {@link ensureFloorUnder}'s
+   * rollback bypass this via {@link removeUnit} directly.)
+   */
+  removalReason(id: number): string | undefined {
+    const u = this.byId.get(id);
+    if (!u || !isStructural(u.kind)) return undefined;
+    if (u.floor >= 1 && !this.structureSpanFree(u.floor + 1, u.x, u.width)) {
+      return "Remove the story above first — floors can't hang in midair.";
+    }
+    return undefined;
   }
 
   removeUnit(id: number): Unit | undefined {
