@@ -892,7 +892,7 @@ class GameApp {
     actions += `<div class="ed-row"><button class="danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4>${f.name}<span class="ed-close">✕</span></h4>` +
+      `<h4>${f.name}<button type="button" class="ed-close" aria-label="Close">✕</button></h4>` +
       `<div class="ed-stats">${rows.join("")}</div>` +
       actions
     );
@@ -943,7 +943,7 @@ class GameApp {
     actions += `<div class="ed-row"><button class="danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4>${f.name}<span class="ed-close">✕</span></h4>` +
+      `<h4>${f.name}<button type="button" class="ed-close" aria-label="Close">✕</button></h4>` +
       `<div class="ed-stats">${rows.join("")}</div>` +
       actions
     );
