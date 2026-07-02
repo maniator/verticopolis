@@ -129,10 +129,11 @@ function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w: numbe
  *  always line up into one continuous concourse. */
 export const LOBBY_VARIANTS = 4;
 
-/** Which pattern slot a lobby tile at grid x occupies. Hardened against
- *  hostile saves (deserialize doesn't validate unit x): a fractional,
- *  negative or non-finite x still lands on a real variant instead of
- *  indexing the engine's baked-graphics array out of bounds. */
+/** Which pattern slot a lobby tile at grid x occupies. Defense-in-depth on
+ *  top of deserialize's geometry clamps: a fractional, negative or non-finite
+ *  x from any other caller (previews, tools, future fake units) still lands
+ *  on a real variant instead of indexing the engine's baked-graphics array
+ *  out of bounds. */
 export function lobbyVariant(x: number): number {
   const t = Math.trunc(Number.isFinite(x) ? x : 0) % LOBBY_VARIANTS;
   return t < 0 ? t + LOBBY_VARIANTS : t;
