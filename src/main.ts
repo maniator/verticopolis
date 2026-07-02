@@ -11,6 +11,7 @@ import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage
 import { trafficTier, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
 import { parseTWR } from "./storage/twrImport";
 import { UI, type Tool } from "./ui/UI";
+import { escapeHtml } from "./ui/escape";
 import { OnboardingController, shouldArm } from "./ui/Onboarding";
 import { registerPWA } from "./pwa";
 
@@ -57,6 +58,13 @@ class GameApp {
   /** World cell the hover inspector tooltip is describing, so it can be
    *  anchored to that spot on screen and ride the tower when the camera moves. */
   private inspectAnchor: { x: number; floor: number } | null = null;
+  /** The facility the inspector card currently describes. */
+  private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
+  /** ✕-dismissed target: stays hidden while the pointer keeps picking the same
+   *  facility (otherwise the next hover event would instantly re-open the
+   *  card). Cleared as soon as the pick moves to anything else — hovering the
+   *  facility afresh is new intent, like any tooltip. */
+  private inspectDismissed: { type: "unit" | "transport"; id: number } | null = null;
   /** Cached so per-frame anchoring doesn't construct a MediaQueryList each tick. */
   private mobileMq = window.matchMedia("(max-width: 860px)");
   /** First-run splash + onboarding (pure DOM chrome). */
@@ -126,6 +134,14 @@ class GameApp {
       },
       onRenameTower: (name) => (this.sim.tower.towerName = name),
       onShowStats: () => this.ui.showStats(this.buildStatsHtml()),
+      onInspectorClose: () => {
+        // Latch the dismissal so the next hover pick over the same facility
+        // doesn't instantly re-open the card the user just closed.
+        this.inspectDismissed = this.inspectTarget;
+        this.inspectTarget = null;
+        this.inspectAnchor = null;
+        this.ui.showInspector(null);
+      },
       onShowSaves: () => this.ui.showSaves(SaveGame.listSlots()),
       onSaveSlot: (n) => {
         SaveGame.saveSlot(n, this.sim);
@@ -825,7 +841,7 @@ class GameApp {
 
     let actions = "";
     if (canRename) {
-      actions += `<div class="ed-row"><input data-edit="noop" id="ed-name" value="${escapeAttr(u.label)}" /><button data-edit="rename">Rename</button></div>`;
+      actions += `<div class="ed-row"><input data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button data-edit="rename">Rename</button></div>`;
     }
     // Price adjuster: offices/hotels any time, condos only while still unsold.
     if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
@@ -1101,7 +1117,7 @@ class GameApp {
     return `<div class="stats-grid">
       <div class="stats-section">Overview</div>
       <div class="col">
-        <span class="k">Tower name</span><span class="v">${escapeAttr(this.sim.tower.towerName)}</span>
+        <span class="k">Tower name</span><span class="v">${escapeHtml(this.sim.tower.towerName)}</span>
         <span class="k">Rating</span><span class="v stars">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
         <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
         ${ratingRow}
@@ -1161,8 +1177,8 @@ class GameApp {
       `<div class="col ms">${items
         .map(
           (m) =>
-            `<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${escapeAttr(m.label)}</span>` +
-            `<span class="v">${escapeAttr(m.desc)}</span>`,
+            `<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${escapeHtml(m.label)}</span>` +
+            `<span class="v">${escapeHtml(m.desc)}</span>`,
         )
         .join("")}</div>`;
     const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
@@ -1294,17 +1310,21 @@ class GameApp {
 
   private inspectPicked(p: Picked | null): void {
     if (!p || p.kind === "floor" || p.kind === "lobby") {
-      this.inspectAnchor = null;
-      this.ui.showInspector(null);
+      this.clearInspector();
       return;
     }
+    if (this.inspectDismissed && this.inspectDismissed.type === p.type && this.inspectDismissed.id === p.id) {
+      return; // ✕-dismissed and the pointer never left it — stay closed
+    }
+    this.inspectDismissed = null;
     if (p.type === "unit") {
       const u = this.sim.tower.units.find((x) => x.id === p.id);
       if (!u) {
-        this.inspectAnchor = null;
-        return this.ui.showInspector(null);
+        this.clearInspector();
+        return;
       }
       this.inspectAnchor = { x: u.x + u.width, floor: u.floor + facilityFloors(u.kind) - 1 };
+      this.inspectTarget = { type: p.type, id: p.id };
       const f = FACILITIES[u.kind];
       // Access — the whole truth, not just "served": a floor can be connected yet
       // sit 3+ rides from the lobby, in which case no commuter ever comes. Only
@@ -1336,7 +1356,7 @@ class GameApp {
           : "";
       this.ui.showInspector(
         `<h4>${f.name}</h4>` +
-          `<div>${u.label !== f.name ? u.label + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
+          `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
           `<div>Status: ${u.state}</div>` +
           (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
           access +
@@ -1347,16 +1367,26 @@ class GameApp {
     } else {
       const t = this.sim.tower.transports.find((x) => x.id === p.id);
       if (!t) {
-        this.inspectAnchor = null;
-        return this.ui.showInspector(null);
+        this.clearInspector();
+        return;
       }
       this.inspectAnchor = { x: t.x + t.width, floor: t.top };
+      this.inspectTarget = { type: p.type, id: p.id };
       const f = FACILITIES[t.kind];
       this.ui.showInspector(
         `<h4>${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
           (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : ""),
       );
     }
+  }
+
+  /** Hide the inspector and forget what it described. The pick moved off the
+   *  facility, so any ✕-dismissal latch is spent too. */
+  private clearInspector(): void {
+    this.inspectAnchor = null;
+    this.inspectTarget = null;
+    this.inspectDismissed = null;
+    this.ui.showInspector(null);
   }
 
   // ---- Save / load / new --------------------------------------------------
@@ -1505,10 +1535,6 @@ class GameApp {
 /** Short floor tag: "5" above ground, "B1"/"B2"… below (floor 0 = B1). */
 function floorTag(floor: number): string {
   return floor >= 1 ? `${floor}` : `B${1 - floor}`;
-}
-
-function escapeAttr(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
