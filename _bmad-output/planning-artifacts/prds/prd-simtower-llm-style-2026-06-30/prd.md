@@ -1,8 +1,8 @@
 ---
 title: Verticopolis — A Browser SimTower Clone
 created: 2026-06-30
-updated: 2026-06-30
-version: 0.1 (Draft)
+updated: 2026-07-02
+version: 0.2 (Draft)
 status: Draft
 source_of_truth: SimTower (1994, Maxis / OPeNBooK)
 ---
@@ -178,8 +178,11 @@ grid**: a structural floor/corridor layer and a room layer on top. A **Room**
 requires a **Floor** beneath it; in this build, placing a room auto-creates the
 floor under it (no separate pre-laying of bare floor is required, though floors
 can also be painted directly). Rooms cannot float — each must sit on the floor
-directly below (or the ground). **Lobbies** are transit-only and required at the
-ground floor and every 15th floor. Multi-story facilities (cinema = 2 floors,
+directly below (or the ground). The same physical-consistency rule applies to
+structure itself: floors above the ground story need the story below built
+beneath them, in both directions — you can neither place a hanging floor nor
+pull a supporting one out from under the story above. **Lobbies** are
+transit-only and required at the ground floor and every 15th floor. Multi-story facilities (cinema = 2 floors,
 recycling = 2, metro = a whole basement floor) occupy their full height/width.
 Building takes in-game construction time; bulldozing returns a partial refund.
 Realizes **UJ-1**, **UJ-4**.
@@ -193,6 +196,13 @@ Realizes **UJ-1**, **UJ-4**.
   ground, floor 0 = B1, down to −9 = B10; top = floor 100.
 - **FR-3** — The player can place a **Room** only where a structural floor
   exists or will be auto-created beneath it; rooms may not overhang empty space.
+- **FR-3a** — Structure must be **supported** `[ADDED 2026-07-02]`: a floor
+  segment above the ground story can be placed only where the story directly
+  below is fully built beneath its whole width (no hanging floors in midair),
+  and the system must refuse to bulldoze structure whose removal would leave
+  the story above unsupported. `[NOTE: this narrows the earlier
+  "canon-non-removable structures kept removable (QoL)" divergence — removal
+  stays a QoL freedom, but never at the cost of physical consistency.]`
 - **FR-4** — The player can paint **Floor** and **Lobby** structure by
   click-drag along a floor.
 - **FR-5** — **Lobby** concourses are transit-only: the system must reject any
@@ -237,7 +247,20 @@ mitigate problems. Each facility type unlocks at a minimum star rating
   [`ECON.hotel`] when occupied, with guests checking in at night and out in the
   morning. (Double/Suite unlock at 3★ per the original; Suite houses 3.)
 - **FR-14** — Hotel rooms become dirty after checkout and must be cleaned by
-  **Housekeeping** before they can be re-rented (a daily cycle).
+  **Housekeeping** before they can be re-rented (a daily cycle). Cleaning is
+  **physical, not instant** `[UPDATED 2026-07-02]`: a room stays visibly dirty
+  (distinct room art) until a housekeeper actually **travels to it** over the
+  staff transport network (FR-25a) and arrives, as in the original; rooms no
+  housekeeper can reach stay dirty and, left that way, attract cockroach
+  infestations.
+- **FR-14a** — Housekeeping has **finite daily capacity** `[ADDED 2026-07-02]`:
+  each Housekeeping unit cleans roughly **20 rooms per day**
+  [`HK_ROOMS_PER_CREW`] with a bounded number of housekeepers in transit at
+  once [`HK_MAX_IN_FLIGHT`], working a checkout-to-evening shift. When dirty
+  rooms exceed capacity, or none of the crews can reach a dirty room, the
+  system tells the player **which problem they have** (an "at capacity — build
+  another" advisory vs. a "can't reach" advisory) instead of leaving the
+  cockroach symptom to speak for itself.
 - **FR-15** — The player can place food/retail/entertainment rooms that earn
   **daily traffic income** scaled by foot traffic and open hours: **Fast Food**
   ($2,000/day, 1★), **Restaurant** ($4,000/day, 3★), **Retail Shop**
@@ -279,18 +302,31 @@ mitigate problems. Each facility type unlocks at a minimum star rating
 ### 4.3 Vertical Transport
 
 **Description:** People reach upper floors only via connected **Transport**.
-**Stairs** and **Escalators** link adjacent floors cheaply; **Elevators**
-(Standard / Service / Express) carry passengers across many floors with
-configurable **cars** and per-floor stop settings. Express elevators stop only
-at lobbies/sky lobbies, the key to tall-tower viability. Dispatch is
-demand-driven: cars serve waiting passengers and idle at the lobby when
-empty. A floor counts as **served** only if it is reachable through the
-transport network. Realizes **UJ-2**, **UJ-4**.
+**Stairs** and **Escalators** are fixed two-floor flights placed with a single
+tap and stackable into continuous columns; **Elevators** (Standard / Service /
+Express) carry passengers across many floors with configurable **cars** and
+per-floor stop settings. Express elevators stop only at lobbies/sky lobbies,
+the key to tall-tower viability. **Service elevators are staff-only** (as in
+the original): tenants never ride them, and together with stairs/escalators
+they form the staff network housekeepers travel on. Dispatch is demand-driven
+and answers the **real crowd**: cars serve the actual people seen waiting and
+riding, and idle at the lobby when empty. A floor counts as **served** only if
+it is reachable through the transport network. Realizes **UJ-2**, **UJ-4**.
 
 **Functional Requirements:**
-- **FR-22** — The player can build **Stairs** (max span 1 floor, capacity 8) and
-  **Escalators** (max span 1 floor, capacity 30) as single-floor links
-  [`maxSpanFor`, `TRANSPORT_CAPACITY`].
+- **FR-22** — The player can build **Stairs** (capacity 8) and **Escalators**
+  (capacity 30) as **fixed two-floor flights** [`maxSpanFor`,
+  `TRANSPORT_CAPACITY`]. `[UPDATED 2026-07-02]` Placement is **one tap/click**
+  on the bottom floor (no drag-to-size, matching the original); the preview
+  shows the true two-floor footprint, and a placed flight renders as a
+  **single flight** between its two floors. The fixed span is enforced
+  everywhere — placement, and any post-placement resize path — so a flight can
+  never be stretched taller.
+- **FR-22a** — Flights **stack into columns** `[ADDED 2026-07-02]`: a new
+  flight may share exactly its landing floor with an existing flight of the
+  same footprint (same horizontal position and width) directly above or below,
+  forming a continuous multi-floor stair/escalator run as in the original;
+  partially-offset overlaps and duplicate flights are still rejected.
 - **FR-23** — The player can build **Standard** (1★, ≤30 floors, ≤8 cars, cap
   21/car), **Service** (2★, ≤30 floors, ≤4 cars, cap 16/car), and **Express**
   (3★, **no effective length limit** — may span the full tower height, ≤8 cars,
@@ -298,17 +334,35 @@ transport network. Realizes **UJ-2**, **UJ-4**.
   the served span [`maxSpanFor`, `MAX_CARS`, `TRANSPORT_CAPACITY`].
 - **FR-24** — The player can edit a placed elevator in-game: adjust its **car
   count** and its **per-floor stop configuration** (which floors a car serves /
-  skips).
+  skips). `[UPDATED 2026-07-02]` Adding a car **costs money** and is refused
+  when unaffordable; removing a car pays back a **partial resale refund**
+  (consistent with bulldoze economics, FR-9).
 - **FR-25** — **Express** elevators skip intermediate non-lobby floors, stopping
   only at lobby/sky-lobby floors — **except their own shaft endpoints (bottom and
   top), which always remain stops** so the shaft stays connected even when an
-  endpoint is not a lobby [`Tower.setExpressStops()`]. Service elevators are
-  intended for staff/freight to keep service traffic off passenger shafts.
+  endpoint is not a lobby [`Tower.setExpressStops()`]. Express service to a sky
+  lobby holds **regardless of build order** (a sky lobby added after the shaft
+  still becomes a stop).
+- **FR-25a** — **Service elevators are staff-only** `[ADDED 2026-07-02, per
+  canon]`: tenants and visitors never route through or board them, and they do
+  not count toward a floor's **served** status (FR-28). Service elevators plus
+  stairs and escalators form the **staff transport network** that housekeepers
+  (FR-14) travel on; when a staff route could equally use stairs or a service
+  elevator, the service elevator wins, so a built service shaft actually
+  carries the staff traffic it exists for.
 - **FR-26** — Elevator cars are dispatched **on demand**: a car travels to serve
   waiting passengers, boards riders up to capacity, lets them alight at their
-  floor, and idles at the ground lobby when there is no demand. *(Dispatch
-  algorithm detail in Addendum §B.)*
-- **FR-27** — A car's displayed load reflects its real passenger count.
+  floor, and idles at the ground lobby when there is no demand.
+  `[UPDATED 2026-07-02]` Dispatch serves the **visible crowd, not just a
+  statistical estimate**: a person seen waiting at a shaft is a live hall call
+  a car must answer, and a rider's destination is a cab call their own car
+  must stop at — so no one the player can see is ever stranded by the
+  aggregate model rounding to zero. **Staff-only shafts answer only real staff
+  calls** (no phantom tenant demand moves a service car). *(Dispatch algorithm
+  detail in Addendum §B.)*
+- **FR-27** — A car's displayed load reflects its real passenger count, and
+  each car shows the original's status cues `[UPDATED 2026-07-02]`: a
+  **direction lantern** while traveling and a **FULL indicator** at capacity.
 - **FR-28** — A floor is **served** if and only if it is reachable from the
   ground lobby through the connected transport network (including transfers at
   sky lobbies); the system computes reachability and exposes "served" status.
@@ -450,6 +504,9 @@ assets). Realizes the feel underlying every journey.
 **Functional Requirements:**
 - **FR-55** — The renderer animates living detail: lobby/corridor walkers,
   stair/escalator climbers, in-car elevator riders, and the metro train.
+  Decorative floor pedestrians reflect **live occupancy** (an empty floor shows
+  no one pacing), and elevator shafts label only the floors the shaft actually
+  stops at.
 - **FR-56** — A **day/night cycle** arcs both sun and moon across the sky;
   interiors light at night, go dark when empty/asleep, and commercial rooms show
   **CLOSED** off-hours.
@@ -580,7 +637,7 @@ as implemented and test-covered.)*
 **Primary**
 - **Parity completeness** — % of `PARITY.md` mechanics marked ✅ and backed by a
   passing test or captured screenshot. Target: **100% of the parity checklist**
-  green (current suite: 84 tests incl. an end-to-end run to TOWER victory).
+  green (current suite: 282 tests incl. an end-to-end run to TOWER victory).
 - **Winnability** — an automated end-to-end run reaches the **TOWER** rank
   without manual intervention. Target: the `parity.test.ts` victory path stays
   green on every commit.

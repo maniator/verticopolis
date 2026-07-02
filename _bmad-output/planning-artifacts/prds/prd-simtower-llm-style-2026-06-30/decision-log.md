@@ -90,3 +90,39 @@ the shipped code and fixed:
   updated to the new name; dated point-in-time review/party snapshots are preserved
   verbatim with a provenance note. Installer-managed `_bmad` config is not
   hand-edited — the durable override lives in `_bmad/custom/config.toml`.
+
+## 2026-07-02 — Session 2 (Update intent, headless) — v0.1 → v0.2
+
+Reconciled the PRD with the work merged on `main` since it was written
+(PRs #75–#94). A `.memlog.md` was initialized for this workspace (bootstrapped
+from this log) and carries the per-change audit trail from here on.
+
+- **FR-3a (new) — structural support invariant** (PRs #86/#87): floors above the
+  ground story require full support from the story below, in both directions
+  (placement *and* bulldoze). Noted as narrowing — not reversing — the earlier
+  "canon-non-removable structures kept removable (QoL)" divergence.
+- **FR-14 / FR-14a — housekeeping is physical** (PRs #89/#93): rooms stay dirty
+  (distinct art) until a housekeeper travels to them over the staff network;
+  ~20 rooms/crew/day capacity with explicit at-capacity / can't-reach advisories.
+- **FR-25a (new) — staff-only service elevators** (PRs #89/#93, per canon):
+  tenants never ride them; service elevators + stairs + escalators form the
+  staff network, service elevators preferred on route ties.
+- **FR-26 / FR-27 — crowd-driven dispatch + car status cues** (PRs #90/#78):
+  real waiting people are hall calls, riders' destinations are per-car cab
+  calls; staff shafts answer only real staff calls. Cars show direction
+  lanterns and a FULL indicator.
+- **FR-22 / FR-22a — stairs & escalators UX** (PR #93): one-tap fixed two-floor
+  flights (span cap enforced on every path incl. resize), single-flight
+  rendering, stacking into aligned columns for continuous runs.
+- **FR-24 — car economics** (PR #81): adding a car costs money and checks
+  affordability; removing one pays a partial resale refund.
+- **FR-25 — express serves sky lobbies regardless of build order** (PR #85).
+- **FR-55 — occupancy-driven decorative pedestrians; shaft floor labels only at
+  actual stops** (PRs #80/#76).
+- **Addendum:** §A gained a staff-network parity row; §B documents crowd
+  hall/cab calls and staff routing; §D gained mobile-GPU robustness notes
+  (texture-band tiling, WebGL context-loss recovery, frame guard, physics
+  disabled — PRs #75/#79/#82/#84/#88). Fixed a stale "200 tiles" in the §A
+  table (lot is 340).
+- **Counts:** test suite reference updated 84 → 282 (28 files).
+- **State:** Draft v0.2; frontmatter `updated: 2026-07-02`.

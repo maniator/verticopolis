@@ -24,8 +24,14 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   −9…100), `STAR_THRESHOLDS`, `TOWER_POPULATION`, per-facility cost/width/minStar/population,
   build caps. Quote numbers from here, never hard-code duplicates.
 - `src/engine/Simulation.ts` — clock/tick, star evaluation, VIP, congestion (v1 + v2 spatial).
-- `src/engine/Tower.ts` — placement/geometry, served-floor reachability, parking chains.
-- `src/engine/EconomySystem.ts`, `EventSystem.ts`, `Crowd.ts`, `econConfig.ts` — money, disasters, routing.
+- `src/engine/Tower.ts` — placement/geometry, served-floor reachability, parking chains,
+  structural support (`isSupported`, `removalReason`), staff connectivity (`staffConnected`).
+- `src/engine/EconomySystem.ts`, `EventSystem.ts`, `Crowd.ts`, `econConfig.ts` — money, disasters,
+  routing; housekeeping capacity constants (`HK_ROOMS_PER_CREW`=20, `HK_MAX_IN_FLIGHT`=4) live in
+  `EconomySystem.ts`.
+- `src/engine/ElevatorDispatch.ts` — SCAN car controller; consumes `Crowd.elevatorCalls(tower)`
+  (per-shaft **hall** calls + per-car **cab** calls). Transport-kind predicates
+  (`isStaffOnlyTransport`, `isStaffTransportKind`, `isFixedSpanTransport`) live in `facilities.ts`.
 - `simModel` defaults to **`"v2"`** (hourly sub-stepping + spatial per-floor congestion).
 
 ## Canon rules that are easy to get wrong
@@ -40,6 +46,21 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - **Office noise** caps adjacent hotel/condo satisfaction (≤0.6); it does not evict.
 - **Cinemas** book an average (~$150k) or **blockbuster** (~$300k, bigger crowd) film monthly.
 - Emergencies (fire-rescue / bomb-ransom) are **player choices** via a modal that **pauses** the sim.
+- **Service elevators are staff-only**: tenants never route through or board them, and they
+  do **not** count toward served-floor reachability. Staff (housekeepers) route over the staff
+  network — service elevators + stairs + escalators — and **service elevators win route ties**
+  (build order must not decide). Staff-only shafts answer **only real staff calls**, never the
+  statistical tenant-demand estimate.
+- **Housekeeping never cleans instantly**: a room stays `dirty` (distinct art) until a
+  housekeeper physically arrives over the staff network. Capacity is finite (~20 rooms/crew/day);
+  over-capacity and can't-reach conditions each have their own player advisory — don't collapse
+  them, and don't let the cockroach event be the only symptom.
+- **Stairs/escalators are fixed two-floor flights**: one-tap placement (no drag-to-size), a
+  span cap enforced on **every** path including resize/extend, and stacking allowed only with an
+  exact-footprint match (same x/width) sharing the landing floor.
+- **Structure needs support both ways**: a floor above the ground story requires the story
+  below fully built beneath it, and bulldozing is refused when it would leave the story above
+  hanging (`Tower.isSupported` / `removalReason`).
 
 ## Ratified divergences from canon (intentional — do NOT "fix")
 - **Wedding Hall** on floor 100 stands in for the original **Cathedral** (religion-neutral clean-room choice); mechanics are identical.
@@ -56,3 +77,15 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   findings are fixed and re-verified on the branch. Resolve Copilot/Codex PR threads.
 - Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
   demo/camera reads the live `GRID.width`.
+
+## Performance & platform gotchas
+- **Excalibur physics is deliberately disabled** (nothing uses it; enabled, it froze phones on
+  big towers at high speed) — do not re-enable it.
+- **Never draw one oversized surface**: tall shafts and the ground plane are tiled into
+  texture-size-safe bands or mobile GPUs render them as black rectangles. Keep new large
+  visuals banded the same way.
+- **WebGL context loss auto-recovers in place** — don't add "refresh the page" dead-ends; a
+  frame-exception guard already keeps one bad frame from freezing the game.
+- Dispatch must be fed the live crowd: pass `crowd.elevatorCalls(tower)` into
+  `ElevatorDispatch` (`accumulate` once per outer step, `moveCars` per sub-step) or visible
+  waiters get stranded when statistical demand rounds to zero.
