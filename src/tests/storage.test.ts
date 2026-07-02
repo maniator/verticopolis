@@ -40,6 +40,28 @@ describe("SaveGame", () => {
     expect(Number.isFinite(u.occupants)).toBe(true);
   });
 
+  it("clamps forged unit/transport geometry from a tampered save to the lot", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // Forged geometry would flow into renderer math (silhouette edges, lobby
+    // variant indexing, per-tile draw loops, shaft band graphics) as
+    // NaN/Infinity or absurd spans.
+    (data.units[0] as { x: unknown }).x = -5.5;
+    (data.units[0] as { floor: unknown }).floor = NaN;
+    (data.units[0] as { width: unknown }).width = 1e9;
+    (data.transports[0] as { x: unknown }).x = Infinity;
+    (data.transports[0] as { top: unknown }).top = 1e9;
+    const loaded = Simulation.deserialize(data);
+    const u = loaded.tower.units[0];
+    expect(Number.isInteger(u.x) && u.x >= 0 && u.x < GRID.width).toBe(true);
+    expect(Number.isInteger(u.floor) && u.floor >= GRID.minFloor && u.floor <= GRID.maxFloor).toBe(true);
+    expect(Number.isInteger(u.width) && u.width >= 1 && u.width <= GRID.width).toBe(true);
+    const t = loaded.tower.transports[0];
+    expect(Number.isInteger(t.x) && t.x >= 0 && t.x < GRID.width).toBe(true);
+    expect(t.top).toBeLessThanOrEqual(GRID.maxFloor);
+    expect(t.top).toBeGreaterThan(t.bottom);
+  });
+
   it("coerces forged unit state/label strings from a tampered save", () => {
     const sim = sampleGame();
     const data = sim.serialize();

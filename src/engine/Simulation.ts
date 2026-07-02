@@ -1337,6 +1337,13 @@ export class Simulation implements SimContext {
       .filter((u) => isFacilityKind(u.kind))
       .map((u) => ({
         ...u,
+        // Coerce geometry to finite integers on the lot: forged floor/x/width
+        // would otherwise flow into renderer math (silhouette edges, lobby
+        // variant indexing, actor positions) as NaN/Infinity, or make a
+        // per-tile draw loop iterate an absurd width.
+        floor: Math.max(GRID.minFloor, Math.min(GRID.maxFloor, Math.round(num(u.floor, 1)))),
+        x: Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0)))),
+        width: Math.max(1, Math.min(GRID.width, Math.round(num(u.width, FACILITIES[u.kind].width)))),
         // Coerce the free-form strings too: a forged `state` would flow into
         // UI innerHTML (the inspector's "Status:" line) and state-machine
         // compares; a non-string `label` would crash the escaping at render.
@@ -1363,16 +1370,20 @@ export class Simulation implements SimContext {
         // throw a RangeError (or OOM) on the very next tick.
         const maxCars = isElevatorKind(t.kind) ? maxCarsFor(t.kind) : 0;
         const cars = Math.max(0, Math.min(maxCars, Math.floor(num(t.cars, 0))));
-        const bottom = Math.round(num(t.bottom, 1));
+        // Clamp the span to the lot: an unbounded forged bottom/top would give
+        // the shaft an absurd height (its banded graphic loop scales with it).
+        const bottom = Math.max(GRID.minFloor, Math.min(GRID.maxFloor, Math.round(num(t.bottom, 1))));
         // A transport must have height (validateTransport requires top > bottom);
         // never deserialize a zero-height shaft from a corrupt save.
-        const top = Math.max(bottom + 1, Math.round(num(t.top, bottom + 1)));
+        const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
         const fixLen = (arr: unknown, fill: number) =>
           Array.from({ length: cars }, (_, i) =>
             Array.isArray(arr) ? num(arr[i], fill) : fill,
           );
         return {
           ...t,
+          // Same geometry hardening as units: keep the shaft on the lot.
+          x: Math.max(0, Math.min(GRID.width - 1, Math.round(num(t.x, 0)))),
           bottom,
           top,
           cars,

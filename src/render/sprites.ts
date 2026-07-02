@@ -142,7 +142,9 @@ function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: numb
   // One pattern slice per structural tile of the unit, scaled to whatever the
   // caller renders a tile as (the engine bakes at TILE px; the gallery draws
   // bigger). Keyed by absolute tile x so runs stay aligned however sliced.
-  const tiles = Math.max(1, Math.round(u.width) || 1);
+  // The slice count is capped by the pixel span so a forged width can't turn
+  // this into a near-endless loop (deserialize clamps width too — second belt).
+  const tiles = Math.max(1, Math.min(Math.round(u.width) || 1, Math.ceil(w)));
   const pitch = w / tiles;
   for (let t = 0; t < tiles; t++) {
     const x0 = x + t * pitch;
