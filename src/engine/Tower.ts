@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
 import { isOperational } from "./types";
 import type {
   Facility,
@@ -463,6 +463,17 @@ export class Tower {
     return { ok: true, unitId: unit.id };
   }
 
+  /** The ONE span rule (and its message) shared by placement and resize, so
+   *  the two paths can never drift apart again. Undefined when the span is
+   *  legal for this kind. */
+  private spanReason(kind: FacilityKind, bottom: number, top: number): string | undefined {
+    const maxSpan = maxSpanFor(kind);
+    if (top - bottom <= maxSpan) return undefined;
+    return isFixedSpanTransport(kind)
+      ? `${FACILITIES[kind].name} links exactly two floors.`
+      : `This elevator can span at most ${maxSpan} floors (${maxSpan + 1} stops).`;
+  }
+
   /** Validate a transport placement without mutating anything. */
   validateTransport(kind: FacilityKind, x: number, bottom: number, top: number): PlaceResult {
     const f = FACILITIES[kind];
@@ -473,10 +484,8 @@ export class Tower {
     if (x < 0 || x + f.width > GRID.width) {
       return { ok: false, reason: "Off the edge of the lot." };
     }
-    const span = top - bottom;
-    if ((kind === "stairs" || kind === "escalator") && span > 1) {
-      return { ok: false, reason: `${f.name} spans exactly one floor.` };
-    }
+    const spanBad = this.spanReason(kind, bottom, top);
+    if (spanBad) return { ok: false, reason: spanBad };
     // Canon: escalators serve commercial spaces (shops/food/theatres), not office
     // complexes — so they may not be placed on a floor that holds an office.
     if (kind === "escalator") {
@@ -486,10 +495,7 @@ export class Tower {
         }
       }
     }
-    const maxSpan = maxSpanFor(kind);
-    if (isElevatorKind(kind) && span > maxSpan) {
-      return { ok: false, reason: `This elevator can span at most ${maxSpan} floors (${maxSpan + 1} stops).` };
-    }
+
 
     // Transports share the structural column but cannot collide with rooms or
     // other shafts — and every floor they serve must actually exist as built
@@ -509,6 +515,20 @@ export class Tower {
       }
       for (const t of this.transports) {
         if (this.transportOverlaps(t, x, f.width, fl)) {
+          // Stacked stair/escalator flights may share their LANDING floor —
+          // the top of one is the bottom of the next, and the flights occupy
+          // different bands — so a continuous stair run stacks in one column,
+          // exactly like the original. The stack must align EXACTLY (same
+          // column and width); a partially offset flight is still a collision.
+          if (
+            isFixedSpanTransport(kind) &&
+            isFixedSpanTransport(t.kind) &&
+            t.x === x &&
+            t.width === f.width &&
+            (bottom === t.top || top === t.bottom)
+          ) {
+            continue;
+          }
           return { ok: false, reason: "Transport shafts cannot overlap." };
         }
       }
@@ -606,10 +626,11 @@ export class Tower {
     if (newBottom < GRID.minFloor || newTop > GRID.maxFloor) {
       return { ok: false, reason: "Outside the buildable range." };
     }
-    const maxSpan = maxSpanFor(t.kind);
-    if (isElevatorKind(t.kind) && newTop - newBottom > maxSpan) {
-      return { ok: false, reason: `This elevator can span at most ${maxSpan} floors (${maxSpan + 1} stops).` };
-    }
+    // Same span rules as placement — the extend arrows must not stretch a
+    // transport past what validateTransport would ever allow (this once let
+    // stairs grow the whole tower height one extend at a time).
+    const spanBad = this.spanReason(t.kind, newBottom, newTop);
+    if (spanBad) return { ok: false, reason: spanBad };
     // Validate only the floors that are being newly added.
     for (let fl = newBottom; fl <= newTop; fl++) {
       if (fl >= t.bottom && fl <= t.top) continue; // already served

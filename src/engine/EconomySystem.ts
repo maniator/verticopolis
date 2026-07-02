@@ -163,6 +163,8 @@ export class EconomySystem {
   private hkCleanedToday = 0;
   /** Day the "can't reach" nudge last fired, so it warns once per day. */
   private hkNudgedDay = -1;
+  /** Day the "at capacity" nudge last fired, so it warns once per day. */
+  private hkStarvedDay = -1;
 
   /** Housekeepers a crew currently has en route, derived from assignments. */
   private hkInFlight(crewId: number): number {
@@ -189,27 +191,65 @@ export class EconomySystem {
       if (!this.hkCapacity.has(crew.id)) this.hkCapacity.set(crew.id, HK_ROOMS_PER_CREW);
     }
     let unreachable = 0;
+    let starved = 0;
     for (const room of tower.units) {
       if (!isHotelKind(room.kind) || room.state !== "dirty") continue;
       if (this.hkAssignedRoom.has(room.id)) continue; // someone's already on it
       let reachable = false;
+      let transient = false; // in-flight/pool limits — retries will get there
+      let outOfCapacity = false; // a crew's DAILY quota is spent
+      let noRoute = false;
       for (const crew of crews) {
         if (!tower.staffConnected(crew.floor, room.floor)) continue;
         reachable = true;
         const left = this.hkCapacity.get(crew.id) ?? 0;
-        if (left <= 0 || this.hkInFlight(crew.id) >= HK_MAX_IN_FLIGHT) continue;
-        const sent = this.sim.spawnStaffTrip?.(crew.floor, room.floor, room.x + room.width / 2, room.id) ?? false;
-        if (!sent) continue; // crowd is full of staff — retry next hour
+        if (left <= 0) {
+          outOfCapacity = true;
+          continue;
+        }
+        if (this.hkInFlight(crew.id) >= HK_MAX_IN_FLIGHT) {
+          transient = true;
+          continue;
+        }
+        // An absent hook (bare test contexts without a crowd) is a transient
+        // condition, not a broken staff network — never report it as
+        // unreachable.
+        const sent = this.sim.spawnStaffTrip?.(crew.floor, room.floor, room.x + room.width / 2, room.id) ?? "full";
+        if (sent === "full") {
+          transient = true; // staff pool at cap — retry next hour
+          break;
+        }
+        if (sent === "no-route") {
+          noRoute = true; // shouldn't happen while connected — try another crew
+          continue;
+        }
         this.hkAssignedRoom.set(room.id, crew.id);
         this.hkCapacity.set(crew.id, left - 1);
         break;
       }
-      if (!reachable) unreachable++;
+      if (this.hkAssignedRoom.has(room.id)) continue;
+      // "Unreachable" covers both no staff-connected crew at all AND the
+      // belt-and-suspenders case where a connected crew failed to route (a
+      // reachability/routing drift) — either way the player must be told
+      // rather than dispatch retrying silently forever. Drift outranks the
+      // capacity message: "build another" is no fix for a broken network.
+      if (!reachable || (noRoute && !transient)) unreachable++;
+      // Every connected crew has spent its daily quota: the hotel has outgrown
+      // its housekeeping. Without this message the only symptom is the daily
+      // cockroach alert, which reads as a bug when a unit already exists.
+      else if (outOfCapacity && !transient) starved++;
     }
     if (unreachable > 0 && this.hkNudgedDay !== this.sim.clock.day) {
       this.hkNudgedDay = this.sim.clock.day;
       this.sim.emit(
         `🧹 Housekeeping can't reach ${unreachable} dirty room(s) — staff travel by service elevator, stairs or escalator, not passenger elevators.`,
+        "bad",
+      );
+    }
+    if (starved > 0 && this.hkStarvedDay !== this.sim.clock.day) {
+      this.hkStarvedDay = this.sim.clock.day;
+      this.sim.emit(
+        `🧹 Housekeeping is at capacity — ${starved} dirty room(s) must wait until tomorrow. One Housekeeping unit cleans ~${HK_ROOMS_PER_CREW} rooms a day; build another.`,
         "bad",
       );
     }

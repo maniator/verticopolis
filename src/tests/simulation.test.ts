@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation, ECON } from "../engine/Simulation";
+import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../engine/facilities";
 
 describe("Rent / price controls", () => {
@@ -352,6 +353,82 @@ describe("Hotel housekeeping", () => {
     sim.buildTransport("elevatorService", x0 + 14, 2, 5);
     for (let i = 0; i < 20; i++) sim.tick(60);
     expect(room.state).not.toBe("dirty");
+  });
+
+  it("staff routing has no leg cap — a long stairs chain matches staffConnected", () => {
+    const sim = hotelTower(23);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 14; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    // Thirteen single-floor stair flights chained 1→14, staggered so shafts
+    // never overlap. Reachability (components) and routing (BFS) must agree.
+    for (let f = 1; f <= 13; f++) {
+      const r = sim.tower.placeTransport("stairs", x0 + (f % 3) * 6, f, f + 1);
+      expect(r.ok).toBe(true);
+    }
+    expect(sim.tower.staffConnected(1, 14)).toBe(true);
+    expect(sim.crowd.staffRoute(sim.tower, 1, 14)).not.toBeNull();
+  });
+
+  it("housekeepers prefer the service elevator over equal-length stairs", () => {
+    const sim = hotelTower(41);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    // Stairs built FIRST (the tie-break used to favor build order)…
+    expect(sim.tower.placeTransport("stairs", x0 + 6, 2, 3).ok).toBe(true);
+    // …then the service elevator covering the same hop.
+    expect(sim.tower.placeTransport("elevatorService", x0 + 12, 2, 5).ok).toBe(true);
+    const service = sim.tower.transports.find((t) => t.kind === "elevatorService")!;
+    const route = sim.crowd.staffRoute(sim.tower, 2, 3);
+    expect(route?.shafts[0]).toBe(service.id); // rides, not climbs
+  });
+
+  it("warns once a day when housekeeping is over capacity", () => {
+    const sim = hotelTower(42);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Widen the ground outward, then floor 2 above it, and fill floor 2 with
+    // more singles than one crew's daily 20.
+    for (let i = x0 + 40; i < x0 + 60; i++) sim.tower.place("lobby", 1, i);
+    for (let i = x0 - 1; i >= x0 - 60; i--) sim.tower.place("lobby", 1, i);
+    for (let i = -60; i < 60; i++) sim.tower.place("floor", 2, x0 + i);
+    sim.tower.place("housekeeping", 2, x0 - 60);
+    let placed = 0;
+    for (let x = x0 - 50; placed < 24 && x + 4 <= x0 + 60; x += 4) {
+      if (sim.tower.place("hotelSingle", 2, x).ok) placed++;
+    }
+    expect(placed).toBe(24);
+    for (const u of sim.tower.units) if (u.kind === "hotelSingle") u.state = "dirty";
+    for (let i = 0; i < 12; i++) sim.tick(60); // through the day shift
+    expect(sim.log.some((l) => l.text.includes("Housekeeping is at capacity"))).toBe(true);
+  });
+
+  it("staff calls are shaft-scoped — only the shaft the staffer uses responds", () => {
+    const sim = hotelTower(31);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    // Two service shafts sharing every stop floor.
+    expect(sim.tower.placeTransport("elevatorService", x0 + 6, 1, 5).ok).toBe(true);
+    expect(sim.tower.placeTransport("elevatorService", x0 + 12, 1, 5).ok).toBe(true);
+    const shafts = sim.tower.transports.filter((t) => t.kind === "elevatorService");
+    // One housekeeper, routed over exactly one shaft, standing at floor 3
+    // waiting for its car.
+    expect(sim.crowd.spawnStaff(sim.tower, 3, 5, x0 + 2, 12345)).toBe("sent");
+    const p = sim.crowd.people.find((q) => q.staff)!;
+    p.state = "waiting";
+    const calls = sim.crowd.elevatorCalls(sim.tower);
+    expect([...calls.hall.keys()]).toEqual([p.shaftId]); // keyed to that shaft only
+    // Dispatch: the used shaft's car answers; the other stays idle at ground.
+    const used = shafts.find((t) => t.id === p.shaftId)!;
+    const other = shafts.find((t) => t.id !== p.shaftId)!;
+    sim.tower.setCars(used.id, 1);
+    sim.tower.setCars(other.id, 1);
+    const dispatch = new ElevatorDispatch();
+    for (let i = 0; i < 4; i++) dispatch.update(sim.tower, 2, 1, sim.crowd.elevatorCalls(sim.tower));
+    expect(used.carPositions[0]).toBeGreaterThan(1);
+    expect(Math.abs(other.carPositions[0] - 1)).toBeLessThan(0.01);
   });
 
   it("tenants never route over service elevators", () => {

@@ -500,8 +500,10 @@ export function drawTransport(
   if (t.kind === "stairs") {
     // No solid background — as in the original, stairs are an open structure you
     // see the tower *through*; only the treads/handrail are drawn (in front of
-    // rooms via the engine's z-order).
-    for (let fl = 0; fl <= t.top - t.bottom; fl++) {
+    // rooms via the engine's z-order). One FLIGHT per connected floor pair: the
+    // top band is just the arrival landing, so it stays empty — a two-floor
+    // stairway draws exactly one staircase, not two stacked ones.
+    for (let fl = 1; fl <= t.top - t.bottom; fl++) {
       const fy = topY + fl * floorH;
       const steps = 5;
       const stepW = (w - 2) / steps;
@@ -520,17 +522,19 @@ export function drawTransport(
 
   if (t.kind === "escalator") {
     // Open structure like the stairs — no solid backing, you see the tower
-    // behind it. Just the diagonal belt and step ridges are drawn.
+    // behind it. Just the diagonal belt and step ridges, rising from the
+    // BOTTOM band up to the arrival floor (the top band is the landing).
+    const by = topY + (t.top - t.bottom) * floorH;
     ctx.strokeStyle = "#cfd4dc"; // belt
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(sx + 1, topY + floorH - 1);
-    ctx.lineTo(sx + w - 1, topY + 1);
+    ctx.moveTo(sx + 1, by + floorH - 1);
+    ctx.lineTo(sx + w - 1, by + 1);
     ctx.stroke();
     ctx.strokeStyle = "rgba(0,0,0,0.28)"; // step ridges
     ctx.lineWidth = 1;
     for (let s = 2; s < w; s += 4) {
-      const yy = topY + floorH - (s / w) * floorH;
+      const yy = by + floorH - (s / w) * floorH;
       ctx.beginPath();
       ctx.moveTo(sx + s, yy);
       ctx.lineTo(sx + s + 1, yy);

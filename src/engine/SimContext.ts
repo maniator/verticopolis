@@ -33,8 +33,9 @@ export interface SimContext {
   /** Human floor label: "floor 5" above ground, "B1"/"B2"… below. */
   floorLabel(floor: number): string;
   /** Dispatch a staff member (housekeeper) from `from` to `to` over the staff
-   * network, walking to `destX` to service unit `cleanUnitId`. Returns false
-   * when no staff route exists (job stays queued). Optional so hand-rolled
-   * test contexts without a crowd can omit it. */
-  spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number): boolean;
+   * network, walking to `destX` to service unit `cleanUnitId`. "full" means
+   * the staff pool is at cap (retry later); "no-route" means the staff
+   * network can't get there (surface it — don't retry silently). Optional so
+   * hand-rolled test contexts without a crowd can omit it. */
+  spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number): "sent" | "full" | "no-route";
 }

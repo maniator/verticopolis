@@ -154,7 +154,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#b0a890",
     transport: true,
-    description: "Cheap vertical link spanning a few floors. People will only climb a short distance.",
+    description: "Cheap two-floor link — one tap places the whole flight. People will only climb a short distance.",
   },
   escalator: {
     kind: "escalator",
@@ -506,4 +506,12 @@ export function maxSpanFor(kind: FacilityKind): number {
   if (kind === "stairs" || kind === "escalator") return 1;
   if (kind === "elevatorExpress") return GRID.maxFloor - GRID.minFloor; // whole tower height
   return 30;
+}
+
+/** True for transports that are a FIXED two-floor unit (stairs, escalators):
+ *  placed with one tap, never dragged to size, never extended. The single
+ *  home for the concept — placement, gestures, ghosts, editor buttons and
+ *  span messages all key off this, so a new kind can't flip half of them. */
+export function isFixedSpanTransport(kind: FacilityKind): boolean {
+  return FACILITIES[kind]?.transport === true && maxSpanFor(kind) === 1;
 }
