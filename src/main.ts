@@ -1,7 +1,7 @@
 import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
 import { FACILITIES, GRID, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "./engine/facilities";
-import { ECON, rentConfig, rentOf, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
+import { ECON, rentConfig, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
@@ -12,6 +12,9 @@ import { trafficTier, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./e
 import { parseTWR } from "./storage/twrImport";
 import { UI, type Tool } from "./ui/UI";
 import { escapeHtml } from "./ui/escape";
+import { floorTag } from "./ui/format";
+import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
+import { buildStatsHtml } from "./ui/statsHtml";
 import { OnboardingController, shouldArm } from "./ui/Onboarding";
 import { registerPWA } from "./pwa";
 
@@ -135,7 +138,7 @@ class GameApp {
         }
       },
       onRenameTower: (name) => (this.sim.tower.towerName = name),
-      onShowStats: () => this.ui.showStats(this.buildStatsHtml()),
+      onShowStats: () => this.ui.showStats(buildStatsHtml(this.sim)),
       onInspectorClose: () => {
         // Latch the dismissal so the next hover pick over the same facility
         // doesn't instantly re-open the card the user just closed.
@@ -826,152 +829,20 @@ class GameApp {
       // The Booking button label lives in the built HTML, so fold the policy into
       // the key — cycling it bumps the key and rebuilds the button.
       const film = u.kind === "cinema" ? `:${u.filmPolicy ?? "auto"}` : "";
-      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}`, () => this.unitEditorHtml(u), this.unitEditorVolatile(u));
+      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}`, () => unitEditorHtml(this.sim, u), unitEditorVolatile(this.sim, u));
     } else {
       const t = this.selectedTransport();
       if (!t) return this.clearSelection();
       this.engine.selectedId = t.id; // outlines the shaft + shows extend arrows
       const maxCars = maxCarsFor(t.kind);
       const shape = `${t.cars <= 1 ? "-" : ""}${t.cars >= maxCars ? "+" : ""}`;
-      this.ui.renderEditor(`transport:${t.id}:${shape}`, () => this.transportEditorHtml(t), this.transportEditorVolatile(t));
+      this.ui.renderEditor(`transport:${t.id}:${shape}`, () => transportEditorHtml(this.sim, t), transportEditorVolatile(this.sim, t));
     }
   }
 
   /** The values in the unit editor that change while it stays open, keyed by the
    *  `data-field` on their cell. These are patched in place each refresh so the
    *  buttons and rename input are never rebuilt out from under a click. */
-  private unitEditorVolatile(u: import("./engine/types").Unit): Record<string, string> {
-    const f = FACILITIES[u.kind];
-    const served = this.sim.tower.isFloorServed(u.floor);
-    const evalPct = Math.round(u.satisfaction * 100);
-    const vol: Record<string, string> = {
-      status: u.state,
-      served: `<span style="color:${served ? "var(--good)" : "var(--bad)"}">${served ? "Yes" : "No"}</span>`,
-      eval: `<span class="evalbar"><span style="width:${evalPct}%"></span></span> ${evalPct}%`,
-    };
-    if (f.population) vol.occupants = `${u.occupants}/${f.population}`;
-    if (rentConfig(u.kind)) {
-      vol.rent = `$${rentOf(u).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
-    }
-    if (u.kind === "cinema") {
-      // A mid-build / burning / gutted cinema books no film — show "—", not a fake feature.
-      vol.showing = !isOperational(u) ? "—" : this.sim.isShowingBlockbuster(u.id) ? "Blockbuster" : "Feature";
-    }
-    return vol;
-  }
-
-  /** The editor card's title bar — one template so the two editors can't drift. */
-  private editorTitleBar = (name: string): string =>
-    `<h4 class="win-title">${escapeHtml(name)}<button type="button" class="ed-close btn xs" aria-label="Close">\u2715</button></h4>`;
-
-  /** One key/value stat row. `field` marks the value for volatile patching. */
-  private kvRow = (label: string, value: string, field?: string): string =>
-    `<span class="k">${label}</span><span class="v"${field ? ` data-field="${field}"` : ""}>${value}</span>`;
-
-  /** One action row of the editor card. */
-  private edRow = (inner: string): string => `<div class="ed-row">${inner}</div>`;
-
-  /** The shared editor-card frame: title bar + stat grid + action rows. */
-  private editorShell(name: string, rows: string[], actions: string[]): string {
-    return this.editorTitleBar(name) + `<div class="ed-stats kv">${rows.join("")}</div>` + actions.join("");
-  }
-
-  private unitEditorHtml(u: import("./engine/types").Unit): string {
-    const f = FACILITIES[u.kind];
-    const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
-    const canRename = u.kind === "office" || u.kind === "condo";
-    const rcfg = rentConfig(u.kind);
-    const vol = this.unitEditorVolatile(u);
-    const rows: string[] = [this.kvRow("Location", floorLabel), this.kvRow("Status", vol.status, "status")];
-    if (f.population) rows.push(this.kvRow("Occupants", vol.occupants, "occupants"));
-    rows.push(this.kvRow("Elevator access", vol.served, "served"));
-    rows.push(this.kvRow("Eval", vol.eval, "eval"));
-    if (rcfg) {
-      const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Quarterly rent";
-      rows.push(this.kvRow(label, vol.rent, "rent"));
-    }
-    if (u.kind === "cinema" && isOperational(u)) {
-      // A gutted/burning/under-construction cinema books no film — omit the row.
-      rows.push(this.kvRow("Now showing", vol.showing, "showing"));
-    }
-    if (u.state === "gutted") {
-      rows.push(this.kvRow("Scrap value", "$0"));
-      rows.push(this.kvRow("⚠", "Gutted — bulldoze and rebuild."));
-    } else {
-      rows.push(this.kvRow("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
-    }
-
-    const actions: string[] = [];
-    if (canRename) {
-      actions.push(
-        this.edRow(
-          `<input class="field" data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button class="btn" data-edit="rename">Rename</button>`,
-        ),
-      );
-    }
-    // Price adjuster: offices/hotels any time, condos only while still unsold.
-    if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
-      const what = u.kind === "condo" ? "price" : "rent";
-      actions.push(this.edRow(`<button class="btn" data-edit="rentDown">– ${what}</button><button class="btn" data-edit="rentUp">+ ${what}</button>`));
-      // Batch-price every unit of this kind at once (no per-room grind).
-      actions.push(this.edRow(`<button class="btn" data-edit="batchKind">Set all ${FACILITIES[u.kind].name.toLowerCase()}s…</button>`));
-    }
-    if (u.kind === "cinema") {
-      const pol = { auto: "Auto", feature: "Feature", blockbuster: "Blockbuster" }[u.filmPolicy ?? "auto"];
-      actions.push(this.edRow(`<button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button>`));
-    }
-    actions.push(this.edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
-
-    return this.editorShell(f.name, rows, actions);
-  }
-
-  private transportEditorVolatile(t: import("./engine/types").Transport): Record<string, string> {
-    const isEl = isElevatorKind(t.kind);
-    const maxCars = maxCarsFor(t.kind);
-    const skipped = t.skipFloors?.length ?? 0;
-    const vol: Record<string, string> = {
-      serves: `${floorTag(t.bottom)} – ${floorTag(t.top)}`,
-      height: `${t.top - t.bottom + 1} floors`,
-    };
-    if (isEl) {
-      vol.cars = `${t.cars} / ${maxCars} max`;
-      vol.capacity = `${this.sim.transportCapacity(t)} riders/trip`;
-      vol.stops = skipped ? `express · skips ${skipped}` : "all floors";
-    }
-    return vol;
-  }
-
-  private transportEditorHtml(t: import("./engine/types").Transport): string {
-    const f = FACILITIES[t.kind];
-    const isEl = isElevatorKind(t.kind);
-    const maxCars = maxCarsFor(t.kind);
-    const vol = this.transportEditorVolatile(t);
-    const rows: string[] = [this.kvRow("Serves floors", vol.serves, "serves"), this.kvRow("Height", vol.height, "height")];
-    if (isEl) {
-      rows.push(this.kvRow("Cars", vol.cars, "cars"));
-      rows.push(this.kvRow("Capacity", vol.capacity, "capacity"));
-      rows.push(this.kvRow("Stops", vol.stops, "stops"));
-    }
-    rows.push(this.kvRow("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
-
-    const actions: string[] = [];
-    if (isEl) {
-      actions.push(
-        this.edRow(
-          `<button class="btn" data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button class="btn" data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button>`,
-        ),
-      );
-      actions.push(this.edRow(`<button class="btn" data-edit="stops">Configure stops…</button>`));
-      actions.push(this.edRow(`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`));
-      // Extend arrows are an elevator affordance: stairs/escalators are a
-      // fixed two-floor flight by rule and never reach this branch.
-      actions.push(this.edRow(`<button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button>`));
-    }
-    actions.push(this.edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
-
-    return this.editorShell(f.name, rows, actions);
-  }
-
   /** Open the per-floor stop-configuration dialog for the selected elevator. */
   private openStopsDialog(): void {
     if (!this.selected || this.selected.type !== "transport") return;
@@ -1149,97 +1020,6 @@ class GameApp {
       }
     }
     this.commitUndo();
-  }
-
-  private buildStatsHtml(): string {
-    const s = this.sim.stats();
-    const c = this.sim.clock;
-    const next = this.sim.nextStarThreshold;
-    const fmt = (n: number) => n.toLocaleString();
-    // Modal-only diagnostics — a full scan and a flood-fill, computed here at
-    // modal-build time so they never run on the ~6 Hz HUD stats() path.
-    const ratingPop = this.sim.ratingPopulation();
-    const parkingWorking = this.sim.tower.functionalParkingSet().size;
-    const stranded = this.sim.strandedFloors().length; // BFS-bearing
-    // Only when hotels have dropped out of the rating (3★+) and actually diverge.
-    const ratingRow =
-      s.star >= 3 && ratingPop < s.population
-        ? `<span class="k">Counts toward stars</span><span class="v">${fmt(ratingPop)}</span>`
-        : "";
-    return `<div class="stats-grid">
-      <div class="stats-section win-title sm">Overview</div>
-      <div class="col kv">
-        <span class="k">Tower name</span><span class="v">${escapeHtml(this.sim.tower.towerName)}</span>
-        <span class="k">Rating</span><span class="v stars">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
-        <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
-        ${ratingRow}
-        <span class="k">Next star at</span><span class="v">${next ? fmt(next) : "—"}</span>
-        <span class="k">Funds</span><span class="v ${this.sim.money < 0 ? "loss" : "money"}">$${fmt(Math.round(this.sim.money))}</span>
-        <span class="k">Date</span><span class="v">${c.dayName}, day ${c.day + 1}</span>
-      </div>
-      <div class="col kv">
-        <span class="k">Floors above</span><span class="v">${s.floors}</span>
-        <span class="k">Basements</span><span class="v">${s.basements}</span>
-        <span class="k">Elevators</span><span class="v">${s.elevators}</span>
-        <span class="k">All transports</span><span class="v">${s.transports}</span>
-      </div>
-      <div class="stats-section win-title sm">Tenancy</div>
-      <div class="col kv">
-        <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
-        <span class="k">Condos sold</span><span class="v">${s.soldCondos}/${s.condos}</span>
-        <span class="k">Vacancies</span><span class="v">${s.vacant}</span>
-      </div>
-      <div class="col kv">
-        <span class="k">Hotel rooms in use</span><span class="v">${s.occupiedHotel}/${s.hotelRooms}</span>
-        <span class="k">Rooms to clean</span><span class="v">${s.dirty}</span>
-        <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
-        <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
-      </div>
-      <div class="stats-section win-title sm">Transport &amp; access</div>
-      <div class="col kv">
-        <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>
-        ${
-          s.parkingSpaces > 0
-            ? `<span class="k">Parking spaces</span><span class="v" style="color:${parkingWorking < s.parkingSpaces ? "var(--bad)" : "var(--good)"}">${parkingWorking} / ${s.parkingSpaces} working</span>`
-            : ""
-        }
-      </div>
-      ${
-        stranded || ratingRow
-          ? `<div class="col kv">${
-              stranded
-                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors 3+ rides from the lobby; they earn rating but draw no visitors. Add a sky-lobby transfer.</span>`
-                : ""
-            }${
-              ratingRow
-                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Hotel guests count toward your star rating only until 3★.</span>`
-                : ""
-            }</div>`
-          : ""
-      }
-      ${this.buildMilestonesHtml()}
-    </div>`;
-  }
-
-  /** The optional-goals checklist for the stats modal. */
-  private buildMilestonesHtml(): string {
-    const mp = this.sim.milestoneProgress();
-    const half = Math.ceil(mp.list.length / 2);
-    const col = (items: typeof mp.list) =>
-      `<div class="col ms kv">${items
-        .map(
-          (m) =>
-            `<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${escapeHtml(m.label)}</span>` +
-            `<span class="v">${escapeHtml(m.desc)}</span>`,
-        )
-        .join("")}</div>`;
-    const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
-    return (
-      `<div class="stats-section win-title sm">🏅 Milestones (${mp.achieved}/${mp.total})` +
-      `<span class="evalbar"><span style="width:${pct}%"></span></span></div>` +
-      col(mp.list.slice(0, half)) +
-      col(mp.list.slice(half))
-    );
   }
 
   private snapX(kind: FacilityKind, tile: number): number {
@@ -1628,11 +1408,6 @@ class GameApp {
     // still re-arms explicitly).
     if (shouldArm(true) && !SaveGame.hasSave()) this.onboarding.arm(this.sim);
   }
-}
-
-/** Short floor tag: "5" above ground, "B1"/"B2"… below (floor 0 = B1). */
-function floorTag(floor: number): string {
-  return floor >= 1 ? `${floor}` : `B${1 - floor}`;
 }
 
 /** The renderer needs WebGL; some in-app file viewers don't provide it. */
