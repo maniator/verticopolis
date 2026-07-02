@@ -1074,11 +1074,16 @@ dialog#modal {
 }
 
 /* Every dialog title bar carries a Win-style ✕ (same affordance as the
- * editor card); Esc and backdrop clicks already close. */
+ * editor card); Esc and backdrop clicks already close. Sticky so the ✕ stays
+ * reachable when a long dialog (help, export) scrolls — that reachability is
+ * the whole point of the button. */
 .modal-box h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  position: sticky;
+  top: -18px; /* cancel the modal-box padding so the bar pins flush to the frame */
+  z-index: 1;
 }
 .modal-box h2 .modal-x {
   margin-left: auto;
