@@ -78,6 +78,12 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
   demo/camera reads the live `GRID.width`.
 
+## UI design system
+- `docs/design-system.md` is the contract for all UI/CSS work: tokens + components
+  (`.btn`/`.win`/`.win-title`/`.well`/`.field`/`.kv`) in `src/styles.css`, organized as ONE
+  generation of CSS. **No skin on IDs; edit rules, never out-specify them; press-only button
+  feedback; one primary per dialog; the splash is box art and stays un-unified.**
+
 ## Performance & platform gotchas
 - **Excalibur physics is deliberately disabled** (nothing uses it; enabled, it froze phones on
   big towers at high speed) — do not re-enable it.

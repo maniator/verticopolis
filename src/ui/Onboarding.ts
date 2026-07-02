@@ -303,7 +303,7 @@ export class OnboardingController {
   private mountPanel(): void {
     const el = document.createElement("div");
     el.id = "onboard";
-    el.className = this.opts.mq.matches ? "onboard--mobile" : "";
+    el.className = `win${this.opts.mq.matches ? " onboard--mobile" : ""}`;
     document.body.appendChild(el);
     this.panelEl = el;
     el.addEventListener("click", (e) => {
@@ -322,7 +322,7 @@ export class OnboardingController {
       );
     }).join("");
     this.panelEl.innerHTML =
-      `<div class="ob-head">Getting Started<button class="ob-skip" data-onboard="skip">Skip</button></div>` +
+      `<div class="win-title">Getting Started<button class="btn xs" data-onboard="skip">Skip</button></div>` +
       `<ol class="ob-list">${items}</ol>`;
   }
 
@@ -340,7 +340,7 @@ export class OnboardingController {
     document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
     this.setDefaultHint();
     if (this.panelEl) {
-      this.panelEl.innerHTML = `<div class="ob-head">Nice — you're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
+      this.panelEl.innerHTML = `<div class="win-title">Nice — you're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
       this.panelEl.addEventListener("click", () => this.clearSession(), { once: true });
     }
     if (this.sendOff) clearTimeout(this.sendOff);

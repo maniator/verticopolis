@@ -290,6 +290,15 @@ async function main() {
   await mobile.waitForTimeout(1000);
   await mobile.screenshot({ path: `${OUT}/09-mobile.png` });
   console.log("captured 09-mobile");
+
+  // 5e) Mobile dialog — proves touch sizing: 36px action buttons, while the
+  // title bar and its ✕ stay compact (the coarse-pointer rule exempts .xs).
+  await mobile.evaluate(() => document.body.classList.add("panels-open"));
+  await mobile.waitForTimeout(200);
+  await mobile.click("#btn-stats");
+  await mobile.waitForTimeout(400);
+  await mobile.screenshot({ path: `${OUT}/09b-mobile-stats.png` });
+  console.log("captured 09b-mobile-stats");
   await mobile.close();
 
   // 6) Sprite gallery (full screenshot of the catalog).

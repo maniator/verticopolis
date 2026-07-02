@@ -279,7 +279,7 @@ export class UI {
 
   showStats(html: string): void {
     const box = this.openModal(`<h2>Tower Statistics</h2>${html}
-      <div class="modal-actions"><button class="primary" data-act="close">Close</button></div>`);
+      <div class="modal-actions"><button class="btn primary" data-act="close">Close</button></div>`);
     box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
   }
 
@@ -293,19 +293,21 @@ export class UI {
         ? `<div class="slot-detail">${escapeHtml(s.towerName ?? "Tower")} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br><span class="slot-when">${fmtWhen(s.savedAt)}</span></div>`
         : `<div class="slot-detail slot-empty">empty</div>`;
       const saveBtn =
-        s.slot === "auto" ? "" : `<button data-save="${s.slot}">Save</button>`;
-      const loadBtn = s.exists ? `<button data-load="${s.slot}">Load</button>` : "";
+        s.slot === "auto" ? "" : `<button class="btn" data-save="${s.slot}">Save</button>`;
+      const loadBtn = s.exists ? `<button class="btn" data-load="${s.slot}">Load</button>` : "";
       const delBtn =
-        s.exists && s.slot !== "auto" ? `<button class="danger" data-del="${s.slot}">✕</button>` : "";
+        s.exists && s.slot !== "auto"
+          ? `<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
+          : "";
       return `<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
     };
     const box = this.openModal(`
       <h2>Saved Towers</h2>
-      <div class="slots">${slots.map(row).join("")}</div>
+      <div class="slots well">${slots.map(row).join("")}</div>
       <div class="modal-actions">
-        <button data-act="export">Export JSON</button>
-        <button data-act="import">Import JSON</button>
-        <button class="primary" data-act="close">Close</button>
+        <button class="btn" data-act="export">Export JSON</button>
+        <button class="btn" data-act="import">Import JSON</button>
+        <button class="btn primary" data-act="close">Close</button>
       </div>`);
     box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
       b.addEventListener("click", () => {
@@ -351,8 +353,8 @@ export class UI {
     const box = this.openModal(`
       <h2>${escapeHtml(title)} — Stops</h2>
       <p style="color:var(--muted);font-size:12px">Untick a floor to make the car skip it (express service). The top and bottom stay connected.</p>
-      <div class="stop-list">${rowsHtml}</div>
-      <div class="modal-actions"><button class="primary" data-act="close">Done</button></div>`);
+      <div class="stop-list well">${rowsHtml}</div>
+      <div class="modal-actions"><button class="btn primary" data-act="close">Done</button></div>`);
     box.querySelectorAll<HTMLInputElement>("input[data-floor]").forEach((cb) => {
       cb.addEventListener("change", () => onToggle(Number(cb.dataset.floor), cb.checked));
     });
@@ -442,15 +444,7 @@ export class UI {
     // Routed through the app so it can latch the dismissal — otherwise the
     // very next hover pick over the same facility re-opens the card.
     const h4 = this.el.inspector.querySelector("h4");
-    if (h4) {
-      const x = document.createElement("button");
-      x.type = "button";
-      x.className = "insp-close";
-      x.setAttribute("aria-label", "Close");
-      x.textContent = "✕";
-      x.addEventListener("click", () => this.cb.onInspectorClose());
-      h4.appendChild(x);
-    }
+    h4?.appendChild(this.titleBarClose("insp-close btn xs", () => this.cb.onInspectorClose()));
     this.inspectorSize = { w: this.el.inspector.offsetWidth, h: this.el.inspector.offsetHeight };
   }
 
@@ -486,17 +480,17 @@ export class UI {
       <h2>Set all ${noun}</h2>
       <div class="batch-modes">
         <label><input type="radio" name="bp-mode" value="set" checked /> Set ${priceWord} to</label>
-        <span class="bp-amount"><button type="button" data-bp="dec" aria-label="decrease">–</button>
-          <input id="bp-price" type="number" inputmode="numeric" value="${band.default}" min="${band.min}" max="${band.max}" step="${band.step}" />
-          <button type="button" data-bp="inc" aria-label="increase">+</button></span>
+        <span class="bp-amount"><button type="button" class="btn" data-bp="dec" aria-label="decrease">–</button>
+          <input id="bp-price" class="field" type="number" inputmode="numeric" value="${band.default}" min="${band.min}" max="${band.max}" step="${band.step}" />
+          <button type="button" class="btn" data-bp="inc" aria-label="increase">+</button></span>
         <div class="bp-band">Range ${money(band.min)}–${money(band.max)}</div>
         <label><input type="radio" name="bp-mode" value="default" /> Reset to default (${money(band.default)})</label>
       </div>
       <label class="bp-only"><input id="bp-only" type="checkbox" /> Only ${noun} still on the default price</label>
       <p id="bp-preview" class="bp-preview" aria-live="polite"></p>
       <div class="modal-actions">
-        <button class="primary" id="bp-apply" data-act="apply">Apply</button>
-        <button data-act="close">Cancel</button>
+        <button class="btn primary" id="bp-apply" data-act="apply">Apply</button>
+        <button class="btn" data-act="close">Cancel</button>
       </div>`);
     const priceEl = box.querySelector<HTMLInputElement>("#bp-price")!;
     const onlyEl = box.querySelector<HTMLInputElement>("#bp-only")!;
@@ -562,7 +556,13 @@ export class UI {
 
   private openModal(html: string): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
-    dialog.innerHTML = `<div class="modal-box">${html}</div>`;
+    dialog.innerHTML = `<div class="modal-box win">${html}</div>`;
+    const box = dialog.firstElementChild as HTMLElement;
+    // Every dialog's TOP-LEVEL h2 is the window title bar; classing it here
+    // keeps the rule in one place instead of in every caller's template.
+    // :scope > h2 so an h2 nested in body content is never skinned.
+    const h2 = box.querySelector(":scope > h2");
+    h2?.classList.add("win-title");
     if (!dialog.open) dialog.showModal();
     // Win-style ✕ in the title bar (same affordance as the editor card) so
     // long dialogs can be dismissed without scrolling to the bottom button.
@@ -572,24 +572,19 @@ export class UI {
     // showModal(): it must not be the first focusable element, or keyboard
     // users would land on ✕ and Enter would dismiss (declining emergencies)
     // instead of activating the primary action.
-    const h2 = dialog.querySelector(".modal-box h2");
     if (h2) {
-      const x = document.createElement("button");
-      x.type = "button";
-      x.className = "modal-x";
-      x.setAttribute("aria-label", "Close");
-      x.textContent = "✕";
       // cancelable, like the native Esc-key cancel event, so an oncancel
       // handler could preventDefault() it without behaving differently here.
-      x.addEventListener("click", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
-      h2.appendChild(x);
+      h2.appendChild(
+        this.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
+      );
     }
     // Click outside the box (on the backdrop) closes the dialog.
     dialog.onclick = (e) => {
       if (e.target === dialog) this.closeModal();
     };
     dialog.oncancel = () => this.closeModal(); // Esc key
-    return dialog.querySelector(".modal-box")!;
+    return box;
   }
   closeModal(): void {
     const dialog = this.el.modal as HTMLDialogElement;
@@ -597,10 +592,22 @@ export class UI {
     dialog.innerHTML = "";
   }
 
+  /** The one way to build a title-bar ✕ (see docs/design-system.md): every
+   * dismissible window's close button comes from here so they can't drift. */
+  private titleBarClose(className: string, onClick: () => void): HTMLButtonElement {
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = className;
+    x.setAttribute("aria-label", "Close");
+    x.textContent = "✕";
+    x.addEventListener("click", onClick);
+    return x;
+  }
+
   confirmModal(title: string, body: string, onYes: () => void): void {
     const box = this.openModal(
       `<h2>${title}</h2><p>${body}</p>
-       <div class="modal-actions"><button data-act="no">Cancel</button><button class="primary" data-act="yes">Confirm</button></div>`,
+       <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">Confirm</button></div>`,
     );
     box.querySelector('[data-act="no"]')!.addEventListener("click", () => this.closeModal());
     box.querySelector('[data-act="yes"]')!.addEventListener("click", () => {
@@ -612,10 +619,10 @@ export class UI {
   showExport(json: string): void {
     const box = this.openModal(
       `<h2>Export tower</h2><p>Copy this JSON or download it as a file.</p>
-       <textarea readonly>${escapeHtml(json)}</textarea>
+       <textarea class="field" readonly>${escapeHtml(json)}</textarea>
        <div class="modal-actions">
-         <button data-act="download" class="primary">Download .json</button>
-         <button data-act="close">Close</button>
+         <button class="btn primary" data-act="download">Download .json</button>
+         <button class="btn" data-act="close">Close</button>
        </div>`,
     );
     box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
@@ -636,11 +643,11 @@ export class UI {
       `<h2>Import tower</h2>
        <p>Paste a Verticopolis JSON export, or choose a file. Original SimTower
        <code>.TWR</code> saves are recognized (full conversion is planned for a future update).</p>
-       <textarea placeholder="Paste save JSON here…"></textarea>
+       <textarea class="field" placeholder="Paste save JSON here…"></textarea>
        <div class="modal-actions">
-         <button data-act="file">Choose file…</button>
-         <button data-act="close">Cancel</button>
-         <button class="primary" data-act="load">Load</button>
+         <button class="btn" data-act="file">Choose file…</button>
+         <button class="btn" data-act="close">Cancel</button>
+         <button class="btn primary" data-act="load">Load</button>
        </div>`,
     );
     const ta = box.querySelector("textarea")!;
@@ -704,7 +711,7 @@ export class UI {
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
       </ul>
-      <div class="modal-actions"><button data-act="reduce-motion"></button><button data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="primary" data-act="close">Got it</button></div>
+      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close">Got it</button></div>
     `);
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
     // When the OS forces reduced motion on, the user pref can't override it — show
@@ -731,8 +738,8 @@ export class UI {
       <h2>⚠️ Emergency</h2>
       <p>${message}</p>
       <div class="modal-actions">
-        <button class="primary" data-act="accept">Pay ${costLabel}</button>
-        <button data-act="decline">Decline</button>
+        <button class="btn primary" data-act="accept">Pay ${costLabel}</button>
+        <button class="btn" data-act="decline">Decline</button>
       </div>
     `);
     const dialog = this.el.modal as HTMLDialogElement;
@@ -756,7 +763,7 @@ export class UI {
     const box = this.openModal(`
       <h2>🏆 TOWER achieved!</h2>
       <p>Your skyscraper has earned the legendary <b>TOWER</b> rating. Wedding bells ring out over the city from the hall on the 100th floor. Congratulations, master builder!</p>
-      <div class="modal-actions"><button class="primary" data-act="close">Continue</button></div>
+      <div class="modal-actions"><button class="btn primary" data-act="close">Continue</button></div>
     `);
     box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
   }

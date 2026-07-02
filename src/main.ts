@@ -846,6 +846,10 @@ class GameApp {
     return vol;
   }
 
+  /** The editor card's title bar — one template so the two editors can't drift. */
+  private editorTitleBar = (name: string): string =>
+    `<h4 class="win-title">${escapeHtml(name)}<button type="button" class="ed-close btn xs" aria-label="Close">\u2715</button></h4>`;
+
   private unitEditorHtml(u: import("./engine/types").Unit): string {
     const f = FACILITIES[u.kind];
     const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
@@ -876,24 +880,24 @@ class GameApp {
 
     let actions = "";
     if (canRename) {
-      actions += `<div class="ed-row"><input data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button data-edit="rename">Rename</button></div>`;
+      actions += `<div class="ed-row"><input class="field" data-edit="noop" id="ed-name" value="${escapeHtml(u.label)}" /><button class="btn" data-edit="rename">Rename</button></div>`;
     }
     // Price adjuster: offices/hotels any time, condos only while still unsold.
     if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
       const what = u.kind === "condo" ? "price" : "rent";
-      actions += `<div class="ed-row"><button data-edit="rentDown">– ${what}</button><button data-edit="rentUp">+ ${what}</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="rentDown">– ${what}</button><button class="btn" data-edit="rentUp">+ ${what}</button></div>`;
       // Batch-price every unit of this kind at once (no per-room grind).
-      actions += `<div class="ed-row"><button data-edit="batchKind">Set all ${FACILITIES[u.kind].name.toLowerCase()}s…</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="batchKind">Set all ${FACILITIES[u.kind].name.toLowerCase()}s…</button></div>`;
     }
     if (u.kind === "cinema") {
       const pol = { auto: "Auto", feature: "Feature", blockbuster: "Blockbuster" }[u.filmPolicy ?? "auto"];
-      actions += `<div class="ed-row"><button data-edit="filmPolicy">Booking: ${pol} ▸</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button></div>`;
     }
-    actions += `<div class="ed-row"><button class="danger" data-edit="sell">Sell / Bulldoze</button></div>`;
+    actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4>${f.name}<button type="button" class="ed-close" aria-label="Close">✕</button></h4>` +
-      `<div class="ed-stats">${rows.join("")}</div>` +
+      this.editorTitleBar(f.name) +
+      `<div class="ed-stats kv">${rows.join("")}</div>` +
       actions
     );
   }
@@ -932,19 +936,19 @@ class GameApp {
 
     let actions = "";
     if (isEl) {
-      actions += `<div class="ed-row"><button data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button></div>`;
-      actions += `<div class="ed-row"><button data-edit="stops">Configure stops…</button></div>`;
-      actions += `<div class="ed-row"><button data-edit="express">Express (lobbies)</button><button data-edit="allstops">All stops</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button class="btn" data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="stops">Configure stops…</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button></div>`;
     }
     // Stairs/escalators span exactly one floor by rule — no extend buttons.
     if (isElevatorKind(t.kind)) {
-      actions += `<div class="ed-row"><button data-edit="extendDown">▼ Extend down</button><button data-edit="extendUp">▲ Extend up</button></div>`;
+      actions += `<div class="ed-row"><button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button></div>`;
     }
-    actions += `<div class="ed-row"><button class="danger" data-edit="sell">Sell / Bulldoze</button></div>`;
+    actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4>${f.name}<button type="button" class="ed-close" aria-label="Close">✕</button></h4>` +
-      `<div class="ed-stats">${rows.join("")}</div>` +
+      this.editorTitleBar(f.name) +
+      `<div class="ed-stats kv">${rows.join("")}</div>` +
       actions
     );
   }
@@ -1153,8 +1157,8 @@ class GameApp {
         ? `<span class="k">Counts toward stars</span><span class="v">${fmt(ratingPop)}</span>`
         : "";
     return `<div class="stats-grid">
-      <div class="stats-section">Overview</div>
-      <div class="col">
+      <div class="stats-section win-title sm">Overview</div>
+      <div class="col kv">
         <span class="k">Tower name</span><span class="v">${escapeHtml(this.sim.tower.towerName)}</span>
         <span class="k">Rating</span><span class="v stars">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
         <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
@@ -1163,26 +1167,26 @@ class GameApp {
         <span class="k">Funds</span><span class="v ${this.sim.money < 0 ? "loss" : "money"}">$${fmt(Math.round(this.sim.money))}</span>
         <span class="k">Date</span><span class="v">${c.dayName}, day ${c.day + 1}</span>
       </div>
-      <div class="col">
+      <div class="col kv">
         <span class="k">Floors above</span><span class="v">${s.floors}</span>
         <span class="k">Basements</span><span class="v">${s.basements}</span>
         <span class="k">Elevators</span><span class="v">${s.elevators}</span>
         <span class="k">All transports</span><span class="v">${s.transports}</span>
       </div>
-      <div class="stats-section">Tenancy</div>
-      <div class="col">
+      <div class="stats-section win-title sm">Tenancy</div>
+      <div class="col kv">
         <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
         <span class="k">Condos sold</span><span class="v">${s.soldCondos}/${s.condos}</span>
         <span class="k">Vacancies</span><span class="v">${s.vacant}</span>
       </div>
-      <div class="col">
+      <div class="col kv">
         <span class="k">Hotel rooms in use</span><span class="v">${s.occupiedHotel}/${s.hotelRooms}</span>
         <span class="k">Rooms to clean</span><span class="v">${s.dirty}</span>
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
-      <div class="stats-section">Transport &amp; access</div>
-      <div class="col">
+      <div class="stats-section win-title sm">Transport &amp; access</div>
+      <div class="col kv">
         <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>
         ${
           s.parkingSpaces > 0
@@ -1192,7 +1196,7 @@ class GameApp {
       </div>
       ${
         stranded || ratingRow
-          ? `<div class="col">${
+          ? `<div class="col kv">${
               stranded
                 ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors 3+ rides from the lobby; they earn rating but draw no visitors. Add a sky-lobby transfer.</span>`
                 : ""
@@ -1212,7 +1216,7 @@ class GameApp {
     const mp = this.sim.milestoneProgress();
     const half = Math.ceil(mp.list.length / 2);
     const col = (items: typeof mp.list) =>
-      `<div class="col ms">${items
+      `<div class="col ms kv">${items
         .map(
           (m) =>
             `<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${escapeHtml(m.label)}</span>` +
@@ -1221,7 +1225,7 @@ class GameApp {
         .join("")}</div>`;
     const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
     return (
-      `<div class="stats-section">🏅 Milestones (${mp.achieved}/${mp.total})` +
+      `<div class="stats-section win-title sm">🏅 Milestones (${mp.achieved}/${mp.total})` +
       `<span class="evalbar"><span style="width:${pct}%"></span></span></div>` +
       col(mp.list.slice(0, half)) +
       col(mp.list.slice(half))
@@ -1414,7 +1418,7 @@ class GameApp {
             : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`
           : "";
       this.ui.showInspector(
-        `<h4>${f.name}</h4>` +
+        `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
           `<div>Status: ${u.state}</div>` +
           (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
@@ -1433,7 +1437,7 @@ class GameApp {
       this.inspectTarget = { type: p.type, id: p.id };
       const f = FACILITIES[t.kind];
       this.ui.showInspector(
-        `<h4>${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
+        `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
           (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : ""),
       );
     }
