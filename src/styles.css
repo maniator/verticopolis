@@ -21,19 +21,21 @@
 
 /* ---- 1. TOKENS ------------------------------------------------------ */
 :root {
-  /* Retro palette — Windows 3.1 / SimTower. Swap these to re-theme. */
-  --bg: #008080;          /* teal desktop */
-  --panel: #c0c0c0;       /* system gray */
+  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
+     they read better at usage sites ("body text", "highlight") and can never
+     diverge from the theme. */
+  --bg: var(--r-desktop);
+  --panel: var(--r-face);
+  --ink: var(--r-ink);       /* body text */
+  --accent: var(--r-title);  /* navy — titles & highlights */
   --panel-light: #d7d7d7;
-  --ink: #000000;         /* body text */
   --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
-  --accent: #000080;      /* navy — titles & highlights */
   --good: #15722e;
   --bad: #b01023;
   --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
   --money: #0a6e26;
   --line: #7a7a7a;
-  /* Win3.1 chrome tokens + the signature two-pixel bevels. */
+  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
   --r-face: #c0c0c0;
   --r-shadow: #808080;
   --r-dark: #000000;
