@@ -306,7 +306,7 @@ class GameApp {
         placed.what === "paint"
           ? placed.ok
             ? `Placed ${FACILITIES[kind].name} on floor ${c.floor}`
-            : `Can't place ${FACILITIES[kind].name} here`
+            : (placed.reason ?? `Can't place ${FACILITIES[kind].name} here`)
           : placed.what === "flight"
             ? placed.ok
               ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}`
@@ -614,9 +614,10 @@ class GameApp {
     kind: FacilityKind,
     tile: number,
     floor: number,
-  ): { what: "paint"; ok: boolean } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
+  ): { what: "paint"; ok: boolean; reason?: string } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
     if (kind === "floor" || kind === "lobby") {
-      return { what: "paint", ok: this.paintBrush(kind, tile, floor) > 0 };
+      const r = this.paintBrush(kind, tile, floor);
+      return { what: "paint", ok: r.placed > 0, reason: r.reason };
     }
     if (isFixedSpanTransport(kind)) {
       const r = this.tryBuildTransport(kind, this.snapX(kind, tile), floor, floor + 1);
@@ -849,9 +850,6 @@ class GameApp {
     }
   }
 
-  /** The values in the unit editor that change while it stays open, keyed by the
-   *  `data-field` on their cell. These are patched in place each refresh so the
-   *  buttons and rename input are never rebuilt out from under a click. */
   /** Open the per-floor stop-configuration dialog for the selected elevator. */
   private openStopsDialog(): void {
     if (!this.selected || this.selected.type !== "transport") return;
@@ -1094,11 +1092,13 @@ class GameApp {
     return tiles;
   }
 
-  /** Lay a brush strip; returns how many tiles were actually placed so
-   *  callers can report honestly (an unsupported strip lays zero). */
-  private paintBrush(kind: FacilityKind, tile: number, floor: number): number {
+  /** Lay a brush strip; returns how many tiles were actually placed, and when
+   *  zero, why — a strip that's already all this kind is not a failure, and a
+   *  real refusal (no support, no money) carries the engine's reason. */
+  private paintBrush(kind: FacilityKind, tile: number, floor: number): { placed: number; reason?: string } {
     const tiles = this.brushTiles(tile);
     let placed = 0;
+    let reason: string | undefined;
     let progress = true;
     while (progress) {
       progress = false;
@@ -1107,14 +1107,20 @@ class GameApp {
         // upgrade plain floor in place (the sky-lobby conversion).
         const existing = this.sim.tower.structureKindAt(floor, tx);
         if (existing === kind || (existing !== undefined && kind !== "lobby")) continue;
-        if (this.sim.build(kind, floor, tx).ok) {
+        const r = this.sim.build(kind, floor, tx);
+        if (r.ok) {
           placed++;
           progress = true;
+        } else {
+          reason = r.reason;
         }
       }
     }
     this.paint = { tile, floor };
-    return placed;
+    if (placed === 0 && tiles.every((tx) => this.sim.tower.structureKindAt(floor, tx) === kind)) {
+      return { placed, reason: `${FACILITIES[kind].name} already built here` };
+    }
+    return { placed, reason };
   }
 
   private paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {

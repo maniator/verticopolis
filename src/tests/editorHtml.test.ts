@@ -59,6 +59,34 @@ describe("editor & stats HTML builders", () => {
     expect(Object.keys(vol)).toEqual(expect.arrayContaining(["cars", "capacity", "stops"]));
   });
 
+  it("every data-field the render emits has a volatile key to patch it", () => {
+    // The reverse direction of the first test: a rendered span whose field is
+    // missing from the volatile map never patches and goes silently stale.
+    // Volatile keys without a rendered span are fine (patchVolatile skips
+    // them) — the editor key in main.ts owns when those rows appear.
+    const grab = (html: string) => [...html.matchAll(/data-field="([^"]+)"/g)].map((m) => m[1]);
+    for (const state of ["occupied", "gutted"] as const) {
+      office.state = state;
+      const keys = Object.keys(unitEditorVolatile(sim, office));
+      for (const field of grab(unitEditorHtml(sim, office))) expect(keys).toContain(field);
+    }
+    office.state = "occupied";
+    const tKeys = Object.keys(transportEditorVolatile(sim, lift));
+    for (const field of grab(transportEditorHtml(sim, lift))) expect(tKeys).toContain(field);
+    // The cinema's state-gated "Now showing" row is where this drifted once.
+    const csim = new Simulation();
+    for (let x = 10; x < 40; x++) expect(csim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (const fl of [2, 3]) for (let x = 10; x < 40; x++) expect(csim.tower.place("floor", fl, x).ok).toBe(true);
+    const rc = csim.tower.place("cinema", 2, 12);
+    expect(rc.ok).toBe(true);
+    const cinema = csim.tower.units.find((u) => u.id === rc.unitId)!;
+    for (const state of ["occupied", "gutted"] as const) {
+      cinema.state = state;
+      const keys = Object.keys(unitEditorVolatile(csim, cinema));
+      for (const field of grab(unitEditorHtml(csim, cinema))) expect(keys).toContain(field);
+    }
+  });
+
   it("stats dialog renders every section as a mini title bar", () => {
     const html = buildStatsHtml(sim);
     for (const section of ["Overview", "Tenancy", "Transport &amp; access", "Milestones"]) {
