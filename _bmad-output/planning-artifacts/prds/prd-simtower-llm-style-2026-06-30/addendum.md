@@ -12,12 +12,13 @@ supporting context for downstream architecture/UX work.
 | SimTower (1994) mechanic | Verticopolis realization | Divergence |
 | --- | --- | --- |
 | Build floors, then rooms; ground + sky lobbies every 15 floors | Two-layer grid; rooms auto-create floor beneath; lobbies at ground + every 15th | Faithful |
-| ~100 floors up, basements below | 100 up, 10 basement levels below (B1…B10, floor 0 = B1 down to floor −9), 200 tiles wide | Faithful (basement depth tuned) |
+| ~100 floors up, basements below | 100 up, 10 basement levels below (B1…B10, floor 0 = B1 down to floor −9), 340 tiles wide | Faithful (basement depth tuned) |
 | Offices, condos, hotel (single/double/suite), food, retail, cinema, party hall | All present with original cadences | Faithful |
 | Services: security, medical, housekeeping, recycling, parking | All present | Faithful |
 | Metro/subway brings visitors | Whole-basement Metro Station | Faithful |
 | **Cathedral** on floor 100 for TOWER | **Wedding Hall** on floor 100 | **Renamed** — religion-agnostic |
-| Stairs, escalators, standard/service/express elevators with cars + stops | All present; SCAN dispatch; editable cars & per-floor stops | Faithful |
+| Stairs, escalators, standard/service/express elevators with cars + stops | All present; SCAN dispatch answers the real routed crowd (hall + cab calls); editable cars & per-floor stops; stairs/escalators are one-tap fixed two-floor flights that stack into columns | Faithful |
+| Service elevators are staff/freight-only; housekeepers travel room to room | Staff-only service shafts + a staff network (service elevators, stairs, escalators) housekeepers physically travel on; rooms stay dirty until a housekeeper arrives | Faithful (since 2026-07-02) |
 | Star ratings 2★/3★/4★/5★ at 300/1k/5k/10k; TOWER at **15,000** | Same thresholds incl. 5★=10k; **TOWER at 15,000** (lot widened to 340 so it's reachable) | Faithful (see 2026-06-30 update) |
 | Fire, terrorist/bomb, VIP inspection, treasure | All present, plus thief + seasonal Santa cameo | Faithful + flavor additions |
 | Aggregate congestion/stress model | **Individually-routed** crowd (BFS) + aggregate backstop | **Enhanced** + backstop |
@@ -56,8 +57,16 @@ supporting context for downstream architecture/UX work.
 - **Elevator dispatch (FR-26):** demand-driven **SCAN** (elevator/disk-scan
   algorithm) — a car continues in its current direction serving requests, then
   reverses; idles at the ground lobby when there is no demand (`ElevatorDispatch`).
+  Since 2026-07-02 the drawn crowd feeds dispatch directly
+  (`Crowd.elevatorCalls`): waiting people are per-floor **hall calls** layered
+  over the statistical demand estimate, and riders' destinations are per-car
+  **cab calls**; staff-only shafts consume hall calls exclusively (no
+  statistical tenant demand).
 - **Commuter routing (FR-30):** each person's path is computed by **BFS** over
-  the connected transport graph (shafts + lobby transfers), in `Crowd`.
+  the connected transport graph (shafts + lobby transfers), in `Crowd`. Staff
+  (housekeepers) route over a separate **staff adjacency** (service elevators +
+  stairs + escalators, service-first on ties) with no ride cap; tenants never
+  see staff-only shafts.
 - **Determinism boundary (review F40):** the *authoritative* state — money,
   population, satisfaction, ratings, events — is recomputed deterministically from
   clock-edge snapshots under the seeded RNG, so headless runs and the test suite
@@ -70,11 +79,13 @@ supporting context for downstream architecture/UX work.
   uses a separate RNG so visuals never perturb gameplay (supports FR-54/FR-57).
 - **Persistence:** `localStorage` autosave + slots; JSON export/import
   (`SaveGame.ts`); best-effort `.TWR` decoder stub (`twrImport.ts`).
-- **Testing:** Vitest suite (84 tests, all passing) covering placement rules,
-  economy, ratings gates, events (housekeeping/fire/bomb/weather), elevator
-  dispatch, crowd BFS routing/movement, save/load, the `.TWR` parser, and an
-  end-to-end run to the TOWER victory (`parity.test.ts`). `npm run typecheck`,
-  `npm run lint`, `npm run screenshots`.
+- **Testing:** Vitest suite (282 tests across 28 files, all passing) covering
+  placement rules (incl. structural support and stair stacking), economy,
+  ratings gates, events (housekeeping/fire/bomb/weather), elevator dispatch
+  (incl. crowd hall/cab calls and staff-only shafts), crowd BFS
+  routing/movement, staff routing, transport rendering geometry, save/load, the
+  `.TWR` parser, and an end-to-end run to the TOWER victory (`parity.test.ts`).
+  `npm run typecheck`, `npm run lint`, `npm run screenshots`.
 
 ## C. Aesthetic & Tone
 
@@ -94,7 +105,13 @@ supporting context for downstream architecture/UX work.
 
 - **Performance:** must stay responsive on a tall, fully-populated tower on a
   mid-range laptop and phone; the ~140 visible-crowd cap and culling are the
-  primary levers.
+  primary levers. Excalibur's physics pass is disabled (nothing in the game
+  uses it; big towers froze phones at high speed with it on).
+- **Mobile GPU robustness (2026-07-02):** oversized draw surfaces (tall
+  elevator/stair shafts, the ground plane) are tiled into texture-size-safe
+  bands so mobile GPUs never drop them as black rectangles; WebGL context loss
+  auto-recovers in place instead of dead-ending on a "refresh the page" card;
+  a frame-exception guard prevents a single bad frame from freezing the game.
 - **Determinism/testability:** the aggregate model + seeded RNG must keep the
   headless suite green; rendering must be separable from simulation.
 - **No network dependency:** everything runs offline, including the single-file
