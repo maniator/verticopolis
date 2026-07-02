@@ -49,7 +49,10 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 ## Artifacts & working conventions
 - BMAD output lives under `_bmad-output/` (`planning-artifacts/prds`, `.../reviews`).
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
-- **Deep adversarial review before merging** (find → verify → synthesize); fix confirmed
-  findings and re-verify before merge. Resolve Copilot/Codex PR threads.
+- **Deep adversarial review runs in the SAME session that writes the code** (find →
+  verify → synthesize via `/gds-code-review` or `/bmad-code-review`) — before pushing,
+  or immediately after opening/updating the PR. Never defer it to "before merge":
+  sessions end and the review gets forgotten. A change isn't done until confirmed
+  findings are fixed and re-verified on the branch. Resolve Copilot/Codex PR threads.
 - Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
   demo/camera reads the live `GRID.width`.

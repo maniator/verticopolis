@@ -570,7 +570,9 @@ export class UI {
       x.className = "modal-x";
       x.setAttribute("aria-label", "Close");
       x.textContent = "✕";
-      x.addEventListener("click", () => dialog.dispatchEvent(new Event("cancel")));
+      // cancelable, like the native Esc-key cancel event, so an oncancel
+      // handler could preventDefault() it without behaving differently here.
+      x.addEventListener("click", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
       h2.appendChild(x);
     }
     if (!dialog.open) dialog.showModal();
