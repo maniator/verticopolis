@@ -303,7 +303,7 @@ export class OnboardingController {
   private mountPanel(): void {
     const el = document.createElement("div");
     el.id = "onboard";
-    el.className = this.opts.mq.matches ? "onboard--mobile" : "";
+    el.className = `win${this.opts.mq.matches ? " onboard--mobile" : ""}`;
     document.body.appendChild(el);
     this.panelEl = el;
     el.addEventListener("click", (e) => {
@@ -322,7 +322,7 @@ export class OnboardingController {
       );
     }).join("");
     this.panelEl.innerHTML =
-      `<div class="ob-head">Getting Started<button class="ob-skip" data-onboard="skip">Skip</button></div>` +
+      `<div class="win-title">Getting Started<button class="btn xs" data-onboard="skip">Skip</button></div>` +
       `<ol class="ob-list">${items}</ol>`;
   }
 
