@@ -14,12 +14,15 @@ describe("editor & stats HTML builders", () => {
 
   beforeEach(() => {
     sim = new Simulation();
-    for (let x = 10; x < 30; x++) sim.tower.place("lobby", 1, x);
-    for (let x = 10; x < 30; x++) sim.tower.place("floor", 2, x);
+    // Assert every placement: a silent fixture failure would make the HTML
+    // assertions below pass or fail for the wrong reason.
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
     const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
     office = sim.tower.units.find((u) => u.id === r.unitId)!;
     office.state = "occupied";
-    sim.buildTransport("elevatorStandard", 10, 1, 2);
+    expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
     lift = sim.tower.transports[sim.tower.transports.length - 1];
   });
 
@@ -41,7 +44,7 @@ describe("editor & stats HTML builders", () => {
     expect(html).toContain('data-field="cars"');
     expect(html).toContain('data-edit="extendUp"');
     // Fixed-span flights get neither cars nor extend arrows.
-    sim.buildTransport("stairs", 14, 1, 2);
+    expect(sim.buildTransport("stairs", 14, 1, 2).ok).toBe(true);
     const stairs = sim.tower.transports[sim.tower.transports.length - 1];
     const stairsHtml = transportEditorHtml(sim, stairs);
     expect(stairsHtml).not.toContain('data-field="cars"');
