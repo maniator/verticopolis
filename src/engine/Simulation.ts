@@ -1405,7 +1405,30 @@ export class Simulation implements SimContext {
             : undefined,
         };
       });
-    sim.tower.setNextId(data.nextId);
+    // Ids drive every by-id lookup — and the renderer keys its retained actors
+    // by them — so they must be sane and unique, and the id counter must sit
+    // above them all (a corrupt/hand-edited nextId would otherwise mint
+    // duplicates for new placements, permanently drawing the wrong room).
+    // "Sane" is stricter than finite: a forged id near/past 2^53 would make
+    // the ++ repair (and allocateId later) a precision no-op that re-mints the
+    // same id forever, so ids must be positive integers under a bound no legit
+    // tower approaches. Max over the SANE ids only, then hand each corrupt or
+    // duplicated id a fresh one.
+    const ID_CAP = 2 ** 31; // ~2.1e9 placements — far past any real save
+    const saneId = (n: unknown): n is number =>
+      typeof n === "number" && Number.isInteger(n) && n > 0 && n < ID_CAP;
+    const entities: { id: number }[] = [...sim.tower.units, ...sim.tower.transports];
+    let maxLoadedId = 0;
+    for (const e of entities) if (saneId(e.id) && e.id > maxLoadedId) maxLoadedId = e.id;
+    const seenIds = new Set<number>();
+    for (const e of entities) {
+      if (!saneId(e.id) || seenIds.has(e.id)) e.id = ++maxLoadedId;
+      seenIds.add(e.id);
+    }
+    // The saved counter gets the same sanity gate: a forged huge nextId would
+    // otherwise win the max and park the counter where ++ stops incrementing.
+    const savedNextId = saneId(data.nextId) ? data.nextId : 0;
+    sim.tower.setNextId(Math.max(savedNextId, maxLoadedId + 1));
     sim.tower.towerName = data.towerName;
     sim.tower.builtWeddingHall = data.builtWeddingHall;
     sim.tower.reindex();

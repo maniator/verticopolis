@@ -78,6 +78,27 @@ interface Run {
   x1: number;
 }
 
+/** A retained room actor plus the mutable inputs its draw closure reads live.
+ *  A signature change repaints IN PLACE (`cv.flagDirty()` re-rasterizes the
+ *  same bitmap and re-uploads the same WebGL texture) instead of allocating a
+ *  fresh canvas + texture. At top speed a big tower flips ~100 room
+ *  signatures per real second (hour/lighting/occupancy churn), and the
+ *  old kill-and-recreate path let dead canvases and GPU textures pile up
+ *  faster than Excalibur's 60s texture GC could drain them — enough sustained
+ *  memory pressure that phones killed (and auto-reloaded) the tab. */
+interface RoomRec {
+  actor: ex.Actor;
+  cv: ex.Canvas;
+  /** Burning/under-construction rooms animate (cache:false, redrawn every
+   *  frame); a transition into or out of an animated state still rebuilds. */
+  animated: boolean;
+  /** Mutable inputs the draw closure reads live — currently just the "dead
+   *  parking space" flag (red X overlay). A separate holder (not a field on
+   *  the record) so the closure can capture it before the actor/canvas exist
+   *  and the record stays fully typed with no placeholder casts. */
+  live: { dead: boolean };
+}
+
 /** A single engine-driven walking figure (lobby/corridor walker or climber). */
 interface Walker {
   actor: ex.Actor;
@@ -161,7 +182,7 @@ export class TowerEngine {
 
   // Retained scene graph, reconciled by stable id.
   private structActors = new Map<number, ex.Actor>();
-  private roomActors = new Map<number, ex.Actor>();
+  private roomActors = new Map<number, RoomRec>();
   private roomSig = new Map<number, string>();
   private transportActors = new Map<number, ex.Actor>();
   private transportSig = new Map<number, string>();
@@ -304,17 +325,17 @@ export class TowerEngine {
         }
       }
     }
-    for (const map of [this.roomActors, this.structActors]) {
-      for (const [id, a] of map) {
-        if (a.z >= bestZ && a.contains(world.x, world.y)) {
-          const u = this.sim.tower.units.find((x) => x.id === id);
-          if (u) {
-            best = { type: "unit", id, kind: u.kind };
-            bestZ = a.z;
-          }
+    const considerUnit = (id: number, a: ex.Actor) => {
+      if (a.z >= bestZ && a.contains(world.x, world.y)) {
+        const u = this.sim.tower.units.find((x) => x.id === id);
+        if (u) {
+          best = { type: "unit", id, kind: u.kind };
+          bestZ = a.z;
         }
       }
-    }
+    };
+    for (const [id, rec] of this.roomActors) considerUnit(id, rec.actor);
+    for (const [id, a] of this.structActors) considerUnit(id, a);
     return best;
   }
 
@@ -1003,14 +1024,28 @@ export class TowerEngine {
           u.kind === "parking" && u.state !== "construction" && u.state !== "fire" && !parkingOK.has(u.id) ? "x" : "";
         const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${open}${lateNight}${dead}`;
         const isDead = dead === "x";
-        const a = this.roomActors.get(u.id);
-        if (!a) {
-          this.addRoom(u, isDead);
+        const rec = this.roomActors.get(u.id);
+        const animated = u.state === "fire" || u.state === "construction";
+        if (!rec) {
+          this.addRoom(u, isDead, animated);
           this.roomSig.set(u.id, sig);
         } else if (this.roomSig.get(u.id) !== sig) {
-          a.kill();
-          this.roomActors.delete(u.id);
-          this.addRoom(u, isDead);
+          if (animated === rec.animated && rec.cv.width === u.width * TILE) {
+            // Repaint in place: the draw closure reads the unit's live state, so
+            // flagging the canvas dirty re-bakes the SAME bitmap into the SAME
+            // GPU texture. No actor churn, no new allocations — see RoomRec.
+            rec.live.dead = isDead;
+            rec.cv.flagDirty();
+          } else {
+            // Rebuild (rare): animated↔static flips the canvas cache mode, which
+            // is fixed at construction (fire ignition/extinguish, build done);
+            // the width guard is belt-and-braces — the sig treats width as a
+            // repaint trigger, but only a rebuild can re-derive the bitmap size,
+            // actor footprint and collider (no engine path resizes a unit today).
+            rec.actor.kill();
+            this.roomActors.delete(u.id);
+            this.addRoom(u, isDead, animated);
+          }
           this.roomSig.set(u.id, sig);
         }
       }
@@ -1020,9 +1055,9 @@ export class TowerEngine {
         a.kill();
         this.structActors.delete(id);
       }
-    for (const [id, a] of this.roomActors)
+    for (const [id, rec] of this.roomActors)
       if (!seenR.has(id)) {
-        a.kill();
+        rec.actor.kill();
         this.roomActors.delete(id);
         this.roomSig.delete(id);
       }
@@ -1169,13 +1204,18 @@ export class TowerEngine {
     return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][lobbyVariant(u.x)];
   }
 
-  private addRoom(u: Unit, deadParking = false): void {
+  /** Build and retain a room actor. `animated` (burning / under construction:
+   *  redraws every frame; the rest bake once and re-bake in place — see
+   *  RoomRec) is computed by syncScene, the only caller with a unit in hand,
+   *  so the repaint-vs-rebuild gate and the canvas cache mode can never drift
+   *  apart on two copies of the predicate. */
+  private addRoom(u: Unit, deadParking: boolean, animated: boolean): void {
     const hgt = facilityFloors(u.kind);
     const w = u.width * TILE;
     const h = hgt * FLOOR;
-    // Burning / under-construction rooms animate, so they redraw; the rest are
-    // baked once and only re-baked when their state or the lighting changes.
-    const animated = u.state === "fire" || u.state === "construction";
+    // The draw closure reads `u` and `live.dead` LIVE, so a later signature
+    // change repaints by flagging the canvas dirty instead of rebuilding it.
+    const live = { dead: deadParking };
     const cv = new ex.Canvas({
       width: w,
       height: h,
@@ -1186,9 +1226,9 @@ export class TowerEngine {
         // Canon "red X" on a parking space that isn't chained to a ramp (dead —
         // no relief). Baked into the sprite; the dead-bit participates in the room
         // signature, so this re-bakes when the signature changes (state/lighting/
-        // hour or the dead-bit). deadParking is computed once per sync from the
+        // hour or the dead-bit). live.dead is refreshed on each sync from the
         // caller's single functionalParkingSet() read — no per-unit recompute.
-        if (deadParking) {
+        if (live.dead) {
           // Dark under-stroke so the X reads as a SHAPE independent of hue
           // (color-blind cue), then the red X on top.
           for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
@@ -1208,7 +1248,7 @@ export class TowerEngine {
     a.graphics.use(cv);
     a.collider.set(ex.Shape.Box(w, h, ex.vec(0, 0)));
     this.engine.add(a);
-    this.roomActors.set(u.id, a);
+    this.roomActors.set(u.id, { actor: a, cv, animated, live });
   }
 
   private addTransport(t: Transport): void {
@@ -1484,7 +1524,7 @@ export class TowerEngine {
 
   private disposeScene(): void {
     for (const a of this.structActors.values()) a.kill();
-    for (const a of this.roomActors.values()) a.kill();
+    for (const rec of this.roomActors.values()) rec.actor.kill();
     for (const a of this.transportActors.values()) a.kill();
     for (const rec of this.escapeActors.values()) {
       rec.l.kill();
