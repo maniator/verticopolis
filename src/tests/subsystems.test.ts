@@ -3,6 +3,7 @@ import { Tower } from "../engine/Tower";
 import { Clock } from "../engine/Clock";
 import { RNG } from "../engine/rng";
 import { ElevatorDispatch } from "../engine/ElevatorDispatch";
+import type { ElevatorCalls } from "../engine/Crowd";
 import { EconomySystem } from "../engine/EconomySystem";
 import { ECON } from "../engine/econConfig";
 import type { SimContext } from "../engine/SimContext";
@@ -47,6 +48,39 @@ describe("ElevatorDispatch", () => {
     const t = tower.transports[0];
     expect(t.carPositions.every((p) => Math.abs(p - t.bottom) < 0.5)).toBe(true);
     expect(t.carDir.every((d) => d === 0)).toBe(true);
+  });
+
+  it("sends a car to a real waiting person even with zero statistical demand", () => {
+    const tower = towerWithElevator(10); // empty tower → the demand model sees nobody
+    const dispatch = new ElevatorDispatch();
+    const t = tower.transports[0];
+    // A routed commuter stands waiting on floor 7 (Crowd.elevatorCalls shape).
+    const calls: ElevatorCalls = { hall: new Map([[t.id, new Map([[7, 1]])]]), cab: new Map() };
+    let served = false;
+    for (let i = 0; i < 100 && !served; i++) {
+      dispatch.update(tower, 1, 1.45, calls);
+      served = t.carPositions.some((p) => Math.abs(p - 7) < 0.05);
+    }
+    expect(served).toBe(true);
+  });
+
+  it("a car's own rider destination (cab stop) is served even when other cars claim the floor", () => {
+    const tower = towerWithElevator(10);
+    tower.setCars(tower.transports[0].id, 2);
+    const t = tower.transports[0];
+    const dispatch = new ElevatorDispatch();
+    // Car 1 carries a rider bound for floor 9; floor 9 is also a hall call that
+    // car 0 (processed first each tick) would otherwise claim away every tick.
+    const calls: ElevatorCalls = {
+      hall: new Map([[t.id, new Map([[9, 1]])]]),
+      cab: new Map([[t.id, new Map([[1, new Set([9])]])]]),
+    };
+    let delivered = false;
+    for (let i = 0; i < 100 && !delivered; i++) {
+      dispatch.update(tower, 1, 1.45, calls);
+      delivered = Math.abs(t.carPositions[1] - 9) < 0.05;
+    }
+    expect(delivered).toBe(true);
   });
 });
 

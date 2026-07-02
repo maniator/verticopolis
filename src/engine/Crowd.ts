@@ -1,6 +1,7 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
 import type { FacilityKind, Transport, Unit } from "./types";
+import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
 import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
 import { RNG } from "./rng";
 
@@ -58,8 +59,24 @@ interface Route {
   shafts: number[];
 }
 
+/** Live calls the drawn crowd places on the elevators (see elevatorCalls).
+ *  A read-only snapshot: the dispatch consumes it, never mutates it. */
+export interface ElevatorCalls {
+  /** Landing buttons: shaftId → floor → how many people want a car there. */
+  hall: ReadonlyMap<number, ReadonlyMap<number, number>>;
+  /** Cab buttons: shaftId → carIndex → floors that car's riders need. */
+  cab: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
+}
+
+/**
+ * Crowd time-base: one in-game minute is worth this many of the crowd's own
+ * seconds (small, so a commute spans a few game-minutes and people zip through
+ * trips at fast speed). Exported for the Simulation's tick conversion.
+ */
+export const CROWD_SECONDS_PER_MINUTE = 2;
+
 const WALK_SPEED = 6; // tiles per second
-const CAR_CAPACITY = 6; // visible riders per car
+const CAR_CAPACITY = 12; // drawn commuters allowed aboard one car (hidden while riding)
 const MAX_PEOPLE = 140;
 /** Staff travel outside the tenant cap (they must be able to work even in a
  *  packed tower) but stay bounded so dispatch can't flood the screen. */
@@ -71,11 +88,16 @@ const STRESS_WAIT = 25; // seconds of waiting that counts as "fed up"
  * aggregate scheduler never sends to their floor, an elevator removed from
  * under them) silently consuming the on-screen population cap.
  */
-const GIVE_UP = 90;
+const GIVE_UP = 120;
 /** Staff are on the clock: they wait longer than a fed-up tenant before
  *  abandoning a job (the failed room is handed back to dispatch and retried),
  *  but not so long that stuck trips pin the staff pool for hours. */
 const STAFF_GIVE_UP = GIVE_UP * 3;
+/** Extra patience per floor of the trip's total ride distance — what one floor
+ *  of riding honestly costs in crowd-seconds, derived from the car speed so it
+ *  can never drift from the dispatch. A fixed budget alone would despawn every
+ *  long-haul rider mid-shaft on a tall tower no matter how good the service. */
+const RIDE_SECONDS_PER_FLOOR = CROWD_SECONDS_PER_MINUTE / CAR_FLOORS_PER_MINUTE;
 
 export class Crowd {
   people: Person[] = [];
@@ -119,6 +141,48 @@ export class Crowd {
   /** 0..1 — how stressed the current crowd is by elevator waits. */
   get stress(): number {
     return this.frustration;
+  }
+
+  /** Live elevator calls from real people (tenants AND staff), for the
+   *  dispatch. Two kinds, exactly like a real lift: `hall` (shaftId → floor →
+   *  waiter count — the landing button) and `cab` (shaftId → carIndex → floors
+   *  a rider aboard that car needs — the buttons inside the cab). Without
+   *  these the drawn commuters exist only in the statistical demand model's
+   *  blind spot: cars glide past waiters, and a rider is hauled around until
+   *  they despawn because their floor is never this particular car's stop.
+   *  Cab stops must be per-car — a rider can only alight from the car they're
+   *  in, so their floor being "handled" by some other car delivers nothing.
+   *  Staff walking toward a staff-only shaft already raise a hall call so the
+   *  car pre-positions instead of retreating to idle just before they arrive
+   *  (a walk toward stairs/escalators never calls a car). */
+  elevatorCalls(tower: Tower): ElevatorCalls {
+    const hall = new Map<number, Map<number, number>>();
+    const cab = new Map<number, Map<number, Set<number>>>();
+    const bump = (shaftId: number, floor: number) => {
+      let floors = hall.get(shaftId);
+      if (!floors) hall.set(shaftId, (floors = new Map()));
+      floors.set(floor, (floors.get(floor) ?? 0) + 1);
+    };
+    for (const p of this.people) {
+      if (p.shaftId == null) continue;
+      if (p.state === "waiting") {
+        bump(p.shaftId, p.floor);
+      } else if (p.state === "riding" && p.carIndex != null) {
+        // Guard the leg lookup — a state-machine hiccup must not leak an
+        // undefined floor into the dispatch's call set.
+        const dest = p.floors[p.leg + 1];
+        if (dest === undefined) continue;
+        let cars = cab.get(p.shaftId);
+        if (!cars) cab.set(p.shaftId, (cars = new Map()));
+        let floors = cars.get(p.carIndex);
+        if (!floors) cars.set(p.carIndex, (floors = new Set()));
+        floors.add(dest);
+      } else if (p.staff && p.state === "toShaft") {
+        const shaft = this.shaftOf(tower, p.shaftId);
+        if (shaft && isStaffOnlyTransport(shaft.kind)) bump(p.shaftId, p.floor);
+      }
+    }
+    return { hall, cab };
   }
 
   // ---- Routing ------------------------------------------------------------
@@ -323,8 +387,8 @@ export class Crowd {
     this.makePerson(tower, r, this.pickX(tower, to, (this.nextId * 2654435761) | 0));
   }
 
-  /** Live staff members on shift (kept as a counter so the per-tick staffCalls
-   *  and the spawn cap never scan the whole crowd). */
+  /** Live staff members on shift (a counter so the spawn cap never has to
+   *  scan the whole crowd). */
   private staffCount = 0;
 
   /**
@@ -342,32 +406,6 @@ export class Crowd {
     p.cleanUnitId = cleanUnitId;
     this.staffCount++;
     return true;
-  }
-
-  private static readonly NO_CALLS: ReadonlyMap<number, number> = new Map();
-
-  /**
-   * Live elevator calls from staff, for the dispatcher: floors where staff
-   * stand waiting at a staff elevator OR are walking toward one (so the car
-   * pre-positions instead of retreating to idle just before they arrive),
-   * plus the destinations of staff already riding — so cars come for them and
-   * then deliver them. A walk toward stairs/escalators never calls a car.
-   * Rebuilt fresh each tick from the people themselves.
-   */
-  staffCalls(tower: Tower): ReadonlyMap<number, number> {
-    if (this.staffCount === 0) return Crowd.NO_CALLS;
-    const calls = new Map<number, number>();
-    const bump = (f: number) => calls.set(f, (calls.get(f) ?? 0) + 1);
-    for (const p of this.people) {
-      if (!p.staff) continue;
-      if (p.state === "waiting") bump(p.floor);
-      else if (p.state === "riding") bump(p.floors[p.leg + 1]);
-      else if (p.state === "toShaft") {
-        const shaft = this.shaftOf(tower, p.shaftId);
-        if (shaft && isStaffOnlyTransport(shaft.kind)) bump(p.floor);
-      }
-    }
-    return calls;
   }
 
   private static readonly NO_RESULTS: { unitId: number; ok: boolean }[] = [];
@@ -396,7 +434,26 @@ export class Crowd {
 
   // ---- Per-frame update ---------------------------------------------------
 
+  /** At fast game speeds a single tick can span tens of crowd-seconds, but the
+   *  person state machine only makes ~one transition per pass (one boarding
+   *  window, one alight check) while the give-up clock charges the full span —
+   *  so long trips die by quantization, not by bad service. Sub-stepping makes
+   *  coarse ticks simulate the way fine ones do. */
+  private static readonly SUB_STEP = 5;
+
   update(dtSec: number, tower: Tower, clock: Clock): void {
+    this.spawn(dtSec, tower, clock);
+    while (dtSec > Crowd.SUB_STEP) {
+      this.advance(Crowd.SUB_STEP, tower);
+      dtSec -= Crowd.SUB_STEP;
+    }
+    this.advance(dtSec, tower);
+  }
+
+  /** Spawn new trips for a span of time. Split out from {@link advance} because
+   *  spawning scans the whole unit list — it must run once per outer sim step,
+   *  not once per fine-grained sub-step, or huge towers grind. */
+  spawn(dtSec: number, tower: Tower, clock: Clock): void {
     // Spawn at a rate that scales with how busy the hour is AND how populated the
     // tower is (review F39) — a 6-office tower and a 12,000-pop tower no longer
     // spawn identically. The MAX_PEOPLE cap in spawnTrips still bounds the total.
@@ -408,7 +465,10 @@ export class Crowd {
       this.spawnAcc -= 1;
       this.spawnTrips(tower, clock);
     }
+  }
 
+  /** Advance every person by a (short) time slice — see SUB_STEP. */
+  advance(dtSec: number, tower: Tower): void {
     let frustrated = 0;
     let travelling = 0;
     for (const p of this.people) {
@@ -416,8 +476,11 @@ export class Crowd {
       // Give up if the journey drags on too long — a fed-up traveller who
       // leaves rather than riding forever toward a floor no car will serve.
       // (Staff are on the clock and wait much longer; a failed job is handed
-      // back to housekeeping dispatch to retry.)
-      if (p.age > (p.staff ? STAFF_GIVE_UP : GIVE_UP) && p.state !== "toDest" && p.state !== "done") {
+      // back to housekeeping dispatch to retry.) The budget also scales with
+      // the trip's ride distance so a legitimate long haul up a tall tower
+      // isn't culled mid-ride.
+      const patience = (p.staff ? STAFF_GIVE_UP : GIVE_UP) + this.tripFloors(p) * RIDE_SECONDS_PER_FLOOR;
+      if (p.age > patience && p.state !== "toDest" && p.state !== "done") {
         if (!p.staff) {
           frustrated++;
           travelling++;
@@ -442,6 +505,13 @@ export class Crowd {
 
   private shaftOf(tower: Tower, id: number | null): Transport | undefined {
     return id == null ? undefined : tower.transports.find((t) => t.id === id);
+  }
+
+  /** Total floors this trip covers across all its legs. */
+  private tripFloors(p: Person): number {
+    let n = 0;
+    for (let i = 0; i + 1 < p.floors.length; i++) n += Math.abs(p.floors[i + 1] - p.floors[i]);
+    return n;
   }
 
   private step(p: Person, dt: number, tower: Tower): void {
@@ -498,6 +568,10 @@ export class Crowd {
           this.carRiders.set(key, n + 1);
           p.carIndex = i;
           p.state = "riding";
+          // The call is served — clear the wait so a once-slow pickup doesn't
+          // keep counting toward frustration for the whole ride (and doesn't
+          // leave the figure red-"!" while strolling off at the destination).
+          p.wait = 0;
           break;
         }
         break;
@@ -511,10 +585,17 @@ export class Crowd {
           return this.finish(p);
         }
         const pos = shaft.carPositions[p.carIndex];
+        const prev = p.fy;
         p.fy = pos;
         p.x = shaft.x + shaft.width / 2;
         const dest = p.floors[p.leg + 1];
-        if (Math.abs(pos - dest) < 0.2) {
+        // Arrived if the car is at the floor — or passed it between samples
+        // (cars move up to ~a floor per step at coarse ticks, so a pure
+        // proximity check can sail a rider straight past their stop). Never
+        // alight at a floor the shaft no longer stops at (express skip-floors
+        // reconfigured mid-ride): ride on until the give-up valve resolves it.
+        const arrived = Math.abs(pos - dest) < 0.2 || (prev - dest) * (pos - dest) <= 0;
+        if (arrived && tower.stopsAt(shaft, dest)) {
           // Arrived at this leg's floor — step off.
           this.releaseSeat(p);
           p.floor = dest;

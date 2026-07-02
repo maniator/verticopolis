@@ -1,5 +1,5 @@
 import { Clock } from "./Clock";
-import { Crowd } from "./Crowd";
+import { Crowd, CROWD_SECONDS_PER_MINUTE } from "./Crowd";
 import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
@@ -54,13 +54,9 @@ function migrateSave(data: SerializedGame): SerializedGame {
   return migrated;
 }
 
-/**
- * Crowd time-base: one in-game minute is worth this many of the crowd's own
- * seconds (small, so a commute spans a few game-minutes and people zip through
- * trips at fast speed), and a single tick advances the crowd by at most this
- * many crowd-seconds so a day-long catch-up step stays bounded.
- */
-const CROWD_SECONDS_PER_MINUTE = 2;
+/** A single tick advances the crowd by at most this many crowd-seconds so a
+ * day-long catch-up step stays bounded (see CROWD_SECONDS_PER_MINUTE, which
+ * lives in Crowd.ts so crowd-side constants can be derived from it). */
 const CROWD_MAX_STEP = 60;
 
 export interface LogEntry {
@@ -393,12 +389,31 @@ export class Simulation implements SimContext {
    * fire the hour/day boundary handlers exactly once if crossed. */
   private advanceStep(dtMinutes: number): void {
     this.clock.advance(dtMinutes);
-    this.elevators.update(this.tower, dtMinutes, this.rushFactor(), this.crowd.staffCalls(this.tower));
-    // Advance the individually-routed crowd in lock-step with game time (after
-    // the cars move, so people board their fresh positions). They run on the
-    // crowd's own seconds — a few per game-minute — and a single huge tick is
-    // capped so a day-long step can't teleport everyone at once.
-    this.crowd.update(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), this.tower, this.clock);
+    // Cars and the drawn crowd (tenants and staff alike) interact through
+    // boarding windows only a fraction of a game-minute wide, so they advance
+    // TOGETHER in short chunks even when the outer step is coarse (fast game
+    // speeds) — a car that teleports 16 floors in one 20-minute step passes
+    // every waiter unboardable and every rider's floor unalightable. Cars
+    // answer the drawn people's calls too (hall calls where waiters stand,
+    // cab stops where riders are headed), not just the statistical demand —
+    // see ElevatorDispatch.update. The unit-list scans (statistical demand,
+    // trip spawning) run once for the whole step; only the cheap car/person
+    // movement runs per chunk.
+    const rush = this.rushFactor();
+    this.elevators.accumulate(this.tower, dtMinutes, rush);
+    // The crowd runs on its own seconds — a few per game-minute — capped so a
+    // huge outer tick still can't teleport (or mass-spawn) everyone at once.
+    this.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), this.tower, this.clock);
+    // The movement loop honors the same cap IN TOTAL: a month-long catch-up
+    // tick (legacy v1 model) advances cars/people by at most CROWD_MAX_STEP
+    // crowd-seconds of motion, not a month of thousands of chunks.
+    const moveMinutes = Math.min(dtMinutes, CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
+    for (let left = moveMinutes; left > 0; ) {
+      const chunk = Math.min(left, 2.5);
+      this.elevators.moveCars(this.tower, chunk, this.crowd.elevatorCalls(this.tower));
+      this.crowd.advance(chunk * CROWD_SECONDS_PER_MINUTE, this.tower);
+      left -= chunk;
+    }
     // Housekeepers who reached (or abandoned) their room since the last step:
     // the room is cleaned on ARRIVAL, never instantly — you can watch them go.
     for (const job of this.crowd.takeStaffResults()) {
