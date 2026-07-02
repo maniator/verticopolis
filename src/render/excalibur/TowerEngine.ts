@@ -2,7 +2,19 @@ import * as ex from "excalibur";
 import type { Simulation } from "../../engine/Simulation";
 import { GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
-import { drawCar, drawMetroTrain, drawTransport, drawUnit, type DrawCtx } from "../sprites";
+import {
+  CRANE_H,
+  CRANE_W,
+  drawCar,
+  drawCrane,
+  drawEscapeStairs,
+  drawMetroTrain,
+  drawTransport,
+  drawUnit,
+  ESCAPE_W,
+  LOBBY_VARIANTS,
+  type DrawCtx,
+} from "../sprites";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
@@ -198,7 +210,15 @@ export class TowerEngine {
 
   // Shared graphics so thousands of tiles/people cost almost nothing.
   private floorGfx!: ex.Canvas;
-  private lobbyGfx!: ex.Canvas;
+  /** Lobby tile variants, baked per [lit][ground][variant] so the concourse
+   *  pattern (columns, chandeliers/planters) repeats and lights up at night. */
+  private lobbyGfx!: ex.Canvas[][][];
+  /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
+  private escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
+  /** Exterior escape-stair actors per above-ground floor, keyed by floor. */
+  private escapeActors = new Map<number, { l: ex.Actor; r: ex.Actor; sig: string }>();
+  /** The rooftop construction crane (present until the 100th floor tops out). */
+  private craneActor: ex.Actor | null = null;
   private personGfx: ex.Canvas[] = [];
   private personGfxRed!: ex.Canvas;
   private personGfxStaff!: ex.Canvas;
@@ -872,18 +892,44 @@ export class TowerEngine {
   // ---- Shared graphics ----------------------------------------------------
 
   private bakeSharedGraphics(): void {
-    const mk = (kind: "floor" | "lobby") =>
+    // Structural tiles bake from a FIXED DrawCtx (not the live this.d): these
+    // canvases cache on first render, so baking from live state would freeze
+    // whatever lighting happened to be on screen at that moment into the tile.
+    const bake = (u: Unit, lit: boolean) =>
       new ex.Canvas({
         width: TILE,
         height: FLOOR,
         cache: true,
-        draw: (ctx) => {
-          this.d.ctx = ctx;
-          drawUnit(this.d, fakeStruct(kind), 0, 0, TILE, FLOOR);
-        },
+        draw: (ctx) => drawUnit({ ctx, lit, anim: 0, hour: lit ? 20 : 12 }, u, 0, 0, TILE, FLOOR),
       });
-    this.floorGfx = mk("floor");
-    this.lobbyGfx = mk("lobby");
+    this.floorGfx = bake(fakeStruct("floor"), false);
+    // Lobby variants: [lit 0/1][ground 0/1][variant]. The fake unit's floor
+    // selects the grand ground style vs the sky-lobby style; its x the variant.
+    this.lobbyGfx = [false, true].map((lit) =>
+      [15, 1].map((floor) =>
+        Array.from({ length: LOBBY_VARIANTS }, (_, v) => bake(fakeStruct("lobby", floor, v), lit)),
+      ),
+    );
+    this.escGfx = {
+      left: [0, 1].map(
+        (p) =>
+          new ex.Canvas({
+            width: ESCAPE_W,
+            height: FLOOR,
+            cache: true,
+            draw: (ctx) => drawEscapeStairs(ctx, "left", p as 0 | 1, FLOOR),
+          }),
+      ),
+      right: [0, 1].map(
+        (p) =>
+          new ex.Canvas({
+            width: ESCAPE_W,
+            height: FLOOR,
+            cache: true,
+            draw: (ctx) => drawEscapeStairs(ctx, "right", p as 0 | 1, FLOOR),
+          }),
+      ),
+    };
 
     for (const color of SHIRTS) {
       this.personGfx.push(
@@ -929,10 +975,26 @@ export class TowerEngine {
     const parkingOK = tower.functionalParkingSet();
     const seenS = new Set<number>();
     const seenR = new Set<number>();
+    // Above-ground silhouette (leftmost/rightmost built tile per floor row),
+    // accumulated in this same pass — it hangs the exterior escape stairs.
+    const edges = new Map<number, { min: number; max: number }>();
     for (const u of tower.units) {
+      for (let f = Math.max(1, u.floor); f < u.floor + facilityFloors(u.kind); f++) {
+        const e = edges.get(f);
+        const right = u.x + u.width;
+        if (!e) edges.set(f, { min: u.x, max: right });
+        else {
+          if (u.x < e.min) e.min = u.x;
+          if (right > e.max) e.max = right;
+        }
+      }
       if (u.kind === "floor" || u.kind === "lobby") {
         seenS.add(u.id);
-        if (!this.structActors.has(u.id)) this.addStruct(u);
+        const a = this.structActors.get(u.id);
+        if (!a) this.addStruct(u);
+        // Lobby tiles swap their shared graphic when the evening lights come on
+        // (chandeliers/sconces glow) — a pointer swap, not a re-bake.
+        else if (u.kind === "lobby") a.graphics.use(this.lobbyTileGfx(u));
       } else {
         seenR.add(u.id);
         // The signature must capture every input the room sprite draws from, so
@@ -993,6 +1055,97 @@ export class TowerEngine {
         this.transportActors.delete(id);
         this.transportSig.delete(id);
       }
+
+    this.syncEscapes(edges);
+    this.syncCrane();
+  }
+
+  /** Reconcile the exterior escape-stair segments to the tower silhouette:
+   *  one left + one right actor per above-ground floor row, re-hung only when
+   *  that row's outermost edge actually moves. */
+  private syncEscapes(edges: Map<number, { min: number; max: number }>): void {
+    for (const [floor, e] of edges) {
+      const sig = `${e.min}:${e.max}`;
+      let rec = this.escapeActors.get(floor);
+      if (rec && rec.sig !== sig) {
+        rec.l.kill();
+        rec.r.kill();
+        rec = undefined;
+        this.escapeActors.delete(floor);
+      }
+      if (!rec) {
+        const parity = (floor % 2) as 0 | 1;
+        const y = this.worldYTop(floor);
+        const l = new ex.Actor({
+          pos: ex.vec(e.min * TILE - ESCAPE_W, y),
+          width: ESCAPE_W,
+          height: FLOOR,
+          anchor: ex.vec(0, 0),
+          z: -2,
+        });
+        l.graphics.use(this.escGfx.left[parity]);
+        const r = new ex.Actor({
+          pos: ex.vec(e.max * TILE, y),
+          width: ESCAPE_W,
+          height: FLOOR,
+          anchor: ex.vec(0, 0),
+          z: -2,
+        });
+        r.graphics.use(this.escGfx.right[parity]);
+        this.engine.add(l);
+        this.engine.add(r);
+        this.escapeActors.set(floor, { l, r, sig });
+      }
+    }
+    for (const [floor, rec] of this.escapeActors)
+      if (!edges.has(floor)) {
+        rec.l.kill();
+        rec.r.kill();
+        this.escapeActors.delete(floor);
+      }
+  }
+
+  /** Keep the rooftop crane perched over the highest built floor; it comes
+   *  down for good once the tower tops out at the 100th floor. */
+  private syncCrane(): void {
+    const tower = this.sim.tower;
+    const hi = tower.highestFloor;
+    if (hi >= GRID.maxFloor) {
+      if (this.craneActor) {
+        this.craneActor.kill();
+        this.craneActor = null;
+      }
+      return;
+    }
+    // Center the crane over the top floor's built run.
+    let min = Infinity;
+    let max = -Infinity;
+    for (const u of tower.units) {
+      if (u.floor + facilityFloors(u.kind) - 1 !== hi) continue;
+      if (u.x < min) min = u.x;
+      if (u.x + u.width > max) max = u.x + u.width;
+    }
+    const cx = min <= max ? ((min + max) / 2) * TILE : (GRID.width / 2) * TILE;
+    const pos = ex.vec(cx, this.worldYTop(hi));
+    if (!this.craneActor) {
+      const cv = new ex.Canvas({
+        width: CRANE_W,
+        height: CRANE_H,
+        cache: false, // animated: trolley/hook/beacon ride the decorative clock
+        draw: (ctx) => drawCrane(ctx, this.d.anim, this.d.lit),
+      });
+      this.craneActor = new ex.Actor({
+        pos,
+        width: CRANE_W,
+        height: CRANE_H,
+        anchor: ex.vec(0.5, 1),
+        z: -2,
+      });
+      this.craneActor.graphics.use(cv);
+      this.engine.add(this.craneActor);
+    } else {
+      this.craneActor.pos = pos;
+    }
   }
 
   private addStruct(u: Unit): void {
@@ -1003,10 +1156,15 @@ export class TowerEngine {
       anchor: ex.vec(0, 0),
       z: -1,
     });
-    a.graphics.use(u.kind === "lobby" ? this.lobbyGfx : this.floorGfx);
+    a.graphics.use(u.kind === "lobby" ? this.lobbyTileGfx(u) : this.floorGfx);
     a.collider.set(ex.Shape.Box(TILE, FLOOR, ex.vec(0, 0)));
     this.engine.add(a);
     this.structActors.set(u.id, a);
+  }
+
+  /** The shared lobby tile graphic for this unit's lighting, style and slot. */
+  private lobbyTileGfx(u: Unit): ex.Canvas {
+    return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][u.x % LOBBY_VARIANTS];
   }
 
   private addRoom(u: Unit, deadParking = false): void {
@@ -1326,6 +1484,15 @@ export class TowerEngine {
     for (const a of this.structActors.values()) a.kill();
     for (const a of this.roomActors.values()) a.kill();
     for (const a of this.transportActors.values()) a.kill();
+    for (const rec of this.escapeActors.values()) {
+      rec.l.kill();
+      rec.r.kill();
+    }
+    this.escapeActors.clear();
+    if (this.craneActor) {
+      this.craneActor.kill();
+      this.craneActor = null;
+    }
     this.structActors.clear();
     this.roomActors.clear();
     this.roomSig.clear();
@@ -1380,12 +1547,12 @@ function buttonNum(ev: ex.PointerEvent): number {
   return 0;
 }
 
-function fakeStruct(kind: "floor" | "lobby"): Unit {
+function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {
   return {
     id: -1,
     kind,
-    floor: 1,
-    x: 0,
+    floor,
+    x,
     width: 1,
     state: "occupied",
     satisfaction: 1,
