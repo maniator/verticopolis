@@ -296,7 +296,9 @@ export class UI {
         s.slot === "auto" ? "" : `<button class="btn" data-save="${s.slot}">Save</button>`;
       const loadBtn = s.exists ? `<button class="btn" data-load="${s.slot}">Load</button>` : "";
       const delBtn =
-        s.exists && s.slot !== "auto" ? `<button class="btn danger" data-del="${s.slot}">✕</button>` : "";
+        s.exists && s.slot !== "auto"
+          ? `<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
+          : "";
       return `<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
     };
     const box = this.openModal(`
