@@ -590,13 +590,13 @@ export class UI {
     dialog.innerHTML = "";
   }
 
-  /** Bind click handlers to a dialog's [data-act] buttons. A close button is
-   *  wired to closeModal by default when present (some dialogs have none);
-   *  explicitly passed actions keep the loud non-null lookup, so a template
-   *  typo still throws on open instead of shipping a dead button. */
-  private wireActions(box: HTMLElement, handlers: Record<string, () => void> = {}): void {
-    if (!("close" in handlers)) {
-      box.querySelector('[data-act="close"]')?.addEventListener("click", () => this.closeModal());
+  /** Bind click handlers to a dialog's [data-act] buttons. Every lookup is
+   *  loud (non-null) so a template typo throws at open instead of shipping a
+   *  dead button — including the default close binding. The two dialogs that
+   *  genuinely render no close button (confirm, emergency) opt out by name. */
+  private wireActions(box: HTMLElement, handlers: Record<string, () => void> = {}, opts: { close?: boolean } = {}): void {
+    if (opts.close !== false && !("close" in handlers)) {
+      box.querySelector('[data-act="close"]')!.addEventListener("click", () => this.closeModal());
     }
     for (const [act, fn] of Object.entries(handlers)) {
       box.querySelector(`[data-act="${act}"]`)!.addEventListener("click", fn);
@@ -620,13 +620,17 @@ export class UI {
       `<h2>${title}</h2><p>${body}</p>
        <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">Confirm</button></div>`,
     );
-    this.wireActions(box, {
-      no: () => this.closeModal(),
-      yes: () => {
-        this.closeModal();
-        onYes();
+    this.wireActions(
+      box,
+      {
+        no: () => this.closeModal(),
+        yes: () => {
+          this.closeModal();
+          onYes();
+        },
       },
-    });
+      { close: false }, // Cancel/Confirm only — no ✕-style close in this template
+    );
   }
 
   showExport(json: string): void {
@@ -764,7 +768,7 @@ export class UI {
       this.closeModal();
       onResolve(opt);
     };
-    this.wireActions(box, { accept: () => finish("accept"), decline: () => finish("decline") });
+    this.wireActions(box, { accept: () => finish("accept"), decline: () => finish("decline") }, { close: false });
     dialog.onclick = (e) => { if (e.target === dialog) finish("decline"); }; // backdrop
     dialog.oncancel = () => finish("decline"); // Esc
   }

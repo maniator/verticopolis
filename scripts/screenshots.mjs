@@ -303,9 +303,15 @@ async function main() {
 
   // 6) Sprite gallery (full screenshot of the catalog).
   const gpage = await browser.newPage({ viewport: { width: 960, height: 1200 } });
-  // ?freeze pins the gallery's animation clock — see gallery.ts — so this
-  // capture is byte-deterministic (the refactor-parity check depends on it).
-  await gpage.goto(`${BASE}/gallery.html?freeze`, { waitUntil: "networkidle" });
+  // Pin the page clock BEFORE load so the gallery's animations (cinema
+  // marquee chase, screen frames) bake at one instant and the capture is
+  // byte-deterministic — the refactor-parity check depends on it. Capture-side
+  // on purpose: no test hook ships in product code, and the same trick covers
+  // any page a parity check ever needs.
+  await gpage.addInitScript(() => {
+    performance.now = () => 12125;
+  });
+  await gpage.goto(`${BASE}/gallery.html`, { waitUntil: "networkidle" });
   await gpage.waitForFunction(() => window.galleryReady === true, null, { timeout: 10000 });
   await gpage.waitForTimeout(800);
   await gpage.screenshot({ path: `${OUT}/06-sprite-gallery.png`, fullPage: true });

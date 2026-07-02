@@ -54,8 +54,8 @@ buttons may not).
   coarse pointers get an invisible tap halo (`::after { inset: -8px }`) for a
   ~34px effective target with zero visual change. In TS there are exactly two
   ✕ builders — `UI`'s private `titleBarClose()` for DOM-built ✕s (modal,
-  inspector) and `main.ts`'s `editorTitleBar()` template for the editor card.
-  Never hand-write a third copy; extend one of those.
+  inspector) and `ui/editorHtml.ts`'s `editorTitleBar()` template for the
+  editor card. Never hand-write a third copy; extend one of those.
 
 ### `.win` — a floating window
 Gray face + `--bevel-out` + `--win-shadow`. Applied to: the modal box, the

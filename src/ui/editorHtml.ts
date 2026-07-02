@@ -14,7 +14,7 @@ import { floorTag } from "./format";
  */
 
 /** The editor card's title bar — one template so the two editors can't drift. */
-export const editorTitleBar = (name: string): string =>
+const editorTitleBar = (name: string): string =>
   `<h4 class="win-title">${escapeHtml(name)}<button type="button" class="ed-close btn xs" aria-label="Close">✕</button></h4>`;
 
 /** One key/value stat row. `field` marks the value for volatile patching. */

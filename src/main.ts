@@ -612,10 +612,10 @@ class GameApp {
     kind: FacilityKind,
     tile: number,
     floor: number,
-  ): { what: "paint" | "flight" | "room"; ok: boolean; reason: string } | null {
+  ): { what: "paint" } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
     if (kind === "floor" || kind === "lobby") {
       this.paintBrush(kind, tile, floor);
-      return { what: "paint", ok: true, reason: "" };
+      return { what: "paint" }; // brush strips have no failure mode to report
     }
     if (isFixedSpanTransport(kind)) {
       const r = this.tryBuildTransport(kind, this.snapX(kind, tile), floor, floor + 1);
@@ -624,7 +624,7 @@ class GameApp {
     if (this.isTransportTool()) return null;
     const before = this.sim.tower.units.length;
     this.tryBuild(kind, floor, this.snapX(kind, tile));
-    return { what: "room", ok: this.sim.tower.units.length > before, reason: "" };
+    return { what: "room", ok: this.sim.tower.units.length > before };
   }
 
   private isTransportTool(): boolean {
@@ -802,10 +802,12 @@ class GameApp {
   /** The currently selected unit/transport, re-looked-up from the live tower
    *  (selection stores only an id — the entity may have been removed). */
   private selectedUnit(): Unit | undefined {
-    return this.sim.tower.units.find((x) => x.id === this.selected?.id);
+    if (this.selected?.type !== "unit") return undefined;
+    return this.sim.tower.units.find((x) => x.id === this.selected!.id);
   }
   private selectedTransport(): Transport | undefined {
-    return this.sim.tower.transports.find((x) => x.id === this.selected?.id);
+    if (this.selected?.type !== "transport") return undefined;
+    return this.sim.tower.transports.find((x) => x.id === this.selected!.id);
   }
 
   private clearSelection(): void {

@@ -60,7 +60,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
   g.addColorStop(1, ground ? "#e3d7b3" : "#d6dee9");
   ctx.fillStyle = g;
   ctx.fillRect(x, y, w, h);
-  // Wainscot line so the wall reads panelled, not flat.
+  // Wainscot line so the wall reads paneled, not flat.
   ctx.fillStyle = ground ? "rgba(120,100,60,0.16)" : "rgba(70,90,115,0.14)";
   ctx.fillRect(x, y + 19, w, 1);
   // Gilded cornice along the ceiling.
