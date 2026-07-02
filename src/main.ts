@@ -1,6 +1,6 @@
 import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
-import { FACILITIES, GRID, facilityFloors, isElevatorKind, isHotelKind, maxCarsFor } from "./engine/facilities";
+import { FACILITIES, GRID, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "./engine/facilities";
 import { ECON, rentConfig, rentOf, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
 import type { FacilityKind, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
@@ -302,7 +302,14 @@ class GameApp {
       this.announce(`Placed ${FACILITIES[kind].name} on floor ${c.floor}`);
       this.refreshCursorPreview();
     } else if (this.isTransportTool()) {
-      if (!this.kbAnchor) {
+      if (isFixedSpanTransport(kind)) {
+        // Stairs/escalators are a fixed two-floor unit — one press places the
+        // flight from the cursor's floor to the one above, matching the
+        // pointer path (no anchor gesture).
+        const r = this.tryBuildTransport(kind, this.snapX(kind, c.tile), c.floor, c.floor + 1);
+        this.announce(r.ok ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}` : r.reason);
+        this.refreshCursorPreview();
+      } else if (!this.kbAnchor) {
         // Snap the anchor column like the mouse path, so a wide shaft near the
         // right edge places instead of failing.
         this.kbAnchor = { tile: this.snapX(kind, c.tile), floor: c.floor };
@@ -385,7 +392,13 @@ class GameApp {
     this.engine.classifyDown = (button, touch, space) => {
       if (button > 0 || space) return "pan"; // middle/right button or held space
       if (this.tool.type === "inspect") return "pan"; // inspect: drag pans, tap selects
-      if (touch && !this.isTransportTool()) return "pan"; // one finger pans; tap acts
+      // On touch, one finger pans and a TAP acts — except drag-sized transports
+      // (elevators), whose press starts the drag-to-size gesture. Stairs and
+      // escalators place on tap like rooms, so a finger-down doesn't instantly
+      // buy a flight the player only meant to pan past.
+      const dragSized =
+        this.tool.type === "build" && this.isTransportTool() && !isFixedSpanTransport(this.tool.kind);
+      if (touch && !dragSized) return "pan";
       return "action";
     };
 
@@ -406,6 +419,11 @@ class GameApp {
         } else {
           this.tryBuild(this.tool.kind, floor, this.snapX(this.tool.kind, tile));
         }
+      } else if (this.tool.type === "build" && isFixedSpanTransport(this.tool.kind)) {
+        // Touch taps with the stairway/escalator tool land here (classifyDown
+        // routes them through the pan/tap gesture so a finger-down can still
+        // pan); the tap drops the whole two-floor flight.
+        this.tryBuildTransport(this.tool.kind, this.snapX(this.tool.kind, tile), floor, floor + 1);
       }
       this.commitUndo();
     };
@@ -419,7 +437,14 @@ class GameApp {
         this.bulldozePicked(picked);
       } else if (this.tool.type === "build") {
         if (this.isTransportTool()) {
-          this.transportStart = { x: this.snapX(this.tool.kind, tile), floor };
+          if (isFixedSpanTransport(this.tool.kind)) {
+            // Stairs/escalators are a fixed two-floor unit: one tap places it
+            // spanning the clicked floor and the one above (as in the
+            // original) — no drag-to-size gesture.
+            this.tryBuildTransport(this.tool.kind, this.snapX(this.tool.kind, tile), floor, floor + 1);
+          } else {
+            this.transportStart = { x: this.snapX(this.tool.kind, tile), floor };
+          }
         } else if (this.tool.kind === "floor" || this.tool.kind === "lobby") {
           // A click lays a wider strip; dragging then extends it.
           this.paintBrush(this.tool.kind, tile, floor);
@@ -450,18 +475,16 @@ class GameApp {
 
     this.engine.onActionUp = () => {
       this.paint = null;
-      if (this.tool.type === "build" && this.isTransportTool()) {
+      // Only drag-sized transports (elevators) commit on release. Stairs and
+      // escalators already placed on the DOWN event, and their hover ghost
+      // also lives in transportPreview — treating it as a drag commit here
+      // would double-place on every desktop click.
+      if (this.tool.type === "build" && this.isTransportTool() && !isFixedSpanTransport(this.tool.kind)) {
         const tp = this.engine.transportPreview;
         if (tp) {
-          if (tp.valid) {
-            const res = this.sim.buildTransport(tp.kind, tp.x, tp.bottom, tp.top);
-            this.audio.sfx(res.ok ? "build" : "error");
-            if (!res.ok && res.reason) this.ui.toast(res.reason, "bad");
-          } else {
-            // Explain *why* it won't go here instead of failing silently.
-            this.audio.sfx("error");
-            this.ui.toast(this.transportReason(tp.kind, tp.x, tp.bottom, tp.top), "bad");
-          }
+          // The helper explains failures (invalid spot, not enough money)
+          // instead of failing silently.
+          this.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
           this.engine.transportPreview = null;
         } else if (this.transportStart) {
           // Pressed without dragging — teach the drag-to-size gesture.
@@ -609,8 +632,16 @@ class GameApp {
     const kind = this.tool.kind;
     if (this.isTransportTool()) {
       const x = this.snapX(kind, tile);
-      this.engine.transportPreview = null;
-      this.engine.preview = { kind, floor, x, valid: this.sim.isUnlocked(kind) };
+      if (isFixedSpanTransport(kind)) {
+        // Stairs/escalators place as a fixed two-floor unit on tap, so the
+        // ghost shows the real footprint and the real validity.
+        const valid = this.sim.isUnlocked(kind) && this.sim.tower.placeTransportDryRun(kind, x, floor, floor + 1);
+        this.engine.transportPreview = { kind, x, bottom: floor, top: floor + 1, valid };
+        this.engine.preview = null;
+      } else {
+        this.engine.transportPreview = null;
+        this.engine.preview = { kind, floor, x, valid: this.sim.isUnlocked(kind) };
+      }
     } else if (kind === "floor" || kind === "lobby") {
       // These tools lay a centered brush strip, not a single tile — so the
       // shadow must span the same run a click will build.
@@ -905,7 +936,10 @@ class GameApp {
       actions += `<div class="ed-row"><button data-edit="stops">Configure stops…</button></div>`;
       actions += `<div class="ed-row"><button data-edit="express">Express (lobbies)</button><button data-edit="allstops">All stops</button></div>`;
     }
-    actions += `<div class="ed-row"><button data-edit="extendDown">▼ Extend down</button><button data-edit="extendUp">▲ Extend up</button></div>`;
+    // Stairs/escalators span exactly one floor by rule — no extend buttons.
+    if (isElevatorKind(t.kind)) {
+      actions += `<div class="ed-row"><button data-edit="extendDown">▼ Extend down</button><button data-edit="extendUp">▲ Extend up</button></div>`;
+    }
     actions += `<div class="ed-row"><button class="danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
@@ -1209,6 +1243,23 @@ class GameApp {
       this.audio.sfx("error");
       this.ui.toast(res.reason, "bad");
     }
+  }
+
+  /** Place a transport span with the usual build/error feedback. Prefers the
+   *  build's own failure reason (e.g. "Not enough money.") and falls back to
+   *  the placement diagnosis when the build didn't say why. Returns the
+   *  outcome (with the shown reason) for callers that also announce it. */
+  private tryBuildTransport(
+    kind: FacilityKind,
+    x: number,
+    bottom: number,
+    top: number,
+  ): { ok: boolean; reason: string } {
+    const res = this.sim.buildTransport(kind, x, bottom, top);
+    this.audio.sfx(res.ok ? "build" : "error");
+    const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
+    if (!res.ok) this.ui.toast(reason, "bad");
+    return { ok: res.ok, reason };
   }
 
   /** Human-readable reason an elevator/stairs span can't be placed. */

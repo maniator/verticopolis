@@ -197,7 +197,7 @@ export class Crowd {
     if (this.adj && this.adjRev === tower.revision) return this.adj;
     // Staff-only transports (service elevators) carry no tenants or visitors:
     // that's the whole point of building one.
-    this.adj = this.buildAdjacency(tower, (t) => !isStaffOnlyTransport(t.kind));
+    this.adj = this.buildAdjacency(tower, tower.transports, (t) => !isStaffOnlyTransport(t.kind));
     this.adjRev = tower.revision;
     return this.adj;
   }
@@ -205,20 +205,27 @@ export class Crowd {
   /** The staff stop-graph: service elevators plus walkable links (stairs and
    *  escalators) — never the passenger elevators. Housekeepers route over
    *  this, using the SAME kind predicate as Tower.staffConnected so routing
-   *  and reachability can never disagree. */
+   *  and reachability can never disagree. Staff-only elevators are listed
+   *  first so equal-leg route ties break toward RIDING the service elevator
+   *  rather than climbing stairs — housekeepers ride, and the player sees the
+   *  shaft they built actually working. */
   private staffAdjacency(tower: Tower): Map<number, { f: number; shaft: number }[]> {
     if (this.staffAdj && this.staffAdjRev === tower.revision) return this.staffAdj;
-    this.staffAdj = this.buildAdjacency(tower, (t) => isStaffTransportKind(t.kind));
+    const serviceFirst = [...tower.transports].sort(
+      (a, b) => Number(isStaffOnlyTransport(b.kind)) - Number(isStaffOnlyTransport(a.kind)),
+    );
+    this.staffAdj = this.buildAdjacency(tower, serviceFirst, (t) => isStaffTransportKind(t.kind));
     this.staffAdjRev = tower.revision;
     return this.staffAdj;
   }
 
   private buildAdjacency(
     tower: Tower,
+    transports: readonly Transport[],
     include: (t: Transport) => boolean,
   ): Map<number, { f: number; shaft: number }[]> {
     const adj = new Map<number, { f: number; shaft: number }[]>();
-    for (const t of tower.transports) {
+    for (const t of transports) {
       if (!include(t)) continue;
       // Elevators carry riders in cars; stairs/escalators are walked (a
       // "climbing" leg, no car). Both are real routing edges now, so short
@@ -242,21 +249,26 @@ export class Crowd {
    * so a badly-zoned tower's commuters give up rather than teleporting there.
    */
   private static readonly MAX_RIDES = 2;
-  /** Staff aren't bound by the two-ride comfort rule — a housekeeper chains
-   *  stairs and service elevators as far as the network reaches. Effectively
-   *  unbounded (the BFS `seen` set terminates it); the number only guards a
-   *  pathological tower, and it MUST stay above any reachable leg count so
-   *  routing agrees with Tower.staffConnected's component answer. */
-  private static readonly MAX_STAFF_RIDES = 99;
   route(tower: Tower, from: number, to: number): Route | null {
     return this.bfsRoute(this.adjacency(tower), from, to, Crowd.MAX_RIDES);
   }
 
-  /** Route over the STAFF network (service elevators / stairs / escalators). */
+  /** Route over the STAFF network (service elevators / stairs / escalators).
+   *  Staff aren't bound by the two-ride comfort rule: the search is UNCAPPED
+   *  (the BFS `seen` set terminates it), so it agrees with what
+   *  Tower.staffConnected calls reachable — both walk the same
+   *  isStaffTransportKind/stopsOf graph. (Parallel implementations: if they
+   *  ever drift, spawnStaff reports "no-route" so dispatch can surface it
+   *  instead of retrying silently.) */
   staffRoute(tower: Tower, from: number, to: number): Route | null {
-    return this.bfsRoute(this.staffAdjacency(tower), from, to, Crowd.MAX_STAFF_RIDES);
+    return this.bfsRoute(this.staffAdjacency(tower), from, to, Infinity);
   }
 
+  /** NOTE: edge ORDER is a contract — within a BFS level the first-listed
+   *  edge wins (seen is marked on enqueue), which is how staffAdjacency's
+   *  service-first ordering expresses the routing preference. Don't replace
+   *  this with a priority frontier or Set-deduped adjacency without keeping
+   *  that tie-break. */
   private bfsRoute(
     adj: Map<number, { f: number; shaft: number }[]>,
     from: number,
@@ -393,19 +405,26 @@ export class Crowd {
 
   /**
    * Dispatch a staff member (housekeeper) from `from` to `to` over the STAFF
-   * network, walking to `destX` (the room being serviced). Returns false when
-   * no staff route exists or too many staff are already on shift; the caller
-   * keeps the job queued and retries later.
+   * network, walking to `destX` (the room being serviced). The two failure
+   * modes are distinct so the caller reacts correctly: "full" (staff pool at
+   * cap — retry later) vs "no-route" (the network can't get there — surface
+   * it, don't retry silently).
    */
-  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number): boolean {
-    if (this.staffCount >= MAX_STAFF) return false;
+  spawnStaff(
+    tower: Tower,
+    from: number,
+    to: number,
+    destX: number,
+    cleanUnitId: number,
+  ): "sent" | "full" | "no-route" {
+    if (this.staffCount >= MAX_STAFF) return "full";
     const r = this.staffRoute(tower, from, to); // handles from === to (walk only)
-    if (!r) return false;
+    if (!r) return "no-route";
     const p = this.makePerson(tower, r, destX);
     p.staff = true;
     p.cleanUnitId = cleanUnitId;
     this.staffCount++;
-    return true;
+    return "sent";
   }
 
   private static readonly NO_RESULTS: { unitId: number; ok: boolean }[] = [];

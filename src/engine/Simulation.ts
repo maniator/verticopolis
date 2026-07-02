@@ -1045,7 +1045,7 @@ export class Simulation implements SimContext {
   /** Send a staff member (housekeeper) over the staff network — see
    *  {@link Crowd.spawnStaff}. Exposed on the context so the economy subsystem
    *  can dispatch crews without owning the crowd. */
-  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number): boolean {
+  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number): "sent" | "full" | "no-route" {
     return this.crowd.spawnStaff(this.tower, from, to, destX, cleanUnitId);
   }
 

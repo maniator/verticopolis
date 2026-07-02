@@ -70,8 +70,10 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     id: "connect",
     title: "Connect it",
     sub: "No one can reach a floor without transport. Run a stairway or elevator down to the ground lobby.",
-    hintDesktop: "Pick Standard Elevator (or Stairway), then drag vertically from the lobby up to your office's floor.",
-    hintMobile: "Tap Elevator (or Stairway), then touch-and-drag vertically to size the shaft from the lobby to your office.",
+    hintDesktop:
+      "Pick Standard Elevator and drag vertically from the lobby to your office's floor — or pick Stairway and just click the lobby (a flight always links two floors).",
+    hintMobile:
+      "Tap Elevator, then touch-and-drag vertically to size the shaft — or tap Stairway once on the lobby (a flight always links two floors).",
     pulse: '.pal-item[data-kind="elevatorStandard"], .pal-item[data-kind="stairs"]',
     done: (sim) => sim.tower.units.some((u) => u.kind === "office" && sim.tower.isFloorServed(u.floor)),
   },

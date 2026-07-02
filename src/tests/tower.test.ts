@@ -221,10 +221,40 @@ describe("Tower transport", () => {
     expect(tower.placeTransport("stairs", 8, 1, 2).ok).toBe(true);
   });
 
+  it("extend arrows can't stretch stairs or escalators beyond one floor", () => {
+    const r = tower.placeTransport("stairs", 8, 1, 2);
+    expect(r.ok).toBe(true);
+    const t = tower.transports.find((x) => x.id === r.transportId)!;
+    // Resizing must obey the same span rule as placement.
+    expect(tower.resizeTransport(t.id, 1, 3).ok).toBe(false);
+    expect(tower.resizeTransport(t.id, 0, 2).ok).toBe(false);
+    expect(t.top).toBe(2); // unchanged
+    expect(t.bottom).toBe(1);
+    const e = tower.placeTransport("escalator", 14, 1, 2);
+    expect(e.ok).toBe(true);
+    const et = tower.transports.find((x) => x.id === e.transportId)!;
+    expect(tower.resizeTransport(et.id, 1, 3).ok).toBe(false);
+    expect(et.top).toBe(2);
+  });
+
   it("prevents overlapping shafts", () => {
     tower.placeTransport("elevatorStandard", 4, 1, 10);
     expect(tower.placeTransport("elevatorStandard", 4, 1, 10).ok).toBe(false);
     expect(tower.placeTransport("elevatorStandard", 12, 1, 10).ok).toBe(true);
+  });
+
+  it("stairs stack in one column, sharing only their landing floor", () => {
+    expect(tower.placeTransport("stairs", 8, 1, 2).ok).toBe(true);
+    // The next flight starts where the last one landed — same column.
+    expect(tower.placeTransport("stairs", 8, 2, 3).ok).toBe(true);
+    expect(tower.placeTransport("stairs", 8, 3, 4).ok).toBe(true);
+    // A continuous run climbs the stack with a transfer at each landing.
+    // But a duplicate flight on the same floors is still an overlap…
+    expect(tower.placeTransport("stairs", 8, 2, 3).ok).toBe(false);
+    // …a partially offset flight doesn't count as a stack…
+    expect(tower.placeTransport("stairs", 10, 4, 5).ok).toBe(false);
+    // …and an elevator can't run through the stair column at all.
+    expect(tower.placeTransport("elevatorStandard", 8, 1, 4).ok).toBe(false);
   });
 
   it("computes floor reachability through linked transports", () => {
