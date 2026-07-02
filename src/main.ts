@@ -1157,7 +1157,7 @@ class GameApp {
         ? `<span class="k">Counts toward stars</span><span class="v">${fmt(ratingPop)}</span>`
         : "";
     return `<div class="stats-grid">
-      <div class="stats-section win-title">Overview</div>
+      <div class="stats-section win-title sm">Overview</div>
       <div class="col kv">
         <span class="k">Tower name</span><span class="v">${escapeHtml(this.sim.tower.towerName)}</span>
         <span class="k">Rating</span><span class="v stars">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
@@ -1173,7 +1173,7 @@ class GameApp {
         <span class="k">Elevators</span><span class="v">${s.elevators}</span>
         <span class="k">All transports</span><span class="v">${s.transports}</span>
       </div>
-      <div class="stats-section win-title">Tenancy</div>
+      <div class="stats-section win-title sm">Tenancy</div>
       <div class="col kv">
         <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
         <span class="k">Condos sold</span><span class="v">${s.soldCondos}/${s.condos}</span>
@@ -1185,7 +1185,7 @@ class GameApp {
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
-      <div class="stats-section win-title">Transport &amp; access</div>
+      <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
         <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>
         ${
@@ -1225,7 +1225,7 @@ class GameApp {
         .join("")}</div>`;
     const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
     return (
-      `<div class="stats-section win-title">🏅 Milestones (${mp.achieved}/${mp.total})` +
+      `<div class="stats-section win-title sm">🏅 Milestones (${mp.achieved}/${mp.total})` +
       `<span class="evalbar"><span style="width:${pct}%"></span></span></div>` +
       col(mp.list.slice(0, half)) +
       col(mp.list.slice(half))

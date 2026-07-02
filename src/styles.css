@@ -204,6 +204,14 @@ html.reduce-motion *::after {
   margin-left: auto;
   flex: none;
 }
+/* Mini variant — section strips inside a window (statistics headers) and
+   other panel-scale bars: smaller, uppercase, tighter padding. */
+.win-title.sm {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+}
 /* Full-bleed: a window's title bar cancels the window's own padding via the
    tokens declared on .win, so the bar can never drift out of alignment with
    the frame — on ANY window, not just the modal. */
@@ -712,14 +720,11 @@ html.reduce-motion *::after {
   font-size: 13px;
   padding: 0 2px;
 }
+/* Layout only — type/casing/padding come from .win-title.sm in the markup. */
 .stats-section {
   grid-column: 1 / -1;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
   margin-top: 6px;
   box-shadow: var(--bevel-out);
-  padding: 2px 6px;
 }
 /* Values echo the HUD: money green (red in debt), stars gold. */
 .stats-grid .v.money {

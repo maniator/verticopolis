@@ -52,8 +52,10 @@ buttons may not).
   button. It NEVER grows on touch — a 36px ✕ inflates every navy bar and a
   wider one stretches into a pill (both shipped bugs, since fixed). Instead,
   coarse pointers get an invisible tap halo (`::after { inset: -8px }`) for a
-  ~34px effective target with zero visual change. In TS, build every ✕ via
-  `UI.titleBarClose()` so they can't drift.
+  ~34px effective target with zero visual change. In TS there are exactly two
+  ✕ builders — `UI`'s private `titleBarClose()` for DOM-built ✕s (modal,
+  inspector) and `main.ts`'s `editorTitleBar()` template for the editor card.
+  Never hand-write a third copy; extend one of those.
 
 ### `.win` — a floating window
 Gray face + `--bevel-out` + `--win-shadow`. Applied to: the modal box, the
@@ -67,9 +69,11 @@ right via `margin-left: auto`. Every dismissible window wears one; the modal's
 is sticky and full-bleed (negative margins derived from the `--pad-y`/`--pad-x`
 tokens on `.modal-box` — never hand-write those offsets).
 
-The palette's "Tools" strip is a real `.win-title`. The sidebar `.panel h3`
-headers are the same idiom at panel scale (10px, uppercase) — a deliberate
-size step-down, not a divergence.
+`.win-title.sm` is the explicit mini variant (11px, uppercase, `2px 6px`)
+for section strips inside a window — the statistics dialog's
+Overview/Tenancy/Milestones headers use it. The palette's "Tools" strip is a
+full-size `.win-title`; the sidebar `.panel h3` headers are the same idiom at
+panel scale (10px, uppercase) — a deliberate size step-down, not a divergence.
 
 ### `.well` — sunken white data area
 `--r-hi` + `--bevel-in`. The File Manager idiom: the Bulletin log, the saves
