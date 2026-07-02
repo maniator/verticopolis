@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Tower } from "../engine/Tower";
 import { Clock } from "../engine/Clock";
 import { Crowd } from "../engine/Crowd";
+import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { Simulation } from "../engine/Simulation";
 import { GRID } from "../engine/facilities";
 
@@ -74,6 +75,35 @@ describe("Crowd: routing and movement", () => {
     expect(r).not.toBeNull();
     expect(r!.floors).toEqual([1, 2]);
     expect(r!.shafts).toEqual([s.transportId]);
+  });
+
+  it("delivers a rider to a floor with zero statistical demand (calls carry destinations)", () => {
+    // Regression: a picked-up rider's destination must be a live call, or the
+    // dispatch — blind to riders — parks the car at the lobby with them aboard
+    // until the give-up valve despawns them.
+    const tower = towerWithElevator(10); // dead tower: the demand model sees nobody
+    const crowd = new Crowd(1);
+    const dispatch = new ElevatorDispatch();
+    const clock = new Clock(12 * 60);
+    const r = crowd.route(tower, 1, 7)!;
+    crowd.people.push({
+      id: 1, seed: 7, state: "toShaft", floor: 1, fy: 1, x: 5,
+      floors: r.floors, shafts: r.shafts, leg: 0, shaftId: r.shafts[0],
+      carIndex: null, destX: 30, wait: 0, age: 0, linger: 0,
+    });
+    let delivered = false;
+    for (let i = 0; i < 400 && !delivered; i++) {
+      // Browser-like stepping: 1 game-minute of cars, 2 crowd-seconds of crowd.
+      dispatch.update(tower, 1, 1.0, crowd.elevatorCalls(tower));
+      crowd.update(2, tower, clock);
+      const p = crowd.people[0];
+      if (!p) break; // despawned without arriving — fail below
+      // Boarding must clear the wait: the call is served, so the ride can't
+      // keep counting toward frustration (or leave the figure red-"!").
+      if (p.state === "riding") expect(p.wait).toBe(0);
+      delivered = p.floor === 7 && (p.state === "toDest" || p.state === "done");
+    }
+    expect(delivered).toBe(true);
   });
 
   it("spawns and advances commuters, reporting stress in [0,1]", () => {
