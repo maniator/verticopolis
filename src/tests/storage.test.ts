@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
-import { GRID } from "../engine/facilities";
+import { FACILITIES, GRID } from "../engine/facilities";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -38,6 +38,19 @@ describe("SaveGame", () => {
     expect(u.satisfaction).toBeGreaterThanOrEqual(0);
     expect(u.satisfaction).toBeLessThanOrEqual(1);
     expect(Number.isFinite(u.occupants)).toBe(true);
+  });
+
+  it("coerces forged unit state/label strings from a tampered save", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // A forged `state` would flow into UI innerHTML (inspector "Status:" line)
+    // and state-machine compares; a non-string label would crash escaping.
+    (data.units[0] as { state: unknown }).state = '<img src=x onerror="x">';
+    (data.units[0] as { label: unknown }).label = 42;
+    const loaded = Simulation.deserialize(data);
+    const u = loaded.tower.units[0];
+    expect(u.state).toBe("empty");
+    expect(u.label).toBe(FACILITIES[u.kind].name);
   });
 
   it("recomputes the sky weather on load (not left stale)", () => {

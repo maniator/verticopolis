@@ -2,6 +2,7 @@ import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
+import { escapeHtml } from "./escape";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -34,6 +35,8 @@ export interface UICallbacks {
   onRenameTower(name: string): void;
   onShowStats(): void;
   onShowSaves(): void;
+  /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
+  onInspectorClose(): void;
   onSaveSlot(slot: number): void;
   onLoadSlot(slot: number | "auto"): void;
   onDeleteSlot(slot: number): void;
@@ -436,6 +439,8 @@ export class UI {
     this.el.inspector.innerHTML = html;
     // ✕ in the title strip (shown on mobile only, via CSS): the docked card has
     // no hover-away to dismiss it there. The card itself stays click-through.
+    // Routed through the app so it can latch the dismissal — otherwise the
+    // very next hover pick over the same facility re-opens the card.
     const h4 = this.el.inspector.querySelector("h4");
     if (h4) {
       const x = document.createElement("button");
@@ -443,7 +448,7 @@ export class UI {
       x.className = "insp-close";
       x.setAttribute("aria-label", "Close");
       x.textContent = "✕";
-      x.addEventListener("click", () => this.showInspector(null));
+      x.addEventListener("click", () => this.cb.onInspectorClose());
       h4.appendChild(x);
     }
     this.inspectorSize = { w: this.el.inspector.offsetWidth, h: this.el.inspector.offsetHeight };
@@ -796,8 +801,4 @@ export function anchorBeside(
     left: clamp(left, gap, Math.max(gap, viewW - size.w - gap)),
     top: clamp(rect.y, gap, Math.max(gap, viewH - size.h - gap)),
   };
-}
-
-function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }

@@ -61,6 +61,24 @@ export type UnitState =
   | "fire" // unit ablaze during a fire emergency
   | "gutted"; // burned-out shell — no income, no tenants; must be bulldozed & rebuilt
 
+const UNIT_STATES: ReadonlySet<string> = new Set([
+  "construction",
+  "empty",
+  "occupied",
+  "moving_in",
+  "vacating",
+  "asleep",
+  "dirty",
+  "fire",
+  "gutted",
+] satisfies UnitState[]);
+
+/** Guard for untrusted input (hand-edited / foreign saves): a forged `state`
+ *  string would otherwise flow into UI innerHTML and state-machine compares. */
+export function isUnitState(v: unknown): v is UnitState {
+  return typeof v === "string" && UNIT_STATES.has(v);
+}
+
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.
  *  The single predicate every "is this room working?" check should route through
  *  so a new inert state (like `gutted`) is honored everywhere at once. */
