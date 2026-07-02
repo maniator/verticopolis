@@ -404,10 +404,14 @@ export class Simulation implements SimContext {
     // The crowd runs on its own seconds — a few per game-minute — capped so a
     // huge outer tick still can't teleport (or mass-spawn) everyone at once.
     this.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), this.tower, this.clock);
-    for (let left = dtMinutes; left > 0; ) {
+    // The movement loop honors the same cap IN TOTAL: a month-long catch-up
+    // tick (legacy v1 model) advances cars/people by at most CROWD_MAX_STEP
+    // crowd-seconds of motion, not a month of thousands of chunks.
+    const moveMinutes = Math.min(dtMinutes, CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
+    for (let left = moveMinutes; left > 0; ) {
       const chunk = Math.min(left, 2.5);
       this.elevators.moveCars(this.tower, chunk, this.crowd.elevatorCalls(this.tower));
-      this.crowd.advance(Math.min(CROWD_MAX_STEP, chunk * CROWD_SECONDS_PER_MINUTE), this.tower);
+      this.crowd.advance(chunk * CROWD_SECONDS_PER_MINUTE, this.tower);
       left -= chunk;
     }
     // Housekeepers who reached (or abandoned) their room since the last step:

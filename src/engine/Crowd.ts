@@ -584,10 +584,13 @@ export class Crowd {
         p.fy = pos;
         p.x = shaft.x + shaft.width / 2;
         const dest = p.floors[p.leg + 1];
-        // Arrived if the car is at the floor — or passed it between samples.
-        // Cars move up to ~a floor per step at coarse ticks, so a pure
-        // proximity check can sail a rider straight past their stop.
-        if (Math.abs(pos - dest) < 0.2 || (prev - dest) * (pos - dest) <= 0) {
+        // Arrived if the car is at the floor — or passed it between samples
+        // (cars move up to ~a floor per step at coarse ticks, so a pure
+        // proximity check can sail a rider straight past their stop). Never
+        // alight at a floor the shaft no longer stops at (express skip-floors
+        // reconfigured mid-ride): ride on until the give-up valve resolves it.
+        const arrived = Math.abs(pos - dest) < 0.2 || (prev - dest) * (pos - dest) <= 0;
+        if (arrived && tower.stopsAt(shaft, dest)) {
           // Arrived at this leg's floor — step off.
           this.releaseSeat(p);
           p.floor = dest;
