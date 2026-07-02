@@ -2,7 +2,7 @@ import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
 import { FACILITIES, GRID, facilityFloors, isElevatorKind, isHotelKind, maxCarsFor } from "./engine/facilities";
 import { ECON, rentConfig, rentOf, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
-import type { FacilityKind } from "./engine/types";
+import type { FacilityKind, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
 import { AudioEngine } from "./audio/Audio";
@@ -415,7 +415,7 @@ class GameApp {
 
     this.engine.onActionMove = (tile, floor, picked) => {
       if (this.tool.type === "bulldoze") {
-        this.bulldozePicked(picked);
+        this.bulldozePicked(picked, true); // drag: blocked tiles fail silently
         return;
       }
       if (this.tool.type !== "build") return;
@@ -999,20 +999,7 @@ class GameApp {
       const u = this.sim.tower.units.find((x) => x.id === this.selected!.id);
       if (!u) return this.clearSelection();
       if (action === "sell") {
-        if (u.state === "fire") {
-          this.audio.sfx("error");
-          this.ui.toast("You can't sell a burning unit — call fire rescue or let it burn out.", "bad");
-          return;
-        }
-        const reason = this.sim.tower.removalReason(u.id);
-        if (reason) {
-          this.audio.sfx("error");
-          this.ui.toast(reason, "bad");
-          return;
-        }
-        this.sim.tower.removeUnit(u.id);
-        // A gutted shell has no salvage value; everything else refunds half.
-        this.sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
+        if (!this.tryRemoveUnit(u, "sell")) return;
         this.audio.sfx("sell");
         this.commitUndo();
         return this.clearSelection();
@@ -1237,7 +1224,10 @@ class GameApp {
     while (progress) {
       progress = false;
       for (const tx of tiles) {
-        if (this.sim.tower.hasStructure(floor, tx)) continue;
+        // Skip tiles already carrying this kind — but let the lobby brush
+        // upgrade plain floor in place (the sky-lobby conversion).
+        const existing = this.sim.tower.structureKindAt(floor, tx);
+        if (existing === kind || (existing !== undefined && kind !== "lobby")) continue;
         if (this.sim.build(kind, floor, tx).ok) progress = true;
       }
     }
@@ -1258,26 +1248,38 @@ class GameApp {
     this.paint = { tile, floor };
   }
 
-  /** Bulldoze whatever Excalibur reported under the pointer, with a refund. */
-  private bulldozePicked(p: Picked | null): void {
+  /**
+   * Shared player-removal gauntlet: burning and load-bearing units refuse —
+   * with an error toast unless `quiet` (drag steps stay silent, like build
+   * drags). Removes with the usual refund and returns true on success.
+   */
+  private tryRemoveUnit(u: Unit, verb: "sell" | "bulldoze", quiet = false): boolean {
+    const blocked =
+      u.state === "fire"
+        ? `You can't ${verb} a burning unit — call fire rescue or let it burn out.`
+        : this.sim.tower.removalReason(u.id);
+    if (blocked) {
+      if (!quiet) {
+        this.audio.sfx("error");
+        this.ui.toast(blocked, "bad");
+      }
+      return false;
+    }
+    this.sim.tower.removeUnit(u.id);
+    // A gutted shell has no salvage value; everything else refunds half.
+    this.sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
+    return true;
+  }
+
+  /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
+   *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
+   *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
+  private bulldozePicked(p: Picked | null, quiet = false): void {
     if (!p) return;
     if (p.type === "unit") {
       const u = this.sim.tower.units.find((x) => x.id === p.id);
       if (!u) return;
-      if (u.state === "fire") {
-        this.audio.sfx("error");
-        this.ui.toast("You can't bulldoze a burning unit — call fire rescue or let it burn out.", "bad");
-        return;
-      }
-      const reason = this.sim.tower.removalReason(u.id);
-      if (reason) {
-        this.audio.sfx("error");
-        this.ui.toast(reason, "bad");
-        return;
-      }
-      this.sim.tower.removeUnit(u.id);
-      // A gutted shell has no salvage value; everything else refunds half.
-      this.sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
+      if (!this.tryRemoveUnit(u, "bulldoze", quiet)) return;
     } else {
       const t = this.sim.tower.transports.find((x) => x.id === p.id);
       if (!t) return;

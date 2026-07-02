@@ -93,6 +93,23 @@ describe("Tower placement", () => {
     expect(tower.canPlace("floor", 2, 20).ok).toBe(true);
   });
 
+  it("lets a lobby upgrade a plain floor in place (sky-lobby conversion)", () => {
+    for (let i = 0; i < 20; i++) tower.place("lobby", 1, i);
+    for (let f = 2; f <= 16; f++) for (let i = 0; i < 20; i++) tower.place("floor", f, i);
+    // Floor 16 sits on 15, so the plain floor-15 tile can't be sold — but a
+    // sky lobby may replace it atomically, never passing through midair.
+    expect(tower.removalReason(tower.unitAt(15, 0)!.id)).toBeDefined();
+    const r = tower.place("lobby", 15, 0);
+    expect(r.ok).toBe(true);
+    expect(tower.unitAt(15, 0)?.kind).toBe("lobby");
+    expect(tower.hasStructure(15, 0)).toBe(true);
+    // Upgrades never target non-lobby floors, existing lobbies, or room tiles.
+    expect(tower.canPlace("lobby", 5, 0).ok).toBe(false);
+    expect(tower.canPlace("lobby", 15, 0).ok).toBe(false); // already a lobby
+    expect(tower.place("office", 15, 5).ok).toBe(true);
+    expect(tower.canPlace("lobby", 15, 5).ok).toBe(false); // room in the way
+  });
+
   it("won't let a supporting floor be removed from under the story above", () => {
     for (let i = 0; i < 5; i++) tower.place("lobby", 1, i);
     const mid = tower.place("floor", 2, 0);
