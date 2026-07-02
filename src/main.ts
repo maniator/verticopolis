@@ -963,7 +963,8 @@ class GameApp {
       );
       actions.push(this.edRow(`<button class="btn" data-edit="stops">Configure stops…</button>`));
       actions.push(this.edRow(`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`));
-      // Stairs/escalators span exactly two floors by rule — no extend buttons.
+      // Extend arrows are an elevator affordance: stairs/escalators are a
+      // fixed two-floor flight by rule and never reach this branch.
       actions.push(this.edRow(`<button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button>`));
     }
     actions.push(this.edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
