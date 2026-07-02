@@ -5,6 +5,8 @@
  * anything user-influenced (tower name, facility labels, imported saves)
  * must pass through it.
  */
+const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+
 export function escapeHtml(s: string): string {
-  return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+  return s.replace(/[&<>"']/g, (c) => ESCAPES[c]!);
 }
