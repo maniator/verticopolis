@@ -86,11 +86,18 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR.
   needless complexity) — and fix what you find before opening or updating a PR.
   Treat it as running `/code-review` on yourself; don't outsource the first
   pass to the bots.
-- **Deep review before merging.** Green CI is necessary but not sufficient —
-  never merge on a passing pipeline alone. Before a PR is merged, run a full
-  adversarial review with the BMAD/BMGD review skill (`/gds-code-review` for
-  gameplay/engine work, `/bmad-code-review` otherwise), and bring in the other
-  agents relevant to the change rather than reviewing solo:
+- **Deep review in the same session that writes the code — not "later,
+  before merge".** Green CI is necessary but not sufficient — never merge on a
+  passing pipeline alone. The session (human or agent) that authors a
+  non-trivial change runs the full adversarial review itself, before pushing or
+  immediately after opening/updating the PR, while the context is still loaded.
+  Deferring it to a hypothetical pre-merge step is how it gets skipped:
+  sessions end, and no later session picks it up. A PR is not "done" —
+  don't report it as finished — until the review has run and its confirmed
+  findings are fixed and re-verified on the branch. Use the BMAD/BMGD review
+  skill (`/gds-code-review` for gameplay/engine work, `/bmad-code-review`
+  otherwise), and bring in the other agents relevant to the change rather than
+  reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
   - **Samus Shepard** (`gds-agent-game-designer`) for mechanics, balance, and

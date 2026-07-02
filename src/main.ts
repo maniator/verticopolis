@@ -1102,11 +1102,11 @@ class GameApp {
       <div class="stats-section">Overview</div>
       <div class="col">
         <span class="k">Tower name</span><span class="v">${escapeAttr(this.sim.tower.towerName)}</span>
-        <span class="k">Rating</span><span class="v">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
+        <span class="k">Rating</span><span class="v stars">${s.star >= 6 ? "TOWER" : s.star + "★"}</span>
         <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
         ${ratingRow}
         <span class="k">Next star at</span><span class="v">${next ? fmt(next) : "—"}</span>
-        <span class="k">Funds</span><span class="v">$${fmt(Math.round(this.sim.money))}</span>
+        <span class="k">Funds</span><span class="v ${this.sim.money < 0 ? "loss" : "money"}">$${fmt(Math.round(this.sim.money))}</span>
         <span class="k">Date</span><span class="v">${c.dayName}, day ${c.day + 1}</span>
       </div>
       <div class="col">
@@ -1161,12 +1161,14 @@ class GameApp {
       `<div class="col ms">${items
         .map(
           (m) =>
-            `<span class="k" style="color:${m.done ? "var(--good)" : "var(--muted)"}">${m.done ? "✓" : "·"} ${escapeAttr(m.label)}</span>` +
-            `<span class="v" style="color:var(--muted)">${escapeAttr(m.desc)}</span>`,
+            `<span class="k${m.done ? " ms-done" : ""}">${m.done ? "✓" : "·"} ${escapeAttr(m.label)}</span>` +
+            `<span class="v">${escapeAttr(m.desc)}</span>`,
         )
         .join("")}</div>`;
+    const pct = mp.total ? Math.round((mp.achieved / mp.total) * 100) : 0;
     return (
-      `<div class="stats-section">🏅 Milestones (${mp.achieved}/${mp.total})</div>` +
+      `<div class="stats-section">🏅 Milestones (${mp.achieved}/${mp.total})` +
+      `<span class="evalbar"><span style="width:${pct}%"></span></span></div>` +
       col(mp.list.slice(0, half)) +
       col(mp.list.slice(half))
     );
