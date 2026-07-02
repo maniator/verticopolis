@@ -303,7 +303,9 @@ async function main() {
 
   // 6) Sprite gallery (full screenshot of the catalog).
   const gpage = await browser.newPage({ viewport: { width: 960, height: 1200 } });
-  await gpage.goto(`${BASE}/gallery.html`, { waitUntil: "networkidle" });
+  // ?freeze pins the gallery's animation clock — see gallery.ts — so this
+  // capture is byte-deterministic (the refactor-parity check depends on it).
+  await gpage.goto(`${BASE}/gallery.html?freeze`, { waitUntil: "networkidle" });
   await gpage.waitForFunction(() => window.galleryReady === true, null, { timeout: 10000 });
   await gpage.waitForTimeout(800);
   await gpage.screenshot({ path: `${OUT}/06-sprite-gallery.png`, fullPage: true });

@@ -122,8 +122,13 @@ canvas.width = (COLS * CELL_W + PAD * 2) * dpr;
 canvas.height = (rows * CELL_H + PAD * 2) * dpr;
 ctx.scale(dpr, dpr);
 
+// A `?freeze` URL param pins the animation clock so the screenshot capture is
+// deterministic — the marquee/screen animations otherwise depend on wall-clock
+// timing at shot time, which made the gallery's byte-parity check flaky.
+const FROZEN_ANIM = new URLSearchParams(location.search).has("freeze") ? 12.125 : null;
+
 function frame() {
-  const anim = performance.now() / 1000;
+  const anim = FROZEN_ANIM ?? performance.now() / 1000;
   const d: DrawCtx = { ctx, lit: true, anim, hour: 19 };
   ctx.fillStyle = "#12151d";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
