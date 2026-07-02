@@ -199,7 +199,7 @@ export class ElevatorDispatch {
     dir: number,
     calls: Set<number>,
     claimed?: Set<number>,
-    cab?: Set<number>,
+    cab?: ReadonlySet<number>,
   ): number | null {
     let best: number | null = null;
     let bestDist = Infinity;

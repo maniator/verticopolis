@@ -59,12 +59,13 @@ interface Route {
   shafts: number[];
 }
 
-/** Live calls the drawn crowd places on the elevators (see elevatorCalls). */
+/** Live calls the drawn crowd places on the elevators (see elevatorCalls).
+ *  A read-only snapshot: the dispatch consumes it, never mutates it. */
 export interface ElevatorCalls {
   /** Landing buttons: shaftId → floor → how many people want a car there. */
-  hall: Map<number, Map<number, number>>;
+  hall: ReadonlyMap<number, ReadonlyMap<number, number>>;
   /** Cab buttons: shaftId → carIndex → floors that car's riders need. */
-  cab: Map<number, Map<number, Set<number>>>;
+  cab: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
 }
 
 /**
@@ -167,11 +168,15 @@ export class Crowd {
       if (p.state === "waiting") {
         bump(p.shaftId, p.floor);
       } else if (p.state === "riding" && p.carIndex != null) {
+        // Guard the leg lookup — a state-machine hiccup must not leak an
+        // undefined floor into the dispatch's call set.
+        const dest = p.floors[p.leg + 1];
+        if (dest === undefined) continue;
         let cars = cab.get(p.shaftId);
         if (!cars) cab.set(p.shaftId, (cars = new Map()));
         let floors = cars.get(p.carIndex);
         if (!floors) cars.set(p.carIndex, (floors = new Set()));
-        floors.add(p.floors[p.leg + 1]);
+        floors.add(dest);
       } else if (p.staff && p.state === "toShaft") {
         const shaft = this.shaftOf(tower, p.shaftId);
         if (shaft && isStaffOnlyTransport(shaft.kind)) bump(p.shaftId, p.floor);
