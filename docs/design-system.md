@@ -40,16 +40,24 @@ period chrome gives press feedback only (list rows like `.pal-item` may hover;
 buttons may not).
 
 - `.btn.primary` — the classic **default button**: an extra dark ring
-  (`0 0 0 1px var(--r-dark)`) + bold label. *One primary per dialog, always the
-  rightmost action.*
+  (`0 0 0 1px var(--r-dark)`) + bold label. *One primary per dialog.* Its DOM
+  position encodes default focus: **first** when the primary should own focus
+  (the emergency's Pay), **last** when the safe action must be reached first
+  (destructive confirms). Don't reorder for looks.
 - `.btn.danger` — red bold label (`--bad-ink`) on the same chrome. Destructive
   actions only (Sell/Bulldoze, slot delete).
-- `.btn.xs` — title-bar size: the ✕ on every dismissible surface, the coach's
-  Skip button.
+- `:disabled` — classic GrayText (`--r-shadow`) on the same raised chrome,
+  default cursor. Never hide a disabled button; show why it can't be pressed.
+- `.btn.xs` — title-bar size: the ✕ in window title bars, the coach's Skip
+  button. On coarse pointers it widens (`min-width: 28px`) but never grows
+  taller — a 36px ✕ inflates every navy bar (a shipped bug, since fixed). In
+  TS, build every ✕ via `UI.titleBarClose()` so they can't drift.
 
 ### `.win` — a floating window
 Gray face + `--bevel-out` + `--win-shadow`. Applied to: the modal box, the
 editor card, the inspector card, the hint strip, the onboarding coach card.
+`.win.docked` (palette, sidebar, its panels) keeps the face/bevel but drops
+the floating drop shadow.
 
 ### `.win-title` — the title bar
 Navy, white, bold, 13px, `3px 8px` padding, flex with the ✕ (`.btn.xs`) pinned
@@ -57,9 +65,9 @@ right via `margin-left: auto`. Every dismissible window wears one; the modal's
 is sticky and full-bleed (negative margins derived from the `--pad-y`/`--pad-x`
 tokens on `.modal-box` — never hand-write those offsets).
 
-The sidebar `.panel h3` headers and the palette's `::before` "Tools" strip are
-the same idiom at panel scale (10px, uppercase) — a deliberate size step-down,
-not a divergence.
+The palette's "Tools" strip is a real `.win-title`. The sidebar `.panel h3`
+headers are the same idiom at panel scale (10px, uppercase) — a deliberate
+size step-down, not a divergence.
 
 ### `.well` — sunken white data area
 `--r-hi` + `--bevel-in`. The File Manager idiom: the Bulletin log, the saves
@@ -104,14 +112,16 @@ splash. It shares interaction grammar only — bevel press states and a visible
 
 ## 6. Rules of engagement
 
-1. **No skin on IDs.** If a rule paints a background/bevel outside the
-   components layer, it's a bug.
+1. **No skin on IDs.** Surface-specific *classes* may tune skin using the
+   tokens; IDs never paint chrome. Two annotated one-offs are grandfathered:
+   `#topbar`'s raised strip and `#stage`'s sunken viewport.
 2. **Edit, don't override.** One generation of CSS: change the rule that owns
    the property; never add a later rule to win by specificity.
 3. **New surface?** Compose it from `.win`/`.win-title`/`.btn`/`.well` before
    inventing anything.
-4. **One primary per dialog**, rightmost. Danger is a label color, not a new
-   button shape.
+4. **One primary per dialog.** Its DOM position is a focus decision, not a
+   style one (see `.btn.primary`). Danger is a label color, not a new button
+   shape.
 5. **Press-only feedback on buttons.** No `:hover` chrome.
 6. **One mobile block** (`max-width: 860px`) — add responsive tweaks there, not
    in new scattered queries.

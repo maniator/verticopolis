@@ -1,15 +1,16 @@
 /* =====================================================================
    VERTICOPOLIS DESIGN SYSTEM
-   One generation of CSS, four layers, no override archaeology:
+   One generation of CSS, five layers, no override archaeology:
 
      1. TOKENS      — every color, bevel, and font, defined once.
      2. BASE        — reset, document, accessibility.
      3. COMPONENTS  — reusable classes (.btn, .win, .win-title, .well,
                       .field, .kv, .toast, .evalbar). Skin lives HERE,
                       on classes — never on IDs.
-     4. LAYOUT + SURFACES — positioning/sizing per screen region. IDs may
-                      appear here for layout only; if a rule paints a
-                      background or bevel outside COMPONENTS, it's a bug.
+     4. LAYOUT + SURFACES — positioning/sizing per screen region.
+                      Surface-specific CLASSES may tune skin using the
+                      tokens; IDs never paint chrome, with two annotated
+                      one-offs (#topbar's raised strip, #stage's viewport).
      5. MEDIA       — one mobile block, pointer/motion/a11y adjuncts.
 
    The look is Windows 3.1 / SimTower: gray faces, two-pixel bevels, navy
@@ -137,8 +138,10 @@ html.reduce-motion *::after {
   box-shadow: var(--bevel-in);
 }
 /* Primary = the classic Win-style DEFAULT BUTTON: same gray face, an extra
-   dark ring around the bevel, bold label. One primary per dialog, always the
-   rightmost action. */
+   dark ring around the bevel, bold label. One primary per dialog; its DOM
+   position encodes default focus — first when it should own focus (emergency
+   Pay), last when the safe action must be reached first (destructive
+   confirms). */
 .btn.primary {
   box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out);
   font-weight: 700;
@@ -152,6 +155,12 @@ html.reduce-motion *::after {
   color: var(--bad-ink);
   font-weight: 700;
 }
+/* Disabled = classic GrayText on the same raised chrome (never a hover/
+   pointer affordance). The browser already suppresses :active. */
+.btn:disabled {
+  color: var(--r-shadow);
+  cursor: default;
+}
 /* Title-bar size: the ✕ on every dismissible surface, the coach's Skip. */
 .btn.xs {
   min-width: 18px;
@@ -160,13 +169,23 @@ html.reduce-motion *::after {
   line-height: 1.3;
 }
 
-/* .win — a floating window: gray face, bevel, one hard shadow. */
+/* .win — a floating window: gray face, bevel, one hard shadow. Windows
+   with inner padding declare it via the --pad-y/--pad-x tokens so their
+   title bar can run full-bleed without hand-synced negative margins. */
 .win {
+  --pad-y: 0px;
+  --pad-x: 0px;
+  --title-gap: 0px;
   background: var(--r-face);
   color: var(--r-ink);
   border: 0;
   border-radius: 0;
   box-shadow: var(--bevel-out), var(--win-shadow);
+}
+/* Docked windows (palette, sidebar, its panels) sit in the app frame — same
+   face and bevel, no floating drop shadow. */
+.win.docked {
+  box-shadow: var(--bevel-out);
 }
 
 /* .win-title — the navy title bar every window wears: same type, same
@@ -185,24 +204,24 @@ html.reduce-motion *::after {
   margin-left: auto;
   flex: none;
 }
-
-/* .well — sunken white data area (the File Manager idiom): lists,
-   textareas, logs, gauges live on wells. */
-.well {
-  background: var(--r-hi);
-  color: var(--r-ink);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-in);
+/* Full-bleed: a window's title bar cancels the window's own padding via the
+   tokens declared on .win, so the bar can never drift out of alignment with
+   the frame — on ANY window, not just the modal. */
+.win > .win-title {
+  margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) var(--title-gap);
 }
 
-/* .field — a text input: a well you type into. */
+/* .well — sunken white data area (the File Manager idiom): lists,
+   textareas, logs, gauges live on wells. .field is a well you type into. */
+.well,
 .field {
   background: var(--r-hi);
   color: var(--r-ink);
   border: 0;
   border-radius: 0;
   box-shadow: var(--bevel-in);
+}
+.field {
   font: inherit;
 }
 
@@ -272,7 +291,8 @@ html.reduce-motion *::after {
   flex-direction: column;
 }
 
-/* ---- Top "Information" bar ---- */
+/* ---- Top "Information" bar ----
+   (deliberate one-off ID paint: the raised strip under the whole bar) */
 #topbar {
   display: flex;
   align-items: center;
@@ -347,8 +367,7 @@ html.reduce-motion *::after {
   gap: 4px;
 }
 #speed .btn {
-  padding: 4px 9px;
-  font-size: 13px;
+  font-size: 13px; /* padding stays the .btn default (3px 9px), as shipped */
 }
 #speed .btn.active {
   font-weight: 700;
@@ -370,23 +389,10 @@ html.reduce-motion *::after {
 #palette {
   width: 176px;
   overflow-y: auto;
-  background: var(--r-face);
   margin: 6px 0 6px 6px;
-  box-shadow: var(--bevel-out);
 }
 .palette-scroll {
   padding: 6px;
-}
-/* The palette's title strip is a ::before (no element to class), so it
-   restates the .win-title recipe. Keep the two in step. */
-.palette-scroll::before {
-  content: "Tools";
-  display: block;
-  background: var(--r-title);
-  color: var(--r-title-fg);
-  font-weight: 700;
-  padding: 2px 6px;
-  margin: 0 -6px 6px;
 }
 .pal-group-title {
   font-size: 10px;
@@ -445,7 +451,8 @@ html.reduce-motion *::after {
   color: #eef2ff;
 }
 
-/* ---- Stage / canvas ---- */
+/* ---- Stage / canvas ----
+   (deliberate one-off ID paint: the sunken sky-blue viewport) */
 #stage {
   position: relative;
   flex: 1;
@@ -478,21 +485,20 @@ html.reduce-motion *::after {
   position: absolute;
   top: 10px;
   left: 10px;
-  padding: 8px 10px;
+  --pad-y: 8px;
+  --pad-x: 10px;
+  --title-gap: 6px;
+  padding: var(--pad-y) var(--pad-x);
   font-size: 12px;
   max-width: 240px;
   pointer-events: none;
 }
-#inspector .win-title {
-  margin: -8px -10px 6px; /* full-bleed: cancels the card's 8px 10px padding */
-}
 /* The card is click-through, so only the ✕ is interactive. Hidden on
-   desktop, where hover-away already dismisses. */
+   desktop, where hover-away already dismisses. Right-pinning comes from
+   .win-title .btn (the bar is flex; float would be ignored). */
 #inspector .insp-close {
   display: none;
   pointer-events: auto;
-  float: right;
-  margin-left: 6px;
 }
 
 /* ---- Toasts ---- */
@@ -512,11 +518,11 @@ html.reduce-motion *::after {
   bottom: 10px;
   left: 10px;
   width: 250px;
-  padding: 10px 12px;
+  --pad-y: 10px;
+  --pad-x: 12px;
+  --title-gap: 8px;
+  padding: var(--pad-y) var(--pad-x);
   font-size: 12px;
-}
-#editor .win-title {
-  margin: -10px -12px 8px; /* full-bleed: cancels the card's 10px 12px padding */
 }
 #editor .ed-stats {
   gap: 1px 8px;
@@ -527,12 +533,14 @@ html.reduce-motion *::after {
   gap: 6px;
   margin-top: 6px;
 }
-#editor .btn {
+/* Row-scoped on purpose: the title bar's ✕ is also a .btn inside #editor,
+   and an unscoped flex: 1 would stretch it across the bar. */
+#editor .ed-row .btn {
   flex: 1;
   padding: 5px;
   font-size: 11px;
 }
-#editor .field {
+#editor .ed-row .field {
   flex: 2;
   padding: 4px 6px;
   font-size: 11px;
@@ -547,9 +555,7 @@ html.reduce-motion *::after {
   /* Scroll when the panels are taller than the viewport (e.g. a phone held
      landscape, where it's wide enough to skip the mobile drawer layout). */
   overflow-y: auto;
-  background: var(--r-face);
   margin: 6px 6px 6px 0;
-  box-shadow: var(--bevel-out);
   gap: 6px;
   padding: 6px;
 }
@@ -560,8 +566,6 @@ html.reduce-motion *::after {
 }
 .panel {
   padding: 0 8px 8px;
-  background: var(--r-face);
-  box-shadow: var(--bevel-out);
 }
 .panel.grow {
   flex: 1;
@@ -596,12 +600,7 @@ html.reduce-motion *::after {
 }
 .wide-btn {
   width: 100%;
-  margin-top: 8px;
-  padding: 6px;
-  font-size: 12px;
-}
-.wide-btn:hover {
-  box-shadow: var(--bevel-in);
+  margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
 }
 #tower-stats {
   font-size: 12px;
@@ -640,8 +639,7 @@ html.reduce-motion *::after {
   margin-bottom: 6px;
 }
 .btn-row .btn {
-  flex: 1;
-  padding: 6px;
+  flex: 1; /* padding stays the .btn default (3px 9px), as shipped */
 }
 
 /* ---- Modal (native <dialog>) ---- */
@@ -658,18 +656,18 @@ html.reduce-motion *::after {
   backdrop-filter: blur(1px);
 }
 .modal-box {
-  /* One padding token: the full-bleed title bar and its sticky offset derive
-     from it, so the bar can never drift out of alignment with the frame. */
   --pad-y: 18px;
   --pad-x: 20px;
+  --title-gap: 12px;
   padding: var(--pad-y) var(--pad-x);
   max-height: 82vh;
   overflow-y: auto;
 }
-/* The dialog title bar: full-bleed and sticky, so the ✕ stays reachable when
-   a long dialog (help, export) scrolls. */
-.modal-box .win-title {
-  margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) 12px;
+/* The dialog title bar is additionally sticky, so the ✕ stays reachable when
+   a long dialog (help, export) scrolls. Full-bleed comes from .win > .win-title.
+   Direct child ONLY — nested .win-title section headers (Tower Statistics)
+   must not become sticky full-bleed bars. */
+.modal-box > .win-title {
   position: sticky;
   top: calc(-1 * var(--pad-y));
   z-index: 1;
@@ -707,8 +705,7 @@ html.reduce-motion *::after {
 .stats-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 8px 18px;
-  margin-top: 6px;
+  gap: 12px;
 }
 .stats-grid .col {
   gap: 3px 10px;
@@ -1119,8 +1116,8 @@ html.reduce-motion *::after {
     align-items: stretch;
     gap: 2px;
   }
-  .palette-scroll::before {
-    display: none; /* no floating "Tools" title bar in the strip */
+  #palette > .win-title {
+    display: none; /* no floating "Tools" title bar in the bottom strip */
   }
   .pal-group-title {
     writing-mode: vertical-rl;
@@ -1211,12 +1208,19 @@ html.reduce-motion *::after {
   }
 }
 
-/* On touch devices every dialog/card action must be a comfortable target;
-   the compact desktop sizing stays for mouse pointers. */
+/* On touch devices dialog/card ACTION buttons grow to a comfortable target;
+   the compact desktop sizing stays for mouse pointers. Title-bar ✕ buttons
+   (.xs) are exempt — 36px squares inflate every navy bar (the production
+   "giant close button" bug); Esc/backdrop/hover-away still dismiss. */
 @media (pointer: coarse) {
   .modal-actions .btn,
-  .modal-box .btn,
-  #editor .btn {
+  .modal-box .btn:not(.xs),
+  #editor .ed-row .btn {
     min-height: 36px;
+  }
+  /* Title-bar ✕s stay bar-height but gain width — a wider target without
+     inflating the navy bar. */
+  .btn.xs {
+    min-width: 28px;
   }
 }

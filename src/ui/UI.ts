@@ -442,15 +442,7 @@ export class UI {
     // Routed through the app so it can latch the dismissal — otherwise the
     // very next hover pick over the same facility re-opens the card.
     const h4 = this.el.inspector.querySelector("h4");
-    if (h4) {
-      const x = document.createElement("button");
-      x.type = "button";
-      x.className = "insp-close btn xs";
-      x.setAttribute("aria-label", "Close");
-      x.textContent = "✕";
-      x.addEventListener("click", () => this.cb.onInspectorClose());
-      h4.appendChild(x);
-    }
+    h4?.appendChild(this.titleBarClose("insp-close btn xs", () => this.cb.onInspectorClose()));
     this.inspectorSize = { w: this.el.inspector.offsetWidth, h: this.el.inspector.offsetHeight };
   }
 
@@ -563,9 +555,12 @@ export class UI {
   private openModal(html: string): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
     dialog.innerHTML = `<div class="modal-box win">${html}</div>`;
-    // Every dialog h2 is a window title bar; classing it here keeps the rule
-    // in one place instead of in every caller's template.
-    dialog.querySelector(".modal-box h2")?.classList.add("win-title");
+    const box = dialog.firstElementChild as HTMLElement;
+    // Every dialog's TOP-LEVEL h2 is the window title bar; classing it here
+    // keeps the rule in one place instead of in every caller's template.
+    // :scope > h2 so an h2 nested in body content is never skinned.
+    const h2 = box.querySelector(":scope > h2");
+    h2?.classList.add("win-title");
     if (!dialog.open) dialog.showModal();
     // Win-style ✕ in the title bar (same affordance as the editor card) so
     // long dialogs can be dismissed without scrolling to the bottom button.
@@ -575,29 +570,36 @@ export class UI {
     // showModal(): it must not be the first focusable element, or keyboard
     // users would land on ✕ and Enter would dismiss (declining emergencies)
     // instead of activating the primary action.
-    const h2 = dialog.querySelector(".modal-box h2");
     if (h2) {
-      const x = document.createElement("button");
-      x.type = "button";
-      x.className = "modal-x btn xs";
-      x.setAttribute("aria-label", "Close");
-      x.textContent = "✕";
       // cancelable, like the native Esc-key cancel event, so an oncancel
       // handler could preventDefault() it without behaving differently here.
-      x.addEventListener("click", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true })));
-      h2.appendChild(x);
+      h2.appendChild(
+        this.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
+      );
     }
     // Click outside the box (on the backdrop) closes the dialog.
     dialog.onclick = (e) => {
       if (e.target === dialog) this.closeModal();
     };
     dialog.oncancel = () => this.closeModal(); // Esc key
-    return dialog.querySelector(".modal-box")!;
+    return box;
   }
   closeModal(): void {
     const dialog = this.el.modal as HTMLDialogElement;
     if (dialog.open) dialog.close();
     dialog.innerHTML = "";
+  }
+
+  /** The one way to build a title-bar ✕ (see docs/design-system.md): every
+   * dismissible window's close button comes from here so they can't drift. */
+  private titleBarClose(className: string, onClick: () => void): HTMLButtonElement {
+    const x = document.createElement("button");
+    x.type = "button";
+    x.className = className;
+    x.setAttribute("aria-label", "Close");
+    x.textContent = "✕";
+    x.addEventListener("click", onClick);
+    return x;
   }
 
   confirmModal(title: string, body: string, onYes: () => void): void {
@@ -617,7 +619,7 @@ export class UI {
       `<h2>Export tower</h2><p>Copy this JSON or download it as a file.</p>
        <textarea class="field" readonly>${escapeHtml(json)}</textarea>
        <div class="modal-actions">
-         <button class="btn" data-act="download" class="primary">Download .json</button>
+         <button class="btn primary" data-act="download">Download .json</button>
          <button class="btn" data-act="close">Close</button>
        </div>`,
     );

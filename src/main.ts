@@ -846,6 +846,10 @@ class GameApp {
     return vol;
   }
 
+  /** The editor card's title bar — one template so the two editors can't drift. */
+  private editorTitleBar = (name: string): string =>
+    `<h4 class="win-title">${escapeHtml(name)}<button type="button" class="ed-close btn xs" aria-label="Close">\u2715</button></h4>`;
+
   private unitEditorHtml(u: import("./engine/types").Unit): string {
     const f = FACILITIES[u.kind];
     const floorLabel = u.floor >= 1 ? `Floor ${u.floor}` : `Basement ${1 - u.floor}`;
@@ -892,7 +896,7 @@ class GameApp {
     actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4 class="win-title">${f.name}<button type="button" class="ed-close btn xs" aria-label="Close">✕</button></h4>` +
+      this.editorTitleBar(f.name) +
       `<div class="ed-stats kv">${rows.join("")}</div>` +
       actions
     );
@@ -943,7 +947,7 @@ class GameApp {
     actions += `<div class="ed-row"><button class="btn danger" data-edit="sell">Sell / Bulldoze</button></div>`;
 
     return (
-      `<h4 class="win-title">${f.name}<button type="button" class="ed-close btn xs" aria-label="Close">✕</button></h4>` +
+      this.editorTitleBar(f.name) +
       `<div class="ed-stats kv">${rows.join("")}</div>` +
       actions
     );

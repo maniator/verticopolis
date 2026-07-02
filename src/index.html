@@ -59,7 +59,8 @@
       </header>
 
       <main id="main">
-        <aside id="palette">
+        <aside id="palette" class="win docked">
+          <div class="win-title">Tools</div>
           <div class="palette-scroll" id="palette-scroll"></div>
         </aside>
 
@@ -71,23 +72,23 @@
           <div id="toast-wrap" role="status" aria-live="assertive" aria-atomic="false"></div>
         </section>
 
-        <aside id="sidebar">
+        <aside id="sidebar" class="win docked">
           <button id="panel-close" class="panel-close btn" title="Close panels" aria-label="Close panels">✕</button>
-          <div class="panel">
+          <div class="panel win docked">
             <h3>Selected</h3>
             <div id="tool-info">Pick a facility from the left.</div>
           </div>
-          <div class="panel">
+          <div class="panel win docked">
             <h3>Tower</h3>
             <input id="tower-name" class="name-input field" maxlength="28" />
             <div id="tower-stats" class="kv"></div>
             <button id="btn-stats" class="wide-btn btn">📊 Full Statistics</button>
           </div>
-          <div class="panel grow">
+          <div class="panel grow win docked">
             <h3>Bulletin</h3>
             <div id="log" class="well" role="log" aria-live="polite" aria-label="Tower bulletin"></div>
           </div>
-          <div class="panel">
+          <div class="panel win docked">
             <h3>Game</h3>
             <div class="btn-row">
               <button class="btn" id="btn-save">Quick Save</button>
