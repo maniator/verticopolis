@@ -1025,23 +1025,26 @@ export class TowerEngine {
         const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${open}${lateNight}${dead}`;
         const isDead = dead === "x";
         const rec = this.roomActors.get(u.id);
+        const animated = u.state === "fire" || u.state === "construction";
         if (!rec) {
-          this.addRoom(u, isDead);
+          this.addRoom(u, isDead, animated);
           this.roomSig.set(u.id, sig);
         } else if (this.roomSig.get(u.id) !== sig) {
-          const animated = u.state === "fire" || u.state === "construction";
-          if (animated === rec.animated) {
+          if (animated === rec.animated && rec.cv.width === u.width * TILE) {
             // Repaint in place: the draw closure reads the unit's live state, so
             // flagging the canvas dirty re-bakes the SAME bitmap into the SAME
             // GPU texture. No actor churn, no new allocations — see RoomRec.
             rec.live.dead = isDead;
             rec.cv.flagDirty();
           } else {
-            // Animated↔static flips the canvas cache mode, which is fixed at
-            // construction — rebuild (rare: fire ignition/extinguish, build done).
+            // Rebuild (rare): animated↔static flips the canvas cache mode, which
+            // is fixed at construction (fire ignition/extinguish, build done);
+            // the width guard is belt-and-braces — the sig treats width as a
+            // repaint trigger, but only a rebuild can re-derive the bitmap size,
+            // actor footprint and collider (no engine path resizes a unit today).
             rec.actor.kill();
             this.roomActors.delete(u.id);
-            this.addRoom(u, isDead);
+            this.addRoom(u, isDead, animated);
           }
           this.roomSig.set(u.id, sig);
         }
@@ -1201,14 +1204,15 @@ export class TowerEngine {
     return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][lobbyVariant(u.x)];
   }
 
-  private addRoom(u: Unit, deadParking = false): void {
+  /** Build and retain a room actor. `animated` (burning / under construction:
+   *  redraws every frame; the rest bake once and re-bake in place — see
+   *  RoomRec) is computed by syncScene, the only caller with a unit in hand,
+   *  so the repaint-vs-rebuild gate and the canvas cache mode can never drift
+   *  apart on two copies of the predicate. */
+  private addRoom(u: Unit, deadParking: boolean, animated: boolean): void {
     const hgt = facilityFloors(u.kind);
     const w = u.width * TILE;
     const h = hgt * FLOOR;
-    // Burning / under-construction rooms animate, so they redraw; the rest are
-    // baked once and only re-baked (in place — see RoomRec) when their state or
-    // the lighting changes.
-    const animated = u.state === "fire" || u.state === "construction";
     // The draw closure reads `u` and `live.dead` LIVE, so a later signature
     // change repaints by flagging the canvas dirty instead of rebuilding it.
     const live = { dead: deadParking };

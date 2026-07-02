@@ -1405,7 +1405,18 @@ export class Simulation implements SimContext {
             : undefined,
         };
       });
-    sim.tower.setNextId(data.nextId);
+    // Never trust the save's id counter below the ids actually in use: a
+    // corrupt/hand-edited nextId (low, missing → NaN) would mint duplicate ids
+    // for new placements, and the renderer keys its retained actors by unit id
+    // — an aliased id would permanently draw the wrong room. Clamp to a fresh
+    // id above every loaded unit and transport.
+    const maxLoadedId = Math.max(
+      0,
+      ...sim.tower.units.map((u) => u.id),
+      ...sim.tower.transports.map((t) => t.id),
+    );
+    const savedNextId = Number.isFinite(data.nextId) ? data.nextId : 0;
+    sim.tower.setNextId(Math.max(savedNextId, maxLoadedId + 1));
     sim.tower.towerName = data.towerName;
     sim.tower.builtWeddingHall = data.builtWeddingHall;
     sim.tower.reindex();

@@ -84,6 +84,27 @@ describe("SaveGame", () => {
     expect(u.label).toBe(FACILITIES[u.kind].name);
   });
 
+  it("clamps a tampered nextId so new placements can never reuse a live id", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // A hand-edited/corrupt id counter — lower than ids already in use, or
+    // missing entirely (→ NaN ids). Either would let a new placement alias an
+    // existing unit's id, which the renderer keys its retained actors by.
+    for (const forged of [1, undefined]) {
+      (data as { nextId: unknown }).nextId = forged;
+      const loaded = Simulation.deserialize(data);
+      const before = new Set([
+        ...loaded.tower.units.map((u) => u.id),
+        ...loaded.tower.transports.map((t) => t.id),
+      ]);
+      // Adjacent to sampleGame's floor strip (x0..x0+11), so placement rules pass.
+      const res = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 12);
+      expect(res.ok).toBe(true);
+      expect(Number.isFinite(res.unitId)).toBe(true);
+      expect(before.has(res.unitId!)).toBe(false);
+    }
+  });
+
   it("recomputes the sky weather on load (not left stale)", () => {
     const sim = sampleGame();
     sim.tick(60 * 24 * 5); // advance a few days
