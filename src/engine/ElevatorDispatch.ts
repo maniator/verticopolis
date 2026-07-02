@@ -36,12 +36,17 @@ export class ElevatorDispatch {
    * Stairs/escalators have no cars (their walkers are drawn directly), so they
    * are skipped here. `rush` is the time-of-day demand multiplier.
    */
-  update(tower: Tower, dt: number, rush: number): void {
+  update(tower: Tower, dt: number, rush: number, staffCalls?: ReadonlyMap<number, number>): void {
     this.pruneRemovedShafts(tower);
     this.accumulateWaiting(tower, dt, rush);
-    const demand = this.waiting;
+    // Service elevators are staff-only, so they answer the REAL calls of staff
+    // currently travelling (passed in from the crowd each tick) instead of the
+    // aggregate tenant-demand estimate — no phantom passenger service. Copied
+    // so boarding decrements below can't mutate the caller's map.
+    const staffDemand = new Map(staffCalls ?? []);
     for (const t of tower.transports) {
       if (!isElevatorKind(t.kind)) continue;
+      const demand = t.kind === "elevatorService" ? staffDemand : this.waiting;
       const stops: number[] = [];
       for (let fl = t.bottom; fl <= t.top; fl++) if (tower.stopsAt(t, fl)) stops.push(fl);
       if (stops.length === 0) continue;

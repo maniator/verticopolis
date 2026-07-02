@@ -276,9 +276,29 @@ describe("Hotel housekeeping", () => {
     sim.tower.place("housekeeping", 2, x0 + 8);
     const room = sim.tower.units.find((u) => u.id === r.unitId)!;
     room.state = "dirty";
-    // Trigger a day boundary so housekeeping runs.
-    for (let i = 0; i < 25; i++) sim.tick(60);
+    // Run past the 8:00 shift start (the clock opens at 7:00) into mid-day, so
+    // the housekeeper has walked over — but stop before the NEXT checkout
+    // re-dirties a re-let room.
+    for (let i = 0; i < 6; i++) sim.tick(60);
     expect(room.state).not.toBe("dirty");
+  });
+
+  it("rooms stay dirty until a housekeeper actually arrives — cleaning is never instant", () => {
+    const sim = hotelTower(12);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const r = sim.tower.place("hotelDouble", 2, x0);
+    sim.tower.place("housekeeping", 2, x0 + 8); // same floor: no ride needed
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // One tick reaches the 8:00 shift start (the clock opens at 7:00): dispatch
+    // sends a housekeeper, but the room is still dirty — nobody's arrived yet.
+    sim.tick(60);
+    expect(room.state).toBe("dirty");
+    expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
+    // The next hour of simulation walks them to the room; arrival cleans it.
+    sim.tick(60);
+    expect(room.state).toBe("empty");
   });
 
   it("housekeepers need a staff route — a passenger elevator alone won't do", () => {
@@ -296,9 +316,11 @@ describe("Hotel housekeeping", () => {
     for (let i = 0; i < 25; i++) sim.tick(60);
     expect(room.state).toBe("dirty");
     expect(sim.log.some((l) => l.text.includes("Housekeeping can't reach"))).toBe(true);
-    // A service elevator linking the crew's floor to the room's floor fixes it.
+    // A service elevator linking the crew's floor to the room's floor fixes it:
+    // the next day-shift dispatch rides a housekeeper up. (Stop mid-day, before
+    // the following checkout re-dirties a re-let room.)
     sim.buildTransport("elevatorService", x0 + 14, 2, 5);
-    for (let i = 0; i < 24; i++) sim.tick(60);
+    for (let i = 0; i < 20; i++) sim.tick(60);
     expect(room.state).not.toBe("dirty");
   });
 

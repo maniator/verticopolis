@@ -265,7 +265,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#c0d0c0",
     description:
-      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator or stairs — never passenger lifts.",
+      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator, stairs or escalator — never passenger lifts.",
   },
   recycling: {
     kind: "recycling",

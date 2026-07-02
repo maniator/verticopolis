@@ -392,12 +392,17 @@ export class Simulation implements SimContext {
    * fire the hour/day boundary handlers exactly once if crossed. */
   private advanceStep(dtMinutes: number): void {
     this.clock.advance(dtMinutes);
-    this.elevators.update(this.tower, dtMinutes, this.rushFactor());
+    this.elevators.update(this.tower, dtMinutes, this.rushFactor(), this.crowd.staffCalls());
     // Advance the individually-routed crowd in lock-step with game time (after
     // the cars move, so people board their fresh positions). They run on the
     // crowd's own seconds — a few per game-minute — and a single huge tick is
     // capped so a day-long step can't teleport everyone at once.
     this.crowd.update(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), this.tower, this.clock);
+    // Housekeepers who reached (or abandoned) their room since the last step:
+    // the room is cleaned on ARRIVAL, never instantly — you can watch them go.
+    for (const job of this.crowd.takeStaffResults()) {
+      this.economy.onHousekeeperResult(job.unitId, job.ok);
+    }
     this.finishConstruction();
 
     const hour = this.clock.hour;
@@ -438,6 +443,9 @@ export class Simulation implements SimContext {
     // Guests check out in the morning (not at midnight), so overnight hotel
     // population is still present at the midnight TOWER/VIP evaluation.
     if (this.clock.hour === 8) this.economy.hotelCheckout();
+    // Housekeeping works a day shift: dispatch keeps sending crews to dirty
+    // rooms through the day (retrying jobs that failed or were over capacity).
+    if (this.clock.hour >= 8 && this.clock.hour <= 19) this.economy.dispatchHousekeepers();
     this.updateSatisfaction();
     this.attemptMoveIns();
     this.economy.collectTrafficIncome();
@@ -1014,6 +1022,13 @@ export class Simulation implements SimContext {
 
   hasAny(kind: FacilityKind): boolean {
     return this.tower.units.some((u) => u.kind === kind);
+  }
+
+  /** Send a staff member (housekeeper) over the staff network — see
+   *  {@link Crowd.spawnStaff}. Exposed on the context so the economy subsystem
+   *  can dispatch crews without owning the crowd. */
+  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number): boolean {
+    return this.crowd.spawnStaff(this.tower, from, to, destX, cleanUnitId);
   }
 
   /** Whether hotel guests currently count toward the star rating (they stop at 3★). */
