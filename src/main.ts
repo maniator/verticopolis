@@ -752,6 +752,10 @@ class GameApp {
       this.clearSelection();
       return;
     }
+    // An explicit tap/click is fresh intent: re-arm the hover inspector even
+    // for a facility whose card was ✕-dismissed (matters on touch, where no
+    // hover stream exists between taps to spend the latch).
+    this.inspectDismissed = null;
     this.selected = { type: p.type, id: p.id };
     this.refreshEditor();
   }
@@ -1310,17 +1314,21 @@ class GameApp {
 
   private inspectPicked(p: Picked | null): void {
     if (!p || p.kind === "floor" || p.kind === "lobby") {
-      this.clearInspector();
+      // Hide, but keep any ✕-dismissal latch: a transient empty/floor pick
+      // (pointer jitter crossing a gap) must not re-arm the card the user
+      // just closed. The latch is spent only by picking a different facility
+      // or by an explicit tap/click (selectPicked).
+      this.hideInspector();
       return;
     }
     if (this.inspectDismissed && this.inspectDismissed.type === p.type && this.inspectDismissed.id === p.id) {
-      return; // ✕-dismissed and the pointer never left it — stay closed
+      return; // ✕-dismissed and only hover picks since — stay closed
     }
     this.inspectDismissed = null;
     if (p.type === "unit") {
       const u = this.sim.tower.units.find((x) => x.id === p.id);
       if (!u) {
-        this.clearInspector();
+        this.hideInspector();
         return;
       }
       this.inspectAnchor = { x: u.x + u.width, floor: u.floor + facilityFloors(u.kind) - 1 };
@@ -1367,7 +1375,7 @@ class GameApp {
     } else {
       const t = this.sim.tower.transports.find((x) => x.id === p.id);
       if (!t) {
-        this.clearInspector();
+        this.hideInspector();
         return;
       }
       this.inspectAnchor = { x: t.x + t.width, floor: t.top };
@@ -1380,13 +1388,19 @@ class GameApp {
     }
   }
 
-  /** Hide the inspector and forget what it described. The pick moved off the
-   *  facility, so any ✕-dismissal latch is spent too. */
-  private clearInspector(): void {
+  /** Hide the inspector card, keeping any ✕-dismissal latch. */
+  private hideInspector(): void {
     this.inspectAnchor = null;
     this.inspectTarget = null;
-    this.inspectDismissed = null;
     this.ui.showInspector(null);
+  }
+
+  /** Hide the inspector and drop the ✕-dismissal latch too — for hard resets
+   *  (new/loaded tower, where a recycled facility id must not stay muted) and
+   *  for explicit taps, which are fresh intent. */
+  private clearInspector(): void {
+    this.inspectDismissed = null;
+    this.hideInspector();
   }
 
   // ---- Save / load / new --------------------------------------------------
@@ -1395,6 +1409,10 @@ class GameApp {
   private adoptSim(sim: Simulation, preserveHistory = false): void {
     this.sim = sim;
     this.clearSelection();
+    // Facility ids restart in a fresh tower — a stale ✕-latch (or anchor)
+    // from the old tower would silently mute the inspector on whichever new
+    // facility happens to reuse the id.
+    this.clearInspector();
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
