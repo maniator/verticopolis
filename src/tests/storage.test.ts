@@ -105,6 +105,27 @@ describe("SaveGame", () => {
     }
   });
 
+  it("repairs corrupt unit ids (NaN / duplicate) so ids stay finite and unique", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // One NaN id (would poison a raw Math.max over ids, and nextId with it)
+    // and one id duplicating another live unit's (would alias by-id lookups
+    // and the renderer's retained actors).
+    (data.units[0] as { id: unknown }).id = NaN;
+    (data.units[1] as { id: unknown }).id = data.units[2].id;
+    const loaded = Simulation.deserialize(data);
+    const ids = [
+      ...loaded.tower.units.map((u) => u.id),
+      ...loaded.tower.transports.map((t) => t.id),
+    ];
+    expect(ids.every((id) => Number.isFinite(id))).toBe(true);
+    expect(new Set(ids).size).toBe(ids.length);
+    // The counter must have landed above every repaired id too.
+    const res = loaded.tower.place("floor", 2, Math.floor(GRID.width / 2) - 20 + 12);
+    expect(res.ok).toBe(true);
+    expect(ids.includes(res.unitId!)).toBe(false);
+  });
+
   it("recomputes the sky weather on load (not left stale)", () => {
     const sim = sampleGame();
     sim.tick(60 * 24 * 5); // advance a few days

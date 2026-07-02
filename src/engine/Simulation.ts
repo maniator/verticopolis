@@ -1405,16 +1405,20 @@ export class Simulation implements SimContext {
             : undefined,
         };
       });
-    // Never trust the save's id counter below the ids actually in use: a
-    // corrupt/hand-edited nextId (low, missing → NaN) would mint duplicate ids
-    // for new placements, and the renderer keys its retained actors by unit id
-    // — an aliased id would permanently draw the wrong room. Clamp to a fresh
-    // id above every loaded unit and transport.
-    const maxLoadedId = Math.max(
-      0,
-      ...sim.tower.units.map((u) => u.id),
-      ...sim.tower.transports.map((t) => t.id),
-    );
+    // Ids drive every by-id lookup — and the renderer keys its retained actors
+    // by them — so they must be finite and unique, and the id counter must sit
+    // above them all (a corrupt/hand-edited nextId would otherwise mint
+    // duplicates for new placements, permanently drawing the wrong room). Max
+    // over the VALID ids only (one NaN id would poison a raw Math.max, and
+    // nextId with it), then hand each corrupt or duplicated id a fresh one.
+    const entities: { id: number }[] = [...sim.tower.units, ...sim.tower.transports];
+    let maxLoadedId = 0;
+    for (const e of entities) if (Number.isFinite(e.id)) maxLoadedId = Math.max(maxLoadedId, e.id);
+    const seenIds = new Set<number>();
+    for (const e of entities) {
+      if (!Number.isFinite(e.id) || seenIds.has(e.id)) e.id = ++maxLoadedId;
+      seenIds.add(e.id);
+    }
     const savedNextId = Number.isFinite(data.nextId) ? data.nextId : 0;
     sim.tower.setNextId(Math.max(savedNextId, maxLoadedId + 1));
     sim.tower.towerName = data.towerName;
