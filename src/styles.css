@@ -375,21 +375,23 @@ body {
   margin-top: 6px;
 }
 
-/* ---- Saves manager ---- */
+/* ---- Saves manager ----
+   The slot list is a single sunken white data well (the File Manager idiom —
+   same language as the Bulletin log and dialog textareas); rows sit flat on
+   it with hairline separators. Chrome/bevels come from the retro layer. */
 .slots {
   display: flex;
   flex-direction: column;
-  gap: 8px;
 }
 .slot {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  background: var(--panel-light);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  padding: 8px 10px;
+  padding: 7px 8px;
+}
+.slot + .slot {
+  border-top: 1px solid var(--panel-light);
 }
 .slot-head b {
   font-size: 13px;
@@ -412,21 +414,14 @@ body {
   flex: none;
 }
 .slot-actions button {
-  background: var(--panel);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: 4px;
+  /* Chrome (face, bevel, colors) comes from the shared .modal-box button
+     recipe in the retro layer; only the compact sizing lives here. */
   padding: 5px 10px;
   font: inherit;
   font-size: 11px;
   cursor: pointer;
 }
-.slot-actions button:hover {
-  background: #d8d8d8;
-}
 .slot-actions button.danger {
-  color: var(--bad-ink);
-  font-weight: 700;
   padding: 5px 8px;
 }
 
@@ -501,9 +496,7 @@ body {
   padding: 6px;
   font-size: 12px;
 }
-.btn-row button:hover {
-  background: #d8d8d8;
-}
+/* (hover feedback comes from the retro layer's :active bevel-in) */
 
 /* ---- Modal (native <dialog>) ---- */
 #modal {
@@ -519,7 +512,11 @@ body {
   backdrop-filter: blur(1px);
 }
 .modal-box {
-  padding: 18px 20px;
+  /* One padding token: the full-bleed title bar and its sticky offset derive
+     from it, so the bar can never drift out of alignment with the frame. */
+  --pad-y: 18px;
+  --pad-x: 20px;
+  padding: var(--pad-y) var(--pad-x);
   max-height: 82vh;
   overflow-y: auto;
 }
@@ -553,11 +550,9 @@ body {
   font: inherit;
   cursor: pointer;
 }
-.modal-actions button.primary {
-  background: var(--accent);
-  color: #ffffff;
-  font-weight: 700;
-}
+/* Primary/danger looks are defined once in the retro chrome layer (EOF):
+   primary = the classic dark "default button" ring, danger = red bold label.
+   No flat web-blue fills inside a 1994 window. */
 
 /* ---- Short viewports (e.g. a phone held landscape) ----
    Wide enough to keep the desktop side-panel layout, but too short for it: the
@@ -955,9 +950,23 @@ dialog#modal {
   border-radius: 0;
   box-shadow: var(--bevel-out), 2px 2px 0 rgba(0, 0, 0, 0.4);
 }
+/* Card title bars run full-bleed to the frame edge, exactly like the modal's
+   h2 bar — one window grammar for every floating surface. */
 #editor h4,
 #inspector h4 {
   background: var(--r-title);
+  color: var(--r-title-fg);
+  padding: 3px 8px;
+}
+#editor h4 {
+  margin: -10px -12px 8px; /* cancels the card's 10px 12px padding */
+}
+#inspector h4 {
+  margin: -8px -10px 6px; /* cancels the card's 8px 10px padding */
+}
+/* The editor's ✕ sits ON the navy bar — it must be title-bar white, not the
+   gray-chrome muted ink (which is illegible on navy). */
+#editor .ed-close {
   color: var(--r-title-fg);
 }
 #editor button {
@@ -989,7 +998,7 @@ dialog#modal {
 .modal-box h2 {
   background: var(--r-title);
   color: var(--r-title-fg);
-  margin: -18px -20px 12px;
+  margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) 12px;
   padding: 3px 8px;
   font-size: 13px;
 }
@@ -1010,6 +1019,31 @@ dialog#modal {
 .modal-actions button:active,
 .modal-box button:active {
   box-shadow: var(--bevel-in);
+}
+/* Primary action = the classic Win-style DEFAULT BUTTON: same gray face, an
+   extra dark ring around the bevel, bold label. One primary per dialog, always
+   the rightmost action. (Replaces the old flat web-blue fill.) */
+.modal-actions button.primary,
+.modal-box button.primary {
+  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out);
+  font-weight: 700;
+}
+.modal-actions button.primary:active,
+.modal-box button.primary:active {
+  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in);
+}
+/* Danger = red bold label on the SAME chrome, everywhere (editor Sell/
+   Bulldoze, saves-slot delete, any future destructive action). */
+.modal-box button.danger,
+.modal-actions button.danger {
+  color: var(--bad-ink);
+  font-weight: 700;
+}
+/* The saves list is a sunken data well; rows lie flat on white. */
+.slots {
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+  padding: 4px;
 }
 #hint {
   background: var(--r-face);
@@ -1079,7 +1113,9 @@ dialog#modal {
   align-items: center;
   gap: 8px;
   position: sticky;
-  top: -18px; /* cancel the modal-box padding so the bar pins flush to the frame */
+  /* Cancel the modal-box padding so the bar pins flush to the frame; derived
+     from the same token as the padding so the two can never drift apart. */
+  top: calc(-1 * var(--pad-y));
   z-index: 1;
 }
 .modal-box h2 .modal-x {
@@ -1115,6 +1151,16 @@ dialog#modal {
 }
 #inspector .insp-close:active {
   box-shadow: var(--bevel-in);
+}
+
+/* On touch devices every dialog/card action must be a comfortable target;
+   the compact desktop sizing stays for mouse pointers. */
+@media (pointer: coarse) {
+  .modal-actions button,
+  .modal-box button,
+  #editor button {
+    min-height: 36px;
+  }
 }
 @media (max-width: 860px) {
   #inspector .insp-close {
@@ -1341,6 +1387,8 @@ html.reduce-motion *::after {
   cursor: pointer;
 }
 .splash-btn:active { box-shadow: inset 2px 2px 0 rgba(0, 0, 0, 0.3); }
+/* The global navy focus ring is invisible on the night-sky splash. */
+.splash-btn:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
 .splash-btn.primary { background: #ffc94a; font-weight: 700; }
 .splash-btn.ghost {
   background: transparent;
@@ -1430,4 +1478,4 @@ html.reduce-motion *::after {
 .bp-amount button { min-width: 28px; }
 .bp-band { margin-left: 22px; color: var(--muted); font-size: 0.85em; }
 .bp-only { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
-.bp-preview { min-height: 2.4em; color: var(--accent); font-weight: 600; }
+.bp-preview { min-height: 2.4em; color: var(--r-title); font-weight: 600; }
