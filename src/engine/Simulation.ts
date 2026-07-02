@@ -632,6 +632,9 @@ export class Simulation implements SimContext {
     }
     let capacity = 0;
     for (const t of this.tower.transports) {
+      // Staff-only: a service elevator carries no tenants, so it adds nothing
+      // to passenger capacity (its payoff is the housekeeping staff network).
+      if (t.kind === "elevatorService") continue;
       const per = transportCarCapacity(t.kind);
       if (isElevatorKind(t.kind)) capacity += t.cars * per;
       else capacity += per; // stairs / escalator
@@ -706,6 +709,8 @@ export class Simulation implements SimContext {
     // Ground-connected shafts and the served floors each one stops at.
     const shaftsByFloor = new Map<number, { id: number; cap: number }[]>();
     for (const t of this.tower.transports) {
+      // Staff-only service elevators carry no passenger load.
+      if (t.kind === "elevatorService") continue;
       let active = false;
       for (let f = t.bottom; f <= t.top; f++) {
         if (this.tower.stopsAt(t, f) && served.has(f)) { active = true; break; }

@@ -130,25 +130,43 @@ export class EconomySystem {
 
   /**
    * Each housekeeping facility services a fixed number of dirty rooms per day.
-   * Without enough housekeeping, dirty rooms pile up and cannot earn — exactly
-   * as in the original, where you scale housekeeping with your hotel.
+   * Housekeepers travel the STAFF network — service elevators, stairs and
+   * escalators, never the passenger lifts — so a room only gets cleaned when
+   * some housekeeping facility is staff-connected to its floor (or on it).
+   * Without enough reachable housekeeping, dirty rooms pile up and cannot
+   * earn — exactly as in the original, where you scale housekeeping with your
+   * hotel and run service elevators up to the room floors.
    */
   private runHousekeeping(): void {
     const capacityPerUnit = 20;
-    let capacity =
-      this.sim.tower.units.filter((u) => u.kind === "housekeeping").length * capacityPerUnit;
-    if (capacity <= 0) return;
+    const tower = this.sim.tower;
+    // Each facility is its own crew with its own daily capacity, stationed on
+    // its floor. (Gutted shells have no staff to send.)
+    const crews = tower.units
+      .filter((u) => u.kind === "housekeeping" && u.state !== "gutted")
+      .map((u) => ({ floor: u.floor, left: capacityPerUnit }));
+    if (crews.length === 0) return;
     let cleaned = 0;
-    for (const u of this.sim.tower.units) {
-      if (capacity <= 0) break;
-      if (isHotelKind(u.kind) && u.state === "dirty" && this.sim.tower.isFloorServed(u.floor)) {
+    let unreachable = 0;
+    for (const u of tower.units) {
+      if (!isHotelKind(u.kind) || u.state !== "dirty") continue;
+      const crew = crews.find((c) => c.left > 0 && tower.staffConnected(c.floor, u.floor));
+      if (crew) {
+        crew.left--;
         u.state = "empty";
         u.satisfaction = 1;
-        capacity--;
         cleaned++;
+      } else if (!crews.some((c) => tower.staffConnected(c.floor, u.floor))) {
+        unreachable++; // no crew can get there at all (vs. merely out of capacity)
       }
     }
     if (cleaned > 0) this.sim.emit(`Housekeeping cleaned ${cleaned} hotel room(s).`, "info");
+    if (unreachable > 0) {
+      this.sim.emit(
+        `🧹 Housekeeping can't reach ${unreachable} dirty room(s) — staff travel by service elevator or stairs, not passenger lifts.`,
+        "bad",
+      );
+    }
   }
 
   /** Rooms left dirty breed cockroaches that creep into the adjacent room along

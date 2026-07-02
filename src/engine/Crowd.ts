@@ -116,6 +116,9 @@ export class Crowd {
     if (this.adj && this.adjRev === tower.revision) return this.adj;
     const adj = new Map<number, { f: number; shaft: number }[]>();
     for (const t of tower.transports) {
+      // Service elevators are staff-only: tenants and visitors never route
+      // over them (canon — that's the whole point of building one).
+      if (t.kind === "elevatorService") continue;
       // Elevators carry riders in cars; stairs/escalators are walked (a
       // "climbing" leg, no car). Both are real routing edges now, so short
       // hops travel on foot and BFS still prefers a single long elevator ride

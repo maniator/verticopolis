@@ -280,6 +280,42 @@ describe("Hotel housekeeping", () => {
     for (let i = 0; i < 25; i++) sim.tick(60);
     expect(room.state).not.toBe("dirty");
   });
+
+  it("housekeepers need a staff route — a passenger elevator alone won't do", () => {
+    const sim = hotelTower(8);
+    sim.star = 2;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    sim.tower.resizeTransport(sim.tower.transports[0].id, 1, 5); // passenger elevator to 5
+    const r = sim.tower.place("hotelDouble", 5, x0);
+    sim.tower.place("housekeeping", 2, x0 + 8); // crew stationed 3 floors below
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "dirty";
+    // Staff won't ride the passenger elevator: the room stays dirty and the
+    // player is told why.
+    for (let i = 0; i < 25; i++) sim.tick(60);
+    expect(room.state).toBe("dirty");
+    expect(sim.log.some((l) => l.text.includes("Housekeeping can't reach"))).toBe(true);
+    // A service elevator linking the crew's floor to the room's floor fixes it.
+    sim.buildTransport("elevatorService", x0 + 14, 2, 5);
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(room.state).not.toBe("dirty");
+  });
+
+  it("tenants never route over service elevators", () => {
+    const sim = hotelTower(9);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
+    sim.star = 2;
+    sim.buildTransport("elevatorService", x0 + 14, 1, 5);
+    // The service shaft is not a passenger route and doesn't serve floors…
+    expect(sim.crowd.route(sim.tower, 1, 5)).toBeNull();
+    expect(sim.tower.isFloorServed(5)).toBe(false);
+    // …but the passenger elevator is.
+    sim.tower.resizeTransport(sim.tower.transports[0].id, 1, 5);
+    expect(sim.crowd.route(sim.tower, 1, 5)).not.toBeNull();
+    expect(sim.tower.isFloorServed(5)).toBe(true);
+  });
 });
 
 describe("Transport editing", () => {

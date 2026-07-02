@@ -192,7 +192,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#4a4a52",
     transport: true,
-    description: "Carries staff and freight. Keeps service traffic off passenger elevators.",
+    description:
+      "Staff-only: housekeepers ride it to reach hotel floors; tenants and visitors never do. Cheap way to link service floors.",
   },
   elevatorExpress: {
     kind: "elevatorExpress",
@@ -263,7 +264,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     minStar: 2,
     population: 0,
     color: "#c0d0c0",
-    description: "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms.",
+    description:
+      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator or stairs — never passenger lifts.",
   },
   recycling: {
     kind: "recycling",
