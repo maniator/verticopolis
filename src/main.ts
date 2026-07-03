@@ -1,7 +1,7 @@
 import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
-import { FACILITIES, GRID, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, maxCarsFor } from "./engine/facilities";
-import { ECON, rentConfig, resaleRefund, carResaleRefund, extendBill } from "./engine/econConfig";
+import { FACILITIES, GRID, facilityFloors, isFixedSpanTransport, maxCarsFor } from "./engine/facilities";
+import { rentConfig } from "./engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
 import { TowerEngine, type Picked } from "./render/excalibur/TowerEngine";
@@ -9,14 +9,16 @@ import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
 import { trafficTier, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
-import { parseTWR } from "./storage/twrImport";
 import { UI, type Tool } from "./ui/UI";
-import { escapeHtml } from "./ui/escape";
-import { floorTag } from "./ui/format";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
-import { announceForPlacement, brushTiles, clampTile, dragRunTiles, snapX, stepCursor, type PlaceOutcome } from "./ui/placement";
+import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
 import { buildStatsHtml } from "./ui/statsHtml";
-import { OnboardingController, shouldArm } from "./ui/Onboarding";
+import { OnboardingController } from "./ui/Onboarding";
+import { BuildActions } from "./game/buildActions";
+import { EditorActions } from "./game/editorActions";
+import { SaveLoad } from "./game/saveLoad";
+import { InspectorController } from "./game/inspector";
+import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA } from "./pwa";
 
 /** Game speeds → in-game minutes advanced per real second. */
@@ -51,23 +53,11 @@ class GameApp {
   private lastStar = 1;
   /** In-progress transport drag (anchor tile/floor). */
   private transportStart: { x: number; floor: number } | null = null;
-  /** Last cell painted while dragging a floor/lobby, so a fast drag lays one
-   *  continuous run instead of scattered slabs. */
-  private paint: { tile: number; floor: number } | null = null;
   /** Currently selected facility for the edit panel. */
   private selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
    *  anchored to that spot on screen and ride the tower when the camera moves. */
   private inspectAnchor: { x: number; floor: number } | null = null;
-  /** The facility the inspector card currently describes. */
-  private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
-  /** ✕-dismissed target: stays hidden while hover picks keep landing on the
-   *  same facility (otherwise the next hover event would instantly re-open
-   *  the card), and survives transient null/floor picks (pointer jitter).
-   *  Spent by picking a DIFFERENT facility, by an explicit tap/click
-   *  (fresh intent — the only re-arm available on touch), or by a tower
-   *  swap (ids restart, so a stale latch would mute an unrelated card). */
-  private inspectDismissed: { type: "unit" | "transport"; id: number } | null = null;
   /** Cached so per-frame anchoring doesn't construct a MediaQueryList each tick. */
   private mobileMq = window.matchMedia("(max-width: 860px)");
   /** First-run splash + onboarding (pure DOM chrome). */
@@ -75,17 +65,19 @@ class GameApp {
   /** Whether the panels currently carry an inline anchor (so the mobile branch
    *  only resets them once, not every frame). */
   private panelsAnchored = false;
-  /** High-water mark of a shaft's extent during an extend-arrow drag, so a
-   *  back-and-forth wiggle is only charged for floors genuinely added. */
-  private extendHwm: { id: number; top: number; bottom: number } | null = null;
   /** Per-device accessibility preferences (localStorage, off the save). */
   private prefs: Prefs = loadPrefs();
   private reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   /** Last shown traffic tier (for boundary hysteresis, so the chip doesn't flicker). */
   private lastTrafficTier: TrafficTier = 0;
-  /** Keyboard build cursor + a pending transport anchor (mouse-free play). */
-  private kbCursor: { tile: number; floor: number } | null = null;
-  private kbAnchor: { tile: number; floor: number } | null = null;
+
+  /** Controller modules (src/game/): each takes a narrow deps slice of this
+   *  app spine, never the GameApp itself (see the modules' own doc comments). */
+  private readonly build: BuildActions;
+  private readonly editor: EditorActions;
+  private readonly saveLoad: SaveLoad;
+  private readonly inspector: InspectorController;
+  private readonly keyboard: KeyboardPlay;
 
   /** Undo/redo: snapshot-based history (see {@link UndoHistory}). Built in the
    *  constructor once `sim`/`ui` exist; its ports close over `this` so they
@@ -96,10 +88,70 @@ class GameApp {
     this.canvas = document.getElementById("view") as HTMLCanvasElement;
     this.sim = SaveGame.load() ?? Simulation.newGame(Date.parse("2024-01-01"));
     this.engine = new TowerEngine(this.canvas, this.sim);
+
+    // Controller modules — built BEFORE the UI because the UI constructor's
+    // initial selectTool fires onSelectTool synchronously (which resets the
+    // keyboard anchor), so `this.keyboard` must already exist. Their UI-facing
+    // deps are lazy closures for the same reason: `this.ui` is assigned just
+    // below. Every module re-asks getSim() so an adoptSim() swap is invisible.
+    this.build = new BuildActions({
+      getSim: () => this.sim,
+      ui: { toast: (text, kind) => this.ui.toast(text, kind) },
+      audio: this.audio,
+      selectedId: () => this.selected?.id ?? null,
+      clearSelection: () => this.clearSelection(),
+    });
+    this.inspector = new InspectorController({
+      getSim: () => this.sim,
+      ui: { showInspector: (html) => this.ui.showInspector(html) },
+      setAnchor: (anchor) => (this.inspectAnchor = anchor),
+    });
+    this.editor = new EditorActions({
+      getSim: () => this.sim,
+      ui: {
+        toast: (text, kind) => this.ui.toast(text, kind),
+        showStopsDialog: (title, floors, onToggle) => this.ui.showStopsDialog(title, floors, onToggle),
+        showBatchPricingDialog: (ctx, cb) => this.ui.showBatchPricingDialog(ctx, cb),
+      },
+      audio: this.audio,
+      build: this.build,
+      selected: () => this.selected,
+      selectedUnit: () => this.selectedUnit(),
+      selectedTransport: () => this.selectedTransport(),
+      clearSelection: () => this.clearSelection(),
+      refreshEditor: () => this.refreshEditor(),
+      captureUndo: (label) => this.captureUndo(label),
+      commitUndo: () => this.commitUndo(),
+      announce: (msg) => this.announce(msg),
+    });
+    this.saveLoad = new SaveLoad({
+      getSim: () => this.sim,
+      adoptSim: (sim, preserveHistory) => this.adoptSim(sim, preserveHistory),
+      ui: { toast: (text, kind) => this.ui.toast(text, kind) },
+      showBootMessage,
+      armOnboarding: () => {
+        this.onboarding.arm(this.sim);
+      },
+    });
+    this.keyboard = new KeyboardPlay({
+      getSim: () => this.sim,
+      engine: this.engine,
+      audio: this.audio,
+      ui: { toast: (text, kind) => this.ui.toast(text, kind) },
+      build: this.build,
+      tool: () => this.tool,
+      isTransportTool: () => this.isTransportTool(),
+      announce: (msg) => this.announce(msg),
+      pickedAt: (floor, tile) => this.pickedAt(floor, tile),
+      selectPicked: (p) => this.selectPicked(p),
+      placeSimpleBuild: (kind, tile, floor) => this.placeSimpleBuild(kind, tile, floor),
+      updateBuildPreview: (tile, floor) => this.updateBuildPreview(tile, floor),
+    });
+
     this.ui = new UI({
       onSelectTool: (t) => {
         this.tool = t;
-        this.kbAnchor = null; // don't carry a pending transport anchor across tools
+        this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
         this.engine.preview = null;
         this.engine.transportPreview = null;
       },
@@ -107,12 +159,12 @@ class GameApp {
         this.speed = s;
         this.engine.paused = SPEEDS[s] === 0;
       },
-      onSave: () => this.save(),
-      onLoad: () => this.load(),
+      onSave: () => this.saveLoad.save(),
+      onLoad: () => this.saveLoad.load(),
       onExport: () => this.ui.showExport(SaveGame.export(this.sim)),
-      onImport: (json) => this.importGame(json),
-      onImportLegacy: (buf, name) => this.importLegacy(buf, name),
-      onNew: () => this.newGame(),
+      onImport: (json) => this.saveLoad.importGame(json),
+      onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
+      onNew: () => this.saveLoad.newGame(),
       onToggleAudio: () => {
         this.audio.start();
         this.audio.setMuted(!this.audio.muted);
@@ -120,7 +172,7 @@ class GameApp {
       },
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
-      onEditAction: (action, root) => this.handleEditAction(action, root),
+      onEditAction: (action, root) => this.editor.handleEditAction(action, root),
       onToggleReducedMotion: () => {
         this.prefs.reducedMotion = !this.prefs.reducedMotion;
         savePrefs(this.prefs);
@@ -137,12 +189,9 @@ class GameApp {
       },
       onRenameTower: (name) => (this.sim.tower.towerName = name),
       onShowStats: () => this.ui.showStats(buildStatsHtml(this.sim)),
-      onInspectorClose: () => {
-        // Latch the dismissal so the next hover pick over the same facility
-        // doesn't instantly re-open the card the user just closed.
-        this.inspectDismissed = this.inspectTarget;
-        this.hideInspector();
-      },
+      // Latches the dismissal so the next hover pick over the same facility
+      // doesn't instantly re-open the card the user just closed.
+      onInspectorClose: () => this.inspector.dismiss(),
       onShowSaves: () => this.ui.showSaves(SaveGame.listSlots()),
       onSaveSlot: (n) => {
         SaveGame.saveSlot(n, this.sim);
@@ -206,11 +255,11 @@ class GameApp {
         if (SaveGame.hasSave()) {
           this.ui.confirmModal("Start a new tower?", "This abandons your current tower (it is not auto-saved).", () => {
             dismiss();
-            this.newGame();
+            this.saveLoad.newGame();
           });
         } else {
           dismiss();
-          this.newGame();
+          this.saveLoad.newGame();
         }
       },
     });
@@ -219,11 +268,11 @@ class GameApp {
     // idle first visit can't persist the throwaway boot sim (which would flip
     // hasSave() true for a tower the player never started).
     window.setInterval(() => {
-      if (!document.getElementById("splash")) this.save(true);
+      if (!document.getElementById("splash")) this.saveLoad.save(true);
     }, 30000);
   }
 
-  // ---- Keyboard play (mouse-free build cursor) ---------------------------
+  // ---- App-spine helpers the controllers borrow --------------------------
 
   /** Announce to the screen-reader live region. */
   private announce(msg: string): void {
@@ -239,103 +288,6 @@ class GameApp {
       (tr) => tile >= tr.x && tile < tr.x + FACILITIES[tr.kind].width && floor >= tr.bottom && floor <= tr.top,
     );
     return t ? { type: "transport", id: t.id, kind: t.kind } : null;
-  }
-
-  private moveCursor(dTile: number, dFloor: number): void {
-    this.kbCursor = stepCursor(this.kbCursor, dTile, dFloor);
-    this.engine.ensureVisible(this.kbCursor.tile, this.kbCursor.floor);
-    this.refreshCursorPreview();
-    this.announceCursor();
-  }
-
-  private refreshCursorPreview(): void {
-    const c = this.kbCursor;
-    if (!c) return;
-    if (this.kbAnchor && this.tool.type === "build" && this.isTransportTool()) {
-      const kind = this.tool.kind;
-      const bottom = Math.min(this.kbAnchor.floor, c.floor);
-      const top = Math.max(this.kbAnchor.floor, c.floor);
-      this.engine.transportPreview = {
-        kind,
-        x: this.kbAnchor.tile,
-        bottom,
-        top,
-        valid: this.sim.tower.placeTransportDryRun(kind, this.kbAnchor.tile, bottom, top) && this.sim.isUnlocked(kind),
-      };
-      this.engine.preview = null;
-    } else {
-      this.updateBuildPreview(c.tile, c.floor);
-    }
-  }
-
-  private announceCursor(): void {
-    const c = this.kbCursor;
-    if (!c) return;
-    const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
-    const here = this.pickedAt(c.floor, c.tile);
-    this.announce(`Cursor: ${loc}, column ${c.tile} — ${here ? FACILITIES[here.kind].name : "empty"}`);
-  }
-
-  private commitCursor(): void {
-    if (!this.kbCursor) {
-      this.moveCursor(0, 0); // first press: just reveal the cursor
-      return;
-    }
-    const c = this.kbCursor;
-    if (this.tool.type === "inspect") {
-      const p = this.pickedAt(c.floor, c.tile);
-      this.selectPicked(p);
-      this.announce(p ? `Selected ${FACILITIES[p.kind].name}` : "Nothing to inspect here");
-      return;
-    }
-    if (this.tool.type === "bulldoze") {
-      this.bulldozeCursor();
-      return;
-    }
-    if (this.tool.type !== "build") return;
-    const kind = this.tool.kind;
-    const placed = this.placeSimpleBuild(kind, c.tile, c.floor);
-    if (placed) {
-      this.announce(announceForPlacement(placed, kind, c.floor));
-      this.refreshCursorPreview();
-    } else if (this.isTransportTool()) {
-      if (!this.kbAnchor) {
-        // Snap the anchor column like the mouse path, so a wide shaft near the
-        // right edge places instead of failing.
-        this.kbAnchor = { tile: snapX(kind, c.tile), floor: c.floor };
-        this.refreshCursorPreview();
-        this.announce(`${FACILITIES[kind].name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
-      } else {
-        const bottom = Math.min(this.kbAnchor.floor, c.floor);
-        const top = Math.max(this.kbAnchor.floor, c.floor);
-        const res = this.sim.buildTransport(kind, this.kbAnchor.tile, bottom, top);
-        this.kbAnchor = null;
-        this.engine.transportPreview = null;
-        if (res.ok) {
-          this.audio.sfx("build");
-          this.announce(`${FACILITIES[kind].name} built, floors ${bottom} to ${top}`);
-        } else {
-          this.audio.sfx("error");
-          if (res.reason) this.ui.toast(res.reason, "bad");
-          this.announce(res.reason ?? "Can't build there");
-        }
-        this.refreshCursorPreview();
-      }
-    }
-  }
-
-  private bulldozeCursor(): void {
-    const c = this.kbCursor;
-    if (!c) return;
-    const p = this.pickedAt(c.floor, c.tile);
-    if (!p) {
-      this.announce("Nothing to bulldoze here");
-      return;
-    }
-    const name = FACILITIES[p.kind].name;
-    this.bulldozePicked(p);
-    this.announce(`Bulldozed ${name}`);
-    this.refreshCursorPreview();
   }
 
   /** Color-blind-safe traffic cue: word + shape-coded bar glyph (never color
@@ -395,7 +347,7 @@ class GameApp {
       }
       if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
       this.captureUndo(this.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[this.tool.kind].name}`);
-      if (this.tool.type === "bulldoze") this.bulldozePicked(picked);
+      if (this.tool.type === "bulldoze") this.build.bulldozePicked(picked);
       else if (this.tool.type === "build") {
         // Touch taps land here for every simple placement, including the
         // stairway/escalator flight (classifyDown routes them through the
@@ -412,7 +364,7 @@ class GameApp {
         this.captureUndo(this.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[this.tool.kind].name}`);
       }
       if (this.tool.type === "bulldoze") {
-        this.bulldozePicked(picked);
+        this.build.bulldozePicked(picked);
       } else if (this.tool.type === "build") {
         // Simple placements (strip paint, two-floor flight, room) happen on
         // the press; a drag-sized shaft instead anchors here and sizes with
@@ -425,7 +377,7 @@ class GameApp {
 
     this.engine.onActionMove = (tile, floor, picked) => {
       if (this.tool.type === "bulldoze") {
-        this.bulldozePicked(picked, true); // drag: blocked tiles fail silently
+        this.build.bulldozePicked(picked, true); // drag: blocked tiles fail silently
         return;
       }
       if (this.tool.type !== "build") return;
@@ -438,12 +390,12 @@ class GameApp {
         this.engine.transportPreview = { kind, x, bottom, top, valid };
         this.engine.preview = null;
       } else if (kind === "floor" || kind === "lobby") {
-        this.paintFloorRun(kind, tile, floor);
+        this.build.paintFloorRun(kind, tile, floor);
       }
     };
 
     this.engine.onActionUp = () => {
-      this.paint = null;
+      this.build.clearPaint();
       // Only drag-sized transports (elevators) commit on release. Stairs and
       // escalators already placed on the DOWN event, and their hover ghost
       // also lives in transportPreview — treating it as a drag commit here
@@ -453,7 +405,7 @@ class GameApp {
         if (tp) {
           // The helper explains failures (invalid spot, not enough money)
           // instead of failing silently.
-          this.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
+          this.build.tryBuildTransport(tp.kind, tp.x, tp.bottom, tp.top);
           this.engine.transportPreview = null;
         } else if (this.transportStart) {
           // Pressed without dragging — teach the drag-to-size gesture.
@@ -470,7 +422,7 @@ class GameApp {
       } else {
         this.engine.preview = null;
         this.engine.transportPreview = null;
-        if (this.tool.type === "inspect") this.inspectPicked(picked);
+        if (this.tool.type === "inspect") this.inspector.inspectPicked(picked);
       }
     };
 
@@ -478,9 +430,9 @@ class GameApp {
     this.engine.onSecondary = (picked) => this.selectPicked(picked);
     // In-world extend arrows on the selected elevator: drag an end to grow or
     // shrink the shaft floor-by-floor.
-    this.engine.onExtendTo = (end, target) => this.extendSelectedTo(end, target);
+    this.engine.onExtendTo = (end, target) => this.editor.extendSelectedTo(end, target);
     this.engine.onExtendEnd = () => {
-      this.extendHwm = null;
+      this.editor.endExtend();
       this.commitUndo();
     };
     // Suppress the browser context menu so right-click is ours to use.
@@ -508,7 +460,7 @@ class GameApp {
     // The GPU dropped the WebGL context (mobile browsers reset it under memory
     // pressure / after backgrounding). Recover for the player instead of
     // Excalibur's dead-end "please refresh the page" card.
-    this.engine.onContextLost = () => this.recoverFromContextLoss();
+    this.engine.onContextLost = () => this.saveLoad.recoverFromContextLoss();
   }
 
   private bindKeys(): void {
@@ -559,22 +511,24 @@ class GameApp {
       // committed with Enter, bulldozed with Delete/X — full mouse-free play.
       const step = e.shiftKey ? 10 : 1;
       switch (e.key) {
-        case "ArrowLeft": case "a": case "A": this.moveCursor(-step, 0); break;
-        case "ArrowRight": case "d": case "D": this.moveCursor(step, 0); break;
-        case "ArrowUp": case "w": case "W": this.moveCursor(0, step); break;
-        case "ArrowDown": case "s": case "S": this.moveCursor(0, -step); break;
-        case "Enter": case " ": case "Spacebar": this.commitCursor(); break;
-        case "Delete": case "Backspace": case "x": case "X": this.bulldozeCursor(); break;
+        case "ArrowLeft": case "a": case "A": this.keyboard.moveCursor(-step, 0); break;
+        case "ArrowRight": case "d": case "D": this.keyboard.moveCursor(step, 0); break;
+        case "ArrowUp": case "w": case "W": this.keyboard.moveCursor(0, step); break;
+        case "ArrowDown": case "s": case "S": this.keyboard.moveCursor(0, -step); break;
+        case "Enter": case " ": case "Spacebar": this.keyboard.commitCursor(); break;
+        case "Delete": case "Backspace": case "x": case "X": this.keyboard.bulldozeCursor(); break;
         case "+": case "=": this.engine.zoomBy(1.15); return;
         case "-": case "_": this.engine.zoomBy(1 / 1.15); return;
-        case "c": case "C":
-          if (this.kbCursor) this.engine.ensureVisible(this.kbCursor.tile, this.kbCursor.floor);
+        case "c": case "C": {
+          const cur = this.keyboard.cursor();
+          if (cur) this.engine.ensureVisible(cur.tile, cur.floor);
           else this.engine.center();
           return;
+        }
         case "Escape":
-          this.kbAnchor = null;
+          this.keyboard.resetAnchor();
           this.engine.transportPreview = null;
-          this.refreshCursorPreview();
+          this.keyboard.refreshCursorPreview();
           this.announce("Cancelled");
           return;
         default:
@@ -594,16 +548,16 @@ class GameApp {
    *  gesture belongs to the caller. */
   private placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
     if (kind === "floor" || kind === "lobby") {
-      const r = this.paintBrush(kind, tile, floor);
+      const r = this.build.paintBrush(kind, tile, floor);
       return { what: "paint", ok: r.placed > 0, reason: r.reason };
     }
     if (isFixedSpanTransport(kind)) {
-      const r = this.tryBuildTransport(kind, snapX(kind, tile), floor, floor + 1);
+      const r = this.build.tryBuildTransport(kind, snapX(kind, tile), floor, floor + 1);
       return { what: "flight", ok: r.ok, reason: r.reason };
     }
     if (this.isTransportTool()) return null;
     const before = this.sim.tower.units.length;
-    this.tryBuild(kind, floor, snapX(kind, tile));
+    this.build.tryBuild(kind, floor, snapX(kind, tile));
     return { what: "room", ok: this.sim.tower.units.length > before };
   }
 
@@ -774,7 +728,7 @@ class GameApp {
     // An explicit tap/click is fresh intent: re-arm the hover inspector even
     // for a facility whose card was ✕-dismissed (matters on touch, where no
     // hover stream exists between taps to spend the latch).
-    this.inspectDismissed = null;
+    this.inspector.resetLatch();
     this.selected = { type: p.type, id: p.id };
     this.refreshEditor();
   }
@@ -828,423 +782,6 @@ class GameApp {
     }
   }
 
-  /** Open the per-floor stop-configuration dialog for the selected elevator. */
-  private openStopsDialog(): void {
-    if (!this.selected || this.selected.type !== "transport") return;
-    const t = this.selectedTransport();
-    if (!t) return;
-    const lobbies = new Set(this.sim.tower.lobbyFloors());
-    const floors: { floor: number; stop: boolean; lobby: boolean }[] = [];
-    for (let fl = t.top; fl >= t.bottom; fl--) {
-      floors.push({ floor: fl, stop: this.sim.tower.stopsAt(t, fl), lobby: lobbies.has(fl) });
-    }
-    this.ui.showStopsDialog(FACILITIES[t.kind].name, floors, (floor, stop) => {
-      // Each toggle is its own undo step (the surrounding handleEditAction
-      // commit already fired before the dialog mutated anything).
-      this.captureUndo("Elevator stops");
-      this.sim.tower.setStop(t.id, floor, stop);
-      this.commitUndo();
-      this.refreshEditor();
-    });
-  }
-
-  /** Drag-extend the selected shaft so `end` reaches `targetFloor`. Charges
-   *  $5,000 per floor, but only for floors beyond the drag's high-water mark
-   *  (so dragging out and back doesn't bill twice). Shrinking is free. */
-  private extendSelectedTo(end: "up" | "down", targetFloor: number): void {
-    if (!this.selected || this.selected.type !== "transport") return;
-    const t = this.selectedTransport();
-    if (!t || !isElevatorKind(t.kind)) return; // only lifts have extend handles / billing
-    if (!this.extendHwm || this.extendHwm.id !== t.id) {
-      this.extendHwm = { id: t.id, top: t.top, bottom: t.bottom };
-      this.captureUndo("Extend");
-    }
-    // Bill only floors past the gesture's high-water mark, clamped to what the
-    // player can afford — a fast drag grows as far as the budget allows (matching
-    // a slow drag), and a broke drag simply stops growing (no per-frame toast).
-    const { nb, nt, added } = extendBill(
-      { bottom: t.bottom, top: t.top },
-      this.extendHwm,
-      end,
-      targetFloor,
-      this.sim.money,
-      ECON.transportFloorCost,
-    );
-    if (nb === t.bottom && nt === t.top) return; // nothing changed this step
-
-    const res = this.sim.tower.resizeTransport(t.id, nb, nt);
-    if (res.ok) {
-      this.sim.money -= added * ECON.transportFloorCost;
-      this.extendHwm.top = Math.max(this.extendHwm.top, nt);
-      this.extendHwm.bottom = Math.min(this.extendHwm.bottom, nb);
-      this.audio.sfx(added > 0 ? "build" : "click");
-      this.refreshEditor();
-    }
-    // A blocked step (cap reached, no structure, another shaft in the way) is
-    // silent so a drag doesn't spam toasts; the shaft simply stops growing.
-  }
-
-  /** Open the batch-pricing dialog pre-scoped to `kind`, wired to the engine's
-   *  pure preview + mutating apply (what you preview is what commits). */
-  private openBatchPricing(kind: FacilityKind): void {
-    const band = rentConfig(kind);
-    if (!band) return;
-    this.ui.showBatchPricingDialog(
-      { kind, kindLabel: FACILITIES[kind].name, band },
-      {
-        preview: (target, opts) => this.sim.previewRentBatch(kind, target, opts)!,
-        apply: (target, opts) => {
-          // Capture BEFORE the mutation (the dialog applies asynchronously, so the
-          // synchronous captureUndo in handleEditAction is stale) → an undoable batch.
-          this.captureUndo("Set prices");
-          const r = this.sim.applyRentBatch(kind, target, opts)!;
-          this.commitUndo();
-          return r;
-        },
-        onApplied: (summary) => {
-          this.audio.sfx("build");
-          this.ui.toast(summary, "good");
-          this.announce(summary);
-          this.refreshEditor();
-        },
-      },
-    );
-  }
-
-  private handleEditAction(action: string, root: HTMLElement): void {
-    if (!this.selected) return;
-    const UNDO_LABELS: Record<string, string> = {
-      sell: "Sell",
-      rename: "Rename",
-      rentUp: "Rent change",
-      rentDown: "Rent change",
-      addcar: "Elevator cars",
-      removecar: "Elevator cars",
-      stops: "Elevator stops",
-      express: "Elevator stops",
-      allstops: "Elevator stops",
-      extendUp: "Extend",
-      extendDown: "Extend",
-      filmPolicy: "Film policy",
-    };
-    this.captureUndo(UNDO_LABELS[action] ?? "Edit");
-    if (this.selected.type === "unit") {
-      const u = this.selectedUnit();
-      if (!u) return this.clearSelection();
-      if (action === "sell") {
-        if (!this.tryRemoveUnit(u, "sell")) return;
-        this.audio.sfx("sell");
-        this.commitUndo();
-        return this.clearSelection();
-      }
-      if (action === "rename") {
-        const input = root.querySelector<HTMLInputElement>("#ed-name");
-        if (input) u.label = input.value.trim() || FACILITIES[u.kind].name;
-        this.audio.sfx("click");
-        this.refreshEditor();
-      } else if (action === "rentUp" || action === "rentDown") {
-        if (this.sim.adjustRent(u.id, action === "rentUp" ? 1 : -1) !== null) {
-          this.audio.sfx("click");
-          this.refreshEditor();
-        }
-      } else if (action === "filmPolicy") {
-        const order = ["auto", "feature", "blockbuster"] as const;
-        const next = order[(order.indexOf(u.filmPolicy ?? "auto") + 1) % order.length];
-        this.sim.setFilmPolicy(u.id, next);
-        this.audio.sfx("click");
-        this.refreshEditor();
-      } else if (action === "batchKind") {
-        this.openBatchPricing(u.kind);
-      }
-    } else {
-      const t = this.selectedTransport();
-      if (!t) return this.clearSelection();
-      if (action === "sell") {
-        this.removeTransportWithRefund(t);
-        this.audio.sfx("sell");
-        this.commitUndo();
-        return this.clearSelection();
-      }
-      if (action === "addcar") {
-        // Cap check first: at max cars the button is disabled anyway, but a
-        // money toast here would blame the wrong constraint.
-        if (t.cars >= maxCarsFor(t.kind)) return;
-        if (!this.canAfford(ECON.addCarCost)) return;
-        if (this.sim.tower.setCars(t.id, t.cars + 1)) this.sim.money -= ECON.addCarCost;
-        this.audio.sfx("build");
-        this.refreshEditor();
-      } else if (action === "removecar") {
-        // A removed car is a sale, so it pays out like one (half back).
-        if (this.sim.tower.setCars(t.id, t.cars - 1)) this.sim.money += carResaleRefund();
-        this.audio.sfx("click");
-        this.refreshEditor();
-      } else if (action === "stops") {
-        this.openStopsDialog();
-      } else if (action === "express") {
-        this.sim.tower.setExpressStops(t.id);
-        this.audio.sfx("click");
-        this.refreshEditor();
-      } else if (action === "allstops") {
-        this.sim.tower.clearStops(t.id);
-        this.audio.sfx("click");
-        this.refreshEditor();
-      } else if (action === "extendUp" || action === "extendDown") {
-        const nb = action === "extendDown" ? t.bottom - 1 : t.bottom;
-        const nt = action === "extendUp" ? t.top + 1 : t.top;
-        const cost = ECON.transportFloorCost;
-        if (!this.canAfford(cost)) return;
-        const res = this.sim.tower.resizeTransport(t.id, nb, nt);
-        if (res.ok) {
-          this.sim.money -= cost;
-          this.audio.sfx("build");
-        } else if (res.reason) {
-          this.audio.sfx("error");
-          this.ui.toast(res.reason, "bad");
-        }
-        this.refreshEditor();
-      }
-    }
-    this.commitUndo();
-  }
-
-  // ---- Actions -----------------------------------------------------------
-
-  private tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
-    const res = this.sim.build(kind, floor, x);
-    if (res.ok) {
-      if (!quiet) this.audio.sfx("build");
-    } else if (!quiet && res.reason) {
-      this.audio.sfx("error");
-      this.ui.toast(res.reason, "bad");
-    }
-  }
-
-  /** Place a transport span with the usual build/error feedback. Prefers the
-   *  build's own failure reason (e.g. "Not enough money.") and falls back to
-   *  the placement diagnosis when the build didn't say why. Returns the
-   *  outcome (with the shown reason) for callers that also announce it. */
-  private tryBuildTransport(
-    kind: FacilityKind,
-    x: number,
-    bottom: number,
-    top: number,
-  ): { ok: boolean; reason: string } {
-    const res = this.sim.buildTransport(kind, x, bottom, top);
-    this.audio.sfx(res.ok ? "build" : "error");
-    const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
-    if (!res.ok) this.ui.toast(reason, "bad");
-    return { ok: res.ok, reason };
-  }
-
-  /** Human-readable reason an elevator/stairs span can't be placed. */
-  private transportReason(kind: FacilityKind, x: number, bottom: number, top: number): string {
-    if (!this.sim.isUnlocked(kind)) {
-      return `${FACILITIES[kind].name} unlocks at ${FACILITIES[kind].minStar}★.`;
-    }
-    const v = this.sim.tower.validateTransport(kind, x, bottom, top);
-    return v.reason ?? "A shaft can't go here — leave a clear column through built floors.";
-  }
-
-  /** Lay a brush strip; returns how many tiles were actually placed and, when
-   *  zero, why. Zero is always the not-placed path for callers — the reason
-   *  just distinguishes a harmless no-op (the strip already carries this
-   *  kind: "already built here") from a real refusal (no support, no money),
-   *  which carries the engine's reason. */
-  private paintBrush(kind: FacilityKind, tile: number, floor: number): { placed: number; reason?: string } {
-    const tiles = brushTiles(tile);
-    let placed = 0;
-    let reason: string | undefined;
-    let progress = true;
-    while (progress) {
-      progress = false;
-      for (const tx of tiles) {
-        // Skip tiles already carrying this kind — but let the lobby brush
-        // upgrade plain floor in place (the sky-lobby conversion).
-        const existing = this.sim.tower.structureKindAt(floor, tx);
-        if (existing === kind || (existing !== undefined && kind !== "lobby")) continue;
-        const r = this.sim.build(kind, floor, tx);
-        if (r.ok) {
-          placed++;
-          progress = true;
-        } else {
-          reason = r.reason;
-        }
-      }
-    }
-    this.paint = { tile, floor };
-    if (placed === 0 && tiles.every((tx) => this.sim.tower.structureKindAt(floor, tx) === kind)) {
-      return { placed, reason: `${FACILITIES[kind].name} already built here` };
-    }
-    return { placed, reason };
-  }
-
-  /**
-   * Paint a continuous floor/lobby run as the pointer drags, filling every cell
-   * between the last painted tile and this one — so dragging lays one long floor
-   * (as in the original) instead of scattered slabs when the drag moves fast.
-   * Cells are built outward from the anchor so each is adjacent to existing
-   * structure; midair cells simply fail to place, exactly as you'd expect.
-   */
-  private paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
-    if (!this.paint || this.paint.floor !== floor) {
-      this.tryBuild(kind, floor, clampTile(tile), true);
-      this.paint = { tile, floor };
-      return;
-    }
-    for (const x of dragRunTiles(this.paint.tile, tile)) {
-      this.tryBuild(kind, floor, x, true);
-    }
-    this.paint = { tile, floor };
-  }
-
-  /**
-   * Shared player-removal gauntlet: burning and load-bearing units refuse —
-   * with an error toast unless `quiet` (drag steps stay silent, like build
-   * drags). Removes with the usual refund and returns true on success.
-   */
-  private tryRemoveUnit(u: Unit, verb: "sell" | "bulldoze", quiet = false): boolean {
-    const blocked =
-      u.state === "fire"
-        ? `You can't ${verb} a burning unit — call fire rescue or let it burn out.`
-        : this.sim.tower.removalReason(u.id);
-    if (blocked) {
-      if (!quiet) {
-        this.audio.sfx("error");
-        this.ui.toast(blocked, "bad");
-      }
-      return false;
-    }
-    this.sim.tower.removeUnit(u.id);
-    // A gutted shell has no salvage value; everything else refunds half.
-    this.sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
-    return true;
-  }
-
-  /** Tear out a shaft and pay its resale — the ONE refund path shared by the
-   *  editor's Sell and the bulldozer, so the payout can't drift. */
-  private removeTransportWithRefund(t: Transport): void {
-    this.sim.tower.removeTransport(t.id);
-    this.sim.money += resaleRefund(t.kind);
-  }
-
-  /** Charge guard for editor actions: false (with error sfx + toast) if the
-   *  player can't pay. */
-  private canAfford(cost: number): boolean {
-    if (this.sim.money >= cost) return true;
-    this.audio.sfx("error");
-    this.ui.toast("Not enough money.", "bad");
-    return false;
-  }
-
-  /** Bulldoze whatever Excalibur reported under the pointer, with a refund.
-   *  `quiet` suppresses blocked-removal feedback on the drag path, so sweeping
-   *  across load-bearing floors doesn't machine-gun toasts and error sfx. */
-  private bulldozePicked(p: Picked | null, quiet = false): void {
-    if (!p) return;
-    if (p.type === "unit") {
-      const u = this.sim.tower.units.find((x) => x.id === p.id);
-      if (!u) return;
-      if (!this.tryRemoveUnit(u, "bulldoze", quiet)) return;
-    } else {
-      const t = this.sim.tower.transports.find((x) => x.id === p.id);
-      if (!t) return;
-      this.removeTransportWithRefund(t);
-    }
-    this.audio.sfx("sell");
-    if (this.selected && this.selected.id === p.id) this.clearSelection();
-  }
-
-  private inspectPicked(p: Picked | null): void {
-    if (!p || p.kind === "floor" || p.kind === "lobby") {
-      // Hide, but keep any ✕-dismissal latch: a transient empty/floor pick
-      // (pointer jitter crossing a gap) must not re-arm the card the user
-      // just closed. The latch is spent only by picking a different facility
-      // or by an explicit tap/click (selectPicked).
-      this.hideInspector();
-      return;
-    }
-    if (this.inspectDismissed && this.inspectDismissed.type === p.type && this.inspectDismissed.id === p.id) {
-      return; // ✕-dismissed and only hover picks since — stay closed
-    }
-    this.inspectDismissed = null;
-    if (p.type === "unit") {
-      const u = this.sim.tower.units.find((x) => x.id === p.id);
-      if (!u) {
-        this.hideInspector();
-        return;
-      }
-      this.inspectAnchor = { x: u.x + u.width, floor: u.floor + facilityFloors(u.kind) - 1 };
-      this.inspectTarget = { type: p.type, id: p.id };
-      const f = FACILITIES[u.kind];
-      // Access — the whole truth, not just "served": a floor can be connected yet
-      // sit 3+ rides from the lobby, in which case no commuter ever comes. Only
-      // shown for units that actually draw commuters/visitors (tenants + venues);
-      // parking/service work via ramp-chaining/coverage, not passenger trips, so
-      // an access warning on them would be a false alarm.
-      const needsAccess = f.population > 0 || ECON.dailyTrafficIncome[u.kind] !== undefined;
-      const served = this.sim.tower.isFloorServed(u.floor);
-      const access = !needsAccess
-        ? ""
-        : !served
-          ? `<div style="color:var(--bad)">Access: not connected — no elevator or stair reaches this floor.</div>`
-          : this.sim.floorReachable(u.floor)
-            ? `<div style="color:var(--good)">Access: reachable (≤2 rides from the lobby).</div>`
-            : `<div style="color:var(--bad)">Access: too far — 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`;
-      // Silent rule: hotel guests stop counting toward the star rating at 3★.
-      const hotel = isHotelKind(u.kind)
-        ? this.sim.hotelsCountTowardRating()
-          ? `<div style="color:var(--good)">Counts toward next star: yes.</div>`
-          : `<div style="color:var(--bad)">Counts toward stars: no — hotel guests stop counting at 3★ (they still earn income).</div>`
-        : "";
-      // Silent rule: a parking space only works when it chains to a ramp. Skip
-      // the verdict while it's still building (or on fire) — "Status" covers that.
-      const parking =
-        u.kind === "parking" && isOperational(u)
-          ? this.sim.tower.functionalParkingSet().has(u.id)
-            ? `<div style="color:var(--good)">Ramp access: connected.</div>`
-            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`
-          : "";
-      this.ui.showInspector(
-        `<h4 class="win-title">${f.name}</h4>` +
-          `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
-          `<div>Status: ${u.state}</div>` +
-          (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
-          access +
-          hotel +
-          parking +
-          `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
-      );
-    } else {
-      const t = this.sim.tower.transports.find((x) => x.id === p.id);
-      if (!t) {
-        this.hideInspector();
-        return;
-      }
-      this.inspectAnchor = { x: t.x + t.width, floor: t.top };
-      this.inspectTarget = { type: p.type, id: p.id };
-      const f = FACILITIES[t.kind];
-      this.ui.showInspector(
-        `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
-          (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : ""),
-      );
-    }
-  }
-
-  /** Hide the inspector card, keeping any ✕-dismissal latch. */
-  private hideInspector(): void {
-    this.inspectAnchor = null;
-    this.inspectTarget = null;
-    this.ui.showInspector(null);
-  }
-
-  /** Hide the inspector and drop the ✕-dismissal latch too — for hard resets
-   *  (new/loaded tower, where a recycled facility id must not stay muted) and
-   *  for explicit taps, which are fresh intent. */
-  private clearInspector(): void {
-    this.inspectDismissed = null;
-    this.hideInspector();
-  }
-
   // ---- Save / load / new --------------------------------------------------
 
   /** Swap in a freshly loaded/created simulation and point the engine at it. */
@@ -1254,7 +791,7 @@ class GameApp {
     // Facility ids restart in a fresh tower — a stale ✕-latch (or anchor)
     // from the old tower would silently mute the inspector on whichever new
     // facility happens to reuse the id.
-    this.clearInspector();
+    this.inspector.clear();
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
@@ -1286,109 +823,11 @@ class GameApp {
     this.history.redo();
   }
 
-  private save(silent = false): void {
-    SaveGame.save(this.sim);
-    if (!silent) this.ui.toast("Tower saved.", "good");
-  }
-
-  /**
-   * Called by the PWA layer the instant a new version is ready, just before it
-   * reloads onto the new assets. Flush the tower to the autosave slot so the
-   * imminent reload can't cost the player any progress, and tell them what's
-   * happening through the existing toast rail.
-   */
+  /** Called by the PWA layer the instant a new version is ready (wired up in
+   *  the bootstrap below) — the SaveLoad controller flushes the tower to the
+   *  autosave slot before the imminent reload. */
   onUpdateReady(): void {
-    this.save(true);
-    this.ui.toast("New version ready — saved your tower, updating…", "info");
-  }
-
-  /**
-   * The WebGL context is gone and Excalibur can't rebuild its GPU resources in
-   * place, so recovery is the same as a manual refresh: flush the tower to the
-   * autosave slot, then reload onto a fresh context — automatically, so the
-   * player never sees a dead screen. Two guards keep this safe:
-   * - a sessionStorage timestamp stops a GPU that dies on every boot from
-   *   reload-looping (second loss within 90s falls back to a manual card), and
-   * - a hidden tab defers the reload until it's visible again, so we don't
-   *   re-boot the renderer in the background just to have the GPU reap it anew.
-   */
-  private recoverFromContextLoss(): void {
-    // Same guard as the autosave timer: never persist the throwaway boot sim
-    // while the first-run splash is still up.
-    if (!document.getElementById("splash")) this.save(true);
-
-    const KEY = "vc-gl-lost-reload";
-    let lastReload = 0;
-    try {
-      lastReload = Number(sessionStorage.getItem(KEY)) || 0;
-    } catch {
-      /* storage may be unavailable; treat as first loss */
-    }
-    if (Date.now() - lastReload < 90_000) {
-      // Auto-reload didn't stick — hand control back to the player.
-      showBootMessage(
-        "The graphics driver crashed twice in a row.<br>Your tower is saved — close other tabs or apps and try again.",
-        true,
-      );
-      return;
-    }
-
-    const reload = () => {
-      try {
-        sessionStorage.setItem(KEY, String(Date.now()));
-      } catch {
-        /* best effort */
-      }
-      location.reload();
-    };
-    if (document.visibilityState === "hidden") {
-      document.addEventListener("visibilitychange", function onVis() {
-        if (document.visibilityState === "visible") {
-          document.removeEventListener("visibilitychange", onVis);
-          reload();
-        }
-      });
-    } else {
-      reload();
-    }
-  }
-  private load(): void {
-    const loaded = SaveGame.load();
-    if (loaded) {
-      this.adoptSim(loaded);
-      this.ui.toast("Tower loaded.", "good");
-    } else {
-      this.ui.toast("No saved tower found.", "bad");
-    }
-  }
-  private importGame(json: string): void {
-    try {
-      this.adoptSim(SaveGame.import(json));
-      this.ui.toast("Tower imported.", "good");
-    } catch (err) {
-      this.ui.toast("Import failed: " + (err as Error).message, "bad");
-    }
-  }
-
-  private importLegacy(buffer: ArrayBuffer, filename: string): void {
-    try {
-      const data = parseTWR(buffer);
-      this.adoptSim(Simulation.deserialize(data));
-      this.ui.toast("Imported original SimTower save.", "good");
-    } catch (err) {
-      // Expected today: the .TWR decoder is a planned v2 feature.
-      this.ui.toast((err as Error).message, "info");
-      void filename;
-    }
-  }
-  private newGame(): void {
-    this.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff));
-    this.ui.toast("New tower founded. Good luck!", "good");
-    // Auto-arm onboarding only for a genuine first-timer. A returning player (a
-    // save exists) is treated as already onboarded even if the localStorage flag
-    // was cleared, so they're never re-onboarded unexpectedly (Replay via Help
-    // still re-arms explicitly).
-    if (shouldArm(true) && !SaveGame.hasSave()) this.onboarding.arm(this.sim);
+    this.saveLoad.onUpdateReady();
   }
 }
 
