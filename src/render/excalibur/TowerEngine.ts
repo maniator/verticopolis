@@ -207,14 +207,12 @@ export class TowerEngine {
    *  floor that carries parking, ping-ponging along that floor's parking run. */
   private garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   private walkers: Walker[] = [];
-  /** Garage/waste display fractions (parking-in-use, recycling-fill), cached and
-   *  recomputed only on the hour or when the layout changes — each is a
-   *  flood-fill / full-unit scan the sim documents as a once-per-sync read, so
-   *  they must never run per frame (tick + updateMotion both read the cache). */
+  /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
+   *  once per syncScene — reusing the parking flood-fill that sync already does
+   *  for the dead-bit — so they're exactly as fresh as the sprites that consume
+   *  them and never run on the per-frame path (updateMotion reads them too). */
   private displayParkingUse = 0;
   private displayRecycleFill = 0;
-  private displayHour = -1;
-  private displayRev = -1;
   /** Per-floor live occupancy in 0..1 (people on the floor, capped), so corridor
    *  loiterers only appear where tenants actually are. Cached and recomputed on
    *  the hour or when the layout changes — not scanned every frame. */
@@ -495,14 +493,10 @@ export class TowerEngine {
     this.d.anim = this.animClock;
     this.d.hour = c.hour;
     this.d.lit = c.isNight() || c.isEvening();
-    // Live garage/waste display state, read by the parking & recycling sprites
-    // when their canvases (re-)bake. Their room signatures carry hour-bucketed
-    // copies, so a change re-bakes them on the next hourly syncScene — and the
-    // underlying flood-fill/scans run only when the hour or layout changes, not
-    // per frame (see refreshDisplayState).
-    this.refreshDisplayState();
-    this.d.parkingUse = this.displayParkingUse;
-    this.d.recycleFill = this.displayRecycleFill;
+    // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
+    // refreshed inside syncScene — the same moment the sprites that read them
+    // re-bake — so they're never staler than the sprite, and the flood-fill /
+    // scans stay off this per-frame path.
     // The crane repaints while its inputs move: the decorative clock (trolley,
     // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
     if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
@@ -1033,6 +1027,13 @@ export class TowerEngine {
     // re-bake alongside the existing state/lighting/hour bits — it adds no
     // per-frame work of its own.
     const parkingOK = tower.functionalParkingSet();
+    // Garage/waste display fractions, refreshed here (not per frame) and reusing
+    // the flood-fill just done — so they're exactly as fresh as the sprite
+    // re-bake below and the garage-car motion visibility that reads them.
+    this.displayParkingUse = this.sim.parkingUsage(parkingOK.size);
+    this.displayRecycleFill = this.sim.recyclingFill();
+    this.d.parkingUse = this.displayParkingUse;
+    this.d.recycleFill = this.displayRecycleFill;
     const seenS = new Set<number>();
     const seenR = new Set<number>();
     for (const u of tower.units) {
@@ -1531,21 +1532,6 @@ export class TowerEngine {
       floor,
       perFloor,
     });
-  }
-
-  /** Recompute the garage/waste display fractions only when the hour or layout
-   *  changes. parkingUsage() runs a parking flood-fill and full-unit scans and
-   *  recyclingFill() scans the unit list; both are sim-documented once-per-sync
-   *  reads, so this guard keeps them off the per-frame path (the sprite sigs
-   *  bucket to the hour anyway, so nothing visible is lost). */
-  private refreshDisplayState(): void {
-    const hour = this.sim.clock.hour;
-    const rev = this.sim.tower.revision;
-    if (hour === this.displayHour && rev === this.displayRev) return;
-    this.displayHour = hour;
-    this.displayRev = rev;
-    this.displayParkingUse = this.sim.parkingUsage();
-    this.displayRecycleFill = this.sim.recyclingFill();
   }
 
   /** Refresh the per-floor occupancy map (0..1) when the hour or layout changes,

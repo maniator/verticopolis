@@ -901,8 +901,10 @@ export class Simulation implements SimContext {
   private officeParkingShort(): boolean {
     if (this.star < 3) return false;
     const d = this.parkingDemand();
-    // Only ramp-chained spaces count (canon).
-    const forOffices = this.tower.functionalParkingSpots() - d.suites;
+    // Only ramp-chained spaces count (canon), and suites reserve theirs first —
+    // clamp at 0 so a suite-heavy lot leaves offices "0 spaces", never a
+    // negative that would read as short even with no office workers (officePop 0).
+    const forOffices = Math.max(0, this.tower.functionalParkingSpots() - d.suites);
     return forOffices * PARKING_WORKERS_PER_SPACE < d.officePop;
   }
 
@@ -913,8 +915,7 @@ export class Simulation implements SimContext {
    * cars stand overnight. Dead (unchained) spaces never show cars — a car
    * couldn't have gotten there.
    */
-  parkingUsage(): number {
-    const spots = this.tower.functionalParkingSpots();
+  parkingUsage(spots: number = this.tower.functionalParkingSpots()): number {
     if (spots === 0) return 0;
     const h = this.clock.hour;
     const d = this.parkingDemand();
