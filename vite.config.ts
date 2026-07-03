@@ -95,8 +95,22 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      include: ["src/engine/**/*.ts", "src/storage/**/*.ts"],
-      exclude: ["**/*.d.ts", "**/*.config.*", "**/types.ts"],
+      // Measure the whole app, not just the well-tested engine — a report
+      // scoped to the strong layers overstates coverage and hides the
+      // untested UI shell. Only tooling entry points are excluded: the
+      // gallery/preview/excalibur pages and the PWA bootstrap are dev/build
+      // plumbing, not game logic.
+      include: ["src/**/*.ts"],
+      exclude: [
+        "**/*.d.ts",
+        "**/*.config.*",
+        "**/types.ts",
+        "src/tests/**",
+        "src/gallery.ts",
+        "src/preview.ts",
+        "src/excalibur-main.ts",
+        "src/pwa.ts",
+      ],
     },
   },
 });
