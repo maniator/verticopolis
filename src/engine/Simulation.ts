@@ -569,15 +569,17 @@ export class Simulation implements SimContext {
         // congestionAt ≈ load/capacity; ~1 is at capacity. Map so a comfortable
         // floor reads green and a jammed one saturates red.
         severity = Math.max(0, Math.min(1, this.congestionAt(floor) / 1.2));
-      } else {
+      } else if (mode === "occupancy") {
         const a = acc.get(floor);
         if (!a || a.total === 0) continue; // no tenancy here → don't tint
-        severity =
-          mode === "occupancy"
-            ? 1 - a.occupied / a.total // vacant share
-            : a.present > 0
-              ? 1 - a.satSum / a.present // average unhappiness
-              : 1; // leased but nobody present reads as a problem
+        severity = 1 - a.occupied / a.total; // vacant share
+      } else {
+        // satisfaction: only judge floors that actually have tenants present
+        // right now — an empty floor has no happiness signal (and its vacancy
+        // is already the occupancy map's job), so leave it untinted.
+        const a = acc.get(floor);
+        if (!a || a.present === 0) continue;
+        severity = 1 - a.satSum / a.present; // average unhappiness
       }
       out.set(floor, { severity, minX: e.min, maxX: e.max });
     }

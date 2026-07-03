@@ -65,4 +65,16 @@ describe("floorHeatmap (stats overlay data)", () => {
     expect(sim.floorHeatmap("occupancy").has(1)).toBe(false); // no tenancy → untinted
     expect(sim.floorHeatmap("congestion").has(1)).toBe(true); // congestion tints built floors
   });
+
+  it("satisfaction skips a leased-but-empty floor (no one present to judge), occupancy flags it", () => {
+    const sim = Simulation.newGame(55);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.tower.place("office", 2, 0); // built, but vacant (nobody present)
+    // Occupancy sees a vacant office (red); satisfaction has no present tenant
+    // to judge, so it leaves the floor untinted rather than falsely flagging it.
+    expect(sim.floorHeatmap("occupancy").get(2)!.severity).toBe(1);
+    expect(sim.floorHeatmap("satisfaction").has(2)).toBe(false);
+  });
 });
