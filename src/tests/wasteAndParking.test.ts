@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
+import type { FacilityKind, Unit, UnitState } from "../engine/types";
 
 /** Canon waste & parking demand mechanics: the recycling centers FILL with the
  * tower's daily garbage (emptied by the morning truck), demand scales with
@@ -13,6 +14,19 @@ const C = Math.floor(W / 2);
 function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
+}
+
+/** Place a unit at a fixed spot that MUST succeed, assert it did, put it in
+ *  `state`, and return it — so a future placement-rule change fails loudly here
+ *  instead of at a later null deref. (Loops that fill a floor until it runs out
+ *  of width keep their own `if (r.ok)` guard — failure is expected there.) */
+function occupy(sim: Simulation, kind: FacilityKind, floor: number, x: number, state: UnitState): Unit {
+  const r = sim.tower.place(kind, floor, x);
+  expect(r.ok).toBe(true);
+  const u = sim.tower.units.find((uu) => uu.id === r.unitId);
+  expect(u).toBeDefined();
+  u!.state = state;
+  return u!;
 }
 
 /** A tower with `offices` occupied offices and a recycling basement row. */
@@ -85,10 +99,7 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     // 24 occupied office workers → 2 spaces; 3 suites → 3 more.
-    for (let i = 0; i < 4; i++) {
-      const r = sim.tower.place("office", 2, i * 9);
-      sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-    }
+    for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
     for (let i = 0; i < 3; i++) sim.tower.place("hotelSuite", 2, 40 + i * 12);
     const d = sim.parkingDemand();
     expect(d.officePop).toBe(4 * FACILITIES.office.population);
@@ -120,11 +131,8 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    for (let i = 0; i < 4; i++) {
-      const r = sim.tower.place("office", 2, i * 9);
-      sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-    }
-    const sr = sim.tower.place("hotelSuite", 2, 40);
+    for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
+    const suite = occupy(sim, "hotelSuite", 2, 40, "empty");
     lay(sim, "floor", 0);
     sim.tower.place("parkingRamp", 0, C);
     for (let i = 1; i <= 4; i++) sim.tower.place("parking", 0, C + i * 6);
@@ -133,11 +141,11 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     const daytime = sim.parkingUsage();
     expect(daytime).toBeGreaterThan(0);
     // Monday 23:00 with a sleeping suite guest: the suite's car stands, offices' gone.
-    sim.tower.units.find((u) => u.id === sr.unitId)!.state = "asleep";
+    suite.state = "asleep";
     sim.clock.minutes = 23 * 60;
     expect(sim.parkingUsage()).toBeGreaterThan(0);
     // Saturday noon, guest checked out: the lot is empty.
-    sim.tower.units.find((u) => u.id === sr.unitId)!.state = "empty";
+    suite.state = "empty";
     sim.clock.minutes = 5 * 1440 + 12 * 60; // Saturday
     expect(sim.parkingUsage()).toBe(0);
   });
@@ -162,8 +170,7 @@ describe("Over-capacity recycling stops flattering commerce", () => {
             placed++;
           }
         }
-      const shop = sim.tower.place("shop", 17, 0);
-      sim.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
+      occupy(sim, "shop", 17, 0, "occupied");
       lay(sim, "floor", 0);
       lay(sim, "floor", -1);
       for (let i = 0; i < centers; i++) sim.tower.place("recycling", -1, i * 20);
