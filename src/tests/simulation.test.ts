@@ -552,7 +552,7 @@ describe("Simulation time", () => {
     expect(sim.clock.day).toBe(startDay + 1);
   });
 
-  it("evicts tenants from unreachable floors", () => {
+  it("evicts tenants from unreachable floors after a notice period", () => {
     const sim = Simulation.newGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Floor 5 with an office but NO transport reaching it.
@@ -562,9 +562,37 @@ describe("Simulation time", () => {
     const office = sim.tower.units.find((u) => u.id === r.unitId)!;
     office.state = "occupied";
     office.satisfaction = 0.2;
-    // Run a day of hours; unreachable floor should bleed satisfaction.
+    // A day of hours bleeds satisfaction to zero and puts the tenant ON NOTICE
+    // (the recoverable grace window) — not gone yet, with the cause attributed.
     for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(office.state).toBe("vacating");
+    expect(office.satisfaction).toBe(0);
+    expect(office.vacateReason).toBe("access");
+    // Riding out the notice period with the floor still unreachable → they leave.
+    for (let i = 0; i < 24 * 3; i++) sim.tick(60);
     expect(office.state).toBe("empty");
+    expect(sim.log.some((e) => /A tenant left .*poor elevator access/.test(e.text))).toBe(true);
+  });
+
+  it("a tenant on notice rescinds when access is restored in time", () => {
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 1; f <= 5; f++)
+      for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
+    const r = sim.tower.place("office", 5, x0);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    office.satisfaction = 0.2;
+    // No transport yet → satisfaction craters and the tenant gives notice.
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(office.state).toBe("vacating");
+    // Connect the floor; satisfaction recovers inside the window and they stay.
+    const t = sim.buildTransport("elevatorStandard", x0 + 11, 1, 5);
+    expect(t.ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 4);
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(office.state).toBe("occupied");
+    expect(office.vacateReason).toBeUndefined();
   });
 });
 

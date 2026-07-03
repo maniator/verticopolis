@@ -1,5 +1,5 @@
 import type { SimContext } from "./SimContext";
-import { isOperational } from "./types";
+import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { RECYCLING_POP_PER_CENTER, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 
@@ -44,12 +44,13 @@ export class EconomySystem {
     );
   }
 
-  /** Quarterly office rent from occupied, reachable offices. */
+  /** Quarterly office rent from occupied, reachable offices — a tenant on
+   *  notice (`vacating`) is still in the space and keeps paying until they go. */
   collectRent(): void {
     let total = 0;
     let count = 0;
     for (const u of this.sim.tower.units) {
-      if (u.kind === "office" && u.state === "occupied" && this.sim.tower.isFloorServed(u.floor)) {
+      if (u.kind === "office" && isTenanted(u) && this.sim.tower.isFloorServed(u.floor)) {
         total += rentOf(u);
         count++;
       }

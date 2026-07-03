@@ -79,6 +79,24 @@ export function isUnitState(v: unknown): v is UnitState {
   return typeof v === "string" && UNIT_STATES.has(v);
 }
 
+/** Why a dissatisfied tenant is leaving — attributed from the dominant
+ *  satisfaction drain at the moment it bottoms out, so the notice/departure
+ *  toast names the real cause instead of always blaming "poor access". */
+export type VacateReason = "access" | "congestion" | "rent" | "noise";
+
+/** Player-facing phrase for each departure cause (toasts + inspector). */
+export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
+  access: "poor elevator access",
+  congestion: "overcrowded elevators",
+  rent: "rent set too high",
+  noise: "office noise next door",
+};
+
+/** Guard for a persisted departure cause from an untrusted save. */
+export function isVacateReason(v: unknown): v is VacateReason {
+  return v === "access" || v === "congestion" || v === "rent" || v === "noise";
+}
+
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.
  *  The single predicate every "is this room working?" check should route through
  *  so a new inert state (like `gutted`) is honored everywhere at once. */
@@ -87,9 +105,25 @@ export function isOperational(u: { state: UnitState }): boolean {
 }
 
 /** People are physically present (the canon "counts as live population" rule):
- *  working, sleeping, or mid move-in. */
+ *  working, sleeping, mid move-in, or on notice. A `vacating` tenant hasn't
+ *  actually left yet — they still live/work there through the notice period —
+ *  so they keep counting until the departure resolves. */
 export function isPresent(u: { state: UnitState }): boolean {
-  return u.state === "occupied" || u.state === "asleep" || u.state === "moving_in";
+  return (
+    u.state === "occupied" ||
+    u.state === "asleep" ||
+    u.state === "moving_in" ||
+    u.state === "vacating"
+  );
+}
+
+/** A long-term lease is in residence — either settled (`occupied`) or on
+ *  notice (`vacating`). Both pay rent, count toward population, and commute; a
+ *  vacating tenant merely carries a pending departure that a timely fix can
+ *  still rescind. The single predicate for "an office/condo that currently has
+ *  a tenant", so the grace-period state is honored everywhere at once. */
+export function isTenanted(u: { state: UnitState }): boolean {
+  return u.state === "occupied" || u.state === "vacating";
 }
 
 /** Nobody home and nothing to simulate — the per-tick presence/satisfaction
@@ -148,6 +182,12 @@ export interface Unit {
   rent?: number;
   /** Name shown when inspected (e.g. tenant company / guest). */
   label: string;
+  /** Why the current tenant gave notice — set while `state === "vacating"`, and
+   *  cleared when they either leave or rescind. Undefined on a settled unit. */
+  vacateReason?: VacateReason;
+  /** Game-clock minute at which a `vacating` tenant actually leaves unless their
+   *  satisfaction recovers first (the notice period). */
+  vacateAt?: number;
   /** Per-cinema film-booking policy. `undefined` ⇒ "auto" (the legacy 40% roll),
    *  so old saves and demo towers behave identically. */
   filmPolicy?: "auto" | "feature" | "blockbuster";

@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
-import { isOperational } from "../engine/types";
+import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { escapeHtml } from "../ui/escape";
@@ -127,15 +127,23 @@ export class InspectorController {
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
+      // A tenant on notice: spell out that they're leaving and why, so the
+      // "Status" line reads as an actionable warning rather than raw state.
+      const statusText = u.state === "vacating" ? "on notice — tenant leaving" : u.state;
+      const notice =
+        u.state === "vacating" && u.vacateReason
+          ? `<div style="color:var(--bad)">Giving notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Fix it to make them stay.</div>`
+          : "";
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
-          `<div>Status: ${u.state}</div>` +
+          `<div>Status: ${statusText}</div>` +
           (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
           access +
           hotel +
           parking +
           recycling +
+          notice +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {

@@ -1,6 +1,6 @@
 import type { SimContext } from "./SimContext";
 import type { Unit } from "./types";
-import { isOperational } from "./types";
+import { isOperational, isTenanted } from "./types";
 import { FACILITIES } from "./facilities";
 import { RNG } from "./rng";
 
@@ -306,7 +306,7 @@ export class EventSystem {
     // An active emergency rattles everyone still in the building.
     if (this.active.size > 0) {
       for (const u of this.sim.tower.units) {
-        if (u.state === "occupied" || u.state === "asleep") {
+        if (isTenanted(u) || u.state === "asleep") {
           u.satisfaction = Math.max(0, u.satisfaction - 0.05);
         }
       }

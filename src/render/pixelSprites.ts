@@ -160,6 +160,26 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
     ctx.fillStyle = "rgba(8,10,22,0.5)";
     ctx.fillRect(x, y, w, h);
   }
+  // A tenant on notice (satisfaction bottomed out) — flag it so the player can
+  // spot the at-risk lease at a glance and fix the cause before they leave.
+  if (u.state === "vacating") noticeBadge(ctx, x, y, w, h);
+}
+
+/** Amber corner ribbon marking a `vacating` (on-notice) lease. */
+function noticeBadge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {
+  const s = Math.min(12, w - 2, h - 2);
+  if (s <= 0) return;
+  ctx.fillStyle = "#E8A030";
+  ctx.beginPath();
+  ctx.moveTo(x + w - s, y);
+  ctx.lineTo(x + w, y);
+  ctx.lineTo(x + w, y + s);
+  ctx.closePath();
+  ctx.fill();
+  // A small exclamation dash inside the ribbon.
+  ctx.fillStyle = "#2A1E06";
+  ctx.fillRect(x + w - 3, y + 2, 1, Math.max(2, s - 6));
+  ctx.fillRect(x + w - 3, y + s - 3, 1, 1);
 }
 
 function vacancy(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, label = "LEASE"): void {
