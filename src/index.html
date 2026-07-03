@@ -108,7 +108,8 @@
       <div id="scrim" aria-hidden="true"></div>
     </div>
 
-    <input id="import-file" type="file" accept=".vctower,application/json,.json,.twr,.TWR" hidden />
+    <!-- accept is set by UI.openImport from the shared TOWER_FILE_EXT constant. -->
+    <input id="import-file" type="file" hidden />
     <dialog id="modal"></dialog>
 
     <script type="module" src="./main.ts"></script>

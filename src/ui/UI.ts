@@ -1,6 +1,6 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
-import type { SlotInfo } from "../storage/SaveGame";
+import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import { escapeHtml } from "./escape";
 
@@ -329,7 +329,19 @@ export class UI {
         this.cb.onShowSaves();
       }),
     );
-    this.wireActions(box, { export: () => this.cb.onExport(), import: () => this.openImport() });
+    // Close the saves dialog first: <dialog>'s top layer paints over the toast
+    // rail, so export feedback would be invisible behind the open modal — and
+    // the file picker likewise replaces this dialog rather than stacking on it.
+    this.wireActions(box, {
+      export: () => {
+        this.closeModal();
+        this.cb.onExport();
+      },
+      import: () => {
+        this.closeModal();
+        this.openImport();
+      },
+    });
   }
 
   setTowerName(name: string): void {
@@ -647,20 +659,29 @@ export class UI {
     a.href = url;
     a.download = filename;
     a.click();
-    URL.revokeObjectURL(url);
+    // Revoking in the same task can abort the download on engines that fetch
+    // the blob URL asynchronously (Safari/Firefox) — and this is the ONLY way
+    // to get a tower out now. Give the navigation a generous head start.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   /** Import goes straight to the file picker — exports are .vctower downloads
    *  now, so there is deliberately no paste-a-save textarea anymore. */
   private openImport(): void {
     const input = document.getElementById("import-file") as HTMLInputElement;
+    // Single source of truth for our own extension (TOWER_FILE_EXT); the
+    // octet-stream entry keeps .vctower selectable on pickers that filter by
+    // MIME type and drop extensions they can't map (Android). Content is
+    // validated on load either way.
+    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.json,application/json,.twr,.TWR`;
     input.value = "";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
-      // Whatever dialog launched the picker (e.g. Saved Towers) is done now.
-      this.closeModal();
       const reader = new FileReader();
+      // A file that vanishes or errors mid-read must not fail silently — the
+      // launching dialog is already gone by the time the read runs.
+      reader.onerror = () => this.toast("Couldn't read that file — please try again.", "bad");
       // Binary .TWR legacy saves are read as bytes; tower files as text.
       if (/\.twr$/i.test(file.name)) {
         reader.onload = () => this.cb.onImportLegacy(reader.result as ArrayBuffer, file.name);

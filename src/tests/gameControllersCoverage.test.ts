@@ -571,7 +571,9 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.exportGame();
     expect(f.downloads).toHaveLength(1);
     expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
-    expect(f.downloads[0].contents.startsWith("VCTOWER1\n")).toBe(true);
+    // The controller's contract is "download exactly what SaveGame.export
+    // produces" — the container format itself is pinned by storage.test.ts.
+    expect(f.downloads[0].contents).toBe(SaveGame.export(sim));
     expect(f.toasts).toEqual([{ text: "Tower exported — check your downloads.", kind: "good" }]);
   });
 

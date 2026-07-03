@@ -197,6 +197,17 @@ describe("SaveGame", () => {
     expect(() => SaveGame.import("VCTOWER1\n" + btoa("[1,2,3]"))).toThrow();
   });
 
+  it("reports a recognized-but-broken tower file as damaged, not as 'not a tower file'", () => {
+    // Truncated at a 4-char base64 boundary: atob succeeds, JSON.parse fails.
+    expect(() => SaveGame.import("VCTOWER1\n" + btoa('{"minutes":'))).toThrow(/damaged/);
+    // A flipped byte inside a multi-byte character: base64 decodes, UTF-8 doesn't.
+    expect(() => SaveGame.import("VCTOWER1\n" + btoa("\xff\xfe"))).toThrow(/damaged/);
+  });
+
+  it("tells the player to update when the file comes from a newer container version", () => {
+    expect(() => SaveGame.import("VCTOWER2\n" + btoa("{}"))).toThrow(/newer version/);
+  });
+
   it("returns null when no save exists", () => {
     expect(SaveGame.load()).toBeNull();
     expect(SaveGame.hasSave()).toBe(false);

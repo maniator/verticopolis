@@ -326,7 +326,8 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
   });
 
-  it("downloadFile clicks a temporary <a download> at a blob URL of the contents, then revokes it", () => {
+  it("downloadFile clicks a temporary <a download> at a blob URL of the contents, revoking it only later", () => {
+    vi.useFakeTimers();
     const { ui } = makeUI();
     const blobs: Blob[] = [];
     (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn((b: Blob) => {
@@ -342,28 +343,37 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload");
     expect(clicks).toEqual([{ href: "blob:vctower", download: "my-tower.vctower" }]);
     expect(blobs).toHaveLength(1);
+    // Revoking in the click's own task can abort the download on engines that
+    // resolve blob URLs asynchronously — it must be deferred, then still happen.
+    expect(revoke).not.toHaveBeenCalled();
+    vi.runAllTimers();
     expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:vctower");
+    vi.useRealTimers();
   });
 
-  it("the Import button goes straight to the file picker — no modal, no textarea", () => {
+  it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
     makeUI();
     const picker = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     document.getElementById("btn-import")!.click();
     expect(picker).toHaveBeenCalledTimes(1);
     expect(dialog().open).toBe(false);
     expect(document.querySelector("textarea")).toBeNull();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    expect(input.accept.startsWith(".vctower")).toBe(true);
   });
 
-  it("a picked tower file is read as text and routed to onImport (and any open dialog closes)", async () => {
+  it("the Saved Towers dialog closes when the picker launches, and a picked tower file routes to onImport", async () => {
     const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     ui.showSaves([]); // launch the picker from the Saved Towers dialog
     click('[data-act="import"]');
+    // The dialog's top layer would paint over any import feedback — it yields
+    // to the picker immediately rather than lingering underneath it.
+    expect(dialog().open).toBe(false);
     const input = document.getElementById("import-file") as HTMLInputElement;
     const file = new File(["VCTOWER1\npayload"], "tower.vctower");
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
-    expect(dialog().open).toBe(false); // the saves dialog is done the moment a file is picked
     await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
   });
 

@@ -123,11 +123,7 @@ export const SaveGame = {
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   export(sim: Simulation): string {
-    const payload = toBase64(JSON.stringify(sim.serialize()));
-    // Wrap the payload at 76 columns (the classic encoded-container width) so
-    // the file is friendly to editors and mail clients; import strips all
-    // whitespace before decoding.
-    return TOWER_FILE_MAGIC + "\n" + (payload.match(/.{1,76}/g) ?? []).join("\n") + "\n";
+    return TOWER_FILE_MAGIC + "\n" + toBase64(JSON.stringify(sim.serialize())) + "\n";
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
@@ -142,19 +138,29 @@ export const SaveGame = {
   /** Parse a .vctower file. Raw-JSON exports from older builds still load. */
   import(text: string): Simulation {
     const trimmed = text.trim();
-    let json = trimmed;
-    if (trimmed.startsWith(TOWER_FILE_MAGIC)) {
+    // Match the whole VCTOWER family, not just this version's magic, so a file
+    // from a newer build gets an honest "update the game" instead of falling
+    // through to the JSON path and reporting gibberish as "not a tower file".
+    const magic = /^VCTOWER(\d+)/.exec(trimmed);
+    let data: SerializedGame;
+    if (magic) {
+      if (magic[0] !== TOWER_FILE_MAGIC) {
+        throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+      }
       try {
-        json = fromBase64(trimmed.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""));
+        // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
+        data = JSON.parse(fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""))) as SerializedGame;
       } catch {
+        // Bad base64, mangled UTF-8, or truncated JSON — the container was
+        // recognized, so the file is OURS but broken. Say so.
         throw new Error("This tower file is damaged and can't be read.");
       }
-    }
-    let data: SerializedGame;
-    try {
-      data = JSON.parse(json) as SerializedGame;
-    } catch {
-      throw new Error("Not a Verticopolis tower file.");
+    } else {
+      try {
+        data = JSON.parse(trimmed) as SerializedGame;
+      } catch {
+        throw new Error("Not a Verticopolis tower file.");
+      }
     }
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
       throw new Error("Not a valid tower save file.");
@@ -178,7 +184,9 @@ function fromBase64(b64: string): string {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return new TextDecoder().decode(bytes);
+  // fatal: a flipped byte inside a multi-byte character must fail the import
+  // loudly, not silently half-load a tower with U+FFFD-mangled strings.
+  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
 }
 
 function nowMs(): number {
