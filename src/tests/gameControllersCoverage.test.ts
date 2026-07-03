@@ -30,12 +30,17 @@ function last<T>(arr: T[]): T {
 function fakes() {
   const toasts: { text: string; kind?: "info" | "good" | "bad" | "money" }[] = [];
   const sfx: string[] = [];
+  const downloads: { filename: string; contents: string }[] = [];
   return {
     toasts,
     sfx,
+    downloads,
     ui: {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
+      },
+      downloadFile: (filename: string, contents: string) => {
+        downloads.push({ filename, contents });
       },
     },
     audio: {
@@ -559,6 +564,15 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.onUpdateReady();
     expect(SaveGame.hasSave()).toBe(true);
     expect(f.toasts).toEqual([{ text: "New version ready — saved your tower, updating…", kind: "info" }]);
+  });
+
+  it("exportGame downloads a .vctower file named after the tower and toasts", () => {
+    sim.tower.towerName = "Vertic Opolis";
+    saveLoad.exportGame();
+    expect(f.downloads).toHaveLength(1);
+    expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
+    expect(f.downloads[0].contents.startsWith("VCTOWER1\n")).toBe(true);
+    expect(f.toasts).toEqual([{ text: "Tower exported — check your downloads.", kind: "good" }]);
   });
 
   it("importGame adopts a Simulation from a SaveGame.export round-trip", () => {

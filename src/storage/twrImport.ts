@@ -45,6 +45,6 @@ export function parseTWR(buffer: ArrayBuffer): SerializedGame {
   // Recognized as a plausible legacy tower — but the decoder isn't built yet.
   throw new LegacyNotYetSupported(
     "Recognized an original SimTower .TWR file. Importing classic saves is planned " +
-      "for a future update — for now, build fresh or import a Verticopolis JSON export.",
+      "for a future update — for now, build fresh or import a Verticopolis tower file.",
   );
 }

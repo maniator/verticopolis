@@ -34,6 +34,7 @@ function fakes() {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
+      downloadFile: () => {},
     },
     audio: {
       sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "click") => {

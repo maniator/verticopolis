@@ -4,7 +4,8 @@ import type { SerializedGame } from "../engine/types";
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
  * handful of named manual slots, so the player can keep multiple towers. Also
- * supports JSON export/import for sharing or backups.
+ * supports export/import of Verticopolis tower files (.vctower) for sharing
+ * or backups.
  *
  * (localStorage suffices for a single save object well under its ~5MB quota.
  * IndexedDB would only be needed for very large numbers of saves; see the
@@ -14,6 +15,18 @@ import type { SerializedGame } from "../engine/types";
 const AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
+
+/**
+ * The Verticopolis tower-file container (.vctower): a magic first line naming
+ * the format and its version, then the base64-encoded save payload. The file
+ * is deliberately NOT raw JSON — exports travel as downloads and come back
+ * through the file picker, never through a copy-paste textarea, and the
+ * encoding keeps casual hand-edits (the classic corrupted-save source) out.
+ * Bumping the container format later means a new magic line (VCTOWER2), with
+ * this one still accepted on import.
+ */
+export const TOWER_FILE_EXT = ".vctower";
+const TOWER_FILE_MAGIC = "VCTOWER1";
 
 export interface SlotInfo {
   slot: number | "auto";
@@ -108,18 +121,65 @@ export const SaveGame = {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
+  /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   export(sim: Simulation): string {
-    return JSON.stringify(sim.serialize(), null, 2);
+    const payload = toBase64(JSON.stringify(sim.serialize()));
+    // Wrap the payload at 76 columns (the classic encoded-container width) so
+    // the file is friendly to editors and mail clients; import strips all
+    // whitespace before decoding.
+    return TOWER_FILE_MAGIC + "\n" + (payload.match(/.{1,76}/g) ?? []).join("\n") + "\n";
   },
 
-  import(json: string): Simulation {
-    const data = JSON.parse(json) as SerializedGame;
+  /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
+  exportFilename(sim: Simulation): string {
+    const slug = (sim.tower.towerName || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return (slug || "tower") + TOWER_FILE_EXT;
+  },
+
+  /** Parse a .vctower file. Raw-JSON exports from older builds still load. */
+  import(text: string): Simulation {
+    const trimmed = text.trim();
+    let json = trimmed;
+    if (trimmed.startsWith(TOWER_FILE_MAGIC)) {
+      try {
+        json = fromBase64(trimmed.slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, ""));
+      } catch {
+        throw new Error("This tower file is damaged and can't be read.");
+      }
+    }
+    let data: SerializedGame;
+    try {
+      data = JSON.parse(json) as SerializedGame;
+    } catch {
+      throw new Error("Not a Verticopolis tower file.");
+    }
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
-      throw new Error("Not a valid SimTower save file.");
+      throw new Error("Not a valid tower save file.");
     }
     return Simulation.deserialize(data);
   },
 };
+
+// Base64 with explicit UTF-8 handling (tower names aren't Latin-1), chunked so
+// String.fromCharCode never sees an argument list long enough to blow the stack.
+function toBase64(text: string): string {
+  const bytes = new TextEncoder().encode(text);
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): string {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
 
 function nowMs(): number {
   // Date is unavailable in the deterministic engine, but the storage layer is

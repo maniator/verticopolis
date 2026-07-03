@@ -101,16 +101,17 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
   musical "scenes" (lobby muzak, office hum, hotel calm, food-court bustle,
   cinema score, subway rumble…) based on what the camera is centered on, plus
   build/sell/promotion jingles.
-- **Save anywhere:** autosave to `localStorage`, multiple save slots, plus JSON
-  export/import.
+- **Save anywhere:** autosave to `localStorage`, multiple save slots, plus
+  tower-file (`.vctower`) export/import.
 
 ## Saving & loading
 
 **For players.** The game **autosaves** to your browser's `localStorage` and
 restores that slot on the next launch. You also get **3 named manual slots** so
-you can keep several towers, and **JSON export/import** for backups or sharing a
-tower with someone else. Saves are managed from the in-game saves panel; clearing
-your browser storage erases them.
+you can keep several towers, and **tower-file export/import** for backups or
+sharing a tower with someone else — Export downloads your tower as a
+**`.vctower`** file, and Import loads one back through a file picker. Saves are
+managed from the in-game saves panel; clearing your browser storage erases them.
 
 **How it works.** A save is a snapshot of the **headless simulation**, not the
 renderer. `Simulation.serialize()` writes the deterministic source of truth —
@@ -170,7 +171,7 @@ and covered by the Vitest suite and/or the captured screenshots.
 | **Bomb threats** (defused by security) on prestige towers | ✅ |
 | **Buried treasure** found while excavating basements | ✅ |
 | Living tower: walking people, riding cars, the metro train, day/night | ✅ |
-| Save/load, multiple slots, JSON export/import | ✅ |
+| Save/load, multiple slots, .vctower export/import | ✅ |
 | `.TWR` original-save import | ⏳ foundation in place (v2) |
 | Per-person stress/routing simulation | ◻︎ abstracted as an aggregate model |
 

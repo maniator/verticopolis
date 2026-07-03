@@ -163,17 +163,38 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
-  it("exports and imports JSON", () => {
+  it("exports a .vctower container (magic line + encoded payload, not raw JSON) and imports it back", () => {
     const sim = sampleGame();
-    const json = SaveGame.export(sim);
-    const loaded = SaveGame.import(json);
+    const file = SaveGame.export(sim);
+    // The made-up format: first line is the magic, and the body is NOT
+    // copy-paste JSON anymore.
+    expect(file.startsWith("VCTOWER1\n")).toBe(true);
+    expect(() => JSON.parse(file)).toThrow();
+    const loaded = SaveGame.import(file);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.star).toBe(sim.star);
+  });
+
+  it("names the export file after the tower", () => {
+    const sim = sampleGame();
+    sim.tower.towerName = "Naftali's Tower #1";
+    expect(SaveGame.exportFilename(sim)).toBe("naftali-s-tower-1.vctower");
+    sim.tower.towerName = "✨✨"; // slugs to nothing → fallback
+    expect(SaveGame.exportFilename(sim)).toBe("tower.vctower");
+  });
+
+  it("still imports a legacy raw-JSON export", () => {
+    const sim = sampleGame();
+    const loaded = SaveGame.import(JSON.stringify(sim.serialize(), null, 2));
+    expect(loaded.money).toBe(sim.money);
   });
 
   it("rejects malformed imports", () => {
     expect(() => SaveGame.import("{}")).toThrow();
     expect(() => SaveGame.import("not json")).toThrow();
+    // A magic line over a garbage body must fail loudly, not half-load.
+    expect(() => SaveGame.import("VCTOWER1\n@@not base64@@")).toThrow();
+    expect(() => SaveGame.import("VCTOWER1\n" + btoa("[1,2,3]"))).toThrow();
   });
 
   it("returns null when no save exists", () => {

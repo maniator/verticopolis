@@ -21,7 +21,7 @@ export interface SaveLoadDeps {
    *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
-  ui: Pick<UI, "toast">;
+  ui: Pick<UI, "toast" | "downloadFile">;
   /** Full-screen boot card (lives with the boot functions in main.ts). */
   showBootMessage(msg: string, withReload?: boolean): void;
   /** Arm first-run onboarding on the just-adopted sim. */
@@ -117,9 +117,16 @@ export class SaveLoad {
     }
   }
 
-  importGame(json: string): void {
+  /** Hand the player their tower as a .vctower file download. */
+  exportGame(): void {
+    const sim = this.deps.getSim();
+    this.deps.ui.downloadFile(SaveGame.exportFilename(sim), SaveGame.export(sim));
+    this.deps.ui.toast("Tower exported — check your downloads.", "good");
+  }
+
+  importGame(data: string): void {
     try {
-      this.deps.adoptSim(SaveGame.import(json));
+      this.deps.adoptSim(SaveGame.import(data));
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.toast("Import failed: " + (err as Error).message, "bad");
