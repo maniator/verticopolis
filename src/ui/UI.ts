@@ -629,7 +629,9 @@ export class UI {
           onYes();
         },
       },
-      { close: false }, // Cancel/Confirm only — no ✕-style close in this template
+      // No [data-act="close"] button in this template to bind — the title-bar
+      // ✕ still exists and closes through the dialog's cancel path.
+      { close: false },
     );
   }
 
