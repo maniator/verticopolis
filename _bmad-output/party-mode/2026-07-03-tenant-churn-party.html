@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tenant Churn — A Round-Table · 2026-07-03</title>
+<style>
+  :root{
+    --bg:#f4f1ea; --panel:#fffdf7; --ink:#20242c; --muted:#6b7280; --line:#e4ddcf;
+    --amber:#e8a030; --amber-deep:#b9791a; --good:#3f9a6a; --bad:#c24a3a;
+    --accent:#4f6a8c; --shadow:0 1px 0 #fff, 0 8px 24px rgba(30,30,40,.08);
+    --font:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{ --bg:#15181e; --panel:#1e232c; --ink:#e9e6dd; --muted:#9aa3b0; --line:#2c333d;
+      --shadow:0 1px 0 rgba(255,255,255,.03), 0 10px 28px rgba(0,0,0,.5); }
+  }
+  :root[data-theme="dark"]{ --bg:#15181e; --panel:#1e232c; --ink:#e9e6dd; --muted:#9aa3b0; --line:#2c333d;
+      --shadow:0 1px 0 rgba(255,255,255,.03), 0 10px 28px rgba(0,0,0,.5); }
+  :root[data-theme="light"]{ --bg:#f4f1ea; --panel:#fffdf7; --ink:#20242c; --muted:#6b7280; --line:#e4ddcf;
+      --shadow:0 1px 0 #fff, 0 8px 24px rgba(30,30,40,.08); }
+
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);line-height:1.55}
+  .wrap{max-width:940px;margin:0 auto;padding:32px 20px 72px}
+  .kicker{font:600 12px/1 var(--font);letter-spacing:.18em;text-transform:uppercase;color:var(--amber-deep)}
+  h1{font-family:var(--serif);font-weight:700;font-size:clamp(30px,6vw,52px);margin:.25em 0 .1em;letter-spacing:-.01em}
+  .sub{font-size:15px;color:var(--muted);margin:0 0 4px}
+  .verdict{font-family:var(--serif);font-style:italic;font-size:clamp(18px,3.4vw,26px);margin:18px 0 0}
+  .verdict b{font-style:normal;color:var(--amber-deep)}
+
+  .hero{display:grid;grid-template-columns:1fr;gap:20px;margin:26px 0 8px;
+    background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px;box-shadow:var(--shadow)}
+  @media(min-width:640px){ .hero{grid-template-columns:200px 1fr;align-items:center} }
+  .hero p{margin:0;color:var(--muted);font-size:14.5px}
+  .hero h3{margin:0 0 8px;font-size:16px}
+
+  .arc{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:12px}
+  .chip{font:600 13px/1 var(--font);padding:7px 11px;border-radius:999px;border:1px solid var(--line);background:var(--bg)}
+  .chip.old{color:var(--muted);text-decoration:line-through}
+  .chip.new{color:#fff;background:var(--amber);border-color:var(--amber-deep)}
+  .arrow{color:var(--amber-deep);font-weight:700}
+
+  h2{font-family:var(--serif);font-size:24px;margin:44px 0 14px;padding-bottom:8px;border-bottom:2px solid var(--line)}
+  .cards{display:grid;grid-template-columns:1fr;gap:16px}
+  @media(min-width:620px){ .cards{grid-template-columns:1fr 1fr} }
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 18px 16px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .card::before{content:"";position:absolute;inset:0 auto 0 0;width:4px;background:var(--who,var(--accent))}
+  .card .top{display:flex;align-items:center;gap:11px;margin-bottom:8px}
+  .card .ico{font-size:26px;line-height:1}
+  .card .name{font-weight:700;font-size:16px}
+  .card .role{font-size:12.5px;color:var(--muted)}
+  .quote{font-family:var(--serif);font-style:italic;font-size:15.5px;margin:8px 0 10px}
+  .win{font-size:13px;color:var(--muted)}
+  .win b{color:var(--ink);font-weight:600}
+
+  .decision{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;margin:14px 0;box-shadow:var(--shadow)}
+  .decision h3{margin:0 0 6px;font-size:17px}
+  .decision .tag{display:inline-block;font:600 11px/1 var(--font);letter-spacing:.06em;text-transform:uppercase;
+    color:var(--good);border:1px solid var(--good);border-radius:6px;padding:3px 7px;margin-bottom:8px}
+  .decision ul{margin:6px 0 0;padding-left:18px}
+  .decision li{margin:5px 0}
+
+  table{width:100%;border-collapse:collapse;font-size:14px;margin-top:6px;background:var(--panel);
+    border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  tr:last-child td{border-bottom:0}
+  .done{color:var(--good);font-weight:600}
+  .open{color:var(--amber-deep);font-weight:600}
+
+  .bit{font-family:var(--serif);font-style:italic;font-size:clamp(18px,3.2vw,24px);text-align:center;
+    color:var(--muted);margin:48px auto 0;max-width:640px}
+  footer{margin-top:26px;text-align:center;color:var(--muted);font-size:12.5px}
+
+  /* animated satisfaction meter */
+  .meterfill{transform-origin:left center;animation:fill 3.4s cubic-bezier(.5,.1,.2,1) .3s both}
+  @keyframes fill{0%{transform:scaleX(.0)}55%{transform:scaleX(.30)}70%{transform:scaleX(.26)}100%{transform:scaleX(.40)}}
+  .ribbon{animation:pulse 2.6s ease-in-out infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+  @media (prefers-reduced-motion: reduce){ .meterfill{animation:none;transform:scaleX(.40)} .ribbon{animation:none} }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="kicker">Party Mode · Round-table · 2026-07-03</div>
+  <h1>Tenant Churn</h1>
+  <p class="sub">Four voices, one mechanic, and the question of how much a tower should be allowed to hurt.</p>
+  <p class="verdict"><b>“Hurt them — but inform prior.”</b> The eviction must always feel earned.</p>
+
+  <section class="hero">
+    <!-- a tiny tower cross-section: an office on notice, and a satisfaction meter climbing toward the 40% line -->
+    <svg viewBox="0 0 200 150" width="100%" height="150" role="img" aria-label="An office on notice with an amber ribbon and a satisfaction meter climbing toward the 40% rescind line.">
+      <rect x="0" y="0" width="200" height="150" rx="8" fill="var(--bg)"/>
+      <!-- floors -->
+      <g stroke="var(--line)" stroke-width="1">
+        <line x1="12" y1="34" x2="188" y2="34"/><line x1="12" y1="62" x2="188" y2="62"/>
+      </g>
+      <!-- the office unit -->
+      <rect x="18" y="38" width="86" height="20" rx="2" fill="var(--panel)" stroke="var(--line)"/>
+      <rect x="24" y="49" width="7" height="7" fill="var(--accent)"/><rect x="36" y="49" width="7" height="7" fill="var(--accent)"/>
+      <rect x="48" y="49" width="7" height="7" fill="var(--accent)"/><rect x="60" y="49" width="7" height="7" fill="var(--muted)"/>
+      <!-- the amber "on notice" corner ribbon -->
+      <polygon class="ribbon" points="104,38 104,52 90,38" fill="var(--amber)"/>
+      <rect class="ribbon" x="99.5" y="40" width="1.4" height="6" fill="#2a1e06"/>
+      <!-- meter track -->
+      <text x="18" y="88" fill="var(--muted)" font-size="9" font-family="sans-serif">satisfaction → keep them</text>
+      <rect x="18" y="94" width="164" height="12" rx="6" fill="var(--bg)" stroke="var(--line)"/>
+      <rect class="meterfill" x="18" y="94" width="164" height="12" rx="6" fill="var(--amber)"/>
+      <!-- the 40% rescind line -->
+      <line x1="83.6" y1="90" x2="83.6" y2="110" stroke="var(--good)" stroke-width="1.6" stroke-dasharray="2 2"/>
+      <text x="86" y="124" fill="var(--good)" font-size="9" font-family="sans-serif">0.40 · rescind bar</text>
+    </svg>
+    <div>
+      <h3>The mechanic, in one breath</h3>
+      <p>A dissatisfied office or condo goes <b>on notice</b> for two in-game days instead of vanishing.
+      Fix the cause and let satisfaction climb back over the line — they stay. Let the clock run out — they leave,
+      and the card told you exactly why and exactly when.</p>
+      <div class="arc">
+        <span class="chip old">rescind at 0.25</span>
+        <span class="arrow">→</span>
+        <span class="chip new">rescind at 0.40</span>
+        <span style="color:var(--muted);font-size:13px">“stabilized ≠ fixed”</span>
+      </div>
+    </div>
+  </section>
+
+  <h2>The room</h2>
+  <div class="cards">
+    <div class="card" style="--who:#c24a3a">
+      <div class="top"><span class="ico">🎮</span><div><div class="name">Samus Shepard</div><div class="role">Game Designer</div></div></div>
+      <p class="quote">“Two days of notice and they cancel the whole eviction the second satisfaction crawls back to twenty-five percent? That’s not a notice period. That’s a hug.”</p>
+      <p class="win"><b>Won:</b> the teeth — 0.40 rescind bar, so a merely-stabilized tower still loses tenants.</p>
+    </div>
+    <div class="card" style="--who:#4f6a8c">
+      <div class="top"><span class="ico">🏗️</span><div><div class="name">Cloud Dragonborn</div><div class="role">Game Architect</div></div></div>
+      <p class="quote">“Verified, not asserted. A balance change doesn’t ship unverified — and there’s finally a red flag at the top of the arch doc.”</p>
+      <p class="win"><b>Won:</b> the 2-day window kept, endgame + parity re-run, invariants written down.</p>
+    </div>
+    <div class="card" style="--who:#3f9a6a">
+      <div class="top"><span class="ico">🎨</span><div><div class="name">Sally</div><div class="role">UX Designer</div></div></div>
+      <p class="quote">“Fix the teeth without amputating the hand. Tension comes from watching it tick — make the pressure visible and two days feels like a nail-biter.”</p>
+      <p class="win"><b>Won:</b> the live countdown + target-vs-current — the fix that bought Samus’s buy-in.</p>
+    </div>
+    <div class="card" style="--who:#b9791a">
+      <div class="top"><span class="ico">📚</span><div><div class="name">Paige</div><div class="role">Technical Writer</div></div></div>
+      <p class="quote">“I love that you three just re-derived, out loud, exactly why this mechanic needs a design doc — and there isn’t one.”</p>
+      <p class="win"><b>Won:</b> the back-filled gdd-/arch- pair, invariants up top.</p>
+    </div>
+  </div>
+
+  <h2>What the room decided</h2>
+  <div class="decision">
+    <span class="tag">Shipped · PR #109</span>
+    <h3>1 · Hurt them, but inform prior</h3>
+    <ul>
+      <li>Rescind bar <b>0.25 → 0.40</b> — “stabilized ≠ fixed”; a real fix still recovers in ~8 served hours.</li>
+      <li>Notice window <b>stays 2 days</b> — shortening it reopens per-rush-hour eviction spam (Cloud’s veto).</li>
+      <li><b>Inform prior:</b> inspector shows an honest “Leaves in under N hours” countdown + “get to 40% to keep them (now X%).”</li>
+    </ul>
+  </div>
+  <div class="decision">
+    <span class="tag">Shipped · PR #109</span>
+    <h3>2 · Back-fill the design note</h3>
+    <ul>
+      <li>Wrote the <b>gdd-tenant-churn</b> (player contract) + <b>arch-tenant-churn</b> (invariants at the top) pair.</li>
+      <li>Balance change guarded by the well-zoned endgame + TOWER parity runs — a healthy tower still doesn’t bleed.</li>
+    </ul>
+  </div>
+
+  <h2>The ledger &amp; what’s left</h2>
+  <table>
+    <thead><tr><th>Finding</th><th>Status</th></tr></thead>
+    <tbody>
+      <tr><td>Stop the toast-spam / limbo loop</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Countdown + recovery target in inspector</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Drop the unreachable <code>noise</code> cause</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Tune the window vs. recovery (0.40 retune)</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Transport-neutral, escalator-inclusive copy</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Back-fill the gdd-/arch- pair</td><td class="done">✅ shipped</td></tr>
+      <tr><td>Should <code>vacating</code> prop a <b>star</b> gate?</td><td class="open">🔲 open — parity call</td></tr>
+      <tr><td>Let office <b>noise</b> actually evict (re-add cause)</td><td class="open">🔲 open — deferred mechanic</td></tr>
+      <tr><td>Confirm the ribbon doesn’t churn <b>screenshots</b></td><td class="open">🔲 open — verify</td></tr>
+      <tr><td><b>Playtest</b> the churn feel (teeth, not tedium)</td><td class="open">🔲 open — needs a human</td></tr>
+    </tbody>
+  </table>
+
+  <p class="bit">“The doc is the fix for the thing we were all afraid of.”</p>
+  <footer>A Party Mode remembrance · tenant-churn round-table · relates to PR&nbsp;#109 · 2026-07-03</footer>
+
+</div>
+</body>
+</html>
