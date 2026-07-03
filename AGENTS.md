@@ -94,10 +94,19 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR.
   Deferring it to a hypothetical pre-merge step is how it gets skipped:
   sessions end, and no later session picks it up. A PR is not "done" —
   don't report it as finished — until the review has run and its confirmed
-  findings are fixed and re-verified on the branch. Use the BMAD/BMGD review
-  skill (`/gds-code-review` for gameplay/engine work, `/bmad-code-review`
-  otherwise), and bring in the other agents relevant to the change rather than
-  reviewing solo:
+  findings are fixed and re-verified on the branch.
+  - **MANDATORY: the deep review IS running the BMGD/BMAD review skill —
+    `/gds-code-review` for gameplay/engine work, `/bmad-code-review` for
+    anything else (storage, persistence, tooling, UI plumbing).** That skill's
+    parallel adversarial layers (Blind Hunter → Edge Case Hunter → Acceptance
+    Auditor, then triage) ARE the deep review. A self-read, a generic
+    `/code-review`, or an ad-hoc subagent pass does **not** satisfy this and
+    must not be reported as "the deep review" — actually invoke the skill,
+    let it triage, then fix every `patch` finding and record every `defer`
+    finding in `_bmad-output/implementation-artifacts/deferred-work.md`. This
+    applies to **every** non-trivial change, including the save/persistence and
+    infra work where it's easy to assume "it's just plumbing."
+  - Bring in the other agents relevant to the change rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
   - **Samus Shepard** (`gds-agent-game-designer`) for mechanics, balance, and
