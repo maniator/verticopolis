@@ -32,6 +32,11 @@ export interface SimContext {
   hasOperational(kind: FacilityKind): boolean;
   /** Human floor label: "floor 5" above ground, "B1"/"B2"… below. */
   floorLabel(floor: number): string;
+  /** Cosmetic-only hooks the events fire so the renderer can animate them; the
+   * engine core stays DOM-free and headless test contexts simply omit them
+   * (the visuals never touch gameplay state, RNG, or the save). */
+  triggerSanta?(): void;
+  triggerExplosion?(floor: number, xTile: number): void;
   /** Dispatch a staff member (housekeeper) from `from` to `to` over the staff
    * network, walking to `destX` to service unit `cleanUnitId`. "full" means
    * the staff pool is at cap (retry later); "no-route" means the staff

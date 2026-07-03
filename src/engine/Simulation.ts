@@ -156,6 +156,12 @@ export class Simulation implements SimContext {
    * from the day number, so it never perturbs the gameplay RNG. */
   weather: WeatherKind = "clear";
 
+  /** Cosmetic event-visual signals the renderer polls (see {@link triggerSanta}
+   * / {@link triggerExplosion}). Purely visual and transient — bumped when the
+   * event fires, never serialized, and with zero effect on gameplay/RNG/save. */
+  santaFxSeq = 0;
+  explosionFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
+
   /** Ids of units currently under construction (finalised on the global tick). */
   private constructing = new Set<number>();
 
@@ -1303,6 +1309,16 @@ export class Simulation implements SimContext {
   /** A bomb scare (exposed for the debug/event hooks and tests). */
   bombThreat(): void {
     this.events.bombThreat();
+  }
+
+  /** Cosmetic event-visual hooks the {@link EventSystem} fires (SimContext).
+   * They only bump a transient counter the renderer polls — no gameplay, RNG,
+   * or save effect — so headless contexts can omit them entirely. */
+  triggerSanta(): void {
+    this.santaFxSeq++;
+  }
+  triggerExplosion(floor: number, xTile: number): void {
+    this.explosionFx = { floor, x: xTile, seq: this.explosionFx.seq + 1 };
   }
 
   /** The player decision awaiting an answer (fire rescue / bomb ransom), or null.

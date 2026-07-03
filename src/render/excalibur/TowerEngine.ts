@@ -19,6 +19,7 @@ import {
   lobbyVariant,
   type DrawCtx,
 } from "../sprites";
+import { drawSanta, drawExplosion } from "../sprites/events";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
@@ -134,10 +135,28 @@ interface Walker {
  * repositions each frame. The controller (main.ts) drives tools, the sim tick
  * and the DOM UI through the hooks below.
  */
+/** How long Santa takes to cross the sky, and how long a bomb flash lingers
+ *  (seconds of the decorative anim clock — so both freeze under pause /
+ *  reduced motion, like every other decoration). */
+const SANTA_FLIGHT_SECONDS = 7;
+const EXPLOSION_SECONDS = 0.9;
+/** Hard cap on simultaneous blast flashes — bombs are rare, but never let the
+ *  list grow unbounded (immediate-mode draws, no actors, so this is the only
+ *  bound needed). */
+const MAX_EXPLOSIONS = 8;
+
 export class TowerEngine {
   engine: ex.Engine;
   sim: Simulation;
   private d: DrawCtx;
+
+  // ---- Event visuals (immediate-mode; no Excalibur actors to leak) --------
+  /** anim-clock time the current Santa flight started, or null when not flying. */
+  private santaStart: number | null = null;
+  private lastSantaSeq = 0;
+  /** In-flight bomb flashes: epicenter tile/floor + the anim time it began. */
+  private explosions: { x: number; floor: number; start: number }[] = [];
+  private lastExplosionSeq = 0;
 
   // Set by the controller each frame; rendered by the overlay.
   preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number } | null = null;
@@ -235,6 +254,38 @@ export class TowerEngine {
   reducedMotion = false;
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
+    // A frozen anim clock can't advance an event visual to completion, so drop
+    // any in flight rather than leave Santa or a flash stuck on screen.
+    if (on) {
+      this.santaStart = null;
+      this.explosions = [];
+    }
+  }
+
+  /**
+   * Poll the sim's cosmetic fx counters and start/retire the matching event
+   * visuals. New visuals only begin while animating (reduced motion / pause
+   * suppress fresh motion, matching every other decoration); in-flight ones
+   * retire when their window on the anim clock elapses. No Excalibur actors are
+   * involved — these are immediate-mode draws — so there is nothing to leak.
+   */
+  private syncEventFx(animating: boolean): void {
+    if (this.sim.santaFxSeq !== this.lastSantaSeq) {
+      this.lastSantaSeq = this.sim.santaFxSeq;
+      if (animating) this.santaStart = this.d.anim;
+    }
+    if (this.sim.explosionFx.seq !== this.lastExplosionSeq) {
+      this.lastExplosionSeq = this.sim.explosionFx.seq;
+      if (animating && this.explosions.length < MAX_EXPLOSIONS) {
+        this.explosions.push({ x: this.sim.explosionFx.x, floor: this.sim.explosionFx.floor, start: this.d.anim });
+      }
+    }
+    if (this.santaStart !== null && this.d.anim - this.santaStart > SANTA_FLIGHT_SECONDS) {
+      this.santaStart = null;
+    }
+    if (this.explosions.length > 0) {
+      this.explosions = this.explosions.filter((e) => this.d.anim - e.start <= EXPLOSION_SECONDS);
+    }
   }
   /** Wall-clock-derived animation time that only advances while unpaused. */
   private animClock = 0;
@@ -468,6 +519,12 @@ export class TowerEngine {
   setSim(sim: Simulation): void {
     this.disposeScene();
     this.clearCrowd();
+    // Drop any in-flight event visuals and adopt the new sim's fx baselines, so
+    // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.
+    this.santaStart = null;
+    this.explosions = [];
+    this.lastSantaSeq = sim.santaFxSeq;
+    this.lastExplosionSeq = sim.explosionFx.seq;
     this.sim = sim;
     this.builtRev = -1;
     // Invalidate the per-floor occupancy cache so a swapped-in tower (new game /
@@ -492,6 +549,7 @@ export class TowerEngine {
     if (animating) this.animClock += nowWall - this.lastAnimWall;
     this.lastAnimWall = nowWall;
     this.d.anim = this.animClock;
+    this.syncEventFx(animating);
     this.d.hour = c.hour;
     this.d.lit = c.isNight() || c.isEvening();
     // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
@@ -739,6 +797,18 @@ export class TowerEngine {
     ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
     this.drawSun(ctx);
     this.drawClouds(ctx);
+    this.renderSanta(ctx);
+  }
+
+  /** Santa's sleigh crossing the sky during a holiday cameo (see syncEventFx). */
+  private renderSanta(ctx: CanvasRenderingContext2D): void {
+    if (this.santaStart === null) return;
+    const p = (this.d.anim - this.santaStart) / SANTA_FLIGHT_SECONDS;
+    if (p < 0 || p > 1) return;
+    // Slide fully across, offscreen to offscreen, with a gentle bob.
+    const x = -160 + p * (this.viewWidth + 320);
+    const y = this.viewHeight * 0.15 + Math.sin(p * Math.PI * 3) * 12;
+    drawSanta(ctx, x, y, 1.15);
   }
 
   private makeOverlay(): void {
@@ -760,9 +830,23 @@ export class TowerEngine {
     }
     ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
     this.drawRain(ctx);
+    this.renderExplosions(ctx);
     this.drawPreview(ctx);
     this.drawSelection(ctx);
     this.drawRuler(ctx);
+  }
+
+  /** Bomb-blast flashes at their epicenters, projected to screen (see syncEventFx). */
+  private renderExplosions(ctx: CanvasRenderingContext2D): void {
+    if (this.explosions.length === 0) return;
+    for (const e of this.explosions) {
+      const p = (this.d.anim - e.start) / EXPLOSION_SECONDS;
+      if (p < 0 || p > 1) continue;
+      const sx = this.worldToScreenX(e.x);
+      const sy = this.worldToScreenY(e.floor) + (FLOOR * this.cam.zoom) / 2;
+      const radius = (24 + p * 56) * this.cam.zoom;
+      drawExplosion(ctx, sx, sy, radius, p);
+    }
   }
 
   /** Clouds drift across the sky on overcast and rainy days (sky layer). */
