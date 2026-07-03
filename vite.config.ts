@@ -97,14 +97,15 @@ export default defineConfig({
       reporter: ["text", "json", "html"],
       // Measure the whole app, not just the well-tested engine — a report
       // scoped to the strong layers overstates coverage and hides the
-      // untested UI shell. Only tooling entry points are excluded: the
-      // gallery/preview/excalibur pages and the PWA bootstrap are dev/build
-      // plumbing, not game logic.
+      // untested UI shell. Excluded: non-code (declarations, configs), the
+      // tests themselves, and the tooling entry points (gallery/preview/
+      // excalibur pages, PWA bootstrap) — dev/build plumbing, not game
+      // logic. types.ts is measured: it carries runtime predicates
+      // (isPresent/isDormant), not just type aliases.
       include: ["src/**/*.ts"],
       exclude: [
         "**/*.d.ts",
         "**/*.config.*",
-        "**/types.ts",
         "src/tests/**",
         "src/gallery.ts",
         "src/preview.ts",
