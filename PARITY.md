@@ -55,10 +55,10 @@ abstraction · ⬜ not present.
 
 ## Events & disasters
 - ✅ Fire — spreads to the neighbor unless Security/Medical contain it; burned rooms are destroyed (gutted shells you must bulldoze and rebuild), never auto-repaired
-- ✅ Bomb threat (4★+) — Security defuses it; otherwise damage + fine
+- ✅ Bomb threat (4★+) — Security defuses it; otherwise damage + fine, with an explosion flash at the blast epicentre
 - ✅ VIP inspection → TOWER win/lose
 - ✅ Treasure discovery; flavorful headlines
-- ✅ Seasonal cameo: Santa visits a 3★+ tower once over the holidays with a cash gift
+- ✅ Seasonal cameo: Santa's sleigh and reindeer fly across the sky above a 3★+ tower once over the holidays (a cameo only — "No presents, sorry", no cash)
 - ✅ Thief — Security catches them; otherwise they make off with some cash
 
 ## Time, audio, presentation

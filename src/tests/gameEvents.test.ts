@@ -50,8 +50,18 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
     star,
     simModel: "v1" as const,
     log: [] as Entry[],
+    // Cosmetic renderer hooks (SimContext) — recorded so tests can assert the
+    // event fired its visual signal without a DOM/canvas.
+    santaCalls: 0,
+    explosionCalls: [] as { floor: number; x: number }[],
     emit(text: string, kind?: LogKind) {
       this.log.push({ text, kind });
+    },
+    triggerSanta() {
+      this.santaCalls++;
+    },
+    triggerExplosion(floor: number, xTile: number) {
+      this.explosionCalls.push({ floor, x: xTile });
     },
     hasAny: (kind: FacilityKind) => tower.units.some((u) => u.kind === kind),
     hasOperational: (kind: FacilityKind) =>
@@ -169,6 +179,33 @@ describe("Bomb-threat event — the 4★ daily roll and its choice", () => {
     events.resolveChoice("decline");
     expect(logHas(ctx, "detonated")).toBe(true);
     expect(ctx.tower.units.filter((u) => u.state === "gutted").length).toBeGreaterThan(0);
+  });
+});
+
+describe("Event visual hooks — the renderer triggers (SimContext)", () => {
+  it("Santa's flyover fires its cosmetic trigger once when he crosses the sky", () => {
+    const ctx = makeCtx(new Tower(), 3, new ScriptedRNG([]));
+    const events = new EventSystem(ctx, 7);
+    for (let d = 0; d < 360; d++) {
+      ctx.clock = new Clock(d * 1440);
+      events.maybeRandomEvent();
+    }
+    // Same year window as the Santa mechanic test — exactly one flyover, one signal.
+    expect(ctx.log.filter((e) => e.text.includes("Santa")).length).toBe(1);
+    expect(ctx.santaCalls).toBe(1);
+  });
+
+  it("an unguarded bomb detonation flashes at the epicentre; a guarded one never does", () => {
+    const boom = makeCtx(officeTower(), 4, new ScriptedRNG([]));
+    new EventSystem(boom, 7).bombThreat(); // no security → detonates
+    expect(boom.explosionCalls).toHaveLength(1);
+    expect(boom.explosionCalls[0].floor).toBeGreaterThanOrEqual(3);
+    expect(boom.explosionCalls[0].floor).toBeLessThanOrEqual(6);
+    expect(boom.explosionCalls[0].x).toBeGreaterThanOrEqual(0);
+
+    const safe = makeCtx(officeTower({ security: true }), 4, new ScriptedRNG([]));
+    new EventSystem(safe, 7).bombThreat(); // security sweeps → no blast
+    expect(safe.explosionCalls).toHaveLength(0);
   });
 });
 

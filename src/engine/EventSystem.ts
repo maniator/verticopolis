@@ -326,6 +326,7 @@ export class EventSystem {
     this.lastSantaYear = year;
     // Canon: Santa is a seasonal cameo only — "No presents, sorry." (No cash.)
     this.sim.emit("🎅 Santa was spotted crossing the sky above your tower for the holidays!", "good");
+    this.sim.triggerSanta?.(); // fly the sleigh across the sky (cosmetic)
   }
 
   /**
@@ -360,7 +361,10 @@ export class EventSystem {
     const targets = this.flammableUnits();
     let destroyed = 0;
     if (targets.length > 0) {
-      const epicentre = this.sim.rng.pick(targets).floor;
+      const ground = this.sim.rng.pick(targets);
+      const epicentre = ground.floor;
+      // Flash the blast at the epicentre room's center (cosmetic; renderer-only).
+      this.sim.triggerExplosion?.(epicentre, ground.x + Math.floor(ground.width / 2));
       for (const u of this.sim.tower.units) {
         if (
           Math.abs(u.floor - epicentre) <= 2 &&
