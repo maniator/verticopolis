@@ -83,6 +83,15 @@
             <input id="tower-name" class="name-input field" maxlength="28" />
             <div id="tower-stats" class="kv"></div>
             <button id="btn-stats" class="wide-btn btn">📊 Full Statistics</button>
+            <label class="overlay-picker" title="Tint every floor by a live metric, like the original's evaluation maps">
+              <span>🗺️ Map overlay</span>
+              <select id="overlay-mode" class="field">
+                <option value="">Off</option>
+                <option value="congestion">Congestion</option>
+                <option value="occupancy">Occupancy</option>
+                <option value="satisfaction">Satisfaction</option>
+              </select>
+            </label>
           </div>
           <div class="panel grow win docked">
             <h3>Bulletin</h3>

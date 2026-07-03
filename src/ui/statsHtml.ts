@@ -1,5 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
+import { LEDGER_CATS, LEDGER_LABELS } from "../engine/Ledger";
 import { escapeHtml } from "./escape";
+import { floorTag } from "./format";
 
 /**
  * The Tower Statistics dialog body — a pure function of the sim, split out of
@@ -88,8 +90,71 @@ export function buildStatsHtml(sim: Simulation): string {
             }</div>`
           : ""
       }
+      ${buildIncomeHtml(sim)}
+      ${buildElevatorHtml(sim)}
       ${buildMilestonesHtml(sim)}
     </div>`;
+}
+
+/** Passenger-elevator utilization, busiest shaft first — how full each runs on
+ *  average, so the player can spot an overloaded shaft (add cars / a parallel
+ *  run) or an idle one. Service elevators are excluded (no passenger load). */
+export function buildElevatorHtml(sim: Simulation): string {
+  const shafts = sim.elevatorStats();
+  if (shafts.length === 0) return "";
+  const kindName: Record<string, string> = {
+    elevatorStandard: "Standard",
+    elevatorExpress: "Express",
+  };
+  const row = (s: (typeof shafts)[number]) => {
+    const pct = Math.round(s.utilization * 100);
+    const color = pct > 85 ? "var(--bad)" : pct < 10 ? "var(--muted)" : "var(--good)";
+    const label = `${kindName[s.kind] ?? "Elevator"} ${floorTag(s.bottom)}–${floorTag(s.top)}`;
+    return (
+      `<span class="k">${escapeHtml(label)} · ${s.cars} car${s.cars === 1 ? "" : "s"}</span>` +
+      `<span class="v" style="color:${color}">${pct}% full</span>`
+    );
+  };
+  // Cap the list so a tower packed with shafts doesn't blow out the modal.
+  const shown = shafts.slice(0, 8);
+  const half = Math.ceil(shown.length / 2);
+  const col = (items: typeof shown) => `<div class="col kv">${items.map(row).join("")}</div>`;
+  return (
+    `<div class="stats-section win-title sm">Elevators (avg load, busiest first)</div>` +
+    col(shown.slice(0, half)) +
+    col(shown.slice(half))
+  );
+}
+
+/** The per-category income breakdown: average $/day over the trailing quarter,
+ *  net of each line's own overhead, so the player can see what actually earns. */
+export function buildIncomeHtml(sim: Simulation): string {
+  const { averages, hasData } = sim.incomeBreakdown();
+  if (!hasData) return "";
+  const money = (n: number) => {
+    const r = Math.round(n);
+    return `${r < 0 ? "-" : ""}$${Math.abs(r).toLocaleString()}`;
+  };
+  const rows = LEDGER_CATS.map((cat) => ({ cat, avg: averages[cat] }))
+    // Hide lines that never moved (e.g. no condos built), but always show a
+    // category that has any activity, positive or negative.
+    .filter((r) => Math.round(r.avg) !== 0)
+    .sort((a, b) => b.avg - a.avg);
+  if (rows.length === 0) return "";
+  const net = LEDGER_CATS.reduce((sum, cat) => sum + averages[cat], 0);
+  const line = (label: string, avg: number, bold = false) =>
+    `<span class="k${bold ? " win-title sm" : ""}">${label}</span>` +
+    `<span class="v" style="color:${avg < 0 ? "var(--bad)" : "var(--good)"}${bold ? ";font-weight:600" : ""}">${money(avg)}/day</span>`;
+  const half = Math.ceil(rows.length / 2);
+  const col = (items: typeof rows) =>
+    `<div class="col kv">${items.map((r) => line(LEDGER_LABELS[r.cat], r.avg)).join("")}</div>`;
+  return (
+    `<div class="stats-section win-title sm">Income (avg / day, last quarter)</div>` +
+    col(rows.slice(0, half)) +
+    `<div class="col kv">${rows.slice(half).map((r) => line(LEDGER_LABELS[r.cat], r.avg)).join("")}` +
+    line("Net", net, true) +
+    `</div>`
+  );
 }
 
 /** The optional-goals checklist for the stats modal. */

@@ -2,6 +2,7 @@ import type { SimContext } from "./SimContext";
 import { isOperational } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { RECYCLING_POP_PER_CENTER, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
+import { ledgerCatFor, type LedgerCat } from "./Ledger";
 
 /** Rooms one housekeeping crew can turn over per day. */
 const HK_ROOMS_PER_CREW = 20;
@@ -56,6 +57,7 @@ export class EconomySystem {
     }
     if (total > 0) {
       this.sim.money += total;
+      this.sim.recordMoney?.("offices", total);
       this.sim.emit(`Quarterly office rent collected: $${total.toLocaleString()} (${count} offices).`, "money");
     }
   }
@@ -95,6 +97,8 @@ export class EconomySystem {
         const earned = Math.floor(u.pendingIncome);
         u.pendingIncome -= earned;
         this.sim.money += earned;
+        const cat = ledgerCatFor(u.kind);
+        if (cat) this.sim.recordMoney?.(cat, earned);
       }
     }
   }
@@ -151,6 +155,7 @@ export class EconomySystem {
     }
     if (revenue > 0) {
       this.sim.money += revenue;
+      this.sim.recordMoney?.("hotels", revenue);
       this.sim.emit(`Hotel guests checked out: $${revenue.toLocaleString()} earned overnight.`, "money");
     }
     // Fresh shift: yesterday's ledger is dropped (its travelers have long
@@ -316,17 +321,31 @@ export class EconomySystem {
     // Fresh film bookings each month: drop last month's blockbusters (incl. any
     // on now-removed or on-fire cinemas) before re-rolling below.
     this.blockbusters.clear();
+    // Transport upkeep and staffed-service upkeep both land in the ledger's
+    // `upkeep` line; revenue-room carrying costs (overhead, condo tax, film
+    // bookings) are charged against that room's own category so each revenue
+    // line reads NET. rec() mirrors every cost into the breakdown as it accrues.
+    const rec = (cat: LedgerCat, amount: number) => this.sim.recordMoney?.(cat, -amount);
     for (const t of this.sim.tower.transports) {
-      if (isElevatorKind(t.kind)) cost += t.cars * ECON.maintenancePerCarMonthly;
+      if (isElevatorKind(t.kind)) {
+        const c = t.cars * ECON.maintenancePerCarMonthly;
+        cost += c;
+        rec("upkeep", c);
+      }
     }
     for (const u of this.sim.tower.units) {
       const m = ECON.serviceMaintenanceMonthly[u.kind];
-      if (m && u.state !== "gutted") cost += m; // a gutted service room is destroyed — no upkeep
+      if (m && u.state !== "gutted") {
+        cost += m; // a gutted service room is destroyed — no upkeep
+        rec("upkeep", m);
+      }
       const operational = isOperational(u);
       // Property tax on an unsold condo: a real carrying cost for holding out
       // for a premium sale (scales with the asking price).
       if (u.kind === "condo" && !u.everOccupied && operational) {
-        cost += Math.ceil(rentOf(u) * ECON.condoMonthlyTaxRate);
+        const tax = Math.ceil(rentOf(u) * ECON.condoMonthlyTaxRate);
+        cost += tax;
+        rec("condos", tax);
       }
       // Operating overhead on space HELD (regardless of occupancy/served) — makes
       // a vacant or unserved floor pure carrying cost. Sold condos are exempt:
@@ -334,6 +353,8 @@ export class EconomySystem {
       // drain on them would be punitive rather than a live decision.
       if (operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
         cost += ECON.overheadPerLeasableUnitMonthly;
+        const cat = ledgerCatFor(u.kind);
+        rec(cat ?? "upkeep", ECON.overheadPerLeasableUnitMonthly);
       }
       // A cinema books a film each month (canon: 150k average / 300k
       // blockbuster). The player sets a per-cinema policy; only "auto" consumes
@@ -343,12 +364,10 @@ export class EconomySystem {
         const policy = u.filmPolicy ?? "auto";
         const blockbuster =
           policy === "blockbuster" ? true : policy === "feature" ? false : this.sim.rng.chance(0.4);
-        if (blockbuster) {
-          this.blockbusters.add(u.id);
-          cost += ECON.cinemaBookingBlockbuster;
-        } else {
-          cost += ECON.cinemaBookingMonthly;
-        }
+        const booking = blockbuster ? ECON.cinemaBookingBlockbuster : ECON.cinemaBookingMonthly;
+        if (blockbuster) this.blockbusters.add(u.id);
+        cost += booking;
+        rec("entertainment", booking);
       }
     }
     if (cost > 0) {

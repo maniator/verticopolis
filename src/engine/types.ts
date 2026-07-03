@@ -214,6 +214,9 @@ export interface SerializedGame {
   /** Ids of optional milestones already achieved, so reload doesn't
    * re-announce them. Optional for older saves. */
   milestones?: string[];
+  /** Rolling income/expense ledger for the stats breakdown (today's running
+   * totals + the trailing per-day window). Optional for pre-ledger saves. */
+  ledger?: unknown;
 }
 
 /** Result of attempting to place a facility. */

@@ -6,6 +6,7 @@ import { ElevatorDispatch } from "./ElevatorDispatch";
 import { EventSystem } from "./EventSystem";
 import type { SimContext } from "./SimContext";
 import { Tower } from "./Tower";
+import { Ledger, ledgerCatFor, type LedgerCat } from "./Ledger";
 import { RNG } from "./rng";
 import { MILESTONES, isTenantFloorUnit } from "./milestones";
 
@@ -80,6 +81,9 @@ export interface LogEntry {
   kind: "info" | "good" | "bad" | "money";
 }
 
+/** The metric the colored stats overlay tints floors by. */
+export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
+
 /** Batch-pricing target: an exact price, or "default" to clear the override. */
 export type BatchTarget = number | "default";
 export interface BatchRentOptions {
@@ -106,6 +110,8 @@ export class Simulation implements SimContext {
   clock = new Clock();
   rng: RNG;
   money: number = ECON.startingMoney;
+  /** Rolling per-category income/expense record for the stats breakdown. */
+  ledger = new Ledger();
   /** 1..5 stars, 6 == TOWER. */
   star = 1;
   evaluatedTower = false;
@@ -488,7 +494,116 @@ export class Simulation implements SimContext {
     this.updateSatisfaction();
     this.attemptMoveIns();
     this.economy.collectTrafficIncome();
+    this.sampleElevatorUtil();
     this.evaluateStar();
+  }
+
+  /** Per-shaft utilization EMA (0..1), keyed by transport id — how full each
+   *  passenger elevator's cars run on average. Sampled hourly off the hot path;
+   *  transient (warms up after load, not serialized). */
+  private elevatorUtil = new Map<number, number>();
+
+  /** Fold this hour's car occupancy into each passenger elevator's running
+   *  utilization average, and forget shafts that have been removed. */
+  private sampleElevatorUtil(): void {
+    const alive = new Set<number>();
+    for (const t of this.tower.transports) {
+      if (!isElevatorKind(t.kind) || isStaffOnlyTransport(t.kind)) continue;
+      alive.add(t.id);
+      const cap = t.cars * transportCarCapacity(t.kind);
+      const load = (t.carLoad ?? []).reduce((sum, n) => sum + n, 0);
+      const frac = cap > 0 ? Math.min(1, load / cap) : 0;
+      const prev = this.elevatorUtil.get(t.id);
+      // Slow EMA so the figure reflects a typical day, not the current instant.
+      this.elevatorUtil.set(t.id, prev === undefined ? frac : 0.15 * frac + 0.85 * prev);
+    }
+    for (const id of [...this.elevatorUtil.keys()]) if (!alive.has(id)) this.elevatorUtil.delete(id);
+  }
+
+  /** Average utilization (0..1) of a passenger elevator, or undefined for a
+   *  non-passenger transport or one not yet sampled. */
+  elevatorUtilization(id: number): number | undefined {
+    return this.elevatorUtil.get(id);
+  }
+
+  /**
+   * Per-floor severity (0 = good/green … 1 = bad/red) plus the floor's built
+   * column extent, for the colored stats overlay — the original's evaluation
+   * maps. Only floors with data for the chosen mode are returned. Scans the unit
+   * list once; the renderer caches it (hourly), so it's off the per-frame path.
+   *
+   * - `congestion`: how jammed the floor's transport is (per-floor congestion).
+   * - `occupancy`:  the floor's vacant share (red = empty, green = fully leased).
+   * - `satisfaction`: tenant unhappiness (red = tenants near leaving).
+   */
+  floorHeatmap(mode: HeatmapMode): Map<number, { severity: number; minX: number; maxX: number }> {
+    const ext = new Map<number, { min: number; max: number }>();
+    // Per-floor tenancy accumulators for the occupancy / satisfaction modes.
+    const acc = new Map<number, { total: number; occupied: number; satSum: number; present: number }>();
+    for (const u of this.tower.units) {
+      const right = u.x + u.width - 1;
+      for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
+        const e = ext.get(fl);
+        if (!e) ext.set(fl, { min: u.x, max: right });
+        else {
+          if (u.x < e.min) e.min = u.x;
+          if (right > e.max) e.max = right;
+        }
+      }
+      const rentable = FACILITIES[u.kind].population > 0 || isHotelKind(u.kind);
+      if (rentable) {
+        const a = acc.get(u.floor) ?? { total: 0, occupied: 0, satSum: 0, present: 0 };
+        a.total++;
+        if (isPresent(u)) {
+          a.occupied++;
+          a.satSum += u.satisfaction;
+          a.present++;
+        }
+        acc.set(u.floor, a);
+      }
+    }
+    const out = new Map<number, { severity: number; minX: number; maxX: number }>();
+    for (const [floor, e] of ext) {
+      let severity: number | undefined;
+      if (mode === "congestion") {
+        // congestionAt ≈ load/capacity; ~1 is at capacity. Map so a comfortable
+        // floor reads green and a jammed one saturates red.
+        severity = Math.max(0, Math.min(1, this.congestionAt(floor) / 1.2));
+      } else if (mode === "occupancy") {
+        const a = acc.get(floor);
+        if (!a || a.total === 0) continue; // no tenancy here → don't tint
+        severity = 1 - a.occupied / a.total; // vacant share
+      } else {
+        // satisfaction: only judge floors that actually have tenants present
+        // right now — an empty floor has no happiness signal (and its vacancy
+        // is already the occupancy map's job), so leave it untinted.
+        const a = acc.get(floor);
+        if (!a || a.present === 0) continue;
+        severity = 1 - a.satSum / a.present; // average unhappiness
+      }
+      out.set(floor, { severity, minX: e.min, maxX: e.max });
+    }
+    return out;
+  }
+
+  /** Per-passenger-elevator utilization report for the stats screen, busiest
+   *  first: each shaft's served range, car count, capacity/trip and average
+   *  fullness. Excludes staff-only service elevators (no passenger load). */
+  elevatorStats(): { id: number; kind: FacilityKind; bottom: number; top: number; cars: number; capacity: number; utilization: number }[] {
+    const out = [];
+    for (const t of this.tower.transports) {
+      if (!isElevatorKind(t.kind) || isStaffOnlyTransport(t.kind)) continue;
+      out.push({
+        id: t.id,
+        kind: t.kind,
+        bottom: t.bottom,
+        top: t.top,
+        cars: t.cars,
+        capacity: t.cars * transportCarCapacity(t.kind),
+        utilization: this.elevatorUtil.get(t.id) ?? 0,
+      });
+    }
+    return out.sort((a, b) => b.utilization - a.utilization);
   }
 
   /** Daily: rent, maintenance, events, VIP. (Hotel checkout is hourly @08:00.) */
@@ -514,6 +629,8 @@ export class Simulation implements SimContext {
     this.checkMilestones();
     this.nudgeStranded();
     this.nudgeServiceShortfalls();
+    // Close the day's ledger so the income breakdown averages over whole days.
+    this.ledger.endDay();
   }
 
   /** Edge-triggered log bulletins (same latch pattern as {@link nudgeStranded})
@@ -1085,6 +1202,7 @@ export class Simulation implements SimContext {
       u.everOccupied = true;
       const price = rentOf(u);
       this.money += price;
+      this.recordMoney("condos", price);
       this.moveInsToday.condos++;
       this.emit(`Condominium on ${this.floorLabel(u.floor)} sold for $${price.toLocaleString()}.`, "money");
     }
@@ -1346,6 +1464,26 @@ export class Simulation implements SimContext {
 
   // ---- Derived stats for UI ---------------------------------------------
 
+  /** Tag money to a stats-breakdown category (positive income, negative
+   *  expense). The single funnel EconomySystem and the sale paths route through
+   *  so the income breakdown stays in lockstep with `money`. */
+  recordMoney(cat: LedgerCat, amount: number): void {
+    this.ledger.record(cat, amount);
+  }
+
+  /** Record a facility's income/expense against its own report category (net),
+   *  a no-op for kinds with no operational money line. */
+  recordMoneyFor(kind: FacilityKind, amount: number): void {
+    const cat = ledgerCatFor(kind);
+    if (cat) this.ledger.record(cat, amount);
+  }
+
+  /** The income breakdown for the stats screen: average $/day per category over
+   *  the trailing quarter, plus whether any data has accrued yet. */
+  incomeBreakdown(): { averages: Record<LedgerCat, number>; hasData: boolean } {
+    return { averages: this.ledger.averagePerDay(), hasData: this.ledger.hasData() };
+  }
+
   get population(): number {
     return this.tower.totalPopulation();
   }
@@ -1440,6 +1578,7 @@ export class Simulation implements SimContext {
       excavated: [...this.excavated],
       blockbusters: this.economy.blockbusterIds,
       milestones: [...this.achievedMilestones],
+      ledger: this.ledger.serialize(),
     };
   }
 
@@ -1472,6 +1611,9 @@ export class Simulation implements SimContext {
     if (Array.isArray(data.milestones)) {
       for (const id of data.milestones) if (typeof id === "string") sim.achievedMilestones.add(id);
     }
+    // Restore the income-breakdown ledger (absent in pre-ledger saves → empty,
+    // warming up as play continues).
+    sim.ledger = Ledger.restore(data.ledger);
     // Reject any unit/transport with an unrecognized kind from untrusted saves,
     // and coerce the numeric fields that drive the loop to finite values so a
     // hand-edited or foreign save can't poison the math with NaN/undefined.

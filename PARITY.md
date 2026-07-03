@@ -61,6 +61,12 @@ abstraction · ⬜ not present.
 - ✅ Seasonal cameo: Santa's sleigh and reindeer fly across the sky above a 3★+ tower once over the holidays (a cameo only — "No presents, sorry", no cash)
 - ✅ Thief — Security catches them; otherwise they make off with some cash
 
+## Stats & readouts
+- ✅ Tower Statistics: population, tenancy, transport/access, parking & recycling demand, milestones
+- ✅ **Income breakdown** — average $/day per category (offices, condos, hotels, retail, food, entertainment) net of each line's overhead, plus an upkeep line and net, over a trailing quarter (the original's income report)
+- ✅ **Elevator utilization** — per-passenger-shaft average load (busiest first) in the stats screen, and a near-capacity warning in the shaft inspector
+- ✅ **Colored evaluation overlay** — a toggleable per-floor heatmap (Congestion / Occupancy / Satisfaction) with a legend, like the original's map views
+
 ## Time, audio, presentation
 - ✅ Day/night sky with the sun and moon both arcing across; lit interiors at night, lights-out when empty/asleep, shops show CLOSED off-hours
 - ✅ Weather: deterministic per-day clear / cloudy / rain (the `WeatherKind` states) — drifting clouds and rain streaks (purely cosmetic; off the gameplay RNG)
