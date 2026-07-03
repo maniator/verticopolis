@@ -14,15 +14,13 @@ import { UI, type Tool } from "./ui/UI";
 import { escapeHtml } from "./ui/escape";
 import { floorTag } from "./ui/format";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
+import { announceForPlacement, brushTiles, clampTile, dragRunTiles, snapX, stepCursor, type PlaceOutcome } from "./ui/placement";
 import { buildStatsHtml } from "./ui/statsHtml";
 import { OnboardingController, shouldArm } from "./ui/Onboarding";
 import { registerPWA } from "./pwa";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
-
-/** Tiles laid by a single tap/click of the Floor/Lobby tool (a drag extends). */
-const STRUCTURE_BRUSH = 8;
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -244,11 +242,7 @@ class GameApp {
   }
 
   private moveCursor(dTile: number, dFloor: number): void {
-    const c = this.kbCursor ?? { tile: Math.floor(GRID.width / 2), floor: 1 };
-    this.kbCursor = {
-      tile: Math.max(0, Math.min(GRID.width - 1, c.tile + dTile)),
-      floor: Math.max(GRID.minFloor, Math.min(GRID.maxFloor, c.floor + dFloor)),
-    };
+    this.kbCursor = stepCursor(this.kbCursor, dTile, dFloor);
     this.engine.ensureVisible(this.kbCursor.tile, this.kbCursor.floor);
     this.refreshCursorPreview();
     this.announceCursor();
@@ -302,25 +296,13 @@ class GameApp {
     const kind = this.tool.kind;
     const placed = this.placeSimpleBuild(kind, c.tile, c.floor);
     if (placed) {
-      this.announce(
-        placed.what === "paint"
-          ? placed.ok
-            ? `Placed ${FACILITIES[kind].name} on floor ${c.floor}`
-            : (placed.reason ?? `Can't place ${FACILITIES[kind].name} here`)
-          : placed.what === "flight"
-            ? placed.ok
-              ? `${FACILITIES[kind].name} built, floors ${c.floor} to ${c.floor + 1}`
-              : placed.reason
-            : placed.ok
-              ? `Placed ${FACILITIES[kind].name}`
-              : `Can't place ${FACILITIES[kind].name} here`,
-      );
+      this.announce(announceForPlacement(placed, kind, c.floor));
       this.refreshCursorPreview();
     } else if (this.isTransportTool()) {
       if (!this.kbAnchor) {
         // Snap the anchor column like the mouse path, so a wide shaft near the
         // right edge places instead of failing.
-        this.kbAnchor = { tile: this.snapX(kind, c.tile), floor: c.floor };
+        this.kbAnchor = { tile: snapX(kind, c.tile), floor: c.floor };
         this.refreshCursorPreview();
         this.announce(`${FACILITIES[kind].name} anchored at floor ${c.floor}. Move to the other end and press Enter.`);
       } else {
@@ -436,7 +418,7 @@ class GameApp {
         // the press; a drag-sized shaft instead anchors here and sizes with
         // the drag.
         if (this.placeSimpleBuild(this.tool.kind, tile, floor) === null) {
-          this.transportStart = { x: this.snapX(this.tool.kind, tile), floor };
+          this.transportStart = { x: snapX(this.tool.kind, tile), floor };
         }
       }
     };
@@ -610,22 +592,18 @@ class GameApp {
    *  keyboard cursor: paint a structure strip, drop a fixed two-floor flight,
    *  or place a room. Returns null for drag-sized shafts — that anchor
    *  gesture belongs to the caller. */
-  private placeSimpleBuild(
-    kind: FacilityKind,
-    tile: number,
-    floor: number,
-  ): { what: "paint"; ok: boolean; reason?: string } | { what: "flight"; ok: boolean; reason: string } | { what: "room"; ok: boolean } | null {
+  private placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
     if (kind === "floor" || kind === "lobby") {
       const r = this.paintBrush(kind, tile, floor);
       return { what: "paint", ok: r.placed > 0, reason: r.reason };
     }
     if (isFixedSpanTransport(kind)) {
-      const r = this.tryBuildTransport(kind, this.snapX(kind, tile), floor, floor + 1);
+      const r = this.tryBuildTransport(kind, snapX(kind, tile), floor, floor + 1);
       return { what: "flight", ok: r.ok, reason: r.reason };
     }
     if (this.isTransportTool()) return null;
     const before = this.sim.tower.units.length;
-    this.tryBuild(kind, floor, this.snapX(kind, tile));
+    this.tryBuild(kind, floor, snapX(kind, tile));
     return { what: "room", ok: this.sim.tower.units.length > before };
   }
 
@@ -641,7 +619,7 @@ class GameApp {
     }
     const kind = this.tool.kind;
     if (this.isTransportTool()) {
-      const x = this.snapX(kind, tile);
+      const x = snapX(kind, tile);
       if (isFixedSpanTransport(kind)) {
         // Stairs/escalators place as a fixed two-floor unit on tap, so the
         // ghost shows the real footprint and the real validity.
@@ -655,14 +633,14 @@ class GameApp {
     } else if (kind === "floor" || kind === "lobby") {
       // These tools lay a centered brush strip, not a single tile — so the
       // shadow must span the same run a click will build.
-      const tiles = this.brushTiles(tile);
+      const tiles = brushTiles(tile);
       const left = tiles[0];
       const span = tiles[tiles.length - 1] - left + 1;
-      const valid = this.sim.canBuild(kind, floor, this.snapX(kind, tile)).ok;
+      const valid = this.sim.canBuild(kind, floor, snapX(kind, tile)).ok;
       this.engine.preview = { kind, floor, x: left, span, valid };
       this.engine.transportPreview = null;
     } else {
-      const x = this.snapX(kind, tile);
+      const x = snapX(kind, tile);
       // Rooms auto-lay their own floor, so validity comes from canBuild (which
       // accounts for the floor tiles and their cost), not raw canPlace.
       const valid = this.sim.canBuild(kind, floor, x).ok;
@@ -1029,11 +1007,6 @@ class GameApp {
     this.commitUndo();
   }
 
-  private snapX(kind: FacilityKind, tile: number): number {
-    const w = FACILITIES[kind].width;
-    return Math.max(0, Math.min(GRID.width - w, tile));
-  }
-
   // ---- Actions -----------------------------------------------------------
 
   private tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
@@ -1072,31 +1045,11 @@ class GameApp {
     return v.reason ?? "A shaft can't go here — leave a clear column through built floors.";
   }
 
-  /**
-   * Paint a continuous floor/lobby run as the pointer drags, filling every cell
-   * between the last painted tile and this one — so dragging lays one long floor
-   * (as in the original) instead of scattered slabs when the drag moves fast.
-   * Cells are built outward from the anchor so each is adjacent to existing
-   * structure; midair cells simply fail to place, exactly as you'd expect.
-   */
-  /** Lay a wider centered run of floor/lobby from a single tap, building in
-   *  passes so each tile is reached once it has a supported neighbor. */
-  /** The tiles a single floor/lobby tap paints — a strip centered on the
-   *  cursor, clamped to the lot. Shared by the placement and its preview so the
-   *  shadow always matches what a click lays down. */
-  private brushTiles(tile: number): number[] {
-    const clampX = (x: number) => Math.max(0, Math.min(GRID.width - 1, x));
-    const half = Math.floor(STRUCTURE_BRUSH / 2);
-    const tiles: number[] = [];
-    for (let d = -half; d < STRUCTURE_BRUSH - half; d++) tiles.push(clampX(tile + d));
-    return tiles;
-  }
-
   /** Lay a brush strip; returns how many tiles were actually placed, and when
    *  zero, why — a strip that's already all this kind is not a failure, and a
    *  real refusal (no support, no money) carries the engine's reason. */
   private paintBrush(kind: FacilityKind, tile: number, floor: number): { placed: number; reason?: string } {
-    const tiles = this.brushTiles(tile);
+    const tiles = brushTiles(tile);
     let placed = 0;
     let reason: string | undefined;
     let progress = true;
@@ -1123,16 +1076,21 @@ class GameApp {
     return { placed, reason };
   }
 
+  /**
+   * Paint a continuous floor/lobby run as the pointer drags, filling every cell
+   * between the last painted tile and this one — so dragging lays one long floor
+   * (as in the original) instead of scattered slabs when the drag moves fast.
+   * Cells are built outward from the anchor so each is adjacent to existing
+   * structure; midair cells simply fail to place, exactly as you'd expect.
+   */
   private paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
-    const clampX = (x: number) => Math.max(0, Math.min(GRID.width - 1, x));
     if (!this.paint || this.paint.floor !== floor) {
-      this.tryBuild(kind, floor, clampX(tile), true);
+      this.tryBuild(kind, floor, clampTile(tile), true);
       this.paint = { tile, floor };
       return;
     }
-    const step = tile >= this.paint.tile ? 1 : -1;
-    for (let x = this.paint.tile + step; x !== tile + step; x += step) {
-      this.tryBuild(kind, floor, clampX(x), true);
+    for (const x of dragRunTiles(this.paint.tile, tile)) {
+      this.tryBuild(kind, floor, x, true);
     }
     this.paint = { tile, floor };
   }
