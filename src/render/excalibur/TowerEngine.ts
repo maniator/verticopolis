@@ -54,21 +54,28 @@ export const HEATMAP_LABELS: Record<HeatmapMode, { title: string; good: string; 
 /** The overlay modes in cycle order (a UI toggle steps Off → each → Off). */
 export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction"];
 
+/** Heatmap ramp stops (green → amber → red). Module-level so the color mixer
+ *  doesn't rebuild the table on every call (it runs once per visible floor per
+ *  frame while an overlay is active). */
+const HEAT_STOPS: readonly (readonly [number, number, number])[] = [
+  [63, 184, 90], // green (good)
+  [224, 169, 78], // amber
+  [214, 52, 47], // red (bad)
+];
+
 /** Severity 0..1 → an rgba tint (green → amber → red) at a fixed overlay alpha.
- *  Two linear segments through green/amber/red so the ramp reads cleanly. */
+ *  Two linear segments through the {@link HEAT_STOPS} so the ramp reads cleanly.
+ *  Allocation-light (no per-call array/closure) since it's on the draw path. */
 function heatColor(severity: number): string {
-  const s = Math.max(0, Math.min(1, severity));
-  const stops: [number, number, number][] = [
-    [63, 184, 90], // green (good)
-    [224, 169, 78], // amber
-    [214, 52, 47], // red (bad)
-  ];
+  const s = severity < 0 ? 0 : severity > 1 ? 1 : severity;
   const seg = s < 0.5 ? 0 : 1;
-  const t = s < 0.5 ? s / 0.5 : (s - 0.5) / 0.5;
-  const a = stops[seg];
-  const b = stops[seg + 1];
-  const mix = (i: number) => Math.round(a[i] + (b[i] - a[i]) * t);
-  return `rgba(${mix(0)},${mix(1)},${mix(2)},0.4)`;
+  const t = (s - seg * 0.5) * 2; // 0..1 within the segment
+  const a = HEAT_STOPS[seg];
+  const b = HEAT_STOPS[seg + 1];
+  const r = Math.round(a[0] + (b[0] - a[0]) * t);
+  const g = Math.round(a[1] + (b[1] - a[1]) * t);
+  const bl = Math.round(a[2] + (b[2] - a[2]) * t);
+  return `rgba(${r},${g},${bl},0.4)`;
 }
 
 /**
@@ -815,6 +822,11 @@ export class TowerEngine {
    * correctly with no manual clipping.
    */
   private makeSky(): void {
+    // cache:false is deliberate (like the overlay below): this is a full-viewport
+    // screen layer whose pixels change every frame — the sun/moon arc and clouds
+    // drift on the decorative clock. A cached canvas would have to flagDirty()
+    // every frame, which re-rasterizes AND re-uploads the whole texture anyway
+    // (see the RoomRec cache note) — no reuse to gain, just extra plumbing.
     this.skyCanvas = new ex.Canvas({
       width: this.viewWidth,
       height: this.viewHeight,
@@ -849,6 +861,14 @@ export class TowerEngine {
   }
 
   private makeOverlay(): void {
+    // cache:false is deliberate: this full-viewport screen layer changes every
+    // frame — the ruler always draws, the build-preview ghost tracks the cursor,
+    // rain animates, and the stats heatmap's tints follow the camera (their
+    // screen coords come from worldToScreen). Nothing here is stable across
+    // frames, so a cached canvas would need a per-frame flagDirty() that
+    // re-rasterizes and re-uploads the whole texture regardless — equal cost to
+    // cache:false, plus extra plumbing and a staleness-bug risk. The *expensive*
+    // input (the per-hour heatmap scan) is cached separately in drawStatsMap.
     this.overlayCanvas = new ex.Canvas({
       width: this.viewWidth,
       height: this.viewHeight,
