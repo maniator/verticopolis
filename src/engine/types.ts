@@ -109,9 +109,10 @@ export function isOperational(u: { state: UnitState }): boolean {
 }
 
 /** People are physically present (the canon "counts as live population" rule):
- *  working, sleeping, mid move-in, or on notice. A `vacating` tenant hasn't
- *  actually left yet — they still live/work there through the notice period —
- *  so they keep counting until the departure resolves. */
+ *  a settled/working tenant, a sleeping guest, or a lease on notice (`vacating`)
+ *  — who hasn't actually left yet and so keeps counting until the departure
+ *  resolves. (`moving_in` is a reserved lifecycle state the sim never currently
+ *  assigns; it stays in the set so it would count if a move-in phase is added.) */
 export function isPresent(u: { state: UnitState }): boolean {
   return (
     u.state === "occupied" ||
