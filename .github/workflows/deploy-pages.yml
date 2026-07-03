@@ -53,14 +53,45 @@ jobs:
       id-token: write
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      # Whichever attempt actually published reports the live URL.
+      url: ${{ steps.deploy3.outputs.page_url || steps.deploy2.outputs.page_url || steps.deploy1.outputs.page_url }}
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      # The Pages backend is intermittently unreliable in TWO ways: it queues
+      # past the action's 10-minute default, AND it returns fast transient
+      # failures (2026-07-02: an 8-minute wait on a SUCCESSFUL deploy, four
+      # timeouts in a row, and a healthy deploy that failed the publish step in
+      # ~5s). A single attempt drops otherwise-good releases on the floor — and a
+      # dropped deploy leaves clients a version behind. So try up to three times
+      # with backoff, each attempt given the same 30-minute timeout so a slow
+      # queue alone never counts as a failure. Only first-party
+      # actions/deploy-pages runs in this job — it holds pages:write +
+      # id-token:write, so no third-party action is trusted with that scope.
+      - name: Deploy to GitHub Pages (attempt 1)
+        id: deploy1
+        continue-on-error: true
         uses: actions/deploy-pages@v4
         with:
-          # The Pages backend queue sometimes backs up well past the action's
-          # 10-minute default (2026-07-02: an 8-minute wait on a SUCCESSFUL
-          # deploy, then four timeouts in a row). Wait up to 30 minutes before
-          # giving up so a slow queue doesn't fail otherwise-healthy deploys.
+          timeout: 1800000
+
+      - name: Back off before attempt 2
+        if: steps.deploy1.outcome == 'failure'
+        run: sleep 30
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deploy2
+        if: steps.deploy1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+        with:
+          timeout: 1800000
+
+      - name: Back off before attempt 3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        run: sleep 60
+      # Final attempt: NOT continue-on-error, so if it too fails the job fails
+      # (and the run is visibly red) rather than passing on a dropped deploy.
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: deploy3
+        if: steps.deploy1.outcome == 'failure' && steps.deploy2.outcome == 'failure'
+        uses: actions/deploy-pages@v4
+        with:
           timeout: 1800000
