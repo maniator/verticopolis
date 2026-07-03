@@ -137,14 +137,19 @@ export class InspectorController {
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
         const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
+        // Round UP so "time remaining" never under-promises, and once the notice
+        // has elapsed say so plainly — the tenant leaves on the next hourly tick,
+        // not in a phantom extra hour.
         const left =
-          minsLeft >= 24 * 60
-            ? `~${Math.round(minsLeft / (24 * 60))} day(s)`
-            : `~${Math.max(1, Math.round(minsLeft / 60))} hour(s)`;
+          minsLeft <= 0
+            ? "any moment now"
+            : minsLeft >= 24 * 60
+              ? `in ~${Math.ceil(minsLeft / (24 * 60))} day(s)`
+              : `in ~${Math.ceil(minsLeft / 60)} hour(s)`;
         const now = Math.round(u.satisfaction * 100);
         const target = Math.round(VACATE_RESCIND * 100);
         notice =
-          `<div style="color:var(--bad)">Giving notice — ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves in ${left}.</div>` +
+          `<div style="color:var(--bad)">Giving notice — ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
           `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
       }
       this.deps.ui.showInspector(
