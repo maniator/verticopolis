@@ -52,9 +52,13 @@ export const SAVE_VERSION = 1;
 const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
 
 /** Satisfaction a vacating tenant must climb back to before they rescind their
- *  notice and stay: high enough that a single served tick isn't "fixed", low
- *  enough that a genuine recovery is rewarded within a game-day. */
-const VACATE_RESCIND = 0.25;
+ *  notice and stay. Set at 0.40 (not a hair above zero) so a tower that merely
+ *  *stabilizes* a unit — nurses it off the floor but never actually makes it a
+ *  good place to be — still loses the tenant: "stabilized" ≠ "fixed". A genuine
+ *  fix reaches 0.40 in ~8 served hours (recovery is +0.05/hr), well inside the
+ *  notice window. Exported because the inspector reads it to show the player the
+ *  exact recovery target (the "inform before you hurt them" contract). */
+export const VACATE_RESCIND = 0.4;
 
 /**
  * Save-format migration seam. Runs before the field-level coercion in

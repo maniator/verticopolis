@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Simulation, ECON } from "../engine/Simulation";
+import { Simulation, ECON, VACATE_RESCIND } from "../engine/Simulation";
 import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../engine/facilities";
 
@@ -634,6 +634,27 @@ describe("Simulation time", () => {
     const noticeToasts = sim.log.filter((e) => /gave notice/i.test(e.text));
     expect(noticeToasts.length).toBe(1);
     expect(noticeToasts[0].text).toMatch(/4 tenants gave notice/);
+  });
+
+  it("a unit only stabilized below the 0.40 rescind bar still evicts (stabilized ≠ fixed)", () => {
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 1; f <= 5; f++)
+      for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
+    expect(sim.buildTransport("elevatorStandard", x0 + 11, 1, 5).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 4);
+    const r = sim.tower.place("office", 5, x0);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    // On notice, notice window elapsed, nursed back ABOVE the old 0.25 bar but
+    // still BELOW the new 0.40 one: under the retune this must still leave.
+    office.state = "vacating";
+    office.vacateReason = "access";
+    office.satisfaction = 0.3;
+    office.vacateAt = 0;
+    expect(0.3).toBeGreaterThan(0.25); // would have rescinded under the old rule
+    expect(0.3).toBeLessThan(VACATE_RESCIND); // but 0.30 < 0.40, so it doesn't now
+    sim.tick(60);
+    expect(office.state).toBe("empty");
   });
 });
 

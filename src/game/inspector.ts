@@ -1,4 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
+import { VACATE_RESCIND } from "../engine/Simulation";
 import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
 import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
@@ -127,8 +128,11 @@ export class InspectorController {
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
-      // A tenant on notice: spell out that they're leaving, why, and how long is
-      // left, so the card reads as an actionable warning rather than raw state.
+      // A tenant on notice: spell out that they're leaving, why, how long is
+      // left, and the exact recovery bar they must clear — the "inform before you
+      // hurt them" contract, so the eviction is never a surprise. The countdown
+      // and the current-vs-target read recompute on every hover, so they tick
+      // down live as the game clock advances.
       const statusText = u.state === "vacating" ? "on notice — tenant leaving" : u.state;
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
@@ -137,9 +141,11 @@ export class InspectorController {
           minsLeft >= 24 * 60
             ? `~${Math.round(minsLeft / (24 * 60))} day(s)`
             : `~${Math.max(1, Math.round(minsLeft / 60))} hour(s)`;
+        const now = Math.round(u.satisfaction * 100);
+        const target = Math.round(VACATE_RESCIND * 100);
         notice =
           `<div style="color:var(--bad)">Giving notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Leaves in ${left}.</div>` +
-          `<div>Fix the cause and let satisfaction climb back to 25% to keep them.</div>`;
+          `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
       }
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
