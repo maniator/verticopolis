@@ -70,7 +70,7 @@ abstraction · ⬜ not present.
 - ✅ Grand lobbies: the ground concourse gets marble, gilded cornice, columns, red carpet and chandeliers that glow after dark; sky lobbies read as cooler stone with planters and framed prints
 
 ## Save / platform
-- ✅ Autosave + multiple save slots, JSON export/import (`localStorage`)
+- ✅ Autosave + multiple save slots, `.vctower` tower-file export/import (`localStorage`)
 - ◑ Import of original `.TWR` saves — decoder is a documented v2 stub
 - ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
 

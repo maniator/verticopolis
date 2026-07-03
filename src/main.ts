@@ -133,7 +133,10 @@ class GameApp {
     this.saveLoad = new SaveLoad({
       getSim: () => this.sim,
       adoptSim: (sim) => this.adoptSim(sim),
-      ui: { toast: (text, kind) => this.ui.toast(text, kind) },
+      ui: {
+        toast: (text, kind) => this.ui.toast(text, kind),
+        downloadFile: (filename, contents) => this.ui.downloadFile(filename, contents),
+      },
       showBootMessage,
       armOnboarding: () => {
         this.onboarding.arm(this.sim);
@@ -169,8 +172,8 @@ class GameApp {
       },
       onSave: () => this.saveLoad.save(),
       onLoad: () => this.saveLoad.load(),
-      onExport: () => this.ui.showExport(SaveGame.export(this.sim)),
-      onImport: (json) => this.saveLoad.importGame(json),
+      onExport: () => void this.saveLoad.exportGame(),
+      onImport: (data) => void this.saveLoad.importGame(data),
       onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
       onNew: () => this.saveLoad.newGame(),
       onToggleAudio: () => {

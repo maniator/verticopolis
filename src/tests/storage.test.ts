@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
@@ -163,17 +163,111 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
-  it("exports and imports JSON", () => {
+  it("exports a .vctower container (magic line + packed payload, not raw JSON) and imports it back", async () => {
     const sim = sampleGame();
-    const json = SaveGame.export(sim);
-    const loaded = SaveGame.import(json);
+    const file = await SaveGame.export(sim);
+    // The made-up format: first line is the magic, and the body is NOT
+    // copy-paste JSON anymore.
+    expect(file.startsWith("VCTOWER1\n")).toBe(true);
+    expect(() => JSON.parse(file)).toThrow();
+    const loaded = await SaveGame.import(file);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.star).toBe(sim.star);
   });
 
-  it("rejects malformed imports", () => {
-    expect(() => SaveGame.import("{}")).toThrow();
-    expect(() => SaveGame.import("not json")).toThrow();
+  it("exports files smaller than the old pretty-printed JSON format", async () => {
+    const sim = sampleGame();
+    const file = await SaveGame.export(sim);
+    const oldFormat = JSON.stringify(sim.serialize(), null, 2);
+    // The whole point of the compressed container: a fraction of the JSON it
+    // replaced, not just marginally under it.
+    expect(file.length).toBeLessThan(oldFormat.length / 2);
+  });
+
+  it("names the export file after the tower", () => {
+    const sim = sampleGame();
+    sim.tower.towerName = "Naftali's Tower #1";
+    expect(SaveGame.exportFilename(sim)).toBe("naftali-s-tower-1.vctower");
+    sim.tower.towerName = "✨✨"; // slugs to nothing → fallback
+    expect(SaveGame.exportFilename(sim)).toBe("tower.vctower");
+  });
+
+  it("still imports a legacy raw-JSON export", async () => {
+    const sim = sampleGame();
+    const loaded = await SaveGame.import(JSON.stringify(sim.serialize(), null, 2));
+    expect(loaded.money).toBe(sim.money);
+  });
+
+  it("rejects malformed imports", async () => {
+    await expect(SaveGame.import("{}")).rejects.toThrow();
+    await expect(SaveGame.import("not json")).rejects.toThrow();
+    await expect(SaveGame.import("[1,2,3]")).rejects.toThrow(); // parses, fails validation
+    // A magic line over a garbage body must fail loudly, not half-load.
+    await expect(SaveGame.import("VCTOWER1\n@@not base64@@")).rejects.toThrow();
+    await expect(SaveGame.import("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
+  });
+
+  it("reports a recognized-but-broken tower file as damaged, not as 'not a tower file'", async () => {
+    // Valid base64 over bytes that are not a deflate stream.
+    await expect(SaveGame.import("VCTOWER1\n" + btoa('{"minutes":'))).rejects.toThrow(/damaged/);
+    // A truncated real export: recognized container, broken payload.
+    const file = await SaveGame.export(sampleGame());
+    await expect(SaveGame.import(file.slice(0, Math.floor(file.length / 2)))).rejects.toThrow(/damaged/);
+  });
+
+  it("tells the player to update when the file comes from a newer container version", async () => {
+    await expect(SaveGame.import("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
+  });
+
+  it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
+    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 64MB
+    // cap, from a tiny compressed input — i.e. a real bomb, not corrupt bytes
+    // (those land on the 'damaged' path instead). 65MB of zeros packs to a few KB.
+    const huge = new Uint8Array(65 * 1024 * 1024); // all zeros → highly compressible
+    const cs: GenericTransformStream = new CompressionStream("deflate-raw");
+    const packed = new Uint8Array(
+      await new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(huge);
+            c.close();
+          },
+        }).pipeThrough(cs),
+      ).arrayBuffer(),
+    );
+    // Chunked btoa (matches SaveGame's own encoder — no node Buffer in the browser).
+    let bin = "";
+    for (let i = 0; i < packed.length; i += 0x8000) bin += String.fromCharCode(...packed.subarray(i, i + 0x8000));
+    await expect(SaveGame.import("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
+  });
+
+  describe("when the browser lacks the compression API", () => {
+    // deflate-raw is a 2022+ browser feature; on an older browser both the
+    // export and the import of a compressed file must fail with an honest
+    // "your browser is too old" message — not a silent failure, and NOT
+    // "this file is damaged" (which would blame a perfectly good save).
+    afterEach(() => vi.unstubAllGlobals());
+    const breakCompression = () =>
+      vi.stubGlobal(
+        "CompressionStream",
+        class {
+          constructor() {
+            throw new TypeError("Unsupported format: deflate-raw");
+          }
+        },
+      );
+
+    it("export reports the browser is too old, not a generic failure", async () => {
+      breakCompression();
+      await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
+    });
+
+    it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
+      // A real, healthy container built while compression WAS available.
+      const file = await SaveGame.export(sampleGame());
+      breakCompression();
+      await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
+    });
   });
 
   it("returns null when no save exists", () => {
@@ -206,13 +300,13 @@ describe("SaveGame", () => {
     expect(loaded.tower.units.length).toBe(sim.tower.units.length);
   });
 
-  it("drops units with an unrecognized kind on load", () => {
+  it("drops units with an unrecognized kind on load", async () => {
     const sim = sampleGame();
     const data = sim.serialize();
     const before = data.units.length;
     // Inject a bogus unit as if from a tampered/old save file.
     (data.units as any).push({ ...data.units[0], id: 99999, kind: "spaceport" });
-    const loaded = SaveGame.import(JSON.stringify(data));
+    const loaded = await SaveGame.import(JSON.stringify(data));
     expect(loaded.tower.units.length).toBe(before);
     expect(loaded.tower.units.some((u) => (u.kind as string) === "spaceport")).toBe(false);
   });

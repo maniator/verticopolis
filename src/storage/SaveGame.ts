@@ -4,7 +4,8 @@ import type { SerializedGame } from "../engine/types";
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
  * handful of named manual slots, so the player can keep multiple towers. Also
- * supports JSON export/import for sharing or backups.
+ * supports export/import of Verticopolis tower files (.vctower) for sharing
+ * or backups.
  *
  * (localStorage suffices for a single save object well under its ~5MB quota.
  * IndexedDB would only be needed for very large numbers of saves; see the
@@ -14,6 +15,19 @@ import type { SerializedGame } from "../engine/types";
 const AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
+
+/**
+ * The Verticopolis tower-file container (.vctower): a magic first line naming
+ * the format and its version, then the save payload — deflate-compressed
+ * JSON, base64-encoded. The file is deliberately NOT raw JSON — exports
+ * travel as downloads and come back through the file picker, never through a
+ * copy-paste textarea — and the compression makes it a fraction of the JSON
+ * it replaces (a ~1.2MB tower packs to ~40KB). Bumping the container format
+ * later means a new magic line (VCTOWER2), with this one still accepted on
+ * import.
+ */
+export const TOWER_FILE_EXT = ".vctower";
+const TOWER_FILE_MAGIC = "VCTOWER1";
 
 export interface SlotInfo {
   slot: number | "auto";
@@ -108,18 +122,154 @@ export const SaveGame = {
     localStorage.setItem(key, JSON.stringify(data));
   },
 
-  export(sim: Simulation): string {
-    return JSON.stringify(sim.serialize(), null, 2);
+  /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
+  async export(sim: Simulation): Promise<string> {
+    if (!compressionSupported()) {
+      throw new Error("This browser is too old to create tower files — try a current browser.");
+    }
+    const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
+    return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
 
-  import(json: string): Simulation {
-    const data = JSON.parse(json) as SerializedGame;
+  /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
+  exportFilename(sim: Simulation): string {
+    const slug = (sim.tower.towerName || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    return (slug || "tower") + TOWER_FILE_EXT;
+  },
+
+  /** Parse a .vctower file. Raw-JSON exports from older builds still load. */
+  async import(text: string): Promise<Simulation> {
+    const trimmed = text.trim();
+    // Match the whole VCTOWER family, not just this version's magic, so a file
+    // from a newer build gets an honest "update the game" instead of falling
+    // through to the JSON path and reporting gibberish as "not a tower file".
+    const magic = /^VCTOWER(\d+)/.exec(trimmed);
+    let data: SerializedGame;
+    if (magic) {
+      if (magic[0] !== TOWER_FILE_MAGIC) {
+        throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+      }
+      // Distinguish "your browser can't decompress" from "this file is broken"
+      // BEFORE the try below — otherwise a missing API blames a healthy file.
+      if (!compressionSupported()) {
+        throw new Error("This browser is too old to open compressed tower files — try a current browser.");
+      }
+      try {
+        // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
+        const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
+        // fatal decoder: a flipped byte must fail the import loudly, never
+        // silently half-load a tower with U+FFFD-mangled strings.
+        data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
+      } catch (err) {
+        // A crafted tiny file can inflate to gigabytes (a decompression bomb);
+        // inflate() caps the output and throws this, distinct from "damaged".
+        if (err instanceof TowerTooLargeError) {
+          throw new Error("This tower file is too large to open safely.");
+        }
+        // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
+        // the container was recognized, so the file is OURS but broken. Say so.
+        throw new Error("This tower file is damaged and can't be read.");
+      }
+    } else {
+      try {
+        data = JSON.parse(trimmed) as SerializedGame;
+      } catch {
+        throw new Error("Not a Verticopolis tower file.");
+      }
+    }
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
-      throw new Error("Not a valid SimTower save file.");
+      throw new Error("Not a valid tower save file.");
     }
     return Simulation.deserialize(data);
   },
 };
+
+// Base64 over raw bytes, chunked so String.fromCharCode never sees an argument
+// list long enough to blow the stack.
+function toBase64(bytes: Uint8Array): string {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  }
+  return btoa(bin);
+}
+
+function fromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+// True when this browser can both compress and decompress raw deflate. Built
+// by actually constructing the streams: the "deflate-raw" format string is
+// newer than CompressionStream itself (Chrome had the API before the format),
+// so a `typeof` check alone would pass on browsers that then throw at use.
+function compressionSupported(): boolean {
+  try {
+    new CompressionStream("deflate-raw");
+    new DecompressionStream("deflate-raw");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Hard ceiling on a decompressed tower. A real maxed-out tower is comfortably
+// under 2MB of JSON; 64MB is generous headroom while still defusing a
+// decompression bomb (a few-KB file that would otherwise inflate to gigabytes
+// and hang the tab before validation ever runs).
+const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+
+/** Thrown by inflate() when a decompressing stream exceeds MAX_INFLATED_BYTES. */
+class TowerTooLargeError extends Error {}
+
+// deflate-raw via the native streams API (no zlib/gzip framing — the magic
+// line already identifies the format, and raw deflate is the smallest).
+function deflate(bytes: Uint8Array): Promise<Uint8Array> {
+  // Compressing our own bounded JSON — no cap needed on the output.
+  return pipe(bytes, new CompressionStream("deflate-raw"));
+}
+
+function inflate(bytes: Uint8Array): Promise<Uint8Array> {
+  // Decompressing untrusted input — cap the output to bound bombs.
+  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
+}
+
+async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxBytes = Infinity): Promise<Uint8Array> {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }).pipeThrough(transform);
+  // Read chunk by chunk so a bomb is aborted mid-inflation, before it can
+  // materialize a giant buffer — rather than Response().arrayBuffer(), which
+  // would buffer the whole (unbounded) output first.
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new TowerTooLargeError();
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
+}
 
 function nowMs(): number {
   // Date is unavailable in the deterministic engine, but the storage layer is

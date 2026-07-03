@@ -1,6 +1,6 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
-import type { SlotInfo } from "../storage/SaveGame";
+import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import { escapeHtml } from "./escape";
 
@@ -22,7 +22,8 @@ export interface UICallbacks {
   onSave(): void;
   onLoad(): void;
   onExport(): void;
-  onImport(json: string): void;
+  /** A picked file's text contents — a .vctower export (or a legacy raw-JSON one). */
+  onImport(data: string): void;
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   onNew(): void;
   onToggleAudio(): boolean; // returns new muted state
@@ -189,7 +190,7 @@ export class UI {
         this.cb.onNew(),
       );
     });
-    document.getElementById("btn-export")!.addEventListener("click", () => this.cb.onExport());
+    document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
@@ -305,8 +306,8 @@ export class UI {
       <h2>Saved Towers</h2>
       <div class="slots well">${slots.map(row).join("")}</div>
       <div class="modal-actions">
-        <button class="btn" data-act="export">Export JSON</button>
-        <button class="btn" data-act="import">Import JSON</button>
+        <button class="btn" data-act="export">Export to file</button>
+        <button class="btn" data-act="import">Import from file</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`);
     box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
@@ -328,7 +329,19 @@ export class UI {
         this.cb.onShowSaves();
       }),
     );
-    this.wireActions(box, { export: () => this.cb.onExport(), import: () => this.openImport() });
+    // Close the saves dialog first: <dialog>'s top layer paints over the toast
+    // rail, so export feedback would be invisible behind the open modal — and
+    // the confirm dialog / file picker replace it rather than stacking on it.
+    this.wireActions(box, {
+      export: () => {
+        this.closeModal();
+        this.confirmExport();
+      },
+      import: () => {
+        this.closeModal();
+        this.openImport();
+      },
+    });
   }
 
   setTowerName(name: string): void {
@@ -615,10 +628,10 @@ export class UI {
     return x;
   }
 
-  confirmModal(title: string, body: string, onYes: () => void): void {
+  confirmModal(title: string, body: string, onYes: () => void, yesLabel = "Confirm"): void {
     const box = this.openModal(
       `<h2>${title}</h2><p>${body}</p>
-       <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">Confirm</button></div>`,
+       <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">${yesLabel}</button></div>`,
     );
     this.wireActions(
       box,
@@ -635,69 +648,61 @@ export class UI {
     );
   }
 
-  showExport(json: string): void {
-    const box = this.openModal(
-      `<h2>Export tower</h2><p>Copy this JSON or download it as a file.</p>
-       <textarea class="field" readonly>${escapeHtml(json)}</textarea>
-       <div class="modal-actions">
-         <button class="btn primary" data-act="download">Download .json</button>
-         <button class="btn" data-act="close">Close</button>
-       </div>`,
+  /** Export is deliberately two-step: the tower is not serialized, packed, or
+   *  downloaded until the player actually clicks Export in this dialog. */
+  private confirmExport(): void {
+    this.confirmModal(
+      "Export tower?",
+      `Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.`,
+      () => this.cb.onExport(),
+      "Export",
     );
-    this.wireActions(box, {
-      download: () => {
-      const blob = new Blob([json], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "tower.json";
-      a.click();
-      URL.revokeObjectURL(url);
-      },
-    });
-    box.querySelector("textarea")?.addEventListener("focus", (e) => (e.target as HTMLTextAreaElement).select());
   }
 
+  /** Hand the player a file download (the export path). Pure DOM plumbing:
+   *  callers decide the name and contents (see SaveGame.export). */
+  downloadFile(filename: string, contents: string): void {
+    // octet-stream (not application/json — the payload isn't) so the browser
+    // downloads our made-up .vctower type instead of trying to display it.
+    const blob = new Blob([contents], { type: "application/octet-stream" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.click();
+    // Revoking in the same task can abort the download on engines that fetch
+    // the blob URL asynchronously (Safari/Firefox) — and this is the ONLY way
+    // to get a tower out now. Give the navigation a generous head start.
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  }
+
+  /** Import goes straight to the file picker — exports are .vctower downloads
+   *  now, so there is deliberately no paste-a-save textarea anymore. */
   private openImport(): void {
-    const box = this.openModal(
-      `<h2>Import tower</h2>
-       <p>Paste a Verticopolis JSON export, or choose a file. Original SimTower
-       <code>.TWR</code> saves are recognized (full conversion is planned for a future update).</p>
-       <textarea class="field" placeholder="Paste save JSON here…"></textarea>
-       <div class="modal-actions">
-         <button class="btn" data-act="file">Choose file…</button>
-         <button class="btn" data-act="close">Cancel</button>
-         <button class="btn primary" data-act="load">Load</button>
-       </div>`,
-    );
-    const ta = box.querySelector("textarea")!;
-    this.wireActions(box, {
-      load: () => {
-        this.closeModal();
-        this.cb.onImport(ta.value);
-      },
-    });
-    box.querySelector('[data-act="file"]')!.addEventListener("click", () => {
-      const input = document.getElementById("import-file") as HTMLInputElement;
-      input.value = "";
-      input.onchange = () => {
-        const file = input.files?.[0];
-        if (!file) return;
-        // Binary .TWR legacy saves are read as bytes; JSON exports as text.
-        const read = (as: "buffer" | "text", done: (result: FileReader["result"]) => void) => {
-          const reader = new FileReader();
-          reader.onload = () => {
-            this.closeModal();
-            done(reader.result);
-          };
-          if (as === "buffer") reader.readAsArrayBuffer(file);
-          else reader.readAsText(file);
-        };
-        if (/\.twr$/i.test(file.name)) read("buffer", (r) => this.cb.onImportLegacy(r as ArrayBuffer, file.name));
-        else read("text", (r) => this.cb.onImport(String(r)));
-      };
-      input.click();
-    });
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    // Single source of truth for our own extension (TOWER_FILE_EXT); the
+    // octet-stream entry keeps .vctower selectable on pickers that filter by
+    // MIME type and drop extensions they can't map (Android). Content is
+    // validated on load either way.
+    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.json,application/json,.twr,.TWR`;
+    input.value = "";
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      // A file that vanishes or errors mid-read must not fail silently — the
+      // launching dialog is already gone by the time the read runs.
+      reader.onerror = () => this.toast("Couldn't read that file — please try again.", "bad");
+      // Binary .TWR legacy saves are read as bytes; tower files as text.
+      if (/\.twr$/i.test(file.name)) {
+        reader.onload = () => this.cb.onImportLegacy(reader.result as ArrayBuffer, file.name);
+        reader.readAsArrayBuffer(file);
+      } else {
+        reader.onload = () => this.cb.onImport(String(reader.result));
+        reader.readAsText(file);
+      }
+    };
+    input.click();
   }
 
   showHelp(): void {

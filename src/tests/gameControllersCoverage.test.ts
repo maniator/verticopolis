@@ -30,12 +30,17 @@ function last<T>(arr: T[]): T {
 function fakes() {
   const toasts: { text: string; kind?: "info" | "good" | "bad" | "money" }[] = [];
   const sfx: string[] = [];
+  const downloads: { filename: string; contents: string }[] = [];
   return {
     toasts,
     sfx,
+    downloads,
     ui: {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
+      },
+      downloadFile: (filename: string, contents: string) => {
+        downloads.push({ filename, contents });
       },
     },
     audio: {
@@ -561,9 +566,34 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "New version ready — saved your tower, updating…", kind: "info" }]);
   });
 
-  it("importGame adopts a Simulation from a SaveGame.export round-trip", () => {
+  it("exportGame downloads a .vctower file named after the tower and toasts the size", async () => {
+    sim.tower.towerName = "Vertic Opolis";
+    await saveLoad.exportGame();
+    expect(f.downloads).toHaveLength(1);
+    expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
+    // The controller's contract is "download exactly what SaveGame.export
+    // produces" — the container format itself is pinned by storage.test.ts.
+    expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
+    expect(f.toasts).toHaveLength(1);
+    expect(f.toasts[0].kind).toBe("good");
+    expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\) — check your downloads\.$/);
+  });
+
+  it("exportGame toasts the failure instead of swallowing it (main.ts fires it with `void`)", async () => {
+    // Simulate a browser that can't compress: SaveGame.export rejects, and the
+    // controller must surface that as a toast, not download nothing in silence.
+    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This browser is too old to create tower files — try a current browser."));
+    await saveLoad.exportGame();
+    expect(f.downloads).toHaveLength(0);
+    expect(f.toasts).toEqual([
+      { text: "Export failed: This browser is too old to create tower files — try a current browser.", kind: "bad" },
+    ]);
+    spy.mockRestore();
+  });
+
+  it("importGame adopts a Simulation from a SaveGame.export round-trip", async () => {
     sim.money = 777_777;
-    saveLoad.importGame(SaveGame.export(sim));
+    await saveLoad.importGame(await SaveGame.export(sim));
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(777_777);

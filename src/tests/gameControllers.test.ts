@@ -34,6 +34,7 @@ function fakes() {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
+      downloadFile: () => {},
     },
     audio: {
       sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "click") => {
@@ -249,8 +250,8 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(f.toasts).toEqual([{ text: "New tower founded. Good luck!", kind: "good" }]);
   });
 
-  it("importGame rejects garbage JSON with a toast and never touches the sim", () => {
-    saveLoad.importGame("{ this is not a tower");
+  it("importGame rejects garbage JSON with a toast and never touches the sim", async () => {
+    await saveLoad.importGame("{ this is not a tower");
     expect(adopted).toHaveLength(0);
     expect(f.toasts).toHaveLength(1);
     expect(f.toasts[0].kind).toBe("bad");

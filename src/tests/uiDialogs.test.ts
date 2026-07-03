@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UI, type UICallbacks } from "../ui/UI";
 
 /**
@@ -112,10 +112,14 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(dialog().innerHTML).toBe(""); // closeModal also empties the dialog
   });
 
-  it("binds caller-supplied [data-act] handlers (saves dialog export)", () => {
+  it("binds caller-supplied [data-act] handlers (saves dialog export opens the confirm dialog)", () => {
     const { ui, cb } = makeUI();
     ui.showSaves([]);
     click('[data-act="export"]');
+    // The handler ran — it swapped the saves dialog for the export confirm —
+    // but nothing is exported until the player clicks Export in there.
+    expect(cb.onExport).not.toHaveBeenCalled();
+    click('[data-act="yes"]');
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
@@ -316,6 +320,95 @@ describe("renderEditor — patch in place on same key, rebuild on new key", () =
     expect(ui.isEditorOpen()).toBe(true);
     editorEl().querySelector<HTMLElement>(".ed-close")!.click();
     expect(ui.isEditorOpen()).toBe(false);
+  });
+});
+
+describe("export/import — file downloads and the file picker, no copy-paste path", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete (URL as { createObjectURL?: unknown }).createObjectURL;
+    delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
+  });
+
+  it("downloadFile clicks a temporary <a download> at a blob URL of the contents, revoking it only later", () => {
+    vi.useFakeTimers();
+    const { ui } = makeUI();
+    const blobs: Blob[] = [];
+    (URL as { createObjectURL?: unknown }).createObjectURL = vi.fn((b: Blob) => {
+      blobs.push(b);
+      return "blob:vctower";
+    });
+    const revoke = ((URL as { revokeObjectURL?: unknown }).revokeObjectURL = vi.fn());
+    const clicks: { href: string; download: string }[] = [];
+    vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(function (this: HTMLAnchorElement) {
+      clicks.push({ href: this.href, download: this.download });
+    });
+
+    ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload");
+    expect(clicks).toEqual([{ href: "blob:vctower", download: "my-tower.vctower" }]);
+    expect(blobs).toHaveLength(1);
+    // Revoking in the click's own task can abort the download on engines that
+    // resolve blob URLs asynchronously — it must be deferred, then still happen.
+    expect(revoke).not.toHaveBeenCalled();
+    vi.runAllTimers();
+    expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:vctower");
+    vi.useRealTimers();
+  });
+
+  it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-export")!.click();
+    expect(dialog().open).toBe(true);
+    expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
+    const yes = dialog().querySelector('[data-act="yes"]')!;
+    expect(yes.textContent).toBe("Export"); // not a generic "Confirm"
+    click('[data-act="no"]'); // cancel → still no export
+    expect(cb.onExport).not.toHaveBeenCalled();
+
+    document.getElementById("btn-export")!.click();
+    click('[data-act="yes"]');
+    expect(cb.onExport).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false); // the toast isn't hidden under the modal
+  });
+
+  it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
+    makeUI();
+    const picker = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    expect(picker).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false);
+    expect(document.querySelector("textarea")).toBeNull();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    expect(input.accept.startsWith(".vctower")).toBe(true);
+  });
+
+  it("the Saved Towers dialog closes when the picker launches, and a picked tower file routes to onImport", async () => {
+    const { ui, cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    ui.showSaves([]); // launch the picker from the Saved Towers dialog
+    click('[data-act="import"]');
+    // The dialog's top layer would paint over any import feedback — it yields
+    // to the picker immediately rather than lingering underneath it.
+    expect(dialog().open).toBe(false);
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    const file = new File(["VCTOWER1\npayload"], "tower.vctower");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+  });
+
+  it("a picked .TWR legacy file is read as bytes and routed to onImportLegacy", async () => {
+    const { cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    const file = new File([new Uint8Array([1, 2, 3])], "MYTOWER.TWR");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImportLegacy).toHaveBeenCalledTimes(1));
+    const [buf, name] = vi.mocked(cb.onImportLegacy).mock.calls[0];
+    expect(name).toBe("MYTOWER.TWR");
+    expect(new Uint8Array(buf)).toEqual(new Uint8Array([1, 2, 3]));
   });
 });
 

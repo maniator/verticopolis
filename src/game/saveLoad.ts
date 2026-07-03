@@ -21,7 +21,7 @@ export interface SaveLoadDeps {
    *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
-  ui: Pick<UI, "toast">;
+  ui: Pick<UI, "toast" | "downloadFile">;
   /** Full-screen boot card (lives with the boot functions in main.ts). */
   showBootMessage(msg: string, withReload?: boolean): void;
   /** Arm first-run onboarding on the just-adopted sim. */
@@ -117,9 +117,26 @@ export class SaveLoad {
     }
   }
 
-  importGame(json: string): void {
+  /** Hand the player their tower as a compressed .vctower file download.
+   *  Only ever called from the export confirm dialog — the tower is not
+   *  serialized or packed until the player has actually clicked Export. */
+  async exportGame(): Promise<void> {
     try {
-      this.deps.adoptSim(SaveGame.import(json));
+      const sim = this.deps.getSim();
+      const file = await SaveGame.export(sim);
+      this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
+      // The container is pure ASCII, so string length == bytes on disk.
+      this.deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB) — check your downloads.`, "good");
+    } catch (err) {
+      // Never fail silently: main.ts fires this with `void`, so an unhandled
+      // rejection here would leave the player with no download and no feedback.
+      this.deps.ui.toast("Export failed: " + (err as Error).message, "bad");
+    }
+  }
+
+  async importGame(data: string): Promise<void> {
+    try {
+      this.deps.adoptSim(await SaveGame.import(data));
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.toast("Import failed: " + (err as Error).message, "bad");
