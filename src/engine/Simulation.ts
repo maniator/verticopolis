@@ -48,13 +48,13 @@ export const SAVE_VERSION = 1;
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving — a grace window the player can use
- *  to fix the cause. Two in-game days. */
-export const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
+ *  to fix the cause. Two in-game days. Module-local: only the churn loop reads it. */
+const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
 
 /** Satisfaction a vacating tenant must climb back to before they rescind their
  *  notice and stay: high enough that a single served tick isn't "fixed", low
  *  enough that a genuine recovery is rewarded within a game-day. */
-export const VACATE_RESCIND = 0.25;
+const VACATE_RESCIND = 0.25;
 
 /**
  * Save-format migration seam. Runs before the field-level coercion in

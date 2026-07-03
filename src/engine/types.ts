@@ -86,10 +86,13 @@ export function isUnitState(v: unknown): v is UnitState {
  *  drains it to zero, so it can annoy but never on its own evict. */
 export type VacateReason = "access" | "congestion" | "rent";
 
-/** Player-facing phrase for each departure cause (toasts + inspector). */
+/** Player-facing phrase for each departure cause (toasts + inspector). Kept
+ *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
+ *  stairs, or escalator) and congestion capacity counts them all, so the copy
+ *  must not single out elevators. */
 export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
-  access: "poor elevator access",
-  congestion: "overcrowded elevators",
+  access: "no route to the lobby",
+  congestion: "overcrowded elevators & stairs",
   rent: "rent set too high",
 };
 

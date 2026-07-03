@@ -571,7 +571,7 @@ describe("Simulation time", () => {
     // Riding out the notice period with the floor still unreachable → they leave.
     for (let i = 0; i < 24 * 3; i++) sim.tick(60);
     expect(office.state).toBe("empty");
-    expect(sim.log.some((e) => /A tenant left .*poor elevator access/.test(e.text))).toBe(true);
+    expect(sim.log.some((e) => /A tenant left .*no route to the lobby/.test(e.text))).toBe(true);
   });
 
   it("a tenant on notice rescinds when access is restored in time", () => {
