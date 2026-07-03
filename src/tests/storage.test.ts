@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
@@ -217,6 +217,35 @@ describe("SaveGame", () => {
 
   it("tells the player to update when the file comes from a newer container version", async () => {
     await expect(SaveGame.import("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
+  });
+
+  describe("when the browser lacks the compression API", () => {
+    // deflate-raw is a 2022+ browser feature; on an older browser both the
+    // export and the import of a compressed file must fail with an honest
+    // "your browser is too old" message — not a silent failure, and NOT
+    // "this file is damaged" (which would blame a perfectly good save).
+    afterEach(() => vi.unstubAllGlobals());
+    const breakCompression = () =>
+      vi.stubGlobal(
+        "CompressionStream",
+        class {
+          constructor() {
+            throw new TypeError("Unsupported format: deflate-raw");
+          }
+        },
+      );
+
+    it("export reports the browser is too old, not a generic failure", async () => {
+      breakCompression();
+      await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
+    });
+
+    it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
+      // A real, healthy container built while compression WAS available.
+      const file = await SaveGame.export(sampleGame());
+      breakCompression();
+      await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
+    });
   });
 
   it("returns null when no save exists", () => {

@@ -124,6 +124,9 @@ export const SaveGame = {
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
+    if (!compressionSupported()) {
+      throw new Error("This browser is too old to create tower files — try a current browser.");
+    }
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
     return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
@@ -148,6 +151,11 @@ export const SaveGame = {
     if (magic) {
       if (magic[0] !== TOWER_FILE_MAGIC) {
         throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+      }
+      // Distinguish "your browser can't decompress" from "this file is broken"
+      // BEFORE the try below — otherwise a missing API blames a healthy file.
+      if (!compressionSupported()) {
+        throw new Error("This browser is too old to open compressed tower files — try a current browser.");
       }
       try {
         // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
@@ -189,6 +197,20 @@ function fromBase64(b64: string): Uint8Array {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+// True when this browser can both compress and decompress raw deflate. Built
+// by actually constructing the streams: the "deflate-raw" format string is
+// newer than CompressionStream itself (Chrome had the API before the format),
+// so a `typeof` check alone would pass on browsers that then throw at use.
+function compressionSupported(): boolean {
+  try {
+    new CompressionStream("deflate-raw");
+    new DecompressionStream("deflate-raw");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // deflate-raw via the native streams API (no zlib/gzip framing — the magic
