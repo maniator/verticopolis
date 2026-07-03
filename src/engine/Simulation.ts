@@ -25,7 +25,7 @@ import {
   transportCarCapacity,
 } from "./facilities";
 import type { FacilityKind, SerializedGame, Unit, WeatherKind } from "./types";
-import { isOperational, isUnitState } from "./types";
+import { isDormant, isOperational, isPresent, isUnitState } from "./types";
 
 /**
  * Current save-format version. `serialize()` always stamps this; `deserialize()`
@@ -58,6 +58,18 @@ function migrateSave(data: SerializedGame): SerializedGame {
  * day-long catch-up step stays bounded (see CROWD_SECONDS_PER_MINUTE, which
  * lives in Crowd.ts so crowd-side constants can be derived from it). */
 const CROWD_MAX_STEP = 60;
+
+/** Clamp a target price into its kind's band. */
+function clampRent(cfg: { min: number; max: number }, target: number): number {
+  return Math.max(cfg.min, Math.min(cfg.max, target));
+}
+
+/** Store a clamped price on a unit. The kind default is stored as "no
+ *  override" (undefined), so a unit set/nudged back to default never counts
+ *  as custom-priced. */
+function storeRent(u: Unit, cfg: { default: number }, clamped: number): void {
+  u.rent = clamped === cfg.default ? undefined : clamped;
+}
 
 export interface LogEntry {
   minute: number;
@@ -545,7 +557,7 @@ export class Simulation implements SimContext {
     const weekend = this.clock.isWeekend;
     for (const u of this.tower.units) {
       const f = FACILITIES[u.kind];
-      if (u.state === "empty" || u.state === "construction" || u.state === "fire" || u.state === "gutted") {
+      if (isDormant(u)) {
         u.occupants = 0;
         continue;
       }
@@ -586,7 +598,7 @@ export class Simulation implements SimContext {
       this.emit("Tenants are complaining of long elevator waits — add cars or shafts.", "bad");
     }
     for (const u of this.tower.units) {
-      if (u.state === "empty" || u.state === "construction" || u.state === "fire" || u.state === "gutted") continue;
+      if (isDormant(u)) continue;
       const served = this.tower.isFloorServed(u.floor);
       const cong = congMap ? (congMap.get(u.floor) ?? 0) : globalCong;
       if (!served) {
@@ -722,7 +734,7 @@ export class Simulation implements SimContext {
     let metro = 0;
     for (const u of this.tower.units) {
       if (u.kind === "metro" && isOperational(u)) metro++;
-      if (u.state === "occupied" || u.state === "asleep" || u.state === "moving_in") {
+      if (isPresent(u)) {
         const p = FACILITIES[u.kind].population;
         if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
       }
@@ -853,10 +865,8 @@ export class Simulation implements SimContext {
     if (!cfg) return null;
     if (!Number.isFinite(target)) return null; // guard NaN/Infinity from any caller
     if (u.kind === "condo" && u.everOccupied) return null; // already sold
-    const clamped = Math.max(cfg.min, Math.min(cfg.max, target));
-    // A price equal to the kind default is stored as "no override" (undefined), so
-    // a unit set/nudged back to default never counts as custom-priced.
-    u.rent = clamped === cfg.default ? undefined : clamped;
+    const clamped = clampRent(cfg, target);
+    storeRent(u, cfg, clamped);
     return clamped;
   }
 
@@ -931,10 +941,9 @@ export class Simulation implements SimContext {
       } else {
         if (target < cfg.min) r.clampedLow++;
         else if (target > cfg.max) r.clampedHigh++;
-        const clamped = Math.max(cfg.min, Math.min(cfg.max, target));
+        const clamped = clampRent(cfg, target);
         if (before !== clamped) r.changed++;
-        // Store default as "no override" (undefined) so it isn't counted custom later.
-        if (mutate) u.rent = clamped === cfg.default ? undefined : clamped;
+        if (mutate) storeRent(u, cfg, clamped);
       }
     }
     return r;
@@ -1031,7 +1040,7 @@ export class Simulation implements SimContext {
     if (this.star < 3) return this.tower.totalPopulation();
     let pop = 0;
     for (const u of this.tower.units) {
-      if ((u.state === "occupied" || u.state === "asleep" || u.state === "moving_in") && !isHotelKind(u.kind)) {
+      if (isPresent(u) && !isHotelKind(u.kind)) {
         pop += FACILITIES[u.kind].population;
       }
     }

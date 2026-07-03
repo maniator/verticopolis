@@ -75,3 +75,15 @@ jobs:
           name: milestone-screenshots
           path: docs/screenshots/milestones/
           if-no-files-found: warn
+
+      # When a visual baseline (visual.spec.ts) fails, Playwright writes the
+      # actual/expected/diff triplet to test-results/ — upload it so the drift
+      # can be reviewed (and, if intentional, adopted as the new baseline)
+      # without rerunning locally.
+      - name: Upload visual diffs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-visual-diffs
+          path: test-results/
+          if-no-files-found: ignore

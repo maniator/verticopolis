@@ -86,6 +86,19 @@ export function isOperational(u: { state: UnitState }): boolean {
   return u.state !== "construction" && u.state !== "fire" && u.state !== "gutted";
 }
 
+/** People are physically present (the canon "counts as live population" rule):
+ *  working, sleeping, or mid move-in. */
+export function isPresent(u: { state: UnitState }): boolean {
+  return u.state === "occupied" || u.state === "asleep" || u.state === "moving_in";
+}
+
+/** Nobody home and nothing to simulate — the per-tick presence/satisfaction
+ *  loops skip these. NOT the inverse of {@link isOperational}: an operational
+ *  `empty` room is still dormant, and fire has its own loop elsewhere. */
+export function isDormant(u: { state: UnitState }): boolean {
+  return u.state === "empty" || u.state === "construction" || u.state === "fire" || u.state === "gutted";
+}
+
 export interface Facility {
   kind: FacilityKind;
   category: FacilityCategory;

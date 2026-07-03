@@ -93,7 +93,10 @@ export function extendBill(
   let nt = cur.top;
   if (end === "up") nt = Math.max(cur.bottom + 1, targetFloor);
   else nb = Math.min(cur.top - 1, targetFloor);
-  const budgetFloors = Math.floor(money / perFloor);
+  // Clamp at zero: in debt the budget is "no new floors", not a negative count
+  // — a negative budget would pull the end BELOW the high-water mark and turn
+  // an outward drag into a silent free shrink.
+  const budgetFloors = Math.max(0, Math.floor(money / perFloor));
   if (nt > hwm.top) nt = hwm.top + Math.min(nt - hwm.top, budgetFloors);
   if (nb < hwm.bottom) nb = hwm.bottom - Math.min(hwm.bottom - nb, budgetFloors);
   const added = Math.max(0, nt - hwm.top) + Math.max(0, hwm.bottom - nb);

@@ -61,4 +61,15 @@ describe("extendBill", () => {
     expect(r.nb).toBe(-3);
     expect(r.added).toBe(3); // floors -1, -2, -3
   });
+
+  it("in debt, an outward drag is a no-op — never a silent free shrink", () => {
+    // A negative budget used to pull the end BELOW the high-water mark:
+    // dragging up with -2 floors of money chopped 2 floors off the top.
+    const up = extendBill({ bottom: 0, top: 5 }, { bottom: 0, top: 5 }, "up", 8, -2 * PF, PF);
+    expect(up.nt).toBe(5); // unchanged, not 3
+    expect(up.added).toBe(0);
+    const down = extendBill({ bottom: 0, top: 5 }, { bottom: 0, top: 5 }, "down", -3, -2 * PF, PF);
+    expect(down.nb).toBe(0); // unchanged, not 2
+    expect(down.added).toBe(0);
+  });
 });

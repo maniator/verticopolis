@@ -10,10 +10,27 @@ export default defineConfig({
   retries: process.env.CI ? 1 : 0,
   workers: 1,
   reporter: "list",
+  expect: {
+    // Visual-baseline comparisons (visual.spec.ts). Animations are frozen and
+    // the caret hidden so a blink can't flake a shot; the diff threshold stays
+    // at Playwright's strict default — the compared surfaces are deterministic
+    // (pinned clock, paused sim), so any pixel drift is a real change.
+    toHaveScreenshot: { animations: "disabled", caret: "hide" },
+  },
+  // Baselines are minted by CI (the update-visual-baselines workflow) because
+  // glyph/canvas rasterization differs across Chromium builds — a local
+  // browser is never the arbiter. Locally the visual tests still RUN (the
+  // clicks and locators smoke the dialogs) but skip the pixel comparison;
+  // set PW_VISUAL=1 to compare anyway (e.g. to eyeball a diff in progress).
+  ignoreSnapshots: !process.env.CI && !process.env.PW_VISUAL,
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    // Sandboxes that can't download browsers can point at a preinstalled
+    // Chromium (e.g. PW_CHROMIUM_PATH=/opt/pw-browsers/chromium). Unset —
+    // the normal case, including CI — Playwright uses its own browser.
+    launchOptions: process.env.PW_CHROMIUM_PATH ? { executablePath: process.env.PW_CHROMIUM_PATH } : {},
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
