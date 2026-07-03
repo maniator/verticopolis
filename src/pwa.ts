@@ -33,6 +33,17 @@ export interface PwaHandlers {
  */
 const UPDATE_GRACE_MS = 900;
 
+/**
+ * How often to poll the server for a newer service worker. The browser only
+ * re-fetches `sw.js` on a navigation, which never happens during a long-lived
+ * game session (the sim is designed to be left running — idle at high speed for
+ * hours). Without an explicit poll, a player who keeps the tab or installed PWA
+ * open right through a release never learns a new version shipped: `onNeedRefresh`
+ * can't fire if nothing re-checks the worker. An hourly poll — plus a check the
+ * moment the tab regains focus — is what actually makes "always latest" hold.
+ */
+const UPDATE_POLL_MS = 60 * 60 * 1000;
+
 export function registerPWA(handlers: PwaHandlers): void {
   // Service workers only work in a secure context with SW support. Bail cleanly
   // otherwise — a non-browser environment, insecure `http://`, or a page opened
@@ -44,6 +55,23 @@ export function registerPWA(handlers: PwaHandlers): void {
 
   const updateSW = registerSW({
     immediate: true,
+    onRegisteredSW(_swUrl, registration) {
+      // The browser's built-in update check only runs on navigation, so for an
+      // installed PWA left open across a release it effectively never fires.
+      // Drive `registration.update()` ourselves on two triggers the navigation
+      // check misses (mirrors maniator/blipit-legends' service-worker hook):
+      //   • an hourly poll, so a session left running still picks up a release;
+      //   • a re-check whenever the tab returns to the foreground, so reopening
+      //     a backgrounded PWA notices a new version right away.
+      // A found update surfaces as a waiting worker → onNeedRefresh below. The
+      // update() call is best-effort (offline / transient network) — swallow it.
+      if (!registration) return;
+      const check = () => void registration.update().catch(() => {});
+      window.setInterval(check, UPDATE_POLL_MS);
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") check();
+      });
+    },
     onNeedRefresh() {
       // A new worker is waiting. Flush the tower to disk FIRST, then activate it
       // (`updateSW(true)` calls skipWaiting and reloads onto the new assets).
