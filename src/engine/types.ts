@@ -92,7 +92,7 @@ export type VacateReason = "access" | "congestion" | "rent";
  *  must not single out elevators. */
 export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   access: "no route to the lobby",
-  congestion: "overcrowded elevators & stairs",
+  congestion: "overcrowded vertical transport",
   rent: "rent set too high",
 };
 

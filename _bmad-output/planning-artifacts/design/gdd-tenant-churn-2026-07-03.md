@@ -74,7 +74,8 @@ same satisfaction drains that caused it:
 
 - **no route to the lobby** — the floor isn't reachable (any transport: elevator,
   stairs, escalator).
-- **overcrowded elevators & stairs** — vertical-transport congestion.
+- **overcrowded vertical transport** — congestion on the elevators / stairs /
+  escalators (kept generic so it stays accurate whatever mix the floor relies on).
 - **rent set too high** — an office priced above the going rate.
 
 **Office noise is deliberately NOT an eviction cause.** Adjacency to an office

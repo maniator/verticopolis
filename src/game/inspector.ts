@@ -137,15 +137,15 @@ export class InspectorController {
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
         const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
-        // Round UP so "time remaining" never under-promises, and once the notice
-        // has elapsed say so plainly — the tenant leaves on the next hourly tick,
-        // not in a phantom extra hour.
+        // Framed as an honest UPPER bound ("under N") using ceil, so the card
+        // never implies the tenant has *more* time than they do. Once the notice
+        // has elapsed, say so plainly — they leave on the next hourly tick.
         const left =
           minsLeft <= 0
             ? "any moment now"
             : minsLeft >= 24 * 60
-              ? `in ~${Math.ceil(minsLeft / (24 * 60))} day(s)`
-              : `in ~${Math.ceil(minsLeft / 60)} hour(s)`;
+              ? `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`
+              : `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
         const now = Math.round(u.satisfaction * 100);
         const target = Math.round(VACATE_RESCIND * 100);
         notice =
