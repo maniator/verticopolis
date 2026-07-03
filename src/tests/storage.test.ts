@@ -219,6 +219,28 @@ describe("SaveGame", () => {
     await expect(SaveGame.import("VCTOWER2\n" + btoa("{}"))).rejects.toThrow(/newer version/);
   });
 
+  it("rejects a decompression bomb with a 'too large' message, not 'damaged'", async () => {
+    // Build a legitimate deflate-raw stream whose OUTPUT is just past the 64MB
+    // cap, from a tiny compressed input — i.e. a real bomb, not corrupt bytes
+    // (those land on the 'damaged' path instead). 65MB of zeros packs to a few KB.
+    const huge = new Uint8Array(65 * 1024 * 1024); // all zeros → highly compressible
+    const cs: GenericTransformStream = new CompressionStream("deflate-raw");
+    const packed = new Uint8Array(
+      await new Response(
+        new ReadableStream<Uint8Array>({
+          start(c) {
+            c.enqueue(huge);
+            c.close();
+          },
+        }).pipeThrough(cs),
+      ).arrayBuffer(),
+    );
+    // Chunked btoa (matches SaveGame's own encoder — no node Buffer in the browser).
+    let bin = "";
+    for (let i = 0; i < packed.length; i += 0x8000) bin += String.fromCharCode(...packed.subarray(i, i + 0x8000));
+    await expect(SaveGame.import("VCTOWER1\n" + btoa(bin))).rejects.toThrow(/too large/);
+  });
+
   describe("when the browser lacks the compression API", () => {
     // deflate-raw is a 2022+ browser feature; on an older browser both the
     // export and the import of a compressed file must fail with an honest

@@ -163,7 +163,12 @@ export const SaveGame = {
         // fatal decoder: a flipped byte must fail the import loudly, never
         // silently half-load a tower with U+FFFD-mangled strings.
         data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
-      } catch {
+      } catch (err) {
+        // A crafted tiny file can inflate to gigabytes (a decompression bomb);
+        // inflate() caps the output and throws this, distinct from "damaged".
+        if (err instanceof TowerTooLargeError) {
+          throw new Error("This tower file is too large to open safely.");
+        }
         // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
         // the container was recognized, so the file is OURS but broken. Say so.
         throw new Error("This tower file is damaged and can't be read.");
@@ -213,24 +218,57 @@ function compressionSupported(): boolean {
   }
 }
 
+// Hard ceiling on a decompressed tower. A real maxed-out tower is comfortably
+// under 2MB of JSON; 64MB is generous headroom while still defusing a
+// decompression bomb (a few-KB file that would otherwise inflate to gigabytes
+// and hang the tab before validation ever runs).
+const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
+
+/** Thrown by inflate() when a decompressing stream exceeds MAX_INFLATED_BYTES. */
+class TowerTooLargeError extends Error {}
+
 // deflate-raw via the native streams API (no zlib/gzip framing — the magic
 // line already identifies the format, and raw deflate is the smallest).
 function deflate(bytes: Uint8Array): Promise<Uint8Array> {
+  // Compressing our own bounded JSON — no cap needed on the output.
   return pipe(bytes, new CompressionStream("deflate-raw"));
 }
 
 function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-  return pipe(bytes, new DecompressionStream("deflate-raw"));
+  // Decompressing untrusted input — cap the output to bound bombs.
+  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
 }
 
-async function pipe(bytes: Uint8Array, transform: GenericTransformStream): Promise<Uint8Array> {
+async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxBytes = Infinity): Promise<Uint8Array> {
   const stream = new ReadableStream<Uint8Array>({
     start(controller) {
       controller.enqueue(bytes);
       controller.close();
     },
   }).pipeThrough(transform);
-  return new Uint8Array(await new Response(stream).arrayBuffer());
+  // Read chunk by chunk so a bomb is aborted mid-inflation, before it can
+  // materialize a giant buffer — rather than Response().arrayBuffer(), which
+  // would buffer the whole (unbounded) output first.
+  const reader = stream.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new TowerTooLargeError();
+    }
+    chunks.push(value);
+  }
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return out;
 }
 
 function nowMs(): number {
