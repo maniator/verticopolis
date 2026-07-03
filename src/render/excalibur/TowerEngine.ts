@@ -1425,15 +1425,19 @@ export class TowerEngine {
       }
     }
     for (const [floor, r] of runs) {
-      const seed = (floor * 97 + r.min * 13) | 0;
-      const cv = new ex.Canvas({ width: 16, height: 8, cache: true, draw: (ctx) => drawStreetCar(ctx, seed) });
       const x0w = this.worldX(r.min) + 2;
       const x1w = this.worldX(r.max) - 18;
+      // A run too short for the car to travel gets none — bail BEFORE creating
+      // the actor, so an untracked actor is never added to the engine (it would
+      // leak: clearMotion only kills what's in this.garageCars).
+      if (x1w <= x0w) continue;
+      const seed = (floor * 97 + r.min * 13) | 0;
+      const cv = new ex.Canvas({ width: 16, height: 8, cache: true, draw: (ctx) => drawStreetCar(ctx, seed) });
       const a = new ex.Actor({ pos: ex.vec(x0w, this.worldYTop(floor) + FLOOR - 10), width: 16, height: 8, anchor: ex.vec(0, 0), z: 0.5 });
       a.graphics.use(cv);
       a.graphics.visible = false;
       this.engine.add(a);
-      if (x1w > x0w) this.garageCars.push({ actor: a, floor, x0w, x1w, seed });
+      this.garageCars.push({ actor: a, floor, x0w, x1w, seed });
     }
     this.buildWalkers();
   }
