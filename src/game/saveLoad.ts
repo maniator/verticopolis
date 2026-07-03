@@ -43,10 +43,14 @@ export class SaveLoad {
    * happening through the existing toast rail.
    */
   onUpdateReady(): void {
-    // Same guard as the autosave timer and recoverFromContextLoss: behind the
-    // first-run splash there is only the throwaway boot sim — persisting it
-    // would flip hasSave() true for a tower the player never started. Return
-    // normally with nothing saved; the update still activates (nothing to lose).
+    // Same guard as the autosave timer and recoverFromContextLoss. The splash
+    // shows on EVERY boot: for a first-timer the sim behind it is a throwaway
+    // boot sim (persisting it would flip hasSave() true for a tower the player
+    // never started); for a returning player it's their real tower, but the
+    // splash pauses time and blocks all input, so in-memory state still equals
+    // the autosave byte-for-byte — skipping the save loses nothing. That
+    // invariant is load-bearing: never let anything mutate the sim while the
+    // splash is up. Returning normally still lets the update activate.
     if (document.getElementById("splash")) return;
     this.save(true);
     this.deps.ui.toast("New version ready — saved your tower, updating…", "info");

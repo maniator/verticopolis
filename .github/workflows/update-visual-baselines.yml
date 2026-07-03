@@ -3,10 +3,11 @@ name: Update visual baselines
 # Regenerates the visual.spec.ts screenshot baselines IN the CI environment —
 # the only renderer the visual gate ever compares against (glyph and canvas
 # rasterization differ across Chromium builds, so locally-minted baselines
-# don't bind). Trigger it by pushing a commit whose message contains
-# "[update-baselines]"; the refreshed snapshots come back as a bot commit on
-# the same branch. Review that commit's image diff like code — it IS the
-# blessing of a new visual truth.
+# don't bind). Trigger it by pushing so that the HEAD commit's message
+# contains "[update-baselines]" (only the head commit of the push is
+# checked); the refreshed snapshots come back as a bot commit on the same
+# branch. Review that commit's image diff like code — it IS the blessing of
+# a new visual truth.
 #
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the
 # baseline commit itself gets no CI run — push (or rebase) once more after
@@ -15,6 +16,12 @@ name: Update visual baselines
 on:
   push:
     branches-ignore: [main]
+
+# One mint per branch at a time: a second trigger cancels the first so the
+# bot never loses a push race against its own checkout (non-fast-forward).
+concurrency:
+  group: update-baselines-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"

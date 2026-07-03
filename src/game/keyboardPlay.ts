@@ -34,7 +34,11 @@ export interface KeyboardPlayDeps {
   announce(msg: string): void;
   /** Undo bracketing — the same contract the mouse gestures get: capture at
    *  the press, commit after. A capture whose commit changes nothing self-heals
-   *  into a no-op entry, so anchoring a shaft (first Enter) is safe to bracket. */
+   *  into a no-op entry, so anchoring a shaft (first Enter) is safe to bracket.
+   *  Known interleave: Enter mid-mouse-drag overwrites the drag's pending
+   *  capture (UndoHistory.capture replaces `pending` by design), fusing the
+   *  pre-Enter drag below the new boundary — accepted, same family as the
+   *  Ctrl+Z-mid-gesture semantics. */
   captureUndo(label: string): void;
   commitUndo(): void;
   /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
