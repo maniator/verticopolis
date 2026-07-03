@@ -606,7 +606,7 @@ describe("Simulation time", () => {
     office.satisfaction = 0.2;
     for (let i = 0; i < 24; i++) sim.tick(60);
     expect(office.state).toBe("vacating");
-    const t = sim.buildTransport("elevatorStandard", x0 + 11, 1, 5);
+    expect(sim.buildTransport("elevatorStandard", x0 + 11, 1, 5).ok).toBe(true);
     sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 4);
     for (let i = 0; i < 24; i++) sim.tick(60);
     expect(office.state).toBe("occupied");
