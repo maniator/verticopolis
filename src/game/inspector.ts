@@ -36,6 +36,22 @@ function parkingDemandLine(sim: Simulation, have: number): string {
   return `<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
 }
 
+/** The recycling inspector block: current fill and the capacity/demand verdict.
+ *  Population and capacity are each scanned once and reused across the strings
+ *  (the demand-met check is `pop <= cap`, exactly {@link Simulation.recyclingDemandMet}),
+ *  so a hover doesn't rescan the unit list several times over. */
+function recyclingLine(sim: Simulation): string {
+  const pop = sim.tower.totalPopulation();
+  const cap = sim.recyclingCapacity();
+  const fillPct = Math.round(sim.recyclingFill() * 100);
+  return (
+    `<div>Fill: ${fillPct}% — truck collects each morning.</div>` +
+    (pop <= cap
+      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population — demand met.</div>`
+      : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed — build another center (4★ requires demand met).</div>`)
+  );
+}
+
 export class InspectorController {
   /** The facility the inspector card currently describes. */
   private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
@@ -110,13 +126,7 @@ export class InspectorController {
             : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`;
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
-      const recycling =
-        u.kind === "recycling" && isOperational(u)
-          ? `<div>Fill: ${Math.round(sim.recyclingFill() * 100)}% — truck collects each morning.</div>` +
-            (sim.recyclingDemandMet()
-              ? `<div style="color:var(--good)">Capacity: ${sim.tower.totalPopulation().toLocaleString()}/${sim.recyclingCapacity().toLocaleString()} population — demand met.</div>`
-              : `<div style="color:var(--bad)">Over capacity: ${sim.tower.totalPopulation().toLocaleString()} population vs ${sim.recyclingCapacity().toLocaleString()} processed — build another center (4★ requires demand met).</div>`)
-          : "";
+      const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
