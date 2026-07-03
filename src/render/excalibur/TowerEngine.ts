@@ -2,6 +2,7 @@ import * as ex from "excalibur";
 import type { Simulation } from "../../engine/Simulation";
 import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
+import { isOperational } from "../../engine/types";
 import {
   CRANE_H,
   CRANE_W,
@@ -1586,8 +1587,11 @@ export class TowerEngine {
     const clock = this.sim.clock;
     const truckHour = clock.hour === GARBAGE_COLLECT_HOUR;
     for (const tk of this.truckActors) {
-      if (tk.actor.graphics.visible !== truckHour) tk.actor.graphics.visible = truckHour;
-      if (!truckHour) continue;
+      // No collection at a center that isn't running (under construction, on
+      // fire, or a gutted shell) — a non-operational plant processes no waste.
+      const show = truckHour && isOperational(tk.u);
+      if (tk.actor.graphics.visible !== show) tk.actor.graphics.visible = show;
+      if (!show) continue;
       const p = (clock.minuteOfDay - GARBAGE_COLLECT_HOUR * 60) / 60; // 0..1 through the hour
       const base = this.worldX(tk.u.x);
       const uw = tk.u.width * TILE;

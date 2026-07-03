@@ -28,11 +28,10 @@ export interface InspectorDeps {
 }
 
 /** The shared demand line for parking spaces & ramps: how many working spaces
- *  the tower has vs what its offices (1 per ~12 workers) and suites (1 each)
- *  currently need. */
-function parkingDemandLine(sim: Simulation): string {
+ *  the tower has (`have`, passed in so the caller's single flood-fill is reused)
+ *  vs what its offices (1 per ~12 workers) and suites (1 each) currently need. */
+function parkingDemandLine(sim: Simulation, have: number): string {
   const d = sim.parkingDemand();
-  const have = sim.tower.functionalParkingSpots();
   const color = have < d.total ? "var(--bad)" : "var(--good)";
   return `<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
 }
@@ -95,14 +94,20 @@ export class InspectorController {
         : "";
       // Silent rule: a parking space only works when it chains to a ramp. Skip
       // the verdict while it's still building (or on fire) — "Status" covers that.
-      const parking =
-        u.kind === "parking" && isOperational(u)
-          ? sim.tower.functionalParkingSet().has(u.id)
-            ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim)
-            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`
-          : u.kind === "parkingRamp" && isOperational(u)
-            ? parkingDemandLine(sim)
-            : "";
+      // One flood-fill for the whole parking card: its `.has(id)` gives ramp
+      // connectivity and its `.size` feeds the demand line, so a hover never
+      // runs the fill twice.
+      const parkingSet =
+        (u.kind === "parking" || u.kind === "parkingRamp") && isOperational(u)
+          ? sim.tower.functionalParkingSet()
+          : null;
+      const parking = !parkingSet
+        ? ""
+        : u.kind === "parkingRamp"
+          ? parkingDemandLine(sim, parkingSet.size)
+          : parkingSet.has(u.id)
+            ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim, parkingSet.size)
+            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`;
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling =
