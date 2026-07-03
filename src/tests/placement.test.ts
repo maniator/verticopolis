@@ -57,10 +57,14 @@ describe("placement helpers", () => {
     expect(dragRunTiles(5, 5)).toEqual([]);
   });
 
-  it("dragRunTiles clamps a run that leaves the lot", () => {
+  it("dragRunTiles clamps a run that leaves the lot, one attempt per column", () => {
     const last = GRID.width - 1;
-    expect(dragRunTiles(last - 2, last + 2)).toEqual([last - 1, last, last, last]);
-    expect(dragRunTiles(2, -3)).toEqual([1, 0, 0, 0, 0]);
+    expect(dragRunTiles(last - 2, last + 2)).toEqual([last - 1, last]);
+    expect(dragRunTiles(2, -3)).toEqual([1, 0]);
+    // A drag living entirely beyond the edge still attempts the edge column once.
+    expect(dragRunTiles(GRID.width + 5, GRID.width + 9)).toEqual([last]);
+    // Runtime is bounded by the lot width, never by the pointer distance.
+    expect(dragRunTiles(0, 1_000_000)).toHaveLength(GRID.width - 1);
   });
 
   it("stepCursor starts a fresh cursor at mid-lot on the ground floor", () => {

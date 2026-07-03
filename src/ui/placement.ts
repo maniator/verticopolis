@@ -36,14 +36,22 @@ export function brushTiles(tile: number): number[] {
 }
 
 /** The cells a floor/lobby drag fills between the last painted tile and the
- *  pointer: every column after `anchor` through `target` inclusive, each
- *  clamped to the lot, ordered outward from the anchor so each cell is
- *  adjacent to already-built structure. Empty when the pointer hasn't left
- *  the anchor column. */
+ *  pointer: every lot column after `anchor` through `target`, ordered outward
+ *  from the anchor so each cell is adjacent to already-built structure. Empty
+ *  when the pointer hasn't left the anchor column. Endpoints are clamped up
+ *  front and each column emitted once, so a pointer flung far off the lot
+ *  costs O(lot width), not O(pointer distance) of repeated edge tiles. */
 export function dragRunTiles(anchor: number, target: number): number[] {
   const step = target >= anchor ? 1 : -1;
+  const from = clampTile(anchor);
+  const to = clampTile(target);
+  if (from === to && anchor !== target) {
+    // The whole run collapsed onto one clamped column (the drag lives beyond
+    // the lot edge) — still attempt that edge column once.
+    return [to];
+  }
   const tiles: number[] = [];
-  for (let x = anchor + step; x !== target + step; x += step) tiles.push(clampTile(x));
+  for (let x = from + step; x !== to + step; x += step) tiles.push(x);
   return tiles;
 }
 
