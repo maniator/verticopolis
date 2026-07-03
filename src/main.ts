@@ -29,6 +29,12 @@ const SPEEDS = [0, 10, 30, 120];
  * loop, scene, camera, panning, zooming and pointer input; this class supplies
  * the tool semantics through the engine's controller hooks, ticks the
  * simulation from the engine's per-frame `onUpdate`, and drives the DOM UI.
+ *
+ * `window.game` surface: e2e/helpers.ts, e2e/visual.spec.ts and
+ * scripts/screenshots.mjs reach this instance at runtime — the public fields
+ * (sim, engine, speed, grid) plus, via any-cast, `selectPicked`, `selected`
+ * and `refreshEditor`. Renaming or moving those requires updating all three
+ * consumers; TypeScript won't catch it.
  */
 class GameApp {
   sim: Simulation;
@@ -126,7 +132,7 @@ class GameApp {
     });
     this.saveLoad = new SaveLoad({
       getSim: () => this.sim,
-      adoptSim: (sim, preserveHistory) => this.adoptSim(sim, preserveHistory),
+      adoptSim: (sim) => this.adoptSim(sim),
       ui: { toast: (text, kind) => this.ui.toast(text, kind) },
       showBootMessage,
       armOnboarding: () => {
@@ -146,6 +152,8 @@ class GameApp {
       selectPicked: (p) => this.selectPicked(p),
       placeSimpleBuild: (kind, tile, floor) => this.placeSimpleBuild(kind, tile, floor),
       updateBuildPreview: (tile, floor) => this.updateBuildPreview(tile, floor),
+      captureUndo: (label) => this.captureUndo(label),
+      commitUndo: () => this.commitUndo(),
     });
 
     this.ui = new UI({
@@ -545,7 +553,10 @@ class GameApp {
   /** The gesture-independent placement cases shared by tap, click, and the
    *  keyboard cursor: paint a structure strip, drop a fixed two-floor flight,
    *  or place a room. Returns null for drag-sized shafts — that anchor
-   *  gesture belongs to the caller. */
+   *  gesture belongs to the caller.
+   *  NOTE: src/tests/gameControllers.test.ts mirrors this body (and pickedAt /
+   *  isTransportTool) to drive KeyboardPlay headlessly — keep the mirror in
+   *  sync when editing. */
   private placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {
     if (kind === "floor" || kind === "lobby") {
       const r = this.build.paintBrush(kind, tile, floor);

@@ -32,6 +32,11 @@ export interface KeyboardPlayDeps {
   isTransportTool(): boolean;
   /** Screen-reader live-region announcer (GameApp owns the one throat). */
   announce(msg: string): void;
+  /** Undo bracketing — the same contract the mouse gestures get: capture at
+   *  the press, commit after. A capture whose commit changes nothing self-heals
+   *  into a no-op entry, so anchoring a shaft (first Enter) is safe to bracket. */
+  captureUndo(label: string): void;
+  commitUndo(): void;
   /** The inspectable/bulldozable entity at a cell (room or transport), if any. */
   pickedAt(floor: number, tile: number): Picked | null;
   selectPicked(p: Picked | null): void;
@@ -114,6 +119,10 @@ export class KeyboardPlay {
     }
     if (tool.type !== "build") return;
     const kind = tool.kind;
+    // Undo parity with the mouse path (onActionDown captures, onActionUp
+    // commits): without this, Ctrl+Z fused a keyboard build into the previous
+    // mouse gesture and keyboard builds were never individually undoable.
+    this.deps.captureUndo(`Build ${FACILITIES[kind].name}`);
     const placed = this.deps.placeSimpleBuild(kind, c.tile, c.floor);
     if (placed) {
       this.deps.announce(announceForPlacement(placed, kind, c.floor));
@@ -142,6 +151,7 @@ export class KeyboardPlay {
         this.refreshCursorPreview();
       }
     }
+    this.deps.commitUndo();
   }
 
   bulldozeCursor(): void {
@@ -153,7 +163,9 @@ export class KeyboardPlay {
       return;
     }
     const name = FACILITIES[p.kind].name;
+    this.deps.captureUndo("Bulldoze");
     this.deps.build.bulldozePicked(p);
+    this.deps.commitUndo();
     this.deps.announce(`Bulldozed ${name}`);
     this.refreshCursorPreview();
   }

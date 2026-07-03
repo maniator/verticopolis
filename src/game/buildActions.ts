@@ -23,7 +23,10 @@ export interface BuildActionsDeps {
   getSim(): Simulation;
   ui: Pick<UI, "toast">;
   audio: Pick<AudioEngine, "sfx">;
-  /** Id of the facility selected in the editor card, if any. */
+  /** Id of the facility selected in the editor card, if any. Compared without
+   *  a unit/transport type — sound only because the tower issues both from ONE
+   *  shared id counter (Tower.nextId), so ids never collide across types. If
+   *  allocation ever splits per type, this dep must carry the type too. */
   selectedId(): number | null;
   clearSelection(): void;
 }

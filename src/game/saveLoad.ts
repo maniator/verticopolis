@@ -16,9 +16,11 @@ export interface SaveLoadDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
   /** Swap in a freshly loaded/created simulation (GameApp owns the rewiring).
-   *  Omitting `preserveHistory` invalidates the undo trail — every path here
-   *  adopts a *different* tower, so all of them omit it. */
-  adoptSim(sim: Simulation, preserveHistory?: boolean): void;
+   *  Deliberately takes NO preserveHistory flag: every path here adopts a
+   *  *different* tower, which must invalidate the undo trail — otherwise Undo
+   *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
+   *  restore may preserve history, and it doesn't go through this module. */
+  adoptSim(sim: Simulation): void;
   ui: Pick<UI, "toast">;
   /** Full-screen boot card (lives with the boot functions in main.ts). */
   showBootMessage(msg: string, withReload?: boolean): void;
@@ -41,6 +43,11 @@ export class SaveLoad {
    * happening through the existing toast rail.
    */
   onUpdateReady(): void {
+    // Same guard as the autosave timer and recoverFromContextLoss: behind the
+    // first-run splash there is only the throwaway boot sim — persisting it
+    // would flip hasSave() true for a tower the player never started. Return
+    // normally with nothing saved; the update still activates (nothing to lose).
+    if (document.getElementById("splash")) return;
     this.save(true);
     this.deps.ui.toast("New version ready — saved your tower, updating…", "info");
   }

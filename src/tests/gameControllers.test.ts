@@ -220,7 +220,7 @@ describe("EditorActions (editor-card money paths)", () => {
 describe("SaveLoad (tower-swap contracts)", () => {
   let sim: Simulation;
   let f: ReturnType<typeof fakes>;
-  let adopted: { sim: Simulation; preserveHistory?: boolean }[];
+  let adopted: Simulation[];
   let saveLoad: SaveLoad;
 
   beforeEach(() => {
@@ -229,21 +229,23 @@ describe("SaveLoad (tower-swap contracts)", () => {
     adopted = [];
     saveLoad = new SaveLoad({
       getSim: () => sim,
-      adoptSim: (s, preserveHistory) => adopted.push({ sim: s, preserveHistory }),
+      adoptSim: (s) => {
+        adopted.push(s);
+      },
       ui: f.ui,
       showBootMessage: () => {},
       armOnboarding: () => {},
     });
   });
 
-  it("newGame adopts a fresh sim WITHOUT preserveHistory (invalidates the undo trail)", () => {
+  it("newGame adopts a fresh sim (the dep's shape forbids preserving the undo trail)", () => {
+    // SaveLoadDeps.adoptSim deliberately takes no preserveHistory flag — the
+    // type itself now guarantees a tower swap through this module invalidates
+    // the undo history, so Undo can never resurrect the abandoned tower.
     saveLoad.newGame();
     expect(adopted).toHaveLength(1);
-    expect(adopted[0].sim).toBeInstanceOf(Simulation);
-    expect(adopted[0].sim).not.toBe(sim);
-    // The adoptSim contract: a falsy preserveHistory clears the undo history,
-    // so Undo can never resurrect the abandoned tower.
-    expect(adopted[0].preserveHistory).toBeFalsy();
+    expect(adopted[0]).toBeInstanceOf(Simulation);
+    expect(adopted[0]).not.toBe(sim);
     expect(f.toasts).toEqual([{ text: "New tower founded. Good luck!", kind: "good" }]);
   });
 
@@ -322,6 +324,7 @@ describe("KeyboardPlay (commit announcements)", () => {
   let announced: string[];
   let tool: Tool;
   let keyboard: KeyboardPlay;
+  let undoLog: string[];
 
   beforeEach(() => {
     sim = new Simulation();
@@ -380,7 +383,10 @@ describe("KeyboardPlay (commit announcements)", () => {
       selectPicked: () => {},
       placeSimpleBuild,
       updateBuildPreview: () => {},
+      captureUndo: (label) => undoLog.push(`capture:${label}`),
+      commitUndo: () => undoLog.push("commit"),
     });
+    undoLog = [];
   });
 
   it("paint commit announces the announceForPlacement paint line", () => {
@@ -411,5 +417,28 @@ describe("KeyboardPlay (commit announcements)", () => {
     keyboard.commitCursor();
     expect(last(announced)).toBe(announceForPlacement({ what: "room", ok: true }, "office", 2));
     expect(last(announced)).toBe("Placed Office");
+  });
+
+  it("keyboard build and bulldoze bracket undo like the mouse gestures", () => {
+    // Undo parity: mouse paths capture on press and commit on release; the
+    // keyboard used to skip both, fusing keyboard edits into the previous
+    // mouse gesture's undo entry.
+    keyboard.moveCursor(0, 0);
+    keyboard.moveCursor(0, 1);
+    tool = { type: "build", kind: "office" };
+    keyboard.commitCursor();
+    expect(undoLog).toEqual(["capture:Build Office", "commit"]);
+    undoLog.length = 0;
+    tool = { type: "bulldoze" };
+    keyboard.commitCursor(); // office sits under the cursor
+    expect(undoLog).toEqual(["capture:Bulldoze", "commit"]);
+    undoLog.length = 0;
+    keyboard.commitCursor(); // nothing left here — no capture for a no-op
+    expect(last(announced)).toBe("Nothing to bulldoze here");
+    expect(undoLog).toEqual([]);
+    // Inspect commits never touch undo.
+    tool = { type: "inspect" };
+    keyboard.commitCursor();
+    expect(undoLog).toEqual([]);
   });
 });
