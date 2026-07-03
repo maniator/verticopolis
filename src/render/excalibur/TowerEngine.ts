@@ -154,7 +154,7 @@ export class TowerEngine {
   /** anim-clock time the current Santa flight started, or null when not flying. */
   private santaStart: number | null = null;
   private lastSantaSeq = 0;
-  /** In-flight bomb flashes: epicentre tile/floor + the anim time it began. */
+  /** In-flight bomb flashes: epicenter tile/floor + the anim time it began. */
   private explosions: { x: number; floor: number; start: number }[] = [];
   private lastExplosionSeq = 0;
 
@@ -836,7 +836,7 @@ export class TowerEngine {
     this.drawRuler(ctx);
   }
 
-  /** Bomb-blast flashes at their epicentres, projected to screen (see syncEventFx). */
+  /** Bomb-blast flashes at their epicenters, projected to screen (see syncEventFx). */
   private renderExplosions(ctx: CanvasRenderingContext2D): void {
     if (this.explosions.length === 0) return;
     for (const e of this.explosions) {

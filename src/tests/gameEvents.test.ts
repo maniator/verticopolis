@@ -4,6 +4,7 @@ import { Tower } from "../engine/Tower";
 import { Clock } from "../engine/Clock";
 import { RNG } from "../engine/rng";
 import type { LogKind } from "../engine/SimContext";
+import { isOperational } from "../engine/types";
 import type { FacilityKind } from "../engine/types";
 
 /**
@@ -64,8 +65,9 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
       this.explosionCalls.push({ floor, x: xTile });
     },
     hasAny: (kind: FacilityKind) => tower.units.some((u) => u.kind === kind),
-    hasOperational: (kind: FacilityKind) =>
-      tower.units.some((u) => u.kind === kind && u.state !== "construction" && u.state !== "fire"),
+    // Use the engine's own predicate so the test double can't drift (a "gutted"
+    // station must not count as an active defense).
+    hasOperational: (kind: FacilityKind) => tower.units.some((u) => u.kind === kind && isOperational(u)),
     floorLabel: (floor: number) => (floor >= 1 ? `floor ${floor}` : `B${1 - floor}`),
   };
 }
@@ -195,7 +197,7 @@ describe("Event visual hooks — the renderer triggers (SimContext)", () => {
     expect(ctx.santaCalls).toBe(1);
   });
 
-  it("an unguarded bomb detonation flashes at the epicentre; a guarded one never does", () => {
+  it("an unguarded bomb detonation flashes at the epicenter; a guarded one never does", () => {
     const boom = makeCtx(officeTower(), 4, new ScriptedRNG([]));
     new EventSystem(boom, 7).bombThreat(); // no security → detonates
     expect(boom.explosionCalls).toHaveLength(1);

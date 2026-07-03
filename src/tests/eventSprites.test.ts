@@ -77,7 +77,7 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
     const sim = Simulation.newGame(1);
     sim.triggerSanta();
     sim.triggerExplosion(9, 30);
-    const data = sim.serialize() as Record<string, unknown>;
+    const data = sim.serialize() as unknown as Record<string, unknown>;
     expect(data.santaFxSeq).toBeUndefined();
     expect(data.explosionFx).toBeUndefined();
     // A reload starts the visual counters clean.

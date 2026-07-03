@@ -355,19 +355,20 @@ export class EventSystem {
     }
     const fine = 15_000 + this.sim.rng.int(0, 15_000);
     this.sim.money -= fine;
-    // Canon: an undetected bomb levels roughly five floors. Pick an epicentre and
+    // Canon: an undetected bomb levels roughly five floors. Pick an epicenter and
     // destroy every room within ±2 floors of it — a genuine catastrophe, not the
     // loss of a single room — so leaving the tower unguarded is dangerous.
     const targets = this.flammableUnits();
     let destroyed = 0;
     if (targets.length > 0) {
       const ground = this.sim.rng.pick(targets);
-      const epicentre = ground.floor;
-      // Flash the blast at the epicentre room's center (cosmetic; renderer-only).
-      this.sim.triggerExplosion?.(epicentre, ground.x + Math.floor(ground.width / 2));
+      const epicenter = ground.floor;
+      // Flash the blast at the epicenter room's true center (fractional tile, so
+      // worldToScreenX places the starburst dead-center for any room width).
+      this.sim.triggerExplosion?.(epicenter, ground.x + ground.width / 2);
       for (const u of this.sim.tower.units) {
         if (
-          Math.abs(u.floor - epicentre) <= 2 &&
+          Math.abs(u.floor - epicenter) <= 2 &&
           u.kind !== "floor" &&
           u.kind !== "lobby" &&
           u.state !== "construction" &&

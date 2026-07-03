@@ -7,7 +7,7 @@
  *
  *  - {@link drawSanta}: the holiday cameo — Santa's sleigh and reindeer crossing
  *    the sky (canon: "Santa Claus and his reindeer fly across the tower").
- *  - {@link drawExplosion}: the bomb-detonation flash at the blast epicentre,
+ *  - {@link drawExplosion}: the bomb-detonation flash at the blast epicenter,
  *    a fading starburst over the rooms it guts.
  */
 
