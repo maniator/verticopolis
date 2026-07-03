@@ -35,6 +35,9 @@ export interface UICallbacks {
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
+  /** Cycle the colored stats overlay to its next mode; returns the button label
+   *  for the newly-active mode (e.g. "Congestion", or "Off"). */
+  onCycleOverlay(): string;
   onShowSaves(): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */
   onInspectorClose(): void;
@@ -194,6 +197,10 @@ export class UI {
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
+    document.getElementById("btn-overlay")?.addEventListener("click", (e) => {
+      const label = this.cb.onCycleOverlay();
+      (e.currentTarget as HTMLButtonElement).textContent = `🗺️ Map: ${label}`;
+    });
 
     this.el.towerName.addEventListener("change", () => {
       this.cb.onRenameTower(this.el.towerName.value.trim() || "Tower One");

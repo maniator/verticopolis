@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import type { Simulation } from "../../engine/Simulation";
+import type { Simulation, HeatmapMode } from "../../engine/Simulation";
 import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
@@ -43,6 +43,33 @@ const clampZoom = (z: number): number =>
 
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
+
+/** Legend copy for each stats-overlay mode. */
+export const HEATMAP_LABELS: Record<HeatmapMode, { title: string; good: string; bad: string }> = {
+  congestion: { title: "Congestion", good: "clear", bad: "jammed" },
+  occupancy: { title: "Occupancy", good: "full", bad: "vacant" },
+  satisfaction: { title: "Satisfaction", good: "happy", bad: "unhappy" },
+};
+
+/** The overlay modes in cycle order (a UI toggle steps Off → each → Off). */
+export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction"];
+
+/** Severity 0..1 → an rgba tint (green → amber → red) at a fixed overlay alpha.
+ *  Two linear segments through green/amber/red so the ramp reads cleanly. */
+function heatColor(severity: number): string {
+  const s = Math.max(0, Math.min(1, severity));
+  const stops: [number, number, number][] = [
+    [63, 184, 90], // green (good)
+    [224, 169, 78], // amber
+    [214, 52, 47], // red (bad)
+  ];
+  const seg = s < 0.5 ? 0 : 1;
+  const t = s < 0.5 ? s / 0.5 : (s - 0.5) / 0.5;
+  const a = stops[seg];
+  const b = stops[seg + 1];
+  const mix = (i: number) => Math.round(a[i] + (b[i] - a[i]) * t);
+  return `rgba(${mix(0)},${mix(1)},${mix(2)},0.4)`;
+}
 
 /**
  * The crowd advances on *game* time, not real time, so the speed control only
@@ -227,6 +254,16 @@ export class TowerEngine {
    *  floor that carries parking, ping-ponging along that floor's parking run. */
   private garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   private walkers: Walker[] = [];
+  /** Active colored stats overlay (congestion / occupancy / satisfaction), or
+   *  null for off. Set by the controller from a UI toggle; drawn over the tower
+   *  as a semi-transparent per-floor heatmap with a legend. */
+  overlayMode: HeatmapMode | null = null;
+  /** Cached heatmap for the active overlay, refreshed on the hour, on a layout
+   *  change, or when the mode flips — never per frame (it scans the unit list). */
+  private heatmap = new Map<number, { severity: number; minX: number; maxX: number }>();
+  private heatmapHour = -1;
+  private heatmapRev = -1;
+  private heatmapMode: HeatmapMode | null = null;
   /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
    *  once per syncScene — reusing the parking flood-fill that sync already does
    *  for the dead-bit — so they're exactly as fresh as the sprites that consume
@@ -829,6 +866,7 @@ export class TowerEngine {
       this.overlayCanvas.height = this.viewHeight;
     }
     ctx.clearRect(0, 0, this.viewWidth, this.viewHeight);
+    this.drawStatsMap(ctx);
     this.drawRain(ctx);
     this.renderExplosions(ctx);
     this.drawPreview(ctx);
@@ -847,6 +885,68 @@ export class TowerEngine {
       const radius = (24 + p * 56) * this.cam.zoom;
       drawExplosion(ctx, sx, sy, radius, p);
     }
+  }
+
+  /** The colored stats overlay: tint each floor by the active metric (green =
+   *  good … red = bad) with a legend. The heatmap is recomputed only when its
+   *  inputs change (hour / layout / mode), never per frame. */
+  private drawStatsMap(ctx: CanvasRenderingContext2D): void {
+    if (!this.overlayMode) return;
+    const hour = this.sim.clock.hour;
+    const rev = this.sim.tower.revision;
+    if (this.overlayMode !== this.heatmapMode || hour !== this.heatmapHour || rev !== this.heatmapRev) {
+      this.heatmap = this.sim.floorHeatmap(this.overlayMode);
+      this.heatmapMode = this.overlayMode;
+      this.heatmapHour = hour;
+      this.heatmapRev = rev;
+    }
+    const z = this.cam.zoom;
+    for (const [floor, cell] of this.heatmap) {
+      const sx = this.worldToScreenX(cell.minX);
+      const sy = this.worldToScreenY(floor);
+      const sw = (cell.maxX - cell.minX + 1) * TILE * z;
+      const sh = FLOOR * z;
+      // Cull rows outside the viewport so a tall tower's off-screen floors cost
+      // nothing to "draw".
+      if (sy + sh < 0 || sy > this.viewHeight || sx + sw < 0 || sx > this.viewWidth) continue;
+      ctx.fillStyle = heatColor(cell.severity);
+      ctx.fillRect(sx, sy, sw, sh);
+    }
+    this.drawHeatLegend(ctx);
+  }
+
+  /** A compact legend for the active overlay: its name and a good→bad gradient. */
+  private drawHeatLegend(ctx: CanvasRenderingContext2D): void {
+    const label = HEATMAP_LABELS[this.overlayMode ?? "congestion"];
+    const pad = 10;
+    const x = 12;
+    const y = 12;
+    const w = 150;
+    const h = 46;
+    ctx.fillStyle = "rgba(16,20,28,0.8)";
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = "#e6ecf5";
+    ctx.font = "600 12px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(label.title, x + pad, y + 17);
+    // Gradient bar.
+    const bx = x + pad;
+    const by = y + 24;
+    const bw = w - pad * 2;
+    const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
+    grad.addColorStop(0, heatColor(0));
+    grad.addColorStop(0.5, heatColor(0.5));
+    grad.addColorStop(1, heatColor(1));
+    ctx.fillStyle = grad;
+    ctx.fillRect(bx, by, bw, 7);
+    ctx.fillStyle = "#9aa6bd";
+    ctx.font = "10px system-ui, sans-serif";
+    ctx.fillText(label.good, bx, by + 18);
+    ctx.textAlign = "right";
+    ctx.fillText(label.bad, bx + bw, by + 18);
+    ctx.textAlign = "left";
   }
 
   /** Clouds drift across the sky on overcast and rainy days (sky layer). */

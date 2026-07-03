@@ -147,9 +147,17 @@ export class InspectorController {
       this.deps.setAnchor({ x: t.x + t.width, floor: t.top });
       this.inspectTarget = { type: p.type, id: p.id };
       const f = FACILITIES[t.kind];
+      // Passenger elevators report how full their cars run on average (staff-only
+      // service elevators carry no passenger load, so they show none).
+      const util = isElevatorKind(t.kind) ? sim.elevatorUtilization(t.id) : undefined;
+      const busy =
+        util === undefined
+          ? ""
+          : `<div style="color:${util > 0.85 ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${util > 0.85 ? " — near capacity, consider more cars or a parallel shaft." : ""}</div>`;
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
-          (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : ""),
+          (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : "") +
+          busy,
       );
     }
   }

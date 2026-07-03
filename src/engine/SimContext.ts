@@ -1,4 +1,5 @@
 import type { Clock } from "./Clock";
+import type { LedgerCat } from "./Ledger";
 import type { RNG } from "./rng";
 import type { Tower } from "./Tower";
 import type { FacilityKind, WeatherKind } from "./types";
@@ -25,6 +26,9 @@ export interface SimContext {
   /** Current cosmetic sky weather; rain depresses commercial foot traffic. */
   readonly weather?: WeatherKind;
   emit(text: string, kind?: LogKind): void;
+  /** Tag money to a stats-breakdown category (positive income, negative
+   *  expense). Optional so a hand-rolled test context can omit it. */
+  recordMoney?(cat: LedgerCat, amount: number): void;
   /** True if the tower contains at least one unit of this kind. */
   hasAny(kind: FacilityKind): boolean;
   /** True if at least one operational (finished, not-on-fire) unit of this kind
