@@ -1,4 +1,4 @@
-import { deflateSync, inflateSync } from "fflate";
+import { deflateSync, Inflate } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/types";
 
@@ -60,8 +60,11 @@ function readSlot(key: string): SerializedGame | null {
   try {
     // Compressed values carry STORE_MAGIC; anything else is a legacy raw-JSON
     // save from before compression (still loads, then upgrades on next write).
+    // The decoder is `fatal` (like the .vctower path) so a flipped byte fails
+    // loudly here — caught below, treated as a corrupt slot — rather than
+    // silently loading a U+FFFD-mangled tower.
     const json = raw.startsWith(STORE_MAGIC)
-      ? new TextDecoder().decode(inflateSync(fromBase64(raw.slice(STORE_MAGIC.length))))
+      ? new TextDecoder("utf-8", { fatal: true }).decode(inflateCapped(fromBase64(raw.slice(STORE_MAGIC.length))))
       : raw;
     return JSON.parse(json) as SerializedGame;
   } catch {
@@ -227,6 +230,34 @@ function fromBase64(b64: string): Uint8Array {
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
   return bytes;
+}
+
+// Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
+// of JSON; 32MB is generous headroom. localStorage is quota-bounded and
+// same-origin, but a corrupt or tampered VCZ1 value could still inflate
+// enormously and hang the tab at boot — so, like the .vctower import path, we
+// bound it. fflate's streaming Inflate lets us abort as soon as the output
+// passes the cap (inflateSync would allocate the whole buffer first).
+const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
+
+class SaveTooLargeError extends Error {}
+
+function inflateCapped(packed: Uint8Array): Uint8Array {
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  const inflater = new Inflate((chunk) => {
+    total += chunk.length;
+    if (total > MAX_SAVE_INFLATED_BYTES) throw new SaveTooLargeError();
+    chunks.push(chunk);
+  });
+  inflater.push(packed, true); // ondata fires synchronously; a throw aborts here
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    out.set(chunk, offset);
+    offset += chunk.length;
+  }
+  return out;
 }
 
 // True when this browser can both compress and decompress raw deflate. Built

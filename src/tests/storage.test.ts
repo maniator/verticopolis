@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
@@ -163,10 +164,12 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
+  const AUTO_KEY = "simtower-clone-save"; // mirrors the internal autosave key
+
   it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
     const sim = sampleGame();
     SaveGame.save(sim);
-    const raw = localStorage.getItem(localStorage.key(0)!)!;
+    const raw = localStorage.getItem(AUTO_KEY)!;
     // The stored value is the compression marker + payload, never raw JSON.
     expect(raw.startsWith("VCZ1:")).toBe(true);
     expect(raw.startsWith("{")).toBe(false);
@@ -175,9 +178,18 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(sim.money);
   });
 
+  it("caps inflation of a corrupt/oversized compressed save — returns null, never hangs the tab", () => {
+    // A real decompression bomb: a few KB of DEFLATE that inflates past the 32MB
+    // cap. inflateCapped must abort and readSlot must degrade to "no save".
+    const bomb = deflateSync(new Uint8Array(33 * 1024 * 1024)); // 33MB of zeros → tiny packed
+    let bin = "";
+    for (let i = 0; i < bomb.length; i += 0x8000) bin += String.fromCharCode(...bomb.subarray(i, i + 0x8000));
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa(bin));
+    expect(SaveGame.load()).toBeNull();
+  });
+
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
     const sim = sampleGame();
-    const AUTO_KEY = "simtower-clone-save"; // the internal autosave key; pre-compression saves were raw JSON
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
     expect(localStorage.getItem(AUTO_KEY)!.startsWith("{")).toBe(true); // legacy: raw JSON, no marker
 
