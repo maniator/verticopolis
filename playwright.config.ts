@@ -17,6 +17,12 @@ export default defineConfig({
     // (pinned clock, paused sim), so any pixel drift is a real change.
     toHaveScreenshot: { animations: "disabled", caret: "hide" },
   },
+  // Baselines are minted by CI (the update-visual-baselines workflow) because
+  // glyph/canvas rasterization differs across Chromium builds — a local
+  // browser is never the arbiter. Locally the visual tests still RUN (the
+  // clicks and locators smoke the dialogs) but skip the pixel comparison;
+  // set PW_VISUAL=1 to compare anyway (e.g. to eyeball a diff in progress).
+  ignoreSnapshots: !process.env.CI && !process.env.PW_VISUAL,
   use: {
     baseURL: "http://127.0.0.1:4173",
     trace: "on-first-retry",

@@ -1,0 +1,61 @@
+name: Update visual baselines
+
+# Regenerates the visual.spec.ts screenshot baselines IN the CI environment —
+# the only renderer the visual gate ever compares against (glyph and canvas
+# rasterization differ across Chromium builds, so locally-minted baselines
+# don't bind). Trigger it by pushing a commit whose message contains
+# "[update-baselines]"; the refreshed snapshots come back as a bot commit on
+# the same branch. Review that commit's image diff like code — it IS the
+# blessing of a new visual truth.
+#
+# The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the
+# baseline commit itself gets no CI run — push (or rebase) once more after
+# pulling it to get a green check on the final head.
+
+on:
+  push:
+    branches-ignore: [main]
+
+env:
+  PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    if: contains(github.event.head_commit.message, '[update-baselines]')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Build
+        run: npm run build
+
+      - name: Regenerate baselines
+        run: npx playwright test visual.spec.ts --update-snapshots
+
+      - name: Commit refreshed baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add e2e/visual.spec.ts-snapshots
+          if git diff --cached --quiet; then
+            echo "Baselines already match this environment — nothing to commit."
+          else
+            git commit -m "Update visual baselines from CI"
+            git push
+          fi

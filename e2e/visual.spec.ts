@@ -7,11 +7,14 @@ import { buildToStar } from "./helpers";
  * query stretching a button into a pill, a sprite refactor shifting a pixel.
  * (All three shipped before this gate existed.)
  *
- * Baselines are committed in visual.spec.ts-snapshots/. When a change is
- * INTENTIONAL, regenerate with `npm run e2e -- --update-snapshots` and review
- * the baseline diff like code — an unexplained pixel change IS the bug. On CI
- * failure, the actual/diff images land in test-results/ (uploaded as the
- * playwright-visual-diffs artifact).
+ * Baselines are committed in visual.spec.ts-snapshots/ and MINTED BY CI (push
+ * a commit containing "[update-baselines]" — see the update-visual-baselines
+ * workflow): rasterization differs across Chromium builds, so only the CI
+ * renderer's output binds. Review the bot's baseline commit like code — an
+ * unexplained pixel change IS the bug. Local runs skip the pixel comparison
+ * (see ignoreSnapshots in playwright.config.ts) but still smoke the dialogs;
+ * on CI failure the actual/diff images land in test-results/ (uploaded as
+ * the playwright-visual-diffs artifact).
  *
  * Determinism: the gallery pins performance.now before load (same trick as
  * scripts/screenshots.mjs) so canvas animation frames bake at one instant.
