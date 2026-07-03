@@ -121,11 +121,14 @@ export function isPresent(u: { state: UnitState }): boolean {
   );
 }
 
-/** A long-term lease is in residence — either settled (`occupied`) or on
- *  notice (`vacating`). Both pay rent, count toward population, and commute; a
- *  vacating tenant merely carries a pending departure that a timely fix can
- *  still rescind. The single predicate for "an office/condo that currently has
- *  a tenant", so the grace-period state is honored everywhere at once. */
+/** State-based: a unit that is settled (`occupied`) or on notice (`vacating`) —
+ *  i.e. still in residence, not yet gone. Purely a `state` check, so it applies
+ *  to any unit the caller iterates (population, crowd, events), not just leases;
+ *  today only office/condo leases ever reach `vacating`, but the predicate makes
+ *  no such assumption. Both states pay rent, count toward population, and
+ *  commute — a vacating tenant merely carries a pending departure a timely fix
+ *  can still rescind — so routing through this keeps the grace-period state
+ *  honored everywhere at once. */
 export function isTenanted(u: { state: UnitState }): boolean {
   return u.state === "occupied" || u.state === "vacating";
 }
