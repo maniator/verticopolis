@@ -188,6 +188,18 @@ describe("SaveGame", () => {
     expect(SaveGame.load()).toBeNull();
   });
 
+  it("rejects a truncated / garbage compressed save — corrupt deflate fails loudly, never a partial tower", () => {
+    // fflate's sync Inflate THROWS on a truncated/invalid stream (it does not
+    // silently emit partial output), and readSlot catches that to null.
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const body = localStorage.getItem(AUTO_KEY)!.slice("VCZ1:".length);
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + body.slice(0, Math.floor(body.length / 2))); // truncated payload
+    expect(SaveGame.load()).toBeNull();
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all")); // outright garbage
+    expect(SaveGame.load()).toBeNull();
+  });
+
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
     const sim = sampleGame();
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
