@@ -649,6 +649,9 @@ export class Simulation implements SimContext {
     if (globalCong > 1.4 && this.clock.hour === 9 && this.rng.chance(0.5)) {
       this.emit("Tenants are complaining of long elevator waits — add cars or shafts.", "bad");
     }
+    // New notices this tick are batched into one toast (like move-ins) so a
+    // tower-wide problem raises a single alarm, not one per unit.
+    const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
     for (const u of this.tower.units) {
       if (isDormant(u)) continue;
       const served = this.tower.isFloorServed(u.floor);
@@ -705,14 +708,13 @@ export class Simulation implements SimContext {
       const leaseTenant = u.kind === "office" || u.kind === "condo";
       if (leaseTenant && u.state === "vacating") {
         if (u.satisfaction >= VACATE_RESCIND) {
-          // Conditions recovered inside the notice window — they stay.
+          // Conditions recovered inside the notice window — they quietly stay.
+          // No toast: "silence when correct", and a per-tick good/bad pair on a
+          // unit that flaps around the threshold would be pure noise. The
+          // clearing inspector/ribbon is the (pull) cue that the fix worked.
           u.state = "occupied";
           u.vacateReason = undefined;
           u.vacateAt = undefined;
-          this.emit(
-            `The tenant in ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} is staying — conditions improved.`,
-            "good",
-          );
         } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
           // Notice ran out and it's still unbearable — they leave for good.
           this.vacate(u, u.vacateReason ?? "access");
@@ -722,14 +724,31 @@ export class Simulation implements SimContext {
         u.state = "vacating";
         u.vacateReason = this.vacateCause(u, served, cong);
         u.vacateAt = this.clock.minutes + VACATE_NOTICE_MINUTES;
-        this.emit(
-          `${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} gave notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Fix it before they leave.`,
-          "bad",
-        );
+        notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });
       } else if (u.satisfaction <= 0 && isHotelKind(u.kind)) {
         this.vacate(u, this.vacateCause(u, served, cong));
       }
     }
+    this.emitNotices(notices);
+  }
+
+  /** Announce this tick's fresh notices as a single toast: a named unit when
+   *  just one gave notice, or a per-cause tally when several did at once — so a
+   *  tower-wide access/congestion problem is one alarm, not a flood. */
+  private emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void {
+    if (notices.length === 0) return;
+    if (notices.length === 1) {
+      const n = notices[0];
+      this.emit(
+        `${FACILITIES[n.kind].name} on ${this.floorLabel(n.floor)} gave notice — ${VACATE_REASON_TEXT[n.reason]}. Fix it before they leave.`,
+        "bad",
+      );
+      return;
+    }
+    const byReason = new Map<VacateReason, number>();
+    for (const n of notices) byReason.set(n.reason, (byReason.get(n.reason) ?? 0) + 1);
+    const parts = [...byReason].map(([r, n]) => `${n} × ${VACATE_REASON_TEXT[r]}`);
+    this.emit(`${notices.length} tenants gave notice — ${parts.join(", ")}. Fix the flagged units before they leave.`, "bad");
   }
 
   /**
@@ -737,19 +756,17 @@ export class Simulation implements SimContext {
    * moment it bottomed out, so the toast/inspector names the real cause instead
    * of always blaming access. The order mirrors the drains in
    * {@link updateSatisfaction}: an unreachable floor is harshest, then elevator
-   * crowding, then an over-market office rent; office-noise adjacency is the
-   * last resort for a hotel/condo that is otherwise served and uncongested.
+   * crowding, then an over-market office rent. (Office noise only caps
+   * satisfaction, never drains it to zero, so it is never a departure cause;
+   * `access` is the catch-all for the rare emergency-driven bottom-out.)
    */
   private vacateCause(u: Unit, served: boolean, cong: number): VacateReason {
     if (!served) return "access";
     if (u.floor !== 1 && cong > 1) return "congestion";
     if (u.kind === "office") {
       const cfg = rentConfig("office");
-      return cfg && rentOf(u) > cfg.default ? "rent" : "access";
+      if (cfg && rentOf(u) > cfg.default) return "rent";
     }
-    const left = this.tower.roomAt(u.floor, u.x - 1);
-    const right = this.tower.roomAt(u.floor, u.x + u.width);
-    if (left?.kind === "office" || right?.kind === "office") return "noise";
     return "access";
   }
 
@@ -1147,6 +1164,10 @@ export class Simulation implements SimContext {
   private moveIn(u: Unit): void {
     u.state = "occupied";
     u.satisfaction = 1;
+    // A fresh tenant carries no prior eviction — clear any leftover notice
+    // bookkeeping so a recycled unit can never present stale departure data.
+    u.vacateReason = undefined;
+    u.vacateAt = undefined;
     if (u.kind === "condo" && !u.everOccupied) {
       u.everOccupied = true;
       const price = rentOf(u);

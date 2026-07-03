@@ -127,13 +127,20 @@ export class InspectorController {
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
-      // A tenant on notice: spell out that they're leaving and why, so the
-      // "Status" line reads as an actionable warning rather than raw state.
+      // A tenant on notice: spell out that they're leaving, why, and how long is
+      // left, so the card reads as an actionable warning rather than raw state.
       const statusText = u.state === "vacating" ? "on notice — tenant leaving" : u.state;
-      const notice =
-        u.state === "vacating" && u.vacateReason
-          ? `<div style="color:var(--bad)">Giving notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Fix it to make them stay.</div>`
-          : "";
+      let notice = "";
+      if (u.state === "vacating" && u.vacateReason) {
+        const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
+        const left =
+          minsLeft >= 24 * 60
+            ? `~${Math.round(minsLeft / (24 * 60))} day(s)`
+            : `~${Math.max(1, Math.round(minsLeft / 60))} hour(s)`;
+        notice =
+          `<div style="color:var(--bad)">Giving notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Leaves in ${left}.</div>` +
+          `<div>Fix the cause and let satisfaction climb back to 25% to keep them.</div>`;
+      }
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +

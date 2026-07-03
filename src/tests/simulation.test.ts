@@ -594,6 +594,47 @@ describe("Simulation time", () => {
     expect(office.state).toBe("occupied");
     expect(office.vacateReason).toBeUndefined();
   });
+
+  it("rescinding is silent and does not spam a good/bad toast pair", () => {
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 1; f <= 5; f++)
+      for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
+    const r = sim.tower.place("office", 5, x0);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    office.satisfaction = 0.2;
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(office.state).toBe("vacating");
+    const t = sim.buildTransport("elevatorStandard", x0 + 11, 1, 5);
+    sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 4);
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(office.state).toBe("occupied");
+    // "Silence when correct": recovering emits no toast, so a unit that flaps
+    // around the threshold can never spam alternating notice/stay messages.
+    expect(sim.log.some((e) => /staying|conditions improved/i.test(e.text))).toBe(false);
+    expect(sim.log.filter((e) => /gave notice/i.test(e.text)).length).toBe(1);
+  });
+
+  it("batches a mass move-out into one notice toast, not one per unit", () => {
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Four offices on an unreachable floor, all equally unhappy → they bottom
+    // out on the same tick and should raise a single aggregated alarm.
+    for (let f = 2; f <= 5; f++) for (let i = 0; i < 40; i++) sim.tower.place("floor", f, x0 + i);
+    const offices = [0, 9, 18, 27].map((dx) => {
+      const r = sim.tower.place("office", 5, x0 + dx);
+      const u = sim.tower.units.find((uu) => uu.id === r.unitId)!;
+      u.state = "occupied";
+      u.satisfaction = 0.2;
+      return u;
+    });
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(offices.every((u) => u.state === "vacating")).toBe(true);
+    const noticeToasts = sim.log.filter((e) => /gave notice/i.test(e.text));
+    expect(noticeToasts.length).toBe(1);
+    expect(noticeToasts[0].text).toMatch(/4 tenants gave notice/);
+  });
 });
 
 describe("Simulation events", () => {
