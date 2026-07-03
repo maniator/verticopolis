@@ -178,19 +178,30 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(sim.money);
   });
 
-  it("caps inflation of a corrupt/oversized compressed save — returns null, never hangs the tab", () => {
-    // A real decompression bomb: a few KB of DEFLATE that inflates past the 32MB
-    // cap. inflateCapped must abort and readSlot must degrade to "no save".
-    const bomb = deflateSync(new Uint8Array(33 * 1024 * 1024)); // 33MB of zeros → tiny packed
+  // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
+  // decompression-bomb fixtures below.
+  const b64 = (bytes: Uint8Array): string => {
     let bin = "";
-    for (let i = 0; i < bomb.length; i += 0x8000) bin += String.fromCharCode(...bomb.subarray(i, i + 0x8000));
-    localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa(bin));
-    expect(SaveGame.load()).toBeNull();
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+
+  it("the 32MB inflate cap — not just a downstream JSON.parse failure — is what rejects an over-cap save", () => {
+    // A VALID, fully loadable save whose JSON inflates PAST the 32MB cap. Without
+    // the cap this decodes to real JSON and loads fine, so a null result proves
+    // inflateCapped aborted the inflation itself (it never allocates the whole
+    // output or hangs) — distinguishing the cap from the downstream JSON.parse.
+    const sim = sampleGame();
+    const data = { ...sim.serialize(), savedAt: 1, filler: "x".repeat(33 * 1024 * 1024) }; // > 32MB inflated
+    const packed = deflateSync(new TextEncoder().encode(JSON.stringify(data)));
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + b64(packed));
+    expect(SaveGame.load()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
   });
 
-  it("rejects a truncated / garbage compressed save — corrupt deflate fails loudly, never a partial tower", () => {
-    // fflate's sync Inflate THROWS on a truncated/invalid stream (it does not
-    // silently emit partial output), and readSlot catches that to null.
+  it("degrades a truncated / garbage compressed save to null — no crash, no partial tower", () => {
+    // Corrupt deflate either makes fflate throw or yields bytes JSON.parse
+    // rejects; either way readSlot catches it and returns null, so the player
+    // never loads a half-decoded tower.
     const sim = sampleGame();
     SaveGame.save(sim);
     const body = localStorage.getItem(AUTO_KEY)!.slice("VCZ1:".length);
