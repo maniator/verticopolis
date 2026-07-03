@@ -29,6 +29,13 @@ function occupy(sim: Simulation, kind: FacilityKind, floor: number, x: number, s
   return u!;
 }
 
+/** Place a unit at a fixed spot the test's assertions depend on and assert it
+ *  succeeded — so a future placement-rule change fails at the placement site,
+ *  not in a later capacity/demand expectation. */
+function mustPlace(sim: Simulation, kind: FacilityKind, floor: number, x: number): void {
+  expect(sim.tower.place(kind, floor, x).ok).toBe(true);
+}
+
 /** A tower with `offices` occupied offices and a recycling basement row. */
 function officeTower(offices: number, centers: number): Simulation {
   const sim = Simulation.newGame(11);
@@ -47,7 +54,7 @@ function officeTower(offices: number, centers: number): Simulation {
   }
   lay(sim, "floor", 0);
   lay(sim, "floor", -1);
-  for (let i = 0; i < centers; i++) sim.tower.place("recycling", -1, i * 20);
+  for (let i = 0; i < centers; i++) mustPlace(sim, "recycling", -1, i * 20);
   return sim;
 }
 
@@ -59,7 +66,7 @@ describe("Recycling fills with population and gates 4★ by DEMAND", () => {
     expect(sim.tower.totalPopulation()).toBe(3000);
     expect(sim.recyclingCapacity()).toBe(RECYCLING_POP_PER_CENTER);
     expect(sim.recyclingDemandMet()).toBe(false);
-    sim.tower.place("recycling", -1, 40);
+    mustPlace(sim, "recycling", -1, 40);
     expect(sim.recyclingCapacity()).toBe(2 * RECYCLING_POP_PER_CENTER);
     expect(sim.recyclingDemandMet()).toBe(true);
   });
@@ -100,7 +107,7 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     lay(sim, "floor", 2);
     // 24 occupied office workers → 2 spaces; 3 suites → 3 more.
     for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
-    for (let i = 0; i < 3; i++) sim.tower.place("hotelSuite", 2, 40 + i * 12);
+    for (let i = 0; i < 3; i++) mustPlace(sim, "hotelSuite", 2, 40 + i * 12);
     const d = sim.parkingDemand();
     expect(d.officePop).toBe(4 * FACILITIES.office.population);
     expect(d.offices).toBe(Math.ceil(d.officePop / PARKING_WORKERS_PER_SPACE));
@@ -108,8 +115,8 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     expect(d.total).toBe(d.offices + d.suites);
     // Three working spaces: exactly enough for the suites, nothing for offices.
     lay(sim, "floor", 0);
-    sim.tower.place("parkingRamp", 0, C);
-    for (let i = 1; i <= 3; i++) sim.tower.place("parking", 0, C + i * 6);
+    mustPlace(sim, "parkingRamp", 0, C);
+    for (let i = 1; i <= 3; i++) mustPlace(sim, "parking", 0, C + i * 6);
     expect(sim.suiteParkingShort()).toBe(false);
   });
 
@@ -118,11 +125,11 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    sim.tower.place("hotelSuite", 2, 0);
+    mustPlace(sim, "hotelSuite", 2, 0);
     expect(sim.suiteParkingShort()).toBe(true); // 1 suite, 0 spaces
     lay(sim, "floor", 0);
-    sim.tower.place("parkingRamp", 0, C);
-    sim.tower.place("parking", 0, C + 6);
+    mustPlace(sim, "parkingRamp", 0, C);
+    mustPlace(sim, "parking", 0, C + 6);
     expect(sim.suiteParkingShort()).toBe(false); // 1 suite, 1 chained space
   });
 
@@ -134,8 +141,8 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
     const suite = occupy(sim, "hotelSuite", 2, 40, "empty");
     lay(sim, "floor", 0);
-    sim.tower.place("parkingRamp", 0, C);
-    for (let i = 1; i <= 4; i++) sim.tower.place("parking", 0, C + i * 6);
+    mustPlace(sim, "parkingRamp", 0, C);
+    for (let i = 1; i <= 4; i++) mustPlace(sim, "parking", 0, C + i * 6);
     // Monday noon: office cars parked, no suite car.
     sim.clock.minutes = 12 * 60; // day 0 = Monday
     const daytime = sim.parkingUsage();
@@ -173,7 +180,7 @@ describe("Over-capacity recycling stops flattering commerce", () => {
       occupy(sim, "shop", 17, 0, "occupied");
       lay(sim, "floor", 0);
       lay(sim, "floor", -1);
-      for (let i = 0; i < centers; i++) sim.tower.place("recycling", -1, i * 20);
+      for (let i = 0; i < centers; i++) mustPlace(sim, "recycling", -1, i * 20);
       sim.clock.minutes = 10 * 60; // shops open at 10:00
       const before = sim.money;
       for (let i = 0; i < 8; i++) sim.tick(60); // a shopping day
