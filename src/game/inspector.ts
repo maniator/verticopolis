@@ -144,7 +144,7 @@ export class InspectorController {
         const now = Math.round(u.satisfaction * 100);
         const target = Math.round(VACATE_RESCIND * 100);
         notice =
-          `<div style="color:var(--bad)">Giving notice — ${VACATE_REASON_TEXT[u.vacateReason]}. Leaves in ${left}.</div>` +
+          `<div style="color:var(--bad)">Giving notice — ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves in ${left}.</div>` +
           `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
       }
       this.deps.ui.showInspector(
