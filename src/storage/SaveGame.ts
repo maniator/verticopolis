@@ -1,3 +1,4 @@
+import { deflateSync, inflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import type { SerializedGame } from "../engine/types";
 
@@ -7,14 +8,28 @@ import type { SerializedGame } from "../engine/types";
  * supports export/import of Verticopolis tower files (.vctower) for sharing
  * or backups.
  *
- * (localStorage suffices for a single save object well under its ~5MB quota.
- * IndexedDB would only be needed for very large numbers of saves; see the
- * project notes for the v2 path.)
+ * localStorage values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
+ * tower is ~750KB of JSON, which — across the autosave slot plus three manual
+ * slots — would crowd the ~5MB localStorage quota and risk a failed save on a
+ * large tower. Compressed, each is a few tens of KB. The compression is
+ * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
+ * critically — right before a reload in the crash-recovery / update paths,
+ * where an async write could be interrupted mid-flush and lose the tower. (The
+ * .vctower FILE format keeps using the async native CompressionStream: those
+ * exports are user-initiated and never race a reload.)
  */
 
 const AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
+
+/**
+ * Prefix marking a compressed localStorage value: this magic, then the
+ * base64 of the DEFLATE-compressed JSON. A legacy uncompressed save is raw
+ * JSON (starts with `{`), so the prefix check cleanly tells the two apart and
+ * old saves keep loading — they re-write compressed on the next save.
+ */
+const STORE_MAGIC = "VCZ1:";
 
 /**
  * The Verticopolis tower-file container (.vctower): a magic first line naming
@@ -43,7 +58,12 @@ function readSlot(key: string): SerializedGame | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
   try {
-    return JSON.parse(raw) as SerializedGame;
+    // Compressed values carry STORE_MAGIC; anything else is a legacy raw-JSON
+    // save from before compression (still loads, then upgrades on next write).
+    const json = raw.startsWith(STORE_MAGIC)
+      ? new TextDecoder().decode(inflateSync(fromBase64(raw.slice(STORE_MAGIC.length))))
+      : raw;
+    return JSON.parse(json) as SerializedGame;
   } catch {
     return null;
   }
@@ -119,7 +139,12 @@ export const SaveGame = {
     const data = sim.serialize() as SerializedGame & { savedAt: number };
     // Stamp save time without relying on a deterministic clock in the engine.
     data.savedAt = nowMs();
-    localStorage.setItem(key, JSON.stringify(data));
+    // DEFLATE the JSON so four full-tower slots stay well under the ~5MB
+    // localStorage quota (see STORE_MAGIC). Synchronous by design — this runs
+    // just before a reload in the crash-recovery path, where an async write
+    // could be lost. base64 keeps the value a safe ASCII string.
+    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data))));
+    localStorage.setItem(key, packed);
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
