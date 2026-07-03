@@ -1045,9 +1045,11 @@ class GameApp {
     return v.reason ?? "A shaft can't go here — leave a clear column through built floors.";
   }
 
-  /** Lay a brush strip; returns how many tiles were actually placed, and when
-   *  zero, why — a strip that's already all this kind is not a failure, and a
-   *  real refusal (no support, no money) carries the engine's reason. */
+  /** Lay a brush strip; returns how many tiles were actually placed and, when
+   *  zero, why. Zero is always the not-placed path for callers — the reason
+   *  just distinguishes a harmless no-op (the strip already carries this
+   *  kind: "already built here") from a real refusal (no support, no money),
+   *  which carries the engine's reason. */
   private paintBrush(kind: FacilityKind, tile: number, floor: number): { placed: number; reason?: string } {
     const tiles = brushTiles(tile);
     let placed = 0;
