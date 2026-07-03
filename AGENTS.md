@@ -124,7 +124,10 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR.
   **re-request a review from Copilot** to get it to look at the latest changes
   (GitHub UI: the ↻ next to Copilot under Reviewers, or
   `request_copilot_review` via the GitHub MCP tools / `gh pr edit`).
-- Resolve a review thread only once its finding is actually addressed in code.
+- Resolve a review thread only once its finding is actually addressed in code —
+  and then actually **mark it Resolved** (`resolve_review_thread` / the
+  "Resolve conversation" button). A reply alone does not clear the thread, and
+  unresolved threads block merge under branch protection.
 
 ## Merging PRs
 

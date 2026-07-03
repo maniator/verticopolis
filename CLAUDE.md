@@ -19,4 +19,6 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
   `npm test`, `npm run build` — all green.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
-- Resolve Copilot/Codex PR review threads before merging.
+- **Resolve Copilot/Codex PR review threads** once addressed — actually mark
+  each thread **Resolved** (`resolve_review_thread`). A reply alone does NOT
+  clear it, and unresolved threads block merge under branch protection.
