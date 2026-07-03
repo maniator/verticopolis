@@ -24,6 +24,8 @@ abstraction · ⬜ not present.
 - ✅ Fast Food, Restaurant, Retail Shop (daily traffic income, business hours)
 - ✅ Cinema (multi-floor, evening crowds), Party Hall
 - ✅ Services — Security, Medical Center, Housekeeping, Recycling Center, Parking
+- ✅ Recycling Center **fills daily** with the tower's garbage (one center per ~2,500 population; a pre-dawn garbage truck empties them) — 4★ requires demand MET, not merely built
+- ✅ Parking demand: offices want a space per ~12 workers from 3★; **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage
 - ✅ Metro Station (whole-floor deep basement; brings visitors)
 - ✅ Wedding Hall on floor 100 (religion-agnostic stand-in for the Cathedral)
 
@@ -48,7 +50,7 @@ abstraction · ⬜ not present.
 - ✅ Tenant stress from real elevator waits (visible commuter frustration) on top of an aggregate congestion backstop → low-satisfaction tenants move out
 - ✅ Crowds tint red when they've waited too long / transport is overwhelmed (the original's visual cue)
 - ✅ Star thresholds: 2★ 300 · 3★ 1,000 · 4★ 5,000 · 5★ 10,000
-- ✅ Facility gates: Security required for 3★, Medical for 4★
+- ✅ Facility gates: Security required for 3★; Medical + recycling demand met for 4★
 - ✅ **TOWER** rating: 5★ + Wedding Hall + metro + VIP inspection (8,000 pop, scaled to our model)
 
 ## Events & disasters

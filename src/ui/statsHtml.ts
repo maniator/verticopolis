@@ -14,6 +14,9 @@ export function buildStatsHtml(sim: Simulation): string {
   // modal-build time so they never run on the ~6 Hz HUD stats() path.
   const ratingPop = sim.ratingPopulation();
   const parkingWorking = sim.tower.functionalParkingSet().size;
+  const parkingDemand = sim.parkingDemand();
+  const recyclingCap = sim.recyclingCapacity();
+  const recyclingShort = !sim.recyclingDemandMet();
   const stranded = sim.strandedFloors().length; // BFS-bearing
   // Only when hotels have dropped out of the rating (3★+) and actually diverge.
   const ratingRow =
@@ -55,6 +58,16 @@ export function buildStatsHtml(sim: Simulation): string {
         ${
           s.parkingSpaces > 0
             ? `<span class="k">Parking spaces</span><span class="v" style="color:${parkingWorking < s.parkingSpaces ? "var(--bad)" : "var(--good)"}">${parkingWorking} / ${s.parkingSpaces} working</span>`
+            : ""
+        }
+        ${
+          s.parkingSpaces > 0 || parkingDemand.total > 0
+            ? `<span class="k">Parking demand</span><span class="v" style="color:${parkingWorking < parkingDemand.total ? "var(--bad)" : "var(--good)"}">${fmt(parkingDemand.total)} needed (${fmt(parkingDemand.offices)} offices + ${fmt(parkingDemand.suites)} suites)</span>`
+            : ""
+        }
+        ${
+          recyclingCap > 0 || (sim.star >= 3 && recyclingShort)
+            ? `<span class="k">Recycling</span><span class="v" style="color:${recyclingShort ? "var(--bad)" : "var(--good)"}">${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " — build more" : ""}</span>`
             : ""
         }
       </div>

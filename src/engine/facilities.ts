@@ -230,7 +230,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#888888",
     basement: true,
-    description: "Basement parking. Must connect to a Parking Ramp. Eases office-worker demand.",
+    description:
+      "Basement parking. Must connect to a Parking Ramp. One space serves ~12 office workers, and every hotel suite needs a space of its own (VIPs drive).",
   },
   security: {
     kind: "security",
@@ -279,7 +280,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#7f9f5f",
     basement: true,
-    description: "Basement facility that processes the tower's waste. Improves large-tower rating.",
+    description:
+      "Basement facility that fills with the tower's daily waste — one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. 4★ requires demand met.",
   },
   metro: {
     kind: "metro",
@@ -346,6 +348,24 @@ export const STAR_THRESHOLDS: Record<number, number> = {
  * (measured ~15,066 occupants at congestion 0.82 with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
+
+/**
+ * Waste-management balance (canon: the FAQ's "Recycle Center … fills daily;
+ * required for 4★" means DEMAND MET, not merely built). One operational center
+ * processes this much population's daily garbage; beyond it the centers
+ * overflow, the 4★ gate closes and commercial appeal sags. 2,500/center makes
+ * the canonical ladder demand 2 centers by 4★ (5,000 pop), 4 by 5★ (10,000)
+ * and 6 by TOWER (15,000) — the original's "keep adding them as you grow".
+ */
+export const RECYCLING_POP_PER_CENTER = 2500;
+
+/** Hour of the daily garbage-truck collection that empties every center.
+ *  Pre-dawn, like the original — you see the truck if you're watching early. */
+export const GARBAGE_COLLECT_HOUR = 5;
+
+/** Office workers one functional parking space serves (canon: offices demand
+ *  parking from 3★). Shared by the move-in penalty, the UI and the tests. */
+export const PARKING_WORKERS_PER_SPACE = 12;
 
 /** Tower geometry constants. */
 export const GRID = {

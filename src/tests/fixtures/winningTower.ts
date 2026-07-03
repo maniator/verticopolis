@@ -64,7 +64,12 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   if (!omit.has("metro")) t.place("metro", GRID.minFloor, 0); // full-lot, bottom of the basement
   if (!omit.has("security")) t.place("security", 2, LEFT + 20);
   if (!omit.has("medical")) t.place("medical", 2, LEFT + 40);
-  if (!omit.has("recycling")) t.place("recycling", -1, LEFT + 60); // basement-only, above the metro
+  // Recycling demand scales with population (canon: ~2,500/center) — a full
+  // tower runs ~17–20k occupants, so build a row of nine centers (22.5k
+  // capacity) in the basement, above the metro.
+  if (!omit.has("recycling")) {
+    for (let i = 0; i < 9; i++) t.place("recycling", -1, LEFT + 60 + i * 20);
+  }
   if (!omit.has("hotelSuite")) {
     t.place("hotelSuite", 2, LEFT + 80); // width 12
     t.place("hotelSuite", 2, LEFT + 96);

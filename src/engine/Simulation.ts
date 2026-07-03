@@ -12,7 +12,10 @@ import { MILESTONES, isTenantFloorUnit } from "./milestones";
 export { ECON } from "./econConfig";
 import {
   FACILITIES,
+  GARBAGE_COLLECT_HOUR,
   GRID,
+  PARKING_WORKERS_PER_SPACE,
+  RECYCLING_POP_PER_CENTER,
   STAR_THRESHOLDS,
   TOWER_POPULATION,
   buildMinutes,
@@ -504,6 +507,36 @@ export class Simulation implements SimContext {
     this.reportMoveIns();
     this.checkMilestones();
     this.nudgeStranded();
+    this.nudgeServiceShortfalls();
+  }
+
+  /** Edge-triggered daily latches (same pattern as {@link nudgeStranded}) for
+   *  the two demand-scaled services: recycling capacity and suite parking.
+   *  Log-only bulletins — they re-arm when the shortfall clears, so a tower
+   *  that outgrows its centers again gets told again. */
+  private wasteNudged = false;
+  private suiteParkingNudged = false;
+  private nudgeServiceShortfalls(): void {
+    const wasteShort = this.star >= 3 && !this.recyclingDemandMet();
+    if (wasteShort && !this.wasteNudged) {
+      const pop = this.tower.totalPopulation();
+      const need = Math.ceil(pop / RECYCLING_POP_PER_CENTER);
+      this.emit(
+        `♻️ Garbage is piling up: ${pop.toLocaleString()} population needs ${need} Recycling Center${need === 1 ? "" : "s"} (you have ${this.recyclingCenters()}). 4★ requires demand met.`,
+        "info",
+      );
+    }
+    this.wasteNudged = wasteShort;
+
+    const suiteShort = this.star >= 3 && this.suiteParkingShort();
+    if (suiteShort && !this.suiteParkingNudged) {
+      const d = this.parkingDemand();
+      this.emit(
+        `🚗 Hotel suites need a working parking space each — ${d.suites} suite${d.suites === 1 ? "" : "s"}, ${this.tower.functionalParkingSpots()} space(s) chained to a ramp.`,
+        "info",
+      );
+    }
+    this.suiteParkingNudged = suiteShort;
   }
 
   /** Once-per-day, edge-triggered log nudge when a leased floor is 3+ rides from
@@ -807,16 +840,90 @@ export class Simulation implements SimContext {
 
   // ---- Move-ins ----------------------------------------------------------
 
-  /** True when the tower is 3★+ and lacks enough parking for its office workforce
-   * (each parking space serves ~12 workers) — offices then demand parking. */
-  private officeParkingShort(): boolean {
-    if (this.star < 3) return false;
+  // ---- Waste management & parking demand ----------------------------------
+
+  /** Operational Recycling Centers (finished, not on fire). */
+  recyclingCenters(): number {
+    return this.countOperational("recycling");
+  }
+
+  /** Population whose daily garbage the tower can process. */
+  recyclingCapacity(): number {
+    return this.recyclingCenters() * RECYCLING_POP_PER_CENTER;
+  }
+
+  /** The canon 4★ recycling gate: DEMAND MET, not merely built — one center
+   *  per ~{@link RECYCLING_POP_PER_CENTER} population, so the requirement keeps
+   *  growing with the tower exactly as in the original. */
+  recyclingDemandMet(): boolean {
+    return this.tower.totalPopulation() <= this.recyclingCapacity();
+  }
+
+  /**
+   * How full every recycling center is right now, 0..1 (centers share the
+   * tower's load). Garbage accumulates through the day from the pre-dawn
+   * truck collection ({@link GARBAGE_COLLECT_HOUR}); a tower over capacity
+   * hits 100% before the day is out — the original's "it filled up, build
+   * more". Derived from the clock and population — never persisted.
+   */
+  recyclingFill(): number {
+    const cap = this.recyclingCapacity();
+    if (cap === 0) return 0;
+    const sinceCollect = (this.clock.minuteOfDay - GARBAGE_COLLECT_HOUR * 60 + 1440) % 1440;
+    return Math.min(1, (this.tower.totalPopulation() / cap) * (sinceCollect / 1440));
+  }
+
+  /** Functional parking spaces the tower NEEDS: one per ~12 office workers
+   *  (canon: offices demand parking from 3★) plus one per hotel suite (canon:
+   *  suite guests — and the VIP — arrive by car). */
+  parkingDemand(): { officePop: number; offices: number; suites: number; total: number } {
     let officePop = 0;
+    let suites = 0;
     for (const u of this.tower.units) {
       if (u.kind === "office" && u.state === "occupied") officePop += FACILITIES.office.population;
+      else if (u.kind === "hotelSuite" && isOperational(u)) suites++;
     }
+    const offices = Math.ceil(officePop / PARKING_WORKERS_PER_SPACE);
+    return { officePop, offices, suites, total: offices + suites };
+  }
+
+  /** True when there aren't enough working spaces for one-per-suite (the VIP
+   *  and suite guests drive — canon "need a parking spot per suite"). */
+  suiteParkingShort(): boolean {
+    const d = this.parkingDemand();
+    return d.suites > 0 && this.tower.functionalParkingSpots() < d.suites;
+  }
+
+  /** True when the tower is 3★+ and lacks enough parking for its office workforce
+   * (each parking space serves ~12 workers) — offices then demand parking.
+   * Suites reserve their one-space-each FIRST (canon), so a lot full of suite
+   * cars gives the offices nothing. */
+  private officeParkingShort(): boolean {
+    if (this.star < 3) return false;
+    const d = this.parkingDemand();
     // Only ramp-chained spaces count (canon).
-    return this.tower.functionalParkingSpots() * 12 < officePop;
+    const forOffices = this.tower.functionalParkingSpots() - d.suites;
+    return forOffices * PARKING_WORKERS_PER_SPACE < d.officePop;
+  }
+
+  /**
+   * Fraction of WORKING parking spaces holding a car right now (0..1) — the
+   * garage's display model, shared by the renderer and the inspector. Office
+   * workers' cars fill the lot through weekday working hours; suite guests'
+   * cars stand overnight. Dead (unchained) spaces never show cars — a car
+   * couldn't have gotten there.
+   */
+  parkingUsage(): number {
+    const spots = this.tower.functionalParkingSpots();
+    if (spots === 0) return 0;
+    const h = this.clock.hour;
+    const d = this.parkingDemand();
+    const officeCars = !this.clock.isWeekend && h >= 8 && h < 18 ? d.offices : 0;
+    let suiteCars = 0;
+    if (h >= 19 || h < 8) {
+      for (const u of this.tower.units) if (u.kind === "hotelSuite" && u.state === "asleep") suiteCars++;
+    }
+    return Math.min(1, (officeCars + suiteCars) / spots);
   }
 
   private attemptMoveIns(): void {
@@ -1009,13 +1116,14 @@ export class Simulation implements SimContext {
     // facility only counts once it is actually operational (not still under
     // construction, not on fire).
     if (target >= 3 && !this.hasOperational("security")) target = Math.min(target, 2);
-    // 4★ wants the full amenity set: Medical, Recycling, more than one Hotel
-    // Suite, and a favorable VIP review (see {@link maybeVipStay}) — per canon.
+    // 4★ wants the full amenity set: Medical, Recycling DEMAND MET (one center
+    // per ~2,500 population — see {@link recyclingDemandMet}), more than one
+    // Hotel Suite, and a favorable VIP review (see {@link maybeVipStay}) — per canon.
     if (
       target >= 4 &&
       !(
         this.hasOperational("medical") &&
-        this.hasOperational("recycling") &&
+        this.recyclingDemandMet() &&
         this.countOperational("hotelSuite") >= 2 &&
         this.vipFavorable
       )
@@ -1123,13 +1231,21 @@ export class Simulation implements SimContext {
       (u) => u.kind === "hotelSuite" && u.state === "asleep" && this.tower.isFloorServed(u.floor),
     );
     if (suites.length === 0) return;
-    if (suites.some((s) => s.satisfaction >= 0.7)) {
+    const happy = suites.some((s) => s.satisfaction >= 0.7);
+    // Canon: every suite needs a parking space of its own — the VIP arrives by
+    // car, and a suite hotel without valet parking never earns the review.
+    if (happy && !this.suiteParkingShort()) {
       this.vipFavorable = true;
       this.emit("A VIP enjoyed their suite — your tower earned a favorable review (4★ unlocked).", "good");
     } else if (this.clock.day - this.lastVipNagDay >= 5) {
-      // Throttle the "underwhelming" line so it can't spam the log every day.
+      // Throttle the nag lines so they can't spam the log every day.
       this.lastVipNagDay = this.clock.day;
-      this.emit("A VIP's suite stay was underwhelming. Improve suite access and try again.", "info");
+      this.emit(
+        happy
+          ? "🚗 The VIP circled the block and left — every hotel suite needs a working parking space (chained to a ramp)."
+          : "A VIP's suite stay was underwhelming. Improve suite access and try again.",
+        "info",
+      );
     }
   }
 

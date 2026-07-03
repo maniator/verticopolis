@@ -27,6 +27,16 @@ export interface InspectorDeps {
   setAnchor(anchor: { x: number; floor: number } | null): void;
 }
 
+/** The shared demand line for parking spaces & ramps: how many working spaces
+ *  the tower has vs what its offices (1 per ~12 workers) and suites (1 each)
+ *  currently need. */
+function parkingDemandLine(sim: Simulation): string {
+  const d = sim.parkingDemand();
+  const have = sim.tower.functionalParkingSpots();
+  const color = have < d.total ? "var(--bad)" : "var(--good)";
+  return `<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
+}
+
 export class InspectorController {
   /** The facility the inspector card currently describes. */
   private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
@@ -88,8 +98,19 @@ export class InspectorController {
       const parking =
         u.kind === "parking" && isOperational(u)
           ? sim.tower.functionalParkingSet().has(u.id)
-            ? `<div style="color:var(--good)">Ramp access: connected.</div>`
+            ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim)
             : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`
+          : u.kind === "parkingRamp" && isOperational(u)
+            ? parkingDemandLine(sim)
+            : "";
+      // Recycling runs on demand: how full it is right now, and whether the
+      // tower has outgrown its centers (the canon 4★ gate).
+      const recycling =
+        u.kind === "recycling" && isOperational(u)
+          ? `<div>Fill: ${Math.round(sim.recyclingFill() * 100)}% — truck collects each morning.</div>` +
+            (sim.recyclingDemandMet()
+              ? `<div style="color:var(--good)">Capacity: ${sim.tower.totalPopulation().toLocaleString()}/${sim.recyclingCapacity().toLocaleString()} population — demand met.</div>`
+              : `<div style="color:var(--bad)">Over capacity: ${sim.tower.totalPopulation().toLocaleString()} population vs ${sim.recyclingCapacity().toLocaleString()} processed — build another center (4★ requires demand met).</div>`)
           : "";
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
@@ -99,6 +120,7 @@ export class InspectorController {
           access +
           hotel +
           parking +
+          recycling +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {

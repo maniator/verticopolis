@@ -34,7 +34,7 @@ function towerWithPop(seed: number, target: number): Simulation {
 }
 
 describe("Canon star ladder (FAQ)", () => {
-  it("4★ requires Medical + Recycling + >1 Suite + a favorable VIP", () => {
+  it("4★ requires Medical + Recycling DEMAND MET + >1 Suite + a favorable VIP", () => {
     const sim = towerWithPop(1, 5200);
     sim.star = 3;
     const top = sim.tower.highestFloor + 1;
@@ -44,16 +44,22 @@ describe("Canon star ladder (FAQ)", () => {
     sim.evaluateStar();
     expect(sim.star).toBe(3); // blocked: no recycling / suites / VIP yet
 
-    // Add the missing amenities.
+    // Add the missing amenities — but only ONE recycling center for 5,200
+    // population (a center processes ~2,500): demand unmet, still blocked.
     lay(sim, "floor", 0);
     lay(sim, "floor", -1);
     sim.tower.place("recycling", -1, 0);
     sim.tower.place("hotelSuite", top, 20);
     sim.tower.place("hotelSuite", top, 40);
-    sim.evaluateStar();
-    expect(sim.star).toBe(3); // still blocked without the favorable VIP
-
     sim.vipFavorable = true;
+    expect(sim.recyclingDemandMet()).toBe(false); // 5,200 pop > 2,500 capacity
+    sim.evaluateStar();
+    expect(sim.star).toBe(3); // canon: recycling DEMAND met, not merely built
+
+    // Two more centers (7,500 capacity ≥ 5,200 pop) satisfy the demand.
+    sim.tower.place("recycling", -1, 20);
+    sim.tower.place("recycling", -1, 40);
+    expect(sim.recyclingDemandMet()).toBe(true);
     sim.evaluateStar();
     expect(sim.star).toBe(4);
   });
@@ -67,7 +73,8 @@ describe("Canon star ladder (FAQ)", () => {
     sim.tower.place("medical", top, 0);
     sim.tower.place("security", top, 60);
     for (let fl = 0; fl >= -5; fl--) lay(sim, "floor", fl);
-    sim.tower.place("recycling", -2, 0); // spans -2/-1
+    // 10,200 population needs five ~2,500-capacity centers (demand met).
+    for (let i = 0; i < 5; i++) sim.tower.place("recycling", -2, i * 20); // each spans -2/-1
     sim.tower.place("hotelSuite", top, 20);
     sim.tower.place("hotelSuite", top, 40);
     sim.evaluateStar();
@@ -117,21 +124,41 @@ describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
 });
 
 describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
-  it("a well-run served suite earns a favorable VIP review", () => {
+  /** A served suite hotel, optionally with the canon one-space-per-suite parking. */
+  function suiteTower(withParking: boolean): { sim: Simulation; suite: ReturnType<Simulation["tower"]["units"]["find"]> } {
     const sim = Simulation.newGame(5);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     sim.buildTransport("elevatorStandard", C, 1, 2);
     sim.star = 3;
+    if (withParking) {
+      lay(sim, "floor", 0);
+      sim.tower.place("parkingRamp", 0, C);
+      sim.tower.place("parking", 0, C + 6); // one working space for the one suite
+    }
     const r = sim.tower.place("hotelSuite", 2, 0);
-    const suite = sim.tower.units.find((u) => u.id === r.unitId)!;
+    return { sim, suite: sim.tower.units.find((u) => u.id === r.unitId) };
+  }
+
+  it("a well-run served suite WITH its parking space earns a favorable VIP review", () => {
+    const { sim, suite } = suiteTower(true);
     expect(sim.vipFavorable).toBe(false);
     for (let i = 0; i < 15; i++) sim.tick(60); // 07:00 → 22:00 (past the 08:00 checkout)
-    suite.state = "asleep"; // a guest checks into the suite for the night
-    suite.satisfaction = 1;
+    suite!.state = "asleep"; // a guest checks into the suite for the night
+    suite!.satisfaction = 1;
     for (let i = 0; i < 3; i++) sim.tick(60); // 22:00 → 01:00, crossing midnight (the VIP check)
     expect(sim.vipFavorable).toBe(true);
+  });
+
+  it("canon: no parking space per suite → the VIP drives off, no review", () => {
+    const { sim, suite } = suiteTower(false);
+    for (let i = 0; i < 15; i++) sim.tick(60);
+    suite!.state = "asleep";
+    suite!.satisfaction = 1;
+    for (let i = 0; i < 3; i++) sim.tick(60);
+    expect(sim.suiteParkingShort()).toBe(true);
+    expect(sim.vipFavorable).toBe(false); // blocked purely by the missing space
   });
 });
 

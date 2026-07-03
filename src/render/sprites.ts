@@ -7,6 +7,7 @@ import {
   drawMedical,
   drawMetro,
   drawParking,
+  drawParkingRamp,
   drawPartyHall,
   drawRecycling,
   drawSecurity,
@@ -24,7 +25,7 @@ export {
   LOBBY_VARIANTS,
   lobbyVariant,
 } from "./sprites/structure";
-export { drawMetroTrain } from "./sprites/facilities";
+export { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "./sprites/facilities";
 export { drawCar, drawTransport } from "./sprites/transport";
 
 /** Facility kinds rendered by the faithful pixel-art room module. */
@@ -83,7 +84,9 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
     case "partyHall":
       return drawPartyHall(ctx, x, y, w, h);
     case "parking":
-      return drawParking(ctx, u, x, y, w, h);
+      return drawParking(d, u, x, y, w, h);
+    case "parkingRamp":
+      return drawParkingRamp(ctx, u, x, y, w, h);
     case "security":
       return drawSecurity(ctx, x, y, w, h);
     case "medical":
@@ -91,7 +94,7 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
     case "housekeeping":
       return drawHousekeeping(ctx, x, y, w, h);
     case "recycling":
-      return drawRecycling(ctx, x, y, w, h);
+      return drawRecycling(d, u, x, y, w, h);
     case "metro":
       return drawMetro(d, x, y, w, h);
     case "weddingHall":
