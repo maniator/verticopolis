@@ -81,7 +81,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
-    onCycleOverlay: vi.fn(() => "Congestion"),
+    onSetOverlay: vi.fn(),
     onShowSaves: vi.fn(),
     onInspectorClose: vi.fn(),
     onSaveSlot: vi.fn(),

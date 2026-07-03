@@ -4,7 +4,8 @@ import { FACILITIES, GRID, facilityFloors, isFixedSpanTransport, maxCarsFor } fr
 import { rentConfig } from "./engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
 import { isOperational } from "./engine/types";
-import { TowerEngine, HEATMAP_MODES, HEATMAP_LABELS, type Picked } from "./render/excalibur/TowerEngine";
+import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
+import type { HeatmapMode } from "./engine/Simulation";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
@@ -200,7 +201,7 @@ class GameApp {
       },
       onRenameTower: (name) => (this.sim.tower.towerName = name),
       onShowStats: () => this.ui.showStats(buildStatsHtml(this.sim)),
-      onCycleOverlay: () => this.cycleOverlay(),
+      onSetOverlay: (mode) => this.setOverlay(mode),
       // Latches the dismissal so the next hover pick over the same facility
       // doesn't instantly re-open the card the user just closed.
       onInspectorClose: () => this.inspector.dismiss(),
@@ -580,15 +581,11 @@ class GameApp {
     return this.tool.type === "build" && !!FACILITIES[this.tool.kind].transport;
   }
 
-  /** Advance the colored stats overlay: Off → Congestion → Occupancy →
-   *  Satisfaction → Off. Returns the label for the newly-active mode so the UI
-   *  button can show it. */
-  private cycleOverlay(): string {
-    const cur = this.engine.overlayMode;
-    const idx = cur ? HEATMAP_MODES.indexOf(cur) : -1;
-    const next = HEATMAP_MODES[idx + 1] ?? null; // past the last mode → off
-    this.engine.overlayMode = next;
-    return next ? HEATMAP_LABELS[next].title : "Off";
+  /** Set the colored stats overlay from the picker value ("" = off). An
+   *  unrecognized value falls back to off, so a stale/forged value can't push a
+   *  bad mode into the renderer. */
+  private setOverlay(mode: string): void {
+    this.engine.overlayMode = (HEATMAP_MODES as readonly string[]).includes(mode) ? (mode as HeatmapMode) : null;
   }
 
   private updateBuildPreview(tile: number, floor: number): void {

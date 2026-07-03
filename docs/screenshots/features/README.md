@@ -23,3 +23,4 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-congestion.png` | The colored stats overlay in **Congestion** mode — floors tinted green (clear) → red (jammed) with a legend. |
 | `overlay-occupancy.png` | **Occupancy** mode — green where fully leased (offices/condos), red/amber on the hotel floors that sit empty at midday. |
 | `overlay-satisfaction.png` | **Satisfaction** mode — green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
+| `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics) — every mode is directly selectable. |

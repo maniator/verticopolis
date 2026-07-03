@@ -612,6 +612,24 @@ html.reduce-motion *::after {
   width: 100%;
   margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
 }
+/* Stats-overlay picker: a labeled dropdown so every map mode is visible and
+ *  directly selectable (no hidden cycle). */
+.overlay-picker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--r-ink);
+}
+.overlay-picker > span {
+  white-space: nowrap;
+}
+.overlay-picker .field {
+  flex: 1;
+  padding: 3px 4px;
+  font-size: 12px;
+}
 #tower-stats {
   font-size: 12px;
   gap: 2px 8px;
