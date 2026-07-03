@@ -510,10 +510,11 @@ export class Simulation implements SimContext {
     this.nudgeServiceShortfalls();
   }
 
-  /** Edge-triggered daily latches (same pattern as {@link nudgeStranded}) for
-   *  the two demand-scaled services: recycling capacity and suite parking.
-   *  Log-only bulletins — they re-arm when the shortfall clears, so a tower
-   *  that outgrows its centers again gets told again. */
+  /** Edge-triggered log bulletins (same latch pattern as {@link nudgeStranded})
+   *  for the two demand-scaled services: recycling capacity and suite parking.
+   *  Each fires once when its shortfall first appears and re-arms only after the
+   *  shortfall clears — so a tower that outgrows its centers again gets told
+   *  again. Evaluated once per day (called from {@link onDay}), not day-latched. */
   private wasteNudged = false;
   private suiteParkingNudged = false;
   private nudgeServiceShortfalls(): void {

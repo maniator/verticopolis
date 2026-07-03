@@ -1603,7 +1603,8 @@ export class TowerEngine {
     }
     // Garage commute cars: cruise the parking decks during the morning and
     // evening rushes, but only when the garage actually has cars to move.
-    // Reads the per-hour cache (refreshed in the tick), never the flood-fill.
+    // Reads the fraction computed in syncScene (per sync, not per frame), so
+    // this frame-path never runs the parking flood-fill itself.
     const rushing = (clock.isMorning() || clock.isEvening()) && this.displayParkingUse > 0;
     for (const g of this.garageCars) {
       if (g.actor.graphics.visible !== rushing) g.actor.graphics.visible = rushing;

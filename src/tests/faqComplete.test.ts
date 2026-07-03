@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { GRID, FACILITIES } from "../engine/facilities";
+import type { Unit } from "../engine/types";
 
 /** FAQ-parity (complete) tests: the canon star ladder, office noise, the
  * hotel-population rule and the VIP-in-suite gate. */
@@ -125,7 +126,7 @@ describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
 
 describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
   /** A served suite hotel, optionally with the canon one-space-per-suite parking. */
-  function suiteTower(withParking: boolean): { sim: Simulation; suite: ReturnType<Simulation["tower"]["units"]["find"]> } {
+  function suiteTower(withParking: boolean): { sim: Simulation; suite: Unit } {
     const sim = Simulation.newGame(5);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -138,15 +139,18 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
       sim.tower.place("parking", 0, C + 6); // one working space for the one suite
     }
     const r = sim.tower.place("hotelSuite", 2, 0);
-    return { sim, suite: sim.tower.units.find((u) => u.id === r.unitId) };
+    expect(r.ok).toBe(true); // fail loudly here, not with a null deref later
+    const suite = sim.tower.units.find((u) => u.id === r.unitId);
+    expect(suite).toBeDefined();
+    return { sim, suite: suite! };
   }
 
   it("a well-run served suite WITH its parking space earns a favorable VIP review", () => {
     const { sim, suite } = suiteTower(true);
     expect(sim.vipFavorable).toBe(false);
     for (let i = 0; i < 15; i++) sim.tick(60); // 07:00 → 22:00 (past the 08:00 checkout)
-    suite!.state = "asleep"; // a guest checks into the suite for the night
-    suite!.satisfaction = 1;
+    suite.state = "asleep"; // a guest checks into the suite for the night
+    suite.satisfaction = 1;
     for (let i = 0; i < 3; i++) sim.tick(60); // 22:00 → 01:00, crossing midnight (the VIP check)
     expect(sim.vipFavorable).toBe(true);
   });
@@ -154,8 +158,8 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
   it("canon: no parking space per suite → the VIP drives off, no review", () => {
     const { sim, suite } = suiteTower(false);
     for (let i = 0; i < 15; i++) sim.tick(60);
-    suite!.state = "asleep";
-    suite!.satisfaction = 1;
+    suite.state = "asleep";
+    suite.satisfaction = 1;
     for (let i = 0; i < 3; i++) sim.tick(60);
     expect(sim.suiteParkingShort()).toBe(true);
     expect(sim.vipFavorable).toBe(false); // blocked purely by the missing space
