@@ -539,7 +539,10 @@ export class Simulation implements SimContext {
   floorHeatmap(mode: HeatmapMode): Map<number, { severity: number; minX: number; maxX: number }> {
     const ext = new Map<number, { min: number; max: number }>();
     // Per-floor tenancy accumulators for the occupancy / satisfaction modes.
-    const acc = new Map<number, { total: number; occupied: number; satSum: number; present: number }>();
+    // `present` is the live-tenant count (offices/condos read present whenever
+    // leased, hotels only while a guest is in); occupancy grades vacancy against
+    // it, satisfaction averages happiness over it.
+    const acc = new Map<number, { total: number; satSum: number; present: number }>();
     for (const u of this.tower.units) {
       const right = u.x + u.width - 1;
       for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
@@ -552,10 +555,9 @@ export class Simulation implements SimContext {
       }
       const rentable = FACILITIES[u.kind].population > 0 || isHotelKind(u.kind);
       if (rentable) {
-        const a = acc.get(u.floor) ?? { total: 0, occupied: 0, satSum: 0, present: 0 };
+        const a = acc.get(u.floor) ?? { total: 0, satSum: 0, present: 0 };
         a.total++;
         if (isPresent(u)) {
-          a.occupied++;
           a.satSum += u.satisfaction;
           a.present++;
         }
@@ -572,7 +574,7 @@ export class Simulation implements SimContext {
       } else if (mode === "occupancy") {
         const a = acc.get(floor);
         if (!a || a.total === 0) continue; // no tenancy here → don't tint
-        severity = 1 - a.occupied / a.total; // vacant share
+        severity = 1 - a.present / a.total; // vacant share
       } else {
         // satisfaction: only judge floors that actually have tenants present
         // right now — an empty floor has no happiness signal (and its vacancy
