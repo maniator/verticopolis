@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
@@ -161,6 +162,76 @@ describe("SaveGame", () => {
     const loaded = SaveGame.load()!;
     const x0 = Math.floor(GRID.width / 2) - 20;
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
+  });
+
+  const AUTO_KEY = "simtower-clone-save"; // mirrors the internal autosave key
+
+  it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const raw = localStorage.getItem(AUTO_KEY)!;
+    // The stored value is the compression marker + payload, never raw JSON.
+    expect(raw.startsWith("VCZ1:")).toBe(true);
+    expect(raw.startsWith("{")).toBe(false);
+    expect(raw.length).toBeLessThan(JSON.stringify(sim.serialize()).length);
+    // …and it still round-trips back to the same tower.
+    expect(SaveGame.load()!.money).toBe(sim.money);
+  });
+
+  // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
+  // decompression-bomb fixtures below.
+  const b64 = (bytes: Uint8Array): string => {
+    let bin = "";
+    for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+    return btoa(bin);
+  };
+
+  it("the 32MB inflate cap — not just a downstream JSON.parse failure — is what rejects an over-cap save", () => {
+    // A VALID, fully loadable save whose JSON inflates PAST the 32MB cap. Without
+    // the cap this decodes to real JSON and loads fine, so a null result proves
+    // inflateCapped aborted the inflation itself (it never allocates the whole
+    // output or hangs) — distinguishing the cap from the downstream JSON.parse.
+    const sim = sampleGame();
+    const data = { ...sim.serialize(), savedAt: 1, filler: "x".repeat(33 * 1024 * 1024) }; // > 32MB inflated
+    const packed = deflateSync(new TextEncoder().encode(JSON.stringify(data)));
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + b64(packed));
+    expect(SaveGame.load()).toBeNull(); // the cap fired (the payload alone is valid + loadable)
+  });
+
+  it("degrades a truncated / garbage compressed save to null — no crash, no partial tower", () => {
+    // Corrupt deflate either makes fflate throw or yields bytes JSON.parse
+    // rejects; either way readSlot catches it and returns null, so the player
+    // never loads a half-decoded tower.
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const body = localStorage.getItem(AUTO_KEY)!.slice("VCZ1:".length);
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + body.slice(0, Math.floor(body.length / 2))); // truncated payload
+    expect(SaveGame.load()).toBeNull();
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all")); // outright garbage
+    expect(SaveGame.load()).toBeNull();
+  });
+
+  it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
+    const sim = sampleGame();
+    localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    expect(localStorage.getItem(AUTO_KEY)!.startsWith("{")).toBe(true); // legacy: raw JSON, no marker
+
+    const loaded = SaveGame.load()!;
+    expect(loaded.money).toBe(sim.money); // old save still readable
+
+    SaveGame.save(loaded); // re-saving migrates it forward
+    expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
+  });
+
+  it("listSlots reads compressed slots — name / star / savedAt survive the round-trip", () => {
+    const sim = sampleGame();
+    sim.tower.towerName = "Compressed Tower";
+    SaveGame.saveSlot(1, sim);
+    const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
+    expect(info.exists).toBe(true);
+    expect(info.towerName).toBe("Compressed Tower");
+    expect(info.funds).toBe(sim.money);
+    expect(info.savedAt).toBeGreaterThan(0);
   });
 
   it("exports a .vctower container (magic line + packed payload, not raw JSON) and imports it back", async () => {
