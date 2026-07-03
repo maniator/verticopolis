@@ -28,8 +28,16 @@ import {
   maxCarsFor,
   transportCarCapacity,
 } from "./facilities";
-import type { FacilityKind, SerializedGame, Unit, WeatherKind } from "./types";
-import { isDormant, isOperational, isPresent, isUnitState } from "./types";
+import type { FacilityKind, SerializedGame, Unit, VacateReason, WeatherKind } from "./types";
+import {
+  isDormant,
+  isOperational,
+  isPresent,
+  isTenanted,
+  isUnitState,
+  isVacateReason,
+  VACATE_REASON_TEXT,
+} from "./types";
 
 /**
  * Current save-format version. `serialize()` always stamps this; `deserialize()`
@@ -38,6 +46,20 @@ import { isDormant, isOperational, isPresent, isUnitState } from "./types";
  * grow.
  */
 export const SAVE_VERSION = 1;
+
+/** How long (game minutes) an office/condo tenant stays "on notice" in the
+ *  `vacating` state before actually leaving — a grace window the player can use
+ *  to fix the cause. Two in-game days. Module-local: only the churn loop reads it. */
+const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
+
+/** Satisfaction a vacating tenant must climb back to before they rescind their
+ *  notice and stay. Set at 0.40 (not a hair above zero) so a tower that merely
+ *  *stabilizes* a unit — nurses it off the floor but never actually makes it a
+ *  good place to be — still loses the tenant: "stabilized" ≠ "fixed". A genuine
+ *  fix reaches 0.40 in ~8 served hours (recovery is +0.05/hr), well inside the
+ *  notice window. Exported because the inspector reads it to show the player the
+ *  exact recovery target (the "inform before you hurt them" contract). */
+export const VACATE_RESCIND = 0.4;
 
 /**
  * Save-format migration seam. Runs before the field-level coercion in
@@ -754,6 +776,9 @@ export class Simulation implements SimContext {
     if (globalCong > 1.4 && this.clock.hour === 9 && this.rng.chance(0.5)) {
       this.emit("Tenants are complaining of long elevator waits — add cars or shafts.", "bad");
     }
+    // New notices this tick are batched into one toast (like move-ins) so a
+    // tower-wide problem raises a single alarm, not one per unit.
+    const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
     for (const u of this.tower.units) {
       if (isDormant(u)) continue;
       const served = this.tower.isFloorServed(u.floor);
@@ -799,14 +824,77 @@ export class Simulation implements SimContext {
       // the authoritative, persisted satisfaction would make the headless and
       // browser runs diverge. The aggregate congestion model above is the single
       // authoritative stress driver.
-      // Tenants abandon a unit that stays unbearable — offices and condos move
-      // out, and hotel guests give up too (review F25). Commercial venues aren't
-      // listed here because their income already requires a served floor, so poor
-      // access starves them directly rather than via a separate move-out.
-      if (u.satisfaction <= 0 && (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind))) {
-        this.vacate(u);
+      // Tenants abandon a unit that stays unbearable. Offices and condos are
+      // long-term leases, so a bottomed-out satisfaction first puts them "on
+      // notice" — the `vacating` grace period — rather than evicting instantly;
+      // fix the cause in time and they rescind and stay. Hotel guests have no
+      // lease to give notice on (and a room cycles nightly), so a chronically
+      // miserable room simply fails to hold its guest right away (review F25).
+      // Commercial venues aren't here: their income already requires a served
+      // floor, so poor access starves them directly rather than via move-out.
+      const leaseTenant = u.kind === "office" || u.kind === "condo";
+      if (leaseTenant && u.state === "vacating") {
+        if (u.satisfaction >= VACATE_RESCIND) {
+          // Conditions recovered inside the notice window — they quietly stay.
+          // No toast: "silence when correct", and a per-tick good/bad pair on a
+          // unit that flaps around the threshold would be pure noise. The
+          // clearing inspector/ribbon is the (pull) cue that the fix worked.
+          u.state = "occupied";
+          u.vacateReason = undefined;
+          u.vacateAt = undefined;
+        } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
+          // Notice ran out and it's still unbearable — they leave for good.
+          this.vacate(u, u.vacateReason ?? "access");
+        }
+      } else if (leaseTenant && u.satisfaction <= 0) {
+        // Give notice: enter the grace period with the attributed cause.
+        u.state = "vacating";
+        u.vacateReason = this.vacateCause(u, served, cong);
+        u.vacateAt = this.clock.minutes + VACATE_NOTICE_MINUTES;
+        notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });
+      } else if (u.satisfaction <= 0 && isHotelKind(u.kind)) {
+        this.vacate(u, this.vacateCause(u, served, cong));
       }
     }
+    this.emitNotices(notices);
+  }
+
+  /** Announce this tick's fresh notices as a single toast: a named unit when
+   *  just one gave notice, or a per-cause tally when several did at once — so a
+   *  tower-wide access/congestion problem is one alarm, not a flood. */
+  private emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void {
+    if (notices.length === 0) return;
+    if (notices.length === 1) {
+      const n = notices[0];
+      this.emit(
+        `${FACILITIES[n.kind].name} on ${this.floorLabel(n.floor)} gave notice — ${VACATE_REASON_TEXT[n.reason]}. Fix it before they leave.`,
+        "bad",
+      );
+      return;
+    }
+    const byReason = new Map<VacateReason, number>();
+    for (const n of notices) byReason.set(n.reason, (byReason.get(n.reason) ?? 0) + 1);
+    const parts = [...byReason].map(([r, n]) => `${n} × ${VACATE_REASON_TEXT[r]}`);
+    this.emit(`${notices.length} tenants gave notice — ${parts.join(", ")}. Fix the flagged units before they leave.`, "bad");
+  }
+
+  /**
+   * Attribute a tenant's departure to the dominant satisfaction drain at the
+   * moment it bottomed out, so the toast/inspector names the real cause instead
+   * of always blaming access. The order mirrors the drains in
+   * {@link updateSatisfaction}: an unreachable floor is harshest, then elevator
+   * crowding, then an over-market office rent. (Office noise only caps
+   * satisfaction, never drains it to zero, so it is never a departure cause;
+   * `access` is the catch-all for the rare emergency-driven bottom-out.)
+   */
+  private vacateCause(u: Unit, served: boolean, cong: number): VacateReason {
+    if (!served) return "access";
+    if (u.floor !== 1 && cong > 1) return "congestion";
+    if (u.kind === "office") {
+      const cfg = rentConfig("office");
+      if (cfg && rentOf(u) > cfg.default) return "rent";
+    }
+    return "access";
   }
 
   /**
@@ -954,12 +1042,17 @@ export class Simulation implements SimContext {
     return result;
   }
 
-  private vacate(u: Unit): void {
+  private vacate(u: Unit, reason: VacateReason): void {
     u.state = "empty";
     u.occupants = 0;
     u.everOccupied = u.kind === "condo" ? u.everOccupied : false;
     u.label = FACILITIES[u.kind].name;
-    this.emit(`A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (poor access).`, "bad");
+    u.vacateReason = undefined;
+    u.vacateAt = undefined;
+    this.emit(
+      `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
+      "bad",
+    );
   }
 
   // ---- Move-ins ----------------------------------------------------------
@@ -1004,7 +1097,7 @@ export class Simulation implements SimContext {
     let officePop = 0;
     let suites = 0;
     for (const u of this.tower.units) {
-      if (u.kind === "office" && u.state === "occupied") officePop += FACILITIES.office.population;
+      if (u.kind === "office" && isTenanted(u)) officePop += FACILITIES.office.population;
       else if (u.kind === "hotelSuite" && isOperational(u)) suites++;
     }
     const offices = Math.ceil(officePop / PARKING_WORKERS_PER_SPACE);
@@ -1198,6 +1291,10 @@ export class Simulation implements SimContext {
   private moveIn(u: Unit): void {
     u.state = "occupied";
     u.satisfaction = 1;
+    // A fresh tenant carries no prior eviction — clear any leftover notice
+    // bookkeeping so a recycled unit can never present stale departure data.
+    u.vacateReason = undefined;
+    u.vacateAt = undefined;
     if (u.kind === "condo" && !u.everOccupied) {
       u.everOccupied = true;
       const price = rentOf(u);
@@ -1508,7 +1605,7 @@ export class Simulation implements SimContext {
     for (const u of this.tower.units) {
       if (u.kind === "office") {
         offices++;
-        if (u.state === "occupied") occupiedOffices++;
+        if (isTenanted(u)) occupiedOffices++; // a lame-duck on notice still holds the space
         if (u.state === "empty") vacant++;
       } else if (u.kind === "condo") {
         condos++;
@@ -1652,6 +1749,11 @@ export class Simulation implements SimContext {
             u.filmPolicy === "feature" || u.filmPolicy === "blockbuster" || u.filmPolicy === "auto"
               ? u.filmPolicy
               : undefined,
+          // Preserve an in-progress eviction across save/reload, hardened like
+          // every other loop-driving field: an out-of-set reason or a non-finite
+          // deadline from a forged save must not reach the toast / state machine.
+          vacateReason: isVacateReason(u.vacateReason) ? u.vacateReason : undefined,
+          vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
         };
       });
     sim.tower.transports = (data.transports ?? [])

@@ -246,7 +246,10 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     // And it won.
     expect(sim.evaluatedTower).toBe(true);
     expect(sim.star).toBe(6);
-  });
+    // This is by far the heaviest test in the suite — it builds a full ~100-floor
+    // tower and simulates 8 game-days hour-by-hour. Give it explicit headroom so
+    // it doesn't skate the global 30s timeout under CI's slower, parallel load.
+  }, 60_000);
 });
 
 describe("F25 / F27 / F36 — smaller review sweep", () => {

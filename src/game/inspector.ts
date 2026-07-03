@@ -1,7 +1,8 @@
 import type { Simulation } from "../engine/Simulation";
+import { VACATE_RESCIND } from "../engine/Simulation";
 import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
-import { isOperational } from "../engine/types";
+import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { escapeHtml } from "../ui/escape";
@@ -127,15 +128,40 @@ export class InspectorController {
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
+      // A tenant on notice: spell out that they're leaving, why, how long is
+      // left, and the exact recovery bar they must clear — the "inform before you
+      // hurt them" contract, so the eviction is never a surprise. The countdown
+      // and the current-vs-target read recompute on every hover, so they tick
+      // down live as the game clock advances.
+      const statusText = u.state === "vacating" ? "on notice — tenant leaving" : u.state;
+      let notice = "";
+      if (u.state === "vacating" && u.vacateReason) {
+        const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
+        // Framed as an honest UPPER bound ("under N") using ceil, so the card
+        // never implies the tenant has *more* time than they do. Once the notice
+        // has elapsed, say so plainly — they leave on the next hourly tick.
+        const left =
+          minsLeft <= 0
+            ? "any moment now"
+            : minsLeft >= 24 * 60
+              ? `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`
+              : `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
+        const now = Math.round(u.satisfaction * 100);
+        const target = Math.round(VACATE_RESCIND * 100);
+        notice =
+          `<div style="color:var(--bad)">Giving notice — ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
+          `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
+      }
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
-          `<div>Status: ${u.state}</div>` +
+          `<div>Status: ${statusText}</div>` +
           (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
           access +
           hotel +
           parking +
           recycling +
+          notice +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {

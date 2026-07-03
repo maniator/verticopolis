@@ -1,6 +1,7 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
 import type { FacilityKind, Transport, Unit } from "./types";
+import { isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
 import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
 import { RNG } from "./rng";
@@ -313,11 +314,12 @@ export class Crowd {
 
   // ---- Spawning -----------------------------------------------------------
 
-  /** Floors carrying an in-service unit (occupied/asleep) that matches `pred`. */
+  /** Floors carrying an in-service unit (tenanted/asleep) that matches `pred`.
+   *  A `vacating` tenant still commutes through their notice period. */
   private floorsWhere(tower: Tower, pred: (u: Unit) => boolean): number[] {
     const set = new Set<number>();
     for (const u of tower.units) {
-      if ((u.state === "occupied" || u.state === "asleep") && pred(u)) set.add(u.floor);
+      if ((isTenanted(u) || u.state === "asleep") && pred(u)) set.add(u.floor);
     }
     return [...set];
   }

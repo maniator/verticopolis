@@ -1,5 +1,6 @@
 import type { Simulation } from "./Simulation";
 import type { Unit } from "./types";
+import { isTenanted } from "./types";
 import { FACILITIES, isHotelKind } from "./facilities";
 
 /** An above-ground, currently-occupied, population-bearing tenant unit — the
@@ -7,7 +8,7 @@ import { FACILITIES, isHotelKind } from "./facilities";
  *  milestone served-check and the stranded-floors diagnostic, so the two can't
  *  drift. (Hotels carry population, so they're included via `population > 0`.) */
 export function isTenantFloorUnit(u: Unit): boolean {
-  return u.floor >= 2 && (u.state === "occupied" || u.state === "asleep") && FACILITIES[u.kind].population > 0;
+  return u.floor >= 2 && (isTenanted(u) || u.state === "asleep") && FACILITIES[u.kind].population > 0;
 }
 
 /**
