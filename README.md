@@ -109,9 +109,10 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
 **For players.** The game **autosaves** to your browser's `localStorage` and
 restores that slot on the next launch. You also get **3 named manual slots** so
 you can keep several towers, and **tower-file export/import** for backups or
-sharing a tower with someone else — Export downloads your tower as a
-**`.vctower`** file, and Import loads one back through a file picker. Saves are
-managed from the in-game saves panel; clearing your browser storage erases them.
+sharing a tower with someone else — Export downloads your tower as a compact,
+compressed **`.vctower`** file (a fraction of the size of the old JSON
+exports), and Import loads one back through a file picker. Saves are managed
+from the in-game saves panel; clearing your browser storage erases them.
 
 **How it works.** A save is a snapshot of the **headless simulation**, not the
 renderer. `Simulation.serialize()` writes the deterministic source of truth —

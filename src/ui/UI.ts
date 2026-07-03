@@ -190,7 +190,7 @@ export class UI {
         this.cb.onNew(),
       );
     });
-    document.getElementById("btn-export")!.addEventListener("click", () => this.cb.onExport());
+    document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
@@ -331,11 +331,11 @@ export class UI {
     );
     // Close the saves dialog first: <dialog>'s top layer paints over the toast
     // rail, so export feedback would be invisible behind the open modal — and
-    // the file picker likewise replaces this dialog rather than stacking on it.
+    // the confirm dialog / file picker replace it rather than stacking on it.
     this.wireActions(box, {
       export: () => {
         this.closeModal();
-        this.cb.onExport();
+        this.confirmExport();
       },
       import: () => {
         this.closeModal();
@@ -628,10 +628,10 @@ export class UI {
     return x;
   }
 
-  confirmModal(title: string, body: string, onYes: () => void): void {
+  confirmModal(title: string, body: string, onYes: () => void, yesLabel = "Confirm"): void {
     const box = this.openModal(
       `<h2>${title}</h2><p>${body}</p>
-       <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">Confirm</button></div>`,
+       <div class="modal-actions"><button class="btn" data-act="no">Cancel</button><button class="btn primary" data-act="yes">${yesLabel}</button></div>`,
     );
     this.wireActions(
       box,
@@ -645,6 +645,17 @@ export class UI {
       // No [data-act="close"] button in this template to bind — the title-bar
       // ✕ still exists and closes through the dialog's cancel path.
       { close: false },
+    );
+  }
+
+  /** Export is deliberately two-step: the tower is not serialized, packed, or
+   *  downloaded until the player actually clicks Export in this dialog. */
+  private confirmExport(): void {
+    this.confirmModal(
+      "Export tower?",
+      `Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.`,
+      () => this.cb.onExport(),
+      "Export",
     );
   }
 

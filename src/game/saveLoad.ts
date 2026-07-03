@@ -117,16 +117,20 @@ export class SaveLoad {
     }
   }
 
-  /** Hand the player their tower as a .vctower file download. */
-  exportGame(): void {
+  /** Hand the player their tower as a compressed .vctower file download.
+   *  Only ever called from the export confirm dialog — the tower is not
+   *  serialized or packed until the player has actually clicked Export. */
+  async exportGame(): Promise<void> {
     const sim = this.deps.getSim();
-    this.deps.ui.downloadFile(SaveGame.exportFilename(sim), SaveGame.export(sim));
-    this.deps.ui.toast("Tower exported — check your downloads.", "good");
+    const file = await SaveGame.export(sim);
+    this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
+    // The container is pure ASCII, so string length == bytes on disk.
+    this.deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB) — check your downloads.`, "good");
   }
 
-  importGame(data: string): void {
+  async importGame(data: string): Promise<void> {
     try {
-      this.deps.adoptSim(SaveGame.import(data));
+      this.deps.adoptSim(await SaveGame.import(data));
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
       this.deps.ui.toast("Import failed: " + (err as Error).message, "bad");

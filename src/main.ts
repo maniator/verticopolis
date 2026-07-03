@@ -172,8 +172,8 @@ class GameApp {
       },
       onSave: () => this.saveLoad.save(),
       onLoad: () => this.saveLoad.load(),
-      onExport: () => this.saveLoad.exportGame(),
-      onImport: (data) => this.saveLoad.importGame(data),
+      onExport: () => void this.saveLoad.exportGame(),
+      onImport: (data) => void this.saveLoad.importGame(data),
       onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
       onNew: () => this.saveLoad.newGame(),
       onToggleAudio: () => {

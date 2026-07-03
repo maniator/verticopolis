@@ -112,10 +112,14 @@ describe("wireActions — the anti-dead-button contract", () => {
     expect(dialog().innerHTML).toBe(""); // closeModal also empties the dialog
   });
 
-  it("binds caller-supplied [data-act] handlers (saves dialog export)", () => {
+  it("binds caller-supplied [data-act] handlers (saves dialog export opens the confirm dialog)", () => {
     const { ui, cb } = makeUI();
     ui.showSaves([]);
     click('[data-act="export"]');
+    // The handler ran — it swapped the saves dialog for the export confirm —
+    // but nothing is exported until the player clicks Export in there.
+    expect(cb.onExport).not.toHaveBeenCalled();
+    click('[data-act="yes"]');
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
@@ -349,6 +353,22 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     vi.runAllTimers();
     expect(revoke).toHaveBeenCalledExactlyOnceWith("blob:vctower");
     vi.useRealTimers();
+  });
+
+  it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-export")!.click();
+    expect(dialog().open).toBe(true);
+    expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
+    const yes = dialog().querySelector('[data-act="yes"]')!;
+    expect(yes.textContent).toBe("Export"); // not a generic "Confirm"
+    click('[data-act="no"]'); // cancel → still no export
+    expect(cb.onExport).not.toHaveBeenCalled();
+
+    document.getElementById("btn-export")!.click();
+    click('[data-act="yes"]');
+    expect(cb.onExport).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false); // the toast isn't hidden under the modal
   });
 
   it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {

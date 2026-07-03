@@ -566,20 +566,22 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "New version ready — saved your tower, updating…", kind: "info" }]);
   });
 
-  it("exportGame downloads a .vctower file named after the tower and toasts", () => {
+  it("exportGame downloads a .vctower file named after the tower and toasts the size", async () => {
     sim.tower.towerName = "Vertic Opolis";
-    saveLoad.exportGame();
+    await saveLoad.exportGame();
     expect(f.downloads).toHaveLength(1);
     expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
     // The controller's contract is "download exactly what SaveGame.export
     // produces" — the container format itself is pinned by storage.test.ts.
-    expect(f.downloads[0].contents).toBe(SaveGame.export(sim));
-    expect(f.toasts).toEqual([{ text: "Tower exported — check your downloads.", kind: "good" }]);
+    expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
+    expect(f.toasts).toHaveLength(1);
+    expect(f.toasts[0].kind).toBe("good");
+    expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\) — check your downloads\.$/);
   });
 
-  it("importGame adopts a Simulation from a SaveGame.export round-trip", () => {
+  it("importGame adopts a Simulation from a SaveGame.export round-trip", async () => {
     sim.money = 777_777;
-    saveLoad.importGame(SaveGame.export(sim));
+    await saveLoad.importGame(await SaveGame.export(sim));
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(777_777);

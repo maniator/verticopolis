@@ -18,12 +18,13 @@ export const SLOT_COUNT = 3;
 
 /**
  * The Verticopolis tower-file container (.vctower): a magic first line naming
- * the format and its version, then the base64-encoded save payload. The file
- * is deliberately NOT raw JSON — exports travel as downloads and come back
- * through the file picker, never through a copy-paste textarea, and the
- * encoding keeps casual hand-edits (the classic corrupted-save source) out.
- * Bumping the container format later means a new magic line (VCTOWER2), with
- * this one still accepted on import.
+ * the format and its version, then the save payload — deflate-compressed
+ * JSON, base64-encoded. The file is deliberately NOT raw JSON — exports
+ * travel as downloads and come back through the file picker, never through a
+ * copy-paste textarea — and the compression makes it a fraction of the JSON
+ * it replaces (a ~1.2MB tower packs to ~40KB). Bumping the container format
+ * later means a new magic line (VCTOWER2), with this one still accepted on
+ * import.
  */
 export const TOWER_FILE_EXT = ".vctower";
 const TOWER_FILE_MAGIC = "VCTOWER1";
@@ -122,8 +123,9 @@ export const SaveGame = {
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
-  export(sim: Simulation): string {
-    return TOWER_FILE_MAGIC + "\n" + toBase64(JSON.stringify(sim.serialize())) + "\n";
+  async export(sim: Simulation): Promise<string> {
+    const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
+    return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
 
   /** Download name for an export: the tower's name slugged, e.g. "tower-one.vctower". */
@@ -136,7 +138,7 @@ export const SaveGame = {
   },
 
   /** Parse a .vctower file. Raw-JSON exports from older builds still load. */
-  import(text: string): Simulation {
+  async import(text: string): Promise<Simulation> {
     const trimmed = text.trim();
     // Match the whole VCTOWER family, not just this version's magic, so a file
     // from a newer build gets an honest "update the game" instead of falling
@@ -149,10 +151,13 @@ export const SaveGame = {
       }
       try {
         // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
-        data = JSON.parse(fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""))) as SerializedGame;
+        const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
+        // fatal decoder: a flipped byte must fail the import loudly, never
+        // silently half-load a tower with U+FFFD-mangled strings.
+        data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
       } catch {
-        // Bad base64, mangled UTF-8, or truncated JSON — the container was
-        // recognized, so the file is OURS but broken. Say so.
+        // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
+        // the container was recognized, so the file is OURS but broken. Say so.
         throw new Error("This tower file is damaged and can't be read.");
       }
     } else {
@@ -169,10 +174,9 @@ export const SaveGame = {
   },
 };
 
-// Base64 with explicit UTF-8 handling (tower names aren't Latin-1), chunked so
-// String.fromCharCode never sees an argument list long enough to blow the stack.
-function toBase64(text: string): string {
-  const bytes = new TextEncoder().encode(text);
+// Base64 over raw bytes, chunked so String.fromCharCode never sees an argument
+// list long enough to blow the stack.
+function toBase64(bytes: Uint8Array): string {
   let bin = "";
   for (let i = 0; i < bytes.length; i += 0x8000) {
     bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
@@ -180,13 +184,31 @@ function toBase64(text: string): string {
   return btoa(bin);
 }
 
-function fromBase64(b64: string): string {
+function fromBase64(b64: string): Uint8Array {
   const bin = atob(b64);
   const bytes = new Uint8Array(bin.length);
   for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  // fatal: a flipped byte inside a multi-byte character must fail the import
-  // loudly, not silently half-load a tower with U+FFFD-mangled strings.
-  return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+  return bytes;
+}
+
+// deflate-raw via the native streams API (no zlib/gzip framing — the magic
+// line already identifies the format, and raw deflate is the smallest).
+function deflate(bytes: Uint8Array): Promise<Uint8Array> {
+  return pipe(bytes, new CompressionStream("deflate-raw"));
+}
+
+function inflate(bytes: Uint8Array): Promise<Uint8Array> {
+  return pipe(bytes, new DecompressionStream("deflate-raw"));
+}
+
+async function pipe(bytes: Uint8Array, transform: GenericTransformStream): Promise<Uint8Array> {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(bytes);
+      controller.close();
+    },
+  }).pipeThrough(transform);
+  return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
 function nowMs(): number {
