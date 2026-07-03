@@ -93,7 +93,8 @@ const ENTRIES: Entry[] = [
   roomEntry("Retail Shop", "shop"),
   roomEntry("Cinema (playing)", "cinema"),
   roomEntry("Party Hall", "partyHall"),
-  roomEntry("Parking", "parking"),
+  roomEntry("Parking (in use)", "parking"),
+  roomEntry("Parking Ramp", "parkingRamp"),
   roomEntry("Security", "security"),
   roomEntry("Medical Center", "medical"),
   roomEntry("Housekeeping", "housekeeping"),
@@ -124,7 +125,9 @@ ctx.scale(dpr, dpr);
 
 function frame() {
   const anim = performance.now() / 1000;
-  const d: DrawCtx = { ctx, lit: true, anim, hour: 19 };
+  // Mid-load garage and a two-thirds-full recycling plant, so the live-state
+  // art (cars in bays, the garbage pile + gauge) actually shows in the catalog.
+  const d: DrawCtx = { ctx, lit: true, anim, hour: 19, parkingUse: 0.7, recycleFill: 0.66 };
   ctx.fillStyle = "#12151d";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ENTRIES.forEach((e, i) => {

@@ -1,14 +1,17 @@
 import * as ex from "excalibur";
 import type { Simulation } from "../../engine/Simulation";
-import { GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
+import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
+import { isOperational } from "../../engine/types";
 import {
   CRANE_H,
   CRANE_W,
   drawCar,
   drawCrane,
   drawEscapeStairs,
+  drawGarbageTruck,
   drawMetroTrain,
+  drawStreetCar,
   drawTransport,
   drawUnit,
   ESCAPE_W,
@@ -198,7 +201,19 @@ export class TowerEngine {
     shown: string;
   }[] = [];
   private trainActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
+  /** The pre-dawn garbage truck: one per recycling center, visible only during
+   *  the collection hour (drives in, loads, drives off — like the metro train). */
+  private truckActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
+  /** Commute cars cruising the garage decks at rush hours: one per basement
+   *  floor that carries parking, ping-ponging along that floor's parking run. */
+  private garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   private walkers: Walker[] = [];
+  /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
+   *  once per syncScene — reusing the parking flood-fill that sync already does
+   *  for the dead-bit — so they're exactly as fresh as the sprites that consume
+   *  them and never run on the per-frame path (updateMotion reads them too). */
+  private displayParkingUse = 0;
+  private displayRecycleFill = 0;
   /** Per-floor live occupancy in 0..1 (people on the floor, capped), so corridor
    *  loiterers only appear where tenants actually are. Cached and recomputed on
    *  the hour or when the layout changes — not scanned every frame. */
@@ -479,6 +494,10 @@ export class TowerEngine {
     this.d.anim = this.animClock;
     this.d.hour = c.hour;
     this.d.lit = c.isNight() || c.isEvening();
+    // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
+    // refreshed inside syncScene — the same moment the sprites that read them
+    // re-bake — so they're never staler than the sprite, and the flood-fill /
+    // scans stay off this per-frame path.
     // The crane repaints while its inputs move: the decorative clock (trolley,
     // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
     if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
@@ -1009,6 +1028,13 @@ export class TowerEngine {
     // re-bake alongside the existing state/lighting/hour bits — it adds no
     // per-frame work of its own.
     const parkingOK = tower.functionalParkingSet();
+    // Garage/waste display fractions, refreshed here (not per frame) and reusing
+    // the flood-fill just done — so they're exactly as fresh as the sprite
+    // re-bake below and the garage-car motion visibility that reads them.
+    this.displayParkingUse = this.sim.parkingUsage(parkingOK.size);
+    this.displayRecycleFill = this.sim.recyclingFill();
+    this.d.parkingUse = this.displayParkingUse;
+    this.d.recycleFill = this.displayRecycleFill;
     const seenS = new Set<number>();
     const seenR = new Set<number>();
     for (const u of tower.units) {
@@ -1036,7 +1062,16 @@ export class TowerEngine {
         // excluded from the set for other reasons and isn't a connectivity fault.
         const dead =
           u.kind === "parking" && u.state !== "construction" && u.state !== "fire" && !parkingOK.has(u.id) ? "x" : "";
-        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${open}${lateNight}${dead}`;
+        // Hour-bucketed live-display bits: how full the garage is (cars) and how
+        // full the recycling centers are (garbage pile). syncScene already runs
+        // on the hour, so these advance the same cadence as open/lateNight.
+        const liveBits =
+          u.kind === "parking"
+            ? `:p${Math.round((this.d.parkingUse ?? 0) * 6)}`
+            : u.kind === "recycling"
+              ? `:r${Math.round((this.d.recycleFill ?? 0) * 8)}`
+              : "";
+        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${open}${lateNight}${dead}${liveBits}`;
         const isDead = dead === "x";
         const rec = this.roomActors.get(u.id);
         const animated = u.state === "fire" || u.state === "construction";
@@ -1227,6 +1262,9 @@ export class TowerEngine {
       cache: !animated,
       draw: (ctx) => {
         this.d.ctx = ctx;
+        // Set per-unit: a dead (unchained) parking space draws no cars. Every
+        // room bake writes it, so one unit's flag can't leak into the next.
+        this.d.parkingDead = live.dead;
         drawUnit(this.d, u, 0, 0, w, h);
         // Canon "red X" on a parking space that isn't chained to a ramp (dead —
         // no relief). Baked into the sprite; the dead-bit participates in the room
@@ -1297,9 +1335,13 @@ export class TowerEngine {
   private clearMotion(): void {
     for (const c of this.carActors) c.actor.kill();
     for (const t of this.trainActors) t.actor.kill();
+    for (const t of this.truckActors) t.actor.kill();
+    for (const g of this.garageCars) g.actor.kill();
     for (const w of this.walkers) w.actor.kill();
     this.carActors = [];
     this.trainActors = [];
+    this.truckActors = [];
+    this.garageCars = [];
     this.walkers = [];
   }
 
@@ -1351,6 +1393,53 @@ export class TowerEngine {
       a.graphics.use(cv);
       this.engine.add(a);
       this.trainActors.push({ actor: a, u, w });
+    }
+    // Garbage trucks: one per recycling center, parked off-screen until the
+    // collection hour (updateMotion drives them in and out along the bottom
+    // story, exactly the metro-train pattern).
+    for (const u of this.sim.tower.units) {
+      if (u.kind !== "recycling") continue;
+      const w = 44;
+      const cv = new ex.Canvas({ width: w, height: 16, cache: true, draw: (ctx) => drawGarbageTruck(ctx, w) });
+      const a = new ex.Actor({
+        pos: ex.vec(this.worldX(u.x), this.worldYTop(u.floor) + FLOOR - 16),
+        width: w,
+        height: 16,
+        anchor: ex.vec(0, 0),
+        z: 0.6,
+      });
+      a.graphics.use(cv);
+      a.graphics.visible = false;
+      this.engine.add(a);
+      this.truckActors.push({ actor: a, u, w });
+    }
+    // Commute cars: one per floor that carries parking structure, cruising the
+    // extent of that floor's parking/ramp run at rush hours.
+    const runs = new Map<number, { min: number; max: number }>();
+    for (const u of this.sim.tower.units) {
+      if (u.kind !== "parking" && u.kind !== "parkingRamp") continue;
+      const r = runs.get(u.floor);
+      const right = u.x + u.width;
+      if (!r) runs.set(u.floor, { min: u.x, max: right });
+      else {
+        if (u.x < r.min) r.min = u.x;
+        if (right > r.max) r.max = right;
+      }
+    }
+    for (const [floor, r] of runs) {
+      const x0w = this.worldX(r.min) + 2;
+      const x1w = this.worldX(r.max) - 18;
+      // A run too short for the car to travel gets none — bail BEFORE creating
+      // the actor, so an untracked actor is never added to the engine (it would
+      // leak: clearMotion only kills what's in this.garageCars).
+      if (x1w <= x0w) continue;
+      const seed = (floor * 97 + r.min * 13) | 0;
+      const cv = new ex.Canvas({ width: 16, height: 8, cache: true, draw: (ctx) => drawStreetCar(ctx, seed) });
+      const a = new ex.Actor({ pos: ex.vec(x0w, this.worldYTop(floor) + FLOOR - 10), width: 16, height: 8, anchor: ex.vec(0, 0), z: 0.5 });
+      a.graphics.use(cv);
+      a.graphics.visible = false;
+      this.engine.add(a);
+      this.garageCars.push({ actor: a, floor, x0w, x1w, seed });
     }
     this.buildWalkers();
   }
@@ -1491,6 +1580,39 @@ export class TowerEngine {
       else if (cycle < 0.75) offset = 0;
       else offset = ((cycle - 0.75) / 0.25) * span;
       tr.actor.pos = ex.vec(this.worldX(tr.u.x) + 3 + offset, this.worldYTop(tr.u.floor) + FLOOR - 15);
+    }
+    // The garbage truck runs on GAME time (the collection is a sim event, not
+    // ambience): during the collection hour it drives in along the center's
+    // bottom story, loads, and drives off — pausing the game freezes it.
+    const clock = this.sim.clock;
+    const truckHour = clock.hour === GARBAGE_COLLECT_HOUR;
+    for (const tk of this.truckActors) {
+      // No collection at a center that isn't running (under construction, on
+      // fire, or a gutted shell) — a non-operational plant processes no waste.
+      const show = truckHour && isOperational(tk.u);
+      if (tk.actor.graphics.visible !== show) tk.actor.graphics.visible = show;
+      if (!show) continue;
+      const p = (clock.minuteOfDay - GARBAGE_COLLECT_HOUR * 60) / 60; // 0..1 through the hour
+      const base = this.worldX(tk.u.x);
+      const uw = tk.u.width * TILE;
+      let x: number;
+      if (p < 0.25) x = base - 60 + (p / 0.25) * 60; // roll in from the left
+      else if (p < 0.7) x = base; // loading at the mouth
+      else x = base + ((p - 0.7) / 0.3) * (uw + 20); // drive off across the deck
+      tk.actor.pos = ex.vec(x, this.worldYTop(tk.u.floor) + FLOOR - 16);
+    }
+    // Garage commute cars: cruise the parking decks during the morning and
+    // evening rushes, but only when the garage actually has cars to move.
+    // Reads the fraction computed in syncScene (per sync, not per frame), so
+    // this frame-path never runs the parking flood-fill itself.
+    const rushing = (clock.isMorning() || clock.isEvening()) && this.displayParkingUse > 0;
+    for (const g of this.garageCars) {
+      if (g.actor.graphics.visible !== rushing) g.actor.graphics.visible = rushing;
+      if (!rushing) continue;
+      let p = (Math.abs(g.seed) % 100) / 100 + anim * 0.05;
+      p -= Math.floor(p);
+      const tt = 1 - Math.abs(2 * p - 1); // ping-pong along the deck
+      g.actor.pos = ex.vec(g.x0w + tt * (g.x1w - g.x0w), this.worldYTop(g.floor) + FLOOR - 10);
     }
     const stress = this.d.stress ?? 0;
     // How busy the building looks right now: scales with population so an empty

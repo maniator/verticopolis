@@ -27,6 +27,31 @@ export interface InspectorDeps {
   setAnchor(anchor: { x: number; floor: number } | null): void;
 }
 
+/** The shared demand line for parking spaces & ramps: how many working spaces
+ *  the tower has (`have`, passed in so the caller's single flood-fill is reused)
+ *  vs what its offices (1 per ~12 workers) and suites (1 each) currently need. */
+function parkingDemandLine(sim: Simulation, have: number): string {
+  const d = sim.parkingDemand();
+  const color = have < d.total ? "var(--bad)" : "var(--good)";
+  return `<div style="color:${color}">Demand: ${have}/${d.total} spaces (${d.offices} for offices, ${d.suites} for suites).</div>`;
+}
+
+/** The recycling inspector block: current fill and the capacity/demand verdict.
+ *  Population and capacity are each scanned once and reused across the strings
+ *  (the demand-met check is `pop <= cap`, exactly {@link Simulation.recyclingDemandMet}),
+ *  so a hover doesn't rescan the unit list several times over. */
+function recyclingLine(sim: Simulation): string {
+  const pop = sim.tower.totalPopulation();
+  const cap = sim.recyclingCapacity();
+  const fillPct = Math.round(sim.recyclingFill() * 100);
+  return (
+    `<div>Fill: ${fillPct}% — truck collects each morning.</div>` +
+    (pop <= cap
+      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population — demand met.</div>`
+      : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed — build another center (4★ requires demand met).</div>`)
+  );
+}
+
 export class InspectorController {
   /** The facility the inspector card currently describes. */
   private inspectTarget: { type: "unit" | "transport"; id: number } | null = null;
@@ -85,12 +110,23 @@ export class InspectorController {
         : "";
       // Silent rule: a parking space only works when it chains to a ramp. Skip
       // the verdict while it's still building (or on fire) — "Status" covers that.
-      const parking =
-        u.kind === "parking" && isOperational(u)
-          ? sim.tower.functionalParkingSet().has(u.id)
-            ? `<div style="color:var(--good)">Ramp access: connected.</div>`
-            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`
-          : "";
+      // One flood-fill for the whole parking card: its `.has(id)` gives ramp
+      // connectivity and its `.size` feeds the demand line, so a hover never
+      // runs the fill twice.
+      const parkingSet =
+        (u.kind === "parking" || u.kind === "parkingRamp") && isOperational(u)
+          ? sim.tower.functionalParkingSet()
+          : null;
+      const parking = !parkingSet
+        ? ""
+        : u.kind === "parkingRamp"
+          ? parkingDemandLine(sim, parkingSet.size)
+          : parkingSet.has(u.id)
+            ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim, parkingSet.size)
+            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`;
+      // Recycling runs on demand: how full it is right now, and whether the
+      // tower has outgrown its centers (the canon 4★ gate).
+      const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
@@ -99,6 +135,7 @@ export class InspectorController {
           access +
           hotel +
           parking +
+          recycling +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {

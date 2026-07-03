@@ -30,6 +30,15 @@ export interface DrawCtx {
   hour: number;
   /** 0..1 transport overcrowding; tints walking crowds "angry" when high. */
   stress?: number;
+  /** 0..1 fraction of working parking spaces holding a car right now (office
+   *  cars by day, suite guests' cars overnight) — drives the garage visuals. */
+  parkingUse?: number;
+  /** Per-unit flag set by the room bake closure: this parking space is dead
+   *  (not chained to a ramp), so no car could ever have reached it. */
+  parkingDead?: boolean;
+  /** 0..1 how full the recycling centers are right now (shared load) —
+   *  garbage piles up through the day until the morning truck collection. */
+  recycleFill?: number;
 }
 
 /** The 7px signage every service facility paints on its back wall; hidden

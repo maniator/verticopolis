@@ -1,7 +1,7 @@
 import type { SimContext } from "./SimContext";
 import { isOperational } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
+import { RECYCLING_POP_PER_CENTER, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 
 /** Rooms one housekeeping crew can turn over per day. */
 const HK_ROOMS_PER_CREW = 20;
@@ -103,14 +103,24 @@ export class EconomySystem {
    * 0..1 demand-share: what fraction of a venue's headline daily take it
    * actually earns, driven by foot traffic. It is a SHARE (capped at 1), not a
    * population multiplier, so commercial income can never exceed its advertised
-   * daily figure. A metro pulls in outside visitors and a recycling centre keeps
+   * daily figure. A metro pulls in outside visitors and a recycling center keeps
    * the tower clean and attractive — both lift trade, the classic reasons to dig
    * down to the subway / run recycling in the original.
    */
   private trafficAppeal(): number {
     const pop = this.sim.tower.totalPopulation();
     const metro = this.hasOperational("metro") ? 0.25 : 0;
-    const recycling = this.hasOperational("recycling") ? 0.1 : 0; // F14: a real effect for the centre
+    // F14: a real effect for the center — scaled by how much of the tower's
+    // waste the centers can actually process (canon fill model): an
+    // overflowing recycling plant stops flattering the tower, so the bonus
+    // shrinks as population outgrows capacity until more centers go in.
+    let recycling = 0;
+    let centers = 0;
+    for (const u of this.sim.tower.units) if (u.kind === "recycling" && isOperational(u)) centers++;
+    if (centers > 0) {
+      const capacity = centers * RECYCLING_POP_PER_CENTER;
+      recycling = 0.1 * Math.min(1, capacity / Math.max(1, pop));
+    }
     return Math.min(1, 0.35 + pop / 8000 + metro + recycling);
   }
 
