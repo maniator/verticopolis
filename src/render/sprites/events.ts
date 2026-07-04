@@ -9,6 +9,10 @@
  *    the sky (canon: "Santa Claus and his reindeer fly across the tower").
  *  - {@link drawExplosion}: the bomb-detonation flash at the blast epicenter,
  *    a fading starburst over the rooms it guts.
+ *  - {@link drawThief}: a masked thief slinking across a floor with a loot sack;
+ *    a security guard trails him when he's caught.
+ *  - {@link drawTreasure}: a gold sparkle + coins rising from an unearthed find.
+ *  - {@link drawVipLimo}: the VIP's limousine, arriving at the lobby for a review.
  */
 
 /** One reindeer facing right: body, head, antlers, legs, a red nose. */
@@ -127,6 +131,131 @@ export function drawExplosion(ctx: CanvasRenderingContext2D, x: number, y: numbe
   ctx.fillStyle = "#fff6d5";
   ctx.beginPath();
   ctx.arc(x, y, radius * 0.34, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
+/**
+ * A masked thief slinking rightward with a money sack, feet at (x, y). When
+ * `caught`, a security guard trails close behind with an alert light. Drawn in
+ * screen space on the overlay (in front of the tower).
+ */
+export function drawThief(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1, caught = false): void {
+  const s = scale;
+  ctx.save();
+  if (caught) {
+    // Security guard just behind (to the left): blue uniform, cap, alert light.
+    const gx = x - 13 * s;
+    ctx.fillStyle = "#274b8f";
+    ctx.fillRect(gx - 4 * s, y - 15 * s, 8 * s, 15 * s);
+    ctx.beginPath();
+    ctx.arc(gx, y - 17 * s, 3.6 * s, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#16305e";
+    ctx.fillRect(gx - 4.5 * s, y - 20 * s, 9 * s, 2.4 * s); // cap
+    ctx.fillStyle = "rgba(255,60,60,0.9)";
+    ctx.beginPath();
+    ctx.arc(gx, y - 24 * s, 2 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Thief: dark hooded figure.
+  ctx.fillStyle = "#2b2f38";
+  ctx.fillRect(x - 4 * s, y - 15 * s, 8 * s, 15 * s); // body
+  ctx.beginPath();
+  ctx.arc(x, y - 17 * s, 4 * s, 0, Math.PI * 2); // hood
+  ctx.fill();
+  ctx.fillStyle = "#e8e8e8"; // eye-mask stripe
+  ctx.fillRect(x - 3 * s, y - 18 * s, 6 * s, 1.6 * s);
+  // Loot sack over the shoulder, marked $.
+  ctx.fillStyle = "#d9c27a";
+  ctx.beginPath();
+  ctx.arc(x + 6 * s, y - 11 * s, 4 * s, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#7a5a1e";
+  ctx.font = `${5 * s}px sans-serif`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.fillText("$", x + 6 * s, y - 11 * s);
+  ctx.restore();
+}
+
+/**
+ * A gold sparkle + coins rising from an unearthed treasure, centered at (x, y).
+ * `phase` runs 0→1: the sparkle grows and drifts up as it fades.
+ */
+export function drawTreasure(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1, phase = 0): void {
+  const alpha = Math.max(0, 1 - phase);
+  if (alpha <= 0) return;
+  const s = scale;
+  const rise = phase * 12 * s;
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  // Coins.
+  ctx.fillStyle = "#f2c14e";
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    ctx.arc(x + (i - 1) * 5 * s, y - rise - i * 2 * s, 2.5 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Four-point sparkle.
+  ctx.fillStyle = "#fff7cc";
+  const cy = y - rise;
+  const R = (4 + phase * 4) * s;
+  const r = R * 0.38;
+  ctx.beginPath();
+  for (let i = 0; i < 8; i++) {
+    const ang = (Math.PI * i) / 4;
+    const rr = i % 2 === 0 ? R : r;
+    const px = x + Math.cos(ang) * rr;
+    const py = cy + Math.sin(ang) * rr;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+/** A black VIP limousine facing right, its wheels resting on the line y. */
+export function drawVipLimo(ctx: CanvasRenderingContext2D, x: number, y: number, scale = 1): void {
+  const s = scale;
+  const w = 44 * s;
+  const h = 9 * s;
+  ctx.save();
+  // Body + cabin.
+  ctx.fillStyle = "#15171c";
+  ctx.fillRect(x - w / 2, y - h, w, h);
+  ctx.fillRect(x - w / 2 + 8 * s, y - h - 5 * s, w - 18 * s, 6 * s);
+  // Tinted windows.
+  ctx.fillStyle = "#6ea0d8";
+  ctx.fillRect(x - w / 2 + 10 * s, y - h - 3.5 * s, 10 * s, 3 * s);
+  ctx.fillRect(x + 2 * s, y - h - 3.5 * s, 10 * s, 3 * s);
+  // Wheels with hubs.
+  ctx.fillStyle = "#0a0b0e";
+  for (const wx of [x - w / 2 + 9 * s, x + w / 2 - 9 * s]) {
+    ctx.beginPath();
+    ctx.arc(wx, y, 3.2 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = "#cfd3da";
+  for (const wx of [x - w / 2 + 9 * s, x + w / 2 - 9 * s]) {
+    ctx.beginPath();
+    ctx.arc(wx, y, 1.3 * s, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Little gold pennant on the hood.
+  ctx.strokeStyle = "#c9a227";
+  ctx.lineWidth = 1 * s;
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2 - 2 * s, y - h);
+  ctx.lineTo(x + w / 2 - 2 * s, y - h - 8 * s);
+  ctx.stroke();
+  ctx.fillStyle = "#c9a227";
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2 - 2 * s, y - h - 8 * s);
+  ctx.lineTo(x + w / 2 + 4 * s, y - h - 6 * s);
+  ctx.lineTo(x + w / 2 - 2 * s, y - h - 4 * s);
+  ctx.closePath();
   ctx.fill();
   ctx.restore();
 }

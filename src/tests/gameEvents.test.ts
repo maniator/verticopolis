@@ -55,6 +55,7 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
     // event fired its visual signal without a DOM/canvas.
     santaCalls: 0,
     explosionCalls: [] as { floor: number; x: number }[],
+    thiefCalls: [] as { caught: boolean }[],
     emit(text: string, kind?: LogKind) {
       this.log.push({ text, kind });
     },
@@ -63,6 +64,9 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
     },
     triggerExplosion(floor: number, xTile: number) {
       this.explosionCalls.push({ floor, x: xTile });
+    },
+    triggerThief(caught: boolean) {
+      this.thiefCalls.push({ caught });
     },
     hasAny: (kind: FacilityKind) => tower.units.some((u) => u.kind === kind),
     // Use the engine's own predicate so the test double can't drift (a "gutted"
@@ -208,6 +212,24 @@ describe("Event visual hooks — the renderer triggers (SimContext)", () => {
     const safe = makeCtx(officeTower({ security: true }), 4, new ScriptedRNG([]));
     new EventSystem(safe, 7).bombThreat(); // security sweeps → no blast
     expect(safe.explosionCalls).toHaveLength(0);
+  });
+
+  it("a thief slinking through fires its trigger — caught with Security, uncaught without", () => {
+    // Run a full year of daily rolls so the 5%/day thief surfaces at least once.
+    const guarded = makeCtx(officeTower({ security: true }), 2, new ScriptedRNG([]));
+    const gEvents = new EventSystem(guarded, 7);
+    const bare = makeCtx(officeTower(), 2, new ScriptedRNG([]));
+    const bEvents = new EventSystem(bare, 7);
+    for (let d = 0; d < 360; d++) {
+      guarded.clock = new Clock(d * 1440);
+      bare.clock = new Clock(d * 1440);
+      gEvents.maybeRandomEvent();
+      bEvents.maybeRandomEvent();
+    }
+    expect(guarded.thiefCalls.length).toBeGreaterThan(0);
+    expect(guarded.thiefCalls.every((c) => c.caught)).toBe(true); // Security → always caught
+    expect(bare.thiefCalls.length).toBeGreaterThan(0);
+    expect(bare.thiefCalls.every((c) => !c.caught)).toBe(true); // no Security → always gets away
   });
 });
 

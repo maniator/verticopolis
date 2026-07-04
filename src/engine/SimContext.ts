@@ -41,6 +41,9 @@ export interface SimContext {
    * (the visuals never touch gameplay state, RNG, or the save). */
   triggerSanta?(): void;
   triggerExplosion?(floor: number, xTile: number): void;
+  triggerThief?(caught: boolean): void;
+  triggerTreasure?(floor: number, xTile: number): void;
+  triggerVip?(): void;
   /** Dispatch a staff member (housekeeper) from `from` to `to` over the staff
    * network, walking to `destX` to service unit `cleanUnitId`. "full" means
    * the staff pool is at cap (retry later); "no-route" means the staff

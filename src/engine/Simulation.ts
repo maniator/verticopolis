@@ -189,6 +189,9 @@ export class Simulation implements SimContext {
    * event fires, never serialized, and with zero effect on gameplay/RNG/save. */
   santaFxSeq = 0;
   explosionFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
+  thiefFx: { caught: boolean; seq: number } = { caught: false, seq: 0 };
+  treasureFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
+  vipFxSeq = 0;
 
   /** Ids of units currently under construction (finalised on the global tick). */
   private constructing = new Set<number>();
@@ -346,6 +349,7 @@ export class Simulation implements SimContext {
         const gold = 400_000 + this.rng.int(0, 200_000); // ~half a million, per the FAQ
         this.money += gold;
         this.emit(`💰 Excavation crews unearthed buried treasure worth $${gold.toLocaleString()}!`, "money");
+        this.triggerTreasure(floor, x + Math.floor(f.width / 2)); // sparkle at the dig site (cosmetic)
       }
     }
     return { ok: true };
@@ -1460,6 +1464,7 @@ export class Simulation implements SimContext {
     if (happy && !this.suiteParkingShort()) {
       this.vipFavorable = true;
       this.emit("A VIP enjoyed their suite — your tower earned a favorable review (4★ unlocked).", "good");
+      this.triggerVip(); // the VIP's limo pulls up (cosmetic)
     } else if (this.clock.day - this.lastVipNagDay >= 5) {
       // Throttle the nag lines so they can't spam the log every day.
       this.lastVipNagDay = this.clock.day;
@@ -1488,6 +1493,7 @@ export class Simulation implements SimContext {
     }
     if (this.clock.day < this.vipVisitDay) return;
     this.vipVisitDay = -1;
+    this.triggerVip(); // the inspecting VIP arrives by limo (cosmetic)
     const pop = this.ratingPopulation();
     const ok =
       this.hasOperational("weddingHall") &&
@@ -1534,6 +1540,15 @@ export class Simulation implements SimContext {
   }
   triggerExplosion(floor: number, xTile: number): void {
     this.explosionFx = { floor, x: xTile, seq: this.explosionFx.seq + 1 };
+  }
+  triggerThief(caught: boolean): void {
+    this.thiefFx = { caught, seq: this.thiefFx.seq + 1 };
+  }
+  triggerTreasure(floor: number, xTile: number): void {
+    this.treasureFx = { floor, x: xTile, seq: this.treasureFx.seq + 1 };
+  }
+  triggerVip(): void {
+    this.vipFxSeq++;
   }
 
   /** The player decision awaiting an answer (fire rescue / bomb ransom), or null.

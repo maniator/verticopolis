@@ -338,11 +338,13 @@ export class EventSystem {
     if (!this.extra.chance(0.05)) return;
     if (this.sim.hasAny("security")) {
       this.sim.emit("🕵️ Security caught a thief prowling the tower — nothing was taken.", "good");
+      this.sim.triggerThief?.(true); // caught: a guard trails him across (cosmetic)
       return;
     }
     const loss = 5_000 + this.extra.int(0, 20_000);
     this.sim.money -= loss;
     this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString()} — build Security.`, "bad");
+    this.sim.triggerThief?.(false); // got away with the loot (cosmetic)
   }
 
   /** A bomb scare. Security defuses it; without guards it does real damage. */
