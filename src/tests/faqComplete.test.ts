@@ -317,7 +317,9 @@ describe("Deep-review regressions (must not come back)", () => {
     let onNotice = false;
     for (let i = 0; i < 24 * 3 && !onNotice; i++) {
       sim.tick(60);
-      onNotice = condo.state === "vacating";
+      // Cast defeats TS control-flow narrowing from the `state = "occupied"`
+      // assignment above — `sim.tick` mutates it, but the compiler can't see that.
+      onNotice = (condo.state as string) === "vacating";
     }
     expect(onNotice).toBe(true);
     expect(condo.vacateReason).toBe("noise");
@@ -342,8 +344,8 @@ describe("Deep-review regressions (must not come back)", () => {
     condo.state = "occupied";
     condo.everOccupied = true;
     condo.satisfaction = 1;
-    // Wear it onto notice…
-    for (let i = 0; i < 24 * 3 && condo.state !== "vacating"; i++) sim.tick(60);
+    // Wear it onto notice… (cast defeats narrowing from `state = "occupied"`).
+    for (let i = 0; i < 24 * 3 && (condo.state as string) !== "vacating"; i++) sim.tick(60);
     expect(condo.state).toBe("vacating");
     // …then fix the cause: remove the office. Noise gone → satisfaction recovers
     // and the tenant rescinds before the notice window elapses.
