@@ -48,6 +48,7 @@ abstraction · ⬜ not present.
 - ✅ Population from offices/condos/hotels; weekday/weekend + rush-hour cycle
 - ✅ **Individually-routed commuters** — real people walk to a shaft, wait, board an actual car, transfer at sky lobbies and arrive (BFS over the transport network)
 - ✅ Tenant stress from real elevator waits (visible commuter frustration) on top of an aggregate congestion backstop → low-satisfaction tenants move out
+- ✅ **Two-ride rule has teeth:** a floor more than two rides from the lobby (one sky-lobby transfer) draws no visitors — its shops/food/cinema earn **no** traffic income, not just a warning, so late-game transport layout is a real economic puzzle
 - ✅ Crowds tint red when they've waited too long / transport is overwhelmed (the original's visual cue)
 - ✅ Star thresholds: 2★ 300 · 3★ 1,000 · 4★ 5,000 · 5★ 10,000
 - ✅ Facility gates: Security required for 3★; Medical + recycling demand met for 4★

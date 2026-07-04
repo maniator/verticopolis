@@ -66,11 +66,36 @@ export class EconomySystem {
   /** Hourly food/retail/entertainment takings, scaled by foot traffic. */
   collectTrafficIncome(): void {
     const appeal = this.trafficAppeal();
+    // Visitor income obeys the two-ride rule: a floor more than two rides from
+    // the lobby draws no patrons (the same "no visitors will come" condition the
+    // stranded-floor advisory reports), so its commercial rooms earn nothing —
+    // the transport puzzle has real economic teeth, not just a warning. This is
+    // stricter than mere connectivity (`isFloorServed`): a floor connected only
+    // via 3+ rides is served but unreachable to visitors, and now earns $0.
+    // Memoized per call since the route BFS isn't free and rooms share floors.
+    const reachCache = new Map<number, boolean>();
+    const drawsVisitors = (floor: number): boolean => {
+      const cached = reachCache.get(floor);
+      if (cached !== undefined) return cached;
+      // Two-ride reachability when the context provides it (the real sim);
+      // minimal test contexts without a crowd fall back to plain connectivity.
+      const hit = this.sim.floorReachable
+        ? this.sim.floorReachable(floor)
+        : this.sim.tower.isFloorServed(floor);
+      reachCache.set(floor, hit);
+      return hit;
+    };
     for (const u of this.sim.tower.units) {
       const daily = ECON.dailyTrafficIncome[u.kind];
       if (daily === undefined) continue;
       if (!isOperational(u)) continue; // gutted/burning/under-construction earn nothing (and must not be revived to "occupied" below)
-      if (!this.sim.tower.isFloorServed(u.floor)) continue;
+      if (!drawsVisitors(u.floor)) {
+        // Unreachable within two rides (stranded, or not connected at all) → no
+        // patrons. Clear any lingering occupancy so a newly-stranded venue reads
+        // empty instead of frozen at its last busy state.
+        if (u.state === "occupied") u.occupants = 0;
+        continue;
+      }
       if (!isOpenAt(u.kind, this.sim.clock.hour)) {
         // Closed for the night — no patrons.
         if (u.state === "occupied") u.occupants = 0;
