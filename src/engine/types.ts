@@ -82,7 +82,7 @@ export function isUnitState(v: unknown): v is UnitState {
 /** Why a dissatisfied tenant is leaving — attributed from the dominant
  *  satisfaction drain at the moment it bottoms out, so the notice/departure
  *  toast names the real cause instead of always blaming "poor access". `noise`
- *  is a hotel/condo whose office neighbour wore them down over sustained,
+ *  marks a hotel/condo worn down by a same-floor office neighbor over sustained,
  *  unaddressed exposure (see the office-noise erosion in updateSatisfaction). */
 export type VacateReason = "access" | "congestion" | "rent" | "noise";
 

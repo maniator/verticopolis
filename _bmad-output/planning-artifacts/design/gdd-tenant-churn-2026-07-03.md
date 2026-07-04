@@ -78,7 +78,7 @@ same satisfaction drains that caused it:
   escalators (kept generic so it stays accurate whatever mix the floor relies on).
 - **rent set too high** — an office priced above the going rate.
 - **office noise next door** — a hotel/condo worn down by a same-floor office
-  neighbour (see below).
+  neighbor (see below).
 
 The copy is transport-neutral on purpose: a floor is "served" by any route to the
 lobby, and congestion counts all transport modes, so the strings must not single
@@ -93,8 +93,8 @@ A hotel/condo with an office immediately beside it on the same floor is worn dow
 in two phases:
 
 1. **Annoyance ceiling** — moving in next to noise *caps* satisfaction at **0.6**
-   at once (the canon "office neighbour is too noisy" hit).
-2. **Erosion** — while the office neighbour remains, satisfaction erodes by a
+   at once (the canon "office neighbor is too noisy" hit).
+2. **Erosion** — while the office neighbor remains, satisfaction erodes by a
    small amount each hour that slightly outpaces the served recovery (net
    ≈ −0.02/hr). Left unaddressed, this drives the tenant below the rescind bar
    and, ~1 game-day later, to zero — at which point they give notice (cause:
@@ -102,7 +102,7 @@ in two phases:
 
 The pressure is deliberately **gentle and heavily telegraphed** (annoyance cap →
 ~1-day erosion → 2-day notice ≈ 3 days end-to-end). **Fixing the cause** — moving
-the office or the neighbour so they're no longer adjacent — stops the erosion, and
+the office or the neighbor so they're no longer adjacent — stops the erosion, and
 satisfaction recovers normally; a tenant already on notice will rescind. A
 hotel/condo that is *not* office-adjacent is entirely unaffected.
 

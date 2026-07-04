@@ -63,15 +63,15 @@ export const VACATE_RESCIND = 0.4;
 
 /** The immediate annoyance ceiling for a hotel/condo sat right beside an office:
  *  moving in next to noise caps satisfaction here at once (canon "office
- *  neighbour is too noisy"). */
+ *  neighbor is too noisy"). */
 const NOISE_CAP = 0.6;
 
-/** Per-hour erosion applied on top of the cap while the office neighbour stays.
+/** Per-hour erosion applied on top of the cap while the office neighbor stays.
  *  It slightly outpaces the +0.05/hr served recovery (net ≈ −0.02/hr), so an
- *  UNADDRESSED noisy neighbour wears the tenant down past the rescind bar and,
+ *  UNADDRESSED noisy neighbor wears the tenant down past the rescind bar and,
  *  eventually, out — a slow, heavily-telegraphed pressure (≈1 day from the cap
  *  to zero, then the 2-day notice), not an instant eviction. Fix it (move the
- *  office or the neighbour) and satisfaction recovers normally. */
+ *  office or the neighbor) and satisfaction recovers normally. */
 const NOISE_EROSION = 0.07;
 
 /**
@@ -819,13 +819,17 @@ export class Simulation implements SimContext {
       }
       // Office noise (canon "Office neighbor is too noisy"): a hotel room or condo
       // with an office immediately beside it on the same floor is worn down in two
-      // phases — an immediate annoyance CEILING (NOISE_CAP), then, if the neighbour
+      // phases — an immediate annoyance CEILING (NOISE_CAP), then, if the neighbor
       // is never dealt with, a slow EROSION past it (NOISE_EROSION outpaces the
       // served recovery). Sustained, unaddressed exposure therefore drives the
       // tenant below the rescind bar and ultimately out (cause: "noise"); moving
-      // the office or the neighbour lets satisfaction recover normally.
+      // the office or the neighbor lets satisfaction recover normally.
+      // Erode THEN clamp to the cap (not clamp-then-erode): a freshly-exposed
+      // unit lands exactly on 0.6 rather than overshooting to 0.53, and the
+      // steady-state stays a true net ≈ −0.02/hr (this tick's +0.05 recovery is
+      // preserved, not discarded by the cap).
       if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
-        u.satisfaction = Math.max(0, Math.min(u.satisfaction, NOISE_CAP) - NOISE_EROSION);
+        u.satisfaction = Math.max(0, Math.min(u.satisfaction - NOISE_EROSION, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
       // {@link crowdStress} for the HUD, but is deliberately NOT written back into

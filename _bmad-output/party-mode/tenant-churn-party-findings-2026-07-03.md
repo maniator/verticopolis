@@ -95,7 +95,7 @@ the served recovery), so sustained, unaddressed exposure wears the tenant below
 the rescind bar and — after the normal 2-day notice — out, attributed to the
 re-added `noise` cause. It's deliberately slow and telegraphed (annoyance cap →
 ~1-day erosion → 2-day notice ≈ 3 days end-to-end); moving the office or the
-neighbour stops the erosion and lets an on-notice tenant rescind, and a
+neighbor stops the erosion and lets an on-notice tenant rescind, and a
 non-adjacent unit is unaffected. A single `officeAdjacent(u)` helper backs both
 the erosion and the cause attribution. Docs updated (`gdd-`/`arch-tenant-churn`).
 This is a deliberate deviation from the original "noise annoys but never evicts"

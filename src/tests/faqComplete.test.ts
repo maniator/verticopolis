@@ -313,7 +313,7 @@ describe("Deep-review regressions (must not come back)", () => {
     condo.satisfaction = 1;
     // The annoyance ceiling bites at once (≤0.6), then sustained exposure erodes
     // past it. Within a couple of game-days the condo goes on notice — attributed
-    // to noise, the canon "office neighbour is too noisy" complaint.
+    // to noise, the canon "office neighbor is too noisy" complaint.
     let onNotice = false;
     for (let i = 0; i < 24 * 3 && !onNotice; i++) {
       sim.tick(60);
