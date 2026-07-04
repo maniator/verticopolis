@@ -141,7 +141,12 @@ export function buildIncomeHtml(sim: Simulation): string {
     .filter((r) => Math.round(r.avg) !== 0)
     .sort((a, b) => b.avg - a.avg);
   if (rows.length === 0) return "";
-  const net = LEDGER_CATS.reduce((sum, cat) => sum + averages[cat], 0);
+  // Net sums only the lines actually shown: a sub-$0.50/day category is hidden
+  // from the list AND excluded here, so a near-zero line can't silently nudge
+  // Net away from the visible rows. (Per-row whole-dollar rounding can still
+  // make the shown figures not add up to the cent — that's display rounding,
+  // not a hidden line.)
+  const net = rows.reduce((sum, r) => sum + r.avg, 0);
   const line = (label: string, avg: number, bold = false) =>
     `<span class="k${bold ? " win-title sm" : ""}">${label}</span>` +
     `<span class="v" style="color:${avg < 0 ? "var(--bad)" : "var(--good)"}${bold ? ";font-weight:600" : ""}">${money(avg)}/day</span>`;
