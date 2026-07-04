@@ -318,6 +318,7 @@ export class TowerEngine {
       this.santaStart = null;
       this.explosions = [];
       this.thiefStart = null;
+      this.thiefCaught = false;
       this.treasures = [];
       this.vipStart = null;
     }
@@ -611,6 +612,7 @@ export class TowerEngine {
     this.santaStart = null;
     this.explosions = [];
     this.thiefStart = null;
+    this.thiefCaught = false;
     this.treasures = [];
     this.vipStart = null;
     this.lastSantaSeq = sim.santaFxSeq;
@@ -979,9 +981,11 @@ export class TowerEngine {
     const centerSx = this.worldToScreenX(GRID.width / 2);
     const groundSy = this.worldToScreenY(1) + FLOOR * this.cam.zoom * 0.5;
     const off = this.viewWidth * 0.6;
+    // The limo faces right, so it drives rightward: in from the left, hold, out
+    // to the right (otherwise it moon-walks).
     let x = centerSx;
-    if (p < 0.25) x = centerSx + (1 - p / 0.25) * off; // arrive from the right
-    else if (p > 0.75) x = centerSx - ((p - 0.75) / 0.25) * off; // depart to the left
+    if (p < 0.25) x = centerSx - (1 - p / 0.25) * off; // arrive from the left
+    else if (p > 0.75) x = centerSx + ((p - 0.75) / 0.25) * off; // depart to the right
     drawVipLimo(ctx, x, groundSy, Math.max(0.9, this.cam.zoom));
   }
 
