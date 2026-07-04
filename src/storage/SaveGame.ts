@@ -101,12 +101,23 @@ export const SaveGame = {
     return localStorage.getItem(AUTO_KEY) !== null;
   },
   load(): Simulation | null {
-    const data = readSlot(AUTO_KEY);
-    if (!data) return null;
+    return this.loadResult().sim;
+  },
+  /**
+   * Load the autosave, distinguishing a genuinely ABSENT save from one that's
+   * present but UNREADABLE (corrupt, or from an incompatible/newer format). Boot
+   * needs the difference: on `corrupt` it must warn and not silently offer
+   * "Continue" (which would drop the player into a fresh tower behind a title
+   * that promised their old one) — see main.ts.
+   */
+  loadResult(): { sim: Simulation | null; corrupt: boolean } {
+    if (localStorage.getItem(AUTO_KEY) === null) return { sim: null, corrupt: false }; // truly empty
+    const data = readSlot(AUTO_KEY); // null ⇒ present but undecodable
+    if (!data) return { sim: null, corrupt: true };
     try {
-      return Simulation.deserialize(data);
+      return { sim: Simulation.deserialize(data), corrupt: false };
     } catch {
-      return null;
+      return { sim: null, corrupt: true }; // decoded, but the schema won't load
     }
   },
   clear(): void {

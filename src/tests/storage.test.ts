@@ -211,6 +211,23 @@ describe("SaveGame", () => {
     expect(SaveGame.load()).toBeNull();
   });
 
+  it("loadResult distinguishes an absent save from a present-but-unreadable one (for an honest boot)", () => {
+    // Absent → not corrupt, no sim.
+    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: false });
+
+    // A real save → readable, not corrupt.
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const ok = SaveGame.loadResult();
+    expect(ok.corrupt).toBe(false);
+    expect(ok.sim?.money).toBe(sim.money);
+
+    // Present but undecodable → corrupt (so boot warns instead of a silent fresh start).
+    localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all"));
+    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: true });
+    expect(SaveGame.hasSave()).toBe(true); // …yet the key IS present — the exact trap this guards
+  });
+
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
     const sim = sampleGame();
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));

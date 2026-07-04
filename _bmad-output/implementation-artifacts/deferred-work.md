@@ -5,16 +5,6 @@ PR that found them. Pick these up when touching the relevant area.
 
 ## Deferred from: code review (2026-07-03, PR #110 — compress localStorage saves)
 
-- **`hasSave()` ≠ `load()` for an unreadable present save** (`SaveGame.ts` `hasSave` vs
-  `readSlot`; boot at `main.ts:95`/`257`/`282`). `hasSave()` only checks key presence and
-  never decodes, so a corrupt/oversized `VCZ1:` value makes the splash offer **Continue**
-  yet drop the player into a fresh tower, which the 30s autosave then overwrites. Pre-existing
-  (invalid raw JSON did the same); the `fatal` decoder + 32MB cap widen the "exists but won't
-  load" set marginally. A corrupt *compressed* save is unrecoverable regardless, so the
-  incremental harm is UX (misleading Continue), not new recoverable-data loss. Fix when
-  touching the boot flow: distinguish "no save" from "save present but unreadable" so the boot
-  path surfaces the corruption instead of silently starting fresh + clobbering.
-
 - **`localStorage.setItem` `QuotaExceededError` unhandled on the pre-reload paths**
   (`SaveGame.ts` `saveTo`; `saveLoad.ts:55`/`72`). `recoverFromContextLoss` and `onUpdateReady`
   call `save()` immediately before `location.reload()`; an uncaught quota/private-mode throw
@@ -23,6 +13,12 @@ PR that found them. Pick these up when touching the relevant area.
   prior good value + surface a toast rather than throwing across the reload.
 
 ## Completed
+
+- ~~**`hasSave()` ≠ `load()` for an unreadable present save**~~ — done 2026-07-04:
+  `SaveGame.loadResult()` distinguishes an absent save from a present-but-unreadable one;
+  boot (`main.ts`) uses readability (not mere presence) for the splash so a corrupt save
+  no longer offers "Continue", and it emits a bulletin/toast telling the player their save
+  couldn't be read before starting fresh. Unit-tested (`storage.test.ts`) and live-verified.
 
 - ~~**Inspector card re-shows on continued hover after ✕-dismissal**~~ —
   done 2026-07-02: `inspectDismissed` latch in `main.ts` keeps the card closed
