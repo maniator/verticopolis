@@ -20,10 +20,17 @@ describe("buildIncomeHtml (income breakdown)", () => {
 
     // Net reflects only the shown rows ($1,000), not $1,000.6 → $1,001. The old
     // code summed every category and would render the inconsistent $1,001.
-    // (Match the thousands separator loosely — toLocaleString is locale-driven.)
-    expect(html).toContain("Net");
-    expect(html).toMatch(/\$1[,.\u00a0\u202f ]?000\/day/);
-    expect(html).not.toContain("$1,001");
+    //
+    // money() formats via toLocaleString, whose thousands separator is
+    // locale-dependent (comma, dot, or a nbsp / narrow-nbsp / thin space).
+    // Collapse any separator sitting between two digits FIRST, so the
+    // discriminating assertion below holds in EVERY locale — otherwise it would
+    // only catch the regression under a comma locale and silently pass against
+    // the buggy code elsewhere.
+    const norm = html.replace(/(\d)[,.\u00a0\u202f\u2009 ](\d)/g, "$1$2");
+    expect(norm).toContain("Net");
+    expect(norm).toContain("$1000/day"); // Offices row and Net both read $1,000
+    expect(norm).not.toContain("$1001"); // the old, hidden-lines-included Net
   });
 
   it("renders nothing before any money has been recorded", () => {
