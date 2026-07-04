@@ -16,9 +16,14 @@ PR that found them. Pick these up when touching the relevant area.
 
 - ~~**`hasSave()` ≠ `load()` for an unreadable present save**~~ — done 2026-07-04:
   `SaveGame.loadResult()` distinguishes an absent save from a present-but-unreadable one;
-  boot (`main.ts`) uses readability (not mere presence) for the splash so a corrupt save
-  no longer offers "Continue", and it emits a bulletin/toast telling the player their save
-  couldn't be read before starting fresh. Unit-tested (`storage.test.ts`) and live-verified.
+  boot (`main.ts`) snapshots readability once (`hadReadableSave`) and uses it — not mere
+  presence — for both the splash ("Continue" no longer appears over a corrupt save) and the
+  "new tower" confirm (no false "abandons your current tower" when the boot sim is already
+  fresh). It emits a bulletin/toast telling the player their save couldn't be read before
+  starting fresh, and `SaveGame.preserveUnreadable()` copies the unreadable bytes to a backup
+  key at boot so the 30s autosave can't clobber a save that's only unreadable *here* (e.g.
+  written by a newer build) and might be recoverable by a later version. Unit-tested
+  (`storage.test.ts`) and live-verified.
 
 - ~~**Inspector card re-shows on continued hover after ✕-dismissal**~~ —
   done 2026-07-02: `inspectDismissed` latch in `main.ts` keeps the card closed

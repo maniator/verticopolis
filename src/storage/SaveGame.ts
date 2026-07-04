@@ -24,6 +24,15 @@ const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
 
 /**
+ * Backup key for an autosave that couldn't be read at boot (see
+ * {@link SaveGame.preserveUnreadable}). A truly corrupt save is dead, but a save
+ * written by a *newer* build and opened on an older one is only unreadable
+ * *here* — stashing the raw bytes keeps them off the autosave slot's chopping
+ * block so a later version can still recover them.
+ */
+const UNREADABLE_KEY = "simtower-clone-unreadable";
+
+/**
  * Prefix marking a compressed localStorage value: this magic, then the
  * base64 of the DEFLATE-compressed JSON. A legacy uncompressed save is raw
  * JSON (starts with `{`), so the prefix check cleanly tells the two apart and
@@ -122,6 +131,21 @@ export const SaveGame = {
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
+  },
+  /**
+   * Stash an unreadable autosave under a backup key so the 30s autosave doesn't
+   * silently destroy it. A truly corrupt compressed save is unrecoverable, but a
+   * save from a *newer* build (opened on an older one) is not — keeping the bytes
+   * lets a later version recover them instead of overwriting on the next tick.
+   */
+  preserveUnreadable(): void {
+    const raw = localStorage.getItem(AUTO_KEY);
+    if (raw === null) return;
+    try {
+      localStorage.setItem(UNREADABLE_KEY, raw);
+    } catch {
+      /* best effort — a full quota just means we can't back it up */
+    }
   },
 
   // ---- Named manual slots ----------------------------------------------
