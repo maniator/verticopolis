@@ -61,6 +61,19 @@ const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
  *  exact recovery target (the "inform before you hurt them" contract). */
 export const VACATE_RESCIND = 0.4;
 
+/** The immediate annoyance ceiling for a hotel/condo sat right beside an office:
+ *  moving in next to noise caps satisfaction here at once (canon "office
+ *  neighbour is too noisy"). */
+const NOISE_CAP = 0.6;
+
+/** Per-hour erosion applied on top of the cap while the office neighbour stays.
+ *  It slightly outpaces the +0.05/hr served recovery (net ≈ −0.02/hr), so an
+ *  UNADDRESSED noisy neighbour wears the tenant down past the rescind bar and,
+ *  eventually, out — a slow, heavily-telegraphed pressure (≈1 day from the cap
+ *  to zero, then the 2-day notice), not an instant eviction. Fix it (move the
+ *  office or the neighbour) and satisfaction recovers normally. */
+const NOISE_EROSION = 0.07;
+
 /**
  * Save-format migration seam. Runs before the field-level coercion in
  * {@link Simulation.deserialize}. v1 is the only format today, so this is the
@@ -804,19 +817,15 @@ export class Simulation implements SimContext {
         const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
         u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
       }
-      // Office noise (canon "Office neighbor is too noisy"): offices are loud and
-      // busy, so a hotel room or condo with an office immediately beside it on the
-      // same floor loses satisfaction — keep residential/hotel zones away from
-      // offices, exactly as the original demands.
-      if ((isHotelKind(u.kind) || u.kind === "condo") && served) {
-        const left = this.tower.roomAt(u.floor, u.x - 1);
-        const right = this.tower.roomAt(u.floor, u.x + u.width);
-        if (left?.kind === "office" || right?.kind === "office") {
-          // Noise CAPS satisfaction (persistent unhappiness) rather than draining
-          // it to zero — adjacency annoys (less income / move-in) and nudges you
-          // to move them, but doesn't on its own guarantee eviction + churn.
-          u.satisfaction = Math.min(u.satisfaction, 0.6);
-        }
+      // Office noise (canon "Office neighbor is too noisy"): a hotel room or condo
+      // with an office immediately beside it on the same floor is worn down in two
+      // phases — an immediate annoyance CEILING (NOISE_CAP), then, if the neighbour
+      // is never dealt with, a slow EROSION past it (NOISE_EROSION outpaces the
+      // served recovery). Sustained, unaddressed exposure therefore drives the
+      // tenant below the rescind bar and ultimately out (cause: "noise"); moving
+      // the office or the neighbour lets satisfaction recover normally.
+      if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
+        u.satisfaction = Math.max(0, Math.min(u.satisfaction, NOISE_CAP) - NOISE_EROSION);
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
       // {@link crowdStress} for the HUD, but is deliberately NOT written back into
@@ -883,9 +892,9 @@ export class Simulation implements SimContext {
    * moment it bottomed out, so the toast/inspector names the real cause instead
    * of always blaming access. The order mirrors the drains in
    * {@link updateSatisfaction}: an unreachable floor is harshest, then elevator
-   * crowding, then an over-market office rent. (Office noise only caps
-   * satisfaction, never drains it to zero, so it is never a departure cause;
-   * `access` is the catch-all for the rare emergency-driven bottom-out.)
+   * crowding, then an over-market office rent, and finally — for a served,
+   * uncongested hotel/condo — sustained office-noise erosion. `access` remains
+   * the catch-all for the rare emergency-driven bottom-out.
    */
   private vacateCause(u: Unit, served: boolean, cong: number): VacateReason {
     if (!served) return "access";
@@ -893,8 +902,21 @@ export class Simulation implements SimContext {
     if (u.kind === "office") {
       const cfg = rentConfig("office");
       if (cfg && rentOf(u) > cfg.default) return "rent";
+      return "access";
     }
+    // A served, uncongested hotel/condo that still bottomed out did so through
+    // sustained office-noise erosion — the only remaining satisfaction sink.
+    if (this.officeAdjacent(u)) return "noise";
     return "access";
+  }
+
+  /** True when a same-floor office sits immediately to either side of `u` — the
+   *  single office-noise adjacency test, shared by the noise erosion and its
+   *  cause attribution so the two can never disagree. */
+  private officeAdjacent(u: Unit): boolean {
+    const left = this.tower.roomAt(u.floor, u.x - 1);
+    const right = this.tower.roomAt(u.floor, u.x + u.width);
+    return left?.kind === "office" || right?.kind === "office";
   }
 
   /**
