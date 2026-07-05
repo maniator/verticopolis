@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import type { Simulation, HeatmapMode } from "../../engine/Simulation";
+import type { Simulation, HeatmapMode, HeatCell } from "../../engine/Simulation";
 import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
@@ -281,7 +281,7 @@ export class TowerEngine {
   overlayMode: HeatmapMode | null = null;
   /** Cached heatmap for the active overlay, refreshed on the hour, on a layout
    *  change, or when the mode flips — never per frame (it scans the unit list). */
-  private heatmap = new Map<number, { severity: number; minX: number; maxX: number }>();
+  private heatmap: HeatCell[] = [];
   private heatmapHour = -1;
   private heatmapRev = -1;
   private heatmapMode: HeatmapMode | null = null;
@@ -999,9 +999,11 @@ export class TowerEngine {
     drawThief(ctx, x, y, 1.1, this.thiefCaught);
   }
 
-  /** The colored stats overlay: tint each floor by the active metric (green =
-   *  good … red = bad) with a legend. The heatmap is recomputed only when its
-   *  inputs change (hour / layout / mode), never per frame. */
+  /** The colored stats overlay: draw each heatmap cell by the active metric
+   *  (green = good … red = bad) with a legend — one cell per floor for
+   *  congestion/occupancy, one per present unit for satisfaction (so a floor can
+   *  show several tints). The heatmap is recomputed only when its inputs change
+   *  (hour / layout / mode), never per frame. */
   private drawStatsMap(ctx: CanvasRenderingContext2D): void {
     if (!this.overlayMode) return;
     const hour = this.sim.clock.hour;
@@ -1013,13 +1015,21 @@ export class TowerEngine {
       this.heatmapRev = rev;
     }
     const z = this.cam.zoom;
-    for (const [floor, cell] of this.heatmap) {
+    // Visible floor band (computed once) to skip the coordinate transforms for
+    // off-screen cells. The loop still visits every cell, but worldToScreenX/Y
+    // each run the engine's affine transform and satisfaction can emit one cell
+    // per present tenant unit, so gating those two transforms on the band avoids
+    // paying them for every off-screen unit in a tall tower each frame.
+    const topFloor = this.screenToFloor(0) + 1;
+    const botFloor = this.screenToFloor(this.viewHeight) - 1;
+    for (const cell of this.heatmap) {
+      if (cell.floor < botFloor || cell.floor > topFloor) continue;
       const sx = this.worldToScreenX(cell.minX);
-      const sy = this.worldToScreenY(floor);
+      const sy = this.worldToScreenY(cell.floor);
       const sw = (cell.maxX - cell.minX + 1) * TILE * z;
       const sh = FLOOR * z;
-      // Cull rows outside the viewport so a tall tower's off-screen floors cost
-      // nothing to "draw".
+      // Exact per-cell cull for horizontal extent (and any residual vertical
+      // slop past the floor-band margin) so partial-edge tints still draw right.
       if (sy + sh < 0 || sy > this.viewHeight || sx + sw < 0 || sx > this.viewWidth) continue;
       ctx.fillStyle = heatColor(cell.severity);
       ctx.fillRect(sx, sy, sw, sh);
