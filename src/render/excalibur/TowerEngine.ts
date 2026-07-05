@@ -1015,11 +1015,11 @@ export class TowerEngine {
       this.heatmapRev = rev;
     }
     const z = this.cam.zoom;
-    // Pre-cull by the visible floor band (computed once) before any per-cell
-    // coordinate transform: worldToScreenX/Y each run the engine's affine
-    // transform, and satisfaction can emit one cell per present tenant unit, so
-    // skipping off-screen floors up front keeps the loop bound to on-screen rows
-    // rather than paying two transforms for every unit in a tall tower.
+    // Visible floor band (computed once) to skip the coordinate transforms for
+    // off-screen cells. The loop still visits every cell, but worldToScreenX/Y
+    // each run the engine's affine transform and satisfaction can emit one cell
+    // per present tenant unit, so gating those two transforms on the band avoids
+    // paying them for every off-screen unit in a tall tower each frame.
     const topFloor = this.screenToFloor(0) + 1;
     const botFloor = this.screenToFloor(this.viewHeight) - 1;
     for (const cell of this.heatmap) {
