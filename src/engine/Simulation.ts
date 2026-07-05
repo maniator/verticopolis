@@ -77,13 +77,15 @@ const NOISE_EROSION = 0.07;
 /** Office-noise erosion for a *sold condo*, gentler than the hotel rate above —
  *  a sold condo is an owner, not a nightly guest, and 1994 condos were "sticky."
  *  A condo owner is annoyed by a noisy neighbor (canon "office neighbor is too
- *  noisy": the unit still reddens on the stats overlay) but only barely net-
- *  negative against the +0.05/hr served recovery, so a *transient* noisy
- *  neighbor — one the player removes within a few days — is fully absorbed and
- *  the owner stays. Only *sustained, unaddressed* adjacency wears an owner down
- *  and out: ≈ a week from the annoyance cap to a notice, then the 2-day window —
- *  roughly triple the hotel's fuse. Fixing the cause (move the office or the
- *  neighbor) recovers satisfaction well before then. */
+ *  noisy": the unit still reddens on the stats overlay) but only *just* exceeds
+ *  the +0.05/hr served recovery, for a shallow net drift of ≈ −0.004/hr: a
+ *  *transient* neighbor the player removes within a few days is fully absorbed
+ *  and the owner stays, while only *sustained, unaddressed* adjacency wears an
+ *  owner down and out — ≈150 game-hours (about a week) from the annoyance cap to
+ *  a notice, then the 2-day window: ≈5× the hotel's ≈30-hour fuse. INVARIANT:
+ *  keep this strictly above the +0.05/hr served recovery — at or below it a
+ *  noise-worn condo never reaches the notice threshold (and D25's loop hangs).
+ *  Fixing the cause (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
 
 /**

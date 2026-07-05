@@ -3,6 +3,18 @@
 Items surfaced by reviews that are real but intentionally not actioned in the
 PR that found them. Pick these up when touching the relevant area.
 
+## Deferred from: gds-code-review (2026-07-05, condo stickiness — CONDO_NOISE_EROSION)
+
+- **D25's horizon margin is now thinner (deterministic, not flaky).** With the
+  gentle condo noise rate, a permanent noisy neighbor reaches a notice at ≈151
+  game-hours; `faqComplete.test.ts` D25/D25b loop `24*8 = 192`, a fixed ~41-tick
+  (~27%) cushion (was ~2.3× at the old hotel rate). Safe today — the drift is
+  fully deterministic (`star=1` disables event RNG; the 2-floor tower never
+  congests) — but the cushion is coupled to two constants: nudging
+  `CONDO_NOISE_EROSION` toward the +0.05/hr recovery, or shrinking the `24*8`
+  horizon, erodes it fast. If either is ever retuned, re-derive the time-to-
+  notice and widen the loop. (Edge Case Hunter; no code change warranted now.)
+
 ## Deferred from: code review (2026-07-03, PR #110 — compress localStorage saves)
 
 - **`localStorage.setItem` `QuotaExceededError` unhandled on the pre-reload paths**
