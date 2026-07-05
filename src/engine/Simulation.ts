@@ -1428,7 +1428,10 @@ export class Simulation implements SimContext {
    * {@link Tower.isFloorServed} yet return false here — connected, but 3+ rides
    * out, so no commuter ever spawns for it. Runs a fresh bounded (≤2-ride) BFS
    * each call — only Crowd's ADJACENCY graph is cached by `tower.revision`, not
-   * the route result — so keep it off the tick/HUD path (inspect/modal/day only).
+   * the route result. Keep it off the per-FRAME/HUD path. The hourly economy
+   * (`collectTrafficIncome`, gating commercial visitor income) does call it, but
+   * dedupes per distinct floor within the call, so it's one small bounded BFS
+   * per commercial floor per game-hour, not per unit — an acceptable tick cost.
    */
   floorReachable(floor: number): boolean {
     if (floor === 1) return true;
