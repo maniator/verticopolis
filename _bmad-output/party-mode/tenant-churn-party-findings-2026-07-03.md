@@ -56,7 +56,7 @@ follow-up work.
 | 5 | Transport-neutral, escalator-inclusive cause copy | ✅ Shipped (#109) |
 | 6 | Back-fill the `gdd-`/`arch-` design pair | ✅ Shipped (#109) |
 | 7 | Reconsider counting `vacating` toward the **star** population | ✅ Resolved — keep (investigated) |
-| 8 | Let office **noise** actually evict (re-add the `noise` cause) | 🔲 Open — deferred mechanic |
+| 8 | Let office **noise** actually evict (re-add the `noise` cause) | ✅ Built — erosion mechanic |
 | 9 | Confirm the amber ribbon doesn't churn demo **screenshots** | ✅ Resolved — no risk (investigated) |
 | 10 | **Playtest** the churn feel (teeth, not tedium) | 🔲 Open — needs a human |
 
@@ -86,13 +86,21 @@ invariant #4 already records that `vacating` counts; the monotonic-star fact is
 why that's safe. *(A future design could still choose (b) if star **demotion**
 is ever introduced — at which point this becomes a live question again.)*
 
-### F-8 — Make office noise a slow drain, not just a cap (deferred mechanic)
-Today office-noise only *caps* an adjacent hotel/condo at 0.6; it can annoy but
-never evict, which is why `noise` was dropped as a vacate cause. Office-noise is a
-canonically important SimTower complaint, so a future pass could let the cap
-*decay* below the rescind bar over sustained exposure — at which point `noise`
-returns as a real, attributable eviction cause. Out of scope for #109 (it's a new
-mechanic, not a fix). — Sally & Cloud.
+### F-8 — Make office noise a slow drain, not just a cap — ✅ BUILT
+Noise used to only *cap* an adjacent hotel/condo at 0.6 and could never evict.
+
+**Built (follow-up branch):** office adjacency now applies the 0.6 annoyance cap
+*and* a gentle per-hour erosion (`NOISE_EROSION = 0.07`, net ≈ −0.02/hr against
+the served recovery), so sustained, unaddressed exposure wears the tenant below
+the rescind bar and — after the normal 2-day notice — out, attributed to the
+re-added `noise` cause. It's deliberately slow and telegraphed (annoyance cap →
+~1-day erosion → 2-day notice ≈ 3 days end-to-end); moving the office or the
+neighbor stops the erosion and lets an on-notice tenant rescind, and a
+non-adjacent unit is unaffected. A single `officeAdjacent(u)` helper backs both
+the erosion and the cause attribution. Docs updated (`gdd-`/`arch-tenant-churn`).
+This is a deliberate deviation from the original "noise annoys but never evicts"
+interpretation, chosen (with user sign-off) so noise is a real zoning pressure.
+— Sally & Cloud; built on user request.
 
 ### F-9 — Screenshot stability of the on-notice ribbon — ✅ RESOLVED: no risk
 `gdd-legibility` principle #5 says nothing new should recompute on the tick loop

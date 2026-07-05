@@ -81,10 +81,10 @@ export function isUnitState(v: unknown): v is UnitState {
 
 /** Why a dissatisfied tenant is leaving — attributed from the dominant
  *  satisfaction drain at the moment it bottoms out, so the notice/departure
- *  toast names the real cause instead of always blaming "poor access". Office
- *  noise is deliberately NOT a cause: it only caps satisfaction at 0.6, never
- *  drains it to zero, so it can annoy but never on its own evict. */
-export type VacateReason = "access" | "congestion" | "rent";
+ *  toast names the real cause instead of always blaming "poor access". `noise`
+ *  marks a hotel/condo worn down by a same-floor office neighbor over sustained,
+ *  unaddressed exposure (see the office-noise erosion in updateSatisfaction). */
+export type VacateReason = "access" | "congestion" | "rent" | "noise";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
@@ -94,11 +94,12 @@ export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   access: "no route to the lobby",
   congestion: "overcrowded vertical transport",
   rent: "rent set too high",
+  noise: "office noise next door",
 };
 
 /** Guard for a persisted departure cause from an untrusted save. */
 export function isVacateReason(v: unknown): v is VacateReason {
-  return v === "access" || v === "congestion" || v === "rent";
+  return v === "access" || v === "congestion" || v === "rent" || v === "noise";
 }
 
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.

@@ -32,10 +32,15 @@ grounds:
    `+0.05` recovery is gated behind `served`. This is what makes a genuinely
    broken layout still evict on schedule while a merely-congested one is
    recoverable. Do not "simplify" the recovery to be unconditional.
-3. **Office noise can never evict.** Noise only *caps* satisfaction at 0.6
-   (`Math.min`), it never drains to 0. Therefore `VacateReason` has no `"noise"`
-   member and `vacateCause` never returns one. If you make noise a drain, you
-   must add the reason back — and re-derive the attribution order.
+3. **Office noise erodes, and can evict (F-8).** A hotel/condo beside a same-floor
+   office is capped at `NOISE_CAP` (0.6) *and* eroded by `NOISE_EROSION` (0.07/hr,
+   net ≈ −0.02/hr against the served recovery), so sustained unaddressed exposure
+   drives it to zero and out with cause `"noise"`. `NOISE_EROSION` **must stay
+   above the +0.05/hr recovery** or the net goes positive and noise stops
+   evicting entirely; keep it gentle so the pressure stays telegraphed. The
+   adjacency test is the single `officeAdjacent(u)` helper, shared by the erosion
+   and `vacateCause` so they can't disagree. *(This reverses the original ship's
+   "noise never evicts" rule — a deliberate design change, see the GDD.)*
 4. **`vacating` counts as present.** `isPresent` and `isTenanted` both include
    `vacating`. A tenant on notice still pays rent, counts as population, and
    commutes. Every all-unit loop that should credit a live tenant routes through

@@ -298,7 +298,7 @@ describe("Deep-review regressions (must not come back)", () => {
     expect(r2.state).toBe("dirty"); // infestation spread from r1 → r2
   });
 
-  it("D25: a condo next to an office stays unhappy but is NOT evicted by noise alone", () => {
+  it("D25: a condo next to an office is worn down by noise and eventually gives notice + moves out", () => {
     const sim = Simulation.newGame(2);
     sim.money = 1e9;
     sim.star = 1; // 1★ → no random fire/bomb events, isolating the noise effect
@@ -311,9 +311,48 @@ describe("Deep-review regressions (must not come back)", () => {
     condo.state = "occupied";
     condo.everOccupied = true;
     condo.satisfaction = 1;
-    for (let i = 0; i < 24 * 12; i++) sim.tick(60); // 12 days
-    expect(condo.state).toBe("occupied"); // capped-unhappy, never drained to eviction
-    expect(condo.satisfaction).toBeLessThanOrEqual(0.6);
+    // The annoyance ceiling bites at once (≤0.6), then sustained exposure erodes
+    // past it. Within a couple of game-days the condo goes on notice — attributed
+    // to noise, the canon "office neighbor is too noisy" complaint.
+    let onNotice = false;
+    for (let i = 0; i < 24 * 3 && !onNotice; i++) {
+      sim.tick(60);
+      // Cast defeats TS control-flow narrowing from the `state = "occupied"`
+      // assignment above — `sim.tick` mutates it, but the compiler can't see that.
+      onNotice = (condo.state as string) === "vacating";
+    }
+    expect(onNotice).toBe(true);
+    expect(condo.vacateReason).toBe("noise");
+    // Left unaddressed, the notice runs out and the tenant leaves for good. (The
+    // now-empty, well-served unit may re-let to a fresh resident afterward, so we
+    // assert the departure actually fired via its toast, not the transient state.)
+    for (let i = 0; i < 24 * 3; i++) sim.tick(60);
+    expect(sim.log.some((e) => /A tenant left .*office noise next door/.test(e.text))).toBe(true);
+  });
+
+  it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {
+    const sim = Simulation.newGame(2);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    const or = sim.tower.place("office", 2, 0);
+    const office = sim.tower.units.find((u) => u.id === or.unitId)!;
+    const cr = sim.tower.place("condo", 2, 9);
+    const condo = sim.tower.units.find((u) => u.id === cr.unitId)!;
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.satisfaction = 1;
+    // Wear it onto notice… (cast defeats narrowing from `state = "occupied"`).
+    for (let i = 0; i < 24 * 3 && (condo.state as string) !== "vacating"; i++) sim.tick(60);
+    expect(condo.state).toBe("vacating");
+    // …then fix the cause: remove the office. Noise gone → satisfaction recovers
+    // and the tenant rescinds before the notice window elapses.
+    sim.tower.removeUnit(office.id);
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(condo.state).toBe("occupied");
+    expect(condo.vacateReason).toBeUndefined();
   });
 
   it("D10: buried treasure is capped per tower (no basement parking farm)", () => {
