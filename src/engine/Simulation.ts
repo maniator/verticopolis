@@ -84,8 +84,9 @@ const NOISE_EROSION = 0.07;
  *  owner down and out — ≈150 game-hours (about a week) from the annoyance cap to
  *  a notice, then the 2-day window: ≈5× the hotel's ≈30-hour fuse. INVARIANT:
  *  keep this strictly above the +0.05/hr served recovery — at or below it a
- *  noise-worn condo never reaches the notice threshold (and D25's loop hangs).
- *  Fixing the cause (move the office or the neighbor) recovers well before. */
+ *  noise-worn condo never reaches the notice threshold, so it never evicts and
+ *  D25's bounded loop runs out without a notice, failing the assertion. Fixing
+ *  the cause (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
 
 /**
@@ -849,12 +850,15 @@ export class Simulation implements SimContext {
       // steady-state stays a true net ≈ −0.02/hr (this tick's +0.05 recovery is
       // preserved, not discarded by the cap).
       if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
-        // A sold condo is an owner, not a nightly guest, so it erodes at the
-        // gentler condo rate — sticky against a transient neighbor the player
-        // removes in time, worn out only by sustained, unaddressed adjacency.
-        // Hotels keep the steeper rate. The annoyance cap is shared, so both
+        // A *sold* condo (everOccupied) is an owner, not a nightly guest, so it
+        // erodes at the gentler condo rate — sticky against a transient neighbor
+        // the player removes in time, worn out only by sustained, unaddressed
+        // adjacency. Hotels (and any not-yet-sold condo) keep the steeper rate;
+        // gating on everOccupied matches the "sold" predicate the rest of the
+        // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
+        // with an occupied-but-unsold condo. The annoyance cap is shared, so both
         // still redden on the stats overlay from the moment of exposure.
-        const erosion = u.kind === "condo" ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
         u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
