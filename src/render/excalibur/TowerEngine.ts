@@ -1018,8 +1018,8 @@ export class TowerEngine {
       const sy = this.worldToScreenY(cell.floor);
       const sw = (cell.maxX - cell.minX + 1) * TILE * z;
       const sh = FLOOR * z;
-      // Cull rows outside the viewport so a tall tower's off-screen floors cost
-      // nothing to "draw".
+      // Cull cells outside the viewport so a tall tower's off-screen tints cost
+      // nothing to "draw" (satisfaction can place several cells on one floor).
       if (sy + sh < 0 || sy > this.viewHeight || sx + sw < 0 || sx > this.viewWidth) continue;
       ctx.fillStyle = heatColor(cell.severity);
       ctx.fillRect(sx, sy, sw, sh);
