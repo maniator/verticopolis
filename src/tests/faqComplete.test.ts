@@ -311,11 +311,13 @@ describe("Deep-review regressions (must not come back)", () => {
     condo.state = "occupied";
     condo.everOccupied = true;
     condo.satisfaction = 1;
-    // The annoyance ceiling bites at once (≤0.6), then sustained exposure erodes
-    // past it. Within a couple of game-days the condo goes on notice — attributed
-    // to noise, the canon "office neighbor is too noisy" complaint.
+    // The annoyance ceiling bites at once (≤0.6) and the unit reddens, but a
+    // sold condo is an owner and erodes at the gentler condo rate, so it takes
+    // ≈ a week of SUSTAINED, unaddressed adjacency to go on notice — attributed
+    // to noise, the canon "office neighbor is too noisy" complaint. (A neighbor
+    // removed in time is absorbed and never evicts — see the stickiness test.)
     let onNotice = false;
-    for (let i = 0; i < 24 * 3 && !onNotice; i++) {
+    for (let i = 0; i < 24 * 8 && !onNotice; i++) {
       sim.tick(60);
       // Cast defeats TS control-flow narrowing from the `state = "occupied"`
       // assignment above — `sim.tick` mutates it, but the compiler can't see that.
@@ -344,8 +346,9 @@ describe("Deep-review regressions (must not come back)", () => {
     condo.state = "occupied";
     condo.everOccupied = true;
     condo.satisfaction = 1;
-    // Wear it onto notice… (cast defeats narrowing from `state = "occupied"`).
-    for (let i = 0; i < 24 * 3 && (condo.state as string) !== "vacating"; i++) sim.tick(60);
+    // Wear it onto notice over ≈ a week (cast defeats narrowing from `state =
+    // "occupied"`).
+    for (let i = 0; i < 24 * 8 && (condo.state as string) !== "vacating"; i++) sim.tick(60);
     expect(condo.state).toBe("vacating");
     // …then fix the cause: remove the office. Noise gone → satisfaction recovers
     // and the tenant rescinds before the notice window elapses.
@@ -353,6 +356,35 @@ describe("Deep-review regressions (must not come back)", () => {
     for (let i = 0; i < 24; i++) sim.tick(60);
     expect(condo.state).toBe("occupied");
     expect(condo.vacateReason).toBeUndefined();
+  });
+
+  it("D25c: a sold condo is sticky — a transient noisy neighbor annoys but never evicts an owner", () => {
+    const sim = Simulation.newGame(2);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    const or = sim.tower.place("office", 2, 0);
+    const office = sim.tower.units.find((u) => u.id === or.unitId)!;
+    const cr = sim.tower.place("condo", 2, 9); // immediately right of the office
+    const condo = sim.tower.units.find((u) => u.id === cr.unitId)!;
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.satisfaction = 1;
+    // Four days of noise — well inside the ≈ week-long condo fuse. The owner is
+    // annoyed (satisfaction sinks below the cap, so the unit reddens) but an
+    // owner is not a lessee: it never goes on notice over a transient neighbor.
+    for (let i = 0; i < 24 * 4; i++) {
+      sim.tick(60);
+      expect(condo.state as string).toBe("occupied"); // never once put on notice
+    }
+    expect(condo.satisfaction).toBeLessThan(0.6); // genuinely annoyed, well below full
+    // Remove the office in time and the owner recovers fully — no churn.
+    sim.tower.removeUnit(office.id);
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(condo.state).toBe("occupied");
+    expect(condo.satisfaction).toBeGreaterThan(0.9); // recovered to happy
   });
 
   it("D10: buried treasure is capped per tower (no basement parking farm)", () => {

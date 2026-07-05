@@ -74,6 +74,18 @@ const NOISE_CAP = 0.6;
  *  office or the neighbor) and satisfaction recovers normally. */
 const NOISE_EROSION = 0.07;
 
+/** Office-noise erosion for a *sold condo*, gentler than the hotel rate above —
+ *  a sold condo is an owner, not a nightly guest, and 1994 condos were "sticky."
+ *  A condo owner is annoyed by a noisy neighbor (canon "office neighbor is too
+ *  noisy": the unit still reddens on the stats overlay) but only barely net-
+ *  negative against the +0.05/hr served recovery, so a *transient* noisy
+ *  neighbor — one the player removes within a few days — is fully absorbed and
+ *  the owner stays. Only *sustained, unaddressed* adjacency wears an owner down
+ *  and out: ≈ a week from the annoyance cap to a notice, then the 2-day window —
+ *  roughly triple the hotel's fuse. Fixing the cause (move the office or the
+ *  neighbor) recovers satisfaction well before then. */
+const CONDO_NOISE_EROSION = 0.054;
+
 /**
  * Save-format migration seam. Runs before the field-level coercion in
  * {@link Simulation.deserialize}. v1 is the only format today, so this is the
@@ -835,7 +847,13 @@ export class Simulation implements SimContext {
       // steady-state stays a true net ≈ −0.02/hr (this tick's +0.05 recovery is
       // preserved, not discarded by the cap).
       if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
-        u.satisfaction = Math.max(0, Math.min(u.satisfaction - NOISE_EROSION, NOISE_CAP));
+        // A sold condo is an owner, not a nightly guest, so it erodes at the
+        // gentler condo rate — sticky against a transient neighbor the player
+        // removes in time, worn out only by sustained, unaddressed adjacency.
+        // Hotels keep the steeper rate. The annoyance cap is shared, so both
+        // still redden on the stats overlay from the moment of exposure.
+        const erosion = u.kind === "condo" ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
       // {@link crowdStress} for the HUD, but is deliberately NOT written back into

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Condo Churn Roundtable — 5 Jul 2026</title>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#151d2c; --panel2:#1b2536; --ink:#e8eef7; --dim:#9fb0c9;
+    --line:#26324a; --accent:#f5b642; --accent2:#6fd0c0; --red:#e2604f; --green:#57b083;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#eef2f8; --panel:#ffffff; --panel2:#f4f7fc; --ink:#16202f; --dim:#5a6b83;
+      --line:#dbe3ef; --accent:#c98a12; --accent2:#1f9c88; --red:#c8452f; --green:#2f8b5c;
+      --shadow:0 10px 26px rgba(30,45,70,.12);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, rgba(245,182,66,.10), transparent 60%),var(--bg);
+    color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 18px 64px;}
+  .wrap{max-width:840px;margin:0 auto}
+  header.hero{text-align:center;margin-bottom:34px}
+  .kicker{letter-spacing:.22em;text-transform:uppercase;font-size:12px;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(28px,5vw,44px);margin:.25em 0 .1em;line-height:1.08;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:15px}
+  .tower{display:block;margin:18px auto 0}
+
+  .reframe{margin:30px 0;padding:26px 24px;border-radius:16px;background:linear-gradient(135deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);box-shadow:var(--shadow);text-align:center}
+  .reframe b{color:var(--accent2)}
+  .reframe .big{font-size:clamp(19px,3.4vw,26px);font-weight:650;line-height:1.35}
+  .reframe .cap{margin-top:10px;color:var(--dim);font-size:13.5px}
+
+  h2.sec{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+
+  .card{display:flex;gap:16px;padding:18px;margin:12px 0;border-radius:14px;background:var(--panel);
+    border:1px solid var(--line);box-shadow:var(--shadow)}
+  .ava{flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:24px;
+    background:var(--panel2);border:1px solid var(--line)}
+  .who{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:4px}
+  .name{font-weight:700}
+  .role{font-size:12px;color:var(--dim);letter-spacing:.02em}
+  .line{color:var(--ink)}
+  .line .q{color:var(--dim);font-style:italic}
+
+  .fork{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  @media (max-width:560px){.fork{grid-template-columns:1fr}}
+  .opt{padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+  .opt h3{margin:0 0 6px;font-size:15px}
+  .opt.value h3{color:var(--accent2)} .opt.risk h3{color:var(--red)}
+  .opt p{margin:0;color:var(--dim);font-size:13.5px}
+
+  .bits{margin-top:8px;padding:16px 18px;border-radius:14px;border:1px dashed var(--line);background:transparent}
+  .bits li{margin:6px 0;color:var(--dim);font-size:14px}
+  .bits b{color:var(--ink)}
+
+  footer{margin-top:40px;text-align:center;color:var(--dim);font-size:12.5px}
+  .chip{display:inline-block;padding:2px 10px;border:1px solid var(--line);border-radius:999px;margin:3px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">Party Mode · Design Roundtable</div>
+    <h1>The Condo Churn Roundtable</h1>
+    <div class="sub">5 July 2026 · sparked by a player noticing sold condos leaving &amp; re-buying for free</div>
+    <svg class="tower" width="120" height="96" viewBox="0 0 120 96" role="img" aria-label="tower">
+      <rect x="34" y="8" width="52" height="84" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <g>
+        <rect x="41" y="16" width="14" height="10" fill="var(--green)"/>
+        <rect x="65" y="16" width="14" height="10" fill="var(--green)"/>
+        <rect x="41" y="32" width="14" height="10" fill="var(--green)"/>
+        <rect x="65" y="32" width="14" height="10" fill="var(--red)"/>
+        <rect x="41" y="48" width="14" height="10" fill="var(--green)"/>
+        <rect x="65" y="48" width="14" height="10" fill="var(--green)"/>
+        <rect x="41" y="64" width="14" height="10" fill="var(--green)"/>
+        <rect x="65" y="64" width="14" height="10" fill="var(--green)"/>
+      </g>
+      <rect x="54" y="78" width="12" height="14" fill="var(--panel2)" stroke="var(--line)"/>
+    </svg>
+  </header>
+
+  <div class="reframe">
+    <div class="big">An office is a <b>lease you manage.</b><br/>A condo is a <b>bet you placed.</b></div>
+    <div class="cap">The reframe that broke the deadlock — the bug was never the money, it was running both through the same <code>vacate()</code> verb.</div>
+  </div>
+
+  <h2 class="sec">Who was in the room</h2>
+
+  <div class="card">
+    <div class="ava">🎲</div>
+    <div>
+      <div class="who"><span class="name">Samus Shepard</span><span class="role">Game Designer</span></div>
+      <div class="line">“We built a consequence engine for offices six days ago — countdown, rescind bar, the works — and then forgot to plug the condo into it. If a condo can’t leave, satisfaction on it is a <span class="q">mood ring.</span>”</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ava">🏛️</div>
+    <div>
+      <div class="who"><span class="name">Cloud Dragonborn</span><span class="role">Game Architect</span></div>
+      <div class="line">“The 1994 condos were sticky because residents were never stress-modeled like offices. We accidentally ran office-noise erosion on condos at office intensity — we handed a condo an <span class="q">office’s nervous system.</span> And remember: rating only ratchets <em>up</em>, so any ‘lost population’ punishment has no teeth on a finished tower.”</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ava">🎨</div>
+    <div>
+      <div class="who"><span class="name">Sally</span><span class="role">UX Designer</span></div>
+      <div class="line">“A condo silently empties, silently refills, and the game says <em>nothing</em> both times. The horror isn’t that it’s free — it’s that it’s <span class="q">invisible and free.</span> Glitches are things that happen without explanation.”</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ava">📋</div>
+    <div>
+      <div class="who"><span class="name">John</span><span class="role">Product Manager</span></div>
+      <div class="line">“<span class="q">Who asked for this?</span> Someone did — the player. But don’t invent a resale-fee mini-economy nobody wanted just to manufacture a sting. That’s the migration-framework mistake wearing a new coat.”</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="ava">📚</div>
+    <div>
+      <div class="who"><span class="name">Paige</span><span class="role">Technical Writer</span></div>
+      <div class="line">“We’re arguing because the invariant isn’t written down. Is a condo a <em>lease</em> or a <em>purchase</em> in our model? Say it and the code writes itself. <span class="q">The doc is the fix for the thing we were all afraid of.</span>”</div>
+    </div>
+  </div>
+
+  <h2 class="sec">The fork they left open — on purpose</h2>
+  <p style="color:var(--dim);margin-top:0">What should a condo’s satisfaction actually <em>be</em>, once it stops being a hair-trigger for walkouts?</p>
+  <div class="fork">
+    <div class="opt value">
+      <h3>Satisfaction = value</h3>
+      <p>Drives sale price, resale, maybe reputation. The noisy neighbor costs you money <em>at sale</em>, not a walkout. Faithful — but risks going inert once the unit’s sold and sitting.</p>
+    </div>
+    <div class="opt risk">
+      <h3>Satisfaction = a patient flight risk</h3>
+      <p>Sticky against <em>spikes</em>, but sustained rock-bottom neglect eventually loses the owner. A much longer fuse than the office’s two-day trigger. Keeps the heatmap honest.</p>
+    </div>
+  </div>
+  <p style="color:var(--dim);font-size:13.5px">The room’s lean: <b style="color:var(--ink)">patient flight risk</b> — the smallest change that keeps satisfaction load-bearing. Cloud’s “should star rating be able to <em>fall</em>?” was left on the whiteboard, deliberately un-opened.</p>
+
+  <h2 class="sec">Running bits &amp; house history</h2>
+  <ul class="bits">
+    <li><b>Paige’s refrain:</b> “the doc is the fix for the thing we were afraid of” — invoked twice, condo invariant rewritten mid-session.</li>
+    <li><b>The callback:</b> this was a sequel to the PR&nbsp;#109 tenant-churn party — <em>“hurt them, but inform prior.”</em></li>
+    <li><b>The player closed it, not the room:</b> the sharpest cut — “if it’s sticky, what’s satisfaction <em>for</em>?” — came from the guest, not the panel.</li>
+    <li><b>Meanwhile, on the PR:</b> Copilot chased our comments to ever-finer boundaries until its last finding was literally a comment about a comment. The clamps held.</li>
+  </ul>
+
+  <footer>
+    <div>
+      <span class="chip">🎲 Samus</span><span class="chip">🏛️ Cloud</span><span class="chip">🎨 Sally</span><span class="chip">📋 John</span><span class="chip">📚 Paige</span>
+    </div>
+    <div style="margin-top:10px">No gameplay code was changed at the table — a decision was <em>made</em>, not merely filed.<br/>Verticopolis · Tower Tycoon · party-mode memory, 5 Jul 2026</div>
+  </footer>
+
+</div>
+</body>
+</html>
