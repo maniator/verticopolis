@@ -119,6 +119,18 @@ export interface LogEntry {
 /** The metric the colored stats overlay tints floors by. */
 export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
 
+/** One tinted rectangle in the stats overlay: a column span on a floor and how
+ *  bad it reads (0 = green/good … 1 = red/bad). Congestion and occupancy emit
+ *  one cell per floor (they're floor-level metrics); satisfaction emits one cell
+ *  per present tenant unit so a single unhappy suite reddens on its own instead
+ *  of being averaged away by content neighbors sharing the floor. */
+export interface HeatCell {
+  floor: number;
+  minX: number;
+  maxX: number;
+  severity: number;
+}
+
 /** Batch-pricing target: an exact price, or "default" to clear the override. */
 export type BatchTarget = number | "default";
 export interface BatchRentOptions {
@@ -575,13 +587,28 @@ export class Simulation implements SimContext {
    * - `occupancy`:  the floor's vacant share (red = empty, green = fully leased).
    * - `satisfaction`: tenant unhappiness (red = tenants near leaving).
    */
-  floorHeatmap(mode: HeatmapMode): Map<number, { severity: number; minX: number; maxX: number }> {
+  floorHeatmap(mode: HeatmapMode): HeatCell[] {
+    if (mode === "satisfaction") {
+      // Per-unit, not per-floor: tint each present tenant's own footprint by its
+      // unhappiness. Averaging a floor would let one miserable suite (near
+      // leaving) vanish behind content neighbors — exactly the tenant the player
+      // opened this overlay to find — so each unit reddens on its own. Only
+      // judge units with someone actually present right now (an empty suite has
+      // no happiness signal; its vacancy is the occupancy map's job).
+      const out: HeatCell[] = [];
+      for (const u of this.tower.units) {
+        const rentable = FACILITIES[u.kind].population > 0 || isHotelKind(u.kind);
+        if (!rentable || !isPresent(u)) continue;
+        out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity: 1 - u.satisfaction });
+      }
+      return out;
+    }
+
     const ext = new Map<number, { min: number; max: number }>();
-    // Per-floor tenancy accumulators for the occupancy / satisfaction modes.
-    // `present` is the live-tenant count (offices/condos read present whenever
-    // leased, hotels only while a guest is in); occupancy grades vacancy against
-    // it, satisfaction averages happiness over it.
-    const acc = new Map<number, { total: number; satSum: number; present: number }>();
+    // Per-floor tenancy accumulator for occupancy. `present` is the live-tenant
+    // count (offices/condos read present whenever leased, hotels only while a
+    // guest is in); occupancy grades vacancy against it.
+    const acc = new Map<number, { total: number; present: number }>();
     for (const u of this.tower.units) {
       const right = u.x + u.width - 1;
       for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
@@ -592,37 +619,29 @@ export class Simulation implements SimContext {
           if (right > e.max) e.max = right;
         }
       }
-      const rentable = FACILITIES[u.kind].population > 0 || isHotelKind(u.kind);
-      if (rentable) {
-        const a = acc.get(u.floor) ?? { total: 0, satSum: 0, present: 0 };
-        a.total++;
-        if (isPresent(u)) {
-          a.satSum += u.satisfaction;
-          a.present++;
+      if (mode === "occupancy") {
+        const rentable = FACILITIES[u.kind].population > 0 || isHotelKind(u.kind);
+        if (rentable) {
+          const a = acc.get(u.floor) ?? { total: 0, present: 0 };
+          a.total++;
+          if (isPresent(u)) a.present++;
+          acc.set(u.floor, a);
         }
-        acc.set(u.floor, a);
       }
     }
-    const out = new Map<number, { severity: number; minX: number; maxX: number }>();
+    const out: HeatCell[] = [];
     for (const [floor, e] of ext) {
-      let severity: number | undefined;
+      let severity: number;
       if (mode === "congestion") {
         // congestionAt ≈ load/capacity; ~1 is at capacity. Map so a comfortable
         // floor reads green and a jammed one saturates red.
         severity = Math.max(0, Math.min(1, this.congestionAt(floor) / 1.2));
-      } else if (mode === "occupancy") {
+      } else {
         const a = acc.get(floor);
         if (!a || a.total === 0) continue; // no tenancy here → don't tint
         severity = 1 - a.present / a.total; // vacant share
-      } else {
-        // satisfaction: only judge floors that actually have tenants present
-        // right now — an empty floor has no happiness signal (and its vacancy
-        // is already the occupancy map's job), so leave it untinted.
-        const a = acc.get(floor);
-        if (!a || a.present === 0) continue;
-        severity = 1 - a.satSum / a.present; // average unhappiness
       }
-      out.set(floor, { severity, minX: e.min, maxX: e.max });
+      out.push({ floor, minX: e.min, maxX: e.max, severity });
     }
     return out;
   }

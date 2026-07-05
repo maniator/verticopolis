@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import type { Simulation, HeatmapMode } from "../../engine/Simulation";
+import type { Simulation, HeatmapMode, HeatCell } from "../../engine/Simulation";
 import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
 import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
@@ -281,7 +281,7 @@ export class TowerEngine {
   overlayMode: HeatmapMode | null = null;
   /** Cached heatmap for the active overlay, refreshed on the hour, on a layout
    *  change, or when the mode flips — never per frame (it scans the unit list). */
-  private heatmap = new Map<number, { severity: number; minX: number; maxX: number }>();
+  private heatmap: HeatCell[] = [];
   private heatmapHour = -1;
   private heatmapRev = -1;
   private heatmapMode: HeatmapMode | null = null;
@@ -1013,9 +1013,9 @@ export class TowerEngine {
       this.heatmapRev = rev;
     }
     const z = this.cam.zoom;
-    for (const [floor, cell] of this.heatmap) {
+    for (const cell of this.heatmap) {
       const sx = this.worldToScreenX(cell.minX);
-      const sy = this.worldToScreenY(floor);
+      const sy = this.worldToScreenY(cell.floor);
       const sw = (cell.maxX - cell.minX + 1) * TILE * z;
       const sh = FLOOR * z;
       // Cull rows outside the viewport so a tall tower's off-screen floors cost

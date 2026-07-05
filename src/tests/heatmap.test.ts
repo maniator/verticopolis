@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
+import { Simulation, type HeatCell } from "../engine/Simulation";
 import { GRID } from "../engine/facilities";
 
 const W = GRID.width;
@@ -7,6 +7,15 @@ const C = Math.floor(W / 2);
 function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
+}
+
+/** All overlay cells covering `floor` (congestion/occupancy have at most one;
+ *  satisfaction has one per present tenant unit). */
+function cellsOn(map: HeatCell[], floor: number): HeatCell[] {
+  return map.filter((c) => c.floor === floor);
+}
+function cellOn(map: HeatCell[], floor: number): HeatCell | undefined {
+  return map.find((c) => c.floor === floor);
 }
 
 describe("floorHeatmap (stats overlay data)", () => {
@@ -24,8 +33,8 @@ describe("floorHeatmap (stats overlay data)", () => {
     }
     for (const x of [0, 9]) sim.tower.place("office", 3, x);
     const map = sim.floorHeatmap("occupancy");
-    expect(map.get(2)!.severity).toBe(0); // fully leased → green
-    expect(map.get(3)!.severity).toBe(1); // fully vacant → red
+    expect(cellOn(map, 2)!.severity).toBe(0); // fully leased → green
+    expect(cellOn(map, 3)!.severity).toBe(1); // fully vacant → red
   });
 
   it("reports each tinted floor's built column extent", () => {
@@ -35,7 +44,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     lay(sim, "floor", 2);
     const r = sim.tower.place("office", 2, 40); // width 9 → tiles 40..48
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-    const cell = sim.floorHeatmap("occupancy").get(2)!;
+    const cell = cellOn(sim.floorHeatmap("occupancy"), 2)!;
     expect(cell.minX).toBeLessThanOrEqual(40);
     expect(cell.maxX).toBeGreaterThanOrEqual(48);
   });
@@ -55,15 +64,47 @@ describe("floorHeatmap (stats overlay data)", () => {
     su.state = "occupied";
     su.satisfaction = 0.2;
     const map = sim.floorHeatmap("satisfaction");
-    expect(map.get(3)!.severity).toBeGreaterThan(map.get(2)!.severity);
+    expect(cellOn(map, 3)!.severity).toBeGreaterThan(cellOn(map, 2)!.severity);
+  });
+
+  it("satisfaction: one miserable suite reddens on its own, not averaged away by happy neighbors on its floor", () => {
+    // Regression: a single vacating condo at 0% satisfaction sharing a floor
+    // with several content condos used to read green because the floor's
+    // average happiness stayed high. Each present unit must now tint by its own
+    // unhappiness.
+    const sim = Simulation.newGame(56);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    const sadX = 0;
+    const happyXs = [16, 32, 48, 64];
+    const sad = sim.tower.place("condo", 2, sadX);
+    const su = sim.tower.units.find((u) => u.id === sad.unitId)!;
+    su.state = "vacating";
+    su.satisfaction = 0;
+    for (const x of happyXs) {
+      const r = sim.tower.place("condo", 2, x);
+      const u = sim.tower.units.find((unit) => unit.id === r.unitId)!;
+      u.state = "occupied";
+      u.satisfaction = 1;
+    }
+    const cells = cellsOn(sim.floorHeatmap("satisfaction"), 2);
+    const sadCell = cells.find((c) => c.minX <= sadX && c.maxX >= sadX)!;
+    expect(sadCell.severity).toBe(1); // the miserable suite is fully red
+    // The happy suites stay green regardless of their unhappy neighbor.
+    for (const x of happyXs) {
+      const cell = cells.find((c) => c.minX <= x && c.maxX >= x)!;
+      expect(cell.severity).toBe(0);
+    }
   });
 
   it("occupancy/satisfaction skip floors with no tenancy; congestion covers built floors", () => {
     const sim = Simulation.newGame(54);
     sim.money = 1e12;
     lay(sim, "lobby", 1); // structural only, no rentable units
-    expect(sim.floorHeatmap("occupancy").has(1)).toBe(false); // no tenancy → untinted
-    expect(sim.floorHeatmap("congestion").has(1)).toBe(true); // congestion tints built floors
+    expect(cellOn(sim.floorHeatmap("occupancy"), 1)).toBeUndefined(); // no tenancy → untinted
+    expect(cellOn(sim.floorHeatmap("congestion"), 1)).toBeDefined(); // congestion tints built floors
   });
 
   it("satisfaction skips a leased-but-empty floor (no one present to judge), occupancy flags it", () => {
@@ -74,7 +115,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     sim.tower.place("office", 2, 0); // built, but vacant (nobody present)
     // Occupancy sees a vacant office (red); satisfaction has no present tenant
     // to judge, so it leaves the floor untinted rather than falsely flagging it.
-    expect(sim.floorHeatmap("occupancy").get(2)!.severity).toBe(1);
-    expect(sim.floorHeatmap("satisfaction").has(2)).toBe(false);
+    expect(cellOn(sim.floorHeatmap("occupancy"), 2)!.severity).toBe(1);
+    expect(cellOn(sim.floorHeatmap("satisfaction"), 2)).toBeUndefined();
   });
 });
