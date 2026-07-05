@@ -74,6 +74,21 @@ const NOISE_CAP = 0.6;
  *  office or the neighbor) and satisfaction recovers normally. */
 const NOISE_EROSION = 0.07;
 
+/** Office-noise erosion for a *sold condo*, gentler than the hotel rate above —
+ *  a sold condo is an owner, not a nightly guest, and 1994 condos were "sticky."
+ *  A condo owner is annoyed by a noisy neighbor (canon "office neighbor is too
+ *  noisy": the unit still reddens on the stats overlay) but only *just* exceeds
+ *  the +0.05/hr served recovery, for a shallow net drift of ≈ −0.004/hr: a
+ *  *transient* neighbor the player removes within a few days is fully absorbed
+ *  and the owner stays, while only *sustained, unaddressed* adjacency wears an
+ *  owner down and out — ≈150 game-hours (about a week) from the annoyance cap to
+ *  a notice, then the 2-day window: ≈5× the hotel's ≈30-hour fuse. INVARIANT:
+ *  keep this strictly above the +0.05/hr served recovery — at or below it the
+ *  net drift is non-negative, so a noise-worn condo never reaches the notice
+ *  threshold and office noise can never evict an owner at all. Fixing the cause
+ *  (move the office or the neighbor) recovers well before. */
+const CONDO_NOISE_EROSION = 0.054;
+
 /**
  * Save-format migration seam. Runs before the field-level coercion in
  * {@link Simulation.deserialize}. v1 is the only format today, so this is the
@@ -858,7 +873,16 @@ export class Simulation implements SimContext {
       // steady-state stays a true net ≈ −0.02/hr (this tick's +0.05 recovery is
       // preserved, not discarded by the cap).
       if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
-        u.satisfaction = Math.max(0, Math.min(u.satisfaction - NOISE_EROSION, NOISE_CAP));
+        // A *sold* condo (everOccupied) is an owner, not a nightly guest, so it
+        // erodes at the gentler condo rate — sticky against a transient neighbor
+        // the player removes in time, worn out only by sustained, unaddressed
+        // adjacency. Hotels (and any not-yet-sold condo) keep the steeper rate;
+        // gating on everOccupied matches the "sold" predicate the rest of the
+        // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
+        // with an occupied-but-unsold condo. The annoyance cap is shared, so both
+        // still redden on the stats overlay from the moment of exposure.
+        const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
       // {@link crowdStress} for the HUD, but is deliberately NOT written back into
