@@ -53,6 +53,15 @@ class GameApp {
   /** Throttle for the per-frame error log, so a repeating throw can't spam. */
   private lastTickErrorLog = 0;
   private shownWin = false;
+  /** A save existed at boot but couldn't be read (corrupt / incompatible). */
+  private saveWasCorrupt = false;
+  /**
+   * Whether a *readable* save existed at boot — snapshotted once, up front, so
+   * the splash and the "new tower" confirm agree on reality. Reading it live
+   * from `SaveGame.hasSave()` would count a corrupt save (wrong for both) and
+   * could flip mid-session if another tab writes the slot.
+   */
+  private hadReadableSave = false;
   /** Whether the emergency-choice modal is currently open. */
   private shownChoice = false;
   /** Last star rating we played a promotion jingle for (so 2★–5★ promotions
@@ -93,7 +102,19 @@ class GameApp {
 
   constructor() {
     this.canvas = document.getElementById("view") as HTMLCanvasElement;
-    this.sim = SaveGame.load() ?? Simulation.newGame(Date.parse("2024-01-01"));
+    // Distinguish "no save" from "save present but unreadable": a corrupt/
+    // incompatible autosave must NOT masquerade as a continuable tower (that
+    // would offer "Continue", then silently start fresh and let the autosave
+    // clobber it). We fall back to a new tower either way, but remember the
+    // corruption so the splash stays honest and the player is told (below).
+    const boot = SaveGame.loadResult();
+    this.saveWasCorrupt = boot.corrupt;
+    this.hadReadableSave = boot.sim !== null;
+    // Stash the unreadable bytes off the autosave slot before the 30s timer can
+    // overwrite them: a save from a *newer* build is only unreadable here, and a
+    // future version may recover it. Best-effort — never blocks boot.
+    if (boot.corrupt) SaveGame.preserveUnreadable();
+    this.sim = boot.sim ?? Simulation.newGame(Date.parse("2024-01-01"));
     this.engine = new TowerEngine(this.canvas, this.sim);
 
     // Controller modules — built BEFORE the UI because the UI constructor's
@@ -255,8 +276,10 @@ class GameApp {
       },
       chime: () => this.audio.sfx("promote"),
     });
+    // A corrupt save is not a continuable tower: reflect READABILITY, not mere
+    // presence, so the splash never promises "Continue" over a fresh boot sim.
     this.onboarding.showSplash({
-      hasSave: SaveGame.hasSave(),
+      hasSave: this.hadReadableSave,
       onContinue: () => {
         /* sim already loaded at construction; splash teardown resumes the engine */
       },
@@ -264,8 +287,11 @@ class GameApp {
         // Guard the same data-loss as the toolbar's New button: starting fresh
         // overwrites the single autosave slot. Keep the splash up (paused) behind
         // the confirmation — only dismiss + start once the player accepts, so a
-        // cancel leaves the title screen intact and no time passes.
-        if (SaveGame.hasSave()) {
+        // cancel leaves the title screen intact and no time passes. Confirm only
+        // when there's a *readable* tower to abandon: over a corrupt save the boot
+        // sim is already fresh, so the "abandons your current tower" prompt would
+        // be a lie (there's nothing continuable to lose).
+        if (this.hadReadableSave) {
           this.ui.confirmModal("Start a new tower?", "This abandons your current tower (it is not auto-saved).", () => {
             dismiss();
             this.saveLoad.newGame();
@@ -276,6 +302,16 @@ class GameApp {
         }
       },
     });
+
+    // Tell the player plainly when their save couldn't be read, rather than
+    // dropping them into a fresh tower with no explanation. Goes to the bulletin
+    // (persists) and pops as a toast on the first UI update after the splash.
+    if (this.saveWasCorrupt) {
+      this.sim.emit(
+        "⚠️ Your saved tower couldn't be read — it may be corrupted or from a newer version. Starting a new tower.",
+        "bad",
+      );
+    }
 
     // Autosave periodically — but never while the first-run splash is up, so an
     // idle first visit can't persist the throwaway boot sim (which would flip
