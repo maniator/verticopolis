@@ -973,7 +973,7 @@ export class TowerEngine {
     }
   }
 
-  /** The VIP limo arriving at the ground lobby: in from the right, hold, off left. */
+  /** The VIP limo arriving at the ground lobby: in from the left, hold, off right. */
   private renderVip(ctx: CanvasRenderingContext2D): void {
     if (this.vipStart === null) return;
     const p = (this.d.anim - this.vipStart) / VIP_VISIT_SECONDS;
