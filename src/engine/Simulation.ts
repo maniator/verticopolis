@@ -578,14 +578,18 @@ export class Simulation implements SimContext {
   }
 
   /**
-   * Per-floor severity (0 = good/green … 1 = bad/red) plus the floor's built
-   * column extent, for the colored stats overlay — the original's evaluation
-   * maps. Only floors with data for the chosen mode are returned. Scans the unit
-   * list once; the renderer caches it (hourly), so it's off the per-frame path.
+   * Colored-overlay cells — severity (0 = good/green … 1 = bad/red) plus the
+   * column extent each tint covers — for the stats overlay (the original's
+   * evaluation maps). NOT a 1:1 floor mapping: `congestion`/`occupancy` emit one
+   * cell per floor (spanning its built extent), while `satisfaction` emits one
+   * cell per present tenant unit (spanning that unit's footprint), so a floor can
+   * carry several satisfaction cells. Only cells with data for the chosen mode
+   * are returned. Scans the unit list once; the renderer caches it (hourly), so
+   * it's off the per-frame path.
    *
    * - `congestion`: how jammed the floor's transport is (per-floor congestion).
    * - `occupancy`:  the floor's vacant share (red = empty, green = fully leased).
-   * - `satisfaction`: tenant unhappiness (red = tenants near leaving).
+   * - `satisfaction`: per-unit tenant unhappiness (red = a tenant near leaving).
    */
   floorHeatmap(mode: HeatmapMode): HeatCell[] {
     if (mode === "satisfaction") {

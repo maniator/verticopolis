@@ -999,9 +999,11 @@ export class TowerEngine {
     drawThief(ctx, x, y, 1.1, this.thiefCaught);
   }
 
-  /** The colored stats overlay: tint each floor by the active metric (green =
-   *  good … red = bad) with a legend. The heatmap is recomputed only when its
-   *  inputs change (hour / layout / mode), never per frame. */
+  /** The colored stats overlay: draw each heatmap cell by the active metric
+   *  (green = good … red = bad) with a legend — one cell per floor for
+   *  congestion/occupancy, one per present unit for satisfaction (so a floor can
+   *  show several tints). The heatmap is recomputed only when its inputs change
+   *  (hour / layout / mode), never per frame. */
   private drawStatsMap(ctx: CanvasRenderingContext2D): void {
     if (!this.overlayMode) return;
     const hour = this.sim.clock.hour;
@@ -1013,13 +1015,21 @@ export class TowerEngine {
       this.heatmapRev = rev;
     }
     const z = this.cam.zoom;
+    // Pre-cull by the visible floor band (computed once) before any per-cell
+    // coordinate transform: worldToScreenX/Y each run the engine's affine
+    // transform, and satisfaction can emit one cell per present tenant unit, so
+    // skipping off-screen floors up front keeps the loop bound to on-screen rows
+    // rather than paying two transforms for every unit in a tall tower.
+    const topFloor = this.screenToFloor(0) + 1;
+    const botFloor = this.screenToFloor(this.viewHeight) - 1;
     for (const cell of this.heatmap) {
+      if (cell.floor < botFloor || cell.floor > topFloor) continue;
       const sx = this.worldToScreenX(cell.minX);
       const sy = this.worldToScreenY(cell.floor);
       const sw = (cell.maxX - cell.minX + 1) * TILE * z;
       const sh = FLOOR * z;
-      // Cull cells outside the viewport so a tall tower's off-screen tints cost
-      // nothing to "draw" (satisfaction can place several cells on one floor).
+      // Exact per-cell cull for horizontal extent (and any residual vertical
+      // slop past the floor-band margin) so partial-edge tints still draw right.
       if (sy + sh < 0 || sy > this.viewHeight || sx + sw < 0 || sx > this.viewWidth) continue;
       ctx.fillStyle = heatColor(cell.severity);
       ctx.fillRect(sx, sy, sw, sh);
