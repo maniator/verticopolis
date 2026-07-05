@@ -83,10 +83,10 @@ const NOISE_EROSION = 0.07;
  *  and the owner stays, while only *sustained, unaddressed* adjacency wears an
  *  owner down and out — ≈150 game-hours (about a week) from the annoyance cap to
  *  a notice, then the 2-day window: ≈5× the hotel's ≈30-hour fuse. INVARIANT:
- *  keep this strictly above the +0.05/hr served recovery — at or below it a
- *  noise-worn condo never reaches the notice threshold, so it never evicts and
- *  D25's bounded loop runs out without a notice, failing the assertion. Fixing
- *  the cause (move the office or the neighbor) recovers well before. */
+ *  keep this strictly above the +0.05/hr served recovery — at or below it the
+ *  net drift is non-negative, so a noise-worn condo never reaches the notice
+ *  threshold and office noise can never evict an owner at all. Fixing the cause
+ *  (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
 
 /**
