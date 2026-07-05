@@ -19,7 +19,7 @@ import {
   lobbyVariant,
   type DrawCtx,
 } from "../sprites";
-import { drawSanta, drawExplosion } from "../sprites/events";
+import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../sprites/events";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
@@ -174,10 +174,14 @@ interface Walker {
  *  reduced motion, like every other decoration). */
 const SANTA_FLIGHT_SECONDS = 7;
 const EXPLOSION_SECONDS = 0.9;
-/** Hard cap on simultaneous blast flashes — bombs are rare, but never let the
- *  list grow unbounded (immediate-mode draws, no actors, so this is the only
- *  bound needed). */
+const THIEF_RUN_SECONDS = 4;
+const TREASURE_SECONDS = 1.8;
+const VIP_VISIT_SECONDS = 6.5;
+/** Hard cap on simultaneous flashes/sparkles — the events are rare, but never
+ *  let the lists grow unbounded (immediate-mode draws, no actors, so this is the
+ *  only bound needed). */
 const MAX_EXPLOSIONS = 8;
+const MAX_TREASURES = 6;
 
 export class TowerEngine {
   engine: ex.Engine;
@@ -191,6 +195,16 @@ export class TowerEngine {
   /** In-flight bomb flashes: epicenter tile/floor + the anim time it began. */
   private explosions: { x: number; floor: number; start: number }[] = [];
   private lastExplosionSeq = 0;
+  /** A thief slinking across the screen; caught → a guard trails him. */
+  private thiefStart: number | null = null;
+  private thiefCaught = false;
+  private lastThiefSeq = 0;
+  /** Sparkles at unearthed-treasure dig sites (world tile/floor). */
+  private treasures: { x: number; floor: number; start: number }[] = [];
+  private lastTreasureSeq = 0;
+  /** The VIP limo's arrival at the lobby. */
+  private vipStart: number | null = null;
+  private lastVipSeq = 0;
 
   // Set by the controller each frame; rendered by the overlay.
   preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number } | null = null;
@@ -299,10 +313,14 @@ export class TowerEngine {
   setReducedMotion(on: boolean): void {
     this.reducedMotion = on;
     // A frozen anim clock can't advance an event visual to completion, so drop
-    // any in flight rather than leave Santa or a flash stuck on screen.
+    // any in flight rather than leave one stuck on screen.
     if (on) {
       this.santaStart = null;
       this.explosions = [];
+      this.thiefStart = null;
+      this.thiefCaught = false;
+      this.treasures = [];
+      this.vipStart = null;
     }
   }
 
@@ -324,11 +342,37 @@ export class TowerEngine {
         this.explosions.push({ x: this.sim.explosionFx.x, floor: this.sim.explosionFx.floor, start: this.d.anim });
       }
     }
+    if (this.sim.thiefFx.seq !== this.lastThiefSeq) {
+      this.lastThiefSeq = this.sim.thiefFx.seq;
+      if (animating) {
+        this.thiefStart = this.d.anim;
+        this.thiefCaught = this.sim.thiefFx.caught;
+      }
+    }
+    if (this.sim.treasureFx.seq !== this.lastTreasureSeq) {
+      this.lastTreasureSeq = this.sim.treasureFx.seq;
+      if (animating && this.treasures.length < MAX_TREASURES) {
+        this.treasures.push({ x: this.sim.treasureFx.x, floor: this.sim.treasureFx.floor, start: this.d.anim });
+      }
+    }
+    if (this.sim.vipFxSeq !== this.lastVipSeq) {
+      this.lastVipSeq = this.sim.vipFxSeq;
+      if (animating) this.vipStart = this.d.anim;
+    }
     if (this.santaStart !== null && this.d.anim - this.santaStart > SANTA_FLIGHT_SECONDS) {
       this.santaStart = null;
     }
     if (this.explosions.length > 0) {
       this.explosions = this.explosions.filter((e) => this.d.anim - e.start <= EXPLOSION_SECONDS);
+    }
+    if (this.thiefStart !== null && this.d.anim - this.thiefStart > THIEF_RUN_SECONDS) {
+      this.thiefStart = null;
+    }
+    if (this.treasures.length > 0) {
+      this.treasures = this.treasures.filter((t) => this.d.anim - t.start <= TREASURE_SECONDS);
+    }
+    if (this.vipStart !== null && this.d.anim - this.vipStart > VIP_VISIT_SECONDS) {
+      this.vipStart = null;
     }
   }
   /** Wall-clock-derived animation time that only advances while unpaused. */
@@ -567,8 +611,15 @@ export class TowerEngine {
     // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.
     this.santaStart = null;
     this.explosions = [];
+    this.thiefStart = null;
+    this.thiefCaught = false;
+    this.treasures = [];
+    this.vipStart = null;
     this.lastSantaSeq = sim.santaFxSeq;
     this.lastExplosionSeq = sim.explosionFx.seq;
+    this.lastThiefSeq = sim.thiefFx.seq;
+    this.lastTreasureSeq = sim.treasureFx.seq;
+    this.lastVipSeq = sim.vipFxSeq;
     this.sim = sim;
     this.builtRev = -1;
     // Invalidate the per-floor occupancy cache so a swapped-in tower (new game /
@@ -889,6 +940,9 @@ export class TowerEngine {
     this.drawStatsMap(ctx);
     this.drawRain(ctx);
     this.renderExplosions(ctx);
+    this.renderTreasures(ctx);
+    this.renderVip(ctx);
+    this.renderThief(ctx);
     this.drawPreview(ctx);
     this.drawSelection(ctx);
     this.drawRuler(ctx);
@@ -905,6 +959,44 @@ export class TowerEngine {
       const radius = (24 + p * 56) * this.cam.zoom;
       drawExplosion(ctx, sx, sy, radius, p);
     }
+  }
+
+  /** Gold sparkles rising from unearthed-treasure dig sites (see syncEventFx). */
+  private renderTreasures(ctx: CanvasRenderingContext2D): void {
+    if (this.treasures.length === 0) return;
+    for (const t of this.treasures) {
+      const p = (this.d.anim - t.start) / TREASURE_SECONDS;
+      if (p < 0 || p > 1) continue;
+      const sx = this.worldToScreenX(t.x);
+      const sy = this.worldToScreenY(t.floor) + (FLOOR * this.cam.zoom) / 2;
+      drawTreasure(ctx, sx, sy, Math.max(0.8, this.cam.zoom), p);
+    }
+  }
+
+  /** The VIP limo arriving at the ground lobby: in from the left, hold, off right. */
+  private renderVip(ctx: CanvasRenderingContext2D): void {
+    if (this.vipStart === null) return;
+    const p = (this.d.anim - this.vipStart) / VIP_VISIT_SECONDS;
+    if (p < 0 || p > 1) return;
+    const centerSx = this.worldToScreenX(GRID.width / 2);
+    const groundSy = this.worldToScreenY(1) + FLOOR * this.cam.zoom * 0.5;
+    const off = this.viewWidth * 0.6;
+    // The limo faces right, so it drives rightward: in from the left, hold, out
+    // to the right (otherwise it moon-walks).
+    let x = centerSx;
+    if (p < 0.25) x = centerSx - (1 - p / 0.25) * off; // arrive from the left
+    else if (p > 0.75) x = centerSx + ((p - 0.75) / 0.25) * off; // depart to the right
+    drawVipLimo(ctx, x, groundSy, Math.max(0.9, this.cam.zoom));
+  }
+
+  /** A thief slinking across the screen (a guard trails him if caught). */
+  private renderThief(ctx: CanvasRenderingContext2D): void {
+    if (this.thiefStart === null) return;
+    const p = (this.d.anim - this.thiefStart) / THIEF_RUN_SECONDS;
+    if (p < 0 || p > 1) return;
+    const x = -80 + p * (this.viewWidth + 160);
+    const y = this.viewHeight * 0.66;
+    drawThief(ctx, x, y, 1.1, this.thiefCaught);
   }
 
   /** The colored stats overlay: tint each floor by the active metric (green =

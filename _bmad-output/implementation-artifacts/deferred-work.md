@@ -12,6 +12,16 @@ PR that found them. Pick these up when touching the relevant area.
   smaller writes). Fix when hardening persistence: wrap `setItem` and, on failure, keep the
   prior good value + surface a toast rather than throwing across the reload.
 
+## Deferred from: code review (2026-07-04, event visuals — thief/treasure/VIP)
+
+- **VIP inspection limo replays every 5 game-days on a persistently-failing tower**
+  (`Simulation.ts` `checkVip` — `triggerVip()` fires before the pass/fail check, and a
+  failed inspection reschedules `vipVisitDay = day + 5`). A tower with a Wedding Hall
+  stuck below the TOWER criteria replays the 6.5s limo cosmetic every 5 days with no
+  throttle — unlike the nag lines, which throttle on `lastVipNagDay`. Low/cosmetic and
+  arguably in-character ("the VIP keeps coming back to inspect"); fix by throttling the
+  limo (or only firing it on a passing inspection) if it ever reads as noisy.
+
 ## Completed
 
 - ~~**`hasSave()` ≠ `load()` for an unreadable present save**~~ — done 2026-07-04:

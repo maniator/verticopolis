@@ -55,6 +55,7 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
     // event fired its visual signal without a DOM/canvas.
     santaCalls: 0,
     explosionCalls: [] as { floor: number; x: number }[],
+    thiefCalls: [] as { caught: boolean }[],
     emit(text: string, kind?: LogKind) {
       this.log.push({ text, kind });
     },
@@ -63,6 +64,9 @@ function makeCtx(tower: Tower, star: number, rng: RNG, money = 1_000_000) {
     },
     triggerExplosion(floor: number, xTile: number) {
       this.explosionCalls.push({ floor, x: xTile });
+    },
+    triggerThief(caught: boolean) {
+      this.thiefCalls.push({ caught });
     },
     hasAny: (kind: FacilityKind) => tower.units.some((u) => u.kind === kind),
     // Use the engine's own predicate so the test double can't drift (a "gutted"
@@ -208,6 +212,31 @@ describe("Event visual hooks — the renderer triggers (SimContext)", () => {
     const safe = makeCtx(officeTower({ security: true }), 4, new ScriptedRNG([]));
     new EventSystem(safe, 7).bombThreat(); // security sweeps → no blast
     expect(safe.explosionCalls).toHaveLength(0);
+  });
+
+  it("a thief slinking through fires its trigger — caught with Security, uncaught without", () => {
+    // Force the 5%/day thief deterministically by scripting the visitor RNG
+    // (`chance(0.05)` → true) instead of looping a year and hoping the roll
+    // surfaces — otherwise a future change to the thief odds, the loop span, or
+    // the RNG seed could fail the test for reasons unrelated to behavior. At 2★
+    // maybeSanta bails before drawing, so maybeThief is the sole extra-RNG draw:
+    // one value for `chance`, and (uncaught path only) one more for the `int` loss.
+    const inject = (events: EventSystem, queue: number[]) => {
+      (events as unknown as { extra: RNG }).extra = new ScriptedRNG(queue);
+    };
+
+    const guarded = makeCtx(officeTower({ security: true }), 2, new ScriptedRNG([]));
+    const gEvents = new EventSystem(guarded, 7);
+    inject(gEvents, [0]); // chance(0.05) → 0 < 0.05 → true (caught, no loss roll)
+    gEvents.maybeRandomEvent();
+
+    const bare = makeCtx(officeTower(), 2, new ScriptedRNG([]));
+    const bEvents = new EventSystem(bare, 7);
+    inject(bEvents, [0, 0.5]); // chance → true, then int(0,20_000) for the loss
+    bEvents.maybeRandomEvent();
+
+    expect(guarded.thiefCalls).toEqual([{ caught: true }]); // Security → caught
+    expect(bare.thiefCalls).toEqual([{ caught: false }]); // no Security → gets away
   });
 });
 
