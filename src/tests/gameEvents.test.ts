@@ -215,21 +215,28 @@ describe("Event visual hooks — the renderer triggers (SimContext)", () => {
   });
 
   it("a thief slinking through fires its trigger — caught with Security, uncaught without", () => {
-    // Run a full year of daily rolls so the 5%/day thief surfaces at least once.
+    // Force the 5%/day thief deterministically by scripting the visitor RNG
+    // (`chance(0.05)` → true) instead of looping a year and hoping the roll
+    // surfaces — otherwise a future change to the thief odds, the loop span, or
+    // the RNG seed could fail the test for reasons unrelated to behavior. At 2★
+    // maybeSanta bails before drawing, so maybeThief is the sole extra-RNG draw:
+    // one value for `chance`, and (uncaught path only) one more for the `int` loss.
+    const inject = (events: EventSystem, queue: number[]) => {
+      (events as unknown as { extra: RNG }).extra = new ScriptedRNG(queue);
+    };
+
     const guarded = makeCtx(officeTower({ security: true }), 2, new ScriptedRNG([]));
     const gEvents = new EventSystem(guarded, 7);
+    inject(gEvents, [0]); // chance(0.05) → 0 < 0.05 → true (caught, no loss roll)
+    gEvents.maybeRandomEvent();
+
     const bare = makeCtx(officeTower(), 2, new ScriptedRNG([]));
     const bEvents = new EventSystem(bare, 7);
-    for (let d = 0; d < 360; d++) {
-      guarded.clock = new Clock(d * 1440);
-      bare.clock = new Clock(d * 1440);
-      gEvents.maybeRandomEvent();
-      bEvents.maybeRandomEvent();
-    }
-    expect(guarded.thiefCalls.length).toBeGreaterThan(0);
-    expect(guarded.thiefCalls.every((c) => c.caught)).toBe(true); // Security → always caught
-    expect(bare.thiefCalls.length).toBeGreaterThan(0);
-    expect(bare.thiefCalls.every((c) => !c.caught)).toBe(true); // no Security → always gets away
+    inject(bEvents, [0, 0.5]); // chance → true, then int(0,20_000) for the loss
+    bEvents.maybeRandomEvent();
+
+    expect(guarded.thiefCalls).toEqual([{ caught: true }]); // Security → caught
+    expect(bare.thiefCalls).toEqual([{ caught: false }]); // no Security → gets away
   });
 });
 
