@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation, ECON, VACATE_RESCIND } from "../engine/Simulation";
 import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../engine/facilities";
+import type { FacilityKind } from "../engine/types";
 
 describe("Rent / price controls", () => {
   it("steps and clamps a unit's price within its band", () => {
@@ -507,13 +508,26 @@ describe("Transport editing", () => {
 
   it("caps cars per elevator type", () => {
     const sim = base(3);
-    sim.star = 2; // service elevator unlocks at 2 stars
+    sim.star = 3; // service unlocks at 2★, express at 3★
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorService", x0, 1, 6);
-    const t = sim.tower.transports[0];
-    expect(t).toBeDefined();
-    sim.tower.setCars(t.id, 99);
-    expect(t.cars).toBe(4); // service elevators max 4 cars
+    // Canon: every elevator kind caps at 8 cars per shaft — service is not an
+    // exception (it is a staff-only standard elevator).
+    const cases: [FacilityKind, number][] = [
+      ["elevatorStandard", 8],
+      ["elevatorService", 8],
+      ["elevatorExpress", 8],
+    ];
+    cases.forEach(([kind, max], i) => {
+      expect(sim.buildTransport(kind, x0 + i * 6, 1, 6).ok).toBe(true);
+      // Assert the build actually appended THIS kind's shaft — otherwise a
+      // silently-dropped placement would let us re-select a prior (already
+      // 8-car) shaft and pass vacuously.
+      expect(sim.tower.transports.length).toBe(i + 1);
+      const t = sim.tower.transports[i];
+      expect(t.kind).toBe(kind);
+      sim.tower.setCars(t.id, 99);
+      expect(t.cars).toBe(max);
+    });
   });
 
   it("computes capacity and congestion from transports", () => {

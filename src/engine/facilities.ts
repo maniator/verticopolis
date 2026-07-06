@@ -484,10 +484,13 @@ export function transportCarCapacity(kind: FacilityKind): number {
   return TRANSPORT_CAPACITY[kind] ?? 0;
 }
 
-/** Maximum cars allowed per shaft, by elevator type. */
+/** Maximum cars allowed per shaft, by elevator type. Canon: every elevator kind
+ *  supports up to 8 cars per shaft in the 1994 original — service is not an
+ *  exception (it is a staff-only standard elevator: same 8 cars, same 30-floor
+ *  span). */
 export const MAX_CARS: Record<string, number> = {
   elevatorStandard: 8,
-  elevatorService: 4,
+  elevatorService: 8,
   elevatorExpress: 8,
 };
 

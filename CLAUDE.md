@@ -36,6 +36,7 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Transport pooling matches the original and is deliberate:** all three
   elevator kinds (standard + service + express) share **one 24-shaft pool** —
   express is **not** counted separately. Stairs + escalators share a separate
-  **64-link pool**. Cars/shaft: standard & express 8, service 4. Spans: standard
-  & service 30 floors, express the whole tower, stairs/escalators a fixed 2
-  floors. Do not "fix" express out of the elevator pool — that would break canon.
+  **64-link pool**. Cars/shaft: 8 for every elevator kind (service included — it
+  is a staff-only standard elevator, not a reduced one). Spans: standard &
+  service 30 floors, express the whole tower, stairs/escalators a fixed 2 floors.
+  Do not "fix" express out of the elevator pool — that would break canon.
