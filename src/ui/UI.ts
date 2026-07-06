@@ -844,10 +844,17 @@ export class UI {
     const btn = document.getElementById("btn-update") as HTMLButtonElement | null;
     if (!btn) return;
     btn.onclick = onClick;
-    if (btn.hidden) {
-      btn.hidden = false;
-      const live = document.getElementById("a11y-live");
-      if (live) live.textContent = "An update is ready.";
+    btn.hidden = false; // reveal (idempotent — safe to call again while shown)
+    // Announce on EVERY call, not just the first reveal: a newer build arriving
+    // while the chip is already visible should still reach screen-reader users.
+    // Clear first, then set on the next frame so an identical message re-fires in
+    // the polite live region instead of being coalesced into a no-op.
+    const live = document.getElementById("a11y-live");
+    if (live) {
+      live.textContent = "";
+      const announce = () => (live.textContent = "An update is ready.");
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(announce);
+      else announce();
     }
   }
 
