@@ -22,6 +22,11 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build` — all green.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
+- **Bump `package.json` `version` on any player-facing change** (minor for a new
+  player-facing capability, patch for a player-noticeable fix/behavior change;
+  internal-only work needs none). It's injected as `__APP_VERSION__` on the splash
+  and anchors the update flow, so a missing bump misreports the build. See
+  [AGENTS.md](./AGENTS.md) → **Versioning**.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Resolve Copilot/Codex PR review threads** once addressed — actually mark
   each thread **Resolved** (`resolve_review_thread`). A reply alone does NOT

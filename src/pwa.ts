@@ -1,7 +1,7 @@
 /// <reference types="vite-plugin-pwa/client" />
 
 /**
- * PWA service-worker registration and the "always run the latest" update flow.
+ * PWA service-worker registration and the player-prompted update flow.
  *
  * This is the ONLY place the service worker is registered (the Vite plugin's
  * auto-injection is turned off), and it's imported solely by the game entry
@@ -9,29 +9,27 @@
  * test graph. Workbox does all the heavy lifting; we only decide *when* to
  * swap in a new version.
  *
- * The rule the user asked for: when a new build ships, force a quick save and
- * then release the new assets so the player is always on the latest code
- * without ever losing their tower. We run in `prompt` mode (the fresh worker
- * waits) so we control that instant: flush the save first, then activate.
+ * We run in `prompt` mode (the fresh worker waits instead of hijacking the
+ * tab) and never activate it on our own: a new build is surfaced to the app,
+ * which asks the player whether to update now or keep playing. This shim stays
+ * deliberately dumb — it owns registration and the update poll and hands the
+ * app an `activate` callback; every "when/how to prompt" decision lives
+ * app-side (GameApp), where it is testable. Nothing here touches the save, the
+ * UI, or reloads on a timer.
  */
 import { registerSW } from "virtual:pwa-register";
 
 export interface PwaHandlers {
   /**
-   * Fired the moment a new version is waiting. Flush any in-memory state to
-   * disk here (a quick save) — a reload follows almost immediately. May be
-   * async; the reload waits for it to settle.
+   * Fired the moment a new version is waiting. `activate` skips the waiting
+   * worker and reloads onto the new assets; the app calls it only when the
+   * player chooses to update now. If it is never called, the new worker simply
+   * activates on the next cold reopen — nothing is forced.
    */
-  onUpdateReady: () => void | Promise<void>;
+  onUpdateAvailable: (activate: () => Promise<void>) => void;
   /** Fired once the app is fully cached and usable offline. */
   onOfflineReady?: () => void;
 }
-
-/**
- * How long to let the "updating…" toast breathe before the reload. Long enough
- * to be seen, short enough to still feel like "always latest".
- */
-const UPDATE_GRACE_MS = 900;
 
 /**
  * How often to poll the server for a newer service worker. The browser only
@@ -40,7 +38,8 @@ const UPDATE_GRACE_MS = 900;
  * hours). Without an explicit poll, a player who keeps the tab or installed PWA
  * open right through a release never learns a new version shipped: `onNeedRefresh`
  * can't fire if nothing re-checks the worker. An hourly poll — plus a check the
- * moment the tab regains focus — is what actually makes "always latest" hold.
+ * moment the tab regains focus — is what lets a long-lived session ever learn a
+ * new build shipped (so it can offer the update prompt).
  */
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 
@@ -73,22 +72,12 @@ export function registerPWA(handlers: PwaHandlers): void {
       });
     },
     onNeedRefresh() {
-      // A new worker is waiting. Flush the tower to disk FIRST, then activate it
-      // (`updateSW(true)` calls skipWaiting and reloads onto the new assets).
-      // The async wrapper also catches a *synchronous* throw from the save.
-      //
-      // If the save throws or rejects (e.g. localStorage quota), we do NOT
-      // reload — that would drop unsaved progress, the one thing this flow
-      // exists to prevent. The new worker simply stays waiting and activates on
-      // the next natural page load, so the player keeps their tower either way.
-      void (async () => {
-        try {
-          await handlers.onUpdateReady();
-        } catch {
-          return;
-        }
-        window.setTimeout(() => void updateSW(true), UPDATE_GRACE_MS);
-      })();
+      // A new worker is waiting. Don't touch it — hand the app an `activate`
+      // callback (skipWaiting + reload onto the new assets) and let it decide
+      // when to prompt the player. Until the player picks "update now", the new
+      // worker keeps waiting and activates on the next cold reopen, so nothing
+      // is ever force-reloaded out from under a live game.
+      handlers.onUpdateAvailable(() => updateSW(true));
     },
     onOfflineReady() {
       handlers.onOfflineReady?.();

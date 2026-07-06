@@ -787,6 +787,84 @@ export class UI {
     dialog.oncancel = () => finish("decline"); // Esc
   }
 
+  /** True while any modal is on screen (the shared `<dialog>` is open). Callers
+   *  use this to avoid opening a second modal, which would wipe the first's DOM
+   *  and its pending handlers. */
+  isModalOpen(): boolean {
+    return (this.el.modal as HTMLDialogElement).open;
+  }
+
+  /**
+   * "A new build is ready" prompt. `onUpdateNow` saves and reloads onto the new
+   * assets; `onLater` defers (the build applies on the next reload). Dismissing
+   * by Esc, the ✕, or a backdrop click all count as "Later" — the safe choice —
+   * and, like the emergency modal, the outcome fires exactly once no matter how
+   * the modal closes.
+   */
+  showUpdatePrompt(onUpdateNow: () => void | Promise<void>, onLater: () => void | Promise<void>): void {
+    const box = this.openModal(`
+      <h2>Update available</h2>
+      <p>A newer version of Verticopolis is ready.</p>
+      <p>Update now saves your tower and reloads onto it — you won't lose any progress. Or keep playing: it'll apply the next time you reopen the game, or whenever you tap <b>↻ Update</b>.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="later">Later</button>
+        <button class="btn primary" data-act="update">Update now</button>
+      </div>
+    `);
+    const dialog = this.el.modal as HTMLDialogElement;
+    let done = false;
+    // The handlers may be async (Update now saves then reloads); we invoke them
+    // fire-and-forget — the modal is already closing and there's nothing here to
+    // await. Route through Promise.resolve().then(...).catch(...) so that BOTH a
+    // synchronous throw and a rejected promise are contained here instead of
+    // escaping as an `unhandledrejection` on the window. (The handlers already
+    // guard their own failures; this is a belt-and-suspenders safety net.)
+    const fireAndForget = (cb: () => void | Promise<void>) => {
+      void Promise.resolve()
+        .then(cb)
+        .catch(() => {});
+    };
+    const later = () => {
+      if (done) return;
+      done = true;
+      this.closeModal();
+      fireAndForget(onLater);
+    };
+    const update = () => {
+      if (done) return;
+      done = true;
+      this.closeModal();
+      fireAndForget(onUpdateNow);
+    };
+    this.wireActions(box, { later, update }, { close: false });
+    dialog.onclick = (e) => {
+      if (e.target === dialog) later();
+    }; // backdrop
+    dialog.oncancel = () => later(); // Esc / ✕
+  }
+
+  /** Reveal the persistent "Update" chip in the speed toolbar (idempotent) and
+   *  wire its click. Announced politely for screen readers. The chip is the
+   *  durable way back to the update prompt after the player defers, and the
+   *  fallback if a calm moment to auto-surface the modal never comes. */
+  showUpdateChip(onClick: () => void): void {
+    const btn = document.getElementById("btn-update") as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.onclick = onClick;
+    btn.hidden = false; // reveal (idempotent — safe to call again while shown)
+    // Announce on EVERY call, not just the first reveal: a newer build arriving
+    // while the chip is already visible should still reach screen-reader users.
+    // Clear first, then set on the next frame so an identical message re-fires in
+    // the polite live region instead of being coalesced into a no-op.
+    const live = document.getElementById("a11y-live");
+    if (live) {
+      live.textContent = "";
+      const announce = () => (live.textContent = "An update is ready.");
+      if (typeof requestAnimationFrame === "function") requestAnimationFrame(announce);
+      else announce();
+    }
+  }
+
   congratsTower(): void {
     const box = this.openModal(`
       <h2>🏆 TOWER achieved!</h2>

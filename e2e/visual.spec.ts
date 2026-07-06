@@ -66,4 +66,37 @@ test.describe("dialog chrome", () => {
     });
     await expect(page.locator("#editor")).toHaveScreenshot("editor-card.png");
   });
+
+  test("update prompt matches baseline and freezes the sim", async ({ page }) => {
+    // Surface the update prompt exactly as the PWA layer does when a new build
+    // is found (the activate callback is a no-op so the page doesn't reload).
+    // The prompt auto-surfaces from the game loop at the next calm moment.
+    await page.evaluate(() => (window as any).game.onUpdateAvailable(async () => {}));
+    await page.waitForSelector("#modal[open]");
+
+    // While the prompt is open the sim is FROZEN — even at full speed the clock
+    // must not advance, so a player reading it can't lose game-hours. (Restore
+    // speed 0 afterward so the shot stays deterministic like the sibling tests.)
+    await page.evaluate(() => ((window as any).game.speed = 3));
+    const before = await page.evaluate(() => (window as any).game.sim.clock.minutes);
+    await page.waitForTimeout(400);
+    const after = await page.evaluate(() => (window as any).game.sim.clock.minutes);
+    expect(after).toBe(before);
+    await page.evaluate(() => ((window as any).game.speed = 0));
+
+    await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
+  });
+
+  test("deferred update chip matches baseline", async ({ page }) => {
+    // Find an update, then choose "Later" — the deferred state where the modal
+    // is gone but the "↻ Update" chip stays in the speed toolbar as the way back
+    // in. Snapshot that toolbar cluster (static — no live counters) so the chip's
+    // placement and styling are pinned.
+    await page.evaluate(() => (window as any).game.onUpdateAvailable(async () => {}));
+    await page.waitForSelector("#modal[open]");
+    await page.locator('#modal [data-act="later"]').click();
+    await page.waitForFunction(() => document.getElementById("modal")?.open === false);
+    await page.waitForSelector("#btn-update:not([hidden])");
+    await expect(page.locator("#speed")).toHaveScreenshot("update-chip.png");
+  });
 });

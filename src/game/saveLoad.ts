@@ -37,12 +37,14 @@ export class SaveLoad {
   }
 
   /**
-   * Called by the PWA layer the instant a new version is ready, just before it
-   * reloads onto the new assets. Flush the tower to the autosave slot so the
-   * imminent reload can't cost the player any progress, and tell them what's
-   * happening through the existing toast rail.
+   * Flush the tower to the autosave slot just before the app reloads onto a new
+   * build (the "Update now" path). The player already chose to update via the
+   * modal, so there's no toast here — the reload is imminent. Throws if the save
+   * fails (e.g. localStorage quota); the caller must NOT reload on a throw, or a
+   * failed save would cost the player their progress — the one thing this exists
+   * to prevent.
    */
-  onUpdateReady(): void {
+  saveBeforeUpdate(): void {
     // Same guard as the autosave timer and recoverFromContextLoss. The splash
     // shows on EVERY boot: for a first-timer the sim behind it is a throwaway
     // boot sim (persisting it would flip hasSave() true for a tower the player
@@ -50,10 +52,9 @@ export class SaveLoad {
     // splash pauses time and blocks all input, so in-memory state still equals
     // the autosave byte-for-byte — skipping the save loses nothing. That
     // invariant is load-bearing: never let anything mutate the sim while the
-    // splash is up. Returning normally still lets the update activate.
+    // splash is up.
     if (document.getElementById("splash")) return;
     this.save(true);
-    this.deps.ui.toast("New version ready — saved your tower, updating…", "info");
   }
 
   /**
