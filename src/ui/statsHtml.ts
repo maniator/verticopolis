@@ -55,7 +55,7 @@ export function buildStatsHtml(sim: Simulation): string {
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
-      ${sim.mode === "modern" ? householdSection(sim) : ""}
+      ${sim.rules.hasVariantHouseholds ? householdSection(sim) : ""}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
         <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>

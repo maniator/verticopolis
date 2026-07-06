@@ -3,6 +3,7 @@ import { Crowd, CROWD_SECONDS_PER_MINUTE } from "./Crowd";
 import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
+import { makeRules, householdPrice, type GameRules } from "./gameRules";
 import { EventSystem } from "./EventSystem";
 import type { SimContext } from "./SimContext";
 import { Tower } from "./Tower";
@@ -90,29 +91,6 @@ const NOISE_EROSION = 0.07;
  *  threshold and office noise can never evict an owner at all. Fixing the cause
  *  (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
-
-/**
- * Modern-mode "variant households": the family sizes a condo can sell to, and
- * how likely each is. Weighted toward the classic 3 so a Modern tower still
- * *feels* like SimTower — the 2s and 5s are the spice, not the staple. The flat
- * Classic condo is a 3, so this distribution is centered there on purpose: a
- * Modern tower of many condos lands near the same average population as a
- * Classic one, only with per-unit variation that makes each sale a small bet.
- * INVARIANT: keep the weights' implied mean ≈ 3 so Modern doesn't silently
- * inflate or deflate the star-rating ladder relative to Classic.
- */
-const HOUSEHOLD_SIZES = [2, 3, 4, 5] as const;
-// mean = (2·4 + 3·6 + 4·2 + 5·1)/13 = 39/13 = 3.0 exactly, with 3 the clear mode —
-// so a Modern tower's condo population matches a Classic one's on average (the
-// invariant above) while still varying unit to unit.
-const HOUSEHOLD_WEIGHTS = [4, 6, 2, 1] as const;
-
-/** A bigger family leans harder on the tower — access, congestion and noise
- *  bite a 5-person household more than a 2-person one. This scales the churn
- *  pressure by how far the household sits from the classic 3, so placing a big
- *  family is higher reward (a pricier sale) but higher risk (it bails sooner if
- *  the tower can't serve it). Per person away from 3; 0 leaves Classic untouched. */
-const HOUSEHOLD_CHURN_PER_PERSON = 0.06;
 
 /**
  * Save-format migration seam. Runs before the field-level coercion in
@@ -251,9 +229,18 @@ export class Simulation implements SimContext {
    * engine can branch on it without ever guarding against a mid-game flip. Old
    * saves with no persisted mode deserialize as `classic`, so their condos stay
    * flat 3s and the population census is unchanged. The UI stamps the player's
-   * choice at tower creation.
+   * choice at tower creation. This is the persisted IDENTITY; the BEHAVIOR that
+   * hangs off it lives in {@link rules}.
    */
   readonly mode: GameMode;
+
+  /**
+   * The mode's behavior, resolved once from {@link mode}. Every place Classic and
+   * Modern diverge routes through this ({@link GameRules}) — the engine calls
+   * `this.rules.<x>()` and never re-tests the mode string, so mode-specific logic
+   * stays in one strategy object instead of smeared across the codebase.
+   */
+  readonly rules: GameRules;
 
   /**
    * Simulation model selector (Phase 2, review F4). `v1` is the shipped behavior:
@@ -345,6 +332,7 @@ export class Simulation implements SimContext {
   constructor(seed = 12345, mode: GameMode = "classic") {
     this.rng = new RNG(seed);
     this.mode = mode;
+    this.rules = makeRules(mode);
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
     this.economy = new EconomySystem(this);
@@ -932,9 +920,9 @@ export class Simulation implements SimContext {
       // A bigger Modern household leans harder on the tower: scale only the
       // NEGATIVE access/congestion pressures, never the recovery, so a well-served
       // big family is just as happy as a small one — the size only bites when the
-      // tower is failing them. Always 1 in Classic (and for flat/unsold condos),
-      // so those towers are untouched.
-      const churn = this.churnSensitivity(u);
+      // tower is failing them. The rule-set returns 1 in Classic (and for
+      // flat/unsold condos), so those towers are untouched.
+      const churn = this.rules.churnMultiplier(u.residents);
       if (!served) {
         u.satisfaction = Math.max(0, u.satisfaction - 0.15 * churn);
       } else if (u.floor !== 1 && cong > 1) {
@@ -1229,29 +1217,6 @@ export class Simulation implements SimContext {
     return result;
   }
 
-  /** Churn multiplier on the NEGATIVE satisfaction pressures for a unit — 1 for
-   *  everything except a Modern condo with a settled household, where a family
-   *  larger than the classic 3 is more demanding (bails sooner) and a smaller one
-   *  a little more forgiving. Clamped positive so it can only ever soften or
-   *  sharpen the drain, never flip its sign. */
-  private churnSensitivity(u: Unit): number {
-    if (u.kind !== "condo" || u.residents === undefined) return 1;
-    const delta = u.residents - FACILITIES.condo.population;
-    return Math.max(0.5, 1 + HOUSEHOLD_CHURN_PER_PERSON * delta);
-  }
-
-  /** Draw a Modern condo's household size (2–5, weighted toward 3) from the
-   *  gameplay RNG, so it's deterministic and reproduces across save/reload. */
-  private rollHousehold(): number {
-    const total = HOUSEHOLD_WEIGHTS.reduce((a, b) => a + b, 0);
-    let roll = this.rng.int(1, total);
-    for (let i = 0; i < HOUSEHOLD_SIZES.length; i++) {
-      roll -= HOUSEHOLD_WEIGHTS[i];
-      if (roll <= 0) return HOUSEHOLD_SIZES[i];
-    }
-    return FACILITIES.condo.population; // unreachable; the classic 3 as a safety net
-  }
-
   private vacate(u: Unit, reason: VacateReason): void {
     // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
     // lose a tenant — you repurchase the unit at what it sold for and hold it as
@@ -1260,14 +1225,13 @@ export class Simulation implements SimContext {
     // sustained neglect genuinely hurt, exactly as it did in the original, and
     // resetting everOccupied lets the repurchased unit re-sell. Do this BEFORE the
     // everOccupied reset below reads it.
-    // Repurchase at what it SOLD for — the size-scaled price in Modern (the
-    // household is still set here, before the reset below), the flat asking price
-    // in Classic — so the sting exactly reverses the sale. 0 for anything that
-    // wasn't an owned condo (offices, never-sold condos: they cost nothing back).
+    // householdPrice reverses the sale exactly — the size-scaled price in Modern
+    // (the household is still set here, before the reset below), the flat asking
+    // price in Classic (residents undefined). 0 for anything that wasn't an owned
+    // condo (offices, never-sold condos: they cost nothing back).
     let buyback = 0;
     if (u.kind === "condo" && u.everOccupied) {
-      const base = rentOf(u);
-      buyback = u.residents !== undefined ? Math.round((base * u.residents) / FACILITIES.condo.population) : base;
+      buyback = householdPrice(rentOf(u), u.residents);
       this.money -= buyback;
       this.recordMoney("condos", -buyback);
     }
@@ -1533,22 +1497,16 @@ export class Simulation implements SimContext {
     u.vacateAt = undefined;
     if (u.kind === "condo" && !u.everOccupied) {
       u.everOccupied = true;
-      // Classic sells to the flat family of 3 at the asking price. Modern draws a
-      // 2–5 person household and scales the sale by its size relative to that 3 —
-      // a bigger family buys a pricier home (the reward side of the bet its higher
-      // churn pays for). The asking price the player set still drives HOW FAST it
-      // sells (via move-in demand); the household size drives WHAT it fetches.
-      const base = rentOf(u);
-      let price = base;
-      if (this.mode === "modern") {
-        const household = this.rollHousehold();
-        u.residents = household;
-        price = Math.round((base * household) / FACILITIES.condo.population);
-      }
+      // The rule-set decides who buys and for how much: Classic → flat 3 at the
+      // asking price; Modern → a 2–5 person household that scales the price. The
+      // asking price the player set still drives HOW FAST it sells (via move-in
+      // demand); the rule-set decides WHAT it fetches and who moves in.
+      const { price, residents } = this.rules.sellCondo(rentOf(u), this.rng);
+      if (residents !== undefined) u.residents = residents;
       this.money += price;
       this.recordMoney("condos", price);
       this.moveInsToday.condos++;
-      const who = u.residents ? ` to a household of ${u.residents}` : "";
+      const who = residents ? ` to a household of ${residents}` : "";
       this.emit(`Condominium on ${this.floorLabel(u.floor)} sold${who} for $${price.toLocaleString()}.`, "money");
     }
     if (u.kind === "office") {
@@ -2005,19 +1963,12 @@ export class Simulation implements SimContext {
           label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
           satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
           occupants: Math.max(0, num(u.occupants, 0)),
-          // Household size for a Modern condo. On a CLASSIC tower it's forced to
-          // undefined (a forged classic save can't smuggle in a variable
-          // household — its condos MUST read the flat 3, keeping the census
-          // canon). On a Modern tower a present value is coerced to a whole number
-          // inside the real generator band (2..5) so a forged save can't inject an
-          // out-of-range size the game never produces or blow up the census.
-          residents:
-            sim.mode !== "modern" || u.residents === undefined
-              ? undefined
-              : Math.max(
-                  HOUSEHOLD_SIZES[0],
-                  Math.min(HOUSEHOLD_SIZES[HOUSEHOLD_SIZES.length - 1], Math.round(num(u.residents, 3))),
-                ),
+          // Household size for a condo, sanitized by the rule-set: Classic strips
+          // it (a forged classic save can't smuggle in a variable household — its
+          // condos MUST read the flat 3), Modern clamps it into the real generator
+          // band (2..5) so a forged value can't inject a size the game never
+          // produces or blow up the census.
+          residents: sim.rules.coerceResidents(u.residents),
           pendingIncome: num(u.pendingIncome, 0),
           // Coerce the optional player-set price too, so a corrupt save can't
           // inject a non-number rent (which would poison income / rentOf math).
