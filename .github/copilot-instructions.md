@@ -64,12 +64,21 @@ snapshots and won't pick up later commits on their own.
 
 ## GitHub PR Review — BMGD/BMAD emulation
 
-For GitHub Copilot pull-request review, **emulate this repo's mandatory deep-review
-skill** even though the native GitHub review surface can't execute a skill. The
-path-specific instructions in
-[`.github/instructions/bmad-review.instructions.md`](./instructions/bmad-review.instructions.md)
-are loaded automatically on the review surface and are the source of truth for how
-to do this. In short:
+For GitHub Copilot pull-request review, run this repo's mandatory deep review.
+Two mechanisms back it, in order of preference:
+
+1. **The loadable `code-review` skill** at
+   [`.github/skills/code-review/SKILL.md`](./skills/code-review/SKILL.md) — Copilot
+   code review loads agent skills from `.github/skills/` when relevant, so this
+   runs the real review method directly on the review surface. It is the source of
+   truth for the method.
+2. **The always-applied overlay** at
+   [`.github/instructions/bmad-review.instructions.md`](./instructions/bmad-review.instructions.md)
+   (`applyTo: "**/*"`) — a distilled fallback that applies even when the skill
+   isn't loaded for a given diff. **Emulate** the deep review from it in that case;
+   do not claim a skill was invoked.
+
+In short:
 
 - Pick the emulated skill by the changed files — **`gds-code-review`** for
   gameplay/engine work (`src/engine/`, `src/render/`, mechanics, economy, ratings,
