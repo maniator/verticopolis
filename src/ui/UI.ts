@@ -7,6 +7,18 @@ import type { UpdateInfo } from "../pwa";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
+/** Hard ceiling on rendered bulletin lines. The DOM node count is held CONSTANT
+ *  at this — append the newest, prune the oldest — so scrollback is generous
+ *  (~a session's worth) yet a long session can never grow the log big enough to
+ *  jank a slow phone. Pair with the engine's log buffer cap ({@link Simulation}). */
+const LOG_DOM_CAP = 300;
+
+/** Most toasts kept on screen at once — and the most fired in a single render.
+ *  A catch-up tick can flush a big batch; only the newest few pop (older ones
+ *  would be pruned off-screen instantly anyway), so we never spawn a burst of
+ *  transient nodes+timers on resume. */
+const TOAST_MAX = 5;
+
 const GROUPS: { title: string; cats: FacilityCategory[] }[] = [
   { title: "Structure", cats: ["structure"] },
   { title: "Transport", cats: ["transport"] },
@@ -51,8 +63,7 @@ export interface UICallbacks {
 export class UI {
   tool: Tool = { type: "inspect" };
   private cb: UICallbacks;
-  private lastLogLen = 0;
-  private toastTimers: number[] = [];
+  private lastLogSeq = 0;
 
   private el = {
     money: document.getElementById("stat-money")!,
@@ -433,21 +444,64 @@ export class UI {
       <span class="k">Transports</span><span class="v">${s.transports}</span>
       <span class="k">Vacancies</span><span class="v">${s.vacant}</span>`;
 
-    this.renderLog(sim.log);
+    this.renderLog(sim.log, sim.logSeq);
   }
 
-  private renderLog(log: LogEntry[]): void {
-    if (log.length === this.lastLogLen) return;
-    // Newly added entries (and surface important ones as toasts).
-    const fresh = log.slice(this.lastLogLen);
-    for (const e of fresh) {
-      if (e.kind === "good" || e.kind === "bad") this.toast(e.text, e.kind);
-    }
-    this.lastLogLen = log.length;
-    this.el.log.innerHTML = log
-      .slice(-40)
-      .map((e) => `<div class="log-line ${e.kind}">${escapeHtml(e.text)}</div>`)
-      .join("");
+  private renderLog(log: LogEntry[], logSeq: number): void {
+    if (logSeq === this.lastLogSeq) return;
+    // Count new entries by the monotonic logSeq, NOT log.length: the engine caps
+    // the log (push+shift), so length stops changing while entries keep flowing —
+    // diffing on length froze this pump (and every toast) after the cap. Clamp to
+    // what's still in the buffer: anything older was shifted out.
+    const fresh = Math.min(logSeq - this.lastLogSeq, log.length);
+    this.lastLogSeq = logSeq;
+    if (fresh <= 0) return;
+    // slice(length - fresh), never slice(-fresh): a fresh of 0 would make -0 → 0
+    // and re-render the WHOLE buffer (the guard above already covers it, but this
+    // keeps the slice honest regardless).
+    const batch = log.slice(log.length - fresh);
+    // Toast only the most-recent good/bad lines of the batch. A catch-up tick
+    // (fast-forward / backgrounded tab) can flush a big batch at once; toast()
+    // already keeps ≤ TOAST_MAX on screen, so firing one per line would spawn
+    // hundreds of transient nodes+timers just to prune them. The bulletin below
+    // still records EVERY line for scrollback.
+    const toastAt = new Set(
+      batch.flatMap((e, i) => (e.kind === "good" || e.kind === "bad" ? [i] : [])).slice(-TOAST_MAX),
+    );
+    batch.forEach((e, i) => {
+      // Append the bulletin line FIRST — it's the durable record; a throwing
+      // toast() must never drop it or stall the rest of the batch.
+      this.el.log.appendChild(this.logLine(e)); // column-reverse ⇒ newest lands on top
+      if (toastAt.has(i)) {
+        try {
+          this.toast(e.text, e.kind);
+        } catch {
+          /* a toast failure is cosmetic — never let it interrupt the pump */
+        }
+      }
+    });
+    // APPEND + PRUNE, never rebuild: the bulletin keeps accepting new lines
+    // forever (it never freezes at the cap — the whole bug) while the DOM node
+    // count stays CONSTANT, so a long session can't grow it big enough to jank a
+    // slow phone. Oldest is the first child under column-reverse.
+    while (this.el.log.childElementCount > LOG_DOM_CAP) this.el.log.firstElementChild!.remove();
+  }
+
+  /** One bulletin line. `textContent` auto-escapes — never interpolate engine
+   *  text into innerHTML (the old renderLog leaned on escapeHtml for this). */
+  private logLine(e: LogEntry): HTMLDivElement {
+    const d = document.createElement("div");
+    d.className = `log-line ${e.kind}`;
+    d.textContent = e.text;
+    return d;
+  }
+
+  /** Adopt a freshly-swapped tower's log baseline (load / import / new / undo /
+   *  redo): take its logSeq so we neither replay its old entries as toasts nor
+   *  skip its next one against a stale cursor, and rebuild the (bounded) bulletin. */
+  resetLog(sim: Simulation): void {
+    this.lastLogSeq = sim.logSeq;
+    this.el.log.replaceChildren(...sim.log.slice(-LOG_DOM_CAP).map((e) => this.logLine(e)));
   }
 
   showInspector(html: string | null): void {
@@ -471,13 +525,13 @@ export class UI {
     t.className = `toast ${kind}`;
     t.textContent = text;
     this.el.toast.appendChild(t);
-    const timer = window.setTimeout(() => {
+    // The toast removes itself; no id registry to keep (nothing cancels toasts).
+    window.setTimeout(() => {
       t.style.transition = "opacity .3s";
       t.style.opacity = "0";
       window.setTimeout(() => t.remove(), 300);
     }, 3600);
-    this.toastTimers.push(timer);
-    while (this.el.toast.children.length > 5) this.el.toast.firstElementChild?.remove();
+    while (this.el.toast.children.length > TOAST_MAX) this.el.toast.firstElementChild?.remove();
   }
 
   /** Batch-pricing dialog, pre-scoped to one priced kind. Live honest preview
