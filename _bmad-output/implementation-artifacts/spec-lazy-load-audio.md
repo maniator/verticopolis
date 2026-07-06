@@ -2,7 +2,7 @@
 title: 'Lazy-load the Tone.js audio stack out of the initial bundle'
 type: 'refactor'
 created: '2026-07-06'
-status: 'in-review'
+status: 'done'
 context: []
 baseline_commit: 'b198fbd'
 ---
@@ -103,3 +103,32 @@ start(): void {
 
 **Manual checks:**
 - Serve the build, tap to start audio, confirm music + a build/error `sfx` play and the mute toggle works.
+
+## Suggested Review Order
+
+**The facade (the whole design lives here)**
+
+- Entry point — the synchronous, Tone-free shell the app constructs at boot.
+  [`Audio.ts:22`](../../src/audio/Audio.ts#L22)
+
+- Lazy load on first gesture: feature-detect, then dynamic `import()` of the engine.
+  [`Audio.ts:41`](../../src/audio/Audio.ts#L41)
+
+- Generation guard (review fix) — a dispose/supersede mid-load can't resurrect a torn-down engine.
+  [`Audio.ts:54`](../../src/audio/Audio.ts#L54)
+
+- `dispose()` invalidates any in-flight load and releases the guard for a clean retry.
+  [`Audio.ts:90`](../../src/audio/Audio.ts#L90)
+
+**The moved engine (verbatim, behavior unchanged)**
+
+- Renamed class + shared `SfxName` type; keeps the sole top-level `tone` import.
+  [`ToneAudioEngine.ts:304`](../../src/audio/ToneAudioEngine.ts#L304)
+
+**Supporting**
+
+- Regression tests for the load/dispose/mute state machine (mock the chunk).
+  [`audioFacade.test.ts:109`](../../src/tests/audioFacade.test.ts#L109)
+
+- Vendor-excalibur split retained; audio chunk auto-named to dodge the `**/excalibur*` ignore.
+  [`vite.config.ts:131`](../../vite.config.ts#L131)

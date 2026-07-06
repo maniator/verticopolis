@@ -1,7 +1,23 @@
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
-import type { SfxName, ToneAudioEngine } from "./ToneAudioEngine";
+import type { SfxName } from "./ToneAudioEngine";
 
 export type { SfxName };
+
+/** The subset of the Tone engine the facade constructs and drives. Declared
+ *  structurally (rather than importing the concrete class) so the loader is a
+ *  clean injectable seam — tests supply any object with this shape, no
+ *  dynamic-import mocking required. */
+interface AudioEngineImpl {
+  readonly started: boolean;
+  start(): void;
+  setMuted(m: boolean): void;
+  update(focus: ViewFocus): void;
+  sfx(name: SfxName): void;
+  dispose(): void;
+}
+
+/** What the lazy engine chunk exposes: a zero-arg engine constructor. */
+type EngineModule = { ToneAudioEngine: new () => AudioEngineImpl };
 
 /**
  * Lightweight synchronous facade over the procedural {@link ToneAudioEngine}.
@@ -26,12 +42,24 @@ export class AudioEngine {
   /** True once the real engine has loaded and started. */
   started = false;
 
-  private impl: ToneAudioEngine | null = null;
+  private impl: AudioEngineImpl | null = null;
   /** In-flight guard so repeated gestures don't kick off duplicate imports. */
   private loading = false;
+  /** Bumped by every `start()` and every `dispose()`. A resolving import that
+   *  captured an older value is stale — its `dispose()`/supersede happened
+   *  mid-load — and must abandon rather than resurrect a torn-down engine. */
+  private generation = 0;
   /** Latest focus seen before the engine loaded, replayed once it's ready so the
    *  correct scene is showing immediately rather than a frame later. */
   private lastFocus: ViewFocus | null = null;
+
+  /**
+   * @param loadEngine Loader for the heavy Tone engine chunk. Defaults to the
+   *   dynamic `import()` that produces the lazy async chunk — the whole point of
+   *   this facade. Injectable purely so tests can supply a synchronous stub
+   *   instead of exercising the bundler's code-split at runtime.
+   */
+  constructor(private readonly loadEngine: () => Promise<EngineModule> = () => import("./ToneAudioEngine")) {}
 
   /** Load (once) and start the real engine. Must be called from a user gesture. */
   start(): void {
@@ -47,8 +75,13 @@ export class AudioEngine {
     const g = globalThis as { AudioContext?: unknown; webkitAudioContext?: unknown };
     if (typeof g.AudioContext === "undefined" && typeof g.webkitAudioContext === "undefined") return;
     this.loading = true;
-    void import("./ToneAudioEngine")
+    const generation = ++this.generation;
+    void this.loadEngine()
       .then(({ ToneAudioEngine }) => {
+        // A dispose() (or a superseding start()) during the load window bumped
+        // `generation`; abandon this stale load — never resurrect a torn-down
+        // engine — and leave `loading` to whoever now owns it.
+        if (generation !== this.generation) return;
         this.loading = false;
         const impl = new ToneAudioEngine();
         impl.setMuted(this.muted);
@@ -59,8 +92,8 @@ export class AudioEngine {
       })
       .catch(() => {
         // Chunk failed to load (offline first-run, blocked request) — stay
-        // silent and let a later gesture retry.
-        this.loading = false;
+        // silent and let a later gesture retry. Only clear our own guard.
+        if (generation === this.generation) this.loading = false;
       });
   }
 
@@ -79,6 +112,10 @@ export class AudioEngine {
   }
 
   dispose(): void {
+    // Invalidate any in-flight load so it can't resurrect us, and release the
+    // guard so a later start() can retry cleanly.
+    this.generation++;
+    this.loading = false;
     this.impl?.dispose();
     this.impl = null;
     this.started = false;
