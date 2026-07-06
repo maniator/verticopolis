@@ -70,6 +70,12 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 ## Artifacts & working conventions
 - BMAD output lives under `_bmad-output/` (`planning-artifacts/prds`, `.../reviews`).
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
+- **Version bump on player-facing change:** bump `package.json` `version` (semver
+  by player impact — **minor** for a new player-facing capability, **patch** for a
+  player-noticeable fix/behavior change) in the same PR; internal-only work
+  (refactor / perf-with-identical-behavior / tests / docs / tooling) needs none.
+  It's injected as `__APP_VERSION__` on the splash and anchors the update flow, so
+  a missing bump on a player-facing change is a review finding.
 - **Deep adversarial review is MANDATORY and runs in the SAME session that writes the
   code — and it means actually invoking `/gds-code-review` (gameplay/engine) or
   `/bmad-code-review` (everything else, incl. storage/persistence/tooling/UI plumbing).**

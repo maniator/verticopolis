@@ -78,6 +78,28 @@ npm run build       # production build must succeed
 
 CI (`.github/workflows/test.yml`) runs all of the above on every PR.
 
+## Versioning
+
+The app version lives in `package.json` (`version`) and is injected at build
+time as `__APP_VERSION__` (see `vite.config.ts`) — it's shown on the splash and
+is the anchor the PWA update flow reports against. It is **not** auto-derived, so
+it only moves if a change moves it.
+
+**Bump `version` in the same PR as any player-facing change**, semver by player
+impact:
+
+- **minor** (`x.Y.0`) — a new player-facing capability (e.g. a Modern-mode
+  feature, a new facility, a new screen).
+- **patch** (`x.y.Z`) — a player-noticeable bug fix or behavior/balance change
+  (economy tuning, an evict rule, a visible UI fix).
+- **no bump** — internal-only work with no player-visible effect: pure refactor,
+  perf with identical behavior, tests, docs, tooling, CI.
+
+A player-facing change that ships **without** a version bump is a review finding:
+the splash — and any future "what's new" surface — would otherwise misreport the
+build as unchanged. When two open PRs both bump, whoever merges second rebases and
+re-bumps. (Bump once per PR, not per commit.)
+
 ## Code review
 
 - **Self-review before pushing.** Read your own diff end-to-end with a
