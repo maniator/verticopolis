@@ -11,3 +11,14 @@ Routing guidance:
 
 | Date | Story | Epic | Type | Priority | Severity | Owner | Status | Notes |
 | ---- | ----- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |
+
+---
+
+## Deferral inbox
+
+_Raw `### Deferred from:` sections appended by the review/quick-dev skills land
+here. Triage them into the table above, then delete the raw note._
+
+## Completed / superseded
+
+_Finished or superseded items, struck through, kept as a short record._
