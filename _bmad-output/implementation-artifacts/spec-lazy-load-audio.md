@@ -132,3 +132,20 @@ start(): void {
 
 - Vendor-excalibur split retained; audio chunk auto-named to dodge the `**/excalibur*` ignore.
   [`vite.config.ts:131`](../../vite.config.ts#L131)
+
+## Review Findings
+
+Second-pass `/bmad-code-review` (Blind Hunter + Edge Case Hunter + Acceptance
+Auditor) on the full PR #140 diff, covering the DI refactor + vendor split that
+the first-pass review had not seen. Plus two Copilot inline comments.
+
+- [x] [Review][Patch] Orphan-leak: adopt `this.impl` before `start()`/`setMuted()` so an engine-init throw can't leak an AudioContext beyond dispose()'s reach [src/audio/Audio.ts]
+- [x] [Review][Patch] `generation` doc comment overstated "every start()"; corrected to "whenever start() kicks off a new load" [src/audio/Audio.ts]
+- [x] [Review][Patch] (Copilot) Test clobbered a pre-existing `AudioContext` and never restored it; now captures + restores the real descriptor [src/tests/audioFacade.test.ts]
+- [x] [Review][Patch] Loader made a spy so "loads only once" asserts a single load, not just a single construct [src/tests/audioFacade.test.ts]
+- [x] [Review][Patch] Added coverage for the `.catch`/failed-load retry path [src/tests/audioFacade.test.ts]
+- [x] [Review][Patch] Added coverage for dispose() after a successful load (engine torn down, started reset) [src/tests/audioFacade.test.ts]
+- [x] [Review][Patch] Added coverage for live setMuted()/update() forwarding after load [src/tests/audioFacade.test.ts]
+- Dismissed (4): lastFocus/muted persisting across dispose() (intentional); navigateFallbackDenylist `/excalibur/` substring (navigation-only, harmless); setMuted-before-start ordering (self-heals, no regression); audio decoupled from shell availability (graceful degradation).
+
+**Acceptance Auditor: no spec violations** — all Always/Never constraints and acceptance criteria satisfied against a fresh build; the optional `loadEngine` DI param is a non-breaking, contract-preserving addition.

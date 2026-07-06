@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { AudioEngine } from "../audio/Audio";
 
 /**
@@ -37,22 +37,31 @@ class StubEngine {
   }
 }
 
-/** The injected loader — resolves asynchronously (like the real import) but with
- *  our stub, so no chunk is loaded. */
-const loader = () => Promise.resolve({ ToneAudioEngine: StubEngine });
+// Capture the environment's real AudioContext (if any) once, so each test can
+// stub it and afterEach can restore the exact original — never leaking a stub
+// into sibling tests.
+const realAudioContext = Object.getOwnPropertyDescriptor(globalThis, "AudioContext");
+
+/** The facade's injectable loader signature, specialized to the stub engine. */
+type TestLoader = () => Promise<{ ToneAudioEngine: typeof StubEngine }>;
 
 describe("AudioEngine facade lazy loading", () => {
-  const hadAudioContext = "AudioContext" in globalThis;
+  // Reset per test: a fresh spy loader that resolves with the stub engine.
+  let loader: Mock<TestLoader>;
+
   beforeEach(() => {
     built.length = 0;
+    loader = vi.fn<TestLoader>(() => Promise.resolve({ ToneAudioEngine: StubEngine }));
     (globalThis as { AudioContext?: unknown }).AudioContext = class {};
   });
   afterEach(() => {
-    if (!hadAudioContext) delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    if (realAudioContext) Object.defineProperty(globalThis, "AudioContext", realAudioContext);
+    else delete (globalThis as { AudioContext?: unknown }).AudioContext;
   });
 
-  it("does not construct the engine until start()", () => {
+  it("does not load or construct the engine until start()", () => {
     const audio = new AudioEngine(loader);
+    expect(loader).not.toHaveBeenCalled();
     expect(built).toHaveLength(0);
     expect(audio.started).toBe(false);
   });
@@ -61,6 +70,7 @@ describe("AudioEngine facade lazy loading", () => {
     const audio = new AudioEngine(loader);
     audio.start();
     await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect(loader).toHaveBeenCalledTimes(1);
     expect(built).toHaveLength(1);
     expect(built[0].started).toBe(true);
   });
@@ -69,6 +79,7 @@ describe("AudioEngine facade lazy loading", () => {
     delete (globalThis as { AudioContext?: unknown }).AudioContext;
     const audio = new AudioEngine(loader);
     audio.start(); // feature check fails → returns before loading
+    expect(loader).not.toHaveBeenCalled();
     expect(built).toHaveLength(0);
     expect(audio.started).toBe(false);
   });
@@ -81,13 +92,43 @@ describe("AudioEngine facade lazy loading", () => {
     expect(built[0].muted).toBe(true);
   });
 
-  it("only loads/constructs once across repeated start() calls", async () => {
+  it("loads the chunk only once across repeated start() calls", async () => {
     const audio = new AudioEngine(loader);
     audio.start();
-    audio.start(); // second gesture while loading — no duplicate load
+    audio.start(); // second gesture while loading — guarded, no second load
     await vi.waitFor(() => expect(audio.started).toBe(true));
     audio.start(); // after load — delegates to the existing engine
+    expect(loader).toHaveBeenCalledTimes(1);
     expect(built).toHaveLength(1);
+  });
+
+  it("forwards setMuted() and update() to the live engine after load", async () => {
+    const audio = new AudioEngine(loader);
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    const focus = { zoom: 3, dominant: "food", centerFloor: 8, weather: "clear" };
+    audio.setMuted(true);
+    audio.update(focus as never);
+    expect(built[0].muted).toBe(true);
+    expect(built[0].lastFocus).toBe(focus);
+  });
+
+  it("replays the latest pre-load focus onto the engine once loaded", async () => {
+    const audio = new AudioEngine(loader);
+    const focus = { zoom: 2, dominant: "office", centerFloor: 5, weather: "clear" };
+    audio.update(focus as never);
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect(built[0].lastFocus).toBe(focus);
+  });
+
+  it("tears down the live engine on dispose() after a successful load", async () => {
+    const audio = new AudioEngine(loader);
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    audio.dispose();
+    expect(built[0].disposed).toBe(true);
+    expect(audio.started).toBe(false);
   });
 
   it("does not resurrect a torn-down engine, and restarts cleanly, when dispose() interrupts a load", async () => {
@@ -96,17 +137,31 @@ describe("AudioEngine facade lazy loading", () => {
     audio.dispose(); // invalidates #1 mid-load
     audio.start(); // load #2 — the one that should win
     await vi.waitFor(() => expect(audio.started).toBe(true));
-    // Exactly one engine built: the abandoned #1 resolves first (microtask
-    // order) and hits the generation guard, so it never constructs.
+    // The abandoned #1 resolves first (microtask order) and hits the generation
+    // guard, so it never constructs — exactly one engine is ever built.
     expect(built).toHaveLength(1);
   });
 
-  it("replays the latest focus onto the engine once loaded", async () => {
-    const audio = new AudioEngine(loader);
-    const focus = { zoom: 2, dominant: "office", centerFloor: 5, weather: "clear" };
-    audio.update(focus as never);
-    audio.start();
-    await vi.waitFor(() => expect(audio.started).toBe(true));
-    expect(built[0].lastFocus).toBe(focus);
+  it("stays silent when the load fails, and retries on a later gesture", async () => {
+    let failNext = true;
+    const flaky = vi.fn<TestLoader>(() =>
+      failNext ? Promise.reject(new Error("chunk fetch failed")) : Promise.resolve({ ToneAudioEngine: StubEngine }),
+    );
+    const audio = new AudioEngine(flaky);
+
+    audio.start(); // attempt #1 rejects
+    await vi.waitFor(() => expect(flaky).toHaveBeenCalledTimes(1));
+    expect(audio.started).toBe(false);
+    expect(built).toHaveLength(0);
+
+    // The failure must have released the in-flight guard so a later gesture can
+    // retry. Poll start() until the (now-succeeding) load takes.
+    failNext = false;
+    await vi.waitFor(() => {
+      audio.start();
+      expect(audio.started).toBe(true);
+    });
+    expect(flaky).toHaveBeenCalledTimes(2);
+    expect(built).toHaveLength(1);
   });
 });

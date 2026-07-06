@@ -45,9 +45,10 @@ export class AudioEngine {
   private impl: AudioEngineImpl | null = null;
   /** In-flight guard so repeated gestures don't kick off duplicate imports. */
   private loading = false;
-  /** Bumped by every `start()` and every `dispose()`. A resolving import that
-   *  captured an older value is stale — its `dispose()`/supersede happened
-   *  mid-load — and must abandon rather than resurrect a torn-down engine. */
+  /** Bumped whenever `start()` kicks off a new load and by every `dispose()`. A
+   *  resolving import that captured an older value is stale — a `dispose()` or a
+   *  superseding load happened mid-flight — and must abandon rather than
+   *  resurrect a torn-down engine. */
   private generation = 0;
   /** Latest focus seen before the engine loaded, replayed once it's ready so the
    *  correct scene is showing immediately rather than a frame later. */
@@ -84,9 +85,12 @@ export class AudioEngine {
         if (generation !== this.generation) return;
         this.loading = false;
         const impl = new ToneAudioEngine();
+        // Adopt the instance BEFORE start()/setMuted() so that if engine init
+        // throws (a live AudioContext already allocated in the constructor), it
+        // stays reachable by dispose() rather than leaking as an orphan.
+        this.impl = impl;
         impl.setMuted(this.muted);
         impl.start();
-        this.impl = impl;
         this.started = impl.started;
         if (this.lastFocus) impl.update(this.lastFocus);
       })
