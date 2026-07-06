@@ -17,13 +17,14 @@ How items flow:
 
 1. The BMGD/BMAD review skills (`gds-code-review`, `bmad-code-review`,
    `*-quick-dev`) append each `defer` finding to the **Deferral inbox** below,
-   under a dated `## Deferred from:` heading.
+   under a dated `### Deferred from:` heading.
 2. Triage folds inbox entries into the table as a curated row (and removes the
    raw inbox note once captured). Pick items up when you next touch the area.
 3. `Type` legend: `review-deferral` (a real finding parked for scope),
    `perf` (a measured/suspected optimization), `feature-request` (unbuilt
-   capability awaiting a spec). `Status`: `open`, `in-progress`, `idea`
-   (feature not yet specced), `done`.
+   capability awaiting a spec), `bug` (a player-reported defect awaiting a
+   fix). `Status`: `open`, `in-progress`, `idea` (feature not yet specced),
+   `done`.
 4. `Priority` is the do-first order (impact × effort × risk, and whether the
    item is blocked) — distinct from `Severity`, which is impact alone. **P1**:
    work next; real correctness/data-safety impact and ready to pick up. **P2**:
@@ -42,6 +43,7 @@ How items flow:
 | ---- | ----- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |
 | 2026-07-06 | condo-modes | Modern condos | review-deferral | P1 | medium | — | open | A `null`/malformed unit entry in a forged/corrupt save (or one written by a buggy/newer build) crashes `deserialize` (pre-existing). The unit loop does `(data.units ?? []).filter((u) => isFacilityKind(u.kind))` — reading `u.kind` on a `null` entry throws and aborts the whole load, turning a recoverable save into a hard failure. Not hit by normal saves (the serializer never emits a `null` entry) — this is defensive load-path hardening, not a bug real towers hit; it's P1 purely on value-to-effort: a one-line, zero-risk guard `u != null &&` on the unit and transport filters. Ship it with a corrupt-save unit test. (Blind Hunter, condo-modes final pass.) |
 | 2026-07-03 | pr-110-compress-saves | — | review-deferral | P2 | medium | — | open | `localStorage.setItem` `QuotaExceededError` unhandled on the pre-reload paths (`SaveGame.ts saveTo`; `saveLoad.ts:55`/`72`). `recoverFromContextLoss` and `onUpdateReady` call `save()` immediately before `location.reload()`; an uncaught quota/private-mode throw there aborts the reload. Pre-existing; PR #110 mitigates it (~20× smaller writes). **Top of P2 — bind to the next persistence/reload touch.** The `try/catch` is trivial; the real work is the *fallback semantics* — do **not** clobber the prior good value until the new write verifies (write-to-temp-then-swap), and a swallowed error must not silently drop the save on these already-fragile paths (keep prior value + toast). Verify on both reload paths. |
+| 2026-07-06 | event-visuals | — | bug | P2 | medium | — | open | Thief event cosmetic can play with **no matching log/toast line** (player-reported). `EventSystem.maybeThief` currently pairs every `triggerThief` with a `sim.emit` (good if caught / bad if not), so this shouldn't happen on the happy path — **repro first**, then find the desync: e.g. the FX seq fires but the emit is dropped/suppressed, the good/bad toast is throttled, or a save/restore replays `thiefFx.seq` (rendering the thief) without re-emitting the log entry. Fix so the cosmetic and its explanatory log line are always emitted together — an unexplained figure floating past reads as a bug. |
 | 2026-07-06 | crane-fix | — | review-deferral | P3 (ready) | low (cosmetic) | — | open | Crane can sit a story low over a multi-floor top unit (pre-existing). `Tower.highestFloor` returns max *base* floor and ignores multi-floor extents, so a top row formed only by the upper story of a 2-floor unit based at `hi−1` yields `highestFloor=hi−1`; the crane perches a story below the visual roof. More visible than the edge-overhang case below — do this one first when the crane/render code is open. Fix: derive the crane's floor from the true topmost occupied row (`u.floor + facilityFloors(u.kind) − 1`). (Edge Case Hunter, floating-crane fix.) |
 | 2026-07-06 | crane-fix | — | review-deferral | P3 (ready) | low (cosmetic) | — | open | Narrow top-run at a tower edge can overhang the crane body past the lot. `syncCrane` anchors the mast over the widest run's center, but `CRANE_W=128px` (~11.6 tiles) with the mast near center means a run narrower than the crane flush to `x=0`/`x=GRID.width` hangs the jib over open sky. Rare (needs a <~12-tile top block flush to an edge). Bundle with the crane fix above. Clamping the body would pull the mast off the run it aligns to — only clamp `pos.x` when the run is near an edge. (gds-code-review, floating-crane fix.) |
 | 2026-07-04 | event-visuals | — | review-deferral | P3 (ready) | low (cosmetic) | — | open | VIP inspection limo replays every 5 game-days on a persistently-failing tower. `Simulation.checkVip` fires `triggerVip()` before the pass/fail check, and a failed inspection reschedules `vipVisitDay=day+5`, so a tower stuck below TOWER criteria replays the 6.5s limo every 5 days with no throttle (unlike the nag lines, which throttle on `lastVipNagDay`). **Most player-visible of the P3 cosmetics** — the design voice argued P2 (a recurring cosmetic loop reads as a bug); parked at the head of P3 as a compromise. Fix by throttling the limo or only firing on a passing inspection. |
@@ -53,7 +55,7 @@ How items flow:
 
 ## Deferral inbox
 
-_Raw `## Deferred from:` sections appended by the review skills land here.
+_Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
 _(empty — all current deferrals are triaged into the table above.)_
