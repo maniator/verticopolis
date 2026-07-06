@@ -1193,6 +1193,24 @@ export class Simulation implements SimContext {
     return this.congestion();
   }
 
+  /** Floor number of the busiest populated-and-served floor — the `argmax` of the
+   *  per-floor congestion map that {@link peakCongestion} takes the max of — or
+   *  `null` when no floor is congested (empty tower, all floors stranded, or the
+   *  v1 scalar model, which has no per-floor worst floor). `null`, never `0`, is
+   *  the "no floor" signal: `0` is a real floor (B1), so a sentinel of `0` would
+   *  be ambiguous. In practice only the populated kinds (offices, condos, hotels)
+   *  feed the map and those are daylight-only — never basements — so a real worst
+   *  floor is always above ground; the `null` guard keeps that an invariant we
+   *  document rather than one we rely on by luck. Lets the HUD name *where* the
+   *  pressure is without the engine formatting any label. */
+  peakCongestionFloor(): number | null {
+    if (this.simModel !== "v2") return null;
+    let peak = 0;
+    let floor: number | null = null;
+    for (const [f, c] of this.spatialCongestionByFloor()) if (c > peak) { peak = c; floor = f; }
+    return floor;
+  }
+
   /**
    * Spatial congestion (v2, review F3): a per-floor ratio of the travelling
    * population that must pass through a floor's serving shafts to those shafts'

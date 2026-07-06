@@ -9,7 +9,7 @@ import type { HeatmapMode } from "./engine/Simulation";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
-import { trafficTier, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
+import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
 import { UI, type Tool } from "./ui/UI";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
@@ -397,23 +397,33 @@ class GameApp {
   }
 
   /** Color-blind-safe traffic cue: word + shape-coded bar glyph (never color
-   *  alone), driven by the same congestion value the engine reads, with boundary
-   *  hysteresis so it doesn't flicker. */
+   *  alone), driven by the tower's PEAK per-floor congestion — its busiest
+   *  populated-and-served floor — so it matches the congestion overlay legend and
+   *  moves as real congestion develops. Boundary hysteresis stops flicker; above
+   *  Smooth it also names the worst floor (e.g. "Backed up · 42F") so the player
+   *  knows *where* to look. */
   private updateTraffic(): void {
-    const cong = this.sim.congestion();
-    const B = [1.0, 1.25, 1.6]; // tier boundaries
+    const cong = this.sim.peakCongestion();
+    const B: readonly number[] = TRAFFIC_BOUNDS; // single source shared with trafficTier() — can't desync
     const raw = trafficTier(cong);
     if (raw > this.lastTrafficTier && cong >= B[this.lastTrafficTier] + 0.03) this.lastTrafficTier = raw;
     else if (raw < this.lastTrafficTier && cong <= B[this.lastTrafficTier - 1] - 0.03) this.lastTrafficTier = raw;
     const tier = this.lastTrafficTier;
-    const label = TRAFFIC_LABELS[tier];
+    const word = TRAFFIC_LABELS[tier];
+    // Above Smooth, surface the hotspot floor (something the 1994 original could
+    // never do). The engine hands us the floor number (null = no hotspot); we
+    // format the label. Populated floors are always above ground, so `NF` is the
+    // right form for every reachable case.
+    const floor = tier > 0 ? this.sim.peakCongestionFloor() : null;
+    const label = floor !== null ? `${word} · ${floor}F` : word;
+    const aria = floor !== null ? `Traffic: ${word}, worst on floor ${floor}` : `Traffic: ${word}`;
     const glyphEl = document.getElementById("traffic-glyph");
     const labelEl = document.getElementById("traffic-label");
     const wrapEl = document.getElementById("traffic");
     if (glyphEl && glyphEl.textContent !== trafficGlyph(tier)) glyphEl.textContent = trafficGlyph(tier);
     if (labelEl && labelEl.textContent !== label) {
       labelEl.textContent = label;
-      wrapEl?.setAttribute("aria-label", `Traffic: ${label}`);
+      wrapEl?.setAttribute("aria-label", aria);
       wrapEl?.classList.toggle("traffic-warn", tier >= 2); // red is a redundant cue, not the only one
     }
   }

@@ -61,6 +61,24 @@ How items flow:
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
+### Deferred from: traffic-indicator fix (PR #141, `/gds-code-review`)
+
+- **Traffic chip's hotspot floor can jitter and spam the `aria-live` region on
+  near-tie crossings** — `updateTraffic` (`src/main.ts`) recomputes
+  `peakCongestionFloor()` raw each ~160ms tick with a strict-`>` argmax. The tier
+  word is hysteresis-smoothed, but the floor suffix is not, so two floors at
+  nearly-equal congestion whose curves cross flip the label `Backed up · 42F` ↔
+  `· 47F`, and because `#traffic` is `aria-live="polite"` every flip re-announces
+  the whole chip to screen readers. Fix direction: move the floor number out of
+  the live region (announce the tier word, not the floor), or debounce the shown
+  floor. Plausible-not-certain (needs genuine near-tie crossings; exact ties are
+  stable). a11y polish, low severity.
+- **Multi-tier upward jumps enter the higher tier ~0.02 congestion early** —
+  the hysteresis up-guard indexes `B` by the current tier, not `raw-1`, so a
+  0→2 or 1→3 jump validates against the lower boundary's deadband. Pre-existing
+  behavior (not introduced by this change), no flicker, ~0.02 calibration
+  asymmetry. Negligible; noting for completeness.
+
 _(empty — all current deferrals are triaged into the table above.)_
 
 ## Completed / superseded
