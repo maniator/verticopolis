@@ -552,7 +552,9 @@ export class Tower {
     if (!valid.ok) return valid;
     const f = FACILITIES[kind];
     const span = top - bottom;
-    const cars = isElevatorKind(kind) ? Math.min(8, Math.max(1, Math.ceil(span / 6))) : 0;
+    // Clamp the initial car count to the kind's own cap (the single source of
+    // truth) so a fresh shaft can never open above what setCars would allow.
+    const cars = isElevatorKind(kind) ? Math.min(maxCarsFor(kind), Math.max(1, Math.ceil(span / 6))) : 0;
     const t: Transport = {
       id: this.nextId++,
       kind,
