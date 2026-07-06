@@ -189,6 +189,38 @@ export const CRANE_W = 128;
 export const CRANE_H = 76;
 
 /**
+ * Where to perch the rooftop crane along the top floor, in world-tile units
+ * (the mid-tile of the widest run of built tiles). Anchoring to the plain
+ * (min,max) midpoint floats the crane over open sky when the top floor is
+ * built in disjoint blocks — a setback, or a partly-leased top office row —
+ * because the midpoint then lands in the gap between blocks. Centering on the
+ * widest CONTIGUOUS run keeps the crane over actual structure; for a
+ * fully-built row the widest run IS the whole span, so the result is the same
+ * midpoint as before. Ties keep the leftmost run. `builtTiles` must be
+ * non-empty (callers only invoke this for a floor that has structure); it may
+ * repeat indices — duplicates are collapsed so a repeated tile can't be read
+ * as a one-wide gap that splits a run.
+ */
+export function craneAnchorTile(builtTiles: Iterable<number>): number {
+  const xs = [...new Set(builtTiles)].sort((a, b) => a - b);
+  let bestStart = xs[0];
+  let bestEnd = xs[0];
+  let runStart = xs[0];
+  for (let i = 1; i <= xs.length; i++) {
+    // A break in the run (or the end of the list) closes the current run.
+    if (i === xs.length || xs[i] !== xs[i - 1] + 1) {
+      if (xs[i - 1] - runStart > bestEnd - bestStart) {
+        bestStart = runStart;
+        bestEnd = xs[i - 1];
+      }
+      if (i < xs.length) runStart = xs[i];
+    }
+  }
+  // bestEnd is the last tile index (inclusive); its right edge is bestEnd + 1.
+  return (bestStart + bestEnd + 1) / 2;
+}
+
+/**
  * The rooftop tower crane that crowns the build while the tower is still
  * climbing (it comes down once the 100th floor caps the tower, as in the
  * original). Drawn fresh each frame into a CRANE_W×CRANE_H rect: the trolley
