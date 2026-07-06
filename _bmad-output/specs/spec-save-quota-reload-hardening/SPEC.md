@@ -20,14 +20,14 @@ A **pain to solve.** When the WebGL context is lost (mobile browsers reset it un
 
 - **CAP-2**
   - **intent:** The card's reassurance matches reality — the player is told their prior tower is safe only when one actually exists.
-  - **success:** With a prior autosave present, the card copy contains "last saved tower is safe"; with none, it does not. The card's guidance is accurate for both a full and a blocked storage failure.
+  - **success:** With a prior autosave present, the card copy contains "last saved tower is safe"; with none, it does not. The guidance matches the cause: a storage failure (full/blocked) offers storage advice; any other throw gets a neutral message with none.
 
 ## Constraints
 
 - The in-catch `SaveGame.hasSave()` read must be guarded in its own try/catch: `getItem` also throws when storage is *disabled* (`SecurityError`), and an unguarded read would re-throw before the card is shown, re-aborting the reload — the exact defect this fixes.
 - `SaveGame.saveTo` must keep throwing on a failed write: the update path (`saveBeforeUpdate` → `main.ts`) relies on the throw to pause the update rather than reload, and that contract must not regress.
 - A failed `setItem` is atomic (it never clobbers), so the prior autosave survives untouched — no write-to-temp-then-swap is introduced.
-- Card copy must be accurate for **both** failure classes it catches — storage full (quota) and storage blocked (private mode / `SecurityError`) — so "free up space" is not the only guidance offered.
+- Card copy must match the failure cause: a storage `DOMException` (quota full / private mode / disabled) gets storage guidance ("free up space or allow site storage"); any other throw (a serialize/stringify/compression bug) gets a neutral "unexpected error" message with **no** storage advice — the catch is broad, so it must not misdiagnose a non-storage failure.
 
 ## Non-goals
 

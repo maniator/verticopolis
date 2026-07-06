@@ -74,9 +74,8 @@ export class SaveLoad {
     if (!document.getElementById("splash")) {
       try {
         this.save(true);
-      } catch {
-        // The pre-reload flush failed — localStorage quota, private-mode, or a
-        // security exception. Left unhandled this throw would escape the
+      } catch (err) {
+        // The pre-reload flush failed. Left unhandled this throw would escape the
         // onContextLost handler and abort the reload, stranding the player on a
         // dead GPU canvas with no explanation. A failed setItem is atomic (it
         // never clobbers), so any prior autosave is intact — but we must NOT
@@ -94,14 +93,20 @@ export class SaveLoad {
         } catch {
           /* storage is unreadable too — just omit the reassurance */
         }
-        // Cover both failure classes the catch handles: storage FULL (quota) and
-        // storage BLOCKED (private mode / SecurityError), where "free up space"
-        // alone would be wrong advice.
+        // Only blame storage for an actual storage failure — quota full,
+        // private-mode, or disabled. A serialize/stringify/compression bug throws
+        // here too, and "free up space" would send the player down the wrong path;
+        // give those a neutral message instead.
+        const isStorageError =
+          err instanceof DOMException &&
+          (err.name === "QuotaExceededError" ||
+            err.name === "SecurityError" ||
+            err.name === "NS_ERROR_DOM_QUOTA_REACHED"); // Firefox's quota name
+        const detail = isStorageError
+          ? "storage is full or blocked." + priorSaveNote + "<br>Free up space or allow site storage, then reload."
+          : "the save hit an unexpected error." + priorSaveNote + "<br>Reload to continue.";
         this.deps.showBootMessage(
-          "The graphics driver crashed and your latest changes couldn't be saved — " +
-            "storage is full or blocked." +
-            priorSaveNote +
-            "<br>Free up space or allow site storage, then reload.",
+          "The graphics driver crashed and your latest changes couldn't be saved — " + detail,
           true,
         );
         return;

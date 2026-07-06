@@ -704,6 +704,26 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
+  it("a non-storage save error (e.g. a serialize/compression bug) shows a neutral card, not misleading storage advice", () => {
+    const reload = stubReload();
+    sim.money = 111_000;
+    SaveGame.save(sim); // a prior autosave exists
+    // A non-storage failure (not a quota/security DOMException) must not be
+    // misdiagnosed as "storage full" and send the player to free up space.
+    const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
+      throw new TypeError("Converting circular structure to JSON");
+    });
+    saveLoad.recoverFromContextLoss();
+    expect(reload).not.toHaveBeenCalled();
+    expect(bootMessages).toHaveLength(1);
+    expect(bootMessages[0].withReload).toBe(true);
+    expect(bootMessages[0].msg).not.toContain("storage is full or blocked");
+    expect(bootMessages[0].msg).not.toContain("Free up space");
+    // The prior tower is still safe, so still reassure.
+    expect(bootMessages[0].msg).toContain("last saved tower is safe");
+    spy.mockRestore();
+  });
+
   it("a context loss behind the splash reloads without persisting the boot sim", () => {
     const reload = stubReload();
     const splash = document.createElement("div");
