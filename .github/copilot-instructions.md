@@ -89,11 +89,21 @@ don't claim a skill was invoked:
 > commits the full BMGD/BMAD skill library under `.claude/skills/` and
 > `.agents/skills/` (~515 files each). Copilot's skill loader has a ~508-file
 > budget those trees blow past, so it drops **all** base-branch skills for safety
-> — a `.github/skills/code-review` skill can't load here. This overlay is the
-> mechanism by design; don't re-add a review skill expecting it to load.
-> (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and `gds-*`
-> families, ~515 files per convention; a bmad-only install lands ~256, under
-> budget.)
+> — a `.github/skills/code-review` skill can't load here. The reviewer's run log
+> states it outright:
+>
+> ```
+> [skills] Materialization aborted (convention .claude/skills has 515 files,
+>   exceeds remaining MAX_SKILL_FILE_COUNT budget (508)); dropping all
+>   base-branch skills for safety.
+> [skills] session=github/copilot-code-review ... configuredDirectories=0
+> [skills] session=github/copilot-code-review SDK reported 0 skills loaded
+> ```
+>
+> This overlay is the mechanism by design; don't re-add a review skill expecting
+> it to load. (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and
+> `gds-*` families, ~515 files per convention; a bmad-only install lands ~256,
+> under budget.)
 
 ## Code review
 
