@@ -20,7 +20,7 @@ import { EditorActions } from "./game/editorActions";
 import { SaveLoad } from "./game/saveLoad";
 import { InspectorController } from "./game/inspector";
 import { KeyboardPlay } from "./game/keyboardPlay";
-import { registerPWA } from "./pwa";
+import { registerPWA, type UpdateInfo } from "./pwa";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
@@ -68,6 +68,9 @@ class GameApp {
    *  the player chooses "Update now" (via the modal or the toolbar chip); null
    *  when the app is already on the latest build. */
   private pendingUpdate: (() => Promise<void>) | null = null;
+  /** Incoming build's identity/notes for the current pending update, shown in
+   *  the prompt. Null when unknown (fetch failed) — the modal then omits it. */
+  private pendingUpdateInfo: UpdateInfo | null = null;
   /** Whether the update modal is currently open — freezes the sim while it's up
    *  (same soft-freeze the emergency modal uses) so a player reading it can't
    *  lose game-hours at high speed. */
@@ -904,8 +907,9 @@ class GameApp {
    *  toolbar "Update" chip so the player always has a way in, and let the
    *  ~6Hz loop pop the prompt at the next calm moment. A second release during
    *  a long session overwrites the pending activation and re-arms the auto-pop. */
-  onUpdateAvailable(activate: () => Promise<void>): void {
+  onUpdateAvailable(activate: () => Promise<void>, info?: UpdateInfo): void {
     this.pendingUpdate = activate;
+    this.pendingUpdateInfo = info ?? null;
     this.updatePromptShown = false;
     this.ui.showUpdateChip(() => this.showUpdatePrompt());
   }
@@ -985,6 +989,7 @@ class GameApp {
           /* best-effort — a failed baseline save just leaves the last autosave in place */
         }
       },
+      this.pendingUpdateInfo,
     );
   }
 }
@@ -1028,7 +1033,7 @@ if (typeof document !== "undefined") {
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload) — see
       // GameApp.onUpdateAvailable.
-      registerPWA({ onUpdateAvailable: (activate) => app.onUpdateAvailable(activate) });
+      registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
     } catch (err) {
       showBootMessage("Something went wrong starting the game: " + (err as Error).message);
       throw err;

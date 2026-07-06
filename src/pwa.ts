@@ -19,16 +19,73 @@
  */
 import { registerSW } from "virtual:pwa-register";
 
+/**
+ * High-level facts about the INCOMING build, read at prompt time from the
+ * deployed `version.json` (see `emit-version-json` in vite.config.ts). The old
+ * client can't introspect the waiting worker, so this is how it learns what it's
+ * updating to. Everything is optional: on any failure the modal just omits it.
+ */
+export interface UpdateInfo {
+  /** The incoming build's `package.json` version, e.g. "1.1.1". */
+  version?: string;
+  /** Short git SHA of the incoming build, e.g. "a1b2c3d". */
+  sha?: string;
+  /** Player-facing "what's new" lines (empty until the trailer harvest ships). */
+  notes?: string[];
+}
+
 export interface PwaHandlers {
   /**
    * Fired the moment a new version is waiting. `activate` skips the waiting
    * worker and reloads onto the new assets; the app calls it only when the
    * player chooses to update now. If it is never called, the new worker simply
-   * activates on the next cold reopen — nothing is forced.
+   * activates on the next cold reopen — nothing is forced. `info` carries the
+   * incoming build's identity/notes (or undefined if it couldn't be fetched).
    */
-  onUpdateAvailable: (activate: () => Promise<void>) => void;
+  onUpdateAvailable: (activate: () => Promise<void>, info?: UpdateInfo) => void;
   /** Fired once the app is fully cached and usable offline. */
   onOfflineReady?: () => void;
+}
+
+/**
+ * Fetch the incoming build's `version.json`, network-fresh. It's deliberately
+ * NOT precached (Workbox `globPatterns` covers no `.json`, and there's no
+ * runtime cache route), so this always hits the freshly deployed file. `onNeedRefresh`
+ * only fires after `registration.update()` already found the new `sw.js`, so the
+ * server's `version.json` reflects the incoming build by the time we ask. Any
+ * failure (offline, 404, malformed) resolves to `null` — the prompt degrades to
+ * its generic copy and never blocks on this. */
+async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
+  try {
+    // Resolve against the page (base is "./", so the site lives at a Pages
+    // subpath) and cache-bust so a CDN edge can't hand back a stale copy.
+    const url = new URL("version.json", document.baseURI);
+    url.searchParams.set("t", String(Date.now()));
+    const res = await fetch(url.href, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    if (!res.ok) return null;
+    const j: unknown = await res.json();
+    if (typeof j !== "object" || j === null) return null;
+    const o = j as Record<string, unknown>;
+    // Sanitize notes from a source that could be malformed or (if the origin is
+    // ever compromised) hostile: keep strings only, trim, drop empties, cap each
+    // line's length so one giant unbroken token can't wreck the modal layout, and
+    // cap the count. Escaping (in the UI) blocks XSS; these bound layout damage.
+    const notes = Array.isArray(o.notes)
+      ? o.notes
+          .filter((n): n is string => typeof n === "string")
+          .map((s) => s.trim())
+          .filter((s) => s.length > 0)
+          .map((s) => (s.length > 200 ? s.slice(0, 200) : s))
+          .slice(0, 3)
+      : [];
+    return {
+      version: typeof o.version === "string" ? o.version : undefined,
+      sha: typeof o.sha === "string" ? o.sha : undefined,
+      notes,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -72,12 +129,19 @@ export function registerPWA(handlers: PwaHandlers): void {
       });
     },
     onNeedRefresh() {
-      // A new worker is waiting. Don't touch it — hand the app an `activate`
-      // callback (skipWaiting + reload onto the new assets) and let it decide
-      // when to prompt the player. Until the player picks "update now", the new
-      // worker keeps waiting and activates on the next cold reopen, so nothing
-      // is ever force-reloaded out from under a live game.
-      handlers.onUpdateAvailable(() => updateSW(true));
+      // A new worker is waiting. Don't touch it — fetch the incoming build's
+      // notes/identity (best-effort), then hand the app an `activate` callback
+      // (skipWaiting + reload onto the new assets) and let it decide when to
+      // prompt the player. Until the player picks "update now", the new worker
+      // keeps waiting and activates on the next cold reopen, so nothing is ever
+      // force-reloaded out from under a live game.
+      void (async () => {
+        const info = await fetchUpdateInfo();
+        handlers.onUpdateAvailable(() => updateSW(true), info ?? undefined);
+      })().catch(() => {
+        // onUpdateAvailable only stores state + shows the chip, but guard anyway
+        // so a throw here can't surface as an unhandled rejection.
+      });
     },
     onOfflineReady() {
       handlers.onOfflineReady?.();

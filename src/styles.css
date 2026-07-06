@@ -790,6 +790,34 @@ html.reduce-motion *::after {
   font-weight: 600;
 }
 
+/* The update prompt's "What's new" section: a small navy section strip (the
+   .win-title.sm idiom, same as the Statistics dialog) over a compact bullet
+   list. The wrapper is deliberate — it keeps the strip OUT of .modal-box's
+   DIRECT children, so it never inherits the full-bleed (.win > .win-title) or
+   sticky (.modal-box > .win-title) treatment reserved for the dialog title bar.
+   Wells are reserved for scrolling logs; this stays short (≤3 lines). */
+.whatsnew {
+  margin-top: 10px;
+}
+.whatsnew > .win-title.sm {
+  margin-bottom: 6px;
+}
+.whatsnew ul {
+  margin: 0 0 0 18px;
+}
+.whatsnew li {
+  margin-bottom: 2px;
+  overflow-wrap: anywhere;
+}
+/* Incoming build id — quiet fine print under the prompt, never the headline.
+   A long unbroken sha must wrap rather than force a horizontal scroll. */
+.build-id {
+  font-size: 11px;
+  color: var(--muted);
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
 /* ---- Tower Statistics dialog ----
  * The stats live on the gray chrome face (never a bare white sheet); each
  * section header is a navy mini title bar (.win-title), so the modal reads

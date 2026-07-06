@@ -1,9 +1,44 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
+import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
+
+/** Short git SHA of the build, or "unknown" outside a checkout. */
+function gitShortSha(): string {
+  try {
+    return execSync("git rev-parse --short HEAD", { stdio: ["ignore", "pipe", "ignore"] })
+      .toString()
+      .trim();
+  } catch {
+    return "unknown";
+  }
+}
+
+/**
+ * Emit `dist/version.json` describing THIS build — the file the running (old)
+ * client fetches when a new worker is waiting, to learn what it's updating to
+ * (see src/pwa.ts `fetchUpdateInfo`). It is deliberately a `.json`, which
+ * Workbox's `globPatterns` does not match, so it is never precached and is
+ * always fetched network-fresh. `notes` is empty today; the `Player-note:`
+ * trailer harvest (see AGENTS.md → Versioning) will populate it once
+ * player-facing features ship.
+ */
+function emitVersionJson(): Plugin {
+  return {
+    name: "emit-version-json",
+    apply: "build",
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "version.json",
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: [] as string[] }),
+      });
+    },
+  };
+}
 
 export default defineConfig({
   root: "src",
@@ -12,6 +47,7 @@ export default defineConfig({
   // in the browser bundle.)
   define: { __APP_VERSION__: JSON.stringify(pkgVersion) },
   plugins: [
+    emitVersionJson(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling
