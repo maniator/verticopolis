@@ -250,6 +250,21 @@ describe("Save hardening at the trust boundary", () => {
     void condo;
   });
 
+  it("does not treat a not-yet-built (construction) unit as sold on load", () => {
+    const sim = Simulation.newGame(3, "classic");
+    servedCondo(sim);
+    const raw = sim.serialize();
+    for (const u of raw.units) {
+      if (u.kind === "condo") {
+        u.everOccupied = true;
+        u.state = "construction"; // forged: sold-but-still-building is impossible
+      }
+    }
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo")!;
+    expect(rc.everOccupied).toBe(false); // can still sell once built
+  });
+
   it("clears a stale household on a not-sold condo on load", () => {
     const sim = Simulation.newGame(3, "modern");
     servedCondo(sim);

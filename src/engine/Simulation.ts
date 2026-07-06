@@ -1956,12 +1956,16 @@ export class Simulation implements SimContext {
         const state = isUnitState(u.state) ? u.state : "empty";
         // Harden the "currently sold/leased" flag at the trust boundary: only a
         // literal `true` counts (a forged "yes" must not mark a condo sold), AND a
-        // unit that deserializes empty or gutted is definitionally NOT currently
-        // owned — normalize the flag to false even if the save left it true. This
-        // rescues a LEGACY "dead" condo whose owner left back when `vacate()` kept
-        // `everOccupied` set on condos: without this it would reload as sold-but-
-        // empty and, since sales require `!everOccupied`, sit off-market forever.
-        const everOccupied = u.everOccupied === true && state !== "empty" && state !== "gutted";
+        // unit that deserializes into a not-yet-built or vacated shell — empty,
+        // under construction, or gutted — is definitionally NOT currently owned, so
+        // normalize the flag to false even if the save left it true. (A sold condo
+        // that's on fire IS still owned, so `fire` is deliberately not cleared.)
+        // This rescues a LEGACY "dead" condo whose owner left back when `vacate()`
+        // kept `everOccupied` set on condos — without it, the unit would reload as
+        // sold-but-empty and, since sales require `!everOccupied`, sit off-market
+        // forever — and blocks a forged construction/sold unit from doing the same.
+        const notOwned = state === "empty" || state === "construction" || state === "gutted";
+        const everOccupied = u.everOccupied === true && !notOwned;
         const soldCondo = u.kind === "condo" && everOccupied;
         // Player-set price, coerced to a finite number. For an UNSOLD condo, also
         // clamp into the re-anchored band so a legacy save priced at the old
