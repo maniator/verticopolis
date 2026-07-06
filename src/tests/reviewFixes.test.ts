@@ -135,6 +135,9 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     expect(new Set(elevators.map((t) => t.kind))).toEqual(
       new Set(["elevatorStandard", "elevatorService", "elevatorExpress"]),
     );
+    // Cross-pool independence (mirror of the walkway test): with the 24-shaft
+    // elevator budget spent, a stair — a SEPARATE pool — is still placeable.
+    expect(sim.buildTransport("stairs", 200, 1, 2).ok).toBe(true);
   });
 
   it("caps stairs + escalators at 64, pooled across both kinds (canon)", () => {
@@ -142,8 +145,11 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     sim.star = 3; // escalators unlock at 3★ (stairs at 1★) — exercise both in one pool
     const kinds: FacilityKind[] = ["stairs", "escalator"];
     let placed = 0;
-    for (let i = 0; i < 80; i++) {
-      // Fixed two-floor links on floors 1–2, spaced 5 tiles apart so none overlap.
+    // 68 fixed two-floor links, spaced 5 tiles apart (> max width 4, so none
+    // overlap) and every attempt on-lot (max x = 67·5 + 4 = 339 < 340). That
+    // overshoots the 64 cap, so the blocked attempts (i ≥ 64) prove the CAP
+    // rejects them — not the lot edge.
+    for (let i = 0; i < 68; i++) {
       if (sim.buildTransport(kinds[i % 2], i * 5, 1, 2).ok) placed++;
     }
     expect(placed).toBe(64);
@@ -153,8 +159,9 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     expect(walkways.length).toBe(64);
     expect(new Set(walkways.map((t) => t.kind))).toEqual(new Set(["stairs", "escalator"]));
     // The walkway pool is separate from the elevator pool: an elevator is still
-    // placeable with 64 walkways down.
-    expect(sim.buildTransport("elevatorStandard", 330, 1, 6).ok).toBe(true);
+    // placeable with 64 walkways down (floors 1–2, matching the walkways, so a
+    // failure here can only mean pool coupling — not a missing upper floor).
+    expect(sim.buildTransport("elevatorStandard", 330, 1, 2).ok).toBe(true);
   });
 });
 
