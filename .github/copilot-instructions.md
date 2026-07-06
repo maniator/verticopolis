@@ -78,6 +78,13 @@ don't claim a skill was invoked:
 - **Run the adversarial layers:** Blind Hunter → Edge Case Hunter → Acceptance
   Auditor, then a `bmad-party-mode` synthesis over only the personas the diff
   implicates.
+- **Deepen from the real skill when useful.** The repo is checked out, so you can
+  read the full method even though the loader dropped it (see the maintainer note
+  below): open `.agents/skills/gds-code-review/SKILL.md` for a gameplay/engine
+  diff, or `.agents/skills/bmad-code-review/SKILL.md` otherwise, plus their
+  `steps/*.md`, and follow them. You **cannot** run their scripts (no shell) or
+  spawn their subagents (you are a single, read-only agent), so apply the steps
+  inline yourself rather than invoking anything.
 - **Apply the review dimensions in the “Code review” section below,** scoped to
   the implicated lenses. Prefer a few high-signal findings over filler.
 - **End every review** with the exact line
