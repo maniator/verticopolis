@@ -283,6 +283,29 @@ describe("Save hardening at the trust boundary", () => {
     expect(rc.residents).toBeUndefined(); // no stale household leaks into the census/UI
   });
 
+  it("stamps the asking price on sale so buy-back survives a later default change", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    // The sale records its asking price on the unit, so rentOf no longer depends
+    // on the kind default (which a future build could move).
+    expect(condo.rent).toBe(ECON.rent.condo.default);
+  });
+
+  it("backfills a legacy sold condo's price to the pre-re-anchor default", () => {
+    // A pre-mode save (no `mode`) whose sold condo omitted `rent` sold at the OLD
+    // $120k default; its buy-back must mirror that, not pick up the new $160k.
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    const raw = sim.serialize();
+    delete (raw as { mode?: unknown }).mode;
+    for (const u of raw.units) if (u.kind === "condo") delete (u as { rent?: unknown }).rent;
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
+    expect(rentOf(rc)).toBe(120_000);
+  });
+
   it("clamps an unsold condo's legacy out-of-band price, leaving sold condos untouched", () => {
     const sim = Simulation.newGame(3, "classic");
     const a = servedCondo(sim);

@@ -93,16 +93,45 @@ const NOISE_EROSION = 0.07;
 const CONDO_NOISE_EROSION = 0.054;
 
 /**
+ * The condo sale price BEFORE this build re-anchored the band (old default 2×
+ * cost was $120k, now $160k). A pre-mode save's SOLD condo that omitted `rent`
+ * sold at this price, so we backfill it on load (see {@link migrateSave}) — the
+ * buy-back must mirror what the unit actually sold for, not the new default.
+ */
+const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
+
+/**
  * Save-format migration seam. Runs before the field-level coercion in
- * {@link Simulation.deserialize}. v1 is the only format today, so this is the
- * identity transform — but it makes `version` an honest contract instead of a
- * constant nobody reads, and gives the next format change a single anchor.
+ * {@link Simulation.deserialize}. Beyond normalizing `version`, it backfills the
+ * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
+ * still mirrors its historical sale price.
  */
 function migrateSave(data: SerializedGame): SerializedGame {
   // A missing/garbled version is normalized so the (future) upgrade chain has a
   // number to branch on; deserialize()'s coercion still hardens every value.
   const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
-  const migrated: SerializedGame = data.version === version ? data : { ...data, version };
+  let migrated: SerializedGame = data.version === version ? data : { ...data, version };
+  // A save with no `mode` predates the condo work. A SOLD condo (owned, not an
+  // empty/dead shell) that omitted `rent` sold at the OLD default — stamp it so
+  // its buy-back mirrors that historical price instead of picking up the new,
+  // higher default via rentOf(). Only touch that exact shape; never re-price a
+  // condo that already carries a rent, or an unsold/dead one.
+  if (migrated.mode === undefined && Array.isArray(migrated.units)) {
+    migrated = {
+      ...migrated,
+      units: migrated.units.map((u) =>
+        u &&
+        u.kind === "condo" &&
+        u.everOccupied === true &&
+        u.rent === undefined &&
+        u.state !== "empty" &&
+        u.state !== "gutted" &&
+        u.state !== "construction"
+          ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }
+          : u,
+      ),
+    };
+  }
   // Future upgrades chain here in order, each bumping migrated.version, e.g.:
   //   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
@@ -1501,8 +1530,14 @@ export class Simulation implements SimContext {
       // asking price; Modern → a 2–5 person household that scales the price. The
       // asking price the player set still drives HOW FAST it sells (via move-in
       // demand); the rule-set decides WHAT it fetches and who moves in.
-      const { price, residents } = this.rules.sellCondo(rentOf(u), this.rng);
+      const asking = rentOf(u);
+      const { price, residents } = this.rules.sellCondo(asking, this.rng);
       if (residents !== undefined) u.residents = residents;
+      // Stamp the asking price the sale was struck at, so a later buy-back mirrors
+      // THIS price even if the kind's default moves in a future build (rentOf
+      // would otherwise pick up the new default for an un-priced condo). A sold
+      // condo can't be repriced, so this stays fixed for the unit's owned life.
+      u.rent = asking;
       this.money += price;
       this.recordMoney("condos", price);
       this.moveInsToday.condos++;

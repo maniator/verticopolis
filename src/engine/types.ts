@@ -213,17 +213,18 @@ export interface Unit {
    *  back to the flat catalog value) rather than the raw field; the rule-set's
    *  pricing/churn and the Households readout read it directly on purpose. */
   residents?: number;
-  /** The "currently sold / leased / booked" predicate — true while the unit is
-   *  taken right now. Set when a tenant first moves in (office lease, hotel
-   *  check-in) or the condo sells, and CLEARED again when the unit is vacated or
-   *  gutted (and, on load, for any not-yet-built/empty shell), so it returns to
-   *  the market: a re-let office, a re-bookable hotel room, or a bought-back condo
-   *  that can re-sell. (Despite the name, it is not a permanent "ever" marker — it
-   *  tracks the current state.) The engine keys off it: it gates the one-time
-   *  condo sale income, blocks repricing a sold condo, exempts a sold condo from
-   *  overhead, and drives the owner buy-back on eviction. NOT a live-occupancy
-   *  signal — whether anyone is home right now is `state` / {@link isTenanted} /
-   *  {@link isPresent}, not this. */
+  /** "Taken" marker whose lifecycle differs by kind:
+   *  - **Offices & condos** — the CURRENTLY-leased/sold predicate: set on move-in
+   *    or sale, and CLEARED again on vacate or gut (and, on load, for any
+   *    empty/construction/gutted shell), so the unit returns to the market — a
+   *    re-let office, or a bought-back condo that can re-sell. It gates the
+   *    one-time condo sale income, blocks repricing a sold condo, exempts a sold
+   *    condo from overhead, and drives the owner buy-back on eviction.
+   *  - **Hotels** — set on the first check-in and never cleared (nightly turnover
+   *    runs through `state`: asleep → dirty → empty), so for a hotel room it reads
+   *    as "has ever been booked", not "booked right now".
+   *  Either way it is NOT a live-occupancy signal — who is present right now is
+   *  `state` / {@link isTenanted} / {@link isPresent}, never this. */
   everOccupied: boolean;
   /** Accumulated income not yet collected (offices/condos). */
   pendingIncome: number;
