@@ -9,8 +9,9 @@ body:
         Verticopolis is a homage to the 1994 **SimTower**. Towers are founded in one of two modes:
         **Classic** (faithful to the 1994 original) or **Modern** (an opt-in "what the original
         couldn't do" layer). New behavior that departs from the original generally belongs in
-        **Modern** mode so Classic stays canon. If your request is about matching the original's
-        behavior in Classic mode, please use the **SimTower parity** template instead.
+        **Modern** mode so Classic stays canon. If you're reporting that an *already-implemented*
+        behavior diverges from the original, use the **SimTower parity report** template instead —
+        this form is for behavior we don't have yet.
   - type: textarea
     id: problem
     attributes:
@@ -36,7 +37,7 @@ body:
       label: Which game mode should this target?
       description: Classic must stay faithful to the 1994 original; new/expanded behavior usually belongs in Modern.
       options:
-        - Classic — a faithful behavior the original had that we're missing
+        - Classic — restore a faithful behavior the original had that we never implemented
         - Modern — a new behavior the original never had
         - Both / mode-agnostic
         - Not sure

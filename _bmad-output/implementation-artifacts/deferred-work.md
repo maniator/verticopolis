@@ -113,3 +113,30 @@ PR that found them. Pick these up when touching the relevant area.
   two duplicate local helpers, and the previously **raw** user-controlled
   `u.label` in the inspector card (settable via Rename) is now escaped — the
   exact regression this entry predicted had already shipped.
+
+## Deferred from: bmad-code-review (2026-07-06, GitHub PR + issue templates — PR #129)
+
+- **PR template references AGENTS.md mode guidance that lands with #123, not on `main` yet.**
+  `.github/PULL_REQUEST_TEMPLATE.md`'s "Game mode impact" section says "See AGENTS.md for
+  the current rule-set location and the 'don't smear mode logic' tripwire." That Classic/Modern
+  rule-set documentation arrives in unmerged PR #123; on the current `main` AGENTS.md has no
+  such section (only an incidental "Modern-mode feature" mention in the Versioning example).
+  Intentional — the mode text was added at the user's request in anticipation of #123. Resolves
+  automatically once #123 merges. **Recommendation: merge #123 before (or together with) #129**
+  so the template never points at absent guidance. No code change needed if merge order holds.
+
+- **No filing path for security / question / docs issues (`blank_issues_enabled: false`).**
+  `.github/ISSUE_TEMPLATE/config.yml` disables blank issues and offers only bug/feature/parity
+  forms; the two contact links (live build, issue search) don't open an issue. A security/vuln
+  disclosure — which AGENTS.md explicitly flags as relevant given untrusted `.TWR` save import —
+  has nowhere to go, as do plain questions or docs/tooling reports. Needs a decision on the
+  security channel (GitHub private vulnerability reporting + SECURITY.md, an email, or a
+  security-advisory contact link) before adding a path. Left for the maintainer to choose.
+
+- **`parity` label does not exist in the repo (action item, not a code change).**
+  `.github/ISSUE_TEMPLATE/parity_report.yml` sets `labels: ["parity"]`, but `parity` is not a
+  GitHub default label and is not present in `maniator/verticopolis` (verified via API; `bug` and
+  `enhancement` exist). GitHub silently drops the missing label, so parity reports arrive
+  unlabeled and label-based triage misses them. Fix is an infra action (create the `parity`
+  label) that the available tooling couldn't perform in-session. **Create the `parity` label**
+  (Settings → Labels, or `gh label create parity`) so the template's label actually applies.

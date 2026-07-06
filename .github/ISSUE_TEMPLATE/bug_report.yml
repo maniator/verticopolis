@@ -60,13 +60,11 @@ body:
     id: mode
     attributes:
       label: Game mode
-      description: Which mode was the affected tower founded in? Behavior can differ between Classic and Modern.
+      description: If your tower was founded with a mode picker, which mode was it? Leave as "Not sure / not applicable" if your build has no mode selector.
       options:
+        - Not sure / not applicable
         - Classic
         - Modern
-        - Not sure / not applicable
-    validations:
-      required: true
   - type: textarea
     id: console
     attributes:
@@ -78,7 +76,6 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: I reproduced this on the latest build at verticopolis.com.
-          required: true
+        - label: I checked whether this still reproduces on the latest build at verticopolis.com (fork/local or older-build reports are still welcome).
         - label: I searched existing issues and this is not a duplicate.
           required: true
