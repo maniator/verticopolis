@@ -82,10 +82,19 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR.
 
 - **Self-review before pushing.** Read your own diff end-to-end with a
   reviewer's eye — correctness (wrong conditions, off-by-one, null/undefined,
-  missing `await`, broken call sites) and cleanup (duplication, dead code,
-  needless complexity) — and fix what you find before opening or updating a PR.
-  Treat it as running `/code-review` on yourself; don't outsource the first
-  pass to the bots.
+  missing `await`, broken call sites), cleanup (duplication, dead code,
+  needless complexity), and **algorithmic complexity** (see below) — and fix
+  what you find before opening or updating a PR. Treat it as running
+  `/code-review` on yourself; don't outsource the first pass to the bots.
+- **No Big-O regressions on hot paths.** The tick loop and render/UI refresh
+  run over the whole tower every step, and towers get large (hundreds of units,
+  dozens of shafts, ~100 floors, thousands of person-trips). Look up entities by
+  id via `Tower.getUnit` / `getTransport` — never `units.find` / `transports.find`
+  — hoist tower-wide facts out of per-unit/per-person loops, keep running counters
+  instead of re-scanning, and memoize per-`revision` work. The deep review must
+  reject any new `.find` / `.filter` / `.some` nested in a loop over another
+  collection on a per-tick or per-frame path, the same as a correctness finding.
+  (Canon and full rationale: `_bmad-output/project-context.md`, Performance section.)
 - **Deep review in the same session that writes the code — not "later,
   before merge".** Green CI is necessary but not sufficient — never merge on a
   passing pipeline alone. The session (human or agent) that authors a

@@ -1209,8 +1209,6 @@ export class TowerEngine {
   private drawSelection(ctx: CanvasRenderingContext2D): void {
     this.arrowHit = {};
     if (this.selectedId == null) return;
-    // drawSelection runs every frame on the uncached overlay canvas, so resolve
-    // the selected entity via the O(1) id-index rather than a linear scan.
     const u = this.sim.tower.getUnit(this.selectedId);
     if (u) {
       const hgt = facilityFloors(u.kind);

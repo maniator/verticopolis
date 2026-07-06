@@ -60,8 +60,7 @@ interface Route {
   shafts: number[];
 }
 
-/** The four spawn-source floor lists, computed once per outer sim step (see
- *  {@link Crowd.spawnFloors}) and shared across the spawn drain loop. */
+/** The four spawn-source floor lists, computed once per outer sim step. */
 interface SpawnFloors {
   leasedOffices: number[];
   staffedOffices: number[];
@@ -323,11 +322,9 @@ export class Crowd {
 
   // ---- Spawning -----------------------------------------------------------
 
-  /** Bin every in-service floor into the four spawn categories in a SINGLE pass
-   *  over `tower.units`. The tenancy gate (a `vacating` tenant still commutes
-   *  through their notice period) and per-category predicates are preserved, and
-   *  insertion order (hence `rng.pick` indexing) matches the old per-category
-   *  scans, so the crowd stays deterministic. */
+  /** Bin every in-service floor into the four spawn categories in one pass over
+   *  `tower.units` (a `vacating` tenant still commutes through their notice
+   *  period). Insertion order is preserved so `rng.pick` stays deterministic. */
   private spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     const hour = clock.hour;
     const weekend = clock.isWeekend;
@@ -506,10 +503,8 @@ export class Crowd {
     const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
     this.spawnAcc += dtSec * timeRate * popFactor;
     if (this.spawnAcc < 1) return;
-    // Categorize floors ONCE per outer step. The drain loop below only adds
-    // people (never units), so the four floor lists are stable across its ≤8
-    // iterations — recomputing them per iteration was up to 8× redundant
-    // full-unit scans (4 scans each). One pass here bins all four at once.
+    // Categorize floors once per outer step: the drain loop below only adds
+    // people (never units), so the four lists are stable across its iterations.
     const floors = this.spawnFloors(tower, clock);
     let guard = 0;
     while (this.spawnAcc >= 1 && guard++ < 8) {
@@ -555,9 +550,6 @@ export class Crowd {
   }
 
   private shaftOf(tower: Tower, id: number | null): Transport | undefined {
-    // O(1) index lookup: this runs for essentially every active person on every
-    // movement sub-step, so a linear `transports.find` here is O(people ×
-    // transports × substeps) per tick.
     return id == null ? undefined : tower.getTransport(id);
   }
 

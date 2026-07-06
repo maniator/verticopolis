@@ -85,10 +85,8 @@ export class EconomySystem {
       reachCache.set(floor, hit);
       return hit;
     };
-    // Whether a metro softens rain's hit to traffic is a tower-wide fact — hoist
-    // it out of the per-unit loop so the O(units) `hasOperational` scan runs at
-    // most once per hour (and only when it's actually raining), not once per
-    // reachable open commercial unit (which was O(units²) on rainy hours).
+    // Whether a metro softens rain's hit to traffic is a tower-wide fact, so
+    // resolve it once here rather than per unit inside the loop below.
     const rainMetroRelief = this.sim.weather === "rain" && this.hasOperational("metro");
     for (const u of this.sim.tower.units) {
       const daily = ECON.dailyTrafficIncome[u.kind];
@@ -208,7 +206,7 @@ export class EconomySystem {
    *  per-crew in-flight counter stays consistent. */
   private hkAssignedRoom = new Map<number, number>();
   /** Crew unit id → housekeepers it currently has en route, maintained in
-   *  lockstep with {@link hkAssignedRoom} for O(1) {@link hkInFlight}. */
+   *  lockstep with {@link hkAssignedRoom}. */
   private hkInFlightByCrew = new Map<number, number>();
   /** Rooms turned over so far today (reported at the next checkout). */
   private hkCleanedToday = 0;
@@ -217,10 +215,7 @@ export class EconomySystem {
   /** Day the "at capacity" nudge last fired, so it warns once per day. */
   private hkStarvedDay = -1;
 
-  /** Housekeepers a crew currently has en route. Read from a maintained counter
-   *  ({@link hkInFlightByCrew}) rather than re-derived by scanning the whole
-   *  assignment map on every check — the old O(assignments) scan sat inside the
-   *  per-room × per-crew dispatch loops, making dispatch O(rooms² × crews). */
+  /** Housekeepers a crew currently has en route. */
   private hkInFlight(crewId: number): number {
     return this.hkInFlightByCrew.get(crewId) ?? 0;
   }

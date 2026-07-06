@@ -796,8 +796,6 @@ class GameApp {
    *  (selection stores only an id — the entity may have been removed). */
   private selectedUnit(): Unit | undefined {
     if (this.selected?.type !== "unit") return undefined;
-    // O(1) id-index lookup — this runs every frame via positionPanels while a
-    // facility is selected, so a linear scan here is O(units) per frame.
     return this.sim.tower.getUnit(this.selected.id);
   }
   private selectedTransport(): Transport | undefined {

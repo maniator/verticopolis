@@ -64,9 +64,7 @@ export class Tower {
    *  tile lookups are O(1) rather than a linear scan (hot in the flood-fills and
    *  the per-frame congestion read). */
   private byId = new Map<number, Unit>();
-  /** id → transport, kept in lockstep with `transports` (mirrors `byId` for
-   *  units) so shaft lookups are O(1) rather than a linear scan. Hot in the
-   *  crowd's per-person routing (`shaftOf`) and the per-frame selection read. */
+  /** id → transport, kept in lockstep with `transports` (mirror of `byId`). */
   private transportsById = new Map<number, Transport>();
   /** floor → number of lobby structural tiles on it, so "is this a lobby floor?"
    *  is O(1). Used to keep express-elevator stops synced with sky lobbies as they
@@ -139,14 +137,12 @@ export class Tower {
     return this.transportsById.get(id);
   }
 
-  /** O(1) unit lookup by id, backed by the {@link byId} index — the public
-   *  accessor every id-based caller (Simulation, Economy, Events, renderer)
-   *  should use instead of a linear `units.find`. */
+  /** Look up a unit by id. */
   getUnit(id: number): Unit | undefined {
     return this.byId.get(id);
   }
 
-  /** O(1) transport lookup by id (see {@link transportsById}). */
+  /** Look up a transport by id. */
   getTransport(id: number): Transport | undefined {
     return this.transportsById.get(id);
   }
@@ -220,9 +216,8 @@ export class Tower {
     this.byId.clear();
     this.lobbyTiles.clear();
     for (const u of this.units) this.register(u);
-    // Rebuild the transport id-index too: deserialize bulk-assigns
-    // `this.transports` before calling reindex, so this is the single point
-    // that keeps the map consistent with a freshly loaded shaft list.
+    // Deserialize bulk-assigns `this.transports` before calling reindex, so
+    // rebuild the transport index (and drop any stale stop lists) here too.
     this.transportsById.clear();
     this.stopsCache.clear();
     for (const t of this.transports) this.transportsById.set(t.id, t);
@@ -829,17 +824,12 @@ export class Tower {
   }
 
   /** Memoized stop lists, keyed by transport id and validated against
-   *  {@link revision}: stops only change on structural / express-config edits
-   *  (each bumps revision), so within a tick every consumer shares one array
-   *  instead of re-walking `bottom..top` (and re-scanning `skipFloors`) per
-   *  call. The returned array is treated as read-only by all callers. */
+   *  {@link revision} (every stop-affecting edit bumps it). Callers treat the
+   *  returned array as read-only. */
   private stopsCache = new Map<number, { rev: number; stops: number[] }>();
 
   /** The floors a transport actually stops at — the single stop-enumeration
-   *  every consumer (routing graphs, dispatch, staff components) shares.
-   *  Memoized per {@link revision}: called every tick per elevator by
-   *  {@link ElevatorDispatch.moveCars} (itself run once per movement sub-chunk),
-   *  and per transport by the crowd's adjacency build. */
+   *  every consumer (routing graphs, dispatch, staff components) shares. */
   stopsOf(t: Transport): number[] {
     const cached = this.stopsCache.get(t.id);
     if (cached && cached.rev === this.revision) return cached.stops;
