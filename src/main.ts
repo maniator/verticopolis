@@ -64,6 +64,21 @@ class GameApp {
   private hadReadableSave = false;
   /** Whether the emergency-choice modal is currently open. */
   private shownChoice = false;
+  /** A newer build is waiting: skips the worker + reloads onto it. Held until
+   *  the player chooses "Update now" (via the modal or the toolbar chip); null
+   *  when the app is already on the latest build. */
+  private pendingUpdate: (() => Promise<void>) | null = null;
+  /** Whether the update modal is currently open — freezes the sim while it's up
+   *  (same soft-freeze the emergency modal uses) so a player reading it can't
+   *  lose game-hours at high speed. */
+  private shownUpdate = false;
+  /** Whether the update modal has already auto-surfaced for the current pending
+   *  build, so it pops at most once on its own; after that the toolbar chip is
+   *  the way back in. Reset when a genuinely newer build arrives. */
+  private updatePromptShown = false;
+  /** True from the moment "Update now" starts activating until the reload lands,
+   *  so a stray chip tap in that window can't fire a second activation. */
+  private updating = false;
   /** Last star rating we played a promotion jingle for (so 2★–5★ promotions
    * each get the jingle FR-58 promises, not only the final TOWER win). */
   private lastStar = 1;
@@ -665,9 +680,11 @@ class GameApp {
   // ---- Per-frame simulation + UI -----------------------------------------
 
   private update(dtMs: number): void {
-    // While an emergency choice is open, freeze time (canon: the modal pauses the
-    // game) so the engine can't auto-resolve the choice out from under the player.
-    if (this.shownChoice) {
+    // While a blocking modal is open, freeze time so nothing changes under it:
+    // an emergency choice (canon: the modal pauses the game) must not auto-resolve
+    // out from under the player, and the update prompt must not let a distracted
+    // player lose game-hours at high speed while it waits for their answer.
+    if (this.shownChoice || this.shownUpdate) {
       this.accMinutes = 0;
       return;
     }
@@ -714,6 +731,11 @@ class GameApp {
       } else if (!pc && this.shownChoice) {
         this.shownChoice = false; // engine auto-resolved it (player ignored the modal)
       }
+      // A new build is waiting: auto-surface the update prompt once, but only at
+      // a calm moment (mirrors how the emergency choice is surfaced above). The
+      // chip is already visible from the instant the build was found, so if a
+      // calm moment never comes the player still has a way in.
+      this.maybeSurfaceUpdatePrompt();
       if (this.sim.evaluatedTower && !this.shownWin) {
         this.shownWin = true;
         this.audio.sfx("promote");
@@ -882,11 +904,93 @@ class GameApp {
     this.history.redo();
   }
 
-  /** Called by the PWA layer the instant a new version is ready (wired up in
-   *  the bootstrap below) — the SaveLoad controller flushes the tower to the
-   *  autosave slot before the imminent reload. */
-  onUpdateReady(): void {
-    this.saveLoad.onUpdateReady();
+  /** Called by the PWA layer the instant a newer build is waiting (wired up in
+   *  the bootstrap below). We do NOT reload — we hold the activation, reveal the
+   *  toolbar "Update" chip so the player always has a way in, and let the
+   *  ~6Hz loop pop the prompt at the next calm moment. A second release during
+   *  a long session overwrites the pending activation and re-arms the auto-pop. */
+  onUpdateAvailable(activate: () => Promise<void>): void {
+    this.pendingUpdate = activate;
+    this.updatePromptShown = false;
+    this.ui.showUpdateChip(() => this.showUpdatePrompt());
+  }
+
+  /** True when it's safe to pop the update modal: nothing else owns the screen
+   *  or a pending player decision. Opening a second modal would wipe the shared
+   *  `<dialog>` and can strand a frozen sim, so this guard is load-bearing. */
+  private updateCoastClear(): boolean {
+    return (
+      this.pendingUpdate !== null &&
+      !this.updating &&
+      !this.shownUpdate &&
+      !this.shownChoice &&
+      !this.transportStart &&
+      !this.ui.isModalOpen() &&
+      !document.getElementById("splash")
+    );
+  }
+
+  /** Auto-surface the update prompt at most once per pending build, only when
+   *  the coast is clear. Called every ~6Hz tick. */
+  private maybeSurfaceUpdatePrompt(): void {
+    if (this.updatePromptShown) return;
+    if (!this.updateCoastClear()) return;
+    this.showUpdatePrompt();
+  }
+
+  /** Open the "update available" modal. Shared by the auto-surface poll and the
+   *  toolbar chip. No-ops unless the coast is clear (so a chip tap during an
+   *  emergency, a drag, or another dialog is simply ignored). */
+  private showUpdatePrompt(): void {
+    if (!this.updateCoastClear()) return;
+    const activate = this.pendingUpdate!;
+    this.updatePromptShown = true;
+    this.shownUpdate = true; // freeze the sim while the prompt is up
+    this.ui.showUpdatePrompt(
+      // Update now: save the tower FIRST, then activate (skipWaiting + reload).
+      // If the save fails we do NOT reload — dropping unsaved progress is the one
+      // thing this flow exists to prevent — so we unfreeze, tell the player, and
+      // leave the build waiting (the chip stays, so they can retry).
+      async () => {
+        try {
+          this.saveLoad.saveBeforeUpdate();
+        } catch {
+          this.shownUpdate = false;
+          this.ui.toast("Couldn't save your tower — update paused. Try again.", "bad");
+          return;
+        }
+        // Unfreeze before activating: on success `activate()` reloads onto the
+        // new build and nothing below matters, but if the worker swap ever
+        // hiccups the sim must not be left frozen with no modal (a save just
+        // ran, so a few resumed ticks are harmless). Keep `pendingUpdate` set
+        // through the call so a failed activate leaves the chip live for a retry
+        // rather than stranding the player on the old build.
+        this.shownUpdate = false;
+        this.updating = true; // block a second activation during the reload window
+        try {
+          await activate();
+        } catch {
+          this.updating = false; // reload didn't happen — allow a retry via the chip
+          this.ui.toast("Update couldn't be applied — try again.", "bad");
+        }
+      },
+      // Later: keep playing. The waiting build activates on the next cold reopen
+      // (prompt mode never force-activates); reset the autosave baseline to now
+      // so that reopen can't cost more than this moment, and leave the chip up so
+      // they can pull the prompt back up and update whenever they like.
+      () => {
+        this.shownUpdate = false;
+        // Mark as surfaced so the auto-pop doesn't immediately re-open — even if a
+        // newer build arrived mid-modal and re-armed it. The chip stays as the way
+        // back in; a genuinely newer build re-arms auto-pop via onUpdateAvailable.
+        this.updatePromptShown = true;
+        try {
+          this.saveLoad.save(true);
+        } catch {
+          /* best-effort — a failed baseline save just leaves the last autosave in place */
+        }
+      },
+    );
   }
 }
 
@@ -927,8 +1031,9 @@ if (typeof document !== "undefined") {
       // Expose for screenshot tooling / debugging.
       (window as unknown as { game: GameApp }).game = app;
       // Register the service worker so the game is installable and offline-ready.
-      // On a new build: quick-save the tower, then swap to the latest assets.
-      registerPWA({ onUpdateReady: () => app.onUpdateReady() });
+      // On a new build: prompt the player (never force a reload) — see
+      // GameApp.onUpdateAvailable.
+      registerPWA({ onUpdateAvailable: (activate) => app.onUpdateAvailable(activate) });
     } catch (err) {
       showBootMessage("Something went wrong starting the game: " + (err as Error).message);
       throw err;

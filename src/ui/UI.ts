@@ -787,6 +787,66 @@ export class UI {
     dialog.oncancel = () => finish("decline"); // Esc
   }
 
+  /** True while any modal is on screen (the shared `<dialog>` is open). Callers
+   *  use this to avoid opening a second modal, which would wipe the first's DOM
+   *  and its pending handlers. */
+  isModalOpen(): boolean {
+    return (this.el.modal as HTMLDialogElement).open;
+  }
+
+  /**
+   * "A new build is ready" prompt. `onUpdateNow` saves and reloads onto the new
+   * assets; `onLater` defers (the build applies on the next reload). Dismissing
+   * by Esc, the ✕, or a backdrop click all count as "Later" — the safe choice —
+   * and, like the emergency modal, the outcome fires exactly once no matter how
+   * the modal closes.
+   */
+  showUpdatePrompt(onUpdateNow: () => void, onLater: () => void): void {
+    const box = this.openModal(`
+      <h2>Update available</h2>
+      <p>A newer version of Verticopolis is ready.</p>
+      <p>Update now saves your tower and reloads onto it — you won't lose any progress. Or keep playing: it'll apply the next time you reopen the game, or whenever you tap <b>↻ Update</b>.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="later">Later</button>
+        <button class="btn primary" data-act="update">Update now</button>
+      </div>
+    `);
+    const dialog = this.el.modal as HTMLDialogElement;
+    let done = false;
+    const later = () => {
+      if (done) return;
+      done = true;
+      this.closeModal();
+      onLater();
+    };
+    const update = () => {
+      if (done) return;
+      done = true;
+      this.closeModal();
+      onUpdateNow();
+    };
+    this.wireActions(box, { later, update }, { close: false });
+    dialog.onclick = (e) => {
+      if (e.target === dialog) later();
+    }; // backdrop
+    dialog.oncancel = () => later(); // Esc / ✕
+  }
+
+  /** Reveal the persistent "Update" chip in the speed toolbar (idempotent) and
+   *  wire its click. Announced politely for screen readers. The chip is the
+   *  durable way back to the update prompt after the player defers, and the
+   *  fallback if a calm moment to auto-surface the modal never comes. */
+  showUpdateChip(onClick: () => void): void {
+    const btn = document.getElementById("btn-update") as HTMLButtonElement | null;
+    if (!btn) return;
+    btn.onclick = onClick;
+    if (btn.hidden) {
+      btn.hidden = false;
+      const live = document.getElementById("a11y-live");
+      if (live) live.textContent = "An update is ready.";
+    }
+  }
+
   congratsTower(): void {
     const box = this.openModal(`
       <h2>🏆 TOWER achieved!</h2>

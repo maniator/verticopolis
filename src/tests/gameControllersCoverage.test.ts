@@ -551,19 +551,19 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts)).toEqual({ text: "Tower loaded.", kind: "good" });
   });
 
-  it("onUpdateReady behind the first-run splash saves nothing (the boot sim is throwaway)", () => {
+  it("saveBeforeUpdate behind the first-run splash saves nothing (the boot sim is throwaway)", () => {
     const splash = document.createElement("div");
     splash.id = "splash";
     document.body.appendChild(splash);
-    saveLoad.onUpdateReady();
+    saveLoad.saveBeforeUpdate();
     expect(SaveGame.hasSave()).toBe(false);
     expect(f.toasts).toEqual([]);
   });
 
-  it("onUpdateReady in play flushes the autosave and announces the update", () => {
-    saveLoad.onUpdateReady();
+  it("saveBeforeUpdate in play flushes the autosave silently (the modal already told the player)", () => {
+    saveLoad.saveBeforeUpdate();
     expect(SaveGame.hasSave()).toBe(true);
-    expect(f.toasts).toEqual([{ text: "New version ready — saved your tower, updating…", kind: "info" }]);
+    expect(f.toasts).toEqual([]);
   });
 
   it("exportGame downloads a .vctower file named after the tower and toasts the size", async () => {
