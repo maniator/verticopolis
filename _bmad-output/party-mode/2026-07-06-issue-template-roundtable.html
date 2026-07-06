@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>The Issue-Template Roundtable — 6 Jul 2026</title>
+<style>
+  :root{
+    --bg:#0e1420; --panel:#151d2c; --panel2:#1b2536; --ink:#e8eef7; --dim:#9fb0c9;
+    --line:#26324a; --accent:#f5b642; --accent2:#6fd0c0; --red:#e2604f; --green:#57b083;
+    --shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: light){
+    :root{ --bg:#eef2f8; --panel:#ffffff; --panel2:#f4f7fc; --ink:#16202f; --dim:#5a6b83;
+      --line:#dbe3ef; --accent:#c98a12; --accent2:#1f9c88; --red:#c8452f; --green:#2f8b5c;
+      --shadow:0 10px 26px rgba(30,45,70,.12);}
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, rgba(245,182,66,.10), transparent 60%),var(--bg);
+    color:var(--ink);font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 18px 64px;}
+  .wrap{max-width:840px;margin:0 auto}
+  header.hero{text-align:center;margin-bottom:34px}
+  .kicker{letter-spacing:.22em;text-transform:uppercase;font-size:12px;color:var(--accent);font-weight:700}
+  h1{font-size:clamp(28px,5vw,44px);margin:.25em 0 .1em;line-height:1.08;letter-spacing:-.01em}
+  .sub{color:var(--dim);font-size:15px}
+  .tower{display:block;margin:18px auto 0}
+  .tower .lift{transform-origin:center;animation:ride 4.2s ease-in-out infinite}
+  @keyframes ride{0%,100%{transform:translateY(0)}50%{transform:translateY(48px)}}
+
+  .reframe{margin:30px 0;padding:26px 24px;border-radius:16px;background:linear-gradient(135deg,var(--panel2),var(--panel));
+    border:1px solid var(--line);box-shadow:var(--shadow);text-align:center}
+  .reframe b{color:var(--accent2)}
+  .reframe .big{font-size:clamp(19px,3.4vw,26px);font-weight:650;line-height:1.35}
+  .reframe .cap{margin-top:10px;color:var(--dim);font-size:13.5px}
+
+  h2.sec{font-size:13px;letter-spacing:.16em;text-transform:uppercase;color:var(--dim);
+    margin:38px 0 14px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+
+  .card{display:flex;gap:16px;padding:18px;margin:12px 0;border-radius:14px;background:var(--panel);
+    border:1px solid var(--line);box-shadow:var(--shadow)}
+  .ava{flex:0 0 auto;width:46px;height:46px;border-radius:12px;display:grid;place-items:center;font-size:24px;
+    background:var(--panel2);border:1px solid var(--line)}
+  .who{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin-bottom:4px}
+  .name{font-weight:700}
+  .role{font-size:12px;color:var(--dim);letter-spacing:.02em}
+  .line{color:var(--ink)}
+  .line .q{color:var(--dim);font-style:italic}
+  .line code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+
+  .fork{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:6px}
+  @media (max-width:560px){.fork{grid-template-columns:1fr}}
+  .opt{padding:16px;border-radius:14px;border:1px solid var(--line);background:var(--panel)}
+  .opt h3{margin:0 0 6px;font-size:15px}
+  .opt.value h3{color:var(--accent2)} .opt.risk h3{color:var(--red)}
+  .opt p{margin:0;color:var(--dim);font-size:13.5px}
+
+  .bits{margin-top:8px;padding:16px 18px;border-radius:14px;border:1px dashed var(--line);background:transparent}
+  .bits li{margin:6px 0;color:var(--dim);font-size:14px}
+  .bits b{color:var(--ink)}
+
+  .landed{margin:14px 0;padding:16px 18px;border-radius:14px;border-left:3px solid var(--green);
+    background:var(--panel);box-shadow:var(--shadow)}
+  .landed .h{font-weight:700;color:var(--green);font-size:13px;letter-spacing:.06em;text-transform:uppercase}
+  .landed code{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px}
+
+  footer{margin-top:40px;text-align:center;color:var(--dim);font-size:12.5px}
+  .chip{display:inline-block;padding:2px 10px;border:1px solid var(--line);border-radius:999px;margin:3px;font-size:12px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="kicker">Party Mode · Design Roundtable</div>
+    <h1>The Issue-Template Roundtable</h1>
+    <div class="sub">6 July 2026 · sparked by a bug form pointing reporters at a save file the game never makes</div>
+    <svg class="tower" width="120" height="112" viewBox="0 0 120 112" role="img" aria-label="tower with elevator">
+      <rect x="34" y="8" width="52" height="96" rx="3" fill="var(--panel)" stroke="var(--line)"/>
+      <rect x="56" y="14" width="8" height="84" fill="var(--panel2)" stroke="var(--line)"/>
+      <rect class="lift" x="57" y="16" width="6" height="10" rx="1" fill="var(--accent)"/>
+      <g>
+        <rect x="40" y="18" width="12" height="9" fill="var(--green)"/>
+        <rect x="68" y="18" width="12" height="9" fill="var(--green)"/>
+        <rect x="40" y="34" width="12" height="9" fill="var(--green)"/>
+        <rect x="68" y="34" width="12" height="9" fill="var(--red)"/>
+        <rect x="40" y="50" width="12" height="9" fill="var(--green)"/>
+        <rect x="68" y="50" width="12" height="9" fill="var(--green)"/>
+        <rect x="40" y="66" width="12" height="9" fill="var(--green)"/>
+        <rect x="68" y="66" width="12" height="9" fill="var(--green)"/>
+        <rect x="40" y="82" width="12" height="9" fill="var(--green)"/>
+        <rect x="68" y="82" width="12" height="9" fill="var(--green)"/>
+      </g>
+      <rect x="52" y="98" width="16" height="6" fill="var(--accent)"/>
+    </svg>
+  </header>
+
+  <div class="reframe">
+    <div class="big">Two forms. Two wrong doors. <b>The fix wasn't more words — it was making the right door <i>look</i> like a door.</b></div>
+    <div class="cap">The bug form named a file that doesn't exist; the feature form whispered a redirect the parity form shouted. Symmetry, not verbosity.</div>
+  </div>
+
+  <h2 class="sec">Round 1 · Should the parity report ask for a <code style="all:unset">.vctower</code>?</h2>
+
+  <div class="card">
+    <div class="ava">🎨</div>
+    <div><div class="who"><span class="name">Sally</span><span class="role">UX Designer</span></div>
+    <div class="line">Who's filing a parity report? Someone already annoyed, who counted something in a 1994 video. Now I add an <em>attach-a-file</em> step? On mobile? That's where forms go to die.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">📋</div>
+    <div><div class="who"><span class="name">John</span><span class="role">Product Manager</span></div>
+    <div class="line">What's the <em>job</em>? Convince us a number is wrong. Half our "cannot reproduce" closes are because we can't recreate their exact tower. The <code>.vctower</code> isn't friction — it's the thing that makes the claim reproducible.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">🏗️</div>
+    <div><div class="who"><span class="name">Winston</span><span class="role">System Architect</span></div>
+    <div class="line">But a divergence is often <em>structural</em>, not positional. "Express elevators counted in the wrong pool" — I need one express elevator, not your save. The canon lives in one file.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">📊</div>
+    <div><div class="who"><span class="name">Mary</span><span class="role">Business Analyst</span></div>
+    <div class="line">That's the clue, Winston. <em>Sometimes</em> it's "at 42 floors with this tenant mix, rent settles where the original never would." <em>That</em> you can't verify from the rule alone. The save is gold for economy and population — near-useless for a build-cap rule. The answer's <b>conditional</b>.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">📚</div>
+    <div><div class="who"><span class="name">Paige</span><span class="role">Technical Writer</span></div>
+    <div class="line">You're all fighting over a field nobody proposed right. The bug form didn't add a required upload — it put five words inside an <em>existing</em> field. <span class="q">"if relevant."</span> A hint, not a hurdle. Do the same here.</div></div>
+  </div>
+
+  <div class="landed">
+    <div class="h">✔ Landed</div>
+    An inline hint in the <b>Current Verticopolis behavior</b> field: <span class="q">"for economy or population divergences, attach your saved tower export (<code>.vctower</code>) so we can reproduce the exact state."</span> No new field, no required flag. It self-sorts — build-cap reporters ignore it, rent reporters get the nudge.
+  </div>
+
+  <h2 class="sec">Round 2 · Should the feature form warn "not for parity"?</h2>
+
+  <div class="card">
+    <div class="ava">📋</div>
+    <div><div class="who"><span class="name">John</span><span class="role">Product Manager</span></div>
+    <div class="line">Read what's <em>already</em> there. Line 12 already redirects to the parity template. The question isn't "add it" — it's "why is it ignored?"</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">🎨</div>
+    <div><div class="who"><span class="name">Sally</span><span class="role">UX Designer</span></div>
+    <div class="line">Because it's the <em>last sentence</em> of a five-line paragraph about modes. Nobody reads paragraph four. It's placed to be missed.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">📊</div>
+    <div><div class="who"><span class="name">Mary</span><span class="role">Business Analyst</span></div>
+    <div class="line">Here's the tell — the <em>asymmetry</em>. The parity form has a bouncer: a loud ⚠️ "don't file Modern differences here." The feature form has a sticky note. Reporters route wrong in exactly the direction we made quiet.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">📚</div>
+    <div><div class="who"><span class="name">Paige</span><span class="role">Technical Writer</span></div>
+    <div class="line">Same information, no visual signal. The eye doesn't stop where nothing tells it to stop. Give it the same ⚠️ callout the parity form uses. Symmetry — each form points firmly at the other.</div></div>
+  </div>
+  <div class="card">
+    <div class="ava">🏗️</div>
+    <div><div class="who"><span class="name">Winston</span><span class="role">System Architect</span></div>
+    <div class="line">A structural fix, not a rewrite. Pull the redirect <em>out</em> of the mode paragraph, give it its own line. Boring, consistent, done.</div></div>
+  </div>
+
+  <div class="landed">
+    <div class="h">✔ Landed</div>
+    The parity redirect extracted into its own <b>⚠️ callout</b> — <span class="q">"This form is for behavior we don't have yet."</span> — mirroring the parity form's own warning. The two templates now guard each other's doors with equal weight.
+  </div>
+
+  <h2 class="sec">Where the room actually clashed</h2>
+  <div class="fork">
+    <div class="opt value"><h3>Attach the save</h3><p>John &amp; Mary: reproducibility is the whole job; economy/population math needs the exact state or we close it "cannot reproduce."</p></div>
+    <div class="opt risk"><h3>Don't tax the form</h3><p>Sally &amp; Winston: most divergences are structural — one elevator proves them. A required upload is pure friction on the majority case.</p></div>
+  </div>
+  <ul class="bits">
+    <li><b>The synthesis nobody walked in with:</b> Paige's "hint in an existing field, <i>if relevant</i>" dissolved the fight — it's invisible to the people it doesn't help and a lifeline to the people it does.</li>
+    <li><b>The diagnosis that reframed round 2:</b> the redirect wasn't <i>missing</i>, it was <i>outranked</i> by its own neighbor. Mary's asymmetry catch — one door with a bouncer, one with a sticky note — was the real bug.</li>
+    <li><b>Running joke:</b> "Converged again. We should stop meeting like this." — three unanimous verdicts in one session, which Winston was told to mark on the calendar.</li>
+  </ul>
+
+  <footer>
+    <div>Verticopolis · Party Mode keepsake</div>
+    <div><span class="chip">📊 Mary</span><span class="chip">📚 Paige</span><span class="chip">📋 John</span><span class="chip">🎨 Sally</span><span class="chip">🏗️ Winston</span></div>
+    <div style="margin-top:8px">PR #137 · <code>claude/bug-report-save-extension-9p1v15</code></div>
+  </footer>
+
+</div>
+</body>
+</html>

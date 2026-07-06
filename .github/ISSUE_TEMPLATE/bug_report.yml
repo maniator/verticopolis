@@ -28,7 +28,7 @@ body:
     id: repro
     attributes:
       label: Steps to reproduce
-      description: How can we reproduce it? Include a saved tower export (`.twr`) if relevant.
+      description: How can we reproduce it? Include a saved tower export (`.vctower`) if relevant.
       value: |
         1.
         2.
