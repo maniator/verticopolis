@@ -11,9 +11,10 @@ export interface FloorEdge {
 /**
  * The tower's exterior silhouette, derived from its units in a SINGLE pass —
  * consumed by the escape stairs (per-floor edges) and the rooftop crane
- * (top-floor tiles). Kept pure and engine-free so it is unit-testable without
- * standing up an Excalibur canvas, and computed once so a structural change
- * doesn't scan the (potentially thousands of) units more than necessary.
+ * (top-floor tiles). Pure and free of any Excalibur/canvas dependency (it reads
+ * only unit data + `facilityFloors`) so it is unit-testable without standing up
+ * the render engine, and computed once so a structural change doesn't scan the
+ * (potentially thousands of) units more than necessary.
  *
  * Every story of a multi-floor room counts on each row it occupies, so a
  * two-story cinema at the edge still dresses its upper row. Basement rows are
