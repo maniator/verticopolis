@@ -94,11 +94,14 @@ export class SaveLoad {
         } catch {
           /* storage is unreadable too — just omit the reassurance */
         }
+        // Cover both failure classes the catch handles: storage FULL (quota) and
+        // storage BLOCKED (private mode / SecurityError), where "free up space"
+        // alone would be wrong advice.
         this.deps.showBootMessage(
           "The graphics driver crashed and your latest changes couldn't be saved — " +
-            "storage may be full." +
+            "storage is full or blocked." +
             priorSaveNote +
-            "<br>Free up space, then reload.",
+            "<br>Free up space or allow site storage, then reload.",
           true,
         );
         return;
