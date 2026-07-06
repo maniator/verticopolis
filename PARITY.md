@@ -19,7 +19,7 @@ abstraction · ⬜ not present.
 
 ## Facilities (all original tenant/room types)
 - ✅ Office (quarterly rent; staffed 8–18 on weekdays)
-- ✅ Condominium (one-time sale; residents live in)
+- ✅ Condominium — one-time sale, residents live in permanently. Priced on the original's construction-cost scale (default ~2× build cost, up to a ~2.5× ceiling; a higher asking price sells slower), and losing an owner to sustained neglect triggers a full-price **buy-back**
 - ✅ Hotel — Single / Double / Suite (nightly revenue, guests check in/out)
 - ✅ Fast Food, Restaurant, Retail Shop (daily traffic income, business hours)
 - ✅ Cinema (multi-floor, evening crowds), Party Hall
@@ -39,7 +39,7 @@ abstraction · ⬜ not present.
 
 ## Economy
 - ✅ Start with $2,000,000
-- ✅ Office rent (quarterly), condo sale (once), hotel nightly revenue
+- ✅ Office rent (quarterly), condo sale (once, at ~2×–2.5× build cost with an owner buy-back on loss), hotel nightly revenue
 - ✅ Food / retail / cinema / party-hall traffic income, scaled by foot traffic + open hours
 - ✅ Per-car and per-service monthly maintenance
 - ✅ Buried treasure when excavating basement rooms
@@ -87,6 +87,7 @@ abstraction · ⬜ not present.
 - Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive) and their waiting drives stress, but a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
 - The **Cathedral** is a religion-agnostic **Wedding Hall**.
 - Population is smaller-scale than the original (retail/food add no residents), so the TOWER goal is tuned to **8,000** rather than 15,000 to stay reachable.
+- Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't — today, *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is). Saves with no mode load as Classic.
 
 ## Verification
 `npm test` runs **95 unit/integration tests** covering placement rules,

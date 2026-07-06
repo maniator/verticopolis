@@ -54,6 +54,10 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
 
 ## How to play
 
+- **Found your tower.** *New Tower* lets you pick a **rule-set** — *Classic*
+  (pixel-faithful 1994) or *Modern* (adds variant **2–5 person condo
+  households**). It's chosen once and fixed for that tower's life; start another
+  to play the other way.
 - **Build floors first.** Lay `Floor` tiles, then place rooms on top of them.
   The ground floor and every 15th floor want a `Lobby`.
 - **Move people.** Every floor needs an `Elevator` or `Stairs` chain back to the
@@ -152,7 +156,7 @@ and covered by the Vitest suite and/or the captured screenshots.
 | Lobby floors are transit-only (no rooms) | ✅ |
 | ~100 floors up, basements below, continuous numbering (B1 = floor 0) | ✅ |
 | Offices (quarterly rent) | ✅ |
-| Condos / apartments (one-time sale) | ✅ |
+| Condos / apartments (one-time sale, ~2×–2.5× cost, owner buy-back on loss) | ✅ |
 | Hotel single / double / suite (nightly, need housekeeping) | ✅ |
 | Fast food, restaurant, shop (foot-traffic income, business hours) | ✅ |
 | Multi-floor cinema, party hall | ✅ |
