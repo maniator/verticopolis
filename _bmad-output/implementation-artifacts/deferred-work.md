@@ -3,6 +3,25 @@
 Items surfaced by reviews that are real but intentionally not actioned in the
 PR that found them. Pick these up when touching the relevant area.
 
+## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
+
+- ~~**`floorHeatmap` recomputes the spatial congestion map once per built floor
+  (O(F²)).**~~ Fixed in the same PR (Copilot + party review): the congestion
+  branch now builds `spatialCongestionByFloor()` once and reads each floor from
+  it, instead of calling `congestionAt(floor)` (a full rebuild) per floor.
+
+- **Per-frame `congestion()` rebuilds the spatial map every frame (pre-existing;
+  MEASURE FIRST).** `TowerEngine.tick()` reads `sim.congestion()` for the walker
+  stress value and `main.ts updateTraffic()` reads it for the traffic cue; in v2
+  each call rebuilds `spatialCongestionByFloor()`. This predates the overlay
+  work and is genuinely on the frame path. A naive memo keyed on
+  `(revision, rush)` is **wrong** — the map also depends on live tenant
+  `isPresent` occupancy, which drifts with sim-time within a rush bucket, so a
+  correct key is as expensive to compute as recomputing. The right fix is likely
+  to cache the *scalar* `congestion()` on the sim and refresh it on the hour
+  tick (where presence actually changes), not a map memo — but **profile a maxed
+  tower first** to confirm it's a real cost before touching the hot loop.
+
 ## Deferred from: gds-code-review (2026-07-05, condo stickiness — CONDO_NOISE_EROSION)
 
 - **D25's horizon margin is now thinner (deterministic, not flaky).** With the

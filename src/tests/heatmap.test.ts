@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { Simulation, type HeatCell } from "../engine/Simulation";
+import {
+  Simulation,
+  congestionSeverity,
+  CONGESTION_CHURN,
+  CONGESTION_GRIDLOCK,
+  type HeatCell,
+} from "../engine/Simulation";
 import { GRID } from "../engine/facilities";
 
 const W = GRID.width;
@@ -117,5 +123,101 @@ describe("floorHeatmap (stats overlay data)", () => {
     // to judge, so it leaves the floor untinted rather than falsely flagging it.
     expect(cellOn(sim.floorHeatmap("occupancy"), 2)!.severity).toBe(1);
     expect(cellOn(sim.floorHeatmap("satisfaction"), 2)).toBeUndefined();
+  });
+});
+
+describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
+  const AMBER = 2 / 3; // the amber ramp stop (green 0 · chartreuse ⅓ · amber ⅔ · red 1)
+
+  it("pins the color ramp to the sim's own thresholds", () => {
+    expect(congestionSeverity(0)).toBe(0); // clear → green
+    // Amber lands exactly at the churn threshold (where tenants start leaving).
+    expect(congestionSeverity(CONGESTION_CHURN)).toBeCloseTo(AMBER, 5);
+    // Fully red at gridlock, and clamped beyond it.
+    expect(congestionSeverity(CONGESTION_GRIDLOCK)).toBe(1);
+    expect(congestionSeverity(CONGESTION_GRIDLOCK + 1)).toBe(1);
+    expect(congestionSeverity(-1)).toBe(0);
+  });
+
+  it("degrades every non-finite / non-positive ratio to green (never red, never NaN)", () => {
+    // A poisoned ratio must read as 'no data → green', not saturate to red or
+    // poison heatColor's ramp index. Infinity is > 0, so this pins the explicit
+    // finite guard, not just the sign check.
+    for (const bad of [NaN, Infinity, -Infinity, -0.001, 0]) {
+      expect(congestionSeverity(bad)).toBe(0);
+    }
+  });
+
+  it("monotonically increases with congestion", () => {
+    let prev = -1;
+    // A dense grid that straddles the churn join (…0.99, 1.0, 1.01…) so a
+    // discontinuity or slope flip at the branch boundary can't slip through.
+    for (const c of [0, 0.05, 0.1, 0.24, 0.5, 0.8, 0.99, 1.0, 1.01, 1.2, 1.4, 1.59, 1.6]) {
+      const s = congestionSeverity(c);
+      expect(s).toBeGreaterThan(prev);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(1);
+      prev = s;
+    }
+  });
+
+  it("is continuous where the two branches meet at churn", () => {
+    const AMBER = 2 / 3;
+    // Both branches must converge on the amber stop — no visible seam at churn.
+    expect(congestionSeverity(CONGESTION_CHURN - 1e-6)).toBeCloseTo(AMBER, 3);
+    expect(congestionSeverity(CONGESTION_CHURN + 1e-6)).toBeCloseTo(AMBER, 3);
+  });
+
+  it("spreads the healthy sub-churn range so a well-served tower is not flat green", () => {
+    // A comfortable tower sits well under churn; those floors must still be
+    // visibly distinct (the bug this fixes: everything collapsed into one green).
+    const low = congestionSeverity(0.05);
+    const busyButFine = congestionSeverity(0.24);
+    expect(low).toBeGreaterThan(0); // not pure green
+    expect(busyButFine - low).toBeGreaterThan(0.1); // a real, visible gap
+    expect(busyButFine).toBeLessThan(AMBER); // …yet honestly still below "straining"
+  });
+
+  it("peakCongestion reports the busiest floor's ratio for the legend", () => {
+    const sim = Simulation.newGame(60);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 6; f++) lay(sim, "floor", f);
+    sim.buildTransport("elevatorStandard", C, 1, 6);
+    sim.tower.setCars(sim.tower.transports[0].id, 1); // one weak car → real load
+    for (let f = 2; f <= 6; f++) {
+      for (let x = 0; x + 9 <= C; x += 9) {
+        const r = sim.tower.place("office", f, x);
+        if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      }
+    }
+    const peak = sim.peakCongestion();
+    let maxFloor = 0;
+    for (let f = 2; f <= 6; f++) maxFloor = Math.max(maxFloor, sim.congestionAt(f));
+    expect(peak).toBeCloseTo(maxFloor, 5); // the max across floors
+    expect(peak).toBeGreaterThan(0);
+  });
+
+  it("floorHeatmap builds the congestion map once but matches per-floor congestionAt", () => {
+    // Guards the O(F²)→O(F) refactor: computing the spatial map once and reading
+    // each floor from it must produce exactly what calling congestionAt(floor)
+    // per floor would (each of which rebuilds the map). Same values, no drift.
+    const sim = Simulation.newGame(61);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 8; f++) lay(sim, "floor", f);
+    sim.buildTransport("elevatorStandard", C, 1, 8);
+    sim.tower.setCars(sim.tower.transports[0].id, 1);
+    for (let f = 2; f <= 8; f++) {
+      for (let x = 0; x + 9 <= C; x += 9) {
+        const r = sim.tower.place("office", f, x);
+        if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      }
+    }
+    const cells = sim.floorHeatmap("congestion");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell.severity).toBeCloseTo(congestionSeverity(sim.congestionAt(cell.floor)), 10);
+    }
   });
 });

@@ -54,22 +54,37 @@ export const HEATMAP_LABELS: Record<HeatmapMode, { title: string; good: string; 
 /** The overlay modes in cycle order (a UI toggle steps Off → each → Off). */
 export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction"];
 
-/** Heatmap ramp stops (green → amber → red). Module-level so the color mixer
- *  doesn't rebuild the table on every call (it runs once per visible floor per
- *  frame while an overlay is active). */
-const HEAT_STOPS: readonly (readonly [number, number, number])[] = [
+/** Heatmap ramp stops (green → chartreuse → amber → red). The chartreuse
+ *  waypoint gives the green→amber leg real resolution, so the lived-in low end
+ *  of a metric (e.g. a healthy tower's congestion) reads as a gradient rather
+ *  than one flat green. The congestion overlay pins its amber stop (⅔) to the
+ *  churn threshold — see `CONGESTION_AMBER_SEVERITY` in the engine. Module-level
+ *  so the color mixer doesn't rebuild the table on every call (it runs once per
+ *  visible floor per frame while an overlay is active). */
+export const HEAT_STOPS: readonly (readonly [number, number, number])[] = [
   [63, 184, 90], // green (good)
-  [224, 169, 78], // amber
+  [163, 199, 71], // chartreuse
+  [224, 169, 78], // amber — the congestion overlay pins churn here (see below)
   [214, 52, 47], // red (bad)
 ];
+const HEAT_SEGS = HEAT_STOPS.length - 1;
 
-/** Severity 0..1 → an rgba tint (green → amber → red) at a fixed overlay alpha.
- *  Two linear segments through the {@link HEAT_STOPS} so the ramp reads cleanly.
- *  Allocation-light (no per-call array/closure) since it's on the draw path. */
-function heatColor(severity: number): string {
-  const s = severity < 0 ? 0 : severity > 1 ? 1 : severity;
-  const seg = s < 0.5 ? 0 : 1;
-  const t = (s - seg * 0.5) * 2; // 0..1 within the segment
+/** Severity 0..1 → an rgba tint (green → chartreuse → amber → red) at a fixed
+ *  overlay alpha. Linear segments through the evenly-spaced {@link HEAT_STOPS}
+ *  so the ramp reads cleanly. Allocation-light (no per-call array/closure) since
+ *  it's on the draw path.
+ *
+ *  Exported for the overlay test that locks the "amber = churn" invariant: the
+ *  congestion ramp's `CONGESTION_AMBER_SEVERITY` (⅔) must land exactly on the
+ *  amber stop, which holds only while the palette keeps amber at position
+ *  ⅔ — i.e. a 4-stop ramp. A test asserts that so a palette edit can't silently
+ *  break the anchor. */
+export function heatColor(severity: number): string {
+  // Clamp to [0,1]; the `> 0` form also folds NaN to 0 so a poisoned severity
+  // can never index past the palette and throw on the draw path.
+  const s = severity > 0 ? (severity > 1 ? 1 : severity) : 0;
+  const seg = Math.min(HEAT_SEGS - 1, Math.floor(s * HEAT_SEGS));
+  const t = s * HEAT_SEGS - seg; // 0..1 within the segment
   const a = HEAT_STOPS[seg];
   const b = HEAT_STOPS[seg + 1];
   const r = Math.round(a[0] + (b[0] - a[0]) * t);
@@ -285,6 +300,11 @@ export class TowerEngine {
   private heatmapHour = -1;
   private heatmapRev = -1;
   private heatmapMode: HeatmapMode | null = null;
+  /** The busiest floor's raw congestion ratio when the congestion overlay was
+   *  last (re)built — surfaced in the legend so an all-green map still reports
+   *  its headroom. 0 for the non-congestion overlays. Refreshed with the cache,
+   *  never per frame. */
+  private heatmapPeakCongestion = 0;
   /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
    *  once per syncScene — reusing the parking flood-fill that sync already does
    *  for the dead-bit — so they're exactly as fresh as the sprites that consume
@@ -1010,6 +1030,7 @@ export class TowerEngine {
     const rev = this.sim.tower.revision;
     if (this.overlayMode !== this.heatmapMode || hour !== this.heatmapHour || rev !== this.heatmapRev) {
       this.heatmap = this.sim.floorHeatmap(this.overlayMode);
+      this.heatmapPeakCongestion = this.overlayMode === "congestion" ? this.sim.peakCongestion() : 0;
       this.heatmapMode = this.overlayMode;
       this.heatmapHour = hour;
       this.heatmapRev = rev;
@@ -1053,14 +1074,22 @@ export class TowerEngine {
     ctx.font = "600 12px system-ui, sans-serif";
     ctx.textAlign = "left";
     ctx.fillText(label.title, x + pad, y + 17);
+    // Congestion reports its busiest floor as a number so an all-green map still
+    // tells the player their headroom (peak = share of a shaft's rush budget in
+    // use; >100% means over the churn line). Right-aligned on the title row.
+    if (this.overlayMode === "congestion") {
+      ctx.textAlign = "right";
+      ctx.fillStyle = "#c7d0e0";
+      ctx.font = "600 11px system-ui, sans-serif";
+      ctx.fillText(`peak ${Math.round(this.heatmapPeakCongestion * 100)}%`, x + w - pad, y + 17);
+      ctx.textAlign = "left";
+    }
     // Gradient bar.
     const bx = x + pad;
     const by = y + 24;
     const bw = w - pad * 2;
     const grad = ctx.createLinearGradient(bx, 0, bx + bw, 0);
-    grad.addColorStop(0, heatColor(0));
-    grad.addColorStop(0.5, heatColor(0.5));
-    grad.addColorStop(1, heatColor(1));
+    for (let i = 0; i < HEAT_STOPS.length; i++) grad.addColorStop(i / HEAT_SEGS, heatColor(i / HEAT_SEGS));
     ctx.fillStyle = grad;
     ctx.fillRect(bx, by, bw, 7);
     ctx.fillStyle = "#9aa6bd";
