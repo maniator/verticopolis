@@ -62,6 +62,28 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you pu
 new commits to a PR, **re-request a Copilot review** — Copilot reviews are one-shot
 snapshots and won't pick up later commits on their own.
 
+## GitHub PR Review — BMGD/BMAD emulation
+
+For GitHub Copilot pull-request review, **emulate this repo's mandatory deep-review
+skill** even though the native GitHub review surface can't execute a skill. The
+path-specific instructions in
+[`.github/instructions/bmad-review.instructions.md`](./instructions/bmad-review.instructions.md)
+are loaded automatically on the review surface and are the source of truth for how
+to do this. In short:
+
+- Pick the emulated skill by the changed files — **`gds-code-review`** for
+  gameplay/engine work (`src/engine/`, `src/render/`, mechanics, economy, ratings,
+  events, elevators, facilities, RNG), **`bmad-code-review`** for everything else
+  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A PR
+  that touches **both** runs both lenses, each scoped to the files it owns; when a
+  single judgment is needed, **default to `gds-code-review` if any gameplay/engine
+  file is touched** (it carries the higher-risk invariants).
+- Run its adversarial layers in order — **Blind Hunter → Edge Case Hunter →
+  Acceptance Auditor** — then synthesize with a **`bmad-party-mode`** step using
+  only the personas the diff implicates.
+- Do **not** claim a BMAD/BMGD skill was actually invoked — reproduce its behavior.
+  Prefer a few high-signal findings over many trivial comments.
+
 ## Code review
 
 Reviews here are expected to be **deep, not a surface skim** — a green pipeline is
