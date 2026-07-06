@@ -46,7 +46,7 @@ export interface SimContext {
    * (the visuals never touch gameplay state, RNG, or the save). */
   triggerSanta?(): void;
   triggerExplosion?(floor: number, xTile: number): void;
-  triggerThief?(caught: boolean): void;
+  triggerThief?(caught: boolean, floor: number): void;
   triggerTreasure?(floor: number, xTile: number): void;
   triggerVip?(): void;
   /** Dispatch a staff member (housekeeper) from `from` to `to` over the staff

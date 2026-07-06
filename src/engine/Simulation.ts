@@ -337,7 +337,7 @@ export class Simulation implements SimContext {
    * event fires, never serialized, and with zero effect on gameplay/RNG/save. */
   santaFxSeq = 0;
   explosionFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
-  thiefFx: { caught: boolean; seq: number } = { caught: false, seq: 0 };
+  thiefFx: { caught: boolean; floor: number; seq: number } = { caught: false, floor: 1, seq: 0 };
   treasureFx: { floor: number; x: number; seq: number } = { floor: 0, x: 0, seq: 0 };
   vipFxSeq = 0;
 
@@ -1810,8 +1810,8 @@ export class Simulation implements SimContext {
   triggerExplosion(floor: number, xTile: number): void {
     this.explosionFx = { floor, x: xTile, seq: this.explosionFx.seq + 1 };
   }
-  triggerThief(caught: boolean): void {
-    this.thiefFx = { caught, seq: this.thiefFx.seq + 1 };
+  triggerThief(caught: boolean, floor: number): void {
+    this.thiefFx = { caught, floor, seq: this.thiefFx.seq + 1 };
   }
   triggerTreasure(floor: number, xTile: number): void {
     this.treasureFx = { floor, x: xTile, seq: this.treasureFx.seq + 1 };
