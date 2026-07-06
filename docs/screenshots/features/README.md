@@ -24,3 +24,12 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-occupancy.png` | **Occupancy** mode — green where fully leased (offices/condos), red/amber on the hotel floors that sit empty at midday. |
 | `overlay-satisfaction.png` | **Satisfaction** mode — green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
 | `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics) — every mode is directly selectable. |
+
+## Condo rule-sets (Classic vs Modern)
+
+Captured from the built app via `scripts/shot-condo-modes.mjs`.
+
+| Screenshot | Shows |
+|---|---|
+| `new-tower-modes.png` | The **Found a New Tower** rule-set picker — Classic (faithful 1994: flat family of 3, 2×–2.5× price, owner buy-back) vs Modern (variant 2–5 households), with the permanence notice. The choice is fixed for the tower's life. |
+| `stats-households-modern.png` | Tower Statistics on a Modern tower: the conditional **Households** section — people housed, average household, and the size mix across sold condos. (Classic towers don't show this section.) |
