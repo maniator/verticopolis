@@ -2003,8 +2003,15 @@ export class Simulation implements SimContext {
     // and coerce the numeric fields that drive the loop to finite values so a
     // hand-edited or foreign save can't poison the math with NaN/undefined.
     const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
-    sim.tower.units = (data.units ?? [])
-      .filter((u) => isFacilityKind(u.kind))
+    // Guard the container type too, not just null: a forged save can clobber
+    // `units` to a non-array scalar/object, and `.filter` on it throws — same
+    // hard-load-failure this hardening exists to prevent. Matches the
+    // Array.isArray guard the sibling arrays (excavated/milestones) already use.
+    sim.tower.units = (Array.isArray(data.units) ? data.units : [])
+      // Drop a null/non-object entry BEFORE reading `.kind`: a forged or
+      // partially-written save can hold a `null` in the array, and `u.kind`
+      // on it throws — aborting the whole load instead of dropping one entry.
+      .filter((u) => u != null && isFacilityKind(u.kind))
       .map((u) => {
         // Coerce geometry to finite integers, and keep the whole FOOTPRINT on
         // the lot (not just the origin): forged floor/x/width would otherwise
@@ -2080,8 +2087,10 @@ export class Simulation implements SimContext {
           vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
         };
       });
-    sim.tower.transports = (data.transports ?? [])
-      .filter((t) => isFacilityKind(t.kind))
+    sim.tower.transports = (Array.isArray(data.transports) ? data.transports : [])
+      // Same null/non-object guard as units: never read `.kind` off a `null`
+      // entry, or one corrupt transport aborts the entire load.
+      .filter((t) => t != null && isFacilityKind(t.kind))
       .map((t) => {
         // Coerce car counts/positions from an untrusted save: a NaN/negative/huge
         // `cars` would otherwise reach `new Array(cars)` in the dispatcher and

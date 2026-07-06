@@ -41,6 +41,44 @@ describe("SaveGame", () => {
     expect(Number.isFinite(u.occupants)).toBe(true);
   });
 
+  it("drops null/malformed unit and transport entries from a corrupt save without throwing", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    const validUnits = data.units.length;
+    const validTransports = data.transports.length;
+    // A forged / partially-written save can hold a null (or a non-object
+    // primitive, or a kind-less object) in the arrays. Reading `.kind` off a
+    // null entry would throw and abort the WHOLE load — turning a recoverable
+    // save into a hard failure. Cover the null-at-front position too.
+    (data.units as unknown[]).unshift(null);
+    (data.units as unknown[]).splice(2, 0, "junk", 42, {});
+    (data.transports as unknown[]).unshift(null);
+    (data.transports as unknown[]).push({});
+    let loaded!: Simulation;
+    expect(() => {
+      loaded = Simulation.deserialize(data);
+    }).not.toThrow();
+    // The bad entries are dropped; every valid unit/transport survives.
+    expect(loaded.tower.units).toHaveLength(validUnits);
+    expect(loaded.tower.transports).toHaveLength(validTransports);
+  });
+
+  it("survives a non-array units/transports container in a corrupt save", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // A forged save can clobber the array field itself to a scalar/object.
+    // `(data.units ?? [])` only guards null/undefined, so `.filter` on a
+    // non-array would throw and abort the load — guard the container type.
+    (data as { units: unknown }).units = 5;
+    (data as { transports: unknown }).transports = { nope: true };
+    let loaded!: Simulation;
+    expect(() => {
+      loaded = Simulation.deserialize(data);
+    }).not.toThrow();
+    expect(loaded.tower.units).toHaveLength(0);
+    expect(loaded.tower.transports).toHaveLength(0);
+  });
+
   it("clamps forged unit/transport geometry from a tampered save to the lot", () => {
     const sim = sampleGame();
     const data = sim.serialize();
