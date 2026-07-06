@@ -1,0 +1,55 @@
+name: Sync labels
+
+# Create or update the repository's labels from .github/labels.yml.
+#
+# Deliberately workflow_dispatch ONLY — this runs when a maintainer taps
+# "Run workflow" (Actions tab, on the default branch), never automatically on
+# push/PR. Labels are repository-wide, so the branch it runs from doesn't
+# matter. The sync is non-destructive: it creates/updates the labels in the
+# manifest and never deletes labels that aren't listed.
+on:
+  workflow_dispatch:
+
+# Least privilege: label management only needs write access to issues.
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create or update labels from .github/labels.yml
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          python3 -m pip install --quiet pyyaml
+          python3 - <<'PY'
+          import subprocess, sys, yaml
+
+          data = yaml.safe_load(open(".github/labels.yml"))
+          labels = (data or {}).get("labels", [])
+          if not labels:
+              print("No labels found under the 'labels:' key in .github/labels.yml")
+              sys.exit(1)
+
+          failed = []
+          for entry in labels:
+              name = str(entry["name"])
+              color = str(entry["color"])
+              desc = str(entry.get("description", ""))
+              print(f"::group::{name}")
+              result = subprocess.run(
+                  ["gh", "label", "create", name, "-c", color, "-d", desc, "--force"]
+              )
+              print("::endgroup::")
+              if result.returncode != 0:
+                  failed.append(name)
+
+          if failed:
+              print(f"::error::Failed to sync labels: {', '.join(failed)}")
+              sys.exit(1)
+          print(f"Synced {len(labels)} labels.")
+          PY
