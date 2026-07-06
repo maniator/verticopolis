@@ -116,6 +116,25 @@ export default defineConfig({
         preview: resolve(__dirname, "src/preview.html"),
         excalibur: resolve(__dirname, "src/excalibur.html"),
       },
+      output: {
+        // Split the Excalibur engine into its own vendor chunk, separate from our
+        // TowerEngine app code. Both the game (main) and the tooling (excalibur)
+        // entry statically import it, so Rollup already hoisted it into one shared
+        // chunk — but sharing a hash with our own code meant every TowerEngine edit
+        // re-downloaded all ~550 kB of the pinned engine. Isolating it lets the
+        // browser (and the PWA precache) reuse the engine across app updates.
+        //
+        // The name deliberately does NOT start with "excalibur": Workbox's
+        // globIgnores excludes `**/excalibur*` from the game precache (to keep the
+        // excalibur.html tooling entry out of the install), and a chunk named
+        // `excalibur-*` would be wrongly dropped from the game's own precache.
+        manualChunks(id) {
+          // Normalize separators before matching: Rollup normally emits POSIX
+          // module ids, but be defensive so the split still holds if a build
+          // (e.g. Windows) surfaces backslashes.
+          if (id.replace(/\\/g, "/").includes("node_modules/excalibur")) return "vendor-excalibur";
+        },
+      },
     },
   },
   test: {
