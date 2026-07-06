@@ -54,12 +54,21 @@ Found a bug? Have an idea?
 Help us improve Verticopolis — report a bug, request a feature, or flag anything
 that doesn't match the 1994 original.
 
-[ Report an issue… ]        ← opens the GitHub issue chooser in a new tab
+[ Let us know… ]            ← opens the GitHub issue chooser in a new tab
 ```
 
 - Heading: `Found a bug? Have an idea?`
 - Lede (muted): `Help us improve Verticopolis — report a bug, request a feature, or flag anything that doesn't match the 1994 original.`
-- Link label: `Report an issue…`
+- Link label: `Let us know…` — the button *answers* the heading rather than re-asking
+  it, and drops the word "issue" (GitHub jargon that reads as *problem-only* to
+  players, discouraging feature-idea filers). Party-mode decision (2026-07-06):
+  UX / PM / Tech-writer / Game-designer unanimous after resolving a grammar
+  dissent on the interim "Report a bug or idea…".
+- Modern-mode hook: the existing "Rule-set (Classic vs Modern)" bullet now ends
+  by inviting players who want a not-yet-built Modern behavior to *suggest it
+  below* — planting the feature-request wish at the moment a player reads that
+  Modern is "what the original couldn't do," then funneling to the same button
+  (a pointer, not a second link). Same party decision.
 
 ## 4. Affordance & behavior
 
