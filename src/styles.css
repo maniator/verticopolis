@@ -139,6 +139,14 @@ html.reduce-motion *::after {
   background: var(--r-face);
   box-shadow: var(--bevel-in);
 }
+/* A .btn on an <a> (the Help "Report an issue" link, the app's only outbound
+   link): anchors are inline, so normalize them to a button box — drop the link
+   underline and use inline-flex so the coarse-pointer min-height (below) lands. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 /* Primary = the classic Win-style DEFAULT BUTTON: same gray face, an extra
    dark ring around the bevel, bold label. One primary per dialog; its DOM
    position encodes default focus — first when it should own focus (emergency
@@ -970,6 +978,13 @@ html.reduce-motion *::after {
   border: 1px solid #b5b5b5;
   border-bottom-width: 2px;
   border-radius: 3px;
+}
+/* Help "Report an issue" row — a plain flex row so the link keeps its natural
+   button width and would sit beside any future sibling link. */
+.help-report {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 /* ── First-run splash + onboarding ─────────────────────────────────────

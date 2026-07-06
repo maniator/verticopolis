@@ -40,6 +40,22 @@ if (typeof HTMLDialogElement.prototype.showModal !== "function") {
   };
 }
 
+// jsdom doesn't implement matchMedia; showHelp() reads it to decide whether the
+// OS is forcing reduced motion. A stub that reports "not forced" is enough.
+if (typeof window.matchMedia !== "function") {
+  window.matchMedia = (media: string) =>
+    ({
+      media,
+      matches: false,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList;
+}
+
 /** Minimal fixture with every id the UI constructor looks up (non-null!). */
 function mountAppDom(): void {
   document.body.innerHTML = `
@@ -434,6 +450,51 @@ describe("toast — kind class and stack cap", () => {
     expect(wrap().children.length).toBe(5);
     expect(wrap().firstElementChild!.textContent).toBe("toast 3");
     expect(wrap().lastElementChild!.textContent).toBe("toast 7");
+  });
+});
+
+describe("showHelp — the Report an issue link", () => {
+  const CHOOSER = "https://github.com/maniator/verticopolis/issues/new/choose";
+
+  it("renders a chooser link that opens in a new tab with rel=noopener", () => {
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`);
+    expect(link, "expected a Report-an-issue link to the GitHub chooser").not.toBeNull();
+    // A new tab (so the game isn't navigated away), with noopener+noreferrer so
+    // the opened page can't reach back through window.opener or see the referrer.
+    expect(link!.target).toBe("_blank");
+    expect(link!.rel).toContain("noopener");
+    expect(link!.rel).toContain("noreferrer");
+    // A screen-reader-only cue warns that activating the link changes context to
+    // a new tab (WCAG 3.2.5), without altering the visible label.
+    const cue = link!.querySelector(".visually-hidden");
+    expect(cue?.textContent).toContain("new tab");
+  });
+
+  it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {
+    const { ui } = makeUI();
+    ui.showHelp();
+    const box = dialog().firstElementChild!;
+    const actions = box.querySelector(".modal-actions")!;
+    // The report link is a body affordance, never a dialog action.
+    expect(actions.querySelector('a[href*="/issues/new"]')).toBeNull();
+    // Footer stays exactly reduce-motion / replay-onboard / close (Got it).
+    const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
+    expect(acts).toEqual(["reduce-motion", "replay-onboard", "close"]);
+  });
+
+  it("gives initial focus to the primary 'Got it', not the external link", () => {
+    // showModal() focuses the first focusable descendant unless something has
+    // autofocus. The report link sits above the footer in DOM order, so without
+    // autofocus an Enter/Space reflex on opening Help would fire the external
+    // link and pop a GitHub tab. autofocus on the primary keeps focus on the
+    // safe dismiss action (and realizes the design-system's stated intent).
+    const { ui } = makeUI();
+    ui.showHelp();
+    const box = dialog().firstElementChild!;
+    expect(box.querySelector('[data-act="close"]')!.hasAttribute("autofocus")).toBe(true);
+    expect(box.querySelector('a[href*="/issues/new"]')!.hasAttribute("autofocus")).toBe(false);
   });
 });
 
