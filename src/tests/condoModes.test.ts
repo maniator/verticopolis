@@ -134,6 +134,21 @@ describe("Buy-back on an evicted owner (Classic canon, all towers)", () => {
     expect(sim.log.some((e) => /owner left .*bought it back for/.test(e.text))).toBe(true);
   });
 
+  it("re-lists a bought-back condo in the current band, dropping a legacy out-of-band price", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    condo.rent = 240_000; // a legacy sold price above the current $200k max
+    sim.money = 1e9;
+    const before = sim.money;
+    for (const t of [...sim.tower.transports]) sim.tower.removeTransport(t.id);
+    expect(tickUntil(sim, () => !condo.everOccupied)).toBe(true);
+    // Buy-back still charged the historical price it sold for …
+    expect(before - sim.money).toBe(240_000);
+    // … but the returned-to-market asking price is clamped into the current band.
+    expect(rentOf(condo)).toBe(200_000);
+  });
+
   it("mirrors the size-scaled price in Modern", () => {
     const sim = Simulation.newGame(7, "modern");
     const condo = servedCondo(sim);

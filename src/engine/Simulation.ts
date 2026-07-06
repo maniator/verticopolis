@@ -1286,6 +1286,15 @@ export class Simulation implements SimContext {
     // and any not-yet-sold condo were never "owned", so nothing to reset there.
     u.everOccupied = false;
     u.residents = undefined;
+    // A condo returning to market re-lists in the CURRENT band: clamp away any
+    // legacy/out-of-band asking price it carried while sold (e.g. a $240k
+    // old-max), so it can't re-sell above the current ceiling — or, in Modern,
+    // above it after household scaling. The buy-back charge above already used
+    // the pre-clamp price, so it still mirrors the historical sale.
+    if (u.kind === "condo" && u.rent !== undefined) {
+      const band = rentConfig("condo")!;
+      u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    }
     u.label = FACILITIES[u.kind].name;
     u.vacateReason = undefined;
     u.vacateAt = undefined;
