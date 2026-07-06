@@ -6,17 +6,17 @@ sources: []
 
 > **Canonical contract.** This SPEC is the complete, preservation-validated contract for what to build, test, and validate.
 
-# Event-log toast/bulletin pump freeze after 200 entries
+# Event-log toast/bulletin pump freeze once the log ring fills
 
 ## Why
 
-A **pain to solve** (player-reported). A thief cosmetic can slink across the tower with **no matching log line and no toast** — an unexplained figure that reads as a bug. A repro-first investigation traced it to a general defect, not a thief-specific one: `Simulation.emit` caps the event log at 200 via push-then-shift, so `log.length` pins at 200; `UI.renderLog` diffs "new entries" off `log.length` (`if (log.length === this.lastLogLen) return`), so once both reach 200 it early-returns **permanently** — every subsequent toast and every bulletin update is silently dropped. Cosmetics (`thiefFx.seq` and siblings) ride a separate monotonic counter and keep animating, so after ~200 events in a session *all* good/bad toasts and the whole event log die while the animations play on. The thief is simply the most dramatic silent cosmetic, which is why a player noticed it. Backlog P2 (`event-visuals`).
+A **pain to solve** (player-reported). A thief cosmetic can slink across the tower with **no matching log line and no toast** — an unexplained figure that reads as a bug. A repro-first investigation traced it to a general defect, not a thief-specific one: `Simulation.emit` caps the event log via push-then-shift, so once the ring is full `log.length` pins at the cap; `UI.renderLog` diffs "new entries" off `log.length` (`if (log.length === this.lastLogLen) return`), so once both reach the cap it early-returns **permanently** — every subsequent toast and every bulletin update is silently dropped. Cosmetics (`thiefFx.seq` and siblings) ride a separate monotonic counter and keep animating, so once the log fills in a session *all* good/bad toasts and the whole event log die while the animations play on. The thief is simply the most dramatic silent cosmetic, which is why a player noticed it. (The cap the bug was found at was 200; this fix pairs the engine + DOM caps at 300 — but the freeze is cap-independent, so the contract is phrased against "the cap", not a number.) Backlog P2 (`event-visuals`).
 
 ## Capabilities
 
 - **CAP-1**
   - **intent:** The toast notifications and the event-log bulletin keep working for the whole session, no matter how many events have already fired.
-  - **success:** After more than 200 emits, a subsequent `good`/`bad` emit still produces a toast **and** re-renders the bulletin.
+  - **success:** After more than the log cap's worth of emits, a subsequent `good`/`bad` emit still produces a toast **and** re-renders the bulletin.
 
 - **CAP-2**
   - **intent:** An event's cosmetic and its explanatory log/toast line can no longer diverge — the fix is general to all events, not a thief special-case.
@@ -28,7 +28,7 @@ A **pain to solve** (player-reported). A thief cosmetic can slink across the tow
 
 ## Constraints
 
-- Diff the log on a **monotonic** signal, not `log.length`: add a `Simulation.logSeq` counter incremented on every `emit` (never decremented by the 200-cap shift); `UI.renderLog` diffs `sim.logSeq` against its last-seen value and clamps the fresh count to `[0, log.length]` (older entries were shifted out and can't be shown/toasted).
+- Diff the log on a **monotonic** signal, not `log.length`: add a `Simulation.logSeq` counter incremented on every `emit` (never decremented by the capped shift); `UI.renderLog` diffs `sim.logSeq` against its last-seen value and clamps the fresh count to `[0, log.length]` (older entries were shifted out and can't be shown/toasted).
 - `logSeq` is a transient UI-diff aid: **engine-pure** (no DOM), and **not serialized** — the log itself isn't serialized, so both reset to 0 on reload.
 - On a tower swap (`adoptSim`: load / import / new-tower / undo / redo), reset the UI log baseline to the new sim's `logSeq` and refresh the bulletin — otherwise the stale baseline skips or spams toasts for the new sim (a secondary desync the investigation flagged).
 - Preserve existing behavior: only `good`/`bad` entries toast; the log stays a bounded ring.
@@ -39,9 +39,9 @@ A **pain to solve** (player-reported). A thief cosmetic can slink across the tow
 
 ## Non-goals
 
-- Changing the thief cosmetic itself, the 200-entry cap size, or which log kinds surface as toasts.
+- Changing the thief cosmetic itself, the log cap size (paired at 300 here), or which log kinds surface as toasts.
 - Persisting the log or replaying toasts after a reload — the log is transient, so a reload starts clean by design.
 
 ## Success signal
 
-In a long session (past 200 logged events), a thief — or any `good`/`bad` event — still shows its toast and its event-log line, so no cosmetic ever plays unexplained. The freeze that silenced all notifications after 200 events is gone.
+In a long session (past the log cap's worth of logged events), a thief — or any `good`/`bad` event — still shows its toast and its event-log line, so no cosmetic ever plays unexplained. The freeze that silenced all notifications once the log filled is gone.
