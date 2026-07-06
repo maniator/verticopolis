@@ -65,33 +65,19 @@ snapshots and won't pick up later commits on their own.
 ## GitHub PR Review — BMGD/BMAD emulation
 
 For GitHub Copilot pull-request review, run this repo's mandatory deep review.
-Two mechanisms back it, in order of preference:
+Two mechanisms back it, and the method itself is defined once — don't restate it
+here:
 
 1. **The loadable `code-review` skill** at
    [`.github/skills/code-review/SKILL.md`](./skills/code-review/SKILL.md) — Copilot
    code review loads agent skills from `.github/skills/` when relevant, so this
-   runs the real review method directly on the review surface. It is the source of
-   truth for the method.
+   runs the real review method directly on the review surface. It is the **source
+   of truth** for the method (lens routing, adversarial layers, lenses, canon).
 2. **The always-applied overlay** at
    [`.github/instructions/bmad-review.instructions.md`](./instructions/bmad-review.instructions.md)
    (`applyTo: "**/*"`) — a distilled fallback that applies even when the skill
    isn't loaded for a given diff. **Emulate** the deep review from it in that case;
    do not claim a skill was invoked.
-
-In short:
-
-- Pick the emulated skill by the changed files — **`gds-code-review`** for
-  gameplay/engine work (`src/engine/`, `src/render/`, mechanics, economy, ratings,
-  events, elevators, facilities, RNG), **`bmad-code-review`** for everything else
-  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A PR
-  that touches **both** runs both lenses, each scoped to the files it owns; when a
-  single judgment is needed, **default to `gds-code-review` if any gameplay/engine
-  file is touched** (it carries the higher-risk invariants).
-- Run its adversarial layers in order — **Blind Hunter → Edge Case Hunter →
-  Acceptance Auditor** — then synthesize with a **`bmad-party-mode`** step using
-  only the personas the diff implicates.
-- Do **not** claim a BMAD/BMGD skill was actually invoked — reproduce its behavior.
-  Prefer a few high-signal findings over many trivial comments.
 
 ## Code review
 
