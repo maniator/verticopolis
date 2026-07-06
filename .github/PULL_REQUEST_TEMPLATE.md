@@ -22,17 +22,17 @@ Closes #
 
 <!--
 Towers are founded once as "classic" or "modern" (immutable for the tower's life).
-Classic must stay faithful to SimTower 1994; Modern is the opt-in divergence layer.
-All behavior the two modes disagree on lives behind the mode's rule-set strategy —
-resolved once at founding, never branched on ad hoc or smeared through the simulation.
-See AGENTS.md for the current rule-set location and the "don't smear mode logic" tripwire.
+Classic must stay faithful to SimTower 1994; Modern is the opt-in "what the original
+couldn't do" layer. Keep behavior the two modes disagree on in a single mode-resolved
+rule-set — resolved once at founding — rather than branching on the mode ad hoc or
+smearing mode checks through the simulation.
 Delete this section only if the change cannot affect gameplay (e.g. docs/tooling).
 -->
 
 - [ ] This change is **classic-canon** (affects all towers, stays faithful to the 1994 original)
 - [ ] This change is **modern-only** (gated behind Modern mode, does not alter Classic behavior)
 - [ ] This change is **mode-agnostic** (identical in both modes)
-- [ ] Any mode-divergent behavior lives behind the mode rule-set strategy (see AGENTS.md), not smeared into the simulation
+- [ ] Any mode-divergent behavior is isolated in the mode rule-set (resolved once at founding), not smeared into the simulation with ad-hoc mode checks
 
 ## Quality gates
 
