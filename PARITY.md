@@ -86,11 +86,11 @@ abstraction · ⬜ not present.
 ## Deliberate divergences
 - Commuters are **individually pathfound** (walk → wait → ride a real car → transfer → arrive) and their waiting drives stress, but a lightweight **aggregate** congestion model still runs underneath as the deterministic, DOM-free backbone the headless tests assert against. The visible crowd is capped (~140 on screen) for performance rather than rendering the entire population at once.
 - The **Cathedral** is a religion-agnostic **Wedding Hall**.
-- Population is smaller-scale than the original (retail/food add no residents), so the TOWER goal is tuned to **8,000** rather than 15,000 to stay reachable.
+- The population census counts **occupants** — office workers + condo residents (hotel guests count only through 3★); retail/food/visitors never do, matching the original's metric. The **TOWER** goal is the canonical **15,000**, kept reachable by widening the buildable lot to 340 tiles (a well-zoned 100-floor tower measures ~15,000 occupants).
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't — today, *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is). Saves with no mode load as Classic.
 
 ## Verification
-`npm test` runs **95 unit/integration tests** covering placement rules,
+`npm test` runs **500+ unit/integration tests** covering placement rules,
 economy, ratings gates, the housekeeping/fire/bomb events, elevator dispatch,
 the individually-routed **crowd's BFS routing and movement**
 (`src/tests/crowd.test.ts`), save/load, the `.TWR` parser, and an
