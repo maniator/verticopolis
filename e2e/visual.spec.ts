@@ -86,4 +86,17 @@ test.describe("dialog chrome", () => {
 
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
   });
+
+  test("deferred update chip matches baseline", async ({ page }) => {
+    // Find an update, then choose "Later" — the deferred state where the modal
+    // is gone but the "↻ Update" chip stays in the speed toolbar as the way back
+    // in. Snapshot that toolbar cluster (static — no live counters) so the chip's
+    // placement and styling are pinned.
+    await page.evaluate(() => (window as any).game.onUpdateAvailable(async () => {}));
+    await page.waitForSelector("#modal[open]");
+    await page.locator('#modal [data-act="later"]').click();
+    await page.waitForFunction(() => document.getElementById("modal")?.open === false);
+    await page.waitForSelector("#btn-update:not([hidden])");
+    await expect(page.locator("#speed")).toHaveScreenshot("update-chip.png");
+  });
 });
