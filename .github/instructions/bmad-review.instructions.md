@@ -15,6 +15,12 @@ Pick the emulated skill by the files the diff touches:
   **`gds-code-review`**.
 - **Everything else** (storage/persistence, `.TWR` import, tooling, build/CI,
   UI plumbing, docs) → emulate **`bmad-code-review`**.
+- **Mixed diff** (touches both) → run **both** lenses, each scoped to the files
+  it owns: apply `gds-code-review` to the gameplay/engine files and
+  `bmad-code-review` to the rest. When a single judgment is needed — the
+  party-mode synthesis, or which lens leads — **default to `gds-code-review` if
+  any gameplay/engine file is touched**, since those carry the higher-risk
+  invariants (determinism, canon, hot-path performance).
 
 Either way, run the skill's adversarial layers in sequence, then triage:
 

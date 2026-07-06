@@ -74,7 +74,10 @@ to do this. In short:
 - Pick the emulated skill by the changed files — **`gds-code-review`** for
   gameplay/engine work (`src/engine/`, `src/render/`, mechanics, economy, ratings,
   events, elevators, facilities, RNG), **`bmad-code-review`** for everything else
-  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs).
+  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A PR
+  that touches **both** runs both lenses, each scoped to the files it owns; when a
+  single judgment is needed, **default to `gds-code-review` if any gameplay/engine
+  file is touched** (it carries the higher-risk invariants).
 - Run its adversarial layers in order — **Blind Hunter → Edge Case Hunter →
   Acceptance Auditor** — then synthesize with a **`bmad-party-mode`** step using
   only the personas the diff implicates.
