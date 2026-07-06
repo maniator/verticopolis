@@ -26,11 +26,13 @@ import {
   isStaffOnlyTransport,
   isHotelKind,
   maxCarsFor,
+  residentCount,
   transportCarCapacity,
 } from "./facilities";
-import type { FacilityKind, SerializedGame, Unit, VacateReason, WeatherKind } from "./types";
+import type { FacilityKind, GameMode, SerializedGame, Unit, VacateReason, WeatherKind } from "./types";
 import {
   isDormant,
+  isGameMode,
   isOperational,
   isPresent,
   isTenanted,
@@ -88,6 +90,29 @@ const NOISE_EROSION = 0.07;
  *  threshold and office noise can never evict an owner at all. Fixing the cause
  *  (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
+
+/**
+ * Modern-mode "variant households": the family sizes a condo can sell to, and
+ * how likely each is. Weighted toward the classic 3 so a Modern tower still
+ * *feels* like SimTower — the 2s and 5s are the spice, not the staple. The flat
+ * Classic condo is a 3, so this distribution is centered there on purpose: a
+ * Modern tower of many condos lands near the same average population as a
+ * Classic one, only with per-unit variation that makes each sale a small bet.
+ * INVARIANT: keep the weights' implied mean ≈ 3 so Modern doesn't silently
+ * inflate or deflate the star-rating ladder relative to Classic.
+ */
+const HOUSEHOLD_SIZES = [2, 3, 4, 5] as const;
+// mean = (2·4 + 3·6 + 4·2 + 5·1)/13 = 39/13 = 3.0 exactly, with 3 the clear mode —
+// so a Modern tower's condo population matches a Classic one's on average (the
+// invariant above) while still varying unit to unit.
+const HOUSEHOLD_WEIGHTS = [4, 6, 2, 1] as const;
+
+/** A bigger family leans harder on the tower — access, congestion and noise
+ *  bite a 5-person household more than a 2-person one. This scales the churn
+ *  pressure by how far the household sits from the classic 3, so placing a big
+ *  family is higher reward (a pricier sale) but higher risk (it bails sooner if
+ *  the tower can't serve it). Per person away from 3; 0 leaves Classic untouched. */
+const HOUSEHOLD_CHURN_PER_PERSON = 0.06;
 
 /**
  * Save-format migration seam. Runs before the field-level coercion in
@@ -221,6 +246,16 @@ export class Simulation implements SimContext {
   evaluatedTower = false;
 
   /**
+   * Rule-set this tower was founded under — {@link GameMode}. Set once at
+   * construction and never reassigned (the field is `readonly`), so the whole
+   * engine can branch on it without ever guarding against a mid-game flip. Old
+   * saves with no persisted mode deserialize as `classic`, so their condos stay
+   * flat 3s and the population census is unchanged. The UI stamps the player's
+   * choice at tower creation.
+   */
+  readonly mode: GameMode;
+
+  /**
    * Simulation model selector (Phase 2, review F4). `v1` is the shipped behavior:
    * a single `tick(dt)` samples the clock once, firing `onHour`/`onDay` at most
    * once per call and handing the full `dt` to every integrator. `v2` decomposes
@@ -307,8 +342,9 @@ export class Simulation implements SimContext {
    * can't be farmed into tens of millions (the find stays a bounded windfall). */
   private treasuresFound = 0;
 
-  constructor(seed = 12345) {
+  constructor(seed = 12345, mode: GameMode = "classic") {
     this.rng = new RNG(seed);
+    this.mode = mode;
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
     this.economy = new EconomySystem(this);
@@ -855,9 +891,11 @@ export class Simulation implements SimContext {
             !weekend && this.clock.hour >= 8 && this.clock.hour < 18 ? f.population : 0;
           break;
         case "condo":
-          // Residents home in evenings/night/weekends.
+          // Residents home in evenings/night/weekends — the whole household
+          // (its real size in Modern, the flat 3 in Classic); one person stays
+          // home during the weekday workday.
           u.occupants =
-            this.clock.isNight() || this.clock.isEvening() || weekend ? f.population : 1;
+            this.clock.isNight() || this.clock.isEvening() || weekend ? residentCount(u) : 1;
           break;
         case "hotelSingle":
         case "hotelDouble":
@@ -891,13 +929,19 @@ export class Simulation implements SimContext {
       if (isDormant(u)) continue;
       const served = this.tower.isFloorServed(u.floor);
       const cong = congMap ? (congMap.get(u.floor) ?? 0) : globalCong;
+      // A bigger Modern household leans harder on the tower: scale only the
+      // NEGATIVE access/congestion pressures, never the recovery, so a well-served
+      // big family is just as happy as a small one — the size only bites when the
+      // tower is failing them. Always 1 in Classic (and for flat/unsold condos),
+      // so those towers are untouched.
+      const churn = this.churnSensitivity(u);
       if (!served) {
-        u.satisfaction = Math.max(0, u.satisfaction - 0.15);
+        u.satisfaction = Math.max(0, u.satisfaction - 0.15 * churn);
       } else if (u.floor !== 1 && cong > 1) {
         // Overcrowded vertical transport stresses everyone, more so the worse it
         // is — but tenants on the ground floor (floor 1) never ride an elevator,
         // so elevator congestion can't possibly bother them.
-        u.satisfaction = Math.max(0, u.satisfaction - 0.04 * Math.min(3, cong - 1));
+        u.satisfaction = Math.max(0, u.satisfaction - 0.04 * Math.min(3, cong - 1) * churn);
       } else {
         u.satisfaction = Math.min(1, u.satisfaction + 0.05);
       }
@@ -1123,7 +1167,7 @@ export class Simulation implements SimContext {
     for (const u of this.tower.units) {
       if (u.kind === "metro" && isOperational(u)) metro++;
       if (isPresent(u)) {
-        const p = FACILITIES[u.kind].population;
+        const p = residentCount(u);
         if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
       }
     }
@@ -1185,15 +1229,64 @@ export class Simulation implements SimContext {
     return result;
   }
 
+  /** Churn multiplier on the NEGATIVE satisfaction pressures for a unit — 1 for
+   *  everything except a Modern condo with a settled household, where a family
+   *  larger than the classic 3 is more demanding (bails sooner) and a smaller one
+   *  a little more forgiving. Clamped positive so it can only ever soften or
+   *  sharpen the drain, never flip its sign. */
+  private churnSensitivity(u: Unit): number {
+    if (u.kind !== "condo" || u.residents === undefined) return 1;
+    const delta = u.residents - FACILITIES.condo.population;
+    return Math.max(0.5, 1 + HOUSEHOLD_CHURN_PER_PERSON * delta);
+  }
+
+  /** Draw a Modern condo's household size (2–5, weighted toward 3) from the
+   *  gameplay RNG, so it's deterministic and reproduces across save/reload. */
+  private rollHousehold(): number {
+    const total = HOUSEHOLD_WEIGHTS.reduce((a, b) => a + b, 0);
+    let roll = this.rng.int(1, total);
+    for (let i = 0; i < HOUSEHOLD_SIZES.length; i++) {
+      roll -= HOUSEHOLD_WEIGHTS[i];
+      if (roll <= 0) return HOUSEHOLD_SIZES[i];
+    }
+    return FACILITIES.condo.population; // unreachable; the classic 3 as a safety net
+  }
+
   private vacate(u: Unit, reason: VacateReason): void {
+    // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
+    // lose a tenant — you repurchase the unit at what it sold for and hold it as
+    // empty inventory to sell again. (A never-sold condo just goes back on the
+    // market at no cost.) Charging the full sale price makes losing an owner to
+    // sustained neglect genuinely hurt, exactly as it did in the original, and
+    // resetting everOccupied lets the repurchased unit re-sell. Do this BEFORE the
+    // everOccupied reset below reads it.
+    // Repurchase at what it SOLD for — the size-scaled price in Modern (the
+    // household is still set here, before the reset below), the flat asking price
+    // in Classic — so the sting exactly reverses the sale. 0 for anything that
+    // wasn't an owned condo (offices, never-sold condos: they cost nothing back).
+    let buyback = 0;
+    if (u.kind === "condo" && u.everOccupied) {
+      const base = rentOf(u);
+      buyback = u.residents !== undefined ? Math.round((base * u.residents) / FACILITIES.condo.population) : base;
+      this.money -= buyback;
+      this.recordMoney("condos", -buyback);
+    }
     u.state = "empty";
     u.occupants = 0;
-    u.everOccupied = u.kind === "condo" ? u.everOccupied : false;
+    // A repurchased condo returns to the market: clear the sold flag and the
+    // Modern household so it can sell fresh (a new price, a new family). Offices
+    // and any not-yet-sold condo were never "owned", so nothing to reset there.
+    u.everOccupied = false;
+    u.residents = undefined;
     u.label = FACILITIES[u.kind].name;
     u.vacateReason = undefined;
     u.vacateAt = undefined;
+    // One toast per departure. A bought-back owner's line carries the cost and
+    // the cause together; every other tenant just gets the plain "left" notice.
     this.emit(
-      `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
+      buyback > 0
+        ? `The owner left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}) — you bought it back for $${buyback.toLocaleString()}.`
+        : `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
       "bad",
     );
   }
@@ -1440,11 +1533,23 @@ export class Simulation implements SimContext {
     u.vacateAt = undefined;
     if (u.kind === "condo" && !u.everOccupied) {
       u.everOccupied = true;
-      const price = rentOf(u);
+      // Classic sells to the flat family of 3 at the asking price. Modern draws a
+      // 2–5 person household and scales the sale by its size relative to that 3 —
+      // a bigger family buys a pricier home (the reward side of the bet its higher
+      // churn pays for). The asking price the player set still drives HOW FAST it
+      // sells (via move-in demand); the household size drives WHAT it fetches.
+      const base = rentOf(u);
+      let price = base;
+      if (this.mode === "modern") {
+        const household = this.rollHousehold();
+        u.residents = household;
+        price = Math.round((base * household) / FACILITIES.condo.population);
+      }
       this.money += price;
       this.recordMoney("condos", price);
       this.moveInsToday.condos++;
-      this.emit(`Condominium on ${this.floorLabel(u.floor)} sold for $${price.toLocaleString()}.`, "money");
+      const who = u.residents ? ` to a household of ${u.residents}` : "";
+      this.emit(`Condominium on ${this.floorLabel(u.floor)} sold${who} for $${price.toLocaleString()}.`, "money");
     }
     if (u.kind === "office") {
       u.everOccupied = true;
@@ -1515,7 +1620,7 @@ export class Simulation implements SimContext {
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
-        pop += FACILITIES[u.kind].population;
+        pop += residentCount(u);
       }
     }
     return pop;
@@ -1811,6 +1916,7 @@ export class Simulation implements SimContext {
       money: this.money,
       star: this.star,
       minutes: this.clock.minutes,
+      mode: this.mode,
       units: this.tower.units.map((u) => ({ ...u })),
       transports: this.tower.transports.map((t) => ({
         ...t,
@@ -1839,7 +1945,10 @@ export class Simulation implements SimContext {
   static deserialize(raw: SerializedGame): Simulation {
     // Run the save through the version seam first, then harden every field below.
     const data = migrateSave(raw);
-    const sim = new Simulation(data.seed);
+    // Mode is founded at creation and immutable, so it comes straight from the
+    // save. A save that predates the fork (or a forged value) has no valid mode
+    // ⇒ classic, keeping every legacy tower pixel-faithful with no migration.
+    const sim = new Simulation(data.seed, isGameMode(data.mode) ? data.mode : "classic");
     sim.money = data.money;
     sim.star = data.star;
     sim.clock = new Clock(data.minutes);
@@ -1896,6 +2005,19 @@ export class Simulation implements SimContext {
           label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
           satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
           occupants: Math.max(0, num(u.occupants, 0)),
+          // Household size for a Modern condo. On a CLASSIC tower it's forced to
+          // undefined (a forged classic save can't smuggle in a variable
+          // household — its condos MUST read the flat 3, keeping the census
+          // canon). On a Modern tower a present value is coerced to a whole number
+          // inside the real generator band (2..5) so a forged save can't inject an
+          // out-of-range size the game never produces or blow up the census.
+          residents:
+            sim.mode !== "modern" || u.residents === undefined
+              ? undefined
+              : Math.max(
+                  HOUSEHOLD_SIZES[0],
+                  Math.min(HOUSEHOLD_SIZES[HOUSEHOLD_SIZES.length - 1], Math.round(num(u.residents, 3))),
+                ),
           pendingIncome: num(u.pendingIncome, 0),
           // Coerce the optional player-set price too, so a corrupt save can't
           // inject a non-number rent (which would poison income / rentOf math).
@@ -1999,9 +2121,11 @@ export class Simulation implements SimContext {
     return sim;
   }
 
-  /** Convenience for the initial empty lot (ground lobby seed). */
-  static newGame(seed = 12345): Simulation {
-    const sim = new Simulation(seed);
+  /** Convenience for the initial empty lot (ground lobby seed). The `mode`
+   *  chosen at the New Tower screen is baked in here, at creation, and is
+   *  immutable for the tower's life. */
+  static newGame(seed = 12345, mode: GameMode = "classic"): Simulation {
+    const sim = new Simulation(seed, mode);
     // Seed a starter ground-floor lobby strip so the player has a base.
     const startX = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) {

@@ -1,5 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import { LEDGER_CATS, LEDGER_LABELS } from "../engine/Ledger";
+import { isPresent } from "../engine/types";
 import { escapeHtml } from "./escape";
 import { floorTag } from "./format";
 
@@ -54,6 +55,7 @@ export function buildStatsHtml(sim: Simulation): string {
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
+      ${sim.mode === "modern" ? householdSection(sim) : ""}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">
         <span class="k">Stranded floors</span><span class="v" style="color:${stranded ? "var(--bad)" : "var(--good)"}">${stranded || "None"}</span>
@@ -159,6 +161,50 @@ export function buildIncomeHtml(sim: Simulation): string {
     `<div class="col kv">${rows.slice(half).map((r) => line(LEDGER_LABELS[r.cat], r.avg)).join("")}` +
     line("Net", net, true) +
     `</div>`
+  );
+}
+
+/**
+ * Modern-only "Households" readout: the size mix of the tower's sold condos,
+ * their average, and the total people housed. This is what makes variant
+ * households legible — the player can see they've filled up on big families and
+ * connect that to churn. Rendered only in Modern mode (a Classic tower's condos
+ * are all 3s, so the section would carry no information); gated by the caller.
+ */
+function householdSection(sim: Simulation): string {
+  const counts = new Map<number, number>();
+  let households = 0;
+  let residents = 0;
+  for (const u of sim.tower.units) {
+    // Count only households actually in residence (isPresent) — the same gate the
+    // population census uses — so "People housed" always agrees with total
+    // population and a not-present unit (empty, gutted) can never leave a ghost
+    // family in the readout.
+    if (u.kind === "condo" && u.residents !== undefined && isPresent(u)) {
+      counts.set(u.residents, (counts.get(u.residents) ?? 0) + 1);
+      households++;
+      residents += u.residents;
+    }
+  }
+  const head = `<div class="stats-section win-title sm">Households</div>`;
+  if (households === 0) {
+    return (
+      head +
+      `<div class="col kv"><span class="k" style="color:var(--muted);grid-column:1/-1">No condos sold yet — each sale draws a 2–5 person family.</span></div>`
+    );
+  }
+  const avg = (residents / households).toFixed(1);
+  const mix = [...counts.keys()]
+    .sort((a, b) => a - b)
+    .map((sz) => `${sz}p × ${counts.get(sz)}`)
+    .join(" · ");
+  return (
+    head +
+    `<div class="col kv">` +
+    `<span class="k">People housed</span><span class="v">${residents.toLocaleString()}</span>` +
+    `<span class="k">Avg household</span><span class="v">${avg}</span>` +
+    `</div>` +
+    `<div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`
   );
 }
 

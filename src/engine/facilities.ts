@@ -1,4 +1,4 @@
-import type { Facility, FacilityKind } from "./types";
+import type { Facility, FacilityKind, Unit } from "./types";
 
 /**
  * Facility catalog. Costs and sizes are tuned to mirror the scale and balance
@@ -322,6 +322,25 @@ const KIND_SET = new Set<string>(ALL_KINDS);
  */
 export function isFacilityKind(value: unknown): value is FacilityKind {
   return typeof value === "string" && KIND_SET.has(value);
+}
+
+/**
+ * The number of people a unit contributes to the population census — the SINGLE
+ * seam every "how many live/work here" count routes through (total population,
+ * star-rating census, per-floor congestion). Almost always the kind's flat
+ * catalog `population`; the one exception is a Modern-mode condo that sold to a
+ * variable-size household, which carries its own `residents`. Classic towers and
+ * every pre-variant save leave `residents` undefined and so read the flat value
+ * — keeping their numbers byte-identical. Take a partial so callers can pass a
+ * bare `{kind, residents}` without a full Unit.
+ */
+export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): number {
+  // Gate the override on condos: `residents` is only ever a condo household, so
+  // a forged save that stamps it on an office can't inflate that office's head
+  // count. Everything else — and any condo without a household set — reads the
+  // flat catalog population.
+  if (u.kind === "condo" && u.residents !== undefined) return u.residents;
+  return FACILITIES[u.kind].population;
 }
 
 /**

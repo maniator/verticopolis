@@ -156,6 +156,10 @@ export class EventSystem {
     u.state = "gutted";
     u.occupants = 0;
     u.everOccupied = false;
+    // A gutted shell houses no one: drop any Modern household so it stops counting
+    // toward the Households readout (it's already excluded from the population
+    // census, which keys off isPresent — this keeps the two from disagreeing).
+    u.residents = undefined;
     u.satisfaction = 0;
     u.pendingIncome = 0;
     u.label = FACILITIES[u.kind].name;

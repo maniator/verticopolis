@@ -25,6 +25,20 @@ PR that found them. Pick these up when touching the relevant area.
   touching vertical placement: derive the crane's floor from the true topmost occupied
   row (`u.floor + facilityFloors(u.kind) − 1`), not the max base floor.
 
+## Deferred from: gds-code-review (2026-07-06, condo modes — price/buy-back/variant households)
+
+- **Out-of-band legacy condo prices aren't re-clamped on load.** The condo price
+  band re-anchored to `min 80k / default 160k / max 200k` (`econConfig.ts`), but
+  `deserialize` coerces a stored per-unit `rent` to a finite number without
+  re-clamping to the new band. A pre-existing save with a custom condo price at
+  the old max (240k) or min (60k) keeps that out-of-band value — it displays past
+  the slider's ends and, for an unsold condo, sells at it. Benign and pre-existing
+  (the band has moved before; player edits clamp, loads don't), and sold condos
+  can't be repriced anyway. If we ever add load-time band validation, clamp condo
+  `rent` into the current `ECON.rent.condo` range here. (Blind Hunter; no code
+  change now — no reachable exploit, and the shipped save has no custom condo
+  prices.)
+
 ## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
 
 - ~~**`floorHeatmap` recomputes the spatial congestion map once per built floor

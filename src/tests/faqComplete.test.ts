@@ -329,7 +329,7 @@ describe("Deep-review regressions (must not come back)", () => {
     // now-empty, well-served unit may re-let to a fresh resident afterward, so we
     // assert the departure actually fired via its toast, not the transient state.)
     for (let i = 0; i < 24 * 3; i++) sim.tick(60);
-    expect(sim.log.some((e) => /A tenant left .*office noise next door/.test(e.text))).toBe(true);
+    expect(sim.log.some((e) => /(A tenant|The owner) left .*office noise next door/.test(e.text))).toBe(true);
   });
 
   it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {

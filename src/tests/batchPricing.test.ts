@@ -70,7 +70,7 @@ describe("Batch pricing", () => {
     expect(res.skippedSold).toBe(1);
     expect(res.matched).toBe(2);
     expect(res.eligible).toBe(1);
-    expect(rentOf(condos[0])).toBe(120_000); // sold one untouched (still default)
+    expect(rentOf(condos[0])).toBe(160_000); // sold one untouched (still the canon 2×-cost default)
     expect(rentOf(condos[1])).toBe(200_000);
   });
 

@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import { VACATE_RESCIND } from "../engine/Simulation";
-import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind } from "../engine/facilities";
+import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind, residentCount } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
 import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
@@ -156,7 +156,7 @@ export class InspectorController {
         `<h4 class="win-title">${f.name}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
           `<div>Status: ${statusText}</div>` +
-          (f.population ? `<div>Occupants: ${u.occupants}/${f.population}</div>` : "") +
+          (f.population ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>` : "") +
           access +
           hotel +
           parking +
