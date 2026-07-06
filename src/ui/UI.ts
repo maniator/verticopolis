@@ -797,7 +797,7 @@ export class UI {
       </ul>
       <h3>Found a bug? Have an idea?</h3>
       <p style="color:var(--muted)">Help us improve Verticopolis — report a bug, request a feature, or flag anything that doesn't match the 1994 original.</p>
-      <p class="help-report"><a class="btn" target="_blank" rel="noopener" href="https://github.com/maniator/verticopolis/issues/new/choose">Report an issue…</a></p>
+      <p class="help-report"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/maniator/verticopolis/issues/new/choose">Report an issue…<span class="visually-hidden"> (opens GitHub in a new tab)</span></a></p>
       <h3>About</h3>
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>

@@ -461,10 +461,15 @@ describe("showHelp — the Report an issue link", () => {
     ui.showHelp();
     const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`);
     expect(link, "expected a Report-an-issue link to the GitHub chooser").not.toBeNull();
-    // A new tab (so the game isn't navigated away) — and noopener so the opened
-    // page can't reach back through window.opener.
+    // A new tab (so the game isn't navigated away), with noopener+noreferrer so
+    // the opened page can't reach back through window.opener or see the referrer.
     expect(link!.target).toBe("_blank");
     expect(link!.rel).toContain("noopener");
+    expect(link!.rel).toContain("noreferrer");
+    // A screen-reader-only cue warns that activating the link changes context to
+    // a new tab (WCAG 3.2.5), without altering the visible label.
+    const cue = link!.querySelector(".visually-hidden");
+    expect(cue?.textContent).toContain("new tab");
   });
 
   it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {

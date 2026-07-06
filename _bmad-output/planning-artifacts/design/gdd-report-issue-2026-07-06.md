@@ -122,7 +122,8 @@ Auditor). Auditor: fully spec-compliant. Findings:
   `autofocus` to the primary "Got it" button — activation of the report link is
   now always deliberate, and focus lands on the safe dismiss action (realizing
   the design-system intent in `docs/design-system.md` §3). Locked by a test.
-- **[Defer] No "opens in a new tab" cue for assistive tech (WCAG 3.2.5).**
-  Minor once focus is fixed (activation is deliberate). Recorded in
-  `implementation-artifacts/backlog.md` — a shared external-link affordance is a
-  cross-app decision, not a one-off on this link.
+- **[Patch — applied] No "opens in a new tab" cue for assistive tech (WCAG
+  3.2.5).** Initially deferred, then fixed after a Copilot review noted the repo
+  already ships a `.visually-hidden` helper (`styles.css:86`). The link now
+  carries a screen-reader-only "(opens GitHub in a new tab)" suffix and
+  `rel="noopener noreferrer"`. Locked by the link-contract test.
