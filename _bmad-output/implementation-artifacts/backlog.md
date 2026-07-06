@@ -80,7 +80,15 @@ Triage them into the table above, then delete the raw note._
   behavior (not introduced by this change), no flicker, ~0.02 calibration
   asymmetry. Negligible; noting for completeness.
 
-_(empty — all current deferrals are triaged into the table above.)_
+### Deferred from: gds-code-review E3.1 (parking ratio + one-car sprite), 2026-07-07
+
+- **Dev sprite catalog stretches parking to the cell width** — `gallery.ts:144`
+  (`w≈292`) and `preview.ts:79` render `drawParking` at the full catalog-cell
+  width, so the new single-stall parking sprite reads as one small car adrift in
+  a wide empty bay. Dev-only tooling (not player-facing), cosmetic. Fix (optional):
+  render parking at its true `u.width * TILE` footprint in the catalog rather than
+  stretching to the cell. _Note: relevant when the E1b width change (parking 6→4)
+  lands and screenshots regenerate — revisit the sprite-gallery shot then._
 
 ## Completed / superseded
 

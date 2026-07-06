@@ -231,7 +231,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     color: "#888888",
     basement: true,
     description:
-      "Basement parking. Must connect to a Parking Ramp. One space serves ~12 office workers, and every hotel suite needs a space of its own (VIPs drive).",
+      "Basement parking. Must connect to a Parking Ramp. One space serves ~24 office workers (one per four offices), and every hotel suite needs a space of its own (VIPs drive).",
   },
   security: {
     kind: "security",
@@ -383,8 +383,10 @@ export const RECYCLING_POP_PER_CENTER = 2500;
 export const GARBAGE_COLLECT_HOUR = 5;
 
 /** Office workers one functional parking space serves (canon: offices demand
- *  parking from 3★). Shared by the move-in penalty, the UI and the tests. */
-export const PARKING_WORKERS_PER_SPACE = 12;
+ *  parking from 3★). The 1994 original asks for one space per **four offices**;
+ *  an office holds 6 workers, so one space serves 24 workers. Shared by the
+ *  move-in penalty, the UI and the tests. */
+export const PARKING_WORKERS_PER_SPACE = 24;
 
 /** Tower geometry constants. */
 export const GRID = {

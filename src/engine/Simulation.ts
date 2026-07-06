@@ -1384,7 +1384,7 @@ export class Simulation implements SimContext {
     return Math.min(1, (this.tower.totalPopulation() / cap) * (sinceCollect / 1440));
   }
 
-  /** Functional parking spaces the tower NEEDS: one per ~12 office workers
+  /** Functional parking spaces the tower NEEDS: one per ~24 office workers
    *  (canon: offices demand parking from 3★) plus one per hotel suite (canon:
    *  suite guests — and the VIP — arrive by car). */
   parkingDemand(): { officePop: number; offices: number; suites: number; total: number } {
@@ -1406,7 +1406,7 @@ export class Simulation implements SimContext {
   }
 
   /** True when the tower is 3★+ and lacks enough parking for its office workforce
-   * (each parking space serves ~12 workers) — offices then demand parking.
+   * (each parking space serves ~24 workers) — offices then demand parking.
    * Suites reserve their one-space-each FIRST (canon), so a lot full of suite
    * cars gives the offices nothing. */
   private officeParkingShort(): boolean {

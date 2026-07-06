@@ -30,7 +30,7 @@ export interface InspectorDeps {
 
 /** The shared demand line for parking spaces & ramps: how many working spaces
  *  the tower has (`have`, passed in so the caller's single flood-fill is reused)
- *  vs what its offices (1 per ~12 workers) and suites (1 each) currently need. */
+ *  vs what its offices (1 per ~24 workers) and suites (1 each) currently need. */
 function parkingDemandLine(sim: Simulation, have: number): string {
   const d = sim.parkingDemand();
   const color = have < d.total ? "var(--bad)" : "var(--good)";

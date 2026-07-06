@@ -5,7 +5,7 @@ import type { FacilityKind, Unit, UnitState } from "../engine/types";
 
 /** Canon waste & parking demand mechanics: the recycling centers FILL with the
  * tower's daily garbage (emptied by the morning truck), demand scales with
- * population and gates 4★, and parking serves offices (1/~12 workers) plus one
+ * population and gates 4★, and parking serves offices (1/~24 workers) plus one
  * space per hotel suite. */
 
 const W = GRID.width;
@@ -99,17 +99,20 @@ describe("Recycling fills with population and gates 4★ by DEMAND", () => {
   });
 });
 
-describe("Parking demand: offices (1/~12 workers) + one space per suite", () => {
+describe("Parking demand: offices (1/~24 workers) + one space per suite", () => {
   it("parkingDemand sums both, and suites reserve their spaces first", () => {
     const sim = Simulation.newGame(12);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    // 24 occupied office workers → 2 spaces; 3 suites → 3 more.
+    // 24 occupied office workers → 1 space (1 per 4 offices); 3 suites → 3 more.
     for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
     for (let i = 0; i < 3; i++) mustPlace(sim, "hotelSuite", 2, 40 + i * 12);
     const d = sim.parkingDemand();
     expect(d.officePop).toBe(4 * FACILITIES.office.population);
+    // Canon: one space per four offices. 4 offices × 6 workers = 24 → exactly 1 space.
+    // A literal (not `ceil(pop / CONST)`, which would tautologically track any ratio).
+    expect(d.offices).toBe(1);
     expect(d.offices).toBe(Math.ceil(d.officePop / PARKING_WORKERS_PER_SPACE));
     expect(d.suites).toBe(3);
     expect(d.total).toBe(d.offices + d.suites);
