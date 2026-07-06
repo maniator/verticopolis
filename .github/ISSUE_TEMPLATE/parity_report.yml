@@ -10,6 +10,11 @@ body:
         number, rule, or behavior diverges from the original. Canon values (build caps, transport
         pooling, economy math) live in `src/engine/facilities.ts` and `PARITY.md` — please cite a
         source for the original's behavior so we can verify it.
+
+        **⚠️ Parity only applies to Classic-mode towers.** Towers can be founded in **Classic**
+        (faithful to 1994) or **Modern** (an opt-in "what the original couldn't do" layer).
+        Differences you see in a **Modern** tower are intentional and are *not* parity bugs — if
+        you'd like to change or extend a Modern-mode behavior, please open a **Feature request** instead.
   - type: dropdown
     id: area
     attributes:
@@ -49,6 +54,8 @@ body:
     attributes:
       label: Before submitting
       options:
+        - label: This is about a **Classic**-mode tower (Modern-mode differences are intentional — use a Feature request for those).
+          required: true
         - label: I checked PARITY.md and this divergence is not already documented as intentional.
           required: true
         - label: I searched existing issues and this is not a duplicate.

@@ -56,6 +56,17 @@ body:
         - Mobile / tablet
     validations:
       required: true
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode
+      description: Which mode was the affected tower founded in? Behavior can differ between Classic and Modern.
+      options:
+        - Classic
+        - Modern
+        - Not sure / not applicable
+    validations:
+      required: true
   - type: textarea
     id: console
     attributes:

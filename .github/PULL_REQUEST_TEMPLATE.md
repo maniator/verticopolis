@@ -12,10 +12,27 @@ Closes #
 ## Type of change
 
 - [ ] Bug fix (non-breaking change that fixes an issue)
-- [ ] New player-facing feature
-- [ ] SimTower parity / canon fix
+- [ ] Classic-canon fix (matches the 1994 original for all towers)
+- [ ] Modern-mode feature (opt-in, "what the original couldn't do")
+- [ ] New player-facing feature (mode-agnostic)
 - [ ] Refactor / internal-only (no player-facing behavior change)
 - [ ] Docs / tooling
+
+## Game mode impact
+
+<!--
+Towers are founded once as "classic" or "modern" (immutable for the tower's life).
+Classic must stay faithful to SimTower 1994; Modern is the opt-in divergence layer.
+All behavior the two modes disagree on lives behind the GameRules strategy
+(src/engine/gameRules.ts: CLASSIC_RULES / MODERN_RULES) — never branch on the mode
+string outside makeRules, and never smear mode logic into the simulation. See AGENTS.md.
+Delete this section only if the change cannot affect gameplay (e.g. docs/tooling).
+-->
+
+- [ ] This change is **classic-canon** (affects all towers, stays faithful to the 1994 original)
+- [ ] This change is **modern-only** (gated behind Modern mode, does not alter Classic behavior)
+- [ ] This change is **mode-agnostic** (identical in both modes)
+- [ ] Any mode-divergent behavior lives behind `GameRules` (`src/engine/gameRules.ts`), not smeared into `Simulation`
 
 ## Quality gates
 
