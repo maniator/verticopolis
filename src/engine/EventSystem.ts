@@ -1,6 +1,6 @@
 import type { SimContext } from "./SimContext";
 import type { Unit } from "./types";
-import { isOperational, isTenanted } from "./types";
+import { isOperational, isPresent, isTenanted } from "./types";
 import { FACILITIES } from "./facilities";
 import { RNG } from "./rng";
 
@@ -360,16 +360,19 @@ export class EventSystem {
   }
 
   /**
-   * Pick a floor for the thief to prowl: a random *tenanted floor* (so he shows
-   * up where people actually are), falling back to the ground lobby when nothing
-   * is leased yet. Selection is over the set of *distinct* tenanted floors, so
-   * it's floor-uniform — a floor holding several occupied units is no likelier
-   * to be picked than one holding a single tenant. Drawn on the seasonal-event
-   * RNG so it never perturbs the gameplay stream — and only *after* the daily
-   * chance passes, so a day with no thief consumes no extra RNG.
+   * Pick a floor for the thief to prowl: a random *inhabited floor* (so he shows
+   * up where people actually are), falling back to the ground lobby when no one
+   * is home yet. "Inhabited" uses {@link isPresent} — the same census predicate
+   * the population count uses — so it counts sleeping hotel guests (`asleep`),
+   * not just leases; otherwise an all-hotel tower (or any tower at night) would
+   * always fall back to the lobby. Selection is over the set of *distinct*
+   * inhabited floors, so it's floor-uniform — a floor holding several occupied
+   * units is no likelier to be picked than one holding a single tenant. Drawn on
+   * the seasonal-event RNG so it never perturbs the gameplay stream — and only
+   * *after* the daily chance passes, so a day with no thief consumes no extra RNG.
    */
   private thiefFloor(): number {
-    const floors = [...new Set(this.sim.tower.units.filter((u) => isTenanted(u)).map((u) => u.floor))];
+    const floors = [...new Set(this.sim.tower.units.filter((u) => isPresent(u)).map((u) => u.floor))];
     return floors.length === 0 ? 1 : this.extra.pick(floors);
   }
 

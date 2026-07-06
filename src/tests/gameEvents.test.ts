@@ -243,17 +243,30 @@ describe("Event visual hooks — the renderer triggers (SimContext)", () => {
     expect(bare.thiefCalls).toEqual([{ caught: false, floor: 1 }]); // no Security → gets away
   });
 
-  it("the thief prowls a random tenanted floor (not mid-air)", () => {
+  it("the thief prowls a random inhabited floor (not mid-air)", () => {
     // Occupy exactly one office (floor 5); thiefFloor() should pick it. Order of
-    // extra-RNG draws once the chance passes: chance, then pick(tenanted).
+    // extra-RNG draws once the chance passes: chance, then pick(present floors).
     const tower = officeTower({ security: true });
     const office = tower.units.find((u) => u.kind === "office" && u.floor === 5)!;
-    office.state = "occupied"; // the sole tenanted unit
+    office.state = "occupied"; // the sole inhabited unit
     const ctx = makeCtx(tower, 2, new ScriptedRNG([]));
     const events = new EventSystem(ctx, 7);
     (events as unknown as { extra: RNG }).extra = new ScriptedRNG([0, 0]); // chance→true, pick→index 0
     events.maybeRandomEvent();
     expect(ctx.thiefCalls).toEqual([{ caught: true, floor: 5 }]);
+  });
+
+  it("counts sleeping (asleep) occupants — an all-hotel tower doesn't always fall back to the lobby", () => {
+    // Hotel guests are `asleep` at night, which isTenanted excludes but isPresent
+    // includes — so the thief should prowl their floor, not the lobby fallback.
+    const tower = officeTower({ security: true });
+    const room = tower.units.find((u) => u.kind === "office" && u.floor === 4)!;
+    room.state = "asleep"; // stand-in for a sleeping guest — the only present unit
+    const ctx = makeCtx(tower, 2, new ScriptedRNG([]));
+    const events = new EventSystem(ctx, 7);
+    (events as unknown as { extra: RNG }).extra = new ScriptedRNG([0, 0]); // chance→true, pick→index 0
+    events.maybeRandomEvent();
+    expect(ctx.thiefCalls).toEqual([{ caught: true, floor: 4 }]);
   });
 });
 
