@@ -27,17 +27,13 @@ PR that found them. Pick these up when touching the relevant area.
 
 ## Deferred from: gds-code-review (2026-07-06, condo modes — price/buy-back/variant households)
 
-- **Out-of-band legacy condo prices aren't re-clamped on load.** The condo price
-  band re-anchored to `min 80k / default 160k / max 200k` (`econConfig.ts`), but
-  `deserialize` coerces a stored per-unit `rent` to a finite number without
-  re-clamping to the new band. A pre-existing save with a custom condo price at
-  the old max (240k) or min (60k) keeps that out-of-band value — it displays past
-  the slider's ends and, for an unsold condo, sells at it. Benign and pre-existing
-  (the band has moved before; player edits clamp, loads don't), and sold condos
-  can't be repriced anyway. If we ever add load-time band validation, clamp condo
-  `rent` into the current `ECON.rent.condo` range here. (Blind Hunter; no code
-  change now — no reachable exploit, and the shipped save has no custom condo
-  prices.)
+- ~~**Out-of-band legacy condo prices aren't re-clamped on load.**~~ Fixed in the
+  same PR (Copilot review): `deserialize` now clamps an UNSOLD condo's `rent` into
+  the re-anchored `ECON.rent.condo` band, so a legacy save priced at the old
+  min/max ($60k/$240k) can't sell below build cost or above the new ceiling (or
+  render past the slider). Sold condos are left untouched so the buy-back still
+  mirrors the historical sale price. (Also hardened: `everOccupied` is coerced to
+  a strict boolean on load, so a forged truthy value can't fake a sold condo.)
 
 ## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
 

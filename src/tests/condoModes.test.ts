@@ -219,6 +219,76 @@ describe("Mode is founded once and persists", () => {
   });
 });
 
+describe("Save hardening at the trust boundary", () => {
+  it("coerces a forged non-boolean everOccupied to false (no phantom sold condo)", () => {
+    const sim = Simulation.newGame(3, "classic");
+    servedCondo(sim);
+    const raw = sim.serialize();
+    // A hand-edited save with a truthy non-boolean sold flag.
+    for (const u of raw.units) if (u.kind === "condo") (u as { everOccupied: unknown }).everOccupied = "yes";
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo")!;
+    expect(rc.everOccupied).toBe(false); // strictly boolean, not truthy
+  });
+
+  it("re-enters a legacy dead condo (everOccupied+empty) into the market on load", () => {
+    // A save from before the buy-back change: an owner left, `vacate()` set the
+    // unit empty but kept everOccupied true. It must not reload as permanently
+    // off-market.
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    const raw = sim.serialize();
+    for (const u of raw.units) {
+      if (u.kind === "condo") {
+        u.everOccupied = true;
+        u.state = "empty";
+      }
+    }
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo")!;
+    expect(rc.everOccupied).toBe(false); // normalized → can re-sell
+    void condo;
+  });
+
+  it("clears a stale household on a not-sold condo on load", () => {
+    const sim = Simulation.newGame(3, "modern");
+    servedCondo(sim);
+    const raw = sim.serialize();
+    // Forge a household onto an EMPTY (not-sold) condo, as a hand-edited or
+    // legacy save might.
+    for (const u of raw.units) {
+      if (u.kind === "condo") {
+        u.state = "empty";
+        u.everOccupied = false;
+        u.residents = 5;
+      }
+    }
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo")!;
+    expect(rc.residents).toBeUndefined(); // no stale household leaks into the census/UI
+  });
+
+  it("clamps an unsold condo's legacy out-of-band price, leaving sold condos untouched", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const a = servedCondo(sim);
+    const b = sim.tower.place("condo", 2, C + 24);
+    const sold = sim.tower.units.find((u) => u.id === b.unitId)!;
+    // a: unsold, priced at the OLD max ($240k, above the new $200k ceiling).
+    a.rent = 240_000;
+    a.everOccupied = false;
+    // sold: an owned (occupied) condo carrying a historical out-of-band price —
+    // must be kept so its buy-back mirrors what it actually sold for.
+    sold.rent = 240_000;
+    sold.everOccupied = true;
+    sold.state = "occupied";
+    const reloaded = Simulation.deserialize(sim.serialize());
+    const ra = reloaded.tower.units.find((u) => u.id === a.id)!;
+    const rsold = reloaded.tower.units.find((u) => u.id === sold.id)!;
+    expect(rentOf(ra)).toBe(200_000); // unsold clamped down to the new max
+    expect(rentOf(rsold)).toBe(240_000); // sold left untouched
+  });
+});
+
 describe("Not-present households never ghost the readout (gutted/empty)", () => {
   it("excludes a gutted sold condo from both population and the Households section", () => {
     const sim = Simulation.newGame(3, "modern");

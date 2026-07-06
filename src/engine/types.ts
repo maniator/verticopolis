@@ -208,10 +208,21 @@ export interface Unit {
   /** Household size of a sold condo — the number of people who actually LIVE
    *  here, set once when the condo sells. Undefined ⇒ the kind's flat population
    *  (the 1994 default of 3), so Classic towers and every pre-variant save read
-   *  identically. Only Modern towers populate it (a 2–5 person family). Read
-   *  everywhere via {@link residentCount}, never off the raw field. */
+   *  identically. Only Modern towers populate it (a 2–5 person family). For any
+   *  POPULATION / OCCUPANCY count, read it via {@link residentCount} (which falls
+   *  back to the flat catalog value) rather than the raw field; the rule-set's
+   *  pricing/churn and the Households readout read it directly on purpose. */
   residents?: number;
-  /** Whether this unit has ever been rented/sold (for one-time income). */
+  /** The "currently sold / leased" predicate — true while the unit is owned or
+   *  leased right now. Set when a tenant first moves in (office lease) or the
+   *  condo sells, and CLEARED again when the unit is vacated or gutted, so it
+   *  returns to the market: a re-let office, or a bought-back condo that can
+   *  re-sell. (Despite the name, it is not a permanent "ever" marker — it tracks
+   *  the current state.) The engine keys off it: it gates the one-time condo sale
+   *  income, blocks repricing a sold condo, exempts a sold condo from overhead,
+   *  and drives the owner buy-back on eviction. NOT a live-occupancy signal —
+   *  whether anyone is home right now is `state` / {@link isTenanted} /
+   *  {@link isPresent}, not this. */
   everOccupied: boolean;
   /** Accumulated income not yet collected (offices/condos). */
   pendingIncome: number;

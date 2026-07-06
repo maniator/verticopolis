@@ -1951,28 +1951,48 @@ export class Simulation implements SimContext {
         const floor = Math.max(GRID.minFloor, Math.min(GRID.maxFloor - (stories - 1), Math.round(num(u.floor, 1))));
         const x = Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0))));
         const width = Math.max(1, Math.min(GRID.width - x, Math.round(num(u.width, FACILITIES[u.kind].width))));
+        // Coerce the free-form state first (a forged `state` would flow into UI
+        // innerHTML and state-machine compares); the sold/leased flag below reads it.
+        const state = isUnitState(u.state) ? u.state : "empty";
+        // Harden the "currently sold/leased" flag at the trust boundary: only a
+        // literal `true` counts (a forged "yes" must not mark a condo sold), AND a
+        // unit that deserializes empty or gutted is definitionally NOT currently
+        // owned — normalize the flag to false even if the save left it true. This
+        // rescues a LEGACY "dead" condo whose owner left back when `vacate()` kept
+        // `everOccupied` set on condos: without this it would reload as sold-but-
+        // empty and, since sales require `!everOccupied`, sit off-market forever.
+        const everOccupied = u.everOccupied === true && state !== "empty" && state !== "gutted";
+        const soldCondo = u.kind === "condo" && everOccupied;
+        // Player-set price, coerced to a finite number. For an UNSOLD condo, also
+        // clamp into the re-anchored band so a legacy save priced at the old
+        // min/max ($60k/$240k) can't sell below build cost or above the new
+        // ceiling (or render past the slider ends). A SOLD condo is left untouched
+        // — its buy-back must mirror the price it actually sold for.
+        let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
+        if (rent !== undefined && u.kind === "condo" && !soldCondo) {
+          const band = rentConfig("condo")!;
+          rent = Math.max(band.min, Math.min(band.max, rent));
+        }
         return {
           ...u,
           floor,
           x,
           width,
-          // Coerce the free-form strings too: a forged `state` would flow into
-          // UI innerHTML (the inspector's "Status:" line) and state-machine
-          // compares; a non-string `label` would crash the escaping at render.
-          state: isUnitState(u.state) ? u.state : "empty",
+          everOccupied,
+          // A non-string `label` would crash the escaping at render.
+          state,
           label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
           satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
           occupants: Math.max(0, num(u.occupants, 0)),
-          // Household size for a condo, sanitized by the rule-set: Classic strips
-          // it (a forged classic save can't smuggle in a variable household — its
-          // condos MUST read the flat 3), Modern clamps it into the real generator
-          // band (2..5) so a forged value can't inject a size the game never
-          // produces or blow up the census.
-          residents: sim.rules.coerceResidents(u.residents),
+          // Household size — only kept for a CURRENTLY-sold condo, and sanitized by
+          // the rule-set (Classic strips it so its condos read the flat 3; Modern
+          // clamps into the 2..5 generator band). A not-sold condo (legacy dead
+          // unit, empty/gutted, or a hand-edited save) carries none, so a stale
+          // household can't leak into the census or a per-unit occupancy readout;
+          // the next sale draws fresh.
+          residents: soldCondo ? sim.rules.coerceResidents(u.residents) : undefined,
           pendingIncome: num(u.pendingIncome, 0),
-          // Coerce the optional player-set price too, so a corrupt save can't
-          // inject a non-number rent (which would poison income / rentOf math).
-          rent: u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0),
+          rent,
           // Coerce the film policy so a hand-edited save can't inject a bad value
           // (undefined ⇒ auto, the legacy behavior).
           filmPolicy:
