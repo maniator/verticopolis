@@ -64,6 +64,8 @@ export class Tower {
    *  tile lookups are O(1) rather than a linear scan (hot in the flood-fills and
    *  the per-frame congestion read). */
   private byId = new Map<number, Unit>();
+  /** id → transport, kept in lockstep with `transports` (mirror of `byId`). */
+  private transportsById = new Map<number, Transport>();
   /** floor → number of lobby structural tiles on it, so "is this a lobby floor?"
    *  is O(1). Used to keep express-elevator stops synced with sky lobbies as they
    *  are built or removed, regardless of the order relative to the elevator. */
@@ -132,7 +134,17 @@ export class Tower {
   }
 
   private transportById(id: number): Transport | undefined {
-    return this.transports.find((t) => t.id === id);
+    return this.transportsById.get(id);
+  }
+
+  /** Look up a unit by id. */
+  getUnit(id: number): Unit | undefined {
+    return this.byId.get(id);
+  }
+
+  /** Look up a transport by id. */
+  getTransport(id: number): Transport | undefined {
+    return this.transportsById.get(id);
   }
 
   /** True if no room occupies any tile of the span. */
@@ -204,6 +216,11 @@ export class Tower {
     this.byId.clear();
     this.lobbyTiles.clear();
     for (const u of this.units) this.register(u);
+    // Deserialize bulk-assigns `this.transports` before calling reindex, so
+    // rebuild the transport index (and drop any stale stop lists) here too.
+    this.transportsById.clear();
+    this.stopsCache.clear();
+    for (const t of this.transports) this.transportsById.set(t.id, t);
     // Note: reindex intentionally does NOT re-run syncExpressStopsForFloor.
     // Every real edit (place / removeUnit) already keeps expresses in sync at
     // the time of the flip, so a save written after this fix is self-consistent.
@@ -568,6 +585,7 @@ export class Tower {
       load: 0,
     };
     this.transports.push(t);
+    this.transportsById.set(t.id, t);
     // Express elevators are lobby-to-lobby by definition: seed their skip list so
     // a freshly placed express actually behaves like one (stops only at lobby /
     // sky-lobby floors plus its own endpoints), instead of stopping everywhere
@@ -787,6 +805,8 @@ export class Tower {
     const idx = this.transports.findIndex((t) => t.id === id);
     if (idx === -1) return undefined;
     const [t] = this.transports.splice(idx, 1);
+    this.transportsById.delete(id);
+    this.stopsCache.delete(id);
     this.revision++;
     return t;
   }
@@ -803,11 +823,19 @@ export class Tower {
     return !(t.skipFloors && t.skipFloors.includes(floor));
   }
 
+  /** Memoized stop lists, keyed by transport id and validated against
+   *  {@link revision} (every stop-affecting edit bumps it). Callers treat the
+   *  returned array as read-only. */
+  private stopsCache = new Map<number, { rev: number; stops: number[] }>();
+
   /** The floors a transport actually stops at — the single stop-enumeration
    *  every consumer (routing graphs, dispatch, staff components) shares. */
   stopsOf(t: Transport): number[] {
+    const cached = this.stopsCache.get(t.id);
+    if (cached && cached.rev === this.revision) return cached.stops;
     const s: number[] = [];
     for (let fl = t.bottom; fl <= t.top; fl++) if (this.stopsAt(t, fl)) s.push(fl);
+    this.stopsCache.set(t.id, { rev: this.revision, stops: s });
     return s;
   }
 

@@ -165,7 +165,7 @@ export class EventSystem {
    *  and ends the panic — it does NOT un-burn: rooms that were ablaze are gutted. */
   private extinguishAll(): void {
     for (const id of [...this.active]) {
-      const u = this.sim.tower.units.find((x) => x.id === id);
+      const u = this.sim.tower.getUnit(id);
       if (u && u.state === "fire") this.gut(u);
     }
     this.active.clear();
@@ -265,7 +265,7 @@ export class EventSystem {
   private processFires(): void {
     if (this.active.size === 0) return;
     for (const id of [...this.active]) {
-      const u = this.sim.tower.units.find((x) => x.id === id);
+      const u = this.sim.tower.getUnit(id);
       if (!u || u.state !== "fire") {
         this.active.delete(id);
         continue;

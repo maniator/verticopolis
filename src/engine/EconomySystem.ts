@@ -85,6 +85,9 @@ export class EconomySystem {
       reachCache.set(floor, hit);
       return hit;
     };
+    // Whether a metro softens rain's hit to traffic is a tower-wide fact, so
+    // resolve it once here rather than per unit inside the loop below.
+    const rainMetroRelief = this.sim.weather === "rain" && this.hasOperational("metro");
     for (const u of this.sim.tower.units) {
       const daily = ECON.dailyTrafficIncome[u.kind];
       if (daily === undefined) continue;
@@ -106,7 +109,7 @@ export class EconomySystem {
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       const rainMult =
         this.sim.weather === "rain"
-          ? (this.hasOperational("metro") ? 0.7 : 0.5) * (u.kind === "fastFood" ? 0.6 : 1)
+          ? (rainMetroRelief ? 0.7 : 0.5) * (u.kind === "fastFood" ? 0.6 : 1)
           : 1;
       // A cinema showing a blockbuster this month draws a much bigger crowd — it
       // has to more than cover the doubled booking fee at healthy traffic (a
@@ -189,6 +192,7 @@ export class EconomySystem {
     // dispatch below (also how crews built mid-shift join the same day).
     this.hkCapacity.clear();
     this.hkAssignedRoom.clear();
+    this.hkInFlightByCrew.clear();
   }
 
   // ---- Housekeeping dispatch ---------------------------------------------
@@ -197,9 +201,13 @@ export class EconomySystem {
   // save load and a crew built at noon join the current shift.
   /** Crew unit id → rooms it can still take on today. */
   private hkCapacity = new Map<number, number>();
-  /** Dirty-room unit id → crew unit id handling it (avoids double dispatch;
-   *  a crew's in-flight count is derived from this map). */
+  /** Dirty-room unit id → crew unit id handling it (avoids double dispatch).
+   *  Mutate only via {@link assignRoom} / {@link releaseAssignment} so the
+   *  per-crew in-flight counter stays consistent. */
   private hkAssignedRoom = new Map<number, number>();
+  /** Crew unit id → housekeepers it currently has en route, maintained in
+   *  lockstep with {@link hkAssignedRoom}. */
+  private hkInFlightByCrew = new Map<number, number>();
   /** Rooms turned over so far today (reported at the next checkout). */
   private hkCleanedToday = 0;
   /** Day the "can't reach" nudge last fired, so it warns once per day. */
@@ -207,11 +215,27 @@ export class EconomySystem {
   /** Day the "at capacity" nudge last fired, so it warns once per day. */
   private hkStarvedDay = -1;
 
-  /** Housekeepers a crew currently has en route, derived from assignments. */
+  /** Housekeepers a crew currently has en route. */
   private hkInFlight(crewId: number): number {
-    let n = 0;
-    for (const c of this.hkAssignedRoom.values()) if (c === crewId) n++;
-    return n;
+    return this.hkInFlightByCrew.get(crewId) ?? 0;
+  }
+
+  /** Record a dispatched crew→room assignment, keeping the in-flight counter in
+   *  lockstep with {@link hkAssignedRoom}. */
+  private assignRoom(roomId: number, crewId: number): void {
+    this.hkAssignedRoom.set(roomId, crewId);
+    this.hkInFlightByCrew.set(crewId, (this.hkInFlightByCrew.get(crewId) ?? 0) + 1);
+  }
+
+  /** Drop a room's assignment (arrival, or a shift reset), decrementing its
+   *  crew's in-flight counter. Safe to call for an unassigned room. */
+  private releaseAssignment(roomId: number): void {
+    const crewId = this.hkAssignedRoom.get(roomId);
+    if (crewId === undefined) return;
+    this.hkAssignedRoom.delete(roomId);
+    const left = (this.hkInFlightByCrew.get(crewId) ?? 0) - 1;
+    if (left > 0) this.hkInFlightByCrew.set(crewId, left);
+    else this.hkInFlightByCrew.delete(crewId);
   }
 
   /**
@@ -264,7 +288,7 @@ export class EconomySystem {
           noRoute = true; // shouldn't happen while connected — try another crew
           continue;
         }
-        this.hkAssignedRoom.set(room.id, crew.id);
+        this.assignRoom(room.id, crew.id);
         this.hkCapacity.set(crew.id, left - 1);
         break;
       }
@@ -304,8 +328,8 @@ export class EconomySystem {
    */
   onHousekeeperResult(roomId: number, ok: boolean): void {
     const crewId = this.hkAssignedRoom.get(roomId);
-    this.hkAssignedRoom.delete(roomId);
-    const room = this.sim.tower.units.find((u) => u.id === roomId);
+    this.releaseAssignment(roomId);
+    const room = this.sim.tower.getUnit(roomId);
     if (ok && room?.state === "dirty") {
       room.state = "empty";
       room.satisfaction = 1;
