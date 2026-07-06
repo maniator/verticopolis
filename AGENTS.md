@@ -123,8 +123,10 @@ re-bumps. (Bump once per PR, not per commit.)
 
 The build emits `dist/version.json` (`{ version, sha, notes }`) that the running
 client fetches when a new build is waiting; the update modal shows a muted
-`Build <version> · <sha>` line always, and a short **"What's new"** list only when
-`notes` is non-empty.
+`Build <version> · <sha>` line **when that fetch succeeds** (it degrades gracefully
+— the line is omitted if `version.json` can't be fetched or lacks a version, and
+the `· <sha>` half is dropped when the sha is `unknown`), plus a short
+**"What's new"** list only when `notes` is non-empty.
 
 `notes` is harvested from an **optional `Player-note:` git commit trailer** — so a
 build only announces something when a commit deliberately said so, and a plumbing

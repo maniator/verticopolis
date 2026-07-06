@@ -795,6 +795,8 @@ export class UI {
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
       </ul>
+      <h3>About</h3>
+      <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close">Got it</button></div>
     `);
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;

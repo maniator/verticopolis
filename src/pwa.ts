@@ -56,12 +56,17 @@ export interface PwaHandlers {
  * failure (offline, 404, malformed) resolves to `null` — the prompt degrades to
  * its generic copy and never blocks on this. */
 async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
+  // Bound the fetch with an AbortController + setTimeout rather than
+  // AbortSignal.timeout — the latter is missing on older Safari/iOS, where it
+  // would throw synchronously and drop build info even on a healthy network.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 4000);
   try {
     // Resolve against the page (base is "./", so the site lives at a Pages
     // subpath) and cache-bust so a CDN edge can't hand back a stale copy.
     const url = new URL("version.json", document.baseURI);
     url.searchParams.set("t", String(Date.now()));
-    const res = await fetch(url.href, { cache: "no-store", signal: AbortSignal.timeout(4000) });
+    const res = await fetch(url.href, { cache: "no-store", signal: controller.signal });
     if (!res.ok) return null;
     const j: unknown = await res.json();
     if (typeof j !== "object" || j === null) return null;
@@ -85,6 +90,8 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
     };
   } catch {
     return null;
+  } finally {
+    clearTimeout(timer);
   }
 }
 
