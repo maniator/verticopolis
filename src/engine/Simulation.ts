@@ -134,6 +134,45 @@ export interface LogEntry {
 /** The metric the colored stats overlay tints floors by. */
 export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
 
+/** Congestion ratio at which tenants begin leaving (see {@link Simulation.updateSatisfaction},
+ *  `cong > 1`) — the overlay paints this AMBER so the color never contradicts the sim. */
+export const CONGESTION_CHURN = 1.0;
+/** Congestion ratio of the worst traffic tier (see `trafficTier`, gridlock > 1.6) —
+ *  the overlay saturates to RED here. */
+export const CONGESTION_GRIDLOCK = 1.6;
+/** Severity of the amber ramp stop, kept in sync with the 4-stop `HEAT_STOPS`
+ *  palette in the renderer (green 0 · chartreuse ⅓ · amber ⅔ · red 1). Anchoring
+ *  churn to this value is what makes "amber = tenants starting to leave" literal. */
+const CONGESTION_AMBER_SEVERITY = 2 / 3;
+
+/**
+ * Congestion ratio → overlay severity (0 = green/clear … 1 = red/gridlock),
+ * anchored to the simulation's own thresholds so the tint never lies about the
+ * state it drives: a floor turns AMBER exactly at the churn point
+ * ({@link CONGESTION_CHURN}, where tenants start leaving) and fully RED at
+ * gridlock ({@link CONGESTION_GRIDLOCK}). The sub-churn range is gamma-lifted so
+ * a healthy tower still shows a legible green→yellow gradient — the busiest
+ * floors stand out instead of collapsing into one flat green wash — while amber
+ * and red stay reserved for genuinely strained transport. Pure (no rendering);
+ * it lives beside the congestion model it interprets.
+ */
+export function congestionSeverity(cong: number): number {
+  // A non-finite ratio (should never happen — capacity is guarded > 0 — but a
+  // corrupt save or future divide could produce one) degrades to green rather
+  // than poisoning the ramp index in heatColor and throwing on the draw path.
+  if (!(cong > 0)) return 0; // also catches NaN and negatives
+  if (cong >= CONGESTION_GRIDLOCK) return 1;
+  if (cong <= CONGESTION_CHURN) {
+    // Expand the lived-in [0, churn) band across most of the green→amber leg.
+    return CONGESTION_AMBER_SEVERITY * Math.pow(cong / CONGESTION_CHURN, 0.6);
+  }
+  // Churn → gridlock climbs amber → red.
+  return (
+    CONGESTION_AMBER_SEVERITY +
+    (1 - CONGESTION_AMBER_SEVERITY) * ((cong - CONGESTION_CHURN) / (CONGESTION_GRIDLOCK - CONGESTION_CHURN))
+  );
+}
+
 /** One tinted rectangle in the stats overlay: a column span on a floor and how
  *  bad it reads (0 = green/good … 1 = red/bad). Congestion and occupancy emit
  *  one cell per floor (they're floor-level metrics); satisfaction emits one cell
@@ -652,9 +691,10 @@ export class Simulation implements SimContext {
     for (const [floor, e] of ext) {
       let severity: number;
       if (mode === "congestion") {
-        // congestionAt ≈ load/capacity; ~1 is at capacity. Map so a comfortable
-        // floor reads green and a jammed one saturates red.
-        severity = Math.max(0, Math.min(1, this.congestionAt(floor) / 1.2));
+        // Sim-anchored ramp: amber at the churn threshold, red at gridlock, with
+        // the sub-churn band spread out so a healthy tower's busiest floors are
+        // still legible instead of a flat green wash (see congestionSeverity).
+        severity = congestionSeverity(this.congestionAt(floor));
       } else {
         const a = acc.get(floor);
         if (!a || a.total === 0) continue; // no tenancy here → don't tint
@@ -1037,6 +1077,19 @@ export class Simulation implements SimContext {
    * the global scalar in v1. Exposed for the inspector and tests. */
   congestionAt(floor: number): number {
     if (this.simModel === "v2") return this.spatialCongestionByFloor().get(floor) ?? 0;
+    return this.congestion();
+  }
+
+  /** The single busiest floor's congestion ratio (0 = clear). The overlay legend
+   *  reads this to report the tower's worst pressure point in one number, so a
+   *  healthy all-green map still communicates its headroom (e.g. "24% of
+   *  capacity"). Computes the per-floor map once rather than per-floor. */
+  peakCongestion(): number {
+    if (this.simModel === "v2") {
+      let peak = 0;
+      for (const c of this.spatialCongestionByFloor().values()) if (c > peak) peak = c;
+      return peak;
+    }
     return this.congestion();
   }
 

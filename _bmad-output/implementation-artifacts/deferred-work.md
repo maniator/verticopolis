@@ -3,6 +3,20 @@
 Items surfaced by reviews that are real but intentionally not actioned in the
 PR that found them. Pick these up when touching the relevant area.
 
+## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
+
+- **`floorHeatmap` recomputes the spatial congestion map once per built floor
+  (pre-existing O(F²)).** Its congestion branch calls `congestionAt(floor)` in
+  the per-floor loop, and each v2 call rebuilds the entire
+  `spatialCongestionByFloor()` map — so a tower with F built floors builds that
+  map F times per overlay refresh. The Edge Case Hunter confirmed this predates
+  the legibility change (the old `congestionAt/1.2` code had the identical
+  per-floor calls); the fix only added one extra full build via
+  `peakCongestion()` per refresh. It is **off the per-frame path** (the renderer
+  caches the heatmap hourly / on layout / on mode flip), so it isn't hot today.
+  When next touching `floorHeatmap`, compute the spatial map once and read
+  per-floor values from it (and have `peakCongestion` reuse the same pass).
+
 ## Deferred from: gds-code-review (2026-07-05, condo stickiness — CONDO_NOISE_EROSION)
 
 - **D25's horizon margin is now thinner (deterministic, not flaky).** With the
