@@ -1,7 +1,9 @@
 /**
- * Captures the two UI surfaces added by the condo-modes feature:
- *   1. features/new-tower-modes.png       — the New Tower rule-set picker
+ * Captures the UI surfaces added by the condo-modes feature:
+ *   1. features/new-tower-modes.png        — the New Tower rule-set picker
  *   2. features/stats-households-modern.png — the Modern-only Households readout
+ *   3. features/condo-modes.png            — the two above stacked into one image
+ *      (a single figure to embed where two adjacent image URLs get mangled).
  *
  * Assumes a static server is serving the built app at BASE_URL (see
  * `vite preview`). Mirrors scripts/screenshots.mjs conventions (drives the live
@@ -10,7 +12,7 @@
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readFileSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT = resolve(__dirname, "../docs/screenshots/features");
@@ -106,6 +108,29 @@ async function main() {
   await page.waitForTimeout(250);
   await page.locator("#modal .modal-box").screenshot({ path: `${OUT}/stats-households-modern.png` });
   console.log("captured stats-households-modern");
+
+  // 3) Stack the two shots into one captioned figure. A single image sidesteps a
+  // rendering quirk where two adjacent raw-image URLs in a PR/markdown body get
+  // the SECOND one code-formatted (backtick-wrapped) and thus broken.
+  const dataUri = (f) => "data:image/png;base64," + readFileSync(`${OUT}/${f}`).toString("base64");
+  const composite = await browser.newPage({ viewport: { width: 640, height: 400 }, deviceScaleFactor: 2 });
+  await composite.setContent(
+    `<style>
+       *{margin:0;box-sizing:border-box}
+       body{background:#c9c6be;padding:20px;font:600 14px system-ui,Segoe UI,Arial;color:#20203a;width:640px}
+       figure{margin:0 0 20px}figure:last-child{margin-bottom:0}
+       figcaption{padding:6px 2px 8px}
+       img{display:block;width:600px;border:1px solid #7a7a7a}
+     </style>
+     <figure><figcaption>New Tower rule-set picker — Classic vs Modern (choice is permanent per tower)</figcaption>
+       <img src="${dataUri("new-tower-modes.png")}"></figure>
+     <figure><figcaption>Modern-only Households stats — people housed, avg household, size mix</figcaption>
+       <img src="${dataUri("stats-households-modern.png")}"></figure>`,
+    { waitUntil: "networkidle" },
+  );
+  await composite.waitForTimeout(150);
+  await (await composite.$("body")).screenshot({ path: `${OUT}/condo-modes.png` });
+  console.log("captured condo-modes (combined)");
 
   await browser.close();
   console.log("Done. Screenshots in", OUT);

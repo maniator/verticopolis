@@ -31,5 +31,6 @@ Captured from the built app via `scripts/shot-condo-modes.mjs`.
 
 | Screenshot | Shows |
 |---|---|
+| `condo-modes.png` | Both of the below stacked into one captioned figure (handy for embedding in a single image slot). |
 | `new-tower-modes.png` | The **Found a New Tower** rule-set picker — Classic (faithful 1994: flat family of 3, 2×–2.5× price, owner buy-back) vs Modern (variant 2–5 households), with the permanence notice. The choice is fixed for the tower's life. |
 | `stats-households-modern.png` | Tower Statistics on a Modern tower: the conditional **Households** section — people housed, average household, and the size mix across sold condos. (Classic towers don't show this section.) |
