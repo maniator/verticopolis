@@ -132,8 +132,9 @@ PR that found them. Pick these up when touching the relevant area.
 - ~~**`parity` label does not exist in the repo.**~~
   **Resolved — label created by the maintainer.** `parity_report.yml` now applies
   `["parity", "classic"]`. The full label taxonomy is checked in at `.github/labels.yml` as the
-  source of truth (with one-time `gh label create` commands). Remaining action items for the
-  maintainer: create the other new labels listed in `.github/labels.yml`
-  (`security`, `documentation`, `classic`, `modern`, `needs-triage`, `needs-repro`,
-  `good first issue`, `help wanted`). Area labels are intentionally deferred until a subsystem
-  has 3+ open issues (documented in the manifest).
+  source of truth. Remaining action item for the maintainer: **run the "Sync labels" workflow
+  once** (Actions → Sync labels → Run workflow, from the default branch) to create the other new
+  labels (`security`, `documentation`, `classic`, `modern`, `needs-triage`, `needs-repro`,
+  `good first issue`, `help wanted`); `.github/labels.yml` also lists equivalent `gh label create`
+  commands as a manual alternative. Area labels are intentionally deferred until a subsystem has
+  3+ open issues (documented in the manifest).

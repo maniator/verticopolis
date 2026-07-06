@@ -1,8 +1,14 @@
-# Label taxonomy for Verticopolis — the source of truth for repo labels.
+# Label taxonomy for Verticopolis — the human-readable list of repo labels.
 #
-# This manifest is documentation, not automation: there is deliberately no
-# label-sync workflow. To apply it, a maintainer runs the `gh label create`
-# commands below once (see the block at the bottom of this file).
+# To apply it, run the "Sync labels" workflow (.github/workflows/labels.yml):
+#   Actions → Sync labels → Run workflow (from the default branch).
+# It's manual (workflow_dispatch) — there is no automatic on-push sync. The
+# workflow mirrors the list below as plain `gh label create` commands; when you
+# change a label here, change it there too. As a manual alternative without the
+# workflow, the equivalent `gh` commands are also at the bottom of this file.
+#
+# Colors are quoted strings on purpose: an unquoted value like 5319e7 would be
+# parsed as a float (scientific notation) by a YAML reader and corrupt the color.
 #
 # Axes:
 #   type        — what kind of thing the issue is (mutually exclusive-ish)
@@ -18,47 +24,51 @@
 labels:
   # --- type ---
   - name: bug
-    color: d73a4a
+    color: "d73a4a"
     description: Something isn't working
   - name: enhancement
-    color: a2eeef
+    color: "a2eeef"
     description: New feature or request
   - name: parity
     color: "231367"
     description: Diverges from the 1994 SimTower original
   - name: security
-    color: b60205
+    color: "b60205"
     description: Security-relevant; triaged from a private report
   - name: documentation
-    color: 0075ca
+    color: "0075ca"
     description: Docs, README, or setup fixes
 
   # --- mode ---
   - name: classic
-    color: 5319e7
+    color: "5319e7"
     description: Affects Classic (1994-faithful) towers
   - name: modern
-    color: 1d76db
+    color: "1d76db"
     description: Affects Modern (opt-in "what the original couldn't do") towers
 
   # --- state ---
   - name: needs-triage
-    color: fbca04
+    color: "fbca04"
     description: Not yet reviewed by a maintainer
   - name: needs-repro
-    color: d4c5f9
+    color: "d4c5f9"
     description: Awaiting a reproduction
 
   # --- contributor ---
   - name: good first issue
-    color: 7057ff
+    color: "7057ff"
     description: Good entry point for newcomers
   - name: help wanted
     color: "008672"
     description: Maintainer would welcome help on this
 
-# One-time setup (safe to re-run; `gh label create` is idempotent with --force):
+# Manual alternative to the Sync labels workflow (safe to re-run; --force updates
+# an existing label). Run once from a machine with the gh CLI authenticated:
 #
+#   gh label create bug           -c d73a4a -d "Something isn't working" --force
+#   gh label create enhancement   -c a2eeef -d "New feature or request" --force
+#   gh label create parity        -c 231367 -d "Diverges from the 1994 SimTower original" --force
 #   gh label create security      -c b60205 -d "Security-relevant; triaged from a private report" --force
 #   gh label create documentation -c 0075ca -d "Docs, README, or setup fixes" --force
 #   gh label create classic       -c 5319e7 -d "Affects Classic (1994-faithful) towers" --force
@@ -67,4 +77,3 @@ labels:
 #   gh label create needs-repro   -c d4c5f9 -d "Awaiting a reproduction" --force
 #   gh label create "good first issue" -c 7057ff -d "Good entry point for newcomers" --force
 #   gh label create "help wanted" -c 008672 -d "Maintainer would welcome help on this" --force
-#   gh label edit parity          -c 231367 -d "Diverges from the 1994 SimTower original"

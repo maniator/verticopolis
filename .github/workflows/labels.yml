@@ -1,12 +1,17 @@
 name: Sync labels
 
-# Create or update the repository's labels from .github/labels.yml.
+# Create or update the repository's labels.
 #
-# Deliberately workflow_dispatch ONLY — this runs when a maintainer taps
-# "Run workflow" (Actions tab, on the default branch), never automatically on
-# push/PR. Labels are repository-wide, so the branch it runs from doesn't
-# matter. The sync is non-destructive: it creates/updates the labels in the
-# manifest and never deletes labels that aren't listed.
+# Deliberately workflow_dispatch ONLY — runs when a maintainer taps "Run
+# workflow", never automatically on push/PR. Run it from the DEFAULT branch so
+# the latest label list is applied; label changes are repository-wide, so the
+# branch only decides which version of this list runs. Non-destructive: it
+# creates/updates the labels below and never deletes labels that aren't listed.
+#
+# The list below mirrors .github/labels.yml (the human-readable taxonomy).
+# When you change one, change the other. It's a plain `gh` list on purpose —
+# no YAML parsing at runtime, so nothing can coerce a color like 5319e7 into a
+# float, and there are no tool/dialect dependencies beyond gh (always present).
 on:
   workflow_dispatch:
 
@@ -17,39 +22,27 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Create or update labels from .github/labels.yml
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
+      - name: Create or update labels
         run: |
-          python3 -m pip install --quiet pyyaml
-          python3 - <<'PY'
-          import subprocess, sys, yaml
-
-          data = yaml.safe_load(open(".github/labels.yml"))
-          labels = (data or {}).get("labels", [])
-          if not labels:
-              print("No labels found under the 'labels:' key in .github/labels.yml")
-              sys.exit(1)
-
-          failed = []
-          for entry in labels:
-              name = str(entry["name"])
-              color = str(entry["color"])
-              desc = str(entry.get("description", ""))
-              print(f"::group::{name}")
-              result = subprocess.run(
-                  ["gh", "label", "create", name, "-c", color, "-d", desc, "--force"]
-              )
-              print("::endgroup::")
-              if result.returncode != 0:
-                  failed.append(name)
-
-          if failed:
-              print(f"::error::Failed to sync labels: {', '.join(failed)}")
-              sys.exit(1)
-          print(f"Synced {len(labels)} labels.")
-          PY
+          set -euo pipefail
+          sync() {
+            echo "::group::$1"
+            gh label create "$1" --color "$2" --description "$3" --force
+            echo "::endgroup::"
+          }
+          sync bug                d73a4a "Something isn't working"
+          sync enhancement        a2eeef "New feature or request"
+          sync parity             231367 "Diverges from the 1994 SimTower original"
+          sync security           b60205 "Security-relevant; triaged from a private report"
+          sync documentation      0075ca "Docs, README, or setup fixes"
+          sync classic            5319e7 "Affects Classic (1994-faithful) towers"
+          sync modern             1d76db "Affects Modern (opt-in \"what the original couldn't do\") towers"
+          sync needs-triage       fbca04 "Not yet reviewed by a maintainer"
+          sync needs-repro        d4c5f9 "Awaiting a reproduction"
+          sync "good first issue" 7057ff "Good entry point for newcomers"
+          sync "help wanted"      008672 "Maintainer would welcome help on this"
+          echo "Synced 11 labels."
