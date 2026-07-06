@@ -116,14 +116,45 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     expect(sim.tower.builtWeddingHall).toBe(false);
   });
 
-  it("caps elevator shafts at 24 (pooled across kinds)", () => {
-    const sim = servedTower(4, 6, 1_000_000_000); // already has 1 shaft
+  it("caps elevator shafts at 24, pooled across ALL three kinds (canon)", () => {
+    const sim = servedTower(4, 6, 1_000_000_000); // already has 1 standard shaft
+    // Unlock service (2★) and express (3★) so the pool actually sees every kind —
+    // the 1994 original counts standard + service + express against ONE 24 budget.
+    sim.star = 3;
+    const kinds: FacilityKind[] = ["elevatorService", "elevatorExpress", "elevatorStandard"];
     let placed = 1;
     for (let i = 0; i < 40; i++) {
-      if (sim.buildTransport("elevatorStandard", i * 5, 1, 6).ok) placed++;
+      if (sim.buildTransport(kinds[i % 3], i * 5, 1, 6).ok) placed++;
     }
     expect(placed).toBe(24);
-    expect(sim.tower.transports.filter((t) => t.kind.startsWith("elevator")).length).toBe(24);
+    const elevators = sim.tower.transports.filter((t) => t.kind.startsWith("elevator"));
+    expect(elevators.length).toBe(24);
+    // The budget is genuinely shared: standard, service AND express all landed in
+    // it — express is not given a pool of its own (this would have passed even if
+    // the cap were per-kind, which is exactly the regression this pins).
+    expect(new Set(elevators.map((t) => t.kind))).toEqual(
+      new Set(["elevatorStandard", "elevatorService", "elevatorExpress"]),
+    );
+  });
+
+  it("caps stairs + escalators at 64, pooled across both kinds (canon)", () => {
+    const sim = structuredTower(5, 6, 1_000_000_000);
+    sim.star = 3; // escalators unlock at 3★ (stairs at 1★) — exercise both in one pool
+    const kinds: FacilityKind[] = ["stairs", "escalator"];
+    let placed = 0;
+    for (let i = 0; i < 80; i++) {
+      // Fixed two-floor links on floors 1–2, spaced 5 tiles apart so none overlap.
+      if (sim.buildTransport(kinds[i % 2], i * 5, 1, 2).ok) placed++;
+    }
+    expect(placed).toBe(64);
+    const walkways = sim.tower.transports.filter(
+      (t) => t.kind === "stairs" || t.kind === "escalator",
+    );
+    expect(walkways.length).toBe(64);
+    expect(new Set(walkways.map((t) => t.kind))).toEqual(new Set(["stairs", "escalator"]));
+    // The walkway pool is separate from the elevator pool: an elevator is still
+    // placeable with 64 walkways down.
+    expect(sim.buildTransport("elevatorStandard", 330, 1, 6).ok).toBe(true);
   });
 });
 
