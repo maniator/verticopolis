@@ -59,13 +59,26 @@ const browser = await chromium.launch({ executablePath: EXECUTABLE });
 const page = await browser.newPage({ viewport: { width: 900, height: 640 }, deviceScaleFactor: 2 });
 await page.goto(BASE, { waitUntil: "networkidle" });
 
-// Dismiss first-run chrome and resume the engine.
-await page.evaluate(() => {
+// Dismiss first-run chrome and resume the engine — thoroughly, so no
+// semi-transparent overlay (splash, onboarding spotlight, mobile scrim, or an
+// open <dialog>'s ::backdrop) is left dimming the HUD.
+const covering = await page.evaluate(() => {
   try { localStorage.setItem("tt.onboarded", "1"); } catch { /* ignore */ }
   document.querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")?.click();
-  document.getElementById("splash")?.remove();
-  document.getElementById("onboard")?.remove();
+  for (const id of ["splash", "onboard", "scrim"]) document.getElementById(id)?.remove();
+  document.querySelectorAll("dialog[open]").forEach((d) => d.close?.());
+  document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
+  const g = window.game;
+  if (g) { g.speed = 1; g.engine.paused = false; }
+  // Report anything still painted over the HUD bar's center (diagnostic).
+  const bar = document.getElementById("topbar");
+  const r = bar.getBoundingClientRect();
+  const stack = document.elementsFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+  return stack
+    .map((el) => `${el.id || el.tagName}.${el.className || ""}`)
+    .filter((s) => !/topbar|status|stat|HTML|BODY/i.test(s));
 });
+console.log(`[${LABEL}] layers above HUD after teardown:`, JSON.stringify(covering));
 
 const signal = await page.evaluate(buildHotspot);
 console.log(`[${LABEL}] peakCongestion=${signal.peak?.toFixed(3)} worstFloor=${signal.floor}`);
