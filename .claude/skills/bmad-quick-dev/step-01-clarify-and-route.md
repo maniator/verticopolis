@@ -1,5 +1,5 @@
 ---
-deferred_work_file: '{implementation_artifacts}/deferred-work.md'
+deferred_work_file: '{implementation_artifacts}/backlog.md'
 spec_file: '' # set at runtime for both routes before leaving this step
 story_key: '' # set at runtime to the current story's full sprint-status key (e.g. 3-2-digest-delivery) when the intent is an epic story and sprint-status resolution succeeds
 ---

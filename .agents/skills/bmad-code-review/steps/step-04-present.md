@@ -1,5 +1,5 @@
 ---
-deferred_work_file: '{implementation_artifacts}/deferred-work.md'
+deferred_work_file: '{implementation_artifacts}/backlog.md'
 ---
 
 # Step 4: Present and Act
@@ -29,7 +29,7 @@ If `{spec_file}` exists and contains a Tasks/Subtasks section, append a `### Rev
 3. **`defer`** findings (checked off, marked deferred):
    `- [x] [Review][Defer] <Title> [<file>:<line>] — deferred, pre-existing`
 
-Also append each `defer` finding to `{deferred_work_file}` under a heading `## Deferred from: code review ({date})`. If `{spec_file}` is set, include its basename in the heading (e.g., `code review of story-3.3 (2026-03-18)`). One bullet per finding with description.
+Also append each `defer` finding to the **Deferral inbox** section of `{deferred_work_file}` (the single Engineering Backlog) under a heading `## Deferred from: code review ({date})`. If `{spec_file}` is set, include its basename in the heading (e.g., `code review of story-3.3 (2026-03-18)`). One bullet per finding with description.
 
 ### 3. Present summary
 

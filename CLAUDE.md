@@ -13,7 +13,7 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
   Edge Case Hunter → Acceptance Auditor → triage) are the review. A self-read or
   a generic `/code-review` does **not** satisfy it. Fix every `patch` finding and
   record every `defer` finding in
-  `_bmad-output/implementation-artifacts/deferred-work.md`. A PR is not "done"
+  `_bmad-output/implementation-artifacts/backlog.md`. A PR is not "done"
   until the skill has run and its confirmed findings are fixed and re-verified.
   This holds **even for small or test-only changes** that touch engine/gameplay
   invariants (e.g. build caps, transport pooling, economy math) — green quality
