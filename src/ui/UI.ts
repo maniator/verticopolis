@@ -801,7 +801,7 @@ export class UI {
    * and, like the emergency modal, the outcome fires exactly once no matter how
    * the modal closes.
    */
-  showUpdatePrompt(onUpdateNow: () => void, onLater: () => void): void {
+  showUpdatePrompt(onUpdateNow: () => void | Promise<void>, onLater: () => void | Promise<void>): void {
     const box = this.openModal(`
       <h2>Update available</h2>
       <p>A newer version of Verticopolis is ready.</p>
@@ -813,17 +813,21 @@ export class UI {
     `);
     const dialog = this.el.modal as HTMLDialogElement;
     let done = false;
+    // The handlers may be async (Update now saves then reloads); we invoke them
+    // fire-and-forget — the modal is already closing and there's nothing here to
+    // await — so `void` the call to make that explicit and keep any future
+    // rejection from going unnoticed as a bare floating promise.
     const later = () => {
       if (done) return;
       done = true;
       this.closeModal();
-      onLater();
+      void onLater();
     };
     const update = () => {
       if (done) return;
       done = true;
       this.closeModal();
-      onUpdateNow();
+      void onUpdateNow();
     };
     this.wireActions(box, { later, update }, { close: false });
     dialog.onclick = (e) => {

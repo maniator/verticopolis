@@ -76,9 +76,6 @@ class GameApp {
    *  build, so it pops at most once on its own; after that the toolbar chip is
    *  the way back in. Reset when a genuinely newer build arrives. */
   private updatePromptShown = false;
-  /** True from the moment "Update now" starts activating until the reload lands,
-   *  so a stray chip tap in that window can't fire a second activation. */
-  private updating = false;
   /** Last star rating we played a promotion jingle for (so 2★–5★ promotions
    * each get the jingle FR-58 promises, not only the final TOWER win). */
   private lastStar = 1;
@@ -921,7 +918,6 @@ class GameApp {
   private updateCoastClear(): boolean {
     return (
       this.pendingUpdate !== null &&
-      !this.updating &&
       !this.shownUpdate &&
       !this.shownChoice &&
       !this.transportStart &&
@@ -962,15 +958,16 @@ class GameApp {
         // Unfreeze before activating: on success `activate()` reloads onto the
         // new build and nothing below matters, but if the worker swap ever
         // hiccups the sim must not be left frozen with no modal (a save just
-        // ran, so a few resumed ticks are harmless). Keep `pendingUpdate` set
-        // through the call so a failed activate leaves the chip live for a retry
-        // rather than stranding the player on the old build.
+        // ran, so a few resumed ticks are harmless). Keep `pendingUpdate` and the
+        // chip live through the call so a failed activate leaves a way to retry
+        // rather than stranding the player on the old build. We intentionally
+        // keep NO "activating" latch: `updateSW(true)` resolves before the reload
+        // fires, so any such latch could stick forever if the reload never comes
+        // — and a second activation is idempotent (skipWaiting + reload) anyway.
         this.shownUpdate = false;
-        this.updating = true; // block a second activation during the reload window
         try {
           await activate();
         } catch {
-          this.updating = false; // reload didn't happen — allow a retry via the chip
           this.ui.toast("Update couldn't be applied — try again.", "bad");
         }
       },
