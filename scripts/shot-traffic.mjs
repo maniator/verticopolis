@@ -39,7 +39,7 @@ function buildHotspot() {
     for (let x = 0; x + 9 <= W && placed < n; x += 9) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        s.tower.units.find((u) => u.id === r.unitId).state = "occupied";
+        s.tower.getUnit(r.unitId).state = "occupied"; // O(1) lookup, no scan
         placed++;
       }
     }

@@ -403,7 +403,10 @@ class GameApp {
    *  Smooth it also names the worst floor (e.g. "Backed up · 42F") so the player
    *  knows *where* to look. */
   private updateTraffic(): void {
-    const cong = this.sim.peakCongestion();
+    // One pass over the spatial map: the ratio drives the tier, the floor names
+    // the hotspot — fetched together so this ~6 Hz loop doesn't rebuild the map
+    // twice per frame on a large tower.
+    const { ratio: cong, floor: hotspot } = this.sim.peakCongestionHotspot();
     const B: readonly number[] = TRAFFIC_BOUNDS; // single source shared with trafficTier() — can't desync
     const raw = trafficTier(cong);
     if (raw > this.lastTrafficTier && cong >= B[this.lastTrafficTier] + 0.03) this.lastTrafficTier = raw;
@@ -414,7 +417,7 @@ class GameApp {
     // never do). The engine hands us the floor number (null = no hotspot); we
     // format the label. Populated floors are always above ground, so `NF` is the
     // right form for every reachable case.
-    const floor = tier > 0 ? this.sim.peakCongestionFloor() : null;
+    const floor = tier > 0 ? hotspot : null;
     // The floor rides its own span (styled as a de-emphasized footnote) so a long
     // "Backed up · 100F" never competes with the tier word or wraps the fixed HUD
     // cell to a second line. The separator lives inside the suffix so Smooth shows

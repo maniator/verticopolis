@@ -14,7 +14,7 @@ function fillFloor(sim: Simulation, floor: number, count: number): void {
   for (let x = 0; x + 9 <= W && placed < count; x += 9) {
     const r = sim.tower.place("office", floor, x);
     if (r.ok) {
-      sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      sim.tower.getUnit(r.unitId!)!.state = "occupied"; // O(1) map lookup, clearer than a scan
       placed++;
     }
   }
@@ -52,9 +52,9 @@ describe("Traffic signal is peak-driven and points at the hotspot", () => {
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 20; f++) lay(sim, "floor", f);
-    sim.buildTransport("elevatorStandard", W - 6, 1, 10);
+    expect(sim.buildTransport("elevatorStandard", W - 6, 1, 10).ok).toBe(true);
     sim.tower.setCars(sim.tower.transports[0].id, 8); // strong shaft, low zone
-    sim.buildTransport("elevatorStandard", W - 12, 10, 20);
+    expect(sim.buildTransport("elevatorStandard", W - 12, 10, 20).ok).toBe(true);
     sim.tower.setCars(sim.tower.transports[1].id, 1); // weak shaft, high zone
     for (let f = 2; f <= 9; f++) fillFloor(sim, f, 12); // healthy zone A
     for (const f of [11, 12, 13]) fillFloor(sim, f, 30); // jammed zone B

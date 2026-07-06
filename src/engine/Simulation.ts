@@ -1180,17 +1180,26 @@ export class Simulation implements SimContext {
     return this.congestion();
   }
 
+  /** Peak per-floor congestion AND the floor it occurs on, in a single pass over
+   *  the spatial map. The HUD needs both (tier from the ratio, hotspot label from
+   *  the floor) every frame, so folding them into one call keeps the ~6 Hz update
+   *  loop rebuilding {@link spatialCongestionByFloor} once, not twice. `floor` is
+   *  `null` when nothing is congested (empty tower, all floors stranded) or in the
+   *  v1 scalar model — see {@link peakCongestionFloor} for why `null`, not `0`. */
+  peakCongestionHotspot(): { ratio: number; floor: number | null } {
+    if (this.simModel !== "v2") return { ratio: this.congestion(), floor: null };
+    let ratio = 0;
+    let floor: number | null = null;
+    for (const [f, c] of this.spatialCongestionByFloor()) if (c > ratio) { ratio = c; floor = f; }
+    return { ratio, floor };
+  }
+
   /** The single busiest floor's congestion ratio (0 = clear). The overlay legend
    *  reads this to report the tower's worst pressure point in one number, so a
    *  healthy all-green map still communicates its headroom (e.g. "24% of
-   *  capacity"). Computes the per-floor map once rather than per-floor. */
+   *  capacity"). */
   peakCongestion(): number {
-    if (this.simModel === "v2") {
-      let peak = 0;
-      for (const c of this.spatialCongestionByFloor().values()) if (c > peak) peak = c;
-      return peak;
-    }
-    return this.congestion();
+    return this.peakCongestionHotspot().ratio;
   }
 
   /** Floor number of the busiest populated-and-served floor — the `argmax` of the
@@ -1204,11 +1213,7 @@ export class Simulation implements SimContext {
    *  document rather than one we rely on by luck. Lets the HUD name *where* the
    *  pressure is without the engine formatting any label. */
   peakCongestionFloor(): number | null {
-    if (this.simModel !== "v2") return null;
-    let peak = 0;
-    let floor: number | null = null;
-    for (const [f, c] of this.spatialCongestionByFloor()) if (c > peak) { peak = c; floor = f; }
-    return floor;
+    return this.peakCongestionHotspot().floor;
   }
 
   /**
