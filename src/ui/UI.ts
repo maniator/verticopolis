@@ -815,19 +815,26 @@ export class UI {
     let done = false;
     // The handlers may be async (Update now saves then reloads); we invoke them
     // fire-and-forget — the modal is already closing and there's nothing here to
-    // await — so `void` the call to make that explicit and keep any future
-    // rejection from going unnoticed as a bare floating promise.
+    // await. Route through Promise.resolve().then(...).catch(...) so that BOTH a
+    // synchronous throw and a rejected promise are contained here instead of
+    // escaping as an `unhandledrejection` on the window. (The handlers already
+    // guard their own failures; this is a belt-and-suspenders safety net.)
+    const fireAndForget = (cb: () => void | Promise<void>) => {
+      void Promise.resolve()
+        .then(cb)
+        .catch(() => {});
+    };
     const later = () => {
       if (done) return;
       done = true;
       this.closeModal();
-      void onLater();
+      fireAndForget(onLater);
     };
     const update = () => {
       if (done) return;
       done = true;
       this.closeModal();
-      void onUpdateNow();
+      fireAndForget(onUpdateNow);
     };
     this.wireActions(box, { later, update }, { close: false });
     dialog.onclick = (e) => {
