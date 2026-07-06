@@ -1,7 +1,7 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
-import type { FacilityCategory, FacilityKind } from "../engine/types";
+import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
@@ -25,7 +25,7 @@ export interface UICallbacks {
   /** A picked file's text contents — a .vctower export (or a legacy raw-JSON one). */
   onImport(data: string): void;
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
-  onNew(): void;
+  onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
   onRedo(): void;
@@ -189,9 +189,9 @@ export class UI {
     document.getElementById("btn-save")!.addEventListener("click", () => this.cb.onSave());
     document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves());
     document.getElementById("btn-new")!.addEventListener("click", () => {
-      this.confirmModal("Start a new tower?", "This abandons your current tower (it is not auto-saved).", () =>
-        this.cb.onNew(),
-      );
+      // The toolbar always has a live tower to abandon, so the picker shows its
+      // fold-in abandon warning; the mode choice and the confirm are one step.
+      this.newTowerModal({ hasSave: true, onFound: (mode) => this.cb.onNew(mode) });
     });
     document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
@@ -654,6 +654,59 @@ export class UI {
     );
   }
 
+  /**
+   * The New Tower rule-set picker. The mode is founded here and is PERMANENT for
+   * the tower's life (never a settings toggle), so the card says so plainly —
+   * the one contract we must never break is that a chosen mode can't drift. When
+   * a readable tower already exists, the abandon warning folds into this same
+   * dialog so founding is a single, honest confirmation. `onFound` fires only
+   * once the player commits; the caller does the actual swap.
+   */
+  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode) => void }): void {
+    const abandon = opts.hasSave
+      ? `<p class="nt-abandon">⚠️ This abandons your current tower (it is not auto-saved).</p>`
+      : "";
+    const box = this.openModal(
+      `<h2>Found a New Tower</h2>
+       <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower — start another to play the other way.</p>
+       <div class="nt-modes">
+         <label class="nt-mode">
+           <input type="radio" name="nt-mode" value="classic" checked />
+           <span class="nt-mode-body">
+             <span class="nt-mode-name">Classic <span class="nt-badge">1994</span></span>
+             <span class="nt-mode-desc">Pixel-faithful SimTower. Every condo houses a family of 3 and sells at 2×–2.5× its build cost; lose an owner to neglect and you buy the condo back at full price.</span>
+           </span>
+         </label>
+         <label class="nt-mode">
+           <input type="radio" name="nt-mode" value="modern" />
+           <span class="nt-mode-body">
+             <span class="nt-mode-name">Modern <span class="nt-badge alt">new</span></span>
+             <span class="nt-mode-desc">Everything in Classic, plus features the original couldn't do:</span>
+             <span class="nt-feature"><b>Variant households</b> — a condo draws a 2–5 person family. Bigger families pay more but lean harder on your elevators, so each sale is a real bet.</span>
+           </span>
+         </label>
+       </div>
+       ${abandon}
+       <div class="modal-actions">
+         <button class="btn" data-act="cancel">Cancel</button>
+         <button class="btn primary" data-act="found">Found Tower</button>
+       </div>`,
+    );
+    this.wireActions(
+      box,
+      {
+        cancel: () => this.closeModal(),
+        found: () => {
+          const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
+          const mode: GameMode = picked === "modern" ? "modern" : "classic";
+          this.closeModal();
+          opts.onFound(mode);
+        },
+      },
+      { close: false },
+    );
+  }
+
   /** Export is deliberately two-step: the tower is not serialized, packed, or
    *  downloaded until the player actually clicks Export in this dialog. */
   private confirmExport(): void {
@@ -730,6 +783,7 @@ export class UI {
         <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space — chain them off a ramp, or they sit empty. Offices want a space per ~12 workers from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
         <li><b>Book the films.</b> Cinemas book a film monthly — a <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default) — no need to edit each room. A preview shows how many change before you apply.</li>
+        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b> — a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Want the other rule-set? Start a new tower.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button) — redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing — try scrolling around!</p>
       <h3>Keyboard play</h3>

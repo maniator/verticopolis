@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Verticopolis — a browser-native SimTower clone in TypeScript",
   "type": "module",
   "engines": {
@@ -20,6 +20,7 @@
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
     "screenshots": "vite build && node scripts/serve-and-shoot.mjs",
+    "screenshots:condo-modes": "vite build && SHOT_SCRIPT=scripts/shot-condo-modes.mjs node scripts/serve-and-shoot.mjs",
     "screenshots:docker": "bash scripts/shoot-docker.sh",
     "icons": "node scripts/gen-pwa-icons.mjs"
   },

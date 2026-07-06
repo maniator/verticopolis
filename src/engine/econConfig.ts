@@ -36,7 +36,14 @@ export const ECON = {
    *  satisfaction all key off how far the chosen price sits from it. */
   rent: {
     office: { default: 10_000, min: 2_000, max: 20_000, step: 1_000 },
-    condo: { default: 120_000, min: 60_000, max: 240_000, step: 10_000 },
+    // Condo sale price, anchored to the 1994 original's construction-cost
+    // multiples: it sold at ~2× cost by default and could be held out to a ~2.5×
+    // ceiling (higher price ⇒ slower to sell — a lever the move-in odds already
+    // honor via `demand`). The floor sits at 1× cost (break-even) — the original
+    // let you drop the price to sell fast, but never below what you paid to build
+    // it. Condo build cost is $80k, so: min 1× = 80k, default 2× = 160k, max
+    // 2.5× = 200k. (Keep these in step with FACILITIES.condo.cost.)
+    condo: { default: 160_000, min: 80_000, max: 200_000, step: 10_000 },
     hotelSingle: { default: 90, min: 40, max: 200, step: 10 },
     hotelDouble: { default: 180, min: 80, max: 400, step: 20 },
     hotelSuite: { default: 500, min: 200, max: 1_000, step: 50 },

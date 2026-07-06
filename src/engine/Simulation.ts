@@ -3,6 +3,7 @@ import { Crowd, CROWD_SECONDS_PER_MINUTE } from "./Crowd";
 import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
 import { ElevatorDispatch } from "./ElevatorDispatch";
+import { makeRules, householdPrice, type GameRules } from "./gameRules";
 import { EventSystem } from "./EventSystem";
 import type { SimContext } from "./SimContext";
 import { Tower } from "./Tower";
@@ -26,11 +27,13 @@ import {
   isStaffOnlyTransport,
   isHotelKind,
   maxCarsFor,
+  residentCount,
   transportCarCapacity,
 } from "./facilities";
-import type { FacilityKind, SerializedGame, Unit, VacateReason, WeatherKind } from "./types";
+import type { FacilityKind, GameMode, SerializedGame, Unit, VacateReason, WeatherKind } from "./types";
 import {
   isDormant,
+  isGameMode,
   isOperational,
   isPresent,
   isTenanted,
@@ -90,16 +93,60 @@ const NOISE_EROSION = 0.07;
 const CONDO_NOISE_EROSION = 0.054;
 
 /**
+ * The condo sale price BEFORE this build re-anchored the band (old default 2×
+ * cost was $120k, now $160k). A pre-mode save's SOLD condo that omitted `rent`
+ * sold at this price, so we backfill it on load (see {@link migrateSave}) — the
+ * buy-back must mirror what the unit actually sold for, not the new default.
+ */
+const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
+
+/**
+ * The widest condo price band that has ever existed (the pre-re-anchor band was
+ * $60k–$240k; the current one is $80k–$200k). A SOLD condo keeps its historical
+ * price rather than being re-clamped to the current band — but it's still bounded
+ * to this range on load, so a forged/corrupt save can't stamp an absurd `rent`
+ * (e.g. $1e9) that the owner buy-back would then reclaim, draining money with no
+ * ceiling. Every legitimate sold price (current or legacy) sits inside this range,
+ * so nothing real is altered.
+ */
+const SOLD_CONDO_MIN_PRICE = 60_000;
+const SOLD_CONDO_MAX_PRICE = 240_000;
+
+/**
  * Save-format migration seam. Runs before the field-level coercion in
- * {@link Simulation.deserialize}. v1 is the only format today, so this is the
- * identity transform — but it makes `version` an honest contract instead of a
- * constant nobody reads, and gives the next format change a single anchor.
+ * {@link Simulation.deserialize}. Beyond normalizing `version`, it backfills the
+ * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
+ * still mirrors its historical sale price.
  */
 function migrateSave(data: SerializedGame): SerializedGame {
   // A missing/garbled version is normalized so the (future) upgrade chain has a
   // number to branch on; deserialize()'s coercion still hardens every value.
   const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
-  const migrated: SerializedGame = data.version === version ? data : { ...data, version };
+  let migrated: SerializedGame = data.version === version ? data : { ...data, version };
+  // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
+  // condition under which deserialize() falls back to Classic, so migration must
+  // agree (an invalid mode string must be treated as legacy here too, else the
+  // save loads Classic yet skips this backfill). A SOLD condo (owned, not an
+  // empty/dead shell) that omitted `rent` sold at the OLD default — stamp it so
+  // its buy-back mirrors that historical price instead of picking up the new,
+  // higher default via rentOf(). Only touch that exact shape; never re-price a
+  // condo that already carries a rent, or an unsold/dead one.
+  if (!isGameMode(migrated.mode) && Array.isArray(migrated.units)) {
+    migrated = {
+      ...migrated,
+      units: migrated.units.map((u) =>
+        u &&
+        u.kind === "condo" &&
+        u.everOccupied === true &&
+        u.rent === undefined &&
+        u.state !== "empty" &&
+        u.state !== "gutted" &&
+        u.state !== "construction"
+          ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }
+          : u,
+      ),
+    };
+  }
   // Future upgrades chain here in order, each bumping migrated.version, e.g.:
   //   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
@@ -221,6 +268,25 @@ export class Simulation implements SimContext {
   evaluatedTower = false;
 
   /**
+   * Rule-set this tower was founded under — {@link GameMode}. Set once at
+   * construction and never reassigned (the field is `readonly`), so the whole
+   * engine can branch on it without ever guarding against a mid-game flip. Old
+   * saves with no persisted mode deserialize as `classic`, so their condos stay
+   * flat 3s and the population census is unchanged. The UI stamps the player's
+   * choice at tower creation. This is the persisted IDENTITY; the BEHAVIOR that
+   * hangs off it lives in {@link rules}.
+   */
+  readonly mode: GameMode;
+
+  /**
+   * The mode's behavior, resolved once from {@link mode}. Every place Classic and
+   * Modern diverge routes through this ({@link GameRules}) — the engine calls
+   * `this.rules.<x>()` and never re-tests the mode string, so mode-specific logic
+   * stays in one strategy object instead of smeared across the codebase.
+   */
+  readonly rules: GameRules;
+
+  /**
    * Simulation model selector (Phase 2, review F4). `v1` is the shipped behavior:
    * a single `tick(dt)` samples the clock once, firing `onHour`/`onDay` at most
    * once per call and handing the full `dt` to every integrator. `v2` decomposes
@@ -307,8 +373,10 @@ export class Simulation implements SimContext {
    * can't be farmed into tens of millions (the find stays a bounded windfall). */
   private treasuresFound = 0;
 
-  constructor(seed = 12345) {
+  constructor(seed = 12345, mode: GameMode = "classic") {
     this.rng = new RNG(seed);
+    this.mode = mode;
+    this.rules = makeRules(mode);
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
     this.economy = new EconomySystem(this);
@@ -855,9 +923,11 @@ export class Simulation implements SimContext {
             !weekend && this.clock.hour >= 8 && this.clock.hour < 18 ? f.population : 0;
           break;
         case "condo":
-          // Residents home in evenings/night/weekends.
+          // Residents home in evenings/night/weekends — the whole household
+          // (its real size in Modern, the flat 3 in Classic); one person stays
+          // home during the weekday workday.
           u.occupants =
-            this.clock.isNight() || this.clock.isEvening() || weekend ? f.population : 1;
+            this.clock.isNight() || this.clock.isEvening() || weekend ? residentCount(u) : 1;
           break;
         case "hotelSingle":
         case "hotelDouble":
@@ -891,13 +961,19 @@ export class Simulation implements SimContext {
       if (isDormant(u)) continue;
       const served = this.tower.isFloorServed(u.floor);
       const cong = congMap ? (congMap.get(u.floor) ?? 0) : globalCong;
+      // A bigger Modern household leans harder on the tower: scale only the
+      // NEGATIVE access/congestion pressures, never the recovery, so a well-served
+      // big family is just as happy as a small one — the size only bites when the
+      // tower is failing them. The rule-set returns 1 in Classic (and for
+      // flat/unsold condos), so those towers are untouched.
+      const churn = this.rules.churnMultiplier(u.residents);
       if (!served) {
-        u.satisfaction = Math.max(0, u.satisfaction - 0.15);
+        u.satisfaction = Math.max(0, u.satisfaction - 0.15 * churn);
       } else if (u.floor !== 1 && cong > 1) {
         // Overcrowded vertical transport stresses everyone, more so the worse it
         // is — but tenants on the ground floor (floor 1) never ride an elevator,
         // so elevator congestion can't possibly bother them.
-        u.satisfaction = Math.max(0, u.satisfaction - 0.04 * Math.min(3, cong - 1));
+        u.satisfaction = Math.max(0, u.satisfaction - 0.04 * Math.min(3, cong - 1) * churn);
       } else {
         u.satisfaction = Math.min(1, u.satisfaction + 0.05);
       }
@@ -1123,7 +1199,7 @@ export class Simulation implements SimContext {
     for (const u of this.tower.units) {
       if (u.kind === "metro" && isOperational(u)) metro++;
       if (isPresent(u)) {
-        const p = FACILITIES[u.kind].population;
+        const p = residentCount(u);
         if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
       }
     }
@@ -1186,14 +1262,53 @@ export class Simulation implements SimContext {
   }
 
   private vacate(u: Unit, reason: VacateReason): void {
+    // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
+    // lose a tenant — you repurchase the unit at what it sold for and hold it as
+    // empty inventory to sell again. (A never-sold condo just goes back on the
+    // market at no cost.) Charging the full sale price makes losing an owner to
+    // sustained neglect genuinely hurt, exactly as it did in the original, and
+    // resetting everOccupied lets the repurchased unit re-sell. Do this BEFORE the
+    // everOccupied reset below reads it.
+    // householdPrice reverses the sale exactly — the size-scaled price in Modern
+    // (the household is still set here, before the reset below), the flat asking
+    // price in Classic (residents undefined). 0 for anything that wasn't an owned
+    // condo (offices, never-sold condos: they cost nothing back).
+    let buyback = 0;
+    if (u.kind === "condo" && u.everOccupied) {
+      buyback = householdPrice(rentOf(u), u.residents);
+      this.money -= buyback;
+      this.recordMoney("condos", -buyback);
+    }
     u.state = "empty";
     u.occupants = 0;
-    u.everOccupied = u.kind === "condo" ? u.everOccupied : false;
+    // Return the unit to market by clearing the "currently leased/sold" flag — a
+    // repurchased condo can then sell fresh, a vacated office re-lease. But
+    // `vacate()` is ALSO the path a miserable HOTEL room loses its guest (the F25
+    // branch in updateSatisfaction), and for a hotel everOccupied means "ever
+    // booked" and must survive turnover (it's tracked by `state`, not this flag) —
+    // so never clear it for hotels, or a previously-booked room would read as
+    // brand new. `residents` is a condo-only field, so clearing it is a no-op
+    // elsewhere and keeps a re-sold condo drawing a fresh household.
+    if (!isHotelKind(u.kind)) u.everOccupied = false;
+    u.residents = undefined;
+    // A condo returning to market re-lists in the CURRENT band: clamp away any
+    // legacy/out-of-band asking price it carried while sold (e.g. a $240k
+    // old-max), so it can't re-sell above the current ceiling — or, in Modern,
+    // above it after household scaling. The buy-back charge above already used
+    // the pre-clamp price, so it still mirrors the historical sale.
+    if (u.kind === "condo" && u.rent !== undefined) {
+      const band = rentConfig("condo")!;
+      u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    }
     u.label = FACILITIES[u.kind].name;
     u.vacateReason = undefined;
     u.vacateAt = undefined;
+    // One toast per departure. A bought-back owner's line carries the cost and
+    // the cause together; every other tenant just gets the plain "left" notice.
     this.emit(
-      `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
+      buyback > 0
+        ? `The owner left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}) — you bought it back for $${buyback.toLocaleString()}.`
+        : `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
       "bad",
     );
   }
@@ -1440,11 +1555,23 @@ export class Simulation implements SimContext {
     u.vacateAt = undefined;
     if (u.kind === "condo" && !u.everOccupied) {
       u.everOccupied = true;
-      const price = rentOf(u);
+      // The rule-set decides who buys and for how much: Classic → flat 3 at the
+      // asking price; Modern → a 2–5 person household that scales the price. The
+      // asking price the player set still drives HOW FAST it sells (via move-in
+      // demand); the rule-set decides WHAT it fetches and who moves in.
+      const asking = rentOf(u);
+      const { price, residents } = this.rules.sellCondo(asking, this.rng);
+      if (residents !== undefined) u.residents = residents;
+      // Stamp the asking price the sale was struck at, so a later buy-back mirrors
+      // THIS price even if the kind's default moves in a future build (rentOf
+      // would otherwise pick up the new default for an un-priced condo). A sold
+      // condo can't be repriced, so this stays fixed for the unit's owned life.
+      u.rent = asking;
       this.money += price;
       this.recordMoney("condos", price);
       this.moveInsToday.condos++;
-      this.emit(`Condominium on ${this.floorLabel(u.floor)} sold for $${price.toLocaleString()}.`, "money");
+      const who = residents ? ` to a household of ${residents}` : "";
+      this.emit(`Condominium on ${this.floorLabel(u.floor)} sold${who} for $${price.toLocaleString()}.`, "money");
     }
     if (u.kind === "office") {
       u.everOccupied = true;
@@ -1515,7 +1642,7 @@ export class Simulation implements SimContext {
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
-        pop += FACILITIES[u.kind].population;
+        pop += residentCount(u);
       }
     }
     return pop;
@@ -1811,6 +1938,7 @@ export class Simulation implements SimContext {
       money: this.money,
       star: this.star,
       minutes: this.clock.minutes,
+      mode: this.mode,
       units: this.tower.units.map((u) => ({ ...u })),
       transports: this.tower.transports.map((t) => ({
         ...t,
@@ -1839,7 +1967,10 @@ export class Simulation implements SimContext {
   static deserialize(raw: SerializedGame): Simulation {
     // Run the save through the version seam first, then harden every field below.
     const data = migrateSave(raw);
-    const sim = new Simulation(data.seed);
+    // Mode is founded at creation and immutable, so it comes straight from the
+    // save. A save that predates the fork (or a forged value) has no valid mode
+    // ⇒ classic, keeping every legacy tower pixel-faithful with no migration.
+    const sim = new Simulation(data.seed, isGameMode(data.mode) ? data.mode : "classic");
     sim.money = data.money;
     sim.star = data.star;
     sim.clock = new Clock(data.minutes);
@@ -1884,22 +2015,58 @@ export class Simulation implements SimContext {
         const floor = Math.max(GRID.minFloor, Math.min(GRID.maxFloor - (stories - 1), Math.round(num(u.floor, 1))));
         const x = Math.max(0, Math.min(GRID.width - 1, Math.round(num(u.x, 0))));
         const width = Math.max(1, Math.min(GRID.width - x, Math.round(num(u.width, FACILITIES[u.kind].width))));
+        // Coerce the free-form state first (a forged `state` would flow into UI
+        // innerHTML and state-machine compares); the sold/leased flag below reads it.
+        const state = isUnitState(u.state) ? u.state : "empty";
+        // Harden the "currently sold/leased" flag at the trust boundary: only a
+        // literal `true` counts (a forged "yes" must not mark a condo sold), AND —
+        // for a LEASE/SALE unit (office, condo), whose everOccupied means "currently
+        // leased/sold" — a shell state (empty, construction, gutted) is definitionally
+        // NOT currently owned, so the flag is normalized to false even if the save
+        // left it true. That rescues a LEGACY "dead" condo whose owner left back when
+        // `vacate()` kept `everOccupied` set (else it reloads sold-but-empty and, since
+        // sales require `!everOccupied`, sits off-market forever) and blocks a forged
+        // shell from doing the same. (A sold unit that's on fire IS still owned, so
+        // `fire` is not cleared.) HOTELS are exempt: their everOccupied means "ever
+        // booked" and legitimately stays true while the room sits `empty` between
+        // guests (turnover runs through `state`, not this flag).
+        const notOwned = state === "empty" || state === "construction" || state === "gutted";
+        const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
+        const soldCondo = u.kind === "condo" && everOccupied;
+        // Player-set price, coerced to a finite number, then bounded for condos.
+        // An UNSOLD condo re-enters the current band ($80k–$200k) so a legacy save
+        // priced at the old min/max ($60k/$240k) can't sell below build cost or
+        // above the new ceiling (or render past the slider ends). A SOLD condo
+        // keeps its historical price so the buy-back mirrors what it sold for, but
+        // is still bounded to the widest-ever band so a forged `rent` can't drive
+        // an unbounded buy-back money drain.
+        let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
+        if (rent !== undefined && u.kind === "condo") {
+          const band = rentConfig("condo")!;
+          const lo = soldCondo ? SOLD_CONDO_MIN_PRICE : band.min;
+          const hi = soldCondo ? SOLD_CONDO_MAX_PRICE : band.max;
+          rent = Math.max(lo, Math.min(hi, rent));
+        }
         return {
           ...u,
           floor,
           x,
           width,
-          // Coerce the free-form strings too: a forged `state` would flow into
-          // UI innerHTML (the inspector's "Status:" line) and state-machine
-          // compares; a non-string `label` would crash the escaping at render.
-          state: isUnitState(u.state) ? u.state : "empty",
+          everOccupied,
+          // A non-string `label` would crash the escaping at render.
+          state,
           label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
           satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
           occupants: Math.max(0, num(u.occupants, 0)),
+          // Household size — only kept for a CURRENTLY-sold condo, and sanitized by
+          // the rule-set (Classic strips it so its condos read the flat 3; Modern
+          // clamps into the 2..5 generator band). A not-sold condo (legacy dead
+          // unit, empty/gutted, or a hand-edited save) carries none, so a stale
+          // household can't leak into the census or a per-unit occupancy readout;
+          // the next sale draws fresh.
+          residents: soldCondo ? sim.rules.coerceResidents(u.residents) : undefined,
           pendingIncome: num(u.pendingIncome, 0),
-          // Coerce the optional player-set price too, so a corrupt save can't
-          // inject a non-number rent (which would poison income / rentOf math).
-          rent: u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0),
+          rent,
           // Coerce the film policy so a hand-edited save can't inject a bad value
           // (undefined ⇒ auto, the legacy behavior).
           filmPolicy:
@@ -1999,9 +2166,11 @@ export class Simulation implements SimContext {
     return sim;
   }
 
-  /** Convenience for the initial empty lot (ground lobby seed). */
-  static newGame(seed = 12345): Simulation {
-    const sim = new Simulation(seed);
+  /** Convenience for the initial empty lot (ground lobby seed). The `mode`
+   *  chosen at the New Tower screen is baked in here, at creation, and is
+   *  immutable for the tower's life. */
+  static newGame(seed = 12345, mode: GameMode = "classic"): Simulation {
+    const sim = new Simulation(seed, mode);
     // Seed a starter ground-floor lobby strip so the player has a base.
     const startX = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) {

@@ -209,7 +209,7 @@ class GameApp {
       onExport: () => void this.saveLoad.exportGame(),
       onImport: (data) => void this.saveLoad.importGame(data),
       onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
-      onNew: () => this.saveLoad.newGame(),
+      onNew: (mode) => this.saveLoad.newGame(mode),
       onToggleAudio: () => {
         this.audio.start();
         this.audio.setMuted(!this.audio.muted);
@@ -296,22 +296,20 @@ class GameApp {
         /* sim already loaded at construction; splash teardown resumes the engine */
       },
       onNewTower: (dismiss) => {
-        // Guard the same data-loss as the toolbar's New button: starting fresh
-        // overwrites the single autosave slot. Keep the splash up (paused) behind
-        // the confirmation — only dismiss + start once the player accepts, so a
-        // cancel leaves the title screen intact and no time passes. Confirm only
-        // when there's a *readable* tower to abandon: over a corrupt save the boot
-        // sim is already fresh, so the "abandons your current tower" prompt would
-        // be a lie (there's nothing continuable to lose).
-        if (this.hadReadableSave) {
-          this.ui.confirmModal("Start a new tower?", "This abandons your current tower (it is not auto-saved).", () => {
+        // The rule-set picker also carries the data-loss guard: starting fresh
+        // overwrites the single autosave slot, so when a *readable* tower exists
+        // the picker folds in the "abandons your current tower" warning. Keep the
+        // splash up (paused) behind it — only dismiss + start once the player
+        // commits to founding, so a cancel leaves the title screen intact and no
+        // time passes. Over a corrupt save the boot sim is already fresh, so the
+        // abandon warning is suppressed (nothing continuable to lose).
+        this.ui.newTowerModal({
+          hasSave: this.hadReadableSave,
+          onFound: (mode) => {
             dismiss();
-            this.saveLoad.newGame();
-          });
-        } else {
-          dismiss();
-          this.saveLoad.newGame();
-        }
+            this.saveLoad.newGame(mode);
+          },
+        });
       },
     });
 

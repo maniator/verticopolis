@@ -25,6 +25,21 @@ PR that found them. Pick these up when touching the relevant area.
   touching vertical placement: derive the crane's floor from the true topmost occupied
   row (`u.floor + facilityFloors(u.kind) − 1`), not the max base floor.
 
+## Deferred from: gds-code-review (2026-07-06, condo modes — final adversarial pass)
+
+- **A `null`/malformed unit entry in a forged save crashes `deserialize` (pre-existing).**
+  `Simulation.deserialize`'s unit loop does `(data.units ?? []).filter((u) => isFacilityKind(u.kind))` — reading `u.kind` on a `null` entry throws a TypeError and aborts the whole load, turning a recoverable save into a hard failure. This predates the condo work (the migrateSave backfill this PR adds correctly short-circuits on falsy `u`, so it doesn't introduce or worsen it) and is orthogonal to condos, so it's deferred to keep the PR scoped. Fix when hardening the loader: guard the unit and transport filters with `u != null &&` (and the same for `data.transports`). (Blind Hunter, final pass; forged/corrupt-save only.)
+
+## Deferred from: gds-code-review (2026-07-06, condo modes — price/buy-back/variant households)
+
+- ~~**Out-of-band legacy condo prices aren't re-clamped on load.**~~ Fixed in the
+  same PR (Copilot review): `deserialize` now clamps an UNSOLD condo's `rent` into
+  the re-anchored `ECON.rent.condo` band, so a legacy save priced at the old
+  min/max ($60k/$240k) can't sell below build cost or above the new ceiling (or
+  render past the slider). Sold condos are left untouched so the buy-back still
+  mirrors the historical sale price. (Also hardened: `everOccupied` is coerced to
+  a strict boolean on load, so a forged truthy value can't fake a sold condo.)
+
 ## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
 
 - ~~**`floorHeatmap` recomputes the spatial congestion map once per built floor

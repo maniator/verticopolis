@@ -1,4 +1,5 @@
 import { Simulation } from "../engine/Simulation";
+import type { GameMode } from "../engine/types";
 import { SaveGame } from "../storage/SaveGame";
 import { parseTWR } from "../storage/twrImport";
 import { shouldArm } from "../ui/Onboarding";
@@ -156,9 +157,14 @@ export class SaveLoad {
     }
   }
 
-  newGame(): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff));
-    this.deps.ui.toast("New tower founded. Good luck!", "good");
+  /** Found a fresh tower under the chosen rule-set. The mode is baked into the
+   *  new Simulation at creation and is immutable for that tower's life. */
+  newGame(mode: GameMode = "classic"): void {
+    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode));
+    this.deps.ui.toast(
+      mode === "modern" ? "New Modern tower founded. Good luck!" : "New tower founded. Good luck!",
+      "good",
+    );
     // Auto-arm onboarding only for a genuine first-timer. A returning player (a
     // save exists) is treated as already onboarded even if the localStorage flag
     // was cleared, so they're never re-onboarded unexpectedly (Replay via Help

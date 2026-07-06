@@ -436,3 +436,41 @@ describe("toast — kind class and stack cap", () => {
     expect(wrap().lastElementChild!.textContent).toBe("toast 7");
   });
 });
+
+describe("newTowerModal — the rule-set picker", () => {
+  it("founds Classic by default (the pre-checked mode)", () => {
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("classic");
+    expect(dialog().open).toBe(false); // and it closes on commit
+  });
+
+  it("founds Modern when that radio is chosen", () => {
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("modern");
+  });
+
+  it("cancels without founding anything", () => {
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: true, onFound });
+    click('[data-act="cancel"]');
+    expect(onFound).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("folds in the abandon warning only when a tower exists to lose", () => {
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: true, onFound: vi.fn() });
+    expect(dialog().querySelector(".nt-abandon")).not.toBeNull();
+    ui.closeModal();
+    ui.newTowerModal({ hasSave: false, onFound: vi.fn() });
+    expect(dialog().querySelector(".nt-abandon")).toBeNull();
+  });
+});

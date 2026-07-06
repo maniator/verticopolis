@@ -726,6 +726,70 @@ html.reduce-motion *::after {
   padding: 7px 14px;
 }
 
+/* ---- New Tower rule-set picker ----
+ * Two selectable mode cards. The chosen rule-set is permanent for the tower, so
+ * the lede spells that out and the cards read as a deliberate, one-time choice. */
+.nt-lede {
+  color: var(--muted);
+}
+.nt-modes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.nt-mode {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 2px solid var(--line, #b8b2a0);
+  border-radius: 6px;
+  cursor: pointer;
+}
+/* The whole card lights up when its radio is chosen (label wraps the input). */
+.nt-mode:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.nt-mode input {
+  margin-top: 3px;
+}
+.nt-mode-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nt-mode-name {
+  font-weight: 600;
+}
+.nt-mode-desc,
+.nt-feature {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+.nt-feature {
+  padding-left: 8px;
+  border-left: 3px solid var(--accent);
+}
+.nt-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  vertical-align: middle;
+  background: var(--muted);
+  color: #fff;
+}
+.nt-badge.alt {
+  background: var(--good);
+}
+.nt-abandon {
+  color: var(--bad);
+  font-weight: 600;
+}
+
 /* ---- Tower Statistics dialog ----
  * The stats live on the gray chrome face (never a bare white sheet); each
  * section header is a navy mini title bar (.win-title), so the modal reads

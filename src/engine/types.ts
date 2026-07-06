@@ -8,6 +8,29 @@
 /** Cosmetic sky weather, derived deterministically from the day. */
 export type WeatherKind = "clear" | "cloudy" | "rain";
 
+/**
+ * Rule-set a tower is founded under. Chosen once at tower creation and immutable
+ * for that save's life (never a runtime toggle), so no simulation code ever has
+ * to ask "did the player switch mid-game?".
+ *
+ * - `classic` — pixel-faithful 1994 SimTower: every condo houses a flat family
+ *   of 3. This is the ONLY mode a save can have if it predates the mode field,
+ *   so a legacy tower's population census loads unchanged (its condos stay flat
+ *   3s). Note the price-band re-anchor and the owner buy-back are 1994-canon
+ *   fixes that apply to EVERY tower regardless of mode — they aren't gated here;
+ *   only behavior the original never had is.
+ * - `modern` — Classic plus opt-in divergences the original couldn't do. Today
+ *   that means *variant households* (a condo draws a 2–5 person family that
+ *   drives its price and how demanding it is). Future Modern features layer in
+ *   the same way, each behind this one flag.
+ */
+export type GameMode = "classic" | "modern";
+
+/** Guard for a persisted mode from an untrusted/older save (absent ⇒ classic). */
+export function isGameMode(v: unknown): v is GameMode {
+  return v === "classic" || v === "modern";
+}
+
 /** Category groups used for the build toolbar and evaluation rules. */
 export type FacilityCategory =
   | "structure"
@@ -182,7 +205,26 @@ export interface Unit {
   satisfaction: number;
   /** Current number of occupants present right now. */
   occupants: number;
-  /** Whether this unit has ever been rented/sold (for one-time income). */
+  /** Household size of a sold condo — the number of people who actually LIVE
+   *  here, set once when the condo sells. Undefined ⇒ the kind's flat population
+   *  (the 1994 default of 3), so Classic towers and every pre-variant save read
+   *  identically. Only Modern towers populate it (a 2–5 person family). For any
+   *  POPULATION / OCCUPANCY count, read it via {@link residentCount} (which falls
+   *  back to the flat catalog value) rather than the raw field; the rule-set's
+   *  pricing/churn and the Households readout read it directly on purpose. */
+  residents?: number;
+  /** "Taken" marker whose lifecycle differs by kind:
+   *  - **Offices & condos** — the CURRENTLY-leased/sold predicate: set on move-in
+   *    or sale, and CLEARED again on vacate or gut (and, on load, for any
+   *    empty/construction/gutted shell), so the unit returns to the market — a
+   *    re-let office, or a bought-back condo that can re-sell. It gates the
+   *    one-time condo sale income, blocks repricing a sold condo, exempts a sold
+   *    condo from overhead, and drives the owner buy-back on eviction.
+   *  - **Hotels** — set on the first check-in and never cleared (nightly turnover
+   *    runs through `state`: asleep → dirty → empty), so for a hotel room it reads
+   *    as "has ever been booked", not "booked right now".
+   *  Either way it is NOT a live-occupancy signal — who is present right now is
+   *  `state` / {@link isTenanted} / {@link isPresent}, never this. */
   everOccupied: boolean;
   /** Accumulated income not yet collected (offices/condos). */
   pendingIncome: number;
@@ -234,6 +276,10 @@ export interface SerializedGame {
   money: number;
   star: number;
   minutes: number;
+  /** Rule-set the tower was founded under. Absent in saves written before the
+   *  mode fork (and never mutated after creation), so a missing value loads as
+   *  `classic` — every legacy tower stays pixel-faithful with no migration. */
+  mode?: GameMode;
   units: Unit[];
   transports: Transport[];
   nextId: number;

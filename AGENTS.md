@@ -67,6 +67,25 @@ self-review before pushing.
 - `src/audio/`, `src/storage/` — sound and save/load, independent of rendering.
 - `src/main.ts` — wires everything together (input, game loop).
 
+### Classic vs Modern rule-sets (`src/engine/gameRules.ts`)
+
+A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
+once at creation and persisted. **All** behavior the two modes disagree on lives
+behind the `GameRules` strategy object (`CLASSIC_RULES` / `MODERN_RULES`); the
+`Simulation` holds a `readonly rules` and calls `this.rules.<x>()`.
+
+**Tripwire — do not let mode logic smear.** The mode string is mapped to behavior
+in exactly one place (`makeRules`). Never write mode-specific *logic* inline
+(`if (sim.mode === "modern") { …compute… }`) in a subsystem — add a method to
+`GameRules` and implement it in both rule-sets instead. Reading `sim.mode` /
+`sim.rules.hasVariantHouseholds` for pure **presentation** (a toast string, a UI
+section toggle) is fine; branching **engine logic** on it is the smell. Name new
+rule-driven modules after the **mechanic** (e.g. condo households), never after
+the mode, so a future feature isn't forced into the wrong drawer. Data-driven
+reads that already return the right value in both modes (e.g. `residentCount`,
+which reads a unit's stored household) stay plain accessors — they're not
+decisions, so they don't belong in `GameRules`.
+
 ## Quality gates (run before pushing)
 
 ```bash

@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor, residentCount } from "./facilities";
 import { isOperational, isPresent } from "./types";
 import type {
   Facility,
@@ -1001,7 +1001,7 @@ export class Tower {
     let pop = 0;
     for (const u of this.units) {
       if (isPresent(u)) {
-        pop += FACILITIES[u.kind].population;
+        pop += residentCount(u);
       }
     }
     return pop;
