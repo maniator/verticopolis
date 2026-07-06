@@ -212,9 +212,10 @@ export class TowerEngine {
   /** In-flight bomb flashes: epicenter tile/floor + the anim time it began. */
   private explosions: { x: number; floor: number; start: number }[] = [];
   private lastExplosionSeq = 0;
-  /** A thief slinking across the screen; caught → a guard trails him. */
+  /** A thief slinking along a tower floor; caught → a guard trails him. */
   private thiefStart: number | null = null;
   private thiefCaught = false;
+  private thiefFloor = 1;
   private lastThiefSeq = 0;
   /** Sparkles at unearthed-treasure dig sites (world tile/floor). */
   private treasures: { x: number; floor: number; start: number }[] = [];
@@ -369,6 +370,7 @@ export class TowerEngine {
       if (animating) {
         this.thiefStart = this.d.anim;
         this.thiefCaught = this.sim.thiefFx.caught;
+        this.thiefFloor = this.sim.thiefFx.floor;
       }
     }
     if (this.sim.treasureFx.seq !== this.lastTreasureSeq) {
@@ -635,6 +637,7 @@ export class TowerEngine {
     this.explosions = [];
     this.thiefStart = null;
     this.thiefCaught = false;
+    this.thiefFloor = 1;
     this.treasures = [];
     this.vipStart = null;
     this.lastSantaSeq = sim.santaFxSeq;
@@ -1011,14 +1014,17 @@ export class TowerEngine {
     drawVipLimo(ctx, x, groundSy, Math.max(0.9, this.cam.zoom));
   }
 
-  /** A thief slinking across the screen (a guard trails him if caught). */
+  /** A thief slinking along a tower floor (a guard trails him if caught). He
+   *  sweeps left→right across the viewport, but his feet are pinned to the
+   *  floor he's prowling (world-space Y, like the VIP limo) — so he walks the
+   *  tower and scrolls with the camera instead of floating at mid-screen. */
   private renderThief(ctx: CanvasRenderingContext2D): void {
     if (this.thiefStart === null) return;
     const p = (this.d.anim - this.thiefStart) / THIEF_RUN_SECONDS;
     if (p < 0 || p > 1) return;
     const x = -80 + p * (this.viewWidth + 160);
-    const y = this.viewHeight * 0.66;
-    drawThief(ctx, x, y, 1.1, this.thiefCaught);
+    const y = this.worldToScreenY(this.thiefFloor) + FLOOR * this.cam.zoom * 0.5;
+    drawThief(ctx, x, y, Math.max(0.9, this.cam.zoom), this.thiefCaught);
   }
 
   /** The colored stats overlay: draw each heatmap cell by the active metric

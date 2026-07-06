@@ -100,8 +100,8 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
     sim.triggerExplosion(7, 42);
     expect(sim.explosionFx).toEqual({ floor: 7, x: 42, seq: 1 });
 
-    sim.triggerThief(true);
-    expect(sim.thiefFx).toEqual({ caught: true, seq: 1 });
+    sim.triggerThief(true, 5);
+    expect(sim.thiefFx).toEqual({ caught: true, floor: 5, seq: 1 });
 
     sim.triggerTreasure(-3, 12);
     expect(sim.treasureFx).toEqual({ floor: -3, x: 12, seq: 1 });
@@ -129,7 +129,7 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
     const sim = Simulation.newGame(1);
     sim.triggerSanta();
     sim.triggerExplosion(9, 30);
-    sim.triggerThief(false);
+    sim.triggerThief(false, 3);
     sim.triggerTreasure(-1, 5);
     sim.triggerVip();
     const data = sim.serialize() as unknown as Record<string, unknown>;

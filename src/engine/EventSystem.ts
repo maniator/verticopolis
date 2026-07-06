@@ -31,6 +31,11 @@ export class EventSystem {
   private static readonly SECURITY_RADIUS = 8;
   private static readonly MEDICAL_RADIUS = 12;
 
+  /** Daily chance a thief prowls the tower (≥2★). Deliberately low so the cameo
+   * reads as the occasional event it is in the original — not a constant parade.
+   * At top speed (~12s/game-day) this is a thief roughly every ~8 minutes. */
+  private static readonly THIEF_DAILY_CHANCE = 0.025;
+
   constructor(private readonly sim: SimContext, seed = 1) {
     this.extra = new RNG((seed ^ 0x5a17a) >>> 0);
   }
@@ -339,16 +344,33 @@ export class EventSystem {
    */
   private maybeThief(): void {
     if (this.sim.star < 2) return;
-    if (!this.extra.chance(0.05)) return;
+    if (!this.extra.chance(EventSystem.THIEF_DAILY_CHANCE)) return;
+    // Anchor the cosmetic to a real floor so the thief prowls the tower rather
+    // than floating across mid-screen (see TowerEngine.renderThief).
+    const floor = this.thiefFloor();
     if (this.sim.hasAny("security")) {
       this.sim.emit("🕵️ Security caught a thief prowling the tower — nothing was taken.", "good");
-      this.sim.triggerThief?.(true); // caught: a guard trails him across (cosmetic)
+      this.sim.triggerThief?.(true, floor); // caught: a guard trails him across (cosmetic)
       return;
     }
     const loss = 5_000 + this.extra.int(0, 20_000);
     this.sim.money -= loss;
     this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString()} — build Security.`, "bad");
-    this.sim.triggerThief?.(false); // got away with the loot (cosmetic)
+    this.sim.triggerThief?.(false, floor); // got away with the loot (cosmetic)
+  }
+
+  /**
+   * Pick a floor for the thief to prowl: a random *tenanted floor* (so he shows
+   * up where people actually are), falling back to the ground lobby when nothing
+   * is leased yet. Selection is over the set of *distinct* tenanted floors, so
+   * it's floor-uniform — a floor holding several occupied units is no likelier
+   * to be picked than one holding a single tenant. Drawn on the seasonal-event
+   * RNG so it never perturbs the gameplay stream — and only *after* the daily
+   * chance passes, so a day with no thief consumes no extra RNG.
+   */
+  private thiefFloor(): number {
+    const floors = [...new Set(this.sim.tower.units.filter((u) => isTenanted(u)).map((u) => u.floor))];
+    return floors.length === 0 ? 1 : this.extra.pick(floors);
   }
 
   /** A bomb scare. Security defuses it; without guards it does real damage. */
