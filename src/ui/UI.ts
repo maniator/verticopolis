@@ -795,9 +795,12 @@ export class UI {
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
       </ul>
+      <h3>Found a bug? Have an idea?</h3>
+      <p style="color:var(--muted)">Help us improve Verticopolis — report a bug, request a feature, or flag anything that doesn't match the 1994 original.</p>
+      <p class="help-report"><a class="btn" target="_blank" rel="noopener" href="https://github.com/maniator/verticopolis/issues/new/choose">Report an issue…</a></p>
       <h3>About</h3>
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
-      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close">Got it</button></div>
+      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
     // When the OS forces reduced motion on, the user pref can't override it — show

@@ -61,7 +61,9 @@ How items flow:
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
-_(empty — all current deferrals are triaged into the table above.)_
+### Deferred from: code review of gdd-report-issue (2026-07-06)
+
+- **P3 · low · review-deferral — external "Report an issue" link has no advance "opens in a new tab" cue.** The Help modal's new `<a target="_blank" rel="noopener">` (UI.ts `showHelp`) changes context (new browser tab to GitHub) without warning assistive tech (WCAG 3.2.5 / G201). Mitigated in the same PR by autofocusing the primary "Got it" so activation is always deliberate, not an on-open Enter/Space reflex — so this is a minor residual. Ready, but the right fix is a **shared** external-link affordance (e.g. a visually-hidden "(opens in a new tab)" helper or a small ↗ glyph convention) applied wherever the app later links out, not a one-off on this single link. Pick it up when a second outbound link appears or when the accessibility pass (see `arch-accessibility`) is next opened. (gds-code-review, Blind Hunter.)
 
 ## Completed / superseded
 
