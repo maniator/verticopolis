@@ -113,3 +113,28 @@ PR that found them. Pick these up when touching the relevant area.
   two duplicate local helpers, and the previously **raw** user-controlled
   `u.label` in the inspector card (settable via Rename) is now escaped — the
   exact regression this entry predicted had already shipped.
+
+## Deferred from: bmad-code-review (2026-07-06, GitHub PR + issue templates — PR #129)
+
+- ~~**PR template references AGENTS.md mode guidance that lands with #123, not on `main` yet.**~~
+  **Resolved in this PR (159cb4e).** The "Game mode impact" section was rewritten to be
+  self-contained — it describes the "keep mode-divergent behavior in one mode-resolved rule-set,
+  don't smear mode checks" convention inline, with no reference to AGENTS.md and no dependency on
+  #123's merge order. No merge-order requirement remains.
+
+- ~~**No filing path for security / docs issues (`blank_issues_enabled: false`).**~~
+  **Resolved in this PR.** Added `SECURITY.md` + a "Report a security vulnerability" contact link
+  pointing at GitHub Private Vulnerability Reporting (2759058), and a `documentation.yml` issue
+  form for docs/README/setup reports (d538141). (Note: the advisory link requires Private
+  Vulnerability Reporting to be enabled in repo Settings → Security.) A dedicated "question"
+  path is intentionally left to the issue-search contact link; revisit if Discussions is enabled.
+
+- ~~**`parity` label does not exist in the repo.**~~
+  **Resolved — label created by the maintainer.** `parity_report.yml` now applies
+  `["parity", "classic"]`. The full label taxonomy is checked in at `.github/labels.yml` as the
+  source of truth. Remaining action item for the maintainer: **run the "Sync labels" workflow
+  once** (Actions → Sync labels → Run workflow, from the default branch) to create the other new
+  labels (`security`, `documentation`, `classic`, `modern`, `needs-triage`, `needs-repro`,
+  `good first issue`, `help wanted`); `.github/labels.yml` also lists equivalent `gh label create`
+  commands as a manual alternative. Area labels are intentionally deferred until a subsystem has
+  3+ open issues (documented in the manifest).

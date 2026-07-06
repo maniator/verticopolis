@@ -1,0 +1,48 @@
+name: Sync labels
+
+# Create or update the repository's labels.
+#
+# Deliberately workflow_dispatch ONLY — runs when a maintainer taps "Run
+# workflow", never automatically on push/PR. Run it from the DEFAULT branch so
+# the latest label list is applied; label changes are repository-wide, so the
+# branch only decides which version of this list runs. Non-destructive: it
+# creates/updates the labels below and never deletes labels that aren't listed.
+#
+# The list below mirrors .github/labels.yml (the human-readable taxonomy).
+# When you change one, change the other. It's a plain `gh` list on purpose —
+# no YAML parsing at runtime, so nothing can coerce a color like 5319e7 into a
+# float, and there are no tool/dialect dependencies beyond gh (always present).
+on:
+  workflow_dispatch:
+
+# Least privilege: label management only needs write access to issues.
+permissions:
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Create or update labels
+        run: |
+          set -euo pipefail
+          sync() {
+            echo "::group::$1"
+            gh label create "$1" --color "$2" --description "$3" --force
+            echo "::endgroup::"
+          }
+          sync bug                d73a4a "Something isn't working"
+          sync enhancement        a2eeef "New feature or request"
+          sync parity             231367 "Diverges from the 1994 SimTower original"
+          sync security           b60205 "Security-relevant; triaged from a private report"
+          sync documentation      0075ca "Docs, README, or setup fixes"
+          sync classic            5319e7 "Affects Classic (1994-faithful) towers"
+          sync modern             1d76db "Affects Modern (opt-in \"what the original couldn't do\") towers"
+          sync needs-triage       fbca04 "Not yet reviewed by a maintainer"
+          sync needs-repro        d4c5f9 "Awaiting a reproduction"
+          sync "good first issue" 7057ff "Good entry point for newcomers"
+          sync "help wanted"      008672 "Maintainer would welcome help on this"
+          echo "Synced 11 labels."

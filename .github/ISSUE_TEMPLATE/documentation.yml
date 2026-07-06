@@ -1,0 +1,38 @@
+name: 📚 Documentation issue
+description: A README, setup, or canon-reference doc is wrong, unclear, or missing.
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For docs only — wrong setup steps, a broken script, unclear wording, or a
+        canon reference that contradicts `PARITY.md`. For gameplay bugs use the Bug
+        report; for parity discrepancies use the SimTower parity report.
+  - type: input
+    id: location
+    attributes:
+      label: Where is it?
+      description: File and section, or a link (e.g. README.md → "Play", AGENTS.md → "Versioning").
+      placeholder: README.md → Play
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: Quote the current text if it's an error, or describe what's absent.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: What should it say instead? A PR is welcome too.
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
