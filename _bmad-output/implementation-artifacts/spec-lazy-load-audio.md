@@ -2,8 +2,9 @@
 title: 'Lazy-load the Tone.js audio stack out of the initial bundle'
 type: 'refactor'
 created: '2026-07-06'
-status: 'draft'
+status: 'in-review'
 context: []
+baseline_commit: 'b198fbd'
 ---
 
 <frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
@@ -55,9 +56,9 @@ context: []
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/audio/ToneAudioEngine.ts` -- move the existing `AudioEngine` class here verbatim, rename to `ToneAudioEngine`, and export `type SfxName = "build"|"sell"|"error"|"promote"|"money"|"click"` used by its `sfx` signature. Keep the top-level Tone import here.
-- [ ] `src/audio/Audio.ts` -- replace with a facade `class AudioEngine` (no `tone` import): fields `muted=false`/`started=false`, a private `impl` and `loading` guard, and a cached `lastFocus`. `start()` feature-detects WebAudio, then `await import("./ToneAudioEngine")`, constructs the impl, forwards `muted`, calls `impl.start()`, replays `lastFocus`; idempotent. `setMuted`/`update`/`sfx`/`dispose` update local state and delegate to `impl` when present. Re-export `ToneAudioEngine`'s types as needed.
-- [ ] Verify no other module value-imports `tone` or the moved class.
+- [x] `src/audio/ToneAudioEngine.ts` -- move the existing `AudioEngine` class here verbatim, rename to `ToneAudioEngine`, and export `type SfxName = "build"|"sell"|"error"|"promote"|"money"|"click"` used by its `sfx` signature. Keep the top-level Tone import here.
+- [x] `src/audio/Audio.ts` -- replace with a facade `class AudioEngine` (no `tone` import): fields `muted=false`/`started=false`, a private `impl` and `loading` guard, and a cached `lastFocus`. `start()` feature-detects WebAudio, then `await import("./ToneAudioEngine")`, constructs the impl, forwards `muted`, calls `impl.start()`, replays `lastFocus`; idempotent. `setMuted`/`update`/`sfx`/`dispose` update local state and delegate to `impl` when present. Re-export `ToneAudioEngine`'s types as needed.
+- [x] Verify no other module value-imports `tone` or the moved class.
 
 **Acceptance Criteria:**
 - Given a production build, when it completes, then `tone`/`standardized-audio-context` appear in a dynamically-loaded chunk (not `main`), and `main`'s size drops by roughly the audio payload (~230 kB raw).
