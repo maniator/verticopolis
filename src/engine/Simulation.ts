@@ -137,8 +137,9 @@ export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
 /** Congestion ratio at which tenants begin leaving (see {@link Simulation.updateSatisfaction},
  *  `cong > 1`) — the overlay paints this AMBER so the color never contradicts the sim. */
 export const CONGESTION_CHURN = 1.0;
-/** Congestion ratio of the worst traffic tier (see `trafficTier`, gridlock > 1.6) —
- *  the overlay saturates to RED here. */
+/** The gridlock boundary of the traffic tiers (`trafficTier` returns gridlock
+ *  for congestion strictly above this) — the overlay saturates to RED at and
+ *  beyond this ratio, so full red coincides with entering the worst tier. */
 export const CONGESTION_GRIDLOCK = 1.6;
 /** Severity of the amber ramp stop, kept in sync with the 4-stop `HEAT_STOPS`
  *  palette in the renderer (green 0 · chartreuse ⅓ · amber ⅔ · red 1). Anchoring
@@ -157,10 +158,12 @@ const CONGESTION_AMBER_SEVERITY = 2 / 3;
  * it lives beside the congestion model it interprets.
  */
 export function congestionSeverity(cong: number): number {
-  // A non-finite ratio (should never happen — capacity is guarded > 0 — but a
-  // corrupt save or future divide could produce one) degrades to green rather
-  // than poisoning the ramp index in heatColor and throwing on the draw path.
-  if (!(cong > 0)) return 0; // also catches NaN and negatives
+  // A non-finite or non-positive ratio (should never happen — capacity is
+  // guarded > 0 — but a corrupt save or future divide could produce NaN or
+  // ±Infinity) degrades to green rather than poisoning the ramp index in
+  // heatColor and throwing on the draw path. Guard Infinity explicitly: it is
+  // > 0, so `cong > 0` alone would let it fall through to the gridlock clamp.
+  if (!Number.isFinite(cong) || cong <= 0) return 0;
   if (cong >= CONGESTION_GRIDLOCK) return 1;
   if (cong <= CONGESTION_CHURN) {
     // Expand the lived-in [0, churn) band across most of the green→amber leg.
@@ -687,6 +690,14 @@ export class Simulation implements SimContext {
         }
       }
     }
+    // Build the congestion source ONCE, not per floor. congestionAt(floor) in v2
+    // rebuilds the whole spatial map on every call, so reading it inside the loop
+    // below would be O(F²) map builds per refresh; the v1 scalar is likewise
+    // read once. (Off the frame path — the renderer caches this hourly — but the
+    // quadratic build is still needless.)
+    const congMap = mode === "congestion" && this.simModel === "v2" ? this.spatialCongestionByFloor() : null;
+    const congScalar = mode === "congestion" && this.simModel !== "v2" ? this.congestion() : 0;
+
     const out: HeatCell[] = [];
     for (const [floor, e] of ext) {
       let severity: number;
@@ -694,7 +705,7 @@ export class Simulation implements SimContext {
         // Sim-anchored ramp: amber at the churn threshold, red at gridlock, with
         // the sub-churn band spread out so a healthy tower's busiest floors are
         // still legible instead of a flat green wash (see congestionSeverity).
-        severity = congestionSeverity(this.congestionAt(floor));
+        severity = congestionSeverity(congMap ? (congMap.get(floor) ?? 0) : congScalar);
       } else {
         const a = acc.get(floor);
         if (!a || a.total === 0) continue; // no tenancy here → don't tint

@@ -139,6 +139,15 @@ describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
     expect(congestionSeverity(-1)).toBe(0);
   });
 
+  it("degrades every non-finite / non-positive ratio to green (never red, never NaN)", () => {
+    // A poisoned ratio must read as 'no data → green', not saturate to red or
+    // poison heatColor's ramp index. Infinity is > 0, so this pins the explicit
+    // finite guard, not just the sign check.
+    for (const bad of [NaN, Infinity, -Infinity, -0.001, 0]) {
+      expect(congestionSeverity(bad)).toBe(0);
+    }
+  });
+
   it("monotonically increases with congestion", () => {
     let prev = -1;
     // A dense grid that straddles the churn join (…0.99, 1.0, 1.01…) so a
@@ -187,5 +196,28 @@ describe("congestionSeverity (overlay ramp, sim-anchored)", () => {
     for (let f = 2; f <= 6; f++) maxFloor = Math.max(maxFloor, sim.congestionAt(f));
     expect(peak).toBeCloseTo(maxFloor, 5); // the max across floors
     expect(peak).toBeGreaterThan(0);
+  });
+
+  it("floorHeatmap builds the congestion map once but matches per-floor congestionAt", () => {
+    // Guards the O(F²)→O(F) refactor: computing the spatial map once and reading
+    // each floor from it must produce exactly what calling congestionAt(floor)
+    // per floor would (each of which rebuilds the map). Same values, no drift.
+    const sim = Simulation.newGame(61);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 8; f++) lay(sim, "floor", f);
+    sim.buildTransport("elevatorStandard", C, 1, 8);
+    sim.tower.setCars(sim.tower.transports[0].id, 1);
+    for (let f = 2; f <= 8; f++) {
+      for (let x = 0; x + 9 <= C; x += 9) {
+        const r = sim.tower.place("office", f, x);
+        if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      }
+    }
+    const cells = sim.floorHeatmap("congestion");
+    expect(cells.length).toBeGreaterThan(0);
+    for (const cell of cells) {
+      expect(cell.severity).toBeCloseTo(congestionSeverity(sim.congestionAt(cell.floor)), 10);
+    }
   });
 });
