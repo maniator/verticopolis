@@ -1,5 +1,5 @@
 ---
-deferred_work_file: '{implementation_artifacts}/deferred-work.md'
+deferred_work_file: '{implementation_artifacts}/backlog.md'
 spec_file: '' # set at runtime for both routes before leaving this step
 story_key: '' # set at runtime to the current story's full sprint-status key (e.g. 3-2-digest-delivery) when the intent is an epic story and sprint-status resolution succeeds
 ---
@@ -82,7 +82,7 @@ If the spec is an epic story and `{sprint_status}` exists: find the `development
    - Present detected distinct goals as a bullet list.
    - Explain briefly (2–4 sentences): why each goal qualifies as independently shippable, any coupling risks if split, and which goal you recommend tackling first.
    - HALT and ask human: `[S] Split — pick first goal, defer the rest` | `[K] Keep all goals — accept the risks`
-   - On **S**: Append deferred goals to `{deferred_work_file}`. Narrow scope to the first-mentioned goal. Continue routing.
+   - On **S**: Append deferred goals under the `## Deferral inbox` section of `{deferred_work_file}` as a `### Deferred from:` block (not into the curated table or Completed log). Narrow scope to the first-mentioned goal. Continue routing.
    - On **K**: Proceed as-is.
 5. Route — choose exactly one:
 

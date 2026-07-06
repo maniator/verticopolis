@@ -195,7 +195,7 @@ Good vs. bad:
     `/code-review`, or an ad-hoc subagent pass does **not** satisfy this and
     must not be reported as "the deep review" — actually invoke the skill,
     let it triage, then fix every `patch` finding and record every `defer`
-    finding in `_bmad-output/implementation-artifacts/deferred-work.md`. This
+    finding in `_bmad-output/implementation-artifacts/backlog.md`. This
     applies to **every** non-trivial change, including the save/persistence and
     infra work where it's easy to assume "it's just plumbing."
   - Bring in the other agents relevant to the change rather than reviewing solo:

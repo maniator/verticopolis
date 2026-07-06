@@ -83,7 +83,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   ARE the deep review; a self-read or a generic `/code-review` does not count. Run it
   before pushing, or immediately after opening/updating the PR — never defer to "before
   merge" (sessions end and it gets forgotten). Fix every `patch` finding; record every
-  `defer` finding in `_bmad-output/implementation-artifacts/deferred-work.md`. A change
+  `defer` finding in `_bmad-output/implementation-artifacts/backlog.md`. A change
   isn't done until confirmed findings are fixed and re-verified on the branch. Resolve
   Copilot/Codex PR threads.
 - Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
