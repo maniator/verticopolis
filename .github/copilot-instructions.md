@@ -64,25 +64,29 @@ snapshots and won't pick up later commits on their own.
 
 ## GitHub PR Review — BMGD/BMAD emulation
 
-For GitHub Copilot pull-request review, **emulate this repo's mandatory deep-review
-skill** even though the native GitHub review surface can't execute a skill. The
-path-specific instructions in
-[`.github/instructions/bmad-review.instructions.md`](./instructions/bmad-review.instructions.md)
-are loaded automatically on the review surface and are the source of truth for how
-to do this. In short:
+Run this repo's mandatory deep review on every PR. The full method is the
+loadable **`code-review`** skill at
+[`.github/skills/code-review/SKILL.md`](./skills/code-review/SKILL.md) — Copilot
+code review loads agent skills from `.github/skills/` when relevant, so it runs
+the real method directly on the review surface. That skill is the **source of
+truth** (lens routing, adversarial layers, lenses, canon).
 
-- Pick the emulated skill by the changed files — **`gds-code-review`** for
-  gameplay/engine work (`src/engine/`, `src/render/`, mechanics, economy, ratings,
-  events, elevators, facilities, RNG), **`bmad-code-review`** for everything else
-  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A PR
-  that touches **both** runs both lenses, each scoped to the files it owns; when a
-  single judgment is needed, **default to `gds-code-review` if any gameplay/engine
-  file is touched** (it carries the higher-risk invariants).
-- Run its adversarial layers in order — **Blind Hunter → Edge Case Hunter →
-  Acceptance Auditor** — then synthesize with a **`bmad-party-mode`** step using
-  only the personas the diff implicates.
-- Do **not** claim a BMAD/BMGD skill was actually invoked — reproduce its behavior.
-  Prefer a few high-signal findings over many trivial comments.
+If the skill isn't loaded for a given diff, **emulate** it from this summary —
+don't claim a skill was invoked:
+
+- **Route by changed files:** `gds-code-review` for gameplay/engine work
+  (`src/engine/`, `src/render/`, mechanics, economy, ratings, events, elevators,
+  facilities, RNG), `bmad-code-review` for everything else (storage/persistence,
+  `.TWR` import, tooling, build/CI, UI plumbing, docs). A **mixed diff** runs both
+  lenses, each scoped to the files it owns; when a single judgment is needed,
+  default to `gds-code-review` if any gameplay/engine file is touched.
+- **Run the layers:** Blind Hunter → Edge Case Hunter → Acceptance Auditor, then
+  a `bmad-party-mode` synthesis over only the personas the diff implicates.
+- **Apply only the implicated lenses** (correctness & edge cases; engine purity &
+  determinism; hot-path Big-O; gameplay balance & canon — `facilities.ts` caps +
+  transport pooling; data/persistence & security; UI/UX & audio-feel; versioning;
+  American English) — the skill spells each out. Prefer a few high-signal findings
+  over filler.
 
 ## Code review
 

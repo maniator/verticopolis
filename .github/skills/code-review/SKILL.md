@@ -1,28 +1,36 @@
 ---
-applyTo: "**/*"
+name: code-review
+description: 'Deep, adversarial pull-request review for Verticopolis. Load and apply this on EVERY code review / PR review of this repo. It routes to the gds-code-review lens for gameplay/engine changes and the bmad-code-review lens for everything else, runs the Blind Hunter -> Edge Case Hunter -> Acceptance Auditor layers, and applies Verticopolis-specific canon (engine purity/determinism, hot-path Big-O, facilities.ts caps + transport pooling, save/.TWR security, versioning).'
 ---
 
-# BMGD/BMAD-Style Code Review Instructions
+# Verticopolis Code Review
 
-For pull-request review, emulate this repository's mandatory deep-review skill
-even though the native GitHub review surface cannot execute a skill. Do not
-claim a BMAD/BMGD skill was actually invoked — reproduce its *behavior*.
+You are an elite code reviewer for **Verticopolis** — a from-scratch,
+browser-native TypeScript clone of SimTower (1994) on Excalibur.js. Apply this
+skill to every pull-request / code review. Reproduce the *behavior* of the
+repo's mandatory deep-review skills; a green pipeline is never enough. Prefer a
+few high-signal findings over many trivial comments, and don't file filler
+comments for lanes with no real issue.
 
-Pick the emulated skill by the files the diff touches:
+> This is the review-surface distillation. The full interactive workflows live
+> in `.agents/skills/gds-code-review/` and `.agents/skills/bmad-code-review/`
+> (they drive subagents, `_bmad/scripts/` resolvers, and patch application, so
+> they're for local/agent runs — not the read-only review surface). Match their
+> judgment here; don't try to execute their tooling.
+
+## Pick the lens by the files the diff touches
 
 - **Gameplay / engine work** (`src/engine/`, `src/render/`, mechanics, economy,
-  ratings, events, elevators/transport, facilities, RNG) → emulate
-  **`gds-code-review`**.
+  ratings, events, elevators/transport, facilities, RNG) → **`gds-code-review`**
+  lens.
 - **Everything else** (storage/persistence, `.TWR` import, tooling, build/CI,
-  UI plumbing, docs) → emulate **`bmad-code-review`**.
+  UI plumbing, docs) → **`bmad-code-review`** lens.
 - **Mixed diff** (touches both) → run **both** lenses, each scoped to the files
-  it owns: apply `gds-code-review` to the gameplay/engine files and
-  `bmad-code-review` to the rest. When a single judgment is needed — the
-  party-mode synthesis, or which lens leads — **default to `gds-code-review` if
-  any gameplay/engine file is touched**, since those carry the higher-risk
-  invariants (determinism, canon, hot-path performance).
+  it owns. When a single judgment is needed (which lens leads, or the synthesis),
+  **default to `gds-code-review` if any gameplay/engine file is touched**, since
+  those carry the higher-risk invariants (determinism, canon, hot-path perf).
 
-Either way, run the skill's adversarial layers in sequence, then triage:
+## Run the adversarial layers, then triage
 
 1. **Blind Hunter** — read the diff cold for real defects a passing pipeline
    would not catch.
@@ -32,15 +40,14 @@ Either way, run the skill's adversarial layers in sequence, then triage:
 3. **Acceptance Auditor** — check the code against what the PR description /
    linked story claims; flag mismatches between claim and behavior.
 
-Then synthesize with a **`bmad-party-mode`** step using only the personas the
-diff actually implicates (Cloud Dragonborn / Winston for engine & structure,
-Samus Shepard for mechanics & balance, Sally for UI/UX & audio-feel, Paige for
-docs). Do not role-play noisily — fold the personas into one practical review.
+Then synthesize with a **party-mode** step using only the personas the diff
+implicates (Cloud Dragonborn / Winston for engine & structure, Samus Shepard
+for mechanics & balance, Sally for UI/UX & audio-feel, Paige for docs). Fold
+them into one practical review — do not role-play noisily.
 
 ## Review lenses
 
-Activate only the lenses implied by the changed files. Prefer a few
-high-signal findings over many trivial comments.
+Activate only the lenses implied by the changed files.
 
 ### Correctness & edge cases
 
