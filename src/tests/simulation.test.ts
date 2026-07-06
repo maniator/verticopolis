@@ -517,8 +517,12 @@ describe("Transport editing", () => {
       ["elevatorService", 8],
       ["elevatorExpress", 8],
     ];
+    // Walk a cursor across the lot, spacing each shaft by its own real width
+    // (plus a 1-tile gap) so the test never overlaps if an elevator width ever
+    // changes — the behavior under test is car caps, not geometry.
+    let x = x0;
     cases.forEach(([kind, max], i) => {
-      expect(sim.buildTransport(kind, x0 + i * 6, 1, 6).ok).toBe(true);
+      expect(sim.buildTransport(kind, x, 1, 6).ok).toBe(true);
       // Assert the build actually appended THIS kind's shaft — otherwise a
       // silently-dropped placement would let us re-select a prior (already
       // 8-car) shaft and pass vacuously.
@@ -527,6 +531,7 @@ describe("Transport editing", () => {
       expect(t.kind).toBe(kind);
       sim.tower.setCars(t.id, 99);
       expect(t.cars).toBe(max);
+      x += FACILITIES[kind].width + 1;
     });
   });
 
