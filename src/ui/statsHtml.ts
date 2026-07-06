@@ -1,5 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import { LEDGER_CATS, LEDGER_LABELS } from "../engine/Ledger";
+import { residentCount } from "../engine/facilities";
 import { isPresent } from "../engine/types";
 import { escapeHtml } from "./escape";
 import { floorTag } from "./format";
@@ -176,14 +177,17 @@ function householdSection(sim: Simulation): string {
   let households = 0;
   let residents = 0;
   for (const u of sim.tower.units) {
-    // Count only households actually in residence (isPresent) — the same gate the
-    // population census uses — so "People housed" always agrees with total
-    // population and a not-present unit (empty, gutted) can never leave a ghost
-    // family in the readout.
-    if (u.kind === "condo" && u.residents !== undefined && isPresent(u)) {
-      counts.set(u.residents, (counts.get(u.residents) ?? 0) + 1);
+    // Count every condo actually in residence (isPresent) — the same gate the
+    // population census uses — and size it through the SAME seam, residentCount,
+    // so "People housed" always equals this condo's contribution to total
+    // population. That falls back to the classic household when `residents` is
+    // absent (a corrupt/hand-edited Modern save), so the readout can't undercount
+    // the census; a not-present unit (empty, gutted) never leaves a ghost family.
+    if (u.kind === "condo" && isPresent(u)) {
+      const size = residentCount(u);
+      counts.set(size, (counts.get(size) ?? 0) + 1);
       households++;
-      residents += u.residents;
+      residents += size;
     }
   }
   const head = `<div class="stats-section win-title sm">Households</div>`;

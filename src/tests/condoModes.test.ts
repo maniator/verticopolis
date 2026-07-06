@@ -335,4 +335,22 @@ describe("Stats panel — Households section (Modern only)", () => {
     tickUntil(classic, () => cc.everOccupied);
     expect(buildStatsHtml(classic)).not.toContain("Households");
   });
+
+  it("keeps 'People housed' equal to the census even when a sold condo lacks residents", () => {
+    // A corrupt/hand-edited Modern save: a present, sold condo with no household.
+    // The census (residentCount) falls back to the classic 3, so the readout must
+    // too — otherwise People housed would undercount total population.
+    const sim = Simulation.newGame(3, "modern");
+    const a = servedCondo(sim);
+    tickUntil(sim, () => a.everOccupied); // a real household (2–5)
+    const b = sim.tower.place("condo", 2, C + 24);
+    const bare = sim.tower.units.find((u) => u.id === b.unitId)!;
+    bare.state = "occupied";
+    bare.everOccupied = true;
+    bare.residents = undefined; // sold but no household on the record
+    const pop = sim.tower.totalPopulation();
+    expect(pop).toBe(a.residents! + 3); // census counts the bare condo as 3
+    const housed = Number(/People housed<\/span><span class="v">([\d,]+)</.exec(buildStatsHtml(sim))![1].replace(/,/g, ""));
+    expect(housed).toBe(pop); // readout agrees with the census
+  });
 });
