@@ -3,7 +3,7 @@
 # Version: 6.9.0
 # Date: 2026-06-30T18:16:33.758Z
 
-project_name: simtower-llm-style
+project_name: verticopolis
 game_dev_experience: intermediate
 planning_artifacts: "{project-root}/_bmad-output/planning-artifacts"
 implementation_artifacts: "{project-root}/_bmad-output/implementation-artifacts"
