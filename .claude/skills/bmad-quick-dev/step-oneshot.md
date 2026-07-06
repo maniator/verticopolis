@@ -26,7 +26,7 @@ Invoke the `bmad-review-adversarial-general` skill in a subagent with the change
 Deduplicate all review findings. Three categories only:
 
 - **patch** — trivially fixable. Auto-fix immediately.
-- **defer** — pre-existing issue not caused by this change. Append to `{deferred_work_file}`.
+- **defer** — pre-existing issue not caused by this change. Append under the `## Deferral inbox` section of `{deferred_work_file}` as a `## Deferred from:` block — never into the curated table or Completed log.
 - **reject** — noise. Drop silently.
 
 If a finding is caused by this change but too significant for a trivial patch, HALT and present it to the human for decision before proceeding.
