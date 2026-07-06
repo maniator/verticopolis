@@ -19,6 +19,7 @@ export type { DrawCtx } from "./sprites/common";
 export {
   CRANE_H,
   CRANE_W,
+  craneAnchorTile,
   drawCrane,
   drawEscapeStairs,
   ESCAPE_W,

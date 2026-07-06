@@ -3,6 +3,28 @@
 Items surfaced by reviews that are real but intentionally not actioned in the
 PR that found them. Pick these up when touching the relevant area.
 
+## Deferred from: gds-code-review (2026-07-06, floating-crane fix)
+
+- **Narrow top-run at the tower's edge can overhang the crane body past the lot.**
+  `syncCrane` anchors the crane's *mast* over the center tile of the widest built
+  run (`craneAnchorTile`), but the graphic is `CRANE_W = 128`px (~11.6 tiles) wide
+  with the mast near center. When the widest run is narrower than the crane and
+  sits against `x = 0` or `x = GRID.width`, the jib/counter-jib (and for the far-left
+  case, negative world-X) hang over open sky/off the lot. Cosmetic and rare (needs a
+  top row built as a <~12-tile block flush to a tower edge). Not worth clamping now:
+  clamping the body would pull the mast off the actual build run (the thing the fix
+  aligned it to). Revisit if a real tower ever exhibits it — likely by clamping
+  `pos.x` to keep the *body* on-lot only when the run is near an edge.
+
+- **Crane can sit a story low over a multi-floor top unit (pre-existing).**
+  `Tower.highestFloor` returns the max *base* floor and ignores multi-floor extents,
+  so a top row formed only by the upper story of a 2-floor unit based at `hi−1` yields
+  `highestFloor = hi−1`; the crane perches at `worldYTop(hi−1)` while the visual roof
+  is at `hi`, reading as embedded one story down. Unchanged by this fix (`worldYTop(hi)`
+  was already the Y source) — flagged by the edge-case pass, not a regression. Fix when
+  touching vertical placement: derive the crane's floor from the true topmost occupied
+  row (`u.floor + facilityFloors(u.kind) − 1`), not the max base floor.
+
 ## Deferred from: gds-code-review (2026-07-06, congestion overlay legibility)
 
 - ~~**`floorHeatmap` recomputes the spatial congestion map once per built floor
