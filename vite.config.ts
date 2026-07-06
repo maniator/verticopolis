@@ -129,7 +129,10 @@ export default defineConfig({
         // excalibur.html tooling entry out of the install), and a chunk named
         // `excalibur-*` would be wrongly dropped from the game's own precache.
         manualChunks(id) {
-          if (id.includes("node_modules/excalibur")) return "vendor-excalibur";
+          // Normalize separators before matching: Rollup normally emits POSIX
+          // module ids, but be defensive so the split still holds if a build
+          // (e.g. Windows) surfaces backslashes.
+          if (id.replace(/\\/g, "/").includes("node_modules/excalibur")) return "vendor-excalibur";
         },
       },
     },

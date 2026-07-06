@@ -353,7 +353,14 @@ export class ToneAudioEngine {
 
   /** Lazily create the audio graph. Must be called from a user gesture. */
   start(): void {
-    if (this.started) return;
+    if (this.started) {
+      // Already built — but the context may have been suspended since (an
+      // autoplay unlock that landed outside the gesture stack, or a backgrounded
+      // tab). main.ts calls start() on every gesture, so re-attempt the resume
+      // here: it's a no-op on a running context and recovers a silent one.
+      void Tone.getContext().resume().catch(() => {});
+      return;
+    }
     const hasWebAudio =
       typeof (globalThis as { AudioContext?: unknown }).AudioContext !== "undefined" ||
       typeof (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext !== "undefined";
