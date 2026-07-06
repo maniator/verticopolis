@@ -62,31 +62,38 @@ CI (`.github/workflows/test.yml`) runs all of the above on every PR. When you pu
 new commits to a PR, **re-request a Copilot review** — Copilot reviews are one-shot
 snapshots and won't pick up later commits on their own.
 
-## GitHub PR Review — BMGD/BMAD emulation
+## GitHub PR Review — BMGD/BMAD review method
 
-Run this repo's mandatory deep review on every PR. The full method is the
-loadable **`code-review`** skill at
-[`.github/skills/code-review/SKILL.md`](./skills/code-review/SKILL.md) — Copilot
-code review loads agent skills from `.github/skills/` when relevant, so it runs
-the real method directly on the review surface. That skill is the **source of
-truth** (lens routing, adversarial layers, lenses, canon).
-
-If the skill isn't loaded for a given diff, **emulate** it from this summary —
+Run this repo's mandatory deep review on **every** PR. GitHub always applies this
+file (`.github/copilot-instructions.md`) to Copilot code review, so this overlay
+**is** the review method — reproduce the behavior of the BMGD/BMAD review skills;
 don't claim a skill was invoked:
 
-- **Route by changed files:** `gds-code-review` for gameplay/engine work
-  (`src/engine/`, `src/render/`, mechanics, economy, ratings, events, elevators,
-  facilities, RNG), `bmad-code-review` for everything else (storage/persistence,
-  `.TWR` import, tooling, build/CI, UI plumbing, docs). A **mixed diff** runs both
-  lenses, each scoped to the files it owns; when a single judgment is needed,
-  default to `gds-code-review` if any gameplay/engine file is touched.
-- **Run the layers:** Blind Hunter → Edge Case Hunter → Acceptance Auditor, then
-  a `bmad-party-mode` synthesis over only the personas the diff implicates.
-- **Apply only the implicated lenses** (correctness & edge cases; engine purity &
-  determinism; hot-path Big-O; gameplay balance & canon — `facilities.ts` caps +
-  transport pooling; data/persistence & security; UI/UX & audio-feel; versioning;
-  American English) — the skill spells each out. Prefer a few high-signal findings
-  over filler.
+- **Route by changed files:** apply the `gds-code-review` lens to gameplay/engine
+  work (`src/engine/`, `src/render/`, mechanics, economy, ratings, events,
+  elevators, facilities, RNG) and the `bmad-code-review` lens to everything else
+  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A
+  **mixed diff** runs both, each scoped to the files it owns; when one judgment is
+  needed, default to the gameplay/engine lens if any such file is touched.
+- **Run the adversarial layers:** Blind Hunter → Edge Case Hunter → Acceptance
+  Auditor, then a `bmad-party-mode` synthesis over only the personas the diff
+  implicates.
+- **Apply the review dimensions in the “Code review” section below,** scoped to
+  the implicated lenses. Prefer a few high-signal findings over filler.
+- **End every review** with the exact line
+  `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
+  — a marker confirming this overlay was applied.
+
+> **Maintainer note — why there is no `.github/skills` review skill.** Copilot
+> code review *can* load agent skills from `.github/skills/`, but this repo
+> commits the full BMGD/BMAD skill library under `.claude/skills/` and
+> `.agents/skills/` (~515 files each). Copilot's skill loader has a ~508-file
+> budget those trees blow past, so it drops **all** base-branch skills for safety
+> — a `.github/skills/code-review` skill can't load here. This overlay is the
+> mechanism by design; don't re-add a review skill expecting it to load.
+> (Investigated 2026-07-06: verticopolis ships both the `bmad-*` and `gds-*`
+> families, ~515 files per convention; a bmad-only install lands ~256, under
+> budget.)
 
 ## Code review
 
