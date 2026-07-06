@@ -216,10 +216,7 @@ class GameApp {
         this.engine.preview = null;
         this.engine.transportPreview = null;
       },
-      onSpeed: (s) => {
-        this.speed = s;
-        this.engine.paused = SPEEDS[s] === 0;
-      },
+      onSpeed: (s) => this.setSpeed(s),
       onSave: () => this.saveLoad.save(),
       onLoad: () => this.saveLoad.load(),
       onExport: () => void this.saveLoad.exportGame(),
@@ -608,11 +605,7 @@ class GameApp {
       // Don't let game keys run the paused engine behind the first-run splash.
       if (document.getElementById("splash")) return;
       if (e.key >= "0" && e.key <= "3") {
-        this.speed = Number(e.key);
-        this.engine.paused = SPEEDS[this.speed] === 0;
-        document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
-          b.classList.toggle("active", (b as HTMLElement).dataset.speed === e.key),
-        );
+        this.setSpeed(Number(e.key));
         return;
       }
 
