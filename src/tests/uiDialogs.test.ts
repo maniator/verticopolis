@@ -560,10 +560,12 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
     expect(toastSpy).toHaveBeenCalledTimes(320);
     expect(toastSpy).toHaveBeenLastCalledWith("event 320", "good");
     // …and the newest line is in the bulletin (it never stopped adding), while the
-    // oldest was pruned out.
-    const logEl = document.getElementById("log")!;
-    expect(logEl.textContent).toContain("event 320");
-    expect(logEl.textContent).not.toContain("event 1 "); // pruned; trailing space avoids matching "event 1X"
+    // oldest was pruned out. Assert per-line node text, not the container's
+    // concatenated textContent (adjacent lines have no separator, so a substring
+    // check on the whole blob is a false-negative trap).
+    const lines = Array.from(document.getElementById("log")!.children, (c) => c.textContent);
+    expect(lines).toContain("event 320");
+    expect(lines).not.toContain("event 1"); // oldest 20 (events 1..20) rolled off: 320 emits, 300-line DOM cap
   });
 
   it("holds the DOM node count constant under a long session (mobile-safe, can't crash)", () => {
