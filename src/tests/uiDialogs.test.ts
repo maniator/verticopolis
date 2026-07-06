@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UI, type UICallbacks } from "../ui/UI";
+import { Simulation } from "../engine/Simulation";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -533,5 +534,104 @@ describe("newTowerModal — the rule-set picker", () => {
     ui.closeModal();
     ui.newTowerModal({ hasSave: false, onFound: vi.fn() });
     expect(dialog().querySelector(".nt-abandon")).toBeNull();
+  });
+});
+
+describe("event-log toast/bulletin pump (regression: froze at the cap; now a bounded rolling window)", () => {
+  const LOG_DOM_CAP = 300; // mirror of the private cap in UI.ts
+  beforeEach(() => mountAppDom());
+  afterEach(() => vi.restoreAllMocks());
+
+  it("keeps toasting and appending the bulletin past the log cap — never freezes", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    ui.update(sim); // sync the UI cursor past any founding log entry
+    const startSeq = sim.logSeq;
+    const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
+    // Fire 320 good events (past the 300 buffer cap), pumping the UI each time.
+    for (let i = 1; i <= 320; i++) {
+      sim.emit(`event ${i}`, "good");
+      ui.update(sim);
+    }
+    // Engine: the buffer is capped, but the cursor stays monotonic.
+    expect(sim.log.length).toBe(300);
+    expect(sim.logSeq - startSeq).toBe(320);
+    // The bug froze toasts at the cap; now every good entry still toasts through 320…
+    expect(toastSpy).toHaveBeenCalledTimes(320);
+    expect(toastSpy).toHaveBeenLastCalledWith("event 320", "good");
+    // …and the newest line is in the bulletin (it never stopped adding), while the
+    // oldest was pruned out.
+    const logEl = document.getElementById("log")!;
+    expect(logEl.textContent).toContain("event 320");
+    expect(logEl.textContent).not.toContain("event 1 "); // pruned; trailing space avoids matching "event 1X"
+  });
+
+  it("holds the DOM node count constant under a long session (mobile-safe, can't crash)", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    for (let i = 1; i <= 1000; i++) {
+      sim.emit(`event ${i}`, i % 2 ? "good" : "info");
+      if (i % 7 === 0) ui.update(sim); // realistic: UI is throttled, not every emit
+    }
+    ui.update(sim);
+    const logEl = document.getElementById("log")!;
+    // 1000 events later the DOM is still bounded to the cap — never unbounded growth.
+    expect(logEl.childElementCount).toBeLessThanOrEqual(LOG_DOM_CAP);
+    // …and still shows the newest (append + prune, not freeze).
+    expect(logEl.textContent).toContain("event 1000");
+  });
+
+  it("caps toasts per frame on a catch-up burst but records every line in the bulletin", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    ui.update(sim); // sync the cursor past the founding entry
+    const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
+    // Backgrounded-tab / fast-forward: 50 good events flush between two frames.
+    for (let i = 1; i <= 50; i++) sim.emit(`burst ${i}`, "good");
+    ui.update(sim);
+    // Only the newest few pop as toasts (TOAST_MAX=5) — not 50 transient nodes/timers…
+    expect(toastSpy).toHaveBeenCalledTimes(5);
+    expect(toastSpy).toHaveBeenLastCalledWith("burst 50", "good");
+    expect(toastSpy).not.toHaveBeenCalledWith("burst 45", "good"); // 45 is the 6th-newest, past the cap
+    // …but the bulletin recorded the whole batch (every line present as its own
+    // node — scrollback intact, not just the toasted ones).
+    const logEl = document.getElementById("log")!;
+    const lines = Array.from(logEl.children, (c) => c.textContent);
+    expect(lines).toContain("burst 1");
+    expect(lines).toContain("burst 50");
+  });
+
+  it("keeps the bulletin line even when toast() throws (line is the durable record)", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    ui.update(sim);
+    vi.spyOn(ui, "toast").mockImplementation(() => {
+      throw new Error("toast boom");
+    });
+    // A throwing toast must not drop the line or abort the pump.
+    expect(() => {
+      sim.emit("resilient line", "bad");
+      ui.update(sim);
+    }).not.toThrow();
+    expect(document.getElementById("log")!.textContent).toContain("resilient line");
+  });
+
+  it("rebases the log cursor on a tower swap so old entries don't replay and new ones aren't skipped", () => {
+    const { ui } = makeUI();
+    const a = Simulation.newGame(1);
+    for (let i = 0; i < 3; i++) {
+      a.emit(`a${i}`, "good");
+      ui.update(a);
+    }
+    const toastSpy = vi.spyOn(ui, "toast").mockImplementation(() => {});
+    // Swap to a fresh tower (what adoptSim does) and rebase the cursor.
+    const b = Simulation.newGame(2);
+    ui.resetLog(b);
+    b.emit("swapped tower event", "bad");
+    ui.update(b);
+    // Only b's new entry toasts — a's three don't replay, and b's isn't skipped.
+    expect(toastSpy).toHaveBeenCalledTimes(1);
+    expect(toastSpy).toHaveBeenCalledWith("swapped tower event", "bad");
+    expect(document.getElementById("log")!.innerHTML).toContain("swapped tower event");
   });
 });

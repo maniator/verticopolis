@@ -915,6 +915,9 @@ class GameApp {
     this.lastStar = sim.star;
     this.accMinutes = 0;
     this.engine.setSim(sim);
+    // Rebase the UI log cursor onto the new tower's log so its old entries don't
+    // replay as toasts and its next entry isn't skipped against a stale cursor.
+    this.ui.resetLog(sim);
     if (!preserveHistory) {
       // A *different* tower (New Tower / Load / a slot / Import) invalidates the
       // undo trail — otherwise Undo could resurrect an unrelated old tower and a

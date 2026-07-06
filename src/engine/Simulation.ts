@@ -304,6 +304,10 @@ export class Simulation implements SimContext {
     return this.onHourRuns;
   }
   log: LogEntry[] = [];
+  /** Monotonic count of {@link emit} calls this session — the UI's "new entries"
+   *  cursor (see emit). NOT `log.length`, which the 200-cap pins. Transient/not
+   *  serialized, like `log`. */
+  logSeq = 0;
 
   /**
    * Individually-routed commuters. The engine owns and advances them as part of
@@ -401,7 +405,16 @@ export class Simulation implements SimContext {
 
   emit(text: string, kind: LogEntry["kind"] = "info"): void {
     this.log.push({ minute: this.clock.minutes, text, kind });
-    if (this.log.length > 200) this.log.shift();
+    // Monotonic emit counter. The UI diffs "new entries since I last looked" on
+    // THIS, never on log.length — the capped shift below makes length
+    // non-monotonic (push+shift pins it at the cap once full), which is what
+    // froze the toast/bulletin pump after the cap while cosmetics kept animating.
+    // Transient like the log itself (neither is serialized): resets to 0 on load.
+    this.logSeq++;
+    // Bounded ring — a session's worth of scrollback (the UI renders up to
+    // LOG_DOM_CAP of it). Cheap in RAM (~100 bytes/entry); the shift is what
+    // makes length non-monotonic, hence the logSeq cursor above.
+    if (this.log.length > 300) this.log.shift();
   }
 
   // ---- Build / sell ------------------------------------------------------
