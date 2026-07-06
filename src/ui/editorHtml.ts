@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Transport, Unit } from "../engine/types";
 import { isOperational } from "../engine/types";
 import { FACILITIES, isElevatorKind, isHotelKind, maxCarsFor, residentCount } from "../engine/facilities";
+import { householdPrice } from "../engine/gameRules";
 import { rentConfig, rentOf, resaleRefund } from "../engine/econConfig";
 import { escapeHtml } from "./escape";
 import { floorTag } from "./format";
@@ -41,7 +42,13 @@ export function unitEditorVolatile(sim: Simulation, u: Unit): Record<string, str
   // the flat catalog value for everything else) — never a bare `5/3` for a big family.
   if (f.population) vol.occupants = `${u.occupants}/${residentCount(u)}`;
   if (rentConfig(u.kind)) {
-    vol.rent = `$${rentOf(u).toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+    // For a SOLD condo the "Sale price" is what it actually fetched — the
+    // household-scaled amount (and exactly what the buy-back will reclaim), not
+    // the base asking. Unsold condos (residents undefined) and every other kind
+    // read the plain asking price. householdPrice falls back to the base when
+    // there's no household, so Classic and unsold condos are unchanged.
+    const price = u.kind === "condo" ? householdPrice(rentOf(u), u.residents) : rentOf(u);
+    vol.rent = `$${price.toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
   }
   if (u.kind === "cinema") {
     // A mid-build / burning / gutted cinema books no film — show "—", not a fake feature.

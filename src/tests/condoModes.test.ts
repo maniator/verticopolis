@@ -4,6 +4,7 @@ import { ECON, rentOf } from "../engine/econConfig";
 import { FACILITIES, GRID, residentCount } from "../engine/facilities";
 import type { GameMode, Unit } from "../engine/types";
 import { buildStatsHtml } from "../ui/statsHtml";
+import { unitEditorVolatile } from "../ui/editorHtml";
 
 /**
  * Condo rule-sets: the Classic price/buy-back parity fixes (all towers) and the
@@ -265,6 +266,35 @@ describe("Save hardening at the trust boundary", () => {
     expect(rc.everOccupied).toBe(false); // can still sell once built
   });
 
+  it("keeps a hotel room's everOccupied through an empty (between-guests) round-trip", () => {
+    // Hotels legitimately sit `empty` between guests while staying "ever booked";
+    // the lease/sale normalization must NOT reset them the way it resets an
+    // empty office/condo.
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    const r = sim.tower.place("hotelSingle", 2, C);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "empty";
+    room.everOccupied = true;
+    const reloaded = Simulation.deserialize(sim.serialize());
+    expect(reloaded.tower.units.find((u) => u.kind === "hotelSingle")!.everOccupied).toBe(true);
+  });
+
+  it("backfills a corrupt pre-fork save (invalid mode string) as legacy for condo pricing", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    const raw = sim.serialize();
+    (raw as { mode?: unknown }).mode = "garbage"; // corrupt, not a valid GameMode
+    for (const u of raw.units) if (u.kind === "condo") delete (u as { rent?: unknown }).rent;
+    const reloaded = Simulation.deserialize(raw);
+    expect(reloaded.mode).toBe("classic"); // invalid mode resolves to classic …
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
+    expect(rentOf(rc)).toBe(120_000); // … and migration treats it as legacy, not the new $160k
+  });
+
   it("clears a stale household on a not-sold condo on load", () => {
     const sim = Simulation.newGame(3, "modern");
     servedCondo(sim);
@@ -304,6 +334,17 @@ describe("Save hardening at the trust boundary", () => {
     const reloaded = Simulation.deserialize(raw);
     const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
     expect(rentOf(rc)).toBe(120_000);
+  });
+
+  it("bounds a forged sold-condo price so buy-back can't drain money without limit", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    const raw = sim.serialize();
+    for (const u of raw.units) if (u.kind === "condo") u.rent = 1e9; // absurd forged price
+    const reloaded = Simulation.deserialize(raw);
+    const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
+    expect(rentOf(rc)).toBe(240_000); // clamped to the widest-ever ceiling, not 1e9
   });
 
   it("clamps an unsold condo's legacy out-of-band price, leaving sold condos untouched", () => {
@@ -357,6 +398,14 @@ describe("Stats panel — Households section (Modern only)", () => {
     const cc = servedCondo(classic);
     tickUntil(classic, () => cc.everOccupied);
     expect(buildStatsHtml(classic)).not.toContain("Households");
+  });
+
+  it("shows a sold Modern condo's editor price as the household-scaled amount (what buy-back reclaims)", () => {
+    const sim = Simulation.newGame(7, "modern");
+    const condo = servedCondo(sim);
+    tickUntil(sim, () => condo.everOccupied);
+    const expected = Math.round((rentOf(condo) * condo.residents!) / 3);
+    expect(unitEditorVolatile(sim, condo).rent).toBe(`$${expected.toLocaleString()}`);
   });
 
   it("keeps 'People housed' equal to the census even when a sold condo lacks residents", () => {

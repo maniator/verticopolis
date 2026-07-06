@@ -101,6 +101,18 @@ const CONDO_NOISE_EROSION = 0.054;
 const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
 
 /**
+ * The widest condo price band that has ever existed (the pre-re-anchor band was
+ * $60k–$240k; the current one is $80k–$200k). A SOLD condo keeps its historical
+ * price rather than being re-clamped to the current band — but it's still bounded
+ * to this range on load, so a forged/corrupt save can't stamp an absurd `rent`
+ * (e.g. $1e9) that the owner buy-back would then reclaim, draining money with no
+ * ceiling. Every legitimate sold price (current or legacy) sits inside this range,
+ * so nothing real is altered.
+ */
+const SOLD_CONDO_MIN_PRICE = 60_000;
+const SOLD_CONDO_MAX_PRICE = 240_000;
+
+/**
  * Save-format migration seam. Runs before the field-level coercion in
  * {@link Simulation.deserialize}. Beyond normalizing `version`, it backfills the
  * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
@@ -111,12 +123,15 @@ function migrateSave(data: SerializedGame): SerializedGame {
   // number to branch on; deserialize()'s coercion still hardens every value.
   const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
   let migrated: SerializedGame = data.version === version ? data : { ...data, version };
-  // A save with no `mode` predates the condo work. A SOLD condo (owned, not an
+  // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
+  // condition under which deserialize() falls back to Classic, so migration must
+  // agree (an invalid mode string must be treated as legacy here too, else the
+  // save loads Classic yet skips this backfill). A SOLD condo (owned, not an
   // empty/dead shell) that omitted `rent` sold at the OLD default — stamp it so
   // its buy-back mirrors that historical price instead of picking up the new,
   // higher default via rentOf(). Only touch that exact shape; never re-price a
   // condo that already carries a rent, or an unsold/dead one.
-  if (migrated.mode === undefined && Array.isArray(migrated.units)) {
+  if (!isGameMode(migrated.mode) && Array.isArray(migrated.units)) {
     migrated = {
       ...migrated,
       units: migrated.units.map((u) =>
@@ -1990,27 +2005,33 @@ export class Simulation implements SimContext {
         // innerHTML and state-machine compares); the sold/leased flag below reads it.
         const state = isUnitState(u.state) ? u.state : "empty";
         // Harden the "currently sold/leased" flag at the trust boundary: only a
-        // literal `true` counts (a forged "yes" must not mark a condo sold), AND a
-        // unit that deserializes into a not-yet-built or vacated shell — empty,
-        // under construction, or gutted — is definitionally NOT currently owned, so
-        // normalize the flag to false even if the save left it true. (A sold condo
-        // that's on fire IS still owned, so `fire` is deliberately not cleared.)
-        // This rescues a LEGACY "dead" condo whose owner left back when `vacate()`
-        // kept `everOccupied` set on condos — without it, the unit would reload as
-        // sold-but-empty and, since sales require `!everOccupied`, sit off-market
-        // forever — and blocks a forged construction/sold unit from doing the same.
+        // literal `true` counts (a forged "yes" must not mark a condo sold), AND —
+        // for a LEASE/SALE unit (office, condo), whose everOccupied means "currently
+        // leased/sold" — a shell state (empty, construction, gutted) is definitionally
+        // NOT currently owned, so the flag is normalized to false even if the save
+        // left it true. That rescues a LEGACY "dead" condo whose owner left back when
+        // `vacate()` kept `everOccupied` set (else it reloads sold-but-empty and, since
+        // sales require `!everOccupied`, sits off-market forever) and blocks a forged
+        // shell from doing the same. (A sold unit that's on fire IS still owned, so
+        // `fire` is not cleared.) HOTELS are exempt: their everOccupied means "ever
+        // booked" and legitimately stays true while the room sits `empty` between
+        // guests (turnover runs through `state`, not this flag).
         const notOwned = state === "empty" || state === "construction" || state === "gutted";
-        const everOccupied = u.everOccupied === true && !notOwned;
+        const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
         const soldCondo = u.kind === "condo" && everOccupied;
-        // Player-set price, coerced to a finite number. For an UNSOLD condo, also
-        // clamp into the re-anchored band so a legacy save priced at the old
-        // min/max ($60k/$240k) can't sell below build cost or above the new
-        // ceiling (or render past the slider ends). A SOLD condo is left untouched
-        // — its buy-back must mirror the price it actually sold for.
+        // Player-set price, coerced to a finite number, then bounded for condos.
+        // An UNSOLD condo re-enters the current band ($80k–$200k) so a legacy save
+        // priced at the old min/max ($60k/$240k) can't sell below build cost or
+        // above the new ceiling (or render past the slider ends). A SOLD condo
+        // keeps its historical price so the buy-back mirrors what it sold for, but
+        // is still bounded to the widest-ever band so a forged `rent` can't drive
+        // an unbounded buy-back money drain.
         let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
-        if (rent !== undefined && u.kind === "condo" && !soldCondo) {
+        if (rent !== undefined && u.kind === "condo") {
           const band = rentConfig("condo")!;
-          rent = Math.max(band.min, Math.min(band.max, rent));
+          const lo = soldCondo ? SOLD_CONDO_MIN_PRICE : band.min;
+          const hi = soldCondo ? SOLD_CONDO_MAX_PRICE : band.max;
+          rent = Math.max(lo, Math.min(hi, rent));
         }
         return {
           ...u,
