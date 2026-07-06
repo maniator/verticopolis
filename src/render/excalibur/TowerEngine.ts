@@ -25,6 +25,7 @@ import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
 import { clampCameraY } from "../cameraBounds";
+import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 
 /** World pixels per tile / per floor. */
 export const TILE = 11;
@@ -1468,28 +1469,19 @@ export class TowerEngine {
    * syncMotion): the silhouette can't move on an hour tick or a lighting flip.
    */
   private syncFacade(): void {
-    // Above-ground silhouette: leftmost/rightmost built tile per floor row
-    // (every story of a multi-floor room counts, so a two-story cinema at the
-    // edge still gets stairs on its upper row).
-    const edges = new Map<number, { min: number; max: number }>();
-    for (const u of this.sim.tower.units) {
-      for (let f = Math.max(1, u.floor); f < u.floor + facilityFloors(u.kind); f++) {
-        const e = edges.get(f);
-        const right = u.x + u.width;
-        if (!e) edges.set(f, { min: u.x, max: right });
-        else {
-          if (u.x < e.min) e.min = u.x;
-          if (right > e.max) e.max = right;
-        }
-      }
-    }
+    // Above-ground silhouette + top-row tiles in ONE pass over the units:
+    // escape stairs read the per-floor edges, the crane reads the top row's
+    // built columns. (Every story of a multi-floor room counts, so a two-story
+    // cinema at the edge still gets stairs on its upper row.)
+    const hi = this.sim.tower.highestFloor;
+    const { edges, topTiles } = facadeGeometry(this.sim.tower.units, hi);
     this.syncEscapes(edges);
-    this.syncCrane(edges);
+    this.syncCrane(hi, topTiles);
   }
 
   /** Reconcile the exterior escape-stair segments: one left + one right actor
    *  per above-ground floor row, slid in place when the row's edge moves. */
-  private syncEscapes(edges: Map<number, { min: number; max: number }>): void {
+  private syncEscapes(edges: Map<number, FloorEdge>): void {
     for (const [floor, e] of edges) {
       const sig = `${e.min}:${e.max}`;
       const y = this.worldYTop(floor);
@@ -1524,9 +1516,10 @@ export class TowerEngine {
    *  comes down once the tower tops out at the 100th floor (and stays away
    *  unless the top is demolished back below it — the crane is derived state,
    *  not a latch). No above-ground floors → no crane (empty/basement lots). */
-  private syncCrane(edges: Map<number, { min: number; max: number }>): void {
-    const hi = this.sim.tower.highestFloor;
-    if (hi >= GRID.maxFloor || !edges.has(hi)) {
+  private syncCrane(hi: number, topTiles: Set<number>): void {
+    // No above-ground structure on the top row (basement-only/empty lot) or the
+    // tower has topped out at the cap → no crane.
+    if (hi >= GRID.maxFloor || topTiles.size === 0) {
       if (this.craneActor) {
         this.craneActor.kill();
         this.craneActor = null;
@@ -1539,7 +1532,7 @@ export class TowerEngine {
     // a partly-leased office row — leaves the midpoint hovering in the gap
     // between blocks, floating the crane over open sky. For a fully-built row
     // the widest run IS the whole span, so this matches the old midpoint.
-    const pos = ex.vec(this.topRunCenter(hi) * TILE, this.worldYTop(hi));
+    const pos = ex.vec(craneAnchorTile(topTiles) * TILE, this.worldYTop(hi));
     if (!this.craneActor) {
       // cache:true + flagDirty from tick(): the crane re-rasterizes only while
       // the decorative clock advances, so pause/reduced-motion stops the
@@ -1562,20 +1555,6 @@ export class TowerEngine {
     } else {
       this.craneActor.pos = pos;
     }
-  }
-
-  /** World-tile center of the widest contiguous built run on `floor` — where the
-   *  crane perches. Scans the tiles each facility covers, expanding multi-floor
-   *  rooms across their rows (so a two-story unit whose upper half reaches the
-   *  top counts there), then defers the run math to {@link craneAnchorTile}.
-   *  Callers guarantee the floor has structure, so the set is never empty. */
-  private topRunCenter(floor: number): number {
-    const built = new Set<number>();
-    for (const u of this.sim.tower.units) {
-      if (u.floor > floor || floor >= u.floor + facilityFloors(u.kind)) continue;
-      for (let x = u.x; x < u.x + u.width; x++) built.add(x);
-    }
-    return craneAnchorTile(built);
   }
 
   /** The shared retained-actor ritual: top-left anchored, box collider the
