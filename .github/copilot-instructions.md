@@ -87,9 +87,10 @@ don't claim a skill was invoked:
   inline yourself rather than invoking anything.
 - **Apply the review dimensions in the “Code review” section below,** scoped to
   the implicated lenses. Prefer a few high-signal findings over filler.
-- **End every review** with the exact line
+- **Include in every review — ideally as the last line — the exact marker**
   `Reviewed against Verticopolis conventions (.github/copilot-instructions.md).`
-  — a marker confirming this overlay was applied.
+  so it stays reliably searchable as confirmation this overlay was applied, even
+  if a template or postamble appends text after it.
 
 > **Maintainer note — why there is no `.github/skills` review skill.** Copilot
 > code review *can* load agent skills from `.github/skills/`, but this repo
