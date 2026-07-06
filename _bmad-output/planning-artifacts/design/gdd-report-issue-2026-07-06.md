@@ -72,13 +72,16 @@ that doesn't match the 1994 original.
 
 ## 4. Affordance & behavior
 
-**One link → the chooser.** A single `Report an issue…` link to
+**One link → the chooser.** A single `Let us know…` link to
 `https://github.com/maniator/verticopolis/issues/new/choose`.
 
-- Rendered as a real **`<a class="btn" target="_blank" rel="noopener">`** — the
+- Rendered as a real **`<a class="btn" target="_blank" rel="noopener noreferrer">`** — the
   established Win-3.1 button chrome, not a novel underlined web-link, and not a
   `.btn` + `window.open()` handler (a programmatic open is popup-blockable; a
-  native anchor is robust and needs no `wireActions` wiring).
+  native anchor is robust and needs no `wireActions` wiring). A `.visually-hidden`
+  "(opens GitHub in a new tab)" suffix gives assistive tech the context-change
+  cue (WCAG 3.2.5); `noreferrer` accompanies `noopener` so the referrer isn't
+  leaked.
 - **Chooser, not deep links.** GitHub already maintains the four-way form picker
   (🐛 Bug / ✨ Feature / 🏙️ Parity / 📚 Docs) plus contact links; one link covers
   all of it, matches `blank_issues_enabled: false`, and never drifts when a fifth
