@@ -181,11 +181,11 @@ export class BuildActions {
     if (!p) return;
     const sim = this.deps.getSim();
     if (p.type === "unit") {
-      const u = sim.tower.units.find((x) => x.id === p.id);
+      const u = sim.tower.getUnit(p.id);
       if (!u) return;
       if (!this.tryRemoveUnit(u, "bulldoze", quiet)) return;
     } else {
-      const t = sim.tower.transports.find((x) => x.id === p.id);
+      const t = sim.tower.getTransport(p.id);
       if (!t) return;
       this.removeTransportWithRefund(t);
     }

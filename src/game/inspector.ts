@@ -81,7 +81,7 @@ export class InspectorController {
     }
     this.inspectDismissed = null;
     if (p.type === "unit") {
-      const u = sim.tower.units.find((x) => x.id === p.id);
+      const u = sim.tower.getUnit(p.id);
       if (!u) {
         this.hide();
         return;
@@ -165,7 +165,7 @@ export class InspectorController {
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {
-      const t = sim.tower.transports.find((x) => x.id === p.id);
+      const t = sim.tower.getTransport(p.id);
       if (!t) {
         this.hide();
         return;

@@ -796,11 +796,13 @@ class GameApp {
    *  (selection stores only an id — the entity may have been removed). */
   private selectedUnit(): Unit | undefined {
     if (this.selected?.type !== "unit") return undefined;
-    return this.sim.tower.units.find((x) => x.id === this.selected!.id);
+    // O(1) id-index lookup — this runs every frame via positionPanels while a
+    // facility is selected, so a linear scan here is O(units) per frame.
+    return this.sim.tower.getUnit(this.selected.id);
   }
   private selectedTransport(): Transport | undefined {
     if (this.selected?.type !== "transport") return undefined;
-    return this.sim.tower.transports.find((x) => x.id === this.selected!.id);
+    return this.sim.tower.getTransport(this.selected.id);
   }
 
   private clearSelection(): void {

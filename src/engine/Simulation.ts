@@ -397,7 +397,7 @@ export class Simulation implements SimContext {
     // Rooms spend time under construction before they can be used.
     const dur = buildMinutes(kind);
     if (dur > 0 && res.unitId !== undefined) {
-      const u = this.tower.units.find((uu) => uu.id === res.unitId);
+      const u = this.tower.getUnit(res.unitId);
       if (u) {
         u.state = "construction";
         u.completeAt = this.clock.minutes + dur;
@@ -573,7 +573,7 @@ export class Simulation implements SimContext {
   private finishConstruction(): void {
     if (this.constructing.size === 0) return;
     for (const id of [...this.constructing]) {
-      const u = this.tower.units.find((uu) => uu.id === id);
+      const u = this.tower.getUnit(id);
       if (!u || u.state !== "construction") {
         this.constructing.delete(id);
         continue;
@@ -1341,7 +1341,7 @@ export class Simulation implements SimContext {
   /** Nudge a unit's price one step within its band — offices/hotels any time,
    *  condos only while unsold. Returns the new price, or null if not adjustable. */
   adjustRent(id: number, dir: 1 | -1): number | null {
-    const u = this.tower.units.find((x) => x.id === id);
+    const u = this.tower.getUnit(id);
     if (!u) return null;
     const cfg = rentConfig(u.kind);
     if (!cfg) return null;
@@ -1420,7 +1420,7 @@ export class Simulation implements SimContext {
   /** Set a cinema's monthly film-booking policy. Returns the new policy, or null
    *  if the unit isn't a cinema. */
   setFilmPolicy(id: number, policy: "auto" | "feature" | "blockbuster"): "auto" | "feature" | "blockbuster" | null {
-    const u = this.tower.units.find((x) => x.id === id);
+    const u = this.tower.getUnit(id);
     if (!u || u.kind !== "cinema") return null;
     u.filmPolicy = policy;
     return policy;

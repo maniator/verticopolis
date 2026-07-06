@@ -1,6 +1,6 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
-import type { FacilityKind, Transport, Unit } from "./types";
+import type { FacilityKind, Transport } from "./types";
 import { isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
 import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
@@ -58,6 +58,15 @@ export interface Person {
 interface Route {
   floors: number[];
   shafts: number[];
+}
+
+/** The four spawn-source floor lists, computed once per outer sim step (see
+ *  {@link Crowd.spawnFloors}) and shared across the spawn drain loop. */
+interface SpawnFloors {
+  leasedOffices: number[];
+  staffedOffices: number[];
+  homes: number[];
+  openVenues: number[];
 }
 
 /** Live calls the drawn crowd places on the elevators (see elevatorCalls).
@@ -314,37 +323,52 @@ export class Crowd {
 
   // ---- Spawning -----------------------------------------------------------
 
-  /** Floors carrying an in-service unit (tenanted/asleep) that matches `pred`.
-   *  A `vacating` tenant still commutes through their notice period. */
-  private floorsWhere(tower: Tower, pred: (u: Unit) => boolean): number[] {
-    const set = new Set<number>();
+  /** Bin every in-service floor into the four spawn categories in a SINGLE pass
+   *  over `tower.units`. The tenancy gate (a `vacating` tenant still commutes
+   *  through their notice period) and per-category predicates are preserved, and
+   *  insertion order (hence `rng.pick` indexing) matches the old per-category
+   *  scans, so the crowd stays deterministic. */
+  private spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
+    const hour = clock.hour;
+    const weekend = clock.isWeekend;
+    const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "cinema";
+    const leased = new Set<number>();
+    const staffed = new Set<number>();
+    const homes = new Set<number>();
+    const venues = new Set<number>();
     for (const u of tower.units) {
-      if ((isTenanted(u) || u.state === "asleep") && pred(u)) set.add(u.floor);
+      if (!(isTenanted(u) || u.state === "asleep")) continue;
+      if (u.kind === "office") {
+        // Offices are leased year-round but only staffed on weekdays, so inbound
+        // workers only head to weekday offices; outbound trips need workers
+        // actually present right now (presence zeroes occupants after 18:00 /
+        // at weekends).
+        if (!weekend) leased.add(u.floor);
+        if (u.occupants > 0) staffed.add(u.floor);
+      } else if (u.kind === "condo" || isHotelKind(u.kind)) {
+        homes.add(u.floor);
+      } else if (isVenue(u.kind) && isOpenAt(u.kind, hour)) {
+        // Venues are destinations only while open for business.
+        venues.add(u.floor);
+      }
     }
-    return [...set];
+    return {
+      leasedOffices: [...leased],
+      staffedOffices: [...staffed],
+      homes: [...homes],
+      openVenues: [...venues],
+    };
   }
 
   /** Decide who travels right now, based on the time of day. */
-  private spawnTrips(tower: Tower, clock: Clock): void {
+  private spawnTrips(tower: Tower, clock: Clock, floors: SpawnFloors): void {
     if (this.people.length >= MAX_PEOPLE) return;
     // Reuse the Clock's own commute windows so peak hours never drift out of
     // sync between the simulation and the crowd.
-    const hour = clock.hour;
     const morning = clock.isMorning();
     const evening = clock.isEvening();
     const day = !morning && !evening && !clock.isNight();
-    const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "cinema";
-    // Offices are leased year-round but only staffed on weekdays, so inbound
-    // workers only head to weekday offices.
-    const leasedOffices = clock.isWeekend ? [] : this.floorsWhere(tower, (u) => u.kind === "office");
-    // Outbound office trips require workers actually present right now (presence
-    // zeroes occupants after 18:00 and at weekends), so we never spawn commuters
-    // leaving an empty office through the back half of the evening window.
-    const staffedOffices = this.floorsWhere(tower, (u) => u.kind === "office" && u.occupants > 0);
-    const homes = this.floorsWhere(tower, (u) => u.kind === "condo" || isHotelKind(u.kind));
-    // Venues are destinations only while they're actually open for business, so
-    // visible demand tracks the same hours the economy and sprites use.
-    const openVenues = this.floorsWhere(tower, (u) => isVenue(u.kind) && isOpenAt(u.kind, hour));
+    const { leasedOffices, staffedOffices, homes, openVenues } = floors;
 
     const trip = (from: number, to: number) => this.add(tower, from, to);
     // Each call makes one trip, chosen at random from whatever movements fit
@@ -481,10 +505,16 @@ export class Crowd {
     const timeRate = clock.isNight() ? 0.3 : clock.isWeekend ? 1.2 : 2.2;
     const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
     this.spawnAcc += dtSec * timeRate * popFactor;
+    if (this.spawnAcc < 1) return;
+    // Categorize floors ONCE per outer step. The drain loop below only adds
+    // people (never units), so the four floor lists are stable across its ≤8
+    // iterations — recomputing them per iteration was up to 8× redundant
+    // full-unit scans (4 scans each). One pass here bins all four at once.
+    const floors = this.spawnFloors(tower, clock);
     let guard = 0;
     while (this.spawnAcc >= 1 && guard++ < 8) {
       this.spawnAcc -= 1;
-      this.spawnTrips(tower, clock);
+      this.spawnTrips(tower, clock, floors);
     }
   }
 
@@ -525,7 +555,10 @@ export class Crowd {
   }
 
   private shaftOf(tower: Tower, id: number | null): Transport | undefined {
-    return id == null ? undefined : tower.transports.find((t) => t.id === id);
+    // O(1) index lookup: this runs for essentially every active person on every
+    // movement sub-step, so a linear `transports.find` here is O(people ×
+    // transports × substeps) per tick.
+    return id == null ? undefined : tower.getTransport(id);
   }
 
   /** Total floors this trip covers across all its legs. */

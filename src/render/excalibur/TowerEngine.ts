@@ -492,7 +492,7 @@ export class TowerEngine {
     let bestZ = -Infinity;
     for (const [id, a] of this.transportActors) {
       if (a.z >= bestZ && a.contains(world.x, world.y)) {
-        const t = this.sim.tower.transports.find((x) => x.id === id);
+        const t = this.sim.tower.getTransport(id);
         if (t) {
           best = { type: "transport", id, kind: t.kind };
           bestZ = a.z;
@@ -501,7 +501,7 @@ export class TowerEngine {
     }
     const considerUnit = (id: number, a: ex.Actor) => {
       if (a.z >= bestZ && a.contains(world.x, world.y)) {
-        const u = this.sim.tower.units.find((x) => x.id === id);
+        const u = this.sim.tower.getUnit(id);
         if (u) {
           best = { type: "unit", id, kind: u.kind };
           bestZ = a.z;
@@ -601,7 +601,7 @@ export class TowerEngine {
     if (this.arrowDrag) {
       // A press without a drag extends a single floor.
       if (this.moved < 5) {
-        const t = this.sim.tower.transports.find((x) => x.id === this.selectedId);
+        const t = this.selectedId == null ? undefined : this.sim.tower.getTransport(this.selectedId);
         if (t) {
           const target = this.arrowDrag.end === "up" ? t.top + 1 : t.bottom - 1;
           this.onExtendTo?.(this.arrowDrag.end, target);
@@ -1209,7 +1209,9 @@ export class TowerEngine {
   private drawSelection(ctx: CanvasRenderingContext2D): void {
     this.arrowHit = {};
     if (this.selectedId == null) return;
-    const u = this.sim.tower.units.find((x) => x.id === this.selectedId);
+    // drawSelection runs every frame on the uncached overlay canvas, so resolve
+    // the selected entity via the O(1) id-index rather than a linear scan.
+    const u = this.sim.tower.getUnit(this.selectedId);
     if (u) {
       const hgt = facilityFloors(u.kind);
       const sx = this.worldToScreenX(u.x);
@@ -1217,7 +1219,7 @@ export class TowerEngine {
       this.strokeSelection(ctx, sx, sy, u.width * TILE * this.cam.zoom, hgt * FLOOR * this.cam.zoom);
       return;
     }
-    const t = this.sim.tower.transports.find((x) => x.id === this.selectedId);
+    const t = this.sim.tower.getTransport(this.selectedId);
     if (t) this.drawTransportSelection(ctx, t);
   }
 
