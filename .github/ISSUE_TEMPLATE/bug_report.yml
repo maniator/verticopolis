@@ -1,0 +1,73 @@
+name: 🐛 Bug report
+description: Something in the game behaves incorrectly or crashes.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
+        first — the issue may already be fixed. The build version is shown on the splash screen.
+  - type: input
+    id: version
+    attributes:
+      label: Build version
+      description: The version shown on the splash screen (e.g. 1.1.0).
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: A clear description of the bug, and what you expected instead.
+      placeholder: I built an express elevator and the shaft pool count went negative...
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      description: How can we reproduce it? Include a saved tower export (`.twr`) if relevant.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome / Chromium
+        - Firefox
+        - Safari
+        - Edge
+        - Other (note in description)
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Desktop
+        - Mobile / tablet
+    validations:
+      required: true
+  - type: textarea
+    id: console
+    attributes:
+      label: Console errors
+      description: Paste any errors from the browser dev-tools console. This is automatically formatted as code.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I reproduced this on the latest build at verticopolis.com.
+          required: true
+        - label: I searched existing issues and this is not a duplicate.
+          required: true

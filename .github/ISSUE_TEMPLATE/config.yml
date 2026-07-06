@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🎮 Play Verticopolis
+    url: https://verticopolis.com
+    about: Try the live build before filing — the bug may already be fixed.
+  - name: 🔎 Search existing issues
+    url: https://github.com/maniator/verticopolis/issues?q=is%3Aissue
+    about: Check whether your bug or idea has already been reported.

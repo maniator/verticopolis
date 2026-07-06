@@ -1,0 +1,47 @@
+name: ✨ Feature request
+description: Suggest a new gameplay capability or quality-of-life improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Verticopolis is a homage to the 1994 **SimTower**. New features are welcome, but
+        gameplay should stay true to the original where it existed. If your request is about
+        matching the original's behavior, please use the **SimTower parity** template instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What are you trying to do, and what's missing or frustrating today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like to see? Describe the player-facing behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about, and why this one is better.
+  - type: dropdown
+    id: canon
+    attributes:
+      label: Relationship to the original SimTower
+      options:
+        - Faithful to the 1994 original
+        - New idea, not in the original
+        - Not sure
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and this is not a duplicate.
+          required: true
