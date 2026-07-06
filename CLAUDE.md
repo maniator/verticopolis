@@ -15,6 +15,10 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
   record every `defer` finding in
   `_bmad-output/implementation-artifacts/deferred-work.md`. A PR is not "done"
   until the skill has run and its confirmed findings are fixed and re-verified.
+  This holds **even for small or test-only changes** that touch engine/gameplay
+  invariants (e.g. build caps, transport pooling, economy math) — green quality
+  gates are **not** a substitute for the review skill, and "the diff is tiny" is
+  not an exemption.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
   `npm test`, `npm run build` — all green.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
@@ -22,3 +26,16 @@ BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Resolve Copilot/Codex PR review threads** once addressed — actually mark
   each thread **Resolved** (`resolve_review_thread`). A reply alone does NOT
   clear it, and unresolved threads block merge under branch protection.
+
+## Canon reference (don't re-derive from memory)
+
+- **Per-tower build caps live in `src/engine/facilities.ts`** (`BUILD_CAPS`,
+  `POOLED_CAPS`, `MAX_CARS`, `maxSpanFor`) and are enforced in one place,
+  `Tower.capReason`. That file is the single source of truth — mirror the 1994
+  original there, not from recollection.
+- **Transport pooling matches the original and is deliberate:** all three
+  elevator kinds (standard + service + express) share **one 24-shaft pool** —
+  express is **not** counted separately. Stairs + escalators share a separate
+  **64-link pool**. Cars/shaft: standard & express 8, service 4. Spans: standard
+  & service 30 floors, express the whole tower, stairs/escalators a fixed 2
+  floors. Do not "fix" express out of the elevator pool — that would break canon.
