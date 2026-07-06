@@ -281,6 +281,27 @@ describe("Save hardening at the trust boundary", () => {
     expect(rc.everOccupied).toBe(false); // can still sell once built
   });
 
+  it("keeps a hotel room's everOccupied when a miserable guest leaves (runtime vacate path)", () => {
+    // A chronically unserved hotel room loses its guest via vacate() (the F25
+    // branch). everOccupied is the "ever booked" marker for hotels and must
+    // survive that, unlike an office/condo returning to market.
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    sim.star = 1; // no random events
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2); // no transport → unserved, so satisfaction bottoms out
+    const r = sim.tower.place("hotelSingle", 2, C);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "asleep";
+    room.everOccupied = true;
+    room.satisfaction = 0.05;
+    // Cast defeats TS control-flow narrowing from the `state = "asleep"` above —
+    // sim.tick mutates it, but the compiler can't see that.
+    for (let i = 0; i < 24 && (room.state as string) !== "empty"; i++) sim.tick(60);
+    expect(room.state as string).toBe("empty"); // the guest left …
+    expect(room.everOccupied).toBe(true); // … but "ever booked" is preserved
+  });
+
   it("keeps a hotel room's everOccupied through an empty (between-guests) round-trip", () => {
     // Hotels legitimately sit `empty` between guests while staying "ever booked";
     // the lease/sale normalization must NOT reset them the way it resets an

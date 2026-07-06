@@ -1281,10 +1281,15 @@ export class Simulation implements SimContext {
     }
     u.state = "empty";
     u.occupants = 0;
-    // A repurchased condo returns to the market: clear the sold flag and the
-    // Modern household so it can sell fresh (a new price, a new family). Offices
-    // and any not-yet-sold condo were never "owned", so nothing to reset there.
-    u.everOccupied = false;
+    // Return the unit to market by clearing the "currently leased/sold" flag — a
+    // repurchased condo can then sell fresh, a vacated office re-lease. But
+    // `vacate()` is ALSO the path a miserable HOTEL room loses its guest (the F25
+    // branch in updateSatisfaction), and for a hotel everOccupied means "ever
+    // booked" and must survive turnover (it's tracked by `state`, not this flag) —
+    // so never clear it for hotels, or a previously-booked room would read as
+    // brand new. `residents` is a condo-only field, so clearing it is a no-op
+    // elsewhere and keeps a re-sold condo drawing a fresh household.
+    if (!isHotelKind(u.kind)) u.everOccupied = false;
     u.residents = undefined;
     // A condo returning to market re-lists in the CURRENT band: clamp away any
     // legacy/out-of-band asking price it carried while sold (e.g. a $240k
