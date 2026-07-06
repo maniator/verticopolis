@@ -415,14 +415,22 @@ class GameApp {
     // format the label. Populated floors are always above ground, so `NF` is the
     // right form for every reachable case.
     const floor = tier > 0 ? this.sim.peakCongestionFloor() : null;
-    const label = floor !== null ? `${word} · ${floor}F` : word;
+    // The floor rides its own span (styled as a de-emphasized footnote) so a long
+    // "Backed up · 100F" never competes with the tier word or wraps the fixed HUD
+    // cell to a second line. The separator lives inside the suffix so Smooth shows
+    // no orphan "· ". The full sentence still goes to aria-label for readers.
+    const floorText = floor !== null ? ` · ${floor}F` : "";
     const aria = floor !== null ? `Traffic: ${word}, worst on floor ${floor}` : `Traffic: ${word}`;
     const glyphEl = document.getElementById("traffic-glyph");
     const labelEl = document.getElementById("traffic-label");
+    const floorEl = document.getElementById("traffic-floor");
     const wrapEl = document.getElementById("traffic");
     if (glyphEl && glyphEl.textContent !== trafficGlyph(tier)) glyphEl.textContent = trafficGlyph(tier);
-    if (labelEl && labelEl.textContent !== label) {
-      labelEl.textContent = label;
+    const labelChanged = labelEl != null && labelEl.textContent !== word;
+    const floorChanged = floorEl != null && floorEl.textContent !== floorText;
+    if (labelChanged) labelEl!.textContent = word;
+    if (floorChanged) floorEl!.textContent = floorText;
+    if (labelChanged || floorChanged) {
       wrapEl?.setAttribute("aria-label", aria);
       wrapEl?.classList.toggle("traffic-warn", tier >= 2); // red is a redundant cue, not the only one
     }

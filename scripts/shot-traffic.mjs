@@ -95,4 +95,11 @@ console.log(`[${LABEL}] chip label = "${label}"  aria = "${aria}"`);
 
 await page.locator("#topbar").screenshot({ path: resolve(OUT, `traffic-${LABEL}.png`) });
 console.log(`[${LABEL}] wrote docs/screenshots/traffic-${LABEL}.png`);
+
+// Mobile: the HUD bar wraps its stats onto a second row (max-width:860px block).
+// Re-shoot the same live state at a phone width to verify the chip reads there too.
+await page.setViewportSize({ width: 390, height: 844 });
+await page.waitForTimeout(400); // let the responsive layout settle
+await page.locator("#topbar").screenshot({ path: resolve(OUT, `traffic-${LABEL}-mobile.png`) });
+console.log(`[${LABEL}] wrote docs/screenshots/traffic-${LABEL}-mobile.png`);
 await browser.close();
