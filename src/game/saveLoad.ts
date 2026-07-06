@@ -71,7 +71,39 @@ export class SaveLoad {
   recoverFromContextLoss(): void {
     // Same guard as the autosave timer: never persist the throwaway boot sim
     // while the first-run splash is still up.
-    if (!document.getElementById("splash")) this.save(true);
+    if (!document.getElementById("splash")) {
+      try {
+        this.save(true);
+      } catch {
+        // The pre-reload flush failed — localStorage quota, private-mode, or a
+        // security exception. Left unhandled this throw would escape the
+        // onContextLost handler and abort the reload, stranding the player on a
+        // dead GPU canvas with no explanation. A failed setItem is atomic (it
+        // never clobbers), so any prior autosave is intact — but we must NOT
+        // silently reload past the unsaved changes either. Hand the player a
+        // card (with a Reload button), as we do for a repeat GPU crash. Only
+        // promise the prior tower is safe when one actually exists — a
+        // first-session crash before any autosave has none to reassure about.
+        // hasSave() READS localStorage, which itself throws when storage is
+        // *disabled* (a SecurityError) rather than merely full — so guard it in
+        // its own try/catch. Otherwise this catch would re-throw before the card
+        // is shown and re-abort the reload, the exact bug this fix exists to kill.
+        let priorSaveNote = "";
+        try {
+          if (SaveGame.hasSave()) priorSaveNote = " Your last saved tower is safe.";
+        } catch {
+          /* storage is unreadable too — just omit the reassurance */
+        }
+        this.deps.showBootMessage(
+          "The graphics driver crashed and your latest changes couldn't be saved — " +
+            "storage may be full." +
+            priorSaveNote +
+            "<br>Free up space, then reload.",
+          true,
+        );
+        return;
+      }
+    }
 
     const KEY = "vc-gl-lost-reload";
     let lastReload = 0;

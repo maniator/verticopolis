@@ -634,6 +634,76 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(SaveGame.hasSave()).toBe(true); // the tower is still saved first
   });
 
+  it("a context loss whose save fails shows a card, keeps the prior tower, and does not reload", () => {
+    const reload = stubReload();
+    // A prior autosave exists (the tower was flushed before the crash).
+    sim.money = 555_000;
+    SaveGame.save(sim);
+    // Now the GPU dies AND storage is full: the pre-reload flush throws. Left
+    // unhandled this would abort the reload and strand the player on a dead
+    // canvas — instead we want a card, and the prior tower must survive.
+    const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    });
+    saveLoad.recoverFromContextLoss();
+    expect(spy).toHaveBeenCalledTimes(1);
+    expect(reload).not.toHaveBeenCalled(); // did not silently reload past unsaved work
+    expect(bootMessages).toHaveLength(1);
+    expect(bootMessages[0].withReload).toBe(true);
+    expect(bootMessages[0].msg).toContain("couldn't be saved");
+    // A prior autosave exists, so the card reassures the player it's safe (don't
+    // imply total loss and send them off to clear the very save that survived).
+    expect(bootMessages[0].msg).toContain("last saved tower is safe");
+    // A failed setItem never clobbers — the prior tower is still loadable.
+    expect(SaveGame.load()?.money).toBe(555_000);
+    spy.mockRestore();
+  });
+
+  it("a context-loss with storage fully disabled (save AND hasSave throw) still shows the card and does not re-abort the reload", () => {
+    const reload = stubReload();
+    // Storage disabled (SecurityError), not merely full: BOTH the write and the
+    // hasSave() read throw. The catch must not re-throw before showing the card.
+    const saveSpy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+    const hasSaveSpy = vi.spyOn(SaveGame, "hasSave").mockImplementation(() => {
+      throw new DOMException("The operation is insecure.", "SecurityError");
+    });
+    expect(() => saveLoad.recoverFromContextLoss()).not.toThrow();
+    expect(reload).not.toHaveBeenCalled();
+    expect(bootMessages).toHaveLength(1);
+    expect(bootMessages[0].withReload).toBe(true);
+    expect(bootMessages[0].msg).not.toContain("last saved tower is safe");
+    saveSpy.mockRestore();
+    hasSaveSpy.mockRestore();
+  });
+
+  it("a first-session context-loss save failure (no prior save) shows the card without a false safety claim", () => {
+    const reload = stubReload();
+    // No prior autosave (crash before the 30s timer fired) AND storage is full.
+    const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    });
+    saveLoad.recoverFromContextLoss();
+    expect(reload).not.toHaveBeenCalled();
+    expect(bootMessages).toHaveLength(1);
+    expect(bootMessages[0].withReload).toBe(true);
+    // Must NOT claim a saved tower is safe when there is none.
+    expect(bootMessages[0].msg).not.toContain("last saved tower is safe");
+    spy.mockRestore();
+  });
+
+  it("saveBeforeUpdate propagates a storage failure so the update flow pauses instead of reloading", () => {
+    // The update path in main.ts wraps saveBeforeUpdate in try/catch and, on a
+    // throw, pauses the update rather than reloading (which would cost progress).
+    // That contract lives here: a failed flush must surface as a throw.
+    const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
+      throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+    });
+    expect(() => saveLoad.saveBeforeUpdate()).toThrow();
+    spy.mockRestore();
+  });
+
   it("a context loss behind the splash reloads without persisting the boot sim", () => {
     const reload = stubReload();
     const splash = document.createElement("div");
