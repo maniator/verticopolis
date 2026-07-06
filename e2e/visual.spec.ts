@@ -82,12 +82,12 @@ test.describe("dialog chrome", () => {
     // While the prompt is open the sim is FROZEN — even at full speed the clock
     // must not advance, so a player reading it can't lose game-hours. (Restore
     // speed 0 afterward so the shot stays deterministic like the sibling tests.)
-    await page.evaluate(() => ((window as any).game.speed = 3));
+    await page.evaluate(() => ((window as any).game.setSpeed(3)));
     const before = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     await page.waitForTimeout(400);
     const after = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     expect(after).toBe(before);
-    await page.evaluate(() => ((window as any).game.speed = 0));
+    await page.evaluate(() => ((window as any).game.setSpeed(0)));
 
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
   });
@@ -109,7 +109,7 @@ test.describe("dialog chrome", () => {
     );
     await page.waitForSelector("#modal[open]");
     await expect(page.locator("#modal .whatsnew li")).toHaveCount(3);
-    await page.evaluate(() => ((window as any).game.speed = 0));
+    await page.evaluate(() => ((window as any).game.setSpeed(0)));
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-notes.png");
   });
 
