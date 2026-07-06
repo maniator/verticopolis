@@ -64,7 +64,6 @@ export class UI {
   tool: Tool = { type: "inspect" };
   private cb: UICallbacks;
   private lastLogSeq = 0;
-  private toastTimers: number[] = [];
 
   private el = {
     money: document.getElementById("stat-money")!,
@@ -526,12 +525,12 @@ export class UI {
     t.className = `toast ${kind}`;
     t.textContent = text;
     this.el.toast.appendChild(t);
-    const timer = window.setTimeout(() => {
+    // The toast removes itself; no id registry to keep (nothing cancels toasts).
+    window.setTimeout(() => {
       t.style.transition = "opacity .3s";
       t.style.opacity = "0";
       window.setTimeout(() => t.remove(), 300);
     }, 3600);
-    this.toastTimers.push(timer);
     while (this.el.toast.children.length > TOAST_MAX) this.el.toast.firstElementChild?.remove();
   }
 

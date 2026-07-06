@@ -305,8 +305,8 @@ export class Simulation implements SimContext {
   }
   log: LogEntry[] = [];
   /** Monotonic count of {@link emit} calls this session — the UI's "new entries"
-   *  cursor (see emit). NOT `log.length`, which the 200-cap pins. Transient/not
-   *  serialized, like `log`. */
+   *  cursor (see emit). NOT `log.length`, which the capped shift pins once the
+   *  ring is full. Transient/not serialized, like `log`. */
   logSeq = 0;
 
   /**
