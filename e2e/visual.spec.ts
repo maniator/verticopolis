@@ -68,23 +68,49 @@ test.describe("dialog chrome", () => {
   });
 
   test("update prompt matches baseline and freezes the sim", async ({ page }) => {
-    // Surface the update prompt exactly as the PWA layer does when a new build
-    // is found (the activate callback is a no-op so the page doesn't reload).
-    // The prompt auto-surfaces from the game loop at the next calm moment.
-    await page.evaluate(() => (window as any).game.onUpdateAvailable(async () => {}));
+    // Surface the update prompt exactly as the PWA layer does when a new build is
+    // found — passing deterministic build info (the real fetch of version.json is
+    // in pwa.ts, out of the test graph) so the "Build …" line is stable. The
+    // activate callback is a no-op so the page doesn't reload.
+    await page.evaluate(() =>
+      (window as any).game.onUpdateAvailable(async () => {}, { version: "1.1.1", sha: "abc1234", notes: [] }),
+    );
     await page.waitForSelector("#modal[open]");
+    // The muted build-id line is present and reads the incoming build.
+    await expect(page.locator("#modal .build-id")).toHaveText("Build 1.1.1 · abc1234");
 
     // While the prompt is open the sim is FROZEN — even at full speed the clock
     // must not advance, so a player reading it can't lose game-hours. (Restore
     // speed 0 afterward so the shot stays deterministic like the sibling tests.)
-    await page.evaluate(() => ((window as any).game.speed = 3));
+    await page.evaluate(() => ((window as any).game.setSpeed(3)));
     const before = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     await page.waitForTimeout(400);
     const after = await page.evaluate(() => (window as any).game.sim.clock.minutes);
     expect(after).toBe(before);
-    await page.evaluate(() => ((window as any).game.speed = 0));
+    await page.evaluate(() => ((window as any).game.setSpeed(0)));
 
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt.png");
+  });
+
+  test("update prompt with what's-new notes matches baseline", async ({ page }) => {
+    // The optional "What's new" block: when the incoming build carries
+    // player-facing notes (harvested from `Player-note:` trailers), the modal
+    // shows up to three, above the build-id line. Deterministic stub info.
+    await page.evaluate(() =>
+      (window as any).game.onUpdateAvailable(async () => {}, {
+        version: "1.1.1",
+        sha: "abc1234",
+        notes: [
+          "Modern towers now draw families of two to five.",
+          "Elevators pick up waiting riders more reliably.",
+          "Condos sell for more as your tower's rating climbs.",
+        ],
+      }),
+    );
+    await page.waitForSelector("#modal[open]");
+    await expect(page.locator("#modal .whatsnew li")).toHaveCount(3);
+    await page.evaluate(() => ((window as any).game.setSpeed(0)));
+    await expect(page.locator("#modal .modal-box")).toHaveScreenshot("update-prompt-notes.png");
   });
 
   test("deferred update chip matches baseline", async ({ page }) => {

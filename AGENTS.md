@@ -115,9 +115,51 @@ impact:
   perf with identical behavior, tests, docs, tooling, CI.
 
 A player-facing change that ships **without** a version bump is a review finding:
-the splash — and any future "what's new" surface — would otherwise misreport the
+the splash — and the update prompt's build-id line — would otherwise misreport the
 build as unchanged. When two open PRs both bump, whoever merges second rebases and
 re-bumps. (Bump once per PR, not per commit.)
+
+### `Player-note:` — what the update prompt shows players
+
+The build emits `dist/version.json` (`{ version, sha, notes }`) that the running
+client fetches when a new build is waiting; the update modal shows a muted
+`Build <version> · <sha>` line **when that fetch succeeds** (it degrades gracefully
+— the line is omitted if `version.json` can't be fetched or lacks a version, and
+the `· <sha>` half is dropped when the sha is `unknown`), plus a short
+**"What's new"** list only when `notes` is non-empty.
+
+`notes` is harvested from an **optional `Player-note:` git commit trailer** — so a
+build only announces something when a commit deliberately said so, and a plumbing
+build stays silent (never a stale or invented changelog). Add one when, and only
+when, a change is something a player would actually notice:
+
+```
+feat(rules): add Modern GameMode with variant household sizes
+
+Player-note: Modern towers now draw families of two to five.
+```
+
+House style for the trailer text (it goes straight in front of players):
+
+- **Player outcome, not mechanism.** Name a thing they know (Elevators, Condos,
+  Modern towers) and what changed for them. Not `spawnFamily()`, not file/PR refs.
+- **One short line**, present tense, ends with a period. Calm voice, matching the
+  game ("New tower founded. Good luck!") — no hype.
+- **Only genuinely player-facing changes earn one.** Internal refactors / perf /
+  tooling get **no** trailer; that build simply shows the build-id line.
+- At most **3** are shown in the modal; keep to the few that matter.
+
+Good vs. bad:
+
+| Change | ❌ mechanism | ✅ player outcome |
+|---|---|---|
+| Modern households | `Modern mode: emit 2–5-person Household entities` | Modern towers now draw families of two to five. |
+| Elevator dispatch fix | `Fix express-shaft pooling regression` | Elevators pick up waiting riders more reliably. |
+
+> Status: the modal renders `notes` today; the automatic harvest of `Player-note:`
+> trailers into `version.json` at build time is wired when the first player-facing
+> feature needs it. Write the trailers now regardless — they're just commit
+> metadata and cost nothing until then.
 
 ## Code review
 

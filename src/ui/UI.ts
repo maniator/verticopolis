@@ -3,6 +3,7 @@ import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResu
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
+import type { UpdateInfo } from "../pwa";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -794,6 +795,8 @@ export class UI {
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
       </ul>
+      <h3>About</h3>
+      <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close">Got it</button></div>
     `);
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
@@ -854,12 +857,40 @@ export class UI {
    * by Esc, the ✕, or a backdrop click all count as "Later" — the safe choice —
    * and, like the emergency modal, the outcome fires exactly once no matter how
    * the modal closes.
+   *
+   * `info` (optional) describes the incoming build: a muted "Build …" caption is
+   * shown when a version/sha is known, and up to three player-facing `notes`
+   * render as a compact "What's new" list. Both degrade to nothing when absent —
+   * most builds ship with no notes, and silence is the correct empty state.
    */
-  showUpdatePrompt(onUpdateNow: () => void | Promise<void>, onLater: () => void | Promise<void>): void {
+  showUpdatePrompt(
+    onUpdateNow: () => void | Promise<void>,
+    onLater: () => void | Promise<void>,
+    info?: UpdateInfo | null,
+  ): void {
+    const notes = (info?.notes ?? []).slice(0, 3);
+    // Wrap the heading + list so the `.win-title.sm` strip is a GRANDCHILD of
+    // `.modal-box.win` — a direct child would inherit the dialog title bar's
+    // full-bleed (`.win > .win-title`) and sticky (`.modal-box > .win-title`)
+    // treatment and overlap the body text. Same nesting the Statistics dialog
+    // uses for its section strips.
+    const notesBlock = notes.length
+      ? `<div class="whatsnew"><h3 class="win-title sm">What's new</h3><ul>${notes
+          .map((n) => `<li>${escapeHtml(n)}</li>`)
+          .join("")}</ul></div>`
+      : "";
+    // Keep a real sha (it anchors a bug report to an exact build) but drop the
+    // "unknown" placeholder a non-git build would stamp, so players never see
+    // "Build 1.1.1 · unknown".
+    const sha = info?.sha && info.sha !== "unknown" ? info.sha : undefined;
+    const idText = [info?.version, sha].filter(Boolean).map((s) => escapeHtml(s!)).join(" · ");
+    const buildLine = idText ? `<p class="build-id">Build ${idText}</p>` : "";
     const box = this.openModal(`
       <h2>Update available</h2>
-      <p>A newer version of Verticopolis is ready.</p>
-      <p>Update now saves your tower and reloads onto it — you won't lose any progress. Or keep playing: it'll apply the next time you reopen the game, or whenever you tap <b>↻ Update</b>.</p>
+      <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it — you won't lose any progress.</p>
+      <p>Or keep playing: it'll apply next time you reopen.</p>
+      ${notesBlock}
+      ${buildLine}
       <div class="modal-actions">
         <button class="btn" data-act="later">Later</button>
         <button class="btn primary" data-act="update">Update now</button>

@@ -20,10 +20,23 @@ import { EditorActions } from "./game/editorActions";
 import { SaveLoad } from "./game/saveLoad";
 import { InspectorController } from "./game/inspector";
 import { KeyboardPlay } from "./game/keyboardPlay";
-import { registerPWA } from "./pwa";
+import { registerPWA, type UpdateInfo } from "./pwa";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
+
+/** Compile-time app version (see vite.config.ts `define`); "dev" outside a build. */
+const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
+/** sessionStorage key: stamped with `Date.now()` right before an "Update now"
+ *  reload so the fresh build greets the player with "Updated …" instead of
+ *  "Welcome back". sessionStorage survives the same-tab reload; the timestamp
+ *  lets the boot ignore a stale flag left by an `updateSW` that resolved without
+ *  ever reloading (so an unrelated later reload is never mislabeled). */
+const RESUME_AFTER_UPDATE_KEY = "vc-resume-after-update";
+/** A real update reloads within a second or two of the click; only honor the
+ *  "Updated" greeting inside this window. */
+const RESUME_AFTER_UPDATE_MAX_AGE_MS = 30_000;
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -68,6 +81,9 @@ class GameApp {
    *  the player chooses "Update now" (via the modal or the toolbar chip); null
    *  when the app is already on the latest build. */
   private pendingUpdate: (() => Promise<void>) | null = null;
+  /** Incoming build's identity/notes for the current pending update, shown in
+   *  the prompt. Null when unknown (fetch failed) — the modal then omits it. */
+  private pendingUpdateInfo: UpdateInfo | null = null;
   /** Whether the update modal is currently open — freezes the sim while it's up
    *  (same soft-freeze the emergency modal uses) so a player reading it can't
    *  lose game-hours at high speed. */
@@ -200,10 +216,7 @@ class GameApp {
         this.engine.preview = null;
         this.engine.transportPreview = null;
       },
-      onSpeed: (s) => {
-        this.speed = s;
-        this.engine.paused = SPEEDS[s] === 0;
-      },
+      onSpeed: (s) => this.setSpeed(s),
       onSave: () => this.saveLoad.save(),
       onLoad: () => this.saveLoad.load(),
       onExport: () => void this.saveLoad.exportGame(),
@@ -279,39 +292,62 @@ class GameApp {
     this.onboarding = new OnboardingController({
       mq: this.mobileMq,
       showHelp: () => this.ui.showHelp(),
-      pauseForSplash: (paused) => {
-        this.speed = paused ? 0 : 1;
-        this.engine.paused = paused;
-        document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
-          b.classList.toggle("active", Number((b as HTMLElement).dataset.speed) === this.speed),
-        );
-      },
+      pauseForSplash: (paused) => this.setSpeed(paused ? 0 : 1),
       chime: () => this.audio.sfx("promote"),
     });
-    // A corrupt save is not a continuable tower: reflect READABILITY, not mere
-    // presence, so the splash never promises "Continue" over a fresh boot sim.
-    this.onboarding.showSplash({
-      hasSave: this.hadReadableSave,
-      onContinue: () => {
-        /* sim already loaded at construction; splash teardown resumes the engine */
-      },
-      onNewTower: (dismiss) => {
-        // The rule-set picker also carries the data-loss guard: starting fresh
-        // overwrites the single autosave slot, so when a *readable* tower exists
-        // the picker folds in the "abandons your current tower" warning. Keep the
-        // splash up (paused) behind it — only dismiss + start once the player
-        // commits to founding, so a cancel leaves the title screen intact and no
-        // time passes. Over a corrupt save the boot sim is already fresh, so the
-        // abandon warning is suppressed (nothing continuable to lose).
-        this.ui.newTowerModal({
-          hasSave: this.hadReadableSave,
-          onFound: (mode) => {
-            dismiss();
-            this.saveLoad.newGame(mode);
-          },
-        });
-      },
-    });
+    // A returning player with a readable save is dropped straight into their
+    // tower — no title screen to click through every launch (and especially not
+    // right after "Update now", whose modal promised "keep playing"). But we boot
+    // PAUSED: time must never advance while the player reacquires their view and
+    // selection, which reset on reload (this is the same "don't lose game-hours"
+    // rule the update modal's freeze enforces, minus the full-screen gate).
+    //
+    // The splash is reserved for the one moment it earns its place — first run /
+    // no readable save / a corrupt save — where its branding, the attribution
+    // line, and the New-Tower-vs-Continue (rule-set) choice are genuine
+    // first-contact value. (The attribution also lives in Help → About, so it
+    // stays discoverable for returning players who never see the splash.)
+    // Read+clear the "just updated" flag UNCONDITIONALLY, before the branch: an
+    // update can reload into an unreadable save (→ the splash branch below), and
+    // the flag must still be consumed there so it can't survive to mislabel a
+    // later boot as "Updated".
+    let justUpdated = false;
+    try {
+      const stamp = Number(sessionStorage.getItem(RESUME_AFTER_UPDATE_KEY));
+      sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);
+      justUpdated = Number.isFinite(stamp) && Date.now() - stamp < RESUME_AFTER_UPDATE_MAX_AGE_MS;
+    } catch {
+      /* sessionStorage can throw in private mode — treat it as not-an-update */
+    }
+    if (this.hadReadableSave) {
+      this.setSpeed(0); // land paused; the ▶ Play control is the single "resume"
+      this.ui.toast(
+        justUpdated ? `Updated to v${APP_VERSION}. Press ▶ to resume.` : "Welcome back. Press ▶ to resume.",
+        "info",
+      );
+    } else {
+      // A corrupt save is not a continuable tower: reflect READABILITY, not mere
+      // presence, so the splash never promises "Continue" over a fresh boot sim.
+      this.onboarding.showSplash({
+        hasSave: this.hadReadableSave,
+        onContinue: () => {
+          /* sim already loaded at construction; splash teardown resumes the engine */
+        },
+        onNewTower: (dismiss) => {
+          // First run / corrupt boot: the rule-set picker chooses Classic vs
+          // Modern. `hasSave` is false here (readable saves skip the splash), so
+          // the picker shows no "abandons your current tower" warning — there's
+          // nothing continuable to lose.
+          this.ui.newTowerModal({
+            hasSave: this.hadReadableSave,
+            onFound: (mode) => {
+              dismiss();
+              this.saveLoad.newGame(mode);
+            },
+          });
+        },
+      });
+    }
 
     // Tell the player plainly when their save couldn't be read, rather than
     // dropping them into a fresh tower with no explanation. Goes to the bulletin
@@ -332,6 +368,17 @@ class GameApp {
   }
 
   // ---- App-spine helpers the controllers borrow --------------------------
+
+  /** Set the game speed (index into {@link SPEEDS}): updates the engine's pause
+   *  state and the toolbar's active button. The single place the three concerns
+   *  are kept in lockstep. */
+  private setSpeed(s: number): void {
+    this.speed = s;
+    this.engine.paused = SPEEDS[s] === 0;
+    document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
+      b.classList.toggle("active", Number((b as HTMLElement).dataset.speed) === s),
+    );
+  }
 
   /** Announce to the screen-reader live region. */
   private announce(msg: string): void {
@@ -558,11 +605,7 @@ class GameApp {
       // Don't let game keys run the paused engine behind the first-run splash.
       if (document.getElementById("splash")) return;
       if (e.key >= "0" && e.key <= "3") {
-        this.speed = Number(e.key);
-        this.engine.paused = SPEEDS[this.speed] === 0;
-        document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
-          b.classList.toggle("active", (b as HTMLElement).dataset.speed === e.key),
-        );
+        this.setSpeed(Number(e.key));
         return;
       }
 
@@ -904,8 +947,9 @@ class GameApp {
    *  toolbar "Update" chip so the player always has a way in, and let the
    *  ~6Hz loop pop the prompt at the next calm moment. A second release during
    *  a long session overwrites the pending activation and re-arms the auto-pop. */
-  onUpdateAvailable(activate: () => Promise<void>): void {
+  onUpdateAvailable(activate: () => Promise<void>, info?: UpdateInfo): void {
     this.pendingUpdate = activate;
+    this.pendingUpdateInfo = info ?? null;
     this.updatePromptShown = false;
     this.ui.showUpdateChip(() => this.showUpdatePrompt());
   }
@@ -963,9 +1007,24 @@ class GameApp {
         // fires, so any such latch could stick forever if the reload never comes
         // — and a second activation is idempotent (skipWaiting + reload) anyway.
         this.shownUpdate = false;
+        // Mark this reload as an update so the fresh build drops the player back
+        // into their tower (paused) with an "Updated …" greeting instead of the
+        // title screen — honoring the modal's "keep playing" promise.
+        try {
+          sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, String(Date.now()));
+        } catch {
+          /* private mode — the player just gets the normal "Welcome back" instead */
+        }
         try {
           await activate();
         } catch {
+          // The reload didn't happen — clear the flag so a later manual reload
+          // isn't mislabeled "Updated", and tell the player they can retry.
+          try {
+            sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);
+          } catch {
+            /* private mode — nothing to clear */
+          }
           this.ui.toast("Update couldn't be applied — try again.", "bad");
         }
       },
@@ -985,6 +1044,7 @@ class GameApp {
           /* best-effort — a failed baseline save just leaves the last autosave in place */
         }
       },
+      this.pendingUpdateInfo,
     );
   }
 }
@@ -1028,7 +1088,7 @@ if (typeof document !== "undefined") {
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload) — see
       // GameApp.onUpdateAvailable.
-      registerPWA({ onUpdateAvailable: (activate) => app.onUpdateAvailable(activate) });
+      registerPWA({ onUpdateAvailable: (activate, info) => app.onUpdateAvailable(activate, info) });
     } catch (err) {
       showBootMessage("Something went wrong starting the game: " + (err as Error).message);
       throw err;
