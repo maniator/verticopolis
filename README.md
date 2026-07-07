@@ -1,8 +1,8 @@
-# 🏙️ Verticopolis — a browser SimTower clone
+# 🏙️ Verticopolis: a browser SimTower clone
 
 **Play it: [verticopolis.com](https://verticopolis.com)**
 
-A from-scratch, browser-native homage to the classic **SimTower** (1994) — a
+A from-scratch, browser-native homage to the classic **SimTower** (1994): a
 vertical metropolis you build floor by floor. Wire it with elevators, attract
 tenants, set the rents, keep everyone happy, and climb the star ratings all the
 way to a coveted **TOWER**.
@@ -10,7 +10,7 @@ way to a coveted **TOWER**.
 Written in **TypeScript** on the **[Excalibur.js](https://excaliburjs.com/)**
 game engine (camera, scene, culling, collision and the render loop), with a
 procedural **WebAudio** soundtrack that changes depending on which part of the
-tower you're looking at. No external art assets — every sprite is drawn in code.
+tower you're looking at. No external art assets: every sprite is drawn in code.
 
 ![Sprite gallery](docs/screenshots/06-sprite-gallery.png)
 
@@ -29,7 +29,7 @@ npm run preview      # serve the production build
 npm run screenshots  # build + headless-capture screenshots into docs/screenshots
 ```
 
-Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow —
+Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow:
 the quality gates (`typecheck`, `lint`, `test`, `build`), the two test tiers, and
 the enforced coverage floors.
 
@@ -40,7 +40,8 @@ Open the served build in Chrome, Edge, or Safari and use **Install app** / **Add
 to Home Screen** to run Verticopolis in its own window, offline.
 
 It's built on **[`vite-plugin-pwa`](https://vite-pwa-org.netlify.app/)** (Workbox
-under the hood) — no hand-rolled service worker. A few details worth knowing:
+under the hood), so there's no hand-rolled service worker. A few details worth
+knowing:
 
 - **Always the latest, never a lost tower.** When a new version is deployed, the
   game detects the waiting update, **forces a quick save first**, shows a brief
@@ -55,14 +56,14 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
 
 ## How to play
 
-- **Found your tower.** *New Tower* lets you pick a **rule-set** — *Classic*
+- **Found your tower.** *New Tower* lets you pick a **rule-set**: *Classic*
   (pixel-faithful 1994) or *Modern* (adds variant **2–5 person condo
   households**). It's chosen once and fixed for that tower's life; start another
   to play the other way.
 - **Build floors first.** Lay `Floor` tiles, then place rooms on top of them.
   The ground floor and every 15th floor want a `Lobby`.
 - **Move people.** Every floor needs an `Elevator` or `Stairs` chain back to the
-  ground lobby — unreachable tenants get unhappy and leave.
+  ground lobby. Unreachable tenants get unhappy and leave.
 - **Make money.** Offices pay quarterly rent, condos sell once for a lump sum,
   hotels earn nightly (and must be cleaned by `Housekeeping`), and shops,
   restaurants and cinemas earn from foot traffic.
@@ -91,12 +92,12 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
   fast food, restaurants, shops, cinema, party hall, parking, security, medical,
   housekeeping, recycling, metro station and the wedding hall.
 - **Transport:** stairs, escalators, and **standard / service / express**
-  elevators — each with adjustable car counts and served-floor ranges, edited
+  elevators, each with adjustable car counts and served-floor ranges, edited
   in-game just like the original.
 - **Living tower:** people walk the lobbies, elevator cars carry passengers up
   and down, window lights switch on and off, the cinema screen plays, and the
   metro train pulls in and departs. All of it runs off a single global game
-  clock — no per-room timers.
+  clock (no per-room timers).
 - **Economy & time:** weekday/weekend rhythms, morning/lunch/evening rushes,
   quarterly rent, monthly maintenance, nightly hotel revenue, and a daily
   housekeeping cycle (rooms get dirty after checkout and need cleaning).
@@ -114,21 +115,21 @@ under the hood) — no hand-rolled service worker. A few details worth knowing:
 **For players.** The game **autosaves** to your browser's `localStorage` and
 restores that slot on the next launch. You also get **3 named manual slots** so
 you can keep several towers, and **tower-file export/import** for backups or
-sharing a tower with someone else — Export downloads your tower as a compact,
+sharing a tower with someone else. Export downloads your tower as a compact,
 compressed **`.vctower`** file (a fraction of the size of the old JSON
 exports), and Import loads one back through a file picker. Saves are managed
 from the in-game saves panel; clearing your browser storage erases them.
 
 **How it works.** A save is a snapshot of the **headless simulation**, not the
-renderer. `Simulation.serialize()` writes the deterministic source of truth —
-money, star rating, the game clock, the RNG seed, every unit and transport, the
-event system (fires, seasonal events) and excavation history — into a plain
-`SerializedGame` object that `SaveGame` stores in `localStorage`
-(`src/storage/SaveGame.ts`). On load, `Simulation.deserialize()` rebuilds the
+renderer. `Simulation.serialize()` writes the deterministic source of truth into a plain
+`SerializedGame` object: money, star rating, the game clock, the RNG seed,
+every unit and transport, the event system (fires, seasonal events) and
+excavation history. `SaveGame` (`src/storage/SaveGame.ts`) stores that object
+in `localStorage`. On load, `Simulation.deserialize()` rebuilds the
 model and the Excalibur scene is regenerated from it.
 
 > **Why not Excalibur's `Serializer`?** Excalibur ships a serializer, but it
-> targets the render layer — Actors, Components, the scene graph. In this project
+> targets the render layer: Actors, Components, the scene graph. In this project
 > those are *derived* view state, rebuilt from the simulation whenever the tower
 > changes; they hold none of the authoritative game state. Serializing them would
 > mean two save paths and a format coupled to the renderer, so the save system
@@ -185,7 +186,7 @@ touch pan/pinch (see `docs/screenshots/09-mobile.png`).
 
 ```
 src/
-  engine/      # pure simulation — no DOM
+  engine/      # pure simulation, no DOM
     types.ts        shared types
     facilities.ts   facility catalog, costs, star thresholds, grid constants
     Clock.ts        game time (days, weekdays, day phases, quarters)
@@ -210,7 +211,7 @@ pointer input all run on **[Excalibur.js](https://excaliburjs.com/)**:
 `TowerEngine` owns the game loop and scene, drawing each facility, transport and
 merged structural "run" as an Excalibur actor whose graphic reuses our pixel-art
 sprite code. `main.ts` only supplies tool semantics through the engine's
-controller hooks and advances the simulation each frame — it never touches the
+controller hooks and advances the simulation each frame. It never touches the
 camera or raw pointer math directly.
 
 For diagrams of the layers, the frame loop, the engine subsystems, input flow,
@@ -225,7 +226,7 @@ to add before/after images to a pull request.
 | --- | --- |
 | ![day](docs/screenshots/03-tower-day.png) | ![night](docs/screenshots/04-tower-night.png) |
 
-### From a lobby to a legend — the ★ progression
+### From a lobby to a legend: the ★ progression
 
 A humble ground floor climbs the whole rating ladder to the coveted **TOWER**.
 These frames are captured by the end-to-end test itself (`e2e/milestones.spec.ts`),
@@ -242,11 +243,11 @@ one per rung, so they can't drift from what the game actually does.
 ## Tests
 
 Two tiers: a fast **Vitest** unit suite (engine, game logic, UI, sprites, audio,
-storage — placement, reachability, economy, star gates, housekeeping, save/load
+storage: placement, reachability, economy, star gates, housekeeping, save/load
 round-trips) and a **Playwright** browser end-to-end smoke that proves the game
 stays winnable and renders. Run `npm test` and `npm run e2e` (after
-`npm run build`). The full testing strategy — the two tiers, the enforced
-coverage floors, and what's unit-tested vs. integration-covered — lives in
+`npm run build`). The full testing strategy (the two tiers, the enforced
+coverage floors, and what's unit-tested vs. integration-covered) lives in
 **[CONTRIBUTING.md](CONTRIBUTING.md)** → *Testing & coverage*.
 
 ## License
@@ -257,5 +258,5 @@ see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 
-Built fresh as a clean-room clone — none of the original game's code or assets
+Built fresh as a clean-room clone. None of the original game's code or assets
 are used.

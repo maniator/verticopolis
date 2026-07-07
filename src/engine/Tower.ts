@@ -37,7 +37,7 @@ function coversGroundFloor(floor: number, hgt: number): boolean {
 }
 
 /** Shared placement/resize refusal — one string so the two paths can't drift. */
-const NEEDS_FLOORS = "Transport must run through built floors — lay floors first.";
+const NEEDS_FLOORS = "Transport must run through built floors. Lay floors first.";
 
 /**
  * The Tower owns the spatial model. Cells have two layers: a structural layer
@@ -290,7 +290,7 @@ export class Tower {
     // The ground floor (level 1) is the tower's entrance concourse — a lobby,
     // never a room floor — exactly as in the original.
     if (coversGroundFloor(floor, hgt)) {
-      return "The ground floor is a lobby concourse — build rooms on floor 2 and up.";
+      return "The ground floor is a lobby concourse. Build rooms on floor 2 and up.";
     }
     // Offices, condos and hotels need daylight; only commercial/service go below.
     if (floor < 1 && NO_BASEMENT_KINDS.has(kind)) return `${f.name} can't be built in the basement.`;
@@ -299,7 +299,7 @@ export class Tower {
       if (requireFloor && !this.spanHasFloor(fl, x, f.width)) return "Build floors on every story first.";
       // Lobbies are transit concourses — no rooms may sit on them, exactly as in
       // the original, where the ground/sky lobby floors stay clear.
-      if (this.spanHasLobby(fl, x, f.width)) return "Lobbies are transit-only — build rooms on a standard floor.";
+      if (this.spanHasLobby(fl, x, f.width)) return "Lobbies are transit-only. Build rooms on a standard floor.";
     }
     return undefined;
   }
@@ -328,7 +328,7 @@ export class Tower {
           return { ok: false, reason: "Structure already here." };
         }
         if (!this.roomSpanFree(floor, x, f.width)) {
-          return { ok: false, reason: "Lobbies are transit-only — clear the rooms here first." };
+          return { ok: false, reason: "Lobbies are transit-only. Clear the rooms here first." };
         }
       }
       if (!this.isSupported(floor, x, f.width)) {
@@ -336,7 +336,7 @@ export class Tower {
           ok: false,
           reason:
             floor >= 2
-              ? "Floors and lobbies must sit on the story below — no floating overhangs."
+              ? "Floors and lobbies must sit on the story below: no floating overhangs."
               : "Floors and lobbies must connect to the existing tower.",
         };
       }
@@ -419,7 +419,7 @@ export class Tower {
     }
     if (remaining.length > 0) {
       for (const id of placed) this.removeUnit(id);
-      return { ok: false, reason: "Build next to the tower — you can't build in midair.", count: 0 };
+      return { ok: false, reason: "Build next to the tower. You can't build in midair.", count: 0 };
     }
     return { ok: true, count: placed.length };
   }
@@ -516,7 +516,7 @@ export class Tower {
     if (kind === "escalator") {
       for (const fl of [bottom, top]) {
         if (this.units.some((u) => u.kind === "office" && u.floor === fl)) {
-          return { ok: false, reason: "Escalators serve commercial floors only — not offices." };
+          return { ok: false, reason: "Escalators can't serve office floors. They link commercial floors only." };
         }
       }
     }
@@ -611,7 +611,7 @@ export class Tower {
     const u = this.byId.get(id);
     if (!u || !isStructural(u.kind)) return undefined;
     if (u.floor >= 1 && !this.structureSpanFree(u.floor + 1, u.x, u.width)) {
-      return "Remove the story above first — floors can't hang in midair.";
+      return "Remove the story above first. Floors can't hang in midair.";
     }
     return undefined;
   }

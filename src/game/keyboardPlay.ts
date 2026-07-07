@@ -101,7 +101,7 @@ export class KeyboardPlay {
     if (!c) return;
     const loc = c.floor >= 1 ? `floor ${c.floor}` : `basement ${1 - c.floor}`;
     const here = this.deps.pickedAt(c.floor, c.tile);
-    this.deps.announce(`Cursor: ${loc}, column ${c.tile} — ${here ? FACILITIES[here.kind].name : "empty"}`);
+    this.deps.announce(`Cursor: ${loc}, column ${c.tile}. ${here ? FACILITIES[here.kind].name : "Empty"}.`);
   }
 
   commitCursor(): void {

@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for reporting a bug! Please check the [live build](https://verticopolis.com)
-        first — the issue may already be fixed. The build version is shown on the splash screen.
+        first, since the issue may already be fixed. The build version is shown on the splash screen.
   - type: input
     id: version
     attributes:

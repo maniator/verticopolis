@@ -24,7 +24,7 @@ Closes #
 Towers are founded once as "classic" or "modern" (immutable for the tower's life).
 Classic must stay faithful to SimTower 1994; Modern is the opt-in "what the original
 couldn't do" layer. Keep behavior the two modes disagree on in a single mode-resolved
-rule-set — resolved once at founding — rather than branching on the mode ad hoc or
+rule-set (resolved once at founding) rather than branching on the mode ad hoc or
 smearing mode checks through the simulation.
 Delete this section only if the change cannot affect gameplay (e.g. docs/tooling).
 -->
@@ -56,7 +56,7 @@ Internal-only work needs no bump.
 ## Screenshots / recordings
 
 <!--
-For any visual or gameplay change, embed actual before/after images here — not a
+For any visual or gameplay change, embed actual before/after images here, not a
 prose description of what a screenshot would show. See docs/screenshots.md for how
 to capture, commit, and embed them. Delete this section only if the change has no
 visual or gameplay surface.

@@ -105,7 +105,7 @@ export class SaveLoad {
           ? "storage is full or blocked." + priorSaveNote + "<br>Free up space or allow site storage, then reload."
           : "the save hit an unexpected error." + priorSaveNote + "<br>Reload to continue.";
         this.deps.showBootMessage(
-          "The graphics driver crashed and your latest changes couldn't be saved — " + detail,
+          "The graphics driver crashed and your latest changes couldn't be saved: " + detail,
           true,
         );
         return;
@@ -122,7 +122,7 @@ export class SaveLoad {
     if (Date.now() - lastReload < 90_000) {
       // Auto-reload didn't stick — hand control back to the player.
       this.deps.showBootMessage(
-        "The graphics driver crashed twice in a row.<br>Your tower is saved — close other tabs or apps and try again.",
+        "The graphics driver crashed twice in a row.<br>Your tower is saved. Close other tabs or apps and try again.",
         true,
       );
       return;
@@ -167,7 +167,7 @@ export class SaveLoad {
       const file = await SaveGame.export(sim);
       this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
       // The container is pure ASCII, so string length == bytes on disk.
-      this.deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB) — check your downloads.`, "good");
+      this.deps.ui.toast(`Tower exported (${(file.length / 1024).toFixed(1)} KB). Check your downloads.`, "good");
     } catch (err) {
       // Never fail silently: main.ts fires this with `void`, so an unhandled
       // rejection here would leave the player with no download and no feedback.

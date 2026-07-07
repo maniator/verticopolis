@@ -158,7 +158,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#b0a890",
     transport: true,
-    description: "Cheap two-floor link — one tap places the whole flight. People will only climb a short distance.",
+    description: "Cheap two-floor link: one tap places the whole flight. People will only climb a short distance.",
   },
   escalator: {
     kind: "escalator",
@@ -271,7 +271,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     population: 0,
     color: "#c0d0c0",
     description:
-      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator, stairs or escalator — never passenger elevators.",
+      "Cleans hotel rooms each day so they can be rented again. One per ~20 rooms. Staff reach rooms by service elevator, stairs or escalator (never passenger elevators).",
   },
   recycling: {
     kind: "recycling",
@@ -285,7 +285,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     color: "#7f9f5f",
     basement: true,
     description:
-      "Basement facility that fills with the tower's daily waste — one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. 4★ requires demand met.",
+      "Basement facility that fills with the tower's daily waste: one center processes ~2,500 population; build more as you grow. A garbage truck collects each morning. 4★ requires demand met.",
   },
   metro: {
     kind: "metro",

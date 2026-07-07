@@ -97,14 +97,14 @@ export class EventSystem {
         this.pending = {
           kind: "fireRescue",
           cost,
-          message: `🚒 Fire rescue available for $${cost.toLocaleString()} — pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
+          message: `🚒 Fire rescue available for $${cost.toLocaleString()}. Pay to stop the spread and save the tower now, or decline and fight it the slow way. Either way the rooms already ablaze burn down to gutted shells you'll rebuild; the fee just limits how far the fire spreads.`,
         };
         this.sim.emit(this.pending.message, "bad");
         // Telegraph the free defense to a player who hasn't built one yet. Use
         // "bad" so it surfaces as a toast during the emergency — the UI only
         // pops toasts for good/bad log entries, and "info" would hide in the log.
         if (!this.sim.hasAny("security")) {
-          this.sim.emit("Tip: a Security office fights fires for free — build one to defend your tower.", "bad");
+          this.sim.emit("Tip: a Security office fights fires for free. Build one to defend your tower.", "bad");
         }
       }
       return;
@@ -115,7 +115,7 @@ export class EventSystem {
       this.pending = {
         kind: "bombThreat",
         cost: 300_000,
-        message: "💣 A caller demands a $300,000 ransom or a bomb detonates — pay, or have Security search the tower.",
+        message: "💣 A caller demands a $300,000 ransom or a bomb detonates. Pay, or have Security search the tower.",
       };
       this.sim.emit(this.pending.message, "bad");
       return;
@@ -138,7 +138,7 @@ export class EventSystem {
         this.sim.money -= p.cost;
         this.extinguishAll();
         this.sim.emit(
-          `🚒 Fire-rescue crews saved the tower for $${p.cost.toLocaleString()}. The rooms that were ablaze are gutted — bulldoze and rebuild them.`,
+          `🚒 Fire-rescue crews saved the tower for $${p.cost.toLocaleString()}. The rooms that were ablaze are gutted. Bulldoze and rebuild them.`,
           "money",
         );
       }
@@ -287,7 +287,7 @@ export class EventSystem {
         this.gut(u);
         this.active.delete(id);
         this.sim.emit(
-          `🔥 The ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)} burned down — only a gutted shell remains. Bulldoze the rubble and rebuild.`,
+          `🔥 The ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.`,
           "bad",
         );
       } else {
@@ -349,13 +349,13 @@ export class EventSystem {
     // than floating across mid-screen (see TowerEngine.renderThief).
     const floor = this.thiefFloor();
     if (this.sim.hasAny("security")) {
-      this.sim.emit("🕵️ Security caught a thief prowling the tower — nothing was taken.", "good");
-      this.sim.triggerThief?.(true, floor); // caught: a guard trails him across (cosmetic)
+      this.sim.emit("🕵️ Security caught a thief prowling the tower. Nothing was taken.", "good");
+      this.sim.triggerThief?.(true, floor); // caught: a guard trails them across (cosmetic)
       return;
     }
     const loss = 5_000 + this.extra.int(0, 20_000);
     this.sim.money -= loss;
-    this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString()} — build Security.`, "bad");
+    this.sim.emit(`🕵️ A thief slipped through the tower and made off with $${loss.toLocaleString()}. Build Security.`, "bad");
     this.sim.triggerThief?.(false, floor); // got away with the loot (cosmetic)
   }
 
@@ -381,7 +381,7 @@ export class EventSystem {
     if (this.sim.hasAny("security")) {
       const cost = 2_000 + this.sim.rng.int(0, 3_000);
       this.sim.money -= cost;
-      this.sim.emit(`💣 A bomb threat was called in — security swept the tower and found nothing. The evacuation cost $${cost.toLocaleString()}.`, "info");
+      this.sim.emit(`💣 A bomb threat was called in. Security swept the tower and found nothing. The evacuation cost $${cost.toLocaleString()}.`, "info");
       return;
     }
     const fine = 15_000 + this.sim.rng.int(0, 15_000);
@@ -411,6 +411,6 @@ export class EventSystem {
         }
       }
     }
-    this.sim.emit(`💣 A bomb detonated with no security to stop it — ${destroyed} room(s) across ~5 floors were gutted, plus a $${fine.toLocaleString()} fine. Build Security!`, "bad");
+    this.sim.emit(`💣 A bomb detonated with no security to stop it. ${destroyed} room(s) across ~5 floors were gutted, plus a $${fine.toLocaleString()} fine. Build Security!`, "bad");
   }
 }

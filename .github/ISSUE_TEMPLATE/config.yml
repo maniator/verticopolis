@@ -2,10 +2,10 @@ blank_issues_enabled: false
 contact_links:
   - name: 🎮 Play Verticopolis
     url: https://verticopolis.com
-    about: Try the live build before filing — the bug may already be fixed.
+    about: Try the live build before filing. The bug may already be fixed.
   - name: 🔎 Search existing issues
     url: https://github.com/maniator/verticopolis/issues?q=is%3Aissue
     about: Check whether your bug or idea has already been reported.
   - name: 🔐 Report a security vulnerability
     url: https://github.com/maniator/verticopolis/security/advisories/new
-    about: Privately disclose a security issue — please don't open a public issue for vulnerabilities. See SECURITY.md.
+    about: Privately disclose a security issue. Please don't open a public issue for vulnerabilities; see SECURITY.md.

@@ -172,7 +172,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // validateTransport passes here (clear column, built floors), so the build
     // failed for a reason placement can't diagnose — the generic fallback.
     expect(build.transportReason("elevatorStandard", 20, 1, 2)).toBe(
-      "A shaft can't go here — leave a clear column through built floors.",
+      "A shaft can't go here. Leave a clear column through built floors.",
     );
   });
 
@@ -203,7 +203,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     build.bulldozePicked({ type: "unit", id: office.id, kind: "office" }); // deliberate click
     expect(f.sfx).toEqual(["error"]);
     expect(f.toasts).toEqual([
-      { text: "You can't bulldoze a burning unit — call fire rescue or let it burn out.", kind: "bad" },
+      { text: "You can't bulldoze a burning unit. Call fire rescue or let it burn out.", kind: "bad" },
     ]);
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(true);
   });
@@ -473,7 +473,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(lift.top).toBe(4);
     expect(last(f.sfx)).toBe("error");
     expect(last(f.toasts)).toEqual({
-      text: "Transport must run through built floors — lay floors first.",
+      text: "Transport must run through built floors. Lay floors first.",
       kind: "bad",
     });
   });
@@ -608,17 +608,17 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
     expect(f.toasts).toHaveLength(1);
     expect(f.toasts[0].kind).toBe("good");
-    expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\) — check your downloads\.$/);
+    expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);
   });
 
   it("exportGame toasts the failure instead of swallowing it (main.ts fires it with `void`)", async () => {
     // Simulate a browser that can't compress: SaveGame.export rejects, and the
     // controller must surface that as a toast, not download nothing in silence.
-    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This browser is too old to create tower files — try a current browser."));
+    const spy = vi.spyOn(SaveGame, "export").mockRejectedValueOnce(new Error("This browser is too old to create tower files. Try a current browser."));
     await saveLoad.exportGame();
     expect(f.downloads).toHaveLength(0);
     expect(f.toasts).toEqual([
-      { text: "Export failed: This browser is too old to create tower files — try a current browser.", kind: "bad" },
+      { text: "Export failed: This browser is too old to create tower files. Try a current browser.", kind: "bad" },
     ]);
     spy.mockRestore();
   });
@@ -864,15 +864,15 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(keyboard.cursor()).toBeNull(); // not revealed yet
     keyboard.moveCursor(-100_000, 0);
     expect(keyboard.cursor()).toEqual({ tile: 0, floor: 1 });
-    expect(last(announced)).toBe("Cursor: floor 1, column 0 — empty");
+    expect(last(announced)).toBe("Cursor: floor 1, column 0. Empty.");
     keyboard.moveCursor(100_000, 0);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: 1 });
     keyboard.moveCursor(0, -100_000);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: GRID.minFloor });
-    expect(last(announced)).toBe(`Cursor: basement ${1 - GRID.minFloor}, column ${GRID.width - 1} — empty`);
+    expect(last(announced)).toBe(`Cursor: basement ${1 - GRID.minFloor}, column ${GRID.width - 1}. Empty.`);
     keyboard.moveCursor(0, 100_000);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: GRID.maxFloor });
-    expect(last(announced)).toBe(`Cursor: floor ${GRID.maxFloor}, column ${GRID.width - 1} — empty`);
+    expect(last(announced)).toBe(`Cursor: floor ${GRID.maxFloor}, column ${GRID.width - 1}. Empty.`);
   });
 
   it("the first Enter with no cursor just reveals it (no select, no build)", () => {

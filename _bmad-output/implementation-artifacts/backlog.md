@@ -68,6 +68,16 @@ How items flow:
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
+### Deferred from: code review of humanize-copy (PR #151, `/bmad-code-review`, 2026-07-07)
+
+- **`package-lock.json` root `version` (1.5.1) has drifted from `package.json`
+  (1.9.x)** — the lockfile's top-level `version`/`packages[""].version` fields
+  were never refreshed by past bumps. Harmless to installs (npm ignores it for
+  the root project) but misleading to readers. Pre-existing on `main`, not
+  introduced by the copy pass. Fix: any `npm install --package-lock-only` run
+  alongside a future version bump re-syncs it. (bmad-code-review, Edge Case
+  Hunter.)
+
 ### Deferred from: traffic-indicator fix (PR #141, `/gds-code-review`)
 
 - **Traffic chip's hotspot floor can jitter and spam the `aria-live` region on

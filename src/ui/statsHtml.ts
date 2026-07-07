@@ -74,8 +74,8 @@ export function buildStatsHtml(sim: Simulation): string {
           recyclingCap > 0 || (sim.star >= 3 && recyclingShort)
             ? `<span class="k">Recycling</span><span class="v" style="color:${recyclingShort ? "var(--bad)" : "var(--good)"}">${
                 recyclingCap === 0
-                  ? `${fmt(s.population)} population, no center — build one`
-                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " — build more" : ""}`
+                  ? `${fmt(s.population)} population, no center (build one)`
+                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " (build more)" : ""}`
               }</span>`
             : ""
         }
@@ -194,7 +194,7 @@ function householdSection(sim: Simulation): string {
   if (households === 0) {
     return (
       head +
-      `<div class="col kv"><span class="k" style="color:var(--muted);grid-column:1/-1">No condos sold yet — each sale draws a 2–5 person family.</span></div>`
+      `<div class="col kv"><span class="k" style="color:var(--muted);grid-column:1/-1">No condos sold yet. Each sale draws a 2–5 person family.</span></div>`
     );
   }
   const avg = (residents / households).toFixed(1);
