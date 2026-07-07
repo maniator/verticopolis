@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-**The full agent guide is [AGENTS.md](./AGENTS.md) — read it.** It covers the
-BMAD/BMGD workflow, architecture, quality gates, and review conventions. The
-BMAD agent rules live in `_bmad-output/project-context.md`. For the human-facing
-quick start and the testing/coverage guide, see
-[CONTRIBUTING.md](./CONTRIBUTING.md).
+**[CONTRIBUTING.md](./CONTRIBUTING.md) is the contributor guide — read it.** It
+is the source of truth for dev setup, quality gates, testing & coverage,
+architecture, versioning, code review, and merging. **[AGENTS.md](./AGENTS.md)**
+adds the agent-specific layer on top: the BMAD/BMGD workflow and the mandatory
+review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 
 ## Non-negotiables (don't skip these)
 
@@ -28,7 +28,7 @@ quick start and the testing/coverage guide, see
   player-facing capability, patch for a player-noticeable fix/behavior change;
   internal-only work needs none). It's injected as `__APP_VERSION__` on the splash
   and anchors the update flow, so a missing bump misreports the build. See
-  [AGENTS.md](./AGENTS.md) → **Versioning**.
+  [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Resolve Copilot/Codex PR review threads** once addressed — actually mark
   each thread **Resolved** (`resolve_review_thread`). A reply alone does NOT
