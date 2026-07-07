@@ -9,9 +9,9 @@ This file is the human-facing quick start: how to run the app, the gates your
 change must pass, and — in depth — how testing and coverage work. It is a
 companion to two deeper documents, not a replacement:
 
-- **[AGENTS.md](./AGENTS.md)** — the full agent/contributor guide: BMAD/BMGD
-  workflow, architecture, versioning, and review conventions. Read it for
-  anything beyond a one-line tweak.
+- **[AGENTS.md](./AGENTS.md)** — the full contributor guide: architecture,
+  versioning, and review conventions. Read it for anything beyond a one-line
+  tweak.
 - **[CLAUDE.md](./CLAUDE.md)** — the short list of non-negotiables.
 
 When those two disagree with this file on a rule, they win — this page points at
@@ -119,15 +119,10 @@ The full coverage configuration (floors, includes, excludes) lives in
 
 ## Code review
 
-Every non-trivial change gets a **deep adversarial review in the same session
-that writes the code** — and that review IS running the project's review skill:
-`/gds-code-review` for gameplay/engine work, `/bmad-code-review` for everything
-else (storage, persistence, tooling, UI plumbing). Green CI is necessary but not
-sufficient. Fix every `patch` finding and record every `defer` finding in
-`_bmad-output/implementation-artifacts/backlog.md`. See
-[CLAUDE.md](./CLAUDE.md) and [AGENTS.md](./AGENTS.md) → **Code review** for the
-full protocol (including bringing in the relevant specialist agents and resolving
-bot review threads).
+Every non-trivial change gets a **deep, adversarial review** before it merges —
+green CI is necessary but not sufficient. Fix the blocking findings and track the
+rest. See [AGENTS.md](./AGENTS.md) → **Code review** for the full protocol
+(including resolving bot review threads).
 
 ## Conventions
 
