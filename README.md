@@ -122,10 +122,10 @@ from the in-game saves panel; clearing your browser storage erases them.
 
 **How it works.** A save is a snapshot of the **headless simulation**, not the
 renderer. `Simulation.serialize()` writes the deterministic source of truth into a plain
-`SerializedGame` object that `SaveGame` stores in `localStorage`
-(`src/storage/SaveGame.ts`): money, star rating, the game clock, the RNG seed,
+`SerializedGame` object: money, star rating, the game clock, the RNG seed,
 every unit and transport, the event system (fires, seasonal events) and
-excavation history. On load, `Simulation.deserialize()` rebuilds the
+excavation history. `SaveGame` (`src/storage/SaveGame.ts`) stores that object
+in `localStorage`. On load, `Simulation.deserialize()` rebuilds the
 model and the Excalibur scene is regenerated from it.
 
 > **Why not Excalibur's `Serializer`?** Excalibur ships a serializer, but it

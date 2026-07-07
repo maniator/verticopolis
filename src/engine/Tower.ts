@@ -336,7 +336,7 @@ export class Tower {
           ok: false,
           reason:
             floor >= 2
-              ? "Floors and lobbies must sit on the story below, with no floating overhangs."
+              ? "Floors and lobbies must sit on the story below: no floating overhangs."
               : "Floors and lobbies must connect to the existing tower.",
         };
       }
@@ -516,7 +516,7 @@ export class Tower {
     if (kind === "escalator") {
       for (const fl of [bottom, top]) {
         if (this.units.some((u) => u.kind === "office" && u.floor === fl)) {
-          return { ok: false, reason: "Escalators serve commercial floors only, not offices." };
+          return { ok: false, reason: "Escalators are for commercial floors, so they can't serve office floors." };
         }
       }
     }

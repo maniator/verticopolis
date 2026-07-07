@@ -49,7 +49,7 @@ function recyclingLine(sim: Simulation): string {
   return (
     `<div>Fill: ${fillPct}%. Truck collects each morning.</div>` +
     (pop <= cap
-      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population, demand met.</div>`
+      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population; demand met.</div>`
       : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`)
   );
 }

@@ -8,12 +8,12 @@ body:
       value: |
         Verticopolis aims to faithfully recreate **SimTower (1994)**. Use this template when a
         number, rule, or behavior diverges from the original. Canon values (build caps, transport
-        pooling, economy math) live in `src/engine/facilities.ts` and `PARITY.md` — please cite a
+        pooling, economy math) live in `src/engine/facilities.ts` and `PARITY.md`. Please cite a
         source for the original's behavior so we can verify it.
 
         **⚠️ Parity only applies to Classic-mode towers.** Towers can be founded in **Classic**
         (faithful to 1994) or **Modern** (an opt-in "what the original couldn't do" layer).
-        Differences you see in a **Modern** tower are intentional and are *not* parity bugs — if
+        Differences you see in a **Modern** tower are intentional and are *not* parity bugs. If
         you'd like to change or extend a Modern-mode behavior, please open a **Feature request** instead.
   - type: dropdown
     id: area
@@ -39,7 +39,7 @@ body:
     id: current
     attributes:
       label: Current Verticopolis behavior
-      description: What does Verticopolis do instead? Include the build version and a repro if possible — for economy or population divergences, attach your saved tower export (`.vctower`) so we can reproduce the exact state.
+      description: What does Verticopolis do instead? Include the build version and a repro if possible. For economy or population divergences, attach your saved tower export (`.vctower`) so we can reproduce the exact state.
     validations:
       required: true
   - type: input
@@ -54,7 +54,7 @@ body:
     attributes:
       label: Before submitting
       options:
-        - label: This is about a **Classic**-mode tower (Modern-mode differences are intentional — use a Feature request for those).
+        - label: This is about a **Classic**-mode tower (Modern-mode differences are intentional; use a Feature request for those).
           required: true
         - label: I checked PARITY.md and this divergence is not already documented as intentional.
           required: true

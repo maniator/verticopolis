@@ -69,7 +69,15 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 
 ## Artifacts & working conventions
 - BMAD output lives under `_bmad-output/` (`planning-artifacts/prds`, `.../reviews`).
-- **No em-dashes in prose.** Use commas, colons, parentheses, or separate sentences instead; en-dashes for numeric ranges (`2–5`, floors `30–60`) are fine. Skip the "X, not Y" emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless, robust, comprehensive, elevate, streamline, and the like). Keep copy plain, human, and grammatically correct.
+- **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
+  text) in anything new you write. Use commas, colons, parentheses, or separate
+  sentences instead. Two standing exceptions: en-dashes in numeric ranges
+  (`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
+  in the stats/editor panels. Existing `src/` code comments are grandfathered;
+  don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
+  emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
+  robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
+  human, and grammatically correct.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Version bump on player-facing change:** bump `package.json` `version` (semver
   by player impact: **minor** for a new player-facing capability, **patch** for a

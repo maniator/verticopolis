@@ -350,7 +350,7 @@ export class EventSystem {
     const floor = this.thiefFloor();
     if (this.sim.hasAny("security")) {
       this.sim.emit("🕵️ Security caught a thief prowling the tower. Nothing was taken.", "good");
-      this.sim.triggerThief?.(true, floor); // caught: a guard trails him across (cosmetic)
+      this.sim.triggerThief?.(true, floor); // caught: a guard trails them across (cosmetic)
       return;
     }
     const loss = 5_000 + this.extra.int(0, 20_000);

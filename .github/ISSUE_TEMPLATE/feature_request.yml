@@ -39,8 +39,8 @@ body:
       label: Which game mode should this target?
       description: Classic must stay faithful to the 1994 original; new/expanded behavior usually belongs in Modern.
       options:
-        - Classic — restore a faithful behavior the original had that we never implemented
-        - Modern — a new behavior the original never had
+        - "Classic: restore a faithful behavior the original had that we never implemented"
+        - "Modern: a new behavior the original never had"
         - Both / mode-agnostic
         - Not sure
     validations:

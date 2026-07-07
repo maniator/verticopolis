@@ -22,14 +22,17 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   gates are **not** a substitute for the review skill, and "the diff is tiny" is
   not an exemption.
 - **Quality gates before pushing:** `npm run typecheck`, `npm run lint`,
-  `npm test`, `npm run build`, all green.
+  `npm test`, `npm run build`. All four must be green.
 - **American English everywhere;** keep `src/engine/` free of DOM/rendering.
-- **No em-dashes in prose** (player-facing copy, docs, code comments, commit and
-  PR text). Use commas, colons, parentheses, or separate sentences instead;
-  en-dashes for numeric ranges (e.g. `2–5`, floors `30–60`) are fine. Skip the
-  "X, not Y" emphatic-restatement pattern and AI marketing vocabulary (leverage,
-  seamless, robust, comprehensive, elevate, streamline, and the like). Keep copy
-  plain, human, and grammatically correct.
+- **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
+  text) in anything new you write. Use commas, colons, parentheses, or separate
+  sentences instead. Two standing exceptions: en-dashes in numeric ranges
+  (`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
+  in the stats/editor panels. Existing `src/` code comments are grandfathered;
+  don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
+  emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
+  robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
+  human, and grammatically correct.
 - **Bump `package.json` `version` on any player-facing change** (minor for a new
   player-facing capability, patch for a player-noticeable fix/behavior change;
   internal-only work needs none). It's injected as `__APP_VERSION__` on the splash

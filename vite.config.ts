@@ -64,7 +64,7 @@ export default defineConfig({
       manifest: {
         name: "Verticopolis",
         short_name: "Verticopolis",
-        description: "A browser-native SimTower clone — build a high-rise floor by floor.",
+        description: "A browser-native SimTower clone: build a high-rise floor by floor.",
         theme_color: "#000080",
         background_color: "#008080",
         display: "standalone",

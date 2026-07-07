@@ -141,7 +141,15 @@ agents, convened as a party for larger changes.
 
 - **American English everywhere:** code, comments, identifiers, strings, commit
   messages, UI copy. Note: `story`/`stories` for floors (not `storey`/`storeys`).
-- **No em-dashes in prose.** Use commas, colons, parentheses, or separate sentences instead; en-dashes for numeric ranges (`2–5`, floors `30–60`) are fine. Skip the "X, not Y" emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless, robust, comprehensive, elevate, streamline, and the like). Keep copy plain, human, and grammatically correct.
+- **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
+  text) in anything new you write. Use commas, colons, parentheses, or separate
+  sentences instead. Two standing exceptions: en-dashes in numeric ranges
+  (`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
+  in the stats/editor panels. Existing `src/` code comments are grandfathered;
+  don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
+  emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
+  robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
+  human, and grammatically correct.
 - Match the surrounding code's formatting, naming, and comment density.
 - Adding a facility/room type? Start in `src/engine/facilities.ts`, then thread it
   through rendering and UI. Don't special-case it in the render layer.

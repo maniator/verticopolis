@@ -2,11 +2,21 @@
 
 Conventions specific to AI agents working in this repository. The **shared
 contributor conventions (dev setup, quality gates, the two test tiers and
-coverage floors, architecture including the Classic vs Modern rule-set
-strategy and the two-layer tower grid, versioning, code review, and merging)
+coverage floors, architecture (including the Classic vs Modern rule-set
+strategy and the two-layer tower grid), versioning, code review, and merging)
 live in [CONTRIBUTING.md](./CONTRIBUTING.md)**. Read it first; this file adds only
 what's specific to running the BMAD/BMGD agent workflows on top of those
 conventions.
+
+One style rule is repeated here because agents are its main offenders:
+**no em-dashes in prose** (player-facing copy, docs, comments, commit and PR
+text) in anything new you write. Use commas, colons, parentheses, or separate
+sentences instead. Two standing exceptions: en-dashes in numeric ranges
+(`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
+in the stats/editor panels. Existing `src/` code comments are grandfathered;
+don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
+emphatic-restatement pattern and AI marketing vocabulary. Keep copy plain,
+human, and grammatically correct.
 
 ## Use BMAD-METHOD for non-trivial work
 

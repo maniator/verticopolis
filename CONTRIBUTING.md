@@ -239,7 +239,7 @@ alone.
   per-frame path is a review-blocking finding, the same as a correctness bug.
 - **Deep, adversarial review before merge, never deferred to "later."** The change gets a full
   adversarial review while its context is still loaded (before pushing, or
-  immediately after opening/updating the PR), not deferred to a hypothetical
+  immediately after opening/updating the PR), not left to a hypothetical
   pre-merge step that never happens. A PR is not "done" until that review has run
   and its confirmed findings are fixed and re-verified on the branch.
 - **Codex re-reviews automatically on every push; Copilot does not.** Copilot's
@@ -256,7 +256,15 @@ alone.
 - **American English everywhere:** comments, identifiers, strings, commit
   messages, and UI copy (`color`, `center`, `behavior`; `story`/`stories` for
   floors).
-- **No em-dashes in prose.** Use commas, colons, parentheses, or separate sentences instead; en-dashes for numeric ranges (`2–5`, floors `30–60`) are fine. Skip the "X, not Y" emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless, robust, comprehensive, elevate, streamline, and the like). Keep copy plain, human, and grammatically correct.
+- **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
+  text) in anything new you write. Use commas, colons, parentheses, or separate
+  sentences instead. Two standing exceptions: en-dashes in numeric ranges
+  (`2–5`, floors `30–60`), and the standalone "—" empty-value placeholder glyphs
+  in the stats/editor panels. Existing `src/` code comments are grandfathered;
+  don't sweep them, but don't add new em-dashes either. Skip the "X, not Y"
+  emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
+  robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
+  human, and grammatically correct.
 - **Keep `src/engine/` free of DOM/rendering** so the simulation stays
   deterministic and unit-testable.
 - **Show visual/gameplay changes with real screenshots** in the PR's

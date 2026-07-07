@@ -1,6 +1,6 @@
 # Verticopolis Design System
 
-The UI speaks one language: **Windows 3.1 / SimTower chrome**: gray faces,
+The UI speaks one language, **Windows 3.1 / SimTower chrome**: gray faces,
 two-pixel bevels, navy title bars, press-only feedback. This document is the
 contract for anyone (human or agent) touching `src/styles.css` or UI markup.
 
@@ -39,7 +39,7 @@ Gray face, bevel out; `:active` = bevel in. **No hover state on purpose**:
 period chrome gives press feedback only (list rows like `.pal-item` may hover;
 buttons may not).
 
-- `.btn.primary`: the classic **default button**: an extra dark ring
+- `.btn.primary`: the classic **default button**, an extra dark ring
   (`0 0 0 1px var(--r-dark)`) + bold label. *One primary per dialog.* Its DOM
   position encodes default focus: **first** when the primary should own focus
   (the emergency's Pay), **last** when the safe action must be reached first
@@ -48,8 +48,8 @@ buttons may not).
   actions only (Sell/Bulldoze, slot delete).
 - `:disabled`: classic GrayText (`--r-shadow`) on the same raised chrome,
   default cursor. Never hide a disabled button; show why it can't be pressed.
-- `.btn.xs`: title-bar size: the ✕ in window title bars, the coach's Skip
-  button. It NEVER grows on touch. A 36px ✕ inflates every navy bar and a
+- `.btn.xs`: title-bar sized, for the ✕ in window title bars and the coach's
+  Skip button. It NEVER grows on touch. A 36px ✕ inflates every navy bar and a
   wider one stretches into a pill (both shipped bugs, since fixed). Instead,
   coarse pointers get an invisible tap halo (`::after { inset: -8px }`) for a
   ~34px effective target with zero visual change. In TS there are exactly two
