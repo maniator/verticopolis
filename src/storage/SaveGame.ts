@@ -39,10 +39,10 @@ const UNREADABLE_KEY = "simtower-clone-unreadable";
  * old saves keep loading — they re-write compressed on the next save.
  */
 const STORE_MAGIC = "VCZ1:";
-// Latest-start write token for same-tab saves. JavaScript runs this module on
-// one event-loop thread, and the increment happens before any async yield, so an
-// older async compression can never pass the token check after a newer save starts.
-let saveGeneration = 0;
+// Latest-start write token for same-tab async saves. A synchronous save clears
+// the token before it writes, so an older async compression can never commit
+// over a newer durable flush.
+let latestAsyncSave: object | null = null;
 
 /**
  * The Verticopolis tower-file container (.vctower): a magic first line naming
@@ -181,7 +181,7 @@ export const SaveGame = {
 
   // ---- Shared writer + export/import -----------------------------------
   saveTo(key: string, sim: Simulation): void {
-    saveGeneration++;
+    latestAsyncSave = null;
     const data = sim.serialize() as SerializedGame & { savedAt: number };
     // Stamp save time without relying on a deterministic clock in the engine.
     data.savedAt = nowMs();
@@ -197,11 +197,13 @@ export const SaveGame = {
       this.saveTo(key, sim);
       return;
     }
-    const generation = ++saveGeneration;
+    const token = {};
+    latestAsyncSave = token;
     const data = sim.serialize() as SerializedGame & { savedAt: number };
     data.savedAt = nowMs();
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
-    if (generation !== saveGeneration) return;
+    if (latestAsyncSave !== token) return;
+    latestAsyncSave = null;
     localStorage.setItem(key, STORE_MAGIC + toBase64(packed));
   },
 
