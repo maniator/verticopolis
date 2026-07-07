@@ -49,87 +49,105 @@ some kinds **expand** (fast food 12→16, restaurant 16→24, cinema 24→31, ra
 6→16) and some **squish** (parking 6→4, suite →10), a true canon migration must
 **reflow each floor**. §1.1 specifies that reflow; §1.3 is the evidence it fits.
 
-### 1.1 Migration design (v1 → v2): per-floor canon reflow
+### 1.0 Three version systems — don't conflate them
+
+| Constant | Where | Value | Bumps when | This initiative |
+|---|---|---|---|---|
+| `SAVE_VERSION` | `Simulation.ts:51` | **1** | the serialized **data schema** changes (drives `migrateSave`) | **1 → 2** (the reflow) |
+| `TOWER_FILE_MAGIC` / `STORE_MAGIC` | `SaveGame.ts:54,41` | `VCTOWER1` / `VCZ1:` | the **container/compression** format changes | unchanged |
+| `package.json version` | | `1.6.0` | any **player-facing** change (semver) | bumps per story |
+
+The reflow is a **`SAVE_VERSION` 1→2** migration (the existing condo-rent backfill
+in `migrateSave` runs but never bumped the stamp, so we are genuinely still at 1).
+It is unrelated to the app semver and to the file-container magics.
+
+### 1.1 Migration design (SAVE_VERSION 1 → 2): two-pass minimal-disruption reflow
 
 ```ts
 // migrateSave(), Simulation.ts:150 seam
 if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
 ```
 
-`upgradeV1toV2` re-lays each floor's rooms at canon widths, preserving **order**
-and, where slack allows, **relative gaps** — never overlapping a neighbor or a
-transport column, always within the (now 375-wide) lot. Algorithm:
+**Validated by a spike against `towerone_6` (§1.3).** Two facts shape it:
 
-1. **Entities, not tiles.** Group units into footprint entities: a multi-floor
-   room (cinema, party hall, recycling, metro — `facilityFloors>1`) is ONE entity
-   that must land at the **same x on every floor it spans**. Single-floor rooms are
-   their own entity. Structural `floor`/`lobby` (width 1) and `transports` are
-   **not** entities to move (see 4, 6).
-2. **Per floor, sort room entities by x.** Compute each entity's canon width
-   (`CANON[kind] ?? stored`).
-3. **Obstacle map = transport columns crossing this floor.** A shaft occupies
-   `[t.x, t.x+t.width)` on every floor in `[t.bottom, t.top]`. Rooms may not land
-   on these columns (parity: rooms never overlap shafts).
-4. **Sweep left→right with a cursor.** For each entity in order: target `x =
-   max(originalX, cursor)`; if `[x, x+canonW)` intersects a transport column or
-   exceeds `GRID.width`, advance past the obstacle; place; set `cursor = x+canonW`.
-   Preserve the original left-gap to the previous entity when it doesn't force an
-   overlap (keeps the player's spacing intent where possible).
-5. **Multi-floor entities:** compute the max target x required across all their
-   floors, then place identically on each — so a 2-floor cinema stays vertical.
-6. **Re-pave.** Ensure a `floor` (or `lobby`) structural tile exists under every
-   tile of every room's NEW footprint; add missing width-1 `floor` units within
-   the lot. Leftover paving from vacated tiles is harmless and kept (avoids
-   stranding a floor that a transport still needs).
-7. **Clamp & flag.** If a floor genuinely cannot fit (should not happen given
-   §1.3 slack), leave the overflowing entity at its pre-reflow width and record a
-   `migrationNotes` entry rather than overlapping.
-8. Stamp `version = 2`. `upgradeV1toV2` is pure/total (no throw); a `version >
-   SAVE_VERSION` save still fails closed as today.
+- **Transports are NOT obstacles.** Room placement checks only `roomSpanFree`
+  (rooms/structure), never shafts — so elevators/stairs/escalators legitimately
+  **overlay** rooms. `towerone_6` proves it: escalators sit *inside* the basement
+  parking run (x226–234 within parking 207–303). The reflow must ignore shafts, or
+  it wrongly shoves rooms around phantom obstacles (an early spike did this and
+  killed 22/85 parking spaces).
+- **Parking only works chained.** `functionalParkingSet` (`Tower.ts:971`) seeds
+  from every ramp; a space counts only if flush-contiguous with a ramp. Squishing
+  6→4 must **not** leave gaps in a chain.
+
+Algorithm — `upgradeV1toV2`:
+
+1. **Pass 1 — parking (ramp-anchored).** For each contiguous parking+ramp run on a
+   basement floor: **anchor the ramp at its original x** and pack its chained
+   parking flush on both sides (left run ends at the ramp's left edge; right run
+   starts at its right edge). This keeps ramp *columns vertically aligned* (as the
+   original had them — 231/231/232/232 in `towerone_6`) and every space chained.
+   Parking spaces are visually identical, so this repositioning is cosmetically
+   invisible. (Ramp alignment is **not** functionally required — every ramp is its
+   own flood-fill seed — but it's near-free and more faithful.)
+2. **Pass 2 — every other room (minimal-disruption).** Per floor, sweep the
+   non-parking rooms left→right, keeping each at its **original x** and growing a
+   widened room **into the paved gap already beside it**; only when the local gap
+   is too small does it absorb into the left gap, then finally push the right
+   neighbor. Obstacles = already-placed rooms (pass-1 parking + multi-floor rooms
+   based on a lower floor). Multi-floor rooms (cinema/recycling) are placed at
+   their base floor and become obstacles above, keeping them vertical.
+3. **Re-pave.** Add a width-1 `floor` tile under any new-footprint tile that
+   wasn't paved (57 tiles on `towerone_6`). Respect the "a floor may not be wider
+   than the floor below" rule — clamp/flag if adding a tile would violate it.
+4. **Clamp & flag.** Off-lot or genuinely-unfittable entities (none on
+   `towerone_6`) keep their pre-reflow width and log a `migrationNotes` entry
+   rather than overlap. Stamp `version = 2`. Pure/total (no throw); `version >
+   SAVE_VERSION` still fails closed.
+
+**Known edge case to solve in E1c:** a *mixed* basement floor (parking **and**
+commercial, e.g. B1) — pass-1 parking can reposition into a non-parking room's
+slot and pass-2 then shoves that room far (one restaurant moved 130 tiles on
+`towerone_6`). Fix: on mixed floors, place non-parking rooms first (or clamp
+parking to its original span) so the two passes don't fight.
 
 ### 1.2 Consequences the reflow deliberately accepts
 
-- **Horizontal shift.** Rooms move in x, so cross-floor vertical alignment (and
-  room↔shaft adjacency) degrades cosmetically. Routing is by floor-reachability,
-  not adjacency, so **reachability/serving is preserved**; only looks change.
-- **New spatial rules re-evaluate post-reflow.** W1 (transport-too-far) and W2
-  (noise distance) are computed on the *new* positions, so a migrated tower may
-  surface a telegraphed penalty it didn't have before. That is *correct* — it now
-  obeys canon spatial rules — and it is safe because those penalties are the
-  recoverable, telegraphed `vacating` kind, never instant loss.
-- **Determinism.** The reflow is a pure function of the save; same input → same
-  output (needed for a golden-fixture test).
+- **Tiny visible shift.** On `towerone_6`, only **31 of 988** visible (non-parking)
+  rooms move at all, all but the one edge-case ≤10 tiles (median 0, 90th %ile 2).
+  So W1 distances, W2 noise adjacency, and congestion are **barely perturbed** —
+  the migration does not silently wreck a working tower.
+- **New spatial rules re-evaluate post-reflow** on the (near-identical) new
+  positions; any surfaced penalty is the recoverable, telegraphed `vacating` kind,
+  never instant loss.
+- **Determinism.** Pure function of the save; same input → same output (golden
+  fixture).
 
-### 1.3 Evidence: `towerone_6.vctower` (the golden fixture)
+### 1.3 Spike evidence: `towerone_6.vctower` (the golden fixture)
 
-Decoded (`VCTOWER1` + base64 deflate-raw JSON), v1, 3★, 62 built floors, 24
-transports (all elevators — no stairs/escalators), 12,975 units of which 11,897
-are width-1 `floor`/`lobby` paving. Rooms needing resize and the reflow headroom:
+Decoded (`VCTOWER1` + base64 deflate-raw JSON), SAVE_VERSION 1, 3★, 62 built
+floors, 24 transports (incl. stairs/escalators), 12,975 units of which 11,897 are
+width-1 `floor`/`lobby` paving. 113 rooms resize (parking 6→4 ×85, ramp 6→16 ×5,
+fastFood 12→16 ×4, restaurant 16→24 ×3, cinema 24→31 ×3, suite 12→10 ×13).
 
-| Kind | Count | Stored → canon | Effect |
-|---|---:|---|---|
-| parking | 85 | 6 → 4 | squish −170 tiles |
-| hotelSuite | 13 | 12 → 10 | squish −26 tiles |
-| parkingRamp | 5 | 6 → 16 | expand +50 |
-| fastFood | 4 | 12 → 16 | expand +16 |
-| restaurant | 3 | 16 → 24 | expand +24 |
-| cinema | 3 | 24 → 31 | expand +21 |
+**Prototype results** (`scratchpad/reflow-proto.mjs`, the two-pass algorithm):
 
-- **14 of 15 expanders collide** with a room immediately to their right if grown
-  in place (`parkingRamp→parking` ×50, `fastFood→office` ×8, `restaurant→medical`
-  ×8, `cinema→condo` ×7, …) — proving expand-in-place is wrong and a reflow is
-  required.
-- **Slack exists:** rightmost room tile is **x=303**; the lot goes to **375** →
-  ~72 tiles of right-hand slack per floor, and basements net-shrink (parking
-  squish −170 ≫ ramp expand +50). So the §1.1 sweep fits without off-lot clamps.
-- **Note:** this save's `hotelSuite` is stored at **12** — proof that widths have
-  already drifted across versions and that `deserialize` faithfully trusts stored
-  widths. The reflow's `CANON` map is keyed by kind, not by "stored==current".
+| Metric | Result |
+|---|---|
+| Room↔room overlaps | **0** |
+| Off-lot rooms | **0** |
+| Dead (unchained) parking | **0 / 85** |
+| Ramp columns | **aligned** (231/231/232/232 — unchanged from original) |
+| Visible rooms moved | **31 / 988** (median 0, all ≤10 except 1) |
+| Re-pave tiles added | 57 |
+| Rightmost edge | 315 / 375 |
+| Outstanding edge case | 1 (mixed-basement restaurant, §1.1) |
 
-**Fixture assertions (test):** after `upgradeV1toV2(towerone_6)` — every room is
-at its canon width; no two rooms overlap on any floor; no room overlaps a
-transport column; every room tile is floor/lobby-backed; the tower still loads,
-serves, and reports parking demand satisfied under the 24-worker rule.
+**Fixture assertions (E1c test):** after `upgradeV1toV2(towerone_6)` — every room
+at canon width; no room↔room overlap on any floor; every ramp column x unchanged;
+0 dead parking; every room tile floor/lobby-backed; visible movement within
+tolerance; the tower loads, serves, and reports parking demand satisfied under the
+24-worker rule.
 
 ## 2. Per-mechanic implementation map
 
