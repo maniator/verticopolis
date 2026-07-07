@@ -75,9 +75,9 @@ describe("editor & stats HTML builders", () => {
     for (const field of grab(transportEditorHtml(sim, lift))) expect(tKeys).toContain(field);
     // The cinema's state-gated "Now showing" row is where this drifted once.
     const csim = new Simulation();
-    for (let x = 10; x < 40; x++) expect(csim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (const fl of [2, 3]) for (let x = 10; x < 40; x++) expect(csim.tower.place("floor", fl, x).ok).toBe(true);
-    const rc = csim.tower.place("cinema", 2, 12);
+    for (let x = 10; x < 44; x++) expect(csim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (const fl of [2, 3]) for (let x = 10; x < 44; x++) expect(csim.tower.place("floor", fl, x).ok).toBe(true);
+    const rc = csim.tower.place("cinema", 2, 12); // 31-wide cinema at 12 → spans 12..42
     expect(rc.ok).toBe(true);
     const cinema = csim.tower.units.find((u) => u.id === rc.unitId)!;
     for (const state of ["occupied", "gutted"] as const) {

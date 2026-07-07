@@ -245,26 +245,27 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   } | null;
 
   /** A richer strip than fixture(): three room floors so the cinema (2 floors,
-   *  24 wide), a condo, and elevator extends up to floor 4 all fit. */
+   *  31 wide — canon), an office, a condo, and elevator/stairs all fit without
+   *  overlap (the 8-wide stairs and the elevator must not collide). */
   beforeEach(() => {
     sim = new Simulation();
-    for (let x = 5; x < 45; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 5; x < 64; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let fl = 2; fl <= 4; fl++) {
-      for (let x = 5; x < 45; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+      for (let x = 5; x < 64; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
     }
-    const rc = sim.tower.place("cinema", 2, 5);
+    const rc = sim.tower.place("cinema", 2, 5); // 31 wide → tiles 5–35
     expect(rc.ok).toBe(true);
     cinema = sim.tower.units.find((u) => u.id === rc.unitId)!;
-    const ro = sim.tower.place("office", 2, 30);
+    const ro = sim.tower.place("office", 2, 38); // clears the wider cinema
     expect(ro.ok).toBe(true);
     office = sim.tower.units.find((u) => u.id === ro.unitId)!;
     office.state = "occupied";
     const rn = sim.tower.place("condo", 4, 5);
     expect(rn.ok).toBe(true);
     condo = sim.tower.units.find((u) => u.id === rn.unitId)!;
-    expect(sim.buildTransport("elevatorStandard", 40, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 58, 1, 2).ok).toBe(true);
     lift = sim.tower.transports[sim.tower.transports.length - 1];
-    expect(sim.buildTransport("stairs", 34, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("stairs", 48, 1, 2).ok).toBe(true); // 8 wide → tiles 48–55, clear of the lift at 58
     stairs = sim.tower.transports[sim.tower.transports.length - 1];
 
     f = fakes();

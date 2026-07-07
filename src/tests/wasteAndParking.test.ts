@@ -119,7 +119,8 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
     // Three working spaces: exactly enough for the suites, nothing for offices.
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    for (let i = 1; i <= 3; i++) mustPlace(sim, "parking", 0, C + i * 6);
+    // Chain flush after the 16-wide ramp; each space is 4 wide (canon).
+    for (let i = 0; i < 3; i++) mustPlace(sim, "parking", 0, C + 16 + i * 4);
     expect(sim.suiteParkingShort()).toBe(false);
   });
 
@@ -132,7 +133,7 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
     expect(sim.suiteParkingShort()).toBe(true); // 1 suite, 0 spaces
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    mustPlace(sim, "parking", 0, C + 6);
+    mustPlace(sim, "parking", 0, C + 16); // flush after the 16-wide ramp
     expect(sim.suiteParkingShort()).toBe(false); // 1 suite, 1 chained space
   });
 
@@ -145,7 +146,7 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
     const suite = occupy(sim, "hotelSuite", 2, 40, "empty");
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    for (let i = 1; i <= 4; i++) mustPlace(sim, "parking", 0, C + i * 6);
+    for (let i = 0; i < 4; i++) mustPlace(sim, "parking", 0, C + 16 + i * 4);
     // Monday noon: office cars parked, no suite car.
     sim.clock.minutes = 12 * 60; // day 0 = Monday
     const daytime = sim.parkingUsage();

@@ -360,11 +360,11 @@ describe("Hotel housekeeping", () => {
     const sim = hotelTower(23);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    for (let f = 3; f <= 14; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
-    // Thirteen single-floor stair flights chained 1→14, staggered so shafts
-    // never overlap. Reachability (components) and routing (BFS) must agree.
+    for (let f = 2; f <= 14; f++) for (let i = 0; i < 24; i++) sim.tower.place("floor", f, x0 + i);
+    // Thirteen single-floor stair flights chained 1→14, staggered so the 8-wide
+    // shafts never overlap. Reachability (components) and routing (BFS) must agree.
     for (let f = 1; f <= 13; f++) {
-      const r = sim.tower.placeTransport("stairs", x0 + (f % 3) * 6, f, f + 1);
+      const r = sim.tower.placeTransport("stairs", x0 + (f % 3) * 8, f, f + 1);
       expect(r.ok).toBe(true);
     }
     expect(sim.tower.staffConnected(1, 14)).toBe(true);
@@ -378,8 +378,8 @@ describe("Hotel housekeeping", () => {
     for (let f = 3; f <= 5; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
     // Stairs built FIRST (the tie-break used to favor build order)…
     expect(sim.tower.placeTransport("stairs", x0 + 6, 2, 3).ok).toBe(true);
-    // …then the service elevator covering the same hop.
-    expect(sim.tower.placeTransport("elevatorService", x0 + 12, 2, 5).ok).toBe(true);
+    // …then the service elevator covering the same hop (clear of the 8-wide stairs).
+    expect(sim.tower.placeTransport("elevatorService", x0 + 16, 2, 5).ok).toBe(true);
     const service = sim.tower.transports.find((t) => t.kind === "elevatorService")!;
     const route = sim.crowd.staffRoute(sim.tower, 2, 3);
     expect(route?.shafts[0]).toBe(service.id); // rides, not climbs

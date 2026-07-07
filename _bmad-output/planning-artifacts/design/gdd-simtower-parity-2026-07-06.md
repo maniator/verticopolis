@@ -95,10 +95,10 @@ whose width tracks the lot (metro backdrop) tracks the new value.
 | Party Hall | 24 | 24 | keep | ✅ |
 | Hotel Single | 4 | 4 | keep | ✅ |
 | Hotel Double | 6 | 6 | keep | ✅ |
-| **Hotel Suite** | 8 | **10** | widen | ✅ |
+| **Hotel Suite** | 12 | **10** | squish | ✅ |
 | **Fast Food** | 12 | **16** | widen | ✅ |
 | **Restaurant** | 16 | **24** | widen | ✅ |
-| **Cinema** | 24 | **31** | widen | ⚠️ single-source — verify |
+| **Cinema** | 24 | **31** | widen | ✅ corroborated (2 sources) |
 | **Stairway** | 4 | **8** | widen | ✅ |
 | **Escalator** | 4 | **8** | widen | ✅ |
 | **Parking Space** | 6 | **4** | narrow | ✅ |
@@ -106,11 +106,12 @@ whose width tracks the lot (metro backdrop) tracks the new value.
 | Elevator (std/svc/exp) | 3/4/4 | undocumented | keep | — |
 | Security / Medical / Housekeeping / Recycling | 8/16/8/20 | undocumented | keep | — |
 
-> **[NOTE FOR DESIGNER]** Cinema 31 and hotel-suite 10 come primarily from the
-> Fandom Room page (single strong source). Both are adopted as canon but flagged;
-> if a second source contradicts, revisit in the architecture phase. Widths left
-> "undocumented" (elevators, service rooms) are **not** changed — canon-first does
-> not mean invent numbers.
+> **[NOTE FOR DESIGNER]** Cinema 31 and hotel-suite 10 are **corroborated by a
+> second source** (Fandom Room/Cinema pages + a second web source confirming
+> "Cinema occupies 2 levels and is 31 segments long" and "Hotel Suite width 10
+> segments") — the E1b gate is cleared and both shipped. Widths left "undocumented"
+> (elevators, service rooms) are **not** changed — canon-first does not mean invent
+> numbers.
 
 ### 2.3 Downstream effects of the width changes
 

@@ -410,7 +410,10 @@ class GameApp {
     const u = this.sim.tower.unitAt(floor, tile);
     if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
     const t = this.sim.tower.transports.find(
-      (tr) => tile >= tr.x && tile < tr.x + FACILITIES[tr.kind].width && floor >= tr.bottom && floor <= tr.top,
+      // Use the shaft's OWN stored width (matches render + overlap checks), not
+      // the catalog width — an old save keeps its stored width, so after a canon
+      // width change (e.g. stairs 4→8) the catalog would give a phantom click zone.
+      (tr) => tile >= tr.x && tile < tr.x + tr.width && floor >= tr.bottom && floor <= tr.top,
     );
     return t ? { type: "transport", id: t.id, kind: t.kind } : null;
   }

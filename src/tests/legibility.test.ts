@@ -18,14 +18,14 @@ describe("Legibility — functionalParkingSet (Tower)", () => {
     layFull(sim, "lobby", 1);
     layFull(sim, "floor", 0);
     sim.tower.place("parkingRamp", 0, C);
-    const a = sim.tower.place("parking", 0, C + 6); // chained to the ramp
+    const a = sim.tower.place("parking", 0, C + 16); // chained flush to the 16-wide ramp
     const b = sim.tower.place("parking", 0, C + 100); // isolated → dead
     const set = sim.tower.functionalParkingSet();
     expect(set.has(a.unitId!)).toBe(true);
     expect(set.has(b.unitId!)).toBe(false);
     expect(sim.tower.functionalParkingSpots()).toBe(set.size); // delegation invariant
-    sim.tower.place("parking", 0, C + 12); // chain-extends off a
-    expect(sim.tower.functionalParkingSet().size).toBe(2); // C+6 and C+12 now both chained
+    sim.tower.place("parking", 0, C + 20); // chain-extends flush off a
+    expect(sim.tower.functionalParkingSet().size).toBe(2); // C+16 and C+20 now both chained
   });
 
   it("stacked parking with no ramp between floors is not connected", () => {
@@ -35,8 +35,8 @@ describe("Legibility — functionalParkingSet (Tower)", () => {
     layFull(sim, "floor", 0);
     layFull(sim, "floor", -1);
     sim.tower.place("parkingRamp", -1, C);
-    sim.tower.place("parking", -1, C + 6); // chained on B2
-    const up = sim.tower.place("parking", 0, C + 6); // directly above, but no ramp on B1
+    sim.tower.place("parking", -1, C + 16); // chained flush on B2
+    const up = sim.tower.place("parking", 0, C + 16); // directly above, but no ramp on B1
     expect(sim.tower.functionalParkingSet().has(up.unitId!)).toBe(false);
   });
 });
@@ -114,7 +114,7 @@ describe("Legibility — rating & stats (Simulation)", () => {
     layFull(sim, "floor", 0);
     expect(sim.stats().parkingSpaces).toBe(0); // no parking yet → stats row is omitted by the UI
     sim.tower.place("parkingRamp", 0, C);
-    sim.tower.place("parking", 0, C + 6);
+    sim.tower.place("parking", 0, C + 16);
     sim.tower.place("parking", 0, C + 100); // dead
     expect(sim.stats().parkingSpaces).toBe(2);
     // The working count is a flood-fill computed at modal-build time (NOT in the

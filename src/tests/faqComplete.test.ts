@@ -136,7 +136,7 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
     if (withParking) {
       lay(sim, "floor", 0);
       sim.tower.place("parkingRamp", 0, C);
-      sim.tower.place("parking", 0, C + 6); // one working space for the one suite
+      sim.tower.place("parking", 0, C + 16); // one working space chained flush to the 16-wide ramp
     }
     const r = sim.tower.place("hotelSuite", 2, 0);
     expect(r.ok).toBe(true); // fail loudly here, not with a null deref later
@@ -247,8 +247,8 @@ describe("Office parking demand (FAQ): offices want parking from 3★", () => {
     sim.star = 3;
     if (withParking) {
       lay(sim, "floor", 0);
-      sim.tower.place("parkingRamp", 0, 0); // spots must chain to a ramp
-      for (let x = 6; x + 6 <= W; x += 6) sim.tower.place("parking", 0, x); // ample parking
+      sim.tower.place("parkingRamp", 0, 0); // 16-wide ramp; spots must chain to it
+      for (let x = 16; x + 4 <= W; x += 4) sim.tower.place("parking", 0, x); // ample parking, flush chain
     }
     for (let i = 0; i < 12; i++) sim.tick(60); // a Monday's working hours
     return sim.tower.units.filter((u) => u.kind === "office" && u.floor >= 3 && u.state === "occupied").length;
@@ -466,11 +466,11 @@ describe("Fine FAQ mechanics", () => {
     for (let x = x0; x < x0 + 140; x++) sim.tower.place("lobby", 1, x);
     for (let x = x0; x < x0 + 140; x++) sim.tower.place("floor", 0, x);
     // No ramp yet → nothing functions.
-    sim.tower.place("parking", 0, x0 + 6);
+    sim.tower.place("parking", 0, x0 + 16);
     expect(sim.tower.functionalParkingSpots()).toBe(0);
-    // Ramp at x0..x0+5, a chain of two spaces (x0+6, x0+12), plus an isolated one.
+    // Ramp at x0..x0+15, a chain of two flush spaces (x0+16, x0+20), plus an isolated one.
     sim.tower.place("parkingRamp", 0, x0);
-    sim.tower.place("parking", 0, x0 + 12);
+    sim.tower.place("parking", 0, x0 + 20);
     sim.tower.place("parking", 0, x0 + 120); // gap → dead X, not connected
     expect(sim.tower.functionalParkingSpots()).toBe(2); // the two chained spaces, not the isolated one
   });

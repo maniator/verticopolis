@@ -28,7 +28,7 @@ them; balance-heavy penalties last.
 - **Unblocks:** everything (wider lot = reflow slack).
 
 ### E1b — Facility widths to canon + width-responsive sprite re-fit  ·  risk: med  ·  version: minor
-- **Change:** `FACILITIES` widths — suite 8→10, fastFood 12→16, restaurant 16→24,
+- **Change:** `FACILITIES` widths — suite 12→10, fastFood 12→16, restaurant 16→24,
   cinema 24→31, stairs 4→8, escalator 4→8, parking 6→4, ramp 6→16
   (`facilities.ts`). Audit each changed kind's sprite draws responsively to `w`
   (`src/render/sprites/*`). Verify `snapX`, fixed-span gesture at width 8.
