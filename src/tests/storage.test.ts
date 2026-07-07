@@ -307,6 +307,15 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(200);
   });
 
+  it("propagates direct async save failures to callers", async () => {
+    const saveToAsync = vi.spyOn(SaveGame, "saveToAsync").mockRejectedValueOnce(new Error("write failed"));
+    try {
+      await expect(SaveGame.saveAsync(sampleGame())).rejects.toThrow(/write failed/);
+    } finally {
+      saveToAsync.mockRestore();
+    }
+  });
+
   // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
   // decompression-bomb fixtures below.
   const b64 = (bytes: Uint8Array): string => {

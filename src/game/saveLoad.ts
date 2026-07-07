@@ -59,7 +59,7 @@ export class SaveLoad {
         await SaveGame.saveAsync(this.deps.getSim());
       } while (this.autosaveQueued);
     } catch {
-      /* periodic autosave is best effort; manual and pre-reload saves still report errors */
+      /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
     }
   }
 
