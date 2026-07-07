@@ -90,6 +90,17 @@ Triage them into the table above, then delete the raw note._
   stretching to the cell. _Note: relevant when the E1b width change (parking 6→4)
   lands and screenshots regenerate — revisit the sprite-gallery shot then._
 
+### Deferred from: gds-code-review E4 (mobile floor/lobby drag-paint), 2026-07-07
+
+- **Jittery touch tap with floor/lobby can over-paint one adjacent tile** — the
+  "action" path has no movement slop (`TowerEngine.pointerMove` fires
+  `onActionMove`→`paintFloorRun` on any movement), while the pan-tap path allows
+  14px. So a touch tap that jitters across a tile boundary lays the anchor strip
+  **and** one extra adjacent tile. Low: floor/lobby runs are contiguous by intent
+  and cheap, and the deferred anchor still lays exactly one strip on a pure
+  (no-move) tap. Fix if it annoys: gate `paintFloorRun` behind a small on-touch
+  movement threshold mirroring the tap slop. (Blind Hunter finding 2.)
+
 ## Completed / superseded
 
 - ~~**P1 — `deserialize` crashes on a `null`/malformed unit or transport entry (condo-modes)**~~

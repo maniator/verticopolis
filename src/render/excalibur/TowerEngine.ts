@@ -262,7 +262,10 @@ export class TowerEngine {
   // Excalibur pointer gesture state.
   private pointers = new Map<number, { sx: number; sy: number }>();
   private gesture: "pan" | "action" | null = null;
-  private pinch: { dist: number } | null = null;
+  // Two-finger gesture: `dist` drives pinch-zoom, `mx`/`my` the finger midpoint
+  // that drives two-finger PAN (so mobile keeps a pan path while a paint tool
+  // owns the one-finger drag — one finger draws, two fingers pan + zoom).
+  private pinch: { dist: number; mx: number; my: number } | null = null;
   private moved = 0;
   private downTouch = false;
   private lastSx = 0;
@@ -521,7 +524,11 @@ export class TowerEngine {
     this.pointers.set(ev.pointerId, { sx: ev.screenPos.x, sy: ev.screenPos.y });
     if (this.pointers.size === 2) {
       const pts = [...this.pointers.values()];
-      this.pinch = { dist: Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy) };
+      this.pinch = {
+        dist: Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy),
+        mx: (pts[0].sx + pts[1].sx) / 2,
+        my: (pts[0].sy + pts[1].sy) / 2,
+      };
       this.gesture = null;
       this.preview = null;
       this.transportPreview = null;
@@ -570,8 +577,13 @@ export class TowerEngine {
       const dist = Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy);
       const mx = (pts[0].sx + pts[1].sx) / 2;
       const my = (pts[0].sy + pts[1].sy) / 2;
+      // Two fingers translate the camera by their midpoint delta (pan) AND scale
+      // by their distance ratio (zoom) — the standard map gesture.
+      this.pan(mx - this.pinch.mx, my - this.pinch.my);
       if (this.pinch.dist > 0) this.zoomAt(dist / this.pinch.dist, mx, my);
       this.pinch.dist = dist;
+      this.pinch.mx = mx;
+      this.pinch.my = my;
       return;
     }
     if (this.arrowDrag) {

@@ -111,6 +111,36 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(sim.tower.structureKindAt(4, 14)).toBeUndefined();
   });
 
+  it("paintFloorRun chains parking into contiguous spaces (canon drag-to-lay a chain)", () => {
+    sim.star = 3; // parking unlocks at 3★
+    sim.money = 1e9;
+    for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
+    // Drag the parking tool across the floor from x=6.
+    build.paintFloorRun("parking", 6, 0);
+    build.paintFloorRun("parking", 34, 0);
+    const spaces = sim.tower.units.filter((u) => u.kind === "parking");
+    expect(spaces.length).toBeGreaterThan(1); // a CHAIN, not one module
+    const w = FACILITIES.parking.width;
+    const xs = spaces.map((u) => u.x).sort((a, b) => a - b);
+    // No two modules overlap: each left edge is at least a full width past the last.
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(w);
+  });
+
+  it("a paint tap at the right edge left-shifts to fit (snapX seed), never no-ops off-lot", () => {
+    sim.star = 3;
+    sim.money = 1e9;
+    const W = GRID.width;
+    // Ground lobby the basement hangs off, then a full-width basement floor.
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < W; x++) sim.tower.place("floor", 0, x);
+    // A tap at the very last column: a width-6 parking footprint would run off
+    // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
+    build.paintFloorRun("parking", W - 1, 0);
+    const p = sim.tower.units.find((u) => u.kind === "parking");
+    expect(p).toBeDefined();
+    expect(p!.x + p!.width).toBeLessThanOrEqual(W); // the whole footprint is on-lot
+  });
+
   it("tryBuild toasts the refusal only when loud; quiet drags stay silent", () => {
     sim.money = 0;
     build.tryBuild("floor", 3, 20); // loud (default): error sfx + toast

@@ -5,7 +5,7 @@ import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
-import { brushTiles, clampTile, dragRunTiles } from "../ui/placement";
+import { brushTiles, dragRunTiles, snapX } from "../ui/placement";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -123,7 +123,10 @@ export class BuildActions {
    */
   paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
     if (!this.paint || this.paint.floor !== floor) {
-      this.tryBuild(kind, floor, clampTile(tile), true);
+      // snapX (not clampTile) so a wide unit's FOOTPRINT stays on-lot: a tap at
+      // the right edge left-shifts to fit instead of silently failing off-lot.
+      // For width-1 floor/lobby this is identical to clampTile.
+      this.tryBuild(kind, floor, snapX(kind, tile), true);
       this.paint = { tile, floor };
       return;
     }
