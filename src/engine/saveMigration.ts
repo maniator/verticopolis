@@ -34,10 +34,19 @@ const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
  * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
  * still mirrors its historical sale price, then chains the versioned upgrades.
  */
+/** The oldest schema version this migrator understands. A save with no valid
+ *  `version` field predates versioning entirely, so it is treated as this — the
+ *  OLDEST schema — not the current one: defaulting a versionless save to the
+ *  latest would skip every upgrade step (e.g. the v1→v2 reflow) for exactly the
+ *  legacy towers that need it. Unknown/garbled versions run migrations
+ *  deterministically from the bottom. */
+const OLDEST_SAVE_VERSION = 1;
+
 export function migrateSave(data: SerializedGame): SerializedGame {
-  // A missing/garbled version is normalized so the upgrade chain has a number to
-  // branch on; deserialize()'s coercion still hardens every value.
-  const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
+  // A missing/garbled version is normalized to the OLDEST schema (not the
+  // current one) so the upgrade chain runs from the bottom for legacy saves;
+  // deserialize()'s coercion still hardens every value.
+  const version = Number.isFinite(data.version) ? data.version : OLDEST_SAVE_VERSION;
   let migrated: SerializedGame = data.version === version ? data : { ...data, version };
   // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
   // condition under which deserialize() falls back to Classic, so migration must

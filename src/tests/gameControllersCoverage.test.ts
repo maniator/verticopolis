@@ -122,8 +122,9 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(spaces.length).toBeGreaterThan(1); // a CHAIN, not one module
     const w = FACILITIES.parking.width;
     const xs = spaces.map((u) => u.x).sort((a, b) => a - b);
-    // No two modules overlap: each left edge is at least a full width past the last.
-    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBeGreaterThanOrEqual(w);
+    // A true CHAIN: consecutive modules sit flush — exactly one width apart, with
+    // no gap (non-contiguous) and no overlap. `=== w` guards both at once.
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(w);
   });
 
   it("a paint tap at the right edge left-shifts to fit (snapX seed), never no-ops off-lot", () => {

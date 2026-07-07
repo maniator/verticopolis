@@ -106,21 +106,23 @@ describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
 });
 
 describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
-  it("a hotel beside an office loses satisfaction; one apart does not", () => {
+  it("a hotel within the office noise band loses satisfaction; one well beyond it does not", () => {
     const sim = Simulation.newGame(4);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     sim.buildTransport("elevatorStandard", C, 1, 2); // floor 2 served
-    // Office at x, a hotel immediately to its right (noisy), and a hotel far away.
+    // Office at C (width 9 ⇒ right edge at C+9); a hotel immediately to its right
+    // sits inside the canon 21-tile band, another placed ~40 tiles away is beyond
+    // it (W2 widened the old 1-tile rule to the documented 21-segment buffer).
     sim.tower.place("office", 2, C);
     const noisy = sim.tower.place("hotelDouble", 2, C + 9);
-    const quiet = sim.tower.place("hotelDouble", 2, C + 30);
+    const quiet = sim.tower.place("hotelDouble", 2, C + 40);
     const a = sim.tower.units.find((u) => u.id === noisy.unitId)!;
     const b = sim.tower.units.find((u) => u.id === quiet.unitId)!;
     for (const u of [a, b]) { u.state = "asleep"; u.satisfaction = 1; }
     for (let i = 0; i < 6; i++) sim.tick(60);
-    expect(a.satisfaction).toBeLessThan(b.satisfaction); // the office neighbor suffers
+    expect(a.satisfaction).toBeLessThan(b.satisfaction); // the in-band neighbor suffers
   });
 });
 
@@ -329,7 +331,7 @@ describe("Deep-review regressions (must not come back)", () => {
     // now-empty, well-served unit may re-let to a fresh resident afterward, so we
     // assert the departure actually fired via its toast, not the transient state.)
     for (let i = 0; i < 24 * 3; i++) sim.tick(60);
-    expect(sim.log.some((e) => /(A tenant|The owner) left .*office noise next door/.test(e.text))).toBe(true);
+    expect(sim.log.some((e) => /(A tenant|The owner) left .*a noisy neighbor nearby/.test(e.text))).toBe(true);
   });
 
   it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {
