@@ -149,8 +149,6 @@ bot review threads).
   thread Resolved; a reply alone doesn't clear it, and unresolved threads block
   merge under branch protection.
 
-Commit and push only when asked.
-
 ## License
 
 Verticopolis is licensed in two parts: the **source code** under the **MIT
