@@ -238,7 +238,7 @@ const DETAIL_ZOOM = 1.7;
 /** Hysteresis band around OVERVIEW_ZOOM so the overview scene doesn't flicker. */
 const OVERVIEW_EXIT = OVERVIEW_ZOOM + 0.08;
 
-function sceneFor(focus: ViewFocus, overview: boolean): Scene {
+export function sceneFor(focus: ViewFocus, overview: boolean): Scene {
   // Zoomed all the way out — you're looking at the whole building, so play the
   // wide overview theme regardless of what happens to be centered. The caller
   // resolves `overview` with hysteresis so hovering near the zoom threshold
@@ -279,23 +279,23 @@ function sceneFor(focus: ViewFocus, overview: boolean): Scene {
 }
 
 /** Map camera zoom to a 0..1 "how close are we" detail factor. */
-function detailFor(zoom: number): number {
+export function detailFor(zoom: number): number {
   return clamp((zoom - OVERVIEW_ZOOM) / (DETAIL_ZOOM - OVERVIEW_ZOOM), 0, 1);
 }
 
-function midiToFreq(n: number): number {
+export function midiToFreq(n: number): number {
   return 440 * Math.pow(2, (n - 69) / 12);
 }
 
-function clamp(x: number, lo: number, hi: number): number {
+export function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
 
-function lerp(a: number, b: number, t: number): number {
+export function lerp(a: number, b: number, t: number): number {
   return a + (b - a) * t;
 }
 
-function sameNotes(a: number[], b: number[]): boolean {
+export function sameNotes(a: number[], b: number[]): boolean {
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;

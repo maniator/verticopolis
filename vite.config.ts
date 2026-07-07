@@ -150,29 +150,13 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
-      // Measure the whole app, not just the well-tested engine — a report
-      // scoped to the strong layers overstates coverage and hides the
-      // untested UI shell. Excluded: non-code (declarations, configs), the
-      // tests themselves, and the tooling entry points (gallery/preview/
-      // excalibur pages, PWA bootstrap) — dev/build plumbing, not game
-      // logic. types.ts is measured: it carries runtime predicates
-      // (isPresent/isDormant), not just type aliases.
-      //
-      // Also excluded: layers that can only run against a real device and are
-      // therefore covered by the Playwright Tier-2 tier (e2e/*.spec.ts drive the
-      // live app end to end), NOT vitest — measuring them here would just depress
-      // the unit number with lines no unit test can reach:
-      //   - the canvas/WebGL DRAWING layer (the Excalibur engine wrapper and the
-      //     pixel-sprite painters);
-      //   - the Web-Audio SYNTHESIS engine (ToneAudioEngine needs an AudioContext);
-      //   - src/main.ts, the composition root / app entry: its constructor news
-      //     up TowerEngine (boots Excalibur/WebGL), so `new GameApp()` can't run
-      //     headless. Its testable LOGIC was deliberately extracted into the
-      //     src/game/* controllers (build/editor/saveLoad/inspector/keyboard),
-      //     which ARE measured and well covered; what remains is engine + rAF +
-      //     DOM/PWA wiring, exercised by e2e (window.game in the *.spec.ts).
-      // The PURE-logic render code stays measured: src/render/facadeGeometry.ts
-      // computes geometry (no canvas) and is unit-tested like the rest.
+      // Coverage measures the whole app so the report can't overstate itself.
+      // Only code that can't run headless is excluded — src/main.ts (its ctor
+      // boots the WebGL engine) and src/render/excalibur/** — plus dev/tooling
+      // entry points; those are integration-covered by the Playwright e2e tier.
+      // Everything else (incl. the sprite painters and the audio engine) IS
+      // unit-measured. Rationale, test tiers, and the per-file floors below are
+      // documented in CONTRIBUTING.md → "Testing & coverage".
       include: ["src/**/*.ts"],
       exclude: [
         "**/*.d.ts",
@@ -183,21 +167,21 @@ export default defineConfig({
         "src/excalibur-main.ts",
         "src/pwa.ts",
         "src/main.ts",
-        "src/audio/ToneAudioEngine.ts",
         "src/render/excalibur/**",
-        "src/render/pixelSprites.ts",
-        "src/render/sprites.ts",
-        "src/render/sprites/**",
       ],
-      // Enforced floor (agreed 2026-07-07): a ratchet so unit coverage of the
-      // testable logic can't rot, not a vanity ceiling. Branches/functions run
-      // a touch lower than lines/statements because defensive else-arms are
-      // legitimately hard to force without writing junk tests.
+      // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
+      // logic layers; per-file globs stop a weak painter/synth file hiding behind
+      // strong siblings. Draw code gets lower BRANCH floors (visual variants are
+      // the e2e visual tier's job). See CONTRIBUTING.md → "Coverage floors".
       thresholds: {
         statements: 85,
         lines: 85,
         functions: 80,
         branches: 80,
+        "src/audio/ToneAudioEngine.ts": { statements: 82, lines: 82, functions: 80, branches: 72 },
+        "src/render/sprites.ts": { statements: 88, lines: 88, functions: 90, branches: 82 },
+        "src/render/sprites/**": { statements: 90, lines: 90, functions: 90, branches: 60 },
+        "src/render/pixelSprites.ts": { statements: 78, lines: 78, functions: 80, branches: 65 },
       },
     },
   },

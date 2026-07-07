@@ -26,11 +26,12 @@ Other scripts:
 ```bash
 npm run build        # production build to dist/
 npm run preview      # serve the production build
-npm test             # run the Vitest suite
-npm run typecheck    # tsc --noEmit
-npm run lint         # eslint
 npm run screenshots  # build + headless-capture screenshots into docs/screenshots
 ```
+
+Contributing? See **[CONTRIBUTING.md](CONTRIBUTING.md)** for the dev workflow —
+the quality gates (`typecheck`, `lint`, `test`, `build`), the two test tiers, and
+the enforced coverage floors.
 
 ## Install it (PWA)
 
@@ -241,18 +242,19 @@ one per rung, so they can't drift from what the game actually does.
 
 ## Tests
 
-The Vitest suite covers placement rules, transport reachability, the economy
-(rent, condo sales, maintenance), star promotion and its facility gates, the
-hotel housekeeping cycle, elevator editing, save/load round-trips (including
-serialize-deserialize stability and corrupt/forward-version saves), and the
-clock. Run with `npm test`.
+Two tiers: a fast **Vitest** unit suite (engine, game logic, UI, sprites, audio,
+storage — placement, reachability, economy, star gates, housekeeping, save/load
+round-trips) and a **Playwright** browser end-to-end smoke that proves the game
+stays winnable and renders. Run `npm test` and `npm run e2e` (after
+`npm run build`). The full testing strategy — the two tiers, the enforced
+coverage floors, and what's unit-tested vs. integration-covered — lives in
+**[CONTRIBUTING.md](CONTRIBUTING.md)** → *Testing & coverage*.
 
-Two layers of **end-to-end** coverage guarantee the game stays winnable:
-a deterministic headless *playthrough* suite (`src/tests/playthrough.test.ts`)
-drives the real win logic to the TOWER and proves every rung's gate blocks it
-when missing, and a Playwright *browser* smoke (`e2e/`) confirms the win — and
-each ★ milestone — actually surfaces on screen. Run the browser tier with
-`npm run e2e` (after `npm run build`).
+## License
+
+The **source code** is **MIT** ([LICENSE](LICENSE)); the original **art and
+audio** are **CC BY 4.0** ([ASSETS-LICENSE](ASSETS-LICENSE.md)). To get involved,
+see **[CONTRIBUTING.md](CONTRIBUTING.md)**.
 
 ---
 

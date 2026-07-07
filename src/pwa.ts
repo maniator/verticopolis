@@ -18,21 +18,16 @@
  * UI, or reloads on a timer.
  */
 import { registerSW } from "virtual:pwa-register";
+import { parseUpdateInfo, type UpdateInfo } from "./pwaUpdateInfo";
 
 /**
  * High-level facts about the INCOMING build, read at prompt time from the
  * deployed `version.json` (see `emit-version-json` in vite.config.ts). The old
  * client can't introspect the waiting worker, so this is how it learns what it's
- * updating to. Everything is optional: on any failure the modal just omits it.
+ * updating to. The interface + its pure sanitizer live in `./pwaUpdateInfo` (so
+ * the bounds are unit-tested); re-exported here for the existing import site.
  */
-export interface UpdateInfo {
-  /** The incoming build's `package.json` version, e.g. "1.1.1". */
-  version?: string;
-  /** Short git SHA of the incoming build, e.g. "a1b2c3d". */
-  sha?: string;
-  /** Player-facing "what's new" lines (empty until the trailer harvest ships). */
-  notes?: string[];
-}
+export type { UpdateInfo };
 
 export interface PwaHandlers {
   /**
@@ -69,25 +64,9 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
     const res = await fetch(url.href, { cache: "no-store", signal: controller.signal });
     if (!res.ok) return null;
     const j: unknown = await res.json();
-    if (typeof j !== "object" || j === null) return null;
-    const o = j as Record<string, unknown>;
-    // Sanitize notes from a source that could be malformed or (if the origin is
-    // ever compromised) hostile: keep strings only, trim, drop empties, cap each
-    // line's length so one giant unbroken token can't wreck the modal layout, and
-    // cap the count. Escaping (in the UI) blocks XSS; these bound layout damage.
-    const notes = Array.isArray(o.notes)
-      ? o.notes
-          .filter((n): n is string => typeof n === "string")
-          .map((s) => s.trim())
-          .filter((s) => s.length > 0)
-          .map((s) => (s.length > 200 ? s.slice(0, 200) : s))
-          .slice(0, 3)
-      : [];
-    return {
-      version: typeof o.version === "string" ? o.version : undefined,
-      sha: typeof o.sha === "string" ? o.sha : undefined,
-      notes,
-    };
+    // Sanitize (bounds the notes, type-guards version/sha) in a pure, unit-tested
+    // helper — see src/pwaUpdateInfo.ts.
+    return parseUpdateInfo(j);
   } catch {
     return null;
   } finally {
