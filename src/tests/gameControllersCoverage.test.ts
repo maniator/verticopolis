@@ -517,11 +517,11 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     document.getElementById("splash")?.remove();
   });
 
-  /** jsdom's location.reload is "not implemented" (navigation), so swap the
-   *  global for a minimal recording stand-in. The module reads the bare
-   *  `location` binding, which resolves to globalThis in the vitest jsdom
-   *  environment — window.location itself is non-configurable, so stubbing
-   *  the global is the least invasive seam. */
+  /** The test DOM's location.reload is a navigation no-op, so swap the global
+   *  for a minimal recording stand-in. The module reads the bare `location`
+   *  binding, which resolves to globalThis in the vitest DOM environment —
+   *  window.location itself is non-configurable, so stubbing the global is the
+   *  least invasive seam. */
   function stubReload() {
     const reload = vi.fn();
     vi.stubGlobal("location", { reload } as unknown as Location);

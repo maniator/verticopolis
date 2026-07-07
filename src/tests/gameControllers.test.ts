@@ -443,3 +443,70 @@ describe("KeyboardPlay (commit announcements)", () => {
     expect(undoLog).toEqual([]);
   });
 });
+
+describe("InspectorController (data-rich cards: parking, recycling, notice)", () => {
+  function place(sim: Simulation, kind: FacilityKind, floor: number, x: number): Unit {
+    const r = sim.tower.place(kind, floor, x);
+    expect(r.ok, `place ${kind} @${floor},${x}`).toBe(true);
+    return sim.tower.units.find((u) => u.id === r.unitId)!;
+  }
+  function makeInspector(sim: Simulation) {
+    const shown: (string | null)[] = [];
+    const inspector = new InspectorController({
+      getSim: () => sim,
+      ui: { showInspector: (html) => shown.push(html) },
+      setAnchor: () => {},
+    });
+    return { inspector, shown };
+  }
+
+  it("a parking ramp shows the tower-wide demand line; a chained space reads connected, an orphan reads dead", () => {
+    const sim = new Simulation();
+    for (let x = 10; x < 46; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 46; x++) expect(sim.tower.place("floor", 0, x).ok).toBe(true);
+    const ramp = place(sim, "parkingRamp", 0, 20); // tiles 20–25
+    const good = place(sim, "parking", 0, 26); // abuts the ramp → connected
+    const dead = place(sim, "parking", 0, 34); // gap at 32–33 → orphaned
+    [ramp, good, dead].forEach((u) => (u.state = "empty")); // operational (not construction)
+
+    const { inspector, shown } = makeInspector(sim);
+    inspector.inspectPicked({ type: "unit", id: ramp.id, kind: "parkingRamp" });
+    expect(last(shown)).toContain("Demand:");
+
+    inspector.inspectPicked({ type: "unit", id: good.id, kind: "parking" });
+    expect(last(shown)).toContain("Ramp access: connected");
+
+    inspector.inspectPicked({ type: "unit", id: dead.id, kind: "parking" });
+    expect(last(shown)).toContain("Ramp access: none");
+    expect(last(shown)).toContain("dead");
+  });
+
+  it("a recycling center shows its fill and the capacity/demand verdict", () => {
+    const sim = new Simulation();
+    for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (const f of [0, -1]) for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
+    const rec = place(sim, "recycling", -1, 12); // 2-floor, width-20 center
+    rec.state = "empty"; // operational
+
+    const { inspector, shown } = makeInspector(sim);
+    inspector.inspectPicked({ type: "unit", id: rec.id, kind: "recycling" });
+    expect(last(shown)).toContain("Fill:");
+    expect(last(shown)).toMatch(/demand met|Over capacity/);
+  });
+
+  it("a tenant on notice spells out the cause, a time bound, and the recovery target", () => {
+    const { sim, office } = fixture();
+    office.state = "vacating";
+    office.vacateReason = "rent";
+    office.vacateAt = sim.clock.minutes + 2 * 60; // ~2 hours left
+    office.satisfaction = 0.3;
+
+    const { inspector, shown } = makeInspector(sim);
+    inspector.inspectPicked({ type: "unit", id: office.id, kind: "office" });
+    const card = last(shown)!;
+    expect(card).toContain("Giving notice");
+    expect(card).toContain("rent set too high");
+    expect(card).toContain("hour(s)");
+    expect(card).toContain("30%"); // current satisfaction in the recovery line
+  });
+});
