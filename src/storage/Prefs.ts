@@ -11,7 +11,7 @@ export interface Prefs {
   colorblindCue?: boolean;
   /** Disable the 1994 "breathing clock" (lunch dilates, night sprints) and run
    *  the day at a uniform real-time rate. Presentation-only, like the speed
-   *  buttons — never serialized with a tower and never touches the sim. */
+   *  buttons: never serialized with a tower, and never touches the sim. */
   steadyClock?: boolean;
 }
 

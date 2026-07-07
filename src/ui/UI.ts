@@ -1,7 +1,6 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
-import { loadPrefs } from "../storage/Prefs";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
@@ -48,6 +47,9 @@ export interface UICallbacks {
   /** Toggle the "steady clock" pref (disables the 1994 breathing-clock pacing);
    *  returns the new steady state (true = steady, breathing off). */
   onToggleSteadyClock(): boolean;
+  /** The live steady-clock state, read from the same in-memory prefs the game
+   *  loop consults (never a second localStorage read, which could disagree). */
+  isSteadyClock(): boolean;
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
@@ -882,7 +884,7 @@ export class UI {
         ? "The day runs at an even pace. Turn off to restore the 1994 rhythm (slow lunch, fast night)."
         : "The 1994 rhythm is on: lunch runs slow, night runs fast. Turn on for an even pace.";
     };
-    scLabel(loadPrefs().steadyClock === true);
+    scLabel(this.cb.isSteadyClock());
     sc.addEventListener("click", () => scLabel(this.cb.onToggleSteadyClock()));
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
     // When the OS forces reduced motion on, the user pref can't override it — show

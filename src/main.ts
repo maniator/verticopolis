@@ -258,6 +258,7 @@ class GameApp {
         savePrefs(this.prefs);
         return this.prefs.steadyClock;
       },
+      isSteadyClock: () => this.prefs.steadyClock === true,
       onReplayOnboarding: () => {
         if (document.getElementById("splash")) return; // never arm behind the splash
         OnboardingController.clearOnboarded();
@@ -800,20 +801,21 @@ class GameApp {
     }
     const minutesPerSecond = SPEEDS[this.speed] ?? 0;
     // The 1994 "breathing clock": scale how fast REAL time feeds sim-minutes by
-    // the canon pacing curve (lunch dilates ~10×, night sprints) unless the
-    // player opted out. Presentation-only — the sim still ticks uniform minutes
+    // the canon pacing curve (lunch dilates ~10x, night sprints) unless the
+    // player opted out. Presentation-only: the sim still ticks uniform minutes,
     // and paceFactor is normalized so a full day costs the same real time, so
     // the speed buttons keep their meaning.
     const pace = this.prefs.steadyClock ? 1 : paceFactor(this.sim.clock.minuteOfDay);
     this.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
     // Step the simulation in small chunks so hourly/daily boundaries fire.
+    const minutesBeforeTicks = this.sim.clock.minutes;
     let guard = 0;
     while (this.accMinutes >= 1 && guard++ < 2000) {
       const step = Math.min(20, this.accMinutes);
       this.sim.tick(step);
       this.accMinutes -= step;
     }
-    this.emitLunchRush();
+    this.emitLunchRush(minutesBeforeTicks);
 
     // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
     // tower never makes panning feel sluggish.
@@ -865,15 +867,26 @@ class GameApp {
     this.positionPanels();
   }
 
-  /** Once per weekday, as the clock crosses noon with the breathing clock on,
-   *  drop a flavor line in the bulletin — it doubles as the only in-game
-   *  explanation of why midday plays out in slow motion (UX call: the clock
-   *  itself is the indicator; no HUD gauges). Transient, like the log. */
-  private emitLunchRush(): void {
+  /** Once per weekday, when this frame's ticks actually CROSSED noon with the
+   *  breathing clock on, drop a flavor line in the bulletin. It doubles as the
+   *  only in-game explanation of why midday plays out in slow motion (UX call:
+   *  the clock itself is the indicator; no HUD gauges). Crossing detection
+   *  (rather than sampling `hour === 12` after the loop) means loading a save
+   *  that already sits inside the noon hour stays quiet, a frozen clock stays
+   *  quiet, and a single huge frame that leaps from 11:5x past 13:00 still
+   *  fires. Transient, like the log. */
+  private emitLunchRush(minutesBeforeTicks: number): void {
+    if (this.prefs.steadyClock) return;
     const c = this.sim.clock;
-    if (this.prefs.steadyClock || c.hour !== 12 || c.isWeekend || c.day === this.lastLunchDay) return;
-    this.lastLunchDay = c.day;
-    this.sim.emit("Lunch rush! Midday plays out in slow motion — just like 1994.", "info");
+    const after = c.minutes;
+    if (after <= minutesBeforeTicks) return; // nothing ticked
+    // The most recent day whose noon falls inside (before, after], if any.
+    const day = Math.floor((after - 12 * 60) / 1440);
+    const noonAbs = day * 1440 + 12 * 60;
+    if (noonAbs <= minutesBeforeTicks || day === this.lastLunchDay) return;
+    if (day % 7 >= 5) return; // weekends: the lunch rush is a weekday event
+    this.lastLunchDay = day;
+    this.sim.emit("Lunch rush! Midday plays out in slow motion, just like 1994.", "info");
   }
 
   /** Keep the world-attached DOM panels (selected-facility editor, hover

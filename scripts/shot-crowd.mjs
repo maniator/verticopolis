@@ -5,7 +5,13 @@ const p = await b.newPage({ viewport: { width: 1280, height: 800 }, deviceScaleF
 p.on("pageerror", (e) => console.error("PAGE ERROR:", e.message));
 p.on("console", (m) => { if (m.type() === "error") console.error("CONSOLE:", m.text()); });
 
-await p.addInitScript(() => localStorage.clear());
+await p.addInitScript(() => {
+  localStorage.clear();
+  // Pin the steady clock so the fixed 6s wait lands mid-morning-rush as
+  // calibrated; the breathing clock (default on) would race to noon and stall
+  // the shot in the lunch crawl.
+  localStorage.setItem("vc.prefs", JSON.stringify({ steadyClock: true }));
+});
 await p.goto("http://localhost:4173/index.html", { waitUntil: "networkidle" });
 await p.waitForFunction(() => window.game?.engine?.engine?.currentScene, null, { timeout: 15000 });
 

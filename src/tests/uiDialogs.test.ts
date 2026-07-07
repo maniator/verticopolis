@@ -103,6 +103,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onEditAction: vi.fn(),
     onToggleReducedMotion: vi.fn(() => true),
     onToggleSteadyClock: vi.fn(() => true),
+    isSteadyClock: vi.fn(() => false),
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
@@ -479,9 +480,12 @@ describe("showHelp — the Report an issue link", () => {
     expect(acts).toEqual(["reduce-motion", "steady-clock", "replay-onboard", "close"]);
   });
 
-  it("wires the Steady clock toggle: label reflects the pref and the click routes through the callback", () => {
-    localStorage.removeItem("vc.prefs");
-    const { ui, cb } = makeUI({ onToggleSteadyClock: vi.fn(() => true) });
+  it("wires the Steady clock toggle: label follows the callback's returned state across clicks", () => {
+    // A stateful stub (On, then Off) makes a stuck toggle or a stale-state
+    // regression falsifiable; a constant stub would pass either bug.
+    let steady = false;
+    const toggle = vi.fn(() => (steady = !steady));
+    const { ui, cb } = makeUI({ onToggleSteadyClock: toggle, isSteadyClock: vi.fn(() => steady) });
     ui.showHelp();
     const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     // Fresh device: breathing clock on, so the "steady" pref reads Off.
@@ -489,18 +493,18 @@ describe("showHelp — the Report an issue link", () => {
     expect(btn.getAttribute("aria-pressed")).toBe("false");
     btn.click();
     expect(cb.onToggleSteadyClock).toHaveBeenCalledTimes(1);
-    // The label trusts the callback's returned state, not a local guess.
     expect(btn.textContent).toBe("Steady clock: On");
     expect(btn.getAttribute("aria-pressed")).toBe("true");
+    btn.click();
+    expect(btn.textContent).toBe("Steady clock: Off");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("reads a persisted steady-clock pref for the toggle's initial label", () => {
-    localStorage.setItem("vc.prefs", JSON.stringify({ steadyClock: true }));
-    const { ui } = makeUI();
+  it("derives the toggle's initial label from the live isSteadyClock callback", () => {
+    const { ui } = makeUI({ isSteadyClock: vi.fn(() => true) });
     ui.showHelp();
     const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     expect(btn.textContent).toBe("Steady clock: On");
-    localStorage.removeItem("vc.prefs");
   });
 
   it("gives initial focus to the primary 'Got it', not the external link", () => {

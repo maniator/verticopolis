@@ -740,6 +740,10 @@ a.btn {
 }
 .modal-actions {
   display: flex;
+  /* The Help footer now holds four buttons (Reduced motion / Steady clock /
+     Replay / Got it); on narrow phones they must wrap as whole buttons rather
+     than compress into multi-line labels. */
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
   justify-content: flex-end;
