@@ -71,16 +71,16 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     title: "Connect it",
     sub: "No one can reach a floor without transport. Run a stairway or elevator down to the ground lobby.",
     hintDesktop:
-      "Pick Standard Elevator and drag vertically from the lobby to your office's floor — or pick Stairway and just click the lobby (a flight always links two floors).",
+      "Pick Standard Elevator and drag vertically from the lobby to your office's floor, or pick Stairway and just click the lobby (a flight always links two floors).",
     hintMobile:
-      "Tap Elevator, then touch-and-drag vertically to size the shaft — or tap Stairway once on the lobby (a flight always links two floors).",
+      "Tap Elevator, then touch-and-drag vertically to size the shaft, or tap Stairway once on the lobby (a flight always links two floors).",
     pulse: '.pal-item[data-kind="elevatorStandard"], .pal-item[data-kind="stairs"]',
     done: (sim) => sim.tower.units.some((u) => u.kind === "office" && sim.tower.isFloorServed(u.floor)),
   },
   {
     id: "play",
     title: "Press Play & wait",
-    sub: "Hit ▶ Play. A tenant moves in within a day or two — rent lands each quarter.",
+    sub: "Hit ▶ Play. A tenant moves in within a day or two. Rent lands each quarter.",
     hintDesktop: "Press ▶ Play in the top bar and let time run.",
     hintMobile: "Tap ▶ Play in the top bar and let time run.",
     pulse: '#speed button[data-speed="1"]',
@@ -155,10 +155,10 @@ export class OnboardingController {
     // a modal surface (like the in-game <dialog id="modal">).
     el.setAttribute("role", "dialog");
     el.setAttribute("aria-modal", "true");
-    el.setAttribute("aria-label", "Verticopolis — start a game");
+    el.setAttribute("aria-label", "Verticopolis: start a game");
     const premise = mobile
       ? "Raise a high-rise floor by floor and climb to the TOWER."
-      : "Raise a living high-rise floor by floor — lease offices, open shops, run hotels, and thread the elevators that keep the city moving. Climb from 1★ to the legendary TOWER.";
+      : "Raise a living high-rise floor by floor: lease offices, open shops, run hotels, and thread the elevators that keep the city moving. Climb from 1★ to the legendary TOWER.";
     const continueBtn = o.hasSave
       ? `<button class="splash-btn primary" data-splash="continue">▶ Continue</button>`
       : "";
@@ -196,7 +196,7 @@ export class OnboardingController {
       `<button class="splash-btn ${o.hasSave ? "" : "primary"}" data-splash="new">＋ New Tower</button>` +
       `<button class="splash-btn ghost" data-splash="help">？ How to Play</button>` +
       `</div>` +
-      `<p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>` +
+      `<p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art, no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>` +
       `<p class="splash-version">v${APP_VERSION}</p>`;
     document.body.appendChild(el);
     this.splashEl = el;
@@ -340,7 +340,7 @@ export class OnboardingController {
     document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
     this.setDefaultHint();
     if (this.panelEl) {
-      this.panelEl.innerHTML = `<div class="win-title">Nice — you're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
+      this.panelEl.innerHTML = `<div class="win-title">Nice, you're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
       this.panelEl.addEventListener("click", () => this.clearSession(), { once: true });
     }
     if (this.sendOff) clearTimeout(this.sendOff);

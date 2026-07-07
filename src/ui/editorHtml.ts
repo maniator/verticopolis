@@ -77,7 +77,7 @@ export function unitEditorHtml(sim: Simulation, u: Unit): string {
   }
   if (u.state === "gutted") {
     rows.push(kvRow("Scrap value", "$0"));
-    rows.push(kvRow("⚠", "Gutted — bulldoze and rebuild."));
+    rows.push(kvRow("⚠", "Gutted: bulldoze and rebuild."));
   } else {
     rows.push(kvRow("Resale value", `$${resaleRefund(f.kind).toLocaleString()}`));
   }

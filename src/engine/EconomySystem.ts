@@ -332,14 +332,14 @@ export class EconomySystem {
     if (unreachable > 0 && this.hkNudgedDay !== this.sim.clock.day) {
       this.hkNudgedDay = this.sim.clock.day;
       this.sim.emit(
-        `🧹 Housekeeping can't reach ${unreachable} dirty room(s) — staff travel by service elevator, stairs or escalator, not passenger elevators.`,
+        `🧹 Housekeeping can't reach ${unreachable} dirty room(s). Staff travel by service elevator, stairs or escalator, not passenger elevators.`,
         "bad",
       );
     }
     if (starved > 0 && this.hkStarvedDay !== this.sim.clock.day) {
       this.hkStarvedDay = this.sim.clock.day;
       this.sim.emit(
-        `🧹 Housekeeping is at capacity — ${starved} dirty room(s) must wait until tomorrow. One Housekeeping unit cleans ~${HK_ROOMS_PER_CREW} rooms a day; build another.`,
+        `🧹 Housekeeping is at capacity. ${starved} dirty room(s) must wait until tomorrow. One Housekeeping unit cleans ~${HK_ROOMS_PER_CREW} rooms a day; build another.`,
         "bad",
       );
     }
@@ -386,7 +386,7 @@ export class EconomySystem {
       }
     }
     if (spread > 0) {
-      this.sim.emit(`🪳 Cockroaches spread from unserviced rooms into ${spread} more — add housekeeping!`, "bad");
+      this.sim.emit(`🪳 Cockroaches spread from unserviced rooms into ${spread} more. Add housekeeping!`, "bad");
     }
   }
 

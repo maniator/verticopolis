@@ -381,7 +381,7 @@ export class UI {
       })
       .join("");
     const box = this.openModal(`
-      <h2>${escapeHtml(title)} — Stops</h2>
+      <h2>${escapeHtml(title)}: Stops</h2>
       <p style="color:var(--muted);font-size:12px">Untick a floor to make the car skip it (express service). The top and bottom stay connected.</p>
       <div class="stop-list well">${rowsHtml}</div>
       <div class="modal-actions"><button class="btn primary" data-act="close">Done</button></div>`);
@@ -742,7 +742,7 @@ export class UI {
       : "";
     const box = this.openModal(
       `<h2>Found a New Tower</h2>
-       <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower — start another to play the other way.</p>
+       <p class="nt-lede">Choose your rule-set. This is set once and <b>cannot be changed</b> for this tower. Start another to play the other way.</p>
        <div class="nt-modes">
          <label class="nt-mode">
            <input type="radio" name="nt-mode" value="classic" checked />
@@ -756,7 +756,7 @@ export class UI {
            <span class="nt-mode-body">
              <span class="nt-mode-name">Modern <span class="nt-badge alt">new</span></span>
              <span class="nt-mode-desc">Everything in Classic, plus features the original couldn't do:</span>
-             <span class="nt-feature"><b>Variant households</b> — a condo draws a 2–5 person family. Bigger families pay more but lean harder on your elevators, so each sale is a real bet.</span>
+             <span class="nt-feature"><b>Variant households</b>: a condo draws a 2–5 person family. Bigger families pay more but lean harder on your elevators, so each sale is a real bet.</span>
            </span>
          </label>
        </div>
@@ -825,7 +825,7 @@ export class UI {
       const reader = new FileReader();
       // A file that vanishes or errors mid-read must not fail silently — the
       // launching dialog is already gone by the time the read runs.
-      reader.onerror = () => this.toast("Couldn't read that file — please try again.", "bad");
+      reader.onerror = () => this.toast("Couldn't read that file. Please try again.", "bad");
       reader.onload = () => this.cb.onImport(String(reader.result));
       reader.readAsText(file);
     };
@@ -845,28 +845,28 @@ export class UI {
         <li><b>Move people.</b> Every floor needs an <b>elevator</b> or <b>stairs</b> chain back to the ground lobby, or tenants leave.</li>
         <li><b>Make money.</b> Offices pay quarterly rent, condos sell once, hotels earn nightly, shops &amp; restaurants earn from foot traffic.</li>
         <li><b>Grow your rating.</b> 2★ at 300 pop, 3★ at 1,000 (needs Security), 4★ at 5,000 (needs Medical, enough Recycling, suites &amp; a VIP), 5★ at 10,000 (needs a Metro).</li>
-        <li><b>Take out the trash.</b> One <b>Recycling Center</b> processes ~2,500 population — it visibly fills through the day and a garbage truck empties it each morning. Outgrow your centers and 4★ locks until you build more.</li>
-        <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> on floor 100 and pass the VIP inspection — the <b>TOWER</b> rank needs 15,000 occupants (office workers + residents).</li>
-        <li><b>Two rides, tops.</b> People take at most <b>two</b> elevator/stair rides to reach a floor — add <b>sky lobbies</b> (every ~15 floors) so distant floors are one transfer away, or nobody comes.</li>
-        <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space — chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
-        <li><b>Book the films.</b> Cinemas book a film monthly — a <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
-        <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default) — no need to edit each room. A preview shows how many change before you apply.</li>
-        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b> — a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Want the other rule-set? Start a new tower — and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
+        <li><b>Take out the trash.</b> One <b>Recycling Center</b> processes ~2,500 population. It visibly fills through the day and a garbage truck empties it each morning. Outgrow your centers and 4★ locks until you build more.</li>
+        <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> on floor 100 and pass the VIP inspection. The <b>TOWER</b> rank needs 15,000 occupants (office workers + residents).</li>
+        <li><b>Two rides, tops.</b> People take at most <b>two</b> elevator/stair rides to reach a floor. Add <b>sky lobbies</b> (every ~15 floors) so distant floors are one transfer away, or nobody comes.</li>
+        <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
+        <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
+        <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
+        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
-      <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button) — redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing — try scrolling around!</p>
+      <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
       <h3>Keyboard play</h3>
-      <p style="color:var(--muted)">Play entirely without a mouse — pick a tool in the palette (Tab to it, Enter to select), then:</p>
+      <p style="color:var(--muted)">Play entirely without a mouse. Pick a tool in the palette (Tab to it, Enter to select), then:</p>
       <ul class="help-keys">
-        <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>) move the build cursor — hold <kbd>Shift</kbd> for ×10</li>
+        <li><kbd>↑</kbd><kbd>↓</kbd><kbd>←</kbd><kbd>→</kbd> (or <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>) move the build cursor. Hold <kbd>Shift</kbd> for ×10</li>
         <li><kbd>Enter</kbd> / <kbd>Space</kbd> build (or inspect) at the cursor. For an elevator or stairway, press once to anchor and again at the far end to size the shaft</li>
         <li><kbd>Delete</kbd> / <kbd>Backspace</kbd> / <kbd>X</kbd> bulldoze at the cursor · <kbd>Esc</kbd> cancel</li>
         <li><kbd>+</kbd> / <kbd>−</kbd> zoom · <kbd>C</kbd> re-center · <kbd>0</kbd>–<kbd>3</kbd> game speed · <kbd>Ctrl</kbd>+<kbd>Z</kbd> undo</li>
       </ul>
       <h3>Found a bug? Have an idea?</h3>
-      <p style="color:var(--muted)">Help us improve Verticopolis — report a bug, request a feature, or flag anything that doesn't match the 1994 original.</p>
+      <p style="color:var(--muted)">Help us improve Verticopolis. Report a bug, request a feature, or flag anything that doesn't match the 1994 original.</p>
       <p class="help-report"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/maniator/verticopolis/issues/new/choose">Let us know…<span class="visually-hidden"> (opens GitHub in a new tab)</span></a></p>
       <h3>About</h3>
-      <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art — no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
+      <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art, no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
@@ -957,7 +957,7 @@ export class UI {
     const buildLine = idText ? `<p class="build-id">Build ${idText}</p>` : "";
     const box = this.openModal(`
       <h2>Update available</h2>
-      <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it — you won't lose any progress.</p>
+      <p>A newer version of Verticopolis is ready. Update now saves your tower and reloads onto it. You won't lose any progress.</p>
       <p>Or keep playing: it'll apply next time you reopen.</p>
       ${notesBlock}
       ${buildLine}

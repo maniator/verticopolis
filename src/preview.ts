@@ -11,19 +11,19 @@ interface Entry {
 }
 
 const ENTRIES: Entry[] = [
-  { label: "Office — busy", kind: "office", state: "occupied", occ: 6, hour: 11 },
-  { label: "Office — vacant", kind: "office", state: "empty", occ: 0, hour: 11 },
-  { label: "Condominium — evening", kind: "condo", state: "occupied", occ: 3, hour: 20 },
-  { label: "Single Room — ready", kind: "hotelSingle", state: "empty", occ: 0, hour: 20 },
-  { label: "Single Room — asleep", kind: "hotelSingle", state: "asleep", occ: 1, hour: 1 },
-  { label: "Double Room — asleep", kind: "hotelDouble", state: "asleep", occ: 2, hour: 1 },
-  { label: "Suite — ready", kind: "hotelSuite", state: "empty", occ: 0, hour: 20 },
-  { label: "Hotel — needs cleaning", kind: "hotelDouble", state: "dirty", occ: 0, hour: 10 },
-  { label: "Fast Food — lunch", kind: "fastFood", state: "occupied", occ: 5, hour: 12 },
-  { label: "Restaurant — dinner", kind: "restaurant", state: "occupied", occ: 6, hour: 19 },
-  { label: "Retail Shop — open", kind: "shop", state: "occupied", occ: 2, hour: 14 },
-  { label: "Retail Shop — closed", kind: "shop", state: "occupied", occ: 0, hour: 23 },
-  { label: "Cinema — showing", kind: "cinema", state: "occupied", occ: 0, hour: 20 },
+  { label: "Office: busy", kind: "office", state: "occupied", occ: 6, hour: 11 },
+  { label: "Office: vacant", kind: "office", state: "empty", occ: 0, hour: 11 },
+  { label: "Condominium: evening", kind: "condo", state: "occupied", occ: 3, hour: 20 },
+  { label: "Single Room: ready", kind: "hotelSingle", state: "empty", occ: 0, hour: 20 },
+  { label: "Single Room: asleep", kind: "hotelSingle", state: "asleep", occ: 1, hour: 1 },
+  { label: "Double Room: asleep", kind: "hotelDouble", state: "asleep", occ: 2, hour: 1 },
+  { label: "Suite: ready", kind: "hotelSuite", state: "empty", occ: 0, hour: 20 },
+  { label: "Hotel: needs cleaning", kind: "hotelDouble", state: "dirty", occ: 0, hour: 10 },
+  { label: "Fast Food: lunch", kind: "fastFood", state: "occupied", occ: 5, hour: 12 },
+  { label: "Restaurant: dinner", kind: "restaurant", state: "occupied", occ: 6, hour: 19 },
+  { label: "Retail Shop: open", kind: "shop", state: "occupied", occ: 2, hour: 14 },
+  { label: "Retail Shop: closed", kind: "shop", state: "occupied", occ: 0, hour: 23 },
+  { label: "Cinema: showing", kind: "cinema", state: "occupied", occ: 0, hour: 20 },
 ];
 
 function makeUnit(e: Entry): Unit {

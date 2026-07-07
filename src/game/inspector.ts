@@ -47,10 +47,10 @@ function recyclingLine(sim: Simulation): string {
   const cap = sim.recyclingCapacity();
   const fillPct = Math.round(sim.recyclingFill() * 100);
   return (
-    `<div>Fill: ${fillPct}% — truck collects each morning.</div>` +
+    `<div>Fill: ${fillPct}%. Truck collects each morning.</div>` +
     (pop <= cap
-      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population — demand met.</div>`
-      : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed — build another center (4★ requires demand met).</div>`)
+      ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population, demand met.</div>`
+      : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`)
   );
 }
 
@@ -100,15 +100,15 @@ export class InspectorController {
       const access = !needsAccess
         ? ""
         : !served
-          ? `<div style="color:var(--bad)">Access: not connected — no elevator or stair reaches this floor.</div>`
+          ? `<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`
           : sim.floorReachable(u.floor)
             ? `<div style="color:var(--good)">Access: reachable (≤2 rides from the lobby).</div>`
-            : `<div style="color:var(--bad)">Access: too far — 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`;
+            : `<div style="color:var(--bad)">Access: too far. 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`;
       // Silent rule: hotel guests stop counting toward the star rating at 3★.
       const hotel = isHotelKind(u.kind)
         ? sim.hotelsCountTowardRating()
           ? `<div style="color:var(--good)">Counts toward next star: yes.</div>`
-          : `<div style="color:var(--bad)">Counts toward stars: no — hotel guests stop counting at 3★ (they still earn income).</div>`
+          : `<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 3★ (they still earn income).</div>`
         : "";
       // Silent rule: a parking space only works when it chains to a ramp. Skip
       // the verdict while it's still building (or on fire) — "Status" covers that.
@@ -125,7 +125,7 @@ export class InspectorController {
           ? parkingDemandLine(sim, parkingSet.size)
           : parkingSet.has(u.id)
             ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim, parkingSet.size)
-            : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`;
+            : `<div style="color:var(--bad)">Ramp access: none. This space is dead (no relief). Chain it to a Parking Ramp.</div>`;
       // W1: a served office whose nearest stairs/elevator is beyond the walking
       // tolerance is silently eroding — surface it always (like the W3 line below),
       // not only once the tenant is already on notice, and name the concrete fix.
@@ -134,7 +134,7 @@ export class InspectorController {
         u.floor !== 1 &&
         sim.tower.isFloorServed(u.floor) &&
         sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
-          ? `<div style="color:var(--bad)">Long walk to transport — tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`
+          ? `<div style="color:var(--bad)">Long walk to transport. Tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`
           : "";
       // W3: a canon commercial venue (not partyHall) more than two floors from a
       // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix — lobbies only
@@ -142,7 +142,7 @@ export class InspectorController {
       // impossible; the real move is to sit within 2 floors of one of those levels.
       const commercialLobby =
         isCommercialKind(u.kind) && sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
-          ? `<div style="color:var(--bad)">Shoppers: too far from a lobby — traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`
+          ? `<div style="color:var(--bad)">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`
           : "";
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
@@ -152,7 +152,7 @@ export class InspectorController {
       // hurt them" contract, so the eviction is never a surprise. The countdown
       // and the current-vs-target read recompute on every hover, so they tick
       // down live as the game clock advances.
-      const statusText = u.state === "vacating" ? "on notice — tenant leaving" : u.state;
+      const statusText = u.state === "vacating" ? "on notice, tenant leaving" : u.state;
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
         const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
@@ -168,7 +168,7 @@ export class InspectorController {
         const now = Math.round(u.satisfaction * 100);
         const target = Math.round(VACATE_RESCIND * 100);
         notice =
-          `<div style="color:var(--bad)">Giving notice — ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
+          `<div style="color:var(--bad)">Giving notice: ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
           `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
       }
       this.deps.ui.showInspector(
@@ -200,7 +200,7 @@ export class InspectorController {
       const busy =
         util === undefined
           ? ""
-          : `<div style="color:${util > 0.85 ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${util > 0.85 ? " — near capacity, consider more cars or a parallel shaft." : ""}</div>`;
+          : `<div style="color:${util > 0.85 ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${util > 0.85 ? ". Near capacity, consider more cars or a parallel shaft." : ""}</div>`;
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
           (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : "") +

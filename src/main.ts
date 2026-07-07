@@ -372,7 +372,7 @@ class GameApp {
     // (persists) and pops as a toast on the first UI update after the splash.
     if (this.saveWasCorrupt) {
       this.sim.emit(
-        "⚠️ Your saved tower couldn't be read — it may be corrupted or from a newer version. Starting a new tower.",
+        "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
         "bad",
       );
     }
@@ -1065,7 +1065,7 @@ class GameApp {
           this.saveLoad.saveBeforeUpdate();
         } catch {
           this.shownUpdate = false;
-          this.ui.toast("Couldn't save your tower — update paused. Try again.", "bad");
+          this.ui.toast("Couldn't save your tower. Update paused. Try again.", "bad");
           return;
         }
         // Unfreeze before activating: on success `activate()` reloads onto the
@@ -1096,7 +1096,7 @@ class GameApp {
           } catch {
             /* private mode — nothing to clear */
           }
-          this.ui.toast("Update couldn't be applied — try again.", "bad");
+          this.ui.toast("Update couldn't be applied. Try again.", "bad");
         }
       },
       // Later: keep playing. The waiting build activates on the next cold reopen

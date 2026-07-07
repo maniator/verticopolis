@@ -413,8 +413,8 @@ export class Simulation implements SimContext {
     if (missing > 0 && !this.tower.spanConnects(floor, x, f.width, hgt)) {
       const reason =
         floor >= 2
-          ? "Rooms must sit on the floor below — no floating overhangs."
-          : "Build next to the tower — you can't build in midair.";
+          ? "Rooms must sit on the floor below: no floating overhangs."
+          : "Build next to the tower. You can't build in midair.";
       return { ok: false, reason, cost: f.cost };
     }
     const cost = f.cost + missing * FACILITIES.floor.cost;
@@ -827,7 +827,7 @@ export class Simulation implements SimContext {
     if (suiteShort && !this.suiteParkingNudged) {
       const d = this.parkingDemand();
       this.emit(
-        `🚗 Hotel suites need a working parking space each — ${d.suites} suite${d.suites === 1 ? "" : "s"}, ${this.tower.functionalParkingSpots()} space(s) chained to a ramp.`,
+        `🚗 Hotel suites need a working parking space each: ${d.suites} suite${d.suites === 1 ? "" : "s"}, ${this.tower.functionalParkingSpots()} space(s) chained to a ramp.`,
         "info",
       );
     }
@@ -843,7 +843,7 @@ export class Simulation implements SimContext {
       // "info", not "bad": the UI toasts every good/bad log entry, and this
       // advisory is meant to be log-only (a quiet bulletin line, not a toast).
       this.emit(
-        "A leased floor is 3+ elevator rides from the lobby — no visitors will come. Check it in the inspector.",
+        "A leased floor is 3+ elevator rides from the lobby. No visitors will come. Check it in the inspector.",
         "info",
       );
     }
@@ -925,7 +925,7 @@ export class Simulation implements SimContext {
       : this.congestion();
     // Warn the player when their elevators can't keep up.
     if (globalCong > 1.4 && this.clock.hour === 9 && this.rng.chance(0.5)) {
-      this.emit("Tenants are complaining of long elevator waits — add cars or shafts.", "bad");
+      this.emit("Tenants are complaining of long elevator waits. Add cars or shafts.", "bad");
     }
     // New notices this tick are batched into one toast (like move-ins) so a
     // tower-wide problem raises a single alarm, not one per unit.
@@ -1050,7 +1050,7 @@ export class Simulation implements SimContext {
     if (notices.length === 1) {
       const n = notices[0];
       this.emit(
-        `${FACILITIES[n.kind].name} on ${this.floorLabel(n.floor)} gave notice — ${VACATE_REASON_TEXT[n.reason]}. Fix it before they leave.`,
+        `${FACILITIES[n.kind].name} on ${this.floorLabel(n.floor)} gave notice: ${VACATE_REASON_TEXT[n.reason]}. Fix it before they leave.`,
         "bad",
       );
       return;
@@ -1058,7 +1058,7 @@ export class Simulation implements SimContext {
     const byReason = new Map<VacateReason, number>();
     for (const n of notices) byReason.set(n.reason, (byReason.get(n.reason) ?? 0) + 1);
     const parts = [...byReason].map(([r, n]) => `${n} × ${VACATE_REASON_TEXT[r]}`);
-    this.emit(`${notices.length} tenants gave notice — ${parts.join(", ")}. Fix the flagged units before they leave.`, "bad");
+    this.emit(`${notices.length} tenants gave notice: ${parts.join(", ")}. Fix the flagged units before they leave.`, "bad");
   }
 
   /**
@@ -1374,7 +1374,7 @@ export class Simulation implements SimContext {
     // the cause together; every other tenant just gets the plain "left" notice.
     this.emit(
       buyback > 0
-        ? `The owner left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}) — you bought it back for $${buyback.toLocaleString()}.`
+        ? `The owner left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString()}.`
         : `A tenant left ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
       "bad",
     );
@@ -1799,14 +1799,14 @@ export class Simulation implements SimContext {
     // car, and a suite hotel without valet parking never earns the review.
     if (happy && !this.suiteParkingShort()) {
       this.vipFavorable = true;
-      this.emit("A VIP enjoyed their suite — your tower earned a favorable review (4★ unlocked).", "good");
+      this.emit("A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).", "good");
       this.triggerVip(); // the VIP's limo pulls up (cosmetic)
     } else if (this.clock.day - this.lastVipNagDay >= 5) {
       // Throttle the nag lines so they can't spam the log every day.
       this.lastVipNagDay = this.clock.day;
       this.emit(
         happy
-          ? "🚗 The VIP circled the block and left — every hotel suite needs a working parking space (chained to a ramp)."
+          ? "🚗 The VIP circled the block and left. Every hotel suite needs a working parking space (chained to a ramp)."
           : "A VIP's suite stay was underwhelming. Improve suite access and try again.",
         "info",
       );
