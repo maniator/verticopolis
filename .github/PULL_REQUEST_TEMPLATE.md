@@ -48,7 +48,7 @@ Delete this section only if the change cannot affect gameplay (e.g. docs/tooling
 <!--
 Bump package.json `version` on any player-facing change:
   minor = new player-facing capability, patch = player-noticeable fix/behavior change.
-Internal-only work needs no bump. See AGENTS.md → Versioning.
+Internal-only work needs no bump.
 -->
 
 - [ ] Bumped `version` (minor / patch), **or** this change is internal-only and needs no bump
