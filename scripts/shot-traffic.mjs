@@ -3,13 +3,13 @@
  * floors + a localized jam on a weak shaft) through the public sim API, lets the
  * live UI loop drive the chip, and screenshots the HUD bar (#topbar).
  *
- * Run via: SHOT_SCRIPT=scripts/shot-traffic.mjs OUT_LABEL=<after|before> \
- *   node scripts/serve-and-shoot.mjs
- * Writes the committed feature shots straight into docs/screenshots/features/:
- *   traffic-chip-<label>.png         (desktop) and
- *   traffic-chip-<label>-mobile.png  (mobile).
- * Use OUT_LABEL=after for the current build and OUT_LABEL=before against a
- * pre-fix build (a git worktree at the old commit).
+ * Run (OUT_LABEL is "after" for the current build, or "before" against a pre-fix
+ * build checked out in a git worktree at the old commit):
+ *   SHOT_SCRIPT=scripts/shot-traffic.mjs OUT_LABEL=after node scripts/serve-and-shoot.mjs
+ * Writes into docs/screenshots/features/ as traffic-chip-<label>.png (desktop)
+ * and traffic-chip-<label>-mobile.png (mobile). The repo tracks the desktop
+ * before + after shots and the after-mobile shot; the before-mobile is produced
+ * but not committed.
  */
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";

@@ -10,8 +10,8 @@ Playwright, so they can't drift from what actually ships. Two entry points:
 
 - `npm run screenshots` — regenerates the full showcase set into
   `docs/screenshots/`.
-- A focused capture for one feature:
-  `SHOT_SCRIPT=scripts/shot-<feature>.mjs node scripts/serve-and-shoot.mjs`.
+- A focused capture for one feature — e.g. the traffic chip:
+  `SHOT_SCRIPT=scripts/shot-traffic.mjs node scripts/serve-and-shoot.mjs`.
   Copy an existing `scripts/shot-*.mjs` as a starting point — each builds a tower
   through the public `window.game` API and screenshots the relevant part of the
   UI (e.g. the `#topbar` HUD) at desktop and mobile widths.
