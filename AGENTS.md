@@ -231,6 +231,24 @@ Good vs. bad:
   branch into a single commit — it loses granular history and forces awkward
   force-resets of the branch for any follow-up work.
 
+## Screenshots in PRs
+
+For any visual or gameplay change, the PR's **Screenshots / recordings** section
+must **embed real images**, not describe them in prose. A sentence like "the chip
+now reads Gridlock" is not a screenshot — reviewers (and the merged record) need
+the actual before/after.
+
+- Capture from the built app (`scripts/shot-*.mjs`; add a focused `shot-<x>.mjs`
+  if none fits and run it via `SHOT_SCRIPT=… node scripts/serve-and-shoot.mjs`).
+- **Commit** the PNGs under `docs/screenshots/` — feature shots go in
+  `docs/screenshots/features/` and get a row in that folder's `README.md`. Don't
+  leave them as throwaway files or session-only chat attachments; if they're
+  worth referencing, they're worth committing.
+- Embed with a raw URL so they render in the PR body:
+  `![after](https://raw.githubusercontent.com/maniator/verticopolis/main/docs/screenshots/features/<name>.png)`
+  (use the PR's branch name instead of `main` in the URL to render live during
+  review; the `main` URL resolves once merged).
+
 ## Gameplay model notes
 
 - Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in
