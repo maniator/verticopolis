@@ -46,6 +46,19 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 | `traffic-chip-after.png` | This change: **Gridlock · 11F** — the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
 | `traffic-chip-after-mobile.png` | The same state at phone width — the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
 
+## Build palette — unlock visibility (locked tiers hidden until earned)
+
+Captured from the built app via `scripts/shot-palette-unlock.mjs`. Parity with the
+1994 original: locked facilities are hidden until their star tier is reached, so
+the palette grows as stars are earned rather than showing dimmed, unbuildable rows.
+
+| Screenshot | Shows |
+|---|---|
+| `palette-unlock.png` | The three below stacked into one captioned figure (handy for embedding in a single image slot). |
+| `palette-1star.png` | A fresh **1★** tower: only the 1★ tools, and the Leisure / Services / Special group headers are absent (nothing unlocked in them yet). |
+| `palette-3star.png` | **3★**: the Leisure and Services headers appear and the 2★/3★ rows (Single/Double/Suite, Restaurant, Retail Shop, Escalator/Service/Express, parking, medical, recycling) are revealed. Special is still hidden. |
+| `palette-5star.png` | **5★**: the full palette — the Special group (Metro Station, Wedding Hall) is now unlocked too. |
+
 ## Tablet responsive breakpoint
 
 Captured with `scripts/shot-tablet.mjs` (full app at several viewport sizes).
