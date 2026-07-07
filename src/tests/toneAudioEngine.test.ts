@@ -12,12 +12,13 @@ import {
 } from "../audio/ToneAudioEngine";
 
 /**
- * ToneAudioEngine is the Web-Audio synthesis layer — it can only make sound
- * against a real AudioContext, so its music graph is exercised by hand, not by
- * unit tests (mocking 230kB of Tone.js would test Tone, not us). What IS
- * unit-tested here: (1) the pure scene/zoom/pitch math, and (2) the load-bearing
- * CONTRACT that with no AudioContext (a test runner, a locked-down browser) the
- * engine stays fully inert — start() is a no-op and every control call is safe.
+ * ToneAudioEngine is the Web-Audio synthesis layer. This file unit-tests (1) the
+ * pure scene/zoom/pitch math and (2) the load-bearing CONTRACT that with no
+ * AudioContext (a test runner, a locked-down browser) the engine stays fully
+ * inert — start() is a no-op and every control call is safe. The engine's graph
+ * control flow (scene transitions, the beat sequencer, sfx dispatch) is exercised
+ * separately in toneAudioEngineGraph.test.ts against a mocked Tone.js + a fake
+ * AudioContext — the audio *nodes* are stubbed so it tests our logic, not Tone's.
  */
 
 const focus = (over: Partial<ViewFocus> = {}): ViewFocus =>
