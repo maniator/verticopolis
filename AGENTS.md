@@ -1,6 +1,9 @@
 # Agent & contributor guide
 
-Conventions for anyone (human or AI agent) working in this repository.
+Conventions for anyone (human or AI agent) working in this repository. For the
+human-facing quick start — dev setup, the quality gates, and the full
+**testing & coverage** guide (the two test tiers, coverage floors, and what's
+unit-exempt-but-integration-covered) — see [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Use BMAD-METHOD for non-trivial work
 

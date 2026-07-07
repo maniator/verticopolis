@@ -2,7 +2,9 @@
 
 **The full agent guide is [AGENTS.md](./AGENTS.md) — read it.** It covers the
 BMAD/BMGD workflow, architecture, quality gates, and review conventions. The
-BMAD agent rules live in `_bmad-output/project-context.md`.
+BMAD agent rules live in `_bmad-output/project-context.md`. For the human-facing
+quick start and the testing/coverage guide, see
+[CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Non-negotiables (don't skip these)
 
