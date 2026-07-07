@@ -47,6 +47,12 @@ describe("minuteOfDayForFrame (canon table, tdt-format.md §3)", () => {
     expect(minuteOfDayForFrame(-1)).toBe(minuteOfDayForFrame(FRAMES_PER_DAY - 1));
     expect(minuteOfDayForFrame(FRAMES_PER_DAY + 400)).toBe(minuteOfDayForFrame(400));
   });
+
+  it("falls back to the day start on non-finite input instead of propagating", () => {
+    expect(minuteOfDayForFrame(NaN)).toBe(DAY_START_MINUTE);
+    expect(minuteOfDayForFrame(Infinity)).toBe(DAY_START_MINUTE);
+    expect(minuteOfDayForFrame(-Infinity)).toBe(DAY_START_MINUTE);
+  });
 });
 
 describe("frameForMinuteOfDay (inverse mapping)", () => {
@@ -76,6 +82,12 @@ describe("frameForMinuteOfDay (inverse mapping)", () => {
       expect(f).toBeLessThan(FRAMES_PER_DAY);
     }
   });
+
+  it("falls back to frame 0 on non-finite input instead of propagating", () => {
+    expect(frameForMinuteOfDay(NaN)).toBe(0);
+    expect(frameForMinuteOfDay(Infinity)).toBe(0);
+    expect(frameForMinuteOfDay(-Infinity)).toBe(0);
+  });
 });
 
 describe("paceFactor (presentation pacing curve)", () => {
@@ -91,10 +103,13 @@ describe("paceFactor (presentation pacing curve)", () => {
     expect(paceFactor(8 * 60) / paceFactor(12 * 60 + 15)).toBeCloseTo(10, 10);
   });
 
-  it("normalizes to a bit-exact uniform-length day", () => {
-    // Real time spent is ∫ 1/paceFactor over the day's minutes; with the
-    // canon normalization it must equal exactly 1,440 — the ×1/×2 speed
-    // buttons keep meaning, the day just spends its time differently.
+  it("preserves the day's total real time (harmonic normalization)", () => {
+    // Real time spent is ∫ 1/paceFactor over the day's minutes; the canon
+    // normalization makes it 1,440 exactly in real arithmetic (float epsilon
+    // in practice — hence toBeCloseTo, not toBe): the ×1/×2 speed buttons
+    // keep meaning, the day just spends its time differently. The plain
+    // average of the factors is deliberately NOT 1 — the invariant is
+    // harmonic, so don't "fix" this by renormalizing the arithmetic mean.
     let realMinutes = 0;
     for (let m = 0; m < 1440; m++) realMinutes += 1 / paceFactor(m);
     expect(realMinutes).toBeCloseTo(1440, 6);
@@ -104,5 +119,11 @@ describe("paceFactor (presentation pacing curve)", () => {
     for (let m = 0; m < 1440; m++) {
       expect(paceFactor(m)).toBeGreaterThan(0);
     }
+  });
+
+  it("returns neutral pacing (1) on non-finite input", () => {
+    expect(paceFactor(NaN)).toBe(1);
+    expect(paceFactor(Infinity)).toBe(1);
+    expect(paceFactor(-Infinity)).toBe(1);
   });
 });

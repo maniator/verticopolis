@@ -2,13 +2,14 @@
  * The 1994 original's variable time pacing — the "breathing clock".
  *
  * The original runs a day as 2,600 frames starting at 7:00 AM, and the number
- * of frames it spends per in-game hour varies wildly by period: the noon hour
- * gets as many frames as the whole 7:00–12:00 morning (the clock crawls ~10×
- * while the lunch crowds swarm), and the 1:00–7:00 night gets only 200 (the
- * small hours flash past). Midnight lands exactly on frame 2300 — the frame
- * the original changes the date. See docs/canon/tdt-format.md §3, including
- * why rates are derived from the period SPANS (the upstream per-frame second
- * values are internally inconsistent on the night row).
+ * of frames it spends per in-game hour varies wildly by period: each lunch
+ * HALF-hour (12:00–12:30, 12:30–13:00) gets as many frames as the whole
+ * 7:00–12:00 morning — the clock crawls ~10× while the lunch crowds swarm —
+ * and the 1:00–7:00 night gets only 200 (the small hours flash past).
+ * Midnight lands exactly on frame 2300 — the frame the original changes the
+ * date. See docs/canon/tdt-format.md §3, including why rates are derived from
+ * the period SPANS (the upstream per-frame second values are internally
+ * inconsistent on the night row).
  *
  * This module is pure presentation math. The simulation keeps its uniform
  * 1,440-minute day; {@link paceFactor} is a multiplier for how fast REAL time
@@ -45,9 +46,11 @@ function wrap(v: number, span: number): number {
 
 /**
  * The in-game minute of day (0..1439) the original shows at a given frame of
- * its 2,600-frame day. Frames outside [0, 2600) wrap.
+ * its 2,600-frame day. Frames outside [0, 2600) wrap; a non-finite frame
+ * (NaN/±Infinity) falls back to the 7:00 day start rather than propagating.
  */
 export function minuteOfDayForFrame(frame: number): number {
+  if (!Number.isFinite(frame)) return DAY_START_MINUTE;
   const f = wrap(frame, FRAMES_PER_DAY);
   let frameStart = 0;
   let minuteStart = 0;
@@ -60,7 +63,7 @@ export function minuteOfDayForFrame(frame: number): number {
     frameStart = p.frameEnd;
     minuteStart = p.minuteEnd;
   }
-  /* istanbul ignore next -- unreachable: wrap() keeps f < FRAMES_PER_DAY */
+  // Unreachable for finite input: wrap() keeps f < FRAMES_PER_DAY.
   return DAY_START_MINUTE;
 }
 
@@ -68,9 +71,11 @@ export function minuteOfDayForFrame(frame: number): number {
  * The frame of the original's day (0..2599) at a given minute of day
  * (0..1439). Inverse of {@link minuteOfDayForFrame} up to flooring.
  * Canon tripwire: `frameForMinuteOfDay(0) === 2300` — midnight is the
- * original's date-change frame.
+ * original's date-change frame. A non-finite minute falls back to frame 0
+ * (the 7:00 day start) rather than propagating.
  */
 export function frameForMinuteOfDay(minuteOfDay: number): number {
+  if (!Number.isFinite(minuteOfDay)) return 0;
   const m = wrap(minuteOfDay - DAY_START_MINUTE, 24 * 60); // minutes since 7:00
   let frameStart = 0;
   let minuteStart = 0;
@@ -82,7 +87,7 @@ export function frameForMinuteOfDay(minuteOfDay: number): number {
     frameStart = p.frameEnd;
     minuteStart = p.minuteEnd;
   }
-  /* istanbul ignore next -- unreachable: wrap() keeps m < 1440 */
+  // Unreachable for finite input: wrap() keeps m < 1440.
   return 0;
 }
 
@@ -92,13 +97,17 @@ export function frameForMinuteOfDay(minuteOfDay: number): number {
  *
  * In the original, frames tick at a constant real-time rate, so a period's
  * pace is proportional to its minutes-per-frame; normalizing by the whole
- * day's average (1440 min / 2600 frames) makes the factors mean out to a
- * bit-exact full day: ∫ 1/paceFactor over the 1,440 minutes = 1,440, so a
- * day takes precisely as much real time as it does with uniform pacing —
- * only its distribution changes (≈1.35× through the morning, ≈0.14× through
- * the lunch crawl, ≈3.25× through the night).
+ * day's average (1440 min / 2600 frames) preserves the day's total length:
+ * ∫ 1/paceFactor over the 1,440 minutes = 1,440 (exactly, in real
+ * arithmetic; within float epsilon in practice), so a day takes as much
+ * real time as it does with uniform pacing — only its distribution changes
+ * (≈1.35× through the morning, ≈0.14× through the lunch crawl, ≈3.25×
+ * through the night). Note the invariant is the harmonic one — the plain
+ * average of the factors is NOT 1 — so never renormalize by the arithmetic
+ * mean. A non-finite minute falls back to neutral pacing (1).
  */
 export function paceFactor(minuteOfDay: number): number {
+  if (!Number.isFinite(minuteOfDay)) return 1;
   const m = wrap(minuteOfDay - DAY_START_MINUTE, 24 * 60);
   let frameStart = 0;
   let minuteStart = 0;
@@ -110,6 +119,6 @@ export function paceFactor(minuteOfDay: number): number {
     frameStart = p.frameEnd;
     minuteStart = p.minuteEnd;
   }
-  /* istanbul ignore next -- unreachable: wrap() keeps m < 1440 */
+  // Unreachable for finite input: wrap() keeps m < 1440.
   return 1;
 }

@@ -34,7 +34,11 @@ notes marked "unconfirmed" are flagged below.
 | 0x16 | i32 | currentDay | Days since "WD 1 / 1Q / Year 1" (signed!) |
 | 0x1A… | — | misc | Screen position words at 0x26/0x28; rest of a ~518-byte block undocumented |
 
-The first floor record begins at about `0x9C4`.
+The header block therefore ends near `0x22C`, where the floor map begins.
+(The upstream notes' `0x9C4` figure is the offset of the **ground floor's**
+record — floor index 10 — in a tower whose ten underground floors are empty:
+~556 header bytes + 10 × ~194 bytes of empty-floor records lands there. It is
+not where the floor map starts; an importer must walk from the header's end.)
 
 ## 2. Money scale
 
@@ -67,8 +71,9 @@ night** (the original's signature rhythm):
   night row (200 frames × 126 s = 7 h) contradicts the 6-hour 1:00–7:00 span.
   We derive per-frame rates from the **spans** (ground truth) and ignore the
   contradictory per-frame second values.
-- `src/engine/timePacing.ts` implements this table as a presentation-layer
-  pacing curve; the simulation itself stays on a uniform 1,440-minute day.
+- `src/engine/timePacing.ts` implements this table's math (deliberately
+  unwired until the pacing feature lands — nothing presents it yet); the
+  simulation itself stays on a uniform 1,440-minute day either way.
 
 ## 4. Floors
 
