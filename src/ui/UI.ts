@@ -35,7 +35,7 @@ export interface UICallbacks {
   onSave(): void;
   onLoad(): void;
   onExport(): void;
-  /** A picked file's text contents — a .vctower export (or a legacy raw-JSON one). */
+  /** A picked file's text contents — a `.vctower` export. */
   onImport(data: string): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
@@ -817,7 +817,7 @@ export class UI {
     // octet-stream entry keeps .vctower selectable on pickers that filter by
     // MIME type and drop extensions they can't map (Android). Content is
     // validated on load either way.
-    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.json,application/json`;
+    input.accept = `${TOWER_FILE_EXT},application/octet-stream`;
     input.value = "";
     input.onchange = () => {
       const file = input.files?.[0];
