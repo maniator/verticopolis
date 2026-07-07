@@ -133,7 +133,7 @@ describe("Onboarding — controller lifecycle", () => {
   });
 });
 
-import { vi } from "vitest";
+import { vi, afterEach } from "vitest";
 
 /** A controller wired with spy opts and an mq whose change handler is capturable. */
 function makeSpyController(mobile = false) {
@@ -153,6 +153,13 @@ function makeSpyController(mobile = false) {
 
 describe("Onboarding — splash / title screen", () => {
   beforeEach(() => clearOnboarded());
+  // showSplash registers a document-level keydown (Esc) handler that only its
+  // own teardownSplash removes. Tests that leave a splash mounted would leak it
+  // onto `document` across tests; drop any lingering overlay + Esc handler here.
+  afterEach(() => {
+    document.getElementById("splash")?.remove();
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" })); // spends any live safeDismiss latch
+  });
 
   it("mounts a modal splash, pauses the engine, and offers Continue only with a save", () => {
     const { c, opts } = makeSpyController();

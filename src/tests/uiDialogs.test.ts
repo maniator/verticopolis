@@ -926,7 +926,7 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
     expect(dialog().open).toBe(false);
   });
 
-  it("Later closes and defers; Esc (cancel) also resolves as Later", async () => {
+  it("Later closes the modal and defers (no update fired)", async () => {
     const onUpdate = vi.fn();
     const onLater = vi.fn();
     const { ui } = makeUI();
@@ -935,6 +935,22 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
     await flush();
     expect(onLater).toHaveBeenCalledOnce();
     expect(onUpdate).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Esc (the dialog cancel path) also resolves as Later, exactly once", async () => {
+    const onUpdate = vi.fn();
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    dialog().dispatchEvent(new Event("cancel")); // Esc / ✕ → oncancel → later()
+    await flush();
+    expect(onLater).toHaveBeenCalledOnce();
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+    dialog().dispatchEvent(new Event("cancel")); // the single-resolve guard holds
+    await flush();
+    expect(onLater).toHaveBeenCalledOnce();
   });
 });
 
