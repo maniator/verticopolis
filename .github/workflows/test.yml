@@ -6,8 +6,10 @@ on:
   pull_request:
     branches: [main]
 
-# CI runs lint/typecheck/tests/build only, it never takes screenshots, so skip
-# downloading Playwright browsers during `npm ci`.
+# The default job (lint/typecheck/tests/build) needs no browser, and the e2e job
+# runs inside the pinned Playwright image whose Chromium is already bundled, so
+# skip Playwright's browser download during `npm ci` workflow-wide. Regenerating
+# the docs gallery is handled by update-screenshots.yml, not here.
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
 

@@ -2,10 +2,11 @@ name: Update screenshots
 
 # Regenerates the committed docs gallery (docs/screenshots/**) with the SINGLE
 # generator, scripts/screenshots.ts, running INSIDE the official Playwright
-# Docker image, the same image `npm run screenshots` uses locally, pinned to the
-# repo's own Playwright version. Chromium build + container fonts decide
-# antialiasing, so this is the one way a local run and CI produce byte-identical
-# PNGs. The refreshed shots come back as a bot commit on the same branch.
+# Docker image pinned to the repo's own Playwright version. Chromium build +
+# container fonts decide antialiasing, so regenerating here (not on a laptop) is
+# what keeps the committed PNGs reproducible. The local `npm run screenshots` is
+# only a host-Chromium preview and its pixels are NOT canonical. The refreshed
+# shots come back as a bot commit on the same branch.
 #
 # Trigger by pushing so the HEAD commit's message contains "[update-screenshots]"
 # (only the head commit of the push is checked), or run it by hand from the
