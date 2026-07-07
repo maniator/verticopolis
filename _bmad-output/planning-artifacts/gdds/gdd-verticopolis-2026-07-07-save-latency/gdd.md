@@ -28,7 +28,7 @@ Players building late-game Verticopolis towers with thousands of units, especial
 
 - Big towers keep feeling alive while autosave runs.
 - Crash recovery and update reloads still get a synchronous flush when they need one.
-- Save files stay compatible with the existing compressed JSON format.
+- Save files move through an explicit v2 to v3 migration hook while staying compatible with the existing compressed JSON container.
 
 ---
 
@@ -38,6 +38,7 @@ Players building late-game Verticopolis towers with thousands of units, especial
 
 - Reduce autosave hitch risk without changing tower simulation rules.
 - Preserve existing localStorage and `.vctower` compatibility.
+- Add an explicit v2 to v3 migration hook in the save-version chain.
 - Keep emergency reload paths safe from async write interruption.
 
 ### Background and Rationale
@@ -60,7 +61,7 @@ The player builds, observes tenant behavior, reacts to problems, and relies on p
 
 ### Win/Loss Conditions
 
-No new win or loss conditions. The success condition for this design is experiential: a large-tower autosave no longer performs synchronous compression on the main thread when asynchronous browser compression is available.
+No new win or loss conditions. The success condition for this design is experiential and compatibility-based: a v2 save loads through a v2 to v3 migration hook, and a large-tower autosave no longer performs synchronous compression on the main thread when asynchronous browser compression is available.
 
 ---
 
@@ -68,7 +69,9 @@ No new win or loss conditions. The success condition for this design is experien
 
 ### Primary Mechanics
 
-- Autosave runs in the background using the existing compressed JSON save format.
+- Autosave runs in the background using the existing compressed JSON save container.
+- Serialized game data is stamped as v3.
+- v2 data converts through an explicit migration hook before normal load hardening.
 - If multiple autosaves are requested while one is running, the newest tower state wins.
 - Manual, update, and crash-recovery saves keep a synchronous path when immediate durability matters.
 
@@ -152,7 +155,8 @@ No audio changes.
 
 - Routine autosave should avoid synchronous DEFLATE on browsers with `CompressionStream("deflate-raw")`.
 - Synchronous save remains available for reload/update/crash-recovery paths.
-- Save format remains `VCZ1:` plus base64 deflated JSON for localStorage.
+- Save container remains `VCZ1:` plus base64 deflated JSON for localStorage.
+- Save schema advances from v2 to v3 through `upgradeV2toV3`, even if the first v3 schema change is a compatibility stamp.
 
 ### Platform-Specific Details
 
@@ -170,7 +174,7 @@ No asset changes.
 
 | Epic | Goal | Summary |
 | --- | --- | --- |
-| Save latency mitigation | Make autosave less likely to hitch large towers | Add async local save support, route the periodic autosave through it, keep critical flushes synchronous, and cover compatibility in tests. |
+| Save latency mitigation | Make autosave less likely to hitch large towers | Add a v2 to v3 migration hook, async local save support, route the periodic autosave through it, keep critical flushes synchronous, and cover compatibility in tests. |
 
 ---
 
@@ -179,6 +183,7 @@ No asset changes.
 ### Technical Metrics
 
 - Existing storage tests pass.
+- A v2 serialized save loads and re-serializes as v3.
 - Autosave can complete through the async compression path and still load through the existing decoder.
 - Concurrent autosave requests coalesce so the latest state is persisted.
 
