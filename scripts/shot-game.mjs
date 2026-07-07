@@ -36,7 +36,7 @@ await p.evaluate(() => {
     if (r.ok) sim.tower.units.find((uu) => uu.id === r.unitId).state = "asleep";
   }
   // Commercial sits on floor 2 (the lobby concourse on floor 1 stays clear).
-  for (let x = left + 6; x + 12 <= left + 55; x += 12) {
+  for (let x = left + 6; x + 16 <= left + 55; x += 16) {
     const r = sim.tower.place("fastFood", 2, x);
     if (r.ok) sim.tower.units.find((uu) => uu.id === r.unitId).state = "occupied";
   }

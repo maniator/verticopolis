@@ -62,7 +62,9 @@ function buildDemoScript() {
   s.tower.placeTransport("stairs", left + span - 12, 1, 2);
 
   const fill = (f, kind) => {
-    const w = { office: 9, condo: 16, hotelDouble: 6, shop: 12, fastFood: 12, restaurant: 16 }[kind];
+    // Canon widths (must match FACILITIES, since place() uses canon and a stale
+    // stride here would overlap → fail to place → leave gappy floors).
+    const w = { office: 9, condo: 16, hotelDouble: 6, shop: 12, fastFood: 16, restaurant: 24 }[kind];
     let x = left + 26;
     while (x + w <= left + span) {
       const r = s.tower.place(kind, f, x);
@@ -100,8 +102,9 @@ function buildDemoScript() {
   for (let x = left; x < left + span; x++) s.tower.place("floor", -1, x);
   const metro = s.tower.place("metro", 0, 0);
   if (metro.ok) s.tower.units.find((u) => u.id === metro.unitId).state = "occupied";
+  // Canon parking: a 16-wide ramp, then 4-wide spaces chained flush after it.
   s.tower.place("parkingRamp", -1, left);
-  for (let x = left + 6; x + 6 <= left + span; x += 6) s.tower.place("parking", -1, x);
+  for (let x = left + 16; x + 4 <= left + span; x += 4) s.tower.place("parking", -1, x);
 
   s.evaluateStar();
   // Point the Excalibur engine at the rebuilt tower and frame the whole thing —
@@ -160,7 +163,7 @@ async function main() {
   // 0b) First-run onboarding in action: press "New Tower" to arm the
   // Getting-Started checklist, then frame the empty lot so the checklist,
   // the pulsed Floor palette item, and the device hint bar are all visible.
-  await page.click('#splash [data-splash="new"]');
+  await page.evaluate(() => document.querySelector('#splash [data-splash="new"]')?.click());
   await page.waitForSelector("#onboard", { timeout: 4000 }).catch(() => {});
   await page.evaluate(frame, { floor: 4, zoom: 1.0 });
   await page.waitForTimeout(500);
@@ -176,11 +179,15 @@ async function main() {
   await page.screenshot({ path: `${OUT}/01-start.png` });
   console.log("captured 01-start");
 
-  // 2) Help dialog.
-  await page.click("#btn-help");
+  // 2) Help dialog. Trigger via the element's own click handler rather than a
+  // synthetic pointer event — the top bar can wrap/reflow at some widths, and a
+  // Playwright actionability click flakes if the button is briefly covered; the
+  // handler fires the same modal regardless of layout.
+  await page.evaluate(() => document.getElementById("btn-help")?.click());
+  await page.waitForSelector("#modal", { timeout: 4000 }).catch(() => {});
   await page.waitForTimeout(300);
   await page.screenshot({ path: `${OUT}/02-help.png` });
-  await page.click('#modal [data-act="close"]');
+  await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.click());
 
   // 3) Build demo tower (frames itself, zoomed out to the full height).
   await page.evaluate(buildDemoScript);
@@ -213,7 +220,7 @@ async function main() {
     g.refreshEditor();
   });
   await page.waitForTimeout(150);
-  await page.click('#editor [data-edit="batchKind"]');
+  await page.evaluate(() => document.querySelector('#editor [data-edit="batchKind"]')?.click());
   await page.waitForTimeout(200);
   // Type a non-default price so the live preview shows a real "N of M" change.
   await page.evaluate(() => {
@@ -223,7 +230,7 @@ async function main() {
   });
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/10-batch-pricing.png` });
-  await page.click('#modal [data-act="close"]');
+  await page.evaluate(() => document.querySelector('#modal [data-act="close"]')?.click());
   console.log("captured 10-batch-pricing");
 
   // 5b) People moving — pause at the morning rush and zoom into the lobby so
@@ -295,7 +302,7 @@ async function main() {
   // title bar and its ✕ stay compact (the coarse-pointer rule exempts .xs).
   await mobile.evaluate(() => document.body.classList.add("panels-open"));
   await mobile.waitForTimeout(200);
-  await mobile.click("#btn-stats");
+  await mobile.evaluate(() => document.getElementById("btn-stats")?.click());
   await mobile.waitForTimeout(400);
   await mobile.screenshot({ path: `${OUT}/09b-mobile-stats.png` });
   console.log("captured 09b-mobile-stats");
