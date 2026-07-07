@@ -256,11 +256,12 @@ alone.
   *Screenshots / recordings* section — committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
   and embed them.
-- **Merge commits only** to `main` — a standard merge commit keeps the branch's
-  individual commits in history and lets the branch keep building cleanly
-  afterward. Don't squash unless there's a real reason (a branch full of
-  throwaway WIP commits); squashing rewrites history and forces awkward
-  force-resets for follow-up work.
+- **Merge to `main` with a merge commit — never a squash-merge.** A standard
+  merge commit keeps the branch's individual commits in history and lets the
+  branch keep building cleanly afterward; squash-merging rewrites the branch into
+  one commit and forces awkward force-resets for follow-up work. Squashing or
+  otherwise tidying your *own* branch/PR history before it merges is fine — the
+  rule is only about the merge **into `main`**.
 
 ## Where things live
 
