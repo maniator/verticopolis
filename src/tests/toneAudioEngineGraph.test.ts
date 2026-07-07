@@ -81,6 +81,11 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("start() builds the graph and becomes active; a second call takes the resume path", () => {
     const eng = new ToneAudioEngine();
     expect(() => eng.start()).not.toThrow();
+    // Assert the graph actually built. Without this, a future mid-start() throw
+    // (catch → dispose leaves started=false — the exact bpm.rampTo failure mode
+    // this file guards) would let every gated test below pass trivially on its
+    // `if (!this.started) return`.
+    expect((eng as unknown as { started: boolean }).started).toBe(true);
     expect(() => eng.start()).not.toThrow(); // already-started branch
   });
 

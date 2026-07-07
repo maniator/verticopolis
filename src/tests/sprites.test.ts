@@ -237,11 +237,11 @@ describe("pure sprite helpers", () => {
     }
   });
 
-  it("craneAnchorTile picks a tile within the built span", () => {
-    const tile = craneAnchorTile([10, 11, 12, 20, 21]);
-    expect(typeof tile).toBe("number");
-    expect(tile).toBeGreaterThanOrEqual(10);
-    expect(tile).toBeLessThanOrEqual(21);
+  it("craneAnchorTile anchors over the center of the LONGEST contiguous run", () => {
+    // Runs: [10,11,12] (len 3) and [20,21] (len 2) → the longest wins, centered
+    // at 11.5. Pinning the value guards the "longest run" contract (a bug that
+    // picked the trailing run would land 20.5, not just "somewhere in span").
+    expect(craneAnchorTile([10, 11, 12, 20, 21])).toBe(11.5);
   });
 
   it("ACCENTS is a palette of hex colors", () => {
