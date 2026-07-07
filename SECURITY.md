@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Verticopolis is a continuously deployed browser game — the live build at
+Verticopolis is a continuously deployed browser game. The live build at
 [verticopolis.com](https://verticopolis.com) is the only supported version.
 Please confirm an issue reproduces on the latest build before reporting.
 
