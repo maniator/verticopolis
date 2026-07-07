@@ -106,6 +106,9 @@ export const SaveGame = {
   save(sim: Simulation): void {
     this.saveTo(AUTO_KEY, sim);
   },
+  async saveAsync(sim: Simulation): Promise<void> {
+    await this.saveToAsync(AUTO_KEY, sim);
+  },
   hasSave(): boolean {
     return localStorage.getItem(AUTO_KEY) !== null;
   },
@@ -183,6 +186,16 @@ export const SaveGame = {
     // could be lost. base64 keeps the value a safe ASCII string.
     const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data))));
     localStorage.setItem(key, packed);
+  },
+  async saveToAsync(key: string, sim: Simulation): Promise<void> {
+    if (!compressionSupported()) {
+      this.saveTo(key, sim);
+      return;
+    }
+    const data = sim.serialize() as SerializedGame & { savedAt: number };
+    data.savedAt = nowMs();
+    const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
+    localStorage.setItem(key, STORE_MAGIC + toBase64(packed));
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */

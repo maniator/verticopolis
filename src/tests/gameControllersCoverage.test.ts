@@ -570,6 +570,30 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toHaveLength(1); // no second toast
   });
 
+  it("routine autosave uses the async path and coalesces to the latest tower", async () => {
+    let releaseFirst!: () => void;
+    const savedMoney: number[] = [];
+    const spy = vi.spyOn(SaveGame, "saveAsync").mockImplementation(async (s) => {
+      savedMoney.push(s.money);
+      if (savedMoney.length === 1) await new Promise<void>((resolve) => (releaseFirst = resolve));
+    });
+
+    sim.money = 100;
+    const first = saveLoad.autosave();
+    await vi.waitFor(() => expect(savedMoney).toEqual([100]));
+
+    sim.money = 200;
+    const second = saveLoad.autosave();
+    expect(savedMoney).toEqual([100]);
+
+    releaseFirst();
+    await first;
+    await second;
+    expect(savedMoney).toEqual([100, 200]);
+    expect(f.toasts).toEqual([]);
+    spy.mockRestore();
+  });
+
   it("load adopts the saved tower; with nothing saved it only toasts", () => {
     saveLoad.load();
     expect(adopted).toHaveLength(0);

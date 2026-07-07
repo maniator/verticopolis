@@ -381,7 +381,7 @@ class GameApp {
     // idle first visit can't persist the throwaway boot sim (which would flip
     // hasSave() true for a tower the player never started).
     window.setInterval(() => {
-      if (!document.getElementById("splash")) this.saveLoad.save(true);
+      if (!document.getElementById("splash")) void this.saveLoad.autosave();
     }, 30000);
   }
 

@@ -1,7 +1,8 @@
 ---
-status: ready-for-dev
+status: in-progress
 created: 2026-07-07
 updated: 2026-07-07
+baseline_commit: 348f912014f3761ab41f961adffc636fd261fda3
 ---
 
 # Spec: Save Latency Mitigation
@@ -21,12 +22,12 @@ Routine autosave should avoid the measured synchronous DEFLATE hitch on large to
 
 ## Tasks
 
-- `src/engine/saveMigration.ts`: bump the current save version to 3 and add an explicit `upgradeV2toV3` migration hook.
-- `src/storage/SaveGame.ts`: add an async local save method that serializes with `savedAt`, compresses through native `CompressionStream` when available, writes the same `VCZ1:` localStorage format, and falls back to the synchronous writer if native compression is unavailable.
-- `src/game/saveLoad.ts`: add a routine autosave method with latest-wins coalescing and use the async local save method.
-- `src/main.ts`: route the 30-second autosave timer through the routine autosave method, leaving manual save, update save, and context-loss recovery on synchronous save.
-- `src/tests/storage.test.ts`: cover v2 to v3 migration, async save round-trip, and fallback behavior.
-- `src/tests/gameControllersCoverage.test.ts`: cover autosave coalescing and confirm pre-reload saves still use the synchronous method.
+- [x] `src/engine/saveMigration.ts`: bump the current save version to 3 and add an explicit `upgradeV2toV3` migration hook.
+- [x] `src/storage/SaveGame.ts`: add an async local save method that serializes with `savedAt`, compresses through native `CompressionStream` when available, writes the same `VCZ1:` localStorage format, and falls back to the synchronous writer if native compression is unavailable.
+- [x] `src/game/saveLoad.ts`: add a routine autosave method with latest-wins coalescing and use the async local save method.
+- [x] `src/main.ts`: route the 30-second autosave timer through the routine autosave method, leaving manual save, update save, and context-loss recovery on synchronous save.
+- [x] `src/tests/storage.test.ts`: cover v2 to v3 migration, async save round-trip, and fallback behavior.
+- [x] `src/tests/gameControllersCoverage.test.ts`: cover autosave coalescing and confirm pre-reload saves still use the synchronous method.
 
 ## Benchmark Evidence
 

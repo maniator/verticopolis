@@ -1,11 +1,12 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { deflateSync } from "fflate";
-import { Simulation } from "../engine/Simulation";
+import { SAVE_VERSION, Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
+  afterEach(() => vi.unstubAllGlobals());
 
   function sampleGame(): Simulation {
     const sim = Simulation.newGame(42);
@@ -239,6 +240,31 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(sim.money);
   });
 
+  it("async autosave writes the same compressed localStorage format", async () => {
+    const sim = sampleGame();
+    sim.money = 765_432;
+    await SaveGame.saveAsync(sim);
+    const raw = localStorage.getItem(AUTO_KEY)!;
+    expect(raw.startsWith("VCZ1:")).toBe(true);
+    expect(SaveGame.load()!.money).toBe(765_432);
+  });
+
+  it("async autosave falls back to the synchronous writer when native compression is unavailable", async () => {
+    vi.stubGlobal(
+      "CompressionStream",
+      class {
+        constructor() {
+          throw new TypeError("Unsupported format: deflate-raw");
+        }
+      },
+    );
+    const sim = sampleGame();
+    sim.money = 246_810;
+    await SaveGame.saveAsync(sim);
+    expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
+    expect(SaveGame.load()!.money).toBe(246_810);
+  });
+
   // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
   // decompression-bomb fixtures below.
   const b64 = (bytes: Uint8Array): string => {
@@ -460,6 +486,16 @@ describe("SaveGame", () => {
     const loaded = Simulation.deserialize(data);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.tower.units.length).toBe(sim.tower.units.length);
+  });
+
+  it("migrates v2 saves to the v3 save schema", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    (data as { version: number }).version = 2;
+    const loaded = Simulation.deserialize(data);
+    expect(SAVE_VERSION).toBe(3);
+    expect(loaded.money).toBe(sim.money);
+    expect(loaded.serialize().version).toBe(3);
   });
 
   it("drops units with an unrecognized kind on load", () => {

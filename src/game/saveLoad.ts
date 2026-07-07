@@ -29,11 +29,36 @@ export interface SaveLoadDeps {
 }
 
 export class SaveLoad {
+  private autosaveRun: Promise<void> | null = null;
+  private autosaveQueued = false;
+
   constructor(private readonly deps: SaveLoadDeps) {}
 
   save(silent = false): void {
     SaveGame.save(this.deps.getSim());
     if (!silent) this.deps.ui.toast("Tower saved.", "good");
+  }
+
+  autosave(): Promise<void> {
+    if (this.autosaveRun) {
+      this.autosaveQueued = true;
+      return this.autosaveRun;
+    }
+    this.autosaveRun = this.drainAutosaves().finally(() => {
+      this.autosaveRun = null;
+    });
+    return this.autosaveRun;
+  }
+
+  private async drainAutosaves(): Promise<void> {
+    try {
+      do {
+        this.autosaveQueued = false;
+        await SaveGame.saveAsync(this.deps.getSim());
+      } while (this.autosaveQueued);
+    } catch {
+      /* periodic autosave is best effort; manual and pre-reload saves still report errors */
+    }
   }
 
   /**
