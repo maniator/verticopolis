@@ -62,7 +62,7 @@ flowchart TD
     Render -. reads .-> Sim
     Engine3D --> Render
     Engine3D -. reads .-> Sim
-    Save <--> Sim
+    Save --> Sim
 
     Engine3D --> Canvas
     UI --> DOM

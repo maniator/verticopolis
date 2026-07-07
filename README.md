@@ -198,7 +198,7 @@ src/
     pixelSprites.ts dollhouse room interiors + walking/seated people
   ui/UI.ts     # palette, status bar, editor panel, modals, toasts
   audio/Audio.ts  # location-based procedural soundtrack + SFX
-  storage/SaveGame.ts  # localStorage + .vctower export/import
+  storage/SaveGame.ts  # localStorage + .vctower export/import (older raw-JSON exports still load)
   main.ts      # GameApp: tool semantics, sim tick, glue (input/camera via Excalibur)
   gallery.ts   # standalone sprite-catalog page (docs/screenshots)
   tests/       # Vitest unit tests for the engine
