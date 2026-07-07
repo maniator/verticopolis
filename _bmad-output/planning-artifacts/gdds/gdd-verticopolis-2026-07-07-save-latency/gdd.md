@@ -28,7 +28,7 @@ Players building late-game Verticopolis towers with thousands of units, especial
 
 - Big towers keep feeling alive while autosave runs.
 - Crash recovery and update reloads still get a synchronous flush when they need one.
-- Save files move through an explicit v2 to v3 migration hook while staying compatible with the existing compressed JSON container.
+- Save files move through an explicit v2 to v3 migration hook while staying compatible with the existing compressed JSON container and legacy autosave key.
 
 ---
 
@@ -156,6 +156,7 @@ No audio changes.
 - Routine autosave should avoid synchronous DEFLATE on browsers with `CompressionStream("deflate-raw")`.
 - Synchronous save remains available for reload/update/crash-recovery paths.
 - Save container remains `VCZ1:` plus base64 deflated JSON for localStorage.
+- Autosaves use `verticopolis-save`, with read fallback for the legacy `simtower-clone-save` key.
 - Save schema advances from v2 to v3 through `upgradeV2toV3`, even if the first v3 schema change is a compatibility stamp.
 
 ### Platform-Specific Details

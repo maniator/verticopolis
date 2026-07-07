@@ -19,14 +19,15 @@ Routine autosave should avoid the measured synchronous DEFLATE hitch on large to
 4. Given update or graphics recovery needs an immediate pre-reload flush, when that path saves, then it keeps using the synchronous `SaveGame.save()` path.
 5. Given existing `VCZ1:` compressed JSON saves, when the game loads them, then compatibility is unchanged.
 6. Given a serialized v2 game, when it is deserialized, then it passes through `upgradeV2toV3` and re-serializes with version 3.
+7. Given an autosave stored under the legacy `simtower-clone-save` key, when the game boots, then it loads that save and future autosaves write the `verticopolis-save` key.
 
 ## Tasks
 
 - [x] `src/engine/saveMigration.ts`: bump the current save version to 3 and add an explicit `upgradeV2toV3` migration hook.
-- [x] `src/storage/SaveGame.ts`: add an async local save method that serializes with `savedAt`, compresses through native `CompressionStream` when available, writes the same `VCZ1:` localStorage format, and falls back to the synchronous writer if native compression is unavailable.
+- [x] `src/storage/SaveGame.ts`: add an async local save method that serializes with `savedAt`, compresses through native `CompressionStream` when available, writes the same `VCZ1:` localStorage format, falls back to the synchronous writer if native compression is unavailable, and reads legacy autosave keys before rewriting to the Verticopolis key.
 - [x] `src/game/saveLoad.ts`: add a routine autosave method with latest-wins coalescing and use the async local save method.
 - [x] `src/main.ts`: route the 30-second autosave timer through the routine autosave method, leaving manual save, update save, and context-loss recovery on synchronous save.
-- [x] `src/tests/storage.test.ts`: cover v2 to v3 migration, async save round-trip, and fallback behavior.
+- [x] `src/tests/storage.test.ts`: cover v2 to v3 migration, async save round-trip, legacy autosave key migration, and fallback behavior.
 - [x] `src/tests/gameControllersCoverage.test.ts`: cover autosave coalescing and confirm pre-reload saves still use the synchronous method.
 
 ## Benchmark Evidence

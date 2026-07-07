@@ -4,3 +4,4 @@
 - 2026-07-07: Chose async JSON compression for routine autosave, not binary save migration. Binary remains out of scope until browser-device profiling proves it is needed.
 - 2026-07-07: Preserved synchronous saves for update and crash-recovery paths because those must finish before reload.
 - 2026-07-07: Clarified that v3 requires an explicit `upgradeV2toV3` migration hook in the save-version chain. The first v3 migration is a compatibility stamp, with future v3 fields added behind the same hook if needed.
+- 2026-07-07: Renamed the autosave key to `verticopolis-save` with a legacy `simtower-clone-save` fallback so older saves still load and future writes move to the app-named key.
