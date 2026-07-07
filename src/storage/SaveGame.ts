@@ -306,14 +306,11 @@ function writeSlot(key: string, value: string): void {
     return;
   }
   const legacy = localStorage.getItem(LEGACY_AUTO_KEY);
-  if (legacy === null) {
-    localStorage.setItem(AUTO_KEY, value);
-    return;
-  }
-  if (localStorage.getItem(AUTO_KEY) === null) {
+  const needsQuotaReclaim = legacy !== null && localStorage.getItem(AUTO_KEY) === null;
+  if (needsQuotaReclaim) {
     localStorage.removeItem(LEGACY_AUTO_KEY);
     try {
-      localStorage.setItem(AUTO_KEY, value);
+      writeAutosaveValue(value);
     } catch (err) {
       try {
         localStorage.setItem(LEGACY_AUTO_KEY, legacy);
@@ -324,8 +321,12 @@ function writeSlot(key: string, value: string): void {
     }
     return;
   }
+  writeAutosaveValue(value);
+  if (legacy !== null) localStorage.removeItem(LEGACY_AUTO_KEY);
+}
+
+function writeAutosaveValue(value: string): void {
   localStorage.setItem(AUTO_KEY, value);
-  localStorage.removeItem(LEGACY_AUTO_KEY);
 }
 
 // Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
