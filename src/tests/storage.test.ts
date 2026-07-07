@@ -6,6 +6,8 @@ import { FACILITIES, GRID } from "../engine/facilities";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
+  // Several compression tests stub browser stream globals; always restore them
+  // so later export/import tests see the real environment.
   afterEach(() => vi.unstubAllGlobals());
 
   function sampleGame(): Simulation {
