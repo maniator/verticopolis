@@ -18,7 +18,7 @@ import type { FacilityKind, SerializedGame, Unit } from "./types";
  * load — not merely written — and a future format bump has exactly one place to
  * grow.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /**
  * The condo sale price BEFORE this build re-anchored the band (old default 2×
@@ -79,10 +79,18 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // v1 → v2: re-lay each floor's rooms at their canon (post-E1b) widths (the
   // segment-parity reflow). Runs for any v1 save; new saves stamp v2 and skip it.
   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
+  // v2 → v3: explicit compatibility hop for the async-save format bump. The
+  // container remains compressed JSON, but new writes stamp v3 so future changes
+  // have a tested migration seam.
+  if (migrated.version === 2) migrated = upgradeV2toV3(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
   // it loads best-effort — the coercion below guards it — rather than throwing
   // away the player's tower.
   return migrated;
+}
+
+export function upgradeV2toV3(data: SerializedGame): SerializedGame {
+  return { ...data, version: 3 };
 }
 
 /**
