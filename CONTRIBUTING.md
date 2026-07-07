@@ -270,7 +270,12 @@ alone.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
-  and embed them.
+  and embed them. Regenerate `docs/screenshots/**` only through CI, in the pinned
+  Playwright Docker image: push with `[update-screenshots]` in the head commit to
+  trigger the `update-screenshots.yml` workflow, and `[update-baselines]` for the
+  `e2e/visual.spec.ts-snapshots` baselines (`update-visual-baselines.yml`). The
+  local `npm run screenshots` is a host-Chromium preview whose antialiasing
+  differs, so its output must not be committed as the final set.
 - **Merge to `main` with a merge commit. Never squash-merge.** A standard
   merge commit keeps the branch's individual commits in history and lets the
   branch keep building cleanly afterward; squash-merging rewrites the branch into

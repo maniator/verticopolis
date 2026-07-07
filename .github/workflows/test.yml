@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [main]
 
-# CI runs lint/typecheck/tests/build only — it never takes screenshots, so skip
+# CI runs lint/typecheck/tests/build only, it never takes screenshots, so skip
 # downloading Playwright browsers during `npm ci`.
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
@@ -39,26 +39,45 @@ jobs:
       - name: Build
         run: npm run build
 
-  # Tier-2 end-to-end smoke: drive the BUILT app in a real browser and prove the
-  # TOWER win surfaces to the player (the congratulations modal). Kept in its own
-  # job so its browser download never slows the fast lint/typecheck/test lane.
-  e2e:
+  # Resolve the Playwright container tag from the repo's own Playwright version so
+  # the e2e job's browser can never drift from the one baselines were minted with
+  # the whole basis of a stable visual gate. (container.image is fixed before a
+  # job's steps run, so the tag has to come from a prior job's output.)
+  resolve-image:
     runs-on: ubuntu-latest
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: pin
+        run: |
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+
+  # Tier-2 end-to-end smoke: drive the BUILT app in a real browser and prove the
+  # TOWER win surfaces (the congratulations modal), plus the visual.spec.ts pixel
+  # baselines. Runs INSIDE the pinned Playwright image, the same Chromium build
+  # the update-visual-baselines and update-screenshots workflows use, so the
+  # baselines it compares against are minted against the identical renderer. Kept
+  # in its own job so the container pull never slows the fast lint/test lane.
+  e2e:
+    needs: resolve-image
+    runs-on: ubuntu-latest
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
 
     steps:
       - uses: actions/checkout@v4
 
+      # The image ships Node 20; install the repo's pinned Node over it (keeping
+      # the image's browsers) so every job runs the same Node the tests expect.
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Build
         run: npm run build
@@ -77,7 +96,7 @@ jobs:
           if-no-files-found: warn
 
       # When a visual baseline (visual.spec.ts) fails, Playwright writes the
-      # actual/expected/diff triplet to test-results/ — upload it so the drift
+      # actual/expected/diff triplet to test-results/, upload it so the drift
       # can be reviewed (and, if intentional, adopted as the new baseline)
       # without rerunning locally.
       - name: Upload visual diffs on failure
