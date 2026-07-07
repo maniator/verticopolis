@@ -143,9 +143,6 @@ discarded, and any future format change has a single place to add an upgrade
 step. The `serialize → deserialize → serialize` round-trip is covered by the
 Vitest suite.
 
-`.TWR` import of original SimTower saves has groundwork in place but is not yet
-wired up (see the parity table below).
-
 ## 1994 SimTower parity
 
 How the clone maps to the original's mechanics. Items marked ✅ are implemented
@@ -178,7 +175,6 @@ and covered by the Vitest suite and/or the captured screenshots.
 | **Buried treasure** found while excavating basements | ✅ |
 | Living tower: walking people, riding cars, the metro train, day/night | ✅ |
 | Save/load, multiple slots, .vctower export/import | ✅ |
-| `.TWR` original-save import | ⏳ foundation in place (v2) |
 | Per-person stress/routing simulation | ◻︎ abstracted as an aggregate model |
 
 **Desktop vs. mobile:** the desktop layout mirrors the original's dollhouse

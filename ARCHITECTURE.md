@@ -43,7 +43,7 @@ flowchart TD
     end
 
     subgraph storage["Persistence — src/storage/"]
-        Save["SaveGame · Prefs · twrImport"]
+        Save["SaveGame · Prefs"]
     end
 
     subgraph engine["Simulation core — src/engine/ (pure, no DOM)"]
@@ -108,9 +108,9 @@ sequenceDiagram
     EX->>TE: draw frame (reads sim state, read-only)
 ```
 
-A thrown frame is contained inside `GameApp.onUpdate` so a transient error skips
-a single frame instead of halting Excalibur's loop (which would freeze the whole
-game).
+A thrown frame is contained inside the `onUpdate` handler `GameApp` installs on
+`TowerEngine`, so a transient error skips a single frame instead of halting
+Excalibur's loop (which would freeze the whole game).
 
 ## Inside the engine — the simulation core
 
@@ -194,12 +194,9 @@ flowchart LR
 
 `Simulation` serializes to/from a plain `SerializedGame` object. `SaveGame`
 persists that to `localStorage` (a periodic autosave slot plus three named
-slots), `saveMigration` upgrades older payloads to the current `SAVE_VERSION` on
-load, and `twrImport` provides the seam for mapping the original 1994 `.TWR` /
-legacy files into the same `SerializedGame` shape — today `parseTWR` recognizes a
-`.TWR` file but the binary decoder is still planned, so the import is
-foundation-in-place rather than wired up. Per-device accessibility preferences (`Prefs`) live
-in their own key, deliberately **off** the save. Undo/redo keeps in-memory
+slots), and `saveMigration` upgrades older payloads to the current `SAVE_VERSION`
+on load. Per-device accessibility preferences (`Prefs`) live in their own key,
+deliberately **off** the save. Undo/redo keeps in-memory
 snapshots and is invalidated when a different tower is adopted.
 
 ```mermaid
@@ -211,7 +208,6 @@ flowchart TD
     SaveGame --> Auto["localStorage:<br/>autosave slot"]
     SaveGame --> Slots["localStorage:<br/>3 named slots"]
 
-    TWR[".TWR / legacy file"] -->|twrImport.parseTWR (planned)| SG
     Load["Load from disk/slot"] -->|saveMigration.migrateSave| SG
 
     Prefs["Prefs (a11y)"] --> PLS["localStorage:<br/>separate key, off the save"]

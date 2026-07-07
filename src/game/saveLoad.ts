@@ -1,7 +1,6 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode } from "../engine/types";
 import { SaveGame } from "../storage/SaveGame";
-import { parseTWR } from "../storage/twrImport";
 import { shouldArm } from "../ui/Onboarding";
 import type { UI } from "../ui/UI";
 
@@ -185,17 +184,6 @@ export class SaveLoad {
     }
   }
 
-  importLegacy(buffer: ArrayBuffer, filename: string): void {
-    try {
-      const data = parseTWR(buffer);
-      this.deps.adoptSim(Simulation.deserialize(data));
-      this.deps.ui.toast("Imported original SimTower save.", "good");
-    } catch (err) {
-      // Expected today: the .TWR decoder is a planned v2 feature.
-      this.deps.ui.toast((err as Error).message, "info");
-      void filename;
-    }
-  }
 
   /** Found a fresh tower under the chosen rule-set. The mode is baked into the
    *  new Simulation at creation and is immutable for that tower's life. */

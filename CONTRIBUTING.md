@@ -279,7 +279,7 @@ alone.
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
 | `src/ui/` | DOM controls — palette, status bar, native `<dialog>` modals. |
 | `src/audio/` | Sound (`ToneAudioEngine.ts`), independent of rendering. |
-| `src/storage/` | Save/load, `.TWR` import. |
+| `src/storage/` | Save/load, `.vctower` tower-file import/export. |
 | `src/main.ts` | Composition root — wires input, engine, and the game loop. |
 | `src/tests/` | Tier-1 vitest unit tests + fixtures. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |

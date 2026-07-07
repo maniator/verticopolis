@@ -37,7 +37,6 @@ export interface UICallbacks {
   onExport(): void;
   /** A picked file's text contents — a .vctower export (or a legacy raw-JSON one). */
   onImport(data: string): void;
-  onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
@@ -818,7 +817,7 @@ export class UI {
     // octet-stream entry keeps .vctower selectable on pickers that filter by
     // MIME type and drop extensions they can't map (Android). Content is
     // validated on load either way.
-    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.json,application/json,.twr,.TWR`;
+    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.json,application/json`;
     input.value = "";
     input.onchange = () => {
       const file = input.files?.[0];
@@ -827,14 +826,8 @@ export class UI {
       // A file that vanishes or errors mid-read must not fail silently — the
       // launching dialog is already gone by the time the read runs.
       reader.onerror = () => this.toast("Couldn't read that file — please try again.", "bad");
-      // Binary .TWR legacy saves are read as bytes; tower files as text.
-      if (/\.twr$/i.test(file.name)) {
-        reader.onload = () => this.cb.onImportLegacy(reader.result as ArrayBuffer, file.name);
-        reader.readAsArrayBuffer(file);
-      } else {
-        reader.onload = () => this.cb.onImport(String(reader.result));
-        reader.readAsText(file);
-      }
+      reader.onload = () => this.cb.onImport(String(reader.result));
+      reader.readAsText(file);
     };
     input.click();
   }
