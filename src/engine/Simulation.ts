@@ -41,14 +41,9 @@ import {
   isVacateReason,
   VACATE_REASON_TEXT,
 } from "./types";
-
-/**
- * Current save-format version. `serialize()` always stamps this; `deserialize()`
- * routes every save through {@link migrateSave} first, so the field is read on
- * load — not merely written — and a future format bump has exactly one place to
- * grow.
- */
-export const SAVE_VERSION = 1;
+// The save-version constant + migration seam are extracted to ./saveMigration.
+import { SAVE_VERSION, migrateSave } from "./saveMigration";
+export { SAVE_VERSION };
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving — a grace window the player can use
@@ -93,14 +88,6 @@ const NOISE_EROSION = 0.07;
 const CONDO_NOISE_EROSION = 0.054;
 
 /**
- * The condo sale price BEFORE this build re-anchored the band (old default 2×
- * cost was $120k, now $160k). A pre-mode save's SOLD condo that omitted `rent`
- * sold at this price, so we backfill it on load (see {@link migrateSave}) — the
- * buy-back must mirror what the unit actually sold for, not the new default.
- */
-const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
-
-/**
  * The widest condo price band that has ever existed (the pre-re-anchor band was
  * $60k–$240k; the current one is $80k–$200k). A SOLD condo keeps its historical
  * price rather than being re-clamped to the current band — but it's still bounded
@@ -111,49 +98,6 @@ const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
  */
 const SOLD_CONDO_MIN_PRICE = 60_000;
 const SOLD_CONDO_MAX_PRICE = 240_000;
-
-/**
- * Save-format migration seam. Runs before the field-level coercion in
- * {@link Simulation.deserialize}. Beyond normalizing `version`, it backfills the
- * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
- * still mirrors its historical sale price.
- */
-function migrateSave(data: SerializedGame): SerializedGame {
-  // A missing/garbled version is normalized so the (future) upgrade chain has a
-  // number to branch on; deserialize()'s coercion still hardens every value.
-  const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
-  let migrated: SerializedGame = data.version === version ? data : { ...data, version };
-  // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
-  // condition under which deserialize() falls back to Classic, so migration must
-  // agree (an invalid mode string must be treated as legacy here too, else the
-  // save loads Classic yet skips this backfill). A SOLD condo (owned, not an
-  // empty/dead shell) that omitted `rent` sold at the OLD default — stamp it so
-  // its buy-back mirrors that historical price instead of picking up the new,
-  // higher default via rentOf(). Only touch that exact shape; never re-price a
-  // condo that already carries a rent, or an unsold/dead one.
-  if (!isGameMode(migrated.mode) && Array.isArray(migrated.units)) {
-    migrated = {
-      ...migrated,
-      units: migrated.units.map((u) =>
-        u &&
-        u.kind === "condo" &&
-        u.everOccupied === true &&
-        u.rent === undefined &&
-        u.state !== "empty" &&
-        u.state !== "gutted" &&
-        u.state !== "construction"
-          ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }
-          : u,
-      ),
-    };
-  }
-  // Future upgrades chain here in order, each bumping migrated.version, e.g.:
-  //   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
-  // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
-  // it loads best-effort — the coercion below guards it — rather than throwing
-  // away the player's tower.
-  return migrated;
-}
 
 /** A single tick advances the crowd by at most this many crowd-seconds so a
  * day-long catch-up step stays bounded (see CROWD_SECONDS_PER_MINUTE, which

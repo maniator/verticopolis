@@ -133,7 +133,7 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // Ground lobby the basement hangs off, then a full-width basement floor.
     for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
     for (let x = 0; x < W; x++) sim.tower.place("floor", 0, x);
-    // A tap at the very last column: a width-6 parking footprint would run off
+    // A tap at the very last column: a width-4 parking footprint would run off
     // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
     build.paintFloorRun("parking", W - 1, 0);
     const p = sim.tower.units.find((u) => u.kind === "parking");

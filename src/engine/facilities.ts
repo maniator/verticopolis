@@ -7,6 +7,10 @@ import type { Facility, FacilityKind, Unit } from "./types";
  * In the original, a single office is the base unit of "width". We use a tile
  * grid where the smallest commercial unit is a few tiles wide.
  */
+/** The buildable lot width in tiles — the canon 1994 map is 375 segments wide.
+ *  Shared by {@link GRID}.width and the full-lot metro so the two can't drift. */
+export const LOT_WIDTH = 375;
+
 export const FACILITIES: Record<FacilityKind, Facility> = {
   lobby: {
     kind: "lobby",
@@ -288,9 +292,8 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     category: "special",
     name: "Metro Station",
     // Spans the full lot width and THREE deep-basement floors (B8–B10 in the
-    // original), so it must be placed at the bottom of the basement. Tracks the
-    // canon lot width (GRID.width) — kept in sync by hand.
-    width: 375,
+    // original), so it must be placed at the bottom of the basement.
+    width: LOT_WIDTH,
     floors: 3,
     cost: 1000000,
     minStar: 4,
@@ -399,7 +402,7 @@ export const GRID = {
    */
   minFloor: -9,
   /** Total buildable width in tiles — the canon 1994 map is 375 segments wide. */
-  width: 375,
+  width: LOT_WIDTH,
   /** Floors between required (sky) lobbies. */
   lobbyInterval: 15,
 } as const;

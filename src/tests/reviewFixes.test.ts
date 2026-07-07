@@ -26,7 +26,7 @@ function layFloor(sim: Simulation, kind: "floor" | "lobby", floor: number): void
 function structuredTower(seed: number, top: number, money = 100_000_000, halfWidth?: number): Simulation {
   const sim = Simulation.newGame(seed);
   sim.money = money;
-  // Optionally build only a centred strip (much cheaper to tick over on the
+  // Optionally build only a centered strip (much cheaper to tick over on the
   // wide 375-tile lot) when a test doesn't need the full width.
   const lay = (kind: "floor" | "lobby", f: number) => {
     if (halfWidth === undefined) return layFloor(sim, kind, f);

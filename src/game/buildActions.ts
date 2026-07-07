@@ -126,12 +126,17 @@ export class BuildActions {
       // snapX (not clampTile) so a wide unit's FOOTPRINT stays on-lot: a tap at
       // the right edge left-shifts to fit instead of silently failing off-lot.
       // For width-1 floor/lobby this is identical to clampTile.
-      this.tryBuild(kind, floor, snapX(kind, tile), true);
-      this.paint = { tile, floor };
+      // Record the SNAPPED anchor (what was actually placed), so a later drag-run
+      // extends from the placed unit, not an off-lot raw tile near the edge.
+      const seedX = snapX(kind, tile);
+      this.tryBuild(kind, floor, seedX, true);
+      this.paint = { tile: seedX, floor };
       return;
     }
     for (const x of dragRunTiles(this.paint.tile, tile)) {
-      this.tryBuild(kind, floor, x, true);
+      // snapX each column so a WIDE unit near the right edge still lands on-lot
+      // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
+      this.tryBuild(kind, floor, snapX(kind, x), true);
     }
     this.paint = { tile, floor };
   }
