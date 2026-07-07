@@ -378,6 +378,15 @@ a.btn {
 /* Color-blind-safe traffic cue: the bar glyph carries the level in shape, so it
    reads in grayscale; the warn color is a redundant extra, never the only cue. */
 #traffic-glyph { font-family: "Courier New", monospace; letter-spacing: -1px; }
+/* One line always: the value carries a glyph + tier word + optional floor suffix;
+   letting it wrap would make this stat taller than its neighbors and break the
+   bar's vertical centering. */
+#traffic { white-space: nowrap; }
+/* The hotspot floor is a footnote to the tier word — smaller and lighter so it
+   reads as "…and it's on floor N" without competing with the tier or widening the
+   cell. It inherits the value's color (incl. the red warn state), so it stays
+   legible, never ghosted. */
+#traffic-floor { font-size: 0.82em; font-weight: 500; }
 #status .traffic-warn { color: var(--bad); font-weight: 700; }
 
 #speed {

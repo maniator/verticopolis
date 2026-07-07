@@ -9,7 +9,7 @@ import type { HeatmapMode } from "./engine/Simulation";
 import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
-import { trafficTier, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
+import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
 import { UI, type Tool } from "./ui/UI";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
@@ -397,23 +397,44 @@ class GameApp {
   }
 
   /** Color-blind-safe traffic cue: word + shape-coded bar glyph (never color
-   *  alone), driven by the same congestion value the engine reads, with boundary
-   *  hysteresis so it doesn't flicker. */
+   *  alone), driven by the tower's PEAK per-floor congestion — its busiest
+   *  populated-and-served floor — so it matches the congestion overlay legend and
+   *  moves as real congestion develops. Boundary hysteresis stops flicker; above
+   *  Smooth it also names the worst floor (e.g. "Backed up · 42F") so the player
+   *  knows *where* to look. */
   private updateTraffic(): void {
-    const cong = this.sim.congestion();
-    const B = [1.0, 1.25, 1.6]; // tier boundaries
+    // One pass over the spatial map: the ratio drives the tier, the floor names
+    // the hotspot — fetched together so this ~6 Hz loop doesn't rebuild the map
+    // twice per frame on a large tower.
+    const { ratio: cong, floor: hotspot } = this.sim.peakCongestionHotspot();
+    const B: readonly number[] = TRAFFIC_BOUNDS; // single source shared with trafficTier() — can't desync
     const raw = trafficTier(cong);
     if (raw > this.lastTrafficTier && cong >= B[this.lastTrafficTier] + 0.03) this.lastTrafficTier = raw;
     else if (raw < this.lastTrafficTier && cong <= B[this.lastTrafficTier - 1] - 0.03) this.lastTrafficTier = raw;
     const tier = this.lastTrafficTier;
-    const label = TRAFFIC_LABELS[tier];
+    const word = TRAFFIC_LABELS[tier];
+    // Above Smooth, surface the hotspot floor (something the 1994 original could
+    // never do). The engine hands us the floor number (null = no hotspot); we
+    // format the label. Populated floors are always above ground, so `NF` is the
+    // right form for every reachable case.
+    const floor = tier > 0 ? hotspot : null;
+    // The floor rides its own span (styled as a de-emphasized footnote) so a long
+    // "Backed up · 100F" never competes with the tier word or wraps the fixed HUD
+    // cell to a second line. The separator lives inside the suffix so Smooth shows
+    // no orphan "· ". The full sentence still goes to aria-label for readers.
+    const floorText = floor !== null ? ` · ${floor}F` : "";
+    const aria = floor !== null ? `Traffic: ${word}, worst on floor ${floor}` : `Traffic: ${word}`;
     const glyphEl = document.getElementById("traffic-glyph");
     const labelEl = document.getElementById("traffic-label");
+    const floorEl = document.getElementById("traffic-floor");
     const wrapEl = document.getElementById("traffic");
     if (glyphEl && glyphEl.textContent !== trafficGlyph(tier)) glyphEl.textContent = trafficGlyph(tier);
-    if (labelEl && labelEl.textContent !== label) {
-      labelEl.textContent = label;
-      wrapEl?.setAttribute("aria-label", `Traffic: ${label}`);
+    const labelChanged = labelEl != null && labelEl.textContent !== word;
+    const floorChanged = floorEl != null && floorEl.textContent !== floorText;
+    if (labelChanged) labelEl!.textContent = word;
+    if (floorChanged) floorEl!.textContent = floorText;
+    if (labelChanged || floorChanged) {
+      wrapEl?.setAttribute("aria-label", aria);
       wrapEl?.classList.toggle("traffic-warn", tier >= 2); // red is a redundant cue, not the only one
     }
   }
