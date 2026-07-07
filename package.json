@@ -5,7 +5,7 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=22.18.0"
   },
   "scripts": {
     "dev": "vite",
@@ -20,9 +20,7 @@
     "e2e": "playwright test",
     "lint": "eslint src --ext .ts,.tsx",
     "lint:fix": "eslint src --ext .ts,.tsx --fix",
-    "screenshots": "vite build && node scripts/serve-and-shoot.mjs",
-    "screenshots:condo-modes": "vite build && SHOT_SCRIPT=scripts/shot-condo-modes.mjs node scripts/serve-and-shoot.mjs",
-    "screenshots:docker": "bash scripts/shoot-docker.sh",
+    "screenshots": "vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs"
   },
   "devDependencies": {
