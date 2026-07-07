@@ -62,12 +62,14 @@ prose description of what a screenshot would show. Capture from the built app
 go in docs/screenshots/features/ and get a row in its README.md), and embed them
 so they render in the PR:
 
-  ![before](https://raw.githubusercontent.com/maniator/verticopolis/main/docs/screenshots/features/your-shot-before.png)
-  ![after](https://raw.githubusercontent.com/maniator/verticopolis/main/docs/screenshots/features/your-shot-after.png)
+  ![before](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/your-shot-before.png)
+  ![after](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/your-shot-after.png)
 
-A `main` raw URL renders once the PR merges; until then use the PR's branch name
-in the URL so it renders live during review. Delete this section only if the
-change has no visual or gameplay surface.
+`<ref>` is the PR's branch name (renders live during review) or `main` (resolves
+once merged). For a PR from a fork, `<owner>/<repo>` is the fork's owner/repo, not
+the upstream — otherwise the image won't render during review. An HTML
+`<img src="…">` tag works too. Delete this section only if the change has no
+visual or gameplay surface.
 -->
 
 ## Notes for reviewers

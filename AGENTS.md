@@ -245,9 +245,11 @@ the actual before/after.
   leave them as throwaway files or session-only chat attachments; if they're
   worth referencing, they're worth committing.
 - Embed with a raw URL so they render in the PR body:
-  `![after](https://raw.githubusercontent.com/maniator/verticopolis/main/docs/screenshots/features/<name>.png)`
-  (use the PR's branch name instead of `main` in the URL to render live during
-  review; the `main` URL resolves once merged).
+  `![after](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/<name>.png)`
+  where `<ref>` is the PR's branch name (renders live during review) or `main`
+  (resolves once merged). For a PR from a **fork**, `<owner>/<repo>` is the
+  fork's owner/repo, not the upstream, or the image won't render during review.
+  (An HTML `<img src="…">` tag works too, and lets you set a `width`.)
 
 ## Gameplay model notes
 
