@@ -199,10 +199,10 @@ export const SaveGame = {
     // just before a reload in the crash-recovery path, where an async write
     // could be lost. base64 keeps the value a safe ASCII string.
     const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data))));
-    localStorage.setItem(key, packed);
+    writeSlot(key, packed);
   },
   async saveToAsync(key: string, sim: Simulation): Promise<void> {
-    if (!compressionSupported()) {
+    if (!compressionEncodeSupported()) {
       this.saveTo(key, sim);
       return;
     }
@@ -213,7 +213,7 @@ export const SaveGame = {
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
-    localStorage.setItem(key, STORE_MAGIC + toBase64(packed));
+    writeSlot(key, STORE_MAGIC + toBase64(packed));
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
@@ -293,6 +293,34 @@ function fromBase64(b64: string): Uint8Array {
   return bytes;
 }
 
+function writeSlot(key: string, value: string): void {
+  if (key !== AUTO_KEY) {
+    localStorage.setItem(key, value);
+    return;
+  }
+  const legacy = localStorage.getItem(LEGACY_AUTO_KEY);
+  if (legacy === null) {
+    localStorage.setItem(AUTO_KEY, value);
+    return;
+  }
+  if (localStorage.getItem(AUTO_KEY) === null) {
+    localStorage.removeItem(LEGACY_AUTO_KEY);
+    try {
+      localStorage.setItem(AUTO_KEY, value);
+    } catch (err) {
+      try {
+        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+      } catch {
+        /* best effort: preserve the old key if the migrated write fails */
+      }
+      throw err;
+    }
+    return;
+  }
+  localStorage.setItem(AUTO_KEY, value);
+  localStorage.removeItem(LEGACY_AUTO_KEY);
+}
+
 // Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
 // of JSON; 32MB is generous headroom. localStorage is quota-bounded and
 // same-origin, but a corrupt or tampered VCZ1 value could still inflate
@@ -327,8 +355,17 @@ function inflateCapped(packed: Uint8Array): Uint8Array {
 // so a `typeof` check alone would pass on browsers that then throw at use.
 function compressionSupported(): boolean {
   try {
-    new CompressionStream("deflate-raw");
+    if (!compressionEncodeSupported()) return false;
     new DecompressionStream("deflate-raw");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function compressionEncodeSupported(): boolean {
+  try {
+    new CompressionStream("deflate-raw");
     return true;
   } catch {
     return false;
