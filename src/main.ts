@@ -474,10 +474,10 @@ class GameApp {
   private wireEngine(): void {
     // Decide whether a press pans the camera or performs the active tool.
     // Pan vs act is pure routing in ./game/gesture (unit-tested). On touch a
-    // paint tool (floor/lobby) owns the one-finger drag so mobile can paint a
-    // run; panning is via the inspect tool or a two-finger drag (which also
-    // zooms). Before this, a floor/lobby drag only ever panned on touch, so
-    // mobile couldn't paint a run at all.
+    // paint tool (floor/lobby/parking) owns the one-finger drag so mobile can
+    // paint a run; panning is via the inspect tool or a two-finger drag (which
+    // also zooms). Before this, a floor/lobby/parking drag only ever panned on
+    // touch, so mobile couldn't paint a run at all.
     this.engine.classifyDown = (button, touch, space) => classifyGesture(this.tool, button, touch, space);
 
     // A press-without-drag: select (inspect) or, on touch, run the tool. The

@@ -1093,12 +1093,17 @@ export class Simulation implements SimContext {
     return "access";
   }
 
-  /** True when a noise SOURCE of one of `kinds` sits within `maxTiles` empty
-   *  segments of `u` on the same floor — scanning outward from each side of the
-   *  footprint. A **lobby tile** in the gap buffers that direction (canon), so a
-   *  lobby placed between the source and the sensitive room cancels the noise.
-   *  Distance 0 is the shared-wall case, so this subsumes the old ±1 rule with no
-   *  double-count. O(maxTiles) per side — bounded and cheap. */
+  /** True when a noise SOURCE of one of `kinds` sits within `maxTiles` tiles
+   *  ("segments") of `u` on the same floor — scanning outward from each side of
+   *  the footprint. Noise is a proximity radius that carries THROUGH built floor
+   *  and any non-source rooms in between (GDD §4.1 uses "empty segments" and
+   *  "tiles" interchangeably for the straight-line distance — "empty" is not a
+   *  gate). Only two things stop it: a **lobby tile** in the gap (canon buffer —
+   *  a lobby between source and sensitive room cancels the noise; this is the
+   *  ONLY documented shield, which is exactly why an intervening non-source room
+   *  must NOT shield), and an **open-air gap** of unbuilt tiles (noise needs
+   *  floor to travel). Distance 0 is the shared-wall case, so this subsumes the
+   *  old ±1 rule with no double-count. O(maxTiles) per side — bounded and cheap. */
   private nearestKindWithin(
     u: Unit,
     isSource: (kind: FacilityKind) => boolean,

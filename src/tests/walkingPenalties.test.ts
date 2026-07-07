@@ -203,6 +203,29 @@ describe("W2 — noise spacing buffers (11 / 21, lobby cancels)", () => {
     for (let i = 0; i < 4; i++) sim.tick(60);
     expect(adj.satisfaction).toBeLessThanOrEqual(0.6); // capped at the annoyance ceiling
   });
+
+  it("noise carries THROUGH a non-source room in the gap — only a lobby/open-air shields", () => {
+    // office(sensitive) — office(non-source) — fastFood(source), all within 11
+    // tiles. Per canon (GDD §4.1) the intervening office is transparent: the
+    // sensitive office still erodes. Pins the deliberate distance-radius model
+    // against a plausible-but-wrong "an intervening room blocks noise" change —
+    // the lobby-buffer test above is the ONLY documented shield.
+    const sim = Simulation.newGame(41);
+    servedTower(sim, 2, 3); // shaft cols [3,6)
+    sim.buildTransport("elevatorStandard", 120, 1, 2); // second shaft → no W1 on any office
+    sim.tower.place("fastFood", 2, 100); // source, footprint [100,116)
+    sim.tower.place("office", 2, 91); // NON-source office wedged in the gap, [91,100)
+    const far = unit(sim, sim.tower.place("office", 2, 82).unitId); // sensitive, [82,91)
+    const control = unit(sim, sim.tower.place("office", 2, 130).unitId); // gap 14 > 11 → quiet
+    for (const u of [far, control]) {
+      expect(sim.tower.nearestTransportDistance(u)).toBeLessThanOrEqual(79); // isolate W2 from W1
+      u.state = "occupied";
+      u.satisfaction = 1;
+    }
+    for (let i = 0; i < 8; i++) sim.tick(60);
+    expect(far.satisfaction).toBeLessThan(control.satisfaction); // noise reached through the middle office
+    expect(control.satisfaction).toBeGreaterThan(0.9); // the truly-distant office stays quiet
+  });
 });
 
 describe("W3 — commercial must be near a lobby (2 floors)", () => {

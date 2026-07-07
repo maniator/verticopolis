@@ -28,8 +28,8 @@ export function isPaintKind(kind: FacilityKind): boolean {
  *   release), the path drag-sized transports and paint runs use.
  *
  * On touch, one finger pans EXCEPT for gestures that OWN the drag: drag-sized
- * transports (elevators) size with it, and paint tools (floor/lobby) lay a run
- * with it. On mouse, everything but inspect acts (pan is space/right-button).
+ * transports (elevators) size with it, and paint tools (floor/lobby/parking) lay
+ * a run with it. On mouse, everything but inspect acts (pan is space/right-button).
  */
 export function classifyGesture(
   tool: Tool,
