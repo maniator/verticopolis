@@ -228,8 +228,9 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
-  // Mirrors SaveGame's internal autosave key so tests can inspect the raw stored value.
-  const AUTO_KEY = "simtower-clone-save";
+  // Mirrors SaveGame's internal autosave keys so tests can inspect raw stored values.
+  const AUTO_KEY = "verticopolis-save";
+  const LEGACY_AUTO_KEY = "simtower-clone-save";
 
   it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
     const sim = sampleGame();
@@ -378,6 +379,19 @@ describe("SaveGame", () => {
     SaveGame.preserveUnreadable();
     expect(localStorage.getItem(UNREADABLE_KEY)).toBe(unreadable); // recoverable later
     expect(localStorage.getItem(AUTO_KEY)).toBe(unreadable); // original left in place
+  });
+
+  it("loads a legacy autosave key and rewrites future saves to the Verticopolis key", () => {
+    const sim = sampleGame();
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    expect(SaveGame.hasSave()).toBe(true);
+    expect(SaveGame.load()!.money).toBe(sim.money);
+
+    const loaded = SaveGame.load()!;
+    loaded.money = 333_333;
+    SaveGame.save(loaded);
+    expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
+    expect(SaveGame.load()!.money).toBe(333_333);
   });
 
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {

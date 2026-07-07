@@ -19,7 +19,8 @@ import type { SerializedGame } from "../engine/types";
  * exports are user-initiated and never race a reload.)
  */
 
-const AUTO_KEY = "simtower-clone-save";
+const AUTO_KEY = "verticopolis-save";
+const LEGACY_AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
 
@@ -85,6 +86,12 @@ function readSlot(key: string): SerializedGame | null {
   }
 }
 
+function autosaveKey(): string {
+  return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) === null
+    ? AUTO_KEY
+    : LEGACY_AUTO_KEY;
+}
+
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
   const data = readSlot(key);
   if (!data) return { slot, exists: false };
@@ -114,7 +121,7 @@ export const SaveGame = {
     await this.saveToAsync(AUTO_KEY, sim);
   },
   hasSave(): boolean {
-    return localStorage.getItem(AUTO_KEY) !== null;
+    return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) !== null;
   },
   load(): Simulation | null {
     return this.loadResult().sim;
@@ -127,8 +134,9 @@ export const SaveGame = {
    * that promised their old one) — see main.ts.
    */
   loadResult(): { sim: Simulation | null; corrupt: boolean } {
-    if (localStorage.getItem(AUTO_KEY) === null) return { sim: null, corrupt: false }; // truly empty
-    const data = readSlot(AUTO_KEY); // null ⇒ present but undecodable
+    const key = autosaveKey();
+    if (localStorage.getItem(key) === null) return { sim: null, corrupt: false }; // truly empty
+    const data = readSlot(key); // null ⇒ present but undecodable
     if (!data) return { sim: null, corrupt: true };
     try {
       return { sim: Simulation.deserialize(data), corrupt: false };
@@ -138,6 +146,7 @@ export const SaveGame = {
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
+    localStorage.removeItem(LEGACY_AUTO_KEY);
   },
   /**
    * Stash an unreadable autosave under a backup key so the 30s autosave doesn't
@@ -146,7 +155,7 @@ export const SaveGame = {
    * lets a later version recover them instead of overwriting on the next tick.
    */
   preserveUnreadable(): void {
-    const raw = localStorage.getItem(AUTO_KEY);
+    const raw = localStorage.getItem(autosaveKey());
     if (raw === null) return;
     try {
       localStorage.setItem(UNREADABLE_KEY, raw);
@@ -174,7 +183,7 @@ export const SaveGame = {
 
   /** Metadata for every slot, for the saves manager UI. */
   listSlots(): SlotInfo[] {
-    const slots: SlotInfo[] = [infoFrom("auto", AUTO_KEY)];
+    const slots: SlotInfo[] = [infoFrom("auto", autosaveKey())];
     for (let n = 1; n <= SLOT_COUNT; n++) slots.push(infoFrom(n, SLOT_KEY(n)));
     return slots;
   },
