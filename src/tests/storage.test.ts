@@ -265,6 +265,45 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(246_810);
   });
 
+  it("does not let an older async autosave overwrite a newer synchronous save", async () => {
+    let captured: Uint8Array | undefined;
+    let release!: () => void;
+    class SlowCompressionStream {
+      readable: ReadableStream<Uint8Array>;
+      writable: WritableStream<Uint8Array>;
+
+      constructor() {
+        this.readable = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            await new Promise<void>((resolve) => (release = resolve));
+            controller.enqueue(deflateSync(captured!));
+            controller.close();
+          },
+        });
+        this.writable = new WritableStream<Uint8Array>({
+          write(chunk) {
+            captured = chunk;
+          },
+        });
+      }
+    }
+    vi.stubGlobal("CompressionStream", SlowCompressionStream);
+    vi.stubGlobal("DecompressionStream", class {});
+
+    const stale = sampleGame();
+    stale.money = 100;
+    const pending = SaveGame.saveAsync(stale);
+    await vi.waitFor(() => expect(captured).toBeDefined());
+
+    const fresh = sampleGame();
+    fresh.money = 200;
+    SaveGame.save(fresh);
+    release();
+    await pending;
+
+    expect(SaveGame.load()!.money).toBe(200);
+  });
+
   // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
   // decompression-bomb fixtures below.
   const b64 = (bytes: Uint8Array): string => {
