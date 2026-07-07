@@ -61,8 +61,17 @@ function mountAppDom(): void {
   document.body.innerHTML = `
     <span id="stat-money"></span><span id="stat-pop"></span><span id="stat-star"></span>
     <span id="stat-time"></span><span id="stat-date"></span>
-    <div id="speed"><button class="btn" data-speed="1">▶</button></div>
+    <div id="speed">
+      <button class="btn" data-speed="0">⏸</button>
+      <button class="btn" data-speed="1">▶</button>
+      <button class="btn" data-speed="2">▶▶</button>
+      <button id="btn-update" hidden>Update</button>
+    </div>
     <button id="audio-toggle">🔊</button>
+    <button id="btn-undo"></button><button id="btn-redo"></button>
+    <button id="panel-toggle"></button><button id="panel-close"></button><div id="scrim"></div>
+    <select id="overlay-mode"><option value=""></option><option value="congestion">c</option></select>
+    <div id="a11y-live"></div>
     <div id="palette-scroll"></div>
     <div id="tool-info"></div>
     <input id="tower-name" />
@@ -703,5 +712,283 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     // Office is unlocked at 1★: not locked (still visible), just flagged unaffordable.
     expect(item("office").classList.contains("locked")).toBe(false);
     expect(item("office").classList.contains("unaffordable")).toBe(true);
+  });
+});
+
+describe("wireControls — toolbar buttons route to callbacks (no dead buttons)", () => {
+  it("speed buttons set the active highlight (one at a time) and report the speed", () => {
+    const { cb } = makeUI();
+    const btns = [...document.querySelectorAll<HTMLButtonElement>("#speed button[data-speed]")];
+    btns[2].click(); // ▶▶ = speed 2
+    expect(cb.onSpeed).toHaveBeenLastCalledWith(2);
+    expect(btns[2].classList.contains("active")).toBe(true);
+    btns[0].click(); // ⏸ = speed 0
+    expect(cb.onSpeed).toHaveBeenLastCalledWith(0);
+    expect(btns.filter((b) => b.classList.contains("active"))).toHaveLength(1); // only one active
+  });
+
+  it("audio toggle flips the icon to match the reported muted state", () => {
+    const { cb } = makeUI({ onToggleAudio: vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false) });
+    const audio = document.getElementById("audio-toggle")!;
+    audio.click();
+    expect(audio.textContent).toBe("🔇");
+    audio.click();
+    expect(audio.textContent).toBe("🔊");
+    expect(cb.onToggleAudio).toHaveBeenCalledTimes(2);
+  });
+
+  it("undo / redo / save / load / stats each route to their callback", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-undo")!.click();
+    document.getElementById("btn-redo")!.click();
+    document.getElementById("btn-save")!.click();
+    document.getElementById("btn-load")!.click();
+    document.getElementById("btn-stats")!.click();
+    expect(cb.onUndo).toHaveBeenCalledOnce();
+    expect(cb.onRedo).toHaveBeenCalledOnce();
+    expect(cb.onSave).toHaveBeenCalledOnce();
+    expect(cb.onShowSaves).toHaveBeenCalledOnce();
+    expect(cb.onShowStats).toHaveBeenCalledOnce();
+  });
+
+  it("the panel toggle opens the mobile drawer; close and scrim shut it", () => {
+    makeUI();
+    document.getElementById("panel-toggle")!.click();
+    expect(document.body.classList.contains("panels-open")).toBe(true);
+    document.getElementById("panel-close")!.click();
+    expect(document.body.classList.contains("panels-open")).toBe(false);
+    document.getElementById("panel-toggle")!.click();
+    document.getElementById("scrim")!.click();
+    expect(document.body.classList.contains("panels-open")).toBe(false);
+  });
+
+  it("the overlay-mode select forwards its value to onSetOverlay", () => {
+    const { cb } = makeUI();
+    const sel = document.getElementById("overlay-mode") as HTMLSelectElement;
+    sel.value = "congestion";
+    sel.dispatchEvent(new Event("change"));
+    expect(cb.onSetOverlay).toHaveBeenCalledWith("congestion");
+  });
+
+  it("renaming the tower forwards a trimmed name; a blank name falls back to Tower One", () => {
+    const { cb } = makeUI();
+    const name = document.getElementById("tower-name") as HTMLInputElement;
+    name.value = "  Skyspire  ";
+    name.dispatchEvent(new Event("change"));
+    expect(cb.onRenameTower).toHaveBeenLastCalledWith("Skyspire");
+    name.value = "   ";
+    name.dispatchEvent(new Event("change"));
+    expect(cb.onRenameTower).toHaveBeenLastCalledWith("Tower One");
+  });
+});
+
+describe("showSaves — the save-slot manager", () => {
+  const slots = [
+    { slot: "auto" as const, exists: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
+    { slot: 1, exists: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
+    { slot: 2, exists: false },
+  ];
+
+  it("renders one row per slot with the right actions (auto: no Save/Delete; empty: Save only)", () => {
+    const { ui } = makeUI();
+    ui.showSaves(slots);
+    const rows = dialog().querySelectorAll(".slot");
+    expect(rows).toHaveLength(3);
+    // Auto row: has Load, but no Save and no Delete.
+    const auto = rows[0];
+    expect(auto.querySelector("[data-save]")).toBeNull();
+    expect(auto.querySelector('[data-load="auto"]')).not.toBeNull();
+    expect(auto.querySelector("[data-del]")).toBeNull();
+    // Filled numbered slot: Save + Load + Delete, and a 6★ tower reads TOWER.
+    const one = rows[1];
+    expect(one.querySelector('[data-save="1"]')).not.toBeNull();
+    expect(one.querySelector('[data-load="1"]')).not.toBeNull();
+    expect(one.querySelector('[data-del="1"]')).not.toBeNull();
+    expect(one.textContent).toContain("TOWER");
+    // Empty slot: Save only, no Load/Delete, and reads "empty".
+    const two = rows[2];
+    expect(two.querySelector('[data-save="2"]')).not.toBeNull();
+    expect(two.querySelector("[data-load]")).toBeNull();
+    expect(two.textContent).toContain("empty");
+  });
+
+  it("Save writes the slot and re-opens the manager; Load loads and closes; Delete deletes and re-opens", () => {
+    const { ui, cb } = makeUI();
+    ui.showSaves(slots);
+    dialog().querySelector<HTMLElement>('[data-save="2"]')!.click();
+    expect(cb.onSaveSlot).toHaveBeenCalledWith(2);
+    expect(cb.onShowSaves).toHaveBeenCalledOnce(); // re-render
+
+    ui.showSaves(slots);
+    dialog().querySelector<HTMLElement>('[data-load="1"]')!.click();
+    expect(cb.onLoadSlot).toHaveBeenCalledWith(1);
+    expect(dialog().open).toBe(false); // Load closes the manager
+
+    ui.showSaves(slots);
+    dialog().querySelector<HTMLElement>('[data-del="1"]')!.click();
+    expect(cb.onDeleteSlot).toHaveBeenCalledWith(1);
+  });
+
+  it("the Auto-save Load routes the special 'auto' slot id", () => {
+    const { ui, cb } = makeUI();
+    ui.showSaves(slots);
+    dialog().querySelector<HTMLElement>('[data-load="auto"]')!.click();
+    expect(cb.onLoadSlot).toHaveBeenCalledWith("auto");
+  });
+});
+
+describe("showStopsDialog — per-floor elevator stop toggles", () => {
+  it("renders a labeled row per floor (basements as B-n) and reports toggles", () => {
+    const { ui } = makeUI();
+    const toggles: Array<[number, boolean]> = [];
+    ui.showStopsDialog(
+      "Express",
+      [
+        { floor: 5, stop: true, lobby: false },
+        { floor: 1, stop: true, lobby: true },
+        { floor: -2, stop: false, lobby: false },
+      ],
+      (floor, stop) => toggles.push([floor, stop]),
+    );
+    const boxes = dialog().querySelectorAll<HTMLInputElement>("input[data-floor]");
+    expect(boxes).toHaveLength(3);
+    expect(dialog().textContent).toContain("Floor 5");
+    expect(dialog().textContent).toContain("B2"); // basement label
+    expect(dialog().querySelector(".stop-lobby")).not.toBeNull(); // lobby tag
+    // Untick floor 5.
+    const f5 = dialog().querySelector<HTMLInputElement>('input[data-floor="5"]')!;
+    f5.checked = false;
+    f5.dispatchEvent(new Event("change"));
+    expect(toggles).toContainEqual([5, false]);
+  });
+});
+
+describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome", () => {
+  it("showStats opens a modal with the supplied HTML and a working Close", () => {
+    const { ui } = makeUI();
+    ui.showStats("<p>ninety-nine floors</p>");
+    expect(dialog().open).toBe(true);
+    expect(dialog().textContent).toContain("ninety-nine floors");
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
+  });
+
+  it("congratsTower announces the TOWER win and closes cleanly", () => {
+    const { ui } = makeUI();
+    ui.congratsTower();
+    expect(dialog().textContent).toContain("TOWER achieved");
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
+  });
+
+  it("showUpdateChip reveals the hidden Update chip and wires its click", () => {
+    const { ui } = makeUI();
+    const chip = document.getElementById("btn-update") as HTMLButtonElement;
+    expect(chip.hidden).toBe(true);
+    const onClick = vi.fn();
+    ui.showUpdateChip(onClick);
+    expect(chip.hidden).toBe(false);
+    chip.click();
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+});
+
+describe("showUpdatePrompt — Later / Update now, resolved once", () => {
+  const flush = () => new Promise((r) => setTimeout(r, 0)); // let fire-and-forget microtasks settle
+
+  it("renders release notes and a build id when provided", () => {
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(
+      () => {},
+      () => {},
+      { version: "1.6.0", sha: "abc1234", notes: ["Palette grows with stars", "Faster tests"] },
+    );
+    expect(dialog().textContent).toContain("Palette grows with stars");
+    expect(dialog().textContent).toContain("Build 1.6.0 · abc1234");
+  });
+
+  it("drops the 'unknown' sha placeholder from the build line", () => {
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(() => {}, () => {}, { version: "1.6.0", sha: "unknown", notes: [] });
+    expect(dialog().textContent).toContain("Build 1.6.0");
+    expect(dialog().textContent).not.toContain("unknown");
+  });
+
+  it("Update now closes and fires the update handler exactly once", async () => {
+    const onUpdate = vi.fn();
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    click('[data-act="update"]');
+    await flush();
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onLater).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Later closes and defers; Esc (cancel) also resolves as Later", async () => {
+    const onUpdate = vi.fn();
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    click('[data-act="later"]');
+    await flush();
+    expect(onLater).toHaveBeenCalledOnce();
+    expect(onUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("showBatchPricingDialog — set-all rent/price with a reset confirm", () => {
+  const result = { matched: 5, eligible: 5, changed: 3, skippedSold: 0, skippedCustom: 2, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
+  function open() {
+    const { ui } = makeUI();
+    const band = { default: 10000, min: 5000, max: 20000, step: 1000 };
+    const preview = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(() => ({ ...result }));
+    const onApplied = vi.fn();
+    ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", band }, { preview, apply, onApplied });
+    return { preview, apply, onApplied };
+  }
+
+  it("previews on open, showing the changed/matched counts", () => {
+    const { preview } = open();
+    expect(preview).toHaveBeenCalled();
+    expect(dialog().querySelector("#bp-preview")!.textContent).toContain("Set 3 of 5 offices");
+  });
+
+  it("the ± steppers move the price within the band and re-preview", () => {
+    const { preview } = open();
+    const price = dialog().querySelector("#bp-price") as HTMLInputElement;
+    expect(price.value).toBe("10000");
+    dialog().querySelector<HTMLElement>('[data-bp="inc"]')!.click();
+    expect(price.value).toBe("11000");
+    dialog().querySelector<HTMLElement>('[data-bp="dec"]')!.click();
+    dialog().querySelector<HTMLElement>('[data-bp="dec"]')!.click();
+    expect(price.value).toBe("9000");
+    expect(preview.mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("Apply commits and reports a summary, then closes", () => {
+    const { apply, onApplied } = open();
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    expect(apply).toHaveBeenCalledOnce();
+    expect(onApplied).toHaveBeenCalledWith(expect.stringContaining("Set 3 offices"));
+    expect(dialog().open).toBe(false);
+  });
+
+  it("a bulk Reset-to-default requires a confirming second click", () => {
+    const { apply } = open();
+    // Select "Reset to default" — set its radio and clear the sibling explicitly
+    // (the test DOM doesn't auto-uncheck radio-group peers), then fire change.
+    dialog().querySelector<HTMLInputElement>('input[name="bp-mode"][value="set"]')!.checked = false;
+    const def = dialog().querySelector<HTMLInputElement>('input[name="bp-mode"][value="default"]')!;
+    def.checked = true;
+    def.dispatchEvent(new Event("change"));
+    const applyBtn = dialog().querySelector<HTMLButtonElement>("#bp-apply")!;
+    applyBtn.click(); // arms, does NOT apply yet
+    expect(applyBtn.textContent).toBe("Confirm reset");
+    expect(apply).not.toHaveBeenCalled();
+    applyBtn.click(); // confirms
+    expect(apply).toHaveBeenCalledOnce();
   });
 });

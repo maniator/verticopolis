@@ -157,6 +157,22 @@ export default defineConfig({
       // excalibur pages, PWA bootstrap) — dev/build plumbing, not game
       // logic. types.ts is measured: it carries runtime predicates
       // (isPresent/isDormant), not just type aliases.
+      //
+      // Also excluded: layers that can only run against a real device and are
+      // therefore covered by the Playwright Tier-2 tier (e2e/*.spec.ts drive the
+      // live app end to end), NOT vitest — measuring them here would just depress
+      // the unit number with lines no unit test can reach:
+      //   - the canvas/WebGL DRAWING layer (the Excalibur engine wrapper and the
+      //     pixel-sprite painters);
+      //   - the Web-Audio SYNTHESIS engine (ToneAudioEngine needs an AudioContext);
+      //   - src/main.ts, the composition root / app entry: its constructor news
+      //     up TowerEngine (boots Excalibur/WebGL), so `new GameApp()` can't run
+      //     headless. Its testable LOGIC was deliberately extracted into the
+      //     src/game/* controllers (build/editor/saveLoad/inspector/keyboard),
+      //     which ARE measured and well covered; what remains is engine + rAF +
+      //     DOM/PWA wiring, exercised by e2e (window.game in the *.spec.ts).
+      // The PURE-logic render code stays measured: src/render/facadeGeometry.ts
+      // computes geometry (no canvas) and is unit-tested like the rest.
       include: ["src/**/*.ts"],
       exclude: [
         "**/*.d.ts",
@@ -166,7 +182,23 @@ export default defineConfig({
         "src/preview.ts",
         "src/excalibur-main.ts",
         "src/pwa.ts",
+        "src/main.ts",
+        "src/audio/ToneAudioEngine.ts",
+        "src/render/excalibur/**",
+        "src/render/pixelSprites.ts",
+        "src/render/sprites.ts",
+        "src/render/sprites/**",
       ],
+      // Enforced floor (agreed 2026-07-07): a ratchet so unit coverage of the
+      // testable logic can't rot, not a vanity ceiling. Branches/functions run
+      // a touch lower than lines/statements because defensive else-arms are
+      // legitimately hard to force without writing junk tests.
+      thresholds: {
+        statements: 85,
+        lines: 85,
+        functions: 80,
+        branches: 80,
+      },
     },
   },
 });
