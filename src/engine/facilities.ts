@@ -288,8 +288,9 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     category: "special",
     name: "Metro Station",
     // Spans the full lot width and THREE deep-basement floors (B8–B10 in the
-    // original), so it must be placed at the bottom of the basement.
-    width: 340,
+    // original), so it must be placed at the bottom of the basement. Tracks the
+    // canon lot width (GRID.width) — kept in sync by hand.
+    width: 375,
     floors: 3,
     cost: 1000000,
     minStar: 4,
@@ -346,9 +347,9 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
 /**
  * Star-rating population thresholds — the canonical 1994 values
  * (300 / 1,000 / 5,000 / 10,000). Above 3★ the rating counts only non-hotel
- * occupants (offices/condos); the lot was widened to 340 tiles so a well-zoned
- * tower holds ~15,000+ of those (measured ~15,066 at congestion 0.82), keeping
- * the canonical 10,000 (5★) and 15,000 (TOWER) genuinely reachable.
+ * occupants (offices/condos); the lot is the canon 375 tiles wide so a well-zoned
+ * tower holds well over 15,000 of those, keeping the canonical 10,000 (5★) and
+ * 15,000 (TOWER) genuinely reachable.
  */
 export const STAR_THRESHOLDS: Record<number, number> = {
   1: 0,
@@ -362,9 +363,9 @@ export const STAR_THRESHOLDS: Record<number, number> = {
  * Population needed for the final TOWER rating (above 5 stars). Same metric as
  * the 1994 original — a census of OCCUPANTS (office workers + condo residents;
  * hotel guests count only while climbing to 3★, then drop out per canon);
- * commercial/visitor traffic never counts. The canonical 15,000: the lot was
- * widened to 340 tiles so a well-zoned 100-floor tower can actually reach it
- * (measured ~15,066 occupants at congestion 0.82 with express + banded locals).
+ * commercial/visitor traffic never counts. The canonical 15,000: the lot is the
+ * canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches it
+ * (with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
 
@@ -397,8 +398,8 @@ export const GRID = {
    * floor: floor 1 = ground, floor 0 = B1, -1 = B2 … -9 = B10 (no gap at 0).
    */
   minFloor: -9,
-  /** Total buildable width in tiles. */
-  width: 340,
+  /** Total buildable width in tiles — the canon 1994 map is 375 segments wide. */
+  width: 375,
   /** Floors between required (sky) lobbies. */
   lobbyInterval: 15,
 } as const;
@@ -488,7 +489,7 @@ export function isStaffTransportKind(kind: FacilityKind): boolean {
 export const TRANSPORT_CAPACITY: Record<string, number> = {
   elevatorStandard: 21,
   elevatorService: 16,
-  elevatorExpress: 33,
+  elevatorExpress: 42, // canon: PC 1.0 express car carries 42 (standard 21)
   escalator: 30, // continuous flow, treated as per-shaft
   stairs: 8,
 };

@@ -27,7 +27,7 @@ function structuredTower(seed: number, top: number, money = 100_000_000, halfWid
   const sim = Simulation.newGame(seed);
   sim.money = money;
   // Optionally build only a centred strip (much cheaper to tick over on the
-  // wide 340-tile lot) when a test doesn't need the full width.
+  // wide 375-tile lot) when a test doesn't need the full width.
   const lay = (kind: "floor" | "lobby", f: number) => {
     if (halfWidth === undefined) return layFloor(sim, kind, f);
     const l = Math.max(0, C - halfWidth);
@@ -146,7 +146,7 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     const kinds: FacilityKind[] = ["stairs", "escalator"];
     let placed = 0;
     // 68 fixed two-floor links, spaced 5 tiles apart (> max width 4, so none
-    // overlap) and every attempt on-lot (max x = 67·5 + 4 = 339 < 340). That
+    // overlap) and every attempt on-lot (max x = 67·5 + 4 = 339 < 375). That
     // overshoots the 64 cap, so the blocked attempts (i ≥ 64) prove the CAP
     // rejects them — not the lot edge.
     for (let i = 0; i < 68; i++) {
