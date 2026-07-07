@@ -119,9 +119,11 @@ diagrams). The prose conventions below are the source of truth.
 
 - **`src/engine/`** — pure game simulation (no DOM). Deterministic and heavily
   unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
-  their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`)
-  and depend on the narrow `SimContext` interface so each is testable on its own.
-  Per-tower build caps and rule-sets live here (`facilities.ts`, `gameRules.ts`).
+  their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`).
+  The extracted `EventSystem` and `EconomySystem` depend only on the narrow
+  `SimContext` interface, so each is testable on its own; `ElevatorDispatch` and
+  `Crowd` operate on `Tower` directly. Per-tower build caps and rule-sets live
+  here (`facilities.ts`, `gameRules.ts`).
 - **`src/render/`** — canvas rendering and pixel-art sprites. Reads engine state,
   never mutates it.
 - **`src/ui/`** — DOM controls (palette, status bar, dialogs), using native

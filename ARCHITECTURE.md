@@ -96,7 +96,7 @@ sequenceDiagram
 
     EX->>TE: onUpdate(ms) every frame
     TE->>GA: onUpdate(ms)
-    Note over GA: accMinutes += ms × speed
+    Note over GA: accMinutes += (ms/1000) × minutesPerSec
     loop while accMinutes ≥ 1 (bounded sub-steps)
         GA->>SIM: tick(step)
         Note over SIM: advance clock, cars,<br/>crowd, economy, events
@@ -195,8 +195,10 @@ flowchart LR
 `Simulation` serializes to/from a plain `SerializedGame` object. `SaveGame`
 persists that to `localStorage` (a periodic autosave slot plus three named
 slots), `saveMigration` upgrades older payloads to the current `SAVE_VERSION` on
-load, and `twrImport` parses the original 1994 `.TWR` / legacy files into the
-same `SerializedGame` shape. Per-device accessibility preferences (`Prefs`) live
+load, and `twrImport` provides the seam for mapping the original 1994 `.TWR` /
+legacy files into the same `SerializedGame` shape — today `parseTWR` recognizes a
+`.TWR` file but the binary decoder is still planned, so the import is
+foundation-in-place rather than wired up. Per-device accessibility preferences (`Prefs`) live
 in their own key, deliberately **off** the save. Undo/redo keeps in-memory
 snapshots and is invalidated when a different tower is adopted.
 
@@ -209,7 +211,7 @@ flowchart TD
     SaveGame --> Auto["localStorage:<br/>autosave slot"]
     SaveGame --> Slots["localStorage:<br/>3 named slots"]
 
-    TWR[".TWR / legacy file"] -->|twrImport.parseTWR| SG
+    TWR[".TWR / legacy file"] -->|twrImport.parseTWR (planned)| SG
     Load["Load from disk/slot"] -->|saveMigration.migrateSave| SG
 
     Prefs["Prefs (a11y)"] --> PLS["localStorage:<br/>separate key, off the save"]
