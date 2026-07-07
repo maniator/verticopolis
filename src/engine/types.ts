@@ -122,7 +122,7 @@ export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   congestion: "overcrowded vertical transport",
   rent: "rent set too high",
   noise: "a noisy neighbor nearby",
-  transportFar: "too far from a stairway, escalator, or elevator",
+  transportFar: "too far from a stairway, escalator, or passenger elevator",
 };
 
 /** Guard for a persisted departure cause from an untrusted save. */

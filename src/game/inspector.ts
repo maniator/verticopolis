@@ -134,7 +134,7 @@ export class InspectorController {
         u.floor !== 1 &&
         sim.tower.isFloorServed(u.floor) &&
         sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
-          ? `<div style="color:var(--bad)">Long walk to transport — tenants tire of the hike. Put a stairway, escalator, or elevator within reach.</div>`
+          ? `<div style="color:var(--bad)">Long walk to transport — tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`
           : "";
       // W3: a canon commercial venue (not partyHall) more than two floors from a
       // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix — lobbies only
