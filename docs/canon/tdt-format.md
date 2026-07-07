@@ -30,9 +30,10 @@ commentary) are fair inspiration.
 
 **Why this exists.** The `.TDT` save is a window into the 1994 original's
 internals: it confirms (or corrects) numbers our engine treats as canon, and it
-is the specification for an importer of original saves
-(`src/storage/twrImport.ts` is today a stub; see PARITY.md). `src/tests/canon.test.ts`
-asserts our engine constants against this page so drift gets caught in CI.
+is the specification for an importer of original saves (not yet implemented; it
+lands with the `.TDT` import PR, which reads this page as its source of truth).
+`src/tests/canon.test.ts` asserts our engine constants against this page so
+drift gets caught in CI.
 
 **Reliability.** Both sources analyzed the Windows version (little-endian);
 neither pins an exact game version. Structures after the floor map are
