@@ -516,7 +516,7 @@ export class Tower {
     if (kind === "escalator") {
       for (const fl of [bottom, top]) {
         if (this.units.some((u) => u.kind === "office" && u.floor === fl)) {
-          return { ok: false, reason: "Escalators are for commercial floors, so they can't serve office floors." };
+          return { ok: false, reason: "Escalators can't serve office floors. They link commercial floors only." };
         }
       }
     }

@@ -74,8 +74,8 @@ export function buildStatsHtml(sim: Simulation): string {
           recyclingCap > 0 || (sim.star >= 3 && recyclingShort)
             ? `<span class="k">Recycling</span><span class="v" style="color:${recyclingShort ? "var(--bad)" : "var(--good)"}">${
                 recyclingCap === 0
-                  ? `${fmt(s.population)} population, no center. Build one`
-                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? ". Build more" : ""}`
+                  ? `${fmt(s.population)} population, no center (build one)`
+                  : `${fmt(s.population)} / ${fmt(recyclingCap)} processed${recyclingShort ? " (build more)" : ""}`
               }</span>`
             : ""
         }

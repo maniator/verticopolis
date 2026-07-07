@@ -152,7 +152,7 @@ export class InspectorController {
       // hurt them" contract, so the eviction is never a surprise. The countdown
       // and the current-vs-target read recompute on every hover, so they tick
       // down live as the game clock advances.
-      const statusText = u.state === "vacating" ? "on notice, tenant leaving" : u.state;
+      const statusText = u.state === "vacating" ? "on notice (tenant leaving)" : u.state;
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
         const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
@@ -200,7 +200,7 @@ export class InspectorController {
       const busy =
         util === undefined
           ? ""
-          : `<div style="color:${util > 0.85 ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${util > 0.85 ? ". Near capacity, consider more cars or a parallel shaft." : ""}</div>`;
+          : `<div style="color:${util > 0.85 ? "var(--bad)" : "var(--good)"}">Avg load: ${Math.round(util * 100)}% full${util > 0.85 ? ". Near capacity; consider more cars or a parallel shaft." : ""}</div>`;
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
           (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : "") +

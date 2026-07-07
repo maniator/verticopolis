@@ -196,7 +196,7 @@ export class OnboardingController {
       `<button class="splash-btn ${o.hasSave ? "" : "primary"}" data-splash="new">＋ New Tower</button>` +
       `<button class="splash-btn ghost" data-splash="help">？ How to Play</button>` +
       `</div>` +
-      `<p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art, no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>` +
+      `<p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>` +
       `<p class="splash-version">v${APP_VERSION}</p>`;
     document.body.appendChild(el);
     this.splashEl = el;
@@ -340,7 +340,7 @@ export class OnboardingController {
     document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
     this.setDefaultHint();
     if (this.panelEl) {
-      this.panelEl.innerHTML = `<div class="win-title">Nice, you're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
+      this.panelEl.innerHTML = `<div class="win-title">Nice. You're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
       this.panelEl.addEventListener("click", () => this.clearSession(), { once: true });
     }
     if (this.sendOff) clearTimeout(this.sendOff);
