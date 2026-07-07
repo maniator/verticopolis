@@ -172,7 +172,12 @@ export const SCENES: Scene[] = [
       s.star = 4;
       const cx = Math.floor(g.grid.width / 2);
       const left = cx - 22;
-      for (let x = left - 6; x < left + 50; x++) s.tower.place("lobby", 1, x);
+      // Ground lobby grows OUTWARD from the seeded center strip: a ground tile only
+      // connects by touching the tower, so laying from a far edge would strand the
+      // whole left side until the loop reached the seed. The floors above rest on
+      // the story below, so their left-to-right order is fine.
+      for (let x = cx; x < left + 50; x++) s.tower.place("lobby", 1, x);
+      for (let x = cx - 1; x >= left - 6; x--) s.tower.place("lobby", 1, x);
       for (let f = 2; f <= 8; f++) for (let x = left; x < left + 44; x++) s.tower.place("floor", f, x);
       s.buildTransport("elevatorStandard", left, 1, 8);
       for (let f = 2; f <= 8; f++)
