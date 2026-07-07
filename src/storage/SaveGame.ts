@@ -39,6 +39,9 @@ const UNREADABLE_KEY = "simtower-clone-unreadable";
  * old saves keep loading — they re-write compressed on the next save.
  */
 const STORE_MAGIC = "VCZ1:";
+// Latest-start write token for same-tab saves. JavaScript runs this module on
+// one event-loop thread, and the increment happens before any async yield, so an
+// older async compression can never pass the token check after a newer save starts.
 let saveGeneration = 0;
 
 /**
