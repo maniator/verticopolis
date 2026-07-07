@@ -69,6 +69,7 @@ abstraction · ⬜ not present.
 - ✅ **Colored evaluation overlay**: a toggleable per-floor heatmap (Congestion / Occupancy / Satisfaction) with a legend, like the original's map views
 
 ## Time, audio, presentation
+- ✅ **The 1994 "breathing clock"** — real time is spent the way the original spent its 2,600 frames/day: the clock crawls through the lunch crush and races through the small hours (span table in `docs/canon/tdt-format.md` §3), normalized so a full day costs the same real time and the speed buttons keep their meaning. Presentation-only (the sim stays a uniform 1,440-minute day); a per-device **Steady clock** preference in Help disables the rhythm
 - ✅ Day/night sky with the sun and moon both arcing across; lit interiors at night, lights-out when empty/asleep, shops show CLOSED off-hours
 - ✅ Weather: deterministic per-day clear / cloudy / rain (the `WeatherKind` states), with drifting clouds and rain streaks (purely cosmetic; off the gameplay RNG)
 - ✅ Location-aware procedural soundtrack + SFX

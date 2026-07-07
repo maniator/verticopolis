@@ -1,6 +1,7 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
+import { loadPrefs } from "../storage/Prefs";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
@@ -44,6 +45,9 @@ export interface UICallbacks {
   onEditAction(action: string, root: HTMLElement): void;
   /** Toggle reduced motion; returns the new effective state. */
   onToggleReducedMotion(): boolean;
+  /** Toggle the "steady clock" pref (disables the 1994 breathing-clock pacing);
+   *  returns the new steady state (true = steady, breathing off). */
+  onToggleSteadyClock(): boolean;
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
@@ -851,6 +855,7 @@ export class UI {
         <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
+        <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> below.</li>
         <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
@@ -867,8 +872,18 @@ export class UI {
       <p class="help-report"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/maniator/verticopolis/issues/new/choose">Let us know…<span class="visually-hidden"> (opens GitHub in a new tab)</span></a></p>
       <h3>About</h3>
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
-      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
+      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
+    const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
+    const scLabel = (steady: boolean) => {
+      sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;
+      sc.setAttribute("aria-pressed", String(steady));
+      sc.title = steady
+        ? "The day runs at an even pace. Turn off to restore the 1994 rhythm (slow lunch, fast night)."
+        : "The 1994 rhythm is on: lunch runs slow, night runs fast. Turn on for an even pace.";
+    };
+    scLabel(loadPrefs().steadyClock === true);
+    sc.addEventListener("click", () => scLabel(this.cb.onToggleSteadyClock()));
     const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
     // When the OS forces reduced motion on, the user pref can't override it — show
     // it as on-by-system and disable the toggle (so it isn't a silent no-op).

@@ -10,6 +10,7 @@ import { AudioEngine } from "./audio/Audio";
 import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
 import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
+import { paceFactor } from "./engine/timePacing";
 import { UI, type Tool } from "./ui/UI";
 import { classifyGesture, isPaintKind } from "./game/gesture";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
@@ -63,6 +64,8 @@ class GameApp {
 
   private canvas: HTMLCanvasElement;
   private accMinutes = 0;
+  /** Last day the noon "Lunch rush!" bulletin fired (transient, like the log). */
+  private lastLunchDay = -1;
   private lastUiUpdate = 0;
   /** Throttle for the per-frame error log, so a repeating throw can't spam. */
   private lastTickErrorLog = 0;
@@ -249,6 +252,11 @@ class GameApp {
         savePrefs(this.prefs);
         this.applyReducedMotion();
         return reducedMotionActive(this.prefs, this.reduceMq.matches);
+      },
+      onToggleSteadyClock: () => {
+        this.prefs.steadyClock = !this.prefs.steadyClock;
+        savePrefs(this.prefs);
+        return this.prefs.steadyClock;
       },
       onReplayOnboarding: () => {
         if (document.getElementById("splash")) return; // never arm behind the splash
@@ -791,7 +799,13 @@ class GameApp {
       return;
     }
     const minutesPerSecond = SPEEDS[this.speed] ?? 0;
-    this.accMinutes += (dtMs / 1000) * minutesPerSecond;
+    // The 1994 "breathing clock": scale how fast REAL time feeds sim-minutes by
+    // the canon pacing curve (lunch dilates ~10×, night sprints) unless the
+    // player opted out. Presentation-only — the sim still ticks uniform minutes
+    // and paceFactor is normalized so a full day costs the same real time, so
+    // the speed buttons keep their meaning.
+    const pace = this.prefs.steadyClock ? 1 : paceFactor(this.sim.clock.minuteOfDay);
+    this.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
     // Step the simulation in small chunks so hourly/daily boundaries fire.
     let guard = 0;
     while (this.accMinutes >= 1 && guard++ < 2000) {
@@ -799,6 +813,7 @@ class GameApp {
       this.sim.tick(step);
       this.accMinutes -= step;
     }
+    this.emitLunchRush();
 
     // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
     // tower never makes panning feel sluggish.
@@ -848,6 +863,17 @@ class GameApp {
     // World-anchor the editor card and inspector tooltip every frame (cheap —
     // just writes left/top), so they ride the tower as the camera pans/zooms.
     this.positionPanels();
+  }
+
+  /** Once per weekday, as the clock crosses noon with the breathing clock on,
+   *  drop a flavor line in the bulletin — it doubles as the only in-game
+   *  explanation of why midday plays out in slow motion (UX call: the clock
+   *  itself is the indicator; no HUD gauges). Transient, like the log. */
+  private emitLunchRush(): void {
+    const c = this.sim.clock;
+    if (this.prefs.steadyClock || c.hour !== 12 || c.isWeekend || c.day === this.lastLunchDay) return;
+    this.lastLunchDay = c.day;
+    this.sim.emit("Lunch rush! Midday plays out in slow motion — just like 1994.", "info");
   }
 
   /** Keep the world-attached DOM panels (selected-facility editor, hover
@@ -978,6 +1004,7 @@ class GameApp {
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
+    this.lastLunchDay = -1;
     this.engine.setSim(sim);
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.

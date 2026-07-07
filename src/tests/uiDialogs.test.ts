@@ -102,6 +102,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onRedo: vi.fn(),
     onEditAction: vi.fn(),
     onToggleReducedMotion: vi.fn(() => true),
+    onToggleSteadyClock: vi.fn(() => true),
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
@@ -473,9 +474,33 @@ describe("showHelp — the Report an issue link", () => {
     const actions = box.querySelector(".modal-actions")!;
     // The report link is a body affordance, never a dialog action.
     expect(actions.querySelector('a[href*="/issues/new"]')).toBeNull();
-    // Footer stays exactly reduce-motion / replay-onboard / close (Got it).
+    // Footer stays exactly reduce-motion / steady-clock / replay-onboard / close (Got it).
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
-    expect(acts).toEqual(["reduce-motion", "replay-onboard", "close"]);
+    expect(acts).toEqual(["reduce-motion", "steady-clock", "replay-onboard", "close"]);
+  });
+
+  it("wires the Steady clock toggle: label reflects the pref and the click routes through the callback", () => {
+    localStorage.removeItem("vc.prefs");
+    const { ui, cb } = makeUI({ onToggleSteadyClock: vi.fn(() => true) });
+    ui.showHelp();
+    const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
+    // Fresh device: breathing clock on, so the "steady" pref reads Off.
+    expect(btn.textContent).toBe("Steady clock: Off");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    btn.click();
+    expect(cb.onToggleSteadyClock).toHaveBeenCalledTimes(1);
+    // The label trusts the callback's returned state, not a local guess.
+    expect(btn.textContent).toBe("Steady clock: On");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("reads a persisted steady-clock pref for the toggle's initial label", () => {
+    localStorage.setItem("vc.prefs", JSON.stringify({ steadyClock: true }));
+    const { ui } = makeUI();
+    ui.showHelp();
+    const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
+    expect(btn.textContent).toBe("Steady clock: On");
+    localStorage.removeItem("vc.prefs");
   });
 
   it("gives initial focus to the primary 'Got it', not the external link", () => {
