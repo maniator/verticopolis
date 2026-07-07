@@ -632,20 +632,6 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "Tower imported.", kind: "good" }]);
   });
 
-  it("importLegacy never reaches the sim: the .TWR decoder is a planned feature", () => {
-    // Garbage that can't even be a .TWR header.
-    saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TWR");
-    expect(adopted).toHaveLength(0);
-    expect(f.toasts).toEqual([
-      { text: "This file is too small to be a SimTower .TWR save.", kind: "info" },
-    ]);
-    // A plausible legacy file is recognized but politely declined for now.
-    saveLoad.importLegacy(new ArrayBuffer(64), "tower.TWR");
-    expect(adopted).toHaveLength(0);
-    expect(last(f.toasts).kind).toBe("info");
-    expect(last(f.toasts).text).toContain("planned");
-  });
-
   it("first context loss: autosave written, reload stamped in sessionStorage, page reloaded", () => {
     const reload = stubReload();
     saveLoad.recoverFromContextLoss();

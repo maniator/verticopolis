@@ -203,45 +203,40 @@ export const SaveGame = {
     return (slug || "tower") + TOWER_FILE_EXT;
   },
 
-  /** Parse a .vctower file. Raw-JSON exports from older builds still load. */
+  /** Parse a `.vctower` tower file. */
   async import(text: string): Promise<Simulation> {
     const trimmed = text.trim();
     // Match the whole VCTOWER family, not just this version's magic, so a file
-    // from a newer build gets an honest "update the game" instead of falling
-    // through to the JSON path and reporting gibberish as "not a tower file".
+    // from a newer build gets an honest "update the game" rather than a generic
+    // "not a tower file".
     const magic = /^VCTOWER(\d+)/.exec(trimmed);
+    if (!magic) {
+      throw new Error("Not a Verticopolis tower file.");
+    }
+    if (magic[0] !== TOWER_FILE_MAGIC) {
+      throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+    }
+    // Distinguish "your browser can't decompress" from "this file is broken"
+    // BEFORE the try below — otherwise a missing API blames a healthy file.
+    if (!compressionSupported()) {
+      throw new Error("This browser is too old to open compressed tower files — try a current browser.");
+    }
     let data: SerializedGame;
-    if (magic) {
-      if (magic[0] !== TOWER_FILE_MAGIC) {
-        throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+    try {
+      // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
+      const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
+      // fatal decoder: a flipped byte must fail the import loudly, never
+      // silently half-load a tower with U+FFFD-mangled strings.
+      data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
+    } catch (err) {
+      // A crafted tiny file can inflate to gigabytes (a decompression bomb);
+      // inflate() caps the output and throws this, distinct from "damaged".
+      if (err instanceof TowerTooLargeError) {
+        throw new Error("This tower file is too large to open safely.");
       }
-      // Distinguish "your browser can't decompress" from "this file is broken"
-      // BEFORE the try below — otherwise a missing API blames a healthy file.
-      if (!compressionSupported()) {
-        throw new Error("This browser is too old to open compressed tower files — try a current browser.");
-      }
-      try {
-        // Whitespace-tolerant: survives files re-wrapped by editors or mailers.
-        const packed = fromBase64(trimmed.slice(magic[0].length).replace(/\s+/g, ""));
-        // fatal decoder: a flipped byte must fail the import loudly, never
-        // silently half-load a tower with U+FFFD-mangled strings.
-        data = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(await inflate(packed))) as SerializedGame;
-      } catch (err) {
-        // A crafted tiny file can inflate to gigabytes (a decompression bomb);
-        // inflate() caps the output and throws this, distinct from "damaged".
-        if (err instanceof TowerTooLargeError) {
-          throw new Error("This tower file is too large to open safely.");
-        }
-        // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
-        // the container was recognized, so the file is OURS but broken. Say so.
-        throw new Error("This tower file is damaged and can't be read.");
-      }
-    } else {
-      try {
-        data = JSON.parse(trimmed) as SerializedGame;
-      } catch {
-        throw new Error("Not a Verticopolis tower file.");
-      }
+      // Bad base64, corrupt deflate data, mangled UTF-8, or truncated JSON —
+      // the container was recognized, so the file is OURS but broken. Say so.
+      throw new Error("This tower file is damaged and can't be read.");
     }
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
       throw new Error("Not a valid tower save file.");

@@ -96,7 +96,6 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onLoad: vi.fn(),
     onExport: vi.fn(),
     onImport: vi.fn(),
-    onImportLegacy: vi.fn(),
     onNew: vi.fn(),
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
@@ -421,20 +420,6 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
     await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
-  });
-
-  it("a picked .TWR legacy file is read as bytes and routed to onImportLegacy", async () => {
-    const { cb } = makeUI();
-    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    document.getElementById("btn-import")!.click();
-    const input = document.getElementById("import-file") as HTMLInputElement;
-    const file = new File([new Uint8Array([1, 2, 3])], "MYTOWER.TWR");
-    Object.defineProperty(input, "files", { value: [file], configurable: true });
-    input.onchange!(new Event("change"));
-    await vi.waitFor(() => expect(cb.onImportLegacy).toHaveBeenCalledTimes(1));
-    const [buf, name] = vi.mocked(cb.onImportLegacy).mock.calls[0];
-    expect(name).toBe("MYTOWER.TWR");
-    expect(new Uint8Array(buf)).toEqual(new Uint8Array([1, 2, 3]));
   });
 });
 

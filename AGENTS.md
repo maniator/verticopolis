@@ -75,8 +75,8 @@ resolving review threads). On top of that, in an agent session:
   - **Samus Shepard** (`gds-agent-game-designer`) for mechanics, balance, and
     player-feel (e.g. economy, ratings, events);
   - **Sally** (`bmad-agent-ux-designer`) for UI/UX and audio-feel changes;
-  - `/security-review` for anything touching untrusted input, saves/`.TWR`
-    import, or persistence.
+  - `/security-review` for anything touching untrusted input, saves, or
+    persistence.
 
   For larger or higher-risk changes, convene several of these as a party
   (`bmad-party-mode`) so the perspectives challenge each other.

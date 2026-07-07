@@ -18,10 +18,10 @@ Instead, report privately through GitHub's
    the link above.
 2. Describe the issue, the impact, and the steps to reproduce it.
 3. Include the build version (shown on the splash screen) and, if relevant, a
-   saved tower export (`.twr`) or a minimal reproduction.
+   saved tower export (`.vctower`) or a minimal reproduction.
 
 Because the game runs entirely client-side, please pay particular attention to
-anything involving **imported save data** (`.twr` / save-game import), since
+anything involving **imported save data** (`.vctower` / save-game import), since
 that is the main path by which untrusted input enters the app.
 
 ## What to expect

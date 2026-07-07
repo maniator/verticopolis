@@ -143,9 +143,6 @@ discarded, and any future format change has a single place to add an upgrade
 step. The `serialize → deserialize → serialize` round-trip is covered by the
 Vitest suite.
 
-`.TWR` import of original SimTower saves has groundwork in place but is not yet
-wired up (see the parity table below).
-
 ## 1994 SimTower parity
 
 How the clone maps to the original's mechanics. Items marked ✅ are implemented
@@ -178,7 +175,6 @@ and covered by the Vitest suite and/or the captured screenshots.
 | **Buried treasure** found while excavating basements | ✅ |
 | Living tower: walking people, riding cars, the metro train, day/night | ✅ |
 | Save/load, multiple slots, .vctower export/import | ✅ |
-| `.TWR` original-save import | ⏳ foundation in place (v2) |
 | Per-person stress/routing simulation | ◻︎ abstracted as an aggregate model |
 
 **Desktop vs. mobile:** the desktop layout mirrors the original's dollhouse
@@ -202,7 +198,7 @@ src/
     pixelSprites.ts dollhouse room interiors + walking/seated people
   ui/UI.ts     # palette, status bar, editor panel, modals, toasts
   audio/Audio.ts  # location-based procedural soundtrack + SFX
-  storage/SaveGame.ts  # localStorage + JSON import/export
+  storage/SaveGame.ts  # localStorage + .vctower export/import
   main.ts      # GameApp: tool semantics, sim tick, glue (input/camera via Excalibur)
   gallery.ts   # standalone sprite-catalog page (docs/screenshots)
   tests/       # Vitest unit tests for the engine
@@ -216,6 +212,9 @@ merged structural "run" as an Excalibur actor whose graphic reuses our pixel-art
 sprite code. `main.ts` only supplies tool semantics through the engine's
 controller hooks and advances the simulation each frame — it never touches the
 camera or raw pointer math directly.
+
+For diagrams of the layers, the frame loop, the engine subsystems, input flow,
+and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
 
 ## Screenshots
 

@@ -355,16 +355,15 @@ describe("SaveGame", () => {
     expect(SaveGame.exportFilename(sim)).toBe("tower.vctower");
   });
 
-  it("still imports a legacy raw-JSON export", async () => {
+  it("rejects a raw-JSON tower export — only .vctower containers import now", async () => {
     const sim = sampleGame();
-    const loaded = await SaveGame.import(JSON.stringify(sim.serialize(), null, 2));
-    expect(loaded.money).toBe(sim.money);
+    await expect(SaveGame.import(JSON.stringify(sim.serialize(), null, 2))).rejects.toThrow(/not a verticopolis tower file/i);
   });
 
   it("rejects malformed imports", async () => {
     await expect(SaveGame.import("{}")).rejects.toThrow();
     await expect(SaveGame.import("not json")).rejects.toThrow();
-    await expect(SaveGame.import("[1,2,3]")).rejects.toThrow(); // parses, fails validation
+    await expect(SaveGame.import("[1,2,3]")).rejects.toThrow(); // no VCTOWER magic → not a tower file
     // A magic line over a garbage body must fail loudly, not half-load.
     await expect(SaveGame.import("VCTOWER1\n@@not base64@@")).rejects.toThrow();
     await expect(SaveGame.import("VCTOWER1\n" + btoa("[1,2,3]"))).rejects.toThrow();
@@ -463,13 +462,13 @@ describe("SaveGame", () => {
     expect(loaded.tower.units.length).toBe(sim.tower.units.length);
   });
 
-  it("drops units with an unrecognized kind on load", async () => {
+  it("drops units with an unrecognized kind on load", () => {
     const sim = sampleGame();
     const data = sim.serialize();
     const before = data.units.length;
     // Inject a bogus unit as if from a tampered/old save file.
     (data.units as any).push({ ...data.units[0], id: 99999, kind: "spaceport" });
-    const loaded = await SaveGame.import(JSON.stringify(data));
+    const loaded = Simulation.deserialize(data);
     expect(loaded.tower.units.length).toBe(before);
     expect(loaded.tower.units.some((u) => (u.kind as string) === "spaceport")).toBe(false);
   });

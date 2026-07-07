@@ -72,7 +72,7 @@ don't claim a skill was invoked:
 - **Route by changed files:** apply the `gds-code-review` lens to gameplay/engine
   work (`src/engine/`, `src/render/`, mechanics, economy, ratings, events,
   elevators, facilities, RNG) and the `bmad-code-review` lens to everything else
-  (storage/persistence, `.TWR` import, tooling, build/CI, UI plumbing, docs). A
+  (storage/persistence, tooling, build/CI, UI plumbing, docs). A
   **mixed diff** runs both, each scoped to the files it owns; when one judgment is
   needed, default to the gameplay/engine lens if any such file is touched.
 - **Run the adversarial layers:** Blind Hunter → Edge Case Hunter → Acceptance
@@ -128,7 +128,7 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
 - **Gameplay balance & player-feel** — economy, ratings, and emergency tuning
   (fires, bombs, events) should be fair across the star curve and match the
   SimTower parity model; watch for dead spots and exploits.
-- **Security** — untrusted input (saves, `.TWR` import, persistence) must degrade
+- **Security** — untrusted input (saves, persistence) must degrade
   gracefully and never crash or trust foreign data.
 
 See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
