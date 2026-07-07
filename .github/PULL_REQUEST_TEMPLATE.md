@@ -56,19 +56,9 @@ Internal-only work needs no bump. See AGENTS.md → Versioning.
 ## Screenshots / recordings
 
 <!--
-For any visual or gameplay change, EMBED actual before/after images here — not a
-prose description of what a screenshot would show. Capture from the built app
-(see scripts/shot-*.mjs), commit the PNGs under docs/screenshots/ (feature shots
-go in docs/screenshots/features/ and get a row in its README.md), and embed them
-so they render in the PR:
-
-  ![before](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/your-shot-before.png)
-  ![after](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/your-shot-after.png)
-
-`<ref>` is the PR's branch name (renders live during review) or `main` (resolves
-once merged). For a PR from a fork, `<owner>/<repo>` is the fork's owner/repo, not
-the upstream — otherwise the image won't render during review. An HTML
-`<img src="…">` tag works too. Delete this section only if the change has no
+For any visual or gameplay change, embed actual before/after images here — not a
+prose description of what a screenshot would show. See docs/screenshots.md for how
+to capture, commit, and embed them. Delete this section only if the change has no
 visual or gameplay surface.
 -->
 

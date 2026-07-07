@@ -234,22 +234,13 @@ Good vs. bad:
 ## Screenshots in PRs
 
 For any visual or gameplay change, the PR's **Screenshots / recordings** section
-must **embed real images**, not describe them in prose. A sentence like "the chip
-now reads Gridlock" is not a screenshot — reviewers (and the merged record) need
-the actual before/after.
-
-- Capture from the built app (`scripts/shot-*.mjs`; add a focused `shot-<x>.mjs`
-  if none fits and run it via `SHOT_SCRIPT=… node scripts/serve-and-shoot.mjs`).
-- **Commit** the PNGs under `docs/screenshots/` — feature shots go in
-  `docs/screenshots/features/` and get a row in that folder's `README.md`. Don't
-  leave them as throwaway files or session-only chat attachments; if they're
-  worth referencing, they're worth committing.
-- Embed with a raw URL so they render in the PR body:
-  `![after](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/<name>.png)`
-  where `<ref>` is the PR's branch name (renders live during review) or `main`
-  (resolves once merged). For a PR from a **fork**, `<owner>/<repo>` is the
-  fork's owner/repo, not the upstream, or the image won't render during review.
-  (An HTML `<img src="…">` tag works too, and lets you set a `width`.)
+must **embed real committed images**, not describe them in prose — a sentence like
+"the chip now reads Gridlock" is not a screenshot; reviewers (and the merged
+record) need the actual before/after. See **[docs/screenshots.md](docs/screenshots.md)**
+for how to capture (`npm run screenshots` / `scripts/shot-*.mjs`), where to commit
+them (`docs/screenshots/`, feature shots under `features/` with a README row), and
+how to embed them (raw-URL / `<img>`, fork-safe). Don't leave shots as throwaway
+files or session-only chat attachments; if they're worth referencing, commit them.
 
 ## Gameplay model notes
 
