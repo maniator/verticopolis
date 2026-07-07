@@ -878,6 +878,11 @@ class GameApp {
   private emitLunchRush(minutesBeforeTicks: number): void {
     if (this.prefs.steadyClock) return;
     const after = this.sim.clock.minutes;
+    // A tampered save can seed the clock with non-finite minutes (deserialize
+    // passes data.minutes to Clock un-hardened); without this, dayOfNoon is NaN,
+    // the once-per-day latch never sticks (NaN !== NaN), and the bulletin spams
+    // every frame. Same defensive posture as timePacing's finite guards.
+    if (!Number.isFinite(after) || !Number.isFinite(minutesBeforeTicks)) return;
     // The first noon strictly after the frame START. Anchoring on the start (not
     // the post-tick clock) keeps this correct even for a single frame that leaps
     // past both noon and the following midnight: the clock's day would have moved
