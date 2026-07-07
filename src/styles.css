@@ -1192,8 +1192,11 @@ a.btn {
   }
 }
 
-/* The ONE mobile block. */
-@media (max-width: 860px) {
+/* Phone block: true phones (≤767px) plus short landscape phones (wide but under
+   600px tall). Portrait tablets (≥768px wide AND ≥600px tall) fall through to the
+   tablet block below; a landscape phone has no vertical room for docked panels, so
+   it stays on the bottom-strip + drawer here. */
+@media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
   #topbar {
     gap: 8px;
     padding: 5px 8px;
@@ -1344,8 +1347,47 @@ a.btn {
   #editor {
     width: min(250px, 80vw);
   }
-  #inspector .insp-close {
-    display: inline-block;
+}
+
+/* Tablet block: portrait tablets and the compact 861–1023 band (wide enough to
+   dock both columns, tall enough for panels). It keeps the desktop 3-column
+   layout — palette and sidebar stay DOCKED, not the phone strip/drawer — but wraps
+   the top bar so nothing clips and tightens the columns so the canvas keeps room.
+   The base desktop rules apply here except these tweaks. */
+@media (min-width: 768px) and (max-width: 1023px) and (min-height: 600px) {
+  /* Top bar wraps: brand + speed buttons stay on row one; the stat chips drop to
+     a full-width second row (same approach as phone), so a long "Gridlock · 42F"
+     traffic chip or the trillion-safe FUND can't cram the bar. */
+  #topbar {
+    flex-wrap: wrap;
+  }
+  #status {
+    order: 3;
+    flex-basis: 100%;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .stat {
+    flex: none;
+  }
+  .stat .value {
+    white-space: nowrap;
+  }
+
+  /* Both columns stay docked, just tighter, so the canvas keeps ~400px+ at 768px
+     and ~665px at 1023px. No drawer toggle is needed (panels are always visible);
+     #panel-toggle keeps its hidden base default since only the phone block shows it. */
+  #palette {
+    width: 150px;
+  }
+  #sidebar {
+    width: 200px;
+  }
+
+  /* Finger-friendly tool rows (the palette is a touch target here, not a
+     hover list); other retro sizing is unchanged. */
+  .pal-item {
+    min-height: 40px;
   }
 }
 
@@ -1369,5 +1411,12 @@ a.btn {
     content: "";
     position: absolute;
     inset: -8px;
+  }
+  /* The inspector card is dismissed by hover-away on a mouse; a coarse (touch)
+     pointer has no reliable hover-off, so reveal its explicit ✕ on every touch
+     tier — phone, tablet, and touch-desktop alike. Gating this on the pointer,
+     not a width breakpoint, is why a new width tier can't silently lose it. */
+  #inspector .insp-close {
+    display: inline-block;
   }
 }

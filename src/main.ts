@@ -102,8 +102,15 @@ class GameApp {
   /** World cell the hover inspector tooltip is describing, so it can be
    *  anchored to that spot on screen and ride the tower when the camera moves. */
   private inspectAnchor: { x: number; floor: number } | null = null;
-  /** Cached so per-frame anchoring doesn't construct a MediaQueryList each tick. */
-  private mobileMq = window.matchMedia("(max-width: 860px)");
+  /** True only on the PHONE tier — MUST mirror the phone `@media` query in
+   *  styles.css (`max-width: 767px`, or a short landscape screen
+   *  `max-width: 1023px and max-height: 599px`). The tablet tier uses the docked
+   *  desktop-style layout, so it must read as NON-mobile here (world-anchored
+   *  editor/inspector popovers, desktop splash) to stay consistent with the CSS.
+   *  Cached so per-frame anchoring doesn't construct a MediaQueryList each tick. */
+  private mobileMq = window.matchMedia(
+    "(max-width: 767px), (max-width: 1023px) and (max-height: 599px)",
+  );
   /** First-run splash + onboarding (pure DOM chrome). */
   private onboarding!: OnboardingController;
   /** Whether the panels currently carry an inline anchor (so the mobile branch
