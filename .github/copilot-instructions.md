@@ -131,9 +131,11 @@ just the obvious lines in the diff, and flag anything CI wouldn't catch:
 - **Security** — untrusted input (saves, `.TWR` import, persistence) must degrade
   gracefully and never crash or trust foreign data.
 
-See [`AGENTS.md`](../AGENTS.md) → "Code review" for the full deep-review-before-merge
-policy (BMAD/BMGD review skill plus the relevant architect / designer / UX /
-security agents, convened as a party for larger changes).
+See [`CONTRIBUTING.md`](../CONTRIBUTING.md) → "Code review" for the
+deep-review-before-merge policy every change must meet;
+[`AGENTS.md`](../AGENTS.md) → "Code review — the agent workflow" adds the
+BMAD/BMGD review skill plus the relevant architect / designer / UX / security
+agents, convened as a party for larger changes.
 
 ## Conventions
 
@@ -143,7 +145,8 @@ security agents, convened as a party for larger changes).
 - Adding a facility/room type? Start in `src/engine/facilities.ts`, then thread it
   through rendering and UI — don't special-case it in the render layer.
 
-[`AGENTS.md`](../AGENTS.md) is the canonical contributor guide (BMAD workflow,
-gameplay model, merge policy, code-review expectations). When this file and
-`AGENTS.md` disagree, **`AGENTS.md` wins** — prefer updating it over duplicating
-detail here.
+[`CONTRIBUTING.md`](../CONTRIBUTING.md) is the canonical contributor guide (dev
+setup, quality gates, architecture, versioning, merge policy, code-review
+expectations); [`AGENTS.md`](../AGENTS.md) adds the agent layer on top (BMAD
+workflow, gameplay model, the mandatory review skill). When this file and those
+disagree, **they win** — prefer updating them over duplicating detail here.

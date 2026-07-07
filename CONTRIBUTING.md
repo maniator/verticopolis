@@ -5,17 +5,11 @@ a browser-native high-rise builder written in TypeScript, with its own code and
 art. It is not affiliated with or derived from the original; the canon it mirrors
 is behavior, not assets.
 
-This file is the human-facing quick start: how to run the app, the gates your
-change must pass, and — in depth — how testing and coverage work. It is a
-companion to two deeper documents, not a replacement:
-
-- **[AGENTS.md](./AGENTS.md)** — the full contributor guide: architecture,
-  versioning, and review conventions. Read it for anything beyond a one-line
-  tweak.
-- **[CLAUDE.md](./CLAUDE.md)** — the short list of non-negotiables.
-
-When those two disagree with this file on a rule, they win — this page points at
-them rather than restating them.
+This is the contributor guide — the source of truth for how work gets done here:
+running the app, the gates every change must pass, the testing & coverage model,
+the architecture you're building within, how versioning works, and how changes
+get reviewed and merged. Read the relevant section before anything beyond a
+one-line tweak.
 
 ## Getting started
 
@@ -117,12 +111,139 @@ These layers were once waved off as "device-only." They are unit-tested here, so
 The full coverage configuration (floors, includes, excludes) lives in
 [`vite.config.ts`](./vite.config.ts).
 
+## Architecture
+
+- **`src/engine/`** — pure game simulation (no DOM). Deterministic and heavily
+  unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
+  their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`)
+  and depend on the narrow `SimContext` interface so each is testable on its own.
+  Per-tower build caps and rule-sets live here (`facilities.ts`, `gameRules.ts`).
+- **`src/render/`** — canvas rendering and pixel-art sprites. Reads engine state,
+  never mutates it.
+- **`src/ui/`** — DOM controls (palette, status bar, dialogs), using native
+  `<dialog>` for modals.
+- **`src/audio/`, `src/storage/`** — sound and save/load, independent of
+  rendering.
+- **`src/main.ts`** — the composition root that wires input, engine, and the
+  game loop together.
+
+The tower grid is **two-layered**: a structural layer (floor/lobby) with a room
+layer sitting on top, exactly like the original SimTower corridor model.
+
+### Classic vs Modern rule-sets (`src/engine/gameRules.ts`)
+
+A tower is founded under an immutable `GameMode` (`classic` | `modern`), chosen
+once at creation and persisted. **All** behavior the two modes disagree on lives
+behind the `GameRules` strategy object (`CLASSIC_RULES` / `MODERN_RULES`); the
+`Simulation` holds a `readonly rules` and calls `this.rules.<x>()`.
+
+**Tripwire — don't let mode logic smear.** The mode string is mapped to behavior
+in exactly one place (`makeRules`). Never write mode-specific *logic* inline
+(`if (sim.mode === "modern") { …compute… }`) in a subsystem — add a method to
+`GameRules` and implement it in both rule-sets instead. Reading `sim.mode` /
+`sim.rules.hasVariantHouseholds` for pure **presentation** (a toast string, a UI
+section toggle) is fine; branching **engine logic** on it is the smell. Name new
+rule-driven modules after the **mechanic** (e.g. condo households), never after
+the mode, so a future feature isn't forced into the wrong drawer. Data-driven
+reads that already return the right value in both modes (e.g. `residentCount`,
+which reads a unit's stored household) stay plain accessors — they're not
+decisions, so they don't belong in `GameRules`.
+
+## Versioning
+
+The app version lives in `package.json` (`version`) and is injected at build
+time as `__APP_VERSION__` (see `vite.config.ts`) — it's shown on the splash and
+is the anchor the PWA update flow reports against. It is **not** auto-derived, so
+it only moves if a change moves it.
+
+**Bump `version` in the same PR as any player-facing change**, semver by player
+impact:
+
+- **minor** (`x.Y.0`) — a new player-facing capability (e.g. a Modern-mode
+  feature, a new facility, a new screen).
+- **patch** (`x.y.Z`) — a player-noticeable bug fix or behavior/balance change
+  (economy tuning, an evict rule, a visible UI fix).
+- **no bump** — internal-only work with no player-visible effect: pure refactor,
+  perf with identical behavior, tests, docs, tooling, CI.
+
+A player-facing change that ships **without** a version bump is a review finding:
+the splash — and the update prompt's build-id line — would otherwise misreport the
+build as unchanged. When two open PRs both bump, whoever merges second rebases and
+re-bumps. (Bump once per PR, not per commit.)
+
+### `Player-note:` — what the update prompt shows players
+
+The build emits `dist/version.json` (`{ version, sha, notes }`) that the running
+client fetches when a new build is waiting; the update modal shows a muted
+`Build <version> · <sha>` line **when that fetch succeeds** (it degrades gracefully
+— the line is omitted if `version.json` can't be fetched or lacks a version, and
+the `· <sha>` half is dropped when the sha is `unknown`), plus a short
+**"What's new"** list only when `notes` is non-empty.
+
+`notes` is harvested from an **optional `Player-note:` git commit trailer** — so a
+build only announces something when a commit deliberately said so, and a plumbing
+build stays silent (never a stale or invented changelog). Add one when, and only
+when, a change is something a player would actually notice:
+
+```
+feat(rules): add Modern GameMode with variant household sizes
+
+Player-note: Modern towers now draw families of two to five.
+```
+
+House style for the trailer text (it goes straight in front of players):
+
+- **Player outcome, not mechanism.** Name a thing they know (Elevators, Condos,
+  Modern towers) and what changed for them. Not `spawnFamily()`, not file/PR refs.
+- **One short line**, present tense, ends with a period. Calm voice, matching the
+  game ("New tower founded. Good luck!") — no hype.
+- **Only genuinely player-facing changes earn one.** Internal refactors / perf /
+  tooling get **no** trailer; that build simply shows the build-id line.
+- At most **3** are shown in the modal; keep to the few that matter.
+
+Good vs. bad:
+
+| Change | ❌ mechanism | ✅ player outcome |
+|---|---|---|
+| Modern households | `Modern mode: emit 2–5-person Household entities` | Modern towers now draw families of two to five. |
+| Elevator dispatch fix | `Fix express-shaft pooling regression` | Elevators pick up waiting riders more reliably. |
+
+> Status: the modal renders `notes` today; the automatic harvest of `Player-note:`
+> trailers into `version.json` at build time is wired when the first player-facing
+> feature needs it. Write the trailers now regardless — they're just commit
+> metadata and cost nothing until then.
+
 ## Code review
 
-Every non-trivial change gets a **deep, adversarial review** before it merges —
-green CI is necessary but not sufficient. Fix the blocking findings and track the
-rest. See [AGENTS.md](./AGENTS.md) → **Code review** for the full protocol
-(including resolving bot review threads).
+Green CI is necessary but **not** sufficient — never merge on a passing pipeline
+alone.
+
+- **Self-review before pushing.** Read your own diff end-to-end with a reviewer's
+  eye — correctness (wrong conditions, off-by-one, null/undefined, missing
+  `await`, broken call sites), cleanup (duplication, dead code, needless
+  complexity), and **algorithmic complexity** (below) — and fix what you find
+  before opening or updating a PR.
+- **No Big-O regressions on hot paths.** The tick loop and render/UI refresh run
+  over the whole tower every step, and towers get large (hundreds of units,
+  dozens of shafts, ~100 floors, thousands of person-trips). Look entities up by
+  id via `Tower.getUnit` / `getTransport` — never `units.find` / `transports.find`
+  — hoist tower-wide facts out of per-unit/per-person loops, keep running counters
+  instead of re-scanning, and memoize per-`revision` work. A new `.find` /
+  `.filter` / `.some` nested in a loop over another collection on a per-tick or
+  per-frame path is a review-blocking finding, the same as a correctness bug.
+- **Deep, adversarial review before merge — not "later."** The change gets a full
+  adversarial review while its context is still loaded (before pushing, or
+  immediately after opening/updating the PR), not deferred to a hypothetical
+  pre-merge step that never happens. A PR is not "done" until that review has run
+  and its confirmed findings are fixed and re-verified on the branch.
+- **Codex re-reviews automatically on every push; Copilot does not.** Copilot's
+  review is a one-shot snapshot, so after pushing new commits to a PR you must
+  **re-request a review from Copilot** to get it to look at the latest changes
+  (the ↻ next to Copilot under Reviewers).
+- **Resolve Copilot/Codex review threads** once the finding is actually addressed
+  in code — and then actually **mark each thread Resolved** ("Resolve
+  conversation"). A reply alone does not clear the thread, and unresolved threads
+  block merge under branch protection.
 
 ## Conventions
 
@@ -131,28 +252,15 @@ rest. See [AGENTS.md](./AGENTS.md) → **Code review** for the full protocol
   floors).
 - **Keep `src/engine/` free of DOM/rendering** so the simulation stays
   deterministic and unit-testable.
-- **Bump `package.json` `version` on any player-facing change** (minor for a new
-  player-facing capability, patch for a player-noticeable fix/behavior change;
-  internal-only work needs no bump). It is injected as `__APP_VERSION__` and
-  anchors the update flow. See [AGENTS.md](./AGENTS.md) → **Versioning**.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section — committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
   and embed them.
-- **Merge commits only** to `main` (never squash unless there's a real reason).
-- **Resolve Copilot/Codex review threads** once addressed — actually mark each
-  thread Resolved; a reply alone doesn't clear it, and unresolved threads block
-  merge under branch protection.
-
-## License
-
-Verticopolis is licensed in two parts: the **source code** under the **MIT
-License** ([`LICENSE`](./LICENSE)), and the original **art and audio assets**
-under **CC BY 4.0** ([`ASSETS-LICENSE`](./ASSETS-LICENSE.md)). By contributing,
-you agree to license your code contributions under MIT and any asset
-contributions under CC BY 4.0. It is an unofficial homage to SimTower (1994),
-ships no original-game assets, and is not affiliated with Maxis / OPeNBooK /
-Vivarium.
+- **Merge commits only** to `main` — a standard merge commit keeps the branch's
+  individual commits in history and lets the branch keep building cleanly
+  afterward. Don't squash unless there's a real reason (a branch full of
+  throwaway WIP commits); squashing rewrites history and forces awkward
+  force-resets for follow-up work.
 
 ## Where things live
 
@@ -170,6 +278,12 @@ Vivarium.
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
 | `docs/` | Contributor docs, including `screenshots.md`. |
 
-For the deeper architecture notes (the Classic vs. Modern rule-set strategy, the
-two-layer tower grid, performance rules on hot paths), see
-[AGENTS.md](./AGENTS.md) → **Architecture**.
+## License
+
+Verticopolis is licensed in two parts: the **source code** under the **MIT
+License** ([`LICENSE`](./LICENSE)), and the original **art and audio assets**
+under **CC BY 4.0** ([`ASSETS-LICENSE`](./ASSETS-LICENSE.md)). By contributing,
+you agree to license your code contributions under MIT and any asset
+contributions under CC BY 4.0. It is an unofficial homage to SimTower (1994),
+ships no original-game assets, and is not affiliated with Maxis / OPeNBooK /
+Vivarium.

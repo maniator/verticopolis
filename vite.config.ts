@@ -23,7 +23,7 @@ function gitShortSha(): string {
  * (see src/pwa.ts `fetchUpdateInfo`). It is deliberately a `.json`, which
  * Workbox's `globPatterns` does not match, so it is never precached and is
  * always fetched network-fresh. `notes` is empty today; the `Player-note:`
- * trailer harvest (see AGENTS.md → Versioning) will populate it once
+ * trailer harvest (see CONTRIBUTING.md → Versioning) will populate it once
  * player-facing features ship.
  */
 function emitVersionJson(): Plugin {

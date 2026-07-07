@@ -13,7 +13,7 @@ body:
     id: location
     attributes:
       label: Where is it?
-      description: File and section, or a link (e.g. README.md → "Play", AGENTS.md → "Versioning").
+      description: File and section, or a link (e.g. README.md → "Play", CONTRIBUTING.md → "Versioning").
       placeholder: README.md → Play
     validations:
       required: true
