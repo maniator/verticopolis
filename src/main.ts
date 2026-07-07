@@ -877,15 +877,19 @@ class GameApp {
    *  fires. Transient, like the log. */
   private emitLunchRush(minutesBeforeTicks: number): void {
     if (this.prefs.steadyClock) return;
-    const c = this.sim.clock;
-    const noonAbs = c.day * 1440 + 12 * 60; // noon of the current calendar day
-    // Fire only when this frame's ticks actually crossed noon (before < noon <=
-    // after), which keeps a load-at-12:xx or a frozen clock quiet while still
-    // catching a single huge frame that leaps from 11:5x past 13:00. Reuse the
-    // Clock's own day/isWeekend helpers so the calendar rules live in one place.
-    if (minutesBeforeTicks >= noonAbs || c.minutes < noonAbs) return;
-    if (c.isWeekend || c.day === this.lastLunchDay) return;
-    this.lastLunchDay = c.day;
+    const after = this.sim.clock.minutes;
+    // The first noon strictly after the frame START. Anchoring on the start (not
+    // the post-tick clock) keeps this correct even for a single frame that leaps
+    // past both noon and the following midnight: the clock's day would have moved
+    // on, but the crossed noon is still the one computed from where we began.
+    // Do NOT "simplify" this to clock.day/isWeekend; that reintroduces the
+    // missed-crossing bug near midnight. A day index's weekday is `day % 7`, and
+    // 5/6 are the weekend, matching Clock.dayOfWeek/isWeekend.
+    const dayOfNoon = Math.floor((minutesBeforeTicks - 12 * 60) / 1440) + 1;
+    const noonAbs = dayOfNoon * 1440 + 12 * 60;
+    if (noonAbs > after) return; // this frame's ticks didn't reach that noon
+    if (dayOfNoon % 7 >= 5 || dayOfNoon === this.lastLunchDay) return; // weekday, once
+    this.lastLunchDay = dayOfNoon;
     this.sim.emit("Lunch rush! Midday plays out in slow motion, just like 1994.", "info");
   }
 
