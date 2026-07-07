@@ -27,7 +27,7 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 
 ## Condo rule-sets (Classic vs Modern)
 
-Captured from the built app via `scripts/shot-condo-modes.mjs`.
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `condo-modes` scene).
 
 | Screenshot | Shows |
 |---|---|
@@ -37,7 +37,7 @@ Captured from the built app via `scripts/shot-condo-modes.mjs`.
 
 ## Traffic congestion chip (peak-driven + hotspot floor)
 
-Captured from the built app via `scripts/shot-traffic.mjs` on an identical jammed
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `traffic` scene) on an identical jammed
 tower (three office floors slammed onto one weak elevator, peak congestion 2.07).
 
 | Screenshot | Shows |
@@ -48,7 +48,7 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 
 ## Build palette: unlock visibility (locked tiers hidden until earned)
 
-Captured from the built app via `scripts/shot-palette-unlock.mjs`. Parity with the
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `palette-unlock` scene). Parity with the
 1994 original: locked facilities are hidden until their star tier is reached, so
 the palette grows as stars are earned rather than showing dimmed, unbuildable rows.
 
@@ -61,7 +61,7 @@ the palette grows as stars are earned rather than showing dimmed, unbuildable ro
 
 ## Tablet responsive breakpoint
 
-Captured with `scripts/shot-tablet.mjs` (full app at several viewport sizes).
+Captured via the unified generator (`scripts/screenshots.ts`, `tablet` scene; full app at several viewport sizes).
 A new tablet tier (`768–1023px` wide and `≥600px` tall) keeps the desktop
 3-column layout (tool palette and panels stay docked) instead of the phone
 bottom-strip + drawer, and wraps the top bar so nothing clips.
@@ -74,7 +74,7 @@ bottom-strip + drawer, and wraps the top bar so nothing clips.
 | `tablet-compact-after.png` | 900×700 **after**: the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
 ## SimTower-1994 segment-width parity + save migration (`towerone_6`)
 
-Captured from the built app via `scripts/shot-migration.mjs` on the real
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `migration` scene) on the real
 `towerone_6` save the initiative began with: loaded twice, once with the v1→v2
 reflow skipped ("before") and once applied ("after"), so the change is honest.
 

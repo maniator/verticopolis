@@ -1,27 +1,33 @@
 name: Update visual baselines
 
-# Regenerates the visual.spec.ts screenshot baselines IN the CI environment —
-# the only renderer the visual gate ever compares against (glyph and canvas
-# rasterization differ across Chromium builds, so locally-minted baselines
-# don't bind). Trigger it by pushing so that the HEAD commit's message
+# Regenerates the visual.spec.ts screenshot baselines INSIDE the pinned
+# Playwright Docker image, the same renderer the e2e visual gate (test.yml)
+# and the docs-screenshot generator run in, so every Playwright-rendered pixel
+# in the repo comes from ONE Chromium build (glyph and canvas rasterization
+# differ across builds, so a locally-minted baseline never binds). Trigger it
+# by pushing so that the HEAD commit's message
 # contains "[update-baselines]" (only the head commit of the push is
 # checked); the refreshed snapshots come back as a bot commit on the same
-# branch. Review that commit's image diff like code — it IS the blessing of
+# branch. Review that commit's image diff like code, it IS the blessing of
 # a new visual truth.
 #
 # The bot pushes with GITHUB_TOKEN, which never triggers workflows, so the
-# baseline commit itself gets no CI run — push (or rebase) once more after
+# baseline commit itself gets no CI run, push (or rebase) once more after
 # pulling it to get a green check on the final head.
 
 on:
   push:
     branches-ignore: [main]
+  workflow_dispatch:
 
-# One mint per branch at a time: a second trigger cancels the first so the
-# bot never loses a push race against its own checkout (non-fast-forward).
+# SHARED with update-screenshots.yml: the two bot workflows both commit to this
+# branch, so they must never run at the same time or they'd race on push. One
+# group + cancel-in-progress:false serializes them (the second queues behind the
+# first); the second then checks out the first's commit (ref below) and
+# fast-forwards. cancel-in-progress is false so a queued mint is never dropped.
 concurrency:
-  group: update-baselines-${{ github.ref }}
-  cancel-in-progress: true
+  group: regen-ci-artifacts-${{ github.ref }}
+  cancel-in-progress: false
 
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
@@ -30,30 +36,60 @@ permissions:
   contents: write
 
 jobs:
-  update:
-    if: contains(github.event.head_commit.message, '[update-baselines]')
+  # Pin the container to the repo's Playwright version so baselines are minted
+  # against the EXACT Chromium the e2e gate (test.yml) compares with, the two
+  # must share a renderer or every baseline drifts. (container.image is fixed
+  # before steps run, so the tag comes from this prior job's output.)
+  resolve-image:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-baselines]')
     runs-on: ubuntu-latest
-
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
     steps:
       - uses: actions/checkout@v4
+      - id: pin
+        run: |
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
 
+  update:
+    needs: resolve-image
+    runs-on: ubuntu-latest
+    # Mint INSIDE the pinned Playwright image, the same renderer the visual gate
+    # runs in, so a locally-unreachable Chromium build never sets the truth.
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+
+    steps:
+      # Check out the branch TIP (not the triggering SHA) with full history: when
+      # this run is queued behind the sibling screenshots run, the tip already has
+      # that run's commit, so the push here fast-forwards. Full history (depth 0)
+      # also lets the rebase-retry below reconcile cleanly if anything did land.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      # A container checkout trips git's dubious-ownership guard; mark the tree
+      # safe so the later add/commit/push work.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # The image ships Node 20; install the repo's pinned Node over it (keeping
+      # the image's browsers).
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@v4
         with:
           node-version-file: ".nvmrc"
-          cache: "npm"
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Install Playwright Chromium
-        run: npx playwright install --with-deps chromium
 
       - name: Build
         run: npm run build
 
       - name: Regenerate baselines
-        run: npx playwright test visual.spec.ts --update-snapshots
+        run: npx playwright test e2e/visual.spec.ts --update-snapshots
 
       - name: Commit refreshed baselines
         run: |
@@ -61,8 +97,17 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add e2e/visual.spec.ts-snapshots
           if git diff --cached --quiet; then
-            echo "Baselines already match this environment — nothing to commit."
-          else
-            git commit -m "Update visual baselines from CI"
-            git push
+            echo "Baselines already match this environment, nothing to commit."
+            exit 0
           fi
+          git commit -m "Update visual baselines from CI"
+          # The sibling screenshots workflow may push concurrently; it touches only
+          # docs/screenshots (disjoint from e2e/visual.spec.ts-snapshots), so a
+          # rejected push just needs a rebase over its commit, then retry.
+          for attempt in 1 2 3 4 5; do
+            if git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            echo "push rejected, rebasing on the remote and retrying ($attempt)"
+            git pull --rebase origin "${GITHUB_REF_NAME}"
+          done
+          echo "could not push refreshed baselines after retries" >&2
+          exit 1

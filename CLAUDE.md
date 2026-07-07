@@ -38,6 +38,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   internal-only work needs none). It's injected as `__APP_VERSION__` on the splash
   and anchors the update flow, so a missing bump misreports the build. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
+- **Screenshots come from the pinned Playwright Docker container in CI, never a
+  host browser.** Regenerate `docs/screenshots/**` only via the
+  `update-screenshots.yml` workflow (marker push `[update-screenshots]`) and mint
+  `e2e/visual.spec.ts-snapshots` only via `update-visual-baselines.yml`
+  (`[update-baselines]`). `npm run screenshots` is a host-Chromium **preview**
+  only; its output (and any downloaded-browser capture) must **not** be committed
+  as the final set. See [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT
