@@ -3,6 +3,7 @@ import { inflateSync } from "fflate";
 // The real v1 save, inlined as a string (vite ?raw) so the test needs no node fs.
 import towerFile from "./fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../engine/Simulation";
+import { floatingStructureCount } from "../engine/saveMigration";
 import { FACILITIES, facilityFloors } from "../engine/facilities";
 import type { SerializedGame, Unit } from "../engine/types";
 
@@ -130,6 +131,28 @@ describe("v1 → v2 reflow migration", () => {
     expect(rest.x + rest.width).toBeLessThanOrEqual(rec.x); // no overlap with the column
   });
 
+  it("never pads a floating floor when a widened room would be shoved past its floor's support", () => {
+    // Floor 3's support (floor 2) ends at x=30. At legacy widths the restaurant
+    // (16) + office (9) fit within 0..30. Canon-widening the restaurant to 24 would
+    // shove the office to x=24..33 — past x=30, where floor 2 no longer holds it up,
+    // so the reflow would pad floor-3 tiles at 30..32 over thin air. The per-floor
+    // guard must instead keep the floor at legacy widths (supported, no float).
+    const save = v1Save([
+      ...pave("floor", 1, 0, 30), // ground, so floor 2 isn't pre-existing-floating
+      ...pave("floor", 2, 0, 30),
+      ...pave("floor", 3, 0, 30),
+      { kind: "restaurant", floor: 3, x: 0, width: 16 },
+      { kind: "office", floor: 3, x: 16, width: 9 },
+    ]);
+    const sim = Simulation.deserialize(save);
+    expect(sim.serialize().version).toBe(2);
+    // Zero floating floors: every floor tile rests on the story below.
+    expect(floatingStructureCount(sim.serialize())).toBe(0);
+    // Nothing off-lot, no overlap, and no room paved beyond floor 2's x=30 support.
+    const rooms = sim.tower.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
+    for (const r of rooms) expect(r.x + r.width).toBeLessThanOrEqual(30);
+  });
+
   it("resolves two ramps on one floor without overlap (multi-ramp garage)", () => {
     // Two separate ramp runs whose legacy ramps (w6) sit only 14 apart — closer
     // than the canon ramp width (16). Anchoring both at their original x would
@@ -168,13 +191,27 @@ describe("v1 → v2 reflow migration", () => {
     expect(raw.version).toBe(1); // it's a pre-migration save
     const parkingBefore = raw.units.filter((u) => u.kind === "parking").length;
     const rampXsBefore = raw.units.filter((u) => u.kind === "parkingRamp").map((u) => u.x).sort((a, b) => a - b);
+    const origW = new Map(raw.units.map((u) => [u.id, u.width]));
 
     const sim = Simulation.deserialize(raw); // runs upgradeV1toV2
     expect(sim.serialize().version).toBe(2);
 
     const rooms = sim.tower.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
-    // (a) Every room is at its canon width.
-    for (const r of rooms) expect(r.width).toBe(FACILITIES[r.kind].width);
+    // (a) Every room is EITHER at its canon width or its original legacy width —
+    // never some arbitrary in-between. A room only keeps legacy width when its
+    // floor is too packed to fit every room at canon (the per-floor fallback), so
+    // the overwhelming majority reach canon on this tower.
+    let atCanon = 0;
+    for (const r of rooms) {
+      const canon = FACILITIES[r.kind].width;
+      expect([canon, origW.get(r.id)]).toContain(r.width);
+      if (r.width === canon) atCanon++;
+    }
+    expect(atCanon / rooms.length).toBeGreaterThan(0.95); // ≥95% canon-ized
+    // (a2) The migration introduces NO new floating floor: every floor tile it pads
+    // under a widened/shifted room rests on the story below. (A pre-existing float
+    // in the original save is left as-is — the migration must never make it worse.)
+    expect(floatingStructureCount(sim.serialize())).toBeLessThanOrEqual(floatingStructureCount(raw));
     // (b) No two room footprints overlap on any shared floor.
     for (let i = 0; i < rooms.length; i++) {
       for (let j = i + 1; j < rooms.length; j++) {

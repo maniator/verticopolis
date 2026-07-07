@@ -138,7 +138,11 @@ export class BuildActions {
       // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
       this.tryBuild(kind, floor, snapX(kind, x), true);
     }
-    this.paint = { tile, floor };
+    // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
+    // for a wide kind near the right edge snapX left-shifts the placement, so a
+    // raw anchor would make the next drag step recompute from an off-lot column
+    // and misfire. Identical to `tile` for width-1 floor/lobby.
+    this.paint = { tile: snapX(kind, tile), floor };
   }
 
   /**

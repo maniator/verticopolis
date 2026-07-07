@@ -5,8 +5,9 @@ import { RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
- *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). */
-const COMMERCIAL_LOBBY_FLOORS = 2;
+ *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). Exported so
+ *  the inspector's "too far from a lobby" line reads the exact same threshold. */
+export const COMMERCIAL_LOBBY_FLOORS = 2;
 /** Share of normal traffic income a commercial unit earns when it is beyond
  *  {@link COMMERCIAL_LOBBY_FLOORS} of a lobby — poor placement starves its trade,
  *  the same way an unserved floor already earns nothing. */

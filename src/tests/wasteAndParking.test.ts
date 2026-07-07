@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
+import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
 
 /** Canon waste & parking demand mechanics: the recycling centers FILL with the
@@ -111,9 +111,9 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
     const d = sim.parkingDemand();
     expect(d.officePop).toBe(4 * FACILITIES.office.population);
     // Canon: one space per four offices. 4 offices × 6 workers = 24 → exactly 1 space.
-    // A literal (not `ceil(pop / CONST)`, which would tautologically track any ratio).
+    // Asserted as a LITERAL, not `ceil(pop / PARKING_WORKERS_PER_SPACE)` — that would
+    // tautologically track whatever the constant is set to and prove nothing.
     expect(d.offices).toBe(1);
-    expect(d.offices).toBe(Math.ceil(d.officePop / PARKING_WORKERS_PER_SPACE));
     expect(d.suites).toBe(3);
     expect(d.total).toBe(d.offices + d.suites);
     // Three working spaces: exactly enough for the suites, nothing for offices.

@@ -39,9 +39,12 @@ export function classifyGesture(
 ): "pan" | "action" {
   if (button > 0 || space) return "pan"; // middle/right button or held space
   if (tool.type === "inspect") return "pan"; // inspect: drag pans, tap selects
-  const build = tool.type === "build";
-  const dragSized = build && !!FACILITIES[tool.kind].transport && !isFixedSpanTransport(tool.kind);
-  const paint = build && isPaintKind(tool.kind);
+  // Narrow to the build variant IN the condition so `tool.kind` is unambiguously
+  // in scope (a `const build = tool.type === "build"` alias only narrows under TS's
+  // aliased-discriminant analysis — this form doesn't lean on it).
+  const dragSized =
+    tool.type === "build" && !!FACILITIES[tool.kind].transport && !isFixedSpanTransport(tool.kind);
+  const paint = tool.type === "build" && isPaintKind(tool.kind);
   if (touch && !dragSized && !paint) return "pan";
   return "action";
 }

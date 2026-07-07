@@ -91,8 +91,9 @@ const CONDO_NOISE_EROSION = 0.054;
 /** Canon "the stairs/elevators are far away" tolerance, in tiles. An office whose
  *  nearest reachable shaft on its own floor sits farther than this wears its
  *  tenant down (W1) — matching the 1994 original's 79-segment walking limit. At
- *  or under it the walk is fine and satisfaction recovers normally. */
-const TRANSPORT_FAR_TILES = 79;
+ *  or under it the walk is fine and satisfaction recovers normally. Exported so the
+ *  inspector's always-on "long walk" line reads the exact same threshold. */
+export const TRANSPORT_FAR_TILES = 79;
 
 /** Canon same-floor noise buffers, in tiles (the gap a source may sit within
  *  before it bothers the sensitive room). Only these two are documented numbers;

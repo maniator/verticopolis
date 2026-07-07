@@ -1,5 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
-import { VACATE_RESCIND } from "../engine/Simulation";
+import { TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../engine/Simulation";
+import { COMMERCIAL_LOBBY_FLOORS } from "../engine/EconomySystem";
 import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isHotelKind, residentCount } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
 import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
@@ -132,7 +133,7 @@ export class InspectorController {
         u.kind === "office" &&
         u.floor !== 1 &&
         sim.tower.isFloorServed(u.floor) &&
-        sim.tower.nearestTransportDistance(u) > 79
+        sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
           ? `<div style="color:var(--bad)">Long walk to transport — tenants tire of the hike. Put stairs or an elevator within reach.</div>`
           : "";
       // W3: a canon commercial venue (not partyHall) more than two floors from a
@@ -140,7 +141,7 @@ export class InspectorController {
       // go on the ground and every 15th floor, so "add a lobby here" is usually
       // impossible; the real move is to sit within 2 floors of one of those levels.
       const commercialLobby =
-        isCommercialKind(u.kind) && sim.tower.nearestLobbyFloorDistance(u.floor) > 2
+        isCommercialKind(u.kind) && sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
           ? `<div style="color:var(--bad)">Shoppers: too far from a lobby — traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`
           : "";
       // Recycling runs on demand: how full it is right now, and whether the

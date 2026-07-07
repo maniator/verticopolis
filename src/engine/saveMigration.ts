@@ -44,9 +44,13 @@ const OLDEST_SAVE_VERSION = 1;
 
 export function migrateSave(data: SerializedGame): SerializedGame {
   // A missing/garbled version is normalized to the OLDEST schema (not the
-  // current one) so the upgrade chain runs from the bottom for legacy saves;
-  // deserialize()'s coercion still hardens every value.
-  const version = Number.isFinite(data.version) ? data.version : OLDEST_SAVE_VERSION;
+  // current one) so the upgrade chain runs from the bottom for legacy saves.
+  // "Valid" means a whole number ≥ the oldest schema: a non-integer (1.5),
+  // zero, negative, NaN, or missing value is treated as legacy so it still runs
+  // the v1→v2 reflow rather than silently skipping it. deserialize()'s coercion
+  // still hardens every value afterward.
+  const valid = Number.isInteger(data.version) && (data.version as number) >= OLDEST_SAVE_VERSION;
+  const version = valid ? data.version : OLDEST_SAVE_VERSION;
   let migrated: SerializedGame = data.version === version ? data : { ...data, version };
   // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
   // condition under which deserialize() falls back to Classic, so migration must
@@ -98,7 +102,14 @@ export function upgradeV1toV2(data: SerializedGame): SerializedGame {
   } catch {
     return safe;
   }
-  return migrationLooksValid(out) ? out : safe;
+  // Reject a reflow that overlaps/runs off-lot, OR that introduces a NEW floating
+  // floor (a slab the reflow padded over a setback where the story below ends).
+  // The delta — not an absolute count — is what matters: an odd hand-built save
+  // may already float, and the migration must not be blamed for that; it must only
+  // never make it worse. The safe fallback keeps legacy widths, which never float.
+  if (!migrationLooksValid(out)) return safe;
+  if (floatingStructureCount(out) > floatingStructureCount(data)) return safe;
+  return out;
 }
 
 /**
@@ -108,9 +119,8 @@ export function upgradeV1toV2(data: SerializedGame): SerializedGame {
  * Per-floor bucketing keeps it near-linear for a one-time load-time check.
  */
 export function migrationLooksValid(data: SerializedGame): boolean {
-  const rooms = (Array.isArray(data.units) ? data.units : []).filter(
-    (u) => u && isFacilityKind(u.kind) && u.kind !== "floor" && u.kind !== "lobby",
-  );
+  const units = Array.isArray(data.units) ? data.units : [];
+  const rooms = units.filter((u) => u && isFacilityKind(u.kind) && u.kind !== "floor" && u.kind !== "lobby");
   const byFloor = new Map<number, { x: number; w: number }[]>();
   for (const r of rooms) {
     if (r.x < 0 || r.x + r.width > GRID.width) return false; // off-lot
@@ -125,6 +135,30 @@ export function migrationLooksValid(data: SerializedGame): boolean {
     for (let i = 1; i < arr.length; i++) if (arr[i].x < arr[i - 1].x + arr[i - 1].w) return false;
   }
   return true;
+}
+
+/**
+ * Count structure tiles (floor/lobby) that hang in mid-air: an above-ground tile
+ * with no structure directly below it, or a basement tile with none directly
+ * above (the ground floor rests on the earth and never counts). Used to guard the
+ * reflow — it must never ADD a floating slab versus the original save (a
+ * pre-existing float in a hand-built/unusual save is left as-is, not blamed on the
+ * migration). Cheap: one pass to index structure, one to test each tile.
+ */
+export function floatingStructureCount(data: SerializedGame): number {
+  const units = Array.isArray(data.units) ? data.units : [];
+  const struct = new Set<string>();
+  for (const u of units) {
+    if (!u || (u.kind !== "floor" && u.kind !== "lobby")) continue;
+    for (let i = 0; i < u.width; i++) struct.add(`${u.floor}:${u.x + i}`);
+  }
+  let floating = 0;
+  for (const u of units) {
+    if (!u || (u.kind !== "floor" && u.kind !== "lobby") || u.floor === 1) continue;
+    const below = u.floor >= 2 ? u.floor - 1 : u.floor + 1;
+    for (let i = 0; i < u.width; i++) if (!struct.has(`${below}:${u.x + i}`)) floating++;
+  }
+  return floating;
 }
 
 /**
@@ -161,7 +195,6 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   const isPark = (k: string): boolean => k === "parking" || k === "parkingRamp";
   const canonW = (k: FacilityKind): number => FACILITIES[k]?.width ?? 1;
   const LOT = GRID.width;
-  const over = (a0: number, a1: number, b0: number, b1: number): boolean => a0 < b1 && b0 < a1;
 
   // Split units: structural paving (kept, plus we may add more), well-formed rooms
   // (reflowed), and anything unrecognized/garbled (passed through untouched — the
@@ -177,6 +210,33 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   }
   const rooms: R[] = [];
   const others: Unit[] = []; // structural + passthrough
+  // Original support envelope: the columns each story is paved on. A reflowed
+  // room may only sit where the story it RESTS on is already paved, or the floor
+  // tiles the reflow pads under it would hang in mid-air (a "floating floor").
+  // Above ground (floor ≥ 2) rests on the floor below; basements (≤ 0) rest on the
+  // story above; the ground floor (1) rests on the earth. Built from ORIGINAL
+  // structure only — the reflow never removes a floor tile, so this can only be an
+  // under-count of support, never an over-count (safe: it never OKs a float).
+  const origStruct = new Set<string>();
+  for (const u of src) {
+    if (!u || !isStruct(u.kind)) continue;
+    const f = Math.round(Number(u.floor));
+    const x0 = Math.round(Number(u.x));
+    const w0 = Math.round(Number(u.width));
+    if (!Number.isFinite(f) || !Number.isFinite(x0) || !Number.isFinite(w0)) continue;
+    for (let i = 0; i < w0; i++) origStruct.add(`${f}:${x0 + i}`);
+  }
+  const restsOn = (floor: number, x: number): boolean => {
+    if (floor === 1) return true; // the ground floor rests on the earth
+    return origStruct.has(`${floor >= 2 ? floor - 1 : floor + 1}:${x}`);
+  };
+  // A footprint column is safe to occupy when placing it can't leave a floor tile
+  // hanging: either this floor is ALREADY paved there (no new tile — its original
+  // support stands) OR the story below supports the fresh tile the reflow would
+  // pad. Only genuinely-new-and-unsupported tiles float, so this blocks exactly
+  // those without over-constraining a room growing within already-built floor.
+  const safeCol = (floor: number, x: number): boolean =>
+    origStruct.has(`${floor}:${x}`) || restsOn(floor, x);
   for (const u of src) {
     if (!u || !isFacilityKind(u.kind) || isStruct(u.kind)) {
       if (u) others.push(u);
@@ -259,43 +319,57 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     if (arr) arr.push(r);
     else byBase.set(r.floor, [r]);
   }
+  // First column ≥ startX where the next `w` columns are all FREE in the floor's
+  // occupancy bitmap (`blocked[x] === 0`) — i.e. supported and unoccupied — or null
+  // if none fits before the lot edge. When a run of free columns is cut short by a
+  // blocked one at `x+k`, no window starting in `[x, x+k]` can fit (each still spans
+  // the blocked column), so we resume at `x+k+1`. Every column is thus visited O(1)
+  // times as x only moves forward: an honest O(LOT) scan per room, no per-step
+  // obstacle search or re-sort — dense floors stay linear.
+  const firstFit = (blocked: Uint8Array, startX: number, w: number): number | null => {
+    let x = Math.max(0, startX);
+    while (x + w <= LOT) {
+      let k = 0;
+      while (k < w && blocked[x + k] === 0) k++;
+      if (k === w) return x;
+      x += k + 1;
+    }
+    return null;
+  };
   for (const F of [...byBase.keys()].sort((a, b) => a - b)) {
     const here = byBase.get(F)!.sort((a, b) => a.x0 - b.x0);
-    let cursor = 0;
-    for (let i = 0; i < here.length; i++) {
-      const r = here[i];
-      const obs = obstaclesByFloor.get(F) ?? [];
-      // On-lot AND clear of every obstacle already on this floor.
-      const clear = (px: number, w: number): boolean =>
-        px >= 0 && px + w <= LOT && !obs.some(([o0, o1]) => over(px, px + w, o0, o1));
-      const nextX0 = i + 1 < here.length ? here[i + 1].x0 : LOT;
-      // Preferred canon placement: keep original x, absorb growth into the left gap,
-      // then shove right past obstacles in x-order (x only increases → O(obs)).
-      let cx = Math.max(r.x0, cursor);
-      cx -= Math.min(Math.max(0, cx + r.w - nextX0), cx - cursor);
-      for (const [o0, o1] of [...obs].sort((a, b) => a[0] - b[0])) if (over(cx, cx + r.w, o0, o1)) cx = o1;
-      // Pick the placement: canon near home if it fits; else keep the LEGACY footprint
-      // in place if IT fits (a boxed room stays home rather than fly across the tower);
-      // else any valid canon spot; else a last-resort clamp the validator will vet.
-      let x: number;
-      let w: number;
-      if (clear(cx, r.w) && Math.abs(cx - r.x0) <= r.w) {
-        x = cx;
-        w = r.w;
-      } else if (clear(r.x0, r.w0)) {
-        x = r.x0;
-        w = r.w0;
-      } else if (clear(cx, r.w)) {
-        x = cx;
-        w = r.w;
-      } else {
-        x = Math.max(0, Math.min(cx, LOT - r.w));
-        w = r.w;
+    // Per-floor occupancy bitmap: a column is blocked if the story below doesn't
+    // support it, or a multi-floor room placed on a lower floor already occupies it.
+    const floorBlocked = new Uint8Array(LOT);
+    for (let x = 0; x < LOT; x++) if (!safeCol(F, x)) floorBlocked[x] = 1;
+    for (const [o0, o1] of obstaclesByFloor.get(F) ?? [])
+      for (let x = Math.max(0, o0); x < Math.min(LOT, o1); x++) floorBlocked[x] = 1;
+    // Try to canon-ize the WHOLE floor: place every room at its canon width in the
+    // first supported + clear column at/after home. All-or-nothing — a single room
+    // that can't fit (an over-packed floor) fails the attempt, because widening
+    // some rooms but clamping others onto unsupported ground is exactly what pads a
+    // floating floor. A floor that can't all fit at canon keeps its ORIGINAL layout
+    // instead (legacy widths at legacy columns — supported and non-overlapping by
+    // construction, since that's how the tower was built). Per-floor, so only the
+    // genuinely-too-tight floors miss canon, not the whole tower.
+    const tryCanon = (): { r: R; x: number; w: number }[] | null => {
+      const blocked = floorBlocked.slice(); // tentative — mutated as rooms place
+      const placed: { r: R; x: number; w: number }[] = [];
+      let cursor = 0;
+      for (const r of here) {
+        const x = firstFit(blocked, Math.max(r.x0, cursor), r.w);
+        if (x === null) return null; // this floor is too tight for canon widths
+        for (let i = x; i < x + r.w; i++) blocked[i] = 1;
+        placed.push({ r, x, w: r.w });
+        cursor = x + r.w;
       }
+      return placed;
+    };
+    const placed = tryCanon() ?? here.map((r) => ({ r, x: r.x0, w: r.w0 }));
+    for (const { r, x, w } of placed) {
       nx.set(r.u, x);
       nw.set(r.u, w);
       addObstacle(r.floor, r.fl, x, w);
-      cursor = x + w;
     }
   }
 
@@ -320,7 +394,19 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
         const key = `${f}:${tx}`;
         if (!paved.has(key)) {
           paved.add(key);
-          outUnits.push({ id: nextId++, kind: "floor", floor: f, x: tx, width: 1, state: "occupied", occupants: 0, everOccupied: false } as Unit);
+          outUnits.push({
+            id: nextId++,
+            kind: "floor",
+            floor: f,
+            x: tx,
+            width: 1,
+            state: "occupied",
+            satisfaction: 1,
+            occupants: 0,
+            everOccupied: false,
+            pendingIncome: 0,
+            label: "Floor",
+          });
         }
       }
     }
