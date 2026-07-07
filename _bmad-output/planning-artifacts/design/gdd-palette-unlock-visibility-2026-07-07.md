@@ -120,10 +120,14 @@ rows in its column with no page reload — the palette grows in place.
   "reached N stars" event. Do not add a toast, banner, badge, glow, or
   animation for newly-unlocked tools. Parity is a quiet, growing toolbar.
 - **No engine changes.** `minStar`, `isUnlocked`, `capReason`, costs, placement
-  guards, and every simulated value are untouched. This is a DOM-visibility
-  change in `UI.ts` + a CSS rule. If a diff hunk lands outside `src/ui/UI.ts`
-  or `src/styles.css`, it is out of scope (the sole exception: the dead
-  facility-button toast branch, which is in `UI.ts`).
+  guards, and every simulated value are untouched. The behavioral change is a
+  DOM-visibility one in `src/ui/UI.ts` (hide-locked logic + the dead
+  facility-button toast removal) plus a CSS rule in `src/styles.css`. Two
+  supporting edits are in scope and expected: `src/main.ts` primes `ui.update()`
+  before the first paint and on every `adoptSim` swap (so the palette never
+  flashes the full catalog, and an active build tool that becomes locked across
+  a lower-star swap falls back to Inspect), and `package.json` (+ its lockfile
+  mirror) carries the version bump. No `src/engine/` file is touched.
 - **No change to affordability behavior.** Unlocked-but-unaffordable tools stay
   visible and dimmed as today. Do not conflate "can't afford" with "locked".
 - **No discoverability tooltip.** Do not add a "coming at N★" hint elsewhere

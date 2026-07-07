@@ -168,7 +168,9 @@ export class UI {
       `<span class="pal-name">${f.name}</span>` +
       `<span class="pal-cost">$${shortMoney(f.cost)}</span>`;
     // Locked facilities are hidden from the palette entirely (parity with the
-    // original), so a visible button is always buildable — no locked toast path.
+    // original), so a visible button is never locked — no locked toast path.
+    // (A visible button may still be unaffordable; the engine build guard, not
+    // this palette, rejects a placement the player can't pay for.)
     this.makeActivatable(item, `${f.name}, $${shortMoney(f.cost)}`, () => {
       this.selectTool({ type: "build", kind });
     });
@@ -429,7 +431,7 @@ export class UI {
     // Leisure/Services/Special at 1★) — no dangling section titles, no per-header
     // re-scan of the DOM.
     const groupsWithUnlocked = new Set<string>();
-    document.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
+    this.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
       const locked = !sim.isUnlocked(kind);
       const affordable = sim.money >= FACILITIES[kind].cost;
@@ -437,9 +439,17 @@ export class UI {
       item.classList.toggle("unaffordable", !locked && !affordable);
       if (!locked && item.dataset.group) groupsWithUnlocked.add(item.dataset.group);
     });
-    document.querySelectorAll<HTMLElement>(".pal-group-title[data-group]").forEach((title) => {
+    this.el.palette.querySelectorAll<HTMLElement>(".pal-group-title[data-group]").forEach((title) => {
       title.hidden = !groupsWithUnlocked.has(title.dataset.group ?? "");
     });
+    // If the active build tool just became locked — loading, founding, or undoing
+    // into a lower-star tower while a higher-star tool was selected — its palette
+    // button is now hidden, leaving no visible active tool while canvas clicks
+    // still attempt the locked facility. Fall back to Inspect so the selection
+    // matches what the palette shows. (Fires once: the tool is Inspect afterward.)
+    if (this.tool.type === "build" && !sim.isUnlocked(this.tool.kind)) {
+      this.selectTool({ type: "inspect" });
+    }
 
     this.setTowerName(sim.tower.towerName);
 

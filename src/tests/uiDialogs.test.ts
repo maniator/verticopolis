@@ -637,3 +637,72 @@ describe("event-log toast/bulletin pump (regression: froze at the cap; now a bou
     expect(document.getElementById("log")!.innerHTML).toContain("swapped tower event");
   });
 });
+
+describe("build palette — locked-tier visibility (SimTower parity)", () => {
+  const palette = (): HTMLElement => document.getElementById("palette-scroll")!;
+  const item = (kind: string): HTMLElement =>
+    palette().querySelector<HTMLElement>(`.pal-item[data-kind="${kind}"]`)!;
+  const header = (group: string): HTMLElement =>
+    palette().querySelector<HTMLElement>(`.pal-group-title[data-group="${group}"]`)!;
+
+  it("hides locked facilities and empty group headers at 1★, reveals them at 3★", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+
+    sim.star = 1;
+    ui.update(sim);
+    // 1★-unlocked kinds are shown; higher-tier kinds carry .locked (-> display:none).
+    expect(item("office").classList.contains("locked")).toBe(false);
+    expect(item("elevatorStandard").classList.contains("locked")).toBe(false);
+    expect(item("hotelSingle").classList.contains("locked")).toBe(true); // 2★
+    expect(item("restaurant").classList.contains("locked")).toBe(true); // 3★
+    expect(item("cinema").classList.contains("locked")).toBe(true); // 3★
+    expect(item("metro").classList.contains("locked")).toBe(true); // 4★
+    // Groups with no unlocked member hide their header; populated ones stay.
+    expect(header("Structure").hidden).toBe(false);
+    expect(header("Commercial").hidden).toBe(false);
+    expect(header("Leisure").hidden).toBe(true);
+    expect(header("Services").hidden).toBe(true);
+    expect(header("Special").hidden).toBe(true);
+
+    sim.star = 3;
+    ui.update(sim);
+    // 2★/3★ kinds now reveal; their group headers appear.
+    expect(item("hotelSingle").classList.contains("locked")).toBe(false);
+    expect(item("restaurant").classList.contains("locked")).toBe(false);
+    expect(item("cinema").classList.contains("locked")).toBe(false);
+    expect(header("Leisure").hidden).toBe(false);
+    expect(header("Services").hidden).toBe(false);
+    // 4★/5★ kinds stay hidden until their tier.
+    expect(item("metro").classList.contains("locked")).toBe(true);
+    expect(header("Special").hidden).toBe(true);
+  });
+
+  it("falls back to Inspect when the active build tool becomes locked after a lower-star swap", () => {
+    const { ui, cb } = makeUI();
+    const sim = Simulation.newGame(1);
+
+    sim.star = 4;
+    ui.update(sim);
+    ui.selectTool({ type: "build", kind: "metro" });
+    expect(ui.tool).toEqual({ type: "build", kind: "metro" });
+
+    // Swap in a lower-star tower (load / new tower / undo) — Metro is now locked.
+    sim.star = 1;
+    ui.update(sim);
+    expect(ui.tool).toEqual({ type: "inspect" });
+    // The engine callback was notified of the reselection, not left stale.
+    expect(cb.onSelectTool).toHaveBeenLastCalledWith({ type: "inspect" });
+  });
+
+  it("keeps an unlocked-but-unaffordable tool visible (only dimmed), not hidden", () => {
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    sim.star = 1;
+    sim.money = 0; // can't afford anything
+    ui.update(sim);
+    // Office is unlocked at 1★: not locked (still visible), just flagged unaffordable.
+    expect(item("office").classList.contains("locked")).toBe(false);
+    expect(item("office").classList.contains("unaffordable")).toBe(true);
+  });
+});
