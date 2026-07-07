@@ -3,8 +3,13 @@
  * floors + a localized jam on a weak shaft) through the public sim API, lets the
  * live UI loop drive the chip, and screenshots the HUD bar (#topbar).
  *
- * Run via: SHOT_SCRIPT=scripts/shot-traffic.mjs node scripts/serve-and-shoot.mjs
- * Output name is set by OUT_LABEL (default "traffic"); goes to docs/screenshots/.
+ * Run via: SHOT_SCRIPT=scripts/shot-traffic.mjs OUT_LABEL=<after|before> \
+ *   node scripts/serve-and-shoot.mjs
+ * Writes the committed feature shots straight into docs/screenshots/features/:
+ *   traffic-chip-<label>.png         (desktop) and
+ *   traffic-chip-<label>-mobile.png  (mobile).
+ * Use OUT_LABEL=after for the current build and OUT_LABEL=before against a
+ * pre-fix build (a git worktree at the old commit).
  */
 import { chromium } from "playwright";
 import { fileURLToPath } from "node:url";
@@ -12,9 +17,9 @@ import { dirname, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const OUT = resolve(__dirname, "../docs/screenshots");
+const OUT = resolve(__dirname, "../docs/screenshots/features");
 const BASE = process.env.BASE_URL || "http://localhost:4173";
-const LABEL = process.env.OUT_LABEL || "traffic";
+const LABEL = process.env.OUT_LABEL || "after";
 const EXECUTABLE = process.env.PW_CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 mkdirSync(OUT, { recursive: true });
 
@@ -101,13 +106,15 @@ console.log(`[${LABEL}] chip label = "${label}"  aria = "${aria}"`);
 await page.evaluate(() => { window.game.sim.money = 9_126_661; });
 await page.waitForTimeout(250); // let the UI loop render the new FUND
 
-await page.locator("#topbar").screenshot({ path: resolve(OUT, `traffic-${LABEL}.png`) });
-console.log(`[${LABEL}] wrote docs/screenshots/traffic-${LABEL}.png`);
+const desktopPath = resolve(OUT, `traffic-chip-${LABEL}.png`);
+await page.locator("#topbar").screenshot({ path: desktopPath });
+console.log(`[${LABEL}] wrote ${desktopPath}`);
 
 // Mobile: the HUD bar wraps its stats onto a second row (max-width:860px block).
 // Re-shoot the same live state at a phone width to verify the chip reads there too.
 await page.setViewportSize({ width: 390, height: 844 });
 await page.waitForTimeout(400); // let the responsive layout settle
-await page.locator("#topbar").screenshot({ path: resolve(OUT, `traffic-${LABEL}-mobile.png`) });
-console.log(`[${LABEL}] wrote docs/screenshots/traffic-${LABEL}-mobile.png`);
+const mobilePath = resolve(OUT, `traffic-chip-${LABEL}-mobile.png`);
+await page.locator("#topbar").screenshot({ path: mobilePath });
+console.log(`[${LABEL}] wrote ${mobilePath}`);
 await browser.close();
