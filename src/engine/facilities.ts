@@ -7,6 +7,10 @@ import type { Facility, FacilityKind, Unit } from "./types";
  * In the original, a single office is the base unit of "width". We use a tile
  * grid where the smallest commercial unit is a few tiles wide.
  */
+/** The buildable lot width in tiles — the canon 1994 map is 375 segments wide.
+ *  Shared by {@link GRID}.width and the full-lot metro so the two can't drift. */
+export const LOT_WIDTH = 375;
+
 export const FACILITIES: Record<FacilityKind, Facility> = {
   lobby: {
     kind: "lobby",
@@ -79,7 +83,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "hotelSuite",
     category: "hotel",
     name: "Suite",
-    width: 12,
+    width: 10,
     cost: 100000,
     minStar: 3,
     // A suite houses a larger party than a double — matching the 1994 original
@@ -92,7 +96,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "fastFood",
     category: "food",
     name: "Fast Food",
-    width: 12,
+    width: 16,
     cost: 100000,
     minStar: 1,
     population: 0,
@@ -103,7 +107,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "restaurant",
     category: "food",
     name: "Restaurant",
-    width: 16,
+    width: 24,
     cost: 200000,
     minStar: 3,
     population: 0,
@@ -125,7 +129,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "cinema",
     category: "entertainment",
     name: "Cinema",
-    width: 24,
+    width: 31,
     floors: 2,
     cost: 500000,
     minStar: 3,
@@ -148,7 +152,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "stairs",
     category: "transport",
     name: "Stairway",
-    width: 4,
+    width: 8,
     cost: 5000,
     minStar: 1,
     population: 0,
@@ -160,7 +164,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "escalator",
     category: "transport",
     name: "Escalator",
-    width: 4,
+    width: 8,
     cost: 20000,
     minStar: 3,
     population: 0,
@@ -212,7 +216,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "parkingRamp",
     category: "service",
     name: "Parking Ramp",
-    width: 6,
+    width: 16,
     cost: 50000,
     minStar: 3,
     population: 0,
@@ -224,14 +228,14 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "parking",
     category: "service",
     name: "Parking Space",
-    width: 6,
+    width: 4,
     cost: 3000,
     minStar: 3,
     population: 0,
     color: "#888888",
     basement: true,
     description:
-      "Basement parking. Must connect to a Parking Ramp. One space serves ~12 office workers, and every hotel suite needs a space of its own (VIPs drive).",
+      "Basement parking. Must connect to a Parking Ramp. One space serves ~24 office workers (one per four offices), and every hotel suite needs a space of its own (VIPs drive).",
   },
   security: {
     kind: "security",
@@ -289,7 +293,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     name: "Metro Station",
     // Spans the full lot width and THREE deep-basement floors (B8–B10 in the
     // original), so it must be placed at the bottom of the basement.
-    width: 340,
+    width: LOT_WIDTH,
     floors: 3,
     cost: 1000000,
     minStar: 4,
@@ -346,9 +350,9 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
 /**
  * Star-rating population thresholds — the canonical 1994 values
  * (300 / 1,000 / 5,000 / 10,000). Above 3★ the rating counts only non-hotel
- * occupants (offices/condos); the lot was widened to 340 tiles so a well-zoned
- * tower holds ~15,000+ of those (measured ~15,066 at congestion 0.82), keeping
- * the canonical 10,000 (5★) and 15,000 (TOWER) genuinely reachable.
+ * occupants (offices/condos); the lot is the canon 375 tiles wide so a well-zoned
+ * tower holds well over 15,000 of those, keeping the canonical 10,000 (5★) and
+ * 15,000 (TOWER) genuinely reachable.
  */
 export const STAR_THRESHOLDS: Record<number, number> = {
   1: 0,
@@ -362,9 +366,9 @@ export const STAR_THRESHOLDS: Record<number, number> = {
  * Population needed for the final TOWER rating (above 5 stars). Same metric as
  * the 1994 original — a census of OCCUPANTS (office workers + condo residents;
  * hotel guests count only while climbing to 3★, then drop out per canon);
- * commercial/visitor traffic never counts. The canonical 15,000: the lot was
- * widened to 340 tiles so a well-zoned 100-floor tower can actually reach it
- * (measured ~15,066 occupants at congestion 0.82 with express + banded locals).
+ * commercial/visitor traffic never counts. The canonical 15,000: the lot is the
+ * canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches it
+ * (with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
 
@@ -383,8 +387,10 @@ export const RECYCLING_POP_PER_CENTER = 2500;
 export const GARBAGE_COLLECT_HOUR = 5;
 
 /** Office workers one functional parking space serves (canon: offices demand
- *  parking from 3★). Shared by the move-in penalty, the UI and the tests. */
-export const PARKING_WORKERS_PER_SPACE = 12;
+ *  parking from 3★). The 1994 original asks for one space per **four offices**;
+ *  an office holds 6 workers, so one space serves 24 workers. Shared by the
+ *  move-in penalty, the UI and the tests. */
+export const PARKING_WORKERS_PER_SPACE = 24;
 
 /** Tower geometry constants. */
 export const GRID = {
@@ -395,8 +401,8 @@ export const GRID = {
    * floor: floor 1 = ground, floor 0 = B1, -1 = B2 … -9 = B10 (no gap at 0).
    */
   minFloor: -9,
-  /** Total buildable width in tiles. */
-  width: 340,
+  /** Total buildable width in tiles — the canon 1994 map is 375 segments wide. */
+  width: LOT_WIDTH,
   /** Floors between required (sky) lobbies. */
   lobbyInterval: 15,
 } as const;
@@ -448,6 +454,15 @@ export function openHoursPerDay(kind: FacilityKind): number {
   return h || 1;
 }
 
+/** The canon foot-traffic commercial kinds — fast food, restaurant, retail
+ *  (shop), cinema. This is the exact set the 1994 noise (W2) and lobby-proximity
+ *  (W3) rules name. `partyHall` earns traffic income too but is deliberately NOT
+ *  in the canon commercial set, so it is exempt from both — keep W2 and W3 keyed
+ *  off this one predicate so they can never drift apart. */
+export function isCommercialKind(kind: FacilityKind): boolean {
+  return kind === "fastFood" || kind === "restaurant" || kind === "shop" || kind === "cinema";
+}
+
 /** True for facilities that keep posted business hours (can be "closed"). */
 export function hasBusinessHours(kind: FacilityKind): boolean {
   return (
@@ -486,7 +501,7 @@ export function isStaffTransportKind(kind: FacilityKind): boolean {
 export const TRANSPORT_CAPACITY: Record<string, number> = {
   elevatorStandard: 21,
   elevatorService: 16,
-  elevatorExpress: 33,
+  elevatorExpress: 42, // canon: PC 1.0 express car carries 42 (standard 21)
   escalator: 30, // continuous flow, treated as per-shaft
   stairs: 8,
 };

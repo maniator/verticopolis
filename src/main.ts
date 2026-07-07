@@ -11,6 +11,7 @@ import { SaveGame } from "./storage/SaveGame";
 import { loadPrefs, savePrefs, reducedMotionActive, type Prefs } from "./storage/Prefs";
 import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph, type TrafficTier } from "./engine/traffic";
 import { UI, type Tool } from "./ui/UI";
+import { classifyGesture, isPaintKind } from "./game/gesture";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
 import { buildStatsHtml } from "./ui/statsHtml";
@@ -97,6 +98,12 @@ class GameApp {
   private lastStar = 1;
   /** In-progress transport drag (anchor tile/floor). */
   private transportStart: { x: number; floor: number } | null = null;
+  /** Deferred touch paint-tool press (tile/floor). On touch, a paint strip is
+   *  NOT laid on the press — the second finger of a two-finger pan/zoom lands as
+   *  its own pointerdown, and a strip committed here would be a paid-for tile the
+   *  pinch path never rolls back. The strip is laid on the first move (drag) or
+   *  the release (tap), by which point a two-finger gesture has already cancelled. */
+  private paintAnchor: { tile: number; floor: number } | null = null;
   /** Currently selected facility for the edit panel. */
   private selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
@@ -403,7 +410,10 @@ class GameApp {
     const u = this.sim.tower.unitAt(floor, tile);
     if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
     const t = this.sim.tower.transports.find(
-      (tr) => tile >= tr.x && tile < tr.x + FACILITIES[tr.kind].width && floor >= tr.bottom && floor <= tr.top,
+      // Use the shaft's OWN stored width (matches render + overlap checks), not
+      // the catalog width — an old save keeps its stored width, so after a canon
+      // width change (e.g. stairs 4→8) the catalog would give a phantom click zone.
+      (tr) => tile >= tr.x && tile < tr.x + tr.width && floor >= tr.bottom && floor <= tr.top,
     );
     return t ? { type: "transport", id: t.id, kind: t.kind } : null;
   }
@@ -463,18 +473,12 @@ class GameApp {
 
   private wireEngine(): void {
     // Decide whether a press pans the camera or performs the active tool.
-    this.engine.classifyDown = (button, touch, space) => {
-      if (button > 0 || space) return "pan"; // middle/right button or held space
-      if (this.tool.type === "inspect") return "pan"; // inspect: drag pans, tap selects
-      // On touch, one finger pans and a TAP acts — except drag-sized transports
-      // (elevators), whose press starts the drag-to-size gesture. Stairs and
-      // escalators place on tap like rooms, so a finger-down doesn't instantly
-      // buy a flight the player only meant to pan past.
-      const dragSized =
-        this.tool.type === "build" && this.isTransportTool() && !isFixedSpanTransport(this.tool.kind);
-      if (touch && !dragSized) return "pan";
-      return "action";
-    };
+    // Pan vs act is pure routing in ./game/gesture (unit-tested). On touch a
+    // paint tool (floor/lobby/parking) owns the one-finger drag so mobile can
+    // paint a run; panning is via the inspect tool or a two-finger drag (which
+    // also zooms). Before this, a floor/lobby/parking drag only ever panned on
+    // touch, so mobile couldn't paint a run at all.
+    this.engine.classifyDown = (button, touch, space) => classifyGesture(this.tool, button, touch, space);
 
     // A press-without-drag: select (inspect) or, on touch, run the tool. The
     // picked entity comes from Excalibur's collider hit-testing.
@@ -497,8 +501,13 @@ class GameApp {
       this.commitUndo();
     };
 
-    this.engine.onActionDown = (tile, floor, _touch, picked) => {
+    this.engine.onActionDown = (tile, floor, touch, picked) => {
       this.audio.start();
+      // A fresh gesture: drop any anchor/run a cancelled pinch left behind. The
+      // pinch-cancel path skips onActionUp (which clears these), so without this
+      // a resumed paint drag would extend from the abandoned anchor across the gap.
+      this.paintAnchor = null;
+      this.build.clearPaint();
       if (this.tool.type === "bulldoze" || this.tool.type === "build") {
         this.captureUndo(this.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[this.tool.kind].name}`);
       }
@@ -507,8 +516,11 @@ class GameApp {
       } else if (this.tool.type === "build") {
         // Simple placements (strip paint, two-floor flight, room) happen on
         // the press; a drag-sized shaft instead anchors here and sizes with
-        // the drag.
-        if (this.placeSimpleBuild(this.tool.kind, tile, floor) === null) {
+        // the drag. A TOUCH paint tool defers to move/up (see paintAnchor) so a
+        // two-finger pan/zoom never drops a paid-for strip on its first finger.
+        if (touch && this.isPaintTool()) {
+          this.paintAnchor = { tile, floor };
+        } else if (this.placeSimpleBuild(this.tool.kind, tile, floor) === null) {
           this.transportStart = { x: snapX(this.tool.kind, tile), floor };
         }
       }
@@ -528,12 +540,26 @@ class GameApp {
         const valid = this.sim.tower.placeTransportDryRun(kind, x, bottom, top) && this.sim.isUnlocked(kind);
         this.engine.transportPreview = { kind, x, bottom, top, valid };
         this.engine.preview = null;
-      } else if (kind === "floor" || kind === "lobby") {
+      } else if (isPaintKind(kind)) {
+        if (this.paintAnchor) {
+          // First move of a deferred touch paint — seed the run at the press
+          // point so the strip starts where the finger went down, then extend.
+          this.build.paintFloorRun(kind, this.paintAnchor.tile, this.paintAnchor.floor);
+          this.paintAnchor = null;
+        }
+        // For a wide unit (parking) each tile-step re-attempts a build; overlaps
+        // fail silently, so successful placements land flush → a contiguous chain.
         this.build.paintFloorRun(kind, tile, floor);
       }
     };
 
     this.engine.onActionUp = () => {
+      // A deferred touch paint that never moved is a TAP — lay the single strip
+      // now (a drag already laid its run via onActionMove and cleared the anchor).
+      if (this.paintAnchor) {
+        if (this.tool.type === "build") this.build.paintFloorRun(this.tool.kind, this.paintAnchor.tile, this.paintAnchor.floor);
+        this.paintAnchor = null;
+      }
       this.build.clearPaint();
       // Only drag-sized transports (elevators) commit on release. Stairs and
       // escalators already placed on the DOWN event, and their hover ghost
@@ -701,6 +727,12 @@ class GameApp {
 
   private isTransportTool(): boolean {
     return this.tool.type === "build" && !!FACILITIES[this.tool.kind].transport;
+  }
+
+  /** Whether the active tool drag-paints a run (floor/lobby/parking) — see
+   *  {@link isPaintKind}. Used by the touch deferral in onActionDown. */
+  private isPaintTool(): boolean {
+    return this.tool.type === "build" && isPaintKind(this.tool.kind);
   }
 
   /** Set the colored stats overlay from the picker value ("" = off). An

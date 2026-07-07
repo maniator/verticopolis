@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
+import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
 
 /** Canon waste & parking demand mechanics: the recycling centers FILL with the
  * tower's daily garbage (emptied by the morning truck), demand scales with
- * population and gates 4★, and parking serves offices (1/~12 workers) plus one
+ * population and gates 4★, and parking serves offices (1/~24 workers) plus one
  * space per hotel suite. */
 
 const W = GRID.width;
@@ -99,24 +99,28 @@ describe("Recycling fills with population and gates 4★ by DEMAND", () => {
   });
 });
 
-describe("Parking demand: offices (1/~12 workers) + one space per suite", () => {
+describe("Parking demand: offices (1/~24 workers) + one space per suite", () => {
   it("parkingDemand sums both, and suites reserve their spaces first", () => {
     const sim = Simulation.newGame(12);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    // 24 occupied office workers → 2 spaces; 3 suites → 3 more.
+    // 24 occupied office workers → 1 space (1 per 4 offices); 3 suites → 3 more.
     for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
     for (let i = 0; i < 3; i++) mustPlace(sim, "hotelSuite", 2, 40 + i * 12);
     const d = sim.parkingDemand();
     expect(d.officePop).toBe(4 * FACILITIES.office.population);
-    expect(d.offices).toBe(Math.ceil(d.officePop / PARKING_WORKERS_PER_SPACE));
+    // Canon: one space per four offices. 4 offices × 6 workers = 24 → exactly 1 space.
+    // Asserted as a LITERAL, not `ceil(pop / PARKING_WORKERS_PER_SPACE)` — that would
+    // tautologically track whatever the constant is set to and prove nothing.
+    expect(d.offices).toBe(1);
     expect(d.suites).toBe(3);
     expect(d.total).toBe(d.offices + d.suites);
     // Three working spaces: exactly enough for the suites, nothing for offices.
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    for (let i = 1; i <= 3; i++) mustPlace(sim, "parking", 0, C + i * 6);
+    // Chain flush after the 16-wide ramp; each space is 4 wide (canon).
+    for (let i = 0; i < 3; i++) mustPlace(sim, "parking", 0, C + 16 + i * 4);
     expect(sim.suiteParkingShort()).toBe(false);
   });
 
@@ -129,7 +133,7 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     expect(sim.suiteParkingShort()).toBe(true); // 1 suite, 0 spaces
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    mustPlace(sim, "parking", 0, C + 6);
+    mustPlace(sim, "parking", 0, C + 16); // flush after the 16-wide ramp
     expect(sim.suiteParkingShort()).toBe(false); // 1 suite, 1 chained space
   });
 
@@ -142,7 +146,7 @@ describe("Parking demand: offices (1/~12 workers) + one space per suite", () => 
     const suite = occupy(sim, "hotelSuite", 2, 40, "empty");
     lay(sim, "floor", 0);
     mustPlace(sim, "parkingRamp", 0, C);
-    for (let i = 1; i <= 4; i++) mustPlace(sim, "parking", 0, C + i * 6);
+    for (let i = 0; i < 4; i++) mustPlace(sim, "parking", 0, C + 16 + i * 4);
     // Monday noon: office cars parked, no suite car.
     sim.clock.minutes = 12 * 60; // day 0 = Monday
     const daytime = sim.parkingUsage();

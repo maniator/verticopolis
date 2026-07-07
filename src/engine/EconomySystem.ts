@@ -1,8 +1,17 @@
 import type { SimContext } from "./SimContext";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { RECYCLING_POP_PER_CENTER, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
+import { RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
+
+/** Canon "commercial must be near a lobby": a shop/food venue more than this many
+ *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). Exported so
+ *  the inspector's "too far from a lobby" line reads the exact same threshold. */
+export const COMMERCIAL_LOBBY_FLOORS = 2;
+/** Share of normal traffic income a commercial unit earns when it is beyond
+ *  {@link COMMERCIAL_LOBBY_FLOORS} of a lobby — poor placement starves its trade,
+ *  the same way an unserved floor already earns nothing. */
+const COMMERCIAL_LOBBY_FAR_MULT = 0.5;
 
 /** Rooms one housekeeping crew can turn over per day. */
 const HK_ROOMS_PER_CREW = 20;
@@ -116,11 +125,27 @@ export class EconomySystem {
       // +70% bump never could, since appeal is capped at 1), so a blockbuster is
       // a genuine upside in a busy tower and a gamble in a quiet one.
       const filmMult = u.kind === "cinema" && this.blockbusters.has(u.id) ? 2.2 : 1;
+      // W3 commercial-near-lobby: a canon commercial venue (fast food, restaurant,
+      // shop, cinema — NOT partyHall, which is outside the canon set) more than two
+      // floors from any (sky) lobby draws far fewer shoppers — poor placement
+      // starves its traffic without evicting it (commercial has no lease). Ground
+      // (floor 1) always anchors as a lobby, so floors 1–3 are always fine; deeper
+      // commercial needs a sky lobby.
+      const lobbyMult =
+        isCommercialKind(u.kind) &&
+        this.sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
+          ? COMMERCIAL_LOBBY_FAR_MULT
+          : 1;
       // Spread the headline DAILY take across the venue's actual open hours so a
       // full day earns ≈ `daily * appeal`, not a per-hour multiple of it. (Before,
       // dividing by a flat 8 while open 9–15 h/day inflated income 2–3x.)
       const hourly =
-        (daily / openHoursPerDay(u.kind)) * appeal * rainMult * filmMult * (0.6 + this.sim.rng.next() * 0.4);
+        (daily / openHoursPerDay(u.kind)) *
+        appeal *
+        rainMult *
+        filmMult *
+        lobbyMult *
+        (0.6 + this.sim.rng.next() * 0.4);
       u.pendingIncome += hourly;
       if (u.pendingIncome >= 1) {
         const earned = Math.floor(u.pendingIncome);

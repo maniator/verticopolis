@@ -72,3 +72,15 @@ bottom-strip + drawer, and wraps the top bar so nothing clips.
 | `tablet-portrait-after.png` | 768×1024 **after**: the tablet layout — Tools docked left, SELECTED/TOWER/BULLETIN/GAME docked right, stats on a tidy second row. |
 | `tablet-compact-before.png` | 900×700 (compact band) **before**: desktop layout cramming — the brand wraps to two lines and the right speed buttons clip off. |
 | `tablet-compact-after.png` | 900×700 **after**: the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
+## SimTower-1994 segment-width parity + save migration (`towerone_6`)
+
+Captured from the built app via `scripts/shot-migration.mjs` on the real
+`towerone_6` save the initiative began with — loaded twice, once with the v1→v2
+reflow skipped ("before") and once applied ("after"), so the change is honest.
+
+| Screenshot | Shows |
+|---|---|
+| `parity-migration-before.png` | The whole 57-floor tower with the reflow **skipped** — rooms at their pre-canon widths. |
+| `parity-migration-after.png` | The same tower **migrated** to canon 1994 segment widths. Deliberately near-identical at full zoom: the reflow is minimum-disruption by design (rooms hold their anchors; only widths change). |
+| `parity-migration-parking-before.png` | Basement parking pre-migration: narrow 6-wide ramps (short diagonals) and 6-wide spaces. |
+| `parity-migration-parking-after.png` | Basement parking after canon widths: ramps widen 6→16 (the long diagonals now span each level) and spaces narrow 6→4, the whole basement reflowed — the clearest read on the change, and where the initiative started ("why does each parking spot only add one spot?"). |

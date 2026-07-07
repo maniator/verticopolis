@@ -105,9 +105,13 @@ export function isUnitState(v: unknown): v is UnitState {
 /** Why a dissatisfied tenant is leaving — attributed from the dominant
  *  satisfaction drain at the moment it bottoms out, so the notice/departure
  *  toast names the real cause instead of always blaming "poor access". `noise`
- *  marks a hotel/condo worn down by a same-floor office neighbor over sustained,
- *  unaddressed exposure (see the office-noise erosion in updateSatisfaction). */
-export type VacateReason = "access" | "congestion" | "rent" | "noise";
+ *  marks a noise-sensitive room (office, hotel, or condo) worn down by a same-floor
+ *  neighbor — an office bothered by nearby commercial, or a hotel/condo by a nearby
+ *  office or commercial venue — over sustained, unaddressed exposure (the W2 noise
+ *  erosion in updateSatisfaction). `transportFar` marks an office whose nearest
+ *  reachable stairs/elevator sits beyond the canon walking tolerance (79 tiles) on
+ *  its own floor — the tenant is served but hates the hike (the W1 penalty). */
+export type VacateReason = "access" | "congestion" | "rent" | "noise" | "transportFar";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
@@ -117,12 +121,15 @@ export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   access: "no route to the lobby",
   congestion: "overcrowded vertical transport",
   rent: "rent set too high",
-  noise: "office noise next door",
+  noise: "a noisy neighbor nearby",
+  transportFar: "too far from a stairway, escalator, or passenger elevator",
 };
 
 /** Guard for a persisted departure cause from an untrusted save. */
 export function isVacateReason(v: unknown): v is VacateReason {
-  return v === "access" || v === "congestion" || v === "rent" || v === "noise";
+  return (
+    v === "access" || v === "congestion" || v === "rent" || v === "noise" || v === "transportFar"
+  );
 }
 
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.

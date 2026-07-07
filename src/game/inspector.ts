@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
-import { VACATE_RESCIND } from "../engine/Simulation";
-import { FACILITIES, facilityFloors, isElevatorKind, isHotelKind, residentCount } from "../engine/facilities";
+import { TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../engine/Simulation";
+import { COMMERCIAL_LOBBY_FLOORS } from "../engine/EconomySystem";
+import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isHotelKind, residentCount } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
 import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
@@ -30,7 +31,7 @@ export interface InspectorDeps {
 
 /** The shared demand line for parking spaces & ramps: how many working spaces
  *  the tower has (`have`, passed in so the caller's single flood-fill is reused)
- *  vs what its offices (1 per ~12 workers) and suites (1 each) currently need. */
+ *  vs what its offices (1 per ~24 workers) and suites (1 each) currently need. */
 function parkingDemandLine(sim: Simulation, have: number): string {
   const d = sim.parkingDemand();
   const color = have < d.total ? "var(--bad)" : "var(--good)";
@@ -125,6 +126,24 @@ export class InspectorController {
           : parkingSet.has(u.id)
             ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim, parkingSet.size)
             : `<div style="color:var(--bad)">Ramp access: none — this space is dead (no relief). Chain it to a Parking Ramp.</div>`;
+      // W1: a served office whose nearest stairs/elevator is beyond the walking
+      // tolerance is silently eroding — surface it always (like the W3 line below),
+      // not only once the tenant is already on notice, and name the concrete fix.
+      const walkFar =
+        u.kind === "office" &&
+        u.floor !== 1 &&
+        sim.tower.isFloorServed(u.floor) &&
+        sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
+          ? `<div style="color:var(--bad)">Long walk to transport — tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`
+          : "";
+      // W3: a canon commercial venue (not partyHall) more than two floors from a
+      // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix — lobbies only
+      // go on the ground and every 15th floor, so "add a lobby here" is usually
+      // impossible; the real move is to sit within 2 floors of one of those levels.
+      const commercialLobby =
+        isCommercialKind(u.kind) && sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
+          ? `<div style="color:var(--bad)">Shoppers: too far from a lobby — traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`
+          : "";
       // Recycling runs on demand: how full it is right now, and whether the
       // tower has outgrown its centers (the canon 4★ gate).
       const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
@@ -160,6 +179,8 @@ export class InspectorController {
           access +
           hotel +
           parking +
+          walkFar +
+          commercialLobby +
           recycling +
           notice +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,

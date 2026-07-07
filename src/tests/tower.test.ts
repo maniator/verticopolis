@@ -135,11 +135,11 @@ describe("Tower placement", () => {
   });
 
   it("requires every story of a multi-floor facility", () => {
-    for (let i = 0; i < 30; i++) tower.place("lobby", 1, i);
+    for (let i = 0; i < 31; i++) tower.place("lobby", 1, i);
     // Cinema is two stories: floors 2 AND 3 must exist as structure.
-    for (let i = 0; i < 30; i++) tower.place("floor", 2, i);
+    for (let i = 0; i < 31; i++) tower.place("floor", 2, i);
     expect(tower.canPlace("cinema", 2, 0).ok).toBe(false); // floor 3 missing
-    for (let i = 0; i < 30; i++) tower.place("floor", 3, i);
+    for (let i = 0; i < 31; i++) tower.place("floor", 3, i);
     expect(tower.canPlace("cinema", 2, 0).ok).toBe(true);
     const r = tower.place("cinema", 2, 0);
     expect(r.ok).toBe(true);
@@ -230,7 +230,7 @@ describe("Tower transport", () => {
     expect(tower.resizeTransport(t.id, 0, 2).ok).toBe(false);
     expect(t.top).toBe(2); // unchanged
     expect(t.bottom).toBe(1);
-    const e = tower.placeTransport("escalator", 14, 1, 2);
+    const e = tower.placeTransport("escalator", 16, 1, 2);
     expect(e.ok).toBe(true);
     const et = tower.transports.find((x) => x.id === e.transportId)!;
     expect(tower.resizeTransport(et.id, 1, 3).ok).toBe(false);
@@ -285,7 +285,7 @@ describe("Tower transport", () => {
     expect(tower.staffConnected(3, 3)).toBe(true); // same floor always works
     // Stairs 2..3 and a service elevator 3..8 chain into one staff network.
     tower.placeTransport("stairs", 12, 2, 3);
-    tower.placeTransport("elevatorService", 16, 3, 8);
+    tower.placeTransport("elevatorService", 20, 3, 8);
     expect(tower.staffConnected(2, 8)).toBe(true);
     expect(tower.staffConnected(2, 10)).toBe(false); // beyond the staff chain
   });

@@ -464,9 +464,9 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     const sim = new Simulation();
     for (let x = 10; x < 46; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 46; x++) expect(sim.tower.place("floor", 0, x).ok).toBe(true);
-    const ramp = place(sim, "parkingRamp", 0, 20); // tiles 20–25
-    const good = place(sim, "parking", 0, 26); // abuts the ramp → connected
-    const dead = place(sim, "parking", 0, 34); // gap at 32–33 → orphaned
+    const ramp = place(sim, "parkingRamp", 0, 20); // tiles 20–35 (canon 16-wide ramp)
+    const good = place(sim, "parking", 0, 36); // abuts the ramp → connected
+    const dead = place(sim, "parking", 0, 42); // gap at 40–41 → orphaned
     [ramp, good, dead].forEach((u) => (u.state = "empty")); // operational (not construction)
 
     const { inspector, shown } = makeInspector(sim);

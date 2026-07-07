@@ -26,8 +26,8 @@ function layFloor(sim: Simulation, kind: "floor" | "lobby", floor: number): void
 function structuredTower(seed: number, top: number, money = 100_000_000, halfWidth?: number): Simulation {
   const sim = Simulation.newGame(seed);
   sim.money = money;
-  // Optionally build only a centred strip (much cheaper to tick over on the
-  // wide 340-tile lot) when a test doesn't need the full width.
+  // Optionally build only a centered strip (much cheaper to tick over on the
+  // wide 375-tile lot) when a test doesn't need the full width.
   const lay = (kind: "floor" | "lobby", f: number) => {
     if (halfWidth === undefined) return layFloor(sim, kind, f);
     const l = Math.max(0, C - halfWidth);
@@ -145,12 +145,16 @@ describe("F18 — 1994 build caps & wedding-hall accounting", () => {
     sim.star = 3; // escalators unlock at 3★ (stairs at 1★) — exercise both in one pool
     const kinds: FacilityKind[] = ["stairs", "escalator"];
     let placed = 0;
-    // 68 fixed two-floor links, spaced 5 tiles apart (> max width 4, so none
-    // overlap) and every attempt on-lot (max x = 67·5 + 4 = 339 < 340). That
-    // overshoots the 64 cap, so the blocked attempts (i ≥ 64) prove the CAP
-    // rejects them — not the lot edge.
+    // 68 fixed two-floor links, 8-wide walkways placed flush (step == width == 8),
+    // so each abuts the next with no overlap (the engine allows flush adjacency —
+    // the parking-chain tests rely on it too). Split across two floor pairs (1–2
+    // and 3–4), 34 slots each (max x = 33·8 = 264, +8 = 272 < 375), so every
+    // attempt is geometrically on-lot and non-overlapping. That overshoots the 64
+    // cap, so the blocked attempts (i ≥ 64) prove the CAP rejects them — not the
+    // lot edge or an overlap.
     for (let i = 0; i < 68; i++) {
-      if (sim.buildTransport(kinds[i % 2], i * 5, 1, 2).ok) placed++;
+      const bottom = i < 34 ? 1 : 3;
+      if (sim.buildTransport(kinds[i % 2], (i % 34) * 8, bottom, bottom + 1).ok) placed++;
     }
     expect(placed).toBe(64);
     const walkways = sim.tower.transports.filter(

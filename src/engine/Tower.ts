@@ -733,6 +733,20 @@ export class Tower {
     return [...this.lobbyTiles.keys()].sort((a, b) => a - b);
   }
 
+  /** Floor-distance from `floor` to the nearest (sky) lobby, in floors — 0 on a
+   *  lobby floor itself. The ground floor (1) always counts as a lobby: visitors
+   *  enter there, so it anchors the distance even before any lobby tile is laid.
+   *  Drives the W3 commercial-near-lobby income penalty (see
+   *  {@link EconomySystem.collectTrafficIncome}). O(lobby floors) — a handful. */
+  nearestLobbyFloorDistance(floor: number): number {
+    let best = Math.abs(floor - 1); // ground is always the tower's entrance lobby
+    for (const lf of this.lobbyTiles.keys()) {
+      const d = Math.abs(floor - lf);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
   /**
    * Toggle whether a transport stops at a floor (express configuration).
    * Endpoints are always stops — a shaft's bottom and top can't be skipped, or
@@ -837,6 +851,66 @@ export class Tower {
     for (let fl = t.bottom; fl <= t.top; fl++) if (this.stopsAt(t, fl)) s.push(fl);
     this.stopsCache.set(t.id, { rev: this.revision, stops: s });
     return s;
+  }
+
+  /** Per-floor list of transport-column spans `[x0, x1)` for shafts that STOP at
+   *  the floor AND make it reachable from the lobby — a dead-ended shaft the
+   *  crowd can't actually use never counts as "an elevator nearby". Memoized by
+   *  {@link revision}, the same signal `servedFloors` invalidates on, so the
+   *  W1 per-office scan below is O(offices × shaftsOnFloor) with no re-walk. */
+  private transportColsRev = -1;
+  private transportColsByFloor = new Map<number, Array<[number, number]>>();
+  private transportColumns(floor: number): Array<[number, number]> {
+    if (this.transportColsRev !== this.revision) {
+      this.transportColsByFloor.clear();
+      const served = this.servedFloors();
+      for (const t of this.transports) {
+        // Service elevators are staff-only (canon): tenants and visitors can't
+        // ride them, so a service shaft next door is NOT the "elevator nearby"
+        // that spares an office the walk. Mirror servedFloors, which excludes them
+        // for the same reason — otherwise a staff shaft would silently suppress W1.
+        if (isStaffOnlyTransport(t.kind)) continue;
+        for (let fl = t.bottom; fl <= t.top; fl++) {
+          // A shaft only helps a floor it stops at, and only if that floor is
+          // actually connected to the lobby (a shaft to nowhere is no relief).
+          if (!this.stopsAt(t, fl) || !served.has(fl)) continue;
+          const list = this.transportColsByFloor.get(fl);
+          // Clamp the span to the lot: a transport's width is trusted from the
+          // save (and can be a legacy value after a catalog change), so an
+          // over-wide or corrupt shaft must not report a column past the lot
+          // edge and skew the W1 distance scan.
+          const span: [number, number] = [Math.max(0, t.x), Math.min(t.x + t.width, GRID.width)];
+          if (list) list.push(span);
+          else this.transportColsByFloor.set(fl, [span]);
+        }
+      }
+      this.transportColsRev = this.revision;
+    }
+    return this.transportColsByFloor.get(floor) ?? [];
+  }
+
+  /**
+   * Nearest reachable transport (elevator/stair/escalator) to a unit, as the
+   * horizontal gap in tiles between the unit's footprint and the closest shaft
+   * column that stops on its floor and is lobby-connected. `0` when a shaft
+   * abuts or overlaps the footprint; `Infinity` when the floor has no reachable
+   * shaft at all (the plain access drain already covers that case). This is the
+   * canon "stairs/elevators are far away" measure — offices past ~79 tiles wear
+   * their tenants down (W1, see {@link Simulation.updateSatisfaction}).
+   */
+  nearestTransportDistance(u: Unit): number {
+    const cols = this.transportColumns(u.floor);
+    if (cols.length === 0) return Infinity;
+    const left = u.x;
+    const right = u.x + u.width;
+    let best = Infinity;
+    for (const [x0, x1] of cols) {
+      // Overlap ⇒ 0; shaft entirely left ⇒ left - x1; entirely right ⇒ x0 - right.
+      const gap = x1 <= left ? left - x1 : x0 >= right ? x0 - right : 0;
+      if (gap < best) best = gap;
+      if (best === 0) break;
+    }
+    return best;
   }
 
   /** Cached reachable-floor set, keyed by {@link revision} so it is recomputed

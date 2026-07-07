@@ -44,7 +44,7 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   // Above-ground standard floors 2..100.
   for (let f = 2; f <= GRID.maxFloor; f++) for (let x = LEFT; x < RIGHT; x++) t.place("floor", f, x);
   // Deep basement stories, built top-down (each hangs off the floor above), full
-  // width so the 340-wide Metro fits at the bottom.
+  // width so the full-lot (375-wide) Metro fits at the bottom.
   for (let f = 0; f >= GRID.minFloor; f--) for (let x = 0; x < GRID.width; x++) t.place("floor", f, x);
 
   // Overlapping standard elevators (cap 30 floors each) that chain service

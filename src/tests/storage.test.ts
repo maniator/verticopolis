@@ -110,6 +110,29 @@ describe("SaveGame", () => {
     expect(t.top).toBeGreaterThan(t.bottom);
   });
 
+  it("preserves a legacy transport width but falls back to catalog width for a corrupt one", () => {
+    // A transport's stored width is trusted so legacy shafts survive a catalog
+    // width change (e.g. stairs 4→8). But a non-finite/non-positive width from a
+    // corrupt save must not reach the consumers: it would NaN-poison the W1 span
+    // scan (Tower.transportColumns) and make the shaft unpickable (hit-testing).
+    const legacy = sampleGame();
+    const legacyData = legacy.serialize();
+    const kind = legacyData.transports[0].kind;
+    const legacyWidth = FACILITIES[kind].width + 3; // a since-changed canon width
+    (legacyData.transports[0] as { width: unknown }).width = legacyWidth;
+    const legacyLoaded = Simulation.deserialize(legacyData);
+    expect(legacyLoaded.tower.transports[0].width).toBe(legacyWidth);
+
+    for (const bad of [NaN, Infinity, -4, 0, "8" as unknown as number]) {
+      const sim = sampleGame();
+      const data = sim.serialize();
+      (data.transports[0] as { width: unknown }).width = bad;
+      const t = Simulation.deserialize(data).tower.transports[0];
+      expect(Number.isInteger(t.width) && t.width > 0).toBe(true);
+      expect(t.width).toBe(FACILITIES[t.kind].width);
+    }
+  });
+
   it("coerces forged unit state/label strings from a tampered save", () => {
     const sim = sampleGame();
     const data = sim.serialize();

@@ -5,7 +5,7 @@ import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
-import { brushTiles, clampTile, dragRunTiles } from "../ui/placement";
+import { brushTiles, dragRunTiles, snapX } from "../ui/placement";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -123,14 +123,26 @@ export class BuildActions {
    */
   paintFloorRun(kind: FacilityKind, tile: number, floor: number): void {
     if (!this.paint || this.paint.floor !== floor) {
-      this.tryBuild(kind, floor, clampTile(tile), true);
-      this.paint = { tile, floor };
+      // snapX (not clampTile) so a wide unit's FOOTPRINT stays on-lot: a tap at
+      // the right edge left-shifts to fit instead of silently failing off-lot.
+      // For width-1 floor/lobby this is identical to clampTile.
+      // Record the SNAPPED anchor (what was actually placed), so a later drag-run
+      // extends from the placed unit, not an off-lot raw tile near the edge.
+      const seedX = snapX(kind, tile);
+      this.tryBuild(kind, floor, seedX, true);
+      this.paint = { tile: seedX, floor };
       return;
     }
     for (const x of dragRunTiles(this.paint.tile, tile)) {
-      this.tryBuild(kind, floor, x, true);
+      // snapX each column so a WIDE unit near the right edge still lands on-lot
+      // (its footprint would otherwise run off; width-1 floor/lobby is unchanged).
+      this.tryBuild(kind, floor, snapX(kind, x), true);
     }
-    this.paint = { tile, floor };
+    // Record the SNAPPED anchor (what actually landed), not the raw pointer tile:
+    // for a wide kind near the right edge snapX left-shifts the placement, so a
+    // raw anchor would make the next drag step recompute from an off-lot column
+    // and misfire. Identical to `tile` for width-1 floor/lobby.
+    this.paint = { tile: snapX(kind, tile), floor };
   }
 
   /**

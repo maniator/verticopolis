@@ -22,6 +22,7 @@ import {
   TOWER_POPULATION,
   buildMinutes,
   facilityFloors,
+  isCommercialKind,
   isElevatorKind,
   isFacilityKind,
   isStaffOnlyTransport,
@@ -41,14 +42,9 @@ import {
   isVacateReason,
   VACATE_REASON_TEXT,
 } from "./types";
-
-/**
- * Current save-format version. `serialize()` always stamps this; `deserialize()`
- * routes every save through {@link migrateSave} first, so the field is read on
- * load — not merely written — and a future format bump has exactly one place to
- * grow.
- */
-export const SAVE_VERSION = 1;
+// The save-version constant + migration seam are extracted to ./saveMigration.
+import { SAVE_VERSION, migrateSave } from "./saveMigration";
+export { SAVE_VERSION };
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving — a grace window the player can use
@@ -92,13 +88,20 @@ const NOISE_EROSION = 0.07;
  *  (move the office or the neighbor) recovers well before. */
 const CONDO_NOISE_EROSION = 0.054;
 
-/**
- * The condo sale price BEFORE this build re-anchored the band (old default 2×
- * cost was $120k, now $160k). A pre-mode save's SOLD condo that omitted `rent`
- * sold at this price, so we backfill it on load (see {@link migrateSave}) — the
- * buy-back must mirror what the unit actually sold for, not the new default.
- */
-const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
+/** Canon "the stairs/elevators are far away" tolerance, in tiles. An office whose
+ *  nearest reachable shaft on its own floor sits farther than this wears its
+ *  tenant down (W1) — matching the 1994 original's 79-segment walking limit. At
+ *  or under it the walk is fine and satisfaction recovers normally. Exported so the
+ *  inspector's always-on "long walk" line reads the exact same threshold. */
+export const TRANSPORT_FAR_TILES = 79;
+
+/** Canon same-floor noise buffers, in tiles (the gap a source may sit within
+ *  before it bothers the sensitive room). Only these two are documented numbers;
+ *  everything else reuses the room's own band (see arch §2.2 / gdd §4.2). The
+ *  commercial source set is {@link isCommercialKind} — the same canon four W3
+ *  uses, so the two penalties can never disagree on what "commercial" means. */
+const OFFICE_NOISE_TILES = 11; // office bothered by commercial within 11
+const HOTEL_NOISE_TILES = 21; // hotel/condo bothered by office or commercial within 21
 
 /**
  * The widest condo price band that has ever existed (the pre-re-anchor band was
@@ -111,49 +114,6 @@ const LEGACY_CONDO_DEFAULT_PRICE = 120_000;
  */
 const SOLD_CONDO_MIN_PRICE = 60_000;
 const SOLD_CONDO_MAX_PRICE = 240_000;
-
-/**
- * Save-format migration seam. Runs before the field-level coercion in
- * {@link Simulation.deserialize}. Beyond normalizing `version`, it backfills the
- * pre-re-anchor condo sale price for legacy saves so an old tower's buy-back
- * still mirrors its historical sale price.
- */
-function migrateSave(data: SerializedGame): SerializedGame {
-  // A missing/garbled version is normalized so the (future) upgrade chain has a
-  // number to branch on; deserialize()'s coercion still hardens every value.
-  const version = Number.isFinite(data.version) ? data.version : SAVE_VERSION;
-  let migrated: SerializedGame = data.version === version ? data : { ...data, version };
-  // A save with no VALID `mode` predates the condo work (or is corrupt) — the same
-  // condition under which deserialize() falls back to Classic, so migration must
-  // agree (an invalid mode string must be treated as legacy here too, else the
-  // save loads Classic yet skips this backfill). A SOLD condo (owned, not an
-  // empty/dead shell) that omitted `rent` sold at the OLD default — stamp it so
-  // its buy-back mirrors that historical price instead of picking up the new,
-  // higher default via rentOf(). Only touch that exact shape; never re-price a
-  // condo that already carries a rent, or an unsold/dead one.
-  if (!isGameMode(migrated.mode) && Array.isArray(migrated.units)) {
-    migrated = {
-      ...migrated,
-      units: migrated.units.map((u) =>
-        u &&
-        u.kind === "condo" &&
-        u.everOccupied === true &&
-        u.rent === undefined &&
-        u.state !== "empty" &&
-        u.state !== "gutted" &&
-        u.state !== "construction"
-          ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }
-          : u,
-      ),
-    };
-  }
-  // Future upgrades chain here in order, each bumping migrated.version, e.g.:
-  //   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
-  // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
-  // it loads best-effort — the coercion below guards it — rather than throwing
-  // away the player's tower.
-  return migrated;
-}
 
 /** A single tick advances the crowd by at most this many crowd-seconds so a
  * day-long catch-up step stays bounded (see CROWD_SECONDS_PER_MINUTE, which
@@ -1001,25 +961,42 @@ export class Simulation implements SimContext {
         const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
         u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
       }
-      // Office noise (canon "Office neighbor is too noisy"): a hotel room or condo
-      // with an office immediately beside it on the same floor is worn down in two
-      // phases — an immediate annoyance CEILING (NOISE_CAP), then, if the neighbor
-      // is never dealt with, a slow EROSION past it (NOISE_EROSION outpaces the
-      // served recovery). Sustained, unaddressed exposure therefore drives the
-      // tenant below the rescind bar and ultimately out (cause: "noise"); moving
-      // the office or the neighbor lets satisfaction recover normally.
-      // Erode THEN clamp to the cap (not clamp-then-erode): a freshly-exposed
-      // unit lands exactly on 0.6 rather than overshooting to 0.53, and the
-      // steady-state stays a true net ≈ −0.02/hr (this tick's +0.05 recovery is
-      // preserved, not discarded by the cap).
-      if ((isHotelKind(u.kind) || u.kind === "condo") && served && this.officeAdjacent(u)) {
+      // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
+      // away"): a served room is worn down in two phases — an immediate annoyance
+      // CEILING (NOISE_CAP), then, if the cause is never dealt with, a slow EROSION
+      // past it (NOISE_EROSION outpaces the +0.05 served recovery). Sustained,
+      // unaddressed exposure drives the tenant below the rescind bar and out;
+      // fixing the cause lets satisfaction recover normally. Two causes feed this
+      // one drain:
+      //   • W1 transport-too-far — a served office whose nearest reachable shaft on
+      //     its floor sits beyond the walking tolerance (ground-floor offices walk
+      //     to the lobby, not a shaft, so they're exempt; offices can't be founded
+      //     on floor 1 anyway, so this guard is belt-and-suspenders).
+      //   • W2 noise — a noise-sensitive room within its canon buffer of a source
+      //     (office↔commercial 11, hotel/condo↔office-or-commercial 21; see
+      //     {@link noiseAfflicted}), widening the old 1-tile office→hotel rule.
+      // They share ONE erosion step per tick (not one each): a doubly-afflicted
+      // office still erodes at the telegraphed ≈ −0.02/hr and lands on the 0.6 cap,
+      // rather than eroding twice and cratering at ~2× the documented rate. The
+      // cause is attributed in vacateCause (transport-far before noise). Erode THEN
+      // clamp to the cap so a freshly-exposed unit lands exactly on 0.6.
+      const farWalk =
+        u.kind === "office" &&
+        served &&
+        u.floor !== 1 &&
+        this.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES;
+      const noisy =
+        (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo") &&
+        served &&
+        this.noiseAfflicted(u);
+      if (farWalk || noisy) {
         // A *sold* condo (everOccupied) is an owner, not a nightly guest, so it
         // erodes at the gentler condo rate — sticky against a transient neighbor
         // the player removes in time, worn out only by sustained, unaddressed
-        // adjacency. Hotels (and any not-yet-sold condo) keep the steeper rate;
-        // gating on everOccupied matches the "sold" predicate the rest of the
+        // adjacency. Hotels, offices, and any not-yet-sold condo keep the steeper
+        // rate; gating on everOccupied matches the "sold" predicate the rest of the
         // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
-        // with an occupied-but-unsold condo. The annoyance cap is shared, so both
+        // with an occupied-but-unsold condo. The annoyance cap is shared, so all
         // still redden on the stats overlay from the moment of exposure.
         const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
         u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
@@ -1099,21 +1076,75 @@ export class Simulation implements SimContext {
     if (u.kind === "office") {
       const cfg = rentConfig("office");
       if (cfg && rentOf(u) > cfg.default) return "rent";
+      // A served, market-priced office that still bottomed out did so through the
+      // W1 walk penalty — its nearest shaft is beyond tolerance (ground-floor
+      // offices are exempt, so this only fires above floor 1).
+      if (u.floor !== 1 && this.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES) {
+        return "transportFar";
+      }
+      // …or the W2 commercial-noise band next door.
+      if (this.noiseAfflicted(u)) return "noise";
       return "access";
     }
     // A served, uncongested hotel/condo that still bottomed out did so through
-    // sustained office-noise erosion — the only remaining satisfaction sink.
-    if (this.officeAdjacent(u)) return "noise";
+    // sustained noise erosion (office or commercial within its band) — the only
+    // remaining satisfaction sink.
+    if (this.noiseAfflicted(u)) return "noise";
     return "access";
   }
 
-  /** True when a same-floor office sits immediately to either side of `u` — the
-   *  single office-noise adjacency test, shared by the noise erosion and its
-   *  cause attribution so the two can never disagree. */
-  private officeAdjacent(u: Unit): boolean {
-    const left = this.tower.roomAt(u.floor, u.x - 1);
-    const right = this.tower.roomAt(u.floor, u.x + u.width);
-    return left?.kind === "office" || right?.kind === "office";
+  /** True when a noise SOURCE of one of `kinds` sits within `maxTiles` tiles
+   *  ("segments") of `u` on the same floor — scanning outward from each side of
+   *  the footprint. Noise is a proximity radius that carries THROUGH built floor
+   *  and any non-source rooms in between (GDD §4.1 uses "empty segments" and
+   *  "tiles" interchangeably for the straight-line distance — "empty" is not a
+   *  gate). Only two things stop it: a **lobby tile** in the gap (canon buffer —
+   *  a lobby between source and sensitive room cancels the noise; this is the
+   *  ONLY documented shield, which is exactly why an intervening non-source room
+   *  must NOT shield), and an **open-air gap** of unbuilt tiles (noise needs
+   *  floor to travel). Distance 0 is the shared-wall case, so this subsumes the
+   *  old ±1 rule with no double-count. O(maxTiles) per side — bounded and cheap. */
+  private nearestKindWithin(
+    u: Unit,
+    isSource: (kind: FacilityKind) => boolean,
+    maxTiles: number,
+  ): boolean {
+    for (const dir of [-1, 1] as const) {
+      const start = dir < 0 ? u.x - 1 : u.x + u.width;
+      for (let d = 0; d <= maxTiles; d++) {
+        const x = start + dir * d;
+        // A lobby between the source and the sensitive room shields it — stop
+        // this direction the moment we cross one.
+        if (this.tower.structureKindAt(u.floor, x) === "lobby") break;
+        const room = this.tower.roomAt(u.floor, x);
+        if (room && isSource(room.kind)) return true;
+        // Noise travels along the floor: a gap of unbuilt tiles (no structure at
+        // all) breaks the run, so a source across an open-air gap doesn't carry.
+        if (!room && !this.tower.hasStructure(u.floor, x)) break;
+      }
+    }
+    return false;
+  }
+
+  /** True when `u` is a noise-sensitive room within its canon buffer of a source
+   *  (W2): an office bothered by commercial within 11 tiles, or a hotel/condo
+   *  bothered by an office OR commercial within 21. The commercial source set is
+   *  the canon {@link isCommercialKind} four (shared with W3). The single
+   *  noise-adjacency test, shared by the noise erosion and its cause attribution
+   *  so the two can never disagree. */
+  private noiseAfflicted(u: Unit): boolean {
+    if (u.kind === "office") {
+      return this.nearestKindWithin(u, isCommercialKind, OFFICE_NOISE_TILES);
+    }
+    if (isHotelKind(u.kind) || u.kind === "condo") {
+      // Hotels/condos are bothered by a noisy office OR any commercial source.
+      return this.nearestKindWithin(
+        u,
+        (k) => k === "office" || isCommercialKind(k),
+        HOTEL_NOISE_TILES,
+      );
+    }
+    return false;
   }
 
   /**
@@ -1384,7 +1415,7 @@ export class Simulation implements SimContext {
     return Math.min(1, (this.tower.totalPopulation() / cap) * (sinceCollect / 1440));
   }
 
-  /** Functional parking spaces the tower NEEDS: one per ~12 office workers
+  /** Functional parking spaces the tower NEEDS: one per ~24 office workers
    *  (canon: offices demand parking from 3★) plus one per hotel suite (canon:
    *  suite guests — and the VIP — arrive by car). */
   parkingDemand(): { officePop: number; offices: number; suites: number; total: number } {
@@ -1406,7 +1437,7 @@ export class Simulation implements SimContext {
   }
 
   /** True when the tower is 3★+ and lacks enough parking for its office workforce
-   * (each parking space serves ~12 workers) — offices then demand parking.
+   * (each parking space serves ~24 workers) — offices then demand parking.
    * Suites reserve their one-space-each FIRST (canon), so a lot full of suite
    * cars gives the offices nothing. */
   private officeParkingShort(): boolean {
@@ -2141,6 +2172,14 @@ export class Simulation implements SimContext {
         // A transport must have height (validateTransport requires top > bottom);
         // never deserialize a zero-height shaft from a corrupt save.
         const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
+        // Shaft width is normally fixed per kind, but a legacy save keeps its own
+        // stored width (canon widths changed over time — e.g. stairs 4→8) and the
+        // consumers trust it, so preserve a valid stored width. Fall back to the
+        // catalog width only when a corrupt/hand-edited save gives a non-positive
+        // or non-finite one, which would otherwise NaN-poison the W1 span scan
+        // (Tower.transportColumns) and make the shaft unpickable (hit-testing).
+        const w0 = Math.round(num(t.width, FACILITIES[t.kind].width));
+        const width = w0 > 0 ? w0 : FACILITIES[t.kind].width;
         const fixLen = (arr: unknown, fill: number) =>
           Array.from({ length: cars }, (_, i) =>
             Array.isArray(arr) ? num(arr[i], fill) : fill,
@@ -2148,8 +2187,11 @@ export class Simulation implements SimContext {
         return {
           ...t,
           // Same geometry hardening as units: keep the shaft's whole width on
-          // the lot (shaft width is fixed per kind, not save-controlled).
+          // the lot (x is clamped by the catalog width, not the save-controlled
+          // stored width, so a legacy over-wide shaft still can't be forged past
+          // the lot edge).
           x: Math.max(0, Math.min(GRID.width - FACILITIES[t.kind].width, Math.round(num(t.x, 0)))),
+          width,
           bottom,
           top,
           cars,

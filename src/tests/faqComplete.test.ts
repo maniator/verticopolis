@@ -106,21 +106,23 @@ describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
 });
 
 describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
-  it("a hotel beside an office loses satisfaction; one apart does not", () => {
+  it("a hotel within the office noise band loses satisfaction; one well beyond it does not", () => {
     const sim = Simulation.newGame(4);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     sim.buildTransport("elevatorStandard", C, 1, 2); // floor 2 served
-    // Office at x, a hotel immediately to its right (noisy), and a hotel far away.
+    // Office at C (width 9 ⇒ right edge at C+9); a hotel immediately to its right
+    // sits inside the canon 21-tile band, another placed ~40 tiles away is beyond
+    // it (W2 widened the old 1-tile rule to the documented 21-segment buffer).
     sim.tower.place("office", 2, C);
     const noisy = sim.tower.place("hotelDouble", 2, C + 9);
-    const quiet = sim.tower.place("hotelDouble", 2, C + 30);
+    const quiet = sim.tower.place("hotelDouble", 2, C + 40);
     const a = sim.tower.units.find((u) => u.id === noisy.unitId)!;
     const b = sim.tower.units.find((u) => u.id === quiet.unitId)!;
     for (const u of [a, b]) { u.state = "asleep"; u.satisfaction = 1; }
     for (let i = 0; i < 6; i++) sim.tick(60);
-    expect(a.satisfaction).toBeLessThan(b.satisfaction); // the office neighbor suffers
+    expect(a.satisfaction).toBeLessThan(b.satisfaction); // the in-band neighbor suffers
   });
 });
 
@@ -136,7 +138,7 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
     if (withParking) {
       lay(sim, "floor", 0);
       sim.tower.place("parkingRamp", 0, C);
-      sim.tower.place("parking", 0, C + 6); // one working space for the one suite
+      sim.tower.place("parking", 0, C + 16); // one working space chained flush to the 16-wide ramp
     }
     const r = sim.tower.place("hotelSuite", 2, 0);
     expect(r.ok).toBe(true); // fail loudly here, not with a null deref later
@@ -247,8 +249,8 @@ describe("Office parking demand (FAQ): offices want parking from 3★", () => {
     sim.star = 3;
     if (withParking) {
       lay(sim, "floor", 0);
-      sim.tower.place("parkingRamp", 0, 0); // spots must chain to a ramp
-      for (let x = 6; x + 6 <= W; x += 6) sim.tower.place("parking", 0, x); // ample parking
+      sim.tower.place("parkingRamp", 0, 0); // 16-wide ramp; spots must chain to it
+      for (let x = 16; x + 4 <= W; x += 4) sim.tower.place("parking", 0, x); // ample parking, flush chain
     }
     for (let i = 0; i < 12; i++) sim.tick(60); // a Monday's working hours
     return sim.tower.units.filter((u) => u.kind === "office" && u.floor >= 3 && u.state === "occupied").length;
@@ -329,7 +331,7 @@ describe("Deep-review regressions (must not come back)", () => {
     // now-empty, well-served unit may re-let to a fresh resident afterward, so we
     // assert the departure actually fired via its toast, not the transient state.)
     for (let i = 0; i < 24 * 3; i++) sim.tick(60);
-    expect(sim.log.some((e) => /(A tenant|The owner) left .*office noise next door/.test(e.text))).toBe(true);
+    expect(sim.log.some((e) => /(A tenant|The owner) left .*a noisy neighbor nearby/.test(e.text))).toBe(true);
   });
 
   it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {
@@ -466,11 +468,11 @@ describe("Fine FAQ mechanics", () => {
     for (let x = x0; x < x0 + 140; x++) sim.tower.place("lobby", 1, x);
     for (let x = x0; x < x0 + 140; x++) sim.tower.place("floor", 0, x);
     // No ramp yet → nothing functions.
-    sim.tower.place("parking", 0, x0 + 6);
+    sim.tower.place("parking", 0, x0 + 16);
     expect(sim.tower.functionalParkingSpots()).toBe(0);
-    // Ramp at x0..x0+5, a chain of two spaces (x0+6, x0+12), plus an isolated one.
+    // Ramp at x0..x0+15, a chain of two flush spaces (x0+16, x0+20), plus an isolated one.
     sim.tower.place("parkingRamp", 0, x0);
-    sim.tower.place("parking", 0, x0 + 12);
+    sim.tower.place("parking", 0, x0 + 20);
     sim.tower.place("parking", 0, x0 + 120); // gap → dead X, not connected
     expect(sim.tower.functionalParkingSpots()).toBe(2); // the two chained spaces, not the isolated one
   });

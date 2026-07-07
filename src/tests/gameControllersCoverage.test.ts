@@ -111,6 +111,37 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(sim.tower.structureKindAt(4, 14)).toBeUndefined();
   });
 
+  it("paintFloorRun chains parking into contiguous spaces (canon drag-to-lay a chain)", () => {
+    sim.star = 3; // parking unlocks at 3★
+    sim.money = 1e9;
+    for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
+    // Drag the parking tool across the floor from x=6.
+    build.paintFloorRun("parking", 6, 0);
+    build.paintFloorRun("parking", 34, 0);
+    const spaces = sim.tower.units.filter((u) => u.kind === "parking");
+    expect(spaces.length).toBeGreaterThan(1); // a CHAIN, not one module
+    const w = FACILITIES.parking.width;
+    const xs = spaces.map((u) => u.x).sort((a, b) => a - b);
+    // A true CHAIN: consecutive modules sit flush — exactly one width apart, with
+    // no gap (non-contiguous) and no overlap. `=== w` guards both at once.
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(w);
+  });
+
+  it("a paint tap at the right edge left-shifts to fit (snapX seed), never no-ops off-lot", () => {
+    sim.star = 3;
+    sim.money = 1e9;
+    const W = GRID.width;
+    // Ground lobby the basement hangs off, then a full-width basement floor.
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < W; x++) sim.tower.place("floor", 0, x);
+    // A tap at the very last column: a width-4 parking footprint would run off
+    // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
+    build.paintFloorRun("parking", W - 1, 0);
+    const p = sim.tower.units.find((u) => u.kind === "parking");
+    expect(p).toBeDefined();
+    expect(p!.x + p!.width).toBeLessThanOrEqual(W); // the whole footprint is on-lot
+  });
+
   it("tryBuild toasts the refusal only when loud; quiet drags stay silent", () => {
     sim.money = 0;
     build.tryBuild("floor", 3, 20); // loud (default): error sfx + toast
@@ -215,26 +246,27 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   } | null;
 
   /** A richer strip than fixture(): three room floors so the cinema (2 floors,
-   *  24 wide), a condo, and elevator extends up to floor 4 all fit. */
+   *  31 wide — canon), an office, a condo, and elevator/stairs all fit without
+   *  overlap (the 8-wide stairs and the elevator must not collide). */
   beforeEach(() => {
     sim = new Simulation();
-    for (let x = 5; x < 45; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 5; x < 64; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let fl = 2; fl <= 4; fl++) {
-      for (let x = 5; x < 45; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+      for (let x = 5; x < 64; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
     }
-    const rc = sim.tower.place("cinema", 2, 5);
+    const rc = sim.tower.place("cinema", 2, 5); // 31 wide → tiles 5–35
     expect(rc.ok).toBe(true);
     cinema = sim.tower.units.find((u) => u.id === rc.unitId)!;
-    const ro = sim.tower.place("office", 2, 30);
+    const ro = sim.tower.place("office", 2, 38); // clears the wider cinema
     expect(ro.ok).toBe(true);
     office = sim.tower.units.find((u) => u.id === ro.unitId)!;
     office.state = "occupied";
     const rn = sim.tower.place("condo", 4, 5);
     expect(rn.ok).toBe(true);
     condo = sim.tower.units.find((u) => u.id === rn.unitId)!;
-    expect(sim.buildTransport("elevatorStandard", 40, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", 58, 1, 2).ok).toBe(true);
     lift = sim.tower.transports[sim.tower.transports.length - 1];
-    expect(sim.buildTransport("stairs", 34, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("stairs", 48, 1, 2).ok).toBe(true); // 8 wide → tiles 48–55, clear of the lift at 58
     stairs = sim.tower.transports[sim.tower.transports.length - 1];
 
     f = fakes();

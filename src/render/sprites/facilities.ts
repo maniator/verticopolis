@@ -255,31 +255,35 @@ export function drawParking(d: DrawCtx, u: Unit, x: number, y: number, w: number
   ctx.fillRect(x, y + 6, w, 1); // pipe
   ctx.fillStyle = "#3c4048";
   ctx.fillRect(x, y + h - 4, w, 2); // deck edge
-  // Bay divider lines.
+  // One space = ONE stall (canon: a Parking Space is a single spot, not a lot).
+  // Frame the stall with two divider lines just inside the module edges, drawn
+  // relative to `w` so a legacy 6-wide unit and a canon 4-wide unit both read as
+  // a single bay.
   ctx.strokeStyle = "rgba(255,255,255,0.45)";
   ctx.lineWidth = 1;
-  for (let lx = x + 12; lx < x + w; lx += 12) {
+  for (const lx of [x + 1.5, x + w - 1.5]) {
     ctx.beginPath();
     ctx.moveTo(lx, y + h - 14);
     ctx.lineTo(lx, y + h - 4);
     ctx.stroke();
   }
-  // Cars fill the bays with actual demand (office cars by day, suite guests'
-  // overnight — see Simulation.parkingUsage). Each bay has a stable rank, so
-  // the same bays fill first as the lot loads up, and a dead (unchained)
-  // space shows no cars at all — none could ever have driven to it.
+  // A single car, centered, shown only when this space actually holds one
+  // (office cars by day, suite guests' overnight — see Simulation.parkingUsage).
+  // A stable per-space roll vs the tower-wide usage fraction keeps the same
+  // spaces filling first as the lot loads; a dead (unchained) space never shows
+  // a car — none could ever have driven to it.
   const use = d.parkingDead ? 0 : (d.parkingUse ?? 0);
-  for (let i = 0, cx = x + 2; cx + 9 < x + w; cx += 12, i++) {
-    if (rand((u.id * 31 + i * 17) | 0) >= use) continue;
-    const color = ACCENTS[(u.id + i) % ACCENTS.length];
-    ctx.fillStyle = color;
-    ctx.fillRect(cx, y + h - 9, 9, 4); // body
-    ctx.fillRect(cx + 2, y + h - 11, 5, 3); // cabin
+  if (rand((u.id * 31) | 0) < use) {
+    const cw = Math.min(9, w - 4);
+    const cx = x + Math.round((w - cw) / 2); // integer x so the car stays crisp (no half-pixel blur)
+    ctx.fillStyle = ACCENTS[u.id % ACCENTS.length];
+    ctx.fillRect(cx, y + h - 9, cw, 4); // body
+    ctx.fillRect(cx + 2, y + h - 11, Math.max(1, cw - 4), 3); // cabin
     ctx.fillStyle = "#cfe4ff";
-    ctx.fillRect(cx + 3, y + h - 10, 3, 2); // window
+    ctx.fillRect(cx + 3, y + h - 10, Math.max(1, cw - 6), 2); // window
     ctx.fillStyle = "#1b1f2a";
     ctx.fillRect(cx + 1, y + h - 5, 2, 2); // wheels
-    ctx.fillRect(cx + 6, y + h - 5, 2, 2);
+    ctx.fillRect(cx + cw - 3, y + h - 5, 2, 2);
   }
 }
 
