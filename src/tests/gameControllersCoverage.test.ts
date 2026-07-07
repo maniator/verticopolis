@@ -864,15 +864,15 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(keyboard.cursor()).toBeNull(); // not revealed yet
     keyboard.moveCursor(-100_000, 0);
     expect(keyboard.cursor()).toEqual({ tile: 0, floor: 1 });
-    expect(last(announced)).toBe("Cursor: floor 1, column 0, empty");
+    expect(last(announced)).toBe("Cursor: floor 1, column 0. Empty.");
     keyboard.moveCursor(100_000, 0);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: 1 });
     keyboard.moveCursor(0, -100_000);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: GRID.minFloor });
-    expect(last(announced)).toBe(`Cursor: basement ${1 - GRID.minFloor}, column ${GRID.width - 1}, empty`);
+    expect(last(announced)).toBe(`Cursor: basement ${1 - GRID.minFloor}, column ${GRID.width - 1}. Empty.`);
     keyboard.moveCursor(0, 100_000);
     expect(keyboard.cursor()).toEqual({ tile: GRID.width - 1, floor: GRID.maxFloor });
-    expect(last(announced)).toBe(`Cursor: floor ${GRID.maxFloor}, column ${GRID.width - 1}, empty`);
+    expect(last(announced)).toBe(`Cursor: floor ${GRID.maxFloor}, column ${GRID.width - 1}. Empty.`);
   });
 
   it("the first Enter with no cursor just reveals it (no select, no build)", () => {
