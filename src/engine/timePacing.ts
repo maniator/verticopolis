@@ -95,9 +95,12 @@ export function frameForMinuteOfDay(minuteOfDay: number): number {
  * How fast sim-minutes should accumulate per unit of real time at the given
  * minute of day, relative to today's uniform pacing (1.0 everywhere).
  *
- * In the original, frames tick at a constant real-time rate, so a period's
- * pace is proportional to its minutes-per-frame; normalizing by the whole
- * day's average (1440 min / 2600 frames) preserves the day's total length:
+ * The curve is derived from the per-period frame spans (doc §3): treating a
+ * frame as a fixed slice of real time, a period's pace is proportional to its
+ * span's minutes-per-frame — no claim is made about the original's actual
+ * real-time frame rate (its per-frame second values are inconsistent and
+ * ignored). Normalizing by the whole day's average (1440 min / 2600 frames)
+ * preserves the day's total length:
  * ∫ 1/paceFactor over the 1,440 minutes = 1,440 (exactly, in real
  * arithmetic; within float epsilon in practice), so a day takes as much
  * real time as it does with uniform pacing — only its distribution changes

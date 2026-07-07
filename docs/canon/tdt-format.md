@@ -50,13 +50,16 @@ stored amounts by 100; our engine keeps display-dollars and must never adopt the
 
 ## 3. Time system
 
-One day is **2,600 frames**, starting at 7:00 AM. Wall-clock seconds per frame
-vary by period — the in-game clock **crawls through lunch and races through the
-night** (the original's signature rhythm):
+One day is **2,600 frames**, starting at 7:00 AM. The mapping from `frameTime`
+to clock time is non-uniform: frames are dense through lunch and sparse
+overnight, so relative to the frame counter the in-game clock **crawls through
+lunch and races through the night** (the original's signature rhythm). The
+span table below is the ground truth for that mapping — we make no claim about
+the original's real-time seconds per frame:
 
 | Frames | In-game span | Hours covered | Notes |
 | --- | --- | --- | --- |
-| 0–400 | 7:00–12:00 | 5h | slow frames |
+| 0–400 | 7:00–12:00 | 5h | sparse — 80 frames/game-hour |
 | 400–800 | 12:00–12:30 | 0.5h | lunch crush — clock ~10× slower than the morning |
 | 800–1200 | 12:30–13:00 | 0.5h | lunch crush continues |
 | 1200–1600 | 13:00–17:00 | 4h | |
