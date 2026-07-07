@@ -34,3 +34,14 @@ Captured from the built app via `scripts/shot-condo-modes.mjs`.
 | `condo-modes.png` | Both of the below stacked into one captioned figure (handy for embedding in a single image slot). |
 | `new-tower-modes.png` | The **Found a New Tower** rule-set picker — Classic (faithful 1994: flat family of 3, 2×–2.5× price, owner buy-back) vs Modern (variant 2–5 households), with the permanence notice. The choice is fixed for the tower's life. |
 | `stats-households-modern.png` | Tower Statistics on a Modern tower: the conditional **Households** section — people housed, average household, and the size mix across sold condos. (Classic towers don't show this section.) |
+
+## Traffic congestion chip (peak-driven + hotspot floor)
+
+Captured from the built app via `scripts/shot-traffic.mjs` on an identical jammed
+tower (three office floors slammed onto one weak elevator, peak congestion 2.07).
+
+| Screenshot | Shows |
+|---|---|
+| `traffic-chip-before.png` | Pre-fix build: the HUD chip reads **Smooth** on a genuinely jammed tower, because it tiered on the tower-wide *average*, which stays under the old 1.0 threshold. |
+| `traffic-chip-after.png` | This change: **Gridlock · 11F** — the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
+| `traffic-chip-after-mobile.png` | The same state at phone width — the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |

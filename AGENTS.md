@@ -231,6 +231,17 @@ Good vs. bad:
   branch into a single commit — it loses granular history and forces awkward
   force-resets of the branch for any follow-up work.
 
+## Screenshots in PRs
+
+For any visual or gameplay change, the PR's **Screenshots / recordings** section
+must **embed real committed images**, not describe them in prose — a sentence like
+"the chip now reads Gridlock" is not a screenshot; reviewers (and the merged
+record) need the actual before/after. See **[docs/screenshots.md](docs/screenshots.md)**
+for how to capture (`npm run screenshots` / `scripts/shot-*.mjs`), where to commit
+them (`docs/screenshots/`, feature shots under `features/` with a README row), and
+how to embed them (raw-URL / `<img>`, fork-safe). Don't leave shots as throwaway
+files or session-only chat attachments; if they're worth referencing, commit them.
+
 ## Gameplay model notes
 
 - Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in

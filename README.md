@@ -218,6 +218,9 @@ camera or raw pointer math directly.
 
 ## Screenshots
 
+See [docs/screenshots.md](docs/screenshots.md) for how these are captured and how
+to add before/after images to a pull request.
+
 | Day | Night |
 | --- | --- |
 | ![day](docs/screenshots/03-tower-day.png) | ![night](docs/screenshots/04-tower-night.png) |
