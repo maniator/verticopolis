@@ -1,4 +1,4 @@
-// @vitest-environment jsdom
+// @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UI, type UICallbacks } from "../ui/UI";
 import { Simulation } from "../engine/Simulation";
@@ -27,10 +27,9 @@ import { Simulation } from "../engine/Simulation";
  *  - toast: kind class + text land on the toast element; the stack is capped.
  */
 
-// jsdom 28 defines HTMLDialogElement but leaves showModal()/close()
-// unimplemented (upstream jsdom issue #3294). Polyfill the minimal semantics
-// the UI relies on: `open` reflects the `open` attribute, which jsdom DOES
-// support, and native close() fires a "close" event.
+// The test DOM (happy-dom) may not fully implement HTMLDialogElement's
+// showModal()/close(); polyfill (guarded) the minimal semantics the UI relies
+// on: `open` reflects the `open` attribute, and close() fires a "close" event.
 if (typeof HTMLDialogElement.prototype.showModal !== "function") {
   HTMLDialogElement.prototype.showModal = function (this: HTMLDialogElement) {
     this.open = true;
@@ -41,8 +40,8 @@ if (typeof HTMLDialogElement.prototype.showModal !== "function") {
   };
 }
 
-// jsdom doesn't implement matchMedia; showHelp() reads it to decide whether the
-// OS is forcing reduced motion. A stub that reports "not forced" is enough.
+// If the test DOM doesn't implement matchMedia, stub it: showHelp() reads it to
+// decide whether the OS is forcing reduced motion. Reporting "not forced" is enough.
 if (typeof window.matchMedia !== "function") {
   window.matchMedia = (media: string) =>
     ({

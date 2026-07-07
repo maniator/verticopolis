@@ -139,7 +139,7 @@ export default defineConfig({
   },
   test: {
     globals: true,
-    environment: "jsdom",
+    environment: "happy-dom",
     root: ".",
     include: ["src/**/*.test.ts"],
     // A few end-to-end tests drive many in-game days of the full hourly v2
