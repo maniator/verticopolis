@@ -217,6 +217,9 @@ sprite code. `main.ts` only supplies tool semantics through the engine's
 controller hooks and advances the simulation each frame — it never touches the
 camera or raw pointer math directly.
 
+For diagrams of the layers, the frame loop, the engine subsystems, input flow,
+and persistence, see **[ARCHITECTURE.md](ARCHITECTURE.md)**.
+
 ## Screenshots
 
 See [docs/screenshots.md](docs/screenshots.md) for how these are captured and how

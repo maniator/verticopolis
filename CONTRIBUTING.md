@@ -113,6 +113,10 @@ The full coverage configuration (floors, includes, excludes) lives in
 
 ## Architecture
 
+For a visual tour — layer diagram, the frame loop, the engine subsystems, input
+flow, and persistence — see **[ARCHITECTURE.md](./ARCHITECTURE.md)** (Mermaid
+diagrams). The prose conventions below are the source of truth.
+
 - **`src/engine/`** — pure game simulation (no DOM). Deterministic and heavily
   unit-tested. `Simulation` is the orchestrator; cohesive subsystems live in
   their own modules (`ElevatorDispatch`, `EventSystem`, `EconomySystem`, `Crowd`)
