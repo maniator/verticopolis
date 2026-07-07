@@ -129,5 +129,8 @@ splash. It shares interaction grammar only — bevel press states and a visible
    style one (see `.btn.primary`). Danger is a label color, not a new button
    shape.
 5. **Press-only feedback on buttons.** No `:hover` chrome.
-6. **One mobile block** (`max-width: 860px`) — add responsive tweaks there, not
-   in new scattered queries.
+6. **Three responsive tiers, not scattered queries** — a phone block
+   (`max-width: 767px`, or a short landscape screen `max-width: 1023px and
+   max-height: 599px`), a tablet block (`768–1023px` wide and `min-height: 600px`,
+   docked layout), and desktop (`≥1024px`). Add responsive tweaks to the matching
+   block. The JS `mobileMq` in `main.ts` mirrors the phone query — keep them in sync.

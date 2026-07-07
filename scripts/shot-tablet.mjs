@@ -56,6 +56,9 @@ function buildDemoTower() {
 const browser = await chromium.launch({ executablePath: EXECUTABLE });
 const page = await browser.newPage({ viewport: VIEWPORTS[0], deviceScaleFactor: 2 });
 await page.goto(BASE, { waitUntil: "networkidle" });
+// The app can finish booting after the network goes idle; wait for the public
+// window.game handle before driving it, or the first evaluate() would throw.
+await page.waitForFunction(() => !!window.game, null, { timeout: 15000 });
 await page.evaluate(() => {
   try { localStorage.setItem("tt.onboarded", "1"); } catch { /* ignore */ }
   document.querySelector("#splash [data-splash='continue'], #splash [data-splash='new']")?.click();
