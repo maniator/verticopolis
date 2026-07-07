@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
 import {
   ToneAudioEngine,
@@ -81,11 +81,21 @@ describe("audio math (pure)", () => {
 });
 
 describe("inert-without-AudioContext contract", () => {
+  let prevAudioContext: unknown;
+  let prevWebkitAudioContext: unknown;
   beforeAll(() => {
     // Force the no-WebAudio path deterministically, regardless of what the test
-    // DOM provides — this is the exact condition start() must survive.
+    // DOM provides — this is the exact condition start() must survive. Save the
+    // prior globals so a later suite in the same worker isn't left without them.
+    prevAudioContext = (globalThis as { AudioContext?: unknown }).AudioContext;
+    prevWebkitAudioContext = (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext;
     delete (globalThis as { AudioContext?: unknown }).AudioContext;
     delete (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext;
+  });
+  afterAll(() => {
+    if (prevAudioContext !== undefined) (globalThis as { AudioContext?: unknown }).AudioContext = prevAudioContext;
+    if (prevWebkitAudioContext !== undefined)
+      (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext = prevWebkitAudioContext;
   });
 
   it("constructs, and start() is a silent no-op (no AudioContext)", () => {

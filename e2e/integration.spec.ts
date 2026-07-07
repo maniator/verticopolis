@@ -19,7 +19,13 @@ test.describe("app integration — main.ts + TowerEngine boot/render boundary", 
     });
 
     await page.goto("/");
-    await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game));
+    // Wait for the invariants we actually assert, not just for `window.game` to
+    // exist — main.ts could publish the handle before every sub-system is wired.
+    await page.waitForFunction(() => {
+      const g = (window as unknown as { game?: { sim?: unknown; engine?: unknown; audio?: unknown } }).game;
+      const canvas = document.querySelector<HTMLCanvasElement>("#view");
+      return Boolean(g?.sim && g.engine && g.audio && canvas && canvas.width > 0 && canvas.height > 0);
+    });
 
     // main.ts wired the GameApp: the sim, the engine, the audio facade and the
     // canvas element are all present — the constructor ran end to end.

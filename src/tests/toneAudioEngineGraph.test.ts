@@ -65,11 +65,17 @@ const focus = (over: Partial<ViewFocus> = {}): ViewFocus =>
   ({ centerFloor: 5, dominant: "office", night: false, zoom: 1, ...over }) as ViewFocus;
 
 describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
+  let prevAudioContext: unknown;
   beforeEach(() => {
+    prevAudioContext = (globalThis as { AudioContext?: unknown }).AudioContext;
     (globalThis as { AudioContext?: unknown }).AudioContext = function () {}; // pass the hasWebAudio gate
+    beat.step = null; // each start() must RE-schedule the beat callback — no stale carry-over between tests
   });
   afterEach(() => {
-    delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    // Restore whatever the environment had (don't blindly delete a real one).
+    if (prevAudioContext === undefined) delete (globalThis as { AudioContext?: unknown }).AudioContext;
+    else (globalThis as { AudioContext?: unknown }).AudioContext = prevAudioContext as never;
+    beat.step = null;
   });
 
   it("start() builds the graph and becomes active; a second call takes the resume path", () => {
