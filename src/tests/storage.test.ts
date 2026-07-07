@@ -228,7 +228,8 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
-  const AUTO_KEY = "simtower-clone-save"; // mirrors the internal autosave key
+  // Mirrors SaveGame's internal autosave key so tests can inspect the raw stored value.
+  const AUTO_KEY = "simtower-clone-save";
 
   it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
     const sim = sampleGame();
