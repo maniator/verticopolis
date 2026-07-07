@@ -45,3 +45,17 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 | `traffic-chip-before.png` | Pre-fix build: the HUD chip reads **Smooth** on a genuinely jammed tower, because it tiered on the tower-wide *average*, which stays under the old 1.0 threshold. |
 | `traffic-chip-after.png` | This change: **Gridlock · 11F** — the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
 | `traffic-chip-after-mobile.png` | The same state at phone width — the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
+
+## Tablet responsive breakpoint
+
+Captured with `scripts/shot-tablet.mjs` (full app at several viewport sizes).
+A new tablet tier (`768–1023px` wide and `≥600px` tall) keeps the desktop
+3-column layout — tool palette and panels stay docked — instead of the phone
+bottom-strip + drawer, and wraps the top bar so nothing clips.
+
+| Screenshot | Shows |
+|---|---|
+| `tablet-portrait-before.png` | 768×1024 (portrait tablet) **before**: the phone UI — tools in a bottom strip, panels hidden behind the ☰ drawer. |
+| `tablet-portrait-after.png` | 768×1024 **after**: the tablet layout — Tools docked left, SELECTED/TOWER/BULLETIN/GAME docked right, stats on a tidy second row. |
+| `tablet-compact-before.png` | 900×700 (compact band) **before**: desktop layout cramming — the brand wraps to two lines and the right speed buttons clip off. |
+| `tablet-compact-after.png` | 900×700 **after**: the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
