@@ -2172,6 +2172,14 @@ export class Simulation implements SimContext {
         // A transport must have height (validateTransport requires top > bottom);
         // never deserialize a zero-height shaft from a corrupt save.
         const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
+        // Shaft width is normally fixed per kind, but a legacy save keeps its own
+        // stored width (canon widths changed over time — e.g. stairs 4→8) and the
+        // consumers trust it, so preserve a valid stored width. Fall back to the
+        // catalog width only when a corrupt/hand-edited save gives a non-positive
+        // or non-finite one, which would otherwise NaN-poison the W1 span scan
+        // (Tower.transportColumns) and make the shaft unpickable (hit-testing).
+        const w0 = Math.round(num(t.width, FACILITIES[t.kind].width));
+        const width = w0 > 0 ? w0 : FACILITIES[t.kind].width;
         const fixLen = (arr: unknown, fill: number) =>
           Array.from({ length: cars }, (_, i) =>
             Array.isArray(arr) ? num(arr[i], fill) : fill,
@@ -2179,8 +2187,11 @@ export class Simulation implements SimContext {
         return {
           ...t,
           // Same geometry hardening as units: keep the shaft's whole width on
-          // the lot (shaft width is fixed per kind, not save-controlled).
+          // the lot (x is clamped by the catalog width, not the save-controlled
+          // stored width, so a legacy over-wide shaft still can't be forged past
+          // the lot edge).
           x: Math.max(0, Math.min(GRID.width - FACILITIES[t.kind].width, Math.round(num(t.x, 0)))),
+          width,
           bottom,
           top,
           cars,

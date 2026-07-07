@@ -729,7 +729,7 @@ class GameApp {
     return this.tool.type === "build" && !!FACILITIES[this.tool.kind].transport;
   }
 
-  /** Whether the active tool drag-paints a run (floor/lobby) — see
+  /** Whether the active tool drag-paints a run (floor/lobby/parking) — see
    *  {@link isPaintKind}. Used by the touch deferral in onActionDown. */
   private isPaintTool(): boolean {
     return this.tool.type === "build" && isPaintKind(this.tool.kind);
