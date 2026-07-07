@@ -188,7 +188,7 @@ export const SaveGame = {
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
     if (!compressionSupported()) {
-      throw new Error("This browser is too old to create tower files — try a current browser.");
+      throw new Error("This browser is too old to create tower files. Try a current browser.");
     }
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
     return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
@@ -214,12 +214,12 @@ export const SaveGame = {
       throw new Error("Not a Verticopolis tower file.");
     }
     if (magic[0] !== TOWER_FILE_MAGIC) {
-      throw new Error("This tower file was made by a newer version of Verticopolis — update the game to load it.");
+      throw new Error("This tower file was made by a newer version of Verticopolis. Update the game to load it.");
     }
     // Distinguish "your browser can't decompress" from "this file is broken"
     // BEFORE the try below — otherwise a missing API blames a healthy file.
     if (!compressionSupported()) {
-      throw new Error("This browser is too old to open compressed tower files — try a current browser.");
+      throw new Error("This browser is too old to open compressed tower files. Try a current browser.");
     }
     let data: SerializedGame;
     try {

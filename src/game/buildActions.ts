@@ -77,7 +77,7 @@ export class BuildActions {
       return `${FACILITIES[kind].name} unlocks at ${FACILITIES[kind].minStar}★.`;
     }
     const v = sim.tower.validateTransport(kind, x, bottom, top);
-    return v.reason ?? "A shaft can't go here — leave a clear column through built floors.";
+    return v.reason ?? "A shaft can't go here. Leave a clear column through built floors.";
   }
 
   /** Lay a brush strip; returns how many tiles were actually placed and, when
@@ -154,7 +154,7 @@ export class BuildActions {
     const sim = this.deps.getSim();
     const blocked =
       u.state === "fire"
-        ? `You can't ${verb} a burning unit — call fire rescue or let it burn out.`
+        ? `You can't ${verb} a burning unit. Call fire rescue or let it burn out.`
         : sim.tower.removalReason(u.id);
     if (blocked) {
       if (!quiet) {

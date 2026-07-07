@@ -616,7 +616,7 @@ class GameApp {
         const now = globalThis.performance ? performance.now() : 0;
         if (now - this.lastTickErrorLog > 2000) {
           this.lastTickErrorLog = now;
-          console.error("[tick] frame error — continuing:", err);
+          console.error("[tick] frame error, continuing:", err);
         }
       }
     };
