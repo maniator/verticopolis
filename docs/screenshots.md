@@ -37,8 +37,10 @@ they render inline:
 ![after](https://raw.githubusercontent.com/<owner>/<repo>/<ref>/docs/screenshots/features/your-shot-after.png)
 ```
 
-- `<ref>` is your PR's **branch name** (renders live during review) or `main`
-  (resolves once the PR merges).
+- `<ref>` can be a **commit SHA** (most stable — it survives branch deletion,
+  never drifts if the shot is later replaced, and avoids ambiguity with branch
+  names containing `/`; preferred for the archival PR record), your PR's **branch
+  name** (renders live during review), or `main` (resolves once the PR merges).
 - For a PR from a **fork**, `<owner>/<repo>` is the fork's owner/repo, not the
   upstream — otherwise the image won't render during review.
 - An HTML `<img src="…" width="…">` tag works too, and lets you size the image

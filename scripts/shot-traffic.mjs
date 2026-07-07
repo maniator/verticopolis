@@ -56,7 +56,10 @@ function buildHotspot() {
 }
 
 const browser = await chromium.launch({ executablePath: EXECUTABLE });
-const page = await browser.newPage({ viewport: { width: 900, height: 640 }, deviceScaleFactor: 2 });
+// A roomy desktop width so the full HUD lays out on one row — brand on one line
+// and every speed button visible (a 900px viewport cramped the bar, wrapping the
+// brand and clipping the right-hand buttons).
+const page = await browser.newPage({ viewport: { width: 1440, height: 400 }, deviceScaleFactor: 2 });
 await page.goto(BASE, { waitUntil: "networkidle" });
 
 // Dismiss first-run chrome and resume the engine — thoroughly, so no
@@ -92,6 +95,11 @@ for (let i = 0; i < 40; i++) {
 }
 const aria = await page.evaluate(() => document.getElementById("traffic")?.getAttribute("aria-label"));
 console.log(`[${LABEL}] chip label = "${label}"  aria = "${aria}"`);
+
+// Swap the demo's build-budget (1e12, a 13-digit FUND that bloats the bar) for a
+// realistic balance now that the tower is built, so the HUD reads like real play.
+await page.evaluate(() => { window.game.sim.money = 9_126_661; });
+await page.waitForTimeout(250); // let the UI loop render the new FUND
 
 await page.locator("#topbar").screenshot({ path: resolve(OUT, `traffic-${LABEL}.png`) });
 console.log(`[${LABEL}] wrote docs/screenshots/traffic-${LABEL}.png`);
