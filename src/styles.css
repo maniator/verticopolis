@@ -446,12 +446,15 @@ a.btn {
   background: var(--r-title);
   color: var(--r-title-fg);
 }
-/* Disabled-state dimming (single source of truth; toggled by classes in UI.ts).
- * Kept legible rather than washed out on the light retro theme. */
-.pal-item.locked {
-  opacity: 0.72;
-  cursor: not-allowed;
+/* Palette state (single source of truth; toggled by classes in UI.ts).
+ * Locked facilities — and any group header left with no unlocked members — are
+ * removed from the palette entirely, matching the original: the toolbar grows
+ * as stars are earned rather than showing a menu of dimmed, unbuildable tools. */
+.pal-item.locked,
+.pal-group-title[hidden] {
+  display: none;
 }
+/* Unlocked but currently unaffordable: dimmed, still visible and buildable. */
 .pal-item.unaffordable {
   opacity: 0.85;
 }

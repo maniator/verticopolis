@@ -118,12 +118,13 @@ export class UI {
     for (const group of GROUPS) {
       const title = document.createElement("div");
       title.className = "pal-group-title";
+      title.dataset.group = group.title;
       title.textContent = group.title;
       frag.appendChild(title);
       for (const kind of ALL_KINDS) {
         const f = FACILITIES[kind];
         if (!group.cats.includes(f.category)) continue;
-        frag.appendChild(this.facilityButton(kind));
+        frag.appendChild(this.facilityButton(kind, group.title));
       }
     }
     this.el.palette.appendChild(frag);
@@ -156,20 +157,19 @@ export class UI {
     return item;
   }
 
-  private facilityButton(kind: FacilityKind): HTMLElement {
+  private facilityButton(kind: FacilityKind, group: string): HTMLElement {
     const f = FACILITIES[kind];
     const item = document.createElement("div");
     item.className = "pal-item";
     item.dataset.kind = kind;
+    item.dataset.group = group;
     item.innerHTML =
       `<span class="pal-swatch" style="background:${f.color}"></span>` +
       `<span class="pal-name">${f.name}</span>` +
       `<span class="pal-cost">$${shortMoney(f.cost)}</span>`;
+    // Locked facilities are hidden from the palette entirely (parity with the
+    // original), so a visible button is always buildable — no locked toast path.
     this.makeActivatable(item, `${f.name}, $${shortMoney(f.cost)}`, () => {
-      if (item.classList.contains("locked")) {
-        this.toast(`${f.name} unlocks at ${f.minStar}★.`, "bad");
-        return;
-      }
       this.selectTool({ type: "build", kind });
     });
     return item;
@@ -420,15 +420,25 @@ export class UI {
     this.el.time.textContent = sim.clock.format();
     this.el.date.textContent = sim.clock.formatRetroDate();
 
-    // Palette unlock state.
+    // Palette unlock state. Parity with the original: a locked facility is
+    // HIDDEN (`.locked` -> display:none, out of layout and tab order), not shown
+    // dimmed — the palette grows as stars are earned. Only affordability dims
+    // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible. We note
+    // which groups have at least one unlocked member in the same pass so a group
+    // header can be hidden when everything beneath it is still locked (e.g.
+    // Leisure/Services/Special at 1★) — no dangling section titles, no per-header
+    // re-scan of the DOM.
+    const groupsWithUnlocked = new Set<string>();
     document.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
       const locked = !sim.isUnlocked(kind);
       const affordable = sim.money >= FACILITIES[kind].cost;
-      // Dimming lives entirely in CSS (.locked / .unaffordable) so there's a
-      // single source of truth for the styling.
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
+      if (!locked && item.dataset.group) groupsWithUnlocked.add(item.dataset.group);
+    });
+    document.querySelectorAll<HTMLElement>(".pal-group-title[data-group]").forEach((title) => {
+      title.hidden = !groupsWithUnlocked.has(title.dataset.group ?? "");
     });
 
     this.setTowerName(sim.tower.towerName);

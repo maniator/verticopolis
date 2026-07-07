@@ -289,6 +289,11 @@ class GameApp {
 
     this.wireEngine();
     this.bindKeys();
+    // Prime the UI once before the first paint. The palette starts with every
+    // facility button present; without this pass a returning player (who skips
+    // the splash) would briefly see the full locked catalog before the throttled
+    // render loop first hides the locked tools — a visible collapse/reflow.
+    this.ui.update(this.sim);
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
@@ -946,6 +951,10 @@ class GameApp {
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.
     this.ui.resetLog(sim);
+    // Refresh the palette to the swapped-in tower's star level immediately, so a
+    // load/new-tower into a different star doesn't briefly show the prior tower's
+    // unlock set until the next throttled render tick.
+    this.ui.update(sim);
     if (!preserveHistory) {
       // A *different* tower (New Tower / Load / a slot / Import) invalidates the
       // undo trail — otherwise Undo could resurrect an unrelated old tower and a
