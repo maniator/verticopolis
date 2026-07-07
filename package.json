@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Verticopolis — a browser-native SimTower clone in TypeScript",
   "type": "module",
   "engines": {
