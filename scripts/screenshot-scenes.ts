@@ -382,7 +382,7 @@ export const SCENES: Scene[] = [
         name: "condo-modes",
         crop: "body",
         setup: async (page) => {
-          const dataUri = (f: string) => "data:image/png;base64," + readFileSync(`${DIRS.features}/${f}`).toString("base64");
+          const dataUri = (f: string) => "data:image/png;base64," + readFileSync(resolve(DIRS.features, f)).toString("base64");
           await page.setContent(
             `<style>
                *{margin:0;box-sizing:border-box}
@@ -419,7 +419,7 @@ export const SCENES: Scene[] = [
         crop: "body",
         viewport: { width: 900, height: 640 },
         setup: async (page) => {
-          const dataUri = (f: string) => "data:image/png;base64," + readFileSync(`${DIRS.features}/${f}`).toString("base64");
+          const dataUri = (f: string) => "data:image/png;base64," + readFileSync(resolve(DIRS.features, f)).toString("base64");
           await page.setContent(
             `<style>
                *{margin:0;box-sizing:border-box}

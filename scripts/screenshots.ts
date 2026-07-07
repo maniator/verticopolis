@@ -35,6 +35,7 @@
  */
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
+import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgClearTransients, pgDismissSplash, pgFrame, pgSetClock, pgSetOverlay } from "./screenshot-builders.ts";
 import { SCENES } from "./screenshot-scenes.ts";
@@ -47,7 +48,7 @@ const perDir: Record<OutDir, number> = { screenshots: 0, features: 0, milestones
 
 async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   const outDir = shot.outDir ?? scene.outDir;
-  const path = `${DIRS[outDir]}/${shot.name}.png`;
+  const path = join(DIRS[outDir], `${shot.name}.png`);
   const baseVp = scene.viewport ?? DESKTOP;
   if (shot.viewport) await page.setViewportSize(shot.viewport);
   try {
