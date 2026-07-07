@@ -62,7 +62,7 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
   for (let x = x0; x + 1 <= x1; ) {
     const r = s.tower.place(kind, floor, x);
     if (r.ok) {
-      const u = s.tower.units.find((uu: any) => uu.id === r.unitId);
+      const u = s.tower.getUnit(r.unitId);
       u.state = state;
       u.everOccupied = true;
       x += u.width; // canon width of what actually got placed
@@ -152,7 +152,7 @@ export function buildCanonTower(): void {
     for (let x = left + 26; x + 1 <= right; ) {
       const r = s.tower.place(kind, f, x);
       if (r.ok) {
-        const u = s.tower.units.find((uu: any) => uu.id === r.unitId);
+        const u = s.tower.getUnit(r.unitId);
         u.state = state;
         u.everOccupied = true;
         if (kind === "office") u.label = "Apex Holdings";
@@ -163,7 +163,7 @@ export function buildCanonTower(): void {
   for (let x = left + 26; x + 1 <= right; ) {
     const r = s.tower.place("fastFood", 2, x);
     if (r.ok) {
-      const u = s.tower.units.find((uu: any) => uu.id === r.unitId);
+      const u = s.tower.getUnit(r.unitId);
       u.state = "occupied";
       x += u.width;
     } else x += 1;
@@ -175,7 +175,7 @@ export function buildCanonTower(): void {
   fill(37, "shop", "occupied");
   fill(38, "restaurant", "occupied");
   const cine = s.tower.place("cinema", 39, left + 26);
-  if (cine.ok) s.tower.units.find((u: any) => u.id === cine.unitId).state = "occupied";
+  if (cine.ok) s.tower.getUnit(cine.unitId).state = "occupied";
   s.tower.place("security", 1, left + 26);
   s.tower.place("medical", 2, left);
   // Basement: a full-lot B1 concourse, a canon parking run on B2, and the Metro
@@ -190,11 +190,11 @@ export function buildCanonTower(): void {
   for (let x = cx - 1; x >= 0; x--) s.tower.place("floor", 0, x);
   for (let f = -1; f >= -4; f--) for (let x = 0; x < W; x++) s.tower.place("floor", f, x);
   const metro = s.tower.place("metro", -4, 0);
-  if (metro.ok) s.tower.units.find((u: any) => u.id === metro.unitId).state = "occupied";
+  if (metro.ok) s.tower.getUnit(metro.unitId).state = "occupied";
   s.tower.place("parkingRamp", -1, left);
   for (let x = left + 16; x + 1 <= right; ) {
     const r = s.tower.place("parking", -1, x);
-    if (r.ok) x += s.tower.units.find((u: any) => u.id === r.unitId).width;
+    if (r.ok) x += s.tower.getUnit(r.unitId).width;
     else x += 1;
   }
   s.evaluateStar();
@@ -228,7 +228,7 @@ export function buildBasement(): void {
     for (let x = left + 10; x + 1 <= right; ) {
       const r = s.tower.place("office", f, x);
       if (r.ok) {
-        const u = s.tower.units.find((uu: any) => uu.id === r.unitId);
+        const u = s.tower.getUnit(r.unitId);
         u.state = "occupied";
         u.occupants = 6;
         x += u.width;
@@ -244,7 +244,7 @@ export function buildBasement(): void {
     s.tower.place("parkingRamp", f, left + 4);
     for (let x = left + 20; x + 1 <= right; ) {
       const r = s.tower.place("parking", f, x);
-      if (r.ok) x += s.tower.units.find((u: any) => u.id === r.unitId).width;
+      if (r.ok) x += s.tower.getUnit(r.unitId).width;
       else x += 1;
     }
   }
@@ -292,8 +292,11 @@ export function pgGrowToStar(target: number): number {
   for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= top; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
-  // Elevators in 15-floor zones, plus an express spanning tall towers.
-  for (let b = 1; b < top; b += 15) s.tower.placeTransport("elevatorStandard", left + 4 + ((b / 15) % 4) * 6, b, Math.min(b + 15, top));
+  // Elevators in 15-floor zones, plus an express spanning tall towers. The
+  // column cycles by band INDEX ((b-1)/15 = 0,1,2,3,...) so the x offset stays an
+  // INTEGER; placeTransport doesn't floor x, and a fractional column would key the
+  // structure map as "floor:6.4" (never matching), silently failing every shaft.
+  for (let b = 1; b < top; b += 15) s.tower.placeTransport("elevatorStandard", left + 4 + (((b - 1) / 15) % 4) * 6, b, Math.min(b + 15, top));
   if (top > 20) s.tower.placeTransport("elevatorExpress", cx, 1, top);
   let placed = 0;
   for (let f = 2; f <= top && placed < wantOffices; f++) {
@@ -350,8 +353,11 @@ export function pgGrowToStar(target: number): number {
   s.evaluateStar();
   g.engine.setSim(s);
   g.engine.setCamera(cx, Math.max(2, Math.floor(top / 2)), Math.max(0.18, 0.95 - top / 70));
-  g.speed = 1;
-  g.engine.paused = false;
+  // Freeze so the milestone shots are byte-stable across regens (nothing here needs
+  // a live crowd, unlike the showcase people-rush shot); a moving sim would churn
+  // the committed diff frame-to-frame.
+  g.speed = 0;
+  g.engine.paused = true;
   return s.star;
 }
 
@@ -396,7 +402,7 @@ export function buildEngineTower(): void {
     } else x += 1;
   }
   sim.tower.placeTransport("elevatorStandard", left + 6, 1, 12);
-  sim.tower.placeTransport("stairs", left + 50, 1, 3);
+  sim.tower.placeTransport("stairs", left + 50, 1, 2); // stairs link exactly 2 floors (maxSpanFor === 1)
   g.engine.center();
   g.speed = 2;
   g.engine.paused = false;

@@ -147,6 +147,11 @@ export const SCENES: Scene[] = [
         setup: async (page) => {
           await page.evaluate(() => {
             const g = (window as any).game;
+            // Clear the office selection carried over from 17-select / 10-batch-pricing
+            // so the inspector editor panel isn't floating over the crowd shot.
+            g.selected = null;
+            if (g.engine) g.engine.selectedId = null;
+            g.refreshEditor?.();
             g.speed = 0;
             const c = g.sim.clock;
             let delta = 8 * 60 + 30 - c.minuteOfDay;
@@ -660,12 +665,18 @@ export const SCENES: Scene[] = [
 
 // ---- Migration + milestone drivers (need Node-side fixture / assertions) -----
 
-const MIGRATION_SAVE = (() => {
-  const raw = readFileSync(resolve(ROOT, "src/tests/fixtures/towerone_6.vctower"), "utf8");
-  const b64 = raw.slice(raw.indexOf("\n") + 1);
-  const compressed = new Uint8Array(Buffer.from(b64, "base64"));
-  return JSON.parse(new TextDecoder().decode(inflateSync(compressed)));
-})();
+// Decode the towerone_6 fixture LAZILY (and cache it) so a subset run that skips
+// the migration scene (e.g. ONLY=milestones) never has to read/inflate it.
+let migrationSaveCache: unknown;
+function migrationSave(): unknown {
+  if (migrationSaveCache === undefined) {
+    const raw = readFileSync(resolve(ROOT, "src/tests/fixtures/towerone_6.vctower"), "utf8");
+    const b64 = raw.slice(raw.indexOf("\n") + 1);
+    const compressed = new Uint8Array(Buffer.from(b64, "base64"));
+    migrationSaveCache = JSON.parse(new TextDecoder().decode(inflateSync(compressed)));
+  }
+  return migrationSaveCache;
+}
 
 /** Load the towerone_6 save at a given stored version (2 = reflow skipped =
  *  "before"; 1 = reflow runs = "after"), then frame either the full tower or a
@@ -681,7 +692,7 @@ async function loadMigration(page: Page, version: number, mode: "full" | "detail
       document.getElementById("splash")?.remove();
       document.querySelector(".modal-backdrop")?.remove();
     },
-    { d: MIGRATION_SAVE, version },
+    { d: migrationSave(), version },
   );
   await page.evaluate((mode) => {
     const g = (window as any).game;

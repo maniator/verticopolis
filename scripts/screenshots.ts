@@ -180,8 +180,12 @@ async function main(): Promise<void> {
   // ONLY=scene-id[,scene-id] re-shoots a subset (fast iteration); default all.
   const only = (process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
   const scenes = only.length ? SCENES.filter((sc) => only.includes(sc.id)) : SCENES;
-  const browser = await chromium.launch({ executablePath: EXECUTABLE });
+  // Launch INSIDE the try so a launch failure still runs the finally that kills
+  // the spawned vite preview (otherwise it orphans on :4173 and the next run
+  // captures against a stale build).
+  let browser: Browser | undefined;
   try {
+    browser = await chromium.launch({ executablePath: EXECUTABLE });
     for (const scene of scenes) {
       // A scene's setup (game wait / build / assertReady) can throw; keep it from
       // aborting the whole run. Record every shot in the scene as failed (so its
@@ -195,7 +199,7 @@ async function main(): Promise<void> {
       }
     }
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
     if (server) server.kill("SIGTERM");
   }
 
