@@ -45,7 +45,7 @@ variable-width; walk, don't seek. Unconfirmed fields are flagged.
 
 | Offset | Size | Field | Meaning |
 | --- | --- | --- | --- |
-| 0x00 | u16 | magic | Always `00 24` on disk |
+| 0x00 | u16 | magic | Always `0x2400` (little-endian, so the bytes on disk read `00 24`) |
 | 0x02 | u16 | level | 1–5 = star rating; **6 = TOWER** |
 | 0x04 | i32 | balance | Current funds, in stored units (see §2) |
 | 0x08 | i32 | otherIncome | Finance-window line |
@@ -92,9 +92,10 @@ ground truth for that mapping:
 | 1200–2400 | 13:00–1:00 | 12h | 36 |
 | 2400–2600 | 1:00–7:00 | 6h | 108: the night sprint |
 
-- **The date changes at tick 2300**: midnight (2000 ticks into the day would be
-  21:00; 1200 + 11h × 100/3.6... simplest check: 1200 + (24:00−13:00) × 3600/36
-  = 1200 + 1100 = 2300 ✓).
+- **The date changes at tick 2300**: midnight. Check it against the table: the
+  13:00 boundary is tick 1200, and the 13:00-to-1:00 period runs at 36 s/tick,
+  so 3600 / 36 = 100 ticks per hour. Midnight is 11 hours after 13:00, so
+  1200 + 11 × 100 = 2300.
 - Every period's seconds-per-tick is exactly consistent with its span
   (e.g. 200 × 108 s = 6 h). [OS] gave 126 s for the night row, which contradicts
   the span; [TD]'s 108 s resolves it; **the old inconsistency footnote is

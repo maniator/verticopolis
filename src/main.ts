@@ -878,14 +878,14 @@ class GameApp {
   private emitLunchRush(minutesBeforeTicks: number): void {
     if (this.prefs.steadyClock) return;
     const c = this.sim.clock;
-    const after = c.minutes;
-    if (after <= minutesBeforeTicks) return; // nothing ticked
-    // The most recent day whose noon falls inside (before, after], if any.
-    const day = Math.floor((after - 12 * 60) / 1440);
-    const noonAbs = day * 1440 + 12 * 60;
-    if (noonAbs <= minutesBeforeTicks || day === this.lastLunchDay) return;
-    if (day % 7 >= 5) return; // weekends: the lunch rush is a weekday event
-    this.lastLunchDay = day;
+    const noonAbs = c.day * 1440 + 12 * 60; // noon of the current calendar day
+    // Fire only when this frame's ticks actually crossed noon (before < noon <=
+    // after), which keeps a load-at-12:xx or a frozen clock quiet while still
+    // catching a single huge frame that leaps from 11:5x past 13:00. Reuse the
+    // Clock's own day/isWeekend helpers so the calendar rules live in one place.
+    if (minutesBeforeTicks >= noonAbs || c.minutes < noonAbs) return;
+    if (c.isWeekend || c.day === this.lastLunchDay) return;
+    this.lastLunchDay = c.day;
     this.sim.emit("Lunch rush! Midday plays out in slow motion, just like 1994.", "info");
   }
 
