@@ -149,9 +149,12 @@ export const SCENES: Scene[] = [
             const g = (window as any).game;
             // Clear the office selection carried over from 17-select / 10-batch-pricing
             // so the inspector editor panel isn't floating over the crowd shot.
+            // Mirror Game.clearSelection: null the selection AND hide the editor
+            // panel. refreshEditor() alone no-ops when selected is null (it early-
+            // returns), so the panel would keep floating; ui.hideEditor() removes it.
             g.selected = null;
             if (g.engine) g.engine.selectedId = null;
-            g.refreshEditor?.();
+            g.ui?.hideEditor?.();
             g.speed = 0;
             const c = g.sim.clock;
             let delta = 8 * 60 + 30 - c.minuteOfDay;
