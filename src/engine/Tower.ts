@@ -875,7 +875,11 @@ export class Tower {
           // actually connected to the lobby (a shaft to nowhere is no relief).
           if (!this.stopsAt(t, fl) || !served.has(fl)) continue;
           const list = this.transportColsByFloor.get(fl);
-          const span: [number, number] = [t.x, t.x + t.width];
+          // Clamp the span to the lot: a transport's width is trusted from the
+          // save (and can be a legacy value after a catalog change), so an
+          // over-wide or corrupt shaft must not report a column past the lot
+          // edge and skew the W1 distance scan.
+          const span: [number, number] = [Math.max(0, t.x), Math.min(t.x + t.width, GRID.width)];
           if (list) list.push(span);
           else this.transportColsByFloor.set(fl, [span]);
         }
