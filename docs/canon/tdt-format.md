@@ -4,8 +4,8 @@
 reverse-engineering notes (`doc/simtower/TDT_format.txt` in
 [fabianschuiki/OpenSkyscraper](https://github.com/fabianschuiki/OpenSkyscraper),
 GPL-3.0). This file **restates the factual layout in our own words** — no GPL
-text or code is copied. Facts about a file format are not copyrightable; the
-original prose is, so keep it that way when editing this page.
+text or code is copied. Keep it that way when editing this page: describe the
+format in your own words and never paste upstream prose or code.
 
 **Why this exists.** The `.TDT` save is a window into the 1994 original's
 internals — it confirms (or corrects) numbers our engine treats as canon, and it
