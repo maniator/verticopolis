@@ -269,6 +269,21 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(246_810);
   });
 
+  it("async autosave only requires native compression, not native decompression", async () => {
+    vi.stubGlobal(
+      "DecompressionStream",
+      class {
+        constructor() {
+          throw new TypeError("Unsupported format: deflate-raw");
+        }
+      },
+    );
+    const sim = sampleGame();
+    sim.money = 135_790;
+    await SaveGame.saveAsync(sim);
+    expect(SaveGame.load()!.money).toBe(135_790);
+  });
+
   it("does not let an older async autosave overwrite a newer synchronous save", async () => {
     let captured: Uint8Array | undefined;
     let release!: () => void;
@@ -392,6 +407,25 @@ describe("SaveGame", () => {
     SaveGame.save(loaded);
     expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
     expect(SaveGame.load()!.money).toBe(333_333);
+  });
+
+  it("removes the legacy autosave key before migrating so quota can be reclaimed", () => {
+    const sim = sampleGame();
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY && localStorage.getItem(LEGACY_AUTO_KEY) !== null) {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      }
+      return realSetItem(key, value);
+    });
+    try {
+      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
+      expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
+    } finally {
+      setSpy.mockRestore();
+    }
   });
 
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
