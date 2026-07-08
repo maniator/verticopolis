@@ -842,11 +842,19 @@ export class UI {
       // the legacy importer instead of the .vctower parser's misdirected
       // error. Everything else decodes as text for the .vctower path (the
       // non-fatal decode is fine: SaveGame.import validates content anyway).
+      // BOM sniffing preserves the old readAsText behavior: a .vctower
+      // re-saved by an editor as UTF-16 must keep decoding, and TextDecoder
+      // alone reads only UTF-8.
+      const decodeText = (b: Uint8Array): string => {
+        if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
+        if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
+        return new TextDecoder().decode(b); // UTF-8; strips a UTF-8 BOM itself
+      };
       reader.onload = () => {
         const buffer = reader.result as ArrayBuffer;
         const bytes = new Uint8Array(buffer);
         if (looksLikeLegacyTower(file.name, bytes)) this.cb.onImportLegacy(buffer, file.name);
-        else this.cb.onImport(new TextDecoder().decode(bytes));
+        else this.cb.onImport(decodeText(bytes));
       };
       reader.readAsArrayBuffer(file);
     };

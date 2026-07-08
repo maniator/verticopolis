@@ -31,9 +31,16 @@ function rooms(spec: TdtSpec) {
   return parse(spec).save.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
 }
 
-/** One tenant of the given type on TDT floor 20 (our floor 11). */
+/** Tenant IDs whose kinds are basement-only in our engine (and the original):
+ *  parking stall/ramp, recycling parts, metro parts. */
+const BASEMENT_ONLY_IDS = new Set([11, 44, 20, 21, 31, 32, 33]);
+
+/** One tenant of the given type on TDT floor 20 (our floor 11), or, for
+ *  basement-only kinds, TDT floor 6 (our floor B4, so even the metro's three
+ *  stories stay below ground). */
 function oneTenant(type: number, left = 100, right = 109, status = 0): TdtSpec {
-  return { floors: [{ index: 20, tenants: [{ left, right, type, status }] }] };
+  const index = BASEMENT_ONLY_IDS.has(Math.abs(type)) ? 6 : 20;
+  return { floors: [{ index, tenants: [{ left, right, type, status }] }] };
 }
 
 describe("tdtFormat: hostile-file hardening (typed errors, never hangs)", () => {
@@ -186,12 +193,15 @@ describe("parseTDT: golden mappings", () => {
   });
 
   it("floor offsets: TDT 0→B10, 9→B1, 10→ground, 109→100F; reserved rows ≥110 dropped with a report", () => {
-    const at = (index: number) =>
-      rooms({ floors: [{ index, tenants: [{ left: 100, right: 109, type: 7 }] }] });
-    expect(at(0)[0].floor).toBe(-9);
-    expect(at(9)[0].floor).toBe(0);
-    expect(at(10)[0].floor).toBe(1);
-    expect(at(109)[0].floor).toBe(100);
+    // Shops carry the basement rows (offices can't exist underground) and an
+    // office carries the top; the ground concourse hosts lobby paving only.
+    const at = (index: number, type: number) =>
+      rooms({ floors: [{ index, tenants: [{ left: 100, right: 109, type }] }] });
+    expect(at(0, 10)[0].floor).toBe(-9);
+    expect(at(9, 10)[0].floor).toBe(0);
+    const ground = parse({ floors: [{ index: 10, tenants: [{ left: 100, right: 109, type: 24 }] }] });
+    expect(ground.save.units.some((u) => u.kind === "lobby" && u.floor === 1)).toBe(true);
+    expect(at(109, 7)[0].floor).toBe(100);
 
     const dropped = parse({ floors: [{ index: 110, tenants: [{ left: 100, right: 109, type: 7 }] }] });
     expect(dropped.save.units).toHaveLength(0);
@@ -278,22 +288,22 @@ describe("parseTDT: golden mappings", () => {
   it("two same-kind buildings on far-apart floors stay TWO units (merge is floor-aware)", () => {
     const { save } = parse({
       floors: [
-        { index: 20, tenants: [{ left: 100, right: 120, type: 21 }] }, // recycling bottom, ours 11
-        { index: 21, tenants: [{ left: 100, right: 120, type: 20 }] }, // its top, ours 12
-        { index: 50, tenants: [{ left: 100, right: 120, type: 21 }] }, // a second center, ours 41
-        { index: 51, tenants: [{ left: 100, right: 120, type: 20 }] },
+        { index: 3, tenants: [{ left: 100, right: 120, type: 21 }] }, // recycling bottom, ours B7
+        { index: 4, tenants: [{ left: 100, right: 120, type: 20 }] }, // its top, ours B6
+        { index: 6, tenants: [{ left: 100, right: 120, type: 21 }] }, // a second center, ours B4
+        { index: 7, tenants: [{ left: 100, right: 120, type: 20 }] },
       ],
     });
     const centers = save.units.filter((u) => u.kind === "recycling");
     expect(centers).toHaveLength(2);
-    expect(centers.map((u) => u.floor).sort((a, b) => a - b)).toEqual([11, 41]);
+    expect(centers.map((u) => u.floor).sort((a, b) => a - b)).toEqual([-6, -3]);
   });
 
   it("two same-kind buildings built flush on the same floor stay TWO units (touch never merges)", () => {
     const { save } = parse({
       floors: [
         {
-          index: 20,
+          index: 5,
           tenants: [
             { left: 100, right: 120, type: 21 },
             { left: 120, right: 140, type: 21 }, // flush neighbor, half-open touch
@@ -332,18 +342,46 @@ describe("parseTDT: golden mappings", () => {
     expect(save.units.filter((u) => u.kind === "office")).toHaveLength(1);
   });
 
+  it("basement-only kinds on above-ground floors are dropped with a report line", () => {
+    // Parking stall + ramp forged onto our floor 11: functional above-ground
+    // parking would bypass Tower.roomPlacementReason's basement rule.
+    const { save, report } = parse({
+      floors: [{ index: 20, tenants: [{ left: 100, right: 116, type: 44 }, { left: 116, right: 120, type: 11 }] }],
+    });
+    expect(save.units.filter((u) => u.kind === "parking" || u.kind === "parkingRamp")).toHaveLength(0);
+    expect(report.couldNotBring.join(" ")).toMatch(/floor its kind can't occupy/);
+    // Same guard on the merged path: recycling forged above ground.
+    const merged = parse({
+      floors: [
+        { index: 20, tenants: [{ left: 100, right: 120, type: 21 }] },
+        { index: 21, tenants: [{ left: 100, right: 120, type: 20 }] },
+      ],
+    });
+    expect(merged.save.units.filter((u) => u.kind === "recycling")).toHaveLength(0);
+  });
+
+  it("daylight kinds in the basement, and rooms covering the ground concourse, are dropped", () => {
+    // Office forged onto B4 (TDT 6): people don't work underground.
+    const office = parse({ floors: [{ index: 6, tenants: [{ left: 100, right: 109, type: 7 }] }] });
+    expect(office.save.units.filter((u) => u.kind === "office")).toHaveLength(0);
+    // Fast food forged onto the ground concourse (TDT 10 = our floor 1).
+    const ground = parse({ floors: [{ index: 10, tenants: [{ left: 100, right: 116, type: 12 }] }] });
+    expect(ground.save.units.filter((u) => u.kind === "fastFood")).toHaveLength(0);
+    expect(ground.report.couldNotBring.join(" ")).toMatch(/floor its kind can't occupy/);
+  });
+
   it("two same-kind buildings stacked on adjacent floor pairs stay TWO units", () => {
     const { save } = parse({
       floors: [
-        { index: 20, tenants: [{ left: 100, right: 120, type: 21 }] }, // center A bottom, ours 11
-        { index: 21, tenants: [{ left: 100, right: 120, type: 20 }] }, // center A top, ours 12
-        { index: 22, tenants: [{ left: 100, right: 120, type: 21 }] }, // center B bottom, ours 13
-        { index: 23, tenants: [{ left: 100, right: 120, type: 20 }] }, // center B top, ours 14
+        { index: 3, tenants: [{ left: 100, right: 120, type: 21 }] }, // center A bottom, ours B7
+        { index: 4, tenants: [{ left: 100, right: 120, type: 20 }] }, // center A top, ours B6
+        { index: 5, tenants: [{ left: 100, right: 120, type: 21 }] }, // center B bottom, ours B5
+        { index: 6, tenants: [{ left: 100, right: 120, type: 20 }] }, // center B top, ours B4
       ],
     });
     const centers = save.units.filter((u) => u.kind === "recycling");
     expect(centers).toHaveLength(2);
-    expect(centers.map((u) => u.floor).sort((a, b) => a - b)).toEqual([11, 13]);
+    expect(centers.map((u) => u.floor).sort((a, b) => a - b)).toEqual([-6, -4]);
   });
 
   it("an imported cathedral below TOWER seeds the pending VIP inspection", () => {

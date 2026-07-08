@@ -142,6 +142,19 @@ function isLobbyFloor(floor: number): boolean {
   return floor === 1 || (floor > 1 && floor % GRID.lobbyInterval === 0);
 }
 
+/** Mirror Tower.roomPlacementReason's floor rules on hostile files: basement-only
+ *  kinds (parking, ramp, recycling, metro) stay below ground, no room may cover
+ *  the ground concourse, and daylight kinds (offices, condos, hotels) stay above
+ *  it. Legitimate 1994 saves already satisfy all three; only corrupt or forged
+ *  data trips this, and deserialize doesn't rerun the placement rules. */
+function misplacedOnFloor(kind: FacilityKind, floor: number): boolean {
+  const hgt = facilityFloors(kind);
+  if (FACILITIES[kind].basement && floor + hgt - 1 >= 1) return true;
+  if (floor <= 1 && floor + hgt - 1 >= 1) return true; // covers the ground concourse
+  if (floor < 1 && (kind === "office" || kind === "condo" || isHotelKind(kind))) return true;
+  return false;
+}
+
 /** Heuristic for the import UI: is this picked file an original SimTower
  *  save? The .TDT extension first; else sniff the header magic, so a renamed
  *  or extension-less copy of a real save still routes here. */
@@ -352,6 +365,7 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     droppedFloors: 0,
     offLot: 0,
     overlapping: 0,
+    misplaced: 0,
     clamped: 0,
     widthMismatch: 0,
   };
@@ -492,6 +506,10 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
       }
       const ext = clampExtent(t);
       if (!ext) continue;
+      if (misplacedOnFloor(kind, ours)) {
+        counts.misplaced++;
+        continue;
+      }
       if (!claimRoom(kind, ours, ext.x, ext.right)) {
         counts.overlapping++;
         continue;
@@ -583,6 +601,10 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     // already accepted.
     if (floor + facilityFloors(m.kind) - 1 > GRID.maxFloor) {
       counts.offLot++;
+      continue;
+    }
+    if (misplacedOnFloor(m.kind, floor)) {
+      counts.misplaced++;
       continue;
     }
     if (!claimRoom(m.kind, floor, m.left, m.right)) {
@@ -984,6 +1006,7 @@ function buildReport(
     droppedFloors: number;
     offLot: number;
     overlapping: number;
+    misplaced: number;
     clamped: number;
     widthMismatch: number;
   },
@@ -1119,6 +1142,11 @@ function buildReport(
   if (counts.overlapping > 0) {
     couldNotBring.push(
       `${counts.overlapping} room${counts.overlapping === 1 ? "" : "s"} overlapped another room and stayed behind.`,
+    );
+  }
+  if (counts.misplaced > 0) {
+    couldNotBring.push(
+      `${counts.misplaced} room${counts.misplaced === 1 ? " was" : "s were"} on a floor its kind can't occupy (corrupt data) and stayed behind.`,
     );
   }
   if (counts.clamped > 0) {

@@ -443,6 +443,24 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(cb.onImport).not.toHaveBeenCalled();
   });
 
+  it("a UTF-16 (BOM) .vctower still decodes to the same text, like readAsText did", async () => {
+    const { cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    // A save re-saved by an editor as UTF-16LE: BOM FF FE, then 2-byte chars.
+    const text = "VCTOWER1\npayload";
+    const bytes = new Uint8Array(2 + text.length * 2);
+    bytes[0] = 0xff;
+    bytes[1] = 0xfe;
+    for (let i = 0; i < text.length; i++) bytes[2 + i * 2] = text.charCodeAt(i);
+    const file = new File([bytes], "tower.vctower");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith(text));
+    expect(cb.onImportLegacy).not.toHaveBeenCalled();
+  });
+
   it("a RENAMED legacy save (wrong extension, 0x2400 magic) still routes to onImportLegacy", async () => {
     const { cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});

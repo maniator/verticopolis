@@ -1,5 +1,6 @@
 import {
   TDT_ELEVATOR_BUILT_FIXED,
+  TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_PER_CAR_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
@@ -169,7 +170,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];
     if (!e) {
-      pad(194); // empty slot: header only, all zeroes (used = 0)
+      pad(TDT_ELEVATOR_HEADER_SIZE); // empty slot: header only, all zeroes (used = 0)
       continue;
     }
     u8(1); // used
