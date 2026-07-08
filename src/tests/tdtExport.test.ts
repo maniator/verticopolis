@@ -301,6 +301,28 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save.money).toBe(0);
   });
 
+  it("forged transports are sanitized like the importer's: unknown kinds drop with a report line, coordinates clamp", () => {
+    const save = sampleSave();
+    save.transports.push(
+      // Unknown kind: no 1994 equivalent.
+      { id: 21_000, kind: "office", x: 10, width: 4, bottom: 1, top: 5, cars: 1, carPositions: [1], carDir: [0], load: 0 },
+      // Wild extents: clamps into the grid instead of wrapping the byte masks.
+      { id: 21_001, kind: "elevatorStandard", x: 9_999, width: 4, bottom: -50, top: 500, cars: NaN, carPositions: [NaN], carDir: [], load: 0 },
+      // Degenerate: dropped.
+      { id: 21_002, kind: "elevatorService", x: 20, width: 4, bottom: 8, top: 8, cars: 2, carPositions: [8, 8], carDir: [0, 0], load: 0 },
+    );
+    const { bytes, report } = buildTDT(save);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    expect(report.staysBehind.join(" ")).toMatch(/2 transports couldn't be represented/);
+    // The sample's 1 shaft + the clamped forgery = 2 shafts, honestly counted.
+    expect(report.comesAlong.join(" ")).toMatch(/2 elevator shafts/);
+    const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save;
+    const clamped = back.transports.filter((t) => t.kind === "elevatorStandard" && t.x !== 150);
+    expect(clamped).toHaveLength(1);
+    expect(clamped[0].bottom).toBeGreaterThanOrEqual(-9);
+    expect(clamped[0].top - clamped[0].bottom).toBeLessThanOrEqual(30);
+  });
+
   it("a forged star feeds ONE sanitized value into both the header and the report", () => {
     const forged = buildTDT({ ...sampleSave(), star: NaN });
     expect(forged.report.star).toBe(1);

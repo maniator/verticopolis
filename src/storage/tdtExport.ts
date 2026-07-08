@@ -5,6 +5,7 @@ import {
   facilityFloors,
   isHotelKind,
   maxCarsFor,
+  maxSpanFor,
   transportCarCapacity,
 } from "../engine/facilities";
 import { frameForMinuteOfDay } from "../engine/timePacing";
@@ -434,12 +435,54 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // Elevator table: 24 slots (doc §6). Live passenger payloads zero-filled at
   // their documented sizes; kind → type via the importer's ELEVATOR_KINDS
   // order (0 express, 1 standard, 2 service).
-  const elevators = save.transports.filter(
-    (t) => t.kind !== "stairs" && t.kind !== "escalator",
-  );
-  const walkways = save.transports.filter(
-    (t) => t.kind === "stairs" || t.kind === "escalator",
-  );
+  //
+  // Transports are sanitized into three buckets first, mirroring the
+  // importer's own trimming rules (transportsFromDecoded): the live game
+  // never produces bad values, but buildTDT takes any serialized input, and
+  // an unclamped coordinate would wrap through the u8/u16 masks into a
+  // structurally-valid-but-nonsensical file the report knows nothing about.
+  const elevators: { kind: FacilityKind; x: number; bottom: number; top: number; cars: number; carPositions: number[]; skipFloors?: number[] }[] = [];
+  const walkways: { kind: FacilityKind; x: number; bottom: number }[] = [];
+  let transportsDropped = 0;
+  for (const t of save.transports) {
+    const width = FACILITIES[t.kind]?.width ?? 0;
+    if (t.kind === "stairs" || t.kind === "escalator") {
+      // A flight must sit fully inside the buildable range (same guard the
+      // importer applies to decoded stair records).
+      if (!Number.isFinite(t.bottom) || t.bottom < GRID.minFloor || t.bottom + 1 > GRID.maxFloor) {
+        transportsDropped++;
+        continue;
+      }
+      const x = Math.max(0, Math.min(GRID.width - width, Math.round(Number.isFinite(t.x) ? t.x : 0)));
+      walkways.push({ kind: t.kind, x, bottom: t.bottom });
+      continue;
+    }
+    if (!ELEVATOR_KINDS.includes(t.kind)) {
+      transportsDropped++; // no 1994 equivalent (forged kind)
+      continue;
+    }
+    if (!Number.isFinite(t.bottom) || !Number.isFinite(t.top)) {
+      transportsDropped++;
+      continue;
+    }
+    const bottom = Math.max(GRID.minFloor, Math.round(t.bottom));
+    let top = Math.min(GRID.maxFloor, Math.round(t.top));
+    if (top <= bottom) {
+      transportsDropped++; // degenerate or wholly out of range
+      continue;
+    }
+    if (top - bottom > maxSpanFor(t.kind)) top = bottom + maxSpanFor(t.kind);
+    const x = Math.max(0, Math.min(GRID.width - width, Math.round(Number.isFinite(t.x) ? t.x : 0)));
+    elevators.push({
+      kind: t.kind,
+      x,
+      bottom,
+      top,
+      cars: t.cars,
+      carPositions: t.carPositions ?? [],
+      skipFloors: t.skipFloors,
+    });
+  }
   // The 24-slot table can't hold more (only forged saves exceed the pooled
   // cap); the drop is counted for the report, never silent.
   const shaftsDropped = Math.max(0, elevators.length - TDT_ELEVATOR_SLOTS);
@@ -452,8 +495,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       continue;
     }
     // Same clamp the importer applies on read (1..maxCarsFor); an unclamped
-    // byte would desync the header from the payload size computed below.
-    const cars = Math.max(1, Math.min(maxCarsFor(e.kind), Math.round(e.cars)));
+    // (or non-finite) count would desync the header byte from the payload
+    // size computed below.
+    const rawCars = Number.isFinite(e.cars) ? Math.round(e.cars) : 1;
+    const cars = Math.max(1, Math.min(maxCarsFor(e.kind), rawCars));
     u8(1); // used
     u8(type);
     u8(transportCarCapacity(e.kind)); // informational; canon 42/21/10
@@ -478,7 +523,8 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       if (stops) servicedCount++;
     }
     for (let c = 0; c < 8; c++) {
-      const home = e.carPositions[c] !== undefined ? Math.round(e.carPositions[c]) : e.bottom;
+      const raw = e.carPositions[c];
+      const home = Number.isFinite(raw) ? Math.round(raw) : e.bottom;
       u8(Math.max(e.bottom, Math.min(e.top, home)) + TDT_FLOOR_OFFSET);
     }
     pad(
@@ -610,6 +656,11 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   if (flightsDropped > 0) {
     staysBehind.push(
       `${flightsDropped} stairway/escalator flight${flightsDropped === 1 ? "" : "s"} past 1994's 64-slot table stayed behind.`,
+    );
+  }
+  if (transportsDropped > 0) {
+    staysBehind.push(
+      `${transportsDropped} transport${transportsDropped === 1 ? "" : "s"} couldn't be represented in a 1994 save and stayed behind.`,
     );
   }
   if (counts.namesDropped > 0) {
