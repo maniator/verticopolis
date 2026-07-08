@@ -559,9 +559,9 @@ class GameApp {
         this.engine.preview = null;
       } else if (isPaintKind(kind)) {
         if (this.paintAnchor) {
-          // First move of a deferred touch paint — seed the run at the press
-          // point so the strip starts where the finger went down, then extend.
-          this.build.paintFloorRun(kind, this.paintAnchor.tile, this.paintAnchor.floor);
+          // First move of a deferred touch paint: stamp the same brush strip a
+          // desktop press lays at the press point, then extend from it.
+          this.build.seedPaint(kind, this.paintAnchor.tile, this.paintAnchor.floor);
           this.paintAnchor = null;
         }
         // For a wide unit (parking) each tile-step re-attempts a build; overlaps
@@ -571,10 +571,11 @@ class GameApp {
     };
 
     this.engine.onActionUp = () => {
-      // A deferred touch paint that never moved is a TAP — lay the single strip
-      // now (a drag already laid its run via onActionMove and cleared the anchor).
+      // A deferred touch paint that never moved is a TAP: lay the same brush
+      // strip a desktop click lays (a drag already laid its run via
+      // onActionMove and cleared the anchor).
       if (this.paintAnchor) {
-        if (this.tool.type === "build") this.build.paintFloorRun(this.tool.kind, this.paintAnchor.tile, this.paintAnchor.floor);
+        if (this.tool.type === "build") this.build.seedPaint(this.tool.kind, this.paintAnchor.tile, this.paintAnchor.floor);
         this.paintAnchor = null;
       }
       this.build.clearPaint();
