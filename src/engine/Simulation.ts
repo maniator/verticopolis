@@ -785,6 +785,7 @@ export class Simulation implements SimContext {
     if (month !== this.lastMonth) {
       this.lastMonth = month;
       this.economy.payMaintenance();
+      this.rollCondoRelocations();
     }
 
     const q = this.clock.quarter;
@@ -1024,6 +1025,13 @@ export class Simulation implements SimContext {
       // floor, so poor access starves them directly rather than via move-out.
       const leaseTenant = u.kind === "office" || u.kind === "condo";
       if (leaseTenant && u.state === "vacating") {
+        // A relocation is a life event, not a complaint: nothing the player does
+        // (not even a fully satisfied tenant) rescinds it, and it is never
+        // re-attributed to another cause. Read it up front from the original
+        // reason so no branch below can flip it. (The noise re-attribution below
+        // only fires for a "noise" reason, so a relocation never reaches it, but
+        // reading it here keeps that independence obvious.)
+        const isRelocation = u.vacateReason === "relocation";
         // A mode that caps noise but never evicts for it (Classic:
         // noiseErosionScale 0) must not let a "noise" notice fire, including one
         // carried in from a pre-split save where noise still eroded. But a real
@@ -1046,7 +1054,7 @@ export class Simulation implements SimContext {
           u.vacateReason = this.vacateCause(u, served, cong);
         }
         const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
-        if (u.satisfaction >= VACATE_RESCIND || rescindNoise) {
+        if (!isRelocation && (u.satisfaction >= VACATE_RESCIND || rescindNoise)) {
           // Conditions recovered inside the notice window, so they quietly stay.
           // No toast: "silence when correct", and a per-tick good/bad pair on a
           // unit that flaps around the threshold would be pure noise. The
@@ -1359,6 +1367,39 @@ export class Simulation implements SimContext {
       result.set(f, c);
     }
     return result;
+  }
+
+  /** Monthly, Modern-only: a sold condo's household may relocate on its own, a
+   *  life event (a job move, an upsize or downsize) unrelated to how well the
+   *  tower serves it, so it can fire even on a perfectly happy condo. The chance
+   *  scales with family size (bigger families are a bigger flight risk). Classic
+   *  returns 0 and never rolls: the `<= 0` guard short-circuits BEFORE any RNG
+   *  draw, so a Classic tower's seeded stream is byte-identical to one without
+   *  this feature. A relocation enters the standard `vacating` notice with a
+   *  non-rescindable "relocation" reason; when the notice elapses the existing
+   *  buy-back reclaims the unit at its household-scaled price and re-lists it. */
+  private rollCondoRelocations(): void {
+    const days = Math.ceil(VACATE_NOTICE_MINUTES / (24 * 60));
+    for (const u of this.tower.units) {
+      // Only a currently-owned condo can relocate: `state === "occupied"` excludes
+      // a bought-back/empty unit (vacate() also clears everOccupied) and a unit
+      // mid-disaster (fire/gutted) or already on a notice, so a phantom "household
+      // relocating" can never land on a unit with no household in place.
+      if (u.kind !== "condo" || u.state !== "occupied" || !u.everOccupied) continue;
+      const chance = this.rules.condoRelocationChance(u.residents);
+      if (chance <= 0 || !this.rng.chance(chance)) continue;
+      u.state = "vacating";
+      u.vacateReason = "relocation";
+      u.vacateAt = this.clock.minutes + VACATE_NOTICE_MINUTES;
+      this.emit(
+        `A household in ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} is relocating. They leave in under ${days} day(s); you buy the unit back to re-sell.`,
+        // "bad" so the advance warning actually TOASTS: the UI toasts only
+        // good/bad log entries; "info" is bulletin-only, which would swallow the
+        // heads-up. The non-blaming framing lives in the wording, not the color,
+        // matching how the neglect notices surface.
+        "bad",
+      );
+    }
   }
 
   private vacate(u: Unit, reason: VacateReason): void {
