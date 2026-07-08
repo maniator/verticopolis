@@ -9,9 +9,10 @@ import type { SerializedGame } from "../engine/types";
  * or backups.
  *
  * localStorage values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
- * tower is ~750KB of JSON, which — across the autosave slot plus three manual
- * slots — would crowd the ~5MB localStorage quota and risk a failed save on a
- * large tower. Compressed, each is a few tens of KB. The compression is
+ * late-game tower is hundreds of KB of JSON even in the sparse v3 unit shape,
+ * and across the autosave slot plus three manual slots the raw JSON would
+ * crowd the ~5MB localStorage quota and risk a failed save on a large tower.
+ * Compressed, each slot lands around 100-120KB. The compression is
  * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
  * critically — right before a reload in the crash-recovery / update paths,
  * where an async write could be interrupted mid-flush and lose the tower. (The
@@ -19,7 +20,8 @@ import type { SerializedGame } from "../engine/types";
  * exports are user-initiated and never race a reload.)
  */
 
-const AUTO_KEY = "simtower-clone-save";
+const AUTO_KEY = "verticopolis-save";
+const LEGACY_AUTO_KEY = "simtower-clone-save";
 const SLOT_KEY = (n: number) => `simtower-clone-slot-${n}`;
 export const SLOT_COUNT = 3;
 
@@ -39,6 +41,10 @@ const UNREADABLE_KEY = "simtower-clone-unreadable";
  * old saves keep loading — they re-write compressed on the next save.
  */
 const STORE_MAGIC = "VCZ1:";
+// Latest-start write token for same-tab async saves. A synchronous save clears
+// the token before it writes, so an older async compression can never commit
+// over a newer durable flush.
+let latestAsyncSave: object | null = null;
 
 /**
  * The Verticopolis tower-file container (.vctower): a magic first line naming
@@ -81,6 +87,12 @@ function readSlot(key: string): SerializedGame | null {
   }
 }
 
+function autosaveKey(): string {
+  return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) === null
+    ? AUTO_KEY
+    : LEGACY_AUTO_KEY;
+}
+
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
   const data = readSlot(key);
   if (!data) return { slot, exists: false };
@@ -106,8 +118,11 @@ export const SaveGame = {
   save(sim: Simulation): void {
     this.saveTo(AUTO_KEY, sim);
   },
+  async saveAsync(sim: Simulation): Promise<void> {
+    await this.saveToAsync(AUTO_KEY, sim);
+  },
   hasSave(): boolean {
-    return localStorage.getItem(AUTO_KEY) !== null;
+    return localStorage.getItem(AUTO_KEY) !== null || localStorage.getItem(LEGACY_AUTO_KEY) !== null;
   },
   load(): Simulation | null {
     return this.loadResult().sim;
@@ -120,17 +135,30 @@ export const SaveGame = {
    * that promised their old one) — see main.ts.
    */
   loadResult(): { sim: Simulation | null; corrupt: boolean } {
-    if (localStorage.getItem(AUTO_KEY) === null) return { sim: null, corrupt: false }; // truly empty
-    const data = readSlot(AUTO_KEY); // null ⇒ present but undecodable
-    if (!data) return { sim: null, corrupt: true };
-    try {
-      return { sim: Simulation.deserialize(data), corrupt: false };
-    } catch {
-      return { sim: null, corrupt: true }; // decoded, but the schema won't load
+    // Try the Verticopolis key first, then the legacy key: a partial migration
+    // or multi-tab divergence can leave an unreadable value on one key beside a
+    // healthy save on the other, and the healthy one must still load. `corrupt`
+    // reports whether any key checked before the successful load was present
+    // but unreadable, so boot still stashes those bytes (preserveUnreadable)
+    // and warns honestly even when the fallback rescued a tower.
+    let corrupt = false;
+    for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
+      if (localStorage.getItem(key) === null) continue; // absent, not corrupt
+      const data = readSlot(key); // null ⇒ present but undecodable
+      if (data) {
+        try {
+          return { sim: Simulation.deserialize(data), corrupt };
+        } catch {
+          /* decoded, but the schema won't load; treated as unreadable below */
+        }
+      }
+      corrupt = true;
     }
+    return { sim: null, corrupt };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
+    localStorage.removeItem(LEGACY_AUTO_KEY);
   },
   /**
    * Stash an unreadable autosave under a backup key so the 30s autosave doesn't
@@ -139,7 +167,7 @@ export const SaveGame = {
    * lets a later version recover them instead of overwriting on the next tick.
    */
   preserveUnreadable(): void {
-    const raw = localStorage.getItem(AUTO_KEY);
+    const raw = localStorage.getItem(autosaveKey());
     if (raw === null) return;
     try {
       localStorage.setItem(UNREADABLE_KEY, raw);
@@ -174,13 +202,19 @@ export const SaveGame = {
 
   /** Metadata for every slot, for the saves manager UI. */
   listSlots(): SlotInfo[] {
-    const slots: SlotInfo[] = [infoFrom("auto", AUTO_KEY)];
+    const slots: SlotInfo[] = [infoFrom("auto", autosaveKey())];
     for (let n = 1; n <= SLOT_COUNT; n++) slots.push(infoFrom(n, SLOT_KEY(n)));
     return slots;
   },
 
   // ---- Shared writer + export/import -----------------------------------
   saveTo(key: string, sim: Simulation): void {
+    // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
+    // token exists so older compressed state can't commit over this newer
+    // flush of the SAME slot). A manual slot save targets a different key, so
+    // it must not cancel the pending autosave commit; that would leave the
+    // autosave slot stale until the next timer tick.
+    if (key === AUTO_KEY) latestAsyncSave = null;
     const data = sim.serialize() as SerializedGame & { savedAt: number };
     // Stamp save time without relying on a deterministic clock in the engine.
     data.savedAt = nowMs();
@@ -188,13 +222,34 @@ export const SaveGame = {
     // localStorage quota (see STORE_MAGIC). Synchronous by design — this runs
     // just before a reload in the crash-recovery path, where an async write
     // could be lost. base64 keeps the value a safe ASCII string.
-    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data))));
-    localStorage.setItem(key, packed);
+    //
+    // Level 1 on purpose: sparse v3 saves (serializeUnit omits default fields)
+    // have already shed their redundancy, so on a real 12,975-unit tower level 1
+    // compressed within 0.8% of the level-6 size at a third of the cost (7ms vs
+    // 21ms), keeping the pre-reload flush short.
+    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
+    writeSlot(key, packed);
+  },
+  async saveToAsync(key: string, sim: Simulation): Promise<void> {
+    if (!compressionEncodeSupported()) {
+      this.saveTo(key, sim);
+      return;
+    }
+    const token = {};
+    latestAsyncSave = token;
+    const data = sim.serialize() as SerializedGame & { savedAt: number };
+    data.savedAt = nowMs();
+    const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
+    if (latestAsyncSave !== token) return;
+    latestAsyncSave = null;
+    writeSlot(key, STORE_MAGIC + toBase64(packed));
   },
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
-    if (!compressionSupported()) {
+    // Export only WRITES compressed data, so it needs just the encoder; a
+    // browser missing only the decoder can still create tower files.
+    if (!compressionEncodeSupported()) {
       throw new Error("This browser is too old to create tower files. Try a current browser.");
     }
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
@@ -225,7 +280,8 @@ export const SaveGame = {
     }
     // Distinguish "your browser can't decompress" from "this file is broken"
     // BEFORE the try below — otherwise a missing API blames a healthy file.
-    if (!compressionSupported()) {
+    // Import only READS compressed data, so it needs just the decoder.
+    if (!compressionDecodeSupported()) {
       throw new Error("This browser is too old to open compressed tower files. Try a current browser.");
     }
     let data: SerializedGame;
@@ -269,6 +325,58 @@ function fromBase64(b64: string): Uint8Array {
   return bytes;
 }
 
+function writeSlot(key: string, value: string): void {
+  if (key !== AUTO_KEY) {
+    localStorage.setItem(key, value);
+    return;
+  }
+  const legacy = localStorage.getItem(LEGACY_AUTO_KEY);
+  const needsQuotaReclaim = legacy !== null && localStorage.getItem(AUTO_KEY) === null;
+  if (needsQuotaReclaim) {
+    localStorage.removeItem(LEGACY_AUTO_KEY);
+    try {
+      writeAutosaveValue(value);
+    } catch (err) {
+      try {
+        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+      } catch {
+        /* best effort: preserve the old key if the migrated write fails */
+      }
+      throw err;
+    }
+    return;
+  }
+  try {
+    writeAutosaveValue(value);
+  } catch (err) {
+    // Both keys can coexist (multi-tab, or an older build re-writing the
+    // legacy key after this build migrated it). The legacy value is usually a
+    // stale duplicate of an already-persisted tower, so under quota pressure
+    // drop it first and retry the write before giving up.
+    if (legacy === null) throw err;
+    localStorage.removeItem(LEGACY_AUTO_KEY);
+    try {
+      writeAutosaveValue(value);
+    } catch (retryErr) {
+      // If the retry fails too, put the legacy value back: an unreadable
+      // primary falls back to the legacy save at load (see loadResult), so
+      // the deleted value may be the only readable tower left.
+      try {
+        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+      } catch {
+        /* best effort: quota may still be exhausted */
+      }
+      throw retryErr;
+    }
+    return;
+  }
+  if (legacy !== null) localStorage.removeItem(LEGACY_AUTO_KEY);
+}
+
+function writeAutosaveValue(value: string): void {
+  localStorage.setItem(AUTO_KEY, value);
+}
+
 // Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
 // of JSON; 32MB is generous headroom. localStorage is quota-bounded and
 // same-origin, but a corrupt or tampered VCZ1 value could still inflate
@@ -297,13 +405,23 @@ function inflateCapped(packed: Uint8Array): Uint8Array {
   return out;
 }
 
-// True when this browser can both compress and decompress raw deflate. Built
-// by actually constructing the streams: the "deflate-raw" format string is
-// newer than CompressionStream itself (Chrome had the API before the format),
-// so a `typeof` check alone would pass on browsers that then throw at use.
-function compressionSupported(): boolean {
+// Per-direction support probes, built by actually constructing the streams:
+// the "deflate-raw" format string is newer than CompressionStream itself
+// (Chrome had the API before the format), so a `typeof` check alone would pass
+// on browsers that then throw at use. Probed separately because each caller
+// needs only one direction (export/saveToAsync encode, import decodes), and a
+// browser missing one must not be blocked from the operation it can perform.
+function compressionEncodeSupported(): boolean {
   try {
     new CompressionStream("deflate-raw");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function compressionDecodeSupported(): boolean {
+  try {
     new DecompressionStream("deflate-raw");
     return true;
   } catch {

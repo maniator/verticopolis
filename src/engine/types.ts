@@ -277,6 +277,25 @@ export interface Transport {
   skipFloors?: number[];
 }
 
+/**
+ * A unit as it appears in a save. Since save v3 the writer omits fields whose
+ * value equals the loader's fallback (see `serializeUnit` in Simulation.ts, which
+ * mirrors the `deserialize` coercion table): `state` "empty", `satisfaction` 1,
+ * `occupants` 0, `everOccupied` false, `pendingIncome` 0, `label` at the catalog
+ * name, and `width` for width-1 floor/lobby tiles only. Every reader must treat
+ * these as optional; `Simulation.deserialize` restores the defaults. Older saves
+ * (v1/v2) always carry the full shape.
+ */
+export interface SerializedUnit extends Omit<Unit, "width" | "state" | "satisfaction" | "occupants" | "everOccupied" | "pendingIncome" | "label"> {
+  width?: number;
+  state?: UnitState;
+  satisfaction?: number;
+  occupants?: number;
+  everOccupied?: boolean;
+  pendingIncome?: number;
+  label?: string;
+}
+
 export interface SerializedGame {
   version: number;
   seed: number;
@@ -287,7 +306,7 @@ export interface SerializedGame {
    *  mode fork (and never mutated after creation), so a missing value loads as
    *  `classic` — every legacy tower stays pixel-faithful with no migration. */
   mode?: GameMode;
-  units: Unit[];
+  units: SerializedUnit[];
   transports: Transport[];
   nextId: number;
   towerName: string;
