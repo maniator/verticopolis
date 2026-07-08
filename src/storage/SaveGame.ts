@@ -152,6 +152,13 @@ export const SaveGame = {
   saveSlot(n: number, sim: Simulation): void {
     this.saveTo(SLOT_KEY(n), sim);
   },
+  /** Raw presence check for a manual slot — parse-free and cheap, so a
+   *  corrupt-but-present slot still reads as occupied. Anything that picks a
+   *  "free" slot to WRITE must use this, never `listSlots().exists` (which is
+   *  parse-based and would offer a possibly-recoverable slot for overwrite). */
+  hasSlot(n: number): boolean {
+    return localStorage.getItem(SLOT_KEY(n)) !== null;
+  },
   loadSlot(n: number): Simulation | null {
     const data = readSlot(SLOT_KEY(n));
     if (!data) return null;

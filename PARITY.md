@@ -81,6 +81,7 @@ abstraction · ⬜ not present.
 
 ## Save / platform
 - ✅ Autosave + multiple save slots, `.vctower` tower-file export/import (`localStorage`)
+- ✅ Import of original 1994 SimTower saves (**`.TDT`**, per `docs/canon/tdt-format.md`): funds, star rating, clock, floors and rooms come over, with a fidelity report shown before anything is adopted and an auto-save to a free slot. Elevators are synthesized from the floor layout (the original's shaft data is not yet decoded); tenant names, rent classes, retail subtypes and finance history are queued follow-ups (backlog `tdt-importer`)
 - ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
 
 ## Deliberate divergences
