@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UI, type UICallbacks } from "../ui/UI";
 import { Simulation } from "../engine/Simulation";
+import * as platformModule from "../platform";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -466,6 +467,36 @@ describe("showHelp — the Report an issue link", () => {
     // a new tab (WCAG 3.2.5), without altering the visible label.
     const cue = link!.querySelector(".visually-hidden");
     expect(cue?.textContent).toContain("new tab");
+  });
+
+  it("routes activation through platform.openExternal ONLY inside a native wrapper", () => {
+    const openExternal = vi.fn();
+    const spy = vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal,
+    });
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    const click = new MouseEvent("click", { cancelable: true });
+    link.dispatchEvent(click);
+    // The wrapper's WebView must not navigate away: the anchor's default is
+    // cancelled and the URL goes out through the port instead.
+    expect(click.defaultPrevented).toBe(true);
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith(CHOOSER);
+    spy.mockRestore();
+
+    // In the browser (isNativeWrapper false) the anchor keeps its default
+    // behavior: nothing intercepts the click, preserving middle-click and
+    // context-menu semantics that a delegating handler would break.
+    const { ui: ui2 } = makeUI();
+    ui2.showHelp();
+    const plain = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    const plainClick = new MouseEvent("click", { cancelable: true });
+    plain.dispatchEvent(plainClick);
+    expect(plainClick.defaultPrevented).toBe(false);
+    expect(openExternal).toHaveBeenCalledTimes(1); // no second routing
   });
 
   it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {

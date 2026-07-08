@@ -4,6 +4,7 @@ import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
+import { getPlatform } from "../platform";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -798,21 +799,21 @@ export class UI {
     );
   }
 
-  /** Hand the player a file download (the export path). Pure DOM plumbing:
-   *  callers decide the name and contents (see SaveGame.export). */
+  /** Hand the player an exported file. Routed through the platform port so a
+   *  native wrapper can deliver it its own way (share sheet); the browser port
+   *  keeps the pre-port blob-anchor download exactly. Callers decide the name
+   *  and contents (see SaveGame.export). */
   downloadFile(filename: string, contents: string): void {
-    // octet-stream (not application/json — the payload isn't) so the browser
+    // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
-    const blob = new Blob([contents], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    // Revoking in the same task can abort the download on engines that fetch
-    // the blob URL asynchronously (Safari/Firefox) — and this is the ONLY way
-    // to get a tower out now. Give the navigation a generous head start.
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    void getPlatform()
+      .saveFile(filename, contents, "application/octet-stream")
+      .catch(() => {
+        // Dead code in the browser (its saveFile never rejects); a native
+        // shell rejects on real failure, and losing an export silently is
+        // never acceptable. Cancel resolves, so this never fires for it.
+        this.toast("Couldn't save your tower file. Please try again.", "bad");
+      });
   }
 
   /** Import goes straight to the file picker — exports are .vctower downloads
@@ -876,6 +877,17 @@ export class UI {
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
+    // Only inside a native wrapper: the report link must not navigate the
+    // shell's WebView away, so hand it to the system browser through the
+    // platform port. Browser builds attach nothing, keeping the anchor's
+    // middle-click and context-menu semantics untouched.
+    if (getPlatform().isNativeWrapper) {
+      const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
+      report.addEventListener("click", (e) => {
+        e.preventDefault();
+        getPlatform().openExternal(report.href);
+      });
+    }
     const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     const scLabel = (steady: boolean) => {
       sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;
