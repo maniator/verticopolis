@@ -18,7 +18,7 @@ Package the existing Verticopolis web game (live at https://verticopolis.com) fo
 
 The work spans two repositories:
 
-- **Public** (`maniator/verticopolis`, MIT): small web-side seams that make the game behave correctly inside native shells, plus assetlinks hosting. All changes are no-ops in the plain browser build.
+- **Public** (`maniator/verticopolis`, MIT): small web-side seams that make the game behave correctly inside native shells, plus assetlinks hosting and the F8 analytics integration. Apart from F8's beacons, all changes are no-ops in the plain browser build.
 - **Private** (the distribution repo): the TWA and Capacitor wrapper projects, store configuration, CI pipelines, signing material references, and all later monetization content.
 
 ## Player Journeys
@@ -49,7 +49,7 @@ Feature: **iOS Capacitor app (private repo)**
 
 Feature: **Usage analytics (privacy-first, one integration for all surfaces)**
 
-- **F8. Anonymous usage analytics.** The game reports anonymous, aggregate usage events (app opens, session length, a small set of gameplay milestones) through a cookieless, first-party analytics integration in the Plausible/Umami class: no cookies, no personal identifiers, no cross-site tracking, so no consent banner and no Apple App Tracking Transparency prompt. One web integration covers every surface because the TWA renders the live site and iOS bundles the same build; the endpoint is an absolute URL (relative paths break under the Capacitor scheme) and the client script is bundled, not CDN-loaded. Every event carries a platform dimension: `ios` when the F1 flag is set, `twa` via a query parameter on the Bubblewrap start URL, `web` otherwise. Tool choice and self-hosting decision happen at story time; if self-hosted, the hosting config is ops and lives in the private repo. Store privacy declarations (Play Data Safety, Apple privacy nutrition labels) must describe this posture truthfully; the E2d/E3d store stories own that alignment.
+- **F8. Anonymous usage analytics.** The game reports anonymous, aggregate usage events (app opens, session length, a small set of gameplay milestones) through a cookieless, first-party analytics integration in the Plausible/Umami class: no cookies, no personal identifiers, no cross-site tracking, so no consent banner and no Apple App Tracking Transparency prompt. One integration in the shared web codebase covers every surface (the plain build for web and TWA, which renders the live site; the native-mode build from the pinned ref for iOS); the endpoint is an absolute URL (relative paths break under the Capacitor scheme) and the client script is bundled, not CDN-loaded. Dev, test, and CI runs send nothing. Every event carries a platform dimension: `ios` when the F1 flag is set, `twa` via a query parameter on the Bubblewrap start URL, `web` otherwise. Tool choice and self-hosting decision happen at story time; if self-hosted, the hosting config is ops and lives in the private repo. Store privacy declarations (Play Data Safety, Apple privacy nutrition labels) must describe this posture truthfully; the E2d/E3d store stories own that alignment.
 
 Feature: **Versioning**
 
@@ -57,8 +57,8 @@ Feature: **Versioning**
 
 ## Non-Functional Requirements
 
-- **N1. Zero browser regression.** All public-repo changes are behavior-neutral in the plain browser build; the existing e2e and visual baselines stay green without regeneration.
-- **N2. Public repo stays clean.** No signing material, team or account identifiers, store metadata, or monetization content in the public repo. Two protocol-public exceptions: `assetlinks.json` and the Android application ID it names. The application ID is public by design (it ships inside every installed APK and in the assetlinks file), so planning docs may state it; everything else store-shaped lives in the private repo.
+- **N1. Zero browser regression.** All public-repo changes are behavior-neutral in the plain browser build; the F8 analytics beacons are the one sanctioned addition, and they alter no gameplay, UI, or storage behavior. The existing e2e and visual baselines stay green without regeneration.
+- **N2. Public repo stays clean.** No signing material, team or account identifiers, store metadata, or monetization content in the public repo. Three public-by-design exceptions: `assetlinks.json`, the Android application ID it names (ships inside every installed APK and in the assetlinks file), and the F8 analytics endpoint URL plus site identifier (necessarily embedded in the shipped client, and visible to anyone who opens devtools). Everything else store-shaped lives in the private repo.
 - **N3. Reproducible store builds.** Every iOS binary is traceable to an exact public-repo ref (tag or commit SHA) recorded in the version ledger. The Android TWA ships no web assets, so its traceability is the wrapper-project state plus the live deploy version recorded in the ledger at upload time.
 - **N4. Secrets live only in CI.** Keystores, certificates, provisioning profiles, and API keys exist only as GitHub Actions secrets in the private repo, never in either repo's history.
 - **N5. Repo conventions hold.** Quality gates (typecheck, lint, test, build) green on every public PR; each story is its own PR; version bump rules per CONTRIBUTING.md; American English; no em-dashes in new prose.
