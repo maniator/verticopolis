@@ -114,6 +114,31 @@ describe("office-noise erosion is Modern-only (canon: Classic caps but never evi
     expect(condo.state).not.toBe("occupied"); // the notice fired
   });
 
+  it("Classic: a noise-stamped office notice is NOT masked when rent is over-market", () => {
+    // A Classic office on a stale noise notice whose rent has since been raised
+    // above the going rate has a real (ungated) rent problem. It must not be
+    // rescinded as noise-only: vacateCause attributes "rent" before "noise", so
+    // nonNoiseProblem must catch the over-market rent and let the eviction stand.
+    const sim = servedTower("classic");
+    sim.star = 1;
+    const cfg = rentConfig("office")!;
+    const r = sim.tower.place("office", 2, C + 2);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)! as unknown as {
+      state: string;
+      satisfaction: number;
+      rent?: number;
+      vacateReason?: string;
+      vacateAt?: number;
+    };
+    office.rent = cfg.max; // priced well over the default going rate
+    office.state = "vacating";
+    office.vacateReason = "noise";
+    office.satisfaction = 0.05;
+    office.vacateAt = 0; // overdue
+    sim.tick(60);
+    expect(office.state).not.toBe("occupied"); // rent problem still evicts, not masked
+  });
+
   it("Classic: a noise-stamped notice is NOT masked when a real access problem appears", () => {
     // A Classic condo on a stale noise notice whose floor has since gone unserved
     // must not be rescinded away: noise can't evict, but the new access problem

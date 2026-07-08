@@ -1034,7 +1034,14 @@ export class Simulation implements SimContext {
         // otherwise rescind the notice outright. Classic thus never shows a
         // noise-caused eviction, while a genuine access problem still lands.
         const noiseCannotEvict = u.vacateReason === "noise" && this.rules.noiseErosionScale() === 0;
-        const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || farWalk;
+        // Every non-noise satisfaction sink still bites in Classic (only noise is
+        // mode-gated), so mirror vacateCause's non-noise causes: unserved
+        // (access), congested, an office priced over the going rate (rent), or a
+        // far-walk office (transportFar). Any of these is a real problem that must
+        // still evict, so it blocks the noise rescind and re-attributes the stamp.
+        const officeCfg = u.kind === "office" ? rentConfig("office") : undefined;
+        const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
+        const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk;
         if (noiseCannotEvict && nonNoiseProblem) {
           u.vacateReason = this.vacateCause(u, served, cong);
         }
