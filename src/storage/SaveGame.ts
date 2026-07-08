@@ -350,12 +350,24 @@ function writeSlot(key: string, value: string): void {
     writeAutosaveValue(value);
   } catch (err) {
     // Both keys can coexist (multi-tab, or an older build re-writing the
-    // legacy key after this build migrated it). The legacy value is a stale
-    // duplicate of an already-persisted tower, so under quota pressure drop
-    // it first and retry the write before giving up.
+    // legacy key after this build migrated it). The legacy value is usually a
+    // stale duplicate of an already-persisted tower, so under quota pressure
+    // drop it first and retry the write before giving up.
     if (legacy === null) throw err;
     localStorage.removeItem(LEGACY_AUTO_KEY);
-    writeAutosaveValue(value);
+    try {
+      writeAutosaveValue(value);
+    } catch (retryErr) {
+      // If the retry fails too, put the legacy value back: an unreadable
+      // primary falls back to the legacy save at load (see loadResult), so
+      // the deleted value may be the only readable tower left.
+      try {
+        localStorage.setItem(LEGACY_AUTO_KEY, legacy);
+      } catch {
+        /* best effort: quota may still be exhausted */
+      }
+      throw retryErr;
+    }
     return;
   }
   if (legacy !== null) localStorage.removeItem(LEGACY_AUTO_KEY);

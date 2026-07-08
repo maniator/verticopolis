@@ -458,6 +458,27 @@ describe("SaveGame", () => {
     expect(boot.corrupt).toBe(false);
   });
 
+  it("restores the legacy key when the quota-pressure retry also fails", () => {
+    // Both keys exist and the origin's quota stays exhausted even after the
+    // legacy key is dropped: the write must fail WITHOUT destroying the legacy
+    // value, which an unreadable primary falls back to at load.
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const legacyValue = JSON.stringify({ ...sim.serialize(), savedAt: 123 });
+    localStorage.setItem(LEGACY_AUTO_KEY, legacyValue);
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return realSetItem(key, value);
+    });
+    try {
+      expect(() => SaveGame.save(sim)).toThrow(/quota/i);
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBe(legacyValue); // restored, not lost
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   it("loads a legacy autosave key and rewrites future saves to the Verticopolis key", () => {
     const sim = sampleGame();
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
