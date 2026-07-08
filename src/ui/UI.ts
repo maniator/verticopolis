@@ -5,6 +5,7 @@ import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
+import { getPlatform } from "../platform";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -801,21 +802,29 @@ export class UI {
     );
   }
 
-  /** Hand the player a file download (the export path). Pure DOM plumbing:
-   *  callers decide the name and contents (see SaveGame.export). */
+  /** Hand the player an exported file. Routed through the platform port so a
+   *  native wrapper can deliver it its own way (share sheet); the browser port
+   *  keeps the pre-port blob-anchor download exactly. Callers decide the name
+   *  and contents (see SaveGame.export). */
   downloadFile(filename: string, contents: string): void {
-    // octet-stream (not application/json — the payload isn't) so the browser
+    // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
-    const blob = new Blob([contents], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    // Revoking in the same task can abort the download on engines that fetch
-    // the blob URL asynchronously (Safari/Firefox) — and this is the ONLY way
-    // to get a tower out now. Give the navigation a generous head start.
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    //
+    // Every failure shape a broken wrapper can produce (sync throw, non-Promise
+    // return, rejection) must reach the same toast, because losing an export
+    // silently is never acceptable. Dead code in the browser (its saveFile
+    // never throws or rejects); a native shell rejects only on real failure,
+    // and cancel resolves, so the toast never fires for it. The call itself
+    // stays synchronous: deferring it would delay the browser download.
+    const fail = (err: unknown) => {
+      console.error("[platform] saveFile failed:", err);
+      this.toast("Couldn't save your tower file. Please try again.", "bad");
+    };
+    try {
+      void Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
+    } catch (err) {
+      fail(err);
+    }
   }
 
   /** Import goes straight to the file picker — exports are .vctower downloads
@@ -950,6 +959,36 @@ export class UI {
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
+    // Only inside a native wrapper: the report link must not navigate the
+    // shell's WebView away, so hand it to the system browser through the
+    // platform port. Browser builds attach nothing, keeping the anchor's
+    // middle-click and context-menu semantics untouched.
+    if (getPlatform().isNativeWrapper) {
+      const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
+      const fallback = (err: unknown) => {
+        // The default is already cancelled; a failing wrapper hook must not
+        // leave the link dead, so fall back to the browser behavior.
+        console.error("[platform] openExternal failed:", err);
+        window.open(report.href, "_blank", "noopener,noreferrer");
+      };
+      const routeExternal = (e: Event) => {
+        e.preventDefault();
+        // Promise.resolve folds an async wrapper hook's rejection (Capacitor's
+        // Browser.open returns a Promise) into the same fallback as a sync
+        // throw; either way the tap must still open the page somewhere.
+        try {
+          void Promise.resolve(getPlatform().openExternal(report.href)).catch(fallback);
+        } catch (err) {
+          fallback(err);
+        }
+      };
+      report.addEventListener("click", routeExternal);
+      // Middle-button activation fires auxclick, not click; route it the same
+      // way (other buttons keep their defaults, e.g. the context menu).
+      report.addEventListener("auxclick", (e) => {
+        if (e.button === 1) routeExternal(e);
+      });
+    }
     const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     const scLabel = (steady: boolean) => {
       sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;

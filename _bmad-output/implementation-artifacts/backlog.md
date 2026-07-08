@@ -78,6 +78,30 @@ How items flow:
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
+### Deferred from: code review of story-e1a-platform-port (`/gds-code-review`, 2026-07-08)
+
+- **Native export feedback is wrong-shaped for the platform port.** `exportGame`
+  (`src/game/saveLoad.ts:168-170`) toasts "Tower exported (X KB). Check your
+  downloads." synchronously, before the port's async `saveFile` settles. Inside
+  a native wrapper that means contradictory toasts on failure (good toast, then
+  the "Couldn't save your tower file" bad toast), a "Check your downloads"
+  message for a share sheet the player may have just cancelled, and copy that
+  is wrong for a share/save flow even on success. Browser behavior is
+  unaffected (its saveFile is synchronous-resolve and never rejects), which is
+  why this is deferred and not patched: the fix (await the port, pick copy per
+  `isNativeWrapper`, decide cancel semantics) is native-UX design that belongs
+  with E3b (native bridge shell) in the mobile-distribution epics. (Edge Case
+  Hunter, E1a review.)
+- **The real native-mode resolution path is unreachable from vitest.** Only
+  `resolvePlatform` is unit-tested with a hand-passed `"native"` mode string;
+  `getPlatform()` reading `import.meta.env.MODE` (vitest pins it to `"test"`)
+  and the one-shot module cache (no reset seam, per the story's
+  no-test-only-setter rule) mean a mode-string rename or env misread would ship
+  as a permanent silent fallback to browser behavior. Covered operationally by
+  E1c, whose acceptance includes verifying the `--mode native` bundle through a
+  local static server; keep that check when E1c lands. (Blind Hunter + Edge
+  Case Hunter, E1a review.)
+
 ### Deferred from: code review of breathing-clock wire-up (PR #154, `/gds-code-review`, 2026-07-07)
 
 - **Backgrounded-tab burst simulation is amplified by night pacing (pre-existing
