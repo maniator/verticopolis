@@ -409,6 +409,13 @@ export class EconomySystem {
         rec("upkeep", c);
       }
     }
+    // The Modern-only economy sinks read through the rule-set, constant for the
+    // whole maintenance run, so resolve it once outside the per-unit loop. A
+    // minimal hand-rolled test context may omit `rules`; fall back to Modern (the
+    // pre-split "all towers charged" behavior) so nothing silently changes.
+    const rules = this.sim.rules ?? MODERN_RULES;
+    const taxRate = rules.condoHoldTaxRate();
+    const overhead = rules.operatingOverheadPerUnit();
     for (const u of this.sim.tower.units) {
       const m = ECON.serviceMaintenanceMonthly[u.kind];
       if (m && u.state !== "gutted") {
@@ -416,14 +423,9 @@ export class EconomySystem {
         rec("upkeep", m);
       }
       const operational = isOperational(u);
-      // The Modern-only economy sinks read through the rule-set. A minimal
-      // hand-rolled test context may omit `rules`; fall back to Modern (the
-      // pre-split "all towers charged" behavior) so nothing silently changes.
-      const rules = this.sim.rules ?? MODERN_RULES;
       // Property tax on an unsold condo: a real carrying cost for holding out
       // for a premium sale (scales with the asking price). Modern-only sink;
       // Classic's rate is 0 (the original had no such tax).
-      const taxRate = rules.condoHoldTaxRate();
       if (taxRate > 0 && u.kind === "condo" && !u.everOccupied && operational) {
         const tax = Math.ceil(rentOf(u) * taxRate);
         cost += tax;
@@ -434,7 +436,6 @@ export class EconomySystem {
       // their income was a one-time sale already banked, so a permanent per-month
       // drain on them would be punitive rather than a live decision. Modern-only
       // sink; Classic's overhead is 0 (pixel-faithful late-game economy).
-      const overhead = rules.operatingOverheadPerUnit();
       if (overhead > 0 && operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
         cost += overhead;
         const cat = ledgerCatFor(u.kind);
