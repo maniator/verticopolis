@@ -58,7 +58,7 @@ export interface ParsedLegacyTower {
  * paving pass; multi-story parts live in {@link PART_FAMILY}; anything in
  * neither table is dropped with a report line.
  */
-const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
+export const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
   3: "hotelSingle",
   4: "hotelDouble", // the original's "twin"; closest match, reported as lossy
   5: "hotelSuite",
@@ -124,16 +124,16 @@ const TDT_BURNED = 48;
 
 /** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4, proven by
  *  the lobby table; TDT 10/24/39/… = floors 1/15/30/…). */
-const TDT_FLOOR_OFFSET = 9;
+export const TDT_FLOOR_OFFSET = 9;
 
 /** Ceiling on the header's signed day counter (~1,000 in-game years) so a
  *  forged value can't blow the minutes math into precision-loss territory. */
 const MAX_IMPORT_DAY = 360_000;
 
 /** Hotel status-byte flags (unit byte 5; doc §4). */
-const HOTEL_OCCUPANT_MASK = 0x03;
-const HOTEL_ASLEEP_FLAG = 16;
-const HOTEL_DIRTY_FLAG = 32;
+export const HOTEL_OCCUPANT_MASK = 0x03;
+export const HOTEL_ASLEEP_FLAG = 16;
+export const HOTEL_DIRTY_FLAG = 32;
 const HOTEL_INFESTED_FLAG = 64;
 
 /** The ground floor (1) and every 15th floor above host a (sky) lobby;

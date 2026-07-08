@@ -8,6 +8,7 @@ import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool } from "../ui/UI";
 import { unitEditorHtml, transportEditorHtml } from "../ui/editorHtml";
 import { SaveGame } from "../storage/SaveGame";
+import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import { buildTdt } from "./fixtures/tdtBuilder";
 import { BuildActions } from "../game/buildActions";
@@ -32,22 +33,27 @@ function last<T>(arr: T[]): T {
 function fakes() {
   const toasts: { text: string; kind?: "info" | "good" | "bad" | "money" }[] = [];
   const sfx: string[] = [];
-  const downloads: { filename: string; contents: string }[] = [];
+  const downloads: { filename: string; contents: string | Uint8Array }[] = [];
   const importReports: { report: ImportReport; open: () => void }[] = [];
+  const exportReports: { report: ExportReport; download: () => void }[] = [];
   return {
     toasts,
     sfx,
     downloads,
     importReports,
+    exportReports,
     ui: {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
-      downloadFile: (filename: string, contents: string) => {
+      downloadFile: (filename: string, contents: string | Uint8Array<ArrayBuffer>) => {
         downloads.push({ filename, contents });
       },
       showImportReport: (report: ImportReport, cb: { onOpen: () => void }) => {
         importReports.push({ report, open: cb.onOpen });
+      },
+      showExportReport: (report: ExportReport, cb: { onDownload: () => void }) => {
+        exportReports.push({ report, download: cb.onDownload });
       },
     },
     audio: {
@@ -663,6 +669,35 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(777_777);
     expect(f.toasts).toEqual([{ text: "Tower imported.", kind: "good" }]);
+  });
+
+  it("exportLegacy: the reverse fidelity report shows first; nothing downloads until the primary", () => {
+    sim.money = 1_234_567;
+    saveLoad.exportLegacy();
+    expect(f.downloads).toHaveLength(0); // two-step contract
+    expect(f.exportReports).toHaveLength(1);
+    const { report, download } = f.exportReports[0];
+    expect(report.money).toBe(1_234_600); // $100-quantized, said up front
+    expect(report.filename).toMatch(/^[A-Z0-9]{1,8}\.TDT$/);
+    download();
+    expect(f.downloads).toHaveLength(1);
+    expect(f.downloads[0].filename).toBe(report.filename);
+    const bytes = f.downloads[0].contents as Uint8Array;
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes[0]).toBe(0x00); // TDT magic 0x2400 little-endian
+    expect(bytes[1]).toBe(0x24);
+  });
+
+  it("exportLegacy: a Modern tower is refused with the rules message, nothing shown or downloaded", () => {
+    saveLoad.newGame("modern");
+    sim = adopted[0];
+    f.toasts.length = 0;
+    saveLoad.exportLegacy();
+    expect(f.exportReports).toHaveLength(0);
+    expect(f.downloads).toHaveLength(0);
+    expect(f.toasts).toEqual([
+      { text: "This tower uses Modern rules. SimTower (1994) can only load Classic towers.", kind: "bad" },
+    ]);
   });
 
   it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", () => {

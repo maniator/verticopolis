@@ -98,6 +98,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onExport: vi.fn(),
     onImport: vi.fn(),
     onImportLegacy: vi.fn(),
+    onExportLegacy: vi.fn(),
     onNew: vi.fn(),
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
@@ -148,7 +149,7 @@ describe("wireActions — the anti-dead-button contract", () => {
     // The handler ran — it swapped the saves dialog for the export confirm —
     // but nothing is exported until the player clicks Export in there.
     expect(cb.onExport).not.toHaveBeenCalled();
-    click('[data-act="yes"]');
+    click('[data-act="export"]'); // the confirm dialog's own primary
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
@@ -436,15 +437,25 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     document.getElementById("btn-export")!.click();
     expect(dialog().open).toBe(true);
     expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
-    const yes = dialog().querySelector('[data-act="yes"]')!;
-    expect(yes.textContent).toBe("Export"); // not a generic "Confirm"
-    click('[data-act="no"]'); // cancel → still no export
+    const primary = dialog().querySelector('[data-act="export"]')!;
+    expect(primary.textContent).toBe("Export"); // not a generic "Confirm"
+    expect(primary.classList.contains("primary")).toBe(true); // one primary per dialog
+    click('[data-act="close"]'); // cancel → still no export
     expect(cb.onExport).not.toHaveBeenCalled();
 
     document.getElementById("btn-export")!.click();
-    click('[data-act="yes"]');
+    click('[data-act="export"]');
     expect(cb.onExport).toHaveBeenCalledTimes(1);
     expect(dialog().open).toBe(false); // the toast isn't hidden under the modal
+  });
+
+  it("the confirm dialog's secondary routes to the 1994 export flow, never the .vctower one", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-export")!.click();
+    click('[data-act="legacy"]');
+    expect(cb.onExportLegacy).toHaveBeenCalledTimes(1);
+    expect(cb.onExport).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
   });
 
   it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
@@ -585,6 +596,63 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     click('[data-act="decline"]');
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
     expect(onOpen).not.toHaveBeenCalled();
+  });
+});
+
+describe("export fidelity report: nothing downloads until the player confirms", () => {
+  const exportReport = () => ({
+    towerName: "GRAND",
+    filename: "GRAND.TDT",
+    star: 3,
+    money: 1_500_000,
+    floors: 5,
+    basements: 1,
+    roomsExported: 9,
+    comesAlong: ["9 rooms with their occupancy and hotel states."],
+    staysBehind: ["The income ledger and finance history start fresh in 1994."],
+  });
+
+  it("shows the facts and both lists; Download fires onDownload and closes", () => {
+    const { ui } = makeUI();
+    const onDownload = vi.fn();
+    ui.showExportReport(exportReport(), { onDownload });
+    expect(dialog().open).toBe(true);
+    const text = dialog().textContent!;
+    expect(text).toContain("GRAND");
+    expect(text).toContain("Comes along");
+    expect(text).toContain("Stays behind");
+    expect(text).toContain("GRAND.TDT");
+    expect(onDownload).not.toHaveBeenCalled(); // two-step contract
+    click('[data-act="download"]');
+    expect(onDownload).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Cancel downloads nothing; content is escaped against hostile tower names", () => {
+    const { ui } = makeUI();
+    const onDownload = vi.fn();
+    ui.showExportReport(
+      { ...exportReport(), towerName: "<img src=x onerror=alert(1)>" },
+      { onDownload },
+    );
+    expect(dialog().querySelector("img")).toBeNull();
+    expect(dialog().textContent).toContain("<img src=x onerror=alert(1)>");
+    click('[data-act="close"]');
+    expect(onDownload).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("never clobbers a live blocking modal: yields with a toast instead", () => {
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
+    const onDownload = vi.fn();
+    ui.showExportReport(exportReport(), { onDownload });
+    expect(dialog().textContent).toContain("A fire has broken out!");
+    expect(document.getElementById("toast-wrap")!.textContent).toContain("Close the open dialog first");
+    click('[data-act="decline"]');
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(onDownload).not.toHaveBeenCalled();
   });
 });
 
