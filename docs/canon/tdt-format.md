@@ -211,9 +211,9 @@ structures; **324-byte per-floor entries** (waiting-up/down counts + up to
 floor, passenger count, turnaround floor, up to 42 passenger indices, their
 destination floors, and per-floor destination counts).
 
-> **Canon conflict for review:** [TD] gives **service capacity 10**; our
-> `TRANSPORT_CAPACITY.elevatorService` is 16. Express 42 and standard 21 match
-> ours. Decide via the canon process before changing the engine.
+> **Resolved (v1.9.5):** all three car capacities now match the save (express
+> 42, standard 21, service 10). Service was an uncited 16; it was lowered to the
+> canon 10 via the review process, and `src/tests/canon.test.ts` pins all three.
 
 ### Stairs / escalators
 

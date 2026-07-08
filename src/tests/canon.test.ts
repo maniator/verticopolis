@@ -7,6 +7,7 @@ import {
   POOLED_CAPS,
   STAR_THRESHOLDS,
   TOWER_POPULATION,
+  TRANSPORT_CAPACITY,
   maxSpanFor,
 } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
@@ -54,6 +55,14 @@ describe("canon: transport pools (tdt-format.md §8)", () => {
     expect(maxSpanFor("elevatorExpress")).toBe(GRID.maxFloor - GRID.minFloor);
     expect(maxSpanFor("stairs")).toBe(1);
     expect(maxSpanFor("escalator")).toBe(1);
+  });
+
+  // Per-car passenger capacity: the value each elevator's .TDT header stores as
+  // its per-car capacity (tdt-format.md §8): express 42, standard 21, service 10.
+  it("car capacities match the save's stored values (express 42 / standard 21 / service 10)", () => {
+    expect(TRANSPORT_CAPACITY.elevatorExpress).toBe(42);
+    expect(TRANSPORT_CAPACITY.elevatorStandard).toBe(21);
+    expect(TRANSPORT_CAPACITY.elevatorService).toBe(10);
   });
 });
 
