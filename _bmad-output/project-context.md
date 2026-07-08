@@ -19,6 +19,20 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - All art and audio are **generated in code** (no ripped/imported assets), a clean-room homage.
 - The simulation is deterministic and **headless-testable** (seeded `rng.ts`); tests are Vitest.
 
+## Distribution targets (packaging only, game scope unchanged)
+- The web game at https://verticopolis.com stays the primary platform and the single
+  source of truth. Distribution now also targets **Android (a TWA of the live site)**
+  and **iOS (a Capacitor wrapper of the same web build)**; see
+  `_bmad-output/planning-artifacts/prds/prd-mobile-distribution-2026-07-08/prd.md`
+  and its paired arch/epics docs.
+- Wrapper projects, store configs, CI signing, and anything monetization-shaped live
+  in the **private distribution repo**, never here. Two
+  protocol-public exceptions (PRD N2): `src/public/.well-known/assetlinks.json` and
+  the Android application ID it names.
+- Public-repo mobile work is limited to platform seams (`src/platform/` port, PWA
+  gating, native build mode) that are **no-ops in the browser build**. This does not
+  loosen the parity scope: no new mechanics, `primary_platform` stays `web`.
+
 ## Where the truth lives (engine)
 - `src/engine/facilities.ts`: **the tuning source of truth**: `GRID` (lot 340 wide, floors
   −9…100), `STAR_THRESHOLDS`, `TOWER_POPULATION`, per-facility cost/width/minStar/population,
