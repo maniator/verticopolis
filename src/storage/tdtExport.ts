@@ -368,14 +368,17 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
 
   // Header (doc §1). The undocumented region is zero-filled; whether the real
   // game needs anything there is the recorded real-game validation risk.
-  // Guard non-finite money (deserialize doesn't harden it yet; see the
-  // backlog's deserialize-coercion row): NaN through the clamp would write 0
-  // to the file while the modal showed "$NaN".
+  // Guard non-finite money and star (deserialize doesn't harden them yet;
+  // see the backlog's deserialize-coercion row): NaN through a clamp would
+  // write 0 to the file while the modal showed the raw garbage. One
+  // sanitized value feeds BOTH the header and the report, so the modal can
+  // never claim a rating the bytes don't carry.
   const money = Number.isFinite(save.money) ? save.money : 0;
   const balance = Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(money / 100)));
+  const star = Number.isFinite(save.star) ? Math.max(1, Math.min(6, Math.round(save.star))) : 1;
   const minuteOfDay = ((save.minutes % 1440) + 1440) % 1440;
   u16(TDT_MAGIC);
-  u16(Math.max(1, Math.min(6, save.star)));
+  u16(star);
   i32(balance);
   i32(0); // otherIncome
   i32(0); // constructionCosts
@@ -389,7 +392,9 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // file that every reader rejects. Unreachable from live play (rooms are at
   // least 4 tiles wide on a 375-tile lot); only forged saves get here.
   for (const [, tenants] of tenantsByTdt) {
-    if (tenants.length >= TDT_MAX_TENANTS_PER_FLOOR) {
+    // Same boundary as the reader (which rejects strictly greater): a floor
+    // AT the ceiling is still parseable and must export.
+    if (tenants.length > TDT_MAX_TENANTS_PER_FLOOR) {
       throw new LegacyExportError(
         "One floor holds more rooms than a SimTower (1994) save can carry.",
       );
@@ -627,7 +632,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   const report: ExportReport = {
     towerName: save.towerName,
     filename: legacyFilename(save.towerName),
-    star: save.star,
+    star,
     money: balance * 100,
     floors: topFloor,
     basements,

@@ -300,6 +300,24 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     expect(report.money).toBe(0);
     expect(parseTDT(bytes.buffer as ArrayBuffer, "S.TDT").save.money).toBe(0);
   });
+
+  it("a forged star feeds ONE sanitized value into both the header and the report", () => {
+    const forged = buildTDT({ ...sampleSave(), star: NaN });
+    expect(forged.report.star).toBe(1);
+    expect(parseTDT(forged.bytes.buffer as ArrayBuffer, "S.TDT").save.star).toBe(1);
+    const high = buildTDT({ ...sampleSave(), star: 9.7 });
+    expect(high.report.star).toBe(6);
+    expect(parseTDT(high.bytes.buffer as ArrayBuffer, "S.TDT").save.star).toBe(6);
+  });
+
+  it("a floor AT the 256-tenant ceiling exports (only strictly-greater refuses)", () => {
+    const save = sampleSave();
+    for (let i = 0; i < 256; i++) {
+      save.units.push(unit({ id: 11_000 + i, kind: "office", floor: 40, x: i, width: 1 }));
+    }
+    const { bytes } = buildTDT(save);
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+  });
 });
 
 describe("shared-table tripwires: the writer's inversions match the importer", () => {
