@@ -4,8 +4,13 @@ import { GRID } from "../engine/facilities";
 import { ECON, rentConfig } from "../engine/econConfig";
 import type { GameMode } from "../engine/types";
 
-/** In-game minutes spanning exactly one month boundary (payMaintenance fires once). */
-const MONTH = 60 * 24 * 31;
+/**
+ * In-game minutes spanning one 30-day month, matching the sim's own month
+ * definition (`Math.floor(clock.day / 30)` in Simulation.onDay). In the v1
+ * model a single `sim.tick(MONTH)` advances the clock in one jump and fires
+ * `onDay` (hence `payMaintenance`) exactly once.
+ */
+const MONTH = 60 * 24 * 30;
 
 /**
  * The three non-canon economy mechanics (operating overhead, condo hold-tax,
@@ -43,7 +48,7 @@ describe("office-noise erosion is Modern-only (canon: Classic caps but never evi
     const hotel = sim.tower.units.find((u) => u.id === r.unitId)!;
     hotel.state = "asleep";
     hotel.satisfaction = 1;
-    // A full week of unbroken exposure — far past any eviction fuse.
+    // A full week of unbroken exposure, far past any eviction fuse.
     for (let i = 0; i < 24 * 7; i++) sim.tick(60);
     return hotel.satisfaction;
   }

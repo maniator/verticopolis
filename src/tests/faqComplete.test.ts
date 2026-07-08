@@ -360,7 +360,7 @@ describe("Deep-review regressions (must not come back)", () => {
     expect(condo.vacateReason).toBeUndefined();
   });
 
-  it("D25c: a sold condo is sticky — a transient noisy neighbor annoys but never evicts an owner", () => {
+  it("D25c: a sold condo is sticky; a transient noisy neighbor annoys but never evicts an owner", () => {
     const sim = Simulation.newGame(2, "modern"); // sold-condo stickiness under the Modern noise erosion
     sim.money = 1e9;
     sim.star = 1;
