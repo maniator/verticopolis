@@ -4,9 +4,9 @@ import { loadPrefs, savePrefs, reducedMotionActive } from "../storage/Prefs";
 describe("Prefs (accessibility preferences)", () => {
   beforeEach(() => localStorage.clear());
 
-  it("round-trips reducedMotion + colorblindCue", () => {
-    savePrefs({ reducedMotion: true, colorblindCue: false });
-    expect(loadPrefs()).toEqual({ reducedMotion: true, colorblindCue: false });
+  it("round-trips reducedMotion + colorblindCue + steadyClock", () => {
+    savePrefs({ reducedMotion: true, colorblindCue: false, steadyClock: true });
+    expect(loadPrefs()).toEqual({ reducedMotion: true, colorblindCue: false, steadyClock: true });
   });
 
   it("defaults to {} when absent", () => {
@@ -16,7 +16,7 @@ describe("Prefs (accessibility preferences)", () => {
   it("tolerates corrupt JSON and non-boolean fields", () => {
     localStorage.setItem("vc.prefs", "{not valid json");
     expect(loadPrefs()).toEqual({});
-    localStorage.setItem("vc.prefs", JSON.stringify({ reducedMotion: "yes", colorblindCue: 1 }));
+    localStorage.setItem("vc.prefs", JSON.stringify({ reducedMotion: "yes", colorblindCue: 1, steadyClock: "sure" }));
     expect(loadPrefs()).toEqual({}); // non-booleans dropped, no throw
   });
 

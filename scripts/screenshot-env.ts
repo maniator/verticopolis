@@ -52,6 +52,7 @@ export interface Scene {
   viewport?: Viewport; // desktop by default
   route?: string; // navigate here instead of building a tower (gallery/excalibur/preview)
   keepSplash?: boolean; // firstRun scene captures splash states, so don't dismiss
+  initScript?: () => void; // runs before page scripts, for per-scene localStorage/bootstrap tweaks
   build?: () => void; // stage the sim once for this scene (runs in-page)
   assertUnits?: number; // after build, assert the tower has ≥ this many units
   shots: Shot[];

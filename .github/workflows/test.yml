@@ -47,6 +47,8 @@ jobs:
   # job's steps run, so the tag has to come from a prior job's output.)
   resolve-image:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     outputs:
       image: ${{ steps.pin.outputs.image }}
     steps:
@@ -65,6 +67,8 @@ jobs:
   e2e:
     needs: resolve-image
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     container:
       image: ${{ needs.resolve-image.outputs.image }}
 

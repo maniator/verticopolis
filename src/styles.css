@@ -740,6 +740,10 @@ a.btn {
 }
 .modal-actions {
   display: flex;
+  /* Wrap the action row when it holds more buttons than fit (e.g. the Help
+     footer's four) so they drop to a second line as whole buttons on narrow
+     screens, rather than compressing into multi-line labels. */
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
   justify-content: flex-end;

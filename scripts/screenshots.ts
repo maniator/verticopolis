@@ -112,6 +112,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         }
       });
     }
+    if (scene.initScript) await page.addInitScript(scene.initScript);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
     if (scene.route) {
       // Route pages set their own ready flag (galleryReady / excaliburReady / previewReady).

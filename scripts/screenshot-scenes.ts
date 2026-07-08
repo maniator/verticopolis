@@ -240,6 +240,11 @@ export const SCENES: Scene[] = [
   {
     id: "crowd",
     outDir: "screenshots",
+    // Pin steadyClock so the fixed 6s wait still lands in the morning rush. The
+    // breathing clock would otherwise race toward noon and change the shot.
+    initScript: () => {
+      localStorage.setItem("vc.prefs", JSON.stringify({ steadyClock: true }));
+    },
     build: buildCrowdTower,
     assertUnits: 40,
     shots: [{ name: "14-crowd-routing", wait: 6000 }],
@@ -714,4 +719,3 @@ async function growToStar(page: Page, target: number): Promise<void> {
   const reached = await page.evaluate(pgGrowToStar, target);
   if (reached < target) throw new Error(`milestone ${target}★ only reached ${reached}★`);
 }
-
