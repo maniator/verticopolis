@@ -43,8 +43,12 @@ import {
  * Writer for original 1994 SimTower saves (`.TDT`): the importer's mirror.
  * Serializes a {@link SerializedGame} into the binary layout documented in
  * `docs/canon/tdt-format.md`, plus an honest {@link ExportReport} of what the
- * 1994 format can and cannot carry. Every semantic table is imported from
- * `tdtImport.ts` and inverted here, so reader and writer cannot drift apart.
+ * 1994 format can and cannot carry. Semantic tables the importer also owns
+ * (tenant IDs, part families, hotel flags, rent classes, elevator kinds) are
+ * imported from `tdtImport.ts` and inverted here, so reader and writer cannot
+ * drift apart on those. {@link PART_STACKS} is writer-local because it adds
+ * emission ORDER, which the reader never needs; consistency-tripwire tests
+ * pin every entry to the shared `PART_FAMILY`/`FAMILY_STORIES` tables.
  *
  * Self-consistency is enforced by tests: every exported buffer must parse
  * back through `parseTDT` with zero warnings and identical room state.
