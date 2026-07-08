@@ -1,4 +1,5 @@
 import { FACILITIES } from "./facilities";
+import { ECON } from "./econConfig";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
 
@@ -76,6 +77,25 @@ export interface GameRules {
    * uniform); Modern sharpens for big families and softens slightly for small.
    */
   churnMultiplier(residents: number | undefined): number;
+
+  // ---- The Modern "deeper economy" layer -------------------------------------
+  // Three mechanics the 1994 original never had, added (gdd-economy-depth,
+  // gdd-tenant-churn) to fight the original's late-game money trivialization.
+  // They are Modern-only: Classic returns the neutral value so a Classic tower is
+  // pixel-faithful (money genuinely trivializes late, exactly as in 1994).
+
+  /** Monthly operating overhead charged per HELD leasable/operational unit
+   *  (a carrying cost on vacant/unserved space). Modern: the tuned value;
+   *  Classic: 0. */
+  operatingOverheadPerUnit(): number;
+  /** Monthly property-tax rate on an UNSOLD condo, as a fraction of its asking
+   *  price. Modern: the tuned rate; Classic: 0. */
+  condoHoldTaxRate(): number;
+  /** Scale on the office-noise satisfaction EROSION that can evict a tenant.
+   *  Modern: 1 (erosion active). Classic: 0, so noise only CAPS satisfaction at
+   *  the ceiling and never erodes below it (canon "office noise caps but never
+   *  evicts"). */
+  noiseErosionScale(): number;
 }
 
 export const CLASSIC_RULES: GameRules = {
@@ -92,6 +112,16 @@ export const CLASSIC_RULES: GameRules = {
   },
   churnMultiplier() {
     return 1;
+  },
+  // Classic is pixel-faithful: none of the Modern economy sinks apply.
+  operatingOverheadPerUnit() {
+    return 0;
+  },
+  condoHoldTaxRate() {
+    return 0;
+  },
+  noiseErosionScale() {
+    return 0; // noise caps satisfaction but never erodes/evicts (canon)
   },
 };
 
@@ -114,6 +144,16 @@ export const MODERN_RULES: GameRules = {
     // Clamped positive so it can only ever soften or sharpen the drain, never
     // flip its sign (dead for the legal 2–5 band; a guard if the band widens).
     return Math.max(0.5, 1 + HOUSEHOLD_CHURN_PER_PERSON * (residents - CLASSIC_HOUSEHOLD));
+  },
+  // Modern runs the deeper-economy sinks at their tuned values.
+  operatingOverheadPerUnit() {
+    return ECON.overheadPerLeasableUnitMonthly;
+  },
+  condoHoldTaxRate() {
+    return ECON.condoMonthlyTaxRate;
+  },
+  noiseErosionScale() {
+    return 1;
   },
 };
 

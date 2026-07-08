@@ -1,4 +1,5 @@
 import type { Clock } from "./Clock";
+import type { GameRules } from "./gameRules";
 import type { LedgerCat } from "./Ledger";
 import type { RNG } from "./rng";
 import type { Tower } from "./Tower";
@@ -20,6 +21,12 @@ export interface SimContext {
   /** Mutable cash balance; subsystems add income / subtract costs directly. */
   money: number;
   readonly star: number;
+  /** The tower's Classic/Modern rule-set (chosen at founding). Subsystems read
+   *  mode-divergent policy through it (e.g. the Modern-only economy sinks) so no
+   *  `if (mode === …)` ever smears across the engine. Optional so a minimal
+   *  hand-rolled test context can omit it; the economy falls back to Modern
+   *  (the pre-split "all towers charged" behavior) when absent. */
+  readonly rules?: GameRules;
   /** Simulation model selector (Phase 2). Absent/`v1` = shipped behavior;
    * `v2` enables the spatial models (e.g. service coverage radius). */
   readonly simModel?: "v1" | "v2";

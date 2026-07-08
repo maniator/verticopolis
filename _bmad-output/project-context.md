@@ -43,7 +43,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
 - **Parking** has a **Ramp** + **Spaces**; a space only functions when chained (contiguous
   spaces) back to a ramp. Unconnected spaces are dead ("red X").
-- **Office noise** caps adjacent hotel/condo satisfaction (≤0.6); it does not evict.
+- **Office noise** caps adjacent hotel/condo satisfaction (≤0.6). In **Classic** that is all it does (canon: caps but never evicts). In **Modern** it also erodes below the cap and can eventually evict (`GameRules.noiseErosionScale()` gates this; Classic returns 0).
 - **Cinemas** book an average (~$150k) or **blockbuster** (~$300k, bigger crowd) film monthly.
 - Emergencies (fire-rescue / bomb-ransom) are **player choices** via a modal that **pauses** the sim.
 - **Service elevators are staff-only**: tenants never route through or board them, and they

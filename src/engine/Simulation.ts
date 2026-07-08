@@ -998,7 +998,14 @@ export class Simulation implements SimContext {
         // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
         // with an occupied-but-unsold condo. The annoyance cap is shared, so all
         // still redden on the stats overlay from the moment of exposure.
-        const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        const baseErosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        // W1 transport-too-far is canon parity and erodes in EVERY tower. W2
+        // office-noise is the Modern-only mechanic: when noise is the ONLY cause,
+        // Classic scales the erosion to 0 so noise merely CAPS satisfaction at
+        // NOISE_CAP and never erodes/evicts (canon "noise caps but never evicts");
+        // Modern keeps eroding. A far-walk office always erodes regardless of mode.
+        const scale = farWalk ? 1 : this.rules.noiseErosionScale();
+        const erosion = baseErosion * scale;
         u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
