@@ -12,6 +12,11 @@ test("winning the TOWER shows the congratulations modal", async ({ page }) => {
   await page.goto("/");
   await page.waitForFunction(() => Boolean((window as unknown as { game?: unknown }).game));
 
+  // Dismiss the title screen first, the way a real player does before playing:
+  // the update loop deliberately holds back auto-surfaced modals (this congrats
+  // included) while the splash is up, so nothing pops over the title screen.
+  await page.evaluate(() => document.getElementById("splash")?.remove());
+
   const star = await page.evaluate(buildToStar, 6);
   expect(star).toBe(6); // the real win logic reached TOWER
 

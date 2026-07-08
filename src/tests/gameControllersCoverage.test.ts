@@ -800,6 +800,9 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed
     expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
+    // The recovery resume flag is stamped so the fresh boot drops the player back
+    // into their tower instead of showing the title screen (see resolveBootScreen).
+    expect(Number(sessionStorage.getItem("vc-resume-after-recovery"))).toBeGreaterThan(0);
     expect(reload).toHaveBeenCalledTimes(1);
     expect(bootMessages).toEqual([]); // no manual card on the first loss
   });
@@ -929,6 +932,9 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
       document.dispatchEvent(new Event("visibilitychange"));
       expect(reload).toHaveBeenCalledTimes(1);
       expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
+      // The deferred reload also stamps the recovery resume flag, so a hidden-tab
+      // recovery drops the player back in rather than showing the title screen.
+      expect(Number(sessionStorage.getItem("vc-resume-after-recovery"))).toBeGreaterThan(0);
       // The one-shot listener removed itself: another flip doesn't re-reload.
       document.dispatchEvent(new Event("visibilitychange"));
       expect(reload).toHaveBeenCalledTimes(1);

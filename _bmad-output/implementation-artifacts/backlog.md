@@ -109,6 +109,19 @@ Triage them into the table above, then delete the raw note._
 - **Per-car 348-byte term unverified.** The elevator record stride `3140 + 324*servicedFloors + 348*cars` is validated end-to-end only against my_tower.TDT, whose 3 shafts are all cars=1, and the fixture pads with the SAME formula (self-referential), so no test independently pins the 348 per-car size (or the 3140 base). Verify against a real save containing a MULTI-CAR built shaft before trusting exports/imports of many-car towers. Confirmed (Low, coverage gap).
 - **`locateStairs` max-built scan is a heuristic, not a guarantee.** It picks the 64-record window with the most in-range built records; a coincidental later region (e.g. the §11 lobby/reachability 528x6 table, or §12 named-tenant bytes) could theoretically out-count a small real table and import phantom flights. Mitigated in practice (my_tower with those trailing blocks imported exactly 6 correct flights; parking's stall bytes inject rejecting values; window tightened to 4 KB; x>=1 rejects the common `01 00..` garbage). Harden with a contiguity/cluster check or calibrate against more real saves (esp. a low-stair-count tower with populated trailing blocks). Suspected (Edge Case hunter, Med).
 
+### Deferred from: splash-on-cold-reopen (`/bmad-code-review`, 2026-07-08)
+
+- **A newly founded tower (New Tower) lands at play speed, not paused.** From the
+  splash, New Tower → `dismiss()` runs `teardownSplash()` → `pauseForSplash(false)`
+  → `setSpeed(1)`, and `SaveLoad.newGame` (`src/game/saveLoad.ts`) never sets a
+  speed, so the fresh tower begins ticking at ▶. Every other boot outcome
+  (Continue, same-tab reload, post-update reload) deliberately lands paused. This
+  is pre-existing (first-run New Tower already did it) and harmless (an empty
+  tower loses no game-hours), so it was not patched in this PR. If we want "every
+  boot lands paused" to be uniform, have `newGame` (or the splash New Tower path)
+  `setSpeed(0)`. Type: review-deferral, Severity: low. (Edge Case Hunter, splash
+  cold-reopen review.)
+
 ### Deferred from: code review of story-e1a-platform-port (`/gds-code-review`, 2026-07-08)
 
 - **Native export feedback is wrong-shaped for the platform port.** `exportGame`

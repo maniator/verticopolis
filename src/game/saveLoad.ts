@@ -32,6 +32,17 @@ export interface SaveLoadDeps {
   armOnboarding(): void;
 }
 
+/**
+ * sessionStorage key stamped right before the WebGL context-loss recovery
+ * reload. The fresh boot reads (and clears) it to learn this reload was an
+ * app-initiated recovery, so it drops the player straight back into their tower
+ * (paused) instead of showing the title screen. Same idea as the update-resume
+ * flag in main.ts. Kept SEPARATE from `vc-gl-lost-reload`, which must persist
+ * across the boot to detect a rapid double crash; this one is consumed at boot
+ * so a later manual reload still shows the splash.
+ */
+export const RESUME_AFTER_RECOVERY_KEY = "vc-resume-after-recovery";
+
 export class SaveLoad {
   private autosaveRun: Promise<void> | null = null;
   private autosaveQueued = false;
@@ -159,7 +170,12 @@ export class SaveLoad {
 
     const reload = () => {
       try {
-        sessionStorage.setItem(KEY, String(Date.now()));
+        const now = String(Date.now());
+        sessionStorage.setItem(KEY, now);
+        // Tell the fresh boot this reload was a recovery, so it resumes the tower
+        // rather than showing the title screen (see resolveBootScreen in
+        // src/bootScreen.ts, consumed by the boot branch in main.ts).
+        sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, now);
       } catch {
         /* best effort */
       }

@@ -19,10 +19,11 @@ import { buildStatsHtml } from "./ui/statsHtml";
 import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
-import { SaveLoad } from "./game/saveLoad";
+import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
 import { InspectorController } from "./game/inspector";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
+import { resolveBootScreen } from "./bootScreen";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
@@ -36,9 +37,12 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
  *  lets the boot ignore a stale flag left by an `updateSW` that resolved without
  *  ever reloading (so an unrelated later reload is never mislabeled). */
 const RESUME_AFTER_UPDATE_KEY = "vc-resume-after-update";
-/** A real update reloads within a second or two of the click; only honor the
- *  "Updated" greeting inside this window. */
-const RESUME_AFTER_UPDATE_MAX_AGE_MS = 30_000;
+/** An app-initiated resume reload (an "Update now" reload or a WebGL context-loss
+ *  recovery reload) fires within a second or two of its trigger. Only honor the
+ *  resume flag (skip the splash, greet accordingly) inside this window, so a stale
+ *  flag left by a trigger that resolved without actually reloading can't skip a
+ *  later boot's splash. Shared by both resume flags. */
+const RESUME_RELOAD_MAX_AGE_MS = 30_000;
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -332,51 +336,73 @@ class GameApp {
       pauseForSplash: (paused) => this.setSpeed(paused ? 0 : 1),
       chime: () => this.audio.sfx("promote"),
     });
-    // A returning player with a readable save is dropped straight into their
-    // tower — no title screen to click through every launch (and especially not
-    // right after "Update now", whose modal promised "keep playing"). But we boot
-    // PAUSED: time must never advance while the player reacquires their view and
-    // selection, which reset on reload (this is the same "don't lose game-hours"
-    // rule the update modal's freeze enforces, minus the full-screen gate).
+    // The title screen loads on every boot, so its branding, the attribution
+    // line, and the Continue-vs-New-Tower (rule-set) choice greet the player each
+    // launch. The exceptions are the two app-initiated resume reloads: the
+    // post-"Update now" reload (its modal promised "keep playing") and the WebGL
+    // context-loss recovery reload (a GPU crash we auto-recover from). Both drop
+    // the player straight back into their tower (paused), skipping the splash.
+    // Continue (or a resume drop-in) boots PAUSED either way: time must never
+    // advance while the player reacquires their view and selection, which reset
+    // on reload (the same "don't lose game-hours" rule the update modal's freeze
+    // enforces).
     //
-    // The splash is reserved for the one moment it earns its place — first run /
-    // no readable save / a corrupt save — where its branding, the attribution
-    // line, and the New-Tower-vs-Continue (rule-set) choice are genuine
-    // first-contact value. (The attribution also lives in Help → About, so it
-    // stays discoverable for returning players who never see the splash.)
-    // Read+clear the "just updated" flag UNCONDITIONALLY, before the branch: an
-    // update can reload into an unreadable save (→ the splash branch below), and
-    // the flag must still be consumed there so it can't survive to mislabel a
-    // later boot as "Updated".
+    // Read+clear both resume flags UNCONDITIONALLY, before the branch: a resume
+    // reload can land on an unreadable save (the splash branch below), and the
+    // flags must still be consumed there so a stale one can't mislabel a later
+    // boot.
     let justUpdated = false;
     try {
       const stamp = Number(sessionStorage.getItem(RESUME_AFTER_UPDATE_KEY));
       sessionStorage.removeItem(RESUME_AFTER_UPDATE_KEY);
-      justUpdated = Number.isFinite(stamp) && Date.now() - stamp < RESUME_AFTER_UPDATE_MAX_AGE_MS;
+      justUpdated = Number.isFinite(stamp) && Date.now() - stamp < RESUME_RELOAD_MAX_AGE_MS;
     } catch {
       /* sessionStorage can throw in private mode — treat it as not-an-update */
     }
-    if (this.hadReadableSave) {
-      this.setSpeed(0); // land paused; the ▶ Play control is the single "resume"
+    let justRecovered = false;
+    try {
+      const stamp = Number(sessionStorage.getItem(RESUME_AFTER_RECOVERY_KEY));
+      sessionStorage.removeItem(RESUME_AFTER_RECOVERY_KEY);
+      justRecovered = Number.isFinite(stamp) && Date.now() - stamp < RESUME_RELOAD_MAX_AGE_MS;
+    } catch {
+      /* sessionStorage can throw in private mode, so treat it as not-a-recovery */
+    }
+    if (resolveBootScreen({ hadReadableSave: this.hadReadableSave, justUpdated, justRecovered }) === "resume") {
+      // An app-initiated resume reload (update or GPU-crash recovery): drop the
+      // player straight back into their tower, skipping the title screen. Land
+      // paused; the ▶ Play control is the single "resume", so time must not
+      // advance while the player reacquires their view and selection, which reset
+      // on reload (the same rule the update modal's freeze enforces). The update
+      // reload gets the "Updated …" greeting; a recovery reload gets the plain
+      // "Welcome back" (a successful GPU recovery is deliberately undramatic).
+      this.setSpeed(0);
       this.ui.toast(
         justUpdated ? `Updated to v${APP_VERSION}. Press ▶ to resume.` : "Welcome back. Press ▶ to resume.",
         "info",
       );
     } else {
-      // A corrupt save is not a continuable tower: reflect READABILITY, not mere
-      // presence, so the splash never promises "Continue" over a fresh boot sim.
+      // Every other boot (cold reopen, a manual reload, first run, or a
+      // corrupt/unreadable save) shows the title screen. `hasSave` reflects
+      // READABILITY, not mere presence, so the splash only promises "Continue"
+      // when a real tower sits behind it, never over a fresh boot sim.
+      const hasSave = this.hadReadableSave;
       this.onboarding.showSplash({
-        hasSave: this.hadReadableSave,
+        hasSave,
         onContinue: () => {
-          /* sim already loaded at construction; splash teardown resumes the engine */
+          // Only rendered when `hasSave`. teardownSplash() resumes the engine to
+          // play speed, so re-pause: a returning player lands back in their tower
+          // paused, the ▶ Play control being the single resume (as in the reload
+          // path above).
+          this.setSpeed(0);
+          this.ui.toast("Welcome back. Press ▶ to resume.", "info");
         },
         onNewTower: (dismiss) => {
-          // First run / corrupt boot: the rule-set picker chooses Classic vs
-          // Modern. `hasSave` is false here (readable saves skip the splash), so
-          // the picker shows no "abandons your current tower" warning — there's
-          // nothing continuable to lose.
+          // The rule-set picker (Classic vs Modern) warns that New Tower abandons
+          // the current tower only when one is continuable (`hasSave`); on a
+          // corrupt / first-run boot there's nothing to lose, so it shows no
+          // warning.
           this.ui.newTowerModal({
-            hasSave: this.hadReadableSave,
+            hasSave,
             onFound: (mode) => {
               dismiss();
               this.saveLoad.newGame(mode);
@@ -854,9 +880,19 @@ class GameApp {
         this.lastStar = this.sim.star;
         if (this.sim.star < 6) this.audio.sfx("promote");
       }
+      // Auto-surfaced modals must never stack over the boot/return splash. A
+      // loaded save can carry a pending emergency (or an already-won TOWER), and
+      // now that returning players see the splash, opening one behind it would be
+      // a wrong greeting, and resolving an emergency MUTATES the sim (pays money /
+      // applies the outcome) while the title screen is up. That breaks the
+      // "nothing changes behind the splash" invariant autosave relies on. The
+      // splash pauses the sim, so nothing is lost by waiting: these surface on the
+      // next calm tick once the player dismisses it. (The update prompt already
+      // self-guards on the splash via updateCoastClear.)
+      const splashUp = !!document.getElementById("splash");
       // Interactive emergency choice (fire rescue / bomb ransom).
       const pc = this.sim.pendingChoice;
-      if (pc && !this.shownChoice) {
+      if (pc && !this.shownChoice && !splashUp) {
         this.shownChoice = true;
         this.audio.sfx("error");
         this.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {
@@ -871,7 +907,7 @@ class GameApp {
       // chip is already visible from the instant the build was found, so if a
       // calm moment never comes the player still has a way in.
       this.maybeSurfaceUpdatePrompt();
-      if (this.sim.evaluatedTower && !this.shownWin) {
+      if (this.sim.evaluatedTower && !this.shownWin && !splashUp) {
         this.shownWin = true;
         this.audio.sfx("promote");
         this.ui.congratsTower();
