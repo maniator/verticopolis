@@ -5,7 +5,7 @@ import type { PlatformPort } from "./types";
 export const browserPlatform: PlatformPort = {
   isNativeWrapper: false,
 
-  saveFile(filename: string, contents: string, mime: string): Promise<void> {
+  saveFile(filename: string, contents: string | Uint8Array<ArrayBuffer>, mime: string): Promise<void> {
     const blob = new Blob([contents], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
