@@ -46,7 +46,7 @@ function fakes() {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
-      downloadFile: (filename: string, contents: string | Uint8Array<ArrayBuffer>) => {
+      downloadFile: (filename: string, contents: string | Uint8Array) => {
         downloads.push({ filename, contents });
       },
       showImportReport: (report: ImportReport, cb: { onOpen: () => void }) => {

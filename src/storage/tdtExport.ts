@@ -73,7 +73,7 @@ export interface ExportReport {
 
 /** Result of a successful export build. */
 export interface BuiltLegacyTower {
-  bytes: Uint8Array<ArrayBuffer>;
+  bytes: Uint8Array;
   report: ExportReport;
 }
 

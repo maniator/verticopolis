@@ -5,8 +5,12 @@ import type { PlatformPort } from "./types";
 export const browserPlatform: PlatformPort = {
   isNativeWrapper: false,
 
-  saveFile(filename: string, contents: string | Uint8Array<ArrayBuffer>, mime: string): Promise<void> {
-    const blob = new Blob([contents], { type: mime });
+  saveFile(filename: string, contents: string | Uint8Array, mime: string): Promise<void> {
+    // The contract's plain Uint8Array admits SharedArrayBuffer-backed views,
+    // which Blob refuses; copying into a fresh view satisfies both (exports
+    // are ~100KB, so the copy is free).
+    const part = typeof contents === "string" ? contents : new Uint8Array(contents);
+    const blob = new Blob([part], { type: mime });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;

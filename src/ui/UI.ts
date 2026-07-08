@@ -826,7 +826,7 @@ export class UI {
    *  and contents (see SaveGame.export); raw bytes flow through too, for the
    *  binary .TDT export. The type mirrors the platform port's saveFile seam
    *  (a cross-repo contract), which is why it is narrower than BlobPart. */
-  downloadFile(filename: string, contents: string | Uint8Array<ArrayBuffer>): void {
+  downloadFile(filename: string, contents: string | Uint8Array): void {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
     //

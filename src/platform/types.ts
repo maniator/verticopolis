@@ -15,7 +15,10 @@
  *    resolver treats anything else (including a truthy non-boolean) as a
  *    malformed injection and falls back to the browser port.
  *  - `saveFile` contents are a string for the `.vctower` text payload (see
- *    SaveGame.export) or a Uint8Array for the binary `.TDT` legacy export; a
+ *    SaveGame.export) or a Uint8Array for the binary `.TDT` legacy export. The
+ *    parameter stays the non-generic `Uint8Array` so a wrapper repo pinned to
+ *    an older TypeScript (where typed arrays are not generic) can still
+ *    compile against this contract. A
  *    shell built before the binary path may reject the byte form, and the
  *    game surfaces that rejection to the player as a failed save (graceful
  *    degradation, not corruption). A native implementation must RESOLVE when
@@ -33,7 +36,7 @@ export interface PlatformPort {
   readonly isNativeWrapper: boolean;
   /** Deliver an exported file to the player: a download in the browser, a
    *  share/save flow in a native shell. */
-  saveFile(filename: string, contents: string | Uint8Array<ArrayBuffer>, mime: string): Promise<void>;
+  saveFile(filename: string, contents: string | Uint8Array, mime: string): Promise<void>;
   /** Open a URL outside the game, so a native shell can hand it to the system
    *  browser instead of navigating its WebView away. May return a Promise
    *  (Capacitor's Browser.open does); the game folds a rejection into the
