@@ -10,7 +10,7 @@ Epic: E1 (web-side native readiness), mobile-distribution initiative. First stor
 
 ## Story
 
-As a **future native wrapper shell (iOS Capacitor, built in `maniator/verticopolis-mobile`)**,
+As a **future native wrapper shell (iOS Capacitor, built in the private distribution repo)**,
 I want **one platform seam (`src/platform/`) through which the game routes file export and external-link opening, with a browser default that is byte-identical to today's behavior**,
 so that **the wrapper can inject native implementations (share sheet, system browser) without the public repo taking any Capacitor dependency and without any browser regression**.
 

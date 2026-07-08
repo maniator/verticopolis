@@ -1,6 +1,6 @@
 /**
  * The seam between the game and a bundled native wrapper (the iOS Capacitor
- * shell built in the private verticopolis-mobile repo). The public repo takes
+ * shell built in the private distribution repo). The public repo takes
  * no wrapper dependency: a wrapper injects its implementation through the
  * `__VC_PLATFORM__` global, and the browser default in `./browser.ts` covers
  * everything else. The Android TWA renders the live site with the plain web
