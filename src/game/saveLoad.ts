@@ -219,7 +219,7 @@ export class SaveLoad {
       const msg =
         err instanceof LegacyExportError
           ? err.message
-          : "Export failed: " + (err as Error).message;
+          : "Export failed: " + (err instanceof Error ? err.message : String(err));
       this.deps.ui.toast(msg, "bad");
       return;
     }

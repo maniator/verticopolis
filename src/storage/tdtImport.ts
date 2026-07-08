@@ -82,7 +82,7 @@ export const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
  * parts into ONE unit; placing every part would double- (or quintuple-)
  * place them.
  */
-const PART_FAMILY: Readonly<Record<number, FacilityKind>> = {
+export const PART_FAMILY: Readonly<Record<number, FacilityKind>> = {
   18: "cinema", // theatre top half
   19: "cinema", // theatre bottom half
   34: "cinema", // theatre screen, top
@@ -102,7 +102,7 @@ const PART_FAMILY: Readonly<Record<number, FacilityKind>> = {
 };
 
 /** How many stories each part family stacks (bounds the merge window). */
-const FAMILY_STORIES: Readonly<Partial<Record<FacilityKind, number>>> = {
+export const FAMILY_STORIES: Readonly<Partial<Record<FacilityKind, number>>> = {
   cinema: 2,
   recycling: 2,
   partyHall: 2,
@@ -114,13 +114,21 @@ const FAMILY_STORIES: Readonly<Partial<Record<FacilityKind, number>>> = {
  *  on the same floor (the one legitimate touch-merge). */
 const SCREEN_PARTS: ReadonlySet<number> = new Set([34, 35]);
 
+/** Elevator table `type` byte → our kind (doc §6): 0 express, 1 standard,
+ *  2 service. Shared with the exporter, which inverts it. */
+export const ELEVATOR_KINDS: readonly FacilityKind[] = [
+  "elevatorExpress",
+  "elevatorStandard",
+  "elevatorService",
+];
+
 /** The metro tunnel: pure backdrop scenery, paved but never a unit and never
  *  merged into the station (a full-lot tunnel would inflate its width). */
 const TDT_METRO_TUNNEL = 45;
 
 const TDT_FLOOR = 0;
 const TDT_LOBBY = 24;
-const TDT_BURNED = 48;
+export const TDT_BURNED = 48;
 
 /** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4, proven by
  *  the lobby table; TDT 10/24/39/… = floors 1/15/30/…). */
@@ -769,7 +777,6 @@ export function transportsFromDecoded(
   let droppedShafts = 0;
   let adjustedShafts = 0;
   let droppedFlights = 0;
-  const ELEVATOR_KINDS: readonly FacilityKind[] = ["elevatorExpress", "elevatorStandard", "elevatorService"];
   for (const e of elevators) {
     const kind = ELEVATOR_KINDS[e.type];
     const rawBottom = e.bottomFloor - TDT_FLOOR_OFFSET;

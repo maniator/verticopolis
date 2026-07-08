@@ -60,15 +60,22 @@ file either loads in the real game or it doesn't.
     history; exact rents (snapped to 1994's four classes); cents-level money
     (rounded to $100 steps); people in transit (the crowd re-simulates);
     satisfaction detail.
-- Primary action **"Download .TDT"**, secondary Cancel. Nothing is serialized
-  until the primary is clicked (same two-step contract as the .vctower path).
-- **Modern-mode towers are refused**, not clamped: the modal is replaced by a
-  plain refusal ("This tower uses Modern rules. SimTower (1994) can only load
-  Classic towers."). Silent de-scoping a player's Modern tower into a broken
-  Classic file would violate the honesty pillar.
-- Filename: `<TowerName>.TDT` via the existing `exportFilename` convention
-  (sanitized, upper-cased 8.3-friendly stem preferred: `TOWER1.TDT` style is
-  what the real game expects on period filesystems; keep ≤8 chars + `.TDT`).
+- Primary action **"Download .TDT"**, secondary Cancel. Nothing is
+  DOWNLOADED until the primary is clicked; the tower is serialized once when
+  the modal opens, because the modal's own facts (rounded funds, snapped-rent
+  counts, drop counts) cannot be computed without building the file. (Amended
+  after review: the earlier "nothing is serialized" wording contradicted the
+  modal's facts requirement.)
+- **Modern-mode towers are refused**, not clamped: a plain refusal toast
+  ("This tower uses Modern rules. SimTower (1994) can only load Classic
+  towers."), matching the app's refusal pattern for imports. Silent
+  de-scoping a player's Modern tower into a broken Classic file would violate
+  the honesty pillar. (Amended after review: originally specified as a modal;
+  a toast is the established pattern for flow-stopping refusals here.)
+- Filename: a new `legacyFilename` helper (the `.vctower` `exportFilename`
+  convention produces lowercase hyphenated names and cannot satisfy 8.3):
+  A–Z0–9 from the tower name, upper-cased, ≤8 chars, never empty and never a
+  reserved DOS device name (CON, PRN, COM1...), plus `.TDT`.
 
 ## 4. Mapping spec (writer = inverse of the importer)
 
@@ -86,10 +93,14 @@ All tables live in one shared module so reader and writer cannot drift.
   four classes, hotel states → status flags (dirty → 32, asleep → 16 +
   occupant count in bits 0–1, occupied office/condo → nonzero status),
   under-construction → negative type.
-- **Multi-story units split back into parts:** cinema → 18/19 (+34/35 screens
-  at original widths), recycling → 20/21, party hall → 29/30, metro →
-  31/32/33, wedding hall → cathedral parts 36–40 stacked down from floor 100.
-  Parking ramp → 44.
+- **Multi-story units split back into parts:** cinema → hall parts 18/19 at
+  the unit's full width (the separate screen halves 34/35 are deliberately
+  NOT emitted: our model holds one full-width cinema and inventing the
+  hall/screen split point would be a guess; the importer merges either shape
+  identically, and real-game rendering of a screenless theatre is a §7
+  validation item), recycling → 20/21, party hall → 29/30, metro → 31/32/33,
+  wedding hall → cathedral parts 36–40 stacked down from floor 100 (taking
+  only floors free of other rooms' stories). Parking ramp → 44.
 - **Transports:** elevator table from our shafts (kind → type 0/1/2, x,
   extents +9, car count, car home floors, `skipFloors` inverted into the
   120-byte serviced map); stairs table from walkway flights, collapsing
@@ -105,10 +116,13 @@ All tables live in one shared module so reader and writer cannot drift.
 - **Round-trip through our own parser:** for a representative built tower,
   export → `parseTDT` → compare: identical room geometry, kinds, states,
   occupancy flags, transports (extents, cars, skipFloors), money (±$100
-  quantum), star, clock minute. Property: `import(export(t))` is stable
-  (exporting the re-import yields byte-identical TDT).
-- **Refusals:** modern-mode tower → refusal modal, no download; empty tower →
-  valid minimal file.
+  quantum), star, and the exact clock minute (the tick clock is
+  finer-grained than minutes, so it is lossless). Property:
+  `import(export(t))` is stable (exporting the re-import yields
+  byte-identical TDT).
+- **Refusals:** modern-mode tower → refusal toast, no download; empty tower →
+  valid minimal file; a floor holding more rooms than the format allows →
+  typed refusal, never a broken file.
 - **Hostile-input immunity inherited:** every exported file must pass the
   importer's load-bearing checks with zero warnings (a warning on our own
   output is a writer bug).

@@ -1,5 +1,12 @@
 import { rentConfig } from "../engine/econConfig";
-import { FACILITIES, GRID, facilityFloors, isHotelKind } from "../engine/facilities";
+import {
+  FACILITIES,
+  GRID,
+  facilityFloors,
+  isHotelKind,
+  maxCarsFor,
+  transportCarCapacity,
+} from "../engine/facilities";
 import { frameForMinuteOfDay } from "../engine/timePacing";
 import type { FacilityKind, SerializedGame, SerializedUnit } from "../engine/types";
 import {
@@ -13,6 +20,7 @@ import {
   TDT_FLOOR_INDEX_ENTRIES,
   TDT_HEADER_SIZE,
   TDT_MAGIC,
+  TDT_MAX_TENANTS_PER_FLOOR,
   TDT_PARKING_SIZE,
   TDT_RETAIL_RECORD_SIZE,
   TDT_RETAIL_SLOTS,
@@ -20,9 +28,11 @@ import {
   TDT_STAIR_SLOTS,
 } from "./tdtFormat";
 import {
+  ELEVATOR_KINDS,
   HOTEL_ASLEEP_FLAG,
   HOTEL_DIRTY_FLAG,
   HOTEL_OCCUPANT_MASK,
+  TDT_BURNED,
   TDT_FLOOR_OFFSET,
   TENANT_KIND,
   rentFromClass,
@@ -101,11 +111,13 @@ const PART_STACKS: Readonly<Partial<Record<FacilityKind, readonly number[]>>> = 
 export function classFromRent(kind: FacilityKind, rent: number | undefined): number {
   const band = rentConfig(kind);
   if (!band || rent === undefined) return 2;
+  // Anchors come from the SAME function the importer applies on read-back, so
+  // "nearest class" is measured against what the class will actually become.
   const values: [number, number][] = [
-    [0, band.min],
+    [0, rentFromClass(kind, 0) ?? band.min],
     [1, rentFromClass(kind, 1) ?? band.min],
     [2, band.default],
-    [3, band.max],
+    [3, rentFromClass(kind, 3) ?? band.max],
   ];
   let best = 2;
   let bestDist = Infinity;
@@ -119,14 +131,26 @@ export function classFromRent(kind: FacilityKind, rent: number | undefined): num
   return best;
 }
 
+/** Names DOS/Win9x reserve for devices: a file by these names cannot exist on
+ *  the filesystems the real game lives on. */
+const DOS_RESERVED = new Set([
+  "CON",
+  "PRN",
+  "AUX",
+  "NUL",
+  ...Array.from({ length: 9 }, (_, i) => `COM${i + 1}`),
+  ...Array.from({ length: 9 }, (_, i) => `LPT${i + 1}`),
+]);
+
 /** DOS-safe download name: A–Z0–9 from the tower name, upper-cased, capped at
- *  8 characters (the real game lives on 8.3 filesystems), never empty. */
+ *  8 characters (the real game lives on 8.3 filesystems), never empty and
+ *  never a reserved device name (CON, PRN, COM1...). */
 export function legacyFilename(towerName: string): string {
   const stem = towerName
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 8);
-  return `${stem || "TOWER1"}.TDT`;
+  return `${!stem || DOS_RESERVED.has(stem) ? "TOWER1" : stem}.TDT`;
 }
 
 /** One tenant record, pre-encoding. */
@@ -167,6 +191,14 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     if (arr) arr.push(t);
     else tenantsByTdt.set(tdt, [t]);
   };
+  /** True when every story of a footprint sits on a writable TDT row (0–109).
+   *  The live game can't build outside it, but buildTDT takes any serialized
+   *  input, and a room written into the reserved rows (or onto a negative map
+   *  key the encoder never reads) would be lost or corrupt the file. */
+  const fitsTdtRows = (floor: number, stories: number): boolean => {
+    const bottom = floor + TDT_FLOOR_OFFSET;
+    return bottom >= 0 && bottom + stories - 1 <= 109;
+  };
 
   const counts = {
     rooms: 0,
@@ -176,6 +208,9 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     occupied: 0,
     construction: 0,
     parkingStalls: 0,
+    burnedOut: 0,
+    vacancyHistoryLost: 0,
+    outOfRange: 0,
   };
 
   // Serialized units may omit width/state/label (older saves): normalize once,
@@ -202,20 +237,47 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   }
 
   for (const u of rooms) {
+    if (!fitsTdtRows(u.floor, facilityFloors(u.kind))) {
+      counts.outOfRange++;
+      continue;
+    }
+    // A burned-out shell (or a room mid-fire) is not a healthy tenant: the
+    // format has its own marker (type 48), which the importer clears back to
+    // bare floor with a report line, exactly what 1994 would show.
+    if (u.state === "fire" || u.state === "gutted") {
+      pushTenant(u.floor, {
+        left: u.x,
+        right: u.x + u.width,
+        type: TDT_BURNED,
+        status: 0,
+        rentClass: 2,
+      });
+      counts.burnedOut++;
+      continue;
+    }
     const construction = u.state === "construction";
+    // Moving-in and vacating tenants are still tenants (rent flows; the 1994
+    // format has no notice period), so they export as occupied.
+    const tenanted = u.state === "occupied" || u.state === "moving_in" || u.state === "vacating";
     let status = 0;
     if (!construction) {
-      if ((u.kind === "office" || u.kind === "condo") && u.state === "occupied") {
+      if ((u.kind === "office" || u.kind === "condo") && tenanted) {
         status = 1;
         counts.occupied++;
       } else if (isHotelKind(u.kind)) {
         // Inverse of the importer's flag decode; "booked but out for the day"
-        // (empty + everOccupied) is the flagless nonzero status it reads back.
+        // (a tenanted or ever-booked room without a sleep/dirty flag) is the
+        // flagless nonzero status it reads back.
         if (u.state === "dirty") status = HOTEL_DIRTY_FLAG;
         else if (u.state === "asleep") {
           status = HOTEL_ASLEEP_FLAG | Math.min(Math.max(u.occupants, 1), HOTEL_OCCUPANT_MASK);
-        } else if (u.everOccupied) status = 1;
+        } else if (tenanted || u.everOccupied) status = 1;
         if (status !== 0) counts.hotelStates++;
+      }
+      // A vacant-but-once-occupied office/condo has no 1994 encoding (nonzero
+      // status means TENANTED there): the vacancy history stays behind.
+      if ((u.kind === "office" || u.kind === "condo") && !tenanted && u.everOccupied) {
+        counts.vacancyHistoryLost++;
       }
     } else {
       counts.construction++;
@@ -239,11 +301,19 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
         const parts: number[] = [];
         for (let i = 0; i < stack.length; i++) {
           const fl = u.floor - i;
+          // Story-aware: a multi-story room whose UPPER story occupies `fl`
+          // (a cinema at 98 reaching 99) blocks the stack just like a room
+          // based there, or the file would carry overlapping tenant records.
           const collides =
             fl < GRID.minFloor ||
             (i > 0 &&
               rooms.some(
-                (o) => o !== u && o.floor === fl && o.x < u.x + u.width && u.x < o.x + o.width,
+                (o) =>
+                  o !== u &&
+                  fl >= o.floor &&
+                  fl < o.floor + facilityFloors(o.kind) &&
+                  o.x < u.x + u.width &&
+                  u.x < o.x + o.width,
               ));
           if (collides) break;
           parts.push(stack[stack.length - 1 - i]); // 40 at the crown, downward
@@ -298,7 +368,11 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
 
   // Header (doc §1). The undocumented region is zero-filled; whether the real
   // game needs anything there is the recorded real-game validation risk.
-  const balance = Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(save.money / 100)));
+  // Guard non-finite money (deserialize doesn't harden it yet; see the
+  // backlog's deserialize-coercion row): NaN through the clamp would write 0
+  // to the file while the modal showed "$NaN".
+  const money = Number.isFinite(save.money) ? save.money : 0;
+  const balance = Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(money / 100)));
   const minuteOfDay = ((save.minutes % 1440) + 1440) % 1440;
   u16(TDT_MAGIC);
   u16(Math.max(1, Math.min(6, save.star)));
@@ -310,11 +384,24 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   i32(Math.max(0, Math.floor(save.minutes / 1440)));
   pad(TDT_HEADER_SIZE - chunks.length);
 
-  // Floor map: 120 records (doc §4). Reserved rows 110–119 stay empty.
+  // A floor whose tenant count exceeds what the format (and our own parser's
+  // hostile-file cap) allows cannot be represented; refuse rather than emit a
+  // file that every reader rejects. Unreachable from live play (rooms are at
+  // least 4 tiles wide on a 375-tile lot); only forged saves get here.
+  for (const [, tenants] of tenantsByTdt) {
+    if (tenants.length >= TDT_MAX_TENANTS_PER_FLOOR) {
+      throw new LegacyExportError(
+        "One floor holds more rooms than a SimTower (1994) save can carry.",
+      );
+    }
+  }
+
+  // Floor map: 120 records (doc §4). Reserved rows 110–119 stay empty, even
+  // when an out-of-range (skipped) room widened an extent up there.
   for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
     const ours = index - TDT_FLOOR_OFFSET;
     const tenants = tenantsByTdt.get(index) ?? [];
-    const ext = extents.get(ours);
+    const ext = ours <= GRID.maxFloor ? extents.get(ours) : undefined;
     u16(tenants.length);
     u16(ext?.left ?? 0);
     u16(ext?.right ?? 0);
@@ -348,22 +435,23 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   const walkways = save.transports.filter(
     (t) => t.kind === "stairs" || t.kind === "escalator",
   );
-  const ELEVATOR_TYPE: Readonly<Partial<Record<FacilityKind, number>>> = {
-    elevatorExpress: 0,
-    elevatorStandard: 1,
-    elevatorService: 2,
-  };
+  // The 24-slot table can't hold more (only forged saves exceed the pooled
+  // cap); the drop is counted for the report, never silent.
+  const shaftsDropped = Math.max(0, elevators.length - TDT_ELEVATOR_SLOTS);
   for (let slot = 0; slot < TDT_ELEVATOR_SLOTS; slot++) {
     const e = elevators[slot];
-    const type = e ? ELEVATOR_TYPE[e.kind] : undefined;
-    if (!e || type === undefined) {
+    // Inverse of the importer's shared ELEVATOR_KINDS order.
+    const type = e ? ELEVATOR_KINDS.indexOf(e.kind) : -1;
+    if (!e || type < 0) {
       pad(TDT_ELEVATOR_HEADER_SIZE); // empty slot: used = 0
       continue;
     }
-    const cars = Math.max(1, e.cars);
+    // Same clamp the importer applies on read (1..maxCarsFor); an unclamped
+    // byte would desync the header from the payload size computed below.
+    const cars = Math.max(1, Math.min(maxCarsFor(e.kind), Math.round(e.cars)));
     u8(1); // used
     u8(type);
-    u8([42, 21, 10][type]); // car capacity (informational)
+    u8(transportCarCapacity(e.kind)); // informational; canon 42/21/10
     u8(cars);
     pad(56); // schedule block: per-day-type car scheduling is not modeled
     u8(1); // visible
@@ -375,7 +463,12 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     let servicedCount = 0;
     for (let fl = 0; fl < TDT_FLOOR_COUNT; fl++) {
       const ours = fl - TDT_FLOOR_OFFSET;
-      const stops = ours >= e.bottom && ours <= e.top && !skip.has(ours);
+      // Endpoints always stop (the importer reads skip flags for interior
+      // floors only), so a degenerate endpoint skip can't poison the map.
+      const stops =
+        ours >= e.bottom &&
+        ours <= e.top &&
+        (!skip.has(ours) || ours === e.bottom || ours === e.top);
       u8(stops ? 1 : 0);
       if (stops) servicedCount++;
     }
@@ -393,8 +486,33 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // Finance history: not modeled; zero-filled at the documented size.
   pad(TDT_FINANCE_SIZE);
 
-  // Parking: connected-stall count + zeroed per-stall table.
-  u16(Math.min(511, counts.parkingStalls));
+  // Parking: the connected count is CHAINED stalls only (canon: a space works
+  // only when contiguous spaces link it back to a ramp on its floor); a lot
+  // full of orphan stalls exports 0, exactly what 1994 could produce itself.
+  const connectedStalls = (() => {
+    const byFloor = new Map<number, { x: number; w: number; ramp: boolean }[]>();
+    for (const u of rooms) {
+      if (u.kind !== "parking" && u.kind !== "parkingRamp") continue;
+      const arr = byFloor.get(u.floor) ?? [];
+      arr.push({ x: u.x, w: u.width, ramp: u.kind === "parkingRamp" });
+      byFloor.set(u.floor, arr);
+    }
+    let connected = 0;
+    for (const arr of byFloor.values()) {
+      arr.sort((a, b) => a.x - b.x);
+      const linked = arr.map((it) => it.ramp);
+      // Chains are one-dimensional: two sweeps settle flush adjacency.
+      for (let i = 1; i < arr.length; i++) {
+        if (!linked[i] && linked[i - 1] && arr[i - 1].x + arr[i - 1].w >= arr[i].x) linked[i] = true;
+      }
+      for (let i = arr.length - 2; i >= 0; i--) {
+        if (!linked[i] && linked[i + 1] && arr[i].x + arr[i].w >= arr[i + 1].x) linked[i] = true;
+      }
+      for (let i = 0; i < arr.length; i++) if (linked[i] && !arr[i].ramp) connected++;
+    }
+    return connected;
+  })();
+  u16(Math.min((TDT_PARKING_SIZE - 2) / 2, connectedStalls)); // 512-slot stall table
   pad(TDT_PARKING_SIZE - 2);
 
   // Stairs table: 64 slots (doc §8). Our walkways are one-story flights;
@@ -428,6 +546,13 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     }
     i += run;
   }
+  // Records past the 64-slot table are dropped and COUNTED (a dropped 3-story
+  // record is 3 flights); the report never overstates what made the trip.
+  let flightsDropped = 0;
+  for (let slot = TDT_STAIR_SLOTS; slot < stairRecords.length; slot++) {
+    const type = stairRecords[slot].type;
+    flightsDropped += type <= 1 ? 1 : type <= 3 ? 2 : 3;
+  }
   for (let slot = 0; slot < TDT_STAIR_SLOTS; slot++) {
     const s = stairRecords[slot];
     if (!s) {
@@ -449,14 +574,39 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     if (floor > topFloor) topFloor = floor;
     if (floor < 1) basements = Math.max(basements, 1 - floor);
   }
-  const shafts = elevators.length;
-  const flights = walkways.length;
+  const shafts = Math.min(elevators.length, TDT_ELEVATOR_SLOTS);
+  const flights = walkways.length - flightsDropped;
   const comesAlong: string[] = [
     `${counts.rooms.toLocaleString()} room${counts.rooms === 1 ? "" : "s"} with their occupancy and hotel states.`,
     `${shafts} elevator shaft${shafts === 1 ? "" : "s"} with per-floor stop settings, and ${flights} stairway/escalator flight${flights === 1 ? "" : "s"}.`,
     `Your funds (${fmtMoney(balance * 100)}), star rating, and the clock.`,
   ];
   const staysBehind: string[] = [];
+  if (counts.burnedOut > 0) {
+    staysBehind.push(
+      `${counts.burnedOut} burned-out room${counts.burnedOut === 1 ? "" : "s"} export as burned floor; rebuild them in 1994.`,
+    );
+  }
+  if (counts.vacancyHistoryLost > 0) {
+    staysBehind.push(
+      `${counts.vacancyHistoryLost} vacant room${counts.vacancyHistoryLost === 1 ? "" : "s"} lose their rental history (1994 only records a sitting tenant).`,
+    );
+  }
+  if (counts.outOfRange > 0) {
+    staysBehind.push(
+      `${counts.outOfRange} room${counts.outOfRange === 1 ? " sits" : "s sit"} outside the floors a 1994 save can hold and stayed behind.`,
+    );
+  }
+  if (shaftsDropped > 0) {
+    staysBehind.push(
+      `${shaftsDropped} elevator shaft${shaftsDropped === 1 ? "" : "s"} past 1994's 24-shaft limit stayed behind.`,
+    );
+  }
+  if (flightsDropped > 0) {
+    staysBehind.push(
+      `${flightsDropped} stairway/escalator flight${flightsDropped === 1 ? "" : "s"} past 1994's 64-slot table stayed behind.`,
+    );
+  }
   if (counts.namesDropped > 0) {
     staysBehind.push(
       `${counts.namesDropped} custom room name${counts.namesDropped === 1 ? "" : "s"} (the 1994 format has nowhere to keep them).`,
@@ -467,7 +617,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       `Exact rents on ${counts.rentsSnapped} room${counts.rentsSnapped === 1 ? "" : "s"} snap to 1994's four lease classes.`,
     );
   }
-  if (save.money !== balance * 100) {
+  if (money !== balance * 100) {
     staysBehind.push("Funds round to the nearest $100 (the format stores hundreds).");
   }
   staysBehind.push("The income ledger and finance history start fresh in 1994.");
