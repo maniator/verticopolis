@@ -497,10 +497,12 @@ export function isStaffTransportKind(kind: FacilityKind): boolean {
   return isStaffOnlyTransport(kind) || kind === "stairs" || kind === "escalator";
 }
 
-/** Passengers a single car of each transport type holds per trip. */
+/** Passengers a single car of each transport type holds per trip. These are the
+ *  per-car capacities the .TDT save stores in each elevator's header (docs/canon/
+ *  tdt-format.md §8): express 42, standard 21, service 10. */
 export const TRANSPORT_CAPACITY: Record<string, number> = {
   elevatorStandard: 21,
-  elevatorService: 16,
+  elevatorService: 10, // canon: the smallest cab (staff-only)
   elevatorExpress: 42, // canon: PC 1.0 express car carries 42 (standard 21)
   escalator: 30, // continuous flow, treated as per-shaft
   stairs: 8,
