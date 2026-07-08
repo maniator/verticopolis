@@ -57,8 +57,8 @@ describe("canon: transport pools (tdt-format.md §8)", () => {
     expect(maxSpanFor("escalator")).toBe(1);
   });
 
-  // Per-car passenger capacity is the value the .TDT save stores per shaft
-  // (tdt-format.md §8): express 42, standard 21, service 10.
+  // Per-car passenger capacity: the value each elevator's .TDT header stores as
+  // its per-car capacity (tdt-format.md §8): express 42, standard 21, service 10.
   it("car capacities match the save's stored values (express 42 / standard 21 / service 10)", () => {
     expect(TRANSPORT_CAPACITY.elevatorExpress).toBe(42);
     expect(TRANSPORT_CAPACITY.elevatorStandard).toBe(21);
