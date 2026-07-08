@@ -130,12 +130,13 @@ Modern via new `GameRules` methods returning the neutral value for Classic:
 | **1** | Pricing split: office/condo/hotel canon rungs (FULL canon values incl. hotels, per Decision 2), No-Rate state | Canon-grounded; establishes the split pattern | M | `pricing-split` (new) |
 | **1** | Household-aware condo departures (Modern) | Only cheap net-new Modern feature; reuses `residents`/`churnMultiplier` | S–M | `condo-eviction` (exists; promote flavor b) |
 | **2: spec first** | Lobby height 1–3 stories | Most *visible* missing thing; iconic buildable grand lobby | M–L | `lobby-height` (new) |
+| **2: spec first** | Elevator per-day-type scheduling (Classic parity, FULL) | Owner tiebreak 2026-07-08: 1994 shipped it (the per-shaft schedule block in the TDT elevator record). Build the scheduling behavior AND its UI to match 1994, and round-trip the TDT schedule bytes on import/export. Epic-sized; needs its own gdd-/arch- docs first (see §7) | L (epic) | `elevator-scheduling` (new) |
 | **2** | Finance 10+10 report | Ready; makes the pricing decisions legible | S–M | `finance-1010` (exists) |
 | **2.5** | Bug-infested sticky hotel state + days-dirty 0-2 | Real hotel texture; needs art + a save field | M | `tdt-importer` (deferred) → own row |
 | **3: flavor, opportunistic** | Retail subtypes, named tenants, twin rename, per-person eval | Cosmetic; do with the importer | S each | `retail-subtypes` etc. |
 | **Parked: spec-first, not tiered** | Bounded star-falling (Modern) | Modern-mode roundtable shortlist #2: a star can fall (grace window, only un-earned stars, never TOWER). Epic-sized; needs its own gdd-/arch- docs before any build | L (epic) | `star-falling` (parked) |
 | **Parked: on demand** | Post-TOWER prestige (Modern) | Roundtable shortlist item, explicitly parked until player demand. Endgame content past the TOWER rank | L (epic) | `post-tower-prestige` (parked) |
-| **Ratified divergences, do NOT build** | 3-day week/12-day calendar; elevator per-day-type car scheduling (SEE §7: elevator scheduling is contested, owner tiebreak pending) | Enormous balance blast radius / a manual-scheduling UI almost nobody uses (QoL regression vs our SCAN dispatch) | n/a | document in PARITY.md |
+| **Ratified divergences, do NOT build** | 3-day week/12-day calendar | Enormous balance blast radius across every rate/eval that assumes a 7-day week | n/a | document in PARITY.md |
 
 ## 5. Acceptance criteria (tier-1)
 
@@ -165,9 +166,9 @@ Modern via new `GameRules` methods returning the neutral value for Classic:
 3. Default starting rent level (likely Average), confirm; the engine already
    defaults units to `cfg.default` = Average for offices, so this composes.
 
-## 7. Contested: elevator per-day-type scheduling (owner tiebreak pending)
+## 7. Resolved: elevator per-day-type scheduling is FULL Classic parity (owner ruling 2026-07-08)
 
-Two ratified artifacts disagree and cannot both stand:
+Two ratified artifacts had disagreed:
 
 - **This roadmap (§4)** originally listed elevator per-day-type car scheduling
   under **"do NOT build"** (a manual-scheduling UI almost nobody uses; a QoL
@@ -177,13 +178,16 @@ Two ratified artifacts disagree and cannot both stand:
   1994 shipped it (the per-shaft schedule block in the TDT elevator record,
   `docs/canon/tdt-format.md`).
 
-The `.TDT` importer/exporter already walks that record, so a defensible middle
-exists: **import/export the schedule bytes for save fidelity** (round-trip a
-real 1994 tower's schedule without dropping it) **without building the
-per-day-type scheduling UI**, and document the UI omission in `PARITY.md`. That
-honors both the "1994 had it" receipt and the "the UI is a QoL regression"
-concern.
+**Owner tiebreak (2026-07-08): FULL PARITY.** Elevator per-day-type schedule
+blocks are confirmed a Classic parity gap. Build the scheduling **behavior AND
+its UI** to match 1994, and round-trip the TDT schedule bytes on import/export.
+The roadmap now carries this as a spec-first tier-2 item (§4,
+`elevator-scheduling` backlog row); it is no longer under "do NOT build". The
+3-day-week / 12-day-calendar item was never part of this conflict and stays
+ratified-out.
 
-This is left OPEN for the owner to tiebreak. Do not let either the roadmap row
-or the party ruling silently overwrite the other; record the resolution here, in
-the party memlog, and in the backlog once decided.
+This is epic-sized: it needs its own `gdd-`/`arch-` docs before any build (the
+scheduling model, the per-day-type UI, and the importer/exporter byte mapping),
+and it will layer a manual per-shaft schedule on top of our automatic SCAN
+dispatch, so the interaction between a user schedule and SCAN needs a design
+pass. Recorded here, in the party memlog, and in the backlog.
