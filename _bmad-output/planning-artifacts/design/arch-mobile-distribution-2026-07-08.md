@@ -43,7 +43,7 @@ private-distribution-repo/
 One tiny seam, `src/platform/`, keeps game code free of any wrapper awareness. Nothing under `src/engine/` changes (that directory stays DOM-free per CLAUDE.md). The port serves the bundled iOS wrapper; the Android TWA deliberately runs the plain web build (see §4) and never touches it.
 
 ```ts
-// src/platform/types.ts (shape ratified by story E1a, PR #160)
+// src/platform/types.ts (shape ratified by story E1a)
 export interface PlatformPort {
   isNativeWrapper: boolean;
   saveFile(filename: string, contents: string, mime: string): Promise<void>;
