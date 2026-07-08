@@ -382,8 +382,13 @@ class GameApp {
     // dropping them into a fresh tower with no explanation. Goes to the bulletin
     // (persists) and pops as a toast on the first UI update after the splash.
     if (this.saveWasCorrupt) {
+      // The corrupt flag can coexist with a loaded tower: an unreadable
+      // Verticopolis autosave with a healthy legacy save behind it loads the
+      // legacy tower, and the message must not claim a fresh start.
       this.sim.emit(
-        "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
+        this.hadReadableSave
+          ? "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead."
+          : "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
         "bad",
       );
     }

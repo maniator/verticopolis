@@ -396,6 +396,27 @@ describe("SaveGame", () => {
     expect(localStorage.getItem(AUTO_KEY)).toBe(unreadable); // original left in place
   });
 
+  it("falls back to a healthy legacy save when the Verticopolis autosave is unreadable, and still flags corruption", () => {
+    const sim = sampleGame();
+    sim.money = 555_555;
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    localStorage.setItem(AUTO_KEY, "VCZ1:not-actually-deflate");
+    const boot = SaveGame.loadResult();
+    expect(boot.sim).not.toBeNull(); // the legacy tower is rescued...
+    expect(boot.sim!.money).toBe(555_555);
+    expect(boot.corrupt).toBe(true); // ...while boot still preserves + warns
+  });
+
+  it("does not consult the legacy key (or flag corruption) when the Verticopolis autosave reads fine", () => {
+    const sim = sampleGame();
+    sim.money = 777_777;
+    SaveGame.save(sim);
+    localStorage.setItem(LEGACY_AUTO_KEY, "VCZ1:garbage-stale-legacy");
+    const boot = SaveGame.loadResult();
+    expect(boot.sim!.money).toBe(777_777);
+    expect(boot.corrupt).toBe(false);
+  });
+
   it("loads a legacy autosave key and rewrites future saves to the Verticopolis key", () => {
     const sim = sampleGame();
     localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));

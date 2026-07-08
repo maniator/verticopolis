@@ -135,15 +135,26 @@ export const SaveGame = {
    * that promised their old one) — see main.ts.
    */
   loadResult(): { sim: Simulation | null; corrupt: boolean } {
-    const key = autosaveKey();
-    if (localStorage.getItem(key) === null) return { sim: null, corrupt: false }; // truly empty
-    const data = readSlot(key); // null ⇒ present but undecodable
-    if (!data) return { sim: null, corrupt: true };
-    try {
-      return { sim: Simulation.deserialize(data), corrupt: false };
-    } catch {
-      return { sim: null, corrupt: true }; // decoded, but the schema won't load
+    // Try the Verticopolis key first, then the legacy key: a partial migration
+    // or multi-tab divergence can leave an unreadable value on one key beside a
+    // healthy save on the other, and the healthy one must still load. `corrupt`
+    // reports whether any key checked before the successful load was present
+    // but unreadable, so boot still stashes those bytes (preserveUnreadable)
+    // and warns honestly even when the fallback rescued a tower.
+    let corrupt = false;
+    for (const key of [AUTO_KEY, LEGACY_AUTO_KEY]) {
+      if (localStorage.getItem(key) === null) continue; // absent, not corrupt
+      const data = readSlot(key); // null ⇒ present but undecodable
+      if (data) {
+        try {
+          return { sim: Simulation.deserialize(data), corrupt };
+        } catch {
+          /* decoded, but the schema won't load; treated as unreadable below */
+        }
+      }
+      corrupt = true;
     }
+    return { sim: null, corrupt };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);
