@@ -1,5 +1,5 @@
 ---
-title: "GDD — Classic/Modern pricing split + the Classic-parity-vs-Modern roadmap"
+title: "GDD: Classic/Modern pricing split + the Classic-parity-vs-Modern roadmap"
 game: Verticopolis (browser SimTower clone)
 author: Samus Shepard (Game Designer), with Cloud Dragonborn (architect) and the economy voice (design party, 2026-07-08)
 date: 2026-07-08
@@ -13,10 +13,10 @@ scope: Two linked outcomes. (1) A Classic/Modern PRICING split: Classic uses the
 grounds:
   - docs/canon/tdt-format.md (§4 rent-class byte 0-4; §7 retail; §9 finance 10+10)
   - src/engine/econConfig.ts (ECON.rent continuous bands; the sinks)
-  - src/engine/gameRules.ts (CLASSIC_RULES / MODERN_RULES — the only mode seam)
+  - src/engine/gameRules.ts (CLASSIC_RULES / MODERN_RULES, the only mode seam)
   - src/engine/EconomySystem.ts (overheadPerLeasableUnitMonthly:430, condoMonthlyTaxRate:421)
   - src/engine/Simulation.ts (updateSatisfaction ratio math ~:961/1505; sellCondo :343/1630)
-  - src/storage/tdtImport.ts (rentFromClass — importer already decodes the 0-4 byte)
+  - src/storage/tdtImport.ts (rentFromClass: importer already decodes the 0-4 byte)
   - _bmad-output/project-context.md (:46 stale "office noise does not evict")
 research:
   - Canon rent values (WebSearch synthesis, single-source on the dollar tables; the
@@ -24,7 +24,7 @@ research:
   - Classic-parity gap audit + Modern-sorting audit (agent passes, 2026-07-08).
 ---
 
-# GDD — Classic/Modern pricing split + roadmap
+# GDD: Classic/Modern pricing split + roadmap
 
 > **Pillars this answers to:** *Canon is the default* (Classic is pixel-faithful
 > 1994) and *Modern = "what the original couldn't do."* The core realization: our
@@ -54,7 +54,7 @@ control (fixed per-facility income). Canon values:
 > unfetchable (403) and no second source corroborates them. Our hotel rates are
 > ~10× BELOW these numbers today. This drives Decision 2.
 
-## 1. Decision — pricing split shape (unanimous)
+## 1. Decision: pricing split shape (unanimous)
 
 - Add **`GameRules.priceOptions(kind)`**. Classic returns a **discrete ladder**
   (the 4 canon rungs + a **No Rate** sentinel); Modern returns today's continuous
@@ -70,7 +70,7 @@ control (fixed per-facility income). Canon values:
 - Batch pricing ("Set all …") becomes "set all to <level>" in Classic; keeps the
   range editor in Modern.
 
-## 2. Decision — Classic uses the FULL canon values (user call, 2026-07-08)
+## 2. Decision: Classic uses the FULL canon values (user call, 2026-07-08)
 
 The party had hedged hotels to "keep our values behind the canon structure"
 because the dollar tables are single-source. The user overruled: **Classic uses
@@ -100,7 +100,7 @@ keeps our tuned continuous ranges, so Modern balance is unaffected. Flag for a
 Classic playthrough sanity pass (does early-hotel cash change the 2★→3★ feel?),
 but do not re-tune away from canon.
 
-## 3. Decision — Classic goes pure; the economy sinks move to Modern
+## 3. Decision: Classic goes pure; the economy sinks move to Modern
 
 Three non-canon mechanics currently apply to ALL towers and are gated behind
 Modern via new `GameRules` methods returning the neutral value for Classic:
@@ -126,14 +126,16 @@ Modern via new `GameRules` methods returning the neutral value for Classic:
 
 | Tier | Item | Why | Effort | Backlog row |
 |---|---|---|---|---|
-| **1 — do now** | Gate the 3 economy sinks behind Modern (+ fix project-context:46) | Restores Classic faithfulness; gives Modern an identity; nearly free | S | `modern-economy-gating` (new) |
-| **1** | Pricing split: office+condo canon rungs, hotel structure-only, No-Rate state | Canon-grounded; establishes the split pattern | M | `pricing-split` (new) |
+| **1: do now** | Gate the 3 economy sinks behind Modern (+ fix project-context:46) | Restores Classic faithfulness; gives Modern an identity; nearly free | S | `modern-economy-gating` (new) |
+| **1** | Pricing split: office/condo/hotel canon rungs (FULL canon values incl. hotels, per Decision 2), No-Rate state | Canon-grounded; establishes the split pattern | M | `pricing-split` (new) |
 | **1** | Household-aware condo departures (Modern) | Only cheap net-new Modern feature; reuses `residents`/`churnMultiplier` | S–M | `condo-eviction` (exists; promote flavor b) |
-| **2 — spec first** | Lobby height 1–3 stories | Most *visible* missing thing; iconic buildable grand lobby | M–L | `lobby-height` (new) |
+| **2: spec first** | Lobby height 1–3 stories | Most *visible* missing thing; iconic buildable grand lobby | M–L | `lobby-height` (new) |
 | **2** | Finance 10+10 report | Ready; makes the pricing decisions legible | S–M | `finance-1010` (exists) |
 | **2.5** | Bug-infested sticky hotel state + days-dirty 0-2 | Real hotel texture; needs art + a save field | M | `tdt-importer` (deferred) → own row |
-| **3 — flavor, opportunistic** | Retail subtypes, named tenants, twin rename, per-person eval | Cosmetic; do with the importer | S each | `retail-subtypes` etc. |
-| **Ratified divergences — do NOT build** | 3-day week/12-day calendar; elevator per-day-type car scheduling | Enormous balance blast radius / a manual-scheduling UI almost nobody uses (QoL regression vs our SCAN dispatch) | — | document in PARITY.md |
+| **3: flavor, opportunistic** | Retail subtypes, named tenants, twin rename, per-person eval | Cosmetic; do with the importer | S each | `retail-subtypes` etc. |
+| **Parked: spec-first, not tiered** | Bounded star-falling (Modern) | Modern-mode roundtable shortlist #2: a star can fall (grace window, only un-earned stars, never TOWER). Epic-sized; needs its own gdd-/arch- docs before any build | L (epic) | `star-falling` (parked) |
+| **Parked: on demand** | Post-TOWER prestige (Modern) | Roundtable shortlist item, explicitly parked until player demand. Endgame content past the TOWER rank | L (epic) | `post-tower-prestige` (parked) |
+| **Ratified divergences, do NOT build** | 3-day week/12-day calendar; elevator per-day-type car scheduling (SEE §7: elevator scheduling is contested, owner tiebreak pending) | Enormous balance blast radius / a manual-scheduling UI almost nobody uses (QoL regression vs our SCAN dispatch) | n/a | document in PARITY.md |
 
 ## 5. Acceptance criteria (tier-1)
 
@@ -154,9 +156,34 @@ Modern via new `GameRules` methods returning the neutral value for Classic:
 
 ## 6. Open questions (owner: user / follow-up)
 
-1. **Verify hotel + condo dollar tables** against the archive.org manual before
-   ever swapping Classic hotels to canon values. Until then, hotels keep our
-   numbers (Decision 2).
-2. Condo minimum: 40k vs 50k (sources conflict) — use 50k provisionally.
-3. Default starting rent level (likely Average) — confirm; the engine already
+1. **Verify hotel + condo dollar tables** against the archive.org manual when it
+   becomes readable. Per Decision 2 (user call, 2026-07-08) Classic already uses
+   the FULL canon values for every rentable kind, hotels included; this is a
+   later cross-check to confirm the single-source dollar tables, not a gate that
+   holds hotels back. If the manual ever contradicts them, re-open Decision 2.
+2. Condo minimum: 40k vs 50k (sources conflict): use 50k provisionally.
+3. Default starting rent level (likely Average), confirm; the engine already
    defaults units to `cfg.default` = Average for offices, so this composes.
+
+## 7. Contested: elevator per-day-type scheduling (owner tiebreak pending)
+
+Two ratified artifacts disagree and cannot both stand:
+
+- **This roadmap (§4)** originally listed elevator per-day-type car scheduling
+  under **"do NOT build"** (a manual-scheduling UI almost nobody uses; a QoL
+  regression against our automatic SCAN dispatch).
+- **The Modern-mode roundtable (party memlog, 2026-07-08)** reclassified the
+  elevator **schedule block** as a **Classic parity gap**, on the receipt that
+  1994 shipped it (the per-shaft schedule block in the TDT elevator record,
+  `docs/canon/tdt-format.md`).
+
+The `.TDT` importer/exporter already walks that record, so a defensible middle
+exists: **import/export the schedule bytes for save fidelity** (round-trip a
+real 1994 tower's schedule without dropping it) **without building the
+per-day-type scheduling UI**, and document the UI omission in `PARITY.md`. That
+honors both the "1994 had it" receipt and the "the UI is a QoL regression"
+concern.
+
+This is left OPEN for the owner to tiebreak. Do not let either the roadmap row
+or the party ruling silently overwrite the other; record the resolution here, in
+the party memlog, and in the backlog once decided.
