@@ -152,7 +152,16 @@ export class InspectorController {
       // hurt them" contract, so the eviction is never a surprise. The countdown
       // and the current-vs-target read recompute on every hover, so they tick
       // down live as the game clock advances.
-      const statusText = u.state === "vacating" ? "on notice (tenant leaving)" : u.state;
+      // A relocation is a life event (Modern condos), not a complaint: the player
+      // cannot keep them by fixing the tower, so the card drops the recovery-bar
+      // line and says plainly what happens instead.
+      const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
+      const statusText =
+        u.state === "vacating"
+          ? isRelocation
+            ? "on notice (household relocating)"
+            : "on notice (tenant leaving)"
+          : u.state;
       let notice = "";
       if (u.state === "vacating" && u.vacateReason) {
         const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
@@ -165,11 +174,17 @@ export class InspectorController {
             : minsLeft >= 24 * 60
               ? `in under ${Math.ceil(minsLeft / (24 * 60))} day(s)`
               : `in under ${Math.ceil(minsLeft / 60)} hour(s)`;
-        const now = Math.round(u.satisfaction * 100);
-        const target = Math.round(VACATE_RESCIND * 100);
-        notice =
-          `<div style="color:var(--bad)">Giving notice: ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
-          `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
+        if (isRelocation) {
+          notice =
+            `<div style="color:var(--bad)">${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
+            `<div>A life event, so you cannot keep them. You buy the unit back to re-sell.</div>`;
+        } else {
+          const now = Math.round(u.satisfaction * 100);
+          const target = Math.round(VACATE_RESCIND * 100);
+          notice =
+            `<div style="color:var(--bad)">Giving notice: ${escapeHtml(VACATE_REASON_TEXT[u.vacateReason])}. Leaves ${left}.</div>` +
+            `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
+        }
       }
       this.deps.ui.showInspector(
         `<h4 class="win-title">${f.name}</h4>` +

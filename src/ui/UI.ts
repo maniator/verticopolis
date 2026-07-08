@@ -761,7 +761,7 @@ export class UI {
            <input type="radio" name="nt-mode" value="classic" checked />
            <span class="nt-mode-body">
              <span class="nt-mode-name">Classic <span class="nt-badge">1994</span></span>
-             <span class="nt-mode-desc">Pixel-faithful SimTower. Every condo houses a family of 3 and sells at 2×–2.5× its build cost; lose an owner to neglect and you buy the condo back at full price.</span>
+             <span class="nt-mode-desc">Pixel-faithful SimTower. Every condo houses a family of 3 and sells at 2×–2.5× its build cost; lose an owner to neglect and you buy the condo back at full price. The 1994 economy runs untouched, so a mature tower's money gets comfortable, just like the original.</span>
            </span>
          </label>
          <label class="nt-mode">
@@ -770,6 +770,7 @@ export class UI {
              <span class="nt-mode-name">Modern <span class="nt-badge alt">new</span></span>
              <span class="nt-mode-desc">Everything in Classic, plus features the original couldn't do:</span>
              <span class="nt-feature"><b>Variant households</b>: a condo draws a 2–5 person family. Bigger families pay more but lean harder on your elevators, so each sale is a real bet.</span>
+             <span class="nt-feature"><b>A deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out. Late-game money stays a real decision.</span>
            </span>
          </label>
        </div>
@@ -1003,7 +1004,7 @@ export class UI {
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
         <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> below.</li>
-        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
+        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
       <h3>Keyboard play</h3>

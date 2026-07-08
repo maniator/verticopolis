@@ -1,4 +1,5 @@
 import { FACILITIES } from "./facilities";
+import { ECON } from "./econConfig";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
 
@@ -76,6 +77,34 @@ export interface GameRules {
    * uniform); Modern sharpens for big families and softens slightly for small.
    */
   churnMultiplier(residents: number | undefined): number;
+
+  // ---- The Modern "deeper economy" layer -------------------------------------
+  // Three mechanics the 1994 original never had, added (gdd-economy-depth,
+  // gdd-tenant-churn) to fight the original's late-game money trivialization.
+  // They are Modern-only: Classic returns the neutral value so a Classic tower is
+  // pixel-faithful (money genuinely trivializes late, exactly as in 1994).
+
+  /** Monthly operating overhead charged per HELD leasable/operational unit
+   *  (a carrying cost on vacant/unserved space). Modern: the tuned value;
+   *  Classic: 0. */
+  operatingOverheadPerUnit(): number;
+  /** Monthly property-tax rate on an UNSOLD condo, as a fraction of its asking
+   *  price. Modern: the tuned rate; Classic: 0. */
+  condoHoldTaxRate(): number;
+  /** Scale on the office-noise satisfaction EROSION that can evict a tenant.
+   *  Modern: 1 (erosion active). Classic: 0, so noise only CAPS satisfaction at
+   *  the ceiling and never erodes below it (canon "office noise caps but never
+   *  evicts"). */
+  noiseErosionScale(): number;
+  /**
+   * Monthly probability that a SOLD condo's household relocates on its own (a
+   * life event unrelated to how well the tower serves it), scaled UP with family
+   * size so a bigger family is a bigger flight risk. Modern: the tuned per-month
+   * chance. Classic: 0 (1994 condos never turn over). Callers MUST short-circuit
+   * on a 0 return BEFORE drawing from the RNG, so a Classic tower's seeded stream
+   * stays byte-identical (Classic never rolls). `residents` undefined is treated
+   * as the mean household of 3. */
+  condoRelocationChance(residents: number | undefined): number;
 }
 
 export const CLASSIC_RULES: GameRules = {
@@ -92,6 +121,19 @@ export const CLASSIC_RULES: GameRules = {
   },
   churnMultiplier() {
     return 1;
+  },
+  // Classic is pixel-faithful: none of the Modern economy sinks apply.
+  operatingOverheadPerUnit() {
+    return 0;
+  },
+  condoHoldTaxRate() {
+    return 0;
+  },
+  noiseErosionScale() {
+    return 0; // noise caps satisfaction but never erodes/evicts (canon)
+  },
+  condoRelocationChance() {
+    return 0; // 1994 condos never turn over; a sold Classic condo is forever
   },
 };
 
@@ -114,6 +156,25 @@ export const MODERN_RULES: GameRules = {
     // Clamped positive so it can only ever soften or sharpen the drain, never
     // flip its sign (dead for the legal 2–5 band; a guard if the band widens).
     return Math.max(0.5, 1 + HOUSEHOLD_CHURN_PER_PERSON * (residents - CLASSIC_HOUSEHOLD));
+  },
+  // Modern runs the deeper-economy sinks at their tuned values.
+  operatingOverheadPerUnit() {
+    return ECON.overheadPerLeasableUnitMonthly;
+  },
+  condoHoldTaxRate() {
+    return ECON.condoMonthlyTaxRate;
+  },
+  noiseErosionScale() {
+    return 1;
+  },
+  condoRelocationChance(residents) {
+    // Scale the base monthly chance by family size relative to the classic 3, so
+    // a 5-person family is a clearly bigger flight risk than a 2-person one (and
+    // the departing pool skews big, which drives the self-scaling turnover sink:
+    // you buy back 4s/5s while re-sales regress toward the mean of 3). A condo
+    // with no household reads as the mean 3, so the scale is exactly 1.
+    const size = residents ?? CLASSIC_HOUSEHOLD;
+    return ECON.condoRelocationChanceMonthly * (size / CLASSIC_HOUSEHOLD);
   },
 };
 

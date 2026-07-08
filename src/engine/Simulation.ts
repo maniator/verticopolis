@@ -785,6 +785,7 @@ export class Simulation implements SimContext {
     if (month !== this.lastMonth) {
       this.lastMonth = month;
       this.economy.payMaintenance();
+      this.rollCondoRelocations();
     }
 
     const q = this.clock.quarter;
@@ -998,7 +999,14 @@ export class Simulation implements SimContext {
         // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
         // with an occupied-but-unsold condo. The annoyance cap is shared, so all
         // still redden on the stats overlay from the moment of exposure.
-        const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        const baseErosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        // W1 transport-too-far is canon parity and erodes in EVERY tower. W2
+        // office-noise is the Modern-only mechanic: when noise is the ONLY cause,
+        // Classic scales the erosion to 0 so noise merely CAPS satisfaction at
+        // NOISE_CAP and never erodes/evicts (canon "noise caps but never evicts");
+        // Modern keeps eroding. A far-walk office always erodes regardless of mode.
+        const scale = farWalk ? 1 : this.rules.noiseErosionScale();
+        const erosion = baseErosion * scale;
         u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
@@ -1017,16 +1025,49 @@ export class Simulation implements SimContext {
       // floor, so poor access starves them directly rather than via move-out.
       const leaseTenant = u.kind === "office" || u.kind === "condo";
       if (leaseTenant && u.state === "vacating") {
-        if (u.satisfaction >= VACATE_RESCIND) {
-          // Conditions recovered inside the notice window — they quietly stay.
+        // A relocation is a life event, not a complaint: nothing the player does
+        // (not even a fully satisfied tenant) rescinds it, and it is never
+        // re-attributed to another cause. Read it up front from the original
+        // reason so no branch below can flip it. (The noise re-attribution below
+        // only fires for a "noise" reason, so a relocation never reaches it, but
+        // reading it here keeps that independence obvious.)
+        const isRelocation = u.vacateReason === "relocation";
+        // A mode that caps noise but never evicts for it (Classic:
+        // noiseErosionScale 0) must not let a "noise" notice fire, including one
+        // carried in from a pre-split save where noise still eroded. But a real
+        // non-noise problem that has appeared since the notice (the floor went
+        // unserved, its transport is congested, or a far-walk office lost its
+        // shaft) can still evict. So when noise can't be the cause, re-attribute a
+        // stale "noise" stamp to the live cause if such a problem exists, and
+        // otherwise rescind the notice outright. Classic thus never shows a
+        // noise-caused eviction, while a genuine access problem still lands.
+        const noiseCannotEvict = u.vacateReason === "noise" && this.rules.noiseErosionScale() === 0;
+        // Every non-noise satisfaction sink still bites in Classic (only noise is
+        // mode-gated), so mirror vacateCause's non-noise causes: unserved
+        // (access), congested, an office priced over the going rate (rent), or a
+        // far-walk office (transportFar). Any of these is a real problem that must
+        // still evict, so it blocks the noise rescind and re-attributes the stamp.
+        const officeCfg = u.kind === "office" ? rentConfig("office") : undefined;
+        const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
+        const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk;
+        if (noiseCannotEvict && nonNoiseProblem) {
+          u.vacateReason = this.vacateCause(u, served, cong);
+        }
+        const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
+        if (!isRelocation && (u.satisfaction >= VACATE_RESCIND || rescindNoise)) {
+          // Conditions recovered inside the notice window, so they quietly stay.
           // No toast: "silence when correct", and a per-tick good/bad pair on a
           // unit that flaps around the threshold would be pure noise. The
           // clearing inspector/ribbon is the (pull) cue that the fix worked.
           u.state = "occupied";
           u.vacateReason = undefined;
           u.vacateAt = undefined;
+          // Lift a rescinded noise-only tenant to the cap so a migrated save
+          // becomes self-consistent (a noise-capped unit sits AT the cap, as a
+          // fresh Classic tower would, not below it from the old erosion).
+          if (rescindNoise) u.satisfaction = Math.max(u.satisfaction, NOISE_CAP);
         } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
-          // Notice ran out and it's still unbearable — they leave for good.
+          // Notice ran out and it's still unbearable, so they leave for good.
           this.vacate(u, u.vacateReason ?? "access");
         }
       } else if (leaseTenant && u.satisfaction <= 0) {
@@ -1326,6 +1367,39 @@ export class Simulation implements SimContext {
       result.set(f, c);
     }
     return result;
+  }
+
+  /** Monthly, Modern-only: a sold condo's household may relocate on its own, a
+   *  life event (a job move, an upsize or downsize) unrelated to how well the
+   *  tower serves it, so it can fire even on a perfectly happy condo. The chance
+   *  scales with family size (bigger families are a bigger flight risk). Classic
+   *  returns 0 and never rolls: the `<= 0` guard short-circuits BEFORE any RNG
+   *  draw, so a Classic tower's seeded stream is byte-identical to one without
+   *  this feature. A relocation enters the standard `vacating` notice with a
+   *  non-rescindable "relocation" reason; when the notice elapses the existing
+   *  buy-back reclaims the unit at its household-scaled price and re-lists it. */
+  private rollCondoRelocations(): void {
+    const days = Math.ceil(VACATE_NOTICE_MINUTES / (24 * 60));
+    for (const u of this.tower.units) {
+      // Only a currently-owned condo can relocate: `state === "occupied"` excludes
+      // a bought-back/empty unit (vacate() also clears everOccupied) and a unit
+      // mid-disaster (fire/gutted) or already on a notice, so a phantom "household
+      // relocating" can never land on a unit with no household in place.
+      if (u.kind !== "condo" || u.state !== "occupied" || !u.everOccupied) continue;
+      const chance = this.rules.condoRelocationChance(u.residents);
+      if (chance <= 0 || !this.rng.chance(chance)) continue;
+      u.state = "vacating";
+      u.vacateReason = "relocation";
+      u.vacateAt = this.clock.minutes + VACATE_NOTICE_MINUTES;
+      this.emit(
+        `A household in ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} is relocating. They leave in under ${days} day(s); you buy the unit back to re-sell.`,
+        // "bad" so the advance warning actually TOASTS: the UI toasts only
+        // good/bad log entries; "info" is bulletin-only, which would swallow the
+        // heads-up. The non-blaming framing lives in the wording, not the color,
+        // matching how the neglect notices surface.
+        "bad",
+      );
+    }
   }
 
   private vacate(u: Unit, reason: VacateReason): void {
