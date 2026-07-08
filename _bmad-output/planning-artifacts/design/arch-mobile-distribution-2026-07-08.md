@@ -22,7 +22,7 @@ grounds:
 
 ## 1. Two-repo topology
 
-**Public `maniator/verticopolis` (MIT)** stays the single source of truth for all game code. It gains only platform seams that are inert in the browser build, plus one protocol-public file (assetlinks). **The private distribution repo** holds everything store-shaped: the Bubblewrap TWA project, the Capacitor iOS project, CI workflows, fastlane config, store listings and privacy answers, the version ledger, and (later, gated) monetization artifacts.
+**Public `maniator/verticopolis` (MIT)** stays the single source of truth for all game code. It gains platform seams that are inert in the browser build, one protocol-public file (assetlinks), and the analytics client from PRD F8 (§9, the one sanctioned non-inert addition). **The private distribution repo** holds everything store-shaped: the Bubblewrap TWA project, the Capacitor iOS project, CI workflows, fastlane config, store listings and privacy answers, the version ledger, and (later, gated) monetization artifacts.
 
 The private repo never vendors game source. Its CI checks out the public repo at the ref named in a tracked one-line `PUBLIC_REF` file (tag or commit SHA) and builds it, so the pin is declarative and every pin bump is a reviewable commit the version ledger cross-checks. A fork of this public repo cannot be made private on GitHub (fork visibility follows the public upstream), and the alternatives lose to this shape: a full-history mirror needs permanent sync care and blurs the public/private separation this repo exists to enforce, and a git submodule buys the same declarative pin at the cost of recursive-checkout plumbing for source the wrapper builds but never edits. If the monetization phase (E4 gate) ever decides on private game-code changes, a mirror can be created in minutes at that point (MIT permits it any time); nothing is lost by not carrying one until then. Note the sync question dissolves under this topology: Android is always current because the TWA renders the live site, and iOS is pinned on purpose so store builds stay reproducible snapshots.
 
@@ -98,7 +98,15 @@ Nothing from this list ever appears in either repo's files or history; the PRD's
 
 The TWA serves the live site, so Android players always run the newest deploy. iOS is a snapshot per submission. The stores will drift between iOS releases; that is acceptable for a single-player game whose saves live client-side. The private repo's release checklist should pair a public tag with an iOS submission whenever player-facing changes accumulate.
 
-## 9. What this architecture refuses to do
+## 9. Analytics seam (public repo, story E1e; PRD F8)
+
+- **Client**: a cookieless Plausible/Umami-class client, bundled with the game (never CDN-loaded), sending anonymous aggregate events only. Tool and hosting chosen in the story; self-hosting on the game's origin is preferred (browser-sense first-party, dodges most ad blocking). If self-hosted, the hosting/ops config lives in the private repo.
+- **Endpoint configuration**: an absolute URL (relative paths break under the Capacitor scheme), supplied at build time via a Vite define/env value so the public repo carries only the public endpoint and site identifier (the third public-by-design exception in PRD N2).
+- **Environment gating**: only production web builds and the `--mode native` bundle send events; dev, test, and CI send nothing (gate on `import.meta.env`, same pattern as the §3 PWA gating). Adblocked and offline sessions degrade silently.
+- **Platform dimension**: `ios` when the §2 port reports `isNativeWrapper`, `twa` when the Bubblewrap start URL's query parameter is present, `web` otherwise. Milestone events hook only existing UI/controller-layer notifications; nothing under `src/engine/` is instrumented.
+- **Store-declaration coupling**: once the Android app is on any Play track, the deploy that enables collection is gated on the Play Data Safety form already declaring this posture (the TWA renders the live site, and the form must stay accurate at all times). Apple's nutrition labels describe it as anonymous usage data, not linked to identity, no tracking, no ATT.
+
+## 10. What this architecture refuses to do
 
 - No Capacitor Android now (TWA covers Android; one store listing, one approach).
 - No forked game behavior per platform outside the port in §2 (PRD counter-metric).
