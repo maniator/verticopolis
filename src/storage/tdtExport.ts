@@ -624,6 +624,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   let topFloor = 0;
   let basements = 0;
   for (const [floor] of extents) {
+    // Count only floors the encoded file can contain (TDT rows 0-109): a
+    // skipped out-of-range room widened extents the reserved rows never
+    // echo, and the modal facts must match the bytes.
+    if (floor < GRID.minFloor || floor > GRID.maxFloor) continue;
     if (floor > topFloor) topFloor = floor;
     if (floor < 1) basements = Math.max(basements, 1 - floor);
   }

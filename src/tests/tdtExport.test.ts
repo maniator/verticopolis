@@ -241,6 +241,9 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
     save.units.push(unit({ id: 9_300, kind: "cinema", floor: 100, x: 10, width: 31 })); // story at 101
     const { bytes, report } = buildTDT(save);
     expect(report.staysBehind.join(" ")).toMatch(/outside the floors/);
+    // The modal facts match the bytes: the skipped room's extent at 101 must
+    // not leak into the reported floor count.
+    expect(report.floors).toBeLessThanOrEqual(100);
     const back = parseTDT(bytes.buffer as ArrayBuffer, "S.TDT");
     expect(back.report.couldNotBring.join(" ")).not.toMatch(/reserved floor row/);
   });
