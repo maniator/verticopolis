@@ -9,8 +9,9 @@ import type { SerializedGame } from "../engine/types";
  * or backups.
  *
  * localStorage values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
- * tower is ~750KB of JSON, which — across the autosave slot plus three manual
- * slots — would crowd the ~5MB localStorage quota and risk a failed save on a
+ * late-game tower is hundreds of KB of JSON even in the sparse v3 unit shape,
+ * which — across the autosave slot plus three manual slots — would crowd the
+ * ~5MB localStorage quota and risk a failed save on a
  * large tower. Compressed, each is a few tens of KB. The compression is
  * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
  * critically — right before a reload in the crash-recovery / update paths,
@@ -205,7 +206,12 @@ export const SaveGame = {
     // localStorage quota (see STORE_MAGIC). Synchronous by design — this runs
     // just before a reload in the crash-recovery path, where an async write
     // could be lost. base64 keeps the value a safe ASCII string.
-    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data))));
+    //
+    // Level 1 on purpose: sparse v3 saves (serializeUnit omits default fields)
+    // have already shed their redundancy, so on a real 12,975-unit tower level 1
+    // compressed within 0.8% of the level-6 size at a third of the cost (7ms vs
+    // 21ms), keeping the pre-reload flush short.
+    const packed = STORE_MAGIC + toBase64(deflateSync(new TextEncoder().encode(JSON.stringify(data)), { level: 1 }));
     writeSlot(key, packed);
   },
   async saveToAsync(key: string, sim: Simulation): Promise<void> {
