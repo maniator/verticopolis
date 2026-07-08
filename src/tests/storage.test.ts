@@ -428,6 +428,30 @@ describe("SaveGame", () => {
     }
   });
 
+  it("retries the autosave write after dropping a coexisting legacy key when quota is tight", () => {
+    // Both keys can coexist (multi-tab, or an older build re-writing the
+    // legacy key after migration). A quota-tight write must reclaim the stale
+    // legacy duplicate and retry rather than fail the autosave.
+    const sim = sampleGame();
+    SaveGame.save(sim); // AUTO_KEY now populated
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY && localStorage.getItem(LEGACY_AUTO_KEY) !== null) {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      }
+      return realSetItem(key, value);
+    });
+    try {
+      sim.money = 424_242;
+      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
+      expect(SaveGame.load()!.money).toBe(424_242);
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
     const sim = sampleGame();
     localStorage.setItem(AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
@@ -531,7 +555,7 @@ describe("SaveGame", () => {
   describe("when the browser lacks the compression API", () => {
     // deflate-raw is a 2022+ browser feature; on an older browser the export
     // and the import of a compressed file must fail with an honest "your
-    // browser is too old" message — not a silent failure, and NOT "this file
+    // browser is too old" message, not a silent failure and not "this file
     // is damaged" (which would blame a perfectly good save). Each direction is
     // probed separately: export needs only the encoder, import only the
     // decoder, so a browser missing one direction still gets the other.

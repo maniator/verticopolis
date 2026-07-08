@@ -330,7 +330,18 @@ function writeSlot(key: string, value: string): void {
     }
     return;
   }
-  writeAutosaveValue(value);
+  try {
+    writeAutosaveValue(value);
+  } catch (err) {
+    // Both keys can coexist (multi-tab, or an older build re-writing the
+    // legacy key after this build migrated it). The legacy value is a stale
+    // duplicate of an already-persisted tower, so under quota pressure drop
+    // it first and retry the write before giving up.
+    if (legacy === null) throw err;
+    localStorage.removeItem(LEGACY_AUTO_KEY);
+    writeAutosaveValue(value);
+    return;
+  }
   if (legacy !== null) localStorage.removeItem(LEGACY_AUTO_KEY);
 }
 
@@ -370,7 +381,7 @@ function inflateCapped(packed: Uint8Array): Uint8Array {
 // the "deflate-raw" format string is newer than CompressionStream itself
 // (Chrome had the API before the format), so a `typeof` check alone would pass
 // on browsers that then throw at use. Probed separately because each caller
-// needs only one direction — export/saveToAsync encode, import decodes — and a
+// needs only one direction (export/saveToAsync encode, import decodes), and a
 // browser missing one must not be blocked from the operation it can perform.
 function compressionEncodeSupported(): boolean {
   try {
