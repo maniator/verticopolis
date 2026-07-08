@@ -18,7 +18,7 @@ note: >
 
 # Epics & Stories: Mobile Distribution
 
-**Merge order:** Public stream: E1a → E1b → E1c → E1d (E1d ends by tagging main, the repo's first release tag; E3 pins to it). Android stream, independent of E1a-E1c: E2a → app record + Play App Signing enrollment (user checkpoint) → E2b → E2c → E2d. iOS stream, after the E1d tag: E3a → E3b → E3c → E3d. E2 and E3 run in parallel.
+**Merge order:** Public stream: E1a → E1b → E1c → E1d (E1d ends by tagging main, the repo's first release tag; E3 pins to it). E1e (analytics) lands any time after E1a, with one hard ordering rule: once the Android app is on any Play track, the Play Data Safety form must declare the F8 posture BEFORE an E1e deploy reaches the live site, because the TWA starts collecting the moment the deploy lands and Play requires the form to be accurate at all times. For iOS, E1e must be inside the ref the build pins to (before the E1d tag, or via a later tag and `PUBLIC_REF` bump). If E1e is not yet live for a given submission, E2d/E3d declare "no data collected" and update the form first when E1e later ships. Android stream, independent of E1a-E1c: E2a → app record + Play App Signing enrollment (user checkpoint) → E2b → E2c → E2d. iOS stream, after the E1d tag: E3a → E3b → E3c → E3d. E2 and E3 run in parallel.
 The TWA renders the live site and consumes none of E1a-E1c, so E2a can start immediately; E2b waits for the Play-provided signing fingerprint, which only exists after the app record and Play App Signing enrollment (arch §4). iOS consumes all of E1.
 
 **Repo split:** E1 = public `maniator/verticopolis`. E2, E3, E4 = the private distribution repo (E2b is a public-repo PR driven by the E2 stream). E4 is a strategy gate, not an implementation epic.
@@ -50,12 +50,18 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **AC:** PRD F5 (mechanism documented), N2, N3. Docs merged; the passthrough is confirmed by existing files being reachable at `https://verticopolis.com/` root; the tag exists and E3a can pin to it.
 - **Review:** `/bmad-code-review`.
 
+### E1e: Privacy-first analytics  ·  risk: low  ·  version: none (invisible to players; privacy posture documented)
+- **Change:** integrate a cookieless, privacy-first analytics client per PRD F8 and arch §9 (Plausible/Umami class; tool and self-host decision made in the story, self-hosting on the game origin preferred): bundled script (not CDN-loaded), absolute endpoint URL, anonymous aggregate events only (app opens, session length, a small set of gameplay milestones), platform dimension (`ios` from the E1a flag, `twa` from the start-URL query parameter that E2a owns setting in the Bubblewrap project, `web` otherwise). Milestone events hook only existing UI/controller-layer notifications; no engine or simulation instrumentation. No cookies, no stored personal identifiers; the posture targets no consent banner and no App Tracking Transparency prompt, and the story validates that against current store policy before the store declarations rely on it. The story defines IP/user-agent handling per PRD F8 (transient processing only, self-hosted access logs disabled or IP-anonymized). Dev, test, and CI send nothing by default, with an explicit opt-in for local validation. If self-hosted, hosting config goes to the private repo. Document the posture in `docs/distribution.md` (or a privacy note the store stories can cite).
+- **AC:** PRD F8, N1 (beacons only; no gameplay, UI, or storage behavior change; e2e and visual baselines untouched), N5. Events visible in the backend from an explicitly opted-in preview or staging run (or a local run with the opt-in set and the tool's localhost guard disabled); without the opt-in, every non-production run (dev, test, CI, preview, staging) sends nothing. Ad-blocked and offline sessions degrade silently: no uncaught errors (the browser's own blocked-request log lines are expected), no gameplay effect.
+- **Depends:** E1a (platform flag). Sequencing relative to E2d/E3d per the merge-order note above; once the Android app is on any Play track, the deploy that enables collection is gated on the Data Safety form already declaring the F8 posture.
+- **Review:** `/bmad-code-review` (plumbing; milestone hooks stay in the UI layer). If a milestone needs a hook beyond the UI/controller layer, the story escalates to `/gds-code-review`.
+
 ---
 
 ## E2: Android TWA (private repo; E2b is a public PR)
 
 ### E2a: Bubblewrap project + signing identity  ·  risk: med  ·  version: n/a (private)
-- **Change:** `bubblewrap init` against `https://verticopolis.com/manifest.webmanifest` into `android-twa/`; applicationId `io.github.maniator.verticopolis` (user may override); generate upload keystore once, store as CI secrets (arch §7) AND in the owner's offline escrow (arch §4: GitHub secrets are write-only, not a backup); extract the upload key's SHA-256 fingerprint.
+- **Change:** `bubblewrap init` against `https://verticopolis.com/manifest.webmanifest` into `android-twa/`; applicationId `io.github.maniator.verticopolis` (user may override); override the generated `twa-manifest.json` start URL to carry the F8 platform marker (for example `/?src=twa`; the web manifest's own `start_url` is `./`, so without this override Android sessions would classify as `web`); generate upload keystore once, store as CI secrets (arch §7) AND in the owner's offline escrow (arch §4: GitHub secrets are write-only, not a backup); extract the upload key's SHA-256 fingerprint.
 - **AC:** PRD F5 (app half). Local `bubblewrap build` produces an installable APK/AAB.
 - **Review:** `/bmad-code-review` (tooling).
 - **STOP-for-user:** Play Console account; keystore secret provisioning + offline escrow; then app record creation and Play App Signing enrollment (E2b needs the Play-provided fingerprint from the Console).
@@ -73,7 +79,7 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **STOP-for-user:** first manual AAB upload in Play Console; service-account creation.
 
 ### E2d: Play listing + data safety  ·  risk: low  ·  version: n/a (private)
-- **Change:** `store/play/`: listing copy, screenshots plan (reuse docs/screenshots pipeline output), data-safety questionnaire answers (no data collected; saves are local), content rating notes.
+- **Change:** `store/play/`: listing copy, screenshots plan (reuse docs/screenshots pipeline output), data-safety questionnaire answers reflecting the F8 analytics posture (anonymous aggregate usage data, not linked to identity, no tracking; saves are local; if E1e is not yet on the live site, answer "no data collected", and when E1e later ships, update the form BEFORE the deploy that enables collection, since the TWA picks it up immediately with no new AAB involved and the form must stay accurate at all times), content rating notes.
 - **AC:** Play done-gate (PRD Done-Gates): AAB on internal track, device smoke test (touch/pinch/save/export, plus the in-app update prompt appearing after a site deploy) passes.
 - **Review:** `/bmad-code-review` (store copy/docs).
 
@@ -99,7 +105,7 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **STOP-for-user:** Apple Developer enrollment, ASC app record, cert/profile/API-key creation, secret provisioning.
 
 ### E3d: App Store metadata + review notes  ·  risk: med (4.2 risk lives here)  ·  version: n/a (private)
-- **Change:** `store/appstore/`: metadata, privacy nutrition labels (no data collected), reviewer notes addressing 4.2 (bundled assets, offline play, native share).
+- **Change:** `store/appstore/`: metadata, privacy nutrition labels reflecting the F8 analytics posture (anonymous aggregate usage data, not linked to identity, no tracking, so no ATT prompt; "no data collected" only if E1e has not shipped in the submitted build), reviewer notes addressing 4.2 (bundled assets, offline play, native share).
 - **AC:** iOS done-gate (PRD Done-Gates): TestFlight build, real-device smoke test incl. Share-sheet export + import.
 - **Review:** `/bmad-code-review` (store copy/docs).
 
