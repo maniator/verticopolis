@@ -823,9 +823,9 @@ export class UI {
   /** Hand the player an exported file. Routed through the platform port so a
    *  native wrapper can deliver it its own way (share sheet); the browser port
    *  keeps the pre-port blob-anchor download exactly. Callers decide the name
-   *  and contents (see SaveGame.export); raw bytes flow through too, for the
-   *  binary .TDT export. */
-  downloadFile(filename: string, contents: string | Uint8Array<ArrayBuffer>): void {
+   *  and contents (see SaveGame.export). Typed as BlobPart so text (.vctower)
+   *  and raw bytes (.TDT) both flow through; Blob takes any of it as-is. */
+  downloadFile(filename: string, contents: BlobPart): void {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
     //

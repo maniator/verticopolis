@@ -448,13 +448,15 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     const width = FACILITIES[t.kind]?.width ?? 0;
     if (t.kind === "stairs" || t.kind === "escalator") {
       // A flight must sit fully inside the buildable range (same guard the
-      // importer applies to decoded stair records).
-      if (!Number.isFinite(t.bottom) || t.bottom < GRID.minFloor || t.bottom + 1 > GRID.maxFloor) {
+      // importer applies to decoded stair records). Round first, like the
+      // elevator path: a fractional floor would silently truncate in u16.
+      const bottom = Number.isFinite(t.bottom) ? Math.round(t.bottom) : NaN;
+      if (!Number.isFinite(bottom) || bottom < GRID.minFloor || bottom + 1 > GRID.maxFloor) {
         transportsDropped++;
         continue;
       }
       const x = Math.max(0, Math.min(GRID.width - width, Math.round(Number.isFinite(t.x) ? t.x : 0)));
-      walkways.push({ kind: t.kind, x, bottom: t.bottom });
+      walkways.push({ kind: t.kind, x, bottom });
       continue;
     }
     if (!ELEVATOR_KINDS.includes(t.kind)) {
