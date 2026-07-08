@@ -1024,7 +1024,22 @@ export class Simulation implements SimContext {
       // floor, so poor access starves them directly rather than via move-out.
       const leaseTenant = u.kind === "office" || u.kind === "condo";
       if (leaseTenant && u.state === "vacating") {
-        if (u.satisfaction >= VACATE_RESCIND) {
+        // A mode that caps noise but never evicts for it (Classic:
+        // noiseErosionScale 0) must not let a "noise" notice fire, including one
+        // carried in from a pre-split save where noise still eroded. But a real
+        // non-noise problem that has appeared since the notice (the floor went
+        // unserved, its transport is congested, or a far-walk office lost its
+        // shaft) can still evict. So when noise can't be the cause, re-attribute a
+        // stale "noise" stamp to the live cause if such a problem exists, and
+        // otherwise rescind the notice outright. Classic thus never shows a
+        // noise-caused eviction, while a genuine access problem still lands.
+        const noiseCannotEvict = u.vacateReason === "noise" && this.rules.noiseErosionScale() === 0;
+        const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || farWalk;
+        if (noiseCannotEvict && nonNoiseProblem) {
+          u.vacateReason = this.vacateCause(u, served, cong);
+        }
+        const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
+        if (u.satisfaction >= VACATE_RESCIND || rescindNoise) {
           // Conditions recovered inside the notice window — they quietly stay.
           // No toast: "silence when correct", and a per-tick good/bad pair on a
           // unit that flaps around the threshold would be pure noise. The
@@ -1032,6 +1047,10 @@ export class Simulation implements SimContext {
           u.state = "occupied";
           u.vacateReason = undefined;
           u.vacateAt = undefined;
+          // Lift a rescinded noise-only tenant to the cap so a migrated save
+          // becomes self-consistent (a noise-capped unit sits AT the cap, as a
+          // fresh Classic tower would, not below it from the old erosion).
+          if (rescindNoise) u.satisfaction = Math.max(u.satisfaction, NOISE_CAP);
         } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
           // Notice ran out and it's still unbearable — they leave for good.
           this.vacate(u, u.vacateReason ?? "access");

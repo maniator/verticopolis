@@ -68,6 +68,71 @@ describe("office-noise erosion is Modern-only (canon: Classic caps but never evi
   it("Classic sits strictly higher than Modern after identical exposure", () => {
     expect(noiseFloor("classic")).toBeGreaterThan(noiseFloor("modern"));
   });
+
+  /**
+   * Migration compat: a Classic save written under the pre-split behavior (when
+   * noise still eroded in every tower) can carry a tenant already ON a noise
+   * notice, with satisfaction eroded below the rescind bar and the grace timer
+   * about to expire. Gating future erosion is not enough: the in-flight notice
+   * must be rescinded, or Classic would still evict for noise on reload and
+   * break the "caps but never evicts" promise.
+   */
+  function migratedNoiseNotice(mode: GameMode): { sim: Simulation; condo: { state: string; satisfaction: number; vacateReason?: string } } {
+    const sim = servedTower(mode);
+    sim.star = 1;
+    const r = sim.tower.place("condo", 2, C + 2);
+    const condo = sim.tower.units.find((u) => u.id === r.unitId)! as unknown as {
+      state: string;
+      satisfaction: number;
+      vacateReason?: string;
+      vacateAt?: number;
+    };
+    // The persisted mid-notice state from a pre-split save.
+    condo.state = "vacating";
+    condo.vacateReason = "noise";
+    condo.satisfaction = 0.05;
+    condo.vacateAt = 0; // already overdue
+    return { sim, condo };
+  }
+
+  it("Classic: a pre-split noise notice is rescinded on load, the tenant never evicts", () => {
+    const { sim, condo } = migratedNoiseNotice("classic");
+    sim.tick(60);
+    expect(condo.state).toBe("occupied");
+    expect(condo.vacateReason).toBeUndefined();
+    expect(condo.satisfaction).toBeGreaterThanOrEqual(0.6); // lifted to the noise cap
+  });
+
+  it("Modern: the same overdue notice still evicts (unchanged)", () => {
+    const { sim, condo } = migratedNoiseNotice("modern");
+    sim.tick(60);
+    expect(condo.state).not.toBe("occupied"); // the notice fired
+  });
+
+  it("Classic: a noise-stamped notice is NOT masked when a real access problem appears", () => {
+    // A Classic condo on a stale noise notice whose floor has since gone unserved
+    // must not be rescinded away: noise can't evict, but the new access problem
+    // can. The notice is re-attributed to the live cause and still fires, rather
+    // than being silently held (and its satisfaction wrongly lifted to the cap).
+    const sim = new Simulation(4, "classic");
+    sim.money = 1_000_000;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2); // NO elevator to floor 2 -> unserved
+    const r = sim.tower.place("condo", 2, C + 2);
+    const condo = sim.tower.units.find((u) => u.id === r.unitId)! as unknown as {
+      state: string;
+      satisfaction: number;
+      vacateReason?: string;
+      vacateAt?: number;
+    };
+    condo.state = "vacating";
+    condo.vacateReason = "noise";
+    condo.satisfaction = 0.05;
+    condo.vacateAt = 0; // overdue
+    sim.tick(60);
+    expect(condo.state).not.toBe("occupied"); // evicted for access, not masked
+  });
 });
 
 describe("operating overhead + condo hold-tax are Modern-only", () => {
