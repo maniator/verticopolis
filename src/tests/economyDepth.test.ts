@@ -21,7 +21,8 @@ describe("Economy depth — #4 operating overhead", () => {
   });
 
   it("charges overhead on vacant/unserved space (pure carrying cost)", () => {
-    const sim = Simulation.newGame(1);
+    // Operating overhead is a Modern-only "deeper economy" sink (Classic is 0).
+    const sim = Simulation.newGame(1, "modern");
     sim.simModel = "v1";
     sim.money = 1e9;
     sim.star = 1; // keep events off

@@ -1,4 +1,5 @@
 import type { SimContext } from "./SimContext";
+import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
@@ -408,6 +409,13 @@ export class EconomySystem {
         rec("upkeep", c);
       }
     }
+    // The Modern-only economy sinks read through the rule-set, constant for the
+    // whole maintenance run, so resolve it once outside the per-unit loop. A
+    // minimal hand-rolled test context may omit `rules`; fall back to Modern (the
+    // pre-split "all towers charged" behavior) so nothing silently changes.
+    const rules = this.sim.rules ?? MODERN_RULES;
+    const taxRate = rules.condoHoldTaxRate();
+    const overhead = rules.operatingOverheadPerUnit();
     for (const u of this.sim.tower.units) {
       const m = ECON.serviceMaintenanceMonthly[u.kind];
       if (m && u.state !== "gutted") {
@@ -416,20 +424,22 @@ export class EconomySystem {
       }
       const operational = isOperational(u);
       // Property tax on an unsold condo: a real carrying cost for holding out
-      // for a premium sale (scales with the asking price).
-      if (u.kind === "condo" && !u.everOccupied && operational) {
-        const tax = Math.ceil(rentOf(u) * ECON.condoMonthlyTaxRate);
+      // for a premium sale (scales with the asking price). Modern-only sink;
+      // Classic's rate is 0 (the original had no such tax).
+      if (taxRate > 0 && u.kind === "condo" && !u.everOccupied && operational) {
+        const tax = Math.ceil(rentOf(u) * taxRate);
         cost += tax;
         rec("condos", tax);
       }
       // Operating overhead on space HELD (regardless of occupancy/served) — makes
       // a vacant or unserved floor pure carrying cost. Sold condos are exempt:
       // their income was a one-time sale already banked, so a permanent per-month
-      // drain on them would be punitive rather than a live decision.
-      if (operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
-        cost += ECON.overheadPerLeasableUnitMonthly;
+      // drain on them would be punitive rather than a live decision. Modern-only
+      // sink; Classic's overhead is 0 (pixel-faithful late-game economy).
+      if (overhead > 0 && operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
+        cost += overhead;
         const cat = ledgerCatFor(u.kind);
-        rec(cat ?? "upkeep", ECON.overheadPerLeasableUnitMonthly);
+        rec(cat ?? "upkeep", overhead);
       }
       // A cinema books a film each month (canon: 150k average / 300k
       // blockbuster). The player sets a per-cinema policy; only "auto" consumes

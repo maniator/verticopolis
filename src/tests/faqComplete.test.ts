@@ -301,7 +301,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D25: a condo next to an office is worn down by noise and eventually gives notice + moves out", () => {
-    const sim = Simulation.newGame(2);
+    const sim = Simulation.newGame(2, "modern"); // noise EVICTION is the Modern churn feature (Classic caps, never evicts)
     sim.money = 1e9;
     sim.star = 1; // 1★ → no random fire/bomb events, isolating the noise effect
     lay(sim, "lobby", 1);
@@ -335,7 +335,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {
-    const sim = Simulation.newGame(2);
+    const sim = Simulation.newGame(2, "modern"); // noise recovery from the Modern erosion mechanic
     sim.money = 1e9;
     sim.star = 1;
     lay(sim, "lobby", 1);
@@ -360,8 +360,8 @@ describe("Deep-review regressions (must not come back)", () => {
     expect(condo.vacateReason).toBeUndefined();
   });
 
-  it("D25c: a sold condo is sticky — a transient noisy neighbor annoys but never evicts an owner", () => {
-    const sim = Simulation.newGame(2);
+  it("D25c: a sold condo is sticky; a transient noisy neighbor annoys but never evicts an owner", () => {
+    const sim = Simulation.newGame(2, "modern"); // sold-condo stickiness under the Modern noise erosion
     sim.money = 1e9;
     sim.star = 1;
     lay(sim, "lobby", 1);
@@ -440,6 +440,9 @@ describe("Fine FAQ mechanics", () => {
 
   it("blockbuster vs average film: two-tier booking cost exists and both occur", () => {
     expect(ECON.cinemaBookingBlockbuster).toBeGreaterThan(ECON.cinemaBookingMonthly);
+    // Classic on purpose: this isolates the cinema BOOKING mechanic (which exists
+    // in both modes) from the Modern-only operating overhead, so the assertion
+    // reads the booking cost alone rather than folding in an unrelated sink.
     const sim = Simulation.newGame(3);
     // This test only exercises the monthly booking economy (no crowd/spatial sim),
     // so run the lighter v1 model — one step per tick instead of 24 hourly
@@ -451,14 +454,13 @@ describe("Fine FAQ mechanics", () => {
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     lay(sim, "floor", 3);
-    sim.tower.place("cinema", 2, 0); // the cinema's monthly cost = film booking + its operating overhead
+    sim.tower.place("cinema", 2, 0); // in Classic the cinema's only monthly cost is the film booking
     for (let d = 0; d < 365; d++) sim.tick(60 * 24);
-    const oh = ECON.overheadPerLeasableUnitMonthly; // the cinema is a leasable/overhead unit
     const bookings = sim.log
       .filter((e) => e.text.startsWith("Monthly maintenance"))
       .map((e) => Number(e.text.replace(/[^0-9]/g, "")));
-    expect(bookings.some((c) => c === ECON.cinemaBookingBlockbuster + oh)).toBe(true); // some blockbuster months
-    expect(bookings.some((c) => c === ECON.cinemaBookingMonthly + oh)).toBe(true); // some average months
+    expect(bookings.some((c) => c === ECON.cinemaBookingBlockbuster)).toBe(true); // some blockbuster months
+    expect(bookings.some((c) => c === ECON.cinemaBookingMonthly)).toBe(true); // some average months
   });
 
   it("strict parking alignment: only ramp-chained spaces function", () => {

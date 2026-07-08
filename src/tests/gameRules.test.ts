@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "../engine/gameRules";
 import { FACILITIES } from "../engine/facilities";
+import { ECON } from "../engine/econConfig";
 import { RNG } from "../engine/rng";
 
 /**
@@ -43,6 +44,14 @@ describe("CLASSIC_RULES", () => {
     expect(CLASSIC_RULES.churnMultiplier(5)).toBe(1);
     expect(CLASSIC_RULES.churnMultiplier(undefined)).toBe(1);
   });
+
+  it("runs NONE of the Modern economy sinks (pixel-faithful late game)", () => {
+    // The three non-canon mechanics (gdd-economy-depth / gdd-tenant-churn) are
+    // all neutral in Classic: no overhead, no condo tax, no noise erosion.
+    expect(CLASSIC_RULES.operatingOverheadPerUnit()).toBe(0);
+    expect(CLASSIC_RULES.condoHoldTaxRate()).toBe(0);
+    expect(CLASSIC_RULES.noiseErosionScale()).toBe(0);
+  });
 });
 
 describe("MODERN_RULES", () => {
@@ -75,6 +84,12 @@ describe("MODERN_RULES", () => {
     expect(MODERN_RULES.churnMultiplier(5)).toBeGreaterThan(1);
     expect(MODERN_RULES.churnMultiplier(2)).toBeLessThan(1);
     expect(MODERN_RULES.churnMultiplier(undefined)).toBe(1);
+  });
+
+  it("runs the deeper-economy sinks at their tuned values", () => {
+    expect(MODERN_RULES.operatingOverheadPerUnit()).toBe(ECON.overheadPerLeasableUnitMonthly);
+    expect(MODERN_RULES.condoHoldTaxRate()).toBe(ECON.condoMonthlyTaxRate);
+    expect(MODERN_RULES.noiseErosionScale()).toBe(1);
   });
 
   it("keeps the variant-household distribution centered on the classic mean", () => {

@@ -998,7 +998,14 @@ export class Simulation implements SimContext {
         // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
         // with an occupied-but-unsold condo. The annoyance cap is shared, so all
         // still redden on the stats overlay from the moment of exposure.
-        const erosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        const baseErosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+        // W1 transport-too-far is canon parity and erodes in EVERY tower. W2
+        // office-noise is the Modern-only mechanic: when noise is the ONLY cause,
+        // Classic scales the erosion to 0 so noise merely CAPS satisfaction at
+        // NOISE_CAP and never erodes/evicts (canon "noise caps but never evicts");
+        // Modern keeps eroding. A far-walk office always erodes regardless of mode.
+        const scale = farWalk ? 1 : this.rules.noiseErosionScale();
+        const erosion = baseErosion * scale;
         u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, NOISE_CAP));
       }
       // NOTE: the individually-routed crowd's frustration is exposed read-only via
@@ -1017,16 +1024,42 @@ export class Simulation implements SimContext {
       // floor, so poor access starves them directly rather than via move-out.
       const leaseTenant = u.kind === "office" || u.kind === "condo";
       if (leaseTenant && u.state === "vacating") {
-        if (u.satisfaction >= VACATE_RESCIND) {
-          // Conditions recovered inside the notice window — they quietly stay.
+        // A mode that caps noise but never evicts for it (Classic:
+        // noiseErosionScale 0) must not let a "noise" notice fire, including one
+        // carried in from a pre-split save where noise still eroded. But a real
+        // non-noise problem that has appeared since the notice (the floor went
+        // unserved, its transport is congested, or a far-walk office lost its
+        // shaft) can still evict. So when noise can't be the cause, re-attribute a
+        // stale "noise" stamp to the live cause if such a problem exists, and
+        // otherwise rescind the notice outright. Classic thus never shows a
+        // noise-caused eviction, while a genuine access problem still lands.
+        const noiseCannotEvict = u.vacateReason === "noise" && this.rules.noiseErosionScale() === 0;
+        // Every non-noise satisfaction sink still bites in Classic (only noise is
+        // mode-gated), so mirror vacateCause's non-noise causes: unserved
+        // (access), congested, an office priced over the going rate (rent), or a
+        // far-walk office (transportFar). Any of these is a real problem that must
+        // still evict, so it blocks the noise rescind and re-attributes the stamp.
+        const officeCfg = u.kind === "office" ? rentConfig("office") : undefined;
+        const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
+        const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk;
+        if (noiseCannotEvict && nonNoiseProblem) {
+          u.vacateReason = this.vacateCause(u, served, cong);
+        }
+        const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
+        if (u.satisfaction >= VACATE_RESCIND || rescindNoise) {
+          // Conditions recovered inside the notice window, so they quietly stay.
           // No toast: "silence when correct", and a per-tick good/bad pair on a
           // unit that flaps around the threshold would be pure noise. The
           // clearing inspector/ribbon is the (pull) cue that the fix worked.
           u.state = "occupied";
           u.vacateReason = undefined;
           u.vacateAt = undefined;
+          // Lift a rescinded noise-only tenant to the cap so a migrated save
+          // becomes self-consistent (a noise-capped unit sits AT the cap, as a
+          // fresh Classic tower would, not below it from the old erosion).
+          if (rescindNoise) u.satisfaction = Math.max(u.satisfaction, NOISE_CAP);
         } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
-          // Notice ran out and it's still unbearable — they leave for good.
+          // Notice ran out and it's still unbearable, so they leave for good.
           this.vacate(u, u.vacateReason ?? "access");
         }
       } else if (leaseTenant && u.satisfaction <= 0) {
