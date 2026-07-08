@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { UI, type UICallbacks } from "../ui/UI";
 import { Simulation } from "../engine/Simulation";
+import * as platformModule from "../platform";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where
@@ -97,6 +98,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onExport: vi.fn(),
     onImport: vi.fn(),
     onImportLegacy: vi.fn(),
+    onExportLegacy: vi.fn(),
     onNew: vi.fn(),
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
@@ -147,7 +149,7 @@ describe("wireActions — the anti-dead-button contract", () => {
     // The handler ran — it swapped the saves dialog for the export confirm —
     // but nothing is exported until the player clicks Export in there.
     expect(cb.onExport).not.toHaveBeenCalled();
-    click('[data-act="yes"]');
+    click('[data-act="export"]'); // the confirm dialog's own primary
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
@@ -383,20 +385,77 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     vi.useRealTimers();
   });
 
+  it("downloadFile hands the export to the platform port with the octet-stream MIME", () => {
+    const saveFile = vi.fn(() => Promise.resolve());
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile,
+      openExternal: () => {},
+    });
+    const { ui } = makeUI();
+    ui.downloadFile("my-tower.vctower", "VCTOWER1\npayload");
+    expect(saveFile).toHaveBeenCalledExactlyOnceWith("my-tower.vctower", "VCTOWER1\npayload", "application/octet-stream");
+  });
+
+  it("downloadFile toasts when the port's saveFile rejects (a native real-failure path)", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.reject(new Error("disk full")),
+      openExternal: () => {},
+    });
+    const { ui } = makeUI();
+    ui.downloadFile("t.vctower", "payload");
+    await vi.waitFor(() => {
+      const toasts = [...document.getElementById("toast-wrap")!.children];
+      expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
+    });
+  });
+
+  it("downloadFile survives a broken port whose saveFile throws synchronously, and still toasts", async () => {
+    // A bridged shell returning undefined or throwing outright is the exact
+    // contract slip the port guards against; it must reach the same toast,
+    // not become an uncaught TypeError at the export call site.
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: (() => {
+        throw new Error("no bridge");
+      }) as unknown as () => Promise<void>,
+      openExternal: () => {},
+    });
+    const { ui } = makeUI();
+    expect(() => ui.downloadFile("t.vctower", "payload")).not.toThrow();
+    await vi.waitFor(() => {
+      const toasts = [...document.getElementById("toast-wrap")!.children];
+      expect(toasts.some((t) => t.className.includes("bad") && t.textContent!.includes("Couldn't save your tower file"))).toBe(true);
+    });
+  });
+
   it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
     const { cb } = makeUI();
     document.getElementById("btn-export")!.click();
     expect(dialog().open).toBe(true);
     expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
-    const yes = dialog().querySelector('[data-act="yes"]')!;
-    expect(yes.textContent).toBe("Export"); // not a generic "Confirm"
-    click('[data-act="no"]'); // cancel → still no export
+    const primary = dialog().querySelector('[data-act="export"]')!;
+    expect(primary.textContent).toBe("Export"); // not a generic "Confirm"
+    expect(primary.classList.contains("primary")).toBe(true); // one primary per dialog
+    click('[data-act="close"]'); // cancel → still no export
     expect(cb.onExport).not.toHaveBeenCalled();
 
     document.getElementById("btn-export")!.click();
-    click('[data-act="yes"]');
+    click('[data-act="export"]');
     expect(cb.onExport).toHaveBeenCalledTimes(1);
     expect(dialog().open).toBe(false); // the toast isn't hidden under the modal
+  });
+
+  it("the confirm dialog's secondary routes to the 1994 export flow, never the .vctower one", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-export")!.click();
+    click('[data-act="legacy"]');
+    expect(cb.onExportLegacy).toHaveBeenCalledTimes(1);
+    expect(cb.onExport).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
   });
 
   it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
@@ -540,6 +599,63 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
   });
 });
 
+describe("export fidelity report: nothing downloads until the player confirms", () => {
+  const exportReport = () => ({
+    towerName: "GRAND",
+    filename: "GRAND.TDT",
+    star: 3,
+    money: 1_500_000,
+    floors: 5,
+    basements: 1,
+    roomsExported: 9,
+    comesAlong: ["9 rooms with their occupancy and hotel states."],
+    staysBehind: ["The income ledger and finance history start fresh in 1994."],
+  });
+
+  it("shows the facts and both lists; Download fires onDownload and closes", () => {
+    const { ui } = makeUI();
+    const onDownload = vi.fn();
+    ui.showExportReport(exportReport(), { onDownload });
+    expect(dialog().open).toBe(true);
+    const text = dialog().textContent!;
+    expect(text).toContain("GRAND");
+    expect(text).toContain("Comes along");
+    expect(text).toContain("Stays behind");
+    expect(text).toContain("GRAND.TDT");
+    expect(onDownload).not.toHaveBeenCalled(); // two-step contract
+    click('[data-act="download"]');
+    expect(onDownload).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Cancel downloads nothing; content is escaped against hostile tower names", () => {
+    const { ui } = makeUI();
+    const onDownload = vi.fn();
+    ui.showExportReport(
+      { ...exportReport(), towerName: "<img src=x onerror=alert(1)>" },
+      { onDownload },
+    );
+    expect(dialog().querySelector("img")).toBeNull();
+    expect(dialog().textContent).toContain("<img src=x onerror=alert(1)>");
+    click('[data-act="close"]');
+    expect(onDownload).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("never clobbers a live blocking modal: yields with a toast instead", () => {
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
+    const onDownload = vi.fn();
+    ui.showExportReport(exportReport(), { onDownload });
+    expect(dialog().textContent).toContain("A fire has broken out!");
+    expect(document.getElementById("toast-wrap")!.textContent).toContain("Close the open dialog first");
+    click('[data-act="decline"]');
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(onDownload).not.toHaveBeenCalled();
+  });
+});
+
 describe("toast — kind class and stack cap", () => {
   const wrap = (): HTMLElement => document.getElementById("toast-wrap")!;
 
@@ -567,6 +683,12 @@ describe("toast — kind class and stack cap", () => {
 describe("showHelp — the Report an issue link", () => {
   const CHOOSER = "https://github.com/maniator/verticopolis/issues/new/choose";
 
+  // A leaked getPlatform mock would silently flip later tests into native
+  // mode; restore unconditionally, even when an assertion fails mid-test.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders a chooser link that opens in a new tab with rel=noopener", () => {
     const { ui } = makeUI();
     ui.showHelp();
@@ -581,6 +703,90 @@ describe("showHelp — the Report an issue link", () => {
     // a new tab (WCAG 3.2.5), without altering the visible label.
     const cue = link!.querySelector(".visually-hidden");
     expect(cue?.textContent).toContain("new tab");
+  });
+
+  it("routes activation through platform.openExternal inside a native wrapper", () => {
+    const openExternal = vi.fn();
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal,
+    });
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    const click = new MouseEvent("click", { cancelable: true });
+    link.dispatchEvent(click);
+    // The wrapper's WebView must not navigate away: the anchor's default is
+    // cancelled and the URL goes out through the port instead.
+    expect(click.defaultPrevented).toBe(true);
+    expect(openExternal).toHaveBeenCalledExactlyOnceWith(CHOOSER);
+    // Middle-button activation fires auxclick, not click; it routes the same
+    // way, while other buttons (e.g. right, whose menu already fired) don't.
+    const middle = new MouseEvent("auxclick", { cancelable: true, button: 1 });
+    link.dispatchEvent(middle);
+    expect(middle.defaultPrevented).toBe(true);
+    expect(openExternal).toHaveBeenCalledTimes(2);
+    const right = new MouseEvent("auxclick", { cancelable: true, button: 2 });
+    link.dispatchEvent(right);
+    expect(right.defaultPrevented).toBe(false);
+    expect(openExternal).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps the plain anchor in the browser: no interception at all", () => {
+    // With the real (browser) platform, nothing intercepts the click,
+    // preserving middle-click and context-menu semantics that a delegating
+    // handler would break.
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    // Listeners run in registration order, so this one (attached after
+    // showHelp wired anything it was going to wire) observes whether the game
+    // cancelled the default, then cancels it itself so happy-dom doesn't
+    // actually navigate the test window to GitHub.
+    let preventedByGame = true;
+    link.addEventListener("click", (e) => {
+      preventedByGame = e.defaultPrevented;
+      e.preventDefault();
+    });
+    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+    expect(preventedByGame).toBe(false);
+  });
+
+  it("falls back to window.open when the wrapper's openExternal throws", () => {
+    // The handler cancels the default before calling the port, so a throwing
+    // wrapper hook must not leave the link dead.
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal: () => {
+        throw new Error("bridge gone");
+      },
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+    expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer");
+  });
+
+  it("falls back to window.open when an async openExternal rejects (Capacitor-style Promise hook)", async () => {
+    // A Promise-returning wrapper hook (Browser.open) that rejects after
+    // preventDefault must reach the same fallback as a sync throw.
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal: () => Promise.reject(new Error("browser plugin failed")),
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+    await vi.waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer"));
   });
 
   it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {

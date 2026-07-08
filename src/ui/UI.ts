@@ -1,10 +1,12 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
+import type { ExportReport } from "../storage/tdtExport";
 import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
+import { getPlatform } from "../platform";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -40,6 +42,8 @@ export interface UICallbacks {
   onImport(data: string): void;
   /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
+  /** Export the live tower as an original 1994 SimTower save (.TDT). */
+  onExportLegacy(): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
@@ -791,31 +795,56 @@ export class UI {
   }
 
   /** Export is deliberately two-step: the tower is not serialized, packed, or
-   *  downloaded until the player actually clicks Export in this dialog. */
+   *  downloaded until the player actually clicks a choice in this dialog.
+   *  The .vctower path stays the primary; the 1994 .TDT path is the secondary
+   *  and leads to its own reverse fidelity modal before any download. */
   private confirmExport(): void {
-    this.confirmModal(
-      "Export tower?",
-      `Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.`,
-      () => this.cb.onExport(),
-      "Export",
-    );
+    const box = this.openModal(`
+      <h2>Export tower?</h2>
+      <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
+      <p style="color:var(--muted);font-size:12px">You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="close">Cancel</button>
+        <button class="btn" data-act="legacy">For SimTower (1994)…</button>
+        <button class="btn primary" data-act="export" autofocus>Export</button>
+      </div>`);
+    this.wireActions(box, {
+      export: () => {
+        this.closeModal();
+        this.cb.onExport();
+      },
+      legacy: () => {
+        this.closeModal();
+        this.cb.onExportLegacy();
+      },
+    });
   }
 
-  /** Hand the player a file download (the export path). Pure DOM plumbing:
-   *  callers decide the name and contents (see SaveGame.export). */
-  downloadFile(filename: string, contents: string): void {
-    // octet-stream (not application/json — the payload isn't) so the browser
+  /** Hand the player an exported file. Routed through the platform port so a
+   *  native wrapper can deliver it its own way (share sheet); the browser port
+   *  keeps the pre-port blob-anchor download exactly. Callers decide the name
+   *  and contents (see SaveGame.export); raw bytes flow through too, for the
+   *  binary .TDT export. The type mirrors the platform port's saveFile seam
+   *  (a cross-repo contract), which is why it is narrower than BlobPart. */
+  downloadFile(filename: string, contents: string | Uint8Array): void {
+    // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
-    const blob = new Blob([contents], { type: "application/octet-stream" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    a.click();
-    // Revoking in the same task can abort the download on engines that fetch
-    // the blob URL asynchronously (Safari/Firefox) — and this is the ONLY way
-    // to get a tower out now. Give the navigation a generous head start.
-    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    //
+    // Every failure shape a broken wrapper can produce (sync throw, non-Promise
+    // return, rejection) must reach the same toast, because losing an export
+    // silently is never acceptable. Dead code in the browser (its saveFile
+    // never throws or rejects); a native shell rejects only on real failure,
+    // and cancel resolves, so the toast never fires for it. The call itself
+    // stays synchronous: deferring it would delay the browser download.
+    const fail = (err: unknown) => {
+      console.error("[platform] saveFile failed:", err);
+      this.toast("Couldn't save your tower file. Please try again.", "bad");
+    };
+    try {
+      void Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
+    } catch (err) {
+      fail(err);
+    }
   }
 
   /** Import goes straight to the file picker — exports are .vctower downloads
@@ -912,6 +941,48 @@ export class UI {
     });
   }
 
+  /**
+   * Reverse fidelity report for a legacy (.TDT) export: what makes the trip
+   * back to 1994 and what stays behind, shown BEFORE anything downloads.
+   * `onDownload` fires only on the primary; Cancel downloads nothing.
+   */
+  showExportReport(report: ExportReport, cb: { onDownload: () => void }): void {
+    // Same modal-clobber guard as the import report: never wipe a live
+    // blocking dialog (emergency choice, update prompt) out from under its
+    // pending resolve.
+    if (this.isModalOpen()) {
+      this.toast("Close the open dialog first, then export again.", "info");
+      return;
+    }
+    const li = (lines: string[]) => lines.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+    const stars = report.star >= 6 ? "TOWER" : `${report.star}★`;
+    const funds = `${report.money < 0 ? "-" : ""}$${Math.abs(report.money).toLocaleString()}`;
+    const box = this.openModal(`
+      <h2>Export for SimTower (1994)</h2>
+      <div class="import-facts well">
+        <b>${escapeHtml(report.towerName)}</b> · ${stars} · ${funds}
+        · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
+        · ${report.roomsExported.toLocaleString()} rooms
+      </div>
+      <h3>Comes along</h3>
+      <ul class="import-list">${li(report.comesAlong)}</ul>
+      <h3>Stays behind</h3>
+      <ul class="import-list">${li(report.staysBehind)}</ul>
+      <p style="color:var(--muted);font-size:12px">Downloads as <b>${escapeHtml(report.filename)}</b>. Your tower here is untouched.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="close">Cancel</button>
+        <button class="btn primary" data-act="download" autofocus>Download .TDT</button>
+      </div>`);
+    const live = document.getElementById("a11y-live");
+    if (live) live.textContent = "SimTower export summary ready.";
+    this.wireActions(box, {
+      download: () => {
+        this.closeModal();
+        cb.onDownload();
+      },
+    });
+  }
+
   showHelp(): void {
     // Replaying the intro is meaningless while the title screen is still up (the
     // handler no-ops behind #splash), so disable that button there.
@@ -950,6 +1021,36 @@ export class UI {
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
+    // Only inside a native wrapper: the report link must not navigate the
+    // shell's WebView away, so hand it to the system browser through the
+    // platform port. Browser builds attach nothing, keeping the anchor's
+    // middle-click and context-menu semantics untouched.
+    if (getPlatform().isNativeWrapper) {
+      const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
+      const fallback = (err: unknown) => {
+        // The default is already cancelled; a failing wrapper hook must not
+        // leave the link dead, so fall back to the browser behavior.
+        console.error("[platform] openExternal failed:", err);
+        window.open(report.href, "_blank", "noopener,noreferrer");
+      };
+      const routeExternal = (e: Event) => {
+        e.preventDefault();
+        // Promise.resolve folds an async wrapper hook's rejection (Capacitor's
+        // Browser.open returns a Promise) into the same fallback as a sync
+        // throw; either way the tap must still open the page somewhere.
+        try {
+          void Promise.resolve(getPlatform().openExternal(report.href)).catch(fallback);
+        } catch (err) {
+          fallback(err);
+        }
+      };
+      report.addEventListener("click", routeExternal);
+      // Middle-button activation fires auxclick, not click; route it the same
+      // way (other buttons keep their defaults, e.g. the context menu).
+      report.addEventListener("auxclick", (e) => {
+        if (e.button === 1) routeExternal(e);
+      });
+    }
     const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     const scLabel = (steady: boolean) => {
       sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;
