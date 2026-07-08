@@ -35,11 +35,16 @@ function rooms(spec: TdtSpec) {
  *  parking stall/ramp, recycling parts, metro parts. */
 const BASEMENT_ONLY_IDS = new Set([11, 44, 20, 21, 31, 32, 33]);
 
-/** One tenant of the given type on TDT floor 20 (our floor 11), or, for
- *  basement-only kinds, TDT floor 6 (our floor B4, so even the metro's three
- *  stories stay below ground). */
+/** Cathedral part IDs: their stand-in Wedding Hall must crown floor 100. */
+const CATHEDRAL_IDS = new Set([36, 37, 38, 39, 40]);
+
+/** One tenant of the given type on TDT floor 20 (our floor 11); basement-only
+ *  kinds go to TDT floor 6 (our floor B4, so even the metro's three stories
+ *  stay below ground) and Cathedral parts to TDT 109 (our floor 100, the
+ *  crown). */
 function oneTenant(type: number, left = 100, right = 109, status = 0): TdtSpec {
-  const index = BASEMENT_ONLY_IDS.has(Math.abs(type)) ? 6 : 20;
+  const id = Math.abs(type);
+  const index = BASEMENT_ONLY_IDS.has(id) ? 6 : CATHEDRAL_IDS.has(id) ? 109 : 20;
   return { floors: [{ index, tenants: [{ left, right, type, status }] }] };
 }
 
@@ -358,6 +363,35 @@ describe("parseTDT: golden mappings", () => {
       ],
     });
     expect(merged.save.units.filter((u) => u.kind === "recycling")).toHaveLength(0);
+  });
+
+  it("an off-crown Cathedral cluster is dropped: the Wedding Hall crowns floor 100 only", () => {
+    // Parts ending at ours 95 (TDT 100..104): corrupt or hand-edited data;
+    // a real winning save's Cathedral always tops out at floor 100.
+    const { save, report } = parse({
+      floors: Array.from({ length: 5 }, (_, i) => ({
+        index: 100 + i,
+        tenants: [{ left: 180, right: 196, type: 36 + i }],
+      })),
+    });
+    expect(save.units.filter((u) => u.kind === "weddingHall")).toHaveLength(0);
+    expect(save.builtWeddingHall).toBe(false);
+    expect(save.vipVisitDay).toBe(-1);
+    expect(report.couldNotBring.join(" ")).toMatch(/floor its kind can't occupy/);
+  });
+
+  it("imported basements seed the excavation history (no re-farmed treasure)", () => {
+    const { save } = parse({
+      // A stall on B1 (TDT 9 = ours 0) and an office upstairs.
+      floors: [
+        { index: 9, tenants: [{ left: 100, right: 104, type: 11 }] },
+        { index: 20, tenants: [{ left: 100, right: 109, type: 7 }] },
+      ],
+    });
+    expect(save.excavated).toContain("0:100");
+    expect(save.excavated).toContain("0:103");
+    // Above-ground tiles are never "excavated".
+    expect(save.excavated!.every((k) => Number(k.split(":")[0]) <= 0)).toBe(true);
   });
 
   it("daylight kinds in the basement, and rooms covering the ground concourse, are dropped", () => {

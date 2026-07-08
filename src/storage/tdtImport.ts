@@ -152,6 +152,9 @@ function misplacedOnFloor(kind: FacilityKind, floor: number): boolean {
   if (FACILITIES[kind].basement && floor + hgt - 1 >= 1) return true;
   if (floor <= 1 && floor + hgt - 1 >= 1) return true; // covers the ground concourse
   if (floor < 1 && (kind === "office" || kind === "condo" || isHotelKind(kind))) return true;
+  // The Wedding Hall crowns floor 100, nowhere else; a real winning save's
+  // Cathedral always tops out there, so an off-crown cluster is corrupt data.
+  if (kind === "weddingHall" && floor !== GRID.maxFloor) return true;
   return false;
 }
 
@@ -650,6 +653,18 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     if (left !== -1) builtExtents.set(floor, { left, right });
   }
 
+  // Every paved basement tile was dug in the legacy game, so seed the
+  // excavation history: without it, bulldozing and rebuilding an imported
+  // basement room would count as fresh ground and could re-pay the
+  // buried-treasure windfall for space the tower already excavated.
+  const excavated: string[] = [];
+  for (const [floor, row] of paved) {
+    if (floor > 0) continue;
+    for (let xTile = 0; xTile < GRID.width; xTile++) {
+      if (row[xTile]) excavated.push(`${floor}:${xTile}`);
+    }
+  }
+
   // ---- Transports: decoded from the save, or synthesized as a fallback -----
   const decoded = tdt.elevators !== null;
   let transports: Transport[];
@@ -687,6 +702,7 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     evaluatedTower: star >= 6,
     vipVisitDay,
     vipFavorable: star >= 6,
+    excavated,
   };
 
   return { save, report: buildReport(save, counts, tdt, decoded, decodeStats, headerNotes) };
