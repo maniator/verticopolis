@@ -231,7 +231,9 @@ export const SaveGame = {
 
   /** Serialize the tower into the .vctower container (see TOWER_FILE_MAGIC). */
   async export(sim: Simulation): Promise<string> {
-    if (!compressionSupported()) {
+    // Export only WRITES compressed data, so it needs just the encoder; a
+    // browser missing only the decoder can still create tower files.
+    if (!compressionEncodeSupported()) {
       throw new Error("This browser is too old to create tower files. Try a current browser.");
     }
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
@@ -262,7 +264,8 @@ export const SaveGame = {
     }
     // Distinguish "your browser can't decompress" from "this file is broken"
     // BEFORE the try below — otherwise a missing API blames a healthy file.
-    if (!compressionSupported()) {
+    // Import only READS compressed data, so it needs just the decoder.
+    if (!compressionDecodeSupported()) {
       throw new Error("This browser is too old to open compressed tower files. Try a current browser.");
     }
     let data: SerializedGame;
@@ -363,23 +366,24 @@ function inflateCapped(packed: Uint8Array): Uint8Array {
   return out;
 }
 
-// True when this browser can both compress and decompress raw deflate. Built
-// by actually constructing the streams: the "deflate-raw" format string is
-// newer than CompressionStream itself (Chrome had the API before the format),
-// so a `typeof` check alone would pass on browsers that then throw at use.
-function compressionSupported(): boolean {
+// Per-direction support probes, built by actually constructing the streams:
+// the "deflate-raw" format string is newer than CompressionStream itself
+// (Chrome had the API before the format), so a `typeof` check alone would pass
+// on browsers that then throw at use. Probed separately because each caller
+// needs only one direction — export/saveToAsync encode, import decodes — and a
+// browser missing one must not be blocked from the operation it can perform.
+function compressionEncodeSupported(): boolean {
   try {
-    if (!compressionEncodeSupported()) return false;
-    new DecompressionStream("deflate-raw");
+    new CompressionStream("deflate-raw");
     return true;
   } catch {
     return false;
   }
 }
 
-function compressionEncodeSupported(): boolean {
+function compressionDecodeSupported(): boolean {
   try {
-    new CompressionStream("deflate-raw");
+    new DecompressionStream("deflate-raw");
     return true;
   } catch {
     return false;

@@ -529,31 +529,40 @@ describe("SaveGame", () => {
   });
 
   describe("when the browser lacks the compression API", () => {
-    // deflate-raw is a 2022+ browser feature; on an older browser both the
-    // export and the import of a compressed file must fail with an honest
-    // "your browser is too old" message — not a silent failure, and NOT
-    // "this file is damaged" (which would blame a perfectly good save).
+    // deflate-raw is a 2022+ browser feature; on an older browser the export
+    // and the import of a compressed file must fail with an honest "your
+    // browser is too old" message — not a silent failure, and NOT "this file
+    // is damaged" (which would blame a perfectly good save). Each direction is
+    // probed separately: export needs only the encoder, import only the
+    // decoder, so a browser missing one direction still gets the other.
     afterEach(() => vi.unstubAllGlobals());
-    const breakCompression = () =>
-      vi.stubGlobal(
-        "CompressionStream",
-        class {
-          constructor() {
-            throw new TypeError("Unsupported format: deflate-raw");
-          }
-        },
-      );
+    const broken = class {
+      constructor() {
+        throw new TypeError("Unsupported format: deflate-raw");
+      }
+    };
+    const breakEncode = () => vi.stubGlobal("CompressionStream", broken);
+    const breakDecode = () => vi.stubGlobal("DecompressionStream", broken);
 
     it("export reports the browser is too old, not a generic failure", async () => {
-      breakCompression();
+      breakEncode();
       await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
       // A real, healthy container built while compression WAS available.
       const file = await SaveGame.export(sampleGame());
-      breakCompression();
+      breakDecode();
       await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
+    });
+
+    it("a decoder-only browser can still import, and an encoder-only browser can still export", async () => {
+      const file = await SaveGame.export(sampleGame());
+      breakEncode(); // decoder-only browser
+      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
+      vi.unstubAllGlobals();
+      breakDecode(); // encoder-only browser
+      await expect(SaveGame.export(sampleGame())).resolves.toMatch(/^VCTOWER1\n/);
     });
   });
 
