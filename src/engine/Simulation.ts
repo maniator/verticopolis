@@ -1040,7 +1040,7 @@ export class Simulation implements SimContext {
         }
         const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
         if (u.satisfaction >= VACATE_RESCIND || rescindNoise) {
-          // Conditions recovered inside the notice window — they quietly stay.
+          // Conditions recovered inside the notice window, so they quietly stay.
           // No toast: "silence when correct", and a per-tick good/bad pair on a
           // unit that flaps around the threshold would be pure noise. The
           // clearing inspector/ribbon is the (pull) cue that the fix worked.
@@ -1052,7 +1052,7 @@ export class Simulation implements SimContext {
           // fresh Classic tower would, not below it from the old erosion).
           if (rescindNoise) u.satisfaction = Math.max(u.satisfaction, NOISE_CAP);
         } else if (this.clock.minutes >= (u.vacateAt ?? 0)) {
-          // Notice ran out and it's still unbearable — they leave for good.
+          // Notice ran out and it's still unbearable, so they leave for good.
           this.vacate(u, u.vacateReason ?? "access");
         }
       } else if (leaseTenant && u.satisfaction <= 0) {
