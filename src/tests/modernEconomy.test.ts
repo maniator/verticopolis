@@ -38,8 +38,13 @@ function servedTower(mode: GameMode): Simulation {
 }
 
 describe("office-noise erosion is Modern-only (canon: Classic caps but never evicts)", () => {
-  /** Place an office with a hotel neighbor inside its noise band; run a long
-   *  stretch of exposure and report the neighbor's floored satisfaction. */
+  /** Place an office with a hotel neighbor inside its noise band, run a week of
+   *  ticks, and report the neighbor's floored satisfaction. The room checks out
+   *  to "dirty" on the first 08:00 (a hotel does not hold its guest overnight and
+   *  this bare tower has no housekeeping to re-let it), but noise erosion keys off
+   *  adjacency, not occupancy state, and a dirty room is not dormant, so the
+   *  satisfaction field keeps taking the mode-gated erosion for the whole loop,
+   *  which is exactly what this measures. */
   function noiseFloor(mode: GameMode): number {
     const sim = servedTower(mode);
     sim.star = 1; // suppress random fire/bomb events so noise is isolated
@@ -48,7 +53,7 @@ describe("office-noise erosion is Modern-only (canon: Classic caps but never evi
     const hotel = sim.tower.units.find((u) => u.id === r.unitId)!;
     hotel.state = "asleep";
     hotel.satisfaction = 1;
-    // A full week of unbroken exposure, far past any eviction fuse.
+    // A week of sustained noise adjacency (state-independent erosion; see above).
     for (let i = 0; i < 24 * 7; i++) sim.tick(60);
     return hotel.satisfaction;
   }
