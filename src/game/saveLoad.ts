@@ -203,8 +203,15 @@ export class SaveLoad {
       sim = Simulation.deserialize(parsed.save);
       report = parsed.report;
     } catch (err) {
+      // LegacyImportError messages are already player-readable; anything else
+      // (a deserialize trust-boundary refusal, an importer bug) keeps the
+      // plain lead but carries the underlying detail, matching importGame's
+      // "Import failed: <message>" diagnosability.
+      const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
       const msg =
-        err instanceof LegacyImportError ? err.message : "This SimTower save couldn't be read.";
+        err instanceof LegacyImportError
+          ? err.message
+          : `This SimTower save couldn't be read.${detail}`;
       this.deps.ui.toast(msg, "bad");
       return;
     }

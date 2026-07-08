@@ -701,7 +701,10 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     builtWeddingHall: hasWeddingHall,
     evaluatedTower: star >= 6,
     vipVisitDay,
-    vipFavorable: star >= 6,
+    // A 4-star-or-better save already passed the original's favorable-suite
+    // VIP review (it gates 4 stars there too); without this, evaluateStar
+    // clamps the imported tower back to 3 stars until a NEW VIP stay.
+    vipFavorable: star >= 4,
     excavated,
   };
 

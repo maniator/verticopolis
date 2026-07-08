@@ -614,6 +614,11 @@ describe("parseTDT: golden mappings", () => {
     const modest = parse({ level: 3 }).save;
     expect(modest.evaluatedTower).toBe(false);
     expect(modest.vipFavorable).toBe(false);
+    // A 4-star save already passed the original's VIP suite review: the flag
+    // carries over, or evaluateStar would clamp the import back to 3 stars.
+    const four = parse({ level: 4 }).save;
+    expect(four.evaluatedTower).toBe(false);
+    expect(four.vipFavorable).toBe(true);
   });
 
   it("meta: classic mode, current schema version, filename-derived name, deterministic seed, sane nextId", () => {
