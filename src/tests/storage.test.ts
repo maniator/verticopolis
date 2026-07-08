@@ -1,11 +1,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { deflateSync } from "fflate";
-import { Simulation } from "../engine/Simulation";
+import { SAVE_VERSION, Simulation } from "../engine/Simulation";
 import { SaveGame } from "../storage/SaveGame";
 import { FACILITIES, GRID } from "../engine/facilities";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
+  // Several compression tests stub browser stream globals; always restore them
+  // so later export/import tests see the real environment.
+  afterEach(() => vi.unstubAllGlobals());
 
   function sampleGame(): Simulation {
     const sim = Simulation.newGame(42);
@@ -225,7 +228,9 @@ describe("SaveGame", () => {
     expect(loaded.tower.unitAt(2, x0)).toBeDefined();
   });
 
-  const AUTO_KEY = "simtower-clone-save"; // mirrors the internal autosave key
+  // Mirrors SaveGame's internal autosave keys so tests can inspect raw stored values.
+  const AUTO_KEY = "verticopolis-save";
+  const LEGACY_AUTO_KEY = "simtower-clone-save";
 
   it("stores autosaves COMPRESSED (tagged, and smaller than the raw JSON), not as a giant blob", () => {
     const sim = sampleGame();
@@ -237,6 +242,135 @@ describe("SaveGame", () => {
     expect(raw.length).toBeLessThan(JSON.stringify(sim.serialize()).length);
     // …and it still round-trips back to the same tower.
     expect(SaveGame.load()!.money).toBe(sim.money);
+  });
+
+  it("async autosave writes the same compressed localStorage format", async () => {
+    const sim = sampleGame();
+    sim.money = 765_432;
+    await SaveGame.saveAsync(sim);
+    const raw = localStorage.getItem(AUTO_KEY)!;
+    expect(raw.startsWith("VCZ1:")).toBe(true);
+    expect(SaveGame.load()!.money).toBe(765_432);
+  });
+
+  it("async autosave falls back to the synchronous writer when native compression is unavailable", async () => {
+    vi.stubGlobal(
+      "CompressionStream",
+      class {
+        constructor() {
+          throw new TypeError("Unsupported format: deflate-raw");
+        }
+      },
+    );
+    const sim = sampleGame();
+    sim.money = 246_810;
+    await SaveGame.saveAsync(sim);
+    expect(localStorage.getItem(AUTO_KEY)!.startsWith("VCZ1:")).toBe(true);
+    expect(SaveGame.load()!.money).toBe(246_810);
+  });
+
+  it("async autosave only requires native compression, not native decompression", async () => {
+    vi.stubGlobal(
+      "DecompressionStream",
+      class {
+        constructor() {
+          throw new TypeError("Unsupported format: deflate-raw");
+        }
+      },
+    );
+    const sim = sampleGame();
+    sim.money = 135_790;
+    await SaveGame.saveAsync(sim);
+    expect(SaveGame.load()!.money).toBe(135_790);
+  });
+
+  it("does not let an older async autosave overwrite a newer synchronous save", async () => {
+    let captured: Uint8Array | undefined;
+    let release!: () => void;
+    class SlowCompressionStream {
+      readable: ReadableStream<Uint8Array>;
+      writable: WritableStream<Uint8Array>;
+
+      constructor() {
+        this.readable = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            await new Promise<void>((resolve) => (release = resolve));
+            controller.enqueue(deflateSync(captured!));
+            controller.close();
+          },
+        });
+        this.writable = new WritableStream<Uint8Array>({
+          write(chunk) {
+            captured = chunk;
+          },
+        });
+      }
+    }
+    vi.stubGlobal("CompressionStream", SlowCompressionStream);
+    vi.stubGlobal("DecompressionStream", class {});
+
+    const stale = sampleGame();
+    stale.money = 100;
+    const pending = SaveGame.saveAsync(stale);
+    await vi.waitFor(() => expect(captured).toBeDefined());
+
+    const fresh = sampleGame();
+    fresh.money = 200;
+    SaveGame.save(fresh);
+    release();
+    await pending;
+
+    expect(SaveGame.load()!.money).toBe(200);
+  });
+
+  it("a manual SLOT save does not cancel an in-flight async autosave commit", async () => {
+    let captured: Uint8Array | undefined;
+    let release!: () => void;
+    class SlowCompressionStream {
+      readable: ReadableStream<Uint8Array>;
+      writable: WritableStream<Uint8Array>;
+
+      constructor() {
+        this.readable = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            await new Promise<void>((resolve) => (release = resolve));
+            controller.enqueue(deflateSync(captured!));
+            controller.close();
+          },
+        });
+        this.writable = new WritableStream<Uint8Array>({
+          write(chunk) {
+            captured = chunk;
+          },
+        });
+      }
+    }
+    vi.stubGlobal("CompressionStream", SlowCompressionStream);
+    vi.stubGlobal("DecompressionStream", class {});
+
+    const auto = sampleGame();
+    auto.money = 111;
+    const pending = SaveGame.saveAsync(auto);
+    await vi.waitFor(() => expect(captured).toBeDefined());
+
+    // Writes a DIFFERENT key, so the pending autosave must still commit.
+    const manual = sampleGame();
+    manual.money = 222;
+    SaveGame.saveSlot(1, manual);
+    release();
+    await pending;
+
+    expect(SaveGame.load()!.money).toBe(111); // autosave landed, not cancelled
+    expect(SaveGame.loadSlot(1)!.money).toBe(222); // slot save intact
+  });
+
+  it("propagates direct async save failures to callers", async () => {
+    const saveToAsync = vi.spyOn(SaveGame, "saveToAsync").mockRejectedValueOnce(new Error("write failed"));
+    try {
+      await expect(SaveGame.saveAsync(sampleGame())).rejects.toThrow(/write failed/);
+    } finally {
+      saveToAsync.mockRestore();
+    }
   });
 
   // Chunked base64 of raw bytes (mirrors SaveGame's own encoder) for the
@@ -301,6 +435,104 @@ describe("SaveGame", () => {
     SaveGame.preserveUnreadable();
     expect(localStorage.getItem(UNREADABLE_KEY)).toBe(unreadable); // recoverable later
     expect(localStorage.getItem(AUTO_KEY)).toBe(unreadable); // original left in place
+  });
+
+  it("falls back to a healthy legacy save when the Verticopolis autosave is unreadable, and still flags corruption", () => {
+    const sim = sampleGame();
+    sim.money = 555_555;
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    localStorage.setItem(AUTO_KEY, "VCZ1:not-actually-deflate");
+    const boot = SaveGame.loadResult();
+    expect(boot.sim).not.toBeNull(); // the legacy tower is rescued...
+    expect(boot.sim!.money).toBe(555_555);
+    expect(boot.corrupt).toBe(true); // ...while boot still preserves + warns
+  });
+
+  it("does not consult the legacy key (or flag corruption) when the Verticopolis autosave reads fine", () => {
+    const sim = sampleGame();
+    sim.money = 777_777;
+    SaveGame.save(sim);
+    localStorage.setItem(LEGACY_AUTO_KEY, "VCZ1:garbage-stale-legacy");
+    const boot = SaveGame.loadResult();
+    expect(boot.sim!.money).toBe(777_777);
+    expect(boot.corrupt).toBe(false);
+  });
+
+  it("restores the legacy key when the quota-pressure retry also fails", () => {
+    // Both keys exist and the origin's quota stays exhausted even after the
+    // legacy key is dropped: the write must fail WITHOUT destroying the legacy
+    // value, which an unreadable primary falls back to at load.
+    const sim = sampleGame();
+    SaveGame.save(sim);
+    const legacyValue = JSON.stringify({ ...sim.serialize(), savedAt: 123 });
+    localStorage.setItem(LEGACY_AUTO_KEY, legacyValue);
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return realSetItem(key, value);
+    });
+    try {
+      expect(() => SaveGame.save(sim)).toThrow(/quota/i);
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBe(legacyValue); // restored, not lost
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it("loads a legacy autosave key and rewrites future saves to the Verticopolis key", () => {
+    const sim = sampleGame();
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    expect(SaveGame.hasSave()).toBe(true);
+    expect(SaveGame.load()!.money).toBe(sim.money);
+
+    const loaded = SaveGame.load()!;
+    loaded.money = 333_333;
+    SaveGame.save(loaded);
+    expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
+    expect(SaveGame.load()!.money).toBe(333_333);
+  });
+
+  it("removes the legacy autosave key before migrating so quota can be reclaimed", () => {
+    const sim = sampleGame();
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY && localStorage.getItem(LEGACY_AUTO_KEY) !== null) {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      }
+      return realSetItem(key, value);
+    });
+    try {
+      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
+      expect(localStorage.getItem(AUTO_KEY)).not.toBeNull();
+    } finally {
+      setSpy.mockRestore();
+    }
+  });
+
+  it("retries the autosave write after dropping a coexisting legacy key when quota is tight", () => {
+    // Both keys can coexist (multi-tab, or an older build re-writing the
+    // legacy key after migration). A quota-tight write must reclaim the stale
+    // legacy duplicate and retry rather than fail the autosave.
+    const sim = sampleGame();
+    SaveGame.save(sim); // AUTO_KEY now populated
+    localStorage.setItem(LEGACY_AUTO_KEY, JSON.stringify({ ...sim.serialize(), savedAt: 123 }));
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key === AUTO_KEY && localStorage.getItem(LEGACY_AUTO_KEY) !== null) {
+        throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      }
+      return realSetItem(key, value);
+    });
+    try {
+      sim.money = 424_242;
+      expect(() => SaveGame.save(sim)).not.toThrow();
+      expect(localStorage.getItem(LEGACY_AUTO_KEY)).toBeNull();
+      expect(SaveGame.load()!.money).toBe(424_242);
+    } finally {
+      setSpy.mockRestore();
+    }
   });
 
   it("still loads a legacy uncompressed (raw-JSON) save, then upgrades it to compressed on the next save", () => {
@@ -404,31 +636,40 @@ describe("SaveGame", () => {
   });
 
   describe("when the browser lacks the compression API", () => {
-    // deflate-raw is a 2022+ browser feature; on an older browser both the
-    // export and the import of a compressed file must fail with an honest
-    // "your browser is too old" message — not a silent failure, and NOT
-    // "this file is damaged" (which would blame a perfectly good save).
+    // deflate-raw is a 2022+ browser feature; on an older browser the export
+    // and the import of a compressed file must fail with an honest "your
+    // browser is too old" message, not a silent failure and not "this file
+    // is damaged" (which would blame a perfectly good save). Each direction is
+    // probed separately: export needs only the encoder, import only the
+    // decoder, so a browser missing one direction still gets the other.
     afterEach(() => vi.unstubAllGlobals());
-    const breakCompression = () =>
-      vi.stubGlobal(
-        "CompressionStream",
-        class {
-          constructor() {
-            throw new TypeError("Unsupported format: deflate-raw");
-          }
-        },
-      );
+    const broken = class {
+      constructor() {
+        throw new TypeError("Unsupported format: deflate-raw");
+      }
+    };
+    const breakEncode = () => vi.stubGlobal("CompressionStream", broken);
+    const breakDecode = () => vi.stubGlobal("DecompressionStream", broken);
 
     it("export reports the browser is too old, not a generic failure", async () => {
-      breakCompression();
+      breakEncode();
       await expect(SaveGame.export(sampleGame())).rejects.toThrow(/too old to create/);
     });
 
     it("importing a compressed file reports the browser is too old, not 'damaged'", async () => {
       // A real, healthy container built while compression WAS available.
       const file = await SaveGame.export(sampleGame());
-      breakCompression();
+      breakDecode();
       await expect(SaveGame.import(file)).rejects.toThrow(/too old to open/);
+    });
+
+    it("a decoder-only browser can still import, and an encoder-only browser can still export", async () => {
+      const file = await SaveGame.export(sampleGame());
+      breakEncode(); // decoder-only browser
+      expect((await SaveGame.import(file)).money).toBe(sampleGame().money);
+      vi.unstubAllGlobals();
+      breakDecode(); // encoder-only browser
+      await expect(SaveGame.export(sampleGame())).resolves.toMatch(/^VCTOWER1\n/);
     });
   });
 
@@ -460,6 +701,16 @@ describe("SaveGame", () => {
     const loaded = Simulation.deserialize(data);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.tower.units.length).toBe(sim.tower.units.length);
+  });
+
+  it("migrates v2 saves to the v3 save schema", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    (data as { version: number }).version = 2;
+    const loaded = Simulation.deserialize(data);
+    expect(SAVE_VERSION).toBe(3);
+    expect(loaded.money).toBe(sim.money);
+    expect(loaded.serialize().version).toBe(3);
   });
 
   it("drops units with an unrecognized kind on load", () => {

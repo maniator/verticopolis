@@ -1,6 +1,7 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
+import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
@@ -37,6 +38,8 @@ export interface UICallbacks {
   onExport(): void;
   /** A picked file's text contents — a `.vctower` export. */
   onImport(data: string): void;
+  /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
+  onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
@@ -821,21 +824,92 @@ export class UI {
     const input = document.getElementById("import-file") as HTMLInputElement;
     // Single source of truth for our own extension (TOWER_FILE_EXT); the
     // octet-stream entry keeps .vctower selectable on pickers that filter by
-    // MIME type and drop extensions they can't map (Android). Content is
-    // validated on load either way.
-    input.accept = `${TOWER_FILE_EXT},application/octet-stream`;
+    // MIME type and drop extensions they can't map (Android). Original 1994
+    // SimTower saves (.TDT) import too. Content is validated on load either
+    // way, and a renamed save still routes right via the header-magic sniff.
+    input.accept = `${TOWER_FILE_EXT},application/octet-stream,.tdt,.TDT`;
     input.value = "";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      // A file that vanishes or errors mid-read must not fail silently — the
+      // A file that vanishes or errors mid-read must not fail silently: the
       // launching dialog is already gone by the time the read runs.
       reader.onerror = () => this.toast("Couldn't read that file. Please try again.", "bad");
-      reader.onload = () => this.cb.onImport(String(reader.result));
-      reader.readAsText(file);
+      // Every pick is read as bytes and routed through ONE heuristic
+      // (looksLikeLegacyTower): extension first, then the header-magic sniff,
+      // so a renamed original save (TOWER1.SAV, no extension) still lands on
+      // the legacy importer instead of the .vctower parser's misdirected
+      // error. Everything else decodes as text for the .vctower path (the
+      // non-fatal decode is fine: SaveGame.import validates content anyway).
+      // BOM sniffing preserves the old readAsText behavior: a .vctower
+      // re-saved by an editor as UTF-16 must keep decoding, and TextDecoder
+      // alone reads only UTF-8.
+      const decodeText = (b: Uint8Array): string => {
+        if (b.length >= 2 && b[0] === 0xff && b[1] === 0xfe) return new TextDecoder("utf-16le").decode(b);
+        if (b.length >= 2 && b[0] === 0xfe && b[1] === 0xff) return new TextDecoder("utf-16be").decode(b);
+        return new TextDecoder().decode(b); // UTF-8; strips a UTF-8 BOM itself
+      };
+      reader.onload = () => {
+        const buffer = reader.result as ArrayBuffer;
+        const bytes = new Uint8Array(buffer);
+        if (looksLikeLegacyTower(file.name, bytes)) this.cb.onImportLegacy(buffer, file.name);
+        else this.cb.onImport(decodeText(bytes));
+      };
+      reader.readAsArrayBuffer(file);
     };
     input.click();
+  }
+
+  /**
+   * Fidelity report for a parsed legacy (.TDT) import: what made it over and
+   * what didn't, shown BEFORE anything is adopted. `onOpen` fires only when
+   * the player commits via "Open tower"; Cancel (or Esc / backdrop / ✕)
+   * adopts nothing. The tower facts sit up top so the player can sanity-check
+   * it's really their save.
+   */
+  showImportReport(report: ImportReport, cb: { onOpen: () => void }): void {
+    // Never clobber a live dialog: the OS file picker isn't a modal, so a
+    // blocking choice (fire/bomb emergency, update prompt) can open in the
+    // shared <dialog> before the file finishes reading. openModal would wipe
+    // its DOM and handlers, stranding the pending resolve and freezing the
+    // sim. Same convention as the update prompt's isModalOpen() gate.
+    if (this.isModalOpen()) {
+      this.toast("Close the open dialog first, then import again.", "info");
+      return;
+    }
+    const li = (lines: string[]) => lines.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+    const stars = report.star >= 6 ? "TOWER" : `${report.star}★`;
+    // Minus before the dollar sign, same as the stats panel (legacy imports
+    // can legitimately arrive in the red).
+    const money = Math.round(report.money);
+    const funds = `${money < 0 ? "-" : ""}$${Math.abs(money).toLocaleString()}`;
+    const box = this.openModal(`
+      <h2>Import from SimTower (1994)</h2>
+      <div class="import-facts well">
+        <b>${escapeHtml(report.towerName)}</b> · ${stars} · ${funds}
+        · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
+        · ${report.unitsImported.toLocaleString()} rooms
+      </div>
+      <h3>Brought over</h3>
+      <ul class="import-list">${li(report.broughtOver)}</ul>
+      <h3>Couldn't bring over</h3>
+      <ul class="import-list">${li(report.couldNotBring)}</ul>
+      <p style="color:var(--muted);font-size:12px">Nothing is adopted until you open it. Your current tower is kept in its autosave, and the import is copied to a free save slot when one is available.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="close">Cancel</button>
+        <button class="btn primary" data-act="open" autofocus>Open tower</button>
+      </div>`);
+    // Announce for screen readers (the modal itself takes focus, but the
+    // polite region tells them WHY a dialog just appeared).
+    const live = document.getElementById("a11y-live");
+    if (live) live.textContent = "SimTower import report ready.";
+    this.wireActions(box, {
+      open: () => {
+        this.closeModal();
+        cb.onOpen();
+      },
+    });
   }
 
   showHelp(): void {

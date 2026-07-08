@@ -35,6 +35,7 @@ function fakes() {
         toasts.push({ text, kind });
       },
       downloadFile: () => {},
+      showImportReport: () => {},
     },
     audio: {
       sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "click") => {

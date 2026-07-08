@@ -10,7 +10,7 @@
  */
 import { FACILITIES, GRID, facilityFloors, isFacilityKind } from "./facilities";
 import { isGameMode } from "./types";
-import type { FacilityKind, SerializedGame, Unit } from "./types";
+import type { FacilityKind, SerializedGame, SerializedUnit } from "./types";
 
 /**
  * Current save-format version. `serialize()` always stamps this; `deserialize()`
@@ -18,7 +18,7 @@ import type { FacilityKind, SerializedGame, Unit } from "./types";
  * load — not merely written — and a future format bump has exactly one place to
  * grow.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 /**
  * The condo sale price BEFORE this build re-anchored the band (old default 2×
@@ -63,12 +63,14 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   if (!isGameMode(migrated.mode) && Array.isArray(migrated.units)) {
     migrated = {
       ...migrated,
+      // A missing `state` reads as "empty" (the deserialize fallback a sparse v3
+      // save relies on), so an omitted state can never be mistaken for a sold shell.
       units: migrated.units.map((u) =>
         u &&
         u.kind === "condo" &&
         u.everOccupied === true &&
         u.rent === undefined &&
-        u.state !== "empty" &&
+        (u.state ?? "empty") !== "empty" &&
         u.state !== "gutted" &&
         u.state !== "construction"
           ? { ...u, rent: LEGACY_CONDO_DEFAULT_PRICE }
@@ -79,10 +81,19 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // v1 → v2: re-lay each floor's rooms at their canon (post-E1b) widths (the
   // segment-parity reflow). Runs for any v1 save; new saves stamp v2 and skip it.
   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
+  // v2 → v3: v3 marks the sparse-unit format: new writes may omit unit fields
+  // that sit at the loader defaults (see serializeUnit in Simulation.ts). Old
+  // saves are already the full shape, so the hop only re-stamps the version;
+  // deserialize's fallback table reads both shapes identically.
+  if (migrated.version === 2) migrated = upgradeV2toV3(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
   // it loads best-effort — the coercion below guards it — rather than throwing
   // away the player's tower.
   return migrated;
+}
+
+export function upgradeV2toV3(data: SerializedGame): SerializedGame {
+  return { ...data, version: 3 };
 }
 
 /**
@@ -123,10 +134,13 @@ export function migrationLooksValid(data: SerializedGame): boolean {
   const rooms = units.filter((u) => u && isFacilityKind(u.kind) && u.kind !== "floor" && u.kind !== "lobby");
   const byFloor = new Map<number, { x: number; w: number }[]>();
   for (const r of rooms) {
-    if (r.x < 0 || r.x + r.width > GRID.width) return false; // off-lot
+    // A sparse save never omits a ROOM's width (see serializeUnit), but read it
+    // through the same catalog fallback deserialize uses so the check can't crash.
+    const width = r.width ?? FACILITIES[r.kind].width;
+    if (r.x < 0 || r.x + width > GRID.width) return false; // off-lot
     for (let f = r.floor; f < r.floor + facilityFloors(r.kind); f++) {
       const arr = byFloor.get(f) ?? [];
-      arr.push({ x: r.x, w: r.width });
+      arr.push({ x: r.x, w: width });
       byFloor.set(f, arr);
     }
   }
@@ -148,15 +162,16 @@ export function migrationLooksValid(data: SerializedGame): boolean {
 export function floatingStructureCount(data: SerializedGame): number {
   const units = Array.isArray(data.units) ? data.units : [];
   const struct = new Set<string>();
+  // A sparse (v3) floor/lobby tile omits its width-1 field; default it like the loader.
   for (const u of units) {
     if (!u || (u.kind !== "floor" && u.kind !== "lobby")) continue;
-    for (let i = 0; i < u.width; i++) struct.add(`${u.floor}:${u.x + i}`);
+    for (let i = 0; i < (u.width ?? 1); i++) struct.add(`${u.floor}:${u.x + i}`);
   }
   let floating = 0;
   for (const u of units) {
     if (!u || (u.kind !== "floor" && u.kind !== "lobby") || u.floor === 1) continue;
     const below = u.floor >= 2 ? u.floor - 1 : u.floor + 1;
-    for (let i = 0; i < u.width; i++) if (!struct.has(`${below}:${u.x + i}`)) floating++;
+    for (let i = 0; i < (u.width ?? 1); i++) if (!struct.has(`${below}:${u.x + i}`)) floating++;
   }
   return floating;
 }
@@ -200,7 +215,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   // (reflowed), and anything unrecognized/garbled (passed through untouched — the
   // deserialize hardening still guards it).
   interface R {
-    u: Unit;
+    u: SerializedUnit;
     kind: FacilityKind;
     floor: number;
     x0: number;
@@ -209,7 +224,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     fl: number; // floors spanned
   }
   const rooms: R[] = [];
-  const others: Unit[] = []; // structural + passthrough
+  const others: SerializedUnit[] = []; // structural + passthrough
   // Original support envelope: the columns each story is paved on. A reflowed
   // room may only sit where the story it RESTS on is already paved, or the floor
   // tiles the reflow pads under it would hang in mid-air (a "floating floor").
@@ -222,7 +237,9 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     if (!u || !isStruct(u.kind)) continue;
     const f = Math.round(Number(u.floor));
     const x0 = Math.round(Number(u.x));
-    const w0 = Math.round(Number(u.width));
+    // Same width-1 structural fallback the sibling readers use, so a sparse
+    // tile still contributes its column to the support envelope.
+    const w0 = Math.round(Number(u.width ?? 1));
     if (!Number.isFinite(f) || !Number.isFinite(x0) || !Number.isFinite(w0)) continue;
     for (let i = 0; i < w0; i++) origStruct.add(`${f}:${x0 + i}`);
   }
@@ -252,8 +269,8 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     rooms.push({ u, kind: u.kind, floor, x0, w0, w: canonW(u.kind), fl: facilityFloors(u.kind) });
   }
 
-  const nx = new Map<Unit, number>(); // room -> new x
-  const nw = new Map<Unit, number>(); // room -> final width (canon, or legacy if boxed)
+  const nx = new Map<SerializedUnit, number>(); // room -> new x
+  const nw = new Map<SerializedUnit, number>(); // room -> final width (canon, or legacy if boxed)
 
   // Obstacles a placed room presents, bucketed by every floor it spans. Pass 2
   // reads only its own floor's footprints instead of re-scanning every room, so the
@@ -377,14 +394,14 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   // at their new x/width, plus a `floor` tile under any new footprint tile that
   // wasn't already paved (so a grown/shifted room never floats over bare space).
   const paved = new Set<string>();
-  for (const u of others) if (isStruct(u.kind)) for (let i = 0; i < u.width; i++) paved.add(`${u.floor}:${u.x + i}`);
+  for (const u of others) if (isStruct(u.kind)) for (let i = 0; i < (u.width ?? 1); i++) paved.add(`${u.floor}:${u.x + i}`);
   // Fresh floor tiles get ids past the highest existing id — a missing/garbled
   // `nextId` must never collide with an existing unit id.
   let nextId = Number.isFinite(data.nextId) ? data.nextId : 1;
   for (const u of src) if (u && Number.isFinite(u.id)) nextId = Math.max(nextId, Math.floor(u.id) + 1);
   // `others` aliases the input unit objects; that's safe because deserialize re-maps
   // (deep-copies) every unit right after migration, and the migration never mutates.
-  const outUnits: Unit[] = [...others];
+  const outUnits: SerializedUnit[] = [...others];
   for (const r of rooms) {
     const x = nx.get(r.u) ?? r.x0;
     const w = nw.get(r.u) ?? r.w0;

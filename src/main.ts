@@ -203,6 +203,7 @@ class GameApp {
       ui: {
         toast: (text, kind) => this.ui.toast(text, kind),
         downloadFile: (filename, contents) => this.ui.downloadFile(filename, contents),
+        showImportReport: (report, cb) => this.ui.showImportReport(report, cb),
       },
       showBootMessage,
       armOnboarding: () => {
@@ -238,6 +239,7 @@ class GameApp {
       onLoad: () => this.saveLoad.load(),
       onExport: () => void this.saveLoad.exportGame(),
       onImport: (data) => void this.saveLoad.importGame(data),
+      onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
       onNew: (mode) => this.saveLoad.newGame(mode),
       onToggleAudio: () => {
         this.audio.start();
@@ -380,8 +382,13 @@ class GameApp {
     // dropping them into a fresh tower with no explanation. Goes to the bulletin
     // (persists) and pops as a toast on the first UI update after the splash.
     if (this.saveWasCorrupt) {
+      // The corrupt flag can coexist with a loaded tower: an unreadable
+      // Verticopolis autosave with a healthy legacy save behind it loads the
+      // legacy tower, and the message must not claim a fresh start.
       this.sim.emit(
-        "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
+        this.hadReadableSave
+          ? "⚠️ Your latest autosave couldn't be read, so an older saved tower was loaded instead."
+          : "⚠️ Your saved tower couldn't be read. It may be corrupted or from a newer version. Starting a new tower.",
         "bad",
       );
     }
@@ -390,7 +397,7 @@ class GameApp {
     // idle first visit can't persist the throwaway boot sim (which would flip
     // hasSave() true for a tower the player never started).
     window.setInterval(() => {
-      if (!document.getElementById("splash")) this.saveLoad.save(true);
+      if (!document.getElementById("splash")) void this.saveLoad.autosave();
     }, 30000);
   }
 
