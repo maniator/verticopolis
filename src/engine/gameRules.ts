@@ -96,6 +96,15 @@ export interface GameRules {
    *  the ceiling and never erodes below it (canon "office noise caps but never
    *  evicts"). */
   noiseErosionScale(): number;
+  /**
+   * Monthly probability that a SOLD condo's household relocates on its own (a
+   * life event unrelated to how well the tower serves it), scaled UP with family
+   * size so a bigger family is a bigger flight risk. Modern: the tuned per-month
+   * chance. Classic: 0 (1994 condos never turn over). Callers MUST short-circuit
+   * on a 0 return BEFORE drawing from the RNG, so a Classic tower's seeded stream
+   * stays byte-identical (Classic never rolls). `residents` undefined is treated
+   * as the mean household of 3. */
+  condoRelocationChance(residents: number | undefined): number;
 }
 
 export const CLASSIC_RULES: GameRules = {
@@ -122,6 +131,9 @@ export const CLASSIC_RULES: GameRules = {
   },
   noiseErosionScale() {
     return 0; // noise caps satisfaction but never erodes/evicts (canon)
+  },
+  condoRelocationChance() {
+    return 0; // 1994 condos never turn over; a sold Classic condo is forever
   },
 };
 
@@ -154,6 +166,15 @@ export const MODERN_RULES: GameRules = {
   },
   noiseErosionScale() {
     return 1;
+  },
+  condoRelocationChance(residents) {
+    // Scale the base monthly chance by family size relative to the classic 3, so
+    // a 5-person family is a clearly bigger flight risk than a 2-person one (and
+    // the departing pool skews big, which drives the self-scaling turnover sink:
+    // you buy back 4s/5s while re-sales regress toward the mean of 3). A condo
+    // with no household reads as the mean 3, so the scale is exactly 1.
+    const size = residents ?? CLASSIC_HOUSEHOLD;
+    return ECON.condoRelocationChanceMonthly * (size / CLASSIC_HOUSEHOLD);
   },
 };
 

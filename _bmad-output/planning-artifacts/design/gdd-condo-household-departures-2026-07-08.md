@@ -3,7 +3,7 @@ title: "GDD: Household-aware condo departures (Modern)"
 game: Verticopolis (browser SimTower clone)
 author: Samus Shepard (Game Designer), with Cloud Dragonborn (architect) and the economy voice
 date: 2026-07-08
-status: In design (awaiting owner ratification of the decisions in section 3)
+status: Ratified (party 2026-07-08, unanimous). Ready to build.
 scope: A Modern-only condo mechanic. A sold condo's household can relocate for
   life reasons (a job move, an upsize or downsize) independent of how well the
   tower serves it, so Modern condos turn over instead of being perfectly sticky.
@@ -57,33 +57,44 @@ when the player is doing everything right.
 The net-new code is a monthly roll behind one new `GameRules` method, one new
 `VacateReason`, and the copy for it.
 
-## 3. Decisions for the owner to ratify
+## 3. Decisions (ratified: party 2026-07-08 + owner)
 
-These are the load-bearing calls. Recommendations are marked.
+### 3a. Economic model: reuse the full-price buy-back (RATIFIED, unanimous)
+Relocation runs the SAME path a neglect departure does: the player reclaims the
+unit at `householdPrice(residents)` and re-lists it to sell fresh. It rides the
+single shared `vacate()` spine with zero new economic semantics (relocation is a
+sold `everOccupied` condo, so it lands in the existing buy-back branch untouched).
 
-### 3a. Economic model: reuse the full-price buy-back (RECOMMENDED) vs. free turnover
-- **Reuse the buy-back (recommended):** relocation runs the SAME path a neglect
-  departure does. The player reclaims the unit at `householdPrice(residents)` and
-  re-lists it to sell fresh. This is consistent with the established condo
-  lifecycle (any owner departure reclaims + re-sells), and "bigger families cost
-  more" falls straight out of `householdPrice`. Turnover is a real, priced event,
-  not free money.
-- **Alternative (free turnover):** the owner just sells and moves on; the unit
-  reverts and re-sells with no buy-back charge. Softer, but it breaks the "costs
-  more" intent and diverges from how condo departures already work.
+**It is a mild self-scaling SINK, not a wash (Winston's correction).** This is the
+point, not a side effect:
+- Relocation risk scales UP with family size (see 3c), so the departing pool skews
+  toward 4s and 5s. You buy those back at `householdPrice(residents)`, and every
+  re-sale rolls a fresh household that regresses toward the mean of 3. Net drain
+  per cycle is roughly `asking/3 · (r_new − r_old)` (negative on average).
+- While the bought-back unit sits unsold it also pays the Modern `condoMonthlyTaxRate`
+  and `overheadPerLeasableUnitMonthly` until it re-sells (the vacancy gap bleeds).
 
-### 3b. Notice model: informational advance notice (RECOMMENDED) vs. instant
-- **Advance notice (recommended):** honor the tenant-churn party's "inform before
-  you hurt" ruling. The condo enters `vacating` with a 2-day (`VACATE_NOTICE_MINUTES`)
-  window and the toast/inspector say the family is relocating and when. Because a
-  relocation is a life event, the notice is **informational and non-rescindable**:
-  fixing the tower cannot keep them (unlike a neglect notice, which rescinds when
-  satisfaction recovers). The window is a heads-up to plan for the turnover, not a
-  save-them prompt.
-- **Alternative (instant):** the family leaves the moment the roll hits. Simpler,
-  but a silent surprise the churn party explicitly argued against.
+That gentle drain is exactly the anti-trivialization the Modern economy layer
+exists for. The rejected alternative (free turnover: no reclaim charge, the unit
+just re-sells and books fresh income) is a success-scaling faucet that re-introduces
+the late-game money trivialization the Modern sinks were added to cure, and it
+would fork the one shared `vacate()` money leg on `reason`. Rejected.
 
-### 3c. Rate and household scaling (proposed default, tune in review)
+Pre-existing, not introduced here (backlog notes, do NOT block): the buy-back reads
+current `rentOf(u)` so a player who re-priced a sold unit can arbitrage it, and a
+low-cash player can be pushed negative by the involuntary charge. Both already exist
+on the ratified neglect buy-back path; relocation reuses it verbatim. Save/reload is
+idempotent at the money leg (`vacate()` clears `everOccupied` before the next pass).
+
+### 3b. Notice model: informational, non-rescindable advance notice (RATIFIED, owner)
+The condo enters `vacating` with a 2-day (`VACATE_NOTICE_MINUTES`) window and the
+toast/inspector say the family is relocating and when. Because a relocation is a
+life event, the notice is **informational and non-rescindable**: fixing the tower
+cannot keep them (unlike a neglect notice, which rescinds when satisfaction
+recovers). The window is a heads-up to plan for the turnover, not a save-them
+prompt. Honors the tenant-churn party's "inform before you hurt" ruling.
+
+### 3c. Rate and household scaling
 - Checked **once a month** (in `payMaintenance`), per sold Modern condo.
 - Base monthly relocation chance ~**1.5%** at the mean household of 3 (so a condo
   turns over roughly once per ~5 in-game years on average: rare texture, not a

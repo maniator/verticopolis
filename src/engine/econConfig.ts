@@ -31,6 +31,13 @@ export const ECON = {
    *  soft transport-puzzle penalty the design review asked for — while a well-run
    *  tower stays hugely profitable (~a 20% haircut, self-scaling, never punitive). */
   overheadPerLeasableUnitMonthly: 700,
+  /** Modern only. Base monthly probability that a sold condo's household
+   *  relocates (a life event: a job move, an upsize or downsize), for a mean
+   *  household of 3; `GameRules.condoRelocationChance` scales it UP with family
+   *  size so bigger families are a bigger flight risk. At ~1.5% a condo turns
+   *  over roughly once every ~5 in-game years on average: rare texture, not a
+   *  treadmill. Classic never relocates a condo (its rule-set returns 0). */
+  condoRelocationChanceMonthly: 0.015,
   /** Player-adjustable price ranges (per the original's rent dropdown). The
    *  `default` is what an un-set unit charges; income, move-in odds and tenant
    *  satisfaction all key off how far the chosen price sits from it. */

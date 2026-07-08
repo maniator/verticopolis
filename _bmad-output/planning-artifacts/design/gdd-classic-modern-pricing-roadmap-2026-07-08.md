@@ -128,7 +128,7 @@ Modern via new `GameRules` methods returning the neutral value for Classic:
 |---|---|---|---|---|
 | **1: do now** | Gate the 3 economy sinks behind Modern (+ fix project-context:46) | Restores Classic faithfulness; gives Modern an identity; nearly free | S | `modern-economy-gating` (new) |
 | **1** | Pricing split: office/condo/hotel canon rungs (FULL canon values incl. hotels, per Decision 2), No-Rate state | Canon-grounded; establishes the split pattern | M | `pricing-split` (new) |
-| **1** | Household-aware condo departures (Modern) | Only cheap net-new Modern feature; reuses `residents`/`churnMultiplier` | S–M | `condo-eviction` (exists; promote flavor b) |
+| **1** | Household-aware condo departures (Modern) SHIPPED v1.12.0 | Only cheap net-new Modern feature; reuses `residents`/`churnMultiplier` | S–M | `condo-eviction` flavor b (spec: gdd-condo-household-departures-2026-07-08) |
 | **2: spec first** | Lobby height 1–3 stories | Most *visible* missing thing; iconic buildable grand lobby | M–L | `lobby-height` (new) |
 | **2: spec first** | Elevator per-day-type scheduling (Classic parity, FULL) | Owner tiebreak 2026-07-08: 1994 shipped it (the per-shaft schedule block in the TDT elevator record). Build the scheduling behavior AND its UI to match 1994, and round-trip the TDT schedule bytes on import/export. Epic-sized; needs its own gdd-/arch- docs first (see §7) | L (epic) | `elevator-scheduling` (new) |
 | **2** | Finance 10+10 report | Ready; makes the pricing decisions legible | S–M | `finance-1010` (exists) |
