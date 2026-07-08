@@ -18,7 +18,7 @@ note: >
 
 # Epics & Stories: Mobile Distribution
 
-**Merge order:** Public stream: E1a → E1b → E1c → E1d (E1d ends by tagging main, the repo's first release tag; E3 pins to it). Android stream, independent of E1a-E1c: E2a → app record + Play App Signing enrollment (user checkpoint) → E2b → E2c → E2d. iOS stream, after the E1d tag: E3a → E3b → E3c → E3d. E2 and E3 run in parallel.
+**Merge order:** Public stream: E1a → E1b → E1c → E1d (E1d ends by tagging main, the repo's first release tag; E3 pins to it). E1e (analytics) lands any time after E1a and before either store submission, so the E2d/E3d privacy declarations describe reality. Android stream, independent of E1a-E1c: E2a → app record + Play App Signing enrollment (user checkpoint) → E2b → E2c → E2d. iOS stream, after the E1d tag: E3a → E3b → E3c → E3d. E2 and E3 run in parallel.
 The TWA renders the live site and consumes none of E1a-E1c, so E2a can start immediately; E2b waits for the Play-provided signing fingerprint, which only exists after the app record and Play App Signing enrollment (arch §4). iOS consumes all of E1.
 
 **Repo split:** E1 = public `maniator/verticopolis`. E2, E3, E4 = the private distribution repo (E2b is a public-repo PR driven by the E2 stream). E4 is a strategy gate, not an implementation epic.
@@ -50,6 +50,12 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **AC:** PRD F5 (mechanism documented), N2, N3. Docs merged; the passthrough is confirmed by existing files being reachable at `https://verticopolis.com/` root; the tag exists and E3a can pin to it.
 - **Review:** `/bmad-code-review`.
 
+### E1e: Privacy-first analytics  ·  risk: low  ·  version: none (invisible to players; privacy posture documented)
+- **Change:** integrate a cookieless, first-party analytics client per PRD F8 (Plausible/Umami class; tool and self-host decision made in the story): bundled script (not CDN-loaded), absolute endpoint URL, anonymous aggregate events only (app opens, session length, a small set of gameplay milestones), platform dimension (`ios` from the E1a flag, `twa` from a Bubblewrap start-URL query parameter, `web` otherwise). No cookies, no personal identifiers, no consent banner, no ATT. If self-hosted, hosting config goes to the private repo. Document the posture in `docs/distribution.md` (or a privacy note the store stories can cite).
+- **AC:** PRD F8, N1 (behavior-neutral beyond the network beacons; e2e and visual baselines untouched), N5. Events visible in the analytics backend from a local run; adblocked and offline sessions degrade silently with no console errors or gameplay effect.
+- **Depends:** E1a (platform flag). Must merge before E2d and E3d finalize store privacy declarations.
+- **Review:** `/bmad-code-review` (plumbing; no gameplay surface).
+
 ---
 
 ## E2: Android TWA (private repo; E2b is a public PR)
@@ -73,7 +79,7 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **STOP-for-user:** first manual AAB upload in Play Console; service-account creation.
 
 ### E2d: Play listing + data safety  ·  risk: low  ·  version: n/a (private)
-- **Change:** `store/play/`: listing copy, screenshots plan (reuse docs/screenshots pipeline output), data-safety questionnaire answers (no data collected; saves are local), content rating notes.
+- **Change:** `store/play/`: listing copy, screenshots plan (reuse docs/screenshots pipeline output), data-safety questionnaire answers reflecting the F8 analytics posture (anonymous aggregate usage data, not linked to identity, no tracking; saves are local; if E1e has not shipped yet, answer "no data collected" and revise on the next submission after it ships), content rating notes.
 - **AC:** Play done-gate (PRD Done-Gates): AAB on internal track, device smoke test (touch/pinch/save/export, plus the in-app update prompt appearing after a site deploy) passes.
 - **Review:** `/bmad-code-review` (store copy/docs).
 
@@ -99,7 +105,7 @@ The TWA renders the live site and consumes none of E1a-E1c, so E2a can start imm
 - **STOP-for-user:** Apple Developer enrollment, ASC app record, cert/profile/API-key creation, secret provisioning.
 
 ### E3d: App Store metadata + review notes  ·  risk: med (4.2 risk lives here)  ·  version: n/a (private)
-- **Change:** `store/appstore/`: metadata, privacy nutrition labels (no data collected), reviewer notes addressing 4.2 (bundled assets, offline play, native share).
+- **Change:** `store/appstore/`: metadata, privacy nutrition labels reflecting the F8 analytics posture (anonymous aggregate usage data, not linked to identity, no tracking, so no ATT prompt; "no data collected" only if E1e has not shipped in the submitted build), reviewer notes addressing 4.2 (bundled assets, offline play, native share).
 - **AC:** iOS done-gate (PRD Done-Gates): TestFlight build, real-device smoke test incl. Share-sheet export + import.
 - **Review:** `/bmad-code-review` (store copy/docs).
 
