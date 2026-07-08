@@ -38,7 +38,7 @@ export interface UICallbacks {
   onExport(): void;
   /** A picked file's text contents — a `.vctower` export. */
   onImport(data: string): void;
-  /** A picked binary legacy save (original SimTower `.TDT`) — raw bytes. */
+  /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
@@ -826,18 +826,18 @@ export class UI {
     // octet-stream entry keeps .vctower selectable on pickers that filter by
     // MIME type and drop extensions they can't map (Android). Original 1994
     // SimTower saves (.TDT) import too. Content is validated on load either
-    // way — a renamed save still routes right via the header-magic sniff.
+    // way, and a renamed save still routes right via the header-magic sniff.
     input.accept = `${TOWER_FILE_EXT},application/octet-stream,.tdt,.TDT`;
     input.value = "";
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
       const reader = new FileReader();
-      // A file that vanishes or errors mid-read must not fail silently — the
+      // A file that vanishes or errors mid-read must not fail silently: the
       // launching dialog is already gone by the time the read runs.
       reader.onerror = () => this.toast("Couldn't read that file. Please try again.", "bad");
       // Every pick is read as bytes and routed through ONE heuristic
-      // (looksLikeLegacyTower): extension first, then the header-magic sniff —
+      // (looksLikeLegacyTower): extension first, then the header-magic sniff,
       // so a renamed original save (TOWER1.SAV, no extension) still lands on
       // the legacy importer instead of the .vctower parser's misdirected
       // error. Everything else decodes as text for the .vctower path (the
@@ -856,7 +856,7 @@ export class UI {
   /**
    * Fidelity report for a parsed legacy (.TDT) import: what made it over and
    * what didn't, shown BEFORE anything is adopted. `onOpen` fires only when
-   * the player commits via "Open tower" — Cancel (or Esc / backdrop / ✕)
+   * the player commits via "Open tower"; Cancel (or Esc / backdrop / ✕)
    * adopts nothing. The tower facts sit up top so the player can sanity-check
    * it's really their save.
    */
@@ -872,10 +872,14 @@ export class UI {
     }
     const li = (lines: string[]) => lines.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
     const stars = report.star >= 6 ? "TOWER" : `${report.star}★`;
+    // Minus before the dollar sign, same as the stats panel (legacy imports
+    // can legitimately arrive in the red).
+    const money = Math.round(report.money);
+    const funds = `${money < 0 ? "-" : ""}$${Math.abs(money).toLocaleString()}`;
     const box = this.openModal(`
       <h2>Import from SimTower (1994)</h2>
       <div class="import-facts well">
-        <b>${escapeHtml(report.towerName)}</b> · ${stars} · $${Math.round(report.money).toLocaleString()}
+        <b>${escapeHtml(report.towerName)}</b> · ${stars} · ${funds}
         · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
         · ${report.unitsImported.toLocaleString()} rooms
       </div>

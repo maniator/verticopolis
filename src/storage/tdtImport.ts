@@ -1,9 +1,10 @@
-import { FACILITIES, GRID, buildMinutes, isHotelKind } from "../engine/facilities";
+import { rentConfig } from "../engine/econConfig";
+import { FACILITIES, GRID, buildMinutes, facilityFloors, isHotelKind, maxCarsFor, maxSpanFor } from "../engine/facilities";
 import { SAVE_VERSION } from "../engine/saveMigration";
 import { minuteOfDayForFrame } from "../engine/timePacing";
-import type { FacilityKind, SerializedGame, Transport, Unit } from "../engine/types";
+import type { FacilityKind, SerializedGame, Transport, Unit, UnitState } from "../engine/types";
 import { LegacyImportError, parseTdtBinary } from "./tdtFormat";
-import type { TdtTower } from "./tdtFormat";
+import type { TdtElevator, TdtStair, TdtTenant, TdtTower } from "./tdtFormat";
 
 export { LegacyImportError };
 
@@ -12,13 +13,16 @@ export { LegacyImportError };
  * {@link TdtTower} the binary walker produces into our {@link SerializedGame}
  * schema plus an honest {@link ImportReport} of what did and didn't survive
  * the trip. The output is deliberately fed through `Simulation.deserialize`
- * by the caller — its trust-boundary hardening is the second validation
+ * by the caller; its trust-boundary hardening is the second validation
  * layer, so nothing here needs to be the last line of defense.
  *
- * v1 scope (see the backlog's tdt-importer row): the header and floor map are
- * decoded; transports are SYNTHESIZED from the floor layout (the original's
- * elevator block is only partially documented); people, retail subtypes,
- * finance history, named tenants and rent classes are queued follow-ups.
+ * Scope (see the backlog's tdt-importer row): the header, floor map,
+ * elevator table and stairs table are decoded, including per-floor stop
+ * settings, rent classes and hotel room states. When the transport blocks
+ * can't be read (truncated/corrupt files), a deterministic layout is
+ * SYNTHESIZED from the floor map instead, and the fidelity report says which
+ * path ran. People, retail subtypes, finance history and named tenants are
+ * queued follow-ups.
  */
 
 /** What the fidelity-report modal shows before the player adopts the tower. */
@@ -28,7 +32,7 @@ export interface ImportReport {
   star: number;
   /** Funds in display dollars (already ×100). */
   money: number;
-  /** In-game day the save was on, 1-indexed — matches the report's own
+  /** In-game day the save was on, 1-indexed; matches the report's own
    *  "The clock: day N" line (the engine's Clock.day is 0-indexed). */
   day: number;
   /** Above-ground floors built (highest floor), and basement levels. */
@@ -49,13 +53,14 @@ export interface ParsedLegacyTower {
 }
 
 /**
- * Tenant type ID → our FacilityKind (doc §5). IDs 0 (floor), 24 (lobby) and
- * 48 (burned) are structural/cleared and handled by the paving pass instead;
- * anything absent here is dropped with a report line.
+ * Single-story tenant type ID → our FacilityKind (doc §5). IDs 0 (floor),
+ * 24 (lobby) and 48 (burned) are structural/cleared and handled by the
+ * paving pass; multi-story parts live in {@link PART_FAMILY}; anything in
+ * neither table is dropped with a report line.
  */
 const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
   3: "hotelSingle",
-  4: "hotelDouble", // the original's "twin" — closest match, reported as lossy
+  4: "hotelDouble", // the original's "twin"; closest match, reported as lossy
   5: "hotelSuite",
   6: "restaurant",
   7: "office",
@@ -66,28 +71,72 @@ const TENANT_KIND: Readonly<Record<number, FacilityKind>> = {
   13: "medical",
   14: "security",
   15: "housekeeping",
-  17: "security", // SECOM — a cut 1994 feature; approximated, reported
-  18: "cinema",
-  34: "cinema", // the notes list two theater IDs; both land on cinema
-  20: "recycling",
-  29: "partyHall",
-  31: "metro",
-  36: "weddingHall", // Cathedral — our deliberate divergence (PARITY.md)
-  45: "parkingRamp",
+  17: "security", // SECOM; a cut 1994 feature; approximated, reported
+  44: "parkingRamp", // parkade ramp (doc §5; [TD]'s corrected reading)
 };
+
+/**
+ * Multi-story units arrive as one part PER FLOOR (doc §5); top/bottom
+ * halves, the theatre's separate screen halves, the metro's three stories,
+ * the cathedral's five stacked parts. The importer merges each cluster of
+ * parts into ONE unit; placing every part would double- (or quintuple-)
+ * place them.
+ */
+const PART_FAMILY: Readonly<Record<number, FacilityKind>> = {
+  18: "cinema", // theatre top half
+  19: "cinema", // theatre bottom half
+  34: "cinema", // theatre screen, top
+  35: "cinema", // theatre screen, bottom
+  20: "recycling",
+  21: "recycling",
+  29: "partyHall",
+  30: "partyHall",
+  31: "metro",
+  32: "metro",
+  33: "metro",
+  36: "weddingHall", // the Cathedral's five stacked parts;
+  37: "weddingHall", //   our deliberate divergence (PARITY.md)
+  38: "weddingHall",
+  39: "weddingHall",
+  40: "weddingHall",
+};
+
+/** How many stories each part family stacks (bounds the merge window). */
+const FAMILY_STORIES: Readonly<Partial<Record<FacilityKind, number>>> = {
+  cinema: 2,
+  recycling: 2,
+  partyHall: 2,
+  metro: 3,
+  weddingHall: 5,
+};
+
+/** The theatre's screen halves: allowed to sit flush AGAINST the hall halves
+ *  on the same floor (the one legitimate touch-merge). */
+const SCREEN_PARTS: ReadonlySet<number> = new Set([34, 35]);
+
+/** The metro tunnel: pure backdrop scenery, paved but never a unit and never
+ *  merged into the station (a full-lot tunnel would inflate its width). */
+const TDT_METRO_TUNNEL = 45;
 
 const TDT_FLOOR = 0;
 const TDT_LOBBY = 24;
 const TDT_BURNED = 48;
 
-/** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4). */
+/** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4, proven by
+ *  the lobby table; TDT 10/24/39/… = floors 1/15/30/…). */
 const TDT_FLOOR_OFFSET = 9;
 
 /** Ceiling on the header's signed day counter (~1,000 in-game years) so a
  *  forged value can't blow the minutes math into precision-loss territory. */
 const MAX_IMPORT_DAY = 360_000;
 
-/** The ground floor (1) and every 15th floor above host a (sky) lobby —
+/** Hotel status-byte flags (unit byte 5; doc §4). */
+const HOTEL_OCCUPANT_MASK = 0x03;
+const HOTEL_ASLEEP_FLAG = 16;
+const HOTEL_DIRTY_FLAG = 32;
+const HOTEL_INFESTED_FLAG = 64;
+
+/** The ground floor (1) and every 15th floor above host a (sky) lobby;
  *  mirrors Tower.ts's isLobbyFloor, which is not exported. */
 function isLobbyFloor(floor: number): boolean {
   return floor === 1 || (floor > 1 && floor % GRID.lobbyInterval === 0);
@@ -101,6 +150,146 @@ export function looksLikeLegacyTower(filename: string, bytes?: Uint8Array): bool
   return !!bytes && bytes.byteLength >= 2 && bytes[0] === 0x00 && bytes[1] === 0x24;
 }
 
+/** Map the unit record's rent/lease byte (doc §4: 0 Very Low, 1 Low,
+ *  2 Average, 3 High, 4 No Rate) onto our per-kind price band. Average and
+ *  No Rate (and garbage) leave the unit on the default via `undefined`. */
+export function rentFromClass(kind: FacilityKind, rentClass: number): number | undefined {
+  const band = rentConfig(kind);
+  if (!band) return undefined;
+  switch (rentClass) {
+    case 0:
+      return band.min;
+    case 1: {
+      // Halfway between minimum and default, snapped to the band's step grid
+      // (the same grid the in-game price editor uses). Guard the divisor: a
+      // misconfigured zero step must not mint a NaN rent.
+      const step = band.step > 0 ? band.step : 1;
+      const mid = (band.min + band.default) / 2;
+      return Math.round((mid - band.min) / step) * step + band.min;
+    }
+    case 3:
+      return band.max;
+    default:
+      return undefined;
+  }
+}
+
+/** A multi-story part collected during the floor walk, pre-merge. */
+interface PartRecord {
+  kind: FacilityKind;
+  typeId: number;
+  floor: number;
+  left: number;
+  right: number;
+  construction: boolean;
+}
+
+/** A merged multi-story unit: the cluster's base floor, top floor, and
+ *  horizontal union. */
+interface MergedPart {
+  kind: FacilityKind;
+  floor: number;
+  topFloor: number;
+  left: number;
+  right: number;
+  construction: boolean;
+}
+
+/**
+ * Merge per-floor parts into whole units. Two parts belong to the same
+ * building only when their extents STRICTLY overlap within the family's
+ * story-height window (a building's stories stack), or, for the theatre
+ * alone, when a screen half sits flush against a hall half on the same
+ * floor. Plain touching is deliberately NOT enough: two independent
+ * same-kind units built flush against each other (or on far-apart floors at
+ * the same x) must stay two units. Each cluster becomes one unit anchored at
+ * its lowest floor, spanning the horizontal union.
+ *
+ * Known imperfection: a screen sandwiched exactly between two flush theatres
+ * can chain them; the width-mismatch report line flags the result.
+ */
+function mergeParts(parts: PartRecord[]): MergedPart[] {
+  const byFamily = new Map<FacilityKind, PartRecord[]>();
+  for (const p of parts) {
+    const arr = byFamily.get(p.kind);
+    if (arr) arr.push(p);
+    else byFamily.set(p.kind, [p]);
+  }
+  const merged: MergedPart[] = [];
+  for (const [kind, records] of byFamily) {
+    const stories = FAMILY_STORIES[kind] ?? 1;
+    // Union-find over this family's parts (a tower holds at most a few dozen).
+    const parent = records.map((_, i) => i);
+    const find = (i: number): number => {
+      while (parent[i] !== i) {
+        parent[i] = parent[parent[i]];
+        i = parent[i];
+      }
+      return i;
+    };
+    const union = (a: number, b: number): void => {
+      const ra = find(a);
+      const rb = find(b);
+      if (ra !== rb) parent[ra] = rb;
+    };
+    for (let i = 0; i < records.length; i++) {
+      for (let j = i + 1; j < records.length; j++) {
+        const a = records[i];
+        const b = records[j];
+        const overlaps = a.left < b.right && b.left < a.right;
+        const withinStories = Math.abs(a.floor - b.floor) < stories;
+        const screenTouch =
+          kind === "cinema" &&
+          a.floor === b.floor &&
+          (a.right === b.left || b.right === a.left) &&
+          SCREEN_PARTS.has(a.typeId) !== SCREEN_PARTS.has(b.typeId);
+        if ((overlaps && withinStories) || screenTouch) union(i, j);
+      }
+    }
+    const clusters = new Map<number, PartRecord[]>();
+    for (let i = 0; i < records.length; i++) {
+      const root = find(i);
+      const arr = clusters.get(root);
+      if (arr) arr.push(records[i]);
+      else clusters.set(root, [records[i]]);
+    }
+    for (const cluster of clusters.values()) {
+      // Two same-kind buildings stacked on ADJACENT floor pairs (e.g. one
+      // recycling on 10/11 and another on 12/13) chain through the union: the
+      // upper half of one sits within the story window of the lower half of
+      // the other. Split any cluster taller than the family's story count
+      // into consecutive-floor groups so each building stays its own unit.
+      cluster.sort((a, b) => a.floor - b.floor);
+      let group: PartRecord[] = [];
+      const flush = (): void => {
+        if (group.length === 0) return;
+        const m: MergedPart = {
+          kind,
+          floor: group[0].floor,
+          topFloor: group[0].floor,
+          left: group[0].left,
+          right: group[0].right,
+          construction: group[0].construction,
+        };
+        for (const p of group) {
+          m.left = Math.min(m.left, p.left);
+          m.right = Math.max(m.right, p.right);
+          m.topFloor = Math.max(m.topFloor, p.floor);
+          m.construction = m.construction || p.construction;
+        }
+        merged.push(m);
+        group = [];
+      };
+      for (const p of cluster) {
+        if (group.length > 0 && p.floor - group[0].floor >= stories) flush();
+        group.push(p);
+      }
+      flush();
+    }
+  }
+  return merged;
+}
+
 /**
  * Parse an original SimTower `.TDT` buffer into our save schema plus a
  * fidelity report. Throws {@link LegacyImportError} (player-readable) for
@@ -111,7 +300,7 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
   const tdt: TdtTower = parseTdtBinary(bytes);
 
   // Header fields are hostile input; every clamp that fires is SAID in the
-  // report — the fidelity modal's whole point is honesty about what changed.
+  // report; the fidelity modal's whole point is honesty about what changed.
   const headerNotes: string[] = [];
   const star = Math.max(1, Math.min(6, tdt.header.level));
   if (tdt.header.level < 1 || tdt.header.level > 6) {
@@ -124,15 +313,15 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
   } else if (tdt.header.currentDay > MAX_IMPORT_DAY) {
     headerNotes.push("The save's day counter was impossibly far in the future and was clamped.");
   }
-  // Clamp the clock into the documented 0–2599 frame range (a u16 can carry
+  // Clamp the clock into the documented 0–2599 tick range (a u16 can carry
   // more); minuteOfDayForFrame would wrap it anyway, but a corrupt value
   // deserves a report line, not a silent wrap.
   const frame = Math.max(0, Math.min(2599, tdt.header.frameTime));
   if (tdt.header.frameTime > 2599) {
     headerNotes.push("The save's clock was out of range and was reset to the end of the night.");
   }
-  // The original's date changes at frame 2300 (midnight), so frames ≥ 2300
-  // are the small hours of `currentDay` itself — minuteOfDayForFrame already
+  // The original's date changes at tick 2300 (midnight), so ticks ≥ 2300 are
+  // the small hours of `currentDay` itself; minuteOfDayForFrame already
   // returns 0..419 for them, making the sum below correct on both sides of
   // the wrap (doc §3).
   const minutes = day * 1440 + minuteOfDayForFrame(frame);
@@ -145,9 +334,16 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     condos: 0,
     soldCondos: 0,
     hotelRooms: 0,
+    hotelAsleep: 0,
+    hotelDirty: 0,
+    hotelBooked: 0,
+    asleepConverted: 0,
+    infested: 0,
     venues: 0, // food, retail, entertainment
     services: 0, // security/medical/housekeeping/recycling/parking/ramp/metro/weddingHall
+    parkingStalls: 0,
     construction: 0,
+    rentsApplied: 0,
     twinRooms: 0,
     secom: 0,
     cathedral: 0,
@@ -174,18 +370,84 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     }
     row.fill(1, lo, hi);
   };
-
   // Tiles already claimed by a kept ROOM per floor: a corrupt file can carry
   // overlapping tenant extents, and two units sharing tiles would corrupt the
   // engine's per-tile room index (last-wins on register, shared-tile deletes
-  // on unregister) — so later overlappers are dropped with a report line.
+  // on unregister); so later overlappers are dropped with a report line.
   const roomClaimed = new Map<number, Uint8Array>();
+  const rowFor = (floor: number): Uint8Array => {
+    let row = roomClaimed.get(floor);
+    if (!row) {
+      row = new Uint8Array(GRID.width);
+      roomClaimed.set(floor, row);
+    }
+    return row;
+  };
+  // Claim EVERY story the engine will register (facilityFloors), or none: a
+  // cinema's upper story colliding with a kept room is the same index
+  // corruption as a base-floor collision.
+  const claimRoom = (kind: FacilityKind, floor: number, left: number, right: number): boolean => {
+    const stories = facilityFloors(kind);
+    for (let f = floor; f < floor + stories; f++) {
+      const row = rowFor(f);
+      for (let i = left; i < right; i++) if (row[i]) return false;
+    }
+    for (let f = floor; f < floor + stories; f++) rowFor(f).fill(1, left, right);
+    return true;
+  };
+  // Clamp a tenant's extents onto the lot. Returns null (and counts) for a
+  // degenerate or fully off-lot extent. Extents are u16s (never negative), so
+  // only the RIGHT edge can poke past.
+  const clampExtent = (t: TdtTenant): { x: number; right: number } | null => {
+    const x = t.left;
+    let right = t.right;
+    if (right <= x || x >= GRID.width) {
+      counts.offLot++;
+      return null;
+    }
+    if (right > GRID.width) {
+      right = GRID.width;
+      counts.clamped++;
+    }
+    return { x, right };
+  };
+
   let nextId = 1;
   const units: Unit[] = [];
+  const partRecords: PartRecord[] = [];
+  const pushUnit = (
+    kind: FacilityKind,
+    floor: number,
+    x: number,
+    width: number,
+    state: UnitState,
+    extras: Partial<Unit> = {},
+  ): Unit => {
+    const unit: Unit = {
+      id: nextId++,
+      kind,
+      floor,
+      x,
+      width,
+      state,
+      satisfaction: 1,
+      occupants: 0,
+      everOccupied: false,
+      pendingIncome: 0,
+      label: FACILITIES[kind].name,
+      ...extras,
+    };
+    units.push(unit);
+    counts.rooms++;
+    if (width !== FACILITIES[kind].width) counts.widthMismatch++;
+    if (state === "construction") counts.construction++;
+    return unit;
+  };
+
   for (const fl of tdt.floors) {
     const ours = fl.index - TDT_FLOOR_OFFSET;
     if (ours > GRID.maxFloor) {
-      // Indexes ≥ 110 are the doc's known ambiguity — not buildable here.
+      // Indexes 110–119 are reserved rows (doc §4); never buildable here.
       if (fl.tenants.length > 0 || fl.rightEdge > fl.leftEdge) counts.droppedFloors++;
       continue;
     }
@@ -202,87 +464,137 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
         counts.burned++;
         continue;
       }
+      if (typeId === TDT_METRO_TUNNEL) {
+        // Backdrop scenery: paved, never a unit, never merged into the
+        // station (a full-lot tunnel would inflate the station's width).
+        paveRange(ours, t.left, t.right);
+        continue;
+      }
+      const partKind = PART_FAMILY[typeId];
+      if (partKind) {
+        const ext = clampExtent(t);
+        if (!ext) continue;
+        paveRange(ours, ext.x, ext.right);
+        partRecords.push({
+          kind: partKind,
+          typeId,
+          floor: ours,
+          left: ext.x,
+          right: ext.right,
+          construction: underConstruction,
+        });
+        continue;
+      }
       const kind = TENANT_KIND[typeId];
       if (!kind) {
         counts.unknown++;
         continue;
       }
-      // Geometry: extents are 8-px segments == our tiles, half-open. The
-      // extents are u16s (never negative), so only the RIGHT edge can poke
-      // off-lot: drop a degenerate or fully off-lot room; trim one that
-      // merely pokes past the edge.
-      const x = t.left;
-      let right = t.right;
-      if (right <= x || x >= GRID.width) {
-        counts.offLot++;
-        continue;
-      }
-      if (right > GRID.width) {
-        right = GRID.width;
-        counts.clamped++;
-      }
-      // Drop a room that overlaps one already kept on this floor (corrupt
-      // files only — the original packs rooms disjointly).
-      let claimed = roomClaimed.get(ours);
-      if (!claimed) {
-        claimed = new Uint8Array(GRID.width);
-        roomClaimed.set(ours, claimed);
-      }
-      let overlaps = false;
-      for (let i = x; i < right && !overlaps; i++) if (claimed[i]) overlaps = true;
-      if (overlaps) {
+      const ext = clampExtent(t);
+      if (!ext) continue;
+      if (!claimRoom(kind, ours, ext.x, ext.right)) {
         counts.overlapping++;
         continue;
       }
-      claimed.fill(1, x, right);
-      const width = right - x;
-      if (width !== FACILITIES[kind].width) counts.widthMismatch++;
-      paveRange(ours, x, right);
+      paveRange(ours, ext.x, ext.right);
 
-      const occupiedHere = !underConstruction && (kind === "office" || kind === "condo") && t.status !== 0;
-      const unit: Unit = {
-        id: nextId++,
-        kind,
-        floor: ours,
-        x,
-        width,
-        state: underConstruction ? "construction" : occupiedHere ? "occupied" : "empty",
-        satisfaction: 1,
-        occupants: 0,
-        everOccupied: occupiedHere,
-        pendingIncome: 0,
-        label: FACILITIES[kind].name,
-      };
-      if (underConstruction) {
-        unit.completeAt = minutes + buildMinutes(kind);
-        counts.construction++;
+      // State: construction wins; hotels decode their status bit field
+      // (doc §4; dirty / occupied-overnight / bug-infested); offices and
+      // condos read nonzero status as tenanted; everything else starts empty.
+      let state: UnitState = underConstruction ? "construction" : "empty";
+      let everOccupied = false;
+      let occupants = 0;
+      if (!underConstruction && (kind === "office" || kind === "condo") && t.status !== 0) {
+        state = "occupied";
+        everOccupied = true;
+      } else if (!underConstruction && isHotelKind(kind) && t.status !== 0) {
+        if (t.status & HOTEL_INFESTED_FLAG) {
+          state = "dirty";
+          everOccupied = true;
+          counts.infested++;
+          counts.hotelDirty++;
+        } else if (t.status & HOTEL_DIRTY_FLAG) {
+          state = "dirty";
+          everOccupied = true;
+          counts.hotelDirty++;
+        } else if (t.status & HOTEL_ASLEEP_FLAG) {
+          everOccupied = true;
+          // Our engine wakes sleepers only at the NEXT 8:00 checkout. A save
+          // written after this morning's checkout (8:00 to 20:00) would leave
+          // its guests asleep all day, so those rooms arrive as checked-out
+          // rooms awaiting housekeeping instead.
+          const minuteOfDay = ((minutes % 1440) + 1440) % 1440;
+          if (minuteOfDay >= 8 * 60 && minuteOfDay < 20 * 60) {
+            state = "dirty";
+            counts.hotelDirty++;
+            counts.asleepConverted++;
+          } else {
+            state = "asleep";
+            occupants = Math.max(1, t.status & HOTEL_OCCUPANT_MASK);
+            counts.hotelAsleep++;
+          }
+        } else {
+          // Nonzero status without a decoded flag: a booked room whose guests
+          // are out in the tower (the normal daytime state). Day guests are
+          // not carried over; the room has been booked, so the "ever booked"
+          // flag survives.
+          everOccupied = true;
+          counts.hotelBooked++;
+        }
       }
-      units.push(unit);
+      // Rent class (unit byte 16) → our price band, for priced kinds.
+      const rent = rentFromClass(kind, t.rentRate);
+      if (rent !== undefined) counts.rentsApplied++;
 
-      counts.rooms++;
+      pushUnit(kind, ours, ext.x, ext.right - ext.x, state, {
+        everOccupied,
+        occupants,
+        rent,
+        ...(underConstruction ? { completeAt: minutes + buildMinutes(kind) } : {}),
+      });
+
       if (kind === "office") {
         counts.offices++;
-        if (occupiedHere) counts.occupiedOffices++;
+        if (state === "occupied") counts.occupiedOffices++;
       } else if (kind === "condo") {
         counts.condos++;
-        if (occupiedHere) counts.soldCondos++;
+        if (state === "occupied") counts.soldCondos++;
       } else if (isHotelKind(kind)) {
         counts.hotelRooms++;
-      } else if (
-        kind === "fastFood" ||
-        kind === "restaurant" ||
-        kind === "shop" ||
-        kind === "cinema" ||
-        kind === "partyHall"
-      ) {
+      } else if (kind === "fastFood" || kind === "restaurant" || kind === "shop") {
         counts.venues++;
       } else {
         counts.services++;
+        if (kind === "parking") counts.parkingStalls++;
       }
       if (typeId === 4) counts.twinRooms++;
       if (typeId === 17) counts.secom++;
-      if (typeId === 36) counts.cathedral++;
     }
+  }
+
+  // ---- Merge multi-story parts into whole units ----------------------------
+  for (const m of mergeParts(partRecords)) {
+    // The Cathedral CROWNS its five stories; our one-story Wedding Hall
+    // stands in at the cluster's TOP floor (floor 100 in a real winning
+    // tower, the canon spot), not its base.
+    const floor = m.kind === "weddingHall" ? m.topFloor : m.floor;
+    // Reject a footprint poking past the buildable top: deserialize would
+    // clamp it DOWN a floor, where it could overlap a room this guard
+    // already accepted.
+    if (floor + facilityFloors(m.kind) - 1 > GRID.maxFloor) {
+      counts.offLot++;
+      continue;
+    }
+    if (!claimRoom(m.kind, floor, m.left, m.right)) {
+      counts.overlapping++;
+      continue;
+    }
+    pushUnit(m.kind, floor, m.left, m.right - m.left, m.construction ? "construction" : "empty", {
+      ...(m.construction ? { completeAt: minutes + buildMinutes(m.kind) } : {}),
+    });
+    if (m.kind === "cinema" || m.kind === "partyHall") counts.venues++;
+    else counts.services++;
+    if (m.kind === "weddingHall") counts.cathedral++; // clusters, not parts
   }
 
   // ---- Paving pass: the corridor layer under everything --------------------
@@ -316,13 +628,28 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     if (left !== -1) builtExtents.set(floor, { left, right });
   }
 
-  // ---- Transports: synthesized, not decoded (v1) ----------------------------
-  const hotelFloors = units.filter((u) => isHotelKind(u.kind)).map((u) => u.floor);
-  const staffFloors = units.filter((u) => u.kind === "housekeeping").map((u) => u.floor);
-  const transports = synthesizeTransports(builtExtents, hotelFloors, staffFloors, nextId);
+  // ---- Transports: decoded from the save, or synthesized as a fallback -----
+  const decoded = tdt.elevators !== null;
+  let transports: Transport[];
+  let decodeStats = { droppedShafts: 0, adjustedShafts: 0, droppedFlights: 0 };
+  if (tdt.elevators !== null) {
+    const d = transportsFromDecoded(tdt.elevators, tdt.stairs ?? [], nextId);
+    transports = d.transports;
+    decodeStats = d;
+  } else {
+    const hotelFloors = units.filter((u) => isHotelKind(u.kind)).map((u) => u.floor);
+    const staffFloors = units.filter((u) => u.kind === "housekeeping").map((u) => u.floor);
+    transports = synthesizeTransports(builtExtents, hotelFloors, staffFloors, nextId);
+  }
   nextId += transports.length;
 
   const towerName = towerNameFromFilename(filename);
+  const hasWeddingHall = units.some((u) => u.kind === "weddingHall");
+  // A save with the Cathedral built but not yet at TOWER is mid-evaluation:
+  // seed the pending VIP inspection (the same +3 days building the hall
+  // schedules), or the hall cap would strand the tower below TOWER forever
+  // (checkVip never runs at -1 and a second hall can't be built).
+  const vipVisitDay = hasWeddingHall && star < 6 ? Math.floor(minutes / 1440) + 3 : -1;
   const save: SerializedGame = {
     version: SAVE_VERSION,
     seed: hashSeed(bytes),
@@ -334,29 +661,179 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     transports,
     nextId,
     towerName,
-    builtWeddingHall: units.some((u) => u.kind === "weddingHall"),
+    builtWeddingHall: hasWeddingHall,
     evaluatedTower: star >= 6,
-    vipVisitDay: -1,
+    vipVisitDay,
     vipFavorable: star >= 6,
   };
 
-  return { save, report: buildReport(save, counts, tdt, transports.length, headerNotes) };
+  return { save, report: buildReport(save, counts, tdt, decoded, decodeStats, headerNotes) };
+}
+
+/** What the decode-path mapping produced, with honest loss accounting. */
+export interface DecodedTransports {
+  transports: Transport[];
+  /** Corrupt shafts dropped (degenerate, out of range, or overlapping). */
+  droppedShafts: number;
+  /** Shafts whose extents were trimmed (lot range or canon span). */
+  adjustedShafts: number;
+  /** Walkway flights dropped at the 64-link pool cap. */
+  droppedFlights: number;
+}
+
+/** True when placing a transport at (x, width, bottom..top) would overlap one
+ *  already placed. Exact-footprint stacked walkways may share their landing
+ *  floor (the engine's own stacking rule), so that one case is allowed. */
+function overlapsPlaced(
+  placed: readonly Transport[],
+  kind: FacilityKind,
+  x: number,
+  width: number,
+  bottom: number,
+  top: number,
+): boolean {
+  const isWalkway = kind === "stairs" || kind === "escalator";
+  for (const t of placed) {
+    if (x >= t.x + t.width || t.x >= x + width) continue;
+    if (bottom > t.top || t.bottom > top) continue;
+    const otherWalkway = t.kind === "stairs" || t.kind === "escalator";
+    if (isWalkway && otherWalkway && t.x === x && t.width === width && (bottom === t.top || top === t.bottom)) {
+      continue; // stacked flights sharing exactly the landing floor
+    }
+    return true;
+  }
+  return false;
 }
 
 /**
- * Deterministic elevator layout from the floor map alone — the original's
- * elevator block is only partially documented, so v1 rebuilds a serviceable
- * layout instead of decoding one (reported to the player). Pure and RNG-free:
- * the same floor map always yields byte-identical shafts.
+ * Map the DECODED elevator and stairs tables onto our transports. Live
+ * passenger/queue state is deliberately not carried over (the crowd
+ * re-simulates), but the shafts themselves come across faithfully: kind,
+ * position, extent, car count, per-floor stop settings (the serviced-floors
+ * map becomes `skipFloors`), and each car's home floor as its starting
+ * position. Two- and three-story walkway variants become stacked flights
+ * (exact-footprint stacking is how the engine models a continuous run).
+ *
+ * Corrupt entries are dropped or trimmed, never invented: a shaft wholly
+ * outside the buildable range is discarded (not clamped into a phantom stub),
+ * spans obey the engine's canon `maxSpanFor`, and no transport may overlap
+ * one already placed. Every drop/trim is counted for the fidelity report.
+ */
+export function transportsFromDecoded(
+  elevators: readonly TdtElevator[],
+  stairs: readonly TdtStair[],
+  firstId: number,
+): DecodedTransports {
+  const out: Transport[] = [];
+  let droppedShafts = 0;
+  let adjustedShafts = 0;
+  let droppedFlights = 0;
+  const ELEVATOR_KINDS: readonly FacilityKind[] = ["elevatorExpress", "elevatorStandard", "elevatorService"];
+  for (const e of elevators) {
+    const kind = ELEVATOR_KINDS[e.type];
+    const rawBottom = e.bottomFloor - TDT_FLOOR_OFFSET;
+    const rawTop = e.topFloor - TDT_FLOOR_OFFSET;
+    if (rawTop <= rawBottom) {
+      droppedShafts++; // degenerate shaft in a corrupt save
+      continue;
+    }
+    // Trim into the buildable range; a shaft with no height left inside it is
+    // corrupt data, not something to fold into a phantom stub at the edge.
+    const bottom = Math.max(GRID.minFloor, rawBottom);
+    let top = Math.min(GRID.maxFloor, rawTop);
+    if (top <= bottom) {
+      droppedShafts++;
+      continue;
+    }
+    let trimmed = bottom !== rawBottom || top !== rawTop;
+    // The engine's canon span cap (standard/service 30; express unlimited).
+    if (top - bottom > maxSpanFor(kind)) {
+      top = bottom + maxSpanFor(kind);
+      trimmed = true;
+    }
+    const width = FACILITIES[kind].width;
+    const x = Math.max(0, Math.min(GRID.width - width, e.x));
+    if (overlapsPlaced(out, kind, x, width, bottom, top)) {
+      droppedShafts++;
+      continue;
+    }
+    if (trimmed) adjustedShafts++;
+    const cars = Math.max(1, Math.min(maxCarsFor(kind), e.cars));
+    // The 120-byte serviced-floors map is the original's per-floor stop
+    // configuration: exactly our skipFloors, inverted. Endpoints always stop.
+    const skipFloors: number[] = [];
+    for (let fl = bottom + 1; fl < top; fl++) {
+      if (!e.serviced[fl + TDT_FLOOR_OFFSET]) skipFloors.push(fl);
+    }
+    const carPositions = Array.from({ length: cars }, (_, i) => {
+      const home = e.carHomes[i] - TDT_FLOOR_OFFSET;
+      return Math.max(bottom, Math.min(top, home));
+    });
+    out.push({
+      id: firstId + out.length,
+      kind,
+      x,
+      width,
+      bottom,
+      top,
+      cars,
+      carPositions,
+      carDir: Array.from({ length: cars }, () => 0),
+      load: 0,
+      skipFloors,
+    });
+  }
+  let walkways = 0;
+  for (const s of stairs) {
+    if (s.type > 5) continue; // undocumented variant in a corrupt save
+    const kind: FacilityKind = s.type % 2 === 1 ? "stairs" : "escalator";
+    const stories = s.type <= 1 ? 1 : s.type <= 3 ? 2 : 3;
+    const width = FACILITIES[kind].width;
+    const x = Math.max(0, Math.min(GRID.width - width, s.x));
+    const base = s.floor - TDT_FLOOR_OFFSET;
+    for (let i = 0; i < stories; i++) {
+      const bottom = base + i;
+      if (bottom < GRID.minFloor || bottom + 1 > GRID.maxFloor) continue;
+      if (walkways >= 64) {
+        droppedFlights++; // past the shared 64-link walkway pool
+        continue;
+      }
+      if (overlapsPlaced(out, kind, x, width, bottom, bottom + 1)) {
+        droppedFlights++;
+        continue;
+      }
+      walkways++;
+      out.push({
+        id: firstId + out.length,
+        kind,
+        x,
+        width,
+        bottom,
+        top: bottom + 1,
+        cars: 0,
+        carPositions: [],
+        carDir: [],
+        load: 0,
+      });
+    }
+  }
+  return { transports: out, droppedShafts, adjustedShafts, droppedFlights };
+}
+
+/**
+ * FALLBACK deterministic elevator layout from the floor map alone; used only
+ * when the save's transport blocks can't be read (truncated or corrupt
+ * files); reported to the player. Pure and RNG-free: the same floor map
+ * always yields byte-identical shafts.
  *
  * - Standard shafts in ≤30-floor bands: one anchored at the LOWEST built
  *   floor (so basements ride the ground band), then one per 15th-floor sky
- *   lobby that extends coverage — every band clamped into the built range so
+ *   lobby that extends coverage; every band clamped into the built range so
  *   a sparse tower never gets a shaft hanging below its lowest floor.
  * - One express shaft when the tower tops ~30 floors, stopping at its
  *   endpoints plus the (sky) lobby floors between them.
  * - Service elevator(s) chained over the hotel/housekeeping floors when
- *   hotels exist and that range actually spans floors — housekeeping is
+ *   hotels exist and that range actually spans floors; housekeeping is
  *   unreachable without staff transport (an all-on-one-floor hotel needs no
  *   shaft; staff walk).
  * - 8 cars per shaft; the 24-shaft pooled cap is respected (never reached by
@@ -410,7 +887,7 @@ export function synthesizeTransports(
       specs.push({ kind: "elevatorExpress", bottom: exBottom, top, skipFloors: skip });
     }
   }
-  // Service chain over the staff range — only when there are hotels to clean.
+  // Service chain over the staff range; only when there are hotels to clean.
   // Anchored at the ground concourse but clamped into the built range; when
   // every hotel and housekeeping sits on one floor, staff walk (no shaft).
   if (hotelFloors.length > 0) {
@@ -469,7 +946,7 @@ export function towerNameFromFilename(filename: string): string {
 }
 
 /** FNV-1a over the file bytes: a stable, deterministic RNG seed for the
- *  imported tower (same file, same seed — golden-testable). */
+ *  imported tower (same file, same seed; golden-testable). */
 function hashSeed(bytes: Uint8Array): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < bytes.length; i++) {
@@ -489,9 +966,16 @@ function buildReport(
     condos: number;
     soldCondos: number;
     hotelRooms: number;
+    hotelAsleep: number;
+    hotelDirty: number;
+    hotelBooked: number;
+    asleepConverted: number;
+    infested: number;
     venues: number;
     services: number;
+    parkingStalls: number;
     construction: number;
+    rentsApplied: number;
     twinRooms: number;
     secom: number;
     cathedral: number;
@@ -504,7 +988,8 @@ function buildReport(
     widthMismatch: number;
   },
   tdt: TdtTower,
-  shafts: number,
+  decoded: boolean,
+  decodeStats: { droppedShafts: number; adjustedShafts: number; droppedFlights: number },
   headerNotes: string[],
 ): ImportReport {
   let floors = 0;
@@ -514,14 +999,29 @@ function buildReport(
     if (u.floor < 1) basements = Math.max(basements, 1 - u.floor);
   }
   const day = Math.floor(save.minutes / 1440) + 1; // 1-indexed, as shown to the player
+  let shafts = 0;
+  let flights = 0;
+  for (const t of save.transports) {
+    if (t.kind === "stairs" || t.kind === "escalator") flights++;
+    else shafts++;
+  }
 
   const broughtOver: string[] = [];
   const rating = save.star >= 6 ? "the TOWER rating" : `your ${save.star}-star rating`;
-  broughtOver.push(`$${save.money.toLocaleString()} in funds and ${rating}.`);
+  // Minus before the dollar sign, matching the stats panel's money formatting.
+  const funds = `${save.money < 0 ? "-" : ""}$${Math.abs(save.money).toLocaleString()}`;
+  broughtOver.push(`${funds} in funds and ${rating}.`);
   broughtOver.push(
     `${floors} floor${floors === 1 ? "" : "s"} of structure` +
       (basements > 0 ? ` and ${basements} basement level${basements === 1 ? "" : "s"}.` : "."),
   );
+  if (decoded) {
+    broughtOver.push(
+      shafts + flights > 0
+        ? `${shafts} elevator shaft${shafts === 1 ? "" : "s"} and ${flights} stairway/escalator flight${flights === 1 ? "" : "s"}, with their stop settings, straight from the save.`
+        : "The save had no elevators or stairways built yet.",
+    );
+  }
   if (counts.offices > 0) {
     broughtOver.push(`${counts.offices} office${counts.offices === 1 ? "" : "s"} (${counts.occupiedOffices} with tenants).`);
   }
@@ -529,7 +1029,12 @@ function buildReport(
     broughtOver.push(`${counts.condos} condo${counts.condos === 1 ? "" : "s"} (${counts.soldCondos} sold).`);
   }
   if (counts.hotelRooms > 0) {
-    broughtOver.push(`${counts.hotelRooms} hotel room${counts.hotelRooms === 1 ? "" : "s"}, starting the day empty and ready for guests.`);
+    const states: string[] = [];
+    if (counts.hotelAsleep > 0) states.push(`${counts.hotelAsleep} with sleeping guests`);
+    if (counts.hotelDirty > 0) states.push(`${counts.hotelDirty} awaiting housekeeping`);
+    broughtOver.push(
+      `${counts.hotelRooms} hotel room${counts.hotelRooms === 1 ? "" : "s"}${states.length ? ` (${states.join(", ")})` : ", ready for guests"}.`,
+    );
   }
   if (counts.venues > 0) {
     broughtOver.push(`${counts.venues} food, retail, and entertainment venue${counts.venues === 1 ? "" : "s"}.`);
@@ -537,15 +1042,27 @@ function buildReport(
   if (counts.services > 0) {
     broughtOver.push(`${counts.services} service and special facilit${counts.services === 1 ? "y" : "ies"}.`);
   }
+  if (counts.rentsApplied > 0) {
+    broughtOver.push(`Rent levels for ${counts.rentsApplied} unit${counts.rentsApplied === 1 ? "" : "s"}, from the save's rent classes.`);
+  }
+  if (counts.parkingStalls > 0 && tdt.parkingConnected !== null && tdt.parkingConnected <= 512) {
+    // 512 is the format's own stall-table size; a bigger count is corrupt and
+    // must not be echoed at the player.
+    broughtOver.push(
+      `${counts.parkingStalls} parking stall${counts.parkingStalls === 1 ? "" : "s"} (the save counted ${tdt.parkingConnected} connected to a ramp).`,
+    );
+  }
   if (counts.construction > 0) {
     broughtOver.push(`${counts.construction} room${counts.construction === 1 ? "" : "s"} still under construction; work resumes now.`);
   }
   broughtOver.push(`The clock: day ${day}, ${formatClock(save.minutes)}.`);
 
   const couldNotBring: string[] = [];
-  couldNotBring.push(
-    `Elevators and stairs: the original's shaft data isn't decoded yet, so ${shafts} elevator${shafts === 1 ? " was" : "s were"} rebuilt from your floor layout.`,
-  );
+  if (!decoded) {
+    couldNotBring.push(
+      `The save's elevator data couldn't be read, so a working layout was rebuilt from your floors (${shafts} shaft${shafts === 1 ? "" : "s"}).`,
+    );
+  }
   if (counts.twinRooms > 0) {
     couldNotBring.push(`${counts.twinRooms} twin room${counts.twinRooms === 1 ? "" : "s"} imported as Double Rooms (the closest match).`);
   }
@@ -555,6 +1072,36 @@ function buildReport(
   if (counts.cathedral > 0) {
     couldNotBring.push("The Cathedral arrives as our Wedding Hall (a deliberate divergence).");
   }
+  if (counts.infested > 0) {
+    couldNotBring.push(
+      `${counts.infested} bug-infested room${counts.infested === 1 ? "" : "s"} arrived as dirty rooms (infestations don't exist here yet).`,
+    );
+  }
+  if (counts.hotelBooked > 0) {
+    couldNotBring.push(
+      `${counts.hotelBooked} booked hotel room${counts.hotelBooked === 1 ? "" : "s"} arrived empty and ready to re-book (day guests aren't carried over).`,
+    );
+  }
+  if (counts.asleepConverted > 0) {
+    couldNotBring.push(
+      `${counts.asleepConverted} room${counts.asleepConverted === 1 ? "" : "s"} with guests asleep past checkout arrived as rooms awaiting housekeeping.`,
+    );
+  }
+  if (decodeStats.droppedShafts > 0) {
+    couldNotBring.push(
+      `${decodeStats.droppedShafts} elevator shaft${decodeStats.droppedShafts === 1 ? " was" : "s were"} corrupt (impossible position) and stayed behind.`,
+    );
+  }
+  if (decodeStats.adjustedShafts > 0) {
+    couldNotBring.push(
+      `${decodeStats.adjustedShafts} elevator shaft${decodeStats.adjustedShafts === 1 ? " was" : "s were"} trimmed to fit the buildable range.`,
+    );
+  }
+  if (decodeStats.droppedFlights > 0) {
+    couldNotBring.push(
+      `${decodeStats.droppedFlights} stairway/escalator flight${decodeStats.droppedFlights === 1 ? "" : "s"} past the 64-link limit (or overlapping another) stayed behind.`,
+    );
+  }
   if (counts.burned > 0) {
     couldNotBring.push(`${counts.burned} burned-out area${counts.burned === 1 ? " was" : "s were"} cleared back to bare floor.`);
   }
@@ -563,7 +1110,7 @@ function buildReport(
   }
   if (counts.droppedFloors > 0) {
     couldNotBring.push(
-      `${counts.droppedFloors} floor record${counts.droppedFloors === 1 ? "" : "s"} above floor 100 stayed behind (not buildable here).`,
+      `${counts.droppedFloors} reserved floor row${counts.droppedFloors === 1 ? "" : "s"} above floor 100 held data and stayed behind.`,
     );
   }
   if (counts.offLot > 0) {
@@ -590,7 +1137,7 @@ function buildReport(
       `The ${tdt.peopleCount.toLocaleString()} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
     );
   }
-  couldNotBring.push("Tenant names, rent settings, retail varieties, and finance history aren't imported yet.");
+  couldNotBring.push("Tenant names, retail varieties, and finance history aren't imported yet.");
   couldNotBring.push(...headerNotes);
   couldNotBring.push(...tdt.warnings);
 

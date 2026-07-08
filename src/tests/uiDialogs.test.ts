@@ -430,7 +430,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
     document.getElementById("btn-import")!.click();
     const input = document.getElementById("import-file") as HTMLInputElement;
-    // The accept list offers exactly .vctower + the legacy .tdt extension —
+    // The accept list offers exactly .vctower + the legacy .tdt extension,
     // pinned in full so no other extension can sneak back in.
     expect(input.accept).toBe(".vctower,application/octet-stream,.tdt,.TDT");
     const file = new File([new Uint8Array([0x00, 0x24, 1, 2])], "MYTOWER.TDT");
@@ -459,7 +459,7 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 });
 
-describe("import fidelity report — nothing adopted until the player opens it", () => {
+describe("import fidelity report: nothing adopted until the player opens it", () => {
   const report = () => ({
     towerName: "GRAND",
     star: 3,
@@ -496,7 +496,7 @@ describe("import fidelity report — nothing adopted until the player opens it",
     expect(dialog().open).toBe(false);
   });
 
-  it("report content is escaped — a hostile tower name can't inject markup", () => {
+  it("report content is escaped: a hostile tower name can't inject markup", () => {
     const { ui } = makeUI();
     const hostile = { ...report(), towerName: "<img src=x onerror=alert(1)>" };
     ui.showImportReport(hostile, { onOpen: vi.fn() });

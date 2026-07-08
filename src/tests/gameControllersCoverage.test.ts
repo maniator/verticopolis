@@ -646,7 +646,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(f.toasts).toEqual([{ text: "This file is too small to be a SimTower save.", kind: "bad" }]);
   });
 
-  it("importLegacy: a valid .TDT shows the fidelity report first — nothing adopted until Open", () => {
+  it("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", () => {
     const bytes = buildTdt({ balance: 12345, level: 3 });
     saveLoad.importLegacy(bytes.buffer as ArrayBuffer, "LEGACY.TDT");
     expect(adopted).toHaveLength(0); // report up, tower not adopted yet
@@ -671,7 +671,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 
   it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", () => {
     // A slot whose payload no longer parses may still be recoverable by a
-    // later build — the import's fresh-slot copy must skip it, not reuse it.
+    // later build; the import's fresh-slot copy must skip it, not reuse it.
     localStorage.setItem("simtower-clone-slot-1", "VCZ1:not-really-deflate");
     saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
     f.importReports[0].open();
