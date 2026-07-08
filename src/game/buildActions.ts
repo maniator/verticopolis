@@ -128,8 +128,10 @@ export class BuildActions {
     }
     // snapX (not clampTile) so a wide unit's footprint stays on-lot: a tap at
     // the right edge left-shifts to fit instead of silently failing off-lot.
+    // Loud, like the desktop press it mirrors: a tap deserves the build sfx
+    // and the refusal toast. Drag steps stay quiet in paintFloorRun.
     const seedX = snapX(kind, tile);
-    this.tryBuild(kind, floor, seedX, true);
+    this.tryBuild(kind, floor, seedX);
     this.paint = { tile: seedX, floor };
   }
 

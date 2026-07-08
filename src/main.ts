@@ -232,6 +232,11 @@ class GameApp {
       onSelectTool: (t) => {
         this.tool = t;
         this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
+        // Drop any in-flight paint gesture too: onActionUp/onActionMove read the
+        // LIVE tool, so a press-then-switch-then-release would stamp the new
+        // kind's strip at the old press point.
+        this.paintAnchor = null;
+        this.build.clearPaint();
         this.engine.preview = null;
         this.engine.transportPreview = null;
       },

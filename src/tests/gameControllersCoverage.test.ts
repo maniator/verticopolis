@@ -139,10 +139,13 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
       expect(sim.tower.structureKindAt(3, x)).toBe("floor");
     }
     // Lobby taps stamp the same strip (extending the ground lobby sideways).
+    // The left boundary can't leak here: every tile left of the stamp is the
+    // fixture's pre-built ground lobby, so only the right edge is assertable.
     build.clearPaint();
+    const lobbyStrip = brushTiles(32);
     build.seedPaint("lobby", 32, 1);
-    for (let x = 30; x <= 35; x++) expect(sim.tower.structureKindAt(1, x)).toBe("lobby");
-    expect(sim.tower.structureKindAt(1, 36)).toBeUndefined();
+    for (const x of lobbyStrip) expect(sim.tower.structureKindAt(1, x)).toBe("lobby");
+    expect(sim.tower.structureKindAt(1, last(lobbyStrip) + 1)).toBeUndefined();
   });
 
   it("seedPaint keeps parking's single-module seed and anchors the chain for the drag", () => {
@@ -150,7 +153,9 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     sim.money = 1e9;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
     build.seedPaint("parking", 6, 0);
-    expect(sim.tower.units.filter((u) => u.kind === "parking")).toHaveLength(1);
+    const seeded = sim.tower.units.filter((u) => u.kind === "parking");
+    expect(seeded).toHaveLength(1);
+    expect(seeded[0].x).toBe(6); // the seed lands where the tap pointed
     // The seed recorded the run anchor: the drag chains flush from it.
     build.paintFloorRun("parking", 34, 0);
     const w = FACILITIES.parking.width;
@@ -187,7 +192,8 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     for (let x = 0; x < W; x++) sim.tower.place("floor", 0, x);
     // A tap at the very last column: a width-4 parking footprint would run off
     // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
-    build.paintFloorRun("parking", W - 1, 0);
+    // Taps commit through seedPaint (the gesture-opening placement).
+    build.seedPaint("parking", W - 1, 0);
     const p = sim.tower.units.find((u) => u.kind === "parking");
     expect(p).toBeDefined();
     expect(p!.x + p!.width).toBeLessThanOrEqual(W); // the whole footprint is on-lot
