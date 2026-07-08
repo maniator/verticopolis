@@ -203,6 +203,7 @@ class GameApp {
       ui: {
         toast: (text, kind) => this.ui.toast(text, kind),
         downloadFile: (filename, contents) => this.ui.downloadFile(filename, contents),
+        showImportReport: (report, cb) => this.ui.showImportReport(report, cb),
       },
       showBootMessage,
       armOnboarding: () => {
@@ -238,6 +239,7 @@ class GameApp {
       onLoad: () => this.saveLoad.load(),
       onExport: () => void this.saveLoad.exportGame(),
       onImport: (data) => void this.saveLoad.importGame(data),
+      onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
       onNew: (mode) => this.saveLoad.newGame(mode),
       onToggleAudio: () => {
         this.audio.start();

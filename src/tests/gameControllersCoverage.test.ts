@@ -8,6 +8,8 @@ import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
 import type { Tool } from "../ui/UI";
 import { unitEditorHtml, transportEditorHtml } from "../ui/editorHtml";
 import { SaveGame } from "../storage/SaveGame";
+import type { ImportReport } from "../storage/tdtImport";
+import { buildTdt } from "./fixtures/tdtBuilder";
 import { BuildActions } from "../game/buildActions";
 import { EditorActions } from "../game/editorActions";
 import { SaveLoad } from "../game/saveLoad";
@@ -31,16 +33,21 @@ function fakes() {
   const toasts: { text: string; kind?: "info" | "good" | "bad" | "money" }[] = [];
   const sfx: string[] = [];
   const downloads: { filename: string; contents: string }[] = [];
+  const importReports: { report: ImportReport; open: () => void }[] = [];
   return {
     toasts,
     sfx,
     downloads,
+    importReports,
     ui: {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
       downloadFile: (filename: string, contents: string) => {
         downloads.push({ filename, contents });
+      },
+      showImportReport: (report: ImportReport, cb: { onOpen: () => void }) => {
+        importReports.push({ report, open: cb.onOpen });
       },
     },
     audio: {
@@ -630,6 +637,57 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0].money).toBe(777_777);
     expect(f.toasts).toEqual([{ text: "Tower imported.", kind: "good" }]);
+  });
+
+  it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", () => {
+    saveLoad.importLegacy(new ArrayBuffer(4), "tiny.TDT");
+    expect(adopted).toHaveLength(0);
+    expect(f.importReports).toHaveLength(0);
+    expect(f.toasts).toEqual([{ text: "This file is too small to be a SimTower save.", kind: "bad" }]);
+  });
+
+  it("importLegacy: a valid .TDT shows the fidelity report first; nothing adopted until Open", () => {
+    const bytes = buildTdt({ balance: 12345, level: 3 });
+    saveLoad.importLegacy(bytes.buffer as ArrayBuffer, "LEGACY.TDT");
+    expect(adopted).toHaveLength(0); // report up, tower not adopted yet
+    expect(f.toasts).toEqual([]);
+    expect(f.importReports).toHaveLength(1);
+    const { report, open } = f.importReports[0];
+    expect(report.towerName).toBe("LEGACY");
+    expect(report.money).toBe(1_234_500);
+    expect(report.star).toBe(3);
+
+    // Confirming adopts the tower, flushes the OLD tower to the autosave, and
+    // copies the import to the first free manual slot.
+    sim.money = 777; // make the pre-import tower recognizable
+    open();
+    expect(adopted).toHaveLength(1);
+    expect(adopted[0]).toBeInstanceOf(Simulation);
+    expect(adopted[0].money).toBe(1_234_500);
+    expect(SaveGame.load()!.money).toBe(777); // current tower kept safe
+    expect(SaveGame.loadSlot(1)!.money).toBe(1_234_500); // fresh-slot copy
+    expect(last(f.toasts)).toEqual({ text: "Tower imported and saved to slot 1.", kind: "good" });
+  });
+
+  it("importLegacy: a corrupt-but-present slot is NOT treated as free (raw presence wins)", () => {
+    // A slot whose payload no longer parses may still be recoverable by a
+    // later build; the import's fresh-slot copy must skip it, not reuse it.
+    localStorage.setItem("simtower-clone-slot-1", "VCZ1:not-really-deflate");
+    saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "CAREFUL.TDT");
+    f.importReports[0].open();
+    expect(localStorage.getItem("simtower-clone-slot-1")).toBe("VCZ1:not-really-deflate");
+    expect(SaveGame.loadSlot(2)).not.toBeNull(); // landed on the next raw-free slot
+    expect(last(f.toasts).text).toBe("Tower imported and saved to slot 2.");
+  });
+
+  it("importLegacy: with every slot full, nothing is overwritten and the toast says so", () => {
+    for (let n = 1; n <= 3; n++) SaveGame.saveSlot(n, sim);
+    const before = [1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`));
+    saveLoad.importLegacy(buildTdt().buffer as ArrayBuffer, "FULL.TDT");
+    f.importReports[0].open();
+    expect(adopted).toHaveLength(1);
+    expect([1, 2, 3].map((n) => localStorage.getItem(`simtower-clone-slot-${n}`))).toEqual(before);
+    expect(last(f.toasts).text).toMatch(/All save slots are full/);
   });
 
   it("first context loss: autosave written, reload stamped in sessionStorage, page reloaded", () => {

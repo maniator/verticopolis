@@ -96,6 +96,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onLoad: vi.fn(),
     onExport: vi.fn(),
     onImport: vi.fn(),
+    onImportLegacy: vi.fn(),
     onNew: vi.fn(),
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
@@ -422,6 +423,120 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
     await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+  });
+
+  it("a picked .TDT legacy save is read as bytes and routed to onImportLegacy", async () => {
+    const { cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    // The accept list offers exactly .vctower + the legacy .tdt extension,
+    // pinned in full so no other extension can sneak back in.
+    expect(input.accept).toBe(".vctower,application/octet-stream,.tdt,.TDT");
+    const file = new File([new Uint8Array([0x00, 0x24, 1, 2])], "MYTOWER.TDT");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImportLegacy).toHaveBeenCalledTimes(1));
+    const [buf, name] = vi.mocked(cb.onImportLegacy).mock.calls[0];
+    expect(name).toBe("MYTOWER.TDT");
+    expect(new Uint8Array(buf)).toEqual(new Uint8Array([0x00, 0x24, 1, 2]));
+    expect(cb.onImport).not.toHaveBeenCalled();
+  });
+
+  it("a UTF-16 (BOM) .vctower still decodes to the same text, like readAsText did", async () => {
+    const { cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    // A save re-saved by an editor as UTF-16LE: BOM FF FE, then 2-byte chars.
+    const text = "VCTOWER1\npayload";
+    const bytes = new Uint8Array(2 + text.length * 2);
+    bytes[0] = 0xff;
+    bytes[1] = 0xfe;
+    for (let i = 0; i < text.length; i++) bytes[2 + i * 2] = text.charCodeAt(i);
+    const file = new File([bytes], "tower.vctower");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith(text));
+    expect(cb.onImportLegacy).not.toHaveBeenCalled();
+  });
+
+  it("a RENAMED legacy save (wrong extension, 0x2400 magic) still routes to onImportLegacy", async () => {
+    const { cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    document.getElementById("btn-import")!.click();
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    // DOS-era copies often lost their extension: the header-magic sniff, not
+    // the filename, must decide.
+    const file = new File([new Uint8Array([0x00, 0x24, 9, 9])], "TOWER1.SAV");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImportLegacy).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(cb.onImportLegacy).mock.calls[0][1]).toBe("TOWER1.SAV");
+    expect(cb.onImport).not.toHaveBeenCalled();
+  });
+});
+
+describe("import fidelity report: nothing adopted until the player opens it", () => {
+  const report = () => ({
+    towerName: "GRAND",
+    star: 3,
+    money: 1_500_000,
+    day: 3,
+    floors: 5,
+    basements: 1,
+    unitsImported: 9,
+    broughtOver: ["$1,500,000 in funds and your 3-star rating."],
+    couldNotBring: ["Elevators were rebuilt from your floor layout."],
+  });
+
+  it("shows the tower facts and both lists; Open tower fires onOpen and closes", () => {
+    const { ui } = makeUI();
+    const onOpen = vi.fn();
+    ui.showImportReport(report(), { onOpen });
+    expect(dialog().open).toBe(true);
+    const text = dialog().textContent!;
+    expect(text).toContain("GRAND");
+    expect(text).toContain("Brought over");
+    expect(text).toContain("Couldn't bring over");
+    expect(text).toContain("Elevators were rebuilt from your floor layout.");
+    click('[data-act="open"]');
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Cancel dismisses without adopting anything", () => {
+    const { ui } = makeUI();
+    const onOpen = vi.fn();
+    ui.showImportReport(report(), { onOpen });
+    click('[data-act="close"]');
+    expect(onOpen).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("report content is escaped: a hostile tower name can't inject markup", () => {
+    const { ui } = makeUI();
+    const hostile = { ...report(), towerName: "<img src=x onerror=alert(1)>" };
+    ui.showImportReport(hostile, { onOpen: vi.fn() });
+    expect(dialog().querySelector("img")).toBeNull();
+    expect(dialog().textContent).toContain("<img src=x onerror=alert(1)>");
+  });
+
+  it("never clobbers a live blocking modal: the report yields with a toast instead", () => {
+    // An emergency choice can open while the OS file picker is up (the picker
+    // isn't a modal); replacing its DOM would strand its resolve and freeze
+    // the sim, so the report must refuse to open over it.
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
+    const onOpen = vi.fn();
+    ui.showImportReport(report(), { onOpen });
+    // The emergency modal survives untouched and can still resolve.
+    expect(dialog().textContent).toContain("A fire has broken out!");
+    expect(document.getElementById("toast-wrap")!.textContent).toContain("Close the open dialog first");
+    click('[data-act="decline"]');
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(onOpen).not.toHaveBeenCalled();
   });
 });
 

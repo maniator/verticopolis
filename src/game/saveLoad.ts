@@ -1,6 +1,8 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode } from "../engine/types";
-import { SaveGame } from "../storage/SaveGame";
+import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
+import { LegacyImportError, parseTDT } from "../storage/tdtImport";
+import type { ImportReport } from "../storage/tdtImport";
 import { shouldArm } from "../ui/Onboarding";
 import type { UI } from "../ui/UI";
 
@@ -21,7 +23,7 @@ export interface SaveLoadDeps {
    *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
-  ui: Pick<UI, "toast" | "downloadFile">;
+  ui: Pick<UI, "toast" | "downloadFile" | "showImportReport">;
   /** Full-screen boot card (lives with the boot functions in main.ts). */
   showBootMessage(msg: string, withReload?: boolean): void;
   /** Arm first-run onboarding on the just-adopted sim. */
@@ -184,6 +186,95 @@ export class SaveLoad {
     }
   }
 
+  /**
+   * Import an original 1994 SimTower save (`.TDT`). Parse and validate FIRST
+   * (through both the binary walker's hardening and `Simulation.deserialize`'s
+   * trust-boundary coercion), then show the fidelity report; nothing is
+   * adopted or persisted until the player confirms with "Open tower". A
+   * garbage file never reaches the sim, the same contract as importGame.
+   */
+  importLegacy(buffer: ArrayBuffer, filename: string): void {
+    let sim: Simulation;
+    let report: ImportReport;
+    try {
+      const parsed = parseTDT(buffer, filename);
+      // Deliberate second hardening layer: the importer's output goes through
+      // the exact trust boundary every other save does.
+      sim = Simulation.deserialize(parsed.save);
+      report = parsed.report;
+    } catch (err) {
+      // LegacyImportError messages are already player-readable; anything else
+      // (a deserialize trust-boundary refusal, an importer bug) keeps the
+      // plain lead but carries the underlying detail, matching importGame's
+      // "Import failed: <message>" diagnosability.
+      const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
+      const msg =
+        err instanceof LegacyImportError
+          ? err.message
+          : `This SimTower save couldn't be read.${detail}`;
+      this.deps.ui.toast(msg, "bad");
+      return;
+    }
+    this.deps.ui.showImportReport(report, {
+      onOpen: () => {
+        // Flush the CURRENT tower to the autosave slot first (same splash
+        // guard as every other flush), so adopting the import can't cost the
+        // player their in-progress tower even if they never saved manually.
+        // A failure must not block the adoption the player just asked for,
+        // but it must be SAID: the report modal promised the autosave.
+        let flushFailed = false;
+        try {
+          this.saveBeforeUpdate();
+        } catch {
+          flushFailed = true;
+        }
+        this.deps.adoptSim(sim);
+        // Auto-save the IMPORTED tower to a fresh slot so a bad import can't
+        // clobber anything and the player can always get back to it. "Fresh"
+        // is a RAW presence check (hasSlot), never the parse-based
+        // listSlots().exists: a corrupt-but-present slot may still be
+        // recoverable by a later build and must not be an overwrite target.
+        let savedTo: number | null = null;
+        let slotWriteFailed = false;
+        try {
+          for (let n = 1; n <= SLOT_COUNT; n++) {
+            if (!SaveGame.hasSlot(n)) {
+              SaveGame.saveSlot(n, sim);
+              savedTo = n;
+              break;
+            }
+          }
+        } catch {
+          slotWriteFailed = true; // quota/disabled storage, NOT "slots full"
+        }
+        // "info" keeps this bulletin log-only: renderLog also toasts "good"
+        // entries, and the explicit success toast below already covers that.
+        this.deps
+          .getSim()
+          .emit(`Imported from SimTower (1994): welcome back to ${sim.tower.towerName}.`, "info");
+        // Honest feedback: distinguish "no free slot" from "the write failed".
+        if (slotWriteFailed) {
+          this.deps.ui.toast(
+            "Tower imported, but the slot copy failed (storage is full or blocked). Export it to a file soon.",
+            "bad",
+          );
+        } else {
+          this.deps.ui.toast(
+            savedTo !== null
+              ? `Tower imported and saved to slot ${savedTo}.`
+              : "Tower imported. All save slots are full, so save it yourself soon.",
+            "good",
+          );
+        }
+        if (flushFailed) {
+          this.deps.ui.toast(
+            "Your previous tower couldn't be backed up to the autosave (storage is full or blocked).",
+            "bad",
+          );
+        }
+      },
+    });
+  }
 
   /** Found a fresh tower under the chosen rule-set. The mode is baked into the
    *  new Simulation at creation and is immutable for that tower's life. */
