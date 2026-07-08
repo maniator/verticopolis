@@ -1,6 +1,7 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
+import type { ExportReport } from "../storage/tdtExport";
 import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
 import { escapeHtml } from "./escape";
@@ -41,6 +42,8 @@ export interface UICallbacks {
   onImport(data: string): void;
   /** A picked binary legacy save (original SimTower `.TDT`), as raw bytes. */
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
+  /** Export the live tower as an original 1994 SimTower save (.TDT). */
+  onExportLegacy(): void;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
@@ -792,21 +795,38 @@ export class UI {
   }
 
   /** Export is deliberately two-step: the tower is not serialized, packed, or
-   *  downloaded until the player actually clicks Export in this dialog. */
+   *  downloaded until the player actually clicks a choice in this dialog.
+   *  The .vctower path stays the primary; the 1994 .TDT path is the secondary
+   *  and leads to its own reverse fidelity modal before any download. */
   private confirmExport(): void {
-    this.confirmModal(
-      "Export tower?",
-      `Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.`,
-      () => this.cb.onExport(),
-      "Export",
-    );
+    const box = this.openModal(`
+      <h2>Export tower?</h2>
+      <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
+      <p style="color:var(--muted);font-size:12px">You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="close">Cancel</button>
+        <button class="btn" data-act="legacy">For SimTower (1994)…</button>
+        <button class="btn primary" data-act="export" autofocus>Export</button>
+      </div>`);
+    this.wireActions(box, {
+      export: () => {
+        this.closeModal();
+        this.cb.onExport();
+      },
+      legacy: () => {
+        this.closeModal();
+        this.cb.onExportLegacy();
+      },
+    });
   }
 
   /** Hand the player an exported file. Routed through the platform port so a
    *  native wrapper can deliver it its own way (share sheet); the browser port
    *  keeps the pre-port blob-anchor download exactly. Callers decide the name
-   *  and contents (see SaveGame.export). */
-  downloadFile(filename: string, contents: string): void {
+   *  and contents (see SaveGame.export); raw bytes flow through too, for the
+   *  binary .TDT export. The type mirrors the platform port's saveFile seam
+   *  (a cross-repo contract), which is why it is narrower than BlobPart. */
+  downloadFile(filename: string, contents: string | Uint8Array): void {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
     //
@@ -917,6 +937,48 @@ export class UI {
       open: () => {
         this.closeModal();
         cb.onOpen();
+      },
+    });
+  }
+
+  /**
+   * Reverse fidelity report for a legacy (.TDT) export: what makes the trip
+   * back to 1994 and what stays behind, shown BEFORE anything downloads.
+   * `onDownload` fires only on the primary; Cancel downloads nothing.
+   */
+  showExportReport(report: ExportReport, cb: { onDownload: () => void }): void {
+    // Same modal-clobber guard as the import report: never wipe a live
+    // blocking dialog (emergency choice, update prompt) out from under its
+    // pending resolve.
+    if (this.isModalOpen()) {
+      this.toast("Close the open dialog first, then export again.", "info");
+      return;
+    }
+    const li = (lines: string[]) => lines.map((s) => `<li>${escapeHtml(s)}</li>`).join("");
+    const stars = report.star >= 6 ? "TOWER" : `${report.star}★`;
+    const funds = `${report.money < 0 ? "-" : ""}$${Math.abs(report.money).toLocaleString()}`;
+    const box = this.openModal(`
+      <h2>Export for SimTower (1994)</h2>
+      <div class="import-facts well">
+        <b>${escapeHtml(report.towerName)}</b> · ${stars} · ${funds}
+        · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
+        · ${report.roomsExported.toLocaleString()} rooms
+      </div>
+      <h3>Comes along</h3>
+      <ul class="import-list">${li(report.comesAlong)}</ul>
+      <h3>Stays behind</h3>
+      <ul class="import-list">${li(report.staysBehind)}</ul>
+      <p style="color:var(--muted);font-size:12px">Downloads as <b>${escapeHtml(report.filename)}</b>. Your tower here is untouched.</p>
+      <div class="modal-actions">
+        <button class="btn" data-act="close">Cancel</button>
+        <button class="btn primary" data-act="download" autofocus>Download .TDT</button>
+      </div>`);
+    const live = document.getElementById("a11y-live");
+    if (live) live.textContent = "SimTower export summary ready.";
+    this.wireActions(box, {
+      download: () => {
+        this.closeModal();
+        cb.onDownload();
       },
     });
   }

@@ -1,6 +1,8 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode } from "../engine/types";
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
+import { LegacyExportError, buildTDT } from "../storage/tdtExport";
+import type { BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { shouldArm } from "../ui/Onboarding";
@@ -23,7 +25,7 @@ export interface SaveLoadDeps {
    *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
-  ui: Pick<UI, "toast" | "downloadFile" | "showImportReport">;
+  ui: Pick<UI, "toast" | "downloadFile" | "showImportReport" | "showExportReport">;
   /** Full-screen boot card (lives with the boot functions in main.ts). */
   showBootMessage(msg: string, withReload?: boolean): void;
   /** Arm first-run onboarding on the just-adopted sim. */
@@ -200,6 +202,30 @@ export class SaveLoad {
       // rejection here would leave the player with no download and no feedback.
       this.deps.ui.toast("Export failed: " + (err as Error).message, "bad");
     }
+  }
+
+  /**
+   * Export the live tower as an original 1994 SimTower save (`.TDT`). Same
+   * two-step contract as the .vctower path: the reverse fidelity modal shows
+   * what does and does not survive the trip back to 1994, and nothing is
+   * downloaded until the player clicks the primary. Modern-mode towers are
+   * refused outright (the 1994 rule set cannot represent them).
+   */
+  exportLegacy(): void {
+    let built: BuiltLegacyTower;
+    try {
+      built = buildTDT(this.deps.getSim().serialize());
+    } catch (err) {
+      const msg =
+        err instanceof LegacyExportError
+          ? err.message
+          : "Export failed: " + (err instanceof Error ? err.message : String(err));
+      this.deps.ui.toast(msg, "bad");
+      return;
+    }
+    this.deps.ui.showExportReport(built.report, {
+      onDownload: () => this.deps.ui.downloadFile(built.report.filename, built.bytes),
+    });
   }
 
   async importGame(data: string): Promise<void> {

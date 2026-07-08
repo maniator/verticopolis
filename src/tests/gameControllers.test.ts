@@ -36,6 +36,7 @@ function fakes() {
       },
       downloadFile: () => {},
       showImportReport: () => {},
+      showExportReport: () => {},
     },
     audio: {
       sfx: (name: "build" | "sell" | "error" | "promote" | "money" | "click") => {
