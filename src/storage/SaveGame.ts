@@ -209,7 +209,12 @@ export const SaveGame = {
 
   // ---- Shared writer + export/import -----------------------------------
   saveTo(key: string, sim: Simulation): void {
-    latestAsyncSave = null;
+    // Only an AUTOSAVE-slot write invalidates an in-flight async autosave (the
+    // token exists so older compressed state can't commit over this newer
+    // flush of the SAME slot). A manual slot save targets a different key, so
+    // it must not cancel the pending autosave commit; that would leave the
+    // autosave slot stale until the next timer tick.
+    if (key === AUTO_KEY) latestAsyncSave = null;
     const data = sim.serialize() as SerializedGame & { savedAt: number };
     // Stamp save time without relying on a deterministic clock in the engine.
     data.savedAt = nowMs();

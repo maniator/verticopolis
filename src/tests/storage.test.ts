@@ -323,6 +323,47 @@ describe("SaveGame", () => {
     expect(SaveGame.load()!.money).toBe(200);
   });
 
+  it("a manual SLOT save does not cancel an in-flight async autosave commit", async () => {
+    let captured: Uint8Array | undefined;
+    let release!: () => void;
+    class SlowCompressionStream {
+      readable: ReadableStream<Uint8Array>;
+      writable: WritableStream<Uint8Array>;
+
+      constructor() {
+        this.readable = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            await new Promise<void>((resolve) => (release = resolve));
+            controller.enqueue(deflateSync(captured!));
+            controller.close();
+          },
+        });
+        this.writable = new WritableStream<Uint8Array>({
+          write(chunk) {
+            captured = chunk;
+          },
+        });
+      }
+    }
+    vi.stubGlobal("CompressionStream", SlowCompressionStream);
+    vi.stubGlobal("DecompressionStream", class {});
+
+    const auto = sampleGame();
+    auto.money = 111;
+    const pending = SaveGame.saveAsync(auto);
+    await vi.waitFor(() => expect(captured).toBeDefined());
+
+    // Writes a DIFFERENT key, so the pending autosave must still commit.
+    const manual = sampleGame();
+    manual.money = 222;
+    SaveGame.saveSlot(1, manual);
+    release();
+    await pending;
+
+    expect(SaveGame.load()!.money).toBe(111); // autosave landed, not cancelled
+    expect(SaveGame.loadSlot(1)!.money).toBe(222); // slot save intact
+  });
+
   it("propagates direct async save failures to callers", async () => {
     const saveToAsync = vi.spyOn(SaveGame, "saveToAsync").mockRejectedValueOnce(new Error("write failed"));
     try {
