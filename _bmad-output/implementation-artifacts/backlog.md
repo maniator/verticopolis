@@ -173,7 +173,7 @@ Triage them into the table above, then delete the raw note._
 ### Deferred from: gds-code-review (mobile tap lays the full brush strip), 2026-07-08
 
 - **A browser `pointercancel` on an unmoved touch press commits the tap
-  placement** — Excalibur routes `cancel` into the same handler as `up`
+  placement**: Excalibur routes `cancel` into the same handler as `up`
   (`TowerEngine.bindInput`), so `onActionUp` treats a system-cancelled press
   (edge-swipe takeover, notification, palm rejection) as a deliberate tap and
   stamps the brush strip; the same routing also lets a cancel commit an
@@ -181,7 +181,7 @@ Triage them into the table above, then delete the raw note._
   stake from 1 tile to 8. Fix when touched next: thread a `cancelled` flag
   from the engine's cancel event into `onActionUp` and drop the tap commit
   (and transport commit) on cancel. (Edge Case Hunter, 2026-07-08.)
-- **A pinch that interrupts a just-seeded paint drag escapes undo** — press,
+- **A pinch that interrupts a just-seeded paint drag escapes undo**: press,
   one move (strip stamped), then a second finger: the pinch branch nulls the
   gesture, `onActionUp`/`commitUndo` never run, and the next gesture's
   `captureUndo` overwrites the pending pre-strip snapshot, so the strip joins
@@ -189,7 +189,7 @@ Triage them into the table above, then delete the raw note._
   stake raised from 1 tile to the brush strip. Fix when touched next: commit
   the pending undo capture when a pinch cancels an action gesture.
   (Edge Case Hunter, 2026-07-08.)
-- **Version bumps can leave `package-lock.json` behind** — the 1.11.0 bump
+- **Version bumps can leave `package-lock.json` behind**: the 1.11.0 bump
   landed in `package.json` only (lockfile stayed at 1.10.1) and was resynced
   incidentally by the 1.11.1 PR. Process note: bump with `npm version
   <x.y.z> --no-git-tag-version` (or run `npm install` after editing) so both
