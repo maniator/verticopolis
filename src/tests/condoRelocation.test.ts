@@ -73,13 +73,20 @@ describe("condo relocation is Modern-only and rides the buy-back", () => {
   it("Modern: a happy sold condo eventually relocates (and the buy-back is charged)", () => {
     const { sim, condo } = towerWithSoldCondo("modern", 5); // max flight risk
     const before = sim.money;
-    let sawRelocationNotice = false;
+    // Capture the notice log the first month it fires (the log is a bounded ring,
+    // and re-sales over many months would otherwise shift the entry out).
+    let relocationLog: { text: string; kind: string } | undefined;
     for (let m = 0; m < 360; m++) {
       sim.tick(MONTH);
-      if (condo.vacateReason === "relocation") sawRelocationNotice = true;
+      if (!relocationLog && condo.vacateReason === "relocation") {
+        relocationLog = sim.log.find((e) => e.text.includes("is relocating"));
+      }
       if (condo.state === "empty") break; // relocated + bought back
     }
-    expect(sawRelocationNotice).toBe(true);
+    // The advance warning must surface as a TOAST, not a silent bulletin line:
+    // the UI toasts only "good"/"bad" entries, so the notice is emitted "bad".
+    expect(relocationLog).toBeDefined();
+    expect(relocationLog!.kind).toBe("bad");
     expect(sim.money).toBeLessThan(before); // the reclaim (buy-back) was charged
   });
 

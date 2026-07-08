@@ -1393,7 +1393,11 @@ export class Simulation implements SimContext {
       u.vacateAt = this.clock.minutes + VACATE_NOTICE_MINUTES;
       this.emit(
         `A household in ${FACILITIES[u.kind].name} on ${this.floorLabel(u.floor)} is relocating. They leave in under ${days} day(s); you buy the unit back to re-sell.`,
-        "info",
+        // "bad" so the advance warning actually TOASTS: the UI toasts only
+        // good/bad log entries; "info" is bulletin-only, which would swallow the
+        // heads-up. The non-blaming framing lives in the wording, not the color,
+        // matching how the neglect notices surface.
+        "bad",
       );
     }
   }
