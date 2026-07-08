@@ -17,19 +17,29 @@ const fakePort = (): PlatformPort => ({
   openExternal: vi.fn(),
 });
 
-describe("resolvePlatform — fallback order", () => {
+describe("resolvePlatform: fallback order", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("native mode with a well-formed injected port uses the injected port", () => {
     const injected = fakePort();
     expect(resolvePlatform("native", injected)).toBe(injected);
   });
 
-  it("native mode without an injected port falls back to the browser default", () => {
+  it("native mode without an injected port falls back to the browser default, quietly", () => {
+    // A bare native bundle (no wrapper shell, e.g. a local preview) is
+    // legitimate, so the fallback must not cry wolf on the console.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(resolvePlatform("native", undefined)).toBe(browserPlatform);
+    expect(warn).not.toHaveBeenCalled();
   });
 
-  it("native mode with a malformed injection falls back instead of crashing later", () => {
+  it("native mode with a malformed injection falls back instead of crashing later, and says so", () => {
     // Anything that doesn't duck-type as a full port is ignored: a wrapper
     // shell bug must degrade to the browser download path, not break export.
+    // Each rejection warns once so the shell author gets a diagnostic.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(resolvePlatform("native", null)).toBe(browserPlatform);
     expect(resolvePlatform("native", "port")).toBe(browserPlatform);
     expect(resolvePlatform("native", { isNativeWrapper: true })).toBe(browserPlatform);
@@ -38,6 +48,22 @@ describe("resolvePlatform — fallback order", () => {
     expect(resolvePlatform("native", noOpen)).toBe(browserPlatform);
     const badFlag = { ...fakePort(), isNativeWrapper: "yes" };
     expect(resolvePlatform("native", badFlag)).toBe(browserPlatform);
+    // The flag must be literally true: a port claiming NOT to be a wrapper is
+    // a contract violation (types.ts), not a half-native third mode.
+    const falseFlag = { ...fakePort(), isNativeWrapper: false };
+    expect(resolvePlatform("native", falseFlag)).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(6);
+  });
+
+  it("a booby-trapped injection (throwing getter) degrades instead of throwing out of boot", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const trapped = Object.defineProperty({ ...fakePort() }, "saveFile", {
+      get() {
+        throw new Error("revoked");
+      },
+    });
+    expect(resolvePlatform("native", trapped)).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(1);
   });
 
   it("non-native modes use the browser default even when a global is injected", () => {
@@ -50,7 +76,7 @@ describe("resolvePlatform — fallback order", () => {
   });
 });
 
-describe("getPlatform — boot-time resolution", () => {
+describe("getPlatform: boot-time resolution", () => {
   afterEach(() => {
     delete (globalThis as { __VC_PLATFORM__?: unknown }).__VC_PLATFORM__;
   });
@@ -65,7 +91,7 @@ describe("getPlatform — boot-time resolution", () => {
   });
 });
 
-describe("browserPlatform — the pre-port export behavior, byte for byte", () => {
+describe("browserPlatform: the pre-port export behavior, byte for byte", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     delete (URL as { createObjectURL?: unknown }).createObjectURL;

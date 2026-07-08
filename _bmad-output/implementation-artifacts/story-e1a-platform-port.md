@@ -4,7 +4,7 @@ baseline_commit: f52489e119c29b0ed6b861f83bbb8fed5c3d5770
 
 # Story E1a: Platform port (`src/platform/`)
 
-Status: review
+Status: done
 
 Epic: E1 (web-side native readiness), mobile-distribution initiative. First story of the epic; unblocks E1b (PWA gating), E1c (native build mode), and E3b (iOS bridge shell in the private repo).
 
@@ -43,7 +43,25 @@ so that **the wrapper can inject native implementations (share sheet, system bro
   - [x] `browserPlatform.openExternal`: spies `window.open` with `_blank` + `noopener,noreferrer`; `isNativeWrapper` is false.
 - [x] `src/tests/uiDialogs.test.ts` (UPDATE, additive only): native-routing test for the help link: with a mocked `getPlatform` returning a fake `isNativeWrapper: true` port, clicking the report link preventDefaults and calls `openExternal` with the chooser URL; without the mock, the existing anchor tests pass unchanged. (AC: 3)
 - [x] Quality gates: `npm run typecheck && npm run lint && npm test && npm run build`. (AC: 6)
-- [ ] `/gds-code-review` in this session; fix `patch` findings, record `defer` findings in `_bmad-output/implementation-artifacts/backlog.md`. Own PR; merge commit; no version bump. (AC: 7)
+- [x] `/gds-code-review` in this session; fix `patch` findings, record `defer` findings in `_bmad-output/implementation-artifacts/backlog.md`. Own PR; merge commit; no version bump. (AC: 7)
+
+### Review Findings
+
+Run 2026-07-08, three layers (Blind Hunter / Edge Case Hunter / Acceptance Auditor), triage: 11 patch, 2 defer, 4 dismissed. All patch findings fixed and re-verified in this session.
+
+- [x] [Review][Patch] Injected saveFile that throws synchronously or returns a non-Promise bypassed the failure toast [src/ui/UI.ts downloadFile] (blind+edge). Fixed with try/catch + Promise.resolve normalization. The first fix attempt (Promise.resolve().then) deferred the browser download by a microtask and the pre-existing tripwire test caught it, so the call stays synchronous.
+- [x] [Review][Patch] Duck-check property reads unguarded: a throwing getter/Proxy injection crashed boot instead of degrading [src/platform/index.ts isPlatformPort] (edge). Wrapped in try/catch returning false.
+- [x] [Review][Patch] Malformed-injection fallback was silent, zero diagnostic for the shell author [src/platform/index.ts resolvePlatform] (blind). Now warns on console for a defined-but-malformed injection; stays quiet for undefined (bare native preview is legitimate).
+- [x] [Review][Patch] downloadFile's catch discarded the rejection reason [src/ui/UI.ts] (edge). Now logs the cause before the toast.
+- [x] [Review][Patch] openExternal throwing after preventDefault left the report link dead [src/ui/UI.ts showHelp] (edge). Handler now falls back to window.open on a throwing wrapper hook.
+- [x] [Review][Patch] Only click was intercepted; middle-button auxclick bypassed the port in native shells [src/ui/UI.ts showHelp] (blind+edge). auxclick button 1 now routes the same way; types.ts contract notes that activations the DOM never sees are the shell's navigation-delegate duty.
+- [x] [Review][Patch] UI.downloadFile delegation had zero direct test coverage [src/tests/uiDialogs.test.ts] (blind). Added tests for the delegation args (incl. MIME), the rejection toast, and the sync-throw survival path.
+- [x] [Review][Patch] Test hygiene: mid-test mockRestore leaked a native-mode getPlatform on assertion failure, and two scenarios shared one it [src/tests/uiDialogs.test.ts] (blind+edge). Split into three tests; describe-scoped afterEach restoreAllMocks.
+- [x] [Review][Patch] isNativeWrapper contract ambiguity: story said boolean-coercible, code required strict boolean, and a false flag created an undocumented half-native state [src/platform/index.ts + types.ts] (auditor+blind). Duck-check now requires literally true; the contract documents it.
+- [x] [Review][Patch] openExternal URL hygiene was unstated in the cross-repo contract [src/platform/types.ts] (blind). Contract now states the game only passes http(s) URLs and the shell should validate the scheme.
+- [x] [Review][Patch] Em-dashes in three new describe titles [src/tests/platform.test.ts] (auditor). Replaced with colons.
+- [x] [Review][Defer] Native export feedback is wrong-shaped: exportGame toasts "Check your downloads" synchronously before the port settles, so a native failure shows contradictory toasts and the copy is wrong for a share sheet [src/game/saveLoad.ts:168-170] — deferred, browser-neutral; the fix belongs with E3b's native shell UX.
+- [x] [Review][Defer] The real native-mode plumbing (import.meta.env.MODE === "native" reaching getPlatform, cache with no reset seam) is unreachable from vitest [src/platform/index.ts] — deferred, covered by E1c's local-server verification of the native bundle.
 
 ## Dev Notes
 
@@ -108,3 +126,4 @@ Claude Code agent session (branch claude/mobile-app-init-ukdxq1)
 ## Change Log
 
 - 2026-07-08: E1a platform port implemented; all quality gates green; status → review (pending /gds-code-review in this session).
+- 2026-07-08: /gds-code-review ran (3 layers): 11 patch findings fixed (hardened saveFile failure handling kept synchronous, guarded duck-check, malformed-injection diagnostic, openExternal fallback + auxclick routing, contract tightening in types.ts, direct downloadFile tests, test hygiene, em-dash cleanup), 2 deferred to the backlog (native export feedback → E3b; native-mode plumbing verification → E1c), 4 dismissed. Gates re-run green; platform files at 100% coverage; status → done.

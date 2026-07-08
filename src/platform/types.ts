@@ -11,11 +11,19 @@
  *    module scripts run (the wrapper's build patches index.html to load it
  *    first), and must consume the `--mode native` bundle. Injecting the global
  *    into a plain-mode bundle is unsupported; plain bundles ignore it.
+ *  - `isNativeWrapper` must be literally `true` on an injected port; the
+ *    resolver treats anything else (including a truthy non-boolean) as a
+ *    malformed injection and falls back to the browser port.
  *  - `saveFile` contents are a string: the `.vctower` export payload is text
  *    (see SaveGame.export), so no byte-array encoding round-trip is needed on
  *    either side. A native implementation must RESOLVE when the player cancels
  *    the share/save flow (cancel is not an error) and reject only on real
  *    failure; the game surfaces rejections to the player.
+ *  - The game only ever hands `openExternal` http(s) URLs from its own UI; a
+ *    native implementation should still validate the scheme before forwarding
+ *    to the system browser, and must also cover activations that bypass DOM
+ *    click handlers (long-press menus, middle-button auxclick the game does
+ *    not see) through its WebView navigation delegate.
  */
 export interface PlatformPort {
   /** True only on a wrapper-injected port. The browser default is false. */

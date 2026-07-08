@@ -806,14 +806,22 @@ export class UI {
   downloadFile(filename: string, contents: string): void {
     // octet-stream (not application/json, the payload isn't) so the browser
     // downloads our made-up .vctower type instead of trying to display it.
-    void getPlatform()
-      .saveFile(filename, contents, "application/octet-stream")
-      .catch(() => {
-        // Dead code in the browser (its saveFile never rejects); a native
-        // shell rejects on real failure, and losing an export silently is
-        // never acceptable. Cancel resolves, so this never fires for it.
-        this.toast("Couldn't save your tower file. Please try again.", "bad");
-      });
+    //
+    // Every failure shape a broken wrapper can produce (sync throw, non-Promise
+    // return, rejection) must reach the same toast, because losing an export
+    // silently is never acceptable. Dead code in the browser (its saveFile
+    // never throws or rejects); a native shell rejects only on real failure,
+    // and cancel resolves, so the toast never fires for it. The call itself
+    // stays synchronous: deferring it would delay the browser download.
+    const fail = (err: unknown) => {
+      console.error("[platform] saveFile failed:", err);
+      this.toast("Couldn't save your tower file. Please try again.", "bad");
+    };
+    try {
+      void Promise.resolve(getPlatform().saveFile(filename, contents, "application/octet-stream")).catch(fail);
+    } catch (err) {
+      fail(err);
+    }
   }
 
   /** Import goes straight to the file picker — exports are .vctower downloads
@@ -883,9 +891,22 @@ export class UI {
     // middle-click and context-menu semantics untouched.
     if (getPlatform().isNativeWrapper) {
       const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
-      report.addEventListener("click", (e) => {
+      const routeExternal = (e: Event) => {
         e.preventDefault();
-        getPlatform().openExternal(report.href);
+        try {
+          getPlatform().openExternal(report.href);
+        } catch (err) {
+          // The default is already cancelled; a throwing wrapper hook must
+          // not leave the link dead, so fall back to the browser behavior.
+          console.error("[platform] openExternal failed:", err);
+          window.open(report.href, "_blank", "noopener,noreferrer");
+        }
+      };
+      report.addEventListener("click", routeExternal);
+      // Middle-button activation fires auxclick, not click; route it the same
+      // way (other buttons keep their defaults, e.g. the context menu).
+      report.addEventListener("auxclick", (e) => {
+        if (e.button === 1) routeExternal(e);
       });
     }
     const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
