@@ -22,12 +22,12 @@ grounds:
 
 ## 1. Two-repo topology
 
-**Public `maniator/verticopolis` (MIT)** stays the single source of truth for all game code. It gains only platform seams that are inert in the browser build, plus one protocol-public file (assetlinks). **Private `maniator/verticopolis-mobile`** holds everything store-shaped: the Bubblewrap TWA project, the Capacitor iOS project, CI workflows, fastlane config, store listings and privacy answers, the version ledger, and (later, gated) monetization artifacts.
+**Public `maniator/verticopolis` (MIT)** stays the single source of truth for all game code. It gains only platform seams that are inert in the browser build, plus one protocol-public file (assetlinks). **The private distribution repo** holds everything store-shaped: the Bubblewrap TWA project, the Capacitor iOS project, CI workflows, fastlane config, store listings and privacy answers, the version ledger, and (later, gated) monetization artifacts.
 
 The private repo never vendors game source. Its CI checks out the public repo at the ref named in a tracked one-line `PUBLIC_REF` file (tag or commit SHA) and builds it, so the pin is declarative and every pin bump is a reviewable commit the version ledger cross-checks. A fork of this public repo cannot be made private on GitHub (fork visibility follows the public upstream), and the alternatives lose to this shape: a full-history mirror needs permanent sync care and blurs the public/private separation this repo exists to enforce, and a git submodule buys the same declarative pin at the cost of recursive-checkout plumbing for source the wrapper builds but never edits. If the monetization phase (E4 gate) ever decides on private game-code changes, a mirror can be created in minutes at that point (MIT permits it any time); nothing is lost by not carrying one until then. Note the sync question dissolves under this topology: Android is always current because the TWA renders the live site, and iOS is pinned on purpose so store builds stay reproducible snapshots.
 
 ```
-verticopolis-mobile/
+private-distribution-repo/
   README.md                  what lives here and why; pointer to the public repo
   PUBLIC_REF                 one line: the public tag/SHA iOS builds pin to
   _bmad-output/              mirrors the public convention for private artifacts

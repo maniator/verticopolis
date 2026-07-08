@@ -26,7 +26,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `_bmad-output/planning-artifacts/prds/prd-mobile-distribution-2026-07-08/prd.md`
   and its paired arch/epics docs.
 - Wrapper projects, store configs, CI signing, and anything monetization-shaped live
-  in the **private `maniator/verticopolis-mobile` repo**, never here. Two
+  in the **private distribution repo**, never here. Two
   protocol-public exceptions (PRD N2): `src/public/.well-known/assetlinks.json` and
   the Android application ID it names.
 - Public-repo mobile work is limited to platform seams (`src/platform/` port, PWA

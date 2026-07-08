@@ -39,7 +39,7 @@ The core fantasy is unchanged (build and run a living tower). The distribution p
 
 1. Android ships first as a TWA built with Bubblewrap against https://verticopolis.com. Capacitor Android is deliberately deferred and only revisited if TWA limits bite (offline bundling, native export, Play Billing).
 2. iOS ships as a Capacitor wrapper with the web assets bundled (not loaded remotely), built and signed entirely on GitHub Actions macOS runners. No local Mac is assumed anywhere in the pipeline.
-3. A private repo (maniator/verticopolis-mobile) holds the wrapper projects, store configs, CI workflows, and all later monetization material. The public MIT repo stays free of store identifiers and monetization content. One public exception: `/.well-known/assetlinks.json` served from verticopolis.com, which is public by protocol design.
+3. A private distribution repo holds the wrapper projects, store configs, CI workflows, and all later monetization material. The public MIT repo stays free of store identifiers and monetization content. One public exception: `/.well-known/assetlinks.json` served from verticopolis.com, which is public by protocol design.
 4. Monetization is a separate, later phase (strategy first, private repo only, user sign-off gate before any implementation).
 
 ## Target Players & Market

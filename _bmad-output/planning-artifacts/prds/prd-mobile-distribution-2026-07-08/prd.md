@@ -19,7 +19,7 @@ Package the existing Verticopolis web game (live at https://verticopolis.com) fo
 The work spans two repositories:
 
 - **Public** (`maniator/verticopolis`, MIT): small web-side seams that make the game behave correctly inside native shells, plus assetlinks hosting. All changes are no-ops in the plain browser build.
-- **Private** (`maniator/verticopolis-mobile`): the TWA and Capacitor wrapper projects, store configuration, CI pipelines, signing material references, and all later monetization content.
+- **Private** (the distribution repo): the TWA and Capacitor wrapper projects, store configuration, CI pipelines, signing material references, and all later monetization content.
 
 ## Player Journeys
 
@@ -86,7 +86,7 @@ Feature: **Versioning**
 
 ## Human Checkpoints (out of agent scope)
 
-1. Create the private repo `maniator/verticopolis-mobile` (this project's agent sessions lacked repository-creation permission; the owner creates it, then grants the sessions access).
+1. Create the private distribution repo (this project's agent sessions lacked repository-creation permission; the owner creates it, then grants the sessions access).
 2. Google Play Console account ($25 one-time) and app record; first manual AAB upload.
 3. Apple Developer Program membership ($99/year), App Store Connect app record, distribution certificate, provisioning profile, and App Store Connect API key.
 4. Provisioning all CI secrets listed in the architecture doc.

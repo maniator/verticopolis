@@ -11,7 +11,7 @@ note: >
   design content, see the PRD decision log). Each public-repo story is its own
   PR: quality gates (typecheck/lint/test/build) + the review skill named per
   story + package.json version bump per CLAUDE.md. E2/E3 stories live in the
-  private maniator/verticopolis-mobile repo; same story-per-PR discipline.
+  private distribution repo; same story-per-PR discipline.
   Acceptance criteria cite PRD requirement IDs; this file is the sequencing +
   change map.
 ---
@@ -21,7 +21,7 @@ note: >
 **Merge order:** Public stream: E1a → E1b → E1c → E1d (E1d ends by tagging main, the repo's first release tag; E3 pins to it). Android stream, independent of E1a-E1c: E2a → app record + Play App Signing enrollment (user checkpoint) → E2b → E2c → E2d. iOS stream, after the E1d tag: E3a → E3b → E3c → E3d. E2 and E3 run in parallel.
 The TWA renders the live site and consumes none of E1a-E1c, so E2a can start immediately; E2b waits for the Play-provided signing fingerprint, which only exists after the app record and Play App Signing enrollment (arch §4). iOS consumes all of E1.
 
-**Repo split:** E1 = public `maniator/verticopolis`. E2, E3, E4 = private `maniator/verticopolis-mobile` (E2b is a public-repo PR driven by the E2 stream). E4 is a strategy gate, not an implementation epic.
+**Repo split:** E1 = public `maniator/verticopolis`. E2, E3, E4 = the private distribution repo (E2b is a public-repo PR driven by the E2 stream). E4 is a strategy gate, not an implementation epic.
 
 ---
 
