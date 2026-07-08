@@ -32,8 +32,10 @@ export interface PlatformPort {
    *  share/save flow in a native shell. */
   saveFile(filename: string, contents: string, mime: string): Promise<void>;
   /** Open a URL outside the game, so a native shell can hand it to the system
-   *  browser instead of navigating its WebView away. */
-  openExternal(url: string): void;
+   *  browser instead of navigating its WebView away. May return a Promise
+   *  (Capacitor's Browser.open does); the game folds a rejection into the
+   *  same browser fallback as a synchronous throw. */
+  openExternal(url: string): void | Promise<void>;
 }
 
 declare global {

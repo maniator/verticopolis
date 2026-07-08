@@ -126,4 +126,5 @@ Claude Code agent session (branch claude/mobile-app-init-ukdxq1)
 ## Change Log
 
 - 2026-07-08: E1a platform port implemented; all quality gates green; status → review (pending /gds-code-review in this session).
+- 2026-07-08: Codex PR review (2 findings): fixed the async openExternal gap (a Promise-returning wrapper hook that rejects after preventDefault now reaches the same window.open fallback as a sync throw; contract widened to `void | Promise<void>`); its second finding (propagate saveFile failure past exportGame's success toast) matches the review deferral already in the backlog and stays deferred to E3b.
 - 2026-07-08: /gds-code-review ran (3 layers): 11 patch findings fixed (hardened saveFile failure handling kept synchronous, guarded duck-check, malformed-injection diagnostic, openExternal fallback + auxclick routing, contract tightening in types.ts, direct downloadFile tests, test hygiene, em-dash cleanup), 2 deferred to the backlog (native export feedback → E3b; native-mode plumbing verification → E1c), 4 dismissed. Gates re-run green; platform files at 100% coverage; status → done.

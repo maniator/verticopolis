@@ -891,15 +891,21 @@ export class UI {
     // middle-click and context-menu semantics untouched.
     if (getPlatform().isNativeWrapper) {
       const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
+      const fallback = (err: unknown) => {
+        // The default is already cancelled; a failing wrapper hook must not
+        // leave the link dead, so fall back to the browser behavior.
+        console.error("[platform] openExternal failed:", err);
+        window.open(report.href, "_blank", "noopener,noreferrer");
+      };
       const routeExternal = (e: Event) => {
         e.preventDefault();
+        // Promise.resolve folds an async wrapper hook's rejection (Capacitor's
+        // Browser.open returns a Promise) into the same fallback as a sync
+        // throw; either way the tap must still open the page somewhere.
         try {
-          getPlatform().openExternal(report.href);
+          void Promise.resolve(getPlatform().openExternal(report.href)).catch(fallback);
         } catch (err) {
-          // The default is already cancelled; a throwing wrapper hook must
-          // not leave the link dead, so fall back to the browser behavior.
-          console.error("[platform] openExternal failed:", err);
-          window.open(report.href, "_blank", "noopener,noreferrer");
+          fallback(err);
         }
       };
       report.addEventListener("click", routeExternal);

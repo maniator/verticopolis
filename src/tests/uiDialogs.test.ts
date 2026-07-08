@@ -589,6 +589,23 @@ describe("showHelp — the Report an issue link", () => {
     expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer");
   });
 
+  it("falls back to window.open when an async openExternal rejects (Capacitor-style Promise hook)", async () => {
+    // A Promise-returning wrapper hook (Browser.open) that rejects after
+    // preventDefault must reach the same fallback as a sync throw.
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal: () => Promise.reject(new Error("browser plugin failed")),
+    });
+    vi.spyOn(console, "error").mockImplementation(() => {});
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const { ui } = makeUI();
+    ui.showHelp();
+    const link = dialog().querySelector<HTMLAnchorElement>(`a[href="${CHOOSER}"]`)!;
+    link.dispatchEvent(new MouseEvent("click", { cancelable: true }));
+    await vi.waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer"));
+  });
+
   it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {
     const { ui } = makeUI();
     ui.showHelp();
