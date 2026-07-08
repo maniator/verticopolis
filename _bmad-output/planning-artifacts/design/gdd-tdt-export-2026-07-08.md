@@ -1,4 +1,4 @@
-# Export to SimTower (1994) — .vctower → .TDT — Design Spec
+# Export to SimTower (1994): .vctower → .TDT Design Spec
 **Verticopolis** · Game design (GDS) · grounded in shipped source (`src/storage/tdtFormat.ts`, `src/storage/tdtImport.ts`, `src/ui/UI.ts`, `docs/canon/tdt-format.md`)
 
 status: ready-for-dev
@@ -54,9 +54,9 @@ file either loads in the real game or it doesn't.
 - Choosing "For SimTower (1994)…" opens the **reverse fidelity modal** (same
   `openModal` chrome as the import report): facts up top (tower name, star,
   funds after rounding, floors), then two lists:
-  - **"Comes along"** — rooms and their occupancy/hotel states, transports with
+  - **"Comes along"**: rooms and their occupancy/hotel states, transports with
     per-floor stop settings, funds, the clock, your star rating.
-  - **"Stays behind"** — custom room names; the income ledger and finance
+  - **"Stays behind"**: custom room names; the income ledger and finance
     history; exact rents (snapped to 1994's four classes); cents-level money
     (rounded to $100 steps); people in transit (the crowd re-simulates);
     satisfaction detail.
