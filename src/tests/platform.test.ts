@@ -93,6 +93,9 @@ describe("getPlatform: boot-time resolution", () => {
 
 describe("browserPlatform: the pre-port export behavior, byte for byte", () => {
   afterEach(() => {
+    // Unconditional: a mid-test assertion failure must not leak fake timers
+    // (or destroyed URL statics) into the rest of the file.
+    vi.useRealTimers();
     vi.restoreAllMocks();
     delete (URL as { createObjectURL?: unknown }).createObjectURL;
     delete (URL as { revokeObjectURL?: unknown }).revokeObjectURL;
@@ -128,5 +131,16 @@ describe("browserPlatform: the pre-port export behavior, byte for byte", () => {
     const open = vi.spyOn(window, "open").mockImplementation(() => null);
     browserPlatform.openExternal("https://example.com/");
     expect(open).toHaveBeenCalledExactlyOnceWith("https://example.com/", "_blank", "noopener,noreferrer");
+  });
+
+  it("openExternal refuses non-http(s) URLs instead of opening them", () => {
+    // The seam must never become a javascript:/file: gadget.
+    const open = vi.spyOn(window, "open").mockImplementation(() => null);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    browserPlatform.openExternal("javascript:alert(1)");
+    browserPlatform.openExternal("file:///etc/passwd");
+    browserPlatform.openExternal("not a url");
+    expect(open).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(3);
   });
 });

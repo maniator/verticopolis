@@ -20,6 +20,19 @@ export const browserPlatform: PlatformPort = {
   },
 
   openExternal(url: string): void {
+    // The game only passes absolute http(s) URLs (the types.ts contract);
+    // refuse anything else so this seam can never become a javascript:/file:
+    // gadget if a future call site ever feeds it an untrusted string.
+    let scheme = "";
+    try {
+      scheme = new URL(url).protocol;
+    } catch {
+      // Not an absolute URL; falls through to the refusal below.
+    }
+    if (scheme !== "http:" && scheme !== "https:") {
+      console.warn("[platform] openExternal refused a non-http(s) URL");
+      return;
+    }
     window.open(url, "_blank", "noopener,noreferrer");
   },
 };
