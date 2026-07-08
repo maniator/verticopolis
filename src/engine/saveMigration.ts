@@ -81,7 +81,7 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // v1 → v2: re-lay each floor's rooms at their canon (post-E1b) widths (the
   // segment-parity reflow). Runs for any v1 save; new saves stamp v2 and skip it.
   if (migrated.version === 1) migrated = upgradeV1toV2(migrated);
-  // v2 → v3: v3 marks the sparse-unit format — new writes may omit unit fields
+  // v2 → v3: v3 marks the sparse-unit format: new writes may omit unit fields
   // that sit at the loader defaults (see serializeUnit in Simulation.ts). Old
   // saves are already the full shape, so the hop only re-stamps the version;
   // deserialize's fallback table reads both shapes identically.
@@ -237,7 +237,9 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     if (!u || !isStruct(u.kind)) continue;
     const f = Math.round(Number(u.floor));
     const x0 = Math.round(Number(u.x));
-    const w0 = Math.round(Number(u.width));
+    // Same width-1 structural fallback the sibling readers use, so a sparse
+    // tile still contributes its column to the support envelope.
+    const w0 = Math.round(Number(u.width ?? 1));
     if (!Number.isFinite(f) || !Number.isFinite(x0) || !Number.isFinite(w0)) continue;
     for (let i = 0; i < w0; i++) origStruct.add(`${f}:${x0 + i}`);
   }

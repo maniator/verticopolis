@@ -10,9 +10,9 @@ import type { SerializedGame } from "../engine/types";
  *
  * localStorage values are DEFLATE-compressed (see {@link STORE_MAGIC}): a real
  * late-game tower is hundreds of KB of JSON even in the sparse v3 unit shape,
- * which — across the autosave slot plus three manual slots — would crowd the
- * ~5MB localStorage quota and risk a failed save on a
- * large tower. Compressed, each is a few tens of KB. The compression is
+ * and across the autosave slot plus three manual slots the raw JSON would
+ * crowd the ~5MB localStorage quota and risk a failed save on a large tower.
+ * Compressed, each slot lands around 100-120KB. The compression is
  * synchronous (fflate) on purpose: saving happens at boot, on a timer, and —
  * critically — right before a reload in the crash-recovery / update paths,
  * where an async write could be interrupted mid-flush and lose the tower. (The

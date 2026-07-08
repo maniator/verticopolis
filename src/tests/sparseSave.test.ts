@@ -47,7 +47,11 @@ function sampleSim(): Simulation {
   const place = (kind: Parameters<Simulation["tower"]["place"]>[0], floor: number, x: number) => {
     const res = sim.tower.place(kind, floor, x);
     if (!res.ok) throw new Error(`place ${kind} failed: ${res.reason}`);
-    return sim.tower.units[sim.tower.units.length - 1];
+    // Look the unit up by identity, never by insertion order, so the helper
+    // stays correct if place() ever pads or sorts the unit list.
+    const placed = sim.tower.units.find((u) => u.kind === kind && u.floor === floor && u.x === x);
+    if (!placed) throw new Error(`placed ${kind} not found at ${floor}:${x}`);
+    return placed;
   };
   for (let i = 0; i < 16; i++) place("lobby", 1, 207 + i); // widen the seeded ground strip
   for (let i = 0; i < 56; i++) place("floor", 2, 167 + i);
@@ -77,6 +81,15 @@ describe("sparse v3 unit serialization", () => {
     const sim = sampleSim();
     const tile = sim.serialize().units.find((u) => u.kind === "floor")!;
     expect(Object.keys(tile).sort()).toEqual(["floor", "id", "kind", "x"]);
+  });
+
+  it("pins floor and lobby catalog width to 1 (sparse saves omit width relying on it)", () => {
+    // serializeUnit omits width for width-1 floor/lobby tiles and deserialize
+    // restores it from the catalog. Changing either catalog width would re-lay
+    // every existing sparse save, so the edit must fail here first and ship
+    // with its own migration.
+    expect(FACILITIES.floor.width).toBe(1);
+    expect(FACILITIES.lobby.width).toBe(1);
   });
 
   it("keeps width on rooms even at catalog width (widths are tuning that drifts)", () => {

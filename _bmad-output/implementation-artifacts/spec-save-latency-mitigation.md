@@ -60,13 +60,14 @@ The REAL 12,975-unit player save (`towerone_6.vctower`, the reflow golden fixtur
 | JSON.stringify, sparse units | 4.36 ms | 692,130 |
 | hand-rolled schema stringifier, full shape | 10.48 ms | 2,089,254 |
 | deflateSync L6 on full JSON | 35.12 ms | 98,958 |
+| deflateSync L6 on sparse JSON | 21.20 ms | 86,555 |
 | deflateSync L1 on sparse JSON | 7.32 ms | 87,227 |
 | end-to-end sync save, full + L6 (shipped before) | 48.33 ms | 131,949 |
 | end-to-end sync save, sparse + L1 (shipped now) | 16.43 ms | 116,309 |
 | native CompressionStream on full JSON | 28.21 ms | 95,662 |
 | native CompressionStream on sparse JSON | 16.28 ms | 85,128 |
 
-Findings the numbers forced: replacing `JSON.stringify` with a schema stringifier of the same shape is a loss (the bytes are the cost, not the stringifier); omitting loader-default fields cuts the JSON to 33% with zero round-trip mismatches; sparseness is what makes level-1 deflate viable (+0.8% size for a third of the cost, versus +12.7% on the full shape).
+Findings the numbers forced: replacing `JSON.stringify` with a schema stringifier of the same shape is a loss (the cost lives in the byte volume rather than in the stringifier); omitting loader-default fields cuts the JSON to 33% with zero round-trip mismatches; sparseness is what makes level-1 deflate viable (+0.8% size for a third of the cost, versus +12.7% on the full shape).
 
 ## Code Map
 
@@ -79,3 +80,16 @@ Findings the numbers forced: replacing `JSON.stringify` with a schema stringifie
 - Storage tests: `src/tests/storage.test.ts`
 - Sparse-format tests: `src/tests/sparseSave.test.ts`
 - Controller tests: `src/tests/gameControllersCoverage.test.ts`
+
+### Review Findings (bmad-code-review, 2026-07-08, sparse-v3 commit)
+
+Layers: Blind Hunter (12 raised), Edge Case Hunter (0 raised, boundaries verified in-repo), Acceptance Auditor (ACs 1-10 pass, 5 raised). Triage: 6 patch (all applied same session), 0 decision-needed, 0 defer, 11 dismissed with code evidence.
+
+- [x] [Review][Patch] serializeUnit could silently drop a future optional Unit field [src/engine/Simulation.ts] (fixed: rest-destructure exhaustiveness guard fails compilation until a new field joins the omit table)
+- [x] [Review][Patch] floor/lobby omitted width restores from the catalog, so a catalog drift would silently re-lay sparse saves [src/engine/Simulation.ts] (fixed: writer also requires FACILITIES width 1, and a canon test pins floor/lobby width to 1)
+- [x] [Review][Patch] reflow support-envelope builder skipped a width-less structural tile instead of defaulting to 1 [src/engine/saveMigration.ts] (fixed: same `?? 1` fallback as the sibling readers)
+- [x] [Review][Patch] stale "few tens of KB" size claim in the SaveGame header, and a new em-dash in the v2-to-v3 comment plus new prose [src/storage/SaveGame.ts, src/engine/saveMigration.ts, backlog, spec, decision log] (fixed: sizes updated, em-dashes and the emphatic-restatement wording removed)
+- [x] [Review][Patch] benchmark evidence table lacked the deflateSync L6 sparse row the level-1 claim compares against [spec] (fixed: row added)
+- [x] [Review][Patch] test helper assumed place() appends the new unit last [src/tests/sparseSave.test.ts] (fixed: looks the unit up by kind/floor/x)
+
+Dismissed with evidence, highlights: negative `state` checks elsewhere all read live Tower.units, never serialized data; the reflow room path already routes an undefined width to passthrough via its Number.isFinite guard; saveTo serializes internally so no full-shape payload can reach the level-1 writer; v3 never shipped full-shape in a release (introduced on this same unmerged branch); the drift-guard test compares sparse and full shapes through the real deserialize, not through a copied table; level-1 output is ordinary raw DEFLATE and never crosses the .vctower native-stream seam; package version was already bumped earlier on this branch.

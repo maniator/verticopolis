@@ -2286,21 +2286,32 @@ export class Simulation implements SimContext {
  * definitionally stable. Rooms always persist their width.
  */
 export function serializeUnit(u: Unit): SerializedUnit {
-  const out: SerializedUnit = { id: u.id, kind: u.kind, floor: u.floor, x: u.x };
-  if (!(u.width === 1 && (u.kind === "floor" || u.kind === "lobby"))) out.width = u.width;
-  if (u.state !== "empty") out.state = u.state;
-  if (u.satisfaction !== 1) out.satisfaction = u.satisfaction;
-  if (u.occupants !== 0) out.occupants = u.occupants;
-  if (u.everOccupied) out.everOccupied = true;
-  if (u.pendingIncome !== 0) out.pendingIncome = u.pendingIncome;
+  // Destructure every known Unit field. The rest must type as empty: when a
+  // future field is added to Unit, `unhandled` stops satisfying
+  // Record<string, never> and this fails to compile, forcing the new field
+  // into the omit table below instead of silently vanishing from saves.
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, completeAt, ...unhandled } = u;
+  const exhaustive: Record<string, never> = unhandled;
+  void exhaustive;
+  const out: SerializedUnit = { id, kind, floor, x };
+  // The catalog-width check makes the omission stop (new saves turn dense
+  // again) if floor/lobby ever left width 1, and the canon test pinning those
+  // widths to 1 turns any such catalog edit into a visible CI failure instead
+  // of a silent re-lay of existing sparse saves.
+  if (!(width === 1 && FACILITIES[kind].width === 1 && (kind === "floor" || kind === "lobby"))) out.width = width;
+  if (state !== "empty") out.state = state;
+  if (satisfaction !== 1) out.satisfaction = satisfaction;
+  if (occupants !== 0) out.occupants = occupants;
+  if (everOccupied) out.everOccupied = true;
+  if (pendingIncome !== 0) out.pendingIncome = pendingIncome;
   // A default label picking up a future catalog rename on load is intended:
   // these labels are cosmetic. Tenant-named units never match and stay written.
-  if (u.label !== FACILITIES[u.kind].name) out.label = u.label;
-  if (u.residents !== undefined) out.residents = u.residents;
-  if (u.rent !== undefined) out.rent = u.rent;
-  if (u.vacateReason !== undefined) out.vacateReason = u.vacateReason;
-  if (u.vacateAt !== undefined) out.vacateAt = u.vacateAt;
-  if (u.filmPolicy !== undefined) out.filmPolicy = u.filmPolicy;
-  if (u.completeAt !== undefined) out.completeAt = u.completeAt;
+  if (label !== FACILITIES[kind].name) out.label = label;
+  if (residents !== undefined) out.residents = residents;
+  if (rent !== undefined) out.rent = rent;
+  if (vacateReason !== undefined) out.vacateReason = vacateReason;
+  if (vacateAt !== undefined) out.vacateAt = vacateAt;
+  if (filmPolicy !== undefined) out.filmPolicy = filmPolicy;
+  if (completeAt !== undefined) out.completeAt = completeAt;
   return out;
 }
