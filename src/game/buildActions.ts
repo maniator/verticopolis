@@ -115,6 +115,27 @@ export class BuildActions {
   }
 
   /**
+   * Open a paint gesture at the press point, matching what a desktop click
+   * lays: floor/lobby stamp the full {@link brushTiles} strip (the touch paths
+   * used to seed a single 1-wide tile here, so phones built one brick at a
+   * time), while parking keeps its single-module seed. Either way the run
+   * anchors at the stamp, so a following drag extends from it with no gap.
+   */
+  seedPaint(kind: FacilityKind, tile: number, floor: number): void {
+    if (kind === "floor" || kind === "lobby") {
+      this.paintBrush(kind, tile, floor); // records the run anchor itself
+      return;
+    }
+    // snapX (not clampTile) so a wide unit's footprint stays on-lot: a tap at
+    // the right edge left-shifts to fit instead of silently failing off-lot.
+    // Loud, like the desktop press it mirrors: a tap deserves the build sfx
+    // and the refusal toast. Drag steps stay quiet in paintFloorRun.
+    const seedX = snapX(kind, tile);
+    this.tryBuild(kind, floor, seedX);
+    this.paint = { tile: seedX, floor };
+  }
+
+  /**
    * Paint a continuous floor/lobby run as the pointer drags, filling every cell
    * between the last painted tile and this one — so dragging lays one long floor
    * (as in the original) instead of scattered slabs when the drag moves fast.

@@ -12,6 +12,7 @@ import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import { buildTdt } from "./fixtures/tdtBuilder";
 import { BuildActions } from "../game/buildActions";
+import { brushTiles } from "../ui/placement";
 import { EditorActions } from "../game/editorActions";
 import { SaveLoad } from "../game/saveLoad";
 import { InspectorController } from "../game/inspector";
@@ -124,6 +125,48 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     expect(sim.tower.structureKindAt(4, 14)).toBeUndefined();
   });
 
+  it("seedPaint stamps the full brush strip for floor/lobby, so a touch tap matches a desktop click", () => {
+    // A touch tap used to seed a single 1-wide tile here while a desktop click
+    // laid the whole brush strip, so phones built one brick at a time.
+    build.seedPaint("floor", 20, 3);
+    for (const x of brushTiles(20)) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
+    const strip = brushTiles(20);
+    expect(sim.tower.structureKindAt(3, strip[0] - 1)).toBeUndefined();
+    expect(sim.tower.structureKindAt(3, last(strip) + 1)).toBeUndefined();
+    // The stamp anchors the run: a drag extends from the strip with no gap.
+    build.paintFloorRun("floor", last(strip) + 3, 3);
+    for (let x = last(strip) + 1; x <= last(strip) + 3; x++) {
+      expect(sim.tower.structureKindAt(3, x)).toBe("floor");
+    }
+    // Lobby taps stamp the same strip (extending the ground lobby sideways).
+    // The left boundary can't leak here: every tile left of the stamp is the
+    // fixture's pre-built ground lobby, so only the right edge is assertable.
+    build.clearPaint();
+    const lobbyStrip = brushTiles(32);
+    build.seedPaint("lobby", 32, 1);
+    for (const x of lobbyStrip) expect(sim.tower.structureKindAt(1, x)).toBe("lobby");
+    expect(sim.tower.structureKindAt(1, last(lobbyStrip) + 1)).toBeUndefined();
+  });
+
+  it("seedPaint keeps parking's single-module seed and anchors the chain for the drag", () => {
+    sim.star = 3; // parking unlocks at 3★
+    sim.money = 1e9;
+    for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, x); // a basement floor (B1) to build on
+    build.seedPaint("parking", 6, 0);
+    const seeded = sim.tower.units.filter((u) => u.kind === "parking");
+    expect(seeded).toHaveLength(1);
+    expect(seeded[0].x).toBe(6); // the seed lands where the tap pointed
+    // The seed recorded the run anchor: the drag chains flush from it.
+    build.paintFloorRun("parking", 34, 0);
+    const w = FACILITIES.parking.width;
+    const xs = sim.tower.units
+      .filter((u) => u.kind === "parking")
+      .map((u) => u.x)
+      .sort((a, b) => a - b);
+    expect(xs.length).toBeGreaterThan(1);
+    for (let i = 1; i < xs.length; i++) expect(xs[i] - xs[i - 1]).toBe(w);
+  });
+
   it("paintFloorRun chains parking into contiguous spaces (canon drag-to-lay a chain)", () => {
     sim.star = 3; // parking unlocks at 3★
     sim.money = 1e9;
@@ -149,7 +192,8 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     for (let x = 0; x < W; x++) sim.tower.place("floor", 0, x);
     // A tap at the very last column: a width-4 parking footprint would run off
     // the lot with a raw clamp and silently fail; snapX left-shifts it to fit.
-    build.paintFloorRun("parking", W - 1, 0);
+    // Taps commit through seedPaint (the gesture-opening placement).
+    build.seedPaint("parking", W - 1, 0);
     const p = sim.tower.units.find((u) => u.kind === "parking");
     expect(p).toBeDefined();
     expect(p!.x + p!.width).toBeLessThanOrEqual(W); // the whole footprint is on-lot
