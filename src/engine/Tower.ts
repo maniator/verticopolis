@@ -78,6 +78,12 @@ export class Tower {
    *  is O(1). Used to keep express-elevator stops synced with sky lobbies as they
    *  are built or removed, regardless of the order relative to the elevator. */
   private lobbyTiles = new Map<number, number>();
+  /** floor → number of NON-lobby tiles on it: plain floor tiles plus every
+   *  tile a room's footprint covers on this story (a multi-story facility
+   *  contributes to each of its stories). Mirror of `lobbyTiles`, kept live by
+   *  register/unregister/reindex so `floorHasNonLobbyContent` is O(1) on every
+   *  hover-preview frame. */
+  private nonLobbyTiles = new Map<number, number>();
 
   private key(floor: number, x: number): string {
     return `${floor}:${x}`;
@@ -192,6 +198,12 @@ export class Tower {
         map.set(k, unit.id);
         if (structural) this.structKind.set(k, unit.kind as "floor" | "lobby");
       }
+      // Non-lobby tile counter (mirror of lobbyTiles). A plain floor tile is
+      // non-lobby; a room's every-story footprint is non-lobby; a lobby is not.
+      if (unit.kind !== "lobby") {
+        const story = unit.floor + fl;
+        this.nonLobbyTiles.set(story, (this.nonLobbyTiles.get(story) ?? 0) + unit.width);
+      }
     }
     if (unit.kind === "lobby") {
       this.lobbyTiles.set(unit.floor, (this.lobbyTiles.get(unit.floor) ?? 0) + unit.width);
@@ -209,6 +221,12 @@ export class Tower {
         map.delete(k);
         if (structural) this.structKind.delete(k);
       }
+      if (unit.kind !== "lobby") {
+        const story = unit.floor + fl;
+        const left = (this.nonLobbyTiles.get(story) ?? 0) - unit.width;
+        if (left > 0) this.nonLobbyTiles.set(story, left);
+        else this.nonLobbyTiles.delete(story);
+      }
     }
     if (unit.kind === "lobby") {
       const left = (this.lobbyTiles.get(unit.floor) ?? 0) - unit.width;
@@ -223,6 +241,7 @@ export class Tower {
     this.rooms.clear();
     this.byId.clear();
     this.lobbyTiles.clear();
+    this.nonLobbyTiles.clear();
     for (const u of this.units) this.register(u);
     // Deserialize bulk-assigns `this.transports` before calling reindex, so
     // rebuild the transport index (and drop any stale stop lists) here too.
@@ -960,16 +979,10 @@ export class Tower {
   /** Does this floor carry any non-lobby content: a plain floor tile, or any
    *  room whose footprint (including a multi-story facility's upper story)
    *  covers this floor? Used by the sky-lobby-commit check to refuse a lobby
-   *  placement on a story that already carries something else. O(GRID.width)
-   *  via the per-tile `structKind`/`rooms` indexes so the check stays cheap on
-   *  every hover-preview frame, regardless of tower size. */
+   *  placement on a story that already carries something else. O(1) via the
+   *  `nonLobbyTiles` counter, which register/unregister keep in lockstep. */
   floorHasNonLobbyContent(floor: number): boolean {
-    for (let x = 0; x < GRID.width; x++) {
-      const k = this.key(floor, x);
-      if (this.structKind.get(k) === "floor") return true;
-      if (this.rooms.has(k)) return true;
-    }
-    return false;
+    return (this.nonLobbyTiles.get(floor) ?? 0) > 0;
   }
 
   /**
