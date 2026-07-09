@@ -40,6 +40,17 @@ corner, but visually quiet so the eye locks onto the grand side.
 
 ## Detection (derived, no state)
 
+> **NOTE (2026-07-09): the detection rules below are the ORIGINAL 1-tile
+> design. They were superseded during implementation by two follow-up
+> `bmad-party-mode` sessions that widened the grand entrance to a 2-tile
+> storefront (with a compact 1-tile fallback for narrow lobbies) and
+> re-anchored the predicate to CONTIGUOUS RUNS, not global lobby extent, so
+> mid-lobby gaps can't orphan a half-facade. The as-shipped rules live in
+> `TowerEngine.refreshFloor1EntranceMap` and `TowerEngine.floor1EntranceKind`
+> (`src/render/excalibur/TowerEngine.ts`). Read them for the canonical
+> behavior; the text below is preserved as design history.**
+
+
 Both variants are chosen from tower geometry, at render time, in the same place
 `lobbyVariant(x)` already lives. Floor 1 only. Predicate, in priority order:
 
