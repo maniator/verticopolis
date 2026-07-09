@@ -960,17 +960,14 @@ export class Tower {
   /** Does this floor carry any non-lobby content: a plain floor tile, or any
    *  room whose footprint (including a multi-story facility's upper story)
    *  covers this floor? Used by the sky-lobby-commit check to refuse a lobby
-   *  placement on a story that already carries something else. Scan is O(n)
-   *  over units on this floor, unavoidable for a legacy save with rooms whose
-   *  footprint starts on a different story. */
+   *  placement on a story that already carries something else. O(GRID.width)
+   *  via the per-tile `structKind`/`rooms` indexes so the check stays cheap on
+   *  every hover-preview frame, regardless of tower size. */
   floorHasNonLobbyContent(floor: number): boolean {
-    for (const u of this.units) {
-      if (isStructural(u.kind)) {
-        if (u.kind === "floor" && u.floor === floor) return true;
-      } else {
-        const hgt = facilityFloors(u.kind);
-        if (u.floor <= floor && u.floor + hgt - 1 >= floor) return true;
-      }
+    for (let x = 0; x < GRID.width; x++) {
+      const k = this.key(floor, x);
+      if (this.structKind.get(k) === "floor") return true;
+      if (this.rooms.has(k)) return true;
     }
     return false;
   }

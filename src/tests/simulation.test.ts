@@ -1037,6 +1037,30 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     expect(r.reason).toBe("Sky lobbies are concourses. Only lobby tiles go here.");
   });
 
+  it("refuses a single-story room on a claimed sky-lobby floor", () => {
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 14);
+    sim.star = 5;
+    sim.buildTransport("elevatorStandard", x0 + 20, 1, 15);
+    expect(sim.build("lobby", 15, x0).ok).toBe(true); // claim floor 15
+    const r = sim.build("office", 15, x0 + 20); // single-story room on the claimed story
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("This room would sit on a sky lobby. Move it up or down a story.");
+  });
+
+  it("refuses a multi-story room whose span crosses a claimed sky-lobby floor", () => {
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 14);
+    sim.star = 5; // unlock cinema
+    sim.buildTransport("elevatorStandard", x0 + 20, 1, 15);
+    expect(sim.build("lobby", 15, x0).ok).toBe(true); // claim floor 15
+    // Cinema is 2 stories tall (footprint spans floor+0 and floor+1). Placing
+    // it at floor 14 would put its upper story on the claimed floor 15.
+    const r = sim.build("cinema", 14, x0 + 5);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("This room would sit on a sky lobby. Move it up or down a story.");
+  });
+
   it("refuses a sky lobby on a floor that already carries rooms", () => {
     const sim = Simulation.newGame(7);
     const x0 = towerToFloor(sim, 15); // includes plain floor on 15, no rooms yet
