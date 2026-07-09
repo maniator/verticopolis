@@ -54,7 +54,7 @@ variable-width; walk, don't seek. Unconfirmed fields are flagged.
 | 0x14 | u16 | tick | Time of day in ticks, 0–2599 (see §3) |
 | 0x16 | i32 | currentDay | Signed; rolls over at 11,987 (999 years, §3 calendar) |
 | 0x1C | u16 | lobbyHeight | Ground lobby height, 1–3 stories [TD] |
-| 0x26 | 2×u16 | window position | Saved viewport X, Y |
+| 0x26 | 2×u16 | window position | Saved viewport X, Y (exporter writes the New Tower default 1105, 3491 so a load opens on the ground lobby, not the top-left sky) |
 | 0x2A | u16 | recyclingCount | Total recycling centers [TD] |
 | 0x2E | u16 | commercialCount | Shops + restaurants + fast food [TD] |
 | 0x30 | u16 | securityCount | Max 10 [TD] |
@@ -179,6 +179,14 @@ retained temporarily [TD]), current floor (negative ⇒ outside [OS]), and a
 **condo = 3, office = 6**, fast food = 48 (**workers + customers**, never a
 census figure; our census counts occupants only).
 
+> **Writer note (harness-confirmed).** The game rebuilds the live crowd on load,
+> so the record *bytes* need no real content, but a **populated** tower must
+> carry a **nonzero count** here or the game faults reading its people block
+> ("file is already open, or damaged"). An **empty** tower is fine at count 0.
+> Our exporter writes the tower's resident/worker census with that many
+> zero-filled records. Verified by forcing a real save's people count to 0
+> (crashes) versus keeping the count and zeroing every record (loads).
+
 ## 7. Commercial (retail) table
 
 A fixed **512-slot** table (18 bytes each; floor byte `0xFF` ⇒ empty slot):
@@ -200,27 +208,67 @@ final byte, §4.)
 
 **24 entries** (confirming the single 24-shaft pool shared by standard +
 service + express; see `POOLED_CAPS` in `src/engine/facilities.ts`). Each entry:
-a **194-byte header**: in-use flag; type (0 = express, 1 = standard,
-2 = service); **car capacity (express 42, standard 21, service 10)**; car count
-1–8 (confirming `MAX_CARS` 8); a 56-byte schedule block (per-day-type car
-schedules); visibility; horizontal position; top/bottom floor; a 120-byte
-serviced-floors bitmap (per-floor stop configuration!); and 8 per-car home
-floors. Built shafts append: an unknown 480-byte block; two 120-byte floor
-structures; **324-byte per-floor entries** (waiting-up/down counts + up to
-40 queued person indices each way); and **348-byte per-car entries** (current
-floor, passenger count, turnaround floor, up to 42 passenger indices, their
-destination floors, and per-floor destination counts).
+a **194-byte header** (byte layout: `used` u8 @0; `type` u8 @1; capacity byte
+@2; `cars` u8 @3; 56-byte schedule block @4; visibility + reserved @60; `x` u16
+@62; `topFloor` u8 @64; `bottomFloor` u8 @65; 120-byte serviced-floors bitmap
+@66; 8 per-car home floors @186). Fields: in-use flag; type (0 = express,
+1 = standard, 2 = service); a **capacity byte**; car count 1–8 (confirming
+`MAX_CARS` 8); the per-day-type car schedule block; visibility; horizontal
+position; top/bottom floor; the serviced-floors bitmap (per-floor stop
+configuration!); and the 8 per-car home floors. Built shafts append a fixed
+**3,140-byte block** (see the measured note below), then **324-byte per-floor
+entries** (per serviced floor: waiting-up/down counts + up to 40 queued person
+indices each way), then **348-byte per-car entries** (per car: current floor,
+passenger count, turnaround floor, up to 42 passenger indices, their destination
+floors, and per-floor destination counts). So one built shaft's record stride is
+`194 + 3140 + 324 * servicedFloors + 348 * cars`.
 
-> **Resolved (v1.9.5):** all three car capacities now match the save (express
-> 42, standard 21, service 10). Service was an uncited 16; it was lowered to the
-> canon 10 via the review process, and `src/tests/canon.test.ts` pins all three.
+> **Measured (Verticopolis RE, tools/simtower round-trip vs the real 1994 game):**
+> the fixed appended block is **3,140 bytes**, not the 480 + 2 * 120 = 720 this
+> doc previously estimated. Walking the three shafts in a real save (my_tower.TDT)
+> with the 720 figure desynced the table after the first shaft and forced the
+> importer to synthesize fake elevators; the 3,140 figure reproduces every
+> shaft's exact file offset (`src/storage/tdtFormat.ts` `TDT_ELEVATOR_BUILT_FIXED`).
+> **The `type` byte @1 is the authoritative kind signal, NOT the capacity byte
+> @2:** in that save a service shaft (type = 2) carried a capacity byte of 21
+> (the standard value, not service's 10), so the capacity byte is unreliable for
+> the kind. The importer reads kind from `type` and takes per-car capacity from
+> the engine's canon table (`transportCarCapacity`), not from byte 2.
+
+> **Resolved (v1.9.5):** the canon per-car capacities are express 42, standard
+> 21, service 10 (`src/tests/canon.test.ts` pins all three). Note the on-disk
+> capacity byte @2 does not reliably carry these per kind (see the measured note),
+> so we do not read the kind from it.
+
+> **Writer note (harness-confirmed).** The 56-byte schedule block @4 is
+> load-bearing on export: the game dispatches cars from it, and a **zero-filled**
+> block reads as "run no cars", so an exported shaft loads with **no cars** and
+> traps everyone. Every built shaft in a sampled real save carried the identical
+> default block **`0x01`×14, `0x05`×14, `0x00`×28**; the exporter emits that
+> (`TDT_ELEVATOR_SCHEDULE_DEFAULT`) so exported shafts run. The precise per-hour
+> WD/WE scheduling model (the elevator editor strip) is a separate feature; see
+> the backlog's `elevator-scheduling`.
 
 ### Stairs / escalators
 
-A fixed **64-entry** table (10 bytes each: built flag, type, left tile, floor,
-people-up count, people-down count), confirming the shared 64-link walkway
-pool. **Type field [TD]:** 0 = escalator, 1 = stairs, 2/3 = two-story
-escalator/stairs, 4/5 = three-story escalator/stairs.
+A fixed **64-entry** table (10 bytes each: built flag u8, type u8, left tile
+u16, floor u16, people-up count u16, people-down count u16), confirming the
+shared 64-link walkway pool. **Type field [TD]:** 0 = escalator, 1 = stairs,
+2/3 = two-story escalator/stairs, 4/5 = three-story escalator/stairs. The game
+packs the built flights into the table's **high slots** (a real save with 6
+flights held them in slots ~58–63), so a reader must scan all 64 slots, not stop
+at the first empty one.
+
+> **Located by signature, not by offset (Verticopolis RE):** the blocks between
+> the elevator table and this stairs table (the finance block §9 and the
+> parking/lobby region §10+) are not yet pinned down across saves. In a real save
+> the stairs table sat **436 bytes before** the offset we got by summing
+> finance (132) + parking (1,026), so the old arithmetic read zeros and lost
+> every flight. `src/storage/tdtFormat.ts` `locateStairs` now finds the table by
+> scanning from the end of the elevator table for the 64-record window (empty or
+> in-range built) that holds the most flights. Finance is still read at its known
+> size (its last i32 carries the tower population total), but the stairs no
+> longer depend on landing exactly after the parking block.
 
 > **Canon question for review:** the format *supports* 2–3-story walkway
 > variants; neither source says whether the shipped game ever creates them. Our
@@ -246,6 +294,17 @@ Max stalls: **512**.
 elevator bitmask (bit N ⇒ elevator N serves this lobby) and the lobby's floor.
 Lobbies observed at in-game floors 1, 15, 30, 45, 60, 75, 90: the canon
 15-floor sky-lobby ladder (§4's floor-mapping proof).
+
+> **Writer note (harness-confirmed).** The game reads a fixed trailing region
+> here after the stairs table; if the file ends early (as our exporter used to,
+> right after the stairs table) it reads past EOF and page-faults (0x0799). The
+> exporter now emits this region **`0xFF`-filled** (the empty-slot sentinel) out
+> to `TDT_ROUTING_TAIL_SIZE`: zero-filling instead is read as live routing data
+> and invents a phantom population, while `0xFF` reads as "all slots empty" so
+> the game rebuilds reachability from the floor map. Blanking this whole region
+> to `0xFF` in a real save still loads, so its live content is not required on
+> read; only its presence and size are. The exact per-tower size for larger
+> (3★+) towers is not yet pinned; see the backlog's `tdt-export-routing-tail`.
 
 ## 12. Named tenants / people
 

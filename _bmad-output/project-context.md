@@ -101,7 +101,11 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   a missing bump on a player-facing change is a review finding.
 - **Deep adversarial review is MANDATORY and runs in the SAME session that writes the
   code, and it means actually invoking `/gds-code-review` (gameplay/engine) or
-  `/bmad-code-review` (everything else, incl. storage/persistence/tooling/UI plumbing).**
+  `/bmad-code-review` (everything else, incl. storage/persistence/tooling/UI plumbing).
+  TDT / save round-trip work (`src/storage/tdt*`, save import/export) routes to
+  `/gds-code-review` despite being storage-mechanism: its correctness is
+  engine-data fidelity (population census, elevator/transport behavior,
+  floor/lobby/view mapping); run both if it also carries a big tooling/UI surface.**
   Its parallel layers (Blind Hunter → Edge Case Hunter → Acceptance Auditor → triage)
   ARE the deep review; a self-read or a generic `/code-review` does not count. Run it
   before pushing, or immediately after opening/updating the PR. Never defer to "before
