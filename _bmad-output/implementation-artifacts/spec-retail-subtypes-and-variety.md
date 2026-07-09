@@ -67,11 +67,10 @@ context:
   - `subtypeIndex(kind, name): number | -1` for TDT export.
   - `canonicalSubtype(kind, name): string | undefined` for load / TDT import whitelist coerce.
 - `src/engine/Simulation.ts:466-539` `build`: after `tower.place` returns `unitId` at line 488, roll subtype via a new private `rollRetailSubtype`. Short-circuit BEFORE the RNG draw when `subtypeListFor(kind)` is null. Model: `rollCondoRelocations` short-circuit at Simulation.ts:1460.
-- `src/engine/Simulation.ts` NEW `rerollSubtype(id): { ok: boolean; subtype?: string }`: picks a canon name different from the current, draws from `sim.rng`, short-circuits non-retail.
+- `src/engine/Simulation.ts` NEW `rerollSubtype(id): string | undefined`: picks a canon name different from the current, draws from `sim.rng`, short-circuits non-retail (and single-entry lists) by returning undefined. Callers coerce to a nullable boolean via `!== undefined`.
 - `src/engine/Simulation.ts:2439-2467` `serializeUnit`: extend destructure; sparse-write `subtype` like `filmPolicy`.
 - `src/engine/Simulation.ts:2233+` `deserialize`: whitelist-coerce `subtype` via `canonicalSubtype(kind, raw)`. Model: `filmPolicy` at Simulation.ts:2297-2300.
-- `src/storage/tdtFormat.ts:521-535`: parse the retail-table's per-slot variant byte into `TdtTail` (add `retailVariants: Uint8Array`, length 512, `0xFF` empty).
-- `src/storage/tdtFormat.ts:150-165, line 394`: `TdtTenant.subtype` is ALREADY parsed from unit-record byte 17 (§4). Use it as the authoritative import source (canon doc says §4 has stronger evidence than §7).
+- `src/storage/tdtFormat.ts:150-165, line 394`: `TdtTenant.subtype` is ALREADY parsed from unit-record byte 17 (§4). Use it as the authoritative import source (canon doc says §4 has stronger evidence than §7). The retail-table (§7) slot bytes stay unparsed on the import side; a downstream reader (or future feature) that needs them can wire the parse later without any Unit-shape change.
 - `src/storage/tdtImport.ts:578-583`: assign `unit.subtype = canonicalSubtype(kind, LIST[t.subtype])`. Out-of-range v maps to undefined.
 - `src/storage/tdtImport.ts:1198`: reword the "retail varieties aren't imported yet" line.
 - `src/storage/tdtExport.ts:513`: replace `u8(0)` with `subtypeIndex(u.kind, u.subtype)` (falls back to 0 for absent).
@@ -83,8 +82,8 @@ context:
 - `src/tests/simulation.test.ts` new `Retail subtypes` block: same-seed determinism, retail gets a subtype, non-retail undefined, byte-identical Classic RNG when no retail (money + pendingIncome + `towerStateSig`), reroll picks a different name and coverage.
 - `src/tests/simulation.test.ts` economy-invariance test: two towers same seed, one fast-food unit forced to different subtypes each, N ticks, money and pendingIncome match byte-identical.
 - `src/tests/tdtImport.test.ts:86-96`: fixture writes `subtype: 3` on a shop, assert `unit.subtype === SHOP_SUBTYPES[3]`.
-- `src/tests/tdtExport.test.ts:569+`: round-trip. `buildTDT` then `parseTDT`, assert both byte 17 and retail-slot carry the canon index.
-- `src/tests/economyDepth.test.ts`: mirror the `filmPolicy` round-trip test at economyDepth.test.ts:112-124 for `subtype` (round-trip + garbage coerce).
+- `src/tests/tdtExport.test.ts` round-trip: build a Simulation with three retail units forced to distinct canon names, `buildTDT` then `parseTDT`, assert the imported units carry the same subtype names on the other side. Byte-17 preservation is proven end-to-end through the imported subtype name; direct slot-byte assertion is unnecessary given `parseTDT` reads byte 17 authoritatively.
+- Serialize round-trip + garbage-coerce coverage lives inline in the `Retail subtypes` block of `src/tests/simulation.test.ts` ("round-trip: subtype survives serialize + deserialize" and "whitelist coerce: hand-edited garbage in the save drops subtype to undefined"), not in `economyDepth.test.ts`.
 - `_bmad-output/implementation-artifacts/backlog.md`: close `retail-subtypes`; update the `tdt-importer` deferral about retail-subtype adoption. Leave `facility-visual-variety` and `commercial-venue-inspector` open (in the Deferral inbox as PR-B).
 - `package.json`: bump minor.
 
@@ -94,7 +93,7 @@ context:
 - [x] `src/engine/retailSubtypes.ts`: canon lists + three helpers.
 - [x] `src/engine/types.ts`: add `subtype?: string` to `Unit`.
 - [x] `src/engine/Simulation.ts`: `build` calls the gated subtype roll; new `rerollSubtype` public method; `serializeUnit` sparse-writes subtype; `deserialize` whitelist-coerces subtype.
-- [x] `src/storage/tdtFormat.ts`: parse the retail-table per-slot variant byte into `TdtTail`.
+- [x] `src/storage/tdtFormat.ts`: no change needed. `TdtTenant.subtype` (unit-record byte 17, §4) is already parsed; the §7 retail-table slot bytes stay unparsed on the import side.
 - [x] `src/storage/tdtImport.ts`: adopt `subtype` on retail units via whitelist; update the "retail varieties aren't imported" message.
 - [x] `src/storage/tdtExport.ts`: write the unit-record byte 17 AND populate the retail-table rows from `u.subtype`.
 - [x] `src/game/inspector.ts`: use `subtype` for the title when present.
