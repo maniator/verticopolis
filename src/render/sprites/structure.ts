@@ -394,12 +394,14 @@ export function drawAwning(ctx: CanvasRenderingContext2D, side: "left" | "right"
   const archP = 6; // pixels per arch
   // The canopy is filled solid from the gilded top rail down to a bottom edge
   // that swings through a row of arches (a classic scalloped valance). Each
-  // column drops to `arch`, the semicircular dip of the scallop it sits in, so
-  // the fringe reads as arches rather than one straight line.
+  // column drops to `arch`, the semicircular dip of the scallop it sits in;
+  // dividing by `archP - 1` (not `archP`) forces each scallop to close back to
+  // 0 on its rightmost column, so consecutive arches meet flush at 0 instead of
+  // stair-stepping through a `~archR/2` seam.
   for (let cx = 0; cx < w; cx++) {
     const t = cx / (w - 1);
     const top = topY + Math.round(t * topDrop);
-    const arch = Math.round(Math.sin((Math.PI * (cx % archP)) / archP) * archR);
+    const arch = Math.round(Math.sin((Math.PI * (cx % archP)) / (archP - 1)) * archR);
     const base = top + bodyH; // flat underside of the solid body
     const bottom = base + arch; // ...dipping through the scallop
     ctx.fillStyle = green; // solid fill
