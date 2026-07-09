@@ -188,6 +188,7 @@ describe("transport, crane & event sprites paint", () => {
     const ctx = (lit: boolean, anim: number): DrawCtx => ({ ctx: null as unknown as CanvasRenderingContext2D, lit, anim, hour: lit ? 20 : 12 });
     const grand = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
     const grandLeft = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-left", 0, 0, 11, 34));
+    const grandSolo = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-solo", 0, 0, 11, 34));
     const service = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "service", 0, 0, 11, 34));
     const grandDay = bake((c) => drawLobbyEntrance({ ...ctx(false, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
     // Draw a normal variant-0 lobby tile via drawUnit for comparison.
@@ -199,11 +200,16 @@ describe("transport, crane & event sprites paint", () => {
     // Both entrance tiles paint, and they don't collapse to the same sprite.
     expect(grand.painted()).toBe(true);
     expect(grandLeft.painted()).toBe(true);
+    expect(grandSolo.painted()).toBe(true);
     expect(service.painted()).toBe(true);
     expect(grand.sig()).not.toBe(service.sig());
     // The two slices of the wide storefront are different halves of the same
     // facade; they must not collapse to the same sprite.
     expect(grand.sig()).not.toBe(grandLeft.sig());
+    // The compact 1-tile fallback is its own recipe; must not collapse into
+    // either slice of the wide storefront.
+    expect(grandSolo.sig()).not.toBe(grand.sig());
+    expect(grandSolo.sig()).not.toBe(grandLeft.sig());
     // Neither entrance duplicates the plain lobby variant.
     expect(grand.sig()).not.toBe(normal.sig());
     expect(service.sig()).not.toBe(normal.sig());

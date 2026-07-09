@@ -436,11 +436,13 @@ export class TowerEngine {
   /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
    *  because it has no motion of its own. */
   private entranceServiceGfx!: ex.Canvas[];
-  /** Floor-1 lobby extent (leftmost tile x, one past rightmost tile x), or null
-   *  when no floor-1 lobby exists. Refreshed at the top of every {@link
-   *  syncScene} sweep so the entrance-variant predicate (grand / service /
-   *  variant) always sees an extent as fresh as the units it's about to render. */
-  private floor1LobbyExtent: { min: number; max: number } | null = null;
+  /** Per-tile entrance kind for the floor-1 lobby, refreshed at the top of
+   *  every {@link syncScene} sweep. Keyed by grid x; absent x means the tile
+   *  takes its slot from the normal 4-variant cycle. Recomputed from the
+   *  tower's floor-1 lobby tiles by walking their CONTIGUOUS runs so a gap in
+   *  the middle of the lobby (mid-remodel bulldoze) can't orphan a grand-left
+   *  half-facade with no grand-right neighbor. */
+  private floor1EntranceMap: Map<number, "grand-left" | "grand-right" | "grand-solo" | "service"> = new Map();
   /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
   private escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
   /** Ground-floor entrance awnings, baked per side. They stand in for the fire
@@ -1437,11 +1439,11 @@ export class TowerEngine {
 
   private syncScene(): void {
     const tower = this.sim.tower;
-    // Refresh the floor-1 lobby extent BEFORE the unit loop that will call
-    // addStruct / lobbyTileGfx: those consumers need to see an extent as fresh
-    // as the tiles they're about to bake, so a newly-placed leftmost tile
-    // picks up the grand-entrance graphic on the same frame it's added.
-    this.refreshFloor1LobbyExtent();
+    // Refresh the floor-1 entrance map BEFORE the unit loop that will call
+    // addStruct / lobbyTileGfx: those consumers need to see a map as fresh as
+    // the tiles they're about to bake, so a newly-placed leftmost tile picks
+    // up the grand-entrance graphic on the same frame it's added.
+    this.refreshFloor1EntranceMap();
     // Fresh flood-fill (not cached — it depends on unit state); read ONCE here
     // per sync. A parking space absent from this set is "dead" and gets a red X.
     // The dead-bit joins the room signature, so a connectivity flip triggers a
@@ -1681,59 +1683,68 @@ export class TowerEngine {
   }
 
   /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
-   *  as. Derived, not stored: reads {@link floor1LobbyExtent}, recomputed at
-   *  the top of each {@link syncScene} so this always sees an extent as fresh
-   *  as the tiles the sync is about to render.
-   *
-   *  The wide grand entrance spans two adjacent tiles at the left frontage
-   *  edge (`grand-left` at `e.min`, `grand-right` at `e.min + 1`), giving a
-   *  22-pixel-wide storefront that reads as a real hotel facade. When the
-   *  lobby is only one tile wide, we fall back to a compact 1-tile grand
-   *  (`grand-solo`) — a toy tower doesn't get the full storefront.
-   *
-   *  The service entrance sits at `e.max - 1`, but ONLY if the lobby is wide
-   *  enough to have room past the grand span (so a 1- or 2-tile lobby is all
-   *  grand, no service).
-   *
-   *  Rules:
-   *    - lobby width 1: `e.min` -> grand-solo, no service.
-   *    - lobby width 2: `e.min` -> grand-left, `e.min+1` -> grand-right.
-   *    - lobby width ≥ 3: `e.min` -> grand-left, `e.min+1` -> grand-right,
-   *      `e.max-1` -> service, everything between -> normal variant cycle. */
+   *  as. A plain lookup in the per-tile map computed by
+   *  {@link refreshFloor1EntranceMap} at the top of every syncScene. */
   private floor1EntranceKind(x: number): "grand-left" | "grand-right" | "grand-solo" | "service" | "none" {
-    const ext = this.floor1LobbyExtent;
-    if (!ext) return "none";
-    const width = ext.max - ext.min;
-    const offset = x - ext.min;
-    // Wide grand takes 2 tiles when there's room; compact grand takes 1.
-    if (width >= 2) {
-      if (offset === 0) return "grand-left";
-      if (offset === 1) return "grand-right";
-    } else if (offset === 0) {
-      return "grand-solo";
-    }
-    // Service only when the lobby is wider than the grand span it sits next to.
-    const grandSpan = width >= 2 ? 2 : 1;
-    if (width > grandSpan && x === ext.max - 1) return "service";
-    return "none";
+    return this.floor1EntranceMap.get(x) ?? "none";
   }
 
-  /** Re-scan floor-1 lobby units for the frontage extent, so
-   *  {@link floor1EntranceVariant} sees the current shape. Runs at the top of
-   *  {@link syncScene}, one linear pass, only when structural revision changed
-   *  (the same gate `syncScene` itself uses), so it stays off the per-frame
-   *  path. */
-  private refreshFloor1LobbyExtent(): void {
-    let min = Infinity;
-    let max = -Infinity;
+  /** Walk the tower's floor-1 lobby tiles, group them into contiguous runs,
+   *  and stamp the grand entrance onto the LEFTMOST run and the service door
+   *  onto the RIGHTMOST run. Populating a per-tile map (rather than checking
+   *  global min/max) keeps every entrance sprite anchored to real neighboring
+   *  tiles, so a gap in the middle of the lobby (mid-remodel bulldoze) cannot
+   *  produce an orphan grand-left half-facade with nothing next to it.
+   *
+   *  Rules:
+   *    - Leftmost run of width ≥ 2: `runStart` -> grand-left, `runStart+1` -> grand-right.
+   *    - Leftmost run of width 1 (toy tower): `runStart` -> grand-solo.
+   *    - Rightmost run of width > grand span: rightmost tile -> service.
+   *    - Rightmost run is the same as the leftmost run: only place service if
+   *      the run has room past the grand span (so 1/2-tile lobbies are all
+   *      grand, no service). */
+  private refreshFloor1EntranceMap(): void {
+    this.floor1EntranceMap.clear();
+    // Collect every floor-1 lobby tile position (lobby units are always
+    // width 1 in the sim, but reading u.width for defense costs nothing).
+    const tiles: number[] = [];
     for (const u of this.sim.tower.units) {
       if (u.kind === "lobby" && u.floor === 1) {
-        if (u.x < min) min = u.x;
-        const right = u.x + u.width;
-        if (right > max) max = right;
+        for (let dx = 0; dx < u.width; dx++) tiles.push(u.x + dx);
       }
     }
-    this.floor1LobbyExtent = min < max ? { min, max } : null;
+    if (tiles.length === 0) return;
+    tiles.sort((a, b) => a - b);
+    // Find the leftmost and rightmost contiguous runs. Both come from the same
+    // sorted list; a single pass locates the first run's end and the last
+    // run's start.
+    let firstRunEnd = 0;
+    while (firstRunEnd + 1 < tiles.length && tiles[firstRunEnd + 1] === tiles[firstRunEnd] + 1) {
+      firstRunEnd++;
+    }
+    let lastRunStart = tiles.length - 1;
+    while (lastRunStart > 0 && tiles[lastRunStart - 1] === tiles[lastRunStart] - 1) {
+      lastRunStart--;
+    }
+    const firstStart = tiles[0];
+    const firstEnd = tiles[firstRunEnd] + 1; // exclusive
+    const firstWidth = firstEnd - firstStart;
+    // Grand entrance on the leftmost run.
+    if (firstWidth >= 2) {
+      this.floor1EntranceMap.set(firstStart, "grand-left");
+      this.floor1EntranceMap.set(firstStart + 1, "grand-right");
+    } else {
+      this.floor1EntranceMap.set(firstStart, "grand-solo");
+    }
+    // Service door on the rightmost run's rightmost tile, but only if that
+    // tile isn't already claimed by the grand entrance.
+    const lastRightX = tiles[tiles.length - 1];
+    const grandSpan = firstWidth >= 2 ? 2 : 1;
+    const sameRunAsFirst = lastRunStart <= firstRunEnd;
+    const roomPastGrand = sameRunAsFirst ? firstWidth > grandSpan : true;
+    if (roomPastGrand && !this.floor1EntranceMap.has(lastRightX)) {
+      this.floor1EntranceMap.set(lastRightX, "service");
+    }
   }
 
   /** Build and retain a room actor. `animated` (burning / under construction:

@@ -372,9 +372,7 @@ function drawGrandFacadeRightInterior(
   }
   ctx.fillStyle = doorGlow;
   ctx.fillRect(doorLeftL, glassTop, doorRightR - doorLeftL + 1, glassBot - glassTop);
-  // Door leaves: subtle glass tint over the glow, split by a gold rail.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(splitX, glassTop, 1, glassBot - glassTop); // (temporary; overwritten by gold split below)
+  // Gold split rail between the two door leaves.
   ctx.fillStyle = goldTrim;
   ctx.fillRect(splitX, glassTop, 1, glassBot - glassTop);
   // Door jambs / frame between doors and glass.
@@ -395,20 +393,31 @@ function drawGrandFacadeRightInterior(
   // this slice bakes with cache: false. Positioned inside the right glass
   // panel, standing on the carpet visible through the window. Green tunic and
   // gold trim echo the marquee overhead.
+  drawDoorman(ctx, glassPanelL, y + h - 4, anim);
+}
+
+/** The green-and-gold doorman as a small pixel figure with a two-frame idle
+ *  sway keyed to `anim`. Head + hat + torso shift one pixel between frames;
+ *  shoes stay planted so it reads as "shifting weight," not "the whole figure
+ *  slides." All rects are ≤ 2 wide and sit inside `[baseX, baseX+2]`, so the
+ *  doorman never overpaints the tile's outer frame at the right edge. */
+function drawDoorman(ctx: CanvasRenderingContext2D, baseX: number, feetY: number, anim: number): void {
   const swayRight = Math.floor(anim / 1.5) % 2 === 0;
-  const dmX = glassPanelL + 1 + (swayRight ? 0 : 1);
-  const feetY = y + h - 4;
+  const bodyX = baseX + (swayRight ? 0 : 1);
+  const feetX = baseX;
   const green = "#234b39";
+  const hatDark = "#173324";
   const gold = "#c9a94c";
+  ctx.fillStyle = hatDark; // hat cap (dark green so it reads distinct from the tunic)
+  ctx.fillRect(bodyX, feetY - 9, 2, 1);
   ctx.fillStyle = "#e0c39b"; // head/face
-  ctx.fillRect(dmX, feetY - 8, 2, 2);
-  ctx.fillStyle = green;
-  ctx.fillRect(dmX - 1, feetY - 9, 4, 1); // hat brim
-  ctx.fillRect(dmX, feetY - 6, 2, 4); // torso
-  ctx.fillStyle = gold;
-  ctx.fillRect(dmX, feetY - 6, 2, 1); // collar
-  ctx.fillStyle = "#1a1512";
-  ctx.fillRect(dmX, feetY - 2, 2, 2); // shoes
+  ctx.fillRect(bodyX, feetY - 8, 2, 2);
+  ctx.fillStyle = green; // torso
+  ctx.fillRect(bodyX, feetY - 6, 2, 4);
+  ctx.fillStyle = gold; // collar/cuffs trim across the top of the torso
+  ctx.fillRect(bodyX, feetY - 6, 2, 1);
+  ctx.fillStyle = "#1a1512"; // shoes stay planted on the carpet
+  ctx.fillRect(feetX, feetY - 2, 2, 2);
 }
 
 /**
@@ -475,27 +484,11 @@ function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h: number
   // at the base of the doors, so the carpet visibly meets the threshold.
   ctx.fillStyle = "#a3243c";
   ctx.fillRect(glassL - 1, y + h - 5, glassR - glassL + 3, 1);
-  // Doorman just outside the right jamb, green torso and gold trim so he
-  // reads as staff of the same building the marquee dresses. The sway is a
-  // one-pixel horizontal shift on a 3-second cycle (two 1.5-second frames);
-  // subtle enough not to distract, alive enough to earn its keep.
-  const swayRight = Math.floor(anim / 1.5) % 2 === 0;
-  const dmX = frameR + 2 + (swayRight ? 0 : 1);
-  // Doorman stands ON the floor row, same one the door sill lands on, so his
-  // shoes plant on the same ground plane the door meets. Any higher and he
-  // floats above the carpet like the door used to.
-  const feetY = y + h - 4;
-  const green = "#234b39";
-  const gold = "#c9a94c";
-  ctx.fillStyle = "#e0c39b"; // head/face
-  ctx.fillRect(dmX, feetY - 8, 2, 2);
-  ctx.fillStyle = green; // hat brim + torso
-  ctx.fillRect(dmX - 1, feetY - 9, 4, 1);
-  ctx.fillRect(dmX, feetY - 6, 2, 4);
-  ctx.fillStyle = gold; // collar/cuffs trim
-  ctx.fillRect(dmX, feetY - 6, 2, 1);
-  ctx.fillStyle = "#1a1512"; // shoes
-  ctx.fillRect(dmX, feetY - 2, 2, 2);
+  // Doorman just outside the right jamb, sharing the wide grand's recipe so
+  // both forms feel like the same figure. baseX = frameR + 1 puts him one
+  // pixel outside the door frame, and drawDoorman's 2-wide sprite fits inside
+  // the remaining 3 pixels of tile without clipping on either sway frame.
+  drawDoorman(ctx, frameR + 1, y + h - 4, anim);
 }
 
 /**
