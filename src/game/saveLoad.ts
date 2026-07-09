@@ -1,5 +1,6 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode } from "../engine/types";
+import type { CalendarKind } from "../engine/calendar";
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import { LegacyExportError, buildTDT } from "../storage/tdtExport";
 import type { BuiltLegacyTower } from "../storage/tdtExport";
@@ -343,10 +344,12 @@ export class SaveLoad {
     });
   }
 
-  /** Found a fresh tower under the chosen rule-set. The mode is baked into the
-   *  new Simulation at creation and is immutable for that tower's life. */
-  newGame(mode: GameMode = "classic"): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode));
+  /** Found a fresh tower under the chosen rule-set. The mode (and, for Modern,
+   *  the calendar choice) is baked into the new Simulation at creation and is
+   *  immutable for that tower's life. Classic always runs the canon calendar, so
+   *  `modernCalendar` is only consulted for Modern. */
+  newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): void {
+    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar));
     this.deps.ui.toast(
       mode === "modern" ? "New Modern tower founded. Good luck!" : "New tower founded. Good luck!",
       "good",

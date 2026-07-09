@@ -4,6 +4,7 @@ import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
 import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
+import type { CalendarKind } from "../engine/calendar";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
@@ -47,7 +48,7 @@ export interface UICallbacks {
   /** The live tower's rules mode, so the export dialog can gate the 1994 path
    *  (Classic only) without serializing the whole tower. */
   getMode(): GameMode;
-  onNew(mode: GameMode): void;
+  onNew(mode: GameMode, modernCalendar: CalendarKind): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
   onRedo(): void;
@@ -220,7 +221,7 @@ export class UI {
     document.getElementById("btn-new")!.addEventListener("click", () => {
       // The toolbar always has a live tower to abandon, so the picker shows its
       // fold-in abandon warning; the mode choice and the confirm are one step.
-      this.newTowerModal({ hasSave: true, onFound: (mode) => this.cb.onNew(mode) });
+      this.newTowerModal({ hasSave: true, onFound: (mode, cal) => this.cb.onNew(mode, cal) });
     });
     document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
@@ -752,7 +753,7 @@ export class UI {
    * dialog so founding is a single, honest confirmation. `onFound` fires only
    * once the player commits; the caller does the actual swap.
    */
-  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode) => void }): void {
+  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind) => void }): void {
     const abandon = opts.hasSave
       ? `<p class="nt-abandon">⚠️ This abandons your current tower (it is not auto-saved).</p>`
       : "";
@@ -778,6 +779,12 @@ export class UI {
            </span>
          </label>
        </div>
+       <div class="nt-calendar">
+         <span class="nt-mode-name">Calendar <span class="nt-badge alt">Modern</span></span>
+         <span class="nt-mode-desc">Classic always runs the authentic compressed 1994 calendar. For Modern, pick the pace:</span>
+         <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="realWorld" checked /> <b>Real-world length</b>: a 7-day week, 90-day quarter and 360-day year, the friendlier pace.</label>
+         <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="canon" /> <b>Short (1994)</b>: a 3-day week, 3-day quarter and 12-day year, the authentic SimTower rhythm.</label>
+       </div>
        ${abandon}
        <div class="modal-actions">
          <button class="btn" data-act="cancel">Cancel</button>
@@ -791,8 +798,18 @@ export class UI {
         found: () => {
           const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
           const mode: GameMode = picked === "modern" ? "modern" : "classic";
+          // The calendar choice only applies to Modern; Classic is always canon,
+          // so a Classic founding pins the harmless default regardless of what
+          // the Modern sub-picker reads. Reading the radio for Classic would let
+          // a curious click persist "canon" on a save that ignores the field,
+          // contradicting the "Classic stores the harmless default" contract.
+          let modernCalendar: CalendarKind = "realWorld";
+          if (mode === "modern") {
+            const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
+            if (pickedCal === "canon") modernCalendar = "canon";
+          }
           this.closeModal();
-          opts.onFound(mode);
+          opts.onFound(mode, modernCalendar);
         },
       },
       { close: false },
@@ -1016,7 +1033,7 @@ export class UI {
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
         <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> below.</li>
-        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Sold condo households also <b>move out on their own</b> now and then, a life event more likely for a bigger family, so you buy the condo back and resell as the tower turns over. It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
+        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Sold condo households also <b>move out on their own</b> now and then, a life event more likely for a bigger family, so you buy the condo back and resell as the tower turns over. It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Modern also lets you pick the <b>calendar</b> when you found the tower: keep the friendlier real-world length (7-day week, 90-day quarter, 360-day year) or run the authentic 1994 compressed calendar (3-day week, 3-day quarter, 12-day year); Classic always runs the compressed one. Whichever you pick, your income per in-game day stays the same, only the cadence changes. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
       <h3>Keyboard play</h3>

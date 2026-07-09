@@ -1,4 +1,5 @@
 import type { SimContext } from "./SimContext";
+import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
@@ -66,10 +67,20 @@ export class EconomySystem {
         count++;
       }
     }
-    if (total > 0) {
-      this.sim.money += total;
-      this.sim.recordMoney?.("offices", total);
-      this.sim.emit(`Quarterly office rent collected: $${total.toLocaleString()} (${count} offices).`, "money");
+    // Income-invariant calendar rescale: rent collects once per quarter, so a
+    // shorter quarter must pay proportionally less to keep a tower's income per
+    // in-game day unchanged. Canon's 3-day quarter pays 3/90 = 1/30 of a
+    // real-world collection, thirty times as often. The divisor is
+    // REAL_WORLD.quarterDays (not a bare 90) so the real-world factor is
+    // structurally exactly 1 (byte-identical) and can't drift if that constant
+    // is ever retuned. Round once on the summed total so per-office rounding
+    // can't accumulate (`total` is a sum of integer rents). See
+    // gdd/arch-classic-calendar-parity-2026-07-08.
+    const collected = Math.round((total * this.sim.clock.calendar.quarterDays) / REAL_WORLD.quarterDays);
+    if (collected > 0) {
+      this.sim.money += collected;
+      this.sim.recordMoney?.("offices", collected);
+      this.sim.emit(`Quarterly office rent collected: $${collected.toLocaleString()} (${count} offices).`, "money");
     }
   }
 
@@ -402,11 +413,24 @@ export class EconomySystem {
     // bookings) are charged against that room's own category so each revenue
     // line reads NET. rec() mirrors every cost into the breakdown as it accrues.
     const rec = (cat: LedgerCat, amount: number) => this.sim.recordMoney?.(cat, -amount);
+    // Income-invariant calendar rescale (mirrors collectRent): maintenance rides
+    // the calendar's period, so a shorter period charges proportionally less to
+    // keep per-in-game-day upkeep unchanged. Canon's 3-day period pays 3/30 =
+    // 1/10, ten times as often; real-world's period is REAL_WORLD.maintPeriodDays
+    // so the factor is structurally exactly 1 (byte-identical), not a bare 30
+    // that could drift from the constant. `charge` rounds per item so `cost`
+    // (money) always equals the sum mirrored into the ledger; every shipped
+    // maintenance constant is a multiple of 10, so the canon 1/10 stays exact.
+    // See gdd/arch-classic-calendar-parity.
+    const scale = this.sim.clock.calendar.maintPeriodDays / REAL_WORLD.maintPeriodDays;
+    const charge = (cat: LedgerCat, raw: number): void => {
+      const a = Math.round(raw * scale);
+      cost += a;
+      rec(cat, a);
+    };
     for (const t of this.sim.tower.transports) {
       if (isElevatorKind(t.kind)) {
-        const c = t.cars * ECON.maintenancePerCarMonthly;
-        cost += c;
-        rec("upkeep", c);
+        charge("upkeep", t.cars * ECON.maintenancePerCarMonthly);
       }
     }
     // The Modern-only economy sinks read through the rule-set, constant for the
@@ -419,17 +443,14 @@ export class EconomySystem {
     for (const u of this.sim.tower.units) {
       const m = ECON.serviceMaintenanceMonthly[u.kind];
       if (m && u.state !== "gutted") {
-        cost += m; // a gutted service room is destroyed — no upkeep
-        rec("upkeep", m);
+        charge("upkeep", m); // a gutted service room is destroyed — no upkeep
       }
       const operational = isOperational(u);
       // Property tax on an unsold condo: a real carrying cost for holding out
       // for a premium sale (scales with the asking price). Modern-only sink;
       // Classic's rate is 0 (the original had no such tax).
       if (taxRate > 0 && u.kind === "condo" && !u.everOccupied && operational) {
-        const tax = Math.ceil(rentOf(u) * taxRate);
-        cost += tax;
-        rec("condos", tax);
+        charge("condos", Math.ceil(rentOf(u) * taxRate));
       }
       // Operating overhead on space HELD (regardless of occupancy/served) — makes
       // a vacant or unserved floor pure carrying cost. Sold condos are exempt:
@@ -437,9 +458,7 @@ export class EconomySystem {
       // drain on them would be punitive rather than a live decision. Modern-only
       // sink; Classic's overhead is 0 (pixel-faithful late-game economy).
       if (overhead > 0 && operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
-        cost += overhead;
-        const cat = ledgerCatFor(u.kind);
-        rec(cat ?? "upkeep", overhead);
+        charge(ledgerCatFor(u.kind) ?? "upkeep", overhead);
       }
       // A cinema books a film each month (canon: 150k average / 300k
       // blockbuster). The player sets a per-cinema policy; only "auto" consumes
@@ -451,13 +470,16 @@ export class EconomySystem {
           policy === "blockbuster" ? true : policy === "feature" ? false : this.sim.rng.chance(0.4);
         const booking = blockbuster ? ECON.cinemaBookingBlockbuster : ECON.cinemaBookingMonthly;
         if (blockbuster) this.blockbusters.add(u.id);
-        cost += booking;
-        rec("entertainment", booking);
+        charge("entertainment", booking);
       }
     }
     if (cost > 0) {
       this.sim.money -= cost;
-      this.sim.emit(`Monthly maintenance paid: $${cost.toLocaleString()}.`, "money");
+      // Real-world's period genuinely is a 30-day month, so it keeps the exact
+      // "Monthly maintenance paid" string (byte-identical). Canon has no month (a
+      // year is 12 days), so it drops the word rather than lie.
+      const monthly = this.sim.clock.calendar.maintPeriodDays === REAL_WORLD.maintPeriodDays;
+      this.sim.emit(`${monthly ? "Monthly maintenance" : "Maintenance"} paid: $${cost.toLocaleString()}.`, "money");
     }
   }
 }
