@@ -357,6 +357,37 @@ export class Tower {
     return reason ? { ok: false, reason } : { ok: true };
   }
 
+  /**
+   * Like {@link canPlace} for a floor/lobby, but does NOT require the tile to be
+   * supported/connected yet. Used to tell a lobby that only fails because it
+   * isn't connected (a detached ground concourse tile) from one that fails for a
+   * real reason (off-lot, wrong floor, overlap), so the auto-lobby bridge can
+   * rescue the former: lay the bridge first and the tile lands connected. Mirrors
+   * {@link canPlaceRoomIgnoringFloor} for the structural side.
+   */
+  canPlaceStructureIgnoringSupport(kind: FacilityKind, floor: number, x: number): PlaceResult {
+    if (!isStructural(kind)) return { ok: false, reason: "Not a structural tile." };
+    const f = FACILITIES[kind];
+    if (floor < GRID.minFloor || floor > GRID.maxFloor) {
+      return { ok: false, reason: "Outside the buildable range." };
+    }
+    if (x < 0 || x + f.width > GRID.width) return { ok: false, reason: "Off the edge of the lot." };
+    if (kind === "lobby" && !isLobbyFloor(floor)) {
+      return { ok: false, reason: "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)." };
+    }
+    if (!this.structureSpanFree(floor, x, f.width)) {
+      // Same in-place floor→lobby upgrade allowance as canPlace: a lobby may sit
+      // on plain floor tiles, anything else is a real collision.
+      if (kind !== "lobby" || !this.spanUpgradeableToLobby(floor, x, f.width)) {
+        return { ok: false, reason: "Structure already here." };
+      }
+      if (!this.roomSpanFree(floor, x, f.width)) {
+        return { ok: false, reason: "Lobbies are transit-only. Clear the rooms here first." };
+      }
+    }
+    return { ok: true };
+  }
+
   /** How many floor tiles under a room's footprint don't yet exist. */
   missingFloorCount(floor: number, x: number, width: number, hgt: number): number {
     let n = 0;
@@ -443,9 +474,9 @@ export class Tower {
    * are scanned bottom-up and lower planned tiles count as support for the one
    * above (both walkways of a stacked pair of cinemas fill, not just the base).
    *
-   * The plan is exactly the set {@link fillBridge} lays once the footprint is in
-   * place (the scan reads only columns outside the footprint, so placing the
-   * footprint can't change it), so a caller can size the charge from its length.
+   * The plan is exactly the set {@link fillBridge} lays: the scan reads only
+   * columns outside the footprint, so laying the footprint (before or after)
+   * can't change it, and a caller can size the charge from its length.
    * Non-mutating.
    */
   bridgeFillPlan(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): { fl: number; x: number }[] {
@@ -497,14 +528,15 @@ export class Tower {
   }
 
   /**
-   * Lay the {@link bridgeFillPlan} tiles for a just-placed room or lobby,
-   * building outward so a ground or basement run (and a multi-story facility's
-   * upper walkway) stays supported as it fills. Must run AFTER the footprint
-   * (the room's own floor, or the lobby tile) is in place, so both ends of each
-   * gap are flanked by structure. Returns the number of tiles actually laid so
-   * the caller can charge for exactly those. The plan is exact, so the retry
-   * loop always drains; a tile only sits out a pass while the lower/adjacent
-   * tile it rests on is being laid, never permanently.
+   * Lay the {@link bridgeFillPlan} tiles for a room or lobby being placed,
+   * building outward from the existing neighbor so a ground or basement run (and
+   * a multi-story facility's upper walkway) stays supported as it fills. Runs
+   * BEFORE the primary is placed, so a detached ground concourse lobby is
+   * connected by the time it lands; rooms and sky lobbies rest on the story
+   * below regardless, so the order is harmless for them. Returns the number of
+   * tiles actually laid so the caller can charge for exactly those. The plan is
+   * exact, so the retry loop always drains; a tile only sits out a pass while the
+   * lower/adjacent tile it rests on is being laid, never permanently.
    */
   fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number {
     const substrate: FacilityKind = kind === "lobby" ? "lobby" : "floor";

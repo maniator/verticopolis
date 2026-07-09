@@ -1,0 +1,126 @@
+import { test, expect } from "@playwright/test";
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
+/**
+ * End-to-end coverage for the auto-floor bridge (backlog `auto-floor-build` (2)):
+ * placing a module through the REAL build controller (`game.build`, the same
+ * BuildActions a click routes through) in the BUILT app fills the floor gap to
+ * its neighbor, charges for the bridge tiles, and refuses an unaffordable run.
+ * This proves the feature survives bundling and the main.ts <-> engine <-> sim
+ * wiring, not just the headless vitest fixture. It complements the exhaustive
+ * unit coverage in src/tests/simulation.test.ts.
+ */
+test.describe("auto-floor bridge between modules (e2e)", () => {
+  test("bridges the gap between two rooms through the real build path, error-free", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+    page.on("console", (m) => {
+      if (m.type() === "error") errors.push(`console.error: ${m.text()}`);
+    });
+
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      const canvas = document.querySelector<HTMLCanvasElement>("#view");
+      return Boolean(g?.sim && g.engine && g.build && canvas && canvas.width > 0 && canvas.height > 0);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    const result = await page.evaluate(() => {
+      const g = (window as any).game;
+      const s = g.sim;
+      const t = s.tower;
+      g.speed = 0; // freeze time so the crowd sim can't churn the setup
+      s.money = 10_000_000;
+      const x0 = Math.floor(g.grid.width / 2) - 20; // over the starter ground lobby
+      // Drive the real build controller (what a click calls), quietly to keep the
+      // no-error assertion clean, not sim.build directly.
+      g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
+      const gapBare = t.structureKindAt(2, x0 + 11); // still empty before B
+      const moneyBeforeB = s.money;
+      g.build.tryBuild("office", 2, x0 + 15, true); // B: [x0+15, x0+24)
+      const gap: (string | undefined)[] = [];
+      for (let i = 9; i < 15; i++) gap.push(t.structureKindAt(2, x0 + i));
+      return {
+        gapBare,
+        gap,
+        bKind: t.unitAt(2, x0 + 15)?.kind,
+        chargedForB: moneyBeforeB - s.money, // office + 9 own floors + 6 bridge floors
+        beyond: t.structureKindAt(2, x0 + 30), // outside the gap, untouched
+      };
+    });
+
+    expect(result.gapBare).toBeUndefined();
+    expect(result.bKind).toBe("office");
+    // The whole six-tile gap between A and B is now plain floor.
+    expect(result.gap).toEqual(["floor", "floor", "floor", "floor", "floor", "floor"]);
+    // Office (40000) + its 9 own floor tiles + the 6 bridge floor tiles (500 each).
+    expect(result.chargedForB).toBe(40000 + (9 + 6) * 500);
+    expect(result.beyond).toBeUndefined();
+
+    // Let the engine render the bridged floors for a few frames; a render throw
+    // would surface as a console error here.
+    await page.waitForTimeout(300);
+    expect(errors).toEqual([]);
+  });
+
+  test("refuses a module when it plus its bridge floor is unaffordable", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      return Boolean(g?.sim && g.build);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    const out = await page.evaluate(() => {
+      const g = (window as any).game;
+      const s = g.sim;
+      const t = s.tower;
+      g.speed = 0;
+      s.money = 10_000_000;
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      g.build.tryBuild("office", 2, x0, true); // neighbor A
+      const cost = s.canBuild("office", 2, x0 + 15).cost; // office + own floors + bridge
+      s.money = cost - 1; // one dollar short of the whole run
+      g.build.tryBuild("office", 2, x0 + 15, true);
+      return {
+        placed: Boolean(t.unitAt(2, x0 + 15)),
+        gapFilled: t.structureKindAt(2, x0 + 11) !== undefined,
+        money: s.money,
+        expectedMoney: cost - 1,
+      };
+    });
+
+    expect(out.placed).toBe(false); // refused as a whole
+    expect(out.gapFilled).toBe(false); // no bridge floor laid
+    expect(out.money).toBe(out.expectedMoney); // nothing charged
+  });
+
+  test("bridges a detached ground concourse lobby with lobby tiles, not floor", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      return Boolean(g?.sim && g.build);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    const out = await page.evaluate(() => {
+      const g = (window as any).game;
+      const s = g.sim;
+      const t = s.tower;
+      g.speed = 0;
+      s.money = 10_000_000;
+      const x0 = Math.floor(g.grid.width / 2) - 20; // starter concourse [x0, x0+40)
+      // Drop a lobby past the concourse edge with a gap; the bridge is what lets a
+      // ground tile that would otherwise float land connected.
+      g.build.tryBuild("lobby", 1, x0 + 45, true);
+      const kinds: (string | undefined)[] = [];
+      for (let i = 40; i <= 45; i++) kinds.push(t.structureKindAt(1, x0 + i));
+      return { kinds };
+    });
+
+    // The gap and the dropped tile are all lobby (matching substrate), no floor.
+    expect(out.kinds).toEqual(["lobby", "lobby", "lobby", "lobby", "lobby", "lobby"]);
+  });
+});

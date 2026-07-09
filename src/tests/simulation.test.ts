@@ -935,4 +935,43 @@ describe("Auto-floor bridge between modules", () => {
       for (let i = 31; i < 34; i++) expect(sim.tower.structureKindAt(fl, x0 + i)).toBe("floor");
     }
   });
+
+  it("bridges a detached ground concourse lobby with lobby tiles", () => {
+    const sim = Simulation.newGame(7); // starter ground lobby spans [x0, x0+40)
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // A ground tile this far from the concourse can't stand alone today; the
+    // lobby bridge is what connects it. Dropped 5 tiles past the concourse edge.
+    expect(sim.tower.structureKindAt(1, x0 + 42)).toBeUndefined(); // gap bare before
+    expect(sim.build("lobby", 1, x0 + 45).ok).toBe(true);
+    // The gap [x0+40, x0+45) fills with LOBBY (not floor), joining the concourse,
+    // and the dropped tile itself is a lobby.
+    for (let i = 40; i <= 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("lobby");
+  });
+
+  it("charges a ground lobby bridge at lobby price and blocks an unaffordable drop", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const can = sim.canBuild("lobby", 1, x0 + 45);
+    // The dropped lobby plus the 5 lobby tiles bridging to the concourse.
+    expect(can.cost).toBe(FACILITIES.lobby.cost * (1 + 5));
+    sim.money = can.cost - 1;
+    expect(sim.build("lobby", 1, x0 + 45).ok).toBe(false); // whole run unaffordable
+    expect(sim.tower.structureKindAt(1, x0 + 42)).toBeUndefined(); // nothing laid
+    expect(sim.money).toBe(can.cost - 1); // nothing charged
+    sim.money = can.cost;
+    expect(sim.build("lobby", 1, x0 + 45).ok).toBe(true);
+    expect(sim.money).toBe(0);
+  });
+
+  it("still refuses a lobby with no reachable lobby neighbor (bridge rescue is narrow)", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Floor 7 is not a lobby floor and has no lobby to bridge to: the rescue must
+    // not fire, so this stays refused (a lobby can't float onto a plain story).
+    expect(sim.build("lobby", 7, x0).ok).toBe(false);
+    expect(sim.tower.structureKindAt(7, x0)).toBeUndefined();
+  });
 });

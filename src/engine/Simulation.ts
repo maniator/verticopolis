@@ -400,12 +400,20 @@ export class Simulation implements SimContext {
     if (!this.isUnlocked(kind)) return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.`, cost: f.cost };
 
     if (!this.isRoomKind(kind)) {
-      const c = this.tower.canPlace(kind, floor, x);
-      if (!c.ok) return { ok: false, reason: c.reason, cost: f.cost };
       // A lobby auto-fills the gap to a neighboring lobby with lobby tiles, so
       // its total charge includes them. A plain floor tool never bridges (empty
       // plan), so this branch only adds cost for the lobby case.
       const bridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, facilityFloors(kind)).length;
+      const c = this.tower.canPlace(kind, floor, x);
+      if (!c.ok) {
+        // Rescue a lobby that fails only because it isn't connected yet: if an
+        // auto-lobby bridge reaches it (bridge > 0 means the fill runs up to the
+        // tile next to it), it lands connected once the bridge is laid. Any other
+        // failure (off-lot, wrong floor, overlap) still refuses.
+        const bridgeable =
+          kind === "lobby" && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
+        if (!bridgeable) return { ok: false, reason: c.reason, cost: f.cost };
+      }
       const cost = f.cost + bridge * FACILITIES.lobby.cost;
       const afford = this.money >= cost;
       return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
@@ -446,13 +454,15 @@ export class Simulation implements SimContext {
       const ef = this.tower.ensureFloorUnder(floor, x, f.width, hgt);
       if (!ef.ok) return { ok: false, reason: ef.reason };
     }
-    const res = this.tower.place(kind, floor, x);
-    if (!res.ok) return { ok: false, reason: res.reason };
-    // With the footprint down, bridge the gap to a neighboring module/lobby.
-    // Runs after placement so both ends of each gap are flanked. Charge only for
-    // tiles actually laid: the plan is exact so this equals can.cost, but
+    // Bridge the gap to a neighboring module/lobby BEFORE placing the primary, so
+    // a detached ground concourse lobby is connected by the time it lands (rooms
+    // and sky lobbies already rest on the story below, so the order is harmless
+    // for them). The fill builds outward from the existing neighbor. Charge only
+    // for tiles actually laid: the plan is exact so this equals can.cost, but
     // reconciling to the real count means a partial fill could never overcharge.
     const laidBridge = this.tower.fillBridge(kind, floor, x, f.width, hgt);
+    const res = this.tower.place(kind, floor, x);
+    if (!res.ok) return { ok: false, reason: res.reason };
     const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
     this.money -= can.cost - (quotedBridge - laidBridge) * substrateCost;
     // Rooms spend time under construction before they can be used.
