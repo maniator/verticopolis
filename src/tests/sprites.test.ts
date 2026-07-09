@@ -7,6 +7,7 @@ import {
   drawCar,
   drawCrane,
   drawEscapeStairs,
+  drawLobbyEntrance,
   craneAnchorTile,
   lobbyVariant,
   LOBBY_VARIANTS,
@@ -176,6 +177,55 @@ describe("transport, crane & event sprites paint", () => {
     expect(awnL.sig()).not.toBe(awnR.sig());
     // The awning is a distinct sprite from the fire escape it stands in for.
     expect(awnL.sig()).not.toBe(esc.sig());
+  });
+
+  it("the grand and service entrance tiles differ from each other and from normal lobby variants", () => {
+    const bake = (fn: (c: CanvasRenderingContext2D) => void) => {
+      const s = spyCtx();
+      fn(s.ctx);
+      return s;
+    };
+    const ctx = (lit: boolean, anim: number): DrawCtx => ({ ctx: null as unknown as CanvasRenderingContext2D, lit, anim, hour: lit ? 20 : 12 });
+    const grand = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
+    const grandLeft = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-left", 0, 0, 11, 34));
+    const grandSolo = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-solo", 0, 0, 11, 34));
+    const service = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "service", 0, 0, 11, 34));
+    const grandDay = bake((c) => drawLobbyEntrance({ ...ctx(false, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
+    // Draw a normal variant-0 lobby tile via drawUnit for comparison.
+    const lobbyUnit: Unit = {
+      id: -1, kind: "lobby", floor: 1, x: 0, width: 1, state: "occupied",
+      satisfaction: 1, occupants: 0, everOccupied: false, pendingIncome: 0, label: "",
+    };
+    const normal = bake((c) => drawUnit({ ...ctx(true, 0), ctx: c }, lobbyUnit, 0, 0, 11, 34));
+    // Both entrance tiles paint, and they don't collapse to the same sprite.
+    expect(grand.painted()).toBe(true);
+    expect(grandLeft.painted()).toBe(true);
+    expect(grandSolo.painted()).toBe(true);
+    expect(service.painted()).toBe(true);
+    expect(grand.sig()).not.toBe(service.sig());
+    // The two slices of the wide storefront are different halves of the same
+    // facade; they must not collapse to the same sprite.
+    expect(grand.sig()).not.toBe(grandLeft.sig());
+    // The compact 1-tile fallback is its own recipe; must not collapse into
+    // either slice of the wide storefront.
+    expect(grandSolo.sig()).not.toBe(grand.sig());
+    expect(grandSolo.sig()).not.toBe(grandLeft.sig());
+    // Neither entrance duplicates the plain lobby variant.
+    expect(grand.sig()).not.toBe(normal.sig());
+    expect(service.sig()).not.toBe(normal.sig());
+    // The grand tile brightens at night, so day and night must differ.
+    expect(grand.sig()).not.toBe(grandDay.sig());
+  });
+
+  it("the grand entrance doorman sway advances with d.anim", () => {
+    const bake = (anim: number) => {
+      const s = spyCtx();
+      drawLobbyEntrance({ ctx: s.ctx, lit: true, anim, hour: 20 }, "grand-right", 0, 0, 11, 34);
+      return s;
+    };
+    // Two frames of the 3-second cycle land at t=0 and t=1.6 (each frame is
+    // 1.5s wide, so anywhere in [0,1.5) is frame A and [1.5, 3.0) is frame B).
+    expect(bake(0).sig()).not.toBe(bake(1.6).sig());
   });
 
   it("event sprites (santa, explosion, thief, treasure, limo) all paint", () => {
