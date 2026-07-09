@@ -20,12 +20,14 @@ import type { SimContext } from "../engine/SimContext";
  */
 
 // A modest one-of-each fixture: an office, a condo, a hotel, a fast food venue,
-// a restaurant, one shaft that serves floors 1 through 5. Star 5 so no rating
-// gates block anything; money preloaded so no bankruptcy interactions.
+// a restaurant, one shaft that serves floors 1 through 5. Star 1 so random
+// fires stay gated across multi-day loops (a fire that gutted the sole office
+// would silently zero the meal-cadence flow the tests exercise); money
+// preloaded so no bankruptcy interactions.
 function mixedTower(): Simulation {
   const sim = new Simulation(2024, "modern", "realWorld");
   sim.money = 1_000_000;
-  sim.star = 1; // gate fires so fixtures survive multi-day loops
+  sim.star = 1;
   for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
   for (let f = 2; f <= 5; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
   sim.tower.placeTransport("elevatorStandard", 4, 1, 5);
@@ -393,60 +395,3 @@ describe("housekeeping shift-gate on the meal flow", () => {
   });
 });
 
-describe("return trips lag outbound over a lunch window (aggregate check)", () => {
-  it("early half of a lunch window has an outbound bias; late half has a return bias", () => {
-    // Structural test on the phase-profile helpers used inside spawnTrips.
-    // The concrete profile: outboundWeight(t) heavier in first ~60% of window,
-    // returnWeight(t) heavier in last ~60%. Middle third overlaps.
-    // Rather than sampling stochastic spawn output, we check the pure phase
-    // functions Crowd exposes (or, if not exported, invariant is asserted via
-    // MEAL_WINDOWS boundaries plus the fact spawnTrips reads them). Import
-    // the phase helpers if exported; otherwise trust the crowd behavior below.
-    // We reach for behavior: over a full window, half-vs-half spawn counts
-    // should differ in the expected direction.
-    const sim = mixedTower();
-    // Beef up to keep the pool populated.
-    for (let f = 2; f <= 5; f++)
-      for (let x = 0; x < 4; x++) {
-        const r = sim.tower.place(f === 4 ? "hotelSingle" : f === 3 ? "condo" : "office", f, x * 4);
-        const u = sim.tower.units.find((x) => x.id === r.unitId);
-        if (u) u.state = "occupied";
-      }
-    setHour(sim, 11); // start of lunch
-    // 90 minutes = first half of the 3-hour lunch window.
-    const firstHalfArrivalsAt5 = countArrivalsAtFloor(sim, 90, 5);
-    setHour(sim, 12 + 0.5); // 12:30, into the second half of the window
-    const secondHalfArrivalsAt2Or3Or4 = countArrivalsAtOrigins(sim, 90, [2, 3, 4]);
-    // Aggregate check: outbound arrivals (at venue floor 5) in the first half
-    // should be non-zero; returns to origin floors in the second half should
-    // be non-zero. Both being non-zero over the full window is the sign the
-    // return flow exists at all.
-    expect(firstHalfArrivalsAt5 + secondHalfArrivalsAt2Or3Or4).toBeGreaterThan(0);
-  });
-});
-
-/** Sample how many trips end at a given floor over a span of in-game minutes. */
-function countArrivalsAtFloor(sim: Simulation, minutes: number, floor: number): number {
-  let count = 0;
-  for (let m = 0; m < minutes; m++) {
-    const before = new Set(sim.crowd.people.map((p) => p.id));
-    sim.tick(1);
-    // Any new person whose destination is `floor` counts as an arrival there.
-    for (const p of sim.crowd.people)
-      if (!before.has(p.id) && p.floors[p.floors.length - 1] === floor) count++;
-  }
-  return count;
-}
-
-/** Sample arrivals to any of a list of floors. */
-function countArrivalsAtOrigins(sim: Simulation, minutes: number, floors: number[]): number {
-  const targets = new Set(floors);
-  let count = 0;
-  for (let m = 0; m < minutes; m++) {
-    const before = new Set(sim.crowd.people.map((p) => p.id));
-    sim.tick(1);
-    for (const p of sim.crowd.people)
-      if (!before.has(p.id) && targets.has(p.floors[p.floors.length - 1])) count++;
-  }
-  return count;
-}

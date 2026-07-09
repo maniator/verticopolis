@@ -423,10 +423,12 @@ export class Crowd {
     const hotelFloors = new Set<number>();
     const staffFloors: { kind: StaffKind; floor: number }[] = [];
     const seenStaff = new Set<string>(); // dedupe kind:floor pairs.
-    const venuesByKind: Partial<Record<FacilityKind, number[]>> = {};
+    // Set per kind so dedupe stays O(1) per unit; a large tower with many
+    // same-kind venues on one floor would otherwise make binning O(units^2).
+    const venuesByKindSet: Partial<Record<FacilityKind, Set<number>>> = {};
     const addVenueByKind = (kind: FacilityKind, floor: number) => {
-      const list = venuesByKind[kind] ?? (venuesByKind[kind] = []);
-      if (!list.includes(floor)) list.push(floor);
+      const set = venuesByKindSet[kind] ?? (venuesByKindSet[kind] = new Set());
+      set.add(floor);
     };
     for (const u of tower.units) {
       // Staff floors read the OPERATIONAL predicate rather than tenant/asleep
@@ -461,6 +463,12 @@ export class Crowd {
         venues.add(u.floor);
         addVenueByKind(u.kind, u.floor);
       }
+    }
+    // Materialize the Sets into insertion-order arrays for the returned bin,
+    // preserving the deterministic `rng.pick` behavior the pool relies on.
+    const venuesByKind: Partial<Record<FacilityKind, number[]>> = {};
+    for (const [kind, set] of Object.entries(venuesByKindSet) as [FacilityKind, Set<number>][]) {
+      if (set) venuesByKind[kind] = [...set];
     }
     return {
       leasedOffices: [...leased],
