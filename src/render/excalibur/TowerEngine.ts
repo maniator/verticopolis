@@ -7,6 +7,8 @@ import {
   CRANE_H,
   CRANE_W,
   craneAnchorTile,
+  AWNING_W,
+  drawAwning,
   drawCar,
   drawCrane,
   drawEscapeStairs,
@@ -418,6 +420,9 @@ export class TowerEngine {
   private lobbyGfx!: ex.Canvas[][][];
   /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
   private escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
+  /** Ground-floor entrance awnings, baked per side. They stand in for the fire
+   *  escape on floor 1 (see {@link syncEscapes}). */
+  private awningGfx!: { left: ex.Canvas; right: ex.Canvas };
   /** Exterior escape-stair actors per above-ground floor, keyed by floor. */
   private escapeActors = new Map<number, { l: ex.Actor; r: ex.Actor; sig: string }>();
   /** The rooftop construction crane (present until the 100th floor tops out). */
@@ -1339,6 +1344,14 @@ export class TowerEngine {
           }),
       );
     this.escGfx = { left: bakeEsc("left"), right: bakeEsc("right") };
+    const bakeAwning = (side: "left" | "right") =>
+      new ex.Canvas({
+        width: AWNING_W,
+        height: FLOOR,
+        cache: true,
+        draw: (ctx) => drawAwning(ctx, side, FLOOR),
+      });
+    this.awningGfx = { left: bakeAwning("left"), right: bakeAwning("right") };
 
     // The tenant/staff bake recipe (one home for the magic person() args).
     // The fed-up variant below is taller and shifts the figure to fit its
@@ -1497,17 +1510,23 @@ export class TowerEngine {
     this.syncCrane(hi, topTiles);
   }
 
-  /** Reconcile the exterior escape-stair segments: one left + one right actor
-   *  per above-ground floor row, slid in place when the row's edge moves. */
+  /** Reconcile the exterior facade segments hung off each above-ground floor's
+   *  left and right edges: fire-escape stairs on floors 2 and up, and the
+   *  ground-floor entrance awnings that stand in for them on floor 1. One left +
+   *  one right actor per row, slid in place when the row's edge moves. */
   private syncEscapes(edges: Map<number, FloorEdge>): void {
     for (const [floor, e] of edges) {
+      // Floor 1 wears awnings over its frontage instead of the fire escape;
+      // they are wider than an escape segment, so the outer offset differs.
+      const ground = floor === 1;
+      const segW = ground ? AWNING_W : ESCAPE_W;
       const sig = `${e.min}:${e.max}`;
       const y = this.worldYTop(floor);
-      const lx = e.min * TILE - ESCAPE_W;
+      const lx = e.min * TILE - segW;
       const rx = e.max * TILE;
       const rec = this.escapeActors.get(floor);
       if (rec) {
-        // Same graphic (parity is fixed per floor) — just follow the edge.
+        // Same graphic (parity/style is fixed per floor), just follow the edge.
         if (rec.sig !== sig) {
           rec.l.pos = ex.vec(lx, y);
           rec.r.pos = ex.vec(rx, y);
@@ -1517,8 +1536,8 @@ export class TowerEngine {
       }
       const parity = (floor % 2) as 0 | 1;
       const hang = (x: number, side: "left" | "right"): ex.Actor => {
-        const a = new ex.Actor({ pos: ex.vec(x, y), width: ESCAPE_W, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
-        a.graphics.use(this.escGfx[side][parity]);
+        const a = new ex.Actor({ pos: ex.vec(x, y), width: segW, height: FLOOR, anchor: ex.vec(0, 0), z: -2 });
+        a.graphics.use(ground ? this.awningGfx[side] : this.escGfx[side][parity]);
         this.engine.add(a);
         return a;
       };

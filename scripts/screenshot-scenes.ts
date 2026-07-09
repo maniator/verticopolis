@@ -614,6 +614,52 @@ export const SCENES: Scene[] = [
       },
     ],
   },
+  // --- Ground-floor entrance awnings (zoomed left/right lobby edges) ----------
+  // Floor 1 wears a green-and-gold entrance marquee in place of the fire escape
+  // that clads the floors above. It sits at the extreme frontage corners, so a
+  // full-tower shot buries it; these two tight crops frame each ground-floor
+  // edge at max zoom so the canopy (and the wider fire escape just above it)
+  // reads clearly.
+  {
+    id: "lobby-awnings",
+    outDir: "features",
+    build: buildCanonTower,
+    assertUnits: 100,
+    shots: [
+      {
+        name: "lobby-awning-left",
+        clock: 12,
+        wait: 500,
+        // Read the live floor-1 lobby extent and center the camera on its left
+        // edge (the awning hangs just outside it), rather than hardcode a tile.
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            let min = Infinity;
+            for (const u of g.sim.tower.units) {
+              if (u.kind === "lobby" && u.floor === 1) min = Math.min(min, u.x);
+            }
+            g.engine.setCamera(min, 1, 3);
+          });
+        },
+      },
+      {
+        name: "lobby-awning-right",
+        clock: 12,
+        wait: 500,
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            let max = -Infinity;
+            for (const u of g.sim.tower.units) {
+              if (u.kind === "lobby" && u.floor === 1) max = Math.max(max, u.x + u.width);
+            }
+            g.engine.setCamera(max, 1, 3);
+          });
+        },
+      },
+    ],
+  },
   // --- Responsive layout (tablet after-fix) -----------------------------------
   {
     id: "tablet",

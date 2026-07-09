@@ -305,7 +305,7 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
 }
 
 /** Width in px of one exterior fire-escape segment. */
-export const ESCAPE_W = 9;
+export const ESCAPE_W = 14;
 
 /**
  * One floor-tall segment of the exterior escape stairs that cling to both
@@ -350,6 +350,79 @@ export function drawEscapeStairs(
     const sy = 2 + ((floorH - 6) * s) / steps;
     ctx.fillRect(Math.round(sx) - 1, Math.round(sy), 3, 1);
   }
+}
+
+/** Width in px of one ground-floor entrance awning. Noticeably wider than a
+ *  fire-escape segment ({@link ESCAPE_W}) so the canopy reads as a projecting
+ *  storefront shade rather than a ladder rail. */
+export const AWNING_W = 24;
+
+/**
+ * A prestige entrance marquee over the ground-floor frontage, standing in for
+ * the fire escape on floor 1. Deep green with gilded trim so it reads as a grand
+ * lobby canopy, not a storefront: the street level wears these instead of the
+ * exterior stairs that clad the floors above, so we swap them in on the ground
+ * row. `side` is the wall the canopy juts out from: it mounts flush to that wall
+ * and slopes down and outward. Painted into a floor-tall canvas (only the upper
+ * strip is used) so it shares the escape segment's top-left anchor and
+ * edge-following geometry.
+ */
+export function drawAwning(ctx: CanvasRenderingContext2D, side: "left" | "right", floorH: number): void {
+  const w = AWNING_W;
+  ctx.save();
+  // Draw in one canonical frame (wall at x = 0, canopy projecting right to
+  // x = w), then mirror it for a left wall so both corners share the recipe.
+  if (side === "left") {
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+  }
+  const topY = Math.round(floorH * 0.1); // just under the lobby cornice
+  // A prestige marquee: a solid deep hunter-green canopy with gilded piping
+  // and a scalloped arch fringe that echo the lobby's gold cornice, sconces
+  // and chandeliers.
+  const green = "#234b39";
+  const greenHi = "#2f6149";
+  const greenLo = "#173324";
+  const gold = "#c9a94c";
+  const goldHi = "#e6cf82";
+  // How far the canopy top edge drops from the wall to the outer lip. Scaled to
+  // the projection (a wider awning juts out and down more) so the slope stays
+  // proportional at any width instead of flattening out.
+  const topDrop = Math.round(w * 0.28);
+  const bodyH = 8; // solid canopy thickness, filled top rail to fringe
+  const archR = 3; // how far each scallop arch bulges below the body
+  const archP = 6; // pixels per arch
+  // The canopy is filled solid from the gilded top rail down to a bottom edge
+  // that swings through a row of arches (a classic scalloped valance). Each
+  // column drops to `arch`, the semicircular dip of the scallop it sits in;
+  // dividing by `archP - 1` (not `archP`) forces each scallop to close back to
+  // 0 on its rightmost column, so consecutive arches meet flush at 0 instead of
+  // stair-stepping through a `~archR/2` seam.
+  for (let cx = 0; cx < w; cx++) {
+    const t = cx / (w - 1);
+    const top = topY + Math.round(t * topDrop);
+    const arch = Math.round(Math.sin((Math.PI * (cx % archP)) / (archP - 1)) * archR);
+    const base = top + bodyH; // flat underside of the solid body
+    const bottom = base + arch; // ...dipping through the scallop
+    ctx.fillStyle = green; // solid fill
+    ctx.fillRect(cx, top, 1, bottom - top);
+    ctx.fillStyle = greenHi; // sheen just under the rail
+    ctx.fillRect(cx, top + 1, 1, 1);
+    ctx.fillStyle = greenLo; // shaded belly above the fringe
+    ctx.fillRect(cx, base - 1, 1, 1);
+    ctx.fillStyle = goldHi; // gilded top rail
+    ctx.fillRect(cx, top, 1, 1);
+    ctx.fillStyle = gold; // gilded edge tracing each arch
+    ctx.fillRect(cx, bottom - 1, 1, 1);
+  }
+  // Gilded outer lip down the projecting edge, and a brass bracket bolting the
+  // canopy to the wall.
+  const lipTop = topY + topDrop;
+  ctx.fillStyle = gold;
+  ctx.fillRect(w - 1, lipTop, 1, bodyH);
+  ctx.fillStyle = "#8a7430";
+  ctx.fillRect(0, topY, 1, bodyH + topDrop);
+  ctx.restore();
 }
 
 /** Charred interior behind the flames of a burning unit. */
