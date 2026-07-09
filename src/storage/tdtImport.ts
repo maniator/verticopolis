@@ -779,6 +779,10 @@ export function transportsFromDecoded(
   let droppedFlights = 0;
   for (const e of elevators) {
     const kind = ELEVATOR_KINDS[e.type];
+    if (!kind) {
+      droppedShafts++; // type byte names no known elevator kind (corrupt save)
+      continue;
+    }
     const rawBottom = e.bottomFloor - TDT_FLOOR_OFFSET;
     const rawTop = e.topFloor - TDT_FLOOR_OFFSET;
     if (rawTop <= rawBottom) {

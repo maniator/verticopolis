@@ -7,6 +7,8 @@ import type { FacilityKind, SerializedGame, Transport } from "../engine/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
+  TDT_STAIR_RECORD_SIZE,
+  locateStairs,
   parseTdtBinary,
 } from "../storage/tdtFormat";
 import {
@@ -920,5 +922,78 @@ describe("end-to-end: import → deserialize → live simulation", () => {
     expect(office().state).toBe("construction");
     for (let i = 0; i < 12 * 60 && office().state === "construction"; i += 30) sim.tick(30);
     expect(office().state).not.toBe("construction");
+  });
+});
+
+describe("locateStairs: finds the stairs table by signature, not a fixed offset", () => {
+  // Build a raw 64-slot stairs table (10 bytes/record) with flights at their slots.
+  const stairTable = (
+    flights: { slot: number; type: number; x: number; floor: number; up?: number; down?: number }[],
+  ): Uint8Array => {
+    const buf = new Uint8Array(64 * TDT_STAIR_RECORD_SIZE);
+    const w16 = (o: number, v: number) => {
+      buf[o] = v & 0xff;
+      buf[o + 1] = (v >> 8) & 0xff;
+    };
+    for (const f of flights) {
+      const o = f.slot * TDT_STAIR_RECORD_SIZE;
+      buf[o] = 1;
+      buf[o + 1] = f.type;
+      w16(o + 2, f.x);
+      w16(o + 4, f.floor);
+      w16(o + 6, f.up ?? 0);
+      w16(o + 8, f.down ?? 0);
+    }
+    return buf;
+  };
+  const concat = (...parts: Uint8Array[]): Uint8Array => {
+    const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+    let off = 0;
+    for (const p of parts) {
+      out.set(p, off);
+      off += p.length;
+    }
+    return out;
+  };
+
+  it("recovers flights packed into the HIGH slots (real saves pack the top slots)", () => {
+    const table = stairTable([
+      { slot: 58, type: 1, x: 195, floor: 9 },
+      { slot: 60, type: 0, x: 168, floor: 11 },
+      { slot: 63, type: 1, x: 221, floor: 14 },
+    ]);
+    // Zero "finance/parking" filler (multiple of 10) before the table.
+    const bytes = concat(new Uint8Array(200), table);
+    expect(locateStairs(bytes, 0)).toEqual([
+      { type: 1, x: 195, floor: 9 },
+      { type: 0, x: 168, floor: 11 },
+      { type: 1, x: 221, floor: 14 },
+    ]);
+  });
+
+  it("accepts a flight anchored at TDT floor 0 (B10 is a valid floor)", () => {
+    const bytes = concat(new Uint8Array(60), stairTable([{ slot: 5, type: 1, x: 100, floor: 0 }]));
+    expect(locateStairs(bytes, 0)).toEqual([{ type: 1, x: 100, floor: 0 }]);
+  });
+
+  it("picks the real table over a smaller coincidental cluster (most flights wins)", () => {
+    const decoy = stairTable([
+      { slot: 2, type: 1, x: 10, floor: 3 },
+      { slot: 4, type: 1, x: 20, floor: 4 },
+    ]);
+    const real = stairTable([
+      { slot: 40, type: 1, x: 150, floor: 8 },
+      { slot: 42, type: 1, x: 160, floor: 9 },
+      { slot: 44, type: 1, x: 170, floor: 10 },
+      { slot: 46, type: 0, x: 180, floor: 11 },
+    ]);
+    const bytes = concat(decoy, new Uint8Array(300), real);
+    const stairs = locateStairs(bytes, 0);
+    expect(stairs).toHaveLength(4);
+    expect(stairs.map((s) => s.x)).toEqual([150, 160, 170, 180]);
+  });
+
+  it("returns [] (no error) when the tower has no stairs", () => {
+    expect(locateStairs(new Uint8Array(2000), 0)).toEqual([]);
   });
 });
