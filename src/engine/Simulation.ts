@@ -2441,7 +2441,8 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, completeAt, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, completeAt, outForMeal: _outForMeal, ...unhandled } = u;
+  void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   const exhaustive: Record<string, never> = unhandled;
   void exhaustive;
   const out: SerializedUnit = { id, kind, floor, x };

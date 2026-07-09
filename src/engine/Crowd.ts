@@ -62,18 +62,37 @@ const MEAL_MIX: Record<MealWindow, MealMix> = {
   lateNight: { origins: ["hotel", "condo"] },
 };
 
+/** True when this unit's kind belongs to the meal-origin bucket. Used by
+ *  `spawnMealOutbound` to pick a specific room on a floor whose visible
+ *  occupancy to drop. */
+function matchesMealOriginKind(u: { kind: FacilityKind }, bucket: MealOriginKind): boolean {
+  switch (bucket) {
+    case "office":
+      return u.kind === "office";
+    case "condo":
+      return u.kind === "condo";
+    case "hotel":
+      return isHotelKind(u.kind);
+    case "staff":
+      return (
+        u.kind === "security" ||
+        u.kind === "medical" ||
+        u.kind === "housekeeping" ||
+        u.kind === "recycling"
+      );
+  }
+}
+
 /**
- * Outbound vs return phase profile (arch §6). `t` is normalized 0..1 across the
- * window. Outbound weight is heavier in the first ~60% of the window; return
- * weight is heavier in the last ~60%. Their integrals over [0, 1] are equal, so
- * aggregate outbound approximately equals aggregate return over the whole
- * window without any per-person tracking.
+ * Outbound phase profile. `t` is normalized 0..1 across the meal window.
+ * Weight is heavier in the first ~60% of the window and hits zero at t=0.6,
+ * so outbound trips cluster near the start and taper toward the middle.
+ * Returns are self-scheduled by each round-tripper on their eating-timer
+ * expiry (PR A retired the aggregate return branch), so no matching
+ * `returnWeight(t)` exists here.
  */
 function outboundWeight(t: number): number {
   return Math.max(0, Math.min(1, 2 * (0.6 - t)));
-}
-function returnWeight(t: number): number {
-  return Math.max(0, Math.min(1, 2 * (t - 0.4)));
 }
 
 /**
@@ -89,7 +108,7 @@ function returnWeight(t: number): number {
  * pace regardless of the game-speed time compression.
  */
 
-export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "done";
+export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "eating" | "done";
 
 export interface Person {
   id: number;
@@ -122,6 +141,22 @@ export interface Person {
   staff?: boolean;
   /** Unit id this staffer is dispatched to service (a dirty hotel room). */
   cleanUnitId?: number;
+  /** Unit id of the ORIGIN room for a round-trip meal person (an office,
+   *  condo, or hotel room whose visible occupancy dropped by 1 when this
+   *  person spawned outbound). Undefined for lobby-centric commuter trips
+   *  and staff dispatches. On return arrival the person decrements
+   *  `originUnit.outForMeal`, guarded so a bulldozed origin cannot ghost-
+   *  decrement a fresh unit built in the same slot after. */
+  originUnitId?: number;
+  /** Remaining crowd-seconds in the `eating` state (a stationary sit at the
+   *  destination floor after the outbound trip's `toDest` completes). Only
+   *  set for round-trip meal persons; drained in the `advance` loop. */
+  eatSecondsLeft?: number;
+  /** True once the outbound arrival has transitioned this person into their
+   *  return trip (venue -> origin). Distinguishes the two `toDest` completions
+   *  a round-tripper has (outbound arrival triggers eating; return arrival
+   *  triggers the outForMeal decrement + despawn). */
+  returning?: boolean;
 }
 
 /** A transport route as a list of floors and the shaft used between each. */
@@ -171,6 +206,31 @@ export const CROWD_SECONDS_PER_MINUTE = 2;
 const WALK_SPEED = 6; // tiles per second
 const CAR_CAPACITY = 12; // drawn commuters allowed aboard one car (hidden while riding)
 const MAX_PEOPLE = 140;
+/** Round-trip meal person "eating" duration, drawn uniformly per person. Real
+ *  minutes converted to crowd-seconds via {@link CROWD_SECONDS_PER_MINUTE}.
+ *  Chosen so a lunch round-trip fits inside the 3-hour window with visible
+ *  slack: ~5 min there, 30-60 min eating, ~5 min back leaves the office
+ *  visibly thinned for ~40-70 minutes. */
+const EAT_MINUTES_MIN = 30;
+const EAT_MINUTES_MAX = 60;
+const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
+const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
+
+/**
+ * Visible occupant count for a room, as seen by the renderer and (PR B) the
+ * live pop census. Subtracts the transient `outForMeal` overlay from the
+ * canonical `u.occupants` so a room whose worker is out to lunch visibly
+ * thins out. Clamped at zero to be robust against any accounting slip; a
+ * runaway outForMeal cannot make figures render as negative counts.
+ *
+ * `u.occupants` remains canonical: `updatePresence` continues to overwrite it
+ * hourly with the expected staff for the hour. This helper is a pure
+ * projection, no state, no side effects.
+ */
+export function visibleOccupants(u: { occupants: number; outForMeal?: number }): number {
+  return Math.max(0, u.occupants - (u.outForMeal ?? 0));
+}
+
 /** Staff travel outside the tenant cap (they must be able to work even in a
  *  packed tower) but stay bounded so dispatch can't flood the screen. */
 const MAX_STAFF = 32;
@@ -513,12 +573,14 @@ export class Crowd {
       options.push(() => trip(this.rng.pick(openVenues), 1)); // late-night stragglers leaving
     }
 
-    // Meal-cadence overlay: add outbound `origin -> venue` and lagged return
-    // `venue -> origin` options during the active meal window. The existing
-    // branches above stay untouched; meal options fold into the same weighted
-    // pool `rng.pick` fires from. `MAX_PEOPLE` at the top of the method caps
-    // the whole thing so tuning meal weights alone bounds saturation.
-    this.pushMealOptions(clock, floors, options, trip);
+    // Meal-cadence overlay: add outbound `origin -> venue` options during the
+    // active meal window. Round-trippers self-schedule their own return leg
+    // after an eating pause (PR A); no `venue -> origin` options are pushed
+    // here. The existing branches above stay untouched; meal options fold into
+    // the same weighted pool `rng.pick` fires from. `MAX_PEOPLE` at the top
+    // of the method caps the whole thing so tuning meal weights alone bounds
+    // saturation.
+    this.pushMealOptions(tower, clock, floors, options);
 
     if (options.length) this.rng.pick(options)();
   }
@@ -527,26 +589,22 @@ export class Crowd {
    *  meal window. Kept separate from the branch tree above so meal cadence is
    *  clearly additive over the shipped morning/evening/day/night flow. */
   private pushMealOptions(
+    tower: Tower,
     clock: Clock,
     floors: SpawnFloors,
     options: Array<() => void>,
-    trip: (from: number, to: number) => void,
   ): void {
     const window = mealWindowFor(clock.hour);
     if (!window) return;
     const w = MEAL_WINDOWS[window];
-    // Normalized position across the window, [0..1). At the start we lean
-    // outbound; at the tail we lean return; the middle third is a crossover.
-    // Include the sub-hour fraction so the profile shifts within an hour, not
-    // in one-hour steps.
+    // Normalized position across the window, [0..1). At the start of the
+    // window the outbound weight is 1 and only outbound trips spawn; returns
+    // are self-scheduled by round-trippers on eating-timer expiry (PR A), so
+    // no separate returnWeight is applied here. Include the sub-hour fraction
+    // so the profile shifts within an hour, not in one-hour steps.
     const hourFrac = clock.minuteOfDay / 60 - w.start;
     const t = Math.max(0, Math.min(1, hourFrac / (w.end - w.start)));
-    // `outbound + back` is > 0 for every `t ∈ [0, 1]` given the shipped profile
-    // (their supports meet at t = 0.4..0.6 and each hits 1 at an endpoint), so
-    // there is no need for a "both zero" early return here. If the profile
-    // constants change, revisit.
     const outbound = outboundWeight(t);
-    const back = returnWeight(t);
 
     // Meal venues open this window (arch §1). If the tower has none, the whole
     // meal path yields nothing (players see no meal trips until they build
@@ -555,10 +613,13 @@ export class Crowd {
     if (!venueFloors.length) return;
 
     // The origins pool: every eligible meal-origin bin, tagged with its
-    // per-population weight and its floor list.
-    const originPools: { floors: number[]; weight: number }[] = [];
-    const push = (list: number[], weight: number): void => {
-      if (list.length && weight > 0) originPools.push({ floors: list, weight });
+    // per-population weight, its floor list, AND the origin KIND so
+    // spawnMealOutbound can pick a specific matching unit on the floor and
+    // attribute the round-trip identity to it.
+    type MealPool = { originKind: MealOriginKind; floors: number[]; weight: number };
+    const originPools: MealPool[] = [];
+    const push = (originKind: MealOriginKind, list: number[], weight: number): void => {
+      if (list.length && weight > 0) originPools.push({ originKind, floors: list, weight });
     };
     const { office, condo, hotel, staff } = ECON.mealPopulationWeights;
     for (const kind of MEAL_MIX[window].origins) {
@@ -567,59 +628,87 @@ export class Crowd {
           // Weekday-only comes for free: staffedOffices is empty on weekends
           // (updatePresence zeros office occupants), so no redundant isWeekend
           // check is needed here.
-          push(floors.staffedOffices, office);
+          push("office", floors.staffedOffices, office);
           break;
         case "condo":
-          push(floors.condoFloors, condo);
+          push("condo", floors.condoFloors, condo);
           break;
         case "hotel":
-          // Hotels are declared as origins for every meal window per the arch,
-          // but `hotelFloors` is gated by `isTenanted(u) || u.state === "asleep"`
-          // (same as the shipped `homes` bin). Under the current hotel state
-          // model guests are only `asleep` between evening move-in (17:00+) and
-          // checkout (08:00), so `hotelFloors` is EMPTY during lunch (11-14)
-          // and mostly empty during dinner (17-20 fills gradually). Breakfast
-          // and late-night see full hotel participation. Broadening the gate to
-          // include daytime guest presence is a real feature the state model
-          // does not yet have; it lands with the `per-person-meal-round-trips`
-          // backlog follow-up. Keeping the origin declared here (with a zero
-          // contribution during the affected hours) documents the design intent
-          // in one place so the follow-up needs no MEAL_MIX change.
-          push(floors.hotelFloors, hotel);
+          // Hotels declared as origins for every meal window per the arch, but
+          // `hotelFloors` is gated by `isTenanted(u) || u.state === "asleep"`
+          // (same as the shipped `homes` bin). Guests are only `asleep`
+          // between evening move-in (17:00+) and checkout (08:00), so
+          // `hotelFloors` is EMPTY during lunch (11-14) and mostly empty
+          // during dinner (17-20 fills gradually). Breakfast and late-night
+          // see full hotel participation. Broadening the gate is a follow-up
+          // (backlog `per-person-meal-round-trips` post-PR-A note); keeping
+          // the origin declared here documents the design intent in one place.
+          push("hotel", floors.hotelFloors, hotel);
           break;
         case "staff": {
           const onShift = floors.staffFloors
             .filter((s) => staffOnShift(s.kind, clock.hour))
             .map((s) => s.floor);
-          push(onShift, staff);
+          push("staff", onShift, staff);
           break;
         }
       }
     }
     if (!originPools.length) return;
 
-    // Contribute options in proportion to the outbound/return phase. The
-    // integer BASE coefficient is small (1..3) so the pool stays balanced with
-    // the existing morning/evening/night branches; `rng.pick` fires one option
-    // per spawn call and the MAX_PEOPLE cap self-throttles. Each contributed
-    // option is then gated by `rng.chance(pool.weight)` so a low-weight
-    // population (condos, 0.3x) contributes with the RIGHT probability at
-    // EVERY phase, not on/off in coarse chunks. Compound rounding would collapse
-    // the middle third of the window for the 0.3x pool otherwise (review D1).
+    // Per-window contribution. Outbound spawns REAL round-trip persons who
+    // handle their own return leg after an eating pause (see spawnMealOutbound,
+    // advance's `eating` case, and transitionToReturn). The aggregate return
+    // branch that pushed `venue -> origin` options was retired in PR A.
+    //
+    // The base coefficient is 3 to preserve the shipped pool weight against
+    // the morning/evening/night branches; `rng.chance(pool.weight)` gates each
+    // option so a low-weight population (condos, 0.3x) contributes with the
+    // right probability at every phase, not on/off in coarse chunks.
     const outboundBase = Math.max(0, Math.round(outbound * 3));
-    const returnBase = Math.max(0, Math.round(back * 3));
     for (const pool of originPools) {
       for (let i = 0; i < outboundBase; i++) {
         if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => trip(this.rng.pick(pool.floors), this.rng.pick(venueFloors)));
-        }
-      }
-      for (let i = 0; i < returnBase; i++) {
-        if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => trip(this.rng.pick(venueFloors), this.rng.pick(pool.floors)));
+          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors));
         }
       }
     }
+  }
+
+  /**
+   * Fire a single meal-round-trip outbound. Picks a random floor from the
+   * pool, then finds a candidate origin unit on that floor of the pool's
+   * kind whose `visibleOccupants > 0` (a worker still IN the room, not
+   * already out). Increments the origin's `outForMeal` and stamps
+   * `originUnitId` on the spawned person; the person self-transitions to
+   * `eating` on arrival and to a return trip on eat-timer expiry.
+   *
+   * If no candidate exists (all workers already out), the call is a no-op:
+   * the caller's `rng.pick` fired but no person spawns. The `MAX_PEOPLE` cap
+   * self-balances the pool.
+   */
+  private spawnMealOutbound(
+    tower: Tower,
+    pool: { originKind: MealOriginKind; floors: number[] },
+    venueFloors: number[],
+  ): void {
+    const originFloor = this.rng.pick(pool.floors);
+    // Candidate units on the chosen floor of the right kind with at least one
+    // available (in-room) occupant.
+    const candidates = tower.units.filter(
+      (u) => u.floor === originFloor && matchesMealOriginKind(u, pool.originKind) && visibleOccupants(u) > 0,
+    );
+    if (candidates.length === 0) return;
+    const origin = this.rng.pick(candidates);
+    const venueFloor = this.rng.pick(venueFloors);
+    // The route is computed by `this.add`, which may fail (route unreachable
+    // from origin to venue). If it fails, no person exists and we must not
+    // increment outForMeal. Order: add first, THEN increment on the returned
+    // person object.
+    const spawned = this.add(tower, originFloor, venueFloor);
+    if (!spawned) return;
+    spawned.originUnitId = origin.id;
+    origin.outForMeal = (origin.outForMeal ?? 0) + 1;
   }
 
   /** Build a person on `route`, walking to `destX` at the end. Shared by
@@ -649,10 +738,10 @@ export class Crowd {
     return person;
   }
 
-  private add(tower: Tower, from: number, to: number): void {
+  private add(tower: Tower, from: number, to: number): Person | null {
     const r = this.route(tower, from, to);
-    if (!r || r.shafts.length === 0) return; // unreachable — no point spawning
-    this.makePerson(tower, r, this.pickX(tower, to, (this.nextId * 2654435761) | 0));
+    if (!r || r.shafts.length === 0) return null; // unreachable — no point spawning
+    return this.makePerson(tower, r, this.pickX(tower, to, (this.nextId * 2654435761) | 0));
   }
 
   /** Live staff members on shift (a counter so the spawn cap never has to
@@ -764,7 +853,7 @@ export class Crowd {
           frustrated++;
           travelling++;
         }
-        this.finish(p);
+        this.finish(p, tower);
         continue;
       }
       this.step(p, dtSec, tower);
@@ -797,7 +886,7 @@ export class Crowd {
     switch (p.state) {
       case "toShaft": {
         const shaft = this.shaftOf(tower, p.shaftId);
-        if (!shaft) return this.finish(p);
+        if (!shaft) return this.finish(p, tower);
         const targetX = shaft.x + shaft.width / 2;
         if (this.walkTo(p, targetX, dt)) {
           // Elevators are boarded (wait for a car); stairs/escalators are
@@ -814,7 +903,7 @@ export class Crowd {
       }
       case "climbing": {
         const shaft = this.shaftOf(tower, p.shaftId);
-        if (!shaft) return this.finish(p);
+        if (!shaft) return this.finish(p, tower);
         const dest = p.floors[p.leg + 1];
         const dir = Math.sign(dest - p.fy) || 1;
         // Escalators carry you a little faster than trudging up stairs.
@@ -837,7 +926,7 @@ export class Crowd {
       case "waiting": {
         p.wait += dt;
         const shaft = this.shaftOf(tower, p.shaftId);
-        if (!shaft) return this.finish(p);
+        if (!shaft) return this.finish(p, tower);
         // Board a car of this shaft that's stopped at our floor with room.
         for (let i = 0; i < shaft.cars; i++) {
           if (Math.abs(shaft.carPositions[i] - p.floor) > 0.25) continue;
@@ -861,7 +950,7 @@ export class Crowd {
         // player trimming the car count (Tower.setCars shrinks carPositions).
         // Either way, step off and move on rather than riding a phantom car.
         if (!shaft || p.carIndex == null || p.carIndex >= shaft.carPositions.length) {
-          return this.finish(p);
+          return this.finish(p, tower);
         }
         const pos = shaft.carPositions[p.carIndex];
         const prev = p.fy;
@@ -893,13 +982,72 @@ export class Crowd {
         // Stroll to a spot on the destination floor, linger, then leave.
         if (this.walkTo(p, p.destX, dt)) {
           p.linger += dt;
-          if (p.linger > 2) this.finish(p);
+          if (p.linger > 2) {
+            // Meal round-tripper: outbound arrival transitions to a stationary
+            // `eating` pause, then a return trip. `returning` distinguishes
+            // the two `toDest` arrivals a round-tripper has; without it, the
+            // return arrival would loop back into `eating` forever.
+            if (p.originUnitId !== undefined && !p.returning) {
+              p.state = "eating";
+              p.linger = 0;
+              p.eatSecondsLeft = this.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
+            } else {
+              this.finish(p, tower);
+            }
+          }
         }
+        break;
+      }
+      case "eating": {
+        // Stationary sit at the venue floor. The person is still rendered at
+        // their destX from the outbound trip. When the timer expires, mutate
+        // into a return trip toward `originUnitId`'s floor (if it still exists)
+        // or despawn quietly (ghost origin from a bulldoze while eating).
+        p.eatSecondsLeft = (p.eatSecondsLeft ?? 0) - dt;
+        if (p.eatSecondsLeft <= 0) this.transitionToReturn(tower, p);
         break;
       }
       default:
         break;
     }
+  }
+
+  /** Mutate an `eating` person into their return leg. Silent despawn on any
+   *  route failure or missing origin unit; the `finish` path will handle the
+   *  `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
+   *  decrement a fresh unit built on the same floor after). */
+  private transitionToReturn(tower: Tower, p: Person): void {
+    const origin = p.originUnitId !== undefined ? tower.units.find((u) => u.id === p.originUnitId) : undefined;
+    if (!origin) {
+      // Ghost origin: unit was bulldozed while the person was eating. No
+      // outForMeal on any unit to decrement (the bulldoze already zeroed it if
+      // it was set); just despawn.
+      p.originUnitId = undefined;
+      this.finish(p, tower);
+      return;
+    }
+    const venueFloor = p.floor;
+    const originFloor = origin.floor;
+    const route = this.route(tower, venueFloor, originFloor);
+    if (!route || route.shafts.length === 0) {
+      // Return route unreachable (transport degraded while eating). The person
+      // "went home some other way"; the accounting must still balance, so
+      // finish() decrements outForMeal via the ghost-guarded path below.
+      p.returning = true;
+      this.finish(p, tower);
+      return;
+    }
+    p.floors = route.floors;
+    p.shafts = route.shafts;
+    p.leg = 0;
+    p.shaftId = route.shafts[0] ?? null;
+    p.carIndex = null;
+    p.state = "toShaft";
+    p.wait = 0;
+    p.age = 0;
+    p.linger = 0;
+    p.destX = this.pickX(tower, originFloor, p.seed);
+    p.returning = true;
   }
 
   /** Walk toward a tile x on the current floor; returns true once arrived. */
@@ -923,7 +1071,7 @@ export class Crowd {
     p.carIndex = null;
   }
 
-  private finish(p: Person): void {
+  private finish(p: Person, tower?: Tower): void {
     this.releaseSeat(p);
     // Report a staff job's outcome: it succeeded only if the staffer actually
     // made it to the destination floor (state "toDest"); a give-up or a shaft
@@ -932,6 +1080,19 @@ export class Crowd {
       this.staffCount = Math.max(0, this.staffCount - 1);
       if (p.cleanUnitId !== undefined) {
         this.staffDone.push({ unitId: p.cleanUnitId, ok: p.state === "toDest" });
+      }
+    }
+    // Meal round-tripper: decrement the origin's outForMeal on ANY despawn
+    // path (successful return arrival, mid-transit give-up, mid-eating
+    // give-up, unreachable-return), so the accounting always balances for a
+    // person whose spawn incremented outForMeal. Guarded so a bulldozed
+    // origin cannot ghost-decrement a fresh unit built on the same floor
+    // after; and cleared `originUnitId` at the ghost site above so a person
+    // whose origin vanished mid-eating skips this path entirely.
+    if (p.originUnitId !== undefined && tower) {
+      const origin = tower.units.find((u) => u.id === p.originUnitId);
+      if (origin && (origin.outForMeal ?? 0) > 0) {
+        origin.outForMeal = (origin.outForMeal ?? 0) - 1;
       }
     }
     p.state = "done";

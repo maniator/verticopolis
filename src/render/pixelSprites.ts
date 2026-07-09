@@ -1,5 +1,6 @@
 import type { FacilityKind, Unit, UnitState } from "../engine/types";
 import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
+import { visibleOccupants } from "../engine/Crowd";
 
 /**
  * Faithful "dollhouse cross-section" room art, following the SimTower design
@@ -239,7 +240,9 @@ function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number)
   const start = x + 6;
   const count = Math.max(1, Math.floor((w - 10) / slot));
   // Show exactly as many workers as are actually present (none on a weekend).
-  const filled = Math.max(0, Math.min(count, u.occupants));
+  // `visibleOccupants` subtracts the transient `outForMeal` overlay, so a
+  // worker out on a lunch round-trip empties her desk until she walks back.
+  const filled = Math.max(0, Math.min(count, visibleOccupants(u)));
   for (let i = 0; i < count; i++) {
     const dx = start + i * slot;
     // Desk.
@@ -263,7 +266,9 @@ function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number):
   const { ctx } = d;
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, "SALE");
   // Residents are "up" only when home and not asleep in the small hours.
-  const home = u.occupants > 0 && !(d.hour >= 23 || d.hour < 6);
+  // Read the meal-adjusted count so a household out to breakfast/dinner/
+  // late-night visibly leaves the sofa empty for the round-trip's duration.
+  const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
   const wall = hash(u.id) > 0.5 ? "#C8A88C" : "#B89CAE";
   const floorY = shell(ctx, x, y, w, h, wall, "#9A7A54");
   wallItem(ctx, x, y, w, "#7a5a44"); // framed picture
