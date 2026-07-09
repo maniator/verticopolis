@@ -406,12 +406,15 @@ export class Simulation implements SimContext {
       const bridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, facilityFloors(kind)).length;
       const c = this.tower.canPlace(kind, floor, x);
       if (!c.ok) {
-        // Rescue a lobby that fails only because it isn't connected yet: if an
-        // auto-lobby bridge reaches it (bridge > 0 means the fill runs up to the
-        // tile next to it), it lands connected once the bridge is laid. Any other
-        // failure (off-lot, wrong floor, overlap) still refuses.
+        // Rescue a GROUND concourse lobby that fails only because it isn't
+        // connected yet: if an auto-lobby bridge reaches it (bridge > 0 means the
+        // fill runs up to the tile next to it), it lands connected once the
+        // bridge is laid. Kept to the ground floor because that is the only case
+        // where a bridge can substitute for support: sky lobbies (floor 15+) rest
+        // on the story below, and a bridge does not build that vertical support,
+        // so an unsupported sky-lobby tile must still refuse.
         const bridgeable =
-          kind === "lobby" && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
+          kind === "lobby" && floor === 1 && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
         if (!bridgeable) return { ok: false, reason: c.reason, cost: f.cost };
       }
       const cost = f.cost + bridge * FACILITIES.lobby.cost;
@@ -457,14 +460,20 @@ export class Simulation implements SimContext {
     // Bridge the gap to a neighboring module/lobby BEFORE placing the primary, so
     // a detached ground concourse lobby is connected by the time it lands (rooms
     // and sky lobbies already rest on the story below, so the order is harmless
-    // for them). The fill builds outward from the existing neighbor. Charge only
-    // for tiles actually laid: the plan is exact so this equals can.cost, but
-    // reconciling to the real count means a partial fill could never overcharge.
+    // for them). The fill builds outward from the existing neighbor. If the
+    // primary still fails after the bridge, roll the bridge tiles back so a
+    // rejected build never orphans structure (nothing was charged for them yet).
     const laidBridge = this.tower.fillBridge(kind, floor, x, f.width, hgt);
     const res = this.tower.place(kind, floor, x);
-    if (!res.ok) return { ok: false, reason: res.reason };
+    if (!res.ok) {
+      for (const id of laidBridge) this.tower.removeUnit(id);
+      return { ok: false, reason: res.reason };
+    }
+    // Charge only for tiles actually laid: the plan is exact so this equals
+    // can.cost, but reconciling to the real count means a partial fill could
+    // never overcharge.
     const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
-    this.money -= can.cost - (quotedBridge - laidBridge) * substrateCost;
+    this.money -= can.cost - (quotedBridge - laidBridge.length) * substrateCost;
     // Rooms spend time under construction before they can be used.
     const dur = buildMinutes(kind);
     if (dur > 0 && res.unitId !== undefined) {

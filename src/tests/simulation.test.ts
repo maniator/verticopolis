@@ -974,4 +974,41 @@ describe("Auto-floor bridge between modules", () => {
     expect(sim.build("lobby", 7, x0).ok).toBe(false);
     expect(sim.tower.structureKindAt(7, x0)).toBeUndefined();
   });
+
+  it("does not rescue an unsupported sky lobby (bridge can't substitute for vertical support)", () => {
+    // The rescue is ground-only: a sky-lobby tile without floor-14 support below
+    // it stays refused, because laying an adjacent lobby bridge does not build
+    // that vertical support. Guard against the Codex-flagged regression where a
+    // sky lobby with a neighbor plus a supported gap tile would sneak through.
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const lf = GRID.lobbyInterval; // 15
+    // Build a supported neighbor A at x0 (column supported by floors 2..14).
+    for (let fl = 2; fl < lf; fl++) {
+      for (let i = 0; i < 8; i++) sim.tower.place("floor", fl, x0 + i);
+    }
+    expect(sim.build("lobby", lf, x0).ok).toBe(true); // A: [x0, x0+1)
+    // Target B at x0+10 has NO floor 14 under it. The rescue must not fire.
+    expect(sim.build("lobby", lf, x0 + 10).ok).toBe(false);
+    // Nothing was laid: no orphan bridge tiles, no B.
+    expect(sim.tower.structureKindAt(lf, x0 + 10)).toBeUndefined();
+    expect(sim.tower.structureKindAt(lf, x0 + 5)).toBeUndefined();
+  });
+
+  it("drains a right-side basement bridge in one pass (no O(gap²) retries)", () => {
+    // The right-side outward-fill regression Copilot flagged: for a
+    // ground/basement bridge whose neighbor is to the RIGHT, the plan must emit
+    // tiles from the neighbor inward so each rests on the last, not primary-side
+    // outward (which would need O(gap²) retry passes). Pin it: a wide gap fills
+    // completely, so if the retry loop ever regresses we would leave holes.
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    sim.star = 3;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Two parking spaces in the basement, B on the RIGHT with a wide gap.
+    sim.build("parking", 0, x0); // A: [x0, x0+4)
+    expect(sim.build("parking", 0, x0 + 20).ok).toBe(true); // B: [x0+20, x0+24)
+    for (let i = 4; i < 20; i++) expect(sim.tower.structureKindAt(0, x0 + i)).toBe("floor");
+  });
 });

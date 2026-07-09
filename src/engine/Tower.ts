@@ -516,11 +516,14 @@ export class Tower {
         if (k === substrate) for (let g = tx + 1; g < x; g++) add(g);
         break; // first structure hit ends the scan, whether or not it matched
       }
-      // Nearest structure after the footprint, mirror of the above.
+      // Nearest structure after the footprint, mirror of the above. Emit
+      // right-side tiles from the neighbor INWARD (descending x) so the ground
+      // and basement outward-fill drains in a single pass instead of walking
+      // support back tile by tile through retries.
       for (let tx = x + width; tx < GRID.width; tx++) {
         const k = this.structKind.get(this.key(fl, tx));
         if (k === undefined) continue;
-        if (k === substrate) for (let g = x + width; g < tx; g++) add(g);
+        if (k === substrate) for (let g = tx - 1; g >= x + width; g--) add(g);
         break;
       }
     }
@@ -538,17 +541,18 @@ export class Tower {
    * exact, so the retry loop always drains; a tile only sits out a pass while the
    * lower/adjacent tile it rests on is being laid, never permanently.
    */
-  fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number {
+  fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number[] {
     const substrate: FacilityKind = kind === "lobby" ? "lobby" : "floor";
     let remaining = this.bridgeFillPlan(kind, floor, x, width, hgt);
-    let placed = 0;
+    const placed: number[] = [];
     let progress = true;
     while (remaining.length > 0 && progress) {
       progress = false;
       const still: { fl: number; x: number }[] = [];
       for (const m of remaining) {
-        if (this.place(substrate, m.fl, m.x).ok) {
-          placed++;
+        const r = this.place(substrate, m.fl, m.x);
+        if (r.ok && r.unitId !== undefined) {
+          placed.push(r.unitId);
           progress = true;
         } else {
           still.push(m);
