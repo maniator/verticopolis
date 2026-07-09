@@ -11,7 +11,12 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
 - **Every non-trivial change gets a deep review, and the deep review IS running
   the BMGD/BMAD review skill in the same session: `/gds-code-review` for
   gameplay/engine work, `/bmad-code-review` for everything else (storage,
-  persistence, tooling, UI plumbing).** Its adversarial layers (Blind Hunter →
+  persistence, tooling, UI plumbing).** **TDT / save round-trip work
+  (`src/storage/tdt*`, save import/export) is `/gds-code-review`, not bmad,
+  even though the mechanism is storage: its correctness is engine-data fidelity
+  (population census, elevator/transport behavior, floor/lobby/view mapping), a
+  gameplay-parity concern. Run both when a change also carries a big
+  tooling/UI-plumbing surface.** Its adversarial layers (Blind Hunter →
   Edge Case Hunter → Acceptance Auditor → triage) are the review. A self-read or
   a generic `/code-review` does **not** satisfy it. Fix every `patch` finding and
   record every `defer` finding in
@@ -38,13 +43,19 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   internal-only work needs none). It's injected as `__APP_VERSION__` on the splash
   and anchors the update flow, so a missing bump misreports the build. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
-- **Screenshots come from the pinned Playwright Docker container in CI, never a
-  host browser.** Regenerate `docs/screenshots/**` only via the
-  `update-screenshots.yml` workflow (marker push `[update-screenshots]`) and mint
-  `e2e/visual.spec.ts-snapshots` only via `update-visual-baselines.yml`
-  (`[update-baselines]`). `npm run screenshots` is a host-Chromium **preview**
-  only; its output (and any downloaded-browser capture) must **not** be committed
-  as the final set. See [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**.
+- **Screenshots come from the pinned Playwright Docker container, never a host
+  browser.** Regenerate `docs/screenshots/**` either via the
+  `update-screenshots.yml` workflow (marker push `[update-screenshots]`) OR
+  locally inside that **same pinned image** (the exact
+  `mcr.microsoft.com/playwright:v<lockfile-playwright-version>-jammy` the workflow
+  resolves), running `npm ci && npm run build && RUN_SERVER=1 node
+  scripts/screenshots.ts` in it. Output from the pinned image is equivalent to
+  CI's and may be committed. Mint `e2e/visual.spec.ts-snapshots` only via
+  `update-visual-baselines.yml` (`[update-baselines]`) or that same pinned image.
+  What is **not** allowed as the final set: `npm run screenshots` on a HOST
+  browser (outside the pinned container) or any downloaded-browser capture, which
+  render different pixels; those are **preview only**. See
+  [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT

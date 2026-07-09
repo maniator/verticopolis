@@ -12,13 +12,16 @@ the shots can't drift from what actually ships. There are no per-feature scripts
 any more; one declarative `SCENES` manifest maps every shot to the state it
 needs, so a new shot is a new manifest row, not a new file.
 
-### The committed images come from CI, not a local run
+### The committed images come from the pinned Docker image, not a host browser
 
 The Chromium build and system fonts decide antialiasing, so an image captured on
 one machine's browser rarely matches another's: commit a host capture and every
 later regen re-renders every PNG, flooding the diff with noise. So the **canonical
-committed set is minted in CI**, inside the pinned Playwright Docker image (one
-Chromium build for the whole repo), never on a laptop:
+committed set is minted inside the pinned Playwright Docker image** (one Chromium
+build for the whole repo), never from a host browser. That image is what CI runs,
+and running the **same pinned image locally is equivalent** and may be committed
+(see [CONTRIBUTING.md](../CONTRIBUTING.md) → Screenshots). In CI, two marker-driven
+workflows produce it:
 
 - [`update-screenshots.yml`](../.github/workflows/update-screenshots.yml)
   regenerates `docs/screenshots/**` and commits it back.

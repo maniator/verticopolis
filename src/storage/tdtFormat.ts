@@ -56,23 +56,94 @@ export const TDT_MAX_PEOPLE = 100_000;
 /**
  * Byte sizes for the tail blocks (doc §6–§10): 16-byte person records after a
  * u32 count; 512 × 18-byte retail rows; 24 elevator entries (194-byte header
- * each, built shafts appending an unknown block, two per-floor structures,
- * one 324-byte entry per serviced floor and one 348-byte entry per car); a
- * 132-byte finance block; a 1,026-byte parking block; and 64 × 10-byte
- * stair/escalator records.
+ * each, built shafts appending a 3,140-byte fixed block, then one 324-byte entry
+ * per serviced floor and one 348-byte entry per car; the 3,140 was measured, see
+ * TDT_ELEVATOR_BUILT_FIXED); a 132-byte finance block; a 1,026-byte parking
+ * block; and 64 × 10-byte stair/escalator records.
  */
 export const TDT_PERSON_RECORD_SIZE = 16;
+/** Upper bound the exporter clamps its people count to: the canon TOWER census
+ *  (15,000). Bounds the people block a forged save can inflate (each unit adds
+ *  16 bytes) while still covering any legitimate tower. */
+export const TDT_MAX_CENSUS = 15_000;
+/** Default saved view-scroll the exporter writes into the header (0x26 = x,
+ *  0x28 = y, in world pixels): the value the 1994 game itself stores for a fresh
+ *  New Tower, which opens the view on the ground lobby. Left at 0 a loaded tower
+ *  opens at the top-left sky instead of on its entrance. */
+export const TDT_DEFAULT_VIEW_X = 1105;
+export const TDT_DEFAULT_VIEW_Y = 3491;
 export const TDT_RETAIL_SLOTS = 512;
 export const TDT_RETAIL_RECORD_SIZE = 18;
 export const TDT_ELEVATOR_SLOTS = 24;
 export const TDT_ELEVATOR_HEADER_SIZE = 194;
-export const TDT_ELEVATOR_BUILT_FIXED = 480 + 2 * 120; // unknown block + two per-floor structures
+// Built shafts append a fixed block whose true size (3140 B) was measured from
+// real 1994 saves via the tools/simtower round-trip harness: walking the three
+// shafts in my_tower.TDT, the record stride
+//   194-byte header + 3140 + 324 * servicedFloors + 348 * cars
+// reproduces every shaft's exact file offset. The earlier 480 + 2 * 120 = 720
+// estimate undercounted this block by 2420 B, which desynced the whole table
+// after the first shaft and forced the importer to synthesize fakes instead.
+export const TDT_ELEVATOR_BUILT_FIXED = 3140;
 export const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
 export const TDT_ELEVATOR_PER_CAR_SIZE = 348;
+/**
+ * The 56-byte per-shaft schedule/config block (bytes 4–59 of an elevator
+ * header) the 1994 game reads to dispatch cars. Every built shaft in a sampled
+ * real save carried this exact default; a zero-filled block instead reads as
+ * "run no cars", so the shaft loads with EMPTY cars and traps everyone
+ * (confirmed via the SimTower harness). The exporter emits this so exported
+ * shafts actually run. The precise per-hour scheduling model (the WD/WE strip
+ * in the elevator editor) is a separate feature; see the backlog's
+ * `elevator-scheduling`. Layout: 14 bytes 0x01, 14 bytes 0x05, 28 bytes 0x00.
+ */
+export const TDT_ELEVATOR_SCHEDULE_DEFAULT: readonly number[] = [
+  ...(Array(14).fill(0x01) as number[]),
+  ...(Array(14).fill(0x05) as number[]),
+  ...(Array(28).fill(0x00) as number[]),
+];
 export const TDT_FINANCE_SIZE = 132;
 export const TDT_PARKING_SIZE = 2 + 512 * 2;
 export const TDT_STAIR_SLOTS = 64;
 export const TDT_STAIR_RECORD_SIZE = 10;
+/**
+ * Size of the trailing routing/reachability region the 1994 game reads AFTER
+ * the stairs table (doc §11+: lobby/reachability tables and related caches).
+ *
+ * The importer skips this region (its live crowd re-simulates), but the real
+ * game reads it at a FIXED extent on load. Our exporter used to end right after
+ * the stairs table, ~25 KB short of that extent, so the game read off the end of
+ * the file and page-faulted (0x0799, surfaced as "This file is already open, or
+ * damaged"). The exporter now emits this region so the file reaches the length
+ * the game expects.
+ *
+ * It is filled with 0xFF, the format's empty-slot sentinel. That choice is
+ * load-bearing and was confirmed with the SimTower harness (tools/simtower/):
+ * ZERO-filling the same span loads but makes the game read the zeros as live
+ * routing data and invent a phantom population (an empty tower reported Pop
+ * 1,280 and a bogus star), whereas 0xFF reads as "every slot empty", so the game
+ * rebuilds reachability and the crowd from the floor map and reports the right
+ * population (an empty tower loads at Pop 0).
+ *
+ * This fixed size is validated against real saves for Classic towers up to two
+ * stars. The exact per-tower size for larger towers (more elevators, sky
+ * lobbies, big crowds) is not yet pinned down and is a follow-up; see the
+ * backlog's `tdt-export-routing-tail` row. Over-emitting is safe (the game
+ * ignores trailing slack); under-emitting is the crash, so this is generous.
+ */
+export const TDT_ROUTING_TAIL_SIZE = 0x6400;
+/** Sanity bounds used to recognize a real stair record while scanning for the
+ *  table: a built flight sits within the tower's tile span, on a valid floor,
+ *  with a plausible waiting-crowd count. Generous on purpose (validation, not
+ *  gameplay): the goal is to reject finance/parking bytes, not to clamp data. */
+export const TDT_MAX_TILE = 800;
+export const TDT_MAX_STAIR_CROWD = 4000;
+/** How far past the elevator table to scan for the stairs table (bytes). The
+ *  finance block (132) + parking/lobby region between the elevator table and the
+ *  stairs table measured ~0.7 KB in a real save and is bounded by parking's
+ *  512-stall table (~1 KB); 4 KB covers that with slack while keeping the scan
+ *  away from the far §11 lobby/§12 named-tenant blocks (smaller window = less
+ *  chance a coincidental later window out-counts the real table). */
+export const TDT_STAIR_SCAN_WINDOW = 4096;
 
 /** One tenant record, mirrored raw from the file (doc §4 / tower-docs unit
  *  record: extents, type, status byte, 10 reserved bytes, rent, subtype). */
@@ -119,8 +190,15 @@ export interface TdtHeader {
 
 /** One decoded elevator entry (doc §8; floors are TDT indexes 0–119). */
 export interface TdtElevator {
-  /** 0 = express, 1 = standard, 2 = service. */
+  /** The elevator kind: 0 = express, 1 = standard, 2 = service. This byte is
+   *  authoritative (confirmed against the real game: a service shaft imported as
+   *  service only from this byte). */
   type: number;
+  /** Byte 2 of the header. The doc calls it per-car capacity (42/21/10), but a
+   *  real save read 21 for BOTH standard AND service shafts, so it is NOT a
+   *  reliable kind signal; {@link type} is. Kept for research; our per-car
+   *  capacity comes from the engine's canon table, not this byte. */
+  capacity: number;
   /** Cars in the shaft, 1–8. */
   cars: number;
   /** Horizontal position in tiles from the left. */
@@ -187,6 +265,12 @@ export class ByteReader {
 
   offset(): number {
     return this.pos;
+  }
+
+  /** The underlying buffer, for tail structures we locate by scanning for a
+   *  record signature rather than by a byte offset we can't pin down. */
+  raw(): Uint8Array {
+    return this.bytes_;
   }
 
   private need(n: number): void {
@@ -322,6 +406,82 @@ export function parseTdtBinary(bytes: Uint8Array): TdtTower {
 type TdtTail = Pick<TdtTower, "peopleCount" | "retailRows" | "elevators" | "stairs" | "parkingConnected" | "warnings">;
 
 /**
+ * Locate and decode the 64 × 10-byte stairs/escalator table (doc §8) by
+ * scanning for its record signature, starting at `from` (the end of the
+ * elevator table). We scan rather than sum block sizes because the finance and
+ * parking/lobby blocks between the elevator table and the stairs table are not
+ * yet pinned down across saves; a real save put the stairs 436 bytes before our
+ * summed offset, so the old arithmetic read zeros and lost every flight.
+ *
+ * A record is *empty* (built byte 0), *built* (built byte 1 with an in-range
+ * type/tile/floor/crowd), or *bad* (anything else). We take the 64-record
+ * window that is entirely empty-or-built and holds the MOST flights: the
+ * surrounding finance/parking bytes contain out-of-range "built" bytes, so a
+ * window overlapping them fails; and because the real table packs its flights
+ * into the high slots, an earlier same-alignment window would clip the trailing
+ * ones, so "first window with a flight" isn't enough. The earliest window that
+ * ties for the maximum count is the true table origin. Returns the built
+ * flights, or an empty array when the tower has no stairs (there is nothing to
+ * anchor on, which is indistinguishable from an all-empty table and is the
+ * common case, not an error).
+ */
+export function locateStairs(bytes: Uint8Array, from: number): TdtStair[] {
+  const REC = TDT_STAIR_RECORD_SIZE;
+  const rd16 = (o: number): number => bytes[o] | (bytes[o + 1] << 8);
+  // 0 = empty, 1 = built, -1 = not a stair record.
+  const classify = (o: number): number => {
+    if (o + REC > bytes.length) return -1;
+    const built = bytes[o];
+    if (built === 0) return 0;
+    if (built !== 1) return -1;
+    const type = bytes[o + 1];
+    const x = rd16(o + 2);
+    const floor = rd16(o + 4);
+    if (type > 5) return -1;
+    // x >= 1: tile 0 is the lot's extreme left edge, never a real flight column, and
+    // rejecting it stops a lone "01 00 .." byte from posing as a stair at 0,0 (which
+    // would out-count a small real table). floor 0 (= B10) IS a valid TDT floor.
+    if (x < 1 || x > TDT_MAX_TILE) return -1;
+    if (floor >= TDT_FLOOR_COUNT) return -1; // floor is a TDT index 0..119; 0 = B10 is valid
+    if (rd16(o + 6) > TDT_MAX_STAIR_CROWD || rd16(o + 8) > TDT_MAX_STAIR_CROWD) return -1;
+    return 1;
+  };
+  // Bound the scan: the table sits just past the finance + parking/lobby blocks,
+  // well within a few KB of the elevator table even in tall towers. A window may
+  // run up against EOF (when the stairs table is the file's last structure, as in
+  // synthetic fixtures): the remaining slots are simply absent, not a mismatch.
+  const last = Math.min(bytes.length - REC, from + TDT_STAIR_SCAN_WINDOW);
+  let bestBase = -1;
+  let bestBuilt = 0;
+  for (let base = Math.max(0, from); base <= last; base++) {
+    let built = 0;
+    let ok = true;
+    for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
+      const o = base + s * REC;
+      if (o + REC > bytes.length) break; // table ends at EOF; later slots absent
+      const c = classify(o);
+      if (c < 0) {
+        ok = false;
+        break;
+      }
+      built += c;
+    }
+    if (ok && built > bestBuilt) {
+      bestBuilt = built; // strictly-greater keeps the earliest window at the max
+      bestBase = base;
+    }
+  }
+  if (bestBase < 0) return []; // no built flights found: the tower has no stairs
+  const stairs: TdtStair[] = [];
+  for (let s = 0; s < TDT_STAIR_SLOTS; s++) {
+    const o = bestBase + s * REC;
+    if (o + REC > bytes.length) break;
+    if (bytes[o] === 1) stairs.push({ type: bytes[o + 1], x: rd16(o + 2), floor: rd16(o + 4) });
+  }
+  return stairs;
+}
+
+/**
  * Walk the blocks after the floor map; people, retail, elevators, finance,
  * parking, stairs (file order per doc §6–§10). A misfit here must never fail
  * the import: each stage that can't be read is recorded as a warning and
@@ -384,7 +544,7 @@ function walkTolerantTail(r: ByteReader): TdtTail {
     }
     const used = r.u8();
     const type = r.u8();
-    r.skip(1); // car capacity; ours comes from the engine's canon table
+    const capacity = r.u8(); // byte 2; NOT a reliable kind signal (a real service shaft read 21). Kind comes from `type`; see TdtElevator.capacity.
     const cars = r.u8();
     r.skip(56); // per-day-type car schedule block (not imported)
     r.skip(2); // visibility flag + reserved byte
@@ -413,43 +573,39 @@ function walkTolerantTail(r: ByteReader): TdtTail {
       return tail;
     }
     r.skip(payload);
-    elevators.push({ type, cars, x, topFloor, bottomFloor, serviced, carHomes });
+    elevators.push({ type, capacity, cars, x, topFloor, bottomFloor, serviced, carHomes });
   }
   tail.elevators = elevators;
+  // The stairs table lives after the finance and parking/lobby blocks, whose
+  // sizes we can't yet pin down across saves, so we locate it by signature from
+  // here (the end of the elevator table) rather than by summing those blocks.
+  const afterElevators = r.offset();
 
-  // ---- Finance block (doc §9); a queued follow-up; skip over it ----------
+  // ---- Finance block (doc §9): best-effort; only used for parkingConnected.
+  // Stairs no longer depend on landing exactly after it. ----
   r.enterBlock("finance block");
-  if (r.remaining() < TDT_FINANCE_SIZE) {
-    warnings.push("The finance block is cut short; stairs and escalators couldn't be read.");
-    return tail;
+  if (r.remaining() >= TDT_FINANCE_SIZE) {
+    r.skip(TDT_FINANCE_SIZE);
+    // ---- Parking block (doc §10): connected-stall count + stall table ----
+    r.enterBlock("parking block");
+    if (r.remaining() >= TDT_PARKING_SIZE) {
+      tail.parkingConnected = r.u16();
+      r.skip(TDT_PARKING_SIZE - 2); // advance past the stall table so the reader position stays honest
+    }
+  } else {
+    // The file ends right after the elevator table, before even the finance
+    // block: the stairs table can't be present, so an empty result here is a
+    // truncation, not a stairless tower. Say so (locateStairs itself can't tell
+    // the two apart; see the backlog's tdt-import stairs-scan defer).
+    warnings.push(
+      "The save ends right after its elevators, so its finance, parking, and stairway data could not be read.",
+    );
   }
-  r.skip(TDT_FINANCE_SIZE);
 
-  // ---- Parking block (doc §10): connected-stall count + stall table -------
-  r.enterBlock("parking block");
-  if (r.remaining() < TDT_PARKING_SIZE) {
-    warnings.push("The parking block is cut short; stairs and escalators couldn't be read.");
-    return tail;
-  }
-  tail.parkingConnected = r.u16();
-  r.skip(TDT_PARKING_SIZE - 2);
-
-  // ---- Stairs/escalators (doc §8): fixed 64 × 10-byte records -------------
+  // ---- Stairs/escalators (doc §8): 64 × 10-byte records, found by signature
+  // (empty array when the tower has no stairs; see locateStairs).
   r.enterBlock("stairs table");
-  if (r.remaining() < TDT_STAIR_SLOTS * TDT_STAIR_RECORD_SIZE) {
-    warnings.push("The stairs table is missing or cut short, so stairways and escalators stayed behind.");
-    return tail;
-  }
-  const stairs: TdtStair[] = [];
-  for (let slot = 0; slot < TDT_STAIR_SLOTS; slot++) {
-    const built = r.u8();
-    const type = r.u8();
-    const x = r.u16();
-    const floor = r.u16();
-    r.skip(4); // live people-up/people-down counts; the crowd re-simulates
-    if (built === 1) stairs.push({ type, x, floor });
-  }
-  tail.stairs = stairs;
+  tail.stairs = locateStairs(r.raw(), afterElevators);
   // Named-tenant and other ancillary blocks follow; not yet imported.
   return tail;
 }

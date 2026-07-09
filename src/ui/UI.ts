@@ -44,6 +44,9 @@ export interface UICallbacks {
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   /** Export the live tower as an original 1994 SimTower save (.TDT). */
   onExportLegacy(): void;
+  /** The live tower's rules mode, so the export dialog can gate the 1994 path
+   *  (Classic only) without serializing the whole tower. */
+  getMode(): GameMode;
   onNew(mode: GameMode): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
@@ -770,6 +773,7 @@ export class UI {
              <span class="nt-mode-name">Modern <span class="nt-badge alt">new</span></span>
              <span class="nt-mode-desc">Everything in Classic, plus features the original couldn't do:</span>
              <span class="nt-feature"><b>Variant households</b>: a condo draws a 2–5 person family. Bigger families pay more but lean harder on your elevators, so each sale is a real bet.</span>
+             <span class="nt-feature"><b>Households come and go</b>: a sold condo's family can move out on its own (a life event, not a complaint), more often for a bigger family. You buy the condo back and resell it, so even a settled tower keeps turning over.</span>
              <span class="nt-feature"><b>A deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out. Late-game money stays a real decision.</span>
            </span>
          </label>
@@ -800,13 +804,20 @@ export class UI {
    *  The .vctower path stays the primary; the 1994 .TDT path is the secondary
    *  and leads to its own reverse fidelity modal before any download. */
   private confirmExport(): void {
+    // The 1994 .TDT path is Classic only: the original rule set has no room for
+    // Modern-only mechanics, so buildTDT refuses a Modern tower. Disable the
+    // button up front (with the reason) rather than let the click fail.
+    const isModern = this.cb.getMode() === "modern";
+    const legacyLine = isModern
+      ? `Saving for the original 1994 game (<b>.TDT</b>) is <b>Classic towers only</b>: the 1994 rule set cannot hold Modern mechanics.`
+      : `You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first. <b>Still experimental</b>: verified to load in the real game for smaller Classic towers.`;
     const box = this.openModal(`
       <h2>Export tower?</h2>
       <p>Your tower will be packed into a <b>${TOWER_FILE_EXT}</b> file and downloaded.</p>
-      <p style="color:var(--muted);font-size:12px">You can also save it for the original 1994 game (<b>.TDT</b>); a summary of what carries over shows first.</p>
+      <p style="color:var(--muted);font-size:12px">${legacyLine}</p>
       <div class="modal-actions">
         <button class="btn" data-act="close">Cancel</button>
-        <button class="btn" data-act="legacy">For SimTower (1994)…</button>
+        <button class="btn" data-act="legacy"${isModern ? ' disabled title="Classic towers only"' : ""}>For SimTower (1994)…</button>
         <button class="btn primary" data-act="export" autofocus>Export</button>
       </div>`);
     this.wireActions(box, {
@@ -960,6 +971,7 @@ export class UI {
     const funds = `${report.money < 0 ? "-" : ""}$${Math.abs(report.money).toLocaleString()}`;
     const box = this.openModal(`
       <h2>Export for SimTower (1994)</h2>
+      <p style="color:var(--muted);font-size:12px"><b>Work in progress.</b> Exporting to the original 1994 format is still experimental. It has been verified to load and play in the real game for smaller Classic towers; a large or complex tower may not load correctly yet. Your tower here is never changed.</p>
       <div class="import-facts well">
         <b>${escapeHtml(report.towerName)}</b> · ${stars} · ${funds}
         · ${report.floors} floor${report.floors === 1 ? "" : "s"}${report.basements ? ` / B${report.basements}` : ""}
@@ -1004,7 +1016,7 @@ export class UI {
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
         <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> below.</li>
-        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
+        <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Sold condo households also <b>move out on their own</b> now and then, a life event more likely for a bigger family, so you buy the condo back and resell as the tower turns over. It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
       <h3>Keyboard play</h3>

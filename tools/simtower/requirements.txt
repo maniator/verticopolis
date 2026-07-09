@@ -1,0 +1,4 @@
+# Host Python dependency for the SimTower harness ISO extractor
+# (tools/simtower/extract-cd.py, run on the host by run.sh on first launch).
+#   pip install -r tools/simtower/requirements.txt
+pycdlib

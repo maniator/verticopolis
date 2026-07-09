@@ -1,0 +1,16 @@
+# Original-game bits must NEVER be committed (clean-room policy, docs/canon/tdt-format.md).
+# Everything pulled off the retail CD / owned OS disks lives here and stays local.
+gamedata/
+manuals/
+wineprefix/
+drive_c/
+saves/
+# native/ holds the genuine 16-bit COMMDLG.DLL (from Win3.1, which you own) that
+# Wine loads to fix SimTower's file Open/Save dialog -- copyrighted, never commit.
+native/
+*.iso
+*.img
+*.ima
+*.vhd
+*.TDT
+*.tdt
