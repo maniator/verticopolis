@@ -1526,7 +1526,7 @@ export class TowerEngine {
       const rx = e.max * TILE;
       const rec = this.escapeActors.get(floor);
       if (rec) {
-        // Same graphic (parity/style is fixed per floor) — just follow the edge.
+        // Same graphic (parity/style is fixed per floor), just follow the edge.
         if (rec.sig !== sig) {
           rec.l.pos = ex.vec(lx, y);
           rec.r.pos = ex.vec(rx, y);

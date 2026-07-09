@@ -370,16 +370,16 @@ export const AWNING_W = 24;
 export function drawAwning(ctx: CanvasRenderingContext2D, side: "left" | "right", floorH: number): void {
   const w = AWNING_W;
   ctx.save();
-  // Draw in one canonical frame — wall at x = 0, canopy projecting right to
-  // x = w — then mirror it for a left wall so both corners share the recipe.
+  // Draw in one canonical frame (wall at x = 0, canopy projecting right to
+  // x = w), then mirror it for a left wall so both corners share the recipe.
   if (side === "left") {
     ctx.translate(w, 0);
     ctx.scale(-1, 1);
   }
   const topY = Math.round(floorH * 0.1); // just under the lobby cornice
-  // A prestige marquee, not a candy stripe: a solid deep hunter-green canopy
-  // with gilded piping and a scalloped arch fringe that echo the lobby's gold
-  // cornice, sconces and chandeliers.
+  // A prestige marquee: a solid deep hunter-green canopy with gilded piping
+  // and a scalloped arch fringe that echo the lobby's gold cornice, sconces
+  // and chandeliers.
   const green = "#234b39";
   const greenHi = "#2f6149";
   const greenLo = "#173324";
