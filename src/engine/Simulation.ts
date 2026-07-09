@@ -402,8 +402,13 @@ export class Simulation implements SimContext {
     if (!this.isRoomKind(kind)) {
       const c = this.tower.canPlace(kind, floor, x);
       if (!c.ok) return { ok: false, reason: c.reason, cost: f.cost };
-      const afford = this.money >= f.cost;
-      return { ok: afford, reason: afford ? undefined : "Not enough money.", cost: f.cost };
+      // A lobby auto-fills the gap to a neighboring lobby with lobby tiles, so
+      // its total charge includes them. A plain floor tool never bridges (empty
+      // plan), so this branch only adds cost for the lobby case.
+      const bridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, facilityFloors(kind)).length;
+      const cost = f.cost + bridge * FACILITIES.lobby.cost;
+      const afford = this.money >= cost;
+      return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
     }
 
     const pre = this.tower.canPlaceRoomIgnoringFloor(kind, floor, x);
@@ -417,7 +422,11 @@ export class Simulation implements SimContext {
           : "Build next to the tower. You can't build in midair.";
       return { ok: false, reason, cost: f.cost };
     }
-    const cost = f.cost + missing * FACILITIES.floor.cost;
+    // Beyond its own floor, a room auto-fills the gap to a neighboring module
+    // with plain floor, so the total charge covers those bridge tiles too and
+    // placement is blocked when the player can't afford the whole run.
+    const bridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length;
+    const cost = f.cost + (missing + bridge) * FACILITIES.floor.cost;
     const afford = this.money >= cost;
     return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
   }
@@ -426,15 +435,26 @@ export class Simulation implements SimContext {
     const can = this.canBuild(kind, floor, x);
     if (!can.ok) return { ok: false, reason: can.reason };
     const f = FACILITIES[kind];
+    const hgt = facilityFloors(kind);
+    // The bridge tiles baked into can.cost, read from the same pre-placement
+    // state canBuild saw (the scan ignores the footprint columns, so laying the
+    // footprint below can't change this count).
+    const quotedBridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length;
     // A room lays its own floor where missing (so you never pre-build bare
     // floors for an office or condo — just drop it next to the tower).
     if (this.isRoomKind(kind)) {
-      const ef = this.tower.ensureFloorUnder(floor, x, f.width, facilityFloors(kind));
+      const ef = this.tower.ensureFloorUnder(floor, x, f.width, hgt);
       if (!ef.ok) return { ok: false, reason: ef.reason };
     }
     const res = this.tower.place(kind, floor, x);
     if (!res.ok) return { ok: false, reason: res.reason };
-    this.money -= can.cost;
+    // With the footprint down, bridge the gap to a neighboring module/lobby.
+    // Runs after placement so both ends of each gap are flanked. Charge only for
+    // tiles actually laid: the plan is exact so this equals can.cost, but
+    // reconciling to the real count means a partial fill could never overcharge.
+    const laidBridge = this.tower.fillBridge(kind, floor, x, f.width, hgt);
+    const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
+    this.money -= can.cost - (quotedBridge - laidBridge) * substrateCost;
     // Rooms spend time under construction before they can be used.
     const dur = buildMinutes(kind);
     if (dur > 0 && res.unitId !== undefined) {

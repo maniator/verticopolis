@@ -791,3 +791,148 @@ describe("Simulation events", () => {
     expect(treasure.length).toBeGreaterThan(0);
   });
 });
+
+describe("Auto-floor bridge between modules", () => {
+  it("fills the floor gap between two rooms on the same story", () => {
+    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    expect(sim.build("office", 2, x0).ok).toBe(true); // A: [x0, x0+9)
+    expect(sim.tower.structureKindAt(2, x0 + 11)).toBeUndefined(); // gap is bare
+    expect(sim.build("office", 2, x0 + 15).ok).toBe(true); // B: [x0+15, x0+24)
+    // The six-tile gap [x0+9, x0+15) is now plain floor, joining A to B.
+    for (let i = 9; i < 15; i++) expect(sim.tower.structureKindAt(2, x0 + i)).toBe("floor");
+    // Tiles beyond the neighbors are untouched (bridge only spans the gap).
+    expect(sim.tower.structureKindAt(2, x0 + 30)).toBeUndefined();
+  });
+
+  it("bridges symmetrically when the second room lands to the left", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("office", 2, x0 + 15); // placed first
+    expect(sim.build("office", 2, x0).ok).toBe(true); // now to its left
+    for (let i = 9; i < 15; i++) expect(sim.tower.structureKindAt(2, x0 + i)).toBe("floor");
+  });
+
+  it("charges for the bridge floor and blocks placement when it can't be afforded", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("office", 2, x0); // A
+    const can = sim.canBuild("office", 2, x0 + 15);
+    // Office + the 9 floors under it + the 6 bridge floors to reach A.
+    expect(can.cost).toBe(FACILITIES.office.cost + (9 + 6) * FACILITIES.floor.cost);
+    sim.money = can.cost - 1; // one dollar short of the whole run
+    expect(sim.build("office", 2, x0 + 15).ok).toBe(false);
+    expect(sim.money).toBe(can.cost - 1); // nothing charged, nothing built
+    expect(sim.tower.structureKindAt(2, x0 + 11)).toBeUndefined();
+    // With exactly enough, it goes in and the money math ties out.
+    sim.money = can.cost;
+    expect(sim.build("office", 2, x0 + 15).ok).toBe(true);
+    expect(sim.money).toBe(0);
+  });
+
+  it("leaves a lone room with only its own floor (no neighbor, no bridge)", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const before = sim.money;
+    expect(sim.build("office", 2, x0).ok).toBe(true);
+    const cost = FACILITIES.office.cost + FACILITIES.office.width * FACILITIES.floor.cost;
+    expect(before - sim.money).toBe(cost); // no extra bridge tiles charged
+    expect(sim.tower.structureKindAt(2, x0 + 12)).toBeUndefined();
+  });
+
+  it("fills the gap between two sky lobbies with lobby tiles, not floor", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const lf = GRID.lobbyInterval; // 15, a sky-lobby floor
+    // Raise a support column to floor 14 but leave floor 15 empty.
+    for (let fl = 2; fl < lf; fl++) {
+      for (let i = 0; i < 10; i++) sim.tower.place("floor", fl, x0 + i);
+    }
+    expect(sim.build("lobby", lf, x0).ok).toBe(true); // A at x0
+    expect(sim.build("lobby", lf, x0 + 7).ok).toBe(true); // B at x0+7
+    // The gap [x0+1, x0+7) is lobby (matching substrate), never plain floor.
+    for (let i = 1; i < 7; i++) expect(sim.tower.structureKindAt(lf, x0 + i)).toBe("lobby");
+  });
+
+  it("does not bridge a plain floor tool across a gap", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("floor", 2, x0);
+    sim.build("floor", 2, x0 + 6); // dropped six tiles away
+    // The floor tool keeps its own drag-run; it must not auto-fill the gap.
+    expect(sim.tower.structureKindAt(2, x0 + 3)).toBeUndefined();
+  });
+
+  it("bridges to the nearest neighbor even across a wide gap (no distance cap)", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("office", 2, x0); // A: [x0, x0+9)
+    expect(sim.build("office", 2, x0 + 30).ok).toBe(true); // B: [x0+30, x0+39)
+    // The whole 21-tile gap fills; bridging is nearest-neighbor, not capped.
+    for (let i = 9; i < 30; i++) expect(sim.tower.structureKindAt(2, x0 + i)).toBe("floor");
+  });
+
+  it("bridges identically in Modern mode (mode-agnostic, like auto-floor-under-room)", () => {
+    const sim = Simulation.newGame(7, "modern");
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("office", 2, x0);
+    expect(sim.build("office", 2, x0 + 15).ok).toBe(true);
+    for (let i = 9; i < 15; i++) expect(sim.tower.structureKindAt(2, x0 + i)).toBe("floor");
+  });
+
+  it("bridges a basement gap with floor (the ground/basement outward-fill path)", () => {
+    const sim = Simulation.newGame(7); // floor-1 lobby (support from above) spans [x0, x0+40)
+    sim.money = 10_000_000;
+    sim.star = 3; // parking unlocks at 3 stars
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    expect(sim.build("parking", 0, x0).ok).toBe(true); // A: [x0, x0+4)
+    expect(sim.build("parking", 0, x0 + 10).ok).toBe(true); // B: [x0+10, x0+14)
+    // The basement gap [x0+4, x0+10) fills with floor, hanging off floor 1 above.
+    for (let i = 4; i < 10; i++) expect(sim.tower.structureKindAt(0, x0 + i)).toBe("floor");
+  });
+
+  it("charges lobby tiles for a lobby bridge and blocks one that can't be afforded", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const lf = GRID.lobbyInterval; // 15
+    for (let fl = 2; fl < lf; fl++) {
+      for (let i = 0; i < 12; i++) sim.tower.place("floor", fl, x0 + i);
+    }
+    sim.build("lobby", lf, x0); // A
+    const can = sim.canBuild("lobby", lf, x0 + 7);
+    // Lobby B plus the six lobby tiles bridging back to A, all at lobby price.
+    expect(can.cost).toBe(FACILITIES.lobby.cost * (1 + 6));
+    sim.money = can.cost - 1;
+    expect(sim.build("lobby", lf, x0 + 7).ok).toBe(false); // unaffordable, so refused
+    expect(sim.tower.structureKindAt(lf, x0 + 3)).toBeUndefined();
+    sim.money = can.cost;
+    expect(sim.build("lobby", lf, x0 + 7).ok).toBe(true);
+    expect(sim.money).toBe(0);
+  });
+
+  it("bridges every story of a stacked multi-story facility above ground", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 20_000_000;
+    sim.star = 3; // cinema unlocks at 3 stars
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Solid support up to floor 4 across both cinema footprints and the gap.
+    for (let fl = 1; fl <= 4; fl++) {
+      for (let i = 0; i < 65; i++) sim.tower.place("floor", fl, x0 + i);
+    }
+    expect(sim.build("cinema", 5, x0).ok).toBe(true); // A: floors 5-6, [x0, x0+31)
+    expect(sim.build("cinema", 5, x0 + 34).ok).toBe(true); // B: floors 5-6, [x0+34, x0+65)
+    // Both walkways bridge: floor 6's gap rests on the floor-5 gap this fill lays.
+    for (const fl of [5, 6]) {
+      for (let i = 31; i < 34; i++) expect(sim.tower.structureKindAt(fl, x0 + i)).toBe("floor");
+    }
+  });
+});
