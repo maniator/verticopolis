@@ -532,9 +532,12 @@ export class Crowd {
     // in one-hour steps.
     const hourFrac = clock.minuteOfDay / 60 - w.start;
     const t = Math.max(0, Math.min(1, hourFrac / (w.end - w.start)));
+    // `outbound + back` is > 0 for every `t ∈ [0, 1]` given the shipped profile
+    // (their supports meet at t = 0.4..0.6 and each hits 1 at an endpoint), so
+    // there is no need for a "both zero" early return here. If the profile
+    // constants change, revisit.
     const outbound = outboundWeight(t);
     const back = returnWeight(t);
-    if (outbound <= 0 && back <= 0) return;
 
     // Meal venues open this window (arch §1). If the tower has none, the whole
     // meal path yields nothing (players see no meal trips until they build
@@ -561,6 +564,18 @@ export class Crowd {
           push(floors.condoFloors, condo);
           break;
         case "hotel":
+          // Hotels are declared as origins for every meal window per the arch,
+          // but `hotelFloors` is gated by `isTenanted(u) || u.state === "asleep"`
+          // (same as the shipped `homes` bin). Under the current hotel state
+          // model guests are only `asleep` between evening move-in (17:00+) and
+          // checkout (08:00), so `hotelFloors` is EMPTY during lunch (11-14)
+          // and mostly empty during dinner (17-20 fills gradually). Breakfast
+          // and late-night see full hotel participation. Broadening the gate to
+          // include daytime guest presence is a real feature the state model
+          // does not yet have; it lands with the `per-person-meal-round-trips`
+          // backlog follow-up. Keeping the origin declared here (with a zero
+          // contribution during the affected hours) documents the design intent
+          // in one place so the follow-up needs no MEAL_MIX change.
           push(floors.hotelFloors, hotel);
           break;
         case "staff": {
@@ -575,21 +590,25 @@ export class Crowd {
     if (!originPools.length) return;
 
     // Contribute options in proportion to the outbound/return phase. The
-    // integer coefficient is small (1..3) so the pool stays balanced with the
-    // existing morning/evening/night branches; `rng.pick` fires one option per
-    // spawn call and the MAX_PEOPLE cap self-throttles.
-    const outboundCount = Math.max(0, Math.round(outbound * 3));
-    const returnCount = Math.max(0, Math.round(back * 3));
+    // integer BASE coefficient is small (1..3) so the pool stays balanced with
+    // the existing morning/evening/night branches; `rng.pick` fires one option
+    // per spawn call and the MAX_PEOPLE cap self-throttles. Each contributed
+    // option is then gated by `rng.chance(pool.weight)` so a low-weight
+    // population (condos, 0.3x) contributes with the RIGHT probability at
+    // EVERY phase, not on/off in coarse chunks. Compound rounding would collapse
+    // the middle third of the window for the 0.3x pool otherwise (review D1).
+    const outboundBase = Math.max(0, Math.round(outbound * 3));
+    const returnBase = Math.max(0, Math.round(back * 3));
     for (const pool of originPools) {
-      // Weight is small (0.3..1.0); scale it into the integer counts by
-      // repeating an origin's option that many times.
-      const perPoolOut = Math.max(0, Math.round(outboundCount * pool.weight));
-      const perPoolBack = Math.max(0, Math.round(returnCount * pool.weight));
-      for (let i = 0; i < perPoolOut; i++) {
-        options.push(() => trip(this.rng.pick(pool.floors), this.rng.pick(venueFloors)));
+      for (let i = 0; i < outboundBase; i++) {
+        if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
+          options.push(() => trip(this.rng.pick(pool.floors), this.rng.pick(venueFloors)));
+        }
       }
-      for (let i = 0; i < perPoolBack; i++) {
-        options.push(() => trip(this.rng.pick(venueFloors), this.rng.pick(pool.floors)));
+      for (let i = 0; i < returnBase; i++) {
+        if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
+          options.push(() => trip(this.rng.pick(venueFloors), this.rng.pick(pool.floors)));
+        }
       }
     }
   }

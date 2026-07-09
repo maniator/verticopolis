@@ -82,6 +82,33 @@ lands via the `population-census-parity` backlog row plus a new
 
 - 2026-07-09: story created from gdd + arch pair.
 
+## Review Findings
+
+`/gds-code-review` 2026-07-09, three adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor). All six load-bearing invariants confirmed hold. Triage: 2 decision_needed (owner resolved), 7 patched, 6 deferred, ~5 dismissed.
+
+**Owner decisions:**
+- **D1** condo compound-rounding: refactored to `rng.chance(pool.weight)` so condos contribute smoothly at every phase, not on-off in coarse chunks. Aggregate integral unchanged; per-phase shape now matches the arch profile.
+- **D2** hotels in lunch/dinner MEAL_MIX: keep declared, add code comment explaining hotelFloors gate excludes daytime hours under the current state model; the honest fix lands with `per-person-meal-round-trips`. Backlog row extended.
+
+**Patched (7):**
+- [x] `[Review][Patch]` D1 refactor to rng.chance [`src/engine/Crowd.ts:577`]
+- [x] `[Review][Patch]` D2 hotel-gate documentation + backlog row extended [`src/engine/Crowd.ts:565`]
+- [x] `[Review][Patch]` P1 weekday-lunch positive test (office->venue count > 0) [`src/tests/mealCadence.test.ts`]
+- [x] `[Review][Patch]` P2 weekend-lunch outcome test (counts office-origin trips in the crowd, not just occupants) [`src/tests/mealCadence.test.ts`]
+- [x] `[Review][Patch]` P3 bulletin-cadence tests via extracted pure `decideMealRush` helper [`src/game/mealRush.ts` + `src/tests/mealRush.test.ts` + `src/main.ts` rewire]
+- [x] `[Review][Patch]` P4 return-lag ASYMMETRY test (outbound heavier in first half, return heavier in second) [`src/tests/mealCadence.test.ts`]
+- [x] `[Review][Patch]` P5 shift-gate wire-up tests (housekeeping-only tower fires at 12, silent at 21, catches removal of the `.filter(staffOnShift)` line) [`src/tests/mealCadence.test.ts`]
+- [x] `[Review][Patch]` P6 removed dead `outbound<=0 && back<=0` early-return + explanatory comment [`src/engine/Crowd.ts:537`]
+- [x] `[Review][Patch]` P7 arch §8 dinner-crawl arithmetic corrected to shipped 120/160/120 [arch doc]
+
+**Deferred (6):**
+- [x] `[Review][Defer]` Spawn-vs-updatePresence ordering (Edge F3) [`src/engine/Simulation.ts`] - pre-existing, not caused by this diff
+- [x] `[Review][Defer]` Day-0 breakfast bulletin skipped (Edge F5) [`src/game/mealRush.ts`] - inherited semantics from shipped lunch code
+- [x] `[Review][Defer]` Post-dinner 2.26x pacing sprint (Edge F6) [`src/engine/timePacing.ts`] - documented arithmetic consequence, not a bug
+- [x] `[Review][Defer]` Bulletin misses on huge-frame multi-day catch-up (Edge F7) [`src/game/mealRush.ts`] - inherited from shipped lunch code
+- [x] `[Review][Defer]` Evening flow dilution by dinner-window meal options (Edge F8) - design intent
+- [x] `[Review][Defer]` `filter().map()` allocation per pushMealOptions call (Edge F10) - negligible perf; revisit if profiler flags it
+
 ## Dev Agent Record
 
 ### Debug Log

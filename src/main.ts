@@ -20,6 +20,7 @@ import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
+import { decideMealRush } from "./game/mealRush";
 import { InspectorController } from "./game/inspector";
 import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
@@ -1001,11 +1002,16 @@ class GameApp {
     // weekend gate skips weekends for the workday meals only (lunch and
     // dinner). Breakfast fires every day (hotels serve breakfast on weekends).
     const emit = (kind: "breakfast" | "lunch" | "dinner", hour: number, text: string, skipWeekend: boolean): void => {
-      const dayOfKind = Math.floor((minutesBeforeTicks - hour * 60) / 1440) + 1;
-      const absMinute = dayOfKind * 1440 + hour * 60;
-      if (absMinute > after) return; // this frame did not reach that hour
-      if (skipWeekend && dayOfKind % cal.weekDays >= cal.weekDays - cal.weekendDays) return;
-      if (dayOfKind === this.lastMealRushDay[kind]) return;
+      const { fire, dayOfKind } = decideMealRush({
+        hour,
+        skipWeekend,
+        before: minutesBeforeTicks,
+        after,
+        weekDays: cal.weekDays,
+        weekendDays: cal.weekendDays,
+        lastFiredDay: this.lastMealRushDay[kind],
+      });
+      if (!fire) return;
       this.lastMealRushDay[kind] = dayOfKind;
       this.sim.emit(text, "info");
     };

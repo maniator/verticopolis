@@ -130,6 +130,173 @@ describe("off-window spawns zero meal-typed trips", () => {
   });
 });
 
+/**
+ * Fixture that seeds a staffed weekday office at floor 2 with real occupants
+ * so `staffedOffices` is non-empty and meal cadence can actually fire office
+ * trips. The base `mixedTower()` places rooms as "occupied" but doesn't set
+ * `occupants > 0`, which the presence model normally does at 07:00.
+ */
+function weekdayStaffedTower(): Simulation {
+  const sim = mixedTower();
+  // Seed office occupants directly so `staffedOffices` is non-empty as soon as
+  // `spawnFloors` runs; sidesteps waiting for `updatePresence` to fill offices
+  // at 07:00 and lets a test pin behavior at any hour.
+  for (const u of sim.tower.units) if (u.kind === "office") u.occupants = 6;
+  return sim;
+}
+
+describe("weekday lunch fires office-origin trips (positive coverage)", () => {
+  it("at 12:00 on a weekday with a staffed office, at least one office -> venue trip spawns within a lunch pump", () => {
+    const sim = weekdayStaffedTower();
+    setHour(sim, 12);
+    // The venue floor is 5 (fastFood + restaurant in mixedTower).
+    // Office floor is 2. A single spawn call may or may not roll the office
+    // origin, so we pump the window and count office->venue trips over that
+    // window. Deterministic: seed 2024, fixed clock, fixed tower.
+    let officeToVenue = 0;
+    let officeIsStillStaffed = false;
+    for (let m = 0; m < 60; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) {
+        if (before.has(p.id)) continue;
+        const origin = p.floors[0];
+        const dest = p.floors[p.floors.length - 1];
+        if (origin === 2 && dest === 5) officeToVenue++;
+      }
+      const office = sim.tower.units.find((u) => u.kind === "office");
+      if (office && office.occupants > 0) officeIsStillStaffed = true;
+    }
+    expect(officeIsStillStaffed).toBe(true); // sanity guard on the fixture
+    expect(officeToVenue).toBeGreaterThan(0); // meal cadence fired at least once
+  });
+});
+
+describe("weekend correctness fires zero OFFICE-ORIGIN trips (outcome, not just mechanism)", () => {
+  it("counting the crowd list, no trip originates at the office floor on a weekend lunch", () => {
+    const sim = weekdayStaffedTower();
+    setToWeekend(sim, 12);
+    // The weekday fixture's manual seed of office occupants would be zeroed by
+    // updatePresence on the next hour boundary; force it now so the meal
+    // path sees the weekend state at spawn time.
+    for (const u of sim.tower.units) if (u.kind === "office") u.occupants = 0;
+    let officeOrigin = 0;
+    for (let m = 0; m < 60; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) {
+        if (before.has(p.id)) continue;
+        if (p.floors[0] === 2) officeOrigin++;
+      }
+    }
+    expect(officeOrigin).toBe(0);
+  });
+
+  it("condos/hotels still fire on weekends when eligible", () => {
+    // Condo floor is 3 in mixedTower. Late-night 21:00 draws hotels + condos
+    // per MEAL_MIX.lateNight; fastFood on floor 5 is open until 22 so the
+    // venue side is populated (mixedTower has no cinema). Confirms condo /
+    // hotel meal flow still exists on weekends.
+    const sim = mixedTower();
+    // Seed a hotel `asleep` so it passes the isTenanted-or-asleep gate.
+    const hotel = sim.tower.units.find((u) => u.kind === "hotelSingle");
+    if (hotel) hotel.state = "asleep";
+    setToWeekend(sim, 21);
+    let condoOrHotelOrigin = 0;
+    for (let m = 0; m < 60; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) {
+        if (before.has(p.id)) continue;
+        if (p.floors[0] === 3 || p.floors[0] === 4) condoOrHotelOrigin++;
+      }
+    }
+    expect(condoOrHotelOrigin).toBeGreaterThan(0);
+  });
+});
+
+describe("staff shift gate wired through pushMealOptions (end-to-end, not helper-only)", () => {
+  /** Housekeeping-only fixture: no rooms of eating kinds, one housekeeping
+   *  facility, one fastFood venue. If the shift filter in pushMealOptions
+   *  ever gets removed, this test starts spawning staff trips at 21:00. */
+  function housekeepingOnly(): Simulation {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 5; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    sim.tower.placeTransport("elevatorStandard", 4, 1, 5);
+    // Housekeeping on floor 2, fastFood on floor 5. No offices/condos/hotels.
+    const hk = sim.tower.place("housekeeping", 2, 10);
+    const ff = sim.tower.place("fastFood", 5, 0);
+    for (const r of [hk, ff]) {
+      const u = sim.tower.units.find((x) => x.id === r.unitId);
+      if (u) u.state = "occupied";
+    }
+    return sim;
+  }
+
+  it("housekeeping-origin trips DO spawn at 12:00 (in shift)", () => {
+    const sim = housekeepingOnly();
+    setHour(sim, 12);
+    let hkOrigin = 0;
+    for (let m = 0; m < 60; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) if (!before.has(p.id) && p.floors[0] === 2) hkOrigin++;
+    }
+    expect(hkOrigin).toBeGreaterThan(0);
+  });
+
+  it("housekeeping-origin trips DO NOT spawn at 21:00 (past shift)", () => {
+    const sim = housekeepingOnly();
+    setHour(sim, 21);
+    let hkOrigin = 0;
+    for (let m = 0; m < 60; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) if (!before.has(p.id) && p.floors[0] === 2) hkOrigin++;
+    }
+    expect(hkOrigin).toBe(0);
+  });
+});
+
+describe("return trips lag outbound: outbound-heavier first half, return-heavier second (asymmetry)", () => {
+  it("asserts the direction the phase profile prescribes", () => {
+    const sim = weekdayStaffedTower();
+    setHour(sim, 11);
+    // Split the 3-hour lunch window into two halves. Count outbound (origin
+    // floor -> venue floor 5) vs return (venue floor 5 -> origin) trips in each.
+    let firstOutbound = 0, firstReturn = 0;
+    for (let m = 0; m < 90; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) {
+        if (before.has(p.id)) continue;
+        const o = p.floors[0], d = p.floors[p.floors.length - 1];
+        if (d === 5 && [2, 3, 4].includes(o)) firstOutbound++;
+        if (o === 5 && [2, 3, 4].includes(d)) firstReturn++;
+      }
+    }
+    let secondOutbound = 0, secondReturn = 0;
+    for (let m = 0; m < 90; m++) {
+      const before = new Set(sim.crowd.people.map((p) => p.id));
+      sim.tick(1);
+      for (const p of sim.crowd.people) {
+        if (before.has(p.id)) continue;
+        const o = p.floors[0], d = p.floors[p.floors.length - 1];
+        if (d === 5 && [2, 3, 4].includes(o)) secondOutbound++;
+        if (o === 5 && [2, 3, 4].includes(d)) secondReturn++;
+      }
+    }
+    // The phase profile: outbound dominates t in [0, 0.4], return dominates
+    // t in [0.6, 1]. So the first-half spawn pool skews outbound, the
+    // second-half skews return.
+    expect(firstOutbound).toBeGreaterThan(firstReturn);
+    expect(secondReturn).toBeGreaterThan(secondOutbound);
+  });
+});
+
 describe("MAX_PEOPLE cap holds through a lunch peak", () => {
   it("does not overflow the crowd cap on a densely-mixed tower", () => {
     const sim = mixedTower();

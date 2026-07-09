@@ -228,15 +228,21 @@ tenants, tuned in the code) so a 1-star tower does not spam.
 on 30 minutes). It has NO dinner crawl; the 17:00-21:00 slot runs at normal
 rate (frames 1600-2000 = 400 frames for 240 minutes = 0.6 min/frame).
 
-Add a dinner crawl by splitting the 17:00-21:00 slot into three:
+Add a dinner crawl by splitting the 17:00-21:00 slot into three, preserving
+the block's ORIGINAL 400-frame budget (not the 1000-frame figure an earlier
+draft of this section listed by mistake, which would have blown the day's
+2600-frame total by 600 frames):
 
-- 17:00-18:00: 300 frames for 60 min
-- 18:00-18:30: 300 frames for 30 min (the dinner crawl, matches lunch)
-- 18:30-21:00: 400 frames for 150 min (slightly compressed to preserve total)
+- 17:00-18:00: 120 frames for 60 min (0.50 min/frame, dinner lead-in)
+- 18:00-18:30: 160 frames for 30 min (0.19 min/frame, the dinner crawl)
+- 18:30-21:00: 120 frames for 150 min (1.25 min/frame, post-dinner)
 
-Total for the four-hour block: 1000 frames for 240 min, same as before. The
-day's 2600-frame total is preserved. The crawl reads visibly slow around 18:00
-just like 12:00.
+Total for the four-hour block: 120 + 160 + 120 = 400 frames for 240 min,
+matching the shipped block exactly. The day's 2600-frame total is preserved.
+The dinner crawl reads visibly slower than surrounding periods (about 2.6x
+slower than the lead-in) but is not as extreme as the noon crawl (13.3x slower
+than the surrounding rate) because the 400-frame budget cannot support both a
+noon-strength crawl and a full 3-hour post-crawl period at neutral rate.
 
 ## 9. Ledger + save/load
 
