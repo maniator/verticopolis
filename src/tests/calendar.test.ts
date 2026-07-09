@@ -105,10 +105,14 @@ describe("income-invariant rent rescale", () => {
     expect(ctx.money).toBe(3 * ECON.rent.office.default);
   });
 
-  it("canon collects 1/30 per collection (3-day quarter vs 90)", () => {
+  it("canon collects 1/30 per collection (3-day quarter vs real-world's 90)", () => {
     const ctx = officeContext(3, CANON);
     new EconomySystem(ctx).collectRent();
-    expect(ctx.money).toBe(Math.round((3 * ECON.rent.office.default * 3) / 90));
+    // Divisor mirrors the production rescale: quarterDays / REAL_WORLD.quarterDays.
+    // Using the constant keeps the test aligned if real-world is ever retuned.
+    expect(ctx.money).toBe(
+      Math.round((3 * ECON.rent.office.default * CANON.quarterDays) / REAL_WORLD.quarterDays),
+    );
   });
 
   it("keeps rent income per in-game day equal across calendars", () => {

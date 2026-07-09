@@ -884,6 +884,18 @@ describe("newTowerModal — the rule-set picker", () => {
     expect(onFound).toHaveBeenCalledWith("modern", "canon");
   });
 
+  it("ignores the calendar radio when founding Classic (persists the harmless default)", () => {
+    // A Classic save's calendar is derived, not read from the persisted field,
+    // so persisting "canon" here would only quietly contradict the contract.
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    // Classic pre-checked; a user toggles the Modern-calendar radio anyway.
+    dialog().querySelector<HTMLInputElement>('input[name="nt-cal"][value="canon"]')!.checked = true;
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("classic", "realWorld");
+  });
+
   it("cancels without founding anything", () => {
     const onFound = vi.fn();
     const { ui } = makeUI();

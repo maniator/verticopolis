@@ -799,9 +799,15 @@ export class UI {
           const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
           const mode: GameMode = picked === "modern" ? "modern" : "classic";
           // The calendar choice only applies to Modern; Classic is always canon,
-          // so a Classic founding passes the harmless default.
-          const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
-          const modernCalendar: CalendarKind = pickedCal === "canon" ? "canon" : "realWorld";
+          // so a Classic founding pins the harmless default regardless of what
+          // the Modern sub-picker reads. Reading the radio for Classic would let
+          // a curious click persist "canon" on a save that ignores the field,
+          // contradicting the "Classic stores the harmless default" contract.
+          let modernCalendar: CalendarKind = "realWorld";
+          if (mode === "modern") {
+            const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
+            if (pickedCal === "canon") modernCalendar = "canon";
+          }
           this.closeModal();
           opts.onFound(mode, modernCalendar);
         },

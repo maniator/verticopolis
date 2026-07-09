@@ -940,7 +940,9 @@ class GameApp {
     // past both noon and the following midnight: the clock's day would have moved
     // on, but the crossed noon is still the one computed from where we began.
     // Do NOT "simplify" this to clock.day/isWeekend; that reintroduces the
-    // missed-crossing bug near midnight. A day index's weekday is `day % 7`, and
+    // missed-crossing bug near midnight. A day index's weekday-vs-weekend split
+    // reads the tower's calendar directly (see the check below) instead of
+    // hard-coding a 7-day week, so the bulletin gates correctly under canon too.
     const cal = this.sim.clock.calendar;
     const dayOfNoon = Math.floor((minutesBeforeTicks - 12 * 60) / 1440) + 1;
     const noonAbs = dayOfNoon * 1440 + 12 * 60;
