@@ -352,6 +352,66 @@ export function drawEscapeStairs(
   }
 }
 
+/** Width in px of one ground-floor entrance awning. Wider than a fire-escape
+ *  segment ({@link ESCAPE_W}) so the canopy reads as a projecting shade rather
+ *  than a ladder rail. */
+export const AWNING_W = 14;
+
+/**
+ * A little striped storefront awning over the ground-floor entrance frontage,
+ * standing in for the fire escape on floor 1. In the 1994 original the lobby's
+ * street level wears these canopies instead of the exterior stairs that clad the
+ * floors above, so we swap them in on the ground row. `side` is the wall the
+ * canopy juts out from: it mounts flush to that wall and slopes down and
+ * outward. Painted into a floor-tall canvas (only the upper strip is used) so it
+ * shares the escape segment's top-left anchor and edge-following geometry.
+ */
+export function drawAwning(ctx: CanvasRenderingContext2D, side: "left" | "right", floorH: number): void {
+  const w = AWNING_W;
+  ctx.save();
+  // Draw in one canonical frame — wall at x = 0, canopy projecting right to
+  // x = w — then mirror it for a left wall so both corners share the recipe.
+  if (side === "left") {
+    ctx.translate(w, 0);
+    ctx.scale(-1, 1);
+  }
+  const topY = Math.round(floorH * 0.12); // just under the lobby cornice
+  const cream = "#f2e4c4";
+  const red = "#a3243c";
+  const trim = "#7a1a2e";
+  // Striped canopy: one vertical band per column, its top and bottom sloping
+  // down as the canopy projects away from the wall (x = 0 toward x = w).
+  for (let cx = 0; cx < w; cx++) {
+    const t = cx / (w - 1);
+    const top = topY + Math.round(t * 4);
+    const bot = topY + 4 + Math.round(t * 5);
+    ctx.fillStyle = Math.floor(cx / 3) % 2 === 0 ? cream : red;
+    ctx.fillRect(cx, top, 1, bot - top);
+  }
+  // Underside shadow along the canopy's lower edge so it reads as 3-D.
+  ctx.fillStyle = "rgba(0,0,0,0.18)";
+  for (let cx = 0; cx < w; cx++) {
+    const t = cx / (w - 1);
+    ctx.fillRect(cx, topY + 3 + Math.round(t * 5), 1, 1);
+  }
+  // Outer front lip at the projecting edge.
+  ctx.fillStyle = trim;
+  ctx.fillRect(w - 2, topY + 4, 2, 6);
+  // Scalloped valance hanging from the front lip.
+  const vy = topY + 9;
+  ctx.fillStyle = trim;
+  ctx.fillRect(0, vy - 1, w, 1);
+  ctx.fillStyle = red;
+  for (let sx = 0; sx < w; sx += 4) {
+    ctx.fillRect(sx, vy, Math.min(4, w - sx), 2);
+    if (sx + 1 < w) ctx.fillRect(sx + 1, vy + 2, Math.min(2, w - sx - 1), 1); // little scallop point
+  }
+  // Support bracket bolting the canopy to the wall.
+  ctx.fillStyle = "#6b5a34";
+  ctx.fillRect(0, topY, 1, 10);
+  ctx.restore();
+}
+
 /** Charred interior behind the flames of a burning unit. */
 export function drawBurntShell(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   ctx.fillStyle = "#241c18";

@@ -3,6 +3,7 @@ import type { Unit, Transport } from "../engine/types";
 import {
   drawUnit,
   drawTransport,
+  drawAwning,
   drawCar,
   drawCrane,
   drawEscapeStairs,
@@ -151,6 +152,8 @@ describe("transport, crane & event sprites paint", () => {
     for (const run of [
       (c: CanvasRenderingContext2D) => drawEscapeStairs(c, "left", 0, 34),
       (c: CanvasRenderingContext2D) => drawEscapeStairs(c, "right", 1, 34),
+      (c: CanvasRenderingContext2D) => drawAwning(c, "left", 34),
+      (c: CanvasRenderingContext2D) => drawAwning(c, "right", 34),
       (c: CanvasRenderingContext2D) => drawCrane(c, 12, true),
       (c: CanvasRenderingContext2D) => drawGarbageTruck(c, 80),
       (c: CanvasRenderingContext2D) => drawMetroTrain(c, 120, true),
@@ -160,6 +163,19 @@ describe("transport, crane & event sprites paint", () => {
       expect(() => run(s.ctx)).not.toThrow();
       expect(s.painted()).toBe(true);
     }
+  });
+
+  it("the ground-floor awning mirrors per side and differs from the escape stairs", () => {
+    const awnL = spyCtx();
+    const awnR = spyCtx();
+    const esc = spyCtx();
+    drawAwning(awnL.ctx, "left", 34);
+    drawAwning(awnR.ctx, "right", 34);
+    drawEscapeStairs(esc.ctx, "left", 0, 34);
+    // Left and right canopies are mirror images, so their draw traces differ.
+    expect(awnL.sig()).not.toBe(awnR.sig());
+    // The awning is a distinct sprite from the fire escape it stands in for.
+    expect(awnL.sig()).not.toBe(esc.sig());
   });
 
   it("event sprites (santa, explosion, thief, treasure, limo) all paint", () => {

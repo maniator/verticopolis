@@ -17,9 +17,11 @@ import { drawBurntShell, drawConstruction, drawFlames, drawFloor, drawLobby } fr
 
 export type { DrawCtx } from "./sprites/common";
 export {
+  AWNING_W,
   CRANE_H,
   CRANE_W,
   craneAnchorTile,
+  drawAwning,
   drawCrane,
   drawEscapeStairs,
   ESCAPE_W,
