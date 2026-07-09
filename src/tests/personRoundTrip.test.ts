@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { Clock } from "../engine/Clock";
-import { visibleOccupants } from "../engine/Crowd";
+import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN } from "../engine/Crowd";
 
 /**
  * Per-person meal round-trip regression suite (PR A: person-tracking epic).
@@ -16,7 +16,7 @@ import { visibleOccupants } from "../engine/Crowd";
  *   - collectTrafficIncome byte-identical (no economy change).
  */
 
-/** A fixture with one served office (5 workers) + a fastFood venue. */
+/** A fixture with one served office (6 workers) + a fastFood venue. */
 function officeAndFastFood(): Simulation {
   const sim = new Simulation(2024, "modern", "realWorld");
   sim.money = 1_000_000;
@@ -183,9 +183,12 @@ describe("outbound arrival transitions to eating with in-range timer (arch §8 t
     }
     expect(seenEating).not.toBeNull();
     const eat = seenEating?.eatSecondsLeft ?? -1;
-    // The person may have already decremented eatSecondsLeft by a partial dt
-    // by the time we sample, so allow a small slack under the min.
-    expect(eat).toBeGreaterThan(0);
+    // The person may have already decremented eatSecondsLeft by up to one crowd
+    // step (sim.tick(1) advances the crowd by CROWD_SECONDS_PER_MINUTE = 2
+    // crowd-seconds) by the time we sample, so allow a 2-second slack under the
+    // 60-second minimum. This still fails a bug that sets the timer far below
+    // the intended floor (e.g. a 5-10 second eat).
+    expect(eat).toBeGreaterThanOrEqual(EAT_SECONDS_MIN - CROWD_SECONDS_PER_MINUTE);
     expect(eat).toBeLessThanOrEqual(120);
   });
 });

@@ -213,8 +213,8 @@ const MAX_PEOPLE = 140;
  *  visibly thinned for ~40-70 minutes. */
 const EAT_MINUTES_MIN = 30;
 const EAT_MINUTES_MAX = 60;
-const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
-const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
+export const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
+export const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
 
 /**
  * Visible occupant count for a room, as seen by the renderer and (PR B) the

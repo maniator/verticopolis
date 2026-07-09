@@ -309,7 +309,12 @@ function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, 
   const asleep = u.state === "asleep";
   const dirty = u.state === "dirty";
   const wall = grade === 3 ? "#C8A86A" : "#D8C49A";
-  const lit = !asleep && (u.occupants > 0 || d.lit);
+  // `visibleOccupants` subtracts the transient `outForMeal` overlay, so a room
+  // whose guests are all out for a meal reads dark and unlit, matching offices
+  // and condos. `outForMeal` is 0 for hotels today (guests only leave asleep at
+  // night), so this is a no-op until hotel meal trips exist, but it keeps the
+  // "someone is here" cue on the same visible projection everywhere.
+  const lit = !asleep && (visibleOccupants(u) > 0 || d.lit);
   const floorY = shell(ctx, x, y, w, h, asleep ? "#3A3550" : wall, "#A88A5E");
   if (grade === 3) {
     // Suite sitting area on the left third.
