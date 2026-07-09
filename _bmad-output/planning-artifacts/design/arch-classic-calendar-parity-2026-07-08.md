@@ -179,9 +179,17 @@ amount *= this.sim.calendar.maintPeriodDays / 30;  // canon 3/30 = 1/10, realWor
 
 Run on `tools/simtower/` (committed, opt-in, bring-your-own-ISO):
 
-1. **Weekend phase** — load a save at a known `currentDay`, observe which day the
-   retail game renders as the weekend (quieter offices / fuller hotels or the
-   date slot), pin `WEEKEND_SLOT` to match. Record the observation in the PR.
+1. **Weekend phase** — VALIDATED 2026-07-08 (Wine harness, `my_tower.TDT`). The
+   retail game's date stamp reads `<n>th WD/<Q>Q/<ord> Year` (identical to our
+   `formatRetroDate`). Loaded from saved `currentDay` 60, the game ran forward
+   and rendered `1st WD/2Q/6th Year` (= our model at day 63) then
+   `2nd WD/3Q/6th Year` (= our model at day 67). Both match exactly: the week is
+   `[1st WD, 2nd WD, WE]` (weekend is the TRAILING slot = `day % 3 == 2`), the
+   quarter rolls every 3 days, and the weekday slot is `day % 3` (0-based). This
+   confirms `CANON.weekendDays: 1` trailing and the absolute phase; no code
+   change needed. (Note: the game advances during a headless load, so this is a
+   two-point progression-consistency check, not a frozen-day read; the two points
+   pin both weekday slots and two quarter boundaries.)
 2. **Maintenance cadence** — read the retail Finance window across several
    in-game days to confirm the recurring-cost beat, justifying the canon
    per-quarter choice (or correcting it).

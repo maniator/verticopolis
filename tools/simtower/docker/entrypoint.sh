@@ -116,7 +116,12 @@ load_tdt() {
   # whichever is up, then let the tower render. Clicks only (no Return), so a
   # stray keypress can't reach the loaded game and trigger a menu/exit.
   sleep 8
-  for _ in $(seq 1 12); do
+  # Click across the OK/Yes button zone AND advance the post-dialog title splash
+  # (which needs a click anywhere and can appear late on a cold boot). Keep
+  # clicking long enough to clear a slow splash, then STOP and let the tower
+  # settle before the shot so we don't catch a transient. Tunable via CLICK_SECS.
+  local click_secs="${CLICK_SECS:-30}"
+  for _ in $(seq 1 "$click_secs"); do
     for xy in "514 453" "512 416" "478 416" "512 433"; do
       xdotool mousemove $xy click 1 >/dev/null 2>&1 || true
     done
