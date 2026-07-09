@@ -229,12 +229,6 @@ export interface TdtTower {
   peopleCount: number | null;
   /** Occupied rows found in the 512-slot retail table (null if unreadable). */
   retailRows: number | null;
-  /** Per-slot canon variant byte from the 512-slot retail table (null if
-   *  unreadable). `0xFF` marks empty. Length 512 when read. The importer keys
-   *  variants off the unit-record byte 17 (§4, stronger evidence than §7),
-   *  but this array is preserved so a round-trip export can rewrite the
-   *  same table without silently zeroing legitimate variants. */
-  retailVariants: Uint8Array | null;
   /** Decoded elevator shafts, or null when the block couldn't be read;
    *  the importer then falls back to synthesizing a layout. */
   elevators: TdtElevator[] | null;
@@ -409,7 +403,7 @@ export function parseTdtBinary(bytes: Uint8Array): TdtTower {
 }
 
 /** Everything walkTolerantTail can produce. */
-type TdtTail = Pick<TdtTower, "peopleCount" | "retailRows" | "retailVariants" | "elevators" | "stairs" | "parkingConnected" | "warnings">;
+type TdtTail = Pick<TdtTower, "peopleCount" | "retailRows" | "elevators" | "stairs" | "parkingConnected" | "warnings">;
 
 /**
  * Locate and decode the 64 × 10-byte stairs/escalator table (doc §8) by
@@ -499,7 +493,6 @@ function walkTolerantTail(r: ByteReader): TdtTail {
   const tail: TdtTail = {
     peopleCount: null,
     retailRows: null,
-    retailVariants: null,
     elevators: null,
     stairs: null,
     parkingConnected: null,
@@ -531,22 +524,16 @@ function walkTolerantTail(r: ByteReader): TdtTail {
     return tail;
   }
   let occupied = 0;
-  // Per doc §7: byte 0 is the row's floor (0xFF marks empty), byte 1 is the
-  // status (0-3), byte 2 is the canon variant. Preserve the variant byte per
-  // slot so a round-trip export can rewrite the same table; the importer
-  // still keys individual units off the unit-record byte 17 (§4, stronger
-  // evidence).
-  const variants = new Uint8Array(TDT_RETAIL_SLOTS);
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
+    // Byte 0 is the row's floor, 0xFF marks empty (doc §7); the rest of the
+    // 18-byte row (status, variant, and reserved bytes) is not consumed here.
+    // The importer keys retail variants off the unit-record byte 17 (§4),
+    // which the tenant parser already captures.
     const floor = r.u8();
-    r.skip(1); // status
-    const variant = r.u8();
-    r.skip(TDT_RETAIL_RECORD_SIZE - 3);
-    variants[slot] = variant;
+    r.skip(TDT_RETAIL_RECORD_SIZE - 1);
     if (floor !== 0xff) occupied++;
   }
   tail.retailRows = occupied;
-  tail.retailVariants = variants;
 
   // ---- Elevator table (doc §8): 24 entries, variable-width when built -----
   r.enterBlock("elevator table");

@@ -113,8 +113,6 @@ describe("buildTDT: export → import round trip", () => {
     // Distinct kinds, distinct floors so the retail-table row order is stable.
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 3, x0 + i);
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 4, x0 + i);
-    const shop = sim.tower.units.find((u) => u.kind === "floor" && u.floor === 2)!; // just to compile
-    void shop;
     // Place through the low-level place path to keep sequence deterministic,
     // then FORCE canonical names so the assertion doesn't hinge on which
     // subtype the RNG happened to pick.

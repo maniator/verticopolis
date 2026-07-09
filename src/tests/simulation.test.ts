@@ -1184,21 +1184,25 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
   });
 
   it("byte-identical Classic RNG stream when no retail is built (short-circuit gate)", () => {
-    // Two towers, same seed, no retail: any subsequent RNG draw (basement
-    // treasure, condo relocation, tenant naming) must land on the exact same
-    // values. Compare the state signature after N ticks.
-    const drive = (seed: number): [number, number] => {
-      const sim = builtTower(seed);
+    // Build N non-retail units, then draw a WITNESS value from sim.rng. A
+    // regression that added even one wasted RNG draw during a non-retail build
+    // would visibly shift the witness. The golden number is captured on a
+    // fresh, no-retail scenario the first time this test runs; the seed and
+    // build sequence are pinned so it's reproducible.
+    const witness = (): number => {
+      const sim = builtTower(3);
       const x0 = Math.floor(GRID.width / 2) - 20;
       buildOne(sim, "office", x0);
       buildOne(sim, "office", x0 + 12);
       buildOne(sim, "condo", x0 + 24);
-      for (let i = 0; i < 24 * 7; i++) sim.tick(60);
-      // Sum every unit's pendingIncome as a hostile-cheap RNG-sensitive summary.
-      const bag = sim.tower.units.reduce((acc, u) => acc + (u.pendingIncome ?? 0), 0);
-      return [sim.money, bag];
+      return sim.rng.int(0, 1_000_000_000);
     };
-    expect(drive(3)).toEqual(drive(3));
+    // Deterministic: same-seed, same-script gives the same witness.
+    expect(witness()).toBe(witness());
+    // Pinned golden number: recorded on the first green run of this test with
+    // the short-circuit in place. If this drifts, a non-retail build path
+    // started drawing from sim.rng and the guarantee is broken.
+    expect(witness()).toBe(720226784);
   });
 
   it("rerollSubtype picks a different canon name from the current on every call", () => {
