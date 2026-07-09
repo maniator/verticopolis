@@ -340,9 +340,11 @@ export class Tower {
       // Sky-lobby canon (floors 15/30/45/60/75/90): a floor becomes lobby-only
       // the moment the player commits a lobby to it. Refuse plain floor tiles
       // there, and refuse a lobby on a sky-lobby floor that already carries
-      // non-lobby content (which would leave the concourse mixed). Ground
-      // floor 1 is out of scope (rooms are blocked by coversGroundFloor, and
-      // the concourse keeps its in-place floor-to-lobby upgrade).
+      // non-lobby content (which would leave the concourse mixed). Ground floor
+      // 1 is out of scope for THIS PLACEMENT RULE only (rooms are already
+      // blocked by coversGroundFloor, and the ground concourse keeps its
+      // in-place floor-to-lobby upgrade). Lobby permanence in removalReason is
+      // a separate rule and covers every floor including ground.
       if (kind === "floor" && isSkyLobbyFloor(floor) && this.floorHasLobby(floor)) {
         return { ok: false, reason: "Sky lobbies are concourses. Only lobby tiles go here." };
       }
@@ -781,10 +783,14 @@ export class Tower {
     const u = this.byId.get(id);
     if (!u || !isStructural(u.kind)) return undefined;
     // Canon (1994 SimTower): once a lobby is placed, it cannot be bulldozed.
-    // Fires FIRST so the canon reason wins over the generic structural message
-    // when both would apply (e.g. a lobby with structure resting on it). Internal
-    // callers that need to revert a lobby tile (bridge rollback, ensureFloorUnder
-    // rollback) go through {@link removeUnit} directly and are unaffected.
+    // Applies at EVERY floor including the ground concourse (floor 1). The
+    // sky-lobby-claimed placement rule scopes ground floor 1 out of the
+    // placement half of the canon, but permanence has no such scope: a ground
+    // lobby tile is just as final as a sky-lobby tile. Fires FIRST so the
+    // canon reason wins over the generic structural message when both would
+    // apply (a lobby with structure resting on it). Internal callers that
+    // need to revert a lobby tile (bridge rollback, ensureFloorUnder rollback)
+    // go through {@link removeUnit} directly and are unaffected.
     if (u.kind === "lobby") {
       return "Lobby tiles are permanent. The 1994 game does not let you remove them.";
     }
