@@ -59,6 +59,11 @@ export interface GameRules {
   /** True when condos house variable-size families — gates variant-household UI
    *  and readouts. */
   readonly hasVariantHouseholds: boolean;
+  /** True when the build preview surfaces the refusal reason on hover (Modern
+   *  pedagogy: hover, read, understand, then click). Classic is pixel-faithful:
+   *  clicks refuse with a toast, the player learns by doing. Purely a UI gate;
+   *  the engine's placement rules are identical either way. */
+  readonly showsPreviewReason: boolean;
   /**
    * Decide a condo's household and sale price the moment it sells. Classic sells
    * to the flat family of 3 at the asking price (no household stored); Modern
@@ -110,6 +115,7 @@ export interface GameRules {
 export const CLASSIC_RULES: GameRules = {
   mode: "classic",
   hasVariantHouseholds: false,
+  showsPreviewReason: false, // canon-faithful pedagogy: click-to-refuse, learn by doing
   sellCondo(base) {
     // Flat family of 3, sold at the asking price — no household stored, so the
     // census reads the catalog 3. Never touches the RNG, so a Classic tower's
@@ -140,6 +146,7 @@ export const CLASSIC_RULES: GameRules = {
 export const MODERN_RULES: GameRules = {
   mode: "modern",
   hasVariantHouseholds: true,
+  showsPreviewReason: true, // Modern surfaces refusal reasons on the invalid preview
   sellCondo(base, rng) {
     const residents = rollHousehold(rng);
     return { price: householdPrice(base, residents), residents };
