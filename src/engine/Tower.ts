@@ -357,6 +357,37 @@ export class Tower {
     return reason ? { ok: false, reason } : { ok: true };
   }
 
+  /**
+   * Like {@link canPlace} for a floor/lobby, but does NOT require the tile to be
+   * supported/connected yet. Used to tell a lobby that only fails because it
+   * isn't connected (a detached ground concourse tile) from one that fails for a
+   * real reason (off-lot, wrong floor, overlap), so the auto-lobby bridge can
+   * rescue the former: lay the bridge first and the tile lands connected. Mirrors
+   * {@link canPlaceRoomIgnoringFloor} for the structural side.
+   */
+  canPlaceStructureIgnoringSupport(kind: FacilityKind, floor: number, x: number): PlaceResult {
+    if (!isStructural(kind)) return { ok: false, reason: "Not a structural tile." };
+    const f = FACILITIES[kind];
+    if (floor < GRID.minFloor || floor > GRID.maxFloor) {
+      return { ok: false, reason: "Outside the buildable range." };
+    }
+    if (x < 0 || x + f.width > GRID.width) return { ok: false, reason: "Off the edge of the lot." };
+    if (kind === "lobby" && !isLobbyFloor(floor)) {
+      return { ok: false, reason: "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)." };
+    }
+    if (!this.structureSpanFree(floor, x, f.width)) {
+      // Same in-place floor→lobby upgrade allowance as canPlace: a lobby may sit
+      // on plain floor tiles, anything else is a real collision.
+      if (kind !== "lobby" || !this.spanUpgradeableToLobby(floor, x, f.width)) {
+        return { ok: false, reason: "Structure already here." };
+      }
+      if (!this.roomSpanFree(floor, x, f.width)) {
+        return { ok: false, reason: "Lobbies are transit-only. Clear the rooms here first." };
+      }
+    }
+    return { ok: true };
+  }
+
   /** How many floor tiles under a room's footprint don't yet exist. */
   missingFloorCount(floor: number, x: number, width: number, hgt: number): number {
     let n = 0;
@@ -422,6 +453,116 @@ export class Tower {
       return { ok: false, reason: "Build next to the tower. You can't build in midair.", count: 0 };
     }
     return { ok: true, count: placed.length };
+  }
+
+  /**
+   * Tiles to auto-fill so a newly placed room or lobby joins up with its
+   * nearest same-substrate neighbor on each of its own stories: the empty
+   * horizontal gap between the footprint and that neighbor is bridged, a room
+   * with plain floor and a lobby with lobby. This is the 1994 quality-of-life
+   * behavior where dropping a second module a few tiles from the first fills
+   * the walkway between them instead of forcing a manual floor run (backlog
+   * `auto-floor-build`).
+   *
+   * The fill kind follows what is being placed: a lobby bridges to a
+   * neighboring lobby with lobby tiles, every room bridges to a neighboring
+   * floor with plain floor. Only empty, supportable tiles are returned: above
+   * ground each bridge tile needs structure directly below (no floating
+   * overhangs), while the ground and basement rest on a run that is flanked by
+   * structure on both ends and so always fills. A multi-story facility's upper
+   * story may rest on the bridge its own lower story will lay, so the stories
+   * are scanned bottom-up and lower planned tiles count as support for the one
+   * above (both walkways of a stacked pair of cinemas fill, not just the base).
+   *
+   * The plan is exactly the set {@link fillBridge} lays: the scan reads only
+   * columns outside the footprint, so laying the footprint (before or after)
+   * can't change it, and a caller can size the charge from its length.
+   * Non-mutating.
+   */
+  bridgeFillPlan(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): { fl: number; x: number }[] {
+    // Only rooms (plain-floor substrate) and lobbies bridge; a bare floor tool
+    // has its own drag-run and would otherwise fill sideways to any neighbor,
+    // and transports (elevators/stairs) never carry a horizontal substrate.
+    if ((isStructural(kind) && kind !== "lobby") || FACILITIES[kind].transport) return [];
+    const substrate: "floor" | "lobby" = kind === "lobby" ? "lobby" : "floor";
+    // Columns this plan will floor on each story, so a story can rest on the
+    // bridge the story below it lays (see the stacked-cinema note above).
+    const plannedByFloor = new Map<number, Set<number>>();
+    // Above ground a bridge tile must rest on the story below: existing
+    // structure, or a lower bridge tile this same plan will lay. On the ground
+    // and in the basement a gap flanked by structure builds outward, so every
+    // empty tile in it is reachable.
+    const supportable = (fl: number, tx: number): boolean => {
+      if (fl < 2) return true;
+      return this.structure.has(this.key(fl - 1, tx)) || (plannedByFloor.get(fl - 1)?.has(tx) ?? false);
+    };
+    const tiles: { fl: number; x: number }[] = [];
+    // Bottom-up so a lower story's planned tiles are known when the story above
+    // is evaluated.
+    for (let fl = floor; fl < floor + hgt; fl++) {
+      const planned = new Set<number>();
+      plannedByFloor.set(fl, planned);
+      const add = (g: number): void => {
+        if (supportable(fl, g)) {
+          tiles.push({ fl, x: g });
+          planned.add(g);
+        }
+      };
+      // Nearest structure before the footprint on this story: bridge only when
+      // it matches the substrate (a room won't stitch itself to a lobby, or a
+      // lobby to a plain floor), and only across the empty run up to it.
+      for (let tx = x - 1; tx >= 0; tx--) {
+        const k = this.structKind.get(this.key(fl, tx));
+        if (k === undefined) continue; // still scanning the gap
+        if (k === substrate) for (let g = tx + 1; g < x; g++) add(g);
+        break; // first structure hit ends the scan, whether or not it matched
+      }
+      // Nearest structure after the footprint, mirror of the above. Emit
+      // right-side tiles from the neighbor INWARD (descending x) so the ground
+      // and basement outward-fill drains in a single pass instead of walking
+      // support back tile by tile through retries.
+      for (let tx = x + width; tx < GRID.width; tx++) {
+        const k = this.structKind.get(this.key(fl, tx));
+        if (k === undefined) continue;
+        if (k === substrate) for (let g = tx - 1; g >= x + width; g--) add(g);
+        break;
+      }
+    }
+    return tiles;
+  }
+
+  /**
+   * Lay the {@link bridgeFillPlan} tiles for a room or lobby being placed,
+   * building outward from the existing neighbor so a ground or basement run (and
+   * a multi-story facility's upper walkway) stays supported as it fills. Runs
+   * BEFORE the primary is placed, so a detached ground concourse lobby is
+   * connected by the time it lands; rooms and sky lobbies rest on the story
+   * below regardless, so the order is harmless for them. Returns the ids of the
+   * placed tiles: `.length` is the tile count for charging, and the ids let a
+   * caller roll the bridge back if a later placement fails. The plan is exact,
+   * so the retry loop always drains; a tile only sits out a pass while the
+   * lower/adjacent tile it rests on is being laid, never permanently.
+   */
+  fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number[] {
+    const substrate: FacilityKind = kind === "lobby" ? "lobby" : "floor";
+    let remaining = this.bridgeFillPlan(kind, floor, x, width, hgt);
+    const placed: number[] = [];
+    let progress = true;
+    while (remaining.length > 0 && progress) {
+      progress = false;
+      const still: { fl: number; x: number }[] = [];
+      for (const m of remaining) {
+        const r = this.place(substrate, m.fl, m.x);
+        if (r.ok && r.unitId !== undefined) {
+          placed.push(r.unitId);
+          progress = true;
+        } else {
+          still.push(m);
+        }
+      }
+      remaining = still;
+    }
+    return placed;
   }
 
   /**
