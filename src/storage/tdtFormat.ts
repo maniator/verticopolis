@@ -525,9 +525,10 @@ function walkTolerantTail(r: ByteReader): TdtTail {
   }
   let occupied = 0;
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
-    // Byte 0 is the row's floor, 0xFF marking an empty slot (doc §7); the
-    // rest is status/variant data not yet consumed (see the backlog's
-    // retail-subtypes row).
+    // Byte 0 is the row's floor, 0xFF marks empty (doc §7); the rest of the
+    // 18-byte row (status, variant, and reserved bytes) is not consumed here.
+    // The importer keys retail variants off the unit-record byte 17 (§4),
+    // which the tenant parser already captures.
     const floor = r.u8();
     r.skip(TDT_RETAIL_RECORD_SIZE - 1);
     if (floor !== 0xff) occupied++;

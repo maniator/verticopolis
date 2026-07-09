@@ -134,6 +134,22 @@ describe("towerStateSig", () => {
     office.label = "Penthouse";
     expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
   });
+
+  it("changes when a retail unit's canon subtype rerolls (Change variety is undoable)", () => {
+    // Without subtype in the signature, commitUndo would drop the reroll step
+    // (see towerStateSig) so the player couldn't undo a Change variety. Pin it.
+    const sim = Simulation.newGame(1);
+    sim.money = 1e12;
+    sim.star = 5;
+    const cx = Math.floor(GRID.width / 2);
+    for (let x = cx - 20; x <= cx + 20; x++) sim.tower.place("floor", 2, x);
+    sim.buildTransport("elevatorStandard", cx, 1, 2);
+    expect(sim.build("shop", 2, cx).ok).toBe(true);
+    const shop = sim.tower.units.find((u) => u.kind === "shop")!;
+    const sig0 = towerStateSig(sim.tower, sim.money);
+    expect(sim.rerollSubtype(shop.id)).toBeDefined();
+    expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
+  });
 });
 
 describe("UndoHistory + Simulation — round-trip", () => {

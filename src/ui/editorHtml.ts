@@ -101,9 +101,18 @@ export function unitEditorHtml(sim: Simulation, u: Unit): string {
     const pol = { auto: "Auto", feature: "Feature", blockbuster: "Blockbuster" }[u.filmPolicy ?? "auto"];
     actions.push(edRow(`<button class="btn" data-edit="filmPolicy">Booking: ${pol} ▸</button>`));
   }
+  // Canon retail reroll: only offer on shop / fastFood / restaurant. Legacy
+  // retail units without a subtype still get the button so a player can opt
+  // into a variant. Kinds without a canon list are gated out at the action
+  // handler (rerollSubtype returns undefined), but the button belongs off
+  // their card to avoid a visible no-op affordance.
+  if (u.kind === "shop" || u.kind === "fastFood" || u.kind === "restaurant") {
+    actions.push(edRow(`<button class="btn" data-edit="changeVariety">Change variety ▸</button>`));
+  }
   actions.push(edRow(`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-  return editorShell(f.name, rows, actions);
+  // Canon retail variant titles the editor card too, matching the inspector.
+  return editorShell(u.subtype ?? f.name, rows, actions);
 }
 
 export function transportEditorVolatile(sim: Simulation, t: Transport): Record<string, string> {

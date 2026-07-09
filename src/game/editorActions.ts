@@ -152,6 +152,7 @@ export class EditorActions {
       extendUp: "Extend",
       extendDown: "Extend",
       filmPolicy: "Film policy",
+      changeVariety: "Change variety",
     };
     this.deps.captureUndo(UNDO_LABELS[action] ?? "Edit");
     if (selected.type === "unit") {
@@ -179,6 +180,15 @@ export class EditorActions {
         sim.setFilmPolicy(u.id, next);
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
+      } else if (action === "changeVariety") {
+        // Canon retail reroll: picks a §7 name different from the current
+        // (`Simulation.rerollSubtype`). Returns undefined for non-retail kinds
+        // and for single-entry lists; both cases are already gated by the
+        // editor card only rendering the button for retail.
+        if (sim.rerollSubtype(u.id) !== undefined) {
+          this.deps.audio.sfx("click");
+          this.deps.refreshEditor();
+        }
       } else if (action === "batchKind") {
         this.openBatchPricing(u.kind);
       }

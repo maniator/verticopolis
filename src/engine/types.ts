@@ -268,6 +268,11 @@ export interface Unit {
   /** Per-cinema film-booking policy. `undefined` ⇒ "auto" (the legacy 40% roll),
    *  so old saves and demo towers behave identically. */
   filmPolicy?: "auto" | "feature" | "blockbuster";
+  /** Canon retail variant name for shop / fastFood / restaurant only (per
+   *  `docs/canon/tdt-format.md` §7 lists). `undefined` on every other kind,
+   *  and on legacy retail units from saves that predate this field, so they
+   *  keep the generic name. Cosmetic-only: the economy never reads it. */
+  subtype?: string;
   /** Game-clock minute at which construction finishes (for the build phase). */
   completeAt?: number;
 }
