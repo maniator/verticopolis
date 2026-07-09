@@ -1,10 +1,80 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
 import type { FacilityKind, Transport } from "./types";
-import { isTenanted } from "./types";
+import { isOperational, isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
 import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
+import { HK_SHIFT_END, HK_SHIFT_START } from "./EconomySystem";
+import { ECON } from "./econConfig";
 import { RNG } from "./rng";
+
+/**
+ * Meal cadence (gdd/arch-tower-wide-meal-cadence-2026-07-09). Four meal windows
+ * drive real transport pressure: every "eating" population (offices, condos,
+ * hotel guests, on-shift staff) spawns outbound trips to open food venues near
+ * the peak of its window and lagged return trips near the tail. Trip options
+ * feed the same weighted `options` array {@link Crowd.spawnTrips} already uses,
+ * so the `MAX_PEOPLE` cap self-balances the pool. Economy is untouched:
+ * `collectTrafficIncome` already models demand volume through appeal factors;
+ * the meal-cadence change just makes the shafts feel the demand.
+ */
+export type StaffKind = "security" | "medical" | "housekeeping" | "recycling";
+
+export const MEAL_WINDOWS = {
+  breakfast: { start: 6, end: 9, venues: ["fastFood"] as FacilityKind[] },
+  lunch: { start: 11, end: 14, venues: ["fastFood", "restaurant"] as FacilityKind[] },
+  dinner: { start: 17, end: 20, venues: ["fastFood", "restaurant"] as FacilityKind[] },
+  lateNight: { start: 21, end: 24, venues: ["fastFood", "cinema"] as FacilityKind[] },
+} as const;
+
+export type MealWindow = keyof typeof MEAL_WINDOWS;
+
+/** The window whose `[start, end)` covers `hour`, or null when off-window.
+ *  Lunch (11-14) matches {@link Clock.isLunch} byte-for-byte. */
+export function mealWindowFor(hour: number): MealWindow | null {
+  for (const k of Object.keys(MEAL_WINDOWS) as MealWindow[]) {
+    const w = MEAL_WINDOWS[k];
+    if (hour >= w.start && hour < w.end) return k;
+  }
+  return null;
+}
+
+/** Whether a staff kind is eligible to make meal trips at this hour. Only
+ *  housekeeping has a modeled shift window today ([HK_SHIFT_START, HK_SHIFT_END)
+ *  in `EconomySystem`); security, medical, and recycling are always eligible
+ *  while their facility is operational. If a future kind gains a shift, add
+ *  its case here alongside the new constants, so the gate stays single-source. */
+export function staffOnShift(kind: StaffKind, hour: number): boolean {
+  if (kind === "housekeeping") return hour >= HK_SHIFT_START && hour < HK_SHIFT_END;
+  return true;
+}
+
+/**
+ * Per-window origin mix (arch §4). The table is authoritative; adding a new
+ * meal window means one row. Weights come from {@link ECON.mealPopulationWeights}.
+ */
+type MealOriginKind = "office" | "condo" | "hotel" | "staff";
+type MealMix = { origins: MealOriginKind[] };
+const MEAL_MIX: Record<MealWindow, MealMix> = {
+  breakfast: { origins: ["hotel", "condo", "staff"] },
+  lunch: { origins: ["office", "condo", "hotel", "staff"] },
+  dinner: { origins: ["office", "condo", "hotel", "staff"] },
+  lateNight: { origins: ["hotel", "condo"] },
+};
+
+/**
+ * Outbound vs return phase profile (arch §6). `t` is normalized 0..1 across the
+ * window. Outbound weight is heavier in the first ~60% of the window; return
+ * weight is heavier in the last ~60%. Their integrals over [0, 1] are equal, so
+ * aggregate outbound approximately equals aggregate return over the whole
+ * window without any per-person tracking.
+ */
+function outboundWeight(t: number): number {
+  return Math.max(0, Math.min(1, 2 * (0.6 - t)));
+}
+function returnWeight(t: number): number {
+  return Math.max(0, Math.min(1, 2 * (t - 0.4)));
+}
 
 /**
  * Individual people who actually route through the tower — SimTower's signature.
@@ -60,12 +130,25 @@ interface Route {
   shafts: number[];
 }
 
-/** The four spawn-source floor lists, computed once per outer sim step. */
+/** The spawn-source floor lists, computed once per outer sim step. `homes`
+ *  keeps its lumped condo+hotel population for the existing morning/evening
+ *  flows; `condoFloors` and `hotelFloors` split them for the meal-cadence path
+ *  (breakfast draws heavily from hotels and lightly from condos, so meals need
+ *  each population weighted independently). `staffFloors` carries the staff
+ *  kind alongside the floor so on-shift filtering can run at consumption time
+ *  without re-scanning `tower.units`. */
 interface SpawnFloors {
   leasedOffices: number[];
   staffedOffices: number[];
   homes: number[];
   openVenues: number[];
+  condoFloors: number[];
+  hotelFloors: number[];
+  staffFloors: { kind: StaffKind; floor: number }[];
+  /** Per-kind venue floor lists for the meal-mix path — same info as
+   *  `openVenues` but keyed so meal windows can draw fastFood-only (breakfast)
+   *  or fastFood+cinema (late-night) without a per-tick filter over units. */
+  venuesByKind: Partial<Record<FacilityKind, number[]>>;
 }
 
 /** Live calls the drawn crowd places on the elevators (see elevatorCalls).
@@ -322,18 +405,43 @@ export class Crowd {
 
   // ---- Spawning -----------------------------------------------------------
 
-  /** Bin every in-service floor into the four spawn categories in one pass over
+  /** Bin every in-service floor into the spawn categories in one pass over
    *  `tower.units` (a `vacating` tenant still commutes through their notice
    *  period). Insertion order is preserved so `rng.pick` stays deterministic. */
   private spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     const hour = clock.hour;
     const weekend = clock.isWeekend;
     const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "cinema";
+    const isStaffKind = (k: FacilityKind): k is StaffKind =>
+      k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
     const leased = new Set<number>();
     const staffed = new Set<number>();
     const homes = new Set<number>();
     const venues = new Set<number>();
+    // Meal-cadence bins: condos and hotels tracked separately (arch §2).
+    const condoFloors = new Set<number>();
+    const hotelFloors = new Set<number>();
+    const staffFloors: { kind: StaffKind; floor: number }[] = [];
+    const seenStaff = new Set<string>(); // dedupe kind:floor pairs.
+    const venuesByKind: Partial<Record<FacilityKind, number[]>> = {};
+    const addVenueByKind = (kind: FacilityKind, floor: number) => {
+      const list = venuesByKind[kind] ?? (venuesByKind[kind] = []);
+      if (!list.includes(floor)) list.push(floor);
+    };
     for (const u of tower.units) {
+      // Staff floors read the OPERATIONAL predicate rather than tenant/asleep
+      // because staff facilities are not tenanted; they exist and function
+      // whenever they are built and not on fire / under construction.
+      if (isStaffKind(u.kind)) {
+        if (isOperational(u)) {
+          const key = `${u.kind}:${u.floor}`;
+          if (!seenStaff.has(key)) {
+            seenStaff.add(key);
+            staffFloors.push({ kind: u.kind, floor: u.floor });
+          }
+        }
+        continue;
+      }
       if (!(isTenanted(u) || u.state === "asleep")) continue;
       if (u.kind === "office") {
         // Offices are leased year-round but only staffed on weekdays, so inbound
@@ -342,11 +450,16 @@ export class Crowd {
         // at weekends).
         if (!weekend) leased.add(u.floor);
         if (u.occupants > 0) staffed.add(u.floor);
-      } else if (u.kind === "condo" || isHotelKind(u.kind)) {
+      } else if (u.kind === "condo") {
         homes.add(u.floor);
+        condoFloors.add(u.floor);
+      } else if (isHotelKind(u.kind)) {
+        homes.add(u.floor);
+        hotelFloors.add(u.floor);
       } else if (isVenue(u.kind) && isOpenAt(u.kind, hour)) {
         // Venues are destinations only while open for business.
         venues.add(u.floor);
+        addVenueByKind(u.kind, u.floor);
       }
     }
     return {
@@ -354,6 +467,10 @@ export class Crowd {
       staffedOffices: [...staffed],
       homes: [...homes],
       openVenues: [...venues],
+      condoFloors: [...condoFloors],
+      hotelFloors: [...hotelFloors],
+      staffFloors,
+      venuesByKind,
     };
   }
 
@@ -369,7 +486,7 @@ export class Crowd {
 
     const trip = (from: number, to: number) => this.add(tower, from, to);
     // Each call makes one trip, chosen at random from whatever movements fit
-    // the hour — so the evening rush is a genuine mix of workers leaving,
+    // the hour, so the evening rush is a genuine mix of workers leaving,
     // residents/guests arriving home and diners heading out, rather than only
     // ever emptying the offices (the old if/else chain starved the others).
     const options: Array<() => void> = [];
@@ -386,7 +503,95 @@ export class Crowd {
     } else if (openVenues.length) {
       options.push(() => trip(this.rng.pick(openVenues), 1)); // late-night stragglers leaving
     }
+
+    // Meal-cadence overlay: add outbound `origin -> venue` and lagged return
+    // `venue -> origin` options during the active meal window. The existing
+    // branches above stay untouched; meal options fold into the same weighted
+    // pool `rng.pick` fires from. `MAX_PEOPLE` at the top of the method caps
+    // the whole thing so tuning meal weights alone bounds saturation.
+    this.pushMealOptions(clock, floors, options, trip);
+
     if (options.length) this.rng.pick(options)();
+  }
+
+  /** Contribute meal-window options to `options` when the clock is inside a
+   *  meal window. Kept separate from the branch tree above so meal cadence is
+   *  clearly additive over the shipped morning/evening/day/night flow. */
+  private pushMealOptions(
+    clock: Clock,
+    floors: SpawnFloors,
+    options: Array<() => void>,
+    trip: (from: number, to: number) => void,
+  ): void {
+    const window = mealWindowFor(clock.hour);
+    if (!window) return;
+    const w = MEAL_WINDOWS[window];
+    // Normalized position across the window, [0..1). At the start we lean
+    // outbound; at the tail we lean return; the middle third is a crossover.
+    // Include the sub-hour fraction so the profile shifts within an hour, not
+    // in one-hour steps.
+    const hourFrac = clock.minuteOfDay / 60 - w.start;
+    const t = Math.max(0, Math.min(1, hourFrac / (w.end - w.start)));
+    const outbound = outboundWeight(t);
+    const back = returnWeight(t);
+    if (outbound <= 0 && back <= 0) return;
+
+    // Meal venues open this window (arch §1). If the tower has none, the whole
+    // meal path yields nothing (players see no meal trips until they build
+    // food; that is correct behavior).
+    const venueFloors = w.venues.flatMap((k) => floors.venuesByKind[k] ?? []);
+    if (!venueFloors.length) return;
+
+    // The origins pool: every eligible meal-origin bin, tagged with its
+    // per-population weight and its floor list.
+    const originPools: { floors: number[]; weight: number }[] = [];
+    const push = (list: number[], weight: number): void => {
+      if (list.length && weight > 0) originPools.push({ floors: list, weight });
+    };
+    const { office, condo, hotel, staff } = ECON.mealPopulationWeights;
+    for (const kind of MEAL_MIX[window].origins) {
+      switch (kind) {
+        case "office":
+          // Weekday-only comes for free: staffedOffices is empty on weekends
+          // (updatePresence zeros office occupants), so no redundant isWeekend
+          // check is needed here.
+          push(floors.staffedOffices, office);
+          break;
+        case "condo":
+          push(floors.condoFloors, condo);
+          break;
+        case "hotel":
+          push(floors.hotelFloors, hotel);
+          break;
+        case "staff": {
+          const onShift = floors.staffFloors
+            .filter((s) => staffOnShift(s.kind, clock.hour))
+            .map((s) => s.floor);
+          push(onShift, staff);
+          break;
+        }
+      }
+    }
+    if (!originPools.length) return;
+
+    // Contribute options in proportion to the outbound/return phase. The
+    // integer coefficient is small (1..3) so the pool stays balanced with the
+    // existing morning/evening/night branches; `rng.pick` fires one option per
+    // spawn call and the MAX_PEOPLE cap self-throttles.
+    const outboundCount = Math.max(0, Math.round(outbound * 3));
+    const returnCount = Math.max(0, Math.round(back * 3));
+    for (const pool of originPools) {
+      // Weight is small (0.3..1.0); scale it into the integer counts by
+      // repeating an origin's option that many times.
+      const perPoolOut = Math.max(0, Math.round(outboundCount * pool.weight));
+      const perPoolBack = Math.max(0, Math.round(returnCount * pool.weight));
+      for (let i = 0; i < perPoolOut; i++) {
+        options.push(() => trip(this.rng.pick(pool.floors), this.rng.pick(venueFloors)));
+      }
+      for (let i = 0; i < perPoolBack; i++) {
+        options.push(() => trip(this.rng.pick(venueFloors), this.rng.pick(pool.floors)));
+      }
+    }
   }
 
   /** Build a person on `route`, walking to `destX` at the end. Shared by
