@@ -128,3 +128,79 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
     expect(out.kinds).toEqual(["lobby", "lobby", "lobby", "lobby", "lobby", "lobby"]);
   });
 });
+
+test.describe("sky-lobby canon (e2e)", () => {
+  test("claims floor 15 with a lobby, then refuses a plain floor tile there", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      return Boolean(g?.sim && g.build);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    const out = await page.evaluate(() => {
+      const g = (window as any).game;
+      const s = g.sim;
+      const t = s.tower;
+      g.speed = 0;
+      s.money = 1e10;
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      // Build a support column up through floor 14 so floor 15 has support below.
+      for (let f = 2; f <= 14; f++) for (let i = 0; i < 40; i++) t.place("floor", f, x0 + i);
+      // Claim floor 15 by placing a lobby there (goes through the real gesture).
+      g.build.tryBuild("lobby", 15, x0 + 20, true);
+      const claimed = t.floorHasLobby(15);
+      // Now try to drop a plain floor tile elsewhere on floor 15.
+      g.build.tryBuild("floor", 15, x0 + 5, true);
+      const kindAfterFloorAttempt = t.structureKindAt(15, x0 + 5);
+      return { claimed, kindAtLobby: t.structureKindAt(15, x0 + 20), kindAfterFloorAttempt };
+    });
+
+    expect(out.claimed).toBe(true);
+    expect(out.kindAtLobby).toBe("lobby");
+    // The refused tryBuild left the cell empty, which is exactly the rule
+    // firing: the floor-15 sky-lobby-claimed check refuses new plain floor
+    // tiles anywhere on the story.
+    expect(out.kindAfterFloorAttempt).toBeUndefined();
+  });
+
+  test("refuses to bulldoze a lobby tile through the real build controller", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      return Boolean(g?.sim && g.build);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    const out = await page.evaluate(() => {
+      const g = (window as any).game;
+      const s = g.sim;
+      const t = s.tower;
+      g.speed = 0;
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      // The starter ground lobby has a lobby at (1, x0).
+      const lobby = t.unitAt(1, x0);
+      const kindBefore = lobby?.kind;
+      const removed = g.build.tryRemoveUnit(lobby, "bulldoze");
+      const kindAfter = t.unitAt(1, x0)?.kind;
+      return { kindBefore, removed, kindAfter };
+    });
+
+    expect(out.kindBefore).toBe("lobby");
+    expect(out.removed).toBe(false);
+    expect(out.kindAfter).toBe("lobby");
+  });
+
+  test("gates the preview-reason hover surface by mode", async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      const g = (window as any).game;
+      return Boolean(g?.sim && g.build);
+    });
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+
+    // Default new tower is Classic, so showsPreviewReason should be false.
+    const classic = await page.evaluate(() => (window as any).game.sim.rules.showsPreviewReason);
+    expect(classic).toBe(false);
+  });
+});

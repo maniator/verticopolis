@@ -93,21 +93,35 @@ describe("Tower placement", () => {
     expect(tower.canPlace("floor", 2, 20).ok).toBe(true);
   });
 
-  it("lets a lobby upgrade a plain floor in place (sky-lobby conversion)", () => {
+  it("refuses a sky lobby on a floor that already carries plain floor tiles (sky-lobby canon)", () => {
+    // Sky-lobby canon (spec-sky-lobby-canon): the sky-lobby-conversion path is
+    // disabled for sky-lobby floors (15/30/45/60/75/90). A lobby is refused on
+    // any of those stories if the floor already carries non-lobby content, so
+    // the player must commit to the concourse BEFORE laying scaffolding. Floor
+    // 1 (ground concourse) keeps its in-place upgrade; only sky-lobby floors
+    // are gated by this rule.
     for (let i = 0; i < 20; i++) tower.place("lobby", 1, i);
     for (let f = 2; f <= 16; f++) for (let i = 0; i < 20; i++) tower.place("floor", f, i);
-    // Floor 16 sits on 15, so the plain floor-15 tile can't be sold — but a
-    // sky lobby may replace it atomically, never passing through midair.
-    expect(tower.removalReason(tower.unitAt(15, 0)!.id)).toBeDefined();
-    const r = tower.place("lobby", 15, 0);
-    expect(r.ok).toBe(true);
-    expect(tower.unitAt(15, 0)?.kind).toBe("lobby");
-    expect(tower.hasStructure(15, 0)).toBe(true);
-    // Upgrades never target non-lobby floors, existing lobbies, or room tiles.
+    // Floor 15 has plain floor tiles from setup, so a lobby placement there is
+    // refused: the sky-lobby-commit gate refuses on a mixed floor.
+    expect(tower.canPlace("lobby", 15, 0).ok).toBe(false);
+    // A lobby is still refused on any non-lobby floor (existing rule).
     expect(tower.canPlace("lobby", 5, 0).ok).toBe(false);
-    expect(tower.canPlace("lobby", 15, 0).ok).toBe(false); // already a lobby
-    expect(tower.place("office", 15, 5).ok).toBe(true);
-    expect(tower.canPlace("lobby", 15, 5).ok).toBe(false); // room in the way
+  });
+
+  it("refuses plain floor tiles and rooms on a claimed sky-lobby floor", () => {
+    // Once the player commits the concourse by placing a lobby on floor 15
+    // (built directly on empty support, no scaffolding first), the whole story
+    // is a sky lobby and refuses further non-lobby tiles per canon.
+    for (let i = 0; i < 20; i++) tower.place("lobby", 1, i);
+    for (let f = 2; f <= 14; f++) for (let i = 0; i < 20; i++) tower.place("floor", f, i);
+    expect(tower.place("lobby", 15, 0).ok).toBe(true);
+    expect(tower.unitAt(15, 0)?.kind).toBe("lobby");
+    // Adding another lobby tile on the same story extends the concourse: OK.
+    expect(tower.place("lobby", 15, 1).ok).toBe(true);
+    // Adding plain floor or a room on the claimed sky-lobby floor is refused.
+    expect(tower.canPlace("floor", 15, 5).ok).toBe(false);
+    expect(tower.canPlace("office", 15, 5).ok).toBe(false);
   });
 
   it("won't let a supporting floor be removed from under the story above", () => {

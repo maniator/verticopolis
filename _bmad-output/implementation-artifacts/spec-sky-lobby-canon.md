@@ -2,7 +2,8 @@
 title: 'Sky-lobby canon: player-triggered claim + lobby permanence'
 type: 'feature'
 created: '2026-07-09'
-status: 'draft'
+status: 'in-review'
+baseline_commit: '32096d7'
 context:
   - '{project-root}/CLAUDE.md'
 ---
@@ -69,13 +70,13 @@ context:
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `src/engine/Tower.ts`: add `isSkyLobbyFloor(floor)` helper (`floor >= 2 && floor % GRID.lobbyInterval === 0`). Wire the two structural refusals in `canPlace`, the room refusal in `roomPlacementReason`, and the lobby-permanence refusal (first) in `removalReason`.
-- [ ] `src/engine/gameRules.ts`: add `showsPreviewReason` to both rule objects.
-- [ ] `src/render/excalibur/TowerEngine.ts`: extend `preview` with `reason?: string`.
-- [ ] `src/main.ts`: in `updateBuildPreview`, populate `preview.reason` from `canBuild().reason` only when `sim.rules.showsPreviewReason`; keep Classic path untouched.
-- [ ] `src/tests/simulation.test.ts`: new describe covering each matrix row plus mode-agnostic parity and the internal-rollback invariant (direct `tower.removeUnit` on a lobby id still works, used by `ensureFloorUnder` and bridge rollback).
-- [ ] `e2e/auto-floor.spec.ts`: extend with player-facing sky-lobby refusals through `game.build.tryBuild`; assert `game.sim.rules.showsPreviewReason` in each mode.
-- [ ] `package.json`: bump to `1.16.0`.
+- [x] `src/engine/Tower.ts`: add `isSkyLobbyFloor(floor)` helper (`floor >= 2 && floor % GRID.lobbyInterval === 0`). Wire the two structural refusals in `canPlace`, the room refusal in `roomPlacementReason`, and the lobby-permanence refusal (first) in `removalReason`.
+- [x] `src/engine/gameRules.ts`: add `showsPreviewReason` to both rule objects.
+- [x] `src/render/excalibur/TowerEngine.ts`: extend `preview` with `reason?: string`.
+- [x] `src/main.ts`: in `updateBuildPreview`, populate `preview.reason` from `canBuild().reason` only when `sim.rules.showsPreviewReason`; keep Classic path untouched.
+- [x] `src/tests/simulation.test.ts`: new describe covering each matrix row plus mode-agnostic parity and the internal-rollback invariant (direct `tower.removeUnit` on a lobby id still works, used by `ensureFloorUnder` and bridge rollback).
+- [x] `e2e/auto-floor.spec.ts`: extend with player-facing sky-lobby refusals through `game.build.tryBuild`; assert `game.sim.rules.showsPreviewReason` in each mode.
+- [x] `package.json`: bump to `1.16.0`.
 
 **Acceptance Criteria:**
 - Given floor 15 has one lobby tile, when the player places a plain floor tile on floor 15, then `sim.build("floor", 15, x)` returns `{ok:false}` with the concourse reason and money is unchanged.

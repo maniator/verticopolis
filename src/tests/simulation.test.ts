@@ -1012,3 +1012,98 @@ describe("Auto-floor bridge between modules", () => {
     for (let i = 4; i < 20; i++) expect(sim.tower.structureKindAt(0, x0 + i)).toBe("floor");
   });
 });
+
+describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
+  // Build a tower up to the story just below the target sky-lobby floor so the
+  // sky lobby has direct support from the story below. Uses tower.place (not
+  // sim.build) so the fixture stays a low-level test setup, not a game action.
+  function towerToFloor(sim: Simulation, top: number): number {
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.money = 1e12;
+    for (let f = 2; f <= top; f++) for (let i = 0; i < 40; i++) sim.tower.place("floor", f, x0 + i);
+    return x0;
+  }
+
+  it("claims a sky-lobby floor the moment a lobby lands on it", () => {
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 14);
+    // Floor 15 is unclaimed to start: floorHasLobby is false.
+    expect(sim.tower.floorHasLobby(15)).toBe(false);
+    expect(sim.build("lobby", 15, x0).ok).toBe(true);
+    expect(sim.tower.floorHasLobby(15)).toBe(true);
+    // Once claimed, adding a plain floor tile anywhere on that story is refused.
+    const r = sim.build("floor", 15, x0 + 20);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("Sky lobbies are concourses. Only lobby tiles go here.");
+  });
+
+  it("refuses a sky lobby on a floor that already carries rooms", () => {
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 15); // includes plain floor on 15, no rooms yet
+    sim.star = 5;
+    sim.buildTransport("elevatorStandard", x0 + 20, 1, 15); // service floor 15 so office builds
+    sim.tower.place("office", 15, x0); // room on floor 15 while it's unclaimed
+    const r = sim.build("lobby", 15, x0 + 20);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("Clear the floor tiles or rooms here first, then place your sky lobby.");
+  });
+
+  it("does not restrict a plain floor on an unclaimed sky-lobby floor", () => {
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 14); // support up through floor 14, floor 15 empty
+    expect(sim.tower.floorHasLobby(15)).toBe(false); // unclaimed sky-lobby floor
+    // A plain floor tile on an unclaimed sky-lobby floor is allowed (the rule
+    // only fires once a lobby has actually claimed the story).
+    expect(sim.build("floor", 15, x0).ok).toBe(true);
+  });
+
+  it("does not fire on ground floor 1 (the concourse keeps its rules)", () => {
+    const sim = Simulation.newGame(7); // ground concourse pre-seeded with lobby
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // Floor 1 has a lobby (from newGame), but adding more plain floor tiles on
+    // it is still allowed, unlike a claimed sky-lobby floor.
+    expect(sim.build("floor", 1, x0 + 40).ok).toBe(true);
+  });
+
+  it("refuses to bulldoze a lobby tile at any floor (1994 canon: lobbies are permanent)", () => {
+    const sim = Simulation.newGame(7); // starter lobby on floor 1
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const lobby = sim.tower.unitAt(1, x0);
+    expect(lobby?.kind).toBe("lobby");
+    const reason = sim.tower.removalReason(lobby!.id);
+    expect(reason).toBe("Lobby tiles are permanent. The 1994 game does not let you remove them.");
+    // sellAt on the lobby fails silently (no refund, tile stays).
+    const before = sim.money;
+    expect(sim.sellAt(1, x0)).toBe(false);
+    expect(sim.money).toBe(before);
+    expect(sim.tower.unitAt(1, x0)?.kind).toBe("lobby");
+  });
+
+  it("still allows internal engine callers to remove a lobby (bridge / auto-floor rollback)", () => {
+    // Rollback paths call tower.removeUnit(id) directly, bypassing removalReason.
+    // Pin the bypass so the sky-lobby-canon guard cannot break internal rollback.
+    const sim = Simulation.newGame(7);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const id = sim.tower.unitAt(1, x0)!.id;
+    expect(sim.tower.removeUnit(id)).toBeDefined();
+    expect(sim.tower.unitAt(1, x0)).toBeUndefined();
+  });
+
+  it("enforces the placement rule identically in Classic and Modern", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const sim = Simulation.newGame(7, mode);
+      const x0 = towerToFloor(sim, 14);
+      expect(sim.build("lobby", 15, x0).ok).toBe(true);
+      const r = sim.build("floor", 15, x0 + 20);
+      expect(r.ok).toBe(false);
+      expect(r.reason).toBe("Sky lobbies are concourses. Only lobby tiles go here.");
+    }
+  });
+
+  it("gates the preview-reason hover surface by mode (Modern true, Classic false)", () => {
+    const classic = Simulation.newGame(7, "classic");
+    const modern = Simulation.newGame(7, "modern");
+    expect(classic.rules.showsPreviewReason).toBe(false);
+    expect(modern.rules.showsPreviewReason).toBe(true);
+  });
+});

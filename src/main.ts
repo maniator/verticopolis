@@ -21,6 +21,7 @@ import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
 import { InspectorController } from "./game/inspector";
+import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { resolveBootScreen } from "./bootScreen";
@@ -116,6 +117,11 @@ class GameApp {
   /** World cell the hover inspector tooltip is describing, so it can be
    *  anchored to that spot on screen and ride the tower when the camera moves. */
   private inspectAnchor: { x: number; floor: number } | null = null;
+  /** True when the inspector card is currently being driven by the build-preview
+   *  refusal path (Modern-only hover tip), rather than the InspectorController.
+   *  Kept so `updateBuildPreview` can clear its own tip when the preview turns
+   *  valid or the tool changes, without stomping a legit inspector card. */
+  private buildRefusalShowing = false;
   /** True only on the PHONE tier — MUST mirror the phone `@media` query in
    *  styles.css (`max-width: 767px`, or a short landscape screen
    *  `max-width: 1023px and max-height: 599px`). The tablet tier uses the docked
@@ -243,6 +249,9 @@ class GameApp {
         this.build.clearPaint();
         this.engine.preview = null;
         this.engine.transportPreview = null;
+        // Drop a build-refusal tooltip if one was up, so a tool switch doesn't
+        // leave a stale Modern hover tip pinned to the old preview cell.
+        this.clearBuildRefusal();
       },
       onSpeed: (s) => this.setSpeed(s),
       onSave: () => this.saveLoad.save(),
@@ -796,6 +805,7 @@ class GameApp {
     if (this.tool.type !== "build") {
       this.engine.preview = null;
       this.engine.transportPreview = null;
+      this.clearBuildRefusal();
       return;
     }
     const kind = this.tool.kind;
@@ -811,23 +821,57 @@ class GameApp {
         this.engine.transportPreview = null;
         this.engine.preview = { kind, floor, x, valid: this.sim.isUnlocked(kind) };
       }
+      this.clearBuildRefusal();
     } else if (kind === "floor" || kind === "lobby") {
       // These tools lay a centered brush strip, not a single tile — so the
       // shadow must span the same run a click will build.
       const tiles = brushTiles(tile);
       const left = tiles[0];
       const span = tiles[tiles.length - 1] - left + 1;
-      const valid = this.sim.canBuild(kind, floor, snapX(kind, tile)).ok;
-      this.engine.preview = { kind, floor, x: left, span, valid };
+      const can = this.sim.canBuild(kind, floor, snapX(kind, tile));
+      const reason = !can.ok && this.sim.rules.showsPreviewReason ? can.reason : undefined;
+      this.engine.preview = { kind, floor, x: left, span, valid: can.ok, reason };
       this.engine.transportPreview = null;
+      this.updateBuildRefusal(reason, floor, left + Math.floor(span / 2));
     } else {
       const x = snapX(kind, tile);
       // Rooms auto-lay their own floor, so validity comes from canBuild (which
       // accounts for the floor tiles and their cost), not raw canPlace.
-      const valid = this.sim.canBuild(kind, floor, x).ok;
-      this.engine.preview = { kind, floor, x, valid };
+      const can = this.sim.canBuild(kind, floor, x);
+      // Modern surfaces the refusal reason on the preview so a hover teaches the
+      // rule before the click; Classic keeps the '94 click-to-refuse pedagogy.
+      const reason = !can.ok && this.sim.rules.showsPreviewReason ? can.reason : undefined;
+      this.engine.preview = { kind, floor, x, valid: can.ok, reason };
       this.engine.transportPreview = null;
+      this.updateBuildRefusal(reason, floor, x + Math.floor(FACILITIES[kind].width / 2));
     }
+  }
+
+  /** Surface a Modern-mode build-refusal reason via the hover inspector DOM
+   *  surface, or clear it if no reason applies. The inspector card is dormant
+   *  in build mode (only the inspect tool drives it, main.ts:640), so the
+   *  build-preview path can safely borrow the same DOM element without racing
+   *  a legit inspector card. `buildRefusalShowing` tracks ownership so a switch
+   *  back to the inspect tool doesn't stomp a fresh card. */
+  private updateBuildRefusal(reason: string | undefined, floor: number, anchorX: number): void {
+    if (reason) {
+      this.inspectAnchor = { x: anchorX, floor };
+      this.ui.showInspector(
+        `<div class="preview-refuse"><strong>Can't build here.</strong> ${escapeHtml(reason)}</div>`,
+      );
+      this.buildRefusalShowing = true;
+    } else {
+      this.clearBuildRefusal();
+    }
+  }
+
+  /** Hide the Modern build-refusal tooltip, but only if the build-preview path
+   *  is the one that put it up (so a live inspect-tool card is never stomped). */
+  private clearBuildRefusal(): void {
+    if (!this.buildRefusalShowing) return;
+    this.ui.showInspector(null);
+    this.inspectAnchor = null;
+    this.buildRefusalShowing = false;
   }
 
   // ---- Per-frame simulation + UI -----------------------------------------

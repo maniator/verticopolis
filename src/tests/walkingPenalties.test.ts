@@ -173,25 +173,14 @@ describe("W2 — noise spacing buffers (11 / 21, lobby cancels)", () => {
     expect(both()).toBeCloseTo(onlyFar(), 5);
   });
 
-  it("a hotel within 21 tiles of an office erodes; a lobby between them cancels it", () => {
-    // Sky lobbies only exist on lobby-interval floors (15, 30…), and only there
-    // can a lobby tile sit between two rooms — so run the buffer test on floor 15.
-    const make = (withLobby: boolean): Simulation => {
-      const sim = Simulation.newGame(9);
-      servedTower(sim, 15, 3);
-      sim.tower.place("office", 15, 50); // footprint [50,59)
-      if (withLobby) sim.tower.place("lobby", 15, 62); // buffer between office and hotel
-      const h = unit(sim, sim.tower.place("hotelDouble", 15, 66).unitId); // gap 7 ≤ 21
-      h.state = "asleep";
-      h.satisfaction = 1;
-      for (let i = 0; i < 8; i++) sim.tick(60);
-      return sim;
-    };
-    const bareH = make(false).tower.units.find((u) => u.kind === "hotelDouble")!;
-    const buffH = make(true).tower.units.find((u) => u.kind === "hotelDouble")!;
-    expect(bareH.satisfaction).toBeLessThan(1); // office noise wore it down
-    expect(buffH.satisfaction).toBeGreaterThan(bareH.satisfaction); // lobby shielded it
-  });
+  // The lobby-between-two-rooms noise-shield scenario (a lobby tile sitting
+  // between an office and a hotel on the same story) is unreachable under
+  // sky-lobby canon (spec-sky-lobby-canon): a claimed sky-lobby floor refuses
+  // rooms, and an unclaimed one refuses the lobby if rooms exist. The engine
+  // path that implements the shield still stands (a legacy save from before
+  // v1.16 can carry such a mixed floor), but there is no new-placement flow
+  // to reach it, so the scenario is now legacy-only and its coverage moves
+  // to save-migration tests rather than a placement fixture.
 
   it("subsumes the old 1-tile office→hotel rule (adjacent still caps at the ceiling)", () => {
     const sim = Simulation.newGame(5);
@@ -230,8 +219,11 @@ describe("W2 — noise spacing buffers (11 / 21, lobby cancels)", () => {
 
 describe("W3 — commercial must be near a lobby (2 floors)", () => {
   it("nearestLobbyFloorDistance anchors on the ground and shrinks with a sky lobby", () => {
+    // Under sky-lobby canon a lobby is refused on floor 15 if the floor already
+    // carries non-lobby content, so support is only laid through floor 14 here,
+    // leaving floor 15 empty for the sky-lobby placement.
     const sim = Simulation.newGame(1);
-    servedTower(sim, 16, 3);
+    servedTower(sim, 14, 3);
     expect(sim.tower.nearestLobbyFloorDistance(3)).toBe(2); // 2 floors above ground
     expect(sim.tower.nearestLobbyFloorDistance(8)).toBe(7);
     sim.tower.place("lobby", 15, 3); // a sky lobby on floor 15 (lobby interval)
@@ -276,11 +268,27 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
   });
 
   it("a sky lobby within 2 floors restores the venue's traffic", () => {
+    // Under sky-lobby canon a claimed sky-lobby floor refuses rooms, and an
+    // unclaimed one refuses a lobby if rooms are on it. Sit the venue one
+    // story above the sky lobby (floor 16, 1 floor from the concourse at 15)
+    // so both the lobby and the venue can be built. `servedTower(15)` leaves
+    // floor 15 with plain floor, so the lobby lands FIRST (its floor is bare
+    // of rooms), then the venue lands on floor 16 above.
     const earn = (skyLobby: boolean): number => {
       const sim = Simulation.newGame(11);
-      servedTower(sim, 16, 3);
-      if (skyLobby) sim.tower.place("lobby", 15, 20); // a sky lobby beside the venue
-      const ff = unit(sim, sim.tower.place("fastFood", 15, 40).unitId); // 14 floors up
+      servedTower(sim, 14, 3);
+      // Cover floor 15 with lobby tiles (the sky concourse) when the flag is
+      // set, else cover it with plain floor tiles so floor 16 above has support
+      // in both branches (only the substrate differs). Under sky-lobby canon
+      // the two states diverge cleanly: with the concourse, the venue on floor
+      // 16 is 1 story from a lobby; without it, 15 floors from the ground.
+      const substrate = skyLobby ? "lobby" : "floor";
+      for (let x = 0; x < 40; x++) sim.tower.place(substrate, 15, x);
+      for (let x = 0; x < 40; x++) sim.tower.place("floor", 16, x); // support for the venue above
+      // Extend the passenger shaft to floor 16 so the venue is transport-served
+      // in both branches (the W3 test isolates lobby distance, not transport).
+      sim.buildTransport("elevatorStandard", 25, 1, 16);
+      const ff = unit(sim, sim.tower.place("fastFood", 16, 5).unitId); // 1 floor from the sky lobby
       ff.state = "occupied";
       const before = sim.money;
       for (let i = 0; i < 24; i++) sim.tick(60);

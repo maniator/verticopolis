@@ -226,8 +226,10 @@ export class TowerEngine {
   private vipStart: number | null = null;
   private lastVipSeq = 0;
 
-  // Set by the controller each frame; rendered by the overlay.
-  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number } | null = null;
+  // Set by the controller each frame; rendered by the overlay. `reason` is the
+  // refusal string (populated only when `valid` is false AND
+  // `sim.rules.showsPreviewReason` is true; presentation-only, no engine change).
+  preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string } | null = null;
   transportPreview: { kind: FacilityKind; x: number; bottom: number; top: number; valid: boolean } | null = null;
   selectedId: number | null = null;
 

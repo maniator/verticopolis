@@ -18,6 +18,14 @@ function isLobbyFloor(floor: number): boolean {
   return floor === 1 || (floor > 1 && floor % GRID.lobbyInterval === 0);
 }
 
+/** Sky-lobby floors are every 15th story above the ground concourse (15, 30,
+ *  45, 60, 75, 90). Distinct from `isLobbyFloor` because floor 1 (the concourse)
+ *  has its own set of rules (`coversGroundFloor`, unremovable-lobby, etc.) and
+ *  is out of scope for the "sky-lobby-claimed" behavior. */
+function isSkyLobbyFloor(floor: number): boolean {
+  return floor >= 2 && floor % GRID.lobbyInterval === 0;
+}
+
 /**
  * Rooms that need daylight and can't sit in a windowless basement. Commercial
  * (shop/fast food/restaurant), entertainment, and service facilities may go
@@ -300,6 +308,15 @@ export class Tower {
       // Lobbies are transit concourses — no rooms may sit on them, exactly as in
       // the original, where the ground/sky lobby floors stay clear.
       if (this.spanHasLobby(fl, x, f.width)) return "Lobbies are transit-only. Build rooms on a standard floor.";
+      // Sky-lobby canon: once a sky-lobby floor is claimed (any lobby on it),
+      // the WHOLE story is a concourse, so a room on any tile of that story is
+      // refused, not just one overlapping a lobby tile. Fires after spanHasLobby
+      // so a room straddling a lobby tile keeps the more specific "transit-only"
+      // reason, while a room on a non-lobby tile of a claimed sky-lobby gets the
+      // "sky lobby" reason.
+      if (isSkyLobbyFloor(fl) && this.floorHasLobby(fl)) {
+        return "This room would sit on a sky lobby. Move it up or down a story.";
+      }
     }
     return undefined;
   }
@@ -319,6 +336,18 @@ export class Tower {
     if (isStructural(kind)) {
       if (kind === "lobby" && !isLobbyFloor(floor)) {
         return { ok: false, reason: "Lobbies only go on the ground floor and every 15th floor (15, 30, 45…)." };
+      }
+      // Sky-lobby canon (floors 15/30/45/60/75/90): a floor becomes lobby-only
+      // the moment the player commits a lobby to it. Refuse plain floor tiles
+      // there, and refuse a lobby on a sky-lobby floor that already carries
+      // non-lobby content (which would leave the concourse mixed). Ground
+      // floor 1 is out of scope (rooms are blocked by coversGroundFloor, and
+      // the concourse keeps its in-place floor-to-lobby upgrade).
+      if (kind === "floor" && isSkyLobbyFloor(floor) && this.floorHasLobby(floor)) {
+        return { ok: false, reason: "Sky lobbies are concourses. Only lobby tiles go here." };
+      }
+      if (kind === "lobby" && isSkyLobbyFloor(floor) && this.floorHasNonLobbyContent(floor)) {
+        return { ok: false, reason: "Clear the floor tiles or rooms here first, then place your sky lobby." };
       }
       if (!this.structureSpanFree(floor, x, f.width)) {
         // A lobby may upgrade plain floor tiles in place (the sky-lobby
@@ -751,6 +780,14 @@ export class Tower {
   removalReason(id: number): string | undefined {
     const u = this.byId.get(id);
     if (!u || !isStructural(u.kind)) return undefined;
+    // Canon (1994 SimTower): once a lobby is placed, it cannot be bulldozed.
+    // Fires FIRST so the canon reason wins over the generic structural message
+    // when both would apply (e.g. a lobby with structure resting on it). Internal
+    // callers that need to revert a lobby tile (bridge rollback, ensureFloorUnder
+    // rollback) go through {@link removeUnit} directly and are unaffected.
+    if (u.kind === "lobby") {
+      return "Lobby tiles are permanent. The 1994 game does not let you remove them.";
+    }
     if (u.floor >= 1 && !this.structureSpanFree(u.floor + 1, u.x, u.width)) {
       return "Remove the story above first. Floors can't hang in midair.";
     }
@@ -912,6 +949,24 @@ export class Tower {
   /** Does this floor carry at least one lobby tile (a ground/sky lobby)? O(1). */
   floorHasLobby(floor: number): boolean {
     return (this.lobbyTiles.get(floor) ?? 0) > 0;
+  }
+
+  /** Does this floor carry any non-lobby content: a plain floor tile, or any
+   *  room whose footprint (including a multi-story facility's upper story)
+   *  covers this floor? Used by the sky-lobby-commit check to refuse a lobby
+   *  placement on a story that already carries something else. Scan is O(n)
+   *  over units on this floor, unavoidable for a legacy save with rooms whose
+   *  footprint starts on a different story. */
+  floorHasNonLobbyContent(floor: number): boolean {
+    for (const u of this.units) {
+      if (isStructural(u.kind)) {
+        if (u.kind === "floor" && u.floor === floor) return true;
+      } else {
+        const hgt = facilityFloors(u.kind);
+        if (u.floor <= floor && u.floor + hgt - 1 >= floor) return true;
+      }
+    }
+    return false;
   }
 
   /**
