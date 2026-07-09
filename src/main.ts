@@ -856,8 +856,13 @@ class GameApp {
   private updateBuildRefusal(reason: string | undefined, floor: number, anchorX: number): void {
     if (reason) {
       this.inspectAnchor = { x: anchorX, floor };
+      // Wrap the tooltip in the standard <h4 class="win-title"> so
+      // UI.showInspector attaches its mobile-only ✕ close (UI.ts:554). On
+      // desktop the tooltip clears as soon as the pointer moves off an invalid
+      // cell, but on the phone tier there is no such hover trail, so a pinned
+      // card needs an explicit dismiss affordance.
       this.ui.showInspector(
-        `<div class="preview-refuse"><strong>Can't build here.</strong> ${escapeHtml(reason)}</div>`,
+        `<h4 class="win-title">Can't build here</h4><div class="preview-refuse">${escapeHtml(reason)}</div>`,
       );
       this.buildRefusalShowing = true;
     } else {
