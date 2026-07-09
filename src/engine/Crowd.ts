@@ -145,9 +145,10 @@ interface SpawnFloors {
   condoFloors: number[];
   hotelFloors: number[];
   staffFloors: { kind: StaffKind; floor: number }[];
-  /** Per-kind venue floor lists for the meal-mix path — same info as
-   *  `openVenues` but keyed so meal windows can draw fastFood-only (breakfast)
-   *  or fastFood+cinema (late-night) without a per-tick filter over units. */
+  /** Per-kind venue floor lists for the meal-mix path (same info as
+   *  `openVenues` but keyed so meal windows can draw fastFood-only for
+   *  breakfast or fastFood+cinema for late-night without a per-tick filter
+   *  over units). */
   venuesByKind: Partial<Record<FacilityKind, number[]>>;
 }
 
