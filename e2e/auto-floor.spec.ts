@@ -38,6 +38,9 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       // no-error assertion clean, not sim.build directly.
       g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
       const gapBare = t.structureKindAt(2, x0 + 11); // still empty before B
+      // Read the quoted cost from the sim itself, not a hard-coded catalog value,
+      // so a future balance tweak doesn't rot this test.
+      const quotedForB = s.canBuild("office", 2, x0 + 15).cost;
       const moneyBeforeB = s.money;
       g.build.tryBuild("office", 2, x0 + 15, true); // B: [x0+15, x0+24)
       const gap: (string | undefined)[] = [];
@@ -46,7 +49,8 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
         gapBare,
         gap,
         bKind: t.unitAt(2, x0 + 15)?.kind,
-        chargedForB: moneyBeforeB - s.money, // office + 9 own floors + 6 bridge floors
+        chargedForB: moneyBeforeB - s.money,
+        quotedForB,
         beyond: t.structureKindAt(2, x0 + 30), // outside the gap, untouched
       };
     });
@@ -55,8 +59,8 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
     expect(result.bKind).toBe("office");
     // The whole six-tile gap between A and B is now plain floor.
     expect(result.gap).toEqual(["floor", "floor", "floor", "floor", "floor", "floor"]);
-    // Office (40000) + its 9 own floor tiles + the 6 bridge floor tiles (500 each).
-    expect(result.chargedForB).toBe(40000 + (9 + 6) * 500);
+    // The build path charges exactly what the sim quoted (office + own floors + bridge).
+    expect(result.chargedForB).toBe(result.quotedForB);
     expect(result.beyond).toBeUndefined();
 
     // Let the engine render the bridged floors for a few frames; a render throw

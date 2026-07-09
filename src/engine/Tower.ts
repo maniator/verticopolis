@@ -481,8 +481,9 @@ export class Tower {
    */
   bridgeFillPlan(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): { fl: number; x: number }[] {
     // Only rooms (plain-floor substrate) and lobbies bridge; a bare floor tool
-    // has its own drag-run and would otherwise fill sideways to any neighbor.
-    if (isStructural(kind) && kind !== "lobby") return [];
+    // has its own drag-run and would otherwise fill sideways to any neighbor,
+    // and transports (elevators/stairs) never carry a horizontal substrate.
+    if ((isStructural(kind) && kind !== "lobby") || FACILITIES[kind].transport) return [];
     const substrate: "floor" | "lobby" = kind === "lobby" ? "lobby" : "floor";
     // Columns this plan will floor on each story, so a story can rest on the
     // bridge the story below it lays (see the stacked-cinema note above).
@@ -536,9 +537,10 @@ export class Tower {
    * a multi-story facility's upper walkway) stays supported as it fills. Runs
    * BEFORE the primary is placed, so a detached ground concourse lobby is
    * connected by the time it lands; rooms and sky lobbies rest on the story
-   * below regardless, so the order is harmless for them. Returns the number of
-   * tiles actually laid so the caller can charge for exactly those. The plan is
-   * exact, so the retry loop always drains; a tile only sits out a pass while the
+   * below regardless, so the order is harmless for them. Returns the ids of the
+   * placed tiles: `.length` is the tile count for charging, and the ids let a
+   * caller roll the bridge back if a later placement fails. The plan is exact,
+   * so the retry loop always drains; a tile only sits out a pass while the
    * lower/adjacent tile it rests on is being laid, never permanently.
    */
   fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number[] {
