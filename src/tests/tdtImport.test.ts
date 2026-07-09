@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { ECON } from "../engine/econConfig";
 import { FACILITIES, GRID, MAX_CARS, maxSpanFor } from "../engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { SAVE_VERSION } from "../engine/saveMigration";
 import type { FacilityKind, SerializedGame, Transport } from "../engine/types";
 import {
@@ -261,6 +262,39 @@ describe("parseTDT: golden mappings", () => {
   it("a metro tunnel (ID 45) alone is scenery: paved, never a unit", () => {
     const { save } = parse(oneTenant(45));
     expect(save.units.every((u) => u.kind === "floor")).toBe(true);
+  });
+
+  describe("retail subtypes (§7 order): canon variant byte adopts onto Unit.subtype", () => {
+    // Import a single tenant of the given retail type with the given variant
+    // byte on unit-record byte 17 (§4), and return the imported unit.
+    const importOne = (type: number, subtype: number) => {
+      const spec = { floors: [{ index: 20, tenants: [{ left: 100, right: 109, type, subtype }] }] };
+      return rooms(spec).find((u) => u.kind === "shop" || u.kind === "fastFood" || u.kind === "restaurant");
+    };
+
+    it("shop with variant 3 imports as SHOP_SUBTYPES[3] ('Book Store')", () => {
+      const u = importOne(10, 3);
+      expect(u?.kind).toBe("shop");
+      expect(u?.subtype).toBe(SHOP_SUBTYPES[3]);
+    });
+
+    it("fast food with variant 1 imports as FASTFOOD_SUBTYPES[1] ('Chinese Cafe')", () => {
+      const u = importOne(12, 1);
+      expect(u?.kind).toBe("fastFood");
+      expect(u?.subtype).toBe(FASTFOOD_SUBTYPES[1]);
+    });
+
+    it("restaurant with variant 4 imports as RESTAURANT_SUBTYPES[4] ('Steak House')", () => {
+      const u = importOne(6, 4);
+      expect(u?.kind).toBe("restaurant");
+      expect(u?.subtype).toBe(RESTAURANT_SUBTYPES[4]);
+    });
+
+    it("an out-of-range variant byte drops to undefined (whitelist coerce)", () => {
+      const u = importOne(10, 200);
+      expect(u?.kind).toBe("shop");
+      expect(u?.subtype).toBeUndefined();
+    });
   });
 
   it("a whole theatre (halves + screen halves) merges into ONE cinema", () => {

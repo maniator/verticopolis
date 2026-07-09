@@ -11,6 +11,7 @@ import {
   maxSpanFor,
 } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 
 /**
  * Canon tripwire — engine constants asserted against the 1994 original's
@@ -114,5 +115,46 @@ describe("canon: tenant populations (tdt-format.md §6)", () => {
 describe("canon: economy anchors (tdt-format.md §2)", () => {
   it("a tower is founded with $2,000,000 (display dollars, never ×100 storage)", () => {
     expect(ECON.startingMoney).toBe(2_000_000);
+  });
+});
+
+describe("canon: retail subtypes (tdt-format.md §7)", () => {
+  // Order is load-bearing: the .TDT format writes an ORDINAL byte, not a
+  // string, so an index change here would silently reinterpret every legacy
+  // save's variants. Match the canon doc §7 lists verbatim.
+  it("has 5 restaurant variants in §7 order", () => {
+    expect([...RESTAURANT_SUBTYPES]).toEqual([
+      "English Pub",
+      "French",
+      "Chinese",
+      "Sushi Bar",
+      "Steak House",
+    ]);
+  });
+
+  it("has 5 fast-food variants in §7 order", () => {
+    expect([...FASTFOOD_SUBTYPES]).toEqual([
+      "Japanese Soba",
+      "Chinese Cafe",
+      "Hamburger Stand",
+      "Ice Cream",
+      "Coffee Shop",
+    ]);
+  });
+
+  it("has 11 shop variants in §7 order", () => {
+    expect([...SHOP_SUBTYPES]).toEqual([
+      "Men's Clothing",
+      "Pet Store",
+      "Flower Shop",
+      "Book Store",
+      "Drug Store",
+      "Boutique",
+      "Electronics",
+      "Bank",
+      "Hair Salon",
+      "Post Office",
+      "Sports Gear",
+    ]);
   });
 });

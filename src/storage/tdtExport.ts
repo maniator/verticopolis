@@ -1,4 +1,5 @@
 import { rentConfig } from "../engine/econConfig";
+import { subtypeIndex } from "../engine/retailSubtypes";
 import {
   FACILITIES,
   GRID,
@@ -172,6 +173,10 @@ interface OutTenant {
   type: number; // negative = under construction
   status: number;
   rentClass: number;
+  /** Canon variant byte for retail (0-based index into the kind's §7 list);
+   *  undefined for non-retail kinds. Written to unit-record byte 17 (§4) AND
+   *  mirrored into the retail-table slot (§7). */
+  subtypeIdx?: number;
 }
 
 /**
@@ -189,6 +194,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // ---- Gather rooms, paving extents, and per-floor tenant records ---------
   const tenantsByTdt = new Map<number, OutTenant[]>();
   const extents = new Map<number, { left: number; right: number }>();
+  // Rows for the §7 retail table: one per emitted shop / fastFood / restaurant,
+  // carrying the TDT-space floor byte and the canon variant. Filled in tenant
+  // gathering, drained by the retail-table write loop. Bounded at 512 slots.
+  const retailRows: { floor: number; variant: number }[] = [];
   const widen = (floor: number, left: number, right: number): void => {
     const e = extents.get(floor);
     if (!e) extents.set(floor, { left, right });
@@ -412,13 +421,30 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
 
     const id = KIND_TENANT.get(u.kind);
     if (id === undefined) continue; // no 1994 equivalent (defensive; none today)
+    // Canon retail variant: the three retail kinds carry a named subtype whose
+    // ordinal in the §7 list gets written into unit-record byte 17 AND the
+    // matching retail-table slot. `subtypeIndex` returns -1 for non-retail or
+    // an absent name; we collapse -1 to 0 (the canon "generic" slot the game
+    // treats as the first variant, matching pre-feature behavior).
+    const subIdx = subtypeIndex(u.kind, u.subtype);
     pushTenant(u.floor, {
       left: u.x,
       right: u.x + u.width,
       type: construction ? -id : id,
       status,
       rentClass,
+      subtypeIdx: subIdx >= 0 ? subIdx : undefined,
     });
+    // Retail table (§7): one 18-byte row per shop / fastFood / restaurant that
+    // will be emitted. Populated even for a legacy retail unit lacking a
+    // subtype (variant byte falls back to 0), so the game's header commercial
+    // count and this table stay consistent. Clamped to the 512-slot cap
+    // (setHdrU16 also clamps commercialCount to 512 above).
+    if (u.kind === "shop" || u.kind === "fastFood" || u.kind === "restaurant") {
+      if (retailRows.length < TDT_RETAIL_SLOTS) {
+        retailRows.push({ floor: u.floor + TDT_FLOOR_OFFSET, variant: subIdx >= 0 ? subIdx : 0 });
+      }
+    }
     counts.rooms++;
   }
 
@@ -510,7 +536,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       u8(t.status);
       pad(10); // reserved bytes 6–15
       u8(t.rentClass);
-      u8(0); // subtype (retail variant / days-dirty): not modeled
+      // Byte 17: canon retail variant (§4 mirror of §7 for shop/fastFood/
+      // restaurant), or 0 for non-retail and for a retail unit whose subtype
+      // was never rolled (legacy save loaded pre-feature).
+      u8(t.subtypeIdx ?? 0);
     }
     pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
   }
@@ -535,10 +564,21 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   i32(peopleCount);
   pad(peopleCount * TDT_PERSON_RECORD_SIZE);
 
-  // Retail table: all slots empty (0xFF floor marker).
+  // Retail table (§7): one row per emitted shop / fastFood / restaurant,
+  // remaining slots empty (0xFF floor marker). Byte 0 = floor (TDT-space),
+  // byte 1 = status (0 = open), byte 2 = canon variant ordinal. Bytes 3..17
+  // stay zero (their canon meaning isn't modeled here).
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
-    u8(0xff);
-    pad(TDT_RETAIL_RECORD_SIZE - 1);
+    const row = retailRows[slot];
+    if (row === undefined) {
+      u8(0xff);
+      pad(TDT_RETAIL_RECORD_SIZE - 1);
+    } else {
+      u8(row.floor & 0xff);
+      u8(0); // status (0 = open / operating)
+      u8(row.variant & 0xff);
+      pad(TDT_RETAIL_RECORD_SIZE - 3);
+    }
   }
 
   // Elevator table: 24 slots (doc §6). Live passenger payloads zero-filled at
