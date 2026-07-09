@@ -242,6 +242,13 @@ export class OnboardingController {
     // wiped). Backdrop = a click on the overlay outside the card.
     const safeDismiss = () => {
       if (!o.hasSave) return;
+      // A stacked modal (How to Play / New Tower) owns Esc and the backdrop while
+      // it's open, so don't let the splash's own Esc ALSO fire underneath it and
+      // tear the title screen down into Continue. Mirrors the guard the main
+      // keyboard handler uses. This became reachable once a returning player with
+      // a save can SEE the splash (hasSave true), which is now every boot except
+      // a post-update resume, and open one of those modals over it.
+      if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) return;
       this.teardownSplash();
       o.onContinue();
     };

@@ -222,6 +222,28 @@ describe("Onboarding — splash / title screen", () => {
     expect(document.getElementById("splash")).not.toBeNull();
   });
 
+  it("Esc is ignored while a modal is stacked over the splash (so canceling Help/New Tower doesn't dismiss the title screen)", () => {
+    const { c } = makeSpyController();
+    const onContinue = vi.fn();
+    c.showSplash({ hasSave: true, onContinue, onNewTower: vi.fn() });
+    // A returning player with a save now sees the splash on any boot that isn't a
+    // post-update resume, and can open a modal over it. That modal owns Esc; the
+    // splash's safeDismiss must not also fire and drop them into Continue.
+    const modal = document.createElement("dialog");
+    modal.id = "modal";
+    modal.setAttribute("open", ""); // happy-dom reflects the attribute to `.open`
+    document.body.appendChild(modal);
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onContinue).not.toHaveBeenCalled();
+    expect(document.getElementById("splash")).not.toBeNull();
+    // Once the modal closes, Esc resolves to Continue as usual.
+    modal.removeAttribute("open");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+    expect(onContinue).toHaveBeenCalledOnce();
+    expect(document.getElementById("splash")).toBeNull();
+    modal.remove();
+  });
+
   it("the persistent hint follows a media-query change (desktop ↔ mobile copy)", () => {
     const { fireMq, ...ctx } = makeSpyController(false);
     void ctx;
