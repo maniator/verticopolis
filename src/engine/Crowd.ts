@@ -669,7 +669,7 @@ export class Crowd {
     for (const pool of originPools) {
       for (let i = 0; i < outboundBase; i++) {
         if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors));
+          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, clock.hour));
         }
       }
     }
@@ -691,12 +691,21 @@ export class Crowd {
     tower: Tower,
     pool: { originKind: MealOriginKind; floors: number[] },
     venueFloors: number[],
+    hour: number,
   ): void {
     const originFloor = this.rng.pick(pool.floors);
     // Candidate units on the chosen floor of the right kind with at least one
-    // available (in-room) occupant.
+    // available (in-room) occupant. For the "staff" bucket, ALSO gate on
+    // on-shift status per unit kind: an off-shift housekeeping room can be on
+    // the same floor as an on-shift security room, and the pool-floor bin only
+    // guarantees at least one on-shift kind exists — the per-unit filter here
+    // makes sure the picked unit is itself on shift (review Blind #5).
     const candidates = tower.units.filter(
-      (u) => u.floor === originFloor && matchesMealOriginKind(u, pool.originKind) && visibleOccupants(u) > 0,
+      (u) =>
+        u.floor === originFloor &&
+        matchesMealOriginKind(u, pool.originKind) &&
+        (pool.originKind !== "staff" || staffOnShift(u.kind as StaffKind, hour)) &&
+        visibleOccupants(u) > 0,
     );
     if (candidates.length === 0) return;
     const origin = this.rng.pick(candidates);
@@ -848,7 +857,13 @@ export class Crowd {
       // the trip's ride distance so a legitimate long haul up a tall tower
       // isn't culled mid-ride.
       const patience = (p.staff ? STAFF_GIVE_UP : GIVE_UP) + this.tripFloors(p) * RIDE_SECONDS_PER_FLOOR;
-      if (p.age > patience && p.state !== "toDest" && p.state !== "done") {
+      // `eating` is a stationary meal pause at the venue (PR A); it is neither
+      // "travelling" nor a service the give-up valve should cull. Excluding it
+      // here keeps a long-tail eater (up to EAT_SECONDS_MAX plus their outbound
+      // trip's age accumulation) from being finished mid-eat and mis-flagged as
+      // a frustrated commuter, which would pollute the crowd stress signal AND
+      // skip the return leg the round-trip design promises. See review Edge #1.
+      if (p.age > patience && p.state !== "toDest" && p.state !== "eating" && p.state !== "done") {
         if (!p.staff) {
           frustrated++;
           travelling++;
@@ -990,6 +1005,12 @@ export class Crowd {
             if (p.originUnitId !== undefined && !p.returning) {
               p.state = "eating";
               p.linger = 0;
+              // Reset the give-up age so the outbound trip's accumulated seconds
+              // do not eat into the return-leg patience budget once
+              // `transitionToReturn` fires. `transitionToReturn` ALSO resets
+              // `p.age` when it succeeds; this reset is the "even if we later
+              // ghost or route-fail" belt-and-braces.
+              p.age = 0;
               p.eatSecondsLeft = this.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
             } else {
               this.finish(p, tower);
@@ -1071,7 +1092,7 @@ export class Crowd {
     p.carIndex = null;
   }
 
-  private finish(p: Person, tower?: Tower): void {
+  private finish(p: Person, tower: Tower): void {
     this.releaseSeat(p);
     // Report a staff job's outcome: it succeeded only if the staffer actually
     // made it to the destination floor (state "toDest"); a give-up or a shaft
@@ -1085,11 +1106,14 @@ export class Crowd {
     // Meal round-tripper: decrement the origin's outForMeal on ANY despawn
     // path (successful return arrival, mid-transit give-up, mid-eating
     // give-up, unreachable-return), so the accounting always balances for a
-    // person whose spawn incremented outForMeal. Guarded so a bulldozed
-    // origin cannot ghost-decrement a fresh unit built on the same floor
-    // after; and cleared `originUnitId` at the ghost site above so a person
-    // whose origin vanished mid-eating skips this path entirely.
-    if (p.originUnitId !== undefined && tower) {
+    // person whose spawn incremented outForMeal. `tower` is REQUIRED (not
+    // optional) so a future call site cannot accidentally leak a decrement
+    // by omitting it; the compiler enforces the balance. Guarded so a
+    // bulldozed origin cannot ghost-decrement a fresh unit built on the same
+    // floor after (`Tower.nextId` is monotonic so bulldoze + rebuild never
+    // reuses an id; the guard defends against the "unit no longer exists"
+    // case, which is the only reachable one).
+    if (p.originUnitId !== undefined) {
       const origin = tower.units.find((u) => u.id === p.originUnitId);
       if (origin && (origin.outForMeal ?? 0) > 0) {
         origin.outForMeal = (origin.outForMeal ?? 0) - 1;

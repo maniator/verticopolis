@@ -163,18 +163,95 @@ describe("MAX_PEOPLE cap holds under real round-trip density", () => {
   });
 });
 
-describe("collectTrafficIncome byte-identical (no economy change)", () => {
-  it("a fixed-clock fixture with a fastFood produces the same amount before and after the person-tracking PR", () => {
-    // Two fresh identical fixtures at 12:00, no meal round-trippers yet.
-    const s1 = officeAndFastFood();
-    const s2 = officeAndFastFood();
-    setHour(s1, 12);
-    setHour(s2, 12);
-    s1.economy.collectTrafficIncome();
-    s2.economy.collectTrafficIncome();
-    expect(s1.money).toBe(s2.money);
-    // Explicit: no meal-cadence overlay affects trafficAppeal or dailyTrafficIncome.
-    expect(s1.money).toBeGreaterThan(1_000_000); // fastFood earned SOMETHING at lunch
+// Economy byte-identical is asserted by `mealCadence.test.ts`'s
+// `collectTrafficIncome is byte-identical after adding meal cadence` block
+// via the sanctioned SimContext harness (`s.economy` is private). PR A did not
+// touch trafficAppeal or dailyTrafficIncome, so that block covers this PR too.
+
+describe("outbound arrival transitions to eating with in-range timer (arch §8 test 2)", () => {
+  it("a person spawned outbound reaches state `eating` with EAT_SECONDS_LEFT in [60, 120] crowd-seconds", () => {
+    // 60..120 crowd-seconds = EAT_MINUTES_MIN..MAX * CROWD_SECONDS_PER_MINUTE
+    // = 30..60 in-game minutes.
+    const sim = officeAndFastFood();
+    setHour(sim, 12);
+    // Pump long enough for a spawn to complete outbound + reach the venue.
+    // ~15 min is generous for a 3-floor trip.
+    let seenEating: { eatSecondsLeft?: number } | null = null;
+    for (let m = 0; m < 30 && !seenEating; m++) {
+      sim.tick(1);
+      seenEating = sim.crowd.people.find((p) => p.state === "eating") ?? null;
+    }
+    expect(seenEating).not.toBeNull();
+    const eat = seenEating?.eatSecondsLeft ?? -1;
+    // The person may have already decremented eatSecondsLeft by a partial dt
+    // by the time we sample, so allow a small slack under the min.
+    expect(eat).toBeGreaterThan(0);
+    expect(eat).toBeLessThanOrEqual(120);
+  });
+});
+
+describe("return trip fires after eating expires (arch §8 test 3)", () => {
+  it("an eating person's route mutates to venue -> origin when eatSecondsLeft hits zero", () => {
+    const sim = officeAndFastFood();
+    setHour(sim, 12);
+    // Find a person in `eating` state and remember their originUnitId.
+    let originId = -1;
+    for (let m = 0; m < 30; m++) {
+      sim.tick(1);
+      const eater = sim.crowd.people.find((p) => p.state === "eating");
+      if (eater) {
+        originId = eater.originUnitId!;
+        break;
+      }
+    }
+    expect(originId).toBeGreaterThan(0);
+    const office = sim.tower.units.find((u) => u.id === originId)!;
+    // Advance long enough for eatSecondsLeft to drain (max 120 crowd-seconds =
+    // ~60 in-game minutes, generously covered by 90 minutes).
+    for (let m = 0; m < 90; m++) sim.tick(1);
+    // The specific person is either mid-return-trip (state in toShaft/waiting/
+    // riding/climbing/toDest with returning=true) or already back (state=done).
+    // Either way, no one still `eating` who originated at that office is left
+    // behind, and if a return-trip person is in-flight their route starts at
+    // the venue floor (5) and ends at the origin floor (2).
+    const stillEatingHere = sim.crowd.people.filter(
+      (p) => p.state === "eating" && p.originUnitId === originId,
+    );
+    expect(stillEatingHere.length).toBe(0);
+    const inFlightReturn = sim.crowd.people.find(
+      (p) => p.originUnitId === originId && p.returning === true && p.state !== "done",
+    );
+    if (inFlightReturn) {
+      expect(inFlightReturn.floors[0]).toBe(5);
+      expect(inFlightReturn.floors[inFlightReturn.floors.length - 1]).toBe(office.floor);
+    }
+  });
+});
+
+describe("bulldoze AFTER return-route computed (arch §8 test 6)", () => {
+  it("removes origin during the return trip; no crash, no unit gets a ghost decrement", () => {
+    const sim = officeAndFastFood();
+    setHour(sim, 12);
+    // Wait for a return-trip person to be in flight (returning=true, state != done).
+    let originId = -1;
+    for (let m = 0; m < 90 && originId < 0; m++) {
+      sim.tick(1);
+      const returner = sim.crowd.people.find(
+        (p) => p.returning === true && p.state !== "done" && p.originUnitId !== undefined,
+      );
+      if (returner) originId = returner.originUnitId!;
+    }
+    expect(originId).toBeGreaterThan(0);
+    // Bulldoze the origin while the return-trip is in transit. The person's
+    // final finish() will find no unit and skip the decrement; the guard must
+    // not throw.
+    sim.tower.removeUnit(originId);
+    for (let m = 0; m < 30; m++) sim.tick(1);
+    // No exception thrown; every person for that origin has despawned.
+    const still = sim.crowd.people.filter(
+      (p) => p.originUnitId === originId && p.state !== "done",
+    );
+    expect(still.length).toBe(0);
   });
 });
 

@@ -79,6 +79,14 @@ interface Person {
    *  destination floor after the outbound trip's `toDest` completes). Only
    *  set for round-trip meal persons. */
   eatSecondsLeft?: number;
+
+  /** True once `transitionToReturn` has mutated this round-tripper into the
+   *  return leg. The `toDest` case uses `!returning` to distinguish the
+   *  outbound arrival (transition to eating) from the return arrival (call
+   *  finish); without this flag the two completions are indistinguishable and
+   *  the return arrival would loop back into eating. Set by
+   *  `transitionToReturn` in both the successful and route-fail branches. */
+  returning?: boolean;
 }
 ```
 
@@ -129,10 +137,19 @@ interface Unit {
   reset `wait = 0`, `age = 0`, keep `originUnitId` set so the final arrival
   decrements the counter.
 
-**Return arrival** (final `toDest` in `advance`):
-- If `originUnitId !== undefined`: look up the unit; if it exists AND
-  `outForMeal > 0`, `--outForMeal`.
-- Transition to `done`.
+**Any despawn of a meal round-tripper** (return arrival, give-up mid-outbound,
+give-up mid-eating, unreachable return, shaft-vanishes-mid-ride, etc.) funnels
+through `finish(p, tower)`. `finish` decrements `outForMeal` on the origin if
+`originUnitId !== undefined && origin exists && origin.outForMeal > 0`. This
+is stronger than "only on return arrival": every increment at spawn time must
+pair with exactly one decrement at despawn, regardless of which leg the person
+was on when they despawned, so the accounting can never leak. The ghost-origin
+case pre-emptively clears `p.originUnitId` in `transitionToReturn`, so finish
+skips the decrement branch entirely for that person.
+
+**`tower` is a REQUIRED parameter on `finish`.** Making it optional would let
+a future call site silently drop the decrement and leak `outForMeal`; the
+compiler enforces the balance.
 
 **Constants:**
 
@@ -168,11 +185,18 @@ options.push(() => this.spawnMealOutbound(tower, pool.originKind, pool.floors, v
 Where `spawnMealOutbound`:
 1. Picks a random floor from `pool.floors`.
 2. Finds candidate origin units on that floor of the pool's kind whose
-   `(u.occupants - (u.outForMeal ?? 0)) > 0`.
+   `(u.occupants - (u.outForMeal ?? 0)) > 0`. For the `staff` bucket the filter
+   ALSO gates on `staffOnShift(u.kind, hour)` because the pool-floor bin only
+   guarantees at least one on-shift kind exists on that floor; another kind on
+   the same floor may be off shift.
 3. If none (all workers already out), no spawn.
-4. Picks a random candidate. Increments its `outForMeal`.
-5. Calls `this.add(tower, originFloor, venueFloor)` and stamps `originUnitId =
-   candidate.id` on the returned person.
+4. Picks a random candidate. Calls `this.add(tower, originFloor, venueFloor)`
+   FIRST.
+5. If `add` returns `null` (route unreachable in 2 rides), returns without
+   incrementing `outForMeal`. Otherwise stamps `originUnitId = candidate.id`
+   on the returned person AND increments `origin.outForMeal`. This order (add
+   first, mutation second) avoids the case where an increment leaks because
+   the route failed.
 
 ## 4. `advance` changes
 
@@ -304,25 +328,37 @@ Existing tests must still pass:
 - `src/engine/types.ts`: add `outForMeal?: number` to `Unit`.
 - `src/engine/Crowd.ts`:
   - PersonState union gains `eating`.
-  - Person interface gains `originUnitId?`, `eatSecondsLeft?`.
+  - Person interface gains `originUnitId?`, `eatSecondsLeft?`, `returning?`.
   - New constants `EAT_MINUTES_MIN/MAX`, `EAT_SECONDS_MIN/MAX`.
   - New `visibleOccupants(u)` exported helper.
-  - New `spawnMealOutbound(tower, kind, floors, venueFloors)` method.
+  - New `spawnMealOutbound(tower, pool, venueFloors, hour)` method.
   - `pushMealOptions` retires the return-trip option builder; outbound
     options call `spawnMealOutbound` instead of the aggregate `trip()`.
-  - `advance` gains an `eating` case; final `toDest` completion path adds the
-    ghost-guarded decrement of the origin's `outForMeal`.
+  - `advance` gains an `eating` case; the give-up patience valve at the top
+    of the advance loop EXCLUDES `state !== "eating"` so a long-tail eater
+    is not culled mid-eat. Entering `eating` also resets `p.age = 0` so the
+    outbound trip's accumulated give-up seconds do not eat into the return
+    leg's patience budget.
+  - `finish(p, tower)` (REQUIRED `tower`, not optional) contains the ghost-
+    guarded `outForMeal` decrement, firing on ANY meal round-tripper despawn.
   - New `transitionToReturn(tower, p)` method.
+- `src/engine/Simulation.ts`:
+  - `serialize`'s Unit destructure adds `outForMeal: _outForMeal, ...unhandled`
+    so the exhaustive `Record<string, never>` check still catches new Unit
+    fields. `outForMeal` is deliberately dropped from the saved shape.
+  - `deserialize`: no change; the missing field coerces to 0 via the read
+    sites' `?? 0` idiom.
 - `src/render/pixelSprites.ts`:
   - Import `visibleOccupants` from Crowd.
   - Swap the two figure-count reads (office line 242, condo line 266) to the
     helper.
 - `src/render/excalibur/TowerEngine.ts`:
   - Sprite cache signature includes `u.outForMeal ?? 0`.
-- `src/engine/Simulation.ts`:
-  - `serialize`: no change (outForMeal transient).
-  - `deserialize`: no change (missing field coerces to 0 via `??`).
-- `src/tests/personRoundTrip.test.ts`: new, 10 tests.
+- `src/tests/personRoundTrip.test.ts`: new, 13 tests covering visibleOccupants
+  pure semantics, visible-dip on spawn, full-window drain, ghost-guard when
+  origin is bulldozed mid-eating AND during return transit, save/load reset,
+  MAX_PEOPLE cap through peak lunch, two-ride reachability, eating-timer
+  in-range, return-leg fires after eat expiry.
 - `PARITY.md`: one-line addition under Time/Population noting the visible
   dip.
 
