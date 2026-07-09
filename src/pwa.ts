@@ -87,6 +87,16 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
 const UPDATE_POLL_MS = 60 * 60 * 1000;
 
 export function registerPWA(handlers: PwaHandlers): void {
+  // Native-wrapper builds (`--mode native`, for the iOS Capacitor shell) get
+  // their updates from the App Store. Skip registration and the hourly
+  // `version.json` poll entirely; the poll would only ever see the bundled
+  // snapshot the wrapper shipped anyway. The Android TWA renders the live
+  // site with the plain build, so it deliberately keeps this flow; the gate
+  // is on the build's Vite mode (inlined in production builds), not on any
+  // runtime wrapper flag.
+  if (import.meta.env.MODE === "native") {
+    return;
+  }
   // Service workers only work in a secure context with SW support. Bail cleanly
   // otherwise — a non-browser environment, insecure `http://`, or a page opened
   // straight from `file://` — rather than let registration throw a

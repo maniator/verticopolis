@@ -161,15 +161,18 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   `isNativeWrapper`, decide cancel semantics) is native-UX design that belongs
   with E3b (native bridge shell) in the mobile-distribution epics. (Edge Case
   Hunter, E1a review.)
-- **The real native-mode resolution path is unreachable from vitest.** Only
-  `resolvePlatform` is unit-tested with a hand-passed `"native"` mode string;
-  `getPlatform()` reading `import.meta.env.MODE` (vitest pins it to `"test"`)
-  and the one-shot module cache (no reset seam, per the story's
-  no-test-only-setter rule) mean a mode-string rename or env misread would ship
-  as a permanent silent fallback to browser behavior. Covered operationally by
-  E1c, whose acceptance includes verifying the `--mode native` bundle through a
-  local static server; keep that check when E1c lands. (Blind Hunter + Edge
-  Case Hunter, E1a review.)
+- **The real native-mode resolution path is unreachable from vitest.** Two
+  surfaces share this hole: `getPlatform()` in `src/platform/index.ts` (E1a)
+  and the `registerPWA` guard in `src/pwa.ts` (E1b). Both read
+  `import.meta.env.MODE`, which vitest pins to `"test"`; both use `vi.stubEnv`
+  in their unit tests, which is an honest simulation but not the compile-time
+  constant a `--mode native` bundle would carry. A mode-string rename or env
+  misread on either surface would ship as a permanent silent fallback to
+  browser behavior. Covered operationally by E1c, whose acceptance includes
+  verifying the `--mode native` bundle through a local static server; keep
+  that check when E1c lands and observe BOTH resolution paths (analytics
+  platform port and PWA gating) end-to-end. (Blind Hunter + Edge Case Hunter,
+  E1a review; extended by the E1b review's Acceptance Auditor.)
 
 ### Deferred from: code review of breathing-clock wire-up (PR #154, `/gds-code-review`, 2026-07-07)
 
