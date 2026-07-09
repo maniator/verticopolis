@@ -6,6 +6,7 @@ import {
   isHotelKind,
   maxCarsFor,
   maxSpanFor,
+  residentCount,
   transportCarCapacity,
 } from "../engine/facilities";
 import { frameForMinuteOfDay } from "../engine/timePacing";
@@ -14,17 +15,23 @@ import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_SCHEDULE_DEFAULT,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
+  TDT_DEFAULT_VIEW_X,
+  TDT_DEFAULT_VIEW_Y,
   TDT_FINANCE_SIZE,
   TDT_FLOOR_COUNT,
   TDT_FLOOR_INDEX_ENTRIES,
   TDT_HEADER_SIZE,
   TDT_MAGIC,
+  TDT_MAX_CENSUS,
   TDT_MAX_TENANTS_PER_FLOOR,
   TDT_PARKING_SIZE,
+  TDT_PERSON_RECORD_SIZE,
   TDT_RETAIL_RECORD_SIZE,
   TDT_RETAIL_SLOTS,
+  TDT_ROUTING_TAIL_SIZE,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
 } from "./tdtFormat";
@@ -218,6 +225,30 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     outOfRange: 0,
   };
 
+  // TDT header aggregate counts the 1994 game TRUSTS (docs/canon/tdt-format.md
+  // §1). Derived from what actually lands in the floor map below, NOT the input
+  // units, so a room dropped as out-of-range, or written as a burned shell,
+  // never inflates a count the reader believes. That mismatch is the very bug
+  // this fixes: a zeroed recyclingCount made the real game nag "your tower needs
+  // a Recycling Center" on a tower that had two (confirmed + fixed via the
+  // SimTower harness, tools/simtower/). parkingStallCount reuses counts.parkingStalls.
+  const header = { recycling: 0, commercial: 0, security: 0, hallCinema: 0 };
+  let hasGroundLobby = false;
+  // Resident/worker census of the emitted tenants, written as the people count
+  // below. The 1994 game rebuilds the live crowd on load, so the record bytes
+  // are zero-filled, but a POPULATED tower must carry a nonzero count here or the
+  // game faults reading its people block (an empty tower is fine at 0; both
+  // confirmed via the SimTower harness, tools/simtower/).
+  let peoplePop = 0;
+  // Guard each addend: residentCount returns a forged condo's raw `residents`,
+  // so one NaN would poison the whole sum to NaN (then count 0, no records) and
+  // re-open the very crash this census prevents. Matches the NaN-hardening the
+  // money/star/coordinate fields already get.
+  const addResidents = (u: Parameters<typeof residentCount>[0]): void => {
+    const r = residentCount(u);
+    if (Number.isFinite(r)) peoplePop += r;
+  };
+
   // Serialized units may omit width/state/label (older saves): normalize once,
   // the same defaults deserialize applies.
   const norm = (u: SerializedUnit) => ({
@@ -232,6 +263,13 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   for (const raw of save.units) {
     const u = norm(raw);
     if (u.kind === "floor" || u.kind === "lobby") {
+      // Ground lobby (our floor 1 = TDT ground row 10) drives lobbyHeight; we
+      // model only single-story lobbies today (see backlog `lobby-height`). A
+      // gutted/burning lobby is not a real lobby: excluding it keeps the same
+      // invariant as the counts (a burned shell never inflates a header field).
+      if (u.kind === "lobby" && u.floor === 1 && u.state !== "fire" && u.state !== "gutted") {
+        hasGroundLobby = true;
+      }
       widen(u.floor, u.x, u.x + u.width);
       continue;
     }
@@ -269,6 +307,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       if ((u.kind === "office" || u.kind === "condo") && tenanted) {
         status = 1;
         counts.occupied++;
+        addResidents(u);
       } else if (isHotelKind(u.kind)) {
         // Inverse of the importer's flag decode; "booked but out for the day"
         // (a tenanted or ever-booked room without a sleep/dirty flag) is the
@@ -277,7 +316,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
         else if (u.state === "asleep") {
           status = HOTEL_ASLEEP_FLAG | Math.min(Math.max(u.occupants, 1), HOTEL_OCCUPANT_MASK);
         } else if (tenanted || u.everOccupied) status = 1;
-        if (status !== 0) counts.hotelStates++;
+        if (status !== 0) {
+          counts.hotelStates++;
+          addResidents(u);
+        }
       }
       // A vacant-but-once-occupied office/condo has no 1994 encoding (nonzero
       // status means TENANTED there): the vacancy history stays behind.
@@ -295,6 +337,25 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     }
     if (u.label && u.label !== FACILITIES[u.kind].name) counts.namesDropped++;
     if (u.kind === "parking") counts.parkingStalls++;
+    // Tally the header aggregates from this EMITTED room (burned/out-of-range
+    // rooms already `continue`d above, so they never count; see the header note).
+    switch (u.kind) {
+      case "recycling":
+        header.recycling++;
+        break;
+      case "shop":
+      case "restaurant":
+      case "fastFood":
+        header.commercial++;
+        break;
+      case "security":
+        header.security++;
+        break;
+      case "partyHall":
+      case "cinema":
+        header.hallCinema++;
+        break;
+    }
 
     const stack = PART_STACKS[u.kind];
     if (stack) {
@@ -370,6 +431,9 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   const pad = (n: number) => {
     for (let i = 0; i < n; i++) chunks.push(0);
   };
+  const padFF = (n: number) => {
+    for (let i = 0; i < n; i++) chunks.push(0xff);
+  };
 
   // Header (doc §1). The undocumented region is zero-filled; whether the real
   // game needs anything there is the recorded real-game validation risk.
@@ -391,6 +455,30 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   u16(frameForMinuteOfDay(minuteOfDay));
   i32(Math.max(0, Math.floor(save.minutes / 1440)));
   pad(TDT_HEADER_SIZE - chunks.length);
+
+  // Backfill the header aggregate counts (doc §1) at their fixed offsets in the
+  // now-zero-padded header. The 1994 game reads these directly for advisories
+  // (e.g. the recycling nag) rather than recomputing from the floor map, so a
+  // zero here misreports the tower. Clamp to the canon caps.
+  const setHdrU16 = (off: number, v: number) => {
+    chunks[off] = v & 0xff;
+    chunks[off + 1] = (v >> 8) & 0xff;
+  };
+  setHdrU16(0x1c, hasGroundLobby ? 1 : 0); // lobbyHeight: 0 with no ground lobby, else 1 (canon is 1–3; we model single-story lobbies)
+  // recycling + hallCinema have no canon count cap (unlike security/parking), but
+  // still clamp to the u16 ceiling so a forged/huge tower can't wrap the field to
+  // a small value (setHdrU16 masks, it doesn't clamp) -- consistent with the
+  // sibling counts and the people census.
+  setHdrU16(0x2a, Math.min(header.recycling, 0xffff)); // recyclingCount
+  setHdrU16(0x2e, Math.min(header.commercial, 512)); // commercialCount (one retail unit per slot, so <=512)
+  setHdrU16(0x30, Math.min(header.security, 10)); // securityCount (canon max 10)
+  setHdrU16(0x32, Math.min(counts.parkingStalls, 512)); // parkingStallCount (max 512 stalls)
+  setHdrU16(0x36, Math.min(header.hallCinema, 0xffff)); // hallCinemaCount (party halls + cinemas)
+  // Saved view-scroll position (0x26 = x, 0x28 = y, world pixels). Left at 0 the
+  // game opens a loaded tower at the top-left sky; we write the game's own New
+  // Tower default so it opens on the ground lobby, the tower's entrance.
+  setHdrU16(0x26, TDT_DEFAULT_VIEW_X);
+  setHdrU16(0x28, TDT_DEFAULT_VIEW_Y);
 
   // A floor whose tenant count exceeds what the format (and our own parser's
   // hostile-file cap) allows cannot be represented; refuse rather than emit a
@@ -427,8 +515,25 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
   }
 
-  // People: none exported; the crowd re-simulates on load either way.
-  i32(0);
+  // People block: a u32 count followed by that many 16-byte records. The crowd
+  // re-simulates on load, so the records are zero-filled (no live positions to
+  // invent), but the COUNT must be nonzero for a populated tower or the 1994
+  // game faults reading this block (an empty tower loads fine at 0; both
+  // confirmed against the game via the SimTower harness). We write the tower's
+  // resident/worker census, clamped to the canon maximum so a forged save can't
+  // bloat the file. See TDT_ROUTING_TAIL_SIZE for the companion trailing-region
+  // fix that lets the whole file reach the length the game reads.
+  // Commercial venues (shops, restaurants, fast food) draw crowds in the game
+  // but have zero catalog residents, so a tower built only from them sums to a
+  // zero census and would fault like an empty people block. Floor the count at
+  // the emitted room count whenever the tower has rooms: the game rebuilds the
+  // real crowd from the map regardless of this number (our census ran ~77 for a
+  // tower the game repopulated to ~291), so any nonzero value is safe, and a
+  // lobby-only/empty tower correctly stays 0.
+  const finitePop = Number.isFinite(peoplePop) ? Math.round(peoplePop) : 0;
+  const peopleCount = Math.max(0, Math.min(Math.max(finitePop, counts.rooms), TDT_MAX_CENSUS));
+  i32(peopleCount);
+  pad(peopleCount * TDT_PERSON_RECORD_SIZE);
 
   // Retail table: all slots empty (0xFF floor marker).
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
@@ -509,7 +614,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     u8(type);
     u8(transportCarCapacity(e.kind)); // informational; canon 42/21/10
     u8(cars);
-    pad(56); // schedule block: per-day-type car scheduling is not modeled
+    // Per-shaft schedule/config block: the game dispatches cars from this; a
+    // zero-fill reads as "run no cars" and traps everyone in a shaft with no
+    // cars. Emit the game's own built-shaft default so exported shafts run.
+    for (const v of TDT_ELEVATOR_SCHEDULE_DEFAULT) u8(v);
     u8(1); // visible
     u8(0); // reserved
     u16(e.x);
@@ -623,6 +731,14 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     u16(0); // people up (live state)
     u16(0); // people down
   }
+
+  // Trailing routing/reachability region (doc §11+). The 1994 game reads this
+  // fixed-size block after the stairs table; without it the file ends ~25 KB
+  // short and the game overruns it on load (page fault 0x0799). Filled with the
+  // format's 0xFF empty-slot sentinel so the game rebuilds reachability and the
+  // crowd from the floor map rather than reading the fill as live population.
+  // See TDT_ROUTING_TAIL_SIZE for the harness evidence and the size caveat.
+  padFF(TDT_ROUTING_TAIL_SIZE);
 
   // ---- Report ---------------------------------------------------------------
   let topFloor = 0;

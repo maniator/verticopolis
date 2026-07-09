@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedGame, Unit } from "../engine/types";
+import type { SerializedGame, Transport, Unit } from "../engine/types";
 import { SAVE_VERSION } from "../engine/saveMigration";
-import { parseTdtBinary } from "../storage/tdtFormat";
+import {
+  TDT_DEFAULT_VIEW_X,
+  TDT_DEFAULT_VIEW_Y,
+  TDT_ELEVATOR_SCHEDULE_DEFAULT,
+  TDT_PERSON_RECORD_SIZE,
+  TDT_ROUTING_TAIL_SIZE,
+  parseTdtBinary,
+} from "../storage/tdtFormat";
 import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../storage/tdtExport";
 import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../storage/tdtImport";
 import { buildTdt, sampleTowerSpec } from "./fixtures/tdtBuilder";
@@ -110,6 +117,87 @@ describe("buildTDT: export → import round trip", () => {
     expect(back.units).toHaveLength(0);
     expect(back.money).toBe(2_000_000);
     expect(report.roomsExported).toBe(0);
+  });
+
+  // The 1994 game TRUSTS the header aggregate counts (doc §1) rather than
+  // recomputing from the floor map: a zeroed recyclingCount made it nag "your
+  // tower needs a Recycling Center" on a tower that had two (found via the real
+  // game, tools/simtower/). These pin the fix AND the invariant the party
+  // ratified: counts come from the EMITTED rooms, not the input (burned shells
+  // and out-of-range rooms never inflate a count the reader believes).
+  describe("header aggregate counts", () => {
+    const u16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
+    const tower = (units: Unit[]): SerializedGame => ({
+      version: SAVE_VERSION,
+      seed: 1,
+      money: 2_000_000,
+      star: 1,
+      minutes: 7 * 60,
+      mode: "classic",
+      units,
+      transports: [],
+      nextId: units.length + 1,
+      towerName: "Counts",
+      builtWeddingHall: false,
+      evaluatedTower: false,
+    });
+
+    it("derives all six counts from the emitted rooms, excluding burned + out-of-range", () => {
+      const { bytes } = buildTDT(
+        tower([
+          unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }), // ground lobby -> lobbyHeight 1
+          unit({ id: 2, kind: "recycling", floor: 2, x: 0, width: 20 }), // counts
+          unit({ id: 3, kind: "recycling", floor: 5, x: 40, width: 20, state: "gutted" }), // burned -> excluded
+          unit({ id: 4, kind: "shop", floor: 8, x: 0, width: 12 }), // commercial
+          unit({ id: 5, kind: "restaurant", floor: 9, x: 0, width: 24 }), // commercial
+          unit({ id: 6, kind: "fastFood", floor: 10, x: 0, width: 16 }), // commercial
+          unit({ id: 7, kind: "shop", floor: 105, x: 0, width: 12 }), // out-of-range -> excluded
+          unit({ id: 8, kind: "security", floor: 11, x: 0, width: 8 }),
+          unit({ id: 9, kind: "partyHall", floor: 12, x: 0, width: 24 }), // hall+cinema
+          unit({ id: 10, kind: "cinema", floor: 13, x: 0, width: 31 }), // hall+cinema
+          unit({ id: 11, kind: "parking", floor: -1, x: 0, width: 4 }),
+          unit({ id: 12, kind: "parking", floor: -2, x: 0, width: 4 }),
+        ]),
+      );
+      expect(u16(bytes, 0x1c)).toBe(1); // lobbyHeight
+      expect(u16(bytes, 0x2a)).toBe(1); // recyclingCount (burned one excluded)
+      expect(u16(bytes, 0x2e)).toBe(3); // commercialCount (out-of-range shop excluded)
+      expect(u16(bytes, 0x30)).toBe(1); // securityCount
+      expect(u16(bytes, 0x32)).toBe(2); // parkingStallCount
+      expect(u16(bytes, 0x36)).toBe(2); // hallCinemaCount (partyHall + cinema)
+    });
+
+    it("clamps securityCount to the canon max of 10", () => {
+      const units: Unit[] = [unit({ id: 0, kind: "lobby", floor: 1, x: 0, width: 1 })];
+      for (let i = 0; i < 12; i++) {
+        units.push(unit({ id: i + 1, kind: "security", floor: 2 + i, x: 0, width: 8 }));
+      }
+      expect(u16(buildTDT(tower(units)).bytes, 0x30)).toBe(10);
+    });
+
+    // Tripwire: the header switch and the emit tables (KIND_TENANT / PART_STACKS)
+    // are maintained separately, so a kind added to the count switch but not to
+    // an emit path would over-count silently. Verify every counted kind emits.
+    it("every counted kind actually emits a tenant (header can't outrun the map)", () => {
+      const counted: { kind: Unit["kind"]; width: number }[] = [
+        { kind: "recycling", width: 20 },
+        { kind: "shop", width: 12 },
+        { kind: "restaurant", width: 24 },
+        { kind: "fastFood", width: 16 },
+        { kind: "security", width: 8 },
+        { kind: "partyHall", width: 24 },
+        { kind: "cinema", width: 31 },
+      ];
+      for (const c of counted) {
+        const { report } = buildTDT(
+          tower([
+            unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+            unit({ id: 2, kind: c.kind, floor: 3, x: 0, width: c.width }),
+          ]),
+        );
+        expect(report.roomsExported, `${c.kind} must emit a tenant`).toBeGreaterThanOrEqual(1);
+      }
+    });
   });
 
   it("the wedding hall round-trips at the crown (floor 100)", () => {
@@ -380,5 +468,119 @@ describe("classFromRent / legacyFilename", () => {
     // Reserved DOS device names can't exist as files on the target systems.
     expect(legacyFilename("Con")).toBe("TOWER1.TDT");
     expect(legacyFilename("lpt1")).toBe("TOWER1.TDT");
+  });
+});
+
+// These pin the fixes that make an exported tower actually LOAD and PLAY in the
+// real 1994 game (found + confirmed with the SimTower harness, tools/simtower/):
+// a populated tower needs a nonzero people count; the file must carry the
+// trailing routing region; built shafts need a real schedule block or their cars
+// never run; and the saved view opens on the ground, not the sky.
+describe("buildTDT: real-game loadability (people, routing tail, schedule, camera)", () => {
+  const u16 = (b: Uint8Array, o: number) => b[o] | (b[o + 1] << 8);
+  const u32 = (b: Uint8Array, o: number) =>
+    (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16) | (b[o + 3] << 24)) >>> 0;
+  // The u32 people count sits immediately after the 120-record floor map.
+  const peopleOffset = (b: Uint8Array): number => {
+    let o = 0x230;
+    for (let i = 0; i < 120; i++) o += 6 + u16(b, o) * 18 + 94 * 2;
+    return o;
+  };
+  const shaft = (over: Partial<Transport> = {}): Transport => ({
+    id: 10, kind: "elevatorStandard", x: 20, width: 8, bottom: 1, top: 9,
+    cars: 1, carPositions: [1], carDir: [0], load: 0, ...over,
+  });
+  const tower = (units: Unit[], transports: Transport[] = []): SerializedGame => ({
+    version: SAVE_VERSION, seed: 1, money: 2_000_000, star: 2, minutes: 7 * 60,
+    mode: "classic", units, transports, nextId: units.length + 1,
+    towerName: "Load", builtWeddingHall: false, evaluatedTower: false,
+  });
+
+  it("an empty tower writes people count 0 (the game loads that fine)", () => {
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
+    expect(u32(bytes, peopleOffset(bytes))).toBe(0);
+  });
+
+  it("a populated tower writes a nonzero census with that many zeroed records", () => {
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "office", floor: 2, x: 0, width: 12, state: "occupied" }), // 6
+        unit({ id: 3, kind: "office", floor: 3, x: 0, width: 12, state: "occupied" }), // 6
+        unit({ id: 4, kind: "condo", floor: 4, x: 0, width: 16, state: "occupied" }), //  3
+        unit({ id: 5, kind: "office", floor: 5, x: 0, width: 12, state: "empty" }), // vacant, 0
+      ]),
+    );
+    const off = peopleOffset(bytes);
+    const count = u32(bytes, off);
+    expect(count).toBe(6 + 6 + 3); // vacant office excluded
+    const records = bytes.subarray(off + 4, off + 4 + count * TDT_PERSON_RECORD_SIZE);
+    expect(records).toHaveLength(count * TDT_PERSON_RECORD_SIZE);
+    expect(records.every((x) => x === 0)).toBe(true); // records re-simulate; content is zero
+  });
+
+  it("a commercial-only tower (zero catalog residents) still writes a NONZERO count", () => {
+    // Shops/restaurants/fast food have catalog population 0, so the resident
+    // census sums to 0 -- but the game still populates them with customers, so a
+    // 0 count would fault like an empty people block. The room-count floor keeps
+    // it nonzero.
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "shop", floor: 2, x: 0, width: 12, state: "occupied" }),
+        unit({ id: 3, kind: "fastFood", floor: 3, x: 0, width: 16, state: "occupied" }),
+      ]),
+    );
+    expect(u32(bytes, peopleOffset(bytes))).toBeGreaterThan(0);
+  });
+
+  it("a forged NaN condo `residents` can't poison the census to 0", () => {
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "office", floor: 2, x: 0, width: 12, state: "occupied" }), // 6
+        unit({ id: 3, kind: "condo", floor: 3, x: 0, width: 16, state: "occupied", residents: NaN }),
+      ]),
+    );
+    // The office's 6 survives (the NaN addend is skipped, not propagated), and
+    // the count stays a finite nonzero -- never NaN -> 0.
+    expect(u32(bytes, peopleOffset(bytes))).toBeGreaterThanOrEqual(6);
+  });
+
+  it("emits the 0xff routing tail so the file reaches the length the game reads", () => {
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
+    const tail = bytes.subarray(bytes.length - TDT_ROUTING_TAIL_SIZE);
+    expect(tail).toHaveLength(TDT_ROUTING_TAIL_SIZE);
+    expect(tail.every((x) => x === 0xff)).toBe(true);
+  });
+
+  it("writes the New Tower view-scroll default so a load opens on the ground lobby", () => {
+    const { bytes } = buildTDT(tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })]));
+    expect(u16(bytes, 0x26)).toBe(TDT_DEFAULT_VIEW_X);
+    expect(u16(bytes, 0x28)).toBe(TDT_DEFAULT_VIEW_Y);
+  });
+
+  it("a built shaft carries the default schedule block (not zeros) so its cars run", () => {
+    const { bytes } = buildTDT(
+      tower([unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 })], [shaft()]),
+    );
+    let o = peopleOffset(bytes);
+    o += 4 + u32(bytes, o) * TDT_PERSON_RECORD_SIZE; // skip people block
+    o += 512 * 18; // skip retail table -> elevator table, first slot is the shaft
+    expect(bytes[o]).toBe(1); // used
+    expect([...bytes.subarray(o + 4, o + 4 + 56)]).toEqual([...TDT_ELEVATOR_SCHEDULE_DEFAULT]);
+  });
+
+  it("all of these still round-trip through our parser with zero warnings", () => {
+    const { bytes } = buildTDT(
+      tower(
+        [
+          unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+          unit({ id: 2, kind: "office", floor: 2, x: 0, width: 12, state: "occupied" }),
+        ],
+        [shaft()],
+      ),
+    );
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
   });
 });
