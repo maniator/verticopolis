@@ -99,6 +99,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onImport: vi.fn(),
     onImportLegacy: vi.fn(),
     onExportLegacy: vi.fn(),
+    getMode: vi.fn(() => "classic" as const),
     onNew: vi.fn(),
     onToggleAudio: vi.fn(() => true),
     onUndo: vi.fn(),
@@ -456,6 +457,18 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(cb.onExportLegacy).toHaveBeenCalledTimes(1);
     expect(cb.onExport).not.toHaveBeenCalled();
     expect(dialog().open).toBe(false);
+  });
+
+  it("the 1994 export is disabled for a Modern tower (Classic only)", () => {
+    const { cb } = makeUI({ getMode: () => "modern" as const });
+    document.getElementById("btn-export")!.click();
+    const legacy = document.querySelector('[data-act="legacy"]') as HTMLButtonElement;
+    expect(legacy.disabled).toBe(true);
+    legacy.click(); // a disabled button fires nothing
+    expect(cb.onExportLegacy).not.toHaveBeenCalled();
+    // the primary .vctower export still works
+    click('[data-act="export"]');
+    expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
   it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
