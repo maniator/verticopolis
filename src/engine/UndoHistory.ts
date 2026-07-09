@@ -1,7 +1,7 @@
 import type { Tower } from "./Tower";
 
 /**
- * A cheap fingerprint of the player-mutable state — structure, transport config,
+ * A cheap fingerprint of the player-mutable state: structure, transport config,
  * labels, rents, cinema booking policy, retail subtype, and money. It
  * deliberately omits the clock/time fields, so the sub-second time delta
  * *within a single gesture* isn't mistaken for a change when {@link UndoHistory}
