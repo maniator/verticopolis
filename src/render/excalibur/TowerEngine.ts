@@ -13,6 +13,7 @@ import {
   drawCrane,
   drawEscapeStairs,
   drawGarbageTruck,
+  drawLobbyEntrance,
   drawMetroTrain,
   drawStreetCar,
   drawTransport,
@@ -420,6 +421,26 @@ export class TowerEngine {
   /** Lobby tile variants, baked per [lit][ground][variant] so the concourse
    *  pattern (columns, chandeliers/planters) repeats and lights up at night. */
   private lobbyGfx!: ex.Canvas[][][];
+  /** The two slices of the wide grand entrance storefront, baked per [lit].
+   *  The left slice is the display window with the chandelier visible through
+   *  the glass; the right slice carries the double doors and the swaying
+   *  doorman. Both are `cache: false` because the right slice's doorman reads
+   *  `d.anim`, and keeping both on the same path is simpler than mixing
+   *  cache-true / cache-false through the same predicate. */
+  private entranceGrandLeftGfx!: ex.Canvas[];
+  private entranceGrandRightGfx!: ex.Canvas[];
+  /** The compact 1-tile grand entrance, used only when the lobby is too narrow
+   *  to fit the wide storefront (a 1-tile toy lobby). `cache: false` for the
+   *  doorman sway. */
+  private entranceGrandSoloGfx!: ex.Canvas[];
+  /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
+   *  because it has no motion of its own. */
+  private entranceServiceGfx!: ex.Canvas[];
+  /** Floor-1 lobby extent (leftmost tile x, one past rightmost tile x), or null
+   *  when no floor-1 lobby exists. Refreshed at the top of every {@link
+   *  syncScene} sweep so the entrance-variant predicate (grand / service /
+   *  variant) always sees an extent as fresh as the units it's about to render. */
+  private floor1LobbyExtent: { min: number; max: number } | null = null;
   /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
   private escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
   /** Ground-floor entrance awnings, baked per side. They stand in for the fire
@@ -1335,6 +1356,30 @@ export class TowerEngine {
         Array.from({ length: LOBBY_VARIANTS }, (_, v) => bake(fakeStruct("lobby", ground ? 1 : 2, v), lit)),
       ),
     );
+    // Grand-entrance tiles need the ANIMATED path (cache: false) so the
+    // doorman's two-frame sway advances on the decorative clock without extra
+    // plumbing. The bake reads `this.d.anim` at draw time; `this.d.lit` is
+    // fixed per canvas so the lit and unlit versions don't get swapped on the
+    // evening flip (that path re-issues use() to swap between them). Service
+    // tiles are static so they use the same cache-true bake as normal variants.
+    const bakeGrand = (kind: "grand-left" | "grand-right" | "grand-solo") => (lit: boolean): ex.Canvas =>
+      new ex.Canvas({
+        width: TILE,
+        height: FLOOR,
+        cache: false,
+        draw: (ctx) => drawLobbyEntrance({ ctx, lit, anim: this.d.anim, hour: lit ? 20 : 12 }, kind, 0, 0, TILE, FLOOR),
+      });
+    const bakeService = (lit: boolean): ex.Canvas =>
+      new ex.Canvas({
+        width: TILE,
+        height: FLOOR,
+        cache: true,
+        draw: (ctx) => drawLobbyEntrance({ ctx, lit, anim: 0, hour: lit ? 20 : 12 }, "service", 0, 0, TILE, FLOOR),
+      });
+    this.entranceGrandLeftGfx = [bakeGrand("grand-left")(false), bakeGrand("grand-left")(true)];
+    this.entranceGrandRightGfx = [bakeGrand("grand-right")(false), bakeGrand("grand-right")(true)];
+    this.entranceGrandSoloGfx = [bakeGrand("grand-solo")(false), bakeGrand("grand-solo")(true)];
+    this.entranceServiceGfx = [bakeService(false), bakeService(true)];
     const bakeEsc = (side: "left" | "right") =>
       [0, 1].map(
         (p) =>
@@ -1392,6 +1437,11 @@ export class TowerEngine {
 
   private syncScene(): void {
     const tower = this.sim.tower;
+    // Refresh the floor-1 lobby extent BEFORE the unit loop that will call
+    // addStruct / lobbyTileGfx: those consumers need to see an extent as fresh
+    // as the tiles they're about to bake, so a newly-placed leftmost tile
+    // picks up the grand-entrance graphic on the same frame it's added.
+    this.refreshFloor1LobbyExtent();
     // Fresh flood-fill (not cached — it depends on unit state); read ONCE here
     // per sync. A parking space absent from this set is "dead" and gets a red X.
     // The dead-bit joins the room signature, so a connectivity flip triggers a
@@ -1611,9 +1661,79 @@ export class TowerEngine {
     this.structActors.set(u.id, this.addBoxActor(ex.vec(this.worldX(u.x), this.worldYTop(u.floor)), TILE, FLOOR, -1, gfx));
   }
 
-  /** The shared lobby tile graphic for this unit's lighting, style and slot. */
+  /** The shared lobby tile graphic for this unit's lighting, style and slot.
+   *  For floor-1 lobby tiles the frontage-edge predicate can override the
+   *  variant to a wide-storefront grand slice, a compact grand fallback, or
+   *  a service entrance; see {@link floor1EntranceKind}. */
   private lobbyTileGfx(u: Unit): ex.Canvas {
-    return this.lobbyGfx[this.litState ? 1 : 0][u.floor === 1 ? 1 : 0][lobbyVariant(u.x)];
+    const lit = this.litState ? 1 : 0;
+    if (u.floor === 1) {
+      const kind = this.floor1EntranceKind(u.x);
+      switch (kind) {
+        case "grand-left": return this.entranceGrandLeftGfx[lit];
+        case "grand-right": return this.entranceGrandRightGfx[lit];
+        case "grand-solo": return this.entranceGrandSoloGfx[lit];
+        case "service": return this.entranceServiceGfx[lit];
+      }
+      return this.lobbyGfx[lit][1][lobbyVariant(u.x)];
+    }
+    return this.lobbyGfx[lit][0][lobbyVariant(u.x)];
+  }
+
+  /** Which entrance (if any) the floor-1 lobby tile at grid `x` should render
+   *  as. Derived, not stored: reads {@link floor1LobbyExtent}, recomputed at
+   *  the top of each {@link syncScene} so this always sees an extent as fresh
+   *  as the tiles the sync is about to render.
+   *
+   *  The wide grand entrance spans two adjacent tiles at the left frontage
+   *  edge (`grand-left` at `e.min`, `grand-right` at `e.min + 1`), giving a
+   *  22-pixel-wide storefront that reads as a real hotel facade. When the
+   *  lobby is only one tile wide, we fall back to a compact 1-tile grand
+   *  (`grand-solo`) — a toy tower doesn't get the full storefront.
+   *
+   *  The service entrance sits at `e.max - 1`, but ONLY if the lobby is wide
+   *  enough to have room past the grand span (so a 1- or 2-tile lobby is all
+   *  grand, no service).
+   *
+   *  Rules:
+   *    - lobby width 1: `e.min` -> grand-solo, no service.
+   *    - lobby width 2: `e.min` -> grand-left, `e.min+1` -> grand-right.
+   *    - lobby width ≥ 3: `e.min` -> grand-left, `e.min+1` -> grand-right,
+   *      `e.max-1` -> service, everything between -> normal variant cycle. */
+  private floor1EntranceKind(x: number): "grand-left" | "grand-right" | "grand-solo" | "service" | "none" {
+    const ext = this.floor1LobbyExtent;
+    if (!ext) return "none";
+    const width = ext.max - ext.min;
+    const offset = x - ext.min;
+    // Wide grand takes 2 tiles when there's room; compact grand takes 1.
+    if (width >= 2) {
+      if (offset === 0) return "grand-left";
+      if (offset === 1) return "grand-right";
+    } else if (offset === 0) {
+      return "grand-solo";
+    }
+    // Service only when the lobby is wider than the grand span it sits next to.
+    const grandSpan = width >= 2 ? 2 : 1;
+    if (width > grandSpan && x === ext.max - 1) return "service";
+    return "none";
+  }
+
+  /** Re-scan floor-1 lobby units for the frontage extent, so
+   *  {@link floor1EntranceVariant} sees the current shape. Runs at the top of
+   *  {@link syncScene}, one linear pass, only when structural revision changed
+   *  (the same gate `syncScene` itself uses), so it stays off the per-frame
+   *  path. */
+  private refreshFloor1LobbyExtent(): void {
+    let min = Infinity;
+    let max = -Infinity;
+    for (const u of this.sim.tower.units) {
+      if (u.kind === "lobby" && u.floor === 1) {
+        if (u.x < min) min = u.x;
+        const right = u.x + u.width;
+        if (right > max) max = right;
+      }
+    }
+    this.floor1LobbyExtent = min < max ? { min, max } : null;
   }
 
   /** Build and retain a room actor. `animated` (burning / under construction:
