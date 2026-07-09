@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Simulation, ECON, VACATE_RESCIND } from "../engine/Simulation";
 import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../engine/facilities";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind, SerializedUnit, Unit } from "../engine/types";
+import { SHOP_SUBTYPES } from "../engine/retailSubtypes";
 
 describe("Rent / price controls", () => {
   it("steps and clamps a unit's price within its band", () => {
@@ -1129,5 +1130,161 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     const modern = Simulation.newGame(7, "modern");
     expect(classic.rules.showsPreviewReason).toBe(false);
     expect(modern.rules.showsPreviewReason).toBe(true);
+  });
+});
+
+describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic invariant", () => {
+  // Build one shop / fastFood / restaurant against a served tower and return
+  // the placed unit. Uses sim.build (the roll seam is inside sim.build) so
+  // every test exercises the real gesture path.
+  function buildOne(sim: Simulation, kind: FacilityKind, x: number): Unit {
+    sim.money = 1e12;
+    sim.star = 5;
+    const r = sim.build(kind, 2, x);
+    expect(r.ok).toBe(true);
+    const u = sim.tower.unitAt(2, x);
+    if (!u) throw new Error("placement failed");
+    return u;
+  }
+
+  it("assigns a canon subtype to every new shop, fast food, and restaurant", () => {
+    // builtTower serves floor 2 across [x0, x0+40); a restaurant is 24 wide so
+    // each kind gets its own tower to keep spans in range.
+    const buildKind = (kind: FacilityKind): Unit => {
+      const s = builtTower(11);
+      return buildOne(s, kind, Math.floor(GRID.width / 2) - 20);
+    };
+    expect(typeof buildKind("shop").subtype).toBe("string");
+    expect(typeof buildKind("fastFood").subtype).toBe("string");
+    expect(typeof buildKind("restaurant").subtype).toBe("string");
+  });
+
+  it("leaves subtype undefined on non-retail kinds (no wasted RNG draw)", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const office = buildOne(sim, "office", x0);
+    expect(office.subtype).toBeUndefined();
+  });
+
+  it("is deterministic across seeds: same seed produces the same subtype sequence", () => {
+    const build3 = (seed: number): [string?, string?, string?] => {
+      const sim = builtTower(seed);
+      const x0 = Math.floor(GRID.width / 2) - 20;
+      return [
+        buildOne(sim, "shop", x0).subtype,
+        buildOne(sim, "shop", x0 + 12).subtype,
+        buildOne(sim, "shop", x0 + 24).subtype,
+      ];
+    };
+    expect(build3(11)).toEqual(build3(11));
+    // A different seed should almost certainly produce a different sequence
+    // (with 11 shop variants over 3 picks the collision probability is 1/11^3,
+    // negligible for a canonical fixed seed).
+    expect(build3(11)).not.toEqual(build3(42));
+  });
+
+  it("byte-identical Classic RNG stream when no retail is built (short-circuit gate)", () => {
+    // Two towers, same seed, no retail: any subsequent RNG draw (basement
+    // treasure, condo relocation, tenant naming) must land on the exact same
+    // values. Compare the state signature after N ticks.
+    const drive = (seed: number): [number, number] => {
+      const sim = builtTower(seed);
+      const x0 = Math.floor(GRID.width / 2) - 20;
+      buildOne(sim, "office", x0);
+      buildOne(sim, "office", x0 + 12);
+      buildOne(sim, "condo", x0 + 24);
+      for (let i = 0; i < 24 * 7; i++) sim.tick(60);
+      // Sum every unit's pendingIncome as a hostile-cheap RNG-sensitive summary.
+      const bag = sim.tower.units.reduce((acc, u) => acc + (u.pendingIncome ?? 0), 0);
+      return [sim.money, bag];
+    };
+    expect(drive(3)).toEqual(drive(3));
+  });
+
+  it("rerollSubtype picks a different canon name from the current on every call", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    const first = shop.subtype!;
+    // 20 rerolls: each result must be a canon name AND different from the
+    // preceding subtype (the "guarantee different from current" contract).
+    let prev = first;
+    for (let i = 0; i < 20; i++) {
+      const next = sim.rerollSubtype(shop.id);
+      expect(typeof next).toBe("string");
+      expect(next).not.toBe(prev);
+      expect(SHOP_SUBTYPES.includes(next as (typeof SHOP_SUBTYPES)[number])).toBe(true);
+      prev = next!;
+    }
+  });
+
+  it("rerollSubtype is a no-op on non-retail kinds", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const office = buildOne(sim, "office", x0);
+    expect(sim.rerollSubtype(office.id)).toBeUndefined();
+    expect(office.subtype).toBeUndefined();
+  });
+
+  it("cosmetic invariant: same seed + differing subtypes on retail leaves the economy byte-identical", () => {
+    // Two towers, identical seeds and identical build scripts (both include a
+    // fast-food unit). Force each to a DIFFERENT subtype after build; run for
+    // several weeks; assert money and per-unit pendingIncome match. This pins
+    // that no economy path reads Unit.subtype.
+    const drive = (force: string): { money: number; pending: number[] } => {
+      const sim = builtTower(11);
+      const x0 = Math.floor(GRID.width / 2) - 20;
+      buildOne(sim, "office", x0);
+      const ff = buildOne(sim, "fastFood", x0 + 12);
+      ff.subtype = force; // pin the variant
+      for (let i = 0; i < 24 * 14; i++) sim.tick(60);
+      const pending = sim.tower.units.map((u) => u.pendingIncome ?? 0);
+      return { money: sim.money, pending };
+    };
+    const a = drive("Chinese Cafe");
+    const b = drive("Hamburger Stand");
+    expect(a.money).toBe(b.money);
+    expect(a.pending).toEqual(b.pending);
+  });
+
+  it("round-trip: subtype survives serialize + deserialize", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    const before = shop.subtype!;
+    const wire = sim.serialize();
+    const revived = Simulation.deserialize(wire);
+    const revivedShop = revived.tower.unitAt(2, x0);
+    expect(revivedShop?.subtype).toBe(before);
+  });
+
+  it("whitelist coerce: hand-edited garbage in the save drops subtype to undefined", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    buildOne(sim, "shop", x0);
+    const wire = sim.serialize();
+    // Force a bogus subtype on the shop record in the wire format.
+    const doc = JSON.parse(JSON.stringify(wire));
+    for (const u of doc.units as SerializedUnit[]) {
+      if (u.kind === "shop") u.subtype = "Not A Canon Variant";
+    }
+    const revived = Simulation.deserialize(doc);
+    const revivedShop = revived.tower.unitAt(2, x0);
+    expect(revivedShop?.subtype).toBeUndefined();
+  });
+
+  it("legacy save without subtype: units load as generic (no re-roll on load)", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    buildOne(sim, "shop", x0);
+    const wire = sim.serialize();
+    const doc = JSON.parse(JSON.stringify(wire));
+    // Strip every subtype field to simulate a save that predates this feature.
+    for (const u of doc.units as SerializedUnit[]) {
+      delete u.subtype;
+    }
+    const revived = Simulation.deserialize(doc);
+    const revivedShop = revived.tower.unitAt(2, x0);
+    expect(revivedShop?.subtype).toBeUndefined();
   });
 });

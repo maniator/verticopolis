@@ -2,7 +2,8 @@
 title: 'Retail subtypes: canon variant names on shops, fast food, and restaurants'
 type: 'feature'
 created: '2026-07-09'
-status: 'draft'
+status: 'in-review'
+baseline_commit: '3c6d59c'
 context:
   - '{project-root}/CLAUDE.md'
   - '{project-root}/docs/canon/tdt-format.md'
@@ -90,17 +91,17 @@ context:
 ## Tasks & Acceptance
 
 **Execution (dependency order: engine, then TDT, then inspector, then tests, then docs):**
-- [ ] `src/engine/retailSubtypes.ts`: canon lists + three helpers.
-- [ ] `src/engine/types.ts`: add `subtype?: string` to `Unit`.
-- [ ] `src/engine/Simulation.ts`: `build` calls the gated subtype roll; new `rerollSubtype` public method; `serializeUnit` sparse-writes subtype; `deserialize` whitelist-coerces subtype.
-- [ ] `src/storage/tdtFormat.ts`: parse the retail-table per-slot variant byte into `TdtTail`.
-- [ ] `src/storage/tdtImport.ts`: adopt `subtype` on retail units via whitelist; update the "retail varieties aren't imported" message.
-- [ ] `src/storage/tdtExport.ts`: write the unit-record byte 17 AND populate the retail-table rows from `u.subtype`.
-- [ ] `src/game/inspector.ts`: use `subtype` for the title when present.
-- [ ] `src/game/editorActions.ts` + `src/ui/editorHtml.ts`: "Change variety" action + button (retail only).
-- [ ] Tests as listed in the Code Map.
-- [ ] `package.json`: bump minor.
-- [ ] `_bmad-output/implementation-artifacts/backlog.md`: close `retail-subtypes`; update the TDT deferral line.
+- [x] `src/engine/retailSubtypes.ts`: canon lists + three helpers.
+- [x] `src/engine/types.ts`: add `subtype?: string` to `Unit`.
+- [x] `src/engine/Simulation.ts`: `build` calls the gated subtype roll; new `rerollSubtype` public method; `serializeUnit` sparse-writes subtype; `deserialize` whitelist-coerces subtype.
+- [x] `src/storage/tdtFormat.ts`: parse the retail-table per-slot variant byte into `TdtTail`.
+- [x] `src/storage/tdtImport.ts`: adopt `subtype` on retail units via whitelist; update the "retail varieties aren't imported" message.
+- [x] `src/storage/tdtExport.ts`: write the unit-record byte 17 AND populate the retail-table rows from `u.subtype`.
+- [x] `src/game/inspector.ts`: use `subtype` for the title when present.
+- [x] `src/game/editorActions.ts` + `src/ui/editorHtml.ts`: "Change variety" action + button (retail only).
+- [x] Tests as listed in the Code Map.
+- [x] `package.json`: bump minor.
+- [x] `_bmad-output/implementation-artifacts/backlog.md`: close `retail-subtypes`; update the TDT deferral line.
 
 **Acceptance Criteria:**
 - Given a fresh Classic tower with seed 42, when three shops are built via `sim.build`, then each carries a `subtype` from `SHOP_SUBTYPES`, and repeating the sequence against a fresh Classic seed 42 produces the identical subtype triple.

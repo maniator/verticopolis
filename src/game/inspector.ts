@@ -186,8 +186,14 @@ export class InspectorController {
             `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
         }
       }
+      // Canon retail variant (§7): a shop / fastFood / restaurant with a
+      // subtype titles as its specific name ("Chinese Cafe"), not the generic
+      // kind name. Legacy retail units and every non-retail kind keep the
+      // catalog name; the subtype field is whitelist-coerced on load, so
+      // untrusted values never reach this string.
+      const title = u.subtype ?? f.name;
       this.deps.ui.showInspector(
-        `<h4 class="win-title">${f.name}</h4>` +
+        `<h4 class="win-title">${escapeHtml(title)}</h4>` +
           `<div>${u.label !== f.name ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
           `<div>Status: ${statusText}</div>` +
           (f.population ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>` : "") +

@@ -1,5 +1,6 @@
 import { rentConfig } from "../engine/econConfig";
 import { FACILITIES, GRID, buildMinutes, facilityFloors, isHotelKind, maxCarsFor, maxSpanFor } from "../engine/facilities";
+import { canonicalSubtype, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { SAVE_VERSION } from "../engine/saveMigration";
 import { minuteOfDayForFrame } from "../engine/timePacing";
 import type { FacilityKind, SerializedGame, Transport, Unit, UnitState } from "../engine/types";
@@ -21,7 +22,7 @@ export { LegacyImportError };
  * settings, rent classes and hotel room states. When the transport blocks
  * can't be read (truncated/corrupt files), a deterministic layout is
  * SYNTHESIZED from the floor map instead, and the fidelity report says which
- * path ran. People, retail subtypes, finance history and named tenants are
+ * path ran. People, finance history and named tenants are
  * queued follow-ups.
  */
 
@@ -575,10 +576,20 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
       const rent = rentFromClass(kind, t.rentRate);
       if (rent !== undefined) counts.rentsApplied++;
 
+      // Canon retail variant: unit-record byte 17 (§4, stronger evidence than
+      // §7 per the doc). Whitelist-coerce against our canon lists so an
+      // out-of-range byte drops to undefined (generic name). Only the three
+      // retail kinds carry a canon variant; every other kind stays generic.
+      let subtype: string | undefined;
+      if (kind === "shop") subtype = canonicalSubtype(kind, SHOP_SUBTYPES[t.subtype]);
+      else if (kind === "fastFood") subtype = canonicalSubtype(kind, FASTFOOD_SUBTYPES[t.subtype]);
+      else if (kind === "restaurant") subtype = canonicalSubtype(kind, RESTAURANT_SUBTYPES[t.subtype]);
+
       pushUnit(kind, ours, ext.x, ext.right - ext.x, state, {
         everOccupied,
         occupants,
         rent,
+        ...(subtype !== undefined ? { subtype } : {}),
         ...(underConstruction ? { completeAt: minutes + buildMinutes(kind) } : {}),
       });
 
@@ -1195,7 +1206,7 @@ function buildReport(
       `The ${tdt.peopleCount.toLocaleString()} people on the save's roster aren't carried over one by one; your tower re-populates as it runs.`,
     );
   }
-  couldNotBring.push("Tenant names, retail varieties, and finance history aren't imported yet.");
+  couldNotBring.push("Tenant names and finance history aren't imported yet.");
   couldNotBring.push(...headerNotes);
   couldNotBring.push(...tdt.warnings);
 

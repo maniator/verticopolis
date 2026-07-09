@@ -10,6 +10,9 @@ import {
   parseTdtBinary,
 } from "../storage/tdtFormat";
 import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../storage/tdtExport";
+import { Simulation } from "../engine/Simulation";
+import { GRID } from "../engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../storage/tdtImport";
 import { buildTdt, sampleTowerSpec } from "./fixtures/tdtBuilder";
 
@@ -95,6 +98,43 @@ describe("buildTDT: export → import round trip", () => {
     const save = { ...sampleSave(), mode: "modern" as const };
     expect(() => buildTDT(save)).toThrow(LegacyExportError);
     expect(() => buildTDT(save)).toThrow(/Classic towers/);
+  });
+
+  it("retail subtypes round-trip: shop / fastFood / restaurant preserve their canon variant", () => {
+    // Build a real Simulation, populate three retail units with distinct
+    // canon subtypes, serialize, export, and re-import through parseTDT.
+    // The resulting units must carry the same variant names on both sides.
+    const sim = Simulation.newGame(3);
+    sim.money = 1e12;
+    sim.star = 5;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
+    sim.buildTransport("elevatorStandard", x0, 1, 2);
+    // Distinct kinds, distinct floors so the retail-table row order is stable.
+    for (let i = 0; i < 40; i++) sim.tower.place("floor", 3, x0 + i);
+    for (let i = 0; i < 40; i++) sim.tower.place("floor", 4, x0 + i);
+    const shop = sim.tower.units.find((u) => u.kind === "floor" && u.floor === 2)!; // just to compile
+    void shop;
+    // Place through the low-level place path to keep sequence deterministic,
+    // then FORCE canonical names so the assertion doesn't hinge on which
+    // subtype the RNG happened to pick.
+    const s = sim.tower.place("shop", 2, x0)!;
+    const f = sim.tower.place("fastFood", 3, x0)!;
+    const r = sim.tower.place("restaurant", 4, x0)!;
+    sim.tower.getUnit(s.unitId!)!.subtype = SHOP_SUBTYPES[3]; // Book Store
+    sim.tower.getUnit(f.unitId!)!.subtype = FASTFOOD_SUBTYPES[1]; // Chinese Cafe
+    sim.tower.getUnit(r.unitId!)!.subtype = RESTAURANT_SUBTYPES[4]; // Steak House
+
+    const wire = sim.serialize();
+    const { bytes } = buildTDT(wire);
+    const back = parseTDT(bytes.buffer as ArrayBuffer, "R.TDT").save;
+
+    const backShop = back.units.find((u) => u.kind === "shop");
+    const backFf = back.units.find((u) => u.kind === "fastFood");
+    const backRest = back.units.find((u) => u.kind === "restaurant");
+    expect(backShop?.subtype).toBe(SHOP_SUBTYPES[3]);
+    expect(backFf?.subtype).toBe(FASTFOOD_SUBTYPES[1]);
+    expect(backRest?.subtype).toBe(RESTAURANT_SUBTYPES[4]);
   });
 
   it("an empty tower exports a valid minimal file", () => {

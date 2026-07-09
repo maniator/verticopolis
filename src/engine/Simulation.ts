@@ -11,6 +11,7 @@ import { Tower } from "./Tower";
 import { Ledger, ledgerCatFor, type LedgerCat } from "./Ledger";
 import { RNG } from "./rng";
 import { MILESTONES, isTenantFloorUnit } from "./milestones";
+import { canonicalSubtype, subtypeListFor } from "./retailSubtypes";
 
 export { ECON } from "./econConfig";
 import {
@@ -495,6 +496,17 @@ export class Simulation implements SimContext {
     // never overcharge.
     const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
     this.money -= can.cost - (quotedBridge - laidBridge.length) * substrateCost;
+    // Canon retail variant: shop / fastFood / restaurant carry a named
+    // subtype ("Chinese Cafe", "Book Store", ...) from the seeded RNG. Every
+    // other kind short-circuits BEFORE the RNG draw (see rollRetailSubtype)
+    // so a Classic tower whose diet skips retail stays byte-identical.
+    if (res.unitId !== undefined) {
+      const name = this.rollRetailSubtype(kind);
+      if (name !== undefined) {
+        const u = this.tower.getUnit(res.unitId);
+        if (u) u.subtype = name;
+      }
+    }
     // Rooms spend time under construction before they can be used.
     const dur = buildMinutes(kind);
     if (dur > 0 && res.unitId !== undefined) {
@@ -1441,6 +1453,43 @@ export class Simulation implements SimContext {
    *  this feature. A relocation enters the standard `vacating` notice with a
    *  non-rescindable "relocation" reason; when the notice elapses the existing
    *  buy-back reclaims the unit at its household-scaled price and re-lists it. */
+  /**
+   * Draw a canon retail variant name from `sim.rng` for the given kind, or
+   * undefined when the kind carries no canon subtype. Short-circuits BEFORE
+   * touching the RNG for every non-retail kind so a Classic tower whose diet
+   * skips retail stays byte-identical (the `subtypeListFor(kind) === null`
+   * branch never observes `this.rng`). Mirrors the `rollCondoRelocations`
+   * short-circuit above where `chance <= 0` returns pre-draw.
+   */
+  private rollRetailSubtype(kind: FacilityKind): string | undefined {
+    const list = subtypeListFor(kind);
+    if (list === null) return undefined;
+    return this.rng.pick(list);
+  }
+
+  /**
+   * Reroll a placed retail unit's canon variant. Returns the new subtype on
+   * success, or undefined when the id isn't a retail unit (non-retail kind
+   * or a kind whose canon list is a single entry). The new name is
+   * guaranteed different from the current one when the list has more than
+   * one option. Called from the inspector's "Change variety" action.
+   */
+  rerollSubtype(id: number): string | undefined {
+    const u = this.tower.getUnit(id);
+    if (!u) return undefined;
+    const list = subtypeListFor(u.kind);
+    if (list === null || list.length < 2) return undefined;
+    // Draw off-current: pick an index in [0, list.length - 1) and skip past
+    // the current position, so the new subtype is never the same as the one
+    // being replaced without rejection-sampling (bounded, deterministic).
+    const currentIdx = u.subtype === undefined ? -1 : list.indexOf(u.subtype);
+    let idx = this.rng.int(0, list.length - 2);
+    if (currentIdx >= 0 && idx >= currentIdx) idx += 1;
+    const next = list[idx];
+    u.subtype = next;
+    return next;
+  }
+
   private rollCondoRelocations(): void {
     const days = Math.ceil(VACATE_NOTICE_MINUTES / (24 * 60));
     for (const u of this.tower.units) {
@@ -2298,6 +2347,10 @@ export class Simulation implements SimContext {
             u.filmPolicy === "feature" || u.filmPolicy === "blockbuster" || u.filmPolicy === "auto"
               ? u.filmPolicy
               : undefined,
+          // Whitelist-coerce the canon retail variant name against the kind's
+          // §7 list, so a scrambled save or a subtype from a kind that doesn't
+          // carry one drops to undefined (unit renders as the generic name).
+          subtype: canonicalSubtype(u.kind as FacilityKind, u.subtype),
           // Preserve an in-progress eviction across save/reload, hardened like
           // every other loop-driving field: an out-of-set reason or a non-finite
           // deadline from a forged save must not reach the toast / state machine.
@@ -2441,7 +2494,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, completeAt, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, ...unhandled } = u;
   const exhaustive: Record<string, never> = unhandled;
   void exhaustive;
   const out: SerializedUnit = { id, kind, floor, x };
@@ -2463,6 +2516,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (vacateReason !== undefined) out.vacateReason = vacateReason;
   if (vacateAt !== undefined) out.vacateAt = vacateAt;
   if (filmPolicy !== undefined) out.filmPolicy = filmPolicy;
+  if (subtype !== undefined) out.subtype = subtype;
   if (completeAt !== undefined) out.completeAt = completeAt;
   return out;
 }
