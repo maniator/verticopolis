@@ -34,7 +34,12 @@ const PERIODS: readonly { frameEnd: number; minuteEnd: number }[] = [
   { frameEnd: 800, minuteEnd: 330 }, // 12:00–12:30 — the lunch crawl
   { frameEnd: 1200, minuteEnd: 360 }, // 12:30–13:00
   { frameEnd: 1600, minuteEnd: 600 }, // 13:00–17:00
-  { frameEnd: 2000, minuteEnd: 840 }, // 17:00–21:00
+  // 17:00–21:00 split into three so the 18:00–18:30 dinner peak crawls, mirroring
+  // the lunch crawl. Total for the four-hour block stays 400 frames / 240 min so
+  // the day's 2600-frame budget is preserved. (arch-tower-wide-meal-cadence §8.)
+  { frameEnd: 1720, minuteEnd: 660 }, // 17:00–18:00  (dinner lead-in)
+  { frameEnd: 1880, minuteEnd: 690 }, // 18:00–18:30  (the dinner crawl)
+  { frameEnd: 2000, minuteEnd: 840 }, // 18:30–21:00  (post-dinner)
   { frameEnd: 2400, minuteEnd: 1080 }, // 21:00– 1:00 (midnight = frame 2300)
   { frameEnd: 2600, minuteEnd: 1440 }, //  1:00– 7:00 — the night sprint
 ];

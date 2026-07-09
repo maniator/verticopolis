@@ -20,6 +20,7 @@ import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
+import { decideMealRush } from "./game/mealRush";
 import { InspectorController } from "./game/inspector";
 import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
@@ -69,8 +70,13 @@ class GameApp {
 
   private canvas: HTMLCanvasElement;
   private accMinutes = 0;
-  /** Last day the noon "Lunch rush!" bulletin fired (transient, like the log). */
-  private lastLunchDay = -1;
+  /** Last day each meal-rush bulletin fired (transient, like the log). Kept
+   *  per meal so a save reloaded mid-day does not spam an already-fired kind. */
+  private lastMealRushDay: Record<"breakfast" | "lunch" | "dinner", number> = {
+    breakfast: -1,
+    lunch: -1,
+    dinner: -1,
+  };
   private lastUiUpdate = 0;
   /** Throttle for the per-frame error log, so a repeating throw can't spam. */
   private lastTickErrorLog = 0;
@@ -906,7 +912,7 @@ class GameApp {
       this.sim.tick(step);
       this.accMinutes -= step;
     }
-    this.emitLunchRush(minutesBeforeTicks);
+    this.emitMealRushes(minutesBeforeTicks);
 
     // Throttle the comparatively expensive DOM/audio updates (~6Hz) so a busy
     // tower never makes panning feel sluggish.
@@ -976,33 +982,44 @@ class GameApp {
    *  that already sits inside the noon hour stays quiet, a frozen clock stays
    *  quiet, and a single huge frame that leaps from 11:5x past 13:00 still
    *  fires. Transient, like the log. */
-  private emitLunchRush(minutesBeforeTicks: number): void {
+  private emitMealRushes(minutesBeforeTicks: number): void {
     if (this.prefs.steadyClock) return;
     const after = this.sim.clock.minutes;
     // A tampered save can seed the clock with non-finite minutes (deserialize
-    // passes data.minutes to Clock un-hardened); without this, dayOfNoon is NaN,
+    // passes data.minutes to Clock un-hardened); without this, dayOfKind is NaN,
     // the once-per-day latch never sticks (NaN !== NaN), and the bulletin spams
     // every frame. Same defensive posture as timePacing's finite guards.
     if (!Number.isFinite(after) || !Number.isFinite(minutesBeforeTicks)) return;
-    // The first noon strictly after the frame START. Anchoring on the start (not
-    // the post-tick clock) keeps this correct even for a single frame that leaps
-    // past both noon and the following midnight: the clock's day would have moved
-    // on, but the crossed noon is still the one computed from where we began.
-    // Do NOT "simplify" this to clock.day/isWeekend; that reintroduces the
-    // missed-crossing bug near midnight. A day index's weekday-vs-weekend split
-    // reads the tower's calendar directly (see the check below) instead of
-    // hard-coding a 7-day week, so the bulletin gates correctly under canon too.
     const cal = this.sim.clock.calendar;
-    const dayOfNoon = Math.floor((minutesBeforeTicks - 12 * 60) / 1440) + 1;
-    const noonAbs = dayOfNoon * 1440 + 12 * 60;
-    if (noonAbs > after) return; // this frame's ticks didn't reach that noon
-    // Weekend = the trailing slots of the calendar's week, matching
-    // Clock.isWeekend (real-world 5/6 of 7; canon the last 1 of 3). Read the
-    // calendar so the bulletin fires on the right days under the canon calendar.
-    // Skip on weekends (no rush) and skip if the bulletin already fired for this day.
-    if (dayOfNoon % cal.weekDays >= cal.weekDays - cal.weekendDays || dayOfNoon === this.lastLunchDay) return;
-    this.lastLunchDay = dayOfNoon;
-    this.sim.emit("Lunch rush! Midday plays out in slow motion, just like 1994.", "info");
+    // Tenant-count floor: silence bulletins in a very small tower (1-star lot
+    // with a handful of rooms), so the log does not chatter through the early
+    // game. 30 occupied tenants is a modest bar; a mid-star tower clears it.
+    const tenants = this.sim.tower.totalPopulation();
+    if (tenants < 30) return;
+    // Emit each meal's bulletin once per day at the START of its window.
+    // Anchoring on the frame START keeps the crossing check correct for a
+    // single huge frame that leaps past the hour boundary; the calendar-aware
+    // weekend gate skips weekends for the workday meals only (lunch and
+    // dinner). Breakfast fires every day (hotels serve breakfast on weekends).
+    const emit = (kind: "breakfast" | "lunch" | "dinner", hour: number, text: string, skipWeekend: boolean): void => {
+      const { fire, dayOfKind } = decideMealRush({
+        hour,
+        skipWeekend,
+        before: minutesBeforeTicks,
+        after,
+        weekDays: cal.weekDays,
+        weekendDays: cal.weekendDays,
+        lastFiredDay: this.lastMealRushDay[kind],
+      });
+      if (!fire) return;
+      this.lastMealRushDay[kind] = dayOfKind;
+      this.sim.emit(text, "info");
+    };
+    // Breakfast at 07:00, dinner at 18:00, lunch at 12:00. Order matches the
+    // day so a slow-motion frame that crosses two boundaries emits both.
+    emit("breakfast", 7, "Breakfast rush! Guests head down for the buffet.", false);
+    emit("lunch", 12, "Lunch rush! Midday plays out in slow motion, just like 1994.", true);
+    emit("dinner", 18, "Dinner rush! Elevators fill for the evening service.", true);
   }
 
   /** Keep the world-attached DOM panels (selected-facility editor, hover
@@ -1133,7 +1150,7 @@ class GameApp {
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;
-    this.lastLunchDay = -1;
+    this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
     this.engine.setSim(sim);
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.

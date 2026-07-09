@@ -12,6 +12,19 @@ export const ECON = {
     partyHall: 3_000,
   } as Record<string, number>,
   maintenancePerCarMonthly: 600,
+  /**
+   * Meal-cadence origin weights (arch-tower-wide-meal-cadence-2026-07-09 §3).
+   * Each eating population contributes meal-window trip options with this
+   * multiplier on its per-floor count. Condo is 0.3 because most residents
+   * cook at home; the rest are 1 so the code path stays uniform. The single
+   * new tunable the meal-cadence feature added.
+   */
+  mealPopulationWeights: {
+    office: 1.0,
+    condo: 0.3,
+    hotel: 1.0,
+    staff: 1.0,
+  },
   /** Cost to add one elevator car to a shaft. */
   addCarCost: 40_000,
   /** Monthly film-booking cost per cinema (canon: 150k average / 300k
