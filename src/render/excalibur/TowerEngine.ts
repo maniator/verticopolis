@@ -1699,10 +1699,14 @@ export class TowerEngine {
    *  Rules:
    *    - Leftmost run of width ≥ 2: `runStart` -> grand-left, `runStart+1` -> grand-right.
    *    - Leftmost run of width 1 (toy tower): `runStart` -> grand-solo.
-   *    - Rightmost run of width > grand span: rightmost tile -> service.
-   *    - Rightmost run is the same as the leftmost run: only place service if
-   *      the run has room past the grand span (so 1/2-tile lobbies are all
-   *      grand, no service). */
+   *    - Rightmost run's rightmost tile -> service, IFF that tile is not
+   *      already claimed by the grand entrance AND there is room past the
+   *      grand span. When the rightmost run is the SAME as the leftmost run,
+   *      "room past the grand span" means the run has more tiles than the
+   *      grand takes (so 1/2-tile lobbies are all grand, no service). When
+   *      the rightmost run is DIFFERENT from the leftmost run, it always has
+   *      room by construction, so any distinct rightmost run gets service on
+   *      its rightmost tile (even width 1). */
   private refreshFloor1EntranceMap(): void {
     this.floor1EntranceMap.clear();
     // Collect every floor-1 lobby tile position (lobby units are always

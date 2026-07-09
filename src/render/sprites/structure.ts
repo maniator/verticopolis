@@ -544,8 +544,9 @@ function drawServiceEntrance(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.fillStyle = brass;
   ctx.fillRect(frameL, doorTop + 5, 1, 2);
   ctx.fillRect(frameL, doorBot - 6, 1, 2);
-  // Doorknob on the right side.
-  ctx.fillRect(panelR, y + Math.floor((doorTop + doorBot) / 2) - y - 1, 1, 1);
+  // Doorknob on the right side, centered vertically on the panel.
+  const knobY = Math.floor((doorTop + doorBot) / 2) - 1;
+  ctx.fillRect(panelR, knobY, 1, 1);
   // Brass "service" plate on the wall to the right of the door: a small gold
   // plaque with three darker etch lines standing in for lettering at this
   // pixel scale. The eye reads the shape as a signage plate, not text.

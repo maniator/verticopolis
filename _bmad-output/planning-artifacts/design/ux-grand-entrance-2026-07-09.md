@@ -40,46 +40,51 @@ corner, but visually quiet so the eye locks onto the grand side.
 
 ## Detection (derived, no state)
 
-> **NOTE (2026-07-09): the detection rules below are the ORIGINAL 1-tile
-> design. They were superseded during implementation by two follow-up
-> `bmad-party-mode` sessions that widened the grand entrance to a 2-tile
-> storefront (with a compact 1-tile fallback for narrow lobbies) and
-> re-anchored the predicate to CONTIGUOUS RUNS, not global lobby extent, so
-> mid-lobby gaps can't orphan a half-facade. The as-shipped rules live in
-> `TowerEngine.refreshFloor1EntranceMap` and `TowerEngine.floor1EntranceKind`
-> (`src/render/excalibur/TowerEngine.ts`). Read them for the canonical
-> behavior; the text below is preserved as design history.**
-
-
-Both variants are chosen from tower geometry, at render time, in the same place
-`lobbyVariant(x)` already lives. Floor 1 only. Predicate, in priority order:
+The entrance kinds are picked per floor-1 lobby tile at render time. Floor 1
+only. Predicate walks the floor-1 lobby tiles' CONTIGUOUS RUNS so a gap in the
+middle of the lobby (mid-remodel bulldoze) cannot orphan a half-facade with no
+neighbor. Rules, in the order they resolve:
 
 ```
-Given a floor-1 lobby unit at grid x, and the floor-1 lobby extent
-(e.min = leftmost lobby tile x, e.max = one past the rightmost lobby tile x):
+Given floor-1 lobby tiles, grouped into their contiguous runs by grid x:
 
-  if x == e.min:            -> grand
-  else if x == e.max - 1
-       and e.max - e.min > 1: -> service
-  else:                       -> variant  (existing 4-cycle pattern)
+  Grand entrance goes on the LEFTMOST run:
+    - run width >= 2 tiles: runStart      -> grand-left
+                             runStart + 1 -> grand-right
+    - run width == 1 tile:   runStart      -> grand-solo (compact fallback)
+
+  Service entrance goes on the RIGHTMOST run's rightmost tile IFF:
+    - the rightmost tile is not already claimed by the grand entrance
+    - AND the rightmost run has room past the grand span
+      (same run as grand: run width > grand span; different run: always)
+
+  Every other tile: -> variant (existing 4-cycle pattern)
 ```
 
 Rules that fall out of this predicate:
 
-- **Single-tile lobby** (`e.max - e.min == 1`): grand only, no service. Grand
-  wins the tie because a one-tile toy tower doesn't need a service entrance.
-- **Two-tile lobby**: grand at left tile, service at right tile, no overlap.
-- **Wider lobbies**: exactly one grand tile and one service tile per tower, at
-  the frontage corners; every interior tile uses the existing 4-variant cycle.
+- **Single-tile lobby**: grand-solo, no service. Toy tower doesn't get the wide
+  storefront and doesn't need a service entrance.
+- **Two-tile lobby**: grand-left + grand-right. No service (grand claims both
+  frontage tiles of the tower).
+- **Three-or-more-tile contiguous lobby**: grand-left + grand-right at the
+  left frontage, service at the rightmost tile, normal variant cycle in
+  between.
+- **Lobby with a mid-remodel gap**: the leftmost run holds the grand entrance
+  (in whichever form fits its width), the rightmost run holds service on its
+  rightmost tile. Gap tiles between them stay empty. No orphan half-facade.
+- **Two disjoint one-tile lobbies**: leftmost gets grand-solo, rightmost gets
+  service.
 - **Basement-only or empty lot**: no floor-1 lobby exists, so no grand or
-  service tile. Same clamping already used by `facadeGeometry`.
+  service tile is placed. `floor1EntranceMap` stays empty.
 
 The predicate does not touch any tile above floor 1. Sky lobbies keep the
 existing variant cycle unchanged.
 
-Detection reuses the same `e.min`/`e.max` the exterior marquee already reads via
-`facadeGeometry` and `syncEscapes`, so the grand entrance visually sits under
-the marquee by construction. No extra data is threaded through the render path.
+Detection reads only `sim.tower.units` (which already drives the exterior
+marquee via `facadeGeometry` / `syncEscapes`), so the grand entrance visually
+sits under the marquee by construction. No extra data is threaded through the
+render path.
 
 ## Art direction
 
@@ -88,50 +93,89 @@ Consistent with the shipped ground-floor lobby palette: warm marble walls
 (`#a3243c` + `#d9b356` edge), and the green-and-gold marquee overhead
 (`#234b39`, `#c9a94c`).
 
-### Grand entrance tile (11x34 px, floor 1, x == e.min)
+### Grand entrance, wide form (22x34 px = 2 x 11x34 tiles)
 
-Priority-ordered elements (must-have first, cut from the bottom if pixels run
-out):
+Rendered as a 2-tile storefront facade. The tile at `x = runStart` paints the
+LEFT slice (a big glass display window looking into the lobby); the tile at
+`x = runStart + 1` paints the RIGHT slice (double doors + doorman + smaller
+glass panel). The two slices compose into one continuous 22 px facade with
+matching cornice, floor and carpet lines so no seam shows.
 
-1. **Glass double doors** (must have). A dark frame (approx `#3a2a20`) with a
-   pale glass panel (`#eef2f7` daytime). Centered in the tile, roughly 6 px
-   wide and reaching from just above the carpet to just below the wainscot line
-   (about y = 6..y + h - 6). A thin gold split line down the center so the eye
-   reads two doors, not one.
-2. **Warm interior glow** (must have). A soft rectangle of warm light spilling
-   through the glass, wider than the door itself (approx door width + 4 px),
-   fading at the edges. Daytime: subtle (`#f7e3a8` at low alpha). Night: strong
-   (`#ffe08a` at higher alpha), so the entrance visibly "turns on" at dusk.
-   The rest of the concourse's chandeliers already brighten at night; the grand
-   entrance goes brightest, becoming the visual anchor after dark.
-3. **Doorman figure** (must have). Roughly 8 px tall, standing to the right of
-   the doors, wearing a green-and-gold uniform that echoes the marquee:
-   green torso (`#234b39`), gold trim at the collar and cuffs (`#c9a94c`), a
-   simple neutral face color, dark shoes. He must read as "staff, on duty,"
-   not as a tenant.
-4. **Red carpet accent** (should have). One extra pixel of carpet color over
-   the polished-floor sheen line, right at the base of the doors, so the
-   interior carpet visibly meets the door. This is a subtle continuity beat,
-   not a projection onto the sidewalk (staying inside the 11 px tile keeps the
-   z-order clean; the sidewalk lives in a different actor layer).
+Shared skeleton (both slices):
 
-**No chandelier in the grand tile.** The marquee outside already carries that
-role; adding a chandelier inside would create two competing focal points at the
-same eye height.
+- **Gilded cornice** across the top, matching the concourse's other tiles so
+  the ceiling line reads continuous across the whole lobby.
+- **Dark storefront frame top rail** just under the cornice (`#3a2a20`).
+- **Kickplate** under the glass, meeting the floor.
+- **Polished floor + red carpet** at the bottom, same rows as the base ground
+  lobby tile (so the entrance blends into the concourse's floor line).
+- **Warm interior background** visible through the glass across the whole
+  facade. Brightens at night so the storefront reads as a hot rectangle of
+  light after dark. Interior carpet stripe visible through the very bottom of
+  the glass.
 
-### Service entrance tile (11x34 px, floor 1, x == e.max - 1 when lobby > 1 wide)
+Left slice adds:
 
-- **Same door frame as the grand tile.** Dark frame, pale glass panel, gold
-  split line. So both entrances read as the same building.
-- **No interior glow.** The service door does not brighten at night; it stays
-  the day-tone glass color at all clocks. This is the visual "quiet" beat that
-  makes the grand side read as primary.
-- **No doorman, no red-carpet accent.** The floor strip stays the standard
-  polished floor + carpet without any local override.
+- **Outer storefront frame post** at the left edge.
+- **Chandelier** visible through the display window, echoing the concourse's
+  chandeliers. This one lives inside the tile because the whole slice is a
+  window looking INTO the lobby, so it inherits an interior chandelier by
+  construction (which is different from the earlier 1-tile design's "no
+  chandelier" rule).
+- **Gold accent rail** across the display window at head height.
+- **Door jamb** along the right edge, meeting the doors in the right slice.
 
-The service entrance is intentionally under-detailed. It provides symmetry with
-the grand side so the right frontage doesn't feel visually orphaned, but it
-never competes with the grand entrance for attention.
+Right slice adds:
+
+- **Double doors** at the left edge of the slice, with a **brighter warm glow**
+  behind the doors than through the display windows (a hotter opening reads
+  as the actual entrance, the wayfinding beat).
+- **Gold split rail** between the two door leaves.
+- **Door jamb** to the right of the doors, then a smaller **glass panel** with
+  the **doorman** visible inside on the carpet.
+- **Outer storefront frame post** at the right edge.
+
+Doorman: a small 2-wide pixel figure with a dark green hat cap, a warm skin
+tone, a green tunic (`#234b39`) with a gold collar band (`#c9a94c`), and dark
+shoes. Two-frame idle sway keyed to `d.anim` (see Animation below).
+
+### Grand entrance, compact form (11x34 px, single-tile fallback)
+
+Used when the leftmost contiguous lobby run is only one tile wide (a toy
+tower). Compresses the wide design into a single tile:
+
+- Dark door frame (`#3a2a20`) centered in the tile, ~5 px wide.
+- Gold split rail between the two door leaves.
+- Warm interior glow behind the glass (subtle by day, hot at night).
+- Small doorman just outside the right jamb, same recipe as the wide form.
+- Red carpet accent at the base of the doors.
+
+### Service entrance tile (11x34 px)
+
+Placed on the rightmost tile of the rightmost contiguous floor-1 lobby run
+when the predicate above allows. Keeps the concourse's warm-lobby grammar
+(same frame color, same cornice) but swaps the glass double-door language
+for a solid wood-panel door:
+
+- **Dark frame** (`#3a2a20`) at the door edges (jambs, header, sill). Same
+  color as the grand entrance's frame so both doors clearly belong to the
+  same building's carpentry.
+- **Solid wood door panel**, warm mid-brown (`#7a5230`) with a highlight
+  edge (`#8f6438`) and shadow edge (`#5c3d21`) for grain, plus two recessed
+  interior panels (upper + lower) so it reads as a paneled wood door.
+- **Brass hinges** (two gold dots on the left jamb) and a small **doorknob**
+  on the right side of the panel.
+- **Small brass "service" plate** on the wall to the right of the door: a
+  gold rectangle with darker gold border and a horizontal etch line standing
+  in for lettering at this pixel scale.
+- **Potted plant** further right on the wall: brass pot with a green shrub,
+  using the same shrub language the sky-lobby planter uses so plants read as
+  one family across the concourse.
+
+**No interior glow, no doorman, no red-carpet accent.** The service door is
+deliberately quiet, and the brass plate + planter give the tile enough
+positive detail to feel like a real service door rather than a shrunken grand
+entrance.
 
 ## Animation
 
@@ -167,41 +211,52 @@ The tile system, ordered by visual weight:
 
 Owned by implementation but pinned here for the reviewer:
 
-- A single-tile floor-1 lobby (`e.max - e.min == 1`) shows exactly one grand
-  tile and no service tile.
-- A two-tile lobby shows grand at the left tile and service at the right tile,
-  never both on the same tile.
-- Wider lobbies show exactly one grand tile and exactly one service tile;
-  every interior tile follows the existing 4-variant cycle.
-- No floor-1 lobby means no grand or service tile (basement-only, empty lot).
+- A single-tile floor-1 lobby shows exactly one **grand-solo** tile and no
+  service tile.
+- A two-tile contiguous floor-1 lobby shows **grand-left** at the leftmost
+  tile and **grand-right** at the next tile. No service tile (grand claims
+  both frontage tiles).
+- A three-or-more-tile contiguous floor-1 lobby shows grand-left + grand-right
+  at the left frontage, a service tile at the rightmost tile, and the normal
+  4-variant cycle on every tile in between.
+- A mid-lobby gap (bulldozed middle tile) keeps grand-left / grand-right on
+  the leftmost run and service on the rightmost run's rightmost tile. No
+  orphan half-facade in the gap.
+- Two disjoint single-tile lobbies (leftmost run + separate rightmost run)
+  place grand-solo on the leftmost run and service on the rightmost run.
+- No floor-1 lobby (basement-only, empty lot) places no grand or service tile.
 - Sky lobbies on floors 2+ are unaffected. `lobbyVariant(x)` still drives them.
 - The doorman sways once every 3 seconds of in-game time; the sway pauses when
-  the game is paused (same rule as other decorative motion in the tower).
+  the game is paused (same rule as other decorative motion in the tower). The
+  shoes stay planted while the head, hat and torso shift 1 px.
 - No save-format bump, no `saveMigration` change, no new engine surface.
 
 ## Deliberate non-goals
 
 - No revolving doors (Samus withdrew this early; too much noise at 11 px).
-- No potted urns flanking the door (cut for pixel budget).
+- No support columns holding up the exterior marquee (a hotel marquee is a
+  wall-mounted cantilever, not a portico).
 - No doorman for the service entrance (asymmetry is the point).
 - No projection of the carpet onto the sidewalk actor (z-order pain).
-- No player-configurable "which side is grand" — always left, always right.
+- No player-configurable "which side is grand"; always left, always right.
 - No behavior change to walker spawns / entry / exit logic. The grand entrance
   reads the sim; it does not drive it.
 
-## Files touched (implementation preview, not a plan)
+## Files touched
 
-- `src/render/sprites/structure.ts`: two new draw functions (or a single
-  parameterized function taking `grand`/`service`) and the tile size doc.
-- `src/render/excalibur/TowerEngine.ts`: bake the new canvases per lit-state,
-  extend the `lobbyGfx` shape or add a floor-1 override in `lobbyTileGfx()`
-  that reads the floor-1 lobby extent from the same source `syncEscapes` uses.
-- `src/tests/sprites.test.ts`: smoke coverage that both new sprites paint and
-  differ from each other and from the existing variants.
-- `scripts/screenshot-scenes.ts`: extend the existing `lobby-awnings` scene
-  (or add a peer scene) so the grand and service tiles are actually in frame
-  in the committed docs images.
-- Version bump: patch (player-noticeable visual change).
+- `src/render/sprites/structure.ts`: `drawGrandFacadeLeft`,
+  `drawGrandFacadeRight`, `drawGrandCompact`, `drawServiceEntrance`, plus the
+  shared `drawDoorman` helper and the `ENTRANCE_GRAND_LEFT` / `_RIGHT` /
+  `_SOLO` / `ENTRANCE_SERVICE` sentinels routed through `drawLobbyEntrance`.
+- `src/render/excalibur/TowerEngine.ts`: `refreshFloor1EntranceMap` (contiguous
+  runs), `floor1EntranceKind` (map lookup), `lobbyTileGfx` routing, and the
+  new `entranceGrandLeftGfx` / `entranceGrandRightGfx` / `entranceGrandSoloGfx`
+  / `entranceServiceGfx` baked canvases.
+- `src/tests/sprites.test.ts`: smoke coverage for all four entrance kinds
+  plus the doorman sway.
+- `scripts/screenshot-scenes.ts`: already covers the two zoomed edge crops
+  from the previous marquee PR; no scene changes needed.
+- Version bump: minor (new player-facing capability, distinct new tile type).
 
 ## Party attribution
 
