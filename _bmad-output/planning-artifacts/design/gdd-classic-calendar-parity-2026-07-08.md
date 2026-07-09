@@ -1,9 +1,9 @@
 ---
-title: "Game Design — Classic Calendar Parity (the canon 12-day year)"
+title: "Game Design: Classic Calendar Parity (the canon 12-day year)"
 game: Verticopolis (browser SimTower clone)
-author: Samus Aran (Game Design — gds agent), with the canon-calendar party
+author: Samus Aran (Game Design, gds agent), with the canon-calendar party
 date: 2026-07-08
-status: Spec — approved for implementation (owner picked the full-canon scope)
+status: Spec, approved for implementation (owner picked the full-canon scope)
 scope: Make Classic run the real 1994 SimTower calendar (12-day year, 3-day
   quarter = 3-day week, weekend every third day) for both the date display AND
   the economic rhythm, without breaking the economy. Give Modern a startup
@@ -16,7 +16,7 @@ grounds:
   - arch-classic-calendar-parity-2026-07-08.md (the engine design)
 ---
 
-# Game Design — Classic Calendar Parity
+# Game Design: Classic Calendar Parity
 
 ## 0. The one-paragraph pitch
 
@@ -85,7 +85,7 @@ real game never would, so a play -> export -> reload loop would drift.
   want the faster pulse.
 - The choice is saved with the tower, so it is stable across reloads.
 
-## 3. The economy rebalance (the crux) — plain-language contract
+## 3. The economy rebalance (the crux): plain-language contract
 
 The design invariant the player feels is: **money earned per in-game day does not
 change when the calendar changes.** Only the *cadence and lump size* of rent and

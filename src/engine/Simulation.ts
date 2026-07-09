@@ -352,11 +352,16 @@ export class Simulation implements SimContext {
     this.rng = new RNG(seed);
     this.mode = mode;
     this.rules = makeRules(mode);
-    this.modernCalendar = modernCalendar;
+    // Classic ALWAYS runs canon, so the modernCalendar field is meaningless
+    // for it. Clamp the persisted value to the harmless default so a
+    // hand-edited or UI-drifted "canon" hint can never survive on disk in a
+    // Classic save and quietly contradict the "Classic stores the harmless
+    // default" contract. Modern honors the player's choice as passed.
+    this.modernCalendar = mode === "classic" ? "realWorld" : modernCalendar;
     // Resolve the calendar once and hand it to the clock (Classic = canon,
     // Modern = the player's choice). The field-initialized real-world clock is
     // replaced here before any tick reads a date.
-    this.clock = new Clock(0, resolveCalendar(mode, modernCalendar));
+    this.clock = new Clock(0, resolveCalendar(mode, this.modernCalendar));
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
     this.economy = new EconomySystem(this);

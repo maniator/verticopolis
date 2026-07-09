@@ -27,7 +27,7 @@ export interface Calendar {
   readonly weekDays: number;
   /** How many trailing days of the week are the weekend. */
   readonly weekendDays: number;
-  /** Days per quarter — the office-rent collection period. */
+  /** Days per quarter, the office-rent collection period. */
   readonly quarterDays: number;
   /** Days per year (= 4 quarters). */
   readonly yearDays: number;
@@ -46,17 +46,19 @@ export type CalendarKind = "canon" | "realWorld";
  * The real 1994 SimTower calendar. Weekend is the LAST of the 3 day-slots
  * (WD, WD, WE), matching the canon "2 weekday + 1 weekend" week.
  *
- * NOTE (harness validation, backlog `classic-calendar-parity`): the weekend
- * *phase* relative to `currentDay` 0 is pinned here to the single TRAILING slot
- * (`weekendDays: 1`, so `Clock.isWeekend` is `dayOfWeek === 2`) and must be
- * confirmed against the retail game (which day-of-week index it renders as the
- * weekend for a known save). `weekendDays` sets HOW MANY trailing slots are the
- * weekend, not WHICH slot, so this model can only express a trailing weekend
- * (the natural shape of the canon "2 weekday + 1 weekend" week). If the harness
- * finds the weekend is a NON-trailing slot (0 or 1), the trailing model can't
- * represent it: that needs an explicit weekend-phase offset added to the
- * calendar + `Clock` arithmetic, tracked as a contingent follow-up on the
- * `classic-calendar-parity` backlog row. Do not silently reinterpret the field.
+ * NOTE (harness-validated 2026-07-08, backlog `classic-calendar-parity`): the
+ * weekend *phase* relative to `currentDay` 0 was CONFIRMED against the retail
+ * game via the Wine harness (see arch §5.1). Loading `my_tower.TDT` and reading
+ * the game's date stamp at two independent points pinned the canon week as
+ * `[1st WD, 2nd WD, WE]` with the weekend on the TRAILING slot
+ * (`weekendDays: 1`, so `Clock.isWeekend` is `dayOfWeek === 2`). `weekendDays`
+ * sets HOW MANY trailing slots are the weekend, not WHICH slot, so this model
+ * can only express a trailing weekend (the natural shape of the canon
+ * "2 weekday + 1 weekend" week). If a future retail-save observation ever shows
+ * a NON-trailing weekend phase, the trailing model cannot represent it: that
+ * needs an explicit weekend-phase offset added to the calendar + `Clock`
+ * arithmetic, tracked as a contingent follow-up on the `classic-calendar-parity`
+ * backlog row. Do not silently reinterpret the field.
  */
 export const CANON: Calendar = {
   kind: "canon",
@@ -69,7 +71,7 @@ export const CANON: Calendar = {
 
 /**
  * Our real-world calendar: the shipped 7 / 90 / 360 behavior with a 30-day
- * maintenance month. This is the byte-identical "nothing changes" path — a
+ * maintenance month. This is the byte-identical "nothing changes" path, a
  * Modern tower left on the default, and every bare `new Clock()`, reads exactly
  * this. Do not fold these constants into {@link CANON}.
  */

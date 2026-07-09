@@ -950,7 +950,8 @@ class GameApp {
     // Weekend = the trailing slots of the calendar's week, matching
     // Clock.isWeekend (real-world 5/6 of 7; canon the last 1 of 3). Read the
     // calendar so the bulletin fires on the right days under the canon calendar.
-    if (dayOfNoon % cal.weekDays >= cal.weekDays - cal.weekendDays || dayOfNoon === this.lastLunchDay) return; // weekday, once
+    // Skip on weekends (no rush) and skip if the bulletin already fired for this day.
+    if (dayOfNoon % cal.weekDays >= cal.weekDays - cal.weekendDays || dayOfNoon === this.lastLunchDay) return;
     this.lastLunchDay = dayOfNoon;
     this.sim.emit("Lunch rush! Midday plays out in slow motion, just like 1994.", "info");
   }

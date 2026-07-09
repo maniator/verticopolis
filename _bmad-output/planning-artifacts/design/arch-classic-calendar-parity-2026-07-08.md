@@ -1,9 +1,9 @@
 ---
-title: "Technical Design — Classic Calendar Parity (mode-resolved calendar)"
+title: "Technical Design: Classic Calendar Parity (mode-resolved calendar)"
 game: Verticopolis (browser SimTower clone)
-author: Cloud Dragonborn (Game Architect — gds agent), with the canon-calendar party
+author: Cloud Dragonborn (Game Architect, gds agent), with the canon-calendar party
 date: 2026-07-08
-status: Spec — approved for implementation
+status: Spec, approved for implementation
 scope: The engine implementation of a mode-resolved calendar (week / quarter /
   year lengths + weekend rule), the income-invariant economy rescale that keeps
   money-per-in-game-day fixed across calendars, the save/determinism seam, and
@@ -16,12 +16,12 @@ grounds:
   - src/engine/types.ts (GameMode, SerializedGame), src/engine/saveMigration.ts
 ---
 
-# Technical Design — Classic Calendar Parity
+# Technical Design: Classic Calendar Parity
 
-## 0. LOAD-BEARING INVARIANTS — read before touching this mechanic
+## 0. LOAD-BEARING INVARIANTS: read before touching this mechanic
 
 > If you change anything here, **re-run `parity.test.ts` (the TOWER run) and
-> `phase2.test.ts` (the well-zoned endgame)** — they are the only guards that the
+> `phase2.test.ts` (the well-zoned endgame)**, they are the only guards that the
 > rescale kept a healthy tower healthy, plus the new `calendar.test.ts` below.
 
 1. **Modern real-world is byte-identical to today.** The real-world calendar is
@@ -31,7 +31,7 @@ grounds:
    net that makes the whole change atomic-but-contained: all risk lives on the
    canon path. Do not "clean up" the real-world constants into the canon ones.
 
-2. **The change is ATOMIC — you cannot land the display without the rescale.**
+2. **The change is ATOMIC, you cannot land the display without the rescale.**
    `Simulation.onDay()` collects rent whenever `clock.quarter` changes. Flip the
    quarter to canon's 3 days without rescaling the per-collection amount and rent
    collects 30x more often at full size = a 30x income bug. The calendar length
@@ -98,25 +98,25 @@ stays exactly as is.
 
 Audited consumers of the calendar-derived getters:
 
-- **Rent** — `Simulation.onDay()` fires `economy.collectRent()` on `clock.quarter`
+- **Rent**, `Simulation.onDay()` fires `economy.collectRent()` on `clock.quarter`
   change. `collectRent()` multiplies its total by `quarterDays / 90` (see §3).
-- **Maintenance** — `onDay()` currently fires `payMaintenance()` on
+- **Maintenance**, `onDay()` currently fires `payMaintenance()` on
   `floor(clock.day / 30)` change. Replace the 30-day "month" with a calendar
   period (canon = per-quarter, the only sub-year cadence canon has; real-world =
   the current 30 days so today is unchanged). Scale `payMaintenance()` amounts by
   `maintPeriodDays / 30`. `rollCondoRelocations()` rides the same tick and is
   rescaled with it (it is a Modern-only monthly roll; keep its per-real-day
   probability invariant).
-- **Weekend demand** — `Crowd.ts` reads `clock.isWeekend` (hotel fill, retail
+- **Weekend demand**, `Crowd.ts` reads `clock.isWeekend` (hotel fill, retail
   rush). No code change beyond the calendar swap; it automatically follows the
   canon 3-day beat in Classic.
-- **Yearly / seasonal events** — `EventSystem.ts` keys some behavior off
+- **Yearly / seasonal events**, `EventSystem.ts` keys some behavior off
   `year` / day-of-year. Anything that means "about once a year" must be rescaled
   so it does not fire 30x more often under a 12-day year: convert to a per-real-day
   probability (`p_perYear / yearDays`) or key it off `day` deltas. Per-day event
   rolls are already calendar-independent and stay as-is. This audit is part of
   the implementation; list each touched call in the PR description.
-- **Display** — `formatRetroDate()` and any HUD/Finance date string.
+- **Display**, `formatRetroDate()` and any HUD/Finance date string.
 
 Nothing in the transport, build-cap, or population-census code reads the
 calendar; those invariants are untouched.
@@ -155,10 +155,10 @@ amount *= this.sim.calendar.maintPeriodDays / 30;  // canon 3/30 = 1/10, realWor
 - **New save field:** `modernCalendar?: "canon" | "realWorld"` on
   `SerializedGame` (Modern only; absent or garbage -> `"realWorld"` via the
   existing coercion pattern). Classic ignores it and always resolves canon.
-- **`SAVE_VERSION`: no bump — additive optional field** (the `filmPolicy` /
+- **`SAVE_VERSION`: no bump, additive optional field** (the `filmPolicy` /
   `vacateReason` precedent). DECIDED during implementation. The calendar is a
   pure function of `mode` + `modernCalendar`, both already in the save, so a
-  Classic save resolves to canon whether it is old or new — there is nothing in
+  Classic save resolves to canon whether it is old or new, there is nothing in
   the save *data* to migrate, and a bump with an identity migration would buy no
   determinism. Existing Classic saves adopting canon on load is the intended
   *fix* (their date display was wrong), not a regression to grandfather, so no
@@ -179,7 +179,7 @@ amount *= this.sim.calendar.maintPeriodDays / 30;  // canon 3/30 = 1/10, realWor
 
 Run on `tools/simtower/` (committed, opt-in, bring-your-own-ISO):
 
-1. **Weekend phase** — VALIDATED 2026-07-08 (Wine harness, `my_tower.TDT`). The
+1. **Weekend phase**, VALIDATED 2026-07-08 (Wine harness, `my_tower.TDT`). The
    retail game's date stamp reads `<n>th WD/<Q>Q/<ord> Year` (identical to our
    `formatRetroDate`). Loaded from saved `currentDay` 60, the game ran forward
    and rendered `1st WD/2Q/6th Year` (= our model at day 63) then
@@ -190,46 +190,46 @@ Run on `tools/simtower/` (committed, opt-in, bring-your-own-ISO):
    change needed. (Note: the game advances during a headless load, so this is a
    two-point progression-consistency check, not a frozen-day read; the two points
    pin both weekday slots and two quarter boundaries.)
-2. **Maintenance cadence** — read the retail Finance window across several
+2. **Maintenance cadence**, read the retail Finance window across several
    in-game days to confirm the recurring-cost beat, justifying the canon
    per-quarter choice (or correcting it).
-3. **Date round-trip** — `currentDay` <-> displayed date exact for MYTOWER /
+3. **Date round-trip**, `currentDay` <-> displayed date exact for MYTOWER /
    TOWER5 / TOWER6 (mostly proven); add any 3-star+ save available.
 
 ## 6. Test plan
 
 `src/tests/calendar.test.ts` (new) plus the existing balance guards:
 
-1. **Canon date math** — `year`/`quarter`/`dayOfWeek` for the proven table
+1. **Canon date math**, `year`/`quarter`/`dayOfWeek` for the proven table
    (`day 55 -> Y5 Q3`, `day 1280 -> Y107`, `day 1289 -> Y108`).
-2. **Real-world unchanged** — the current getters produce today's exact values
+2. **Real-world unchanged**, the current getters produce today's exact values
    for a spread of days; `formatRetroDate()` string pinned.
-3. **Income invariance** — simulate the same tower for N in-game days under canon
+3. **Income invariance**, simulate the same tower for N in-game days under canon
    vs real-world; total rent + maintenance net is equal within rounding. This is
    the balance invariant, encoded, not a hand-typed dollar figure.
-4. **Cadence** — rent fires on every canon quarter boundary (every 3 days) in
+4. **Cadence**, rent fires on every canon quarter boundary (every 3 days) in
    Classic and every 90 days in real-world; maintenance likewise.
-5. **First-period safety** — a save deserialized mid-quarter does not double-
+5. **First-period safety**, a save deserialized mid-quarter does not double-
    collect or skip on the first `onDay()` after load, under both calendars.
-6. **Toggle persistence** — Modern `canon`/`realWorld` round-trips through
+6. **Toggle persistence**, Modern `canon`/`realWorld` round-trips through
    serialize/deserialize; missing field coerces to `realWorld`.
-7. **`parity.test.ts` + `phase2.test.ts`** — a healthy tower stays healthy (the
+7. **`parity.test.ts` + `phase2.test.ts`**, a healthy tower stays healthy (the
    real balance guard for the rescale).
 
 ## 7. File-touch summary
 
-- `src/engine/Clock.ts` — hold a `Calendar`; derive `dayOfWeek`/`isWeekend`/
+- `src/engine/Clock.ts`, hold a `Calendar`; derive `dayOfWeek`/`isWeekend`/
   `quarter`/`year`/`dayName`/`formatRetroDate` from it. New `calendar.ts` (or a
   small block here) for `CANON` / `REAL_WORLD` constants + `resolveCalendar`.
-- `src/engine/Simulation.ts` — hold/resolve the `Calendar`; `onDay()` maintenance
+- `src/engine/Simulation.ts`, hold/resolve the `Calendar`; `onDay()` maintenance
   period off the calendar (kill `day/30`); keep the `lastQuarter`/`lastMonth`
   re-derivation pointed at the resolved calendar.
-- `src/engine/EconomySystem.ts` — `collectRent` / `payMaintenance` rescale.
-- `src/engine/EventSystem.ts` — rescale any per-year cadence (audit + list).
-- `src/engine/types.ts` — `SerializedGame.modernCalendar`, coercion helper.
-- `src/engine/saveMigration.ts` — version decision (see §4).
-- New-Tower UI (Modern) — the Short vs Real-world toggle, wired to the save field.
-- `docs/canon/tdt-format.md` — cross-link §3 as the constant source; `PARITY.md`
+- `src/engine/EconomySystem.ts`, `collectRent` / `payMaintenance` rescale.
+- `src/engine/EventSystem.ts`, rescale any per-year cadence (audit + list).
+- `src/engine/types.ts`, `SerializedGame.modernCalendar`, coercion helper.
+- `src/engine/saveMigration.ts`, version decision (see §4).
+- New-Tower UI (Modern), the Short vs Real-world toggle, wired to the save field.
+- `docs/canon/tdt-format.md`, cross-link §3 as the constant source; `PARITY.md`
   line noting Classic = canon calendar, Modern default = real-world.
 - Fold in the deferred `tdtFormat.ts:603` truncation-warning wording tweak.
   (Not folded in: no discrete deferred wording item was found in the backlog
@@ -245,7 +245,7 @@ were all confirmed satisfied by the reviewers.
 
 **Patched (7):**
 - `[Patch]` Rescale divisors were bare `90`/`30` literals, not linked to the
-  `REAL_WORLD` constants they must equal for the byte-identical claim — now
+  `REAL_WORLD` constants they must equal for the byte-identical claim, now
   `REAL_WORLD.quarterDays` / `REAL_WORLD.maintPeriodDays` (`EconomySystem.ts`,
   `Simulation.ts` condo relocation).
 - `[Patch]` `emitLunchRush` still hard-coded a 7-day week (`% 7 >= 5`); routed
