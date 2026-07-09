@@ -1222,6 +1222,26 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
     }
   });
 
+  it("rerollSubtype from a legacy (undefined) unit can reach every canon variant, including the last", () => {
+    // A legacy retail unit loads with subtype === undefined. Reroll must be
+    // able to land on ANY canon name, including the last entry in the list.
+    // Pin the last shop variant ("Sports Gear") specifically because the
+    // earlier off-current index math left it unreachable when currentIdx = -1.
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    const reached = new Set<string>();
+    for (let i = 0; i < 400; i++) {
+      shop.subtype = undefined; // simulate a legacy unit before every reroll
+      const next = sim.rerollSubtype(shop.id);
+      if (next !== undefined) reached.add(next);
+    }
+    // With 11 shop variants and 400 uniform-random rolls, every entry is
+    // reached with overwhelming probability (missing 1 = (10/11)^400, negligible).
+    expect(reached.size).toBe(SHOP_SUBTYPES.length);
+    expect(reached.has(SHOP_SUBTYPES[SHOP_SUBTYPES.length - 1])).toBe(true);
+  });
+
   it("rerollSubtype is a no-op on non-retail kinds", () => {
     const sim = builtTower(11);
     const x0 = Math.floor(GRID.width / 2) - 20;

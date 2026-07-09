@@ -1479,12 +1479,21 @@ export class Simulation implements SimContext {
     if (!u) return undefined;
     const list = subtypeListFor(u.kind);
     if (list === null || list.length < 2) return undefined;
-    // Draw off-current: pick an index in [0, list.length - 1) and skip past
-    // the current position, so the new subtype is never the same as the one
-    // being replaced without rejection-sampling (bounded, deterministic).
+    // Draw off-current: when the unit has a canon subtype to avoid, pick from
+    // [0, list.length - 2] and skip past the current position, so the new
+    // subtype is never the same as the one being replaced without rejection
+    // sampling. When the unit has no current subtype (legacy retail unit, or
+    // a whitelist-coerced away value) draw from the full range [0,
+    // list.length - 1] so every canon variant is reachable, including the
+    // last entry.
     const currentIdx = u.subtype === undefined ? -1 : list.indexOf(u.subtype);
-    let idx = this.rng.int(0, list.length - 2);
-    if (currentIdx >= 0 && idx >= currentIdx) idx += 1;
+    let idx: number;
+    if (currentIdx < 0) {
+      idx = this.rng.int(0, list.length - 1);
+    } else {
+      idx = this.rng.int(0, list.length - 2);
+      if (idx >= currentIdx) idx += 1;
+    }
     const next = list[idx];
     u.subtype = next;
     return next;
