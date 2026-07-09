@@ -5,6 +5,10 @@
  * "tiles". A facility occupies a contiguous run of tiles on a single floor.
  */
 
+// Type-only import (erased at compile) for the persisted calendar choice; its
+// home is calendar.ts, which imports GameMode back from here.
+import type { CalendarKind } from "./calendar";
+
 /** Cosmetic sky weather, derived deterministically from the day. */
 export type WeatherKind = "clear" | "cloudy" | "rain";
 
@@ -312,6 +316,11 @@ export interface SerializedGame {
    *  mode fork (and never mutated after creation), so a missing value loads as
    *  `classic` — every legacy tower stays pixel-faithful with no migration. */
   mode?: GameMode;
+  /** A Modern tower's calendar choice (`canon` short vs `realWorld` length),
+   *  made at New Tower. Ignored for Classic (always canon). Absent on saves
+   *  written before the calendar toggle, and on all legacy Modern saves, so a
+   *  missing value loads as `realWorld` — the shipped 7/90/360 behavior. */
+  modernCalendar?: CalendarKind;
   units: SerializedUnit[];
   transports: Transport[];
   nextId: number;

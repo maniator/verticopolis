@@ -799,6 +799,27 @@ a.btn {
   padding-left: 8px;
   border-left: 3px solid var(--accent);
 }
+/* Modern-only calendar sub-picker: same card idiom as the mode cards, a step
+   lighter so it reads as a secondary choice under the two rule-sets. */
+.nt-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 2px solid var(--line, #b8b2a0);
+  border-radius: 6px;
+}
+.nt-cal-opt {
+  display: block;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  cursor: pointer;
+}
+.nt-cal-opt input {
+  margin-right: 6px;
+}
 .nt-badge {
   font-size: 10px;
   font-weight: 700;

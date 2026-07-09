@@ -327,10 +327,15 @@ export class EventSystem {
    * cameo only, with no gift, exactly as the original ("No presents, sorry").
    */
   private maybeSanta(): void {
-    const year = Math.floor(this.sim.clock.day / 360);
-    const dayOfYear = ((this.sim.clock.day % 360) + 360) % 360;
-    // The last stretch of the year is "the holidays".
-    if (dayOfYear < 340 || this.sim.star < 3 || year === this.lastSantaYear) return;
+    // Calendar-aware "once a year over the holidays". Under real-world this is
+    // exactly the old behavior (year = day/360, holidays = the last 20 days);
+    // under the canon 12-day year the holiday window scales to a 1-day sliver so
+    // Santa still visits at most once a canon year, not once per 360 days.
+    const cal = this.sim.clock.calendar;
+    const year = this.sim.clock.year;
+    const dayOfYear = ((this.sim.clock.day % cal.yearDays) + cal.yearDays) % cal.yearDays;
+    const holidayStart = cal.yearDays - Math.max(1, Math.round((cal.yearDays * 20) / 360));
+    if (dayOfYear < holidayStart || this.sim.star < 3 || year === this.lastSantaYear) return;
     if (!this.extra.chance(0.4)) return; // not every holiday day
     this.lastSantaYear = year;
     // Canon: Santa is a seasonal cameo only — "No presents, sorry." (No cash.)

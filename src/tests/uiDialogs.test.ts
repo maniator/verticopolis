@@ -856,22 +856,32 @@ describe("showHelp — the Report an issue link", () => {
 });
 
 describe("newTowerModal — the rule-set picker", () => {
-  it("founds Classic by default (the pre-checked mode)", () => {
+  it("founds Classic by default (the pre-checked mode), with the harmless default calendar", () => {
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("classic");
+    expect(onFound).toHaveBeenCalledWith("classic", "realWorld");
     expect(dialog().open).toBe(false); // and it closes on commit
   });
 
-  it("founds Modern when that radio is chosen", () => {
+  it("founds Modern when that radio is chosen (real-world calendar by default)", () => {
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
     dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("modern");
+    expect(onFound).toHaveBeenCalledWith("modern", "realWorld");
+  });
+
+  it("passes the Modern short-calendar choice when picked", () => {
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-cal"][value="canon"]')!.checked = true;
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("modern", "canon");
   });
 
   it("cancels without founding anything", () => {

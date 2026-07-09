@@ -1,4 +1,5 @@
 import { Clock } from "./Clock";
+import { resolveCalendar, coerceCalendarKind, REAL_WORLD, type CalendarKind } from "./calendar";
 import { Crowd, CROWD_SECONDS_PER_MINUTE } from "./Crowd";
 import { EconomySystem, HK_SHIFT_START, HK_SHIFT_END } from "./EconomySystem";
 import { ECON, rentOf, rentConfig, resaleRefund } from "./econConfig";
@@ -239,6 +240,16 @@ export class Simulation implements SimContext {
   readonly mode: GameMode;
 
   /**
+   * A Modern tower's calendar choice, made at New Tower and persisted. Only
+   * meaningful for Modern (Classic ALWAYS runs the canon calendar); a Classic
+   * tower stores the harmless default. The resolved model lives on
+   * {@link clock}.calendar (see `resolveCalendar`); read the calendar there, not
+   * this raw choice. Old saves without the field coerce to `realWorld`, so a
+   * legacy Modern tower keeps the shipped 7/90/360 behavior.
+   */
+  readonly modernCalendar: CalendarKind;
+
+  /**
    * The mode's behavior, resolved once from {@link mode}. Every place Classic and
    * Modern diverge routes through this ({@link GameRules}) — the engine calls
    * `this.rules.<x>()` and never re-tests the mode string, so mode-specific logic
@@ -337,10 +348,15 @@ export class Simulation implements SimContext {
    * can't be farmed into tens of millions (the find stays a bounded windfall). */
   private treasuresFound = 0;
 
-  constructor(seed = 12345, mode: GameMode = "classic") {
+  constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld") {
     this.rng = new RNG(seed);
     this.mode = mode;
     this.rules = makeRules(mode);
+    this.modernCalendar = modernCalendar;
+    // Resolve the calendar once and hand it to the clock (Classic = canon,
+    // Modern = the player's choice). The field-initialized real-world clock is
+    // replaced here before any tick reads a date.
+    this.clock = new Clock(0, resolveCalendar(mode, modernCalendar));
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
     this.economy = new EconomySystem(this);
@@ -781,9 +797,12 @@ export class Simulation implements SimContext {
   private onDay(): void {
     this.weather = Simulation.weatherFor(this.clock.day);
 
-    const month = Math.floor(this.clock.day / 30);
-    if (month !== this.lastMonth) {
-      this.lastMonth = month;
+    // Maintenance rides the calendar's period, not a hard-coded 30-day month:
+    // under the canon calendar a whole year is 12 days, so a 30-day "month" is
+    // incoherent. Real-world keeps its 30-day month (period = 30).
+    const period = Math.floor(this.clock.day / this.clock.calendar.maintPeriodDays);
+    if (period !== this.lastMonth) {
+      this.lastMonth = period;
       this.economy.payMaintenance();
       this.rollCondoRelocations();
     }
@@ -1386,7 +1405,14 @@ export class Simulation implements SimContext {
       // mid-disaster (fire/gutted) or already on a notice, so a phantom "household
       // relocating" can never land on a unit with no household in place.
       if (u.kind !== "condo" || u.state !== "occupied" || !u.everOccupied) continue;
-      const chance = this.rules.condoRelocationChance(u.residents);
+      // The rule returns a per-30-day-month chance, but this roll fires on the
+      // maintenance tick, which rides the calendar's period. Scale by
+      // maintPeriodDays/30 so the per-in-game-day relocation rate is invariant to
+      // the calendar (real-world = 30 → ×1). Classic returns 0 and still
+      // short-circuits BEFORE the RNG draw, so its seeded stream is untouched.
+      const chance =
+        this.rules.condoRelocationChance(u.residents) *
+        (this.clock.calendar.maintPeriodDays / REAL_WORLD.maintPeriodDays);
       if (chance <= 0 || !this.rng.chance(chance)) continue;
       u.state = "vacating";
       u.vacateReason = "relocation";
@@ -2080,6 +2106,7 @@ export class Simulation implements SimContext {
       star: this.star,
       minutes: this.clock.minutes,
       mode: this.mode,
+      modernCalendar: this.modernCalendar,
       units: this.tower.units.map(serializeUnit),
       transports: this.tower.transports.map((t) => ({
         ...t,
@@ -2111,10 +2138,16 @@ export class Simulation implements SimContext {
     // Mode is founded at creation and immutable, so it comes straight from the
     // save. A save that predates the fork (or a forged value) has no valid mode
     // ⇒ classic, keeping every legacy tower pixel-faithful with no migration.
-    const sim = new Simulation(data.seed, isGameMode(data.mode) ? data.mode : "classic");
+    const sim = new Simulation(
+      data.seed,
+      isGameMode(data.mode) ? data.mode : "classic",
+      coerceCalendarKind(data.modernCalendar),
+    );
     sim.money = data.money;
     sim.star = data.star;
-    sim.clock = new Clock(data.minutes);
+    // Reuse the calendar the constructor already resolved from mode + choice, so
+    // the restored clock reads the same week/quarter/year as a fresh tower would.
+    sim.clock = new Clock(data.minutes, sim.clock.calendar);
     sim.evaluatedTower = data.evaluatedTower;
     // Restore the pending VIP inspection so saving during the post-Wedding-Hall
     // window doesn't permanently cancel the TOWER evaluation.
@@ -2317,7 +2350,7 @@ export class Simulation implements SimContext {
     sim.weather = Simulation.weatherFor(sim.clock.day);
     sim.lastDay = sim.clock.day;
     sim.lastQuarter = sim.clock.quarter;
-    sim.lastMonth = Math.floor(sim.clock.day / 30);
+    sim.lastMonth = Math.floor(sim.clock.day / sim.clock.calendar.maintPeriodDays);
     sim.lastHour = sim.clock.hour;
     // Silently adopt any milestone already satisfied at load time (e.g. a save
     // that predates this feature) so the next day doesn't spam a burst of
@@ -2330,8 +2363,8 @@ export class Simulation implements SimContext {
   /** Convenience for the initial empty lot (ground lobby seed). The `mode`
    *  chosen at the New Tower screen is baked in here, at creation, and is
    *  immutable for the tower's life. */
-  static newGame(seed = 12345, mode: GameMode = "classic"): Simulation {
-    const sim = new Simulation(seed, mode);
+  static newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): Simulation {
+    const sim = new Simulation(seed, mode, modernCalendar);
     // Seed a starter ground-floor lobby strip so the player has a base.
     const startX = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) {

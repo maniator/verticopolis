@@ -4,6 +4,7 @@ import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
 import { looksLikeLegacyTower, type ImportReport } from "../storage/tdtImport";
 import type { FacilityCategory, FacilityKind, GameMode } from "../engine/types";
+import type { CalendarKind } from "../engine/calendar";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
@@ -47,7 +48,7 @@ export interface UICallbacks {
   /** The live tower's rules mode, so the export dialog can gate the 1994 path
    *  (Classic only) without serializing the whole tower. */
   getMode(): GameMode;
-  onNew(mode: GameMode): void;
+  onNew(mode: GameMode, modernCalendar: CalendarKind): void;
   onToggleAudio(): boolean; // returns new muted state
   onUndo(): void;
   onRedo(): void;
@@ -220,7 +221,7 @@ export class UI {
     document.getElementById("btn-new")!.addEventListener("click", () => {
       // The toolbar always has a live tower to abandon, so the picker shows its
       // fold-in abandon warning; the mode choice and the confirm are one step.
-      this.newTowerModal({ hasSave: true, onFound: (mode) => this.cb.onNew(mode) });
+      this.newTowerModal({ hasSave: true, onFound: (mode, cal) => this.cb.onNew(mode, cal) });
     });
     document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
     document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
@@ -752,7 +753,7 @@ export class UI {
    * dialog so founding is a single, honest confirmation. `onFound` fires only
    * once the player commits; the caller does the actual swap.
    */
-  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode) => void }): void {
+  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind) => void }): void {
     const abandon = opts.hasSave
       ? `<p class="nt-abandon">⚠️ This abandons your current tower (it is not auto-saved).</p>`
       : "";
@@ -778,6 +779,12 @@ export class UI {
            </span>
          </label>
        </div>
+       <div class="nt-calendar">
+         <span class="nt-mode-name">Calendar <span class="nt-badge alt">Modern</span></span>
+         <span class="nt-mode-desc">Classic always runs the authentic compressed 1994 calendar. For Modern, pick the pace:</span>
+         <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="realWorld" checked /> <b>Real-world length</b>: a 7-day week, 90-day quarter and 360-day year, the friendlier pace.</label>
+         <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="canon" /> <b>Short (1994)</b>: a 3-day week, 3-day quarter and 12-day year, the authentic SimTower rhythm.</label>
+       </div>
        ${abandon}
        <div class="modal-actions">
          <button class="btn" data-act="cancel">Cancel</button>
@@ -791,8 +798,12 @@ export class UI {
         found: () => {
           const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
           const mode: GameMode = picked === "modern" ? "modern" : "classic";
+          // The calendar choice only applies to Modern; Classic is always canon,
+          // so a Classic founding passes the harmless default.
+          const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
+          const modernCalendar: CalendarKind = pickedCal === "canon" ? "canon" : "realWorld";
           this.closeModal();
-          opts.onFound(mode);
+          opts.onFound(mode, modernCalendar);
         },
       },
       { close: false },

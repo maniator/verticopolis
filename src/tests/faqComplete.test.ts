@@ -196,8 +196,12 @@ describe("Events & amounts (FAQ Cluster B)", () => {
     lay(sim, "floor", 3);
     expect(sim.tower.place("cinema", 2, 0).ok).toBe(true); // spans floors 2–3
     const before = sim.money;
-    sim.tick(60 * 24); // crosses the first day → monthly maintenance runs
-    expect(before - sim.money).toBeGreaterThanOrEqual(150_000);
+    // The film booking is charged once per maintenance period, scaled to keep
+    // per-in-game-day upkeep calendar-invariant (Classic's canon 3-day period ⇒
+    // 1/10 of a real-world 30-day charge, ten times as often).
+    const scale = sim.clock.calendar.maintPeriodDays / 30;
+    sim.tick(60 * 24); // crosses the first day → maintenance runs
+    expect(before - sim.money).toBeGreaterThanOrEqual(Math.round(150_000 * scale));
   });
 
   it("an unguarded bomb levels several rooms across ~5 floors", () => {
@@ -456,11 +460,15 @@ describe("Fine FAQ mechanics", () => {
     lay(sim, "floor", 3);
     sim.tower.place("cinema", 2, 0); // in Classic the cinema's only monthly cost is the film booking
     for (let d = 0; d < 365; d++) sim.tick(60 * 24);
+    // The booking is the tower's only upkeep here, so the maintenance charge IS
+    // the booking, scaled to the calendar's period (Classic's canon 3-day period
+    // ⇒ 1/10). Assert against the scaled tiers so the test is calendar-agnostic.
+    const scale = sim.clock.calendar.maintPeriodDays / 30;
     const bookings = sim.log
-      .filter((e) => e.text.startsWith("Monthly maintenance"))
+      .filter((e) => e.text.startsWith("Maintenance paid"))
       .map((e) => Number(e.text.replace(/[^0-9]/g, "")));
-    expect(bookings.some((c) => c === ECON.cinemaBookingBlockbuster)).toBe(true); // some blockbuster months
-    expect(bookings.some((c) => c === ECON.cinemaBookingMonthly)).toBe(true); // some average months
+    expect(bookings.some((c) => c === Math.round(ECON.cinemaBookingBlockbuster * scale))).toBe(true); // some blockbuster periods
+    expect(bookings.some((c) => c === Math.round(ECON.cinemaBookingMonthly * scale))).toBe(true); // some average periods
   });
 
   it("strict parking alignment: only ramp-chained spaces function", () => {
