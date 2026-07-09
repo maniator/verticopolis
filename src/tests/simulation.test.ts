@@ -1133,6 +1133,12 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 });
 
+// Pinned golden subtype sequences per seed for the determinism test below.
+// Any change here means the RNG stream shifted (a wasted draw, a Mulberry32
+// constant change, a fixture reorder), not that the subtype list itself moved.
+const SEED_11_SUBTYPES = ["Boutique", "Boutique", "Electronics"] as const;
+const SEED_42_SUBTYPES = ["Electronics", "Drug Store", "Post Office"] as const;
+
 describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic invariant", () => {
   // Build one shop / fastFood / restaurant against a served tower and return
   // the placed unit. Uses sim.build (the roll seam is inside sim.build) so
@@ -1176,11 +1182,14 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
         buildOne(sim, "shop", x0 + 24).subtype,
       ];
     };
+    // Same-seed determinism: two runs of the same seed produce identical
+    // subtype sequences.
     expect(build3(11)).toEqual(build3(11));
-    // A different seed should almost certainly produce a different sequence
-    // (with 11 shop variants over 3 picks the collision probability is 1/11^3,
-    // negligible for a canonical fixed seed).
-    expect(build3(11)).not.toEqual(build3(42));
+    // Pinned golden sequences per seed: any RNG-stream change (a wasted draw
+    // earlier in the build path, a different Mulberry32 constant, a reordered
+    // fixture) would shift these deterministically, no flake window.
+    expect(build3(11)).toEqual([SEED_11_SUBTYPES[0], SEED_11_SUBTYPES[1], SEED_11_SUBTYPES[2]]);
+    expect(build3(42)).toEqual([SEED_42_SUBTYPES[0], SEED_42_SUBTYPES[1], SEED_42_SUBTYPES[2]]);
   });
 
   it("byte-identical Classic RNG stream when no retail is built (short-circuit gate)", () => {

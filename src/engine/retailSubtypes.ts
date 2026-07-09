@@ -4,7 +4,7 @@ import type { FacilityKind } from "./types";
  * Canon named variants for the three retail kinds, ordered per
  * `docs/canon/tdt-format.md` §7 (Commercial retail table). Order is
  * load-bearing: the TDT format writes an ORDINAL byte, not a string, so
- * SHOP_SUBTYPES[3] must be the same tile the 1994 game reads at index 3.
+ * SHOP_SUBTYPES[3] must be the same name the 1994 game reads at index 3.
  * `src/tests/canon.test.ts` pins length and order against the canon doc.
  */
 export const RESTAURANT_SUBTYPES = [
@@ -42,8 +42,8 @@ export const SHOP_SUBTYPES = [
  * subtype (every kind that isn't shop / fastFood / restaurant). Callers use
  * the null return as the pre-RNG-draw short-circuit: a Classic tower whose
  * diet skips retail must NOT touch `sim.rng`, or its seeded rent/event stream
- * would drift. Mirrors the `rollCondoRelocations` short-circuit at
- * `Simulation.ts:1460` where `chance <= 0` returns before the roll.
+ * would drift. Mirrors the `Simulation.rollCondoRelocations` short-circuit
+ * where `chance <= 0` returns before the roll.
  */
 export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
   switch (kind) {
