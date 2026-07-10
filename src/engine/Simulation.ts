@@ -1905,9 +1905,13 @@ export class Simulation implements SimContext {
   /** Population that counts toward the star/TOWER thresholds. Per the original,
    * hotel guests count only while climbing to 3★; once the tower is 3★ they no
    * longer count toward 4★/5★/TOWER (the displayed {@link population} still
-   * includes them). */
+   * includes them). Meal round-trippers do NOT add on top here: their origin
+   * unit's canonical occupancy still carries them, so they are already present in
+   * the baseline count while they travel/eat. */
   ratingPopulation(): number {
-    if (this.star < 3) return this.tower.totalPopulation();
+    if (this.star < 3) {
+      return this.tower.totalPopulation();
+    }
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
@@ -2135,6 +2139,10 @@ export class Simulation implements SimContext {
   }
 
   get population(): number {
+    // Displayed population stays on the canonical room census. A worker out to
+    // lunch still counts via their origin room's baseline occupancy, so meal
+    // round-trips do not make HUD population spike or dip. Delegate to
+    // Tower.totalPopulation() so this metric has a single source of truth.
     return this.tower.totalPopulation();
   }
 
@@ -2503,7 +2511,8 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, ...unhandled } = u;
+  void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   const exhaustive: Record<string, never> = unhandled;
   void exhaustive;
   const out: SerializedUnit = { id, kind, floor, x };

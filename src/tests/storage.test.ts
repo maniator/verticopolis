@@ -703,14 +703,31 @@ describe("SaveGame", () => {
     expect(loaded.tower.units.length).toBe(sim.tower.units.length);
   });
 
-  it("migrates v2 saves to the v3 save schema", () => {
+  it("migrates a v2 save through the version ladder to the current schema", () => {
     const sim = sampleGame();
     const data = sim.serialize();
     (data as { version: number }).version = 2;
     const loaded = Simulation.deserialize(data);
-    expect(SAVE_VERSION).toBe(3);
+    expect(SAVE_VERSION).toBe(4);
     expect(loaded.money).toBe(sim.money);
-    expect(loaded.serialize().version).toBe(3);
+    expect(loaded.serialize().version).toBe(4);
+  });
+
+  it("migrates a v3 save to v4 (venue-census bump): re-stamps version, tower intact", () => {
+    // v3 -> v4 is additive/no-op data-wise: the meal-customer census reads a
+    // transient overlay that is never serialized, so a v3 save is already valid
+    // v4 data. The migration only re-stamps the version; the tower round-trips
+    // unchanged and does not fall through the "newer than this build" path.
+    const sim = sampleGame();
+    const data = sim.serialize();
+    (data as { version: number }).version = 3;
+    const beforeUnits = JSON.stringify(data.units);
+    const loaded = Simulation.deserialize(data);
+    expect(loaded.serialize().version).toBe(4);
+    expect(loaded.money).toBe(sim.money);
+    expect(loaded.tower.totalPopulation()).toBe(sim.tower.totalPopulation());
+    // Units survive the hop byte-for-byte (only the version stamp changed).
+    expect(JSON.stringify(loaded.serialize().units)).toBe(beforeUnits);
   });
 
   it("drops units with an unrecognized kind on load", () => {

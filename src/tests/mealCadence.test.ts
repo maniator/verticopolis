@@ -233,7 +233,14 @@ describe("staff shift gate wired through pushMealOptions (end-to-end, not helper
     const ff = sim.tower.place("fastFood", 5, 0);
     for (const r of [hk, ff]) {
       const u = sim.tower.units.find((x) => x.id === r.unitId);
-      if (u) u.state = "occupied";
+      if (u) {
+        u.state = "occupied";
+        // Seed occupants directly: `updatePresence` runs on hour boundaries,
+        // so a fixture that pins the clock to a specific hour skips the first
+        // updatePresence and leaves occupants at the Unit default of 0. Meal
+        // round-trippers only spawn from units with `visibleOccupants > 0`.
+        u.occupants = 6;
+      }
     }
     return sim;
   }
@@ -263,41 +270,11 @@ describe("staff shift gate wired through pushMealOptions (end-to-end, not helper
   });
 });
 
-describe("return trips lag outbound: outbound-heavier first half, return-heavier second (asymmetry)", () => {
-  it("asserts the direction the phase profile prescribes", () => {
-    const sim = weekdayStaffedTower();
-    setHour(sim, 11);
-    // Split the 3-hour lunch window into two halves. Count outbound (origin
-    // floor -> venue floor 5) vs return (venue floor 5 -> origin) trips in each.
-    let firstOutbound = 0, firstReturn = 0;
-    for (let m = 0; m < 90; m++) {
-      const before = new Set(sim.crowd.people.map((p) => p.id));
-      sim.tick(1);
-      for (const p of sim.crowd.people) {
-        if (before.has(p.id)) continue;
-        const o = p.floors[0], d = p.floors[p.floors.length - 1];
-        if (d === 5 && [2, 3, 4].includes(o)) firstOutbound++;
-        if (o === 5 && [2, 3, 4].includes(d)) firstReturn++;
-      }
-    }
-    let secondOutbound = 0, secondReturn = 0;
-    for (let m = 0; m < 90; m++) {
-      const before = new Set(sim.crowd.people.map((p) => p.id));
-      sim.tick(1);
-      for (const p of sim.crowd.people) {
-        if (before.has(p.id)) continue;
-        const o = p.floors[0], d = p.floors[p.floors.length - 1];
-        if (d === 5 && [2, 3, 4].includes(o)) secondOutbound++;
-        if (o === 5 && [2, 3, 4].includes(d)) secondReturn++;
-      }
-    }
-    // The phase profile: outbound dominates t in [0, 0.4], return dominates
-    // t in [0.6, 1]. So the first-half spawn pool skews outbound, the
-    // second-half skews return.
-    expect(firstOutbound).toBeGreaterThan(firstReturn);
-    expect(secondReturn).toBeGreaterThan(secondOutbound);
-  });
-});
+// The prior "return trips lag outbound aggregate check" was retired when PR A
+// (per-person meal round-trips) replaced the aggregate return branch with a
+// round-tripper's self-scheduled return. Return trips no longer spawn new
+// persons; they mutate the eating person's route in place. Coverage of the
+// round-trip lifecycle lives in `personRoundTrip.test.ts`.
 
 describe("MAX_PEOPLE cap holds through a lunch peak", () => {
   it("does not overflow the crowd cap on a densely-mixed tower", () => {

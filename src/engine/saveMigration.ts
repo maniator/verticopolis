@@ -18,7 +18,7 @@ import type { FacilityKind, SerializedGame, SerializedUnit } from "./types";
  * load — not merely written — and a future format bump has exactly one place to
  * grow.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 /**
  * The condo sale price BEFORE this build re-anchored the band (old default 2×
@@ -86,10 +86,26 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // saves are already the full shape, so the hop only re-stamps the version;
   // deserialize's fallback table reads both shapes identically.
   if (migrated.version === 2) migrated = upgradeV2toV3(migrated);
+  // v3 → v4: this release adds the transient meal-overlay / associated-census
+  // seam, but HUD population and ratingPopulation stay on the canonical room
+  // census. The `outForMeal` overlay is never serialized and resets to 0 on
+  // load, so there is no saved field to backfill and the hop only re-stamps the
+  // version. The step exists so the version ladder stays gapless, a future
+  // v4-shaped field has one obvious place to land, and a v3 save loads as v4
+  // instead of tripping the "newer than this build" best-effort path.
+  if (migrated.version === 3) migrated = upgradeV3toV4(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
   // it loads best-effort — the coercion below guards it — rather than throwing
   // away the player's tower.
   return migrated;
+}
+
+export function upgradeV3toV4(data: SerializedGame): SerializedGame {
+  // Additive/no-op data-wise: the meal-customer census reads a transient overlay
+  // (`Unit.outForMeal`) that is never persisted, so a v3 save is already a valid
+  // v4 save. Only the stamp changes; deserialize's field coercion reads both
+  // shapes identically.
+  return { ...data, version: 4 };
 }
 
 export function upgradeV2toV3(data: SerializedGame): SerializedGame {

@@ -529,9 +529,15 @@ describe("parseTDT: golden mappings", () => {
     const office = rooms(oneTenant(7, 100, 109, 1))[0];
     expect(office.state).toBe("occupied");
     expect(office.everOccupied).toBe(true);
+    expect(office.occupants).toBe(FACILITIES.office.population);
+    const condo = rooms(oneTenant(9, 100, 113, 1))[0];
+    expect(condo.state).toBe("occupied");
+    expect(condo.everOccupied).toBe(true);
+    expect(condo.occupants).toBe(FACILITIES.condo.population);
     const vacantOffice = rooms(oneTenant(7, 100, 109, 0))[0];
     expect(vacantOffice.state).toBe("empty");
     expect(vacantOffice.everOccupied).toBe(false);
+    expect(vacantOffice.occupants).toBe(0);
     expect(office.satisfaction).toBe(1);
   });
 
