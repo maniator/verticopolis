@@ -154,7 +154,7 @@ describe("sparse v3 unit serialization", () => {
   it("shrinks the REAL 12,975-unit tower to under half its full-shape JSON and reloads identically", () => {
     const sim = Simulation.deserialize(decodeVctower(towerFile)); // v1 fixture -> reflow -> live tower
     const sparse = sim.serialize();
-    expect(sparse.version).toBe(3);
+    expect(sparse.version).toBe(4);
     const sparseJson = JSON.stringify(sparse);
     const fullJson = JSON.stringify({ ...sparse, units: sparse.units.map(materialize) });
     expect(sparseJson.length).toBeLessThan(fullJson.length * 0.5);

@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor, residentCount } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor, residentCount } from "./facilities";
 import { isOperational, isPresent } from "./types";
 import type {
   Facility,
@@ -61,6 +61,9 @@ export class Tower {
   builtWeddingHall = false;
   /** Bumped whenever units/transports are added or removed (render caching). */
   revision = 0;
+  /** Bumped whenever a room's transient meal overlay changes, so the renderer can
+   *  repaint visible office/condo headcounts without treating it as a build edit. */
+  mealOverlayRevision = 0;
 
   /** "floor:x" -> structural unit id (floor/lobby). */
   private structure = new Map<string, number>();
@@ -154,6 +157,11 @@ export class Tower {
   /** Look up a unit by id. */
   getUnit(id: number): Unit | undefined {
     return this.byId.get(id);
+  }
+
+  /** Mark a transient meal-overlay change that should repaint room sprites. */
+  bumpMealOverlayRevision(): void {
+    this.mealOverlayRevision++;
   }
 
   /** Look up a transport by id. */
@@ -1289,6 +1297,34 @@ export class Tower {
       if (isPresent(u)) {
         pop += residentCount(u);
       }
+    }
+    return pop;
+  }
+
+  /**
+   * Venue-associated meal customers currently out of their home unit: the sum of
+   * the transient `outForMeal` overlay across present units. These are the
+   * workers/residents who left an office, condo, or hotel room for a meal round-
+   * trip and are now at (or travelling to/from) a venue. Reading the derived
+   * overlay counts each round-tripper exactly once (spawn increments, despawn
+   * decrements a single origin), so it never double-counts and needs no scan of
+   * the crowd's Person array. Mirrors {@link totalPopulation}: gated on
+   * `isPresent` and a pure read with no side effects.
+   *
+   * `outForMeal` is a `Unit` field this class already owns, so the count lives
+   * here (single source of truth); {@link Crowd.mealAssociatedPopulation} is the
+   * meal-domain seam that delegates to it. `opts.excludeHotelOrigin` drops
+   * customers whose origin is a hotel room, so the star census can hold the canon
+   * "hotel guests stop counting at 3 stars" rule for meal customers too.
+   */
+  associatedPopulation(opts?: { excludeHotelOrigin?: boolean }): number {
+    const excludeHotel = opts?.excludeHotelOrigin ?? false;
+    let pop = 0;
+    for (const u of this.units) {
+      const out = u.outForMeal ?? 0;
+      if (out <= 0 || !isPresent(u)) continue;
+      if (excludeHotel && isHotelKind(u.kind)) continue;
+      pop += out;
     }
     return pop;
   }

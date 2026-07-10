@@ -222,6 +222,15 @@ export interface Unit {
   satisfaction: number;
   /** Current number of occupants present right now. */
   occupants: number;
+  /** Transient count of workers/residents currently out on a meal round-trip
+   *  originating from THIS unit. Not persisted (a save reload resets it to 0
+   *  and the next `updatePresence` hour boundary re-baselines `occupants`).
+   *  The renderer and pop census read
+   *  `visibleOccupants(u) = max(0, occupants - outForMeal)`. Incremented at
+   *  meal-round-trip spawn; decremented at return arrival, guarded so a
+   *  bulldozed origin does not ghost-decrement a fresh unit built on the
+   *  same floor after. See `arch-person-meal-round-trips-2026-07-09` §1-2. */
+  outForMeal?: number;
   /** Household size of a sold condo — the number of people who actually LIVE
    *  here, set once when the condo sells. Undefined ⇒ the kind's flat population
    *  (the 1994 default of 3), so Classic towers and every pre-variant save read
