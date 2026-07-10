@@ -1069,7 +1069,7 @@ export class Crowd {
    *  `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
    *  decrement a fresh unit built on the same floor after). */
   private transitionToReturn(tower: Tower, p: Person): void {
-    const origin = p.originUnitId !== undefined ? tower.getUnit(p.originUnitId) : undefined;
+    const origin = this.originUnit(tower, p);
     if (!origin) {
       // Ghost origin: unit was bulldozed while the person was eating, so there
       // is no origin unit left to decrement. Just despawn.
@@ -1113,6 +1113,11 @@ export class Crowd {
     return false;
   }
 
+  /** The room a meal round-tripper originated from, if it still exists. */
+  private originUnit(tower: Tower, p: Person): Unit | undefined {
+    return p.originUnitId === undefined ? undefined : tower.getUnit(p.originUnitId);
+  }
+
   /** Free this person's seat in their current car (if aboard), so bulldozing
    * a shaft mid-ride never leaks rider counts and shrinks a car's capacity. */
   private releaseSeat(p: Person): void {
@@ -1143,12 +1148,10 @@ export class Crowd {
     // floor after (`Tower.nextId` is monotonic so bulldoze + rebuild never
     // reuses an id; the guard defends against the "unit no longer exists"
     // case, which is the only reachable one).
-    if (p.originUnitId !== undefined) {
-      const origin = tower.getUnit(p.originUnitId);
-      if (origin && (origin.outForMeal ?? 0) > 0) {
-        origin.outForMeal = (origin.outForMeal ?? 0) - 1;
-        tower.bumpMealOverlayRevision();
-      }
+    const origin = this.originUnit(tower, p);
+    if (origin && (origin.outForMeal ?? 0) > 0) {
+      origin.outForMeal = (origin.outForMeal ?? 0) - 1;
+      tower.bumpMealOverlayRevision();
     }
     p.state = "done";
   }
