@@ -2146,7 +2146,13 @@ export class Simulation implements SimContext {
     // static resident count, per canon's venue-customer census. The overlay is
     // transient and zero except during meal windows, so this equals
     // `totalPopulation()` at all other times.
-    return this.tower.totalPopulation() + this.crowd.mealAssociatedPopulation(this.tower);
+    // Single pass: combines residentCount + outForMeal to avoid scanning tower.units twice.
+    let pop = 0;
+    for (const u of this.tower.units) {
+      if (!isPresent(u)) continue;
+      pop += residentCount(u) + (u.outForMeal ?? 0);
+    }
+    return pop;
   }
 
   get nextStarThreshold(): number | null {
