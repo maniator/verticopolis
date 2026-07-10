@@ -363,12 +363,12 @@ export const STAR_THRESHOLDS: Record<number, number> = {
 };
 
 /**
- * Population needed for the final TOWER rating (above 5 stars). Same metric as
- * the 1994 original — a census of OCCUPANTS (office workers + condo residents;
- * hotel guests count while climbing up through 4★, then drop out per canon);
- * commercial/visitor traffic never counts. The canonical 15,000: the lot is the
- * canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches it
- * (with express + banded locals).
+ * Population needed for the final TOWER rating (above 5 stars). A census of
+ * OCCUPANTS (office workers + condo residents; hotel guests count while climbing
+ * up through 4★, then drop out, our tuned ladder rather than a 1994 parity
+ * claim); commercial/visitor traffic never counts. The canonical 15,000: the lot
+ * is the canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches
+ * it (with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
 
