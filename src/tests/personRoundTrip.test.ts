@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { Clock } from "../engine/Clock";
-import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN } from "../engine/Crowd";
+import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../engine/Crowd";
 
 /**
  * Per-person meal round-trip regression suite (PR A: person-tracking epic).
@@ -242,7 +242,7 @@ describe("outbound arrival transitions to eating with in-range timer (arch §8 t
     // 60-second minimum. This still fails a bug that sets the timer far below
     // the intended floor (e.g. a 5-10 second eat).
     expect(eat).toBeGreaterThanOrEqual(EAT_SECONDS_MIN - CROWD_SECONDS_PER_MINUTE);
-    expect(eat).toBeLessThanOrEqual(120);
+    expect(eat).toBeLessThanOrEqual(EAT_SECONDS_MAX);
   });
 });
 
