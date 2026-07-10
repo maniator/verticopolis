@@ -780,7 +780,11 @@ export class Crowd {
 
   private add(tower: Tower, from: number, to: number): Person | null {
     const r = this.route(tower, from, to);
-    if (!r || r.shafts.length === 0) return null; // unreachable, no point spawning
+    // Only a null route is unreachable. A same-floor trip is a valid walk-only
+    // route (`bfsRoute` returns `{ floors: [from], shafts: [] }` when
+    // from === to), and `makePerson` already starts those in `state: "toDest"`,
+    // so a meal origin and venue on the same floor still spawns and strolls.
+    if (!r) return null;
     return this.makePerson(tower, r, this.pickX(tower, to, (this.nextId * 2654435761) | 0));
   }
 
@@ -1080,7 +1084,7 @@ export class Crowd {
     const venueFloor = p.floor;
     const originFloor = origin.floor;
     const route = this.route(tower, venueFloor, originFloor);
-    if (!route || route.shafts.length === 0) {
+    if (!route) {
       // Return route unreachable (transport degraded while eating). The person
       // "went home some other way"; the accounting must still balance, so
       // finish() decrements outForMeal via the ghost-guarded path below.
@@ -1093,7 +1097,9 @@ export class Crowd {
     p.leg = 0;
     p.shaftId = route.shafts[0] ?? null;
     p.carIndex = null;
-    p.state = "toShaft";
+    // A same-floor return has no rides, so walk straight back (mirrors
+    // makePerson): otherwise a "toShaft" state with no shaft would stall.
+    p.state = route.shafts.length === 0 ? "toDest" : "toShaft";
     p.wait = 0;
     p.age = 0;
     p.linger = 0;

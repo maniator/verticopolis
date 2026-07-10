@@ -82,6 +82,58 @@ describe("outbound meal spawn decrements visible occupancy", () => {
   });
 });
 
+describe("same-floor meal round-trip (walk-only route)", () => {
+  /** Office and fastFood venue on the SAME floor, so origin -> venue routes
+   *  with zero rides. The trip must still spawn a real round-tripper (guards
+   *  the reviewer thread: `add` must reject only null routes, not empty-shaft
+   *  same-floor ones, which `makePerson` already walks). */
+  function officeAndFastFoodSameFloor(): Simulation {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 3; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    sim.tower.placeTransport("elevatorStandard", 4, 1, 3);
+    const office = sim.tower.place("office", 2, 30);
+    const ff = sim.tower.place("fastFood", 2, 0); // same floor as the office
+    for (const r of [office, ff]) {
+      const u = sim.tower.units.find((x) => x.id === r.unitId);
+      if (u) {
+        u.state = "occupied";
+        u.occupants = 6;
+      }
+    }
+    return sim;
+  }
+
+  it("a same-floor lunch trip still dips visible occupancy", () => {
+    const sim = officeAndFastFoodSameFloor();
+    setHour(sim, 12);
+    const office = sim.tower.units.find((u) => u.kind === "office")!;
+    const startingVisible = visibleOccupants(office);
+    expect(startingVisible).toBeGreaterThan(0);
+    let seenAtLeastOneOut = false;
+    for (let m = 0; m < 30; m++) {
+      sim.tick(1);
+      if (visibleOccupants(office) < startingVisible) {
+        seenAtLeastOneOut = true;
+        break;
+      }
+    }
+    expect(seenAtLeastOneOut).toBe(true);
+    expect(office.outForMeal ?? 0).toBeGreaterThan(0);
+    expect(office.occupants).toBe(6);
+  });
+
+  it("outForMeal drains fully after a same-floor round-trip completes", () => {
+    const sim = officeAndFastFoodSameFloor();
+    setHour(sim, 11);
+    for (let m = 0; m < 240; m++) sim.tick(1);
+    const office = sim.tower.units.find((u) => u.kind === "office")!;
+    expect(office.outForMeal ?? 0).toBe(0);
+  });
+});
+
 describe("round trip completes and re-increments visible occupancy", () => {
   it("outForMeal drains fully by the time all stragglers finish their return leg", () => {
     // The last outbound spawn fires around t=0.6 (12:48 for lunch). With max
