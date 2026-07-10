@@ -88,7 +88,7 @@ export function buildStatsHtml(sim: Simulation): string {
                 : ""
             }${
               ratingRow
-                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Hotel guests count toward your star rating up through 4★; reaching 5★ needs that many permanent residents.</span>`
+                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Hotel guests count toward your star rating up to 4★; from 5★ on, only permanent residents count. Your rating won't drop, and hotels still earn income.</span>`
                 : ""
             }</div>`
           : ""
