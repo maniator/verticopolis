@@ -1905,14 +1905,12 @@ export class Simulation implements SimContext {
   /** Population that counts toward the star/TOWER thresholds. Per the original,
    * hotel guests count only while climbing to 3★; once the tower is 3★ they no
    * longer count toward 4★/5★/TOWER (the displayed {@link population} still
-   * includes them). Venue-associated meal customers (workers/residents out on a
-   * meal round-trip) count too, mirroring the displayed population, with the same
-   * hotel exclusion applied to their ORIGIN unit: a guest out for a meal is still
-   * a hotel person and drops out of the rating census at 3★, so the origin-kind
-   * filter (`excludeHotelOrigin`) mirrors the tenant-side `!isHotelKind` gate. */
+   * includes them). Meal round-trippers do NOT add on top here: their origin
+   * unit's canonical occupancy still carries them, so they are already present in
+   * the baseline count while they travel/eat. */
   ratingPopulation(): number {
     if (this.star < 3) {
-      return this.tower.totalPopulation() + this.crowd.mealAssociatedPopulation(this.tower);
+      return this.tower.totalPopulation();
     }
     let pop = 0;
     for (const u of this.tower.units) {
@@ -1920,7 +1918,7 @@ export class Simulation implements SimContext {
         pop += residentCount(u);
       }
     }
-    return pop + this.crowd.mealAssociatedPopulation(this.tower, { excludeHotelOrigin: true });
+    return pop;
   }
 
   hasAny(kind: FacilityKind): boolean {
@@ -2141,16 +2139,14 @@ export class Simulation implements SimContext {
   }
 
   get population(): number {
-    // Displayed population folds in the venue-associated meal customers (workers
-    // and residents currently out on a meal round-trip) on top of the tower's
-    // static resident count, per canon's venue-customer census. The overlay is
-    // transient and zero except during meal windows, so this equals
-    // `totalPopulation()` at all other times.
-    // Single pass: combines residentCount + outForMeal to avoid scanning tower.units twice.
+    // Displayed population stays on the canonical room census. A worker out to
+    // lunch still counts via their origin room's baseline occupancy, so meal
+    // round-trips do not make HUD population spike or dip. Keep this a single
+    // pass over tower.units rather than delegating to totalPopulation().
     let pop = 0;
     for (const u of this.tower.units) {
       if (!isPresent(u)) continue;
-      pop += residentCount(u) + (u.outForMeal ?? 0);
+      pop += residentCount(u);
     }
     return pop;
   }

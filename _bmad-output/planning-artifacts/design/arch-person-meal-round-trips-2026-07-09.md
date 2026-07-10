@@ -7,8 +7,9 @@ status: Spec, approved for implementation
 scope: Engine implementation of the per-person meal round-trip: origin
   identity on Person, a new eating state, an outForMeal overlay counter on
   Unit, retirement of the aggregate return branch in pushMealOptions, and the
-  render+cache updates that surface the visible dip. Ships PR A of the three-
-  PR person-tracking + census + import-seed epic.
+  render+cache updates that surface the visible dip. The shipped branch also
+  bundles the venue-census seam and the TDT import occupancy seed that were
+  originally planned as follow-up PRs.
 grounds:
   - gdd-person-meal-round-trips-2026-07-09.md (the player-facing contract)
   - src/engine/Crowd.ts (Person state machine, spawn/advance, pushMealOptions,
@@ -364,5 +365,6 @@ Existing tests must still pass:
 
 ## 10. Version bump
 
-Player-facing new capability (visible office/condo/hotel dip during meals).
-Minor bump: `1.16.0 -> 1.17.0`.
+Player-facing new capability (visible office/condo dip during meals, plus the
+bundled census/import follow-up work).
+Minor bump: `1.17.0 -> 1.18.0`.
