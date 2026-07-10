@@ -267,7 +267,9 @@ function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number):
   if (u.state === "empty") return vacancy(ctx, x, y, w, h, "SALE");
   // Residents are "up" only when home and not asleep in the small hours.
   // Read the meal-adjusted count so a household out to breakfast/dinner/
-  // late-night visibly leaves the sofa empty for the round-trip's duration.
+  // or a late-night trip (before 23:00) visibly leaves the sofa empty for
+  // the round-trip's duration. After 23:00 the gate below already hides
+  // residents regardless, so there is no separate dip to show.
   const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
   const wall = hash(u.id) > 0.5 ? "#C8A88C" : "#B89CAE";
   const floorY = shell(ctx, x, y, w, h, wall, "#9A7A54");
