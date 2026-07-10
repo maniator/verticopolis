@@ -300,6 +300,26 @@ export class Crowd {
     return this.frustration;
   }
 
+  /**
+   * Venue-associated meal-customer census: how many tower occupants are
+   * currently out on a meal round-trip (heading to a venue, `eating`, or
+   * returning). This is the meal-domain seam PR B adds so the tower's
+   * population count reflects a worker at lunch as a person at the venue, per
+   * canon's venue-customer census, instead of an empty desk.
+   *
+   * The count is read from the derived `outForMeal` overlay each origin unit
+   * carries (delegated to {@link Tower.associatedPopulation}); spawn increments
+   * exactly one origin and every despawn path decrements exactly one, so each
+   * round-tripper is counted once with no scan of the Person array and no
+   * double-count against {@link Tower.totalPopulation}, which already counts the
+   * origin unit's static residents. `opts.excludeHotelOrigin` drops hotel-origin
+   * customers so the star census can keep the canon "hotel guests stop counting
+   * at 3 stars" rule.
+   */
+  mealAssociatedPopulation(tower: Tower, opts?: { excludeHotelOrigin?: boolean }): number {
+    return tower.associatedPopulation(opts);
+  }
+
   /** Live elevator calls from real people (tenants AND staff), for the
    *  dispatch. Two kinds, exactly like a real lift: `hall` (shaftId → floor →
    *  waiter count — the landing button) and `cab` (shaftId → carIndex → floors
