@@ -329,6 +329,7 @@ export class TowerEngine {
   private floorLiveHour = -1;
   private floorLiveRev = -1;
   private builtRev = -1;
+  private mealOverlayRev = -1;
   private litState = false;
   private lastSyncHour = -1;
   /** Set by the controller from the game speed: when paused, the decorative
@@ -502,6 +503,7 @@ export class TowerEngine {
     this.syncMotion();
     this.syncFacade();
     this.builtRev = this.sim.tower.revision;
+    this.mealOverlayRev = this.sim.tower.mealOverlayRevision;
     this.bindInput();
   }
 
@@ -689,6 +691,7 @@ export class TowerEngine {
     this.lastVipSeq = sim.vipFxSeq;
     this.sim = sim;
     this.builtRev = -1;
+    this.mealOverlayRev = -1;
     // Invalidate the per-floor occupancy cache so a swapped-in tower (new game /
     // load) can't briefly gate walkers on the previous sim's occupancy even if
     // its hour and revision happen to match the cached keys.
@@ -725,13 +728,17 @@ export class TowerEngine {
     this.engine.backgroundColor = ex.Color.fromHex(skyColor(c.hour));
     if (this.onUpdate) this.onUpdate(elapsed);
 
-    // Reconcile room/structure actors when the model, lighting, or the hour
-    // changes (occupancy shifts on the hour, so sprites must re-bake then).
+    // Reconcile room/structure actors when the model, lighting, the hour, or a
+    // meal-overlay repaint trigger changes. The overlay path keeps visible
+    // office/condo dips in sync even when someone leaves and returns inside one
+    // hour bucket.
     const structuralChanged = this.sim.tower.revision !== this.builtRev;
-    if (structuralChanged || this.d.lit !== this.litState || this.d.hour !== this.lastSyncHour) {
+    const mealOverlayChanged = this.sim.tower.mealOverlayRevision !== this.mealOverlayRev;
+    if (structuralChanged || mealOverlayChanged || this.d.lit !== this.litState || this.d.hour !== this.lastSyncHour) {
       this.litState = this.d.lit;
       this.lastSyncHour = this.d.hour;
       this.syncScene();
+      this.mealOverlayRev = this.sim.tower.mealOverlayRevision;
     }
     // Motion actors and the exterior facade (escape stairs, roof crane) only
     // need reconciling when the layout itself changes.

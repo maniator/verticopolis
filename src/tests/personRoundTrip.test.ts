@@ -78,6 +78,7 @@ describe("outbound meal spawn decrements visible occupancy", () => {
     // `outForMeal` is what got incremented; `u.occupants` is unchanged.
     expect(office.outForMeal ?? 0).toBeGreaterThan(0);
     expect(office.occupants).toBe(6); // canonical seat count, untouched
+    expect(sim.tower.mealOverlayRevision).toBeGreaterThan(0);
   });
 });
 

@@ -303,9 +303,9 @@ export class Crowd {
   /**
    * Venue-associated meal-customer census: how many tower occupants are
    * currently out on a meal round-trip (heading to a venue, `eating`, or
-   * returning). This is the meal-domain seam PR B adds so the tower's
-   * population count reflects a worker at lunch as a person at the venue, per
-   * canon's venue-customer census, instead of an empty desk.
+   * returning). This is a separate venue-side census seam for meal traffic; it
+   * does not change HUD population or star-rating population, which stay on the
+   * canonical room census.
    *
    * The count is read from the derived `outForMeal` overlay each origin unit
    * carries (delegated to {@link Tower.associatedPopulation}); spawn increments
@@ -748,6 +748,7 @@ export class Crowd {
     if (!spawned) return;
     spawned.originUnitId = origin.id;
     origin.outForMeal = (origin.outForMeal ?? 0) + 1;
+    tower.bumpMealOverlayRevision();
   }
 
   /** Build a person on `route`, walking to `destX` at the end. Shared by
@@ -1068,7 +1069,7 @@ export class Crowd {
    *  `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
    *  decrement a fresh unit built on the same floor after). */
   private transitionToReturn(tower: Tower, p: Person): void {
-    const origin = p.originUnitId !== undefined ? tower.units.find((u) => u.id === p.originUnitId) : undefined;
+    const origin = p.originUnitId !== undefined ? tower.getUnit(p.originUnitId) : undefined;
     if (!origin) {
       // Ghost origin: unit was bulldozed while the person was eating, so there
       // is no origin unit left to decrement. Just despawn.
@@ -1143,9 +1144,10 @@ export class Crowd {
     // reuses an id; the guard defends against the "unit no longer exists"
     // case, which is the only reachable one).
     if (p.originUnitId !== undefined) {
-      const origin = tower.units.find((u) => u.id === p.originUnitId);
+      const origin = tower.getUnit(p.originUnitId);
       if (origin && (origin.outForMeal ?? 0) > 0) {
         origin.outForMeal = (origin.outForMeal ?? 0) - 1;
+        tower.bumpMealOverlayRevision();
       }
     }
     p.state = "done";

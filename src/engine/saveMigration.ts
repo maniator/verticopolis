@@ -86,13 +86,13 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // saves are already the full shape, so the hop only re-stamps the version;
   // deserialize's fallback table reads both shapes identically.
   if (migrated.version === 2) migrated = upgradeV2toV3(migrated);
-  // v3 → v4: the venue-population census (PR B) surfaces meal round-trip
-  // customers in the displayed/rating population. The `outForMeal` overlay that
-  // drives it is TRANSIENT (never serialized; reset to 0 on load), so there is
-  // no new saved field to backfill, so the hop only re-stamps the version. The
-  // step exists so the version ladder stays gapless and a future v4-shaped field
-  // has one obvious place to land, and so a v3 save loads as v4 rather than
-  // tripping the "newer than this build" best-effort path.
+  // v3 → v4: this release adds the transient meal-overlay / associated-census
+  // seam, but HUD population and ratingPopulation stay on the canonical room
+  // census. The `outForMeal` overlay is never serialized and resets to 0 on
+  // load, so there is no saved field to backfill and the hop only re-stamps the
+  // version. The step exists so the version ladder stays gapless, a future
+  // v4-shaped field has one obvious place to land, and a v3 save loads as v4
+  // instead of tripping the "newer than this build" best-effort path.
   if (migrated.version === 3) migrated = upgradeV3toV4(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
   // it loads best-effort — the coercion below guards it — rather than throwing

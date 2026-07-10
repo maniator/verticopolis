@@ -61,6 +61,9 @@ export class Tower {
   builtWeddingHall = false;
   /** Bumped whenever units/transports are added or removed (render caching). */
   revision = 0;
+  /** Bumped whenever a room's transient meal overlay changes, so the renderer can
+   *  repaint visible office/condo headcounts without treating it as a build edit. */
+  mealOverlayRevision = 0;
 
   /** "floor:x" -> structural unit id (floor/lobby). */
   private structure = new Map<string, number>();
@@ -154,6 +157,11 @@ export class Tower {
   /** Look up a unit by id. */
   getUnit(id: number): Unit | undefined {
     return this.byId.get(id);
+  }
+
+  /** Mark a transient meal-overlay change that should repaint room sprites. */
+  bumpMealOverlayRevision(): void {
+    this.mealOverlayRevision++;
   }
 
   /** Look up a transport by id. */
