@@ -1866,9 +1866,17 @@ export class Simulation implements SimContext {
 
   evaluateStar(): void {
     if (this.star >= 6) return;
-    const pop = this.ratingPopulation();
+    // Evaluate each rung with the population appropriate to THAT rung, not the
+    // tower's current star. Hotels help climb up through 4★ but 5★ (and TOWER)
+    // need real residents, so a rung at/above the 5★ drop-out point is tested on
+    // the non-hotel occupant census. Keying off the rung (rather than the current
+    // star, as {@link ratingPopulation} does for display) stops a single tick
+    // from leaping 3★→5★ on hotel guests.
+    const popWithHotels = this.tower.totalPopulation();
+    const popOccupantsOnly = this.occupantPopulation();
     let target = this.star;
     for (let s = 5; s >= 1; s--) {
+      const pop = s >= 5 ? popOccupantsOnly : popWithHotels;
       if (pop >= STAR_THRESHOLDS[s]) {
         target = s;
         break;
@@ -1902,16 +1910,26 @@ export class Simulation implements SimContext {
     }
   }
 
-  /** Population that counts toward the star/TOWER thresholds. Per the original,
-   * hotel guests count only while climbing to 3★; once the tower is 3★ they no
-   * longer count toward 4★/5★/TOWER (the displayed {@link population} still
-   * includes them). Meal round-trippers do NOT add on top here: their origin
-   * unit's canonical occupancy still carries them, so they are already present in
-   * the baseline count while they travel/eat. */
+  /** Population that counts toward the star/TOWER thresholds, from the CURRENT
+   * star's perspective — this is the display/HUD read. Hotel rooms and suites
+   * count while climbing up through 4★; once the tower is 4★ they no longer count
+   * toward 5★/TOWER (the displayed {@link population} still includes them).
+   * {@link evaluateStar} does NOT use this for promotion: it tests each rung on
+   * the population appropriate to that rung, so promotion can't leap 3★→5★ on
+   * hotel guests. Meal round-trippers do NOT add on top here: their origin unit's
+   * canonical occupancy still carries them, so they are already present in the
+   * baseline count while they travel/eat. */
   ratingPopulation(): number {
-    if (this.star < 3) {
+    if (this.star < 4) {
       return this.tower.totalPopulation();
     }
+    return this.occupantPopulation();
+  }
+
+  /** Non-hotel occupant census: office workers + condo residents only. This is
+   * the rating population once hotels drop out (4★+) and the figure each 5★/TOWER
+   * rung is tested against in {@link evaluateStar}. */
+  private occupantPopulation(): number {
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
@@ -1932,9 +1950,9 @@ export class Simulation implements SimContext {
     return this.crowd.spawnStaff(this.tower, from, to, destX, cleanUnitId);
   }
 
-  /** Whether hotel guests currently count toward the star rating (they stop at 3★). */
+  /** Whether hotel guests currently count toward the star rating (they stop at 4★). */
   hotelsCountTowardRating(): boolean {
-    return this.star < 3;
+    return this.star < 4;
   }
 
   /**

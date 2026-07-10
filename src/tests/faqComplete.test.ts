@@ -87,8 +87,8 @@ describe("Canon star ladder (FAQ)", () => {
   });
 });
 
-describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
-  it("hotel guests count for the rating below 3★ but not at/above it", () => {
+describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
+  it("hotel guests count for the rating below 4★ but not at/above it", () => {
     const sim = Simulation.newGame(3);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -98,10 +98,68 @@ describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
       const r = sim.tower.place("hotelSingle", 2, x);
       if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
     }
-    sim.star = 1;
-    expect(sim.ratingPopulation()).toBeGreaterThan(0); // hotels count toward 2★
     sim.star = 3;
-    expect(sim.ratingPopulation()).toBe(0); // hotels excluded once at 3★
+    expect(sim.ratingPopulation()).toBeGreaterThan(0); // hotels count while climbing to 4★
+    sim.star = 4;
+    expect(sim.ratingPopulation()).toBe(0); // hotels excluded once at 4★
+  });
+
+  it("a 3★ tower can't leap to 5★ on hotel guests in one evaluateStar tick", () => {
+    // Offices give ~5,400 occupant population: past the 4★ bar (5,000), short of
+    // the 5★ bar (10,000). Hotel suites then pad the raw head count over 10,000.
+    const sim = towerWithPop(7, 5400);
+    sim.star = 3;
+    const occupantPop = sim.tower.totalPopulation();
+    expect(occupantPop).toBeGreaterThanOrEqual(5000);
+    expect(occupantPop).toBeLessThan(10000);
+
+    // Fill floors above the offices with occupied suites until the raw census
+    // (offices + hotels) clears the 10,000 5★ bar.
+    let f = sim.tower.highestFloor + 1;
+    while (sim.tower.totalPopulation() < 10200 && f <= 100) {
+      lay(sim, "floor", f);
+      for (let x = 0; x + FACILITIES.hotelSuite.width <= W && sim.tower.totalPopulation() < 10200; x += FACILITIES.hotelSuite.width) {
+        const r = sim.tower.place("hotelSuite", f, x);
+        if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
+      }
+      f++;
+    }
+    expect(sim.tower.totalPopulation()).toBeGreaterThanOrEqual(10000); // raw census over the 5★ bar
+    expect(sim.ratingPopulation()).toBeGreaterThanOrEqual(10000); // display read at 3★ still counts hotels
+
+    // Satisfy every 4★ and 5★ GATE so only the population census can hold the
+    // rating back: Medical, Security, Recycling demand met, 2 Suites, VIP, Metro.
+    const top = f;
+    lay(sim, "floor", top);
+    sim.tower.place("medical", top, 0);
+    sim.tower.place("security", top, 60);
+    sim.vipFavorable = true;
+    for (let fl = 0; fl >= -8; fl--) lay(sim, "floor", fl);
+    for (let i = 0; i < 6; i++) sim.tower.place("recycling", -2, i * 20); // 15,000 capacity ≥ census
+    expect(sim.recyclingDemandMet()).toBe(true);
+    expect(sim.tower.place("metro", -8, 0).ok).toBe(true);
+
+    // Gates are all met and the RAW head count is over 10,000 — but the non-hotel
+    // occupant census is not, so the tower promotes only to 4★, never leaping to
+    // 5★ on hotel guests.
+    sim.evaluateStar();
+    expect(sim.star).toBe(4);
+
+    // Add real (non-hotel) residents past 10,000 occupants and 5★ follows.
+    let g = sim.tower.highestFloor + 1;
+    while (sim.ratingPopulation() < 10200 && g <= 100) {
+      lay(sim, "floor", g);
+      for (let x = 0; x + FACILITIES.office.width <= W && sim.ratingPopulation() < 10200; x += FACILITIES.office.width) {
+        const r = sim.tower.place("office", g, x);
+        if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      }
+      g++;
+    }
+    // Recycling must still meet the now-larger census for the 4★ gate to hold.
+    for (let i = 0; i < 4; i++) sim.tower.place("recycling", -4, i * 20);
+    expect(sim.recyclingDemandMet()).toBe(true);
+    sim.evaluateStar();
+    expect(sim.star).toBe(5);
   });
 });
 

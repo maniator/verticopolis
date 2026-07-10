@@ -12,7 +12,7 @@ import { Clock } from "../engine/Clock";
  *   - population and ratingPopulation keep reading the canonical room census;
  *     the venue overlay is never folded into either metric.
  *   - ratingPopulation keeps the canon hotel exclusion via the room-side hotel
- *     gate at 3★+.
+ *     gate at 4★+.
  *   - Ghost guard: an origin bulldozed mid-meal does not corrupt the census.
  *   - SAVE_VERSION is 4 and a v3 save migrates cleanly.
  */
@@ -123,7 +123,7 @@ describe("population stays on the canonical room census", () => {
 });
 
 describe("ratingPopulation stays on the canonical room census", () => {
-  it("below 3★ ratingPopulation equals population even with meal customers out", () => {
+  it("below 4★ ratingPopulation equals population even with meal customers out", () => {
     const sim = officeAndFastFood();
     const hotel = addOccupiedHotel(sim);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
@@ -133,18 +133,18 @@ describe("ratingPopulation stays on the canonical room census", () => {
     expect(sim.ratingPopulation()).toBe(sim.population);
   });
 
-  it("at 3★ meal customers do not change the hotel-excluded rating census", () => {
+  it("at 4★ meal customers do not change the hotel-excluded rating census", () => {
     const sim = officeAndFastFood();
     const hotel = addOccupiedHotel(sim);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
-    sim.star = 3;
+    sim.star = 4;
     // Baseline rating census (no one out) with hotels excluded from tenants.
     const ratingBase = sim.ratingPopulation();
     office.outForMeal = 2;
     hotel.outForMeal = 3;
     expect(sim.ratingPopulation()).toBe(ratingBase);
     // Displayed population still exceeds the rating census because hotel guests
-    // count in the HUD below/above meals, but never in the 3★+ rating read.
+    // count in the HUD below/above meals, but never in the 4★+ rating read.
     expect(sim.population).toBeGreaterThan(ratingBase);
   });
 });
