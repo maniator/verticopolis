@@ -1,6 +1,6 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
-import type { FacilityKind, Transport } from "./types";
+import type { FacilityKind, Transport, Unit } from "./types";
 import { isOperational, isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
 import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
@@ -185,6 +185,9 @@ interface SpawnFloors {
    *  breakfast or fastFood+cinema for late-night without a per-tick filter
    *  over units). */
   venuesByKind: Partial<Record<FacilityKind, number[]>>;
+  /** Unit list per floor, binned once so outbound meal spawns can sample
+   *  candidates without re-scanning the full `tower.units` array each time. */
+  unitsByFloor: Map<number, Unit[]>;
 }
 
 /** Live calls the drawn crowd places on the elevators (see elevatorCalls).
@@ -487,11 +490,15 @@ export class Crowd {
     // Set per kind so dedupe stays O(1) per unit; a large tower with many
     // same-kind venues on one floor would otherwise make binning O(units^2).
     const venuesByKindSet: Partial<Record<FacilityKind, Set<number>>> = {};
+    const unitsByFloor = new Map<number, Unit[]>();
     const addVenueByKind = (kind: FacilityKind, floor: number) => {
       const set = venuesByKindSet[kind] ?? (venuesByKindSet[kind] = new Set());
       set.add(floor);
     };
     for (const u of tower.units) {
+      const floorUnits = unitsByFloor.get(u.floor);
+      if (floorUnits) floorUnits.push(u);
+      else unitsByFloor.set(u.floor, [u]);
       // Staff floors read the OPERATIONAL predicate rather than tenant/asleep
       // because staff facilities are not tenanted; they exist and function
       // whenever they are built and not on fire / under construction.
@@ -540,6 +547,7 @@ export class Crowd {
       hotelFloors: [...hotelFloors],
       staffFloors,
       venuesByKind,
+      unitsByFloor,
     };
   }
 
@@ -669,7 +677,7 @@ export class Crowd {
     for (const pool of originPools) {
       for (let i = 0; i < outboundBase; i++) {
         if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, clock.hour));
+          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, clock.hour, floors));
         }
       }
     }
@@ -692,6 +700,7 @@ export class Crowd {
     pool: { originKind: MealOriginKind; floors: number[] },
     venueFloors: number[],
     hour: number,
+    floors: SpawnFloors,
   ): void {
     const originFloor = this.rng.pick(pool.floors);
     // Candidate units on the chosen floor of the right kind with at least one
@@ -700,7 +709,8 @@ export class Crowd {
     // the same floor as an on-shift security room, and the pool-floor bin only
     // guarantees at least one on-shift kind exists — the per-unit filter here
     // makes sure the picked unit is itself on shift (review Blind #5).
-    const candidates = tower.units.filter(
+    const floorUnits = floors.unitsByFloor.get(originFloor) ?? [];
+    const candidates = floorUnits.filter(
       (u) =>
         u.floor === originFloor &&
         matchesMealOriginKind(u, pool.originKind) &&
@@ -1040,9 +1050,8 @@ export class Crowd {
   private transitionToReturn(tower: Tower, p: Person): void {
     const origin = p.originUnitId !== undefined ? tower.units.find((u) => u.id === p.originUnitId) : undefined;
     if (!origin) {
-      // Ghost origin: unit was bulldozed while the person was eating. No
-      // outForMeal on any unit to decrement (the bulldoze already zeroed it if
-      // it was set); just despawn.
+      // Ghost origin: unit was bulldozed while the person was eating, so there
+      // is no origin unit left to decrement. Just despawn.
       p.originUnitId = undefined;
       this.finish(p, tower);
       return;
