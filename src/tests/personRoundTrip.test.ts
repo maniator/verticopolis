@@ -30,7 +30,7 @@ function officeAndFastFood(): Simulation {
     const u = sim.tower.units.find((x) => x.id === r.unitId);
     if (u) {
       u.state = "occupied";
-      u.occupants = 6; // seeded so meal round-trippers can spawn immediately
+      u.occupants = 6; // full office headcount (FACILITIES.office population) so meal round-trippers can spawn immediately
     }
   }
   return sim;

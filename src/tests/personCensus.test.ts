@@ -32,6 +32,8 @@ function officeAndFastFood(): Simulation {
     const u = sim.tower.units.find((x) => x.id === r.unitId);
     if (u) {
       u.state = "occupied";
+      // Seed a full office headcount (matches FACILITIES.office population) so
+      // the census has real occupants to draw meal round-trippers from.
       u.occupants = 6;
     }
   }
