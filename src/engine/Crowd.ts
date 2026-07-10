@@ -185,8 +185,9 @@ interface SpawnFloors {
    *  breakfast or fastFood+cinema for late-night without a per-tick filter
    *  over units). */
   venuesByKind: Partial<Record<FacilityKind, number[]>>;
-  /** Unit list per floor, binned once so outbound meal spawns can sample
-   *  candidates without re-scanning the full `tower.units` array each time. */
+  /** Snapshot of unit lists by floor, built in {@link spawnFloors} once per
+   *  outer step so outbound meal spawns can sample candidates without
+   *  re-scanning the full `tower.units` array each time. */
   unitsByFloor: Map<number, Unit[]>;
 }
 
@@ -712,7 +713,6 @@ export class Crowd {
     const floorUnits = floors.unitsByFloor.get(originFloor) ?? [];
     const candidates = floorUnits.filter(
       (u) =>
-        u.floor === originFloor &&
         matchesMealOriginKind(u, pool.originKind) &&
         (pool.originKind !== "staff" || staffOnShift(u.kind as StaffKind, hour)) &&
         visibleOccupants(u) > 0,
