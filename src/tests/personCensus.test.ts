@@ -4,14 +4,14 @@ import { Clock } from "../engine/Clock";
 
 /**
  * Venue-population census regression suite (PR B: population-census parity).
- * Guards the census seam and its fold into the displayed and rating population:
+ * Guards the census seam and the invariant that displayed/rating population stay
+ * on canonical room occupancy while meal round-trippers are tracked separately:
  *   - Tower.associatedPopulation / Crowd.mealAssociatedPopulation read the
  *     transient `outForMeal` overlay (the derived projection), counting each
  *     meal round-tripper exactly once with no double count.
- *   - population = totalPopulation + venue-associated meal customers.
+ *   - population and ratingPopulation keep reading the canonical room census.
  *   - ratingPopulation folds the census in, with the canon hotel exclusion
- *     applied to the customer's ORIGIN unit at 3★+ (a guest out for a meal is
- *     still a hotel person and drops out of the rating census at 3★).
+ *     already enforced by the room-side hotel gate at 3★+.
  *   - Ghost guard: an origin bulldozed mid-meal does not corrupt the census.
  *   - SAVE_VERSION is 4 and a v3 save migrates cleanly.
  */
@@ -104,22 +104,23 @@ describe("Crowd.mealAssociatedPopulation delegates to Tower.associatedPopulation
   });
 });
 
-describe("population folds in venue-associated meal customers", () => {
-  it("population = totalPopulation + census", () => {
+describe("population stays on the canonical room census", () => {
+  it("meal customers do not add on top of totalPopulation", () => {
     const sim = officeAndFastFood();
     const base = sim.tower.totalPopulation();
     expect(sim.population).toBe(base); // no one out yet
     const office = sim.tower.units.find((u) => u.kind === "office")!;
     office.outForMeal = 2;
-    expect(sim.population).toBe(base + 2);
-    // Canonical occupancy and resident count are untouched by the overlay.
+    expect(sim.population).toBe(base);
+    // Canonical occupancy and resident count are untouched by the overlay, so the
+    // derived meal census must stay separate from the HUD's population total.
     expect(office.occupants).toBe(6);
     expect(sim.tower.totalPopulation()).toBe(base);
   });
 });
 
-describe("ratingPopulation folds the census with the hotel-origin exclusion", () => {
-  it("below 3★ ratingPopulation equals population (hotels + their customers count)", () => {
+describe("ratingPopulation stays on the canonical room census", () => {
+  it("below 3★ ratingPopulation equals population even with meal customers out", () => {
     const sim = officeAndFastFood();
     const hotel = addOccupiedHotel(sim);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
@@ -129,19 +130,19 @@ describe("ratingPopulation folds the census with the hotel-origin exclusion", ()
     expect(sim.ratingPopulation()).toBe(sim.population);
   });
 
-  it("at 3★ includes non-hotel meal customers but EXCLUDES hotel-origin ones", () => {
+  it("at 3★ meal customers do not change the hotel-excluded rating census", () => {
     const sim = officeAndFastFood();
     const hotel = addOccupiedHotel(sim);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
     sim.star = 3;
     // Baseline rating census (no one out) with hotels excluded from tenants.
     const ratingBase = sim.ratingPopulation();
-    office.outForMeal = 2; // non-hotel customers: DO count
-    hotel.outForMeal = 3; // hotel-origin customers: do NOT count at 3★
-    expect(sim.ratingPopulation()).toBe(ratingBase + 2);
-    // The displayed population counts BOTH the office and hotel customers, so it
-    // stays strictly above the rating census (the hotel side is excluded there).
-    expect(sim.population).toBeGreaterThan(sim.ratingPopulation());
+    office.outForMeal = 2;
+    hotel.outForMeal = 3;
+    expect(sim.ratingPopulation()).toBe(ratingBase);
+    // Displayed population still exceeds the rating census because hotel guests
+    // count in the HUD below/above meals, but never in the 3★+ rating read.
+    expect(sim.population).toBeGreaterThan(ratingBase);
   });
 });
 
@@ -171,19 +172,18 @@ describe("ghost guard: bulldozing the origin mid-meal does not corrupt the censu
   });
 });
 
-describe("integration: displayed population rises during lunch then settles", () => {
-  it("population exceeds totalPopulation at the lunch peak and returns after", () => {
+describe("integration: meal census rises during lunch while HUD population stays steady", () => {
+  it("associatedPopulation rises at the lunch peak and returns after", () => {
     const sim = officeAndFastFood();
     setHour(sim, 11);
     const base = sim.tower.totalPopulation();
-    let sawRise = false;
+    let sawAssociatedRise = false;
     for (let m = 0; m < 180; m++) {
       sim.tick(1);
-      if (sim.population > base) sawRise = true;
-      // The census can never make displayed pop drop below the static baseline.
-      expect(sim.population).toBeGreaterThanOrEqual(base);
+      if (sim.tower.associatedPopulation() > 0) sawAssociatedRise = true;
+      expect(sim.population).toBe(base);
     }
-    expect(sawRise).toBe(true);
+    expect(sawAssociatedRise).toBe(true);
     // Run out the window + straggler wind-down: every customer is home, census 0.
     for (let m = 0; m < 120; m++) sim.tick(1);
     expect(sim.tower.associatedPopulation()).toBe(0);

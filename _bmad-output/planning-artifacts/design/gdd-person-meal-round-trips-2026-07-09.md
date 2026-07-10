@@ -6,10 +6,9 @@ date: 2026-07-09
 status: Spec, approved for implementation
 scope: Turn the aggregate meal-cadence flow into real per-person round-trips.
   When an office worker leaves for lunch, THAT worker's seat is empty until
-  they walk back. Offices, condos, and hotels visibly thin out during their
-  meal peak and refill on return. First of three stacked PRs that together
-  deliver population-census parity with the 1994 game and improve TDT
-  round-trip fidelity.
+  they walk back. Offices and condos visibly thin out during their meal peak
+  and refill on return. The shipped branch also bundles the venue-census seam
+  and TDT import occupancy seed that were originally planned as follow-up PRs.
 grounds:
   - src/engine/Crowd.ts (Person state machine, spawn/advance, pushMealOptions)
   - src/engine/Simulation.ts (updatePresence, u.occupants derivation)
@@ -30,9 +29,9 @@ arrival). This change makes the round trip real. When a worker leaves floor 32
 at 12:10 for a fastFood on floor 5, that specific worker's seat empties. She
 sits at fastFood for 45 minutes, then walks back up. Floor 32's office visibly
 thins from six workers to two through the peak and refills through the tail.
-Same for condos on their way to breakfast, hotel guests on late-night snacks,
-and staff on lunch. The mechanic that was previously invisible is now the
-thing the player watches at noon.
+Same for condos on their way to breakfast, and staff on lunch. Hotel guest
+figures are still a follow-up. The mechanic that was previously invisible is
+now the thing the player watches at noon.
 
 ## 1. Why this matters as a parity feature
 
@@ -40,12 +39,13 @@ The tower-wide meal cadence PR closed the transport-pulse gap. This PR closes
 the visible-occupancy gap that we deliberately pulled from that PR (the "fake
 render dip" the party rejected as a shell game). It also unlocks a chain of
 canon parity work: real per-person round-trips give the population census a
-correct hourly view of who is where, which lets PR B (population-census parity)
-count venue customers toward pop per canon, which lets PR C (TDT import seed)
-match the retail game's reported population on import.
+correct hourly view of who is where, which lets the bundled venue-census seam
+track meal customers separately and lets the bundled TDT import seed match the
+retail game's reported population on import.
 
-Standalone value: even without PRs B and C, the visible dip is what makes
-"lunch rush" a felt mechanic the player can watch play out floor by floor.
+Standalone value: even with the bundled census/import follow-ups stripped away,
+the visible dip is what makes "lunch rush" a felt mechanic the player can
+watch play out floor by floor.
 
 ## 2. The design pillar this serves
 
@@ -63,8 +63,9 @@ player can see WHO is out and where.
   14:00. Same for dinner if the tower has late workers.
 - **Condos** thin out during their meal windows. A condo whose family is home
   at 09:00 shows one figure during a breakfast trip and refills as they return.
-- **Hotels** thin out during breakfast and late-night meal windows (the two
-  windows where the hotel state model has guests in-room today).
+- **Hotels** still route meal trips in the underlying simulation windows, but
+  the room art does not yet draw a guest-figure dip. That visual follow-up is
+  intentionally deferred.
 - The dip is *continuous*: as one worker leaves, the room drops by one; when
   they get back, the room ticks up by one. It is not a global "12:00 -> empty"
   flip.
@@ -84,8 +85,9 @@ player can see WHO is out and where.
   per-person tracking does not add or remove any income.
 - No new venue kinds, no new save fields, no mode gate (Classic + Modern both
   get the visible dip).
-- The census number the HUD shows (`Pop`) does not change in this PR (PR B
-  handles the census work).
+- The census number the HUD shows (`Pop`) still does not spike or dip when
+  diners leave. The bundled venue-census seam tracks meal customers
+  separately; canonical room occupancy remains the HUD source of truth.
 
 ## 4. The mechanic details (contract)
 
@@ -107,9 +109,12 @@ player can see WHO is out and where.
 
 ## 5. Explicitly out of scope for this PR
 
-- **Venue customer census** (fastFood, restaurant, shop populations per canon).
-  That is PR B, alongside a SAVE_VERSION bump.
-- **TDT import population seed.** PR C, close after PR B.
+- **Venue customer census shown in a venue inspector or HUD roll-up.**
+  The branch now carries the underlying census seam and SAVE_VERSION bump, but
+  not a new venue-facing UI.
+- **Additional TDT population-fidelity work beyond occupied office/condo
+  seeding.** The branch now seeds those room types immediately on import; any
+  deeper import parity remains follow-up work.
 - **Hotel daytime gate expansion** (making hotels contribute lunch/dinner meal
   trips even when guests are not `asleep`). Follow-up; needs its own decision
   on how to model "guest is in-tower".
@@ -150,7 +155,7 @@ player can see WHO is out and where.
    not see any ghost effect on the tower's Pop or on rooms built on that
    floor next.
 5. The tower's `Pop` HUD number is unchanged relative to the shipped
-   behavior. (PR B changes this number.)
+   behavior. The bundled venue-census seam does not inflate that HUD read.
 6. `collectTrafficIncome` returns exactly the same values before and after.
 7. On a heavy weekday-lunch sim, `Crowd.people.length` never exceeds
    `MAX_PEOPLE = 140`.
@@ -158,9 +163,9 @@ player can see WHO is out and where.
 ## 8. Development note on the abstraction
 
 **"u.occupants stays canonical; outForMeal is the overlay. Two fields; one
-truth per view."** The renderer, the sprite cache, and the (future PR B)
-`livePopulation` census all read the derived
-`visibleOccupants(u) = max(0, u.occupants - u.outForMeal)`. `updatePresence`
+truth per view."** The renderer and sprite cache read the derived
+`visibleOccupants(u) = max(0, u.occupants - u.outForMeal)`, while the bundled
+meal census reads the overlay itself. `updatePresence`
 continues to overwrite `u.occupants` hourly with the expected staff count;
 this PR does not touch that logic. The two fields cohabit cleanly because
 `u.occupants` is the *baseline* (what should be here at this hour) and
