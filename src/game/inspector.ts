@@ -107,7 +107,7 @@ export class InspectorController {
       // Silent rule: hotel guests stop counting toward the star rating at 4★.
       const hotel = isHotelKind(u.kind)
         ? sim.hotelsCountTowardRating()
-          ? `<div style="color:var(--good)">Counts toward next star: yes.</div>`
+          ? `<div style="color:var(--good)">Counts toward stars: yes.</div>`
           : `<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`
         : "";
       // Silent rule: a parking space only works when it chains to a ramp. Skip
