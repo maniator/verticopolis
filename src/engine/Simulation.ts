@@ -1905,16 +1905,22 @@ export class Simulation implements SimContext {
   /** Population that counts toward the star/TOWER thresholds. Per the original,
    * hotel guests count only while climbing to 3★; once the tower is 3★ they no
    * longer count toward 4★/5★/TOWER (the displayed {@link population} still
-   * includes them). */
+   * includes them). Venue-associated meal customers (workers/residents out on a
+   * meal round-trip) count too, mirroring the displayed population, with the same
+   * hotel exclusion applied to their ORIGIN unit: a guest out for a meal is still
+   * a hotel person and drops out of the rating census at 3★, so the origin-kind
+   * filter (`excludeHotelOrigin`) mirrors the tenant-side `!isHotelKind` gate. */
   ratingPopulation(): number {
-    if (this.star < 3) return this.tower.totalPopulation();
+    if (this.star < 3) {
+      return this.tower.totalPopulation() + this.crowd.mealAssociatedPopulation(this.tower);
+    }
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
         pop += residentCount(u);
       }
     }
-    return pop;
+    return pop + this.crowd.mealAssociatedPopulation(this.tower, { excludeHotelOrigin: true });
   }
 
   hasAny(kind: FacilityKind): boolean {
@@ -2135,7 +2141,12 @@ export class Simulation implements SimContext {
   }
 
   get population(): number {
-    return this.tower.totalPopulation();
+    // Displayed population folds in the venue-associated meal customers (workers
+    // and residents currently out on a meal round-trip) on top of the tower's
+    // static resident count, per canon's venue-customer census. The overlay is
+    // transient and zero except during meal windows, so this equals
+    // `totalPopulation()` at all other times.
+    return this.tower.totalPopulation() + this.crowd.mealAssociatedPopulation(this.tower);
   }
 
   get nextStarThreshold(): number | null {
