@@ -12,7 +12,7 @@ import { Clock } from "../engine/Clock";
  *   - population and ratingPopulation keep reading the canonical room census;
  *     the venue overlay is never folded into either metric.
  *   - ratingPopulation keeps the canon hotel exclusion via the room-side hotel
- *     gate at 3★+.
+ *     gate at 4★+.
  *   - Ghost guard: an origin bulldozed mid-meal does not corrupt the census.
  *   - SAVE_VERSION is 4 and a v3 save migrates cleanly.
  */

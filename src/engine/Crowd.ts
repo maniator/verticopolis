@@ -314,7 +314,7 @@ export class Crowd {
    * double-count against {@link Tower.totalPopulation}, which already counts the
    * origin unit's static residents. `opts.excludeHotelOrigin` drops hotel-origin
    * customers so the star census can keep the canon "hotel guests stop counting
-   * at 3 stars" rule.
+   * at 4 stars" rule.
    */
   mealAssociatedPopulation(tower: Tower, opts?: { excludeHotelOrigin?: boolean }): number {
     return tower.associatedPopulation(opts);

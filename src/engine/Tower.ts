@@ -1315,7 +1315,7 @@ export class Tower {
    * here (single source of truth); {@link Crowd.mealAssociatedPopulation} is the
    * meal-domain seam that delegates to it. `opts.excludeHotelOrigin` drops
    * customers whose origin is a hotel room, so the star census can hold the canon
-   * "hotel guests stop counting at 3 stars" rule for meal customers too.
+   * "hotel guests stop counting at 4 stars" rule for meal customers too.
    */
   associatedPopulation(opts?: { excludeHotelOrigin?: boolean }): number {
     const excludeHotel = opts?.excludeHotelOrigin ?? false;
