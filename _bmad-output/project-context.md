@@ -51,8 +51,8 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 ## Canon rules that are easy to get wrong
 - **Star ladder** (population + gates): 2★ 300 · 3★ 1,000 (Security) · 4★ 5,000
   (Medical + Recycling + >1 Suite + a favorable VIP) · 5★ 10,000 (Metro). **TOWER = 15,000.**
-- **Rating census** counts office workers + condo residents. **Hotel guests count only
-  while climbing to 3★, then drop out** (`ratingPopulation()`). Commercial visitors never count.
+- **Rating census** counts office workers + condo residents. **Hotel guests count
+  while climbing up through 4★, then drop out** (`ratingPopulation()`). Commercial visitors never count.
 - **Two-ride rule:** a trip uses at most **two** transport rides (one sky-lobby transfer);
   floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
 - **Parking** has a **Ramp** + **Spaces**; a space only functions when chained (contiguous

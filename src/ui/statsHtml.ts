@@ -22,9 +22,9 @@ export function buildStatsHtml(sim: Simulation): string {
   const recyclingCap = sim.recyclingCapacity();
   const recyclingShort = !sim.recyclingDemandMet();
   const stranded = sim.strandedFloors().length; // BFS-bearing
-  // Only when hotels have dropped out of the rating (3★+) and actually diverge.
+  // Only when hotels have dropped out of the rating (4★+) and actually diverge.
   const ratingRow =
-    s.star >= 3 && ratingPop < s.population
+    s.star >= 4 && ratingPop < s.population
       ? `<span class="k">Counts toward stars</span><span class="v">${fmt(ratingPop)}</span>`
       : "";
   return `<div class="stats-grid">
@@ -88,7 +88,7 @@ export function buildStatsHtml(sim: Simulation): string {
                 : ""
             }${
               ratingRow
-                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Hotel guests count toward your star rating only until 3★.</span>`
+                ? `<span class="k" style="color:var(--muted);grid-column:1/-1">Hotel guests count toward your star rating up through 4★; reaching 5★ needs that many permanent residents.</span>`
                 : ""
             }</div>`
           : ""

@@ -349,7 +349,7 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
 
 /**
  * Star-rating population thresholds — the canonical 1994 values
- * (300 / 1,000 / 5,000 / 10,000). Above 3★ the rating counts only non-hotel
+ * (300 / 1,000 / 5,000 / 10,000). Above 4★ the rating counts only non-hotel
  * occupants (offices/condos); the lot is the canon 375 tiles wide so a well-zoned
  * tower holds well over 15,000 of those, keeping the canonical 10,000 (5★) and
  * 15,000 (TOWER) genuinely reachable.
@@ -365,7 +365,7 @@ export const STAR_THRESHOLDS: Record<number, number> = {
 /**
  * Population needed for the final TOWER rating (above 5 stars). Same metric as
  * the 1994 original — a census of OCCUPANTS (office workers + condo residents;
- * hotel guests count only while climbing to 3★, then drop out per canon);
+ * hotel guests count while climbing up through 4★, then drop out per canon);
  * commercial/visitor traffic never counts. The canonical 15,000: the lot is the
  * canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches it
  * (with express + banded locals).

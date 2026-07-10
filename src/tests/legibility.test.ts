@@ -90,7 +90,7 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
 });
 
 describe("Legibility — rating & stats (Simulation)", () => {
-  it("hotelsCountTowardRating flips at 3★ and rating population diverges", () => {
+  it("hotelsCountTowardRating flips at 4★ and rating population diverges", () => {
     const sim = Simulation.newGame(6);
     sim.money = 1e12;
     layFull(sim, "lobby", 1);
@@ -99,12 +99,12 @@ describe("Legibility — rating & stats (Simulation)", () => {
       const r = sim.tower.place("hotelSingle", 2, x);
       if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
     }
-    sim.star = 1;
-    expect(sim.hotelsCountTowardRating()).toBe(true);
-    expect(sim.ratingPopulation()).toBe(sim.population); // hotels included below 3★
     sim.star = 3;
+    expect(sim.hotelsCountTowardRating()).toBe(true);
+    expect(sim.ratingPopulation()).toBe(sim.population); // hotels included below 4★
+    sim.star = 4;
     expect(sim.hotelsCountTowardRating()).toBe(false);
-    expect(sim.ratingPopulation()).toBeLessThan(sim.population); // hotels excluded at 3★+
+    expect(sim.ratingPopulation()).toBeLessThan(sim.population); // hotels excluded at 4★+
   });
 
   it("stats() exposes only the cheap parkingSpaces count (garage-less → 0)", () => {

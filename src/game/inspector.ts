@@ -104,11 +104,11 @@ export class InspectorController {
           : sim.floorReachable(u.floor)
             ? `<div style="color:var(--good)">Access: reachable (≤2 rides from the lobby).</div>`
             : `<div style="color:var(--bad)">Access: too far. 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`;
-      // Silent rule: hotel guests stop counting toward the star rating at 3★.
+      // Silent rule: hotel guests stop counting toward the star rating at 4★.
       const hotel = isHotelKind(u.kind)
         ? sim.hotelsCountTowardRating()
           ? `<div style="color:var(--good)">Counts toward next star: yes.</div>`
-          : `<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 3★ (they still earn income).</div>`
+          : `<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`
         : "";
       // Silent rule: a parking space only works when it chains to a ramp. Skip
       // the verdict while it's still building (or on fire) — "Status" covers that.

@@ -87,8 +87,8 @@ describe("Canon star ladder (FAQ)", () => {
   });
 });
 
-describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
-  it("hotel guests count for the rating below 3★ but not at/above it", () => {
+describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
+  it("hotel guests count for the rating below 4★ but not at/above it", () => {
     const sim = Simulation.newGame(3);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -98,10 +98,10 @@ describe("Hotel population counts only while climbing to 3★ (FAQ)", () => {
       const r = sim.tower.place("hotelSingle", 2, x);
       if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
     }
-    sim.star = 1;
-    expect(sim.ratingPopulation()).toBeGreaterThan(0); // hotels count toward 2★
     sim.star = 3;
-    expect(sim.ratingPopulation()).toBe(0); // hotels excluded once at 3★
+    expect(sim.ratingPopulation()).toBeGreaterThan(0); // hotels count while climbing to 4★
+    sim.star = 4;
+    expect(sim.ratingPopulation()).toBe(0); // hotels excluded once at 4★
   });
 });
 

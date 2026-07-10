@@ -17,7 +17,7 @@ describe("full playthrough → TOWER win", () => {
   it("the lot genuinely holds ≥15,000 rating occupants (balance guarantee)", () => {
     const sim = new Simulation(1);
     buildWinningTower(sim);
-    sim.evaluateStar(); // ≥3★ so ratingPopulation switches to the occupant census
+    sim.evaluateStar(); // ≥4★ so ratingPopulation switches to the occupant census
     expect(sim.ratingPopulation()).toBeGreaterThanOrEqual(TOWER_POPULATION);
   });
 

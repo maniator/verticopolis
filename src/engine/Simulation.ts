@@ -1902,12 +1902,15 @@ export class Simulation implements SimContext {
     }
   }
 
-  /** Population that counts toward the star/TOWER thresholds. Per the original,
-   * hotel guests count only while climbing to 3★; once the tower is 3★ they no
-   * longer count toward 4★/5★/TOWER (the displayed {@link population} still
-   * includes them). */
+  /** Population that counts toward the star/TOWER thresholds. Hotel rooms and
+   * suites count while climbing up through 4★; once the tower is 4★ they no
+   * longer count toward 5★/TOWER (the displayed {@link population} still
+   * includes them). Note: this keys off the CURRENT star, so a tower that clears
+   * every 4★ and 5★ gate in one {@link evaluateStar} tick can leap 3★→5★ with
+   * hotels still counted for that single promotion. This mirrors the pre-existing
+   * ratchet at the old 3★ seam and is an accepted corner, not a surprise. */
   ratingPopulation(): number {
-    if (this.star < 3) return this.tower.totalPopulation();
+    if (this.star < 4) return this.tower.totalPopulation();
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
@@ -1928,9 +1931,9 @@ export class Simulation implements SimContext {
     return this.crowd.spawnStaff(this.tower, from, to, destX, cleanUnitId);
   }
 
-  /** Whether hotel guests currently count toward the star rating (they stop at 3★). */
+  /** Whether hotel guests currently count toward the star rating (they stop at 4★). */
   hotelsCountTowardRating(): boolean {
-    return this.star < 3;
+    return this.star < 4;
   }
 
   /**
