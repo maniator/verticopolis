@@ -537,6 +537,9 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
       if (!underConstruction && (kind === "office" || kind === "condo") && t.status !== 0) {
         state = "occupied";
         everOccupied = true;
+        // Seed a live headcount from imported occupancy so imported towers don't
+        // render/behave as empty until the first hourly presence sync.
+        occupants = FACILITIES[kind].population;
       } else if (!underConstruction && isHotelKind(kind) && t.status !== 0) {
         if (t.status & HOTEL_INFESTED_FLAG) {
           state = "dirty";

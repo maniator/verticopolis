@@ -1493,7 +1493,12 @@ export class TowerEngine {
             : u.kind === "recycling"
               ? `:r${Math.round((this.d.recycleFill ?? 0) * 8)}`
               : "";
-        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${open}${lateNight}${dead}${liveBits}`;
+        // Include `outForMeal` in the cache key: pixelSprites reads visible
+        // occupants via `u.occupants - (u.outForMeal ?? 0)`, so the sprite must
+        // re-raster when the visible dip changes even though canonical
+        // `u.occupants` did not. Without this, an office bakes at t=0 with six
+        // workers and would keep rendering six through the whole meal peak.
+        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${open}${lateNight}${dead}${liveBits}`;
         const isDead = dead === "x";
         const rec = this.roomActors.get(u.id);
         const animated = u.state === "fire" || u.state === "construction";
