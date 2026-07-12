@@ -753,27 +753,21 @@ a.btn {
 }
 
 /* ---- Crash screen ----
-   The full-screen card shown when the GPU drops the WebGL context (see
-   src/ui/crashScreen.ts). Plain DOM over a scrim: the canvas is dead, so
-   everything here must render without it. */
-.crash-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.55);
-}
-.crash-overlay .crash-card {
+   The card shown when the GPU drops the WebGL context (see
+   src/ui/crashScreen.ts). A real dialog opened with showModal(), so it wins
+   the top layer even when another dialog was open at crash time; the canvas
+   is dead, so everything here must render without it. */
+.crash-card {
   max-width: 440px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.crash-overlay .crash-status {
+dialog.crash-card::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.crash-card .crash-status {
   min-height: 1.2em;
   color: var(--muted);
 }

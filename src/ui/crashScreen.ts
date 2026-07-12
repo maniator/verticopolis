@@ -10,8 +10,14 @@ import { routeExternalInWrapper } from "./externalLink";
  * dropped the WebGL context). It replaces the old silent autosave-and-reload:
  * the player learns what happened, can download a crash-report zip (crash
  * details plus their tower save), can open a prefilled bug report, and reloads
- * when THEY choose to. The card is plain DOM on purpose: the canvas is dead,
- * and everything here must work without it.
+ * when THEY choose to. Plain DOM on purpose: the canvas is dead, and
+ * everything here must work without it.
+ *
+ * It is a real dialog element opened with showModal(), not a z-indexed div:
+ * a crash can land while another dialog (help, stats, an emergency) is open,
+ * and only the top layer wins over an open dialog's backdrop. showModal also
+ * brings true modality: focus is trapped inside, the page behind goes inert,
+ * and assistive tech gets the alertdialog for free.
  */
 
 export interface CrashScreenOptions {
@@ -29,36 +35,33 @@ export interface CrashScreenOptions {
 }
 
 /** Idempotence guard: context loss can only fire once per engine, but a
- *  defensive second call must not stack a second card. */
-const CARD_ID = "crash-screen";
+ *  defensive second call must not stack a second card. main.ts's key handler
+ *  also checks this id to mute game shortcuts (undo could otherwise mutate
+ *  the sim behind the card, after the flush the card just described). */
+export const CRASH_SCREEN_ID = "crash-screen";
 
 export function showCrashScreen(opts: CrashScreenOptions): void {
-  if (document.getElementById(CARD_ID)) return;
+  if (document.getElementById(CRASH_SCREEN_ID)) return;
 
   const saveLine = opts.save.behindSplash
     ? "No game was in progress; your saved towers are untouched."
     : opts.save.flushed
       ? "Your tower was saved. Nothing is lost."
       : opts.save.storageBlame
-      ? "Your latest changes couldn't be saved: storage is full or blocked." +
-        (opts.save.hadPriorSave ? " Your last saved tower is safe." : "")
-      : "Your latest changes couldn't be saved: the save hit an unexpected error." +
-        (opts.save.hadPriorSave ? " Your last saved tower is safe." : "");
+        ? "Your latest changes couldn't be saved: storage is full or blocked." +
+          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "")
+        : "Your latest changes couldn't be saved: the save hit an unexpected error." +
+          (opts.save.hadPriorSave ? " Your last saved tower is safe." : "");
   const repeatLine = opts.crash.repeat
     ? `<p><b>This is the second crash in a row.</b> Closing other tabs or apps before reloading may help.</p>`
     : "";
 
-  const overlay = document.createElement("div");
-  overlay.id = CARD_ID; // idempotence handle only; styling hangs off the class
-  overlay.className = "crash-overlay";
-  overlay.setAttribute("role", "alertdialog");
-  overlay.setAttribute("aria-modal", "true");
-  overlay.setAttribute("aria-labelledby", "crash-screen-title");
-  // A fixed overlay above everything (styling in styles.css under
-  // "Crash screen"): the game underneath is frozen, the render clock stopped
-  // when the context died, so nothing behind needs to stay reachable.
-  overlay.innerHTML = `
-    <div class="win crash-card">
+  const dialog = document.createElement("dialog");
+  dialog.id = CRASH_SCREEN_ID;
+  dialog.className = "win crash-card";
+  dialog.setAttribute("role", "alertdialog");
+  dialog.setAttribute("aria-labelledby", "crash-screen-title");
+  dialog.innerHTML = `
       <h2 id="crash-screen-title" class="win-title">The game crashed</h2>
       <p>The graphics driver reset while the game was running. On phones and tablets this usually means the device ran out of graphics memory, often on a very large tower at the fastest speed.</p>
       <p>${escapeHtml(saveLine)}</p>
@@ -68,27 +71,42 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
       <div class="modal-actions">
         <button class="btn" data-act="download">Download crash report</button>
         <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href="${escapeHtml(bugReportUrl({ version: opts.version, crash: opts.crash }))}">Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
-        <button class="btn primary" data-act="reload">Reload game</button>
-      </div>
-    </div>`;
-  document.body.appendChild(overlay);
+        <button class="btn primary" data-act="reload" autofocus>Reload game</button>
+      </div>`;
+  document.body.appendChild(dialog);
+  // Escape must not dismiss the card: the game behind it cannot draw, so
+  // closing would strand the player on a dead canvas with no controls.
+  dialog.addEventListener("cancel", (e) => e.preventDefault());
+  try {
+    dialog.showModal();
+  } catch {
+    // A runtime without dialog support (or a dialog already-open edge) still
+    // gets the card: it renders as a plain block; the CSS keeps it visible.
+    dialog.setAttribute("open", "");
+  }
 
-  const status = overlay.querySelector<HTMLElement>(".crash-status")!;
-  const downloadBtn = overlay.querySelector<HTMLButtonElement>('[data-act="download"]')!;
+  const status = dialog.querySelector<HTMLElement>(".crash-status")!;
+  const downloadBtn = dialog.querySelector<HTMLButtonElement>('[data-act="download"]')!;
   downloadBtn.addEventListener("click", () => {
     // Disable while packing so a double-tap can't race two exports; re-enable
     // on failure so the player can retry.
     downloadBtn.disabled = true;
     status.textContent = "Packing crash report…";
     void (async () => {
-      const details = buildCrashDetails(opts.getSim(), opts.crash, {
+      // One sim capture per click: the JSON summary and the packed save must
+      // describe the same state even if the app swaps the instance meanwhile.
+      const sim = opts.getSim();
+      const details = buildCrashDetails(sim, opts.crash, {
         version: opts.version,
         speed: opts.speed,
         frameErrors: opts.frameErrors,
       });
-      const { filename, bytes } = await buildCrashReportZip(opts.getSim(), details);
+      const { filename, bytes } = await buildCrashReportZip(sim, details);
       await getPlatform().saveFile(filename, bytes, "application/zip");
-      status.textContent = "Crash report downloaded. Please attach the zip when you report the bug.";
+      // No "downloaded!" claim: a native wrapper's share sheet RESOLVES on
+      // cancel too (the platform contract), so like the export flow this
+      // points at the downloads folder instead of asserting success.
+      status.textContent = "Crash report ready. Check your downloads, then attach the zip to your bug report.";
       downloadBtn.disabled = false;
     })().catch((err) => {
       // Keep the diagnostic trail: this is the one feature whose whole point
@@ -99,11 +117,11 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
       downloadBtn.disabled = false;
     });
   });
-  overlay.querySelector<HTMLButtonElement>('[data-act="reload"]')!.addEventListener("click", () => opts.onReload());
+  dialog.querySelector<HTMLButtonElement>('[data-act="reload"]')!.addEventListener("click", () => opts.onReload());
   // Inside a native wrapper the bug-report link routes to the system browser
   // through the platform port (same treatment as the Help dialog's link).
-  routeExternalInWrapper(overlay.querySelector<HTMLAnchorElement>('[data-act="report"]')!);
-  // Move keyboard/screen-reader focus into the dialog (the canvas underneath
-  // is dead); the primary action is the safe default.
-  overlay.querySelector<HTMLButtonElement>('[data-act="reload"]')!.focus();
+  routeExternalInWrapper(dialog.querySelector<HTMLAnchorElement>('[data-act="report"]')!);
+  // showModal honors the autofocus above; the explicit call covers the
+  // no-dialog-support fallback so focus still lands in the card.
+  dialog.querySelector<HTMLButtonElement>('[data-act="reload"]')!.focus();
 }

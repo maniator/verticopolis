@@ -26,7 +26,7 @@ import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { resolveBootScreen } from "./bootScreen";
-import { showCrashScreen } from "./ui/crashScreen";
+import { CRASH_SCREEN_ID, showCrashScreen } from "./ui/crashScreen";
 import type { FrameErrorEntry } from "./game/crashReport";
 
 /** Game speeds → in-game minutes advanced per real second. */
@@ -36,8 +36,9 @@ const SPEEDS = [0, 10, 30, 120];
  *  fastest speed (120 min/s) a device that can't simulate that fast in real
  *  time accrues debt every frame; without a cap each frame does more work than
  *  the last until frames run seconds long (see the clamp in update()). 30
- *  minutes is a generous two-plus frames of fastest-speed debt at 60fps yet
- *  keeps the largest single frame's sim work bounded near two tick chunks. */
+ *  minutes is 15 ideal frames of fastest-speed debt (2 sim-minutes per 60fps
+ *  frame), generous headroom for hitches, while keeping the largest single
+ *  frame's sim work bounded near two 20-minute tick chunks. */
 const MAX_CATCHUP_MINUTES = 30;
 
 /** Ring-buffer depth for tick-guard failures included in a crash report. */
@@ -731,6 +732,12 @@ class GameApp {
 
   private bindKeys(): void {
     window.addEventListener("keydown", (e) => {
+      // The crash screen owns all input while it is up: the renderer is dead
+      // and the tower was just flushed, so game shortcuts (undo especially)
+      // must not silently mutate the sim behind the card. Checked before the
+      // undo/redo block below, which deliberately runs ahead of the #modal
+      // guard and would otherwise stay live.
+      if (document.getElementById(CRASH_SCREEN_ID)) return;
       // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y) — handled BEFORE the
       // modifier bail below so it isn't swallowed; skipped while typing in a field
       // (which keeps its own edit history, e.g. the rename box).

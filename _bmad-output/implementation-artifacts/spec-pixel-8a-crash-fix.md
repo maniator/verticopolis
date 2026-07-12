@@ -2,7 +2,7 @@
 title: 'Pixel 8a fast-speed crash: tile batching, catch-up clamp, crash-report screen'
 type: 'bugfix'
 created: '2026-07-12'
-status: 'in-review'
+status: 'done'
 baseline_commit: '3afeb401aed443cb655a0d26f11d2acd2a985863'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/investigations/pixel-8a-fast-speed-crash-investigation.md'
