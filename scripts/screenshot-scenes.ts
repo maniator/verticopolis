@@ -284,6 +284,52 @@ export const SCENES: Scene[] = [
     assertUnits: 40,
     shots: [{ name: "14-fire", clock: 14, frame: { floor: 5, zoom: 1.2 }, wait: 700 }],
   },
+  // --- Crash screen: the context-loss card (crash report + bug report) --------
+  {
+    id: "crash-screen",
+    outDir: "features",
+    viewport: PHONE,
+    build: buildCanonTower,
+    assertUnits: 200,
+    shots: [
+      {
+        name: "crash-screen",
+        // The card IS the subject: without this, pgClearTransients would close
+        // it before the capture (the sweep clicks close/decline buttons and
+        // calls HTMLDialogElement.close() on whatever dialog is open).
+        keepDialogs: true,
+        clock: 12,
+        setup: async (page) => {
+          // Fire the same hook the engine raises when the GPU drops the WebGL
+          // context; the recovery flow flushes the autosave and opens the card.
+          // Both links are asserted with messages that name the real problem
+          // (the hook is nullable on TowerEngine, and a silently skipped clock
+          // stop would leave the backdrop advancing between runs).
+          await page.evaluate(() => {
+            const engine = (window as any).game?.engine;
+            if (typeof engine?.onContextLost !== "function") {
+              throw new Error("game.engine.onContextLost is not wired; the crash-screen scene needs the recovery hook");
+            }
+            // Match the real context-loss path: TowerEngine.handleContextLost
+            // stops the Excalibur clock BEFORE raising the hook, so the frame
+            // under the card is frozen exactly as in a real crash.
+            const clock = engine.engine?.clock;
+            if (typeof clock?.stop !== "function") {
+              throw new Error("game.engine.engine.clock is unavailable; the crash-screen scene needs to freeze the frame");
+            }
+            clock.stop();
+            engine.onContextLost();
+          });
+          // Fail the shot (keep the committed image) if the card never mounts.
+          await page.waitForSelector("dialog#crash-screen[open]", { timeout: 4000 });
+        },
+        // Capture exactly at the verified state: a 0ms settle steps zero
+        // frames, so nothing advances behind the frozen card (after a real
+        // context loss no further frames run either).
+        wait: 0,
+      },
+    ],
+  },
   // --- Mobile: built tower, stats drawer, palette -----------------------------
   {
     id: "mobile",

@@ -84,3 +84,13 @@ reflow skipped ("before") and once applied ("after"), so the change is honest.
 | `parity-migration-after.png` | The same tower **migrated** to canon 1994 segment widths. Deliberately near-identical at full zoom: the reflow is minimum-disruption by design (rooms hold their anchors; only widths change). |
 | `parity-migration-parking-before.png` | Basement parking pre-migration: narrow 6-wide ramps (short diagonals) and 6-wide spaces. |
 | `parity-migration-parking-after.png` | Basement parking after canon widths: ramps widen 6→16 (the long diagonals now span each level) and spaces narrow 6→4, the whole basement reflowed. This is the clearest read on the change, and where the initiative started ("why does each parking spot only add one spot?"). |
+
+## Crash screen (context-loss recovery with a crash report)
+
+Captured from the built app via the unified generator (entrypoint `scripts/screenshots.ts`; the
+`crash-screen` scene is defined in `scripts/screenshot-scenes.ts`) on a phone-sized viewport: a full canon
+tower running, then the same hook the engine raises when the GPU drops the WebGL context.
+
+| Screenshot | Shows |
+|---|---|
+| `crash-screen.png` | The crash card that replaced the silent auto-reload (v1.20.0): what happened, the save status, **Download crash report** (a zip with the crash details and the tower save), **Report a bug** (prefilled GitHub issue form), and **Reload game**. |
