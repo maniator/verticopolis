@@ -989,10 +989,14 @@ export class Simulation implements SimContext {
           u.occupants = u.state === "asleep" ? f.population : 0;
           break;
         default:
-          // Commercial venues (fastFood, restaurant, shop) show their ambient
-          // crowd only while open for business; a tenanted but closed venue
-          // shows zero so the heatmap and lit-window sprite go dark after
-          // closing time, matching player expectations.
+          // Every kind without its own case above takes this open-hours gate.
+          // It only changes behavior for commercial venues (fastFood,
+          // restaurant, shop): they show their ambient crowd only while open,
+          // so a tenanted but closed venue reads zero and the heatmap and
+          // lit-window sprite go dark after closing time. The other
+          // default-branch kinds are unaffected: cinema and partyHall have
+          // population 0 (occupants is 0 either way) and kinds without
+          // business hours pass isOpenAt unconditionally.
           u.occupants =
             u.state === "occupied" && isOpenAt(u.kind, this.clock.hour)
               ? f.population
@@ -1982,7 +1986,13 @@ export class Simulation implements SimContext {
         // censusCount: commercial units contribute their live customer tally
         // (cinema excluded via population = 0), everyone else residentCount.
         pop += censusCount(u);
-        if (isCommercialKind(u.kind)) pop -= Math.min(u.hotelCustomersIn ?? 0, u.customersIn ?? 0);
+        // The subtraction mirrors censusCount's gate exactly, population > 0
+        // included: a commercial kind censusCount skips (cinema) must not have
+        // forged or future customer counters subtracted from a tally that
+        // never added them.
+        if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
+          pop -= Math.min(u.hotelCustomersIn ?? 0, u.customersIn ?? 0);
+        }
       }
     }
     return pop;

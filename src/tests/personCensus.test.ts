@@ -349,6 +349,22 @@ describe("hotel-origin venue customers stay out of the 4-star-plus census", () =
     expect(sim.ratingPopulation()).toBe(12); // 6 office + 6 non-hotel customers
   });
 
+  it("forged counters on a population-0 commercial kind (cinema) never subtract", () => {
+    // censusCount skips cinema (population 0), so its customersIn is never
+    // added to the census. The hotel-origin subtraction must mirror that gate:
+    // forged or future counters on a cinema must not be subtracted from a
+    // tally that never added them.
+    const sim = officeAndFastFood();
+    sim.star = 4;
+    const cinema = sim.tower.place("cinema", 3, 0);
+    const cinemaUnit = sim.tower.units.find((u) => u.id === cinema.unitId)!;
+    cinemaUnit.state = "occupied";
+    const base = sim.ratingPopulation();
+    cinemaUnit.customersIn = 50;
+    cinemaUnit.hotelCustomersIn = 50;
+    expect(sim.ratingPopulation()).toBe(base);
+  });
+
   it("a breakfast hotel guest is counted at the venue AND flagged as hotel-origin", () => {
     const sim = new Simulation(2024, "modern", "realWorld");
     sim.money = 1_000_000;
