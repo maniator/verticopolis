@@ -428,9 +428,18 @@ export class TowerEngine {
       this.vipStart = null;
     }
   }
-  /** Wall-clock-derived animation time that only advances while unpaused. */
+  /** Frame-clock-derived animation time that only advances while unpaused. */
   private animClock = 0;
-  private lastAnimWall = 0;
+  /** Reset the decorative animation clock to zero. Used by the screenshot
+   *  generator right after it swaps in a manually stepped clock, so the
+   *  decorations start from a known phase (the pre-swap boot accumulated a
+   *  wall-time-dependent amount) and every capture is reproducible. */
+  resetDecorativeClock(): void {
+    this.animClock = 0;
+    // Also zero the published value the sprites read, so the reset is effective
+    // immediately even if a capture happens before the next tick() copies it.
+    this.d.anim = 0;
+  }
 
   // Individually-routed commuters (SimTower's signature) are owned and advanced
   // by the engine; the renderer only draws each person and removes them as they
@@ -769,18 +778,23 @@ export class TowerEngine {
     else this.center();
   }
 
-  private tick(elapsed: number): void {
+  private tick(elapsedMs: number): void {
     const c = this.sim.clock;
-    // Advance the decorative animation clock by real elapsed time, but only
-    // while the game is running — paused (speed 0) freezes the walkers, train
-    // and street just like the simulated crowd and elevators.
-    const nowWall = (globalThis.performance ? performance.now() : 0) / 1000;
-    if (this.lastAnimWall === 0) this.lastAnimWall = nowWall;
+    // Advance the decorative animation clock by the frame's elapsed time, but
+    // only while the game is running: paused (speed 0) freezes the walkers,
+    // train and street just like the simulated crowd and elevators. `elapsedMs`
+    // comes from the engine clock, not wall time, so a manually stepped clock
+    // (the screenshot generator swaps in Excalibur's TestClock) advances the
+    // decorations deterministically; under the standard clock it is the real
+    // per-frame delta, so live play is effectively unchanged. The one visible
+    // difference from the old performance.now() delta: Excalibur clamps a frame
+    // longer than 200ms (a tab switch or stall) to 1ms, so the decorations
+    // resume from where they froze instead of jumping ahead. That is a slight
+    // improvement, and it never affects a screenshot (the clock is stepped).
     // Freeze the decorative clock when paused OR reduced-motion is on; functional
     // motion (cars, routed crowd) advances from sim state, not this clock.
     const animating = !this.paused && !this.reducedMotion;
-    if (animating) this.animClock += nowWall - this.lastAnimWall;
-    this.lastAnimWall = nowWall;
+    if (animating) this.animClock += elapsedMs / 1000;
     this.d.anim = this.animClock;
     this.syncEventFx(animating);
     this.d.hour = c.hour;
@@ -794,7 +808,7 @@ export class TowerEngine {
     if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
     this.engine.backgroundColor = ex.Color.fromHex(skyColor(c.hour));
-    if (this.onUpdate) this.onUpdate(elapsed);
+    if (this.onUpdate) this.onUpdate(elapsedMs);
 
     // Reconcile room/structure actors when the model, lighting, the hour, or a
     // meal-overlay repaint trigger changes. The overlay path keeps visible

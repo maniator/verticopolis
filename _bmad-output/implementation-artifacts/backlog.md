@@ -118,6 +118,11 @@ How items flow:
   huge towers on phones. See
   investigations/pixel-8a-fast-speed-crash-investigation.md.
 
+### Deferred from: code review of screenshot-determinism (`/gds-code-review`, 2026-07-12)
+
+- **`pgRefreshUi` depends on the ~160ms UI throttle living in the caller (`main.ts` `update()`), not inside `ui.update()`.** The screenshot runner repaints throttled DOM chrome before capture by calling `ui.update()` / `updateTraffic()` directly, which works only because the `performance.now()`-based throttle guard sits in `GameApp.update`, not in `UI.update`. If that throttle ever moves into `UI.update` (or becomes `performance.now`-based inside it), the direct call would be silently swallowed under stepped frames (a few wall-clock ms), capturing stale chrome with no error. Follow-up if it ever bites: expose an unthrottled `UI.forceUpdate()` entry point for the generator. (Low; fragile invariant, not a live bug.)
+- **Scene builders and `assertReady` run against the already-adopted (frozen) clock.** `pgAdoptTestClock` precedes `pgDismissSplash`, `scene.build`, and `assertReady` in `runScene`, and no frames step until the first `settle()`. Every current builder mutates the sim synchronously (places units, `setSim`) and `assertReady` reads synchronous sim state, so this is a non-issue today. But a future builder that needs an engine tick to materialize something would spin to the `waitForFunction` timeout instead of passing as it would under the live clock. Latent constraint to remember when adding scenes. (Low; no current scene affected.)
+
 ### Deferred from: code review of spec-stranded-floor-move-ins (2026-07-12)
 
 - Stranded-floor advisory latch is a single tower-wide boolean (`Simulation.strandedNudged`): while any stranded floor persists, a different floor going stranded on a later day emits no new advisory. Widened surface since the latch is now held by the `rentable` scope while the stats modal lists only `leased` floors, so an all-empty stranded slab (invisible in the modal) can consume the one-shot nudge a later leased-and-stranded floor would otherwise get. Consider a per-floor or count-based latch.
