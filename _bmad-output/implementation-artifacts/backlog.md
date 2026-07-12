@@ -126,6 +126,8 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of PR #184 commercial census takeover (`/gds-code-review` + party, 2026-07-12)
 
+- **Congestion-overlay meal invalidation lacks a direct test (Edge, layouts round).** `drawStatsMap` now invalidates on `mealOverlayRevision` for the congestion mode, but no test drives the private render path across a revision bump; `towerEngineMealOverlay.test.ts` covers the sync trigger only. Add one if a TowerEngine test harness ever exists. (Low, coverage.)
+
 - **Closed shutter hides the variety (Blind, visuals round).** `closedShutter` draws a uniform shutter regardless of subtype, so a variety reroll is invisible on a closed venue despite the bake-sig repaint. Acceptable (closed venues reading uniform matches the 1994 feel); revisit only if players report confusion, e.g. tint the shutter with the variety's awning accent. (Low.)
 - **Over-capacity arrivals eat uncounted (Edge, visuals round, documented by design).** `customersIn` counts arrived eaters only, so several people can be en route to a venue with one free seat; the extras eat visibly at the venue but never enter the census. Bounded and balanced; the "up to N" cap is on the census, not bodies in the room. Revisit with per-person round-trips if seat reservations ever matter. (Info.)
 

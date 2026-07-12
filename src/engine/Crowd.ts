@@ -1237,8 +1237,9 @@ export class Crowd {
       const venue = tower.getUnit(p.venueUnitId);
       if (venue && (venue.customersIn ?? 0) > 0) {
         venue.customersIn = (venue.customersIn ?? 0) - 1;
-        // Mirror the hotel-origin split taken at eating entry (the flag, not
-        // a fresh origin lookup, so a mid-meal bulldoze cannot unbalance it).
+        // Mirror the hotel-origin split taken at eating entry (via the flag
+        // rather than a fresh origin lookup, so a mid-meal bulldoze cannot
+        // unbalance it).
         if (p.countedHotelGuest && (venue.hotelCustomersIn ?? 0) > 0) {
           venue.hotelCustomersIn = (venue.hotelCustomersIn ?? 0) - 1;
         }

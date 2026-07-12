@@ -55,21 +55,24 @@ function hash(seed: number): number {
 // not a variant. State cues never vary. Hotels are the deliberate exception:
 // real hotel rooms are uniform, so they take linen wall tints and a bed
 // mirror only, and their whole job stays broadcasting ready/asleep/dirty. The
-// seed is GEOGRAPHY, not unit id: TDT import renumbers every id, but a room's
+// seed is GEOGRAPHY rather than unit id: TDT import renumbers every id, but a room's
 // (floor, x) footprint survives save, load, export, and import, so the same
 // spot always wears the same look ("your mauve corner office on 40 stays
 // mauve"). Matches the lobbyVariant(x) precedent. Anchors are listed twice in
-// each table so the classic look stays the most common: seasoning, not
-// patchwork. Hue varies, luminance holds (roughly +/-10 per channel around
+// each table so the classic look stays the most common (seasoning rather
+// than patchwork). Hue varies, luminance holds (roughly +/-10 per channel around
 // each anchor) so the night scrim, heatmap tints, and lit/dark reads never
 // grow ambiguous, and no variety color enters the reserved state palette
 // (vacancy grays, notice amber, dirty tray, ready lamp, stress red).
 
-/** Deterministic per-room pick: geography + axis -> [0, n). Pure function of
- *  immutable unit fields, so it needs no bake-signature bit and never touches
- *  the sim RNG stream. */
-function geoVariant(u: Pick<Unit, "floor" | "x">, axis: number, n: number): number {
-  return Math.floor(hash((u.floor - GRID.minFloor) * GRID.width + u.x + axis * 104729) * n);
+/** Deterministic per-room pick: kind + geography + axis -> [0, n). Pure
+ *  function of immutable unit fields, so it needs no bake-signature bit and
+ *  never touches the sim RNG stream. The kind salt (ratified formula) keeps a
+ *  bulldoze-and-rebuild of a different kind at the same footprint from
+ *  inheriting correlated picks. */
+function geoVariant(u: Pick<Unit, "kind" | "floor" | "x">, axis: number, n: number): number {
+  const kindSalt = (u.kind.length * 7919 + u.kind.charCodeAt(0) * 31) | 0;
+  return Math.floor(hash(kindSalt + (u.floor - GRID.minFloor) * GRID.width + u.x + axis * 104729) * n);
 }
 
 /** Run `draw` mirrored horizontally inside the room rect when `flip` is set:
@@ -430,7 +433,7 @@ function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number)
       ctx.fillStyle = "#8C5A3A";
       ctx.fillRect(x + 30, floorY - 5, 3, 3);
       const sideStart = x + 40;
-      for (let i = 0; i < 2; i++) {
+      for (let i = 0; i < 3; i++) {
         const dx = sideStart + i * 22;
         if (dx + 15 > x + w - 4) break;
         ctx.fillStyle = PAL.wood;
@@ -518,7 +521,7 @@ function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number):
       ctx.fillRect(tx + 5, floorY - 7, 4, 1);
       if (home) {
         person(ctx, tx - 4, floorY, 1.4, (u.id * 5) | 0, true);
-        person(ctx, tx + 14, floorY, 1.4, (u.id * 5 + 11) | 0, true);
+        if (visibleOccupants(u) > 1) person(ctx, tx + 14, floorY, 1.4, (u.id * 5 + 11) | 0, true);
       }
       lamp(x + w - 10);
     } else if (layout === 4) {
@@ -648,22 +651,25 @@ function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, 
       ctx.fillRect(x + sofaW + 6, floorY - 14, 6, 3);
     }
     beds.forEach((b, i) => bed(b.bx, b.bw, b.pillows, i));
-    ctx.fillStyle = grade === 2 ? "#6A4A30" : "#6A4A30"; // nightstand
-    ctx.fillRect(x + w - 6, floorY - 6, 4, 6);
     if (grade === 2) {
-      // Shared nightstand between the two beds as well.
+      // Shared nightstand between the two beds.
       const gapX = beds[0].bx + beds[0].bw + 2;
       ctx.fillStyle = "#6A4A30";
       ctx.fillRect(gapX, floorY - 5, 4, 5);
     }
-    if (!asleep && dirty) {
-      ctx.fillStyle = "#D4623A"; // housekeeping tray by the nightstand
-      ctx.fillRect(x + w - 6, floorY - 9, 4, 3);
-    } else if (lit && !dirty) {
-      ctx.fillStyle = "#FFD86A"; // ready: lamp on
-      ctx.fillRect(x + w - 5, floorY - 11, 2, 5);
-    }
   });
+  // State cues and their nightstand anchor draw OUTSIDE the mirror so they
+  // render pixel-identical on flipped rooms (Sally's rule: variation never
+  // touches a state cue). asleep/dirty are exclusive unit states.
+  ctx.fillStyle = "#6A4A30"; // nightstand
+  ctx.fillRect(x + w - 6, floorY - 6, 4, 6);
+  if (dirty) {
+    ctx.fillStyle = "#D4623A"; // housekeeping tray by the nightstand
+    ctx.fillRect(x + w - 6, floorY - 9, 4, 3);
+  } else if (lit) {
+    ctx.fillStyle = "#FFD86A"; // ready: lamp on
+    ctx.fillRect(x + w - 5, floorY - 11, 2, 5);
+  }
   if (asleep) {
     // The "z" is text, so it draws OUTSIDE the mirror wrapper at a computed
     // position (mirrored text would render backward), floating over the first

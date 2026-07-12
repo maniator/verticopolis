@@ -321,8 +321,8 @@ describe("retail subtype looks paint distinctly (drawRoom)", () => {
   // Draw each canon variant through the REAL drawRoom path at an open hour and
   // compare full paint logs: the variety system's contract is that every
   // variant of a kind paints differently (colors or geometry), while the kind
-  // silhouette survives. Also exercises every fixture/goods/emblem branch so
-  // the coverage gate keeps guarding this file.
+  // anchor shape survives. Also exercises every fixture and interior branch
+  // so the coverage gate keeps guarding this file.
   const cases: Array<[Unit["kind"], readonly string[], number]> = [
     ["fastFood", FASTFOOD_SUBTYPES, 12],
     ["restaurant", RESTAURANT_SUBTYPES, 19],

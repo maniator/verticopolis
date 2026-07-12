@@ -1117,8 +1117,8 @@ export class TowerEngine {
     // congestion overlay must also invalidate on the meal-overlay revision or
     // its cells and peak legend trail the traffic chip by up to an hour during
     // a meal window. The other overlay modes stay hour-and-structure keyed.
-    // Two numeric fields, not a composite string: this runs every frame while
-    // an overlay is open, and per-frame string building is avoidable GC churn.
+    // Two numeric fields instead of a composite string: this runs every frame
+    // while an overlay is open, and per-frame string building is GC churn.
     const towerRev = this.sim.tower.revision;
     const mealRev = this.overlayMode === "congestion" ? this.sim.tower.mealOverlayRevision : 0;
     if (
