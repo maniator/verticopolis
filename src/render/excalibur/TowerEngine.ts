@@ -563,6 +563,13 @@ export class TowerEngine {
   private pointerDown(ev: ex.PointerEvent): void {
     const contact = this.tracker.down(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
     if (contact === "pinch-start") {
+      // A live extend-arrow drag must end here: pointerMove checks arrowDrag
+      // right after the pinch branch, so a stale one would resume (with a
+      // positional jump) the moment the pinch hands off to a pan.
+      if (this.arrowDrag) {
+        this.onExtendEnd?.();
+        this.arrowDrag = null;
+      }
       this.gesture = null;
       this.preview = null;
       this.transportPreview = null;
@@ -608,7 +615,7 @@ export class TowerEngine {
     if (this.tracker.pinching) {
       if (mv) {
         // Two fingers translate the camera by their midpoint delta (pan) AND
-        // scale by their distance ratio (zoom) — the standard map gesture.
+        // scale by their distance ratio (zoom): the standard map gesture.
         this.pan(mv.panDx, mv.panDy);
         if (mv.zoom !== 1) this.zoomAt(mv.zoom, mv.cx, mv.cy);
       }
@@ -685,6 +692,12 @@ export class TowerEngine {
   setSim(sim: Simulation): void {
     this.disposeScene();
     this.clearCrowd();
+    // Full input reset: a tower swap (new game / load) must not inherit a
+    // half-finished gesture, and dropping any tracked contacts here is the
+    // recovery path if a browser ever swallows a pointer's up/cancel.
+    this.tracker.reset();
+    this.gesture = null;
+    this.arrowDrag = null;
     // Drop any in-flight event visuals and adopt the new sim's fx baselines, so
     // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.
     this.santaStart = null;

@@ -20,22 +20,25 @@ class ExcaliburIdNormalizer {
   }
 }
 
-describe("stablePointerId — prefer the native DOM pointerId", () => {
+describe("stablePointerId: prefer the native DOM pointerId", () => {
   it("uses the native event's pointerId when present and finite", () => {
     expect(stablePointerId(0, { pointerId: 17 })).toBe(17);
     expect(stablePointerId(3, { pointerId: 0 })).toBe(0);
   });
 
-  it("falls back to the engine id when the native event lacks a usable id", () => {
-    expect(stablePointerId(2, undefined)).toBe(2);
-    expect(stablePointerId(2, null)).toBe(2);
-    expect(stablePointerId(2, {})).toBe(2); // e.g. a legacy TouchEvent
-    expect(stablePointerId(2, { pointerId: "7" })).toBe(2);
-    expect(stablePointerId(2, { pointerId: NaN })).toBe(2);
+  it("falls back to the engine id, mapped into a disjoint negative key space", () => {
+    expect(stablePointerId(2, undefined)).toBe(-3);
+    expect(stablePointerId(2, null)).toBe(-3);
+    expect(stablePointerId(2, {})).toBe(-3); // e.g. a legacy TouchEvent
+    expect(stablePointerId(2, { pointerId: "7" })).toBe(-3);
+    expect(stablePointerId(2, { pointerId: NaN })).toBe(-3);
+    // The fallback can never collide with a real native id (non-negative),
+    // so a fallback-tracked contact cannot overwrite a native-tracked one.
+    expect(stablePointerId(0, undefined)).toBe(-1);
   });
 });
 
-describe("PinchTracker — contact lifecycle", () => {
+describe("PinchTracker: contact lifecycle", () => {
   it("classifies first contact single, second pinch-start, third pinch-extra", () => {
     const t = new PinchTracker();
     expect(t.down(10, 0, 0)).toBe("single");
@@ -46,7 +49,7 @@ describe("PinchTracker — contact lifecycle", () => {
   });
 
   it("ends empty after the reshuffle-prone sequence when keyed by STABLE ids", () => {
-    // Pinch with native ids 10 then 11; lift 10 (the lower id) FIRST — the
+    // Pinch with native ids 10 then 11; lift 10 (the lower id) FIRST, the
     // exact order that used to strand a phantom under Excalibur's renumbering.
     const t = new PinchTracker();
     t.down(10, 0, 0);
@@ -93,7 +96,7 @@ describe("PinchTracker — contact lifecycle", () => {
   });
 });
 
-describe("PinchTracker — pinch camera math", () => {
+describe("PinchTracker: pinch camera math", () => {
   it("returns midpoint pan deltas and the finger-distance zoom ratio", () => {
     const t = new PinchTracker();
     t.down(1, 0, 0);
@@ -139,7 +142,7 @@ describe("PinchTracker — pinch camera math", () => {
   });
 });
 
-describe("PinchTracker — three-finger hygiene", () => {
+describe("PinchTracker: three-finger hygiene", () => {
   it("re-baselines when a pinch continues on the remaining two contacts", () => {
     const t = new PinchTracker();
     t.down(1, 0, 0);
@@ -149,7 +152,7 @@ describe("PinchTracker — three-finger hygiene", () => {
     expect(r).toEqual({ pinch: "continues" });
     expect(t.pinching).toBe(true);
     // First move after the hand-over must measure from the NEW pair's
-    // baseline (dist ~223.6, midpoint (50, 100)) — a zero-delta move proves
+    // baseline (dist ~223.6, midpoint (50, 100)): a zero-delta move proves
     // there is no jump from the lifted finger's stale baseline.
     const mv = t.move(2, 100, 0)!;
     expect(mv).toEqual({ panDx: 0, panDy: 0, zoom: 1, cx: 50, cy: 100 });
@@ -163,6 +166,19 @@ describe("PinchTracker — three-finger hygiene", () => {
     expect(t.down(3, 40, 90)).toBe("pinch-extra");
     const mv = t.move(1, 0, 0)!; // no finger actually moved
     expect(mv).toEqual({ panDx: 0, panDy: 0, zoom: 1, cx: 60, cy: 0 });
+  });
+
+  it("a mid-pinch CANCEL of one finger routes through up() and hands off the survivor", () => {
+    // The engine binds Excalibur's "cancel" event to the same pointerUp
+    // handler as "up" (browsers cancel a contact when they take the gesture:
+    // notification shade, app switch). At the tracker level cancel IS up.
+    const t = new PinchTracker();
+    t.down(1, 0, 0);
+    t.down(2, 100, 40);
+    const cancelled = t.up(1); // pointercancel for finger 1
+    expect(cancelled).toEqual({ pinch: "ended", survivor: { x: 100, y: 40 } });
+    expect(t.up(2)).toEqual({ pinch: "none" }); // then finger 2 cancels too
+    expect(t.size).toBe(0); // no phantom left behind by the cancels
   });
 
   it("reset drops all contacts and any live pinch", () => {

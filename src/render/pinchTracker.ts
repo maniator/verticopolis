@@ -24,7 +24,11 @@ export function stablePointerId(engineId: number, nativeEvent: unknown): number 
     const id = (nativeEvent as { pointerId: unknown }).pointerId;
     if (typeof id === "number" && Number.isFinite(id)) return id;
   }
-  return engineId;
+  // Fallback ids live in a disjoint (negative) key space: native pointerIds
+  // are non-negative, so a contact tracked by a native id can never be
+  // overwritten by one tracked via the fallback (e.g. the legacy TouchEvent
+  // path), even if their raw numbers collide.
+  return -1 - engineId;
 }
 
 /** A screen-space contact position. */

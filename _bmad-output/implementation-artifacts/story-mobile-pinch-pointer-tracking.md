@@ -1,6 +1,6 @@
 # Story: Stable touch-pointer tracking (mobile pinch sticks, taps stop placing)
 
-Status: **ready-for-dev**
+Status: **done**
 
 <!-- Created 2026-07-12 from the concluded investigation
      _bmad-output/implementation-artifacts/investigations/mobile-zoom-placement-investigation.md.
@@ -25,10 +25,10 @@ so that **the camera never wedges into a broken zoom state and a valid (gold) pl
 
 ## Tasks / Subtasks
 
-- [ ] New pure module `src/game/pinchTracker.ts`: `stablePointerId(exId, nativeEvent)` + `PinchTracker` (contact map, pinch state, hand-off result). No Excalibur/DOM imports; shapes structural so tests stay headless. (AC: 1,2,3,4,6)
-- [ ] Delegate `TowerEngine.pointerDown/Move/Up` pointer bookkeeping to the tracker; key everything by `stablePointerId`; on pinch end with a survivor, seed `gesture = "pan"`, `lastSx/lastSy` from the survivor, poison `moved` so release cannot tap. (AC: 1,3,5)
-- [ ] Tests `src/tests/pinchTracker.test.ts` covering the AC 6 matrix, including a literal simulation of Excalibur's `_normalizePointerId` renumbering to prove the old keying leaks and the new one does not. (AC: 2,6)
-- [ ] Version bump 1.18.2 + gates + `/gds-code-review`. (AC: 7,8)
+- [x] New pure module `src/render/pinchTracker.ts` (placed beside `cameraBounds.ts`, the existing pure-split precedent, instead of `src/game/`; see Completion Notes): `stablePointerId(exId, nativeEvent)` + `PinchTracker` (contact map, pinch state, hand-off result). No Excalibur/DOM imports; shapes structural so tests stay headless. (AC: 1,2,3,4,6)
+- [x] Delegate `TowerEngine.pointerDown/Move/Up` pointer bookkeeping to the tracker; key everything by `stablePointerId`; on pinch end with a survivor, seed `gesture = "pan"`, `lastSx/lastSy` from the survivor, poison `moved` so release cannot tap. (AC: 1,3,5)
+- [x] Tests `src/tests/pinchTracker.test.ts` covering the AC 6 matrix, including a literal simulation of Excalibur's `_normalizePointerId` renumbering to prove the old keying leaks and the new one does not. (AC: 2,6)
+- [x] Version bump 1.18.2 + gates + `/gds-code-review`. (AC: 7,8)
 
 ## Dev Notes
 
@@ -108,7 +108,21 @@ claude-fable-5 (session 2026-07-12)
 ### Completion Notes List
 
 - 2026-07-12: Story created dev-ready from the concluded investigation.
+- 2026-07-12: Implemented. Two recorded deviations from the Dev Notes, both behavior-preserving:
+  the module landed in `src/render/pinchTracker.ts` (beside `cameraBounds.ts`, its named
+  precedent and its only consumer's layer) rather than `src/game/`; and a third finger
+  LANDING does not re-baseline the pinch (a mathematical no-op since positions only change
+  on `move`, and every `move` re-baselines), while lifts that keep 2+ contacts do re-baseline
+  as specified. Both covered by tests.
+- 2026-07-12: `/gds-code-review` findings applied on the branch: em-dash sweep of new
+  prose/comments, explicit mid-pinch cancel test, fallback ids mapped to a disjoint
+  negative key space, a live extend-arrow drag now terminates on pinch-start, and
+  `setSim` performs a full input reset (`tracker.reset()`, gesture, arrowDrag).
 
 ### File List
 
-_(pending implementation)_
+- `src/render/pinchTracker.ts` (new)
+- `src/tests/pinchTracker.test.ts` (new)
+- `src/render/excalibur/TowerEngine.ts` (pointer handlers delegate to the tracker)
+- `package.json` (1.18.1 to 1.18.2)
+- `_bmad-output/implementation-artifacts/investigations/mobile-zoom-placement-investigation.md` (case file)
