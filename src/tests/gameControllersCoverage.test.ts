@@ -577,7 +577,11 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   let sim: Simulation;
   let f: ReturnType<typeof fakes>;
   let adopted: Simulation[];
-  let bootMessages: { msg: string; withReload?: boolean }[];
+  let crashScreens: {
+    crash: { kind: string; repeat: boolean; saveFlushed: boolean };
+    save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
+    onReload: () => void;
+  }[];
   let armed: number;
   let saveLoad: SaveLoad;
 
@@ -588,7 +592,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     sim = new Simulation();
     f = fakes();
     adopted = [];
-    bootMessages = [];
+    crashScreens = [];
     armed = 0;
     saveLoad = new SaveLoad({
       getSim: () => sim,
@@ -596,7 +600,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
         adopted.push(s);
       },
       ui: f.ui,
-      showBootMessage: (msg, withReload) => bootMessages.push({ msg, withReload }),
+      showCrashScreen: (info) => crashScreens.push(info),
       armOnboarding: () => armed++,
     });
   });
@@ -795,58 +799,62 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts).text).toMatch(/All save slots are full/);
   });
 
-  it("first context loss: autosave written, reload stamped in sessionStorage, page reloaded", () => {
+  it("first context loss: autosave written, crash screen shown, nothing reloads until the player asks", () => {
     const reload = stubReload();
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed
+    expect(crashScreens).toHaveLength(1);
+    expect(crashScreens[0].crash).toEqual({ kind: "webgl-context-lost", repeat: false, saveFlushed: true });
+    expect(crashScreens[0].save).toEqual({ flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false });
+    // No silent auto-reload: the reload (and its session stamps) is the
+    // player's Reload button.
+    expect(reload).not.toHaveBeenCalled();
+    expect(sessionStorage.getItem("vc-gl-lost-reload")).toBeNull();
+    crashScreens[0].onReload();
     expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
     // The recovery resume flag is stamped so the fresh boot drops the player back
     // into their tower instead of showing the title screen (see resolveBootScreen).
     expect(Number(sessionStorage.getItem("vc-resume-after-recovery"))).toBeGreaterThan(0);
     expect(reload).toHaveBeenCalledTimes(1);
-    expect(bootMessages).toEqual([]); // no manual card on the first loss
   });
 
-  it("second loss within 90s falls back to the manual boot card — no reload loop", () => {
-    const reload = stubReload();
+  it("a second loss within 90s of the last recovery reload is flagged as a repeat", () => {
+    stubReload();
     sessionStorage.setItem("vc-gl-lost-reload", String(Date.now()));
     saveLoad.recoverFromContextLoss();
-    expect(reload).not.toHaveBeenCalled();
-    expect(bootMessages).toHaveLength(1);
-    expect(bootMessages[0].msg).toContain("crashed twice");
-    expect(bootMessages[0].withReload).toBe(true);
+    expect(crashScreens).toHaveLength(1);
+    expect(crashScreens[0].crash.repeat).toBe(true);
     expect(SaveGame.hasSave()).toBe(true); // the tower is still saved first
   });
 
-  it("a context loss whose save fails shows a card, keeps the prior tower, and does not reload", () => {
+  it("a context loss whose save fails says so on the screen, keeps the prior tower, and blames storage", () => {
     const reload = stubReload();
     // A prior autosave exists (the tower was flushed before the crash).
     sim.money = 555_000;
     SaveGame.save(sim);
-    // Now the GPU dies AND storage is full: the pre-reload flush throws. Left
-    // unhandled this would abort the reload and strand the player on a dead
-    // canvas — instead we want a card, and the prior tower must survive.
+    // Now the GPU dies AND storage is full: the pre-crash flush throws. Left
+    // unhandled this would escape the onContextLost handler and skip the crash
+    // screen — instead the screen must show, and the prior tower must survive.
     const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
       throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
     });
     saveLoad.recoverFromContextLoss();
     expect(spy).toHaveBeenCalledTimes(1);
-    expect(reload).not.toHaveBeenCalled(); // did not silently reload past unsaved work
-    expect(bootMessages).toHaveLength(1);
-    expect(bootMessages[0].withReload).toBe(true);
-    expect(bootMessages[0].msg).toContain("couldn't be saved");
-    // A prior autosave exists, so the card reassures the player it's safe (don't
-    // imply total loss and send them off to clear the very save that survived).
-    expect(bootMessages[0].msg).toContain("last saved tower is safe");
+    expect(reload).not.toHaveBeenCalled();
+    expect(crashScreens).toHaveLength(1);
+    // A prior autosave exists, so the screen reassures the player it's safe
+    // (don't imply total loss and send them off to clear the very save that
+    // survived).
+    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: true, hadPriorSave: true });
+    expect(crashScreens[0].crash.saveFlushed).toBe(false);
     // A failed setItem never clobbers — the prior tower is still loadable.
     expect(SaveGame.load()?.money).toBe(555_000);
     spy.mockRestore();
   });
 
-  it("a context-loss with storage fully disabled (save AND hasSave throw) still shows the card and does not re-abort the reload", () => {
-    const reload = stubReload();
+  it("a context-loss with storage fully disabled (save AND hasSave throw) still shows the screen", () => {
     // Storage disabled (SecurityError), not merely full: BOTH the write and the
-    // hasSave() read throw. The catch must not re-throw before showing the card.
+    // hasSave() read throw. The catch must not re-throw before the screen shows.
     const saveSpy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
       throw new DOMException("The operation is insecure.", "SecurityError");
     });
@@ -854,26 +862,22 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
       throw new DOMException("The operation is insecure.", "SecurityError");
     });
     expect(() => saveLoad.recoverFromContextLoss()).not.toThrow();
-    expect(reload).not.toHaveBeenCalled();
-    expect(bootMessages).toHaveLength(1);
-    expect(bootMessages[0].withReload).toBe(true);
-    expect(bootMessages[0].msg).not.toContain("last saved tower is safe");
+    expect(crashScreens).toHaveLength(1);
+    // Storage is unreadable, so no false "your last saved tower is safe" claim.
+    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: true, hadPriorSave: false });
     saveSpy.mockRestore();
     hasSaveSpy.mockRestore();
   });
 
-  it("a first-session context-loss save failure (no prior save) shows the card without a false safety claim", () => {
-    const reload = stubReload();
+  it("a first-session context-loss save failure (no prior save) makes no false safety claim", () => {
     // No prior autosave (crash before the 30s timer fired) AND storage is full.
     const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
       throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
     });
     saveLoad.recoverFromContextLoss();
-    expect(reload).not.toHaveBeenCalled();
-    expect(bootMessages).toHaveLength(1);
-    expect(bootMessages[0].withReload).toBe(true);
+    expect(crashScreens).toHaveLength(1);
     // Must NOT claim a saved tower is safe when there is none.
-    expect(bootMessages[0].msg).not.toContain("last saved tower is safe");
+    expect(crashScreens[0].save.hadPriorSave).toBe(false);
     spy.mockRestore();
   });
 
@@ -888,8 +892,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     spy.mockRestore();
   });
 
-  it("a non-storage save error (e.g. a serialize/compression bug) shows a neutral card, not misleading storage advice", () => {
-    const reload = stubReload();
+  it("a non-storage save error (e.g. a serialize/compression bug) is not blamed on storage", () => {
     sim.money = 111_000;
     SaveGame.save(sim); // a prior autosave exists
     // A non-storage failure (not a quota/security DOMException) must not be
@@ -898,49 +901,23 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
       throw new TypeError("Converting circular structure to JSON");
     });
     saveLoad.recoverFromContextLoss();
-    expect(reload).not.toHaveBeenCalled();
-    expect(bootMessages).toHaveLength(1);
-    expect(bootMessages[0].withReload).toBe(true);
-    expect(bootMessages[0].msg).not.toContain("storage is full or blocked");
-    expect(bootMessages[0].msg).not.toContain("Free up space");
+    expect(crashScreens).toHaveLength(1);
     // The prior tower is still safe, so still reassure.
-    expect(bootMessages[0].msg).toContain("last saved tower is safe");
+    expect(crashScreens[0].save).toEqual({ flushed: false, behindSplash: false, storageBlame: false, hadPriorSave: true });
     spy.mockRestore();
   });
 
-  it("a context loss behind the splash reloads without persisting the boot sim", () => {
-    const reload = stubReload();
+  it("a context loss behind the splash shows the screen without persisting the boot sim", () => {
     const splash = document.createElement("div");
     splash.id = "splash";
     document.body.appendChild(splash);
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(false);
-    expect(reload).toHaveBeenCalledTimes(1);
-  });
-
-  it("a hidden tab defers the reload until it becomes visible again", () => {
-    const reload = stubReload();
-    let visibility: DocumentVisibilityState = "hidden";
-    Object.defineProperty(document, "visibilityState", {
-      configurable: true,
-      get: () => visibility,
-    });
-    try {
-      saveLoad.recoverFromContextLoss();
-      expect(reload).not.toHaveBeenCalled(); // parked on visibilitychange
-      visibility = "visible";
-      document.dispatchEvent(new Event("visibilitychange"));
-      expect(reload).toHaveBeenCalledTimes(1);
-      expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
-      // The deferred reload also stamps the recovery resume flag, so a hidden-tab
-      // recovery drops the player back in rather than showing the title screen.
-      expect(Number(sessionStorage.getItem("vc-resume-after-recovery"))).toBeGreaterThan(0);
-      // The one-shot listener removed itself: another flip doesn't re-reload.
-      document.dispatchEvent(new Event("visibilitychange"));
-      expect(reload).toHaveBeenCalledTimes(1);
-    } finally {
-      delete (document as unknown as Record<string, unknown>).visibilityState;
-    }
+    expect(crashScreens).toHaveLength(1);
+    // Nothing needed flushing (the splash pauses the sim); the screen words
+    // this case separately instead of claiming a tower was saved.
+    expect(crashScreens[0].save.flushed).toBe(true);
+    expect(crashScreens[0].save.behindSplash).toBe(true);
   });
 });
 

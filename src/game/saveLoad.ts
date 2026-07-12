@@ -27,8 +27,15 @@ export interface SaveLoadDeps {
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
   ui: Pick<UI, "toast" | "downloadFile" | "showImportReport" | "showExportReport">;
-  /** Full-screen boot card (lives with the boot functions in main.ts). */
-  showBootMessage(msg: string, withReload?: boolean): void;
+  /** Full-screen crash card (src/ui/crashScreen.ts, wired by main.ts with the
+   *  app-side context: version, live sim, frame-error buffer). SaveLoad hands
+   *  it only what it owns: the crash shape, the save outcome, and the reload
+   *  action that stamps the recovery session flags. */
+  showCrashScreen(info: {
+    crash: { kind: "webgl-context-lost"; repeat: boolean; saveFlushed: boolean };
+    save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
+    onReload: () => void;
+  }): void;
   /** Arm first-run onboarding on the just-adopted sim. */
   armOnboarding(): void;
 }
@@ -100,59 +107,59 @@ export class SaveLoad {
 
   /**
    * The WebGL context is gone and Excalibur can't rebuild its GPU resources in
-   * place, so recovery is the same as a manual refresh: flush the tower to the
-   * autosave slot, then reload onto a fresh context — automatically, so the
-   * player never sees a dead screen. Two guards keep this safe:
-   * - a sessionStorage timestamp stops a GPU that dies on every boot from
-   *   reload-looping (second loss within 90s falls back to a manual card), and
-   * - a hidden tab defers the reload until it's visible again, so we don't
-   *   re-boot the renderer in the background just to have the GPU reap it anew.
+   * place, so this session can no longer draw. Flush the tower to the autosave
+   * slot, then show the crash screen: what happened, a crash-report zip
+   * download, a bug-report link, and a Reload button. The reload is the
+   * player's choice (no more silent auto-reload, which erased every trace of
+   * the crash); their reload stamps the recovery flag so the fresh boot drops
+   * them straight back into the tower.
    */
   recoverFromContextLoss(): void {
     // Same guard as the autosave timer: never persist the throwaway boot sim
-    // while the first-run splash is still up.
-    if (!document.getElementById("splash")) {
+    // while the first-run splash is still up. The splash also means there is
+    // nothing to flush (it pauses the sim), so "flushed" stays honest.
+    let flushed = true;
+    let storageBlame = false;
+    let hadPriorSave = false;
+    // Behind the splash nothing needed flushing, but "your tower was saved"
+    // would be a false claim (a first-timer has no tower at all) — the screen
+    // words that case separately.
+    const behindSplash = !!document.getElementById("splash");
+    if (!behindSplash) {
       try {
         this.save(true);
       } catch (err) {
-        // The pre-reload flush failed. Left unhandled this throw would escape the
-        // onContextLost handler and abort the reload, stranding the player on a
-        // dead GPU canvas with no explanation. A failed setItem is atomic (it
-        // never clobbers), so any prior autosave is intact — but we must NOT
-        // silently reload past the unsaved changes either. Hand the player a
-        // card (with a Reload button), as we do for a repeat GPU crash. Only
-        // promise the prior tower is safe when one actually exists — a
-        // first-session crash before any autosave has none to reassure about.
-        // hasSave() READS localStorage, which itself throws when storage is
-        // *disabled* (a SecurityError) rather than merely full — so guard it in
-        // its own try/catch. Otherwise this catch would re-throw before the card
-        // is shown and re-abort the reload, the exact bug this fix exists to kill.
-        let priorSaveNote = "";
+        // The pre-crash flush failed. Left unhandled this throw would escape
+        // the onContextLost handler and skip the crash screen, stranding the
+        // player on a dead GPU canvas with no explanation. A failed setItem is
+        // atomic (it never clobbers), so any prior autosave is intact — but we
+        // must not promise "your tower was saved" either; the screen words the
+        // failure. Only promise the prior tower is safe when one actually
+        // exists — a first-session crash before any autosave has none to
+        // reassure about. hasSave() READS localStorage, which itself throws
+        // when storage is *disabled* (a SecurityError) rather than merely full,
+        // so guard it in its own try/catch.
+        flushed = false;
         try {
-          if (SaveGame.hasSave()) priorSaveNote = " Your last saved tower is safe.";
+          hadPriorSave = SaveGame.hasSave();
         } catch {
           /* storage is unreadable too — just omit the reassurance */
         }
         // Only blame storage for an actual storage failure — quota full,
-        // private-mode, or disabled. A serialize/stringify/compression bug throws
-        // here too, and "free up space" would send the player down the wrong path;
-        // give those a neutral message instead.
-        const isStorageError =
+        // private-mode, or disabled. A serialize/stringify/compression bug
+        // throws here too, and "free up space" would send the player down the
+        // wrong path; those get the neutral wording.
+        storageBlame =
           err instanceof DOMException &&
           (err.name === "QuotaExceededError" ||
             err.name === "SecurityError" ||
             err.name === "NS_ERROR_DOM_QUOTA_REACHED"); // Firefox's quota name
-        const detail = isStorageError
-          ? "storage is full or blocked." + priorSaveNote + "<br>Free up space or allow site storage, then reload."
-          : "the save hit an unexpected error." + priorSaveNote + "<br>Reload to continue.";
-        this.deps.showBootMessage(
-          "The graphics driver crashed and your latest changes couldn't be saved: " + detail,
-          true,
-        );
-        return;
       }
     }
 
+    // A second loss within 90 seconds of the last recovery reload means
+    // reloading alone isn't fixing it; the screen adds advice to close other
+    // tabs/apps. (The timestamp is stamped by the reload action below.)
     const KEY = "vc-gl-lost-reload";
     let lastReload = 0;
     try {
@@ -160,38 +167,25 @@ export class SaveLoad {
     } catch {
       /* storage may be unavailable; treat as first loss */
     }
-    if (Date.now() - lastReload < 90_000) {
-      // Auto-reload didn't stick — hand control back to the player.
-      this.deps.showBootMessage(
-        "The graphics driver crashed twice in a row.<br>Your tower is saved. Close other tabs or apps and try again.",
-        true,
-      );
-      return;
-    }
+    const repeat = Date.now() - lastReload < 90_000;
 
-    const reload = () => {
-      try {
-        const now = String(Date.now());
-        sessionStorage.setItem(KEY, now);
-        // Tell the fresh boot this reload was a recovery, so it resumes the tower
-        // rather than showing the title screen (see resolveBootScreen in
-        // src/bootScreen.ts, consumed by the boot branch in main.ts).
-        sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, now);
-      } catch {
-        /* best effort */
-      }
-      location.reload();
-    };
-    if (document.visibilityState === "hidden") {
-      document.addEventListener("visibilitychange", function onVis() {
-        if (document.visibilityState === "visible") {
-          document.removeEventListener("visibilitychange", onVis);
-          reload();
+    this.deps.showCrashScreen({
+      crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed },
+      save: { flushed, behindSplash, storageBlame, hadPriorSave },
+      onReload: () => {
+        try {
+          const now = String(Date.now());
+          sessionStorage.setItem(KEY, now);
+          // Tell the fresh boot this reload was a recovery, so it resumes the
+          // tower rather than showing the title screen (see resolveBootScreen
+          // in src/bootScreen.ts, consumed by the boot branch in main.ts).
+          sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, now);
+        } catch {
+          /* best effort */
         }
-      });
-    } else {
-      reload();
-    }
+        location.reload();
+      },
+    });
   }
 
   load(): void {

@@ -285,7 +285,15 @@ export class TowerEngine {
   private lastSy = 0;
 
   // Retained scene graph, reconciled by stable id.
-  private structActors = new Map<number, ex.Actor>();
+  /** Static floor/lobby tiles live in ONE TileMap entity, not per-tile actors:
+   *  a full late-game slab is ~9,000+ one-tile units, and paying Excalibur's
+   *  per-actor update/draw overhead for each of them dominated the frame on
+   *  phones (measured ~55% of a paused frame on a 10,344-unit save). The
+   *  TileMap culls to on-screen cells and costs one entity. Cells keep the
+   *  exact same shared baked canvases the actors used, so pixels don't change.
+   *  Keyed by unit id, mirroring the other reconcile maps. */
+  private structTileMap!: ex.TileMap;
+  private structTiles = new Map<number, ex.Tile>();
   private roomActors = new Map<number, RoomRec>();
   private roomSig = new Map<number, string>();
   private transportActors = new Map<number, ex.Actor>();
@@ -503,6 +511,7 @@ export class TowerEngine {
     await this.engine.start();
     this.engine.currentScene.camera.zoom = 0.9;
     this.bakeSharedGraphics();
+    this.makeStructTileMap();
     this.makeGround();
     this.makeSky();
     this.makeOverlay();
@@ -519,7 +528,13 @@ export class TowerEngine {
   // ---- Input (Excalibur pointer system) ----------------------------------
 
   private tf(ev: ex.PointerEvent): { tile: number; floor: number } {
-    return { tile: Math.floor(ev.worldPos.x / TILE), floor: Math.ceil(-ev.worldPos.y / FLOOR) };
+    return this.worldToCell(ev.worldPos);
+  }
+
+  /** World point → grid cell, the single inverse of worldX/worldYTop. Shared
+   *  by pointer handling and the pick fallback so the two can't drift. */
+  private worldToCell(world: ex.Vector): { tile: number; floor: number } {
+    return { tile: Math.floor(world.x / TILE), floor: Math.ceil(-world.y / FLOOR) };
   }
 
   private bindInput(): void {
@@ -557,7 +572,18 @@ export class TowerEngine {
       }
     };
     for (const [id, rec] of this.roomActors) considerUnit(id, rec.actor);
-    for (const [id, a] of this.structActors) considerUnit(id, a);
+    // Floor/lobby tiles have no per-tile actors (they live in the struct
+    // TileMap), so resolve them by grid lookup instead of an actor scan. They
+    // sat at z -1, below every room (0) and transport (1), so they only ever
+    // won a pick when nothing else contained the point — which is exactly the
+    // "no actor matched" case here. O(1) versus the old scan of ~9,000 actors.
+    if (!best) {
+      const { tile, floor } = this.worldToCell(world);
+      const u = this.sim.tower.unitAt(floor, tile);
+      if (u && (u.kind === "floor" || u.kind === "lobby")) {
+        best = { type: "unit", id: u.id, kind: u.kind };
+      }
+    }
     return best;
   }
 
@@ -1511,14 +1537,18 @@ export class TowerEngine {
     for (const u of tower.units) {
       if (u.kind === "floor" || u.kind === "lobby") {
         seenS.add(u.id);
-        const a = this.structActors.get(u.id);
-        if (!a) this.addStruct(u);
+        const cell = this.structTiles.get(u.id);
+        if (!cell) this.addStruct(u);
         else if (u.kind === "lobby") {
           // Lobby tiles swap their shared graphic when the evening lights come
-          // on (chandeliers/sconces glow). Guarded: GraphicsComponent.use()
-          // reallocates bounds even for the same graphic, so skip when current.
+          // on (chandeliers/sconces glow). Guarded: clearing and re-adding a
+          // cell graphic dirties the TileMap's cached geometry, so skip when
+          // the cell already shows the right canvas.
           const gfx = this.lobbyTileGfx(u);
-          if (a.graphics.current !== gfx) a.graphics.use(gfx);
+          if (cell.getGraphics()[0] !== gfx) {
+            cell.clearGraphics();
+            cell.addGraphic(gfx);
+          }
         }
       } else {
         seenR.add(u.id);
@@ -1578,7 +1608,16 @@ export class TowerEngine {
         }
       }
     }
-    this.reap(this.structActors, seenS, (a) => a.kill());
+    this.reap(this.structTiles, seenS, (cell) => {
+      // A dead unit's cell may have been re-claimed IN THIS SAME PASS by its
+      // replacement (building a lobby over bare floor removes the floor unit
+      // and adds the lobby at the same coordinates in one revision). The add
+      // ran above, so blindly clearing here would wipe the replacement's
+      // just-set graphic; only clear when no live floor/lobby unit owns the
+      // cell anymore. Cell coords map back to the grid: row 0 is the top floor.
+      const live = tower.unitAt(GRID.maxFloor - cell.y, cell.x);
+      if (!live || (live.kind !== "floor" && live.kind !== "lobby")) cell.clearGraphics();
+    });
     this.reap(this.roomActors, seenR, (rec, id) => {
       rec.actor.kill();
       this.roomSig.delete(id);
@@ -1715,9 +1754,31 @@ export class TowerEngine {
     return a;
   }
 
+  /** One TileMap entity carries every static floor/lobby tile (see the
+   *  structTiles field note). Sized to the whole buildable grid so cell
+   *  lookups are plain coordinate math; row 0 is the TOP floor because the
+   *  map's origin is its top-left corner in world space. */
+  private makeStructTileMap(): void {
+    this.structTileMap = new ex.TileMap({
+      pos: ex.vec(0, this.worldYTop(GRID.maxFloor)),
+      tileWidth: TILE,
+      tileHeight: FLOOR,
+      columns: GRID.width,
+      rows: GRID.maxFloor - GRID.minFloor + 1,
+    });
+    this.structTileMap.z = -1; // behind rooms (0) and transports (1), like the old actors
+    this.engine.add(this.structTileMap);
+  }
+
   private addStruct(u: Unit): void {
+    // Floor/lobby units are one tile wide in the sim (and the old per-unit
+    // actor drew exactly one tile regardless), so a unit maps to one cell.
+    const cell = this.structTileMap.getTile(u.x, GRID.maxFloor - u.floor);
+    if (!cell) return; // outside the grid; the sim never places there
     const gfx = u.kind === "lobby" ? this.lobbyTileGfx(u) : this.floorGfx;
-    this.structActors.set(u.id, this.addBoxActor(ex.vec(this.worldX(u.x), this.worldYTop(u.floor)), TILE, FLOOR, -1, gfx));
+    cell.clearGraphics();
+    cell.addGraphic(gfx);
+    this.structTiles.set(u.id, cell);
   }
 
   /** The shared lobby tile graphic for this unit's lighting, style and slot.
@@ -2208,7 +2269,7 @@ export class TowerEngine {
   }
 
   private disposeScene(): void {
-    for (const a of this.structActors.values()) a.kill();
+    for (const cell of this.structTiles.values()) cell.clearGraphics();
     for (const rec of this.roomActors.values()) rec.actor.kill();
     for (const a of this.transportActors.values()) a.kill();
     for (const rec of this.escapeActors.values()) {
@@ -2221,7 +2282,7 @@ export class TowerEngine {
       this.craneActor = null;
       this.craneGfx = null;
     }
-    this.structActors.clear();
+    this.structTiles.clear();
     this.roomActors.clear();
     this.roomSig.clear();
     this.transportActors.clear();

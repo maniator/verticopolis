@@ -26,9 +26,22 @@ import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { resolveBootScreen } from "./bootScreen";
+import { showCrashScreen } from "./ui/crashScreen";
+import type { FrameErrorEntry } from "./game/crashReport";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
+
+/** Hard cap on owed-but-unsimulated minutes carried between frames. At the
+ *  fastest speed (120 min/s) a device that can't simulate that fast in real
+ *  time accrues debt every frame; without a cap each frame does more work than
+ *  the last until frames run seconds long (see the clamp in update()). 30
+ *  minutes is a generous two-plus frames of fastest-speed debt at 60fps yet
+ *  keeps the largest single frame's sim work bounded near two tick chunks. */
+const MAX_CATCHUP_MINUTES = 30;
+
+/** Ring-buffer depth for tick-guard failures included in a crash report. */
+const MAX_FRAME_ERRORS = 5;
 
 /** Compile-time app version (see vite.config.ts `define`); "dev" outside a build. */
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
@@ -80,6 +93,9 @@ class GameApp {
   private lastUiUpdate = 0;
   /** Throttle for the per-frame error log, so a repeating throw can't spam. */
   private lastTickErrorLog = 0;
+  /** The last few tick-guard failures, kept for the crash report (the guard
+   *  swallows them to keep the game alive, which otherwise erases the trail). */
+  private frameErrors: FrameErrorEntry[] = [];
   private shownWin = false;
   /** A save existed at boot but couldn't be read (corrupt / incompatible). */
   private saveWasCorrupt = false;
@@ -222,7 +238,16 @@ class GameApp {
         showImportReport: (report, cb) => this.ui.showImportReport(report, cb),
         showExportReport: (report, cb) => this.ui.showExportReport(report, cb),
       },
-      showBootMessage,
+      // SaveLoad owns the crash shape and the reload action; the app supplies
+      // the context only it has (version, the live sim, the frame-error ring).
+      showCrashScreen: (info) =>
+        showCrashScreen({
+          ...info,
+          version: APP_VERSION,
+          speed: this.speed,
+          getSim: () => this.sim,
+          frameErrors: this.frameErrors,
+        }),
       armOnboarding: () => {
         this.onboarding.arm(this.sim);
       },
@@ -687,6 +712,13 @@ class GameApp {
         if (now - this.lastTickErrorLog > 2000) {
           this.lastTickErrorLog = now;
           console.error("[tick] frame error, continuing:", err);
+          // Same throttle for the crash-report ring buffer: a repeating throw
+          // records one entry per window, not one per frame.
+          this.frameErrors.push({
+            at: new Date().toISOString(),
+            message: err instanceof Error ? `${err.message}\n${err.stack ?? ""}`.trim() : String(err),
+          });
+          if (this.frameErrors.length > MAX_FRAME_ERRORS) this.frameErrors.shift();
         }
       }
     };
@@ -908,6 +940,16 @@ class GameApp {
     // the speed buttons keep their meaning.
     const pace = this.prefs.steadyClock ? 1 : paceFactor(this.sim.clock.minuteOfDay);
     this.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
+    // Cap the catch-up debt. Owed minutes grow with real frame time, so on a
+    // device that can't simulate the fastest speed in real time every frame
+    // would carry ever more sim work, stretching frames toward seconds of
+    // sustained CPU+GPU load — the profile under which Android reclaims the
+    // WebGL context (the Pixel 8a "random crash"). Dropping the excess trades
+    // clock accuracy for survival: the game visibly runs slower than the
+    // speed button promises on hardware that can't keep up, and a tab restored
+    // from the background resumes with one bounded step instead of replaying
+    // the whole absence.
+    if (this.accMinutes > MAX_CATCHUP_MINUTES) this.accMinutes = MAX_CATCHUP_MINUTES;
     // Step the simulation in small chunks so hourly/daily boundaries fire.
     const minutesBeforeTicks = this.sim.clock.minutes;
     let guard = 0;
