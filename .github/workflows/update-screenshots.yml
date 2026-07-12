@@ -13,6 +13,20 @@ name: Update screenshots
 # Actions tab. The bot pushes with GITHUB_TOKEN, which never triggers workflows,
 # so the screenshot commit gets no CI run of its own, push once more after
 # pulling it to get a green check on the final head.
+#
+# DETERMINISM GUARD (do NOT delete without understanding why it exists): the
+# generator is meant to be a pure function of the seeded sim + step count, so a
+# regen only changes pixels when the UI actually changed. That property has no
+# other enforcement (code review twice missed a wall-clock leak that recommitted
+# churn on every nightly run). This workflow proves it by generating TWICE, in
+# parallel (the `shoot` matrix below), and failing if the two runs differ
+# byte-for-byte (`verify-and-commit`). The likeliest future regression is not an
+# edit to scripts/: it is someone adding a time-reading decoration to the ENGINE
+# render path, never touching this generator, and going green. The full-set,
+# both-runs comparison is what catches that. If the extra runner-minutes ever
+# bite, the two `shoot` jobs already run concurrently (wall-clock is one
+# generation, not two); do not "optimize" it down to a subset of scenes, which
+# would go blind exactly when a new live scene is added.
 
 on:
   push:
@@ -48,28 +62,34 @@ jobs:
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
           echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
 
-  screenshots:
+  # Two INDEPENDENT full generations, one per matrix leg, running in parallel on
+  # separate runners of the SAME pinned image. Each uploads its docs/screenshots
+  # as an artifact; verify-and-commit diffs the two. Because they share the image
+  # (one Chromium build + fonts), a byte difference between them can only come
+  # from a nondeterministic input (a wall-clock read leaking into a capture), not
+  # from the environment. Running them concurrently keeps the wall-clock at one
+  # generation even though we shoot twice.
+  shoot:
     needs: resolve-image
     runs-on: ubuntu-latest
-    # Every step runs inside the pinned Playwright image, the browser + fonts
-    # that make the output reproducible.
     container:
       image: ${{ needs.resolve-image.outputs.image }}
+    strategy:
+      fail-fast: false
+      matrix:
+        run: [a, b]
     env:
       # Browsers already ship in the image; don't re-download them on npm ci.
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
     steps:
-      # Check out the branch TIP (not the triggering SHA) with full history: when
-      # this run is queued behind the sibling baselines run, the tip already has
-      # that run's commit, so the push here fast-forwards. Full history (depth 0)
-      # also lets the rebase-retry below reconcile cleanly if anything did land.
+      # Check out the branch TIP (not the triggering SHA) with full history so
+      # both legs generate from the same source. (Only verify-and-commit pushes.)
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      # A container checkout trips git's dubious-ownership guard; mark the tree safe
-      # so the later add/commit/push work.
+      # A container checkout trips git's dubious-ownership guard; mark the tree safe.
       - name: Trust the workspace
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
 
@@ -92,10 +112,60 @@ jobs:
           export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
           RUN_SERVER=1 node scripts/screenshots.ts
 
+      - name: Upload this run's gallery
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-${{ matrix.run }}
+          path: docs/screenshots
+          retention-days: 1
+          if-no-files-found: error
+
+  # Determinism guard + commit. Downloads both generations, diffs them, and only
+  # if they match byte-for-byte commits one back to the branch. A mismatch fails
+  # the workflow (nothing committed) rather than letting a nondeterministic
+  # generator recommit wall-clock churn. See the header note above.
+  verify-and-commit:
+    needs: shoot
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+          fetch-depth: 0
+
+      - name: Download generation A
+        uses: actions/download-artifact@v4
+        with:
+          name: shots-a
+          path: /tmp/shots-a
+      - name: Download generation B
+        uses: actions/download-artifact@v4
+        with:
+          name: shots-b
+          path: /tmp/shots-b
+
+      - name: Verify the generator is deterministic
+        run: |
+          # Both artifacts were uploaded the same way, so their trees match
+          # structurally; a per-file byte difference can only be nondeterminism.
+          if ! diff -rq /tmp/shots-a /tmp/shots-b; then
+            echo "::error::screenshot generator is nondeterministic: two parallel runs in the same pinned image produced different pixels. A wall-clock read leaked into a capture (likely a new time-driven decoration in the engine render path); fix it before committing."
+            exit 1
+          fi
+          echo "Generator is deterministic: two independent runs in the pinned image matched byte-for-byte."
+
       - name: Commit refreshed screenshots
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Adopt generation A as the committed set (identical to B by the check
+          # above). upload-artifact strips the common path prefix, so the gallery
+          # may sit at the artifact root OR under docs/screenshots/; find it.
+          src=/tmp/shots-a
+          [ -d "$src/docs/screenshots" ] && src="$src/docs/screenshots"
+          rm -rf docs/screenshots
+          mkdir -p docs/screenshots
+          cp -a "$src/." docs/screenshots/
           git add docs/screenshots
           if git diff --cached --quiet; then
             echo "Screenshots already match this environment, nothing to commit."

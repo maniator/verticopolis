@@ -27,6 +27,7 @@ import {
   pgGrowToStar,
   pgPaletteAtStar,
   pgSetOverlay,
+  pgStep,
 } from "./screenshot-builders.ts";
 
 // ---- The declarative SCENES manifest ----------------------------------------
@@ -616,11 +617,25 @@ export const SCENES: Scene[] = [
       {
         name: "traffic-chip-after",
         crop: "#topbar",
+        // Capture exactly at the verified state: `wait: 0` is a 0ms settle that
+        // steps 0 frames (settle ceils 0/FRAME_MS to 0), so the pre-capture
+        // refresh repaints the chip off the precise jammed state the loop below
+        // confirmed, not a frame later. The default 500ms would instead advance
+        // the sim ~30 more frames past it.
+        wait: 0,
         setup: async (page) => {
-          // Let the live UI loop settle the chip off "Smooth".
+          // Step the clock in fixed chunks and refresh the chip until it leaves
+          // "Smooth". The sim and the step count are both deterministic, so the
+          // chip flips on the same chunk (and reads the same) every run; the
+          // wall-clock UI throttle is bypassed by refreshing explicitly.
           for (let i = 0; i < 40; i++) {
-            await page.waitForTimeout(150);
-            const label = await page.evaluate(() => document.getElementById("traffic-label")?.textContent ?? "");
+            const stepped = await page.evaluate(pgStep, 10);
+            if (!stepped) throw new Error("traffic chip needs the stepped clock");
+            const label = await page.evaluate(() => {
+              const g = (window as any).game;
+              g?.updateTraffic?.();
+              return document.getElementById("traffic-label")?.textContent ?? "";
+            });
             if (label && label !== "Smooth") break;
           }
         },
@@ -636,7 +651,9 @@ export const SCENES: Scene[] = [
         name: "traffic-chip-after-mobile",
         crop: "#topbar",
         viewport: PHONE,
-        wait: 500,
+        // Reflow-only shot: the viewport change is pure DOM, so step no frames
+        // (wait 0) from the jammed state the desktop shot just verified.
+        wait: 0,
       },
     ],
   },

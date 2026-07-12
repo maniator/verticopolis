@@ -25,6 +25,14 @@
  * (`[update-screenshots]` / `[update-baselines]`) triggers them. Regenerate the
  * committed set that way, not by committing a host run.
  *
+ * Determinism: once a page is ready the runner swaps the live Excalibur clock
+ * for a manually stepped TestClock (pgAdoptTestClock) and every settle advances
+ * whole frames (pgStep via settle()), so each capture is a pure function of the
+ * seeded sim plus the step count; wall time never leaks into the pixels. DOM
+ * chrome is captured with CSS animations disabled. Rerunning the generator in
+ * the same pinned image therefore reproduces every PNG byte-for-byte, and a
+ * regen diff means the UI actually changed.
+ *
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
  * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets.
  *
@@ -37,10 +45,29 @@ import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgClearTransients, pgDismissSplash, pgFrame, pgSetClock, pgSetOverlay } from "./screenshot-builders.ts";
+import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep } from "./screenshot-builders.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 
 // ---- Runner -----------------------------------------------------------------
+
+const FRAME_MS = 1000 / 60;
+
+/** Deterministic settle: advance the page by `ms` of VIRTUAL time by stepping
+ *  the adopted TestClock in whole frames, so identical runs replay identical
+ *  frames (the sim feed, elevator/crowd motion, and the decorative animation
+ *  clock all advance per step, never per wall-clock). Rounds UP so a positive
+ *  `ms` always covers at least that much virtual time (never under-steps and
+ *  captures a hair early); `ms <= 0` steps nothing, honoring the contract
+ *  exactly. Pages with no engine clock fall back to a real wait: the route
+ *  pages (gallery/preview) are frozen by the pinned performance.now set in
+ *  runScene, and the composite setContent shots are static markup, so a wall
+ *  wait can't shift either. */
+async function settle(page: Page, ms: number): Promise<void> {
+  // ceil already yields >= 1 frame for any ms > 0, so no lower clamp is needed;
+  // ms <= 0 yields <= 0, which pgStep treats as "no step" (returns false).
+  const stepped = await page.evaluate(pgStep, Math.ceil(ms / FRAME_MS));
+  if (!stepped) await page.waitForTimeout(Math.max(0, ms));
+}
 
 let captured = 0;
 const failures: string[] = [];
@@ -50,7 +77,20 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   const outDir = shot.outDir ?? scene.outDir;
   const path = join(DIRS[outDir], `${shot.name}.png`);
   const baseVp = scene.viewport ?? DESKTOP;
-  if (shot.viewport) await page.setViewportSize(shot.viewport);
+  if (shot.viewport) {
+    await page.setViewportSize(shot.viewport);
+    // Excalibur sizes its canvas from a ResizeObserver (DisplayMode.FillContainer),
+    // whose callback fires on the browser's own schedule, NOT the stepped clock.
+    // If we start stepping before it runs, the resize (canvas dims + camera) lands
+    // at a wall-dependent moment relative to the frames and the capture, so a
+    // viewport-override shot on a live engine (e.g. tablet-compact-after) drifts
+    // run to run. Flush the observer with two rAFs first (observers deliver
+    // before paint; the stopped Excalibur clock means this advances no sim or
+    // animation time) so the new size is fully applied before the settle steps.
+    await page.evaluate(
+      () => new Promise<void>((r) => requestAnimationFrame(() => requestAnimationFrame(() => r()))),
+    );
+  }
   try {
     if (shot.clock !== undefined) await page.evaluate(pgSetClock, shot.clock);
     // Always drive the overlay dropdown (default "") so a prior shot's overlay
@@ -60,16 +100,20 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
-    await page.waitForTimeout(shot.wait ?? 500);
-    // Sweep stray toasts / event dialogs the running sim may have popped during
-    // the wait, unless this shot is deliberately showing a modal.
+    await settle(page, shot.wait ?? 500);
+    // Repaint the throttled DOM chrome off the final sim state, then sweep
+    // stray toasts / event dialogs the running sim may have popped during the
+    // settle, unless this shot is deliberately showing a modal.
+    await page.evaluate(pgRefreshUi);
     const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
     await page.evaluate(pgClearTransients, keepDialogs);
     await page.waitForTimeout(80);
+    // animations: "disabled" freezes CSS animation (the splash star twinkle,
+    // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.
     if (shot.crop) {
-      await page.locator(shot.crop).screenshot({ path });
+      await page.locator(shot.crop).screenshot({ path, animations: "disabled" });
     } else {
-      await page.screenshot({ path, fullPage: !!shot.fullPage });
+      await page.screenshot({ path, fullPage: !!shot.fullPage, animations: "disabled" });
     }
   } finally {
     // Always restore the scene viewport, even if the shot threw, so one failed
@@ -131,9 +175,25 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         }
         return;
       }
-      await page.waitForTimeout(800);
+      // excalibur.html runs a live TowerEngine; take over its clock so the demo
+      // tower's frames replay identically. "none" is fine here (gallery/preview
+      // have no engine and are already frozen by the pinned performance.now
+      // above), but an engine whose clock can't be swapped must fail the scene
+      // rather than silently capture wall-clock pixels.
+      if ((await page.evaluate(pgAdoptTestClock)) === "failed") {
+        throw new Error("engine present but test-clock adoption failed");
+      }
+      await settle(page, 800);
     } else {
       await page.waitForFunction(() => !!(window as any).game, null, { timeout: 15000 });
+      // From here on, frames advance only when settle()/pgStep drives them:
+      // wall time (rAF jitter, CI load, staging latency) can no longer leak
+      // into what the sim and the decorations look like at capture. A failed
+      // adoption would silently revert the page to wall-clock timing, so it
+      // fails the scene (existing committed images stay untouched).
+      if ((await page.evaluate(pgAdoptTestClock)) !== "adopted") {
+        throw new Error("test-clock adoption failed on the game page");
+      }
       if (!scene.keepSplash) await page.evaluate(pgDismissSplash);
       if (scene.build) await page.evaluate(scene.build);
       if (scene.assertUnits) await assertReady(page, scene.assertUnits);
