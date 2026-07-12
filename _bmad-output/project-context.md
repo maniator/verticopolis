@@ -83,6 +83,13 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 
 ## Artifacts & working conventions
 - BMAD output lives under `_bmad-output/` (`planning-artifacts/prds`, `.../reviews`).
+- **Shift-left + regression testing** (full rule in `AGENTS.md` -> Testing
+  discipline): every bug fix ships a regression test pinning the failure,
+  including the shift into and out of the failing condition; pin each invariant
+  with a unit-level guard at the cheapest tier, never only a heavy integration
+  run; test fixtures must assert every construction step the claim depends on
+  (`expect(r.ok)`), because a silently degraded fixture tests a different tower
+  than the one described.
 - **No em-dashes in prose** (player-facing copy, docs, comments, commit and PR
   text) in anything new you write. Use commas, colons, parentheses, or separate
   sentences instead. Two standing exceptions: en-dashes in numeric ranges

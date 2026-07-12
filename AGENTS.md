@@ -93,6 +93,31 @@ resolving review threads). On top of that, in an agent session:
 - The full canon and rationale for the hot-path performance rules live in
   `_bmad-output/project-context.md` (Performance section).
 
+## Testing discipline: shift-left and regression
+
+These rules sit on top of the two test tiers in
+[CONTRIBUTING.md](./CONTRIBUTING.md) → **Testing & coverage**:
+
+- **Every bug fix ships a regression test that pins the failure.** Reproduce
+  the reported behavior in a test that would fail on the pre-fix engine and
+  passes after. Cover the state shifts around the fix (the condition
+  appearing, clearing, and relapsing), not just the steady state. A fix
+  without its regression test is not done.
+- **Shift tests left: pin each invariant at the cheapest tier that can catch
+  it.** When a defect surfaces in a heavy integration run (a multi-day
+  simulated tower, an e2e spec) or in a player save, do not leave the only
+  guard there. Add a small unit test that fails in milliseconds on the same
+  root cause. Heavy scenario tests are canaries; they are not a substitute
+  for unit guards on the invariant itself.
+- **Fixtures must assert their own construction.** Every `place` / `build` /
+  `placeTransport` call a test's claim depends on must check `ok` (or assert
+  the resulting count). A fixture that silently degrades tests a different
+  tower than the one described, and its green result is a lie. When a fixture
+  encodes a topology claim (served, reachable, stranded, zoned), assert the
+  claim directly before running the scenario. Precedent: the phase2 endgame
+  tower shipped for months with no sky lobbies and no express elevators
+  because nothing checked `ok`, and it kept passing for the wrong reason.
+
 ## Gameplay model notes
 
 - Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in
