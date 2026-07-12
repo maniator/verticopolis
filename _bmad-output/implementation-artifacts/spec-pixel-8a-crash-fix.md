@@ -62,7 +62,7 @@ the crash report; it contains only what the report shows the player.
 - `src/storage/SaveGame.ts:249` -- export(sim) produces the .vctower payload for the zip
 - `.github/ISSUE_TEMPLATE/bug_report.yml` -- field ids (version, what-happened) for the prefilled issue URL
 - `src/tests/gameControllersCoverage.test.ts:790-930` -- existing recoverFromContextLoss tests to update
-- `package.json` -- version bump to 1.19.0
+- `package.json` -- version bump (landed as 1.20.0; the rebased base already shipped 1.19.0)
 
 ## Tasks & Acceptance
 
@@ -73,7 +73,7 @@ the crash report; it contains only what the report shows the player.
 - [x] `src/game/saveLoad.ts` -- recoverFromContextLoss keeps the splash guard + flush + failure card paths, replaces auto-reload with deps.showCrashScreen({repeat, saveFailed...}); remove visibility-deferred reload (screen waits for the player instead)
 - [x] `src/tests/crashReport.test.ts` -- New: unzip the built zip (fflate unzipSync), assert report fields and that the .vctower payload re-imports to the same tower; URL helper encodes fields
 - [x] `src/tests/gameControllersCoverage.test.ts` -- Update context-loss tests: crash screen shown instead of reload, flush still happens, double-crash flag passed, failed-flush wording preserved
-- [x] `package.json` -- Bump version 1.18.1 -> 1.19.0
+- [x] `package.json` -- Bump version (landed as 1.20.0 after the base moved to 1.19.0)
 
 **Acceptance Criteria:**
 - Given the SIXSEVEN save, when the scene is built, then scene entity count drops from ~11,000 to under 2,000 and paused p50 frame time drops by roughly half (measured via the ablation harness).
