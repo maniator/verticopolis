@@ -1,5 +1,5 @@
 import { Simulation } from "../engine/Simulation";
-import type { GameMode } from "../engine/types";
+import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
 import { LegacyExportError, buildTDT } from "../storage/tdtExport";
@@ -20,6 +20,13 @@ import type { UI } from "../ui/UI";
 export interface SaveLoadDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
+  /** The live camera as save cargo (GameApp reads TowerEngine.viewState).
+   *  Stamped onto the sim right before every save/export of the CURRENT
+   *  tower so the view travels with it; an imported sim keeps the view its
+   *  own file carried, so its writes are never stamped. Null when no camera
+   *  exists (headless tests); a null stamp never ERASES a view the sim
+   *  already carries (see stampView). */
+  getView(): SerializedView | null;
   /** Swap in a freshly loaded/created simulation (GameApp owns the rewiring).
    *  Deliberately takes NO preserveHistory flag: every path here adopts a
    *  *different* tower, which must invalidate the undo trail — otherwise Undo
@@ -57,8 +64,19 @@ export class SaveLoad {
 
   constructor(private readonly deps: SaveLoadDeps) {}
 
+  /** Stamp the live camera onto the sim before a save/export. A null camera
+   *  (headless context) stamps nothing rather than null, so it can never
+   *  erase a view the sim already carries (e.g. one a TDT import brought
+   *  over before any camera existed). */
+  private stampView(sim: Simulation): void {
+    const view = this.deps.getView();
+    if (view) sim.view = view;
+  }
+
   save(silent = false): void {
-    SaveGame.save(this.deps.getSim());
+    const sim = this.deps.getSim();
+    this.stampView(sim);
+    SaveGame.save(sim);
     if (!silent) this.deps.ui.toast("Tower saved.", "good");
   }
 
@@ -77,7 +95,11 @@ export class SaveLoad {
     try {
       do {
         this.autosaveQueued = false;
-        await SaveGame.saveAsync(this.deps.getSim());
+        const sim = this.deps.getSim();
+        // Re-stamp per iteration: the camera may have moved while the
+        // previous async compression was in flight.
+        this.stampView(sim);
+        await SaveGame.saveAsync(sim);
       } while (this.autosaveQueued);
     } catch {
       /* periodic autosave is best effort and has no UI surface; manual and pre-reload saves still report errors */
@@ -204,6 +226,7 @@ export class SaveLoad {
   async exportGame(): Promise<void> {
     try {
       const sim = this.deps.getSim();
+      this.stampView(sim);
       const file = await SaveGame.export(sim);
       this.deps.ui.downloadFile(SaveGame.exportFilename(sim), file);
       // The container is pure ASCII, so string length == bytes on disk.
@@ -225,7 +248,9 @@ export class SaveLoad {
   exportLegacy(): void {
     let built: BuiltLegacyTower;
     try {
-      built = buildTDT(this.deps.getSim().serialize());
+      const sim = this.deps.getSim();
+      this.stampView(sim);
+      built = buildTDT(sim.serialize());
     } catch (err) {
       const msg =
         err instanceof LegacyExportError

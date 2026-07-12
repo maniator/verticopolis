@@ -54,7 +54,7 @@ variable-width; walk, don't seek. Unconfirmed fields are flagged.
 | 0x14 | u16 | tick | Time of day in ticks, 0–2599 (see §3) |
 | 0x16 | i32 | currentDay | Signed; rolls over at 11,987 (999 years, §3 calendar) |
 | 0x1C | u16 | lobbyHeight | Ground lobby height, 1–3 stories [TD] |
-| 0x26 | 2×u16 | window position | Saved viewport X, Y (exporter writes the New Tower default 1105, 3491 so a load opens on the ground lobby, not the top-left sky) |
+| 0x26 | 2×u16 | window position | Saved viewport X, Y in world px (8 px per tile segment, 36 px per floor slot). Our importer reads it (a 0, 0 pair means "no saved view": the game then opens at the top-left sky). Our exporter writes the live camera view when the save carries one, else the New Tower default 1105, 3491 so a load opens on the ground lobby. The window-size constants behind the mapping (640×469) are derived from that default anchor, not measured; see `viewWordsFromView` in `src/storage/tdtFormat.ts`. |
 | 0x2A | u16 | recyclingCount | Total recycling centers [TD] |
 | 0x2E | u16 | commercialCount | Shops + restaurants + fast food [TD] |
 | 0x30 | u16 | securityCount | Max 10 [TD] |

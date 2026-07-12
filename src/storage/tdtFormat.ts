@@ -69,9 +69,77 @@ export const TDT_MAX_CENSUS = 15_000;
 /** Default saved view-scroll the exporter writes into the header (0x26 = x,
  *  0x28 = y, in world pixels): the value the 1994 game itself stores for a fresh
  *  New Tower, which opens the view on the ground lobby. Left at 0 a loaded tower
- *  opens at the top-left sky instead of on its entrance. */
+ *  opens at the top-left sky instead of on its entrance. Used only when the
+ *  save carries no view of its own (see {@link viewWordsFromView}). */
 export const TDT_DEFAULT_VIEW_X = 1105;
 export const TDT_DEFAULT_VIEW_Y = 3491;
+
+/** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4, proven by
+ *  the lobby table; TDT 10/24/39/… = floors 1/15/30/…). Lives here (not in
+ *  tdtImport) because the pure view-word mapping below needs it too. */
+export const TDT_FLOOR_OFFSET = 9;
+
+/**
+ * 1994 world metrics for the header's view-scroll words. Horizontal: tenant
+ * extents are 8-pixel segments == our tiles (doc §4), on a 375-segment lot
+ * (3,000 px). Vertical: 36 px per floor across the 120 floor slots (4,320 px).
+ * The window size is DERIVED, not documented: anchoring on the known New
+ * Tower default (1105, 3491) which "opens on the ground lobby", a 469-px
+ * client height puts 3491 + 469 = 3960 exactly at the bottom edge of TDT
+ * floor 10 (the ground floor pinned to the bottom of the screen), and 640 is
+ * the 1994 display width. The round-trip tests pin this anchor.
+ */
+export const TDT_TILE_PX = 8;
+export const TDT_FLOOR_PX = 36;
+export const TDT_WORLD_W = 375 * TDT_TILE_PX;
+export const TDT_WORLD_H = TDT_FLOOR_COUNT * TDT_FLOOR_PX;
+export const TDT_VIEW_W = 640;
+export const TDT_VIEW_H = 469;
+
+/**
+ * Map a saved camera view (center in OUR grid units) to the header's
+ * view-scroll words (top-left of the 1994 window, world px). Non-finite
+ * members fall back to the New Tower default words; finite values clamp into
+ * the window range the 1994 game can actually scroll to, so a view centered
+ * on B10 lands as close as the window allows (ground at the bottom edge)
+ * rather than out of range.
+ */
+export function viewWordsFromView(view: { tile: number; floor: number }): { x: number; y: number } {
+  if (!Number.isFinite(view.tile) || !Number.isFinite(view.floor)) {
+    return { x: TDT_DEFAULT_VIEW_X, y: TDT_DEFAULT_VIEW_Y };
+  }
+  const fTdt = view.floor + TDT_FLOOR_OFFSET;
+  const centerX = view.tile * TDT_TILE_PX;
+  // Floor f (index from the bottom) spans world y in
+  // [(119 - f) * 36, (120 - f) * 36]; its center is the top edge + 18.
+  const centerY = (TDT_FLOOR_COUNT - 1 - fTdt) * TDT_FLOOR_PX + TDT_FLOOR_PX / 2;
+  const x = Math.max(0, Math.min(TDT_WORLD_W - TDT_VIEW_W, Math.round(centerX - TDT_VIEW_W / 2)));
+  const y = Math.max(0, Math.min(TDT_WORLD_H - TDT_VIEW_H, Math.round(centerY - TDT_VIEW_H / 2)));
+  // Never emit the (0, 0) "no saved view" sentinel for a REAL view: an
+  // unclamped input (top-left extreme) would otherwise vanish on re-import.
+  // One pixel of scroll is imperceptible but unambiguous.
+  return x === 0 && y === 0 ? { x: 0, y: 1 } : { x, y };
+}
+
+/**
+ * Inverse of {@link viewWordsFromView}: header view-scroll words → camera
+ * center in OUR grid units. The (0, 0) pair is the 1994 "no saved view"
+ * failure mode (the game then opens at the top-left sky) and maps to null so
+ * the renderer falls back to centering. Values stay FRACTIONAL (a camera
+ * center is fractional by nature, and rounding here would make
+ * export → import → export drift by a word, breaking the exporter's
+ * idempotence test), and are deliberately NOT clamped to our grid: this
+ * walker stays engine-free, and every import already passes
+ * `Simulation.deserialize`, whose trust boundary clamps the view along with
+ * everything else.
+ */
+export function viewFromViewWords(x: number, y: number): { tile: number; floor: number } | null {
+  if (x === 0 && y === 0) return null;
+  const tile = (x + TDT_VIEW_W / 2) / TDT_TILE_PX;
+  const centerY = y + TDT_VIEW_H / 2;
+  const fTdt = TDT_FLOOR_COUNT - 1 - (centerY - TDT_FLOOR_PX / 2) / TDT_FLOOR_PX;
+  return { tile, floor: fTdt - TDT_FLOOR_OFFSET };
+}
 export const TDT_RETAIL_SLOTS = 512;
 export const TDT_RETAIL_RECORD_SIZE = 18;
 export const TDT_ELEVATOR_SLOTS = 24;
@@ -186,6 +254,11 @@ export interface TdtHeader {
   frameTime: number;
   /** Days since "WD 1 / 1Q / Year 1". Signed in the file. */
   currentDay: number;
+  /** Saved view-scroll (doc §1 row 0x26): top-left of the 1994 window in
+   *  world px. (0, 0) means "no saved view" (the game then opens at the
+   *  top-left sky); see {@link viewFromViewWords}. */
+  viewX: number;
+  viewY: number;
 }
 
 /** One decoded elevator entry (doc §8; floors are TDT indexes 0–119). */
@@ -359,10 +432,15 @@ export function parseTdtBinary(bytes: Uint8Array): TdtTower {
   r.skip(12); // otherIncome, constructionCosts, lastQuarterMoney (finance import is a queued follow-up)
   const frameTime = r.u16();
   const currentDay = r.i32();
-  // The rest of the ~518-byte misc block (screen position words, undocumented
-  // fields) carries nothing v1 imports.
+  // Skip the words between currentDay and the view scroll (lobbyHeight at
+  // 0x1C and undocumented fields; lobby height is a known parity gap, see the
+  // backlog), then read the saved view position at 0x26/0x28.
+  r.skip(0x26 - r.offset());
+  const viewX = r.u16();
+  const viewY = r.u16();
+  // The rest of the ~518-byte misc block carries nothing v1 imports.
   r.skip(TDT_HEADER_SIZE - r.offset());
-  const header: TdtHeader = { version, level, balance, frameTime, currentDay };
+  const header: TdtHeader = { version, level, balance, frameTime, currentDay, viewX, viewY };
 
   const floors: TdtFloor[] = [];
   for (let index = 0; index < TDT_FLOOR_COUNT; index++) {

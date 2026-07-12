@@ -4,7 +4,7 @@ import { canonicalSubtype, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES
 import { SAVE_VERSION } from "../engine/saveMigration";
 import { minuteOfDayForFrame } from "../engine/timePacing";
 import type { FacilityKind, SerializedGame, Transport, Unit, UnitState } from "../engine/types";
-import { LegacyImportError, parseTdtBinary } from "./tdtFormat";
+import { LegacyImportError, parseTdtBinary, TDT_FLOOR_OFFSET, viewFromViewWords } from "./tdtFormat";
 import type { TdtElevator, TdtStair, TdtTenant, TdtTower } from "./tdtFormat";
 
 export { LegacyImportError };
@@ -131,9 +131,9 @@ const TDT_FLOOR = 0;
 const TDT_LOBBY = 24;
 export const TDT_BURNED = 48;
 
-/** TDT floor index → our floor: uniform `ours = tdt − 9` (doc §4, proven by
- *  the lobby table; TDT 10/24/39/… = floors 1/15/30/…). */
-export const TDT_FLOOR_OFFSET = 9;
+// TDT_FLOOR_OFFSET moved to tdtFormat.ts (the pure view-word mapping needs
+// it); re-exported here so existing importers/tests keep their import path.
+export { TDT_FLOOR_OFFSET };
 
 /** Ceiling on the header's signed day counter (~1,000 in-game years) so a
  *  forged value can't blow the minutes math into precision-loss territory. */
@@ -738,6 +738,11 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
     vipFavorable: star >= 4,
     excavated,
   };
+  // Bring the 1994 save's view scroll over so the tower opens where its
+  // player last stood (no zoom: the format has none). (0, 0) means no saved
+  // view; out-of-grid values clamp at the deserialize trust boundary.
+  const view = viewFromViewWords(tdt.header.viewX, tdt.header.viewY);
+  if (view) save.view = view;
 
   return { save, report: buildReport(save, counts, tdt, decoded, decodeStats, headerNotes) };
 }

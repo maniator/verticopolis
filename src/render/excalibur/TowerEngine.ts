@@ -1,8 +1,8 @@
 import * as ex from "excalibur";
 import type { Simulation, HeatmapMode, HeatCell } from "../../engine/Simulation";
 import { GARBAGE_COLLECT_HOUR, GRID, facilityFloors, hasBusinessHours, isElevatorKind, isOpenAt, transportCarCapacity } from "../../engine/facilities";
-import type { FacilityKind, Transport, Unit, WeatherKind } from "../../engine/types";
-import { isOperational } from "../../engine/types";
+import type { FacilityKind, SerializedView, Transport, Unit, WeatherKind } from "../../engine/types";
+import { isOperational, VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import {
   CRANE_H,
   CRANE_W,
@@ -41,9 +41,12 @@ export const FLOOR = 34;
  *  floors → 1632px, safely under both, so tall shafts are split into bands. */
 const TRANSPORT_BAND_FLOORS = 48;
 
-/** Camera zoom range (screen pixels per world pixel). */
-export const MIN_ZOOM = 0.3;
-export const MAX_ZOOM = 3;
+/** Camera zoom range (screen pixels per world pixel). The values live in
+ *  engine/types (VIEW_ZOOM_MIN/MAX) because the save schema clamps a restored
+ *  view's zoom at the deserialize trust boundary; re-exported here so render
+ *  code keeps its familiar names and the range exists in one place. */
+export const MIN_ZOOM = VIEW_ZOOM_MIN;
+export const MAX_ZOOM = VIEW_ZOOM_MAX;
 const clampZoom = (z: number): number =>
   Number.isFinite(z) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) : MIN_ZOOM;
 
@@ -515,7 +518,8 @@ export class TowerEngine {
     this.makeGround();
     this.makeSky();
     this.makeOverlay();
-    this.center();
+    // A boot-loaded autosave restores its saved view; a fresh tower centers.
+    this.adoptCamera(this.sim.view);
     this.litState = this.d.lit;
     this.syncScene();
     this.syncMotion();
@@ -720,7 +724,7 @@ export class TowerEngine {
     this.gesture = null;
   }
 
-  setSim(sim: Simulation): void {
+  setSim(sim: Simulation, opts?: { keepCamera?: boolean }): void {
     this.disposeScene();
     this.clearCrowd();
     // Full input reset: a tower swap (new game / load) must not inherit a
@@ -752,7 +756,17 @@ export class TowerEngine {
     this.floorLiveHour = -1;
     this.floorLiveRev = -1;
     this.floorLive.clear();
-    this.center();
+    this.adoptCamera(sim.view, opts?.keepCamera);
+  }
+
+  /** Camera policy for a swapped-in (or boot-loaded) tower: an undo/redo
+   *  restore keeps the camera where the player is looking (keepCamera); a
+   *  genuine tower swap (new game / load / import) restores the save's own
+   *  view when it carries one, else centers as always. */
+  private adoptCamera(view: SerializedView | null, keepCamera?: boolean): void {
+    if (keepCamera) return;
+    if (view) this.applyView(view);
+    else this.center();
   }
 
   private tick(elapsed: number): void {
@@ -921,6 +935,22 @@ export class TowerEngine {
   center(): void {
     const hi = this.sim.tower.highestFloor;
     this.cam.pos = ex.vec((GRID.width / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
+  }
+
+  /** The live camera as save-file cargo: center in grid units plus zoom (the
+   *  exact inverse of {@link applyView}, so a same-device round trip is
+   *  lossless). Stamped onto the sim by the UI layer right before a save. */
+  viewState(): SerializedView {
+    return { tile: this.cam.pos.x / TILE, floor: -this.cam.pos.y / FLOOR, zoom: this.cam.zoom };
+  }
+
+  /** Restore a saved view. Zoom is optional (a TDT import has none): absent,
+   *  the session's current zoom stays. Everything funnels through setCamera's
+   *  clampZoom and the standard clamp() so a view saved on another device (or
+   *  forged in a file) is re-bounded for THIS viewport before it can render. */
+  private applyView(v: SerializedView): void {
+    this.setCamera(v.tile, v.floor, v.zoom ?? this.cam.zoom);
+    this.clamp();
   }
 
   /** Zoom by a factor about the current center (keyboard +/- zoom). */

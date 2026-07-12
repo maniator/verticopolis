@@ -37,6 +37,7 @@ import {
   TDT_ROUTING_TAIL_SIZE,
   TDT_STAIR_RECORD_SIZE,
   TDT_STAIR_SLOTS,
+  viewWordsFromView,
 } from "./tdtFormat";
 import {
   ELEVATOR_KINDS,
@@ -510,10 +511,15 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   setHdrU16(0x32, Math.min(counts.parkingStalls, 512)); // parkingStallCount (max 512 stalls)
   setHdrU16(0x36, Math.min(header.hallCinema, 0xffff)); // hallCinemaCount (party halls + cinemas)
   // Saved view-scroll position (0x26 = x, 0x28 = y, world pixels). Left at 0 the
-  // game opens a loaded tower at the top-left sky; we write the game's own New
-  // Tower default so it opens on the ground lobby, the tower's entrance.
-  setHdrU16(0x26, TDT_DEFAULT_VIEW_X);
-  setHdrU16(0x28, TDT_DEFAULT_VIEW_Y);
+  // game opens a loaded tower at the top-left sky. When the save carries the
+  // player's view, write THAT (mapped to 1994 world px), so the exported tower
+  // opens where they were standing; otherwise fall back to the game's own New
+  // Tower default, which opens on the ground lobby, the tower's entrance.
+  const viewWords = save.view
+    ? viewWordsFromView(save.view)
+    : { x: TDT_DEFAULT_VIEW_X, y: TDT_DEFAULT_VIEW_Y };
+  setHdrU16(0x26, viewWords.x);
+  setHdrU16(0x28, viewWords.y);
 
   // A floor whose tenant count exceeds what the format (and our own parser's
   // hostile-file cap) allows cannot be represented; refuse rather than emit a

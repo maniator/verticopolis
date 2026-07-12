@@ -243,6 +243,7 @@ class GameApp {
     });
     this.saveLoad = new SaveLoad({
       getSim: () => this.sim,
+      getView: () => this.engine.viewState(),
       adoptSim: (sim) => this.adoptSim(sim),
       ui: {
         toast: (text, kind) => this.ui.toast(text, kind),
@@ -365,6 +366,9 @@ class GameApp {
       onInspectorClose: () => this.inspector.dismiss(),
       onShowSaves: () => this.ui.showSaves(SaveGame.listSlots()),
       onSaveSlot: (n) => {
+        // Manual slots carry the view too: stamp the live camera the same way
+        // SaveLoad does for the autosave and exports.
+        this.sim.view = this.engine.viewState();
         SaveGame.saveSlot(n, this.sim);
         this.ui.toast(`Saved to slot ${n}.`, "good");
       },
@@ -1262,7 +1266,10 @@ class GameApp {
     // A crash report pairs the CURRENT tower's save with these entries; errors
     // recorded against a previous tower would point triage at the wrong state.
     this.frameErrors.length = 0;
-    this.engine.setSim(sim);
+    // An undo/redo restore keeps the camera under the player (preserveHistory
+    // is only ever true on that path); a real tower swap lets the engine
+    // restore the save's own view or center a fresh one.
+    this.engine.setSim(sim, { keepCamera: preserveHistory });
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.
     this.ui.resetLog(sim);
