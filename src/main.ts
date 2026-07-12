@@ -943,7 +943,7 @@ class GameApp {
     // Cap the catch-up debt. Owed minutes grow with real frame time, so on a
     // device that can't simulate the fastest speed in real time every frame
     // would carry ever more sim work, stretching frames toward seconds of
-    // sustained CPU+GPU load — the profile under which Android reclaims the
+    // sustained CPU+GPU load, the profile under which Android reclaims the
     // WebGL context (the Pixel 8a "random crash"). Dropping the excess trades
     // clock accuracy for survival: the game visibly runs slower than the
     // speed button promises on hardware that can't keep up, and a tab restored

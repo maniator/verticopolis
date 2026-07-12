@@ -122,7 +122,7 @@ export class SaveLoad {
     let storageBlame = false;
     let hadPriorSave = false;
     // Behind the splash nothing needed flushing, but "your tower was saved"
-    // would be a false claim (a first-timer has no tower at all) — the screen
+    // would be a false claim (a first-timer has no tower at all), so the screen
     // words that case separately.
     const behindSplash = !!document.getElementById("splash");
     if (!behindSplash) {
@@ -132,10 +132,10 @@ export class SaveLoad {
         // The pre-crash flush failed. Left unhandled this throw would escape
         // the onContextLost handler and skip the crash screen, stranding the
         // player on a dead GPU canvas with no explanation. A failed setItem is
-        // atomic (it never clobbers), so any prior autosave is intact — but we
+        // atomic (it never clobbers), so any prior autosave is intact, but we
         // must not promise "your tower was saved" either; the screen words the
         // failure. Only promise the prior tower is safe when one actually
-        // exists — a first-session crash before any autosave has none to
+        // exists: a first-session crash before any autosave has none to
         // reassure about. hasSave() READS localStorage, which itself throws
         // when storage is *disabled* (a SecurityError) rather than merely full,
         // so guard it in its own try/catch.

@@ -3,6 +3,7 @@ import { getPlatform } from "../platform";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
 import type { CrashDescription, FrameErrorEntry } from "../game/crashReport";
 import { escapeHtml } from "./escape";
+import { routeExternalInWrapper } from "./externalLink";
 
 /**
  * The full-screen crash card. Shown when the game can no longer draw (the GPU
@@ -48,24 +49,23 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
     : "";
 
   const overlay = document.createElement("div");
-  overlay.id = CARD_ID;
+  overlay.id = CARD_ID; // idempotence handle only; styling hangs off the class
+  overlay.className = "crash-overlay";
   overlay.setAttribute("role", "alertdialog");
   overlay.setAttribute("aria-modal", "true");
   overlay.setAttribute("aria-labelledby", "crash-screen-title");
-  // A fixed overlay above everything: the game underneath is frozen (the
-  // render clock stopped when the context died), so nothing behind needs to
-  // stay reachable.
-  overlay.style.cssText =
-    "position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,0.55)";
+  // A fixed overlay above everything (styling in styles.css under
+  // "Crash screen"): the game underneath is frozen, the render clock stopped
+  // when the context died, so nothing behind needs to stay reachable.
   overlay.innerHTML = `
-    <div class="win" style="max-width:440px;padding:16px;display:flex;flex-direction:column;gap:10px">
+    <div class="win crash-card">
       <h2 id="crash-screen-title" class="win-title">The game crashed</h2>
       <p>The graphics driver reset while the game was running. On phones and tablets this usually means the device ran out of graphics memory, often on a very large tower at the fastest speed.</p>
       <p>${escapeHtml(saveLine)}</p>
       ${repeatLine}
       <p>A crash report helps us fix this. It's a zip with the crash details and your tower save; nothing is sent anywhere until you attach it to a bug report yourself.</p>
-      <p class="crash-status" aria-live="polite" style="min-height:1.2em;color:var(--muted)"></p>
-      <div class="modal-actions" style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+      <p class="crash-status" aria-live="polite"></p>
+      <div class="modal-actions">
         <button class="btn" data-act="download">Download crash report</button>
         <a class="btn" data-act="report" target="_blank" rel="noopener noreferrer" href="${escapeHtml(bugReportUrl({ version: opts.version, crash: opts.crash }))}">Report a bug<span class="visually-hidden"> (opens GitHub in a new tab)</span></a>
         <button class="btn primary" data-act="reload">Reload game</button>
@@ -100,6 +100,9 @@ export function showCrashScreen(opts: CrashScreenOptions): void {
     });
   });
   overlay.querySelector<HTMLButtonElement>('[data-act="reload"]')!.addEventListener("click", () => opts.onReload());
+  // Inside a native wrapper the bug-report link routes to the system browser
+  // through the platform port (same treatment as the Help dialog's link).
+  routeExternalInWrapper(overlay.querySelector<HTMLAnchorElement>('[data-act="report"]')!);
   // Move keyboard/screen-reader focus into the dialog (the canvas underneath
   // is dead); the primary action is the safe default.
   overlay.querySelector<HTMLButtonElement>('[data-act="reload"]')!.focus();

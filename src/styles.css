@@ -752,6 +752,32 @@ a.btn {
   padding: 7px 14px;
 }
 
+/* ---- Crash screen ----
+   The full-screen card shown when the GPU drops the WebGL context (see
+   src/ui/crashScreen.ts). Plain DOM over a scrim: the canvas is dead, so
+   everything here must render without it. */
+.crash-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.55);
+}
+.crash-overlay .crash-card {
+  max-width: 440px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.crash-overlay .crash-status {
+  min-height: 1.2em;
+  color: var(--muted);
+}
+
 /* ---- New Tower rule-set picker ----
  * Two selectable mode cards. The chosen rule-set is permanent for the tower, so
  * the lede spells that out and the cards read as a deliberate, one-time choice. */

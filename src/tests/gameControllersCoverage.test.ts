@@ -834,7 +834,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     SaveGame.save(sim);
     // Now the GPU dies AND storage is full: the pre-crash flush throws. Left
     // unhandled this would escape the onContextLost handler and skip the crash
-    // screen — instead the screen must show, and the prior tower must survive.
+    // screen. Instead the screen must show, and the prior tower must survive.
     const spy = vi.spyOn(SaveGame, "save").mockImplementationOnce(() => {
       throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
     });

@@ -575,7 +575,7 @@ export class TowerEngine {
     // Floor/lobby tiles have no per-tile actors (they live in the struct
     // TileMap), so resolve them by grid lookup instead of an actor scan. They
     // sat at z -1, below every room (0) and transport (1), so they only ever
-    // won a pick when nothing else contained the point — which is exactly the
+    // won a pick when nothing else contained the point, which is exactly the
     // "no actor matched" case here. O(1) versus the old scan of ~9,000 actors.
     if (!best) {
       const { tile, floor } = this.worldToCell(world);

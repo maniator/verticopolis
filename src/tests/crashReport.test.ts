@@ -25,7 +25,7 @@ describe("crash report packaging", () => {
     expect(details.tower.units).toBe(sim.tower.units.length);
     expect(details.tower.speed).toBe(3);
     expect(details.recentFrameErrors).toEqual([{ at: "2026-07-12T00:00:00.000Z", message: "boom" }]);
-    // createdAt must be a real ISO timestamp — it becomes the zip's filename stamp.
+    // createdAt must be a real ISO timestamp; it becomes the zip's filename stamp.
     expect(new Date(details.createdAt).toISOString()).toBe(details.createdAt);
   });
 
