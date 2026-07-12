@@ -305,6 +305,38 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   files move together; consider a CI assert that the two versions match.
   (Blind Hunter, 2026-07-08.)
 
+### Deferred from: party-mode chrome restructure, 2026-07-12
+
+- **`colorblindCue` pref has no UI**: the Prefs field ships (default on, gates
+  optional color-redundant markers) but nothing exposes it. The new Settings
+  dialog is its natural home; exposing it deserves its own story with a demo
+  of the gated markers and copy that explains what changes. (Party decision,
+  2026-07-12.)
+
+### Deferred from: bmad-code-review (settings modal), 2026-07-12
+
+- **The splash can no longer reach the sound/accessibility controls**: the
+  Help dialog (openable from the splash's "How to Play") used to host the
+  volume sliders and the Reduced motion / Steady clock toggles; they moved to
+  the Settings dialog, whose only entry (`btn-settings`) sits behind the
+  splash's focus trap. A motion-sensitive player without the OS-level
+  `prefers-reduced-motion` (which still forces the pref and tames the splash)
+  cannot enable the user override before dismissing the animated splash. Fix
+  when touched next: a small Settings affordance on the splash, or hoist the
+  Reduced motion toggle there. (Edge Case Hunter, 2026-07-12.)
+
+### Deferred from: bmad-code-review (persisted volume settings), 2026-07-12
+
+- **Cross-tab prefs writes are whole-object last-writer-wins**: `savePrefs`
+  rewrites the entire `vc.prefs` blob from a per-tab in-memory copy loaded
+  once at boot, so a write from tab A (e.g. the debounced volume save) can
+  revert a newer field written by tab B (e.g. mute). Pre-existing shape for
+  reducedMotion/steadyClock; the volume feature adds three fields and a
+  200ms trailing debounce that widens the window slightly (pagehide flush
+  bounds it). Fix when touched next: read-merge-write inside `savePrefs`, or
+  a `storage`-event listener that folds remote changes into `this.prefs`.
+  (Edge Case Hunter, 2026-07-12.)
+
 ## Completed / superseded
 
 - ~~**P1, `deserialize` crashes on a `null`/malformed unit or transport entry (condo-modes)**~~
