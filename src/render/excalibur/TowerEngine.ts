@@ -317,7 +317,8 @@ export class TowerEngine {
    *  change, or when the mode flips — never per frame (it scans the unit list). */
   private heatmap: HeatCell[] = [];
   private heatmapHour = -1;
-  private heatmapRev = "";
+  private heatmapTowerRev = -1;
+  private heatmapMealRev = -1;
   private heatmapMode: HeatmapMode | null = null;
   /** The busiest floor's raw congestion ratio when the congestion overlay was
    *  last (re)built — surfaced in the legend so an all-green map still reports
@@ -1116,15 +1117,22 @@ export class TowerEngine {
     // congestion overlay must also invalidate on the meal-overlay revision or
     // its cells and peak legend trail the traffic chip by up to an hour during
     // a meal window. The other overlay modes stay hour-and-structure keyed.
-    const rev = `${this.sim.tower.revision}:${
-      this.overlayMode === "congestion" ? this.sim.tower.mealOverlayRevision : 0
-    }`;
-    if (this.overlayMode !== this.heatmapMode || hour !== this.heatmapHour || rev !== this.heatmapRev) {
+    // Two numeric fields, not a composite string: this runs every frame while
+    // an overlay is open, and per-frame string building is avoidable GC churn.
+    const towerRev = this.sim.tower.revision;
+    const mealRev = this.overlayMode === "congestion" ? this.sim.tower.mealOverlayRevision : 0;
+    if (
+      this.overlayMode !== this.heatmapMode ||
+      hour !== this.heatmapHour ||
+      towerRev !== this.heatmapTowerRev ||
+      mealRev !== this.heatmapMealRev
+    ) {
       this.heatmap = this.sim.floorHeatmap(this.overlayMode);
       this.heatmapPeakCongestion = this.overlayMode === "congestion" ? this.sim.peakCongestion() : 0;
       this.heatmapMode = this.overlayMode;
       this.heatmapHour = hour;
-      this.heatmapRev = rev;
+      this.heatmapTowerRev = towerRev;
+      this.heatmapMealRev = mealRev;
     }
     const z = this.cam.zoom;
     // Visible floor band (computed once) to skip the coordinate transforms for

@@ -586,60 +586,90 @@ function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, 
   const { ctx } = d;
   const asleep = u.state === "asleep";
   const dirty = u.state === "dirty";
-  // Hotels are DELIBERATELY uniform (party verdict): a real hotel corridor is
-  // identical rooms, and the room's whole job is broadcasting its state
-  // (ready lamp / asleep z / dirty tray). Variety here is only the linen wall
-  // tint (suite drifts hue-only in its own gold band so the grade tell
-  // survives) and a mirrored bed; every state cue renders pixel-identical.
+  // Rooms of the SAME grade stay uniform (party verdict: a hotel corridor is
+  // identical rooms and the room's job is broadcasting ready/asleep/dirty),
+  // but the GRADES are distinct geometry: a Single is one small bed, a Double
+  // is two beds with a real gap, a Suite is a wide room with a sitting area
+  // and a wide bed. Per-unit variety is only the linen wall tint (suite
+  // drifts hue-only in its own gold band) and a mirrored floor plan.
   const wallBand = grade === 3 ? SUITE_WALLS : HOTEL_WALLS;
   const wall = wallBand[geoVariant(u, 0, wallBand.length)];
   // "Someone is here at all" gate stays canonical for hotels.
   const lit = !asleep && (u.occupants > 0 || d.lit);
   const floorY = shell(ctx, x, y, w, h, asleep ? "#3A3550" : wall, "#A88A5E");
   const flip = geoVariant(u, 1, 2) === 1;
-  const base = x + (grade === 3 ? Math.min(w * 0.2, 18) + 10 : 6);
-  const bedW = x + w - 5 - base;
   const bedTop = floorY - 9;
+  // One bed per grade slot; each draws its own headboard, mattress, foot
+  // band, pillow, and (asleep) sleeper, so a Double reads as two real beds.
+  const bed = (bx: number, bw: number, pillows: number, sleeper: number) => {
+    ctx.fillStyle = "#5A3F2C"; // headboard
+    ctx.fillRect(bx, bedTop - 2, 3, 11);
+    ctx.fillStyle = "#E8E2D2"; // mattress
+    ctx.fillRect(bx + 3, bedTop, bw - 3, 9);
+    ctx.fillStyle = shade(PAL.brass, 10); // foot band
+    ctx.fillRect(bx + 3, bedTop + 6, bw - 3, 1);
+    ctx.fillStyle = "#FBF7EC"; // pillow(s)
+    ctx.fillRect(bx + 4, bedTop + 1, Math.max(4, Math.round(bw * 0.22)), 3);
+    if (pillows >= 2) ctx.fillRect(bx + 4, bedTop + 5, Math.max(3, Math.round(bw * 0.18)), 2);
+    if (asleep && sleeper < u.occupants) {
+      ctx.fillStyle = "#6677BB"; // blanket
+      ctx.fillRect(bx + 4 + Math.round(bw * 0.2), bedTop + 2, Math.round(bw * 0.6), 5);
+      ctx.fillStyle = SKIN[(u.id + sleeper) % SKIN.length];
+      ctx.fillRect(bx + 5, bedTop + 1, 3, 3);
+    } else if (dirty) {
+      ctx.fillStyle = "#B8A98A"; // rumpled bedding
+      ctx.fillRect(bx + 4, bedTop + 1, Math.round(bw * 0.8), 6);
+    }
+  };
+  // Bed positions per grade, in unmirrored room coordinates.
+  const beds: { bx: number; bw: number; pillows: number }[] = [];
+  if (grade === 1) {
+    beds.push({ bx: x + 6, bw: Math.min(Math.round(w * 0.5), 24), pillows: 1 });
+  } else if (grade === 2) {
+    // Two beds with a REAL gap; two mattresses touching read as one long bed.
+    const bw = Math.min(Math.round((w - 26) / 2), 24);
+    beds.push({ bx: x + 6, bw, pillows: 1 });
+    beds.push({ bx: x + 6 + bw + 8, bw, pillows: 1 });
+  } else {
+    // Suite: the sitting area owns the left third, a wide two-pillow bed the rest.
+    const sofaW = Math.min(Math.round(w * 0.2), 18);
+    beds.push({ bx: x + sofaW + 14, bw: Math.min(Math.round(w * 0.42), 40), pillows: 2 });
+  }
   maybeMirrored(ctx, flip, x, w, () => {
     if (grade === 3) {
-      // Suite sitting area on the left third.
-      const sofaW = Math.min(w * 0.2, 18);
-      ctx.fillStyle = "#7C5A6A";
+      const sofaW = Math.min(Math.round(w * 0.2), 18);
+      ctx.fillStyle = "#7C5A6A"; // sitting area
       ctx.fillRect(x + 5, floorY - 6, sofaW, 6);
       ctx.fillStyle = "#8C6A7A";
       ctx.fillRect(x + 5, floorY - 9, sofaW, 3);
+      ctx.fillStyle = "#7A6A50"; // floor lamp beside the sofa
+      ctx.fillRect(x + sofaW + 8, floorY - 12, 2, 12);
+      ctx.fillStyle = lit ? "#F0D890" : "#9a8f70";
+      ctx.fillRect(x + sofaW + 6, floorY - 14, 6, 3);
     }
-    ctx.fillStyle = "#5A3F2C"; // headboard
-    ctx.fillRect(base, bedTop - 2, 4, 11);
-    ctx.fillStyle = "#E8E2D2"; // mattress
-    ctx.fillRect(base + 4, bedTop, bedW - 4, 9);
-    ctx.fillStyle = shade(PAL.brass, 10); // foot band
-    ctx.fillRect(base + 4, bedTop + 6, bedW - 4, 1);
-    ctx.fillStyle = "#FBF7EC"; // pillow(s)
-    ctx.fillRect(base + 5, bedTop + 1, Math.max(5, bedW * 0.2), 3);
-    if (grade >= 2) ctx.fillRect(base + 5, bedTop + 5, Math.max(4, bedW * 0.16), 2);
-    ctx.fillStyle = "#6A4A30"; // nightstand
+    beds.forEach((b, i) => bed(b.bx, b.bw, b.pillows, i));
+    ctx.fillStyle = grade === 2 ? "#6A4A30" : "#6A4A30"; // nightstand
     ctx.fillRect(x + w - 6, floorY - 6, 4, 6);
-
-    if (asleep) {
-      ctx.fillStyle = "#6677BB";
-      ctx.fillRect(base + 6 + bedW * 0.2, bedTop + 2, bedW * 0.6, 5);
-      ctx.fillStyle = SKIN[u.id % SKIN.length];
-      ctx.fillRect(base + 6, bedTop + 1, 3, 3);
-    } else if (dirty) {
-      ctx.fillStyle = "#B8A98A";
-      ctx.fillRect(base + 5, bedTop + 1, bedW * 0.8, 6);
-      ctx.fillStyle = "#D4623A";
+    if (grade === 2) {
+      // Shared nightstand between the two beds as well.
+      const gapX = beds[0].bx + beds[0].bw + 2;
+      ctx.fillStyle = "#6A4A30";
+      ctx.fillRect(gapX, floorY - 5, 4, 5);
+    }
+    if (!asleep && dirty) {
+      ctx.fillStyle = "#D4623A"; // housekeeping tray by the nightstand
       ctx.fillRect(x + w - 6, floorY - 9, 4, 3);
-    } else if (lit) {
+    } else if (lit && !dirty) {
       ctx.fillStyle = "#FFD86A"; // ready: lamp on
       ctx.fillRect(x + w - 5, floorY - 11, 2, 5);
     }
   });
   if (asleep) {
     // The "z" is text, so it draws OUTSIDE the mirror wrapper at a computed
-    // position (mirrored text would render backward).
-    const zx = flip ? 2 * x + w - (base + 12) - 5 : base + 12;
+    // position (mirrored text would render backward), floating over the first
+    // occupied bed.
+    const zSrc = beds[0].bx + 8;
+    const zx = flip ? 2 * x + w - zSrc - 5 : zSrc;
     ctx.fillStyle = "rgba(210,220,255,0.9)";
     ctx.font = "8px system-ui, sans-serif";
     ctx.fillText("z", zx, bedTop - 1);
