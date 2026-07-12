@@ -357,6 +357,8 @@ describe("hotel-origin venue customers stay out of the 4-star-plus census", () =
     const sim = officeAndFastFood();
     sim.star = 4;
     const cinema = sim.tower.place("cinema", 3, 0);
+    expect(cinema.reason).toBeUndefined();
+    expect(cinema.ok).toBe(true);
     const cinemaUnit = sim.tower.units.find((u) => u.id === cinema.unitId)!;
     cinemaUnit.state = "occupied";
     const base = sim.ratingPopulation();
