@@ -89,6 +89,79 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
   });
 });
 
+describe("Legibility — two-ride rule gates move-ins (Simulation)", () => {
+  /** Like threeRideTower, but with empty rentable units instead of a tenant:
+   *  condo/office/hotel on floor 40 (3 rides out) and a control condo on
+   *  floor 14 (one ride up shaft A). */
+  function strandedMoveInTower(seed: number): {
+    sim: Simulation;
+    unit: (id: number) => { state: string; everOccupied: boolean };
+    ids: { condo40: number; office40: number; hotel40: number; condo14: number };
+  } {
+    const sim = Simulation.newGame(seed);
+    sim.money = 1e12;
+    layFull(sim, "lobby", 1);
+    for (let f = 2; f <= 45; f++) layFull(sim, "floor", f);
+    sim.tower.placeTransport("elevatorStandard", C, 1, 15); // A
+    sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30); // B (transfer at 15)
+    sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45); // C (transfer at 30)
+    const ids = {
+      condo40: sim.tower.place("condo", 40, 20).unitId!,
+      office40: sim.tower.place("office", 40, 60).unitId!,
+      hotel40: sim.tower.place("hotelSingle", 40, 100).unitId!,
+      condo14: sim.tower.place("condo", 14, 20).unitId!,
+    };
+    const unit = (id: number) => sim.tower.units.find((u) => u.id === id)!;
+    return { sim, unit, ids };
+  }
+
+  it("no tenant kind moves in on a served floor 3+ rides out, while a reachable floor fills", () => {
+    const { sim, unit, ids } = strandedMoveInTower(8);
+    expect(sim.tower.isFloorServed(40)).toBe(true); // served, so only the two-ride gate blocks
+    sim.tick(7 * DAY); // a week of hourly move-in rolls
+    expect(unit(ids.condo40).state).toBe("empty");
+    expect(unit(ids.condo40).everOccupied).toBe(false); // no sale banked
+    expect(unit(ids.office40).state).toBe("empty");
+    expect(unit(ids.hotel40).everOccupied).toBe(false); // never filled, even in the evenings
+    expect(unit(ids.condo14).everOccupied).toBe(true); // control: demand itself is alive
+  });
+
+  it("move-ins resume once a shortcut puts the floor within two rides", () => {
+    const { sim, unit, ids } = strandedMoveInTower(9);
+    sim.tick(2 * DAY);
+    expect(unit(ids.condo40).everOccupied).toBe(false);
+    // 1 → 15 → 40: two rides via the new shaft.
+    expect(sim.tower.placeTransport("elevatorStandard", C - 10, 15, 45).ok).toBe(true);
+    sim.tick(3 * DAY);
+    expect(unit(ids.condo40).everOccupied).toBe(true);
+  });
+
+  it("a condo already sold on a stranded floor survives save/load untouched", () => {
+    const { sim, ids } = strandedMoveInTower(10);
+    const before = sim.tower.units.find((u) => u.id === ids.condo40)!;
+    before.state = "occupied"; // sold under the old rules (the SixSeven shape)
+    before.everOccupied = true;
+    before.rent = 160_000;
+    const loaded = Simulation.deserialize(sim.serialize());
+    loaded.tick(2 * DAY);
+    const after = loaded.tower.units.find((u) => u.kind === "condo" && u.floor === 40)!;
+    expect(after.state).toBe("occupied"); // no retroactive eviction
+    expect(after.everOccupied).toBe(true); // no buy-back reversal
+  });
+
+  it("the daily advisory covers a stranded floor of still-empty units; stats scope stays leased-only", () => {
+    const { sim } = strandedMoveInTower(11);
+    // Wide scope sees the empty units; the stats-modal (leased) scope does not.
+    expect(sim.strandedFloors("rentable")).toContain(40);
+    expect(sim.strandedFloors()).toEqual([]);
+    const count = () => sim.log.filter((e) => e.text.includes("3+ elevator rides")).length;
+    sim.tick(DAY);
+    expect(count()).toBe(1); // fired with nothing leased up there
+    sim.tick(DAY);
+    expect(count()).toBe(1); // latched while the condition persists
+  });
+});
+
 describe("Legibility — rating & stats (Simulation)", () => {
   it("hotelsCountTowardRating flips at 4★ and rating population diverges", () => {
     const sim = Simulation.newGame(6);

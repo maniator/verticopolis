@@ -191,37 +191,51 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
       for (let x = C; x < W; x++) sim.tower.place(k, f, x);
       for (let x = C - 1; x >= 0; x--) sim.tower.place(k, f, x);
     };
-    lay("lobby", 1);
-    for (let f = 2; f <= 100; f++) lay("floor", f);
+    // Sky-lobby floors get LOBBY tiles, not floor tiles: a lobby can't be laid
+    // over existing floor tiles ("Clear the floor tiles or rooms here first"),
+    // so the old lay-floors-then-lobbies order silently left the tower with no
+    // sky lobbies at all — and an express with nothing to stop at.
     const sky = [15, 30, 45, 60, 75, 90];
-    for (const sf of sky) lay("lobby", sf);
+    const skyset = new Set(sky);
+    lay("lobby", 1);
+    for (let f = 2; f <= 100; f++) lay(skyset.has(f) ? "lobby" : "floor", f);
     for (let fl = 0; fl >= -2; fl--) lay("floor", fl); // 3 basement floors for the metro
 
-    // Zoned transport: 2 express (lobby-to-lobby) + 1 local per 15-floor band.
-    let col = W - 4;
-    const addShaft = (kind: string, b: number, t: number) => {
-      const r = sim.buildTransport(kind as never, col, b, t);
-      if (r.ok) sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 8);
-      col -= 5;
+    // Zoned transport, and every piece must actually land (this fixture used to
+    // degrade silently: express is star-gated, so rank up BEFORE building).
+    // Layout matters under honest per-floor congestion and the 79-tile walking
+    // tolerance: 3 shaft GROUPS spread across the lot so no office is a long
+    // walk from a lobby-connected shaft, one local per group per 15-floor band
+    // (3 parallel locals per band), staggered so adjacent bands sharing a
+    // sky-lobby endpoint never collide, plus 2 lobby-to-lobby express shafts
+    // for the ≤2-ride hop to every band. 23 shafts, inside the 24-shaft pool.
+    sim.star = 5;
+    const addShaft = (kind: string, x: number, b: number, t: number) => {
+      const r = sim.buildTransport(kind as never, x, b, t);
+      expect(r.ok).toBe(true); // the fixture's zoning must actually land
+      sim.tower.setCars(sim.tower.transports[sim.tower.transports.length - 1].id, 8);
     };
-    addShaft("elevatorExpress", 1, 100);
-    addShaft("elevatorExpress", 1, 100);
-    for (const [b, t] of [[1, 15], [15, 30], [30, 45], [45, 60], [60, 75], [75, 90], [90, 100]]) {
-      addShaft("elevatorStandard", b as number, t as number);
-    }
-    const right = col; // offices must stop before the shaft columns
+    addShaft("elevatorExpress", 350, 1, 100);
+    addShaft("elevatorExpress", 356, 1, 100);
+    const groups = [40, 187, 334];
+    const bands: Array<[number, number]> = [[1, 15], [15, 30], [30, 45], [45, 60], [60, 75], [75, 90], [90, 100]];
+    bands.forEach(([b, t], i) => {
+      for (const g of groups) addShaft("elevatorStandard", g + (i % 2 ? 5 : 0), b, t);
+    });
+    // The zoning holds the two-ride rule everywhere: express to a sky lobby,
+    // local to the floor. Nothing in this tower is stranded.
+    for (let f = 2; f <= 100; f++) expect(sim.floorReachable(f)).toBe(true);
 
     // Services distributed up the tower (coverage radius), a metro, and offices.
     sim.tower.place("metro", -2, 0);
-    for (let f = 8; f <= 98; f += 15) sim.tower.place("security", f, 0);
-    for (let f = 8; f <= 98; f += 24) sim.tower.place("medical", f, 8);
+    for (let f = 8; f <= 98; f += 15) sim.tower.place("security", f, 60);
+    for (let f = 8; f <= 98; f += 24) sim.tower.place("medical", f, 100);
 
-    const skyset = new Set(sky);
     let pop = 0;
     for (let f = 2; f <= 99 && pop < TOWER_POPULATION + 600; f++) {
       if (skyset.has(f)) continue;
-      for (let x = 16; x + 9 <= right && pop < TOWER_POPULATION + 600; x += 9) {
-        const r = sim.tower.place("office", f, x);
+      for (let x = 16; x + 9 <= 350 && pop < TOWER_POPULATION + 600; x += 9) {
+        const r = sim.tower.place("office", f, x); // skips slots under shaft columns/services
         if (r.ok) {
           const u = sim.tower.units.find((uu) => uu.id === r.unitId)!;
           u.state = "occupied";
@@ -233,8 +247,9 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     expect(sim.population).toBeGreaterThanOrEqual(TOWER_POPULATION);
 
     // Crown it and summon the VIP, then run several real days of hourly sim.
-    sim.star = 5;
-    expect(sim.build("weddingHall", 100, C).ok).toBe(true);
+    // (Already 5★ from the transport unlock above. x=100 keeps the hall clear
+    // of the center shaft group's column.)
+    expect(sim.build("weddingHall", 100, 100).ok).toBe(true);
     const popBeforeRun = sim.population;
     for (let day = 0; day < 8 && !sim.evaluatedTower; day++) sim.tick(60 * 24);
 
