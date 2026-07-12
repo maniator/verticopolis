@@ -110,6 +110,14 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: spec-pixel-8a-crash-fix (2026-07-12)
+
+- Renderer: the ~935 room actors still cost ~16ms of a paused desktop frame on a
+  10,344-unit save (ablation in the crash investigation). Batching or culling
+  them the way floor/lobby tiles were TileMap-ified is the next big win for
+  huge towers on phones. See
+  investigations/pixel-8a-fast-speed-crash-investigation.md.
+
 ### Deferred from: code review of spec-stranded-floor-move-ins (2026-07-12)
 
 - Stranded-floor advisory latch is a single tower-wide boolean (`Simulation.strandedNudged`): while any stranded floor persists, a different floor going stranded on a later day emits no new advisory. Widened surface since the latch is now held by the `rentable` scope while the stats modal lists only `leased` floors, so an all-empty stranded slab (invisible in the modal) can consume the one-shot nudge a later leased-and-stranded floor would otherwise get. Consider a per-floor or count-based latch.

@@ -8,6 +8,7 @@ import type { CalendarKind } from "../engine/calendar";
 import { escapeHtml } from "./escape";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
+import { routeExternalInWrapper } from "./externalLink";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
@@ -1056,36 +1057,9 @@ export class UI {
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
       <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
-    // Only inside a native wrapper: the report link must not navigate the
-    // shell's WebView away, so hand it to the system browser through the
-    // platform port. Browser builds attach nothing, keeping the anchor's
-    // middle-click and context-menu semantics untouched.
-    if (getPlatform().isNativeWrapper) {
-      const report = box.querySelector<HTMLAnchorElement>(".help-report a")!;
-      const fallback = (err: unknown) => {
-        // The default is already cancelled; a failing wrapper hook must not
-        // leave the link dead, so fall back to the browser behavior.
-        console.error("[platform] openExternal failed:", err);
-        window.open(report.href, "_blank", "noopener,noreferrer");
-      };
-      const routeExternal = (e: Event) => {
-        e.preventDefault();
-        // Promise.resolve folds an async wrapper hook's rejection (Capacitor's
-        // Browser.open returns a Promise) into the same fallback as a sync
-        // throw; either way the tap must still open the page somewhere.
-        try {
-          void Promise.resolve(getPlatform().openExternal(report.href)).catch(fallback);
-        } catch (err) {
-          fallback(err);
-        }
-      };
-      report.addEventListener("click", routeExternal);
-      // Middle-button activation fires auxclick, not click; route it the same
-      // way (other buttons keep their defaults, e.g. the context menu).
-      report.addEventListener("auxclick", (e) => {
-        if (e.button === 1) routeExternal(e);
-      });
-    }
+    // Inside a native wrapper the report link routes to the system browser
+    // through the platform port (see routeExternalInWrapper).
+    routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
     const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
     const scLabel = (steady: boolean) => {
       sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;

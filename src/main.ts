@@ -26,9 +26,23 @@ import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { resolveBootScreen } from "./bootScreen";
+import { CRASH_SCREEN_ID, showCrashScreen } from "./ui/crashScreen";
+import type { FrameErrorEntry } from "./game/crashReport";
 
 /** Game speeds → in-game minutes advanced per real second. */
 const SPEEDS = [0, 10, 30, 120];
+
+/** Hard cap on owed-but-unsimulated minutes carried between frames. At the
+ *  fastest speed (120 min/s) a device that can't simulate that fast in real
+ *  time accrues debt every frame; without a cap each frame does more work than
+ *  the last until frames run seconds long (see the clamp in update()). 30
+ *  minutes is 15 ideal frames of fastest-speed debt (2 sim-minutes per 60fps
+ *  frame), generous headroom for hitches, while keeping the largest single
+ *  frame's sim work bounded near two 20-minute tick chunks. */
+const MAX_CATCHUP_MINUTES = 30;
+
+/** Ring-buffer depth for tick-guard failures included in a crash report. */
+const MAX_FRAME_ERRORS = 5;
 
 /** Compile-time app version (see vite.config.ts `define`); "dev" outside a build. */
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
@@ -80,6 +94,9 @@ class GameApp {
   private lastUiUpdate = 0;
   /** Throttle for the per-frame error log, so a repeating throw can't spam. */
   private lastTickErrorLog = 0;
+  /** The last few tick-guard failures, kept for the crash report (the guard
+   *  swallows them to keep the game alive, which otherwise erases the trail). */
+  private frameErrors: FrameErrorEntry[] = [];
   private shownWin = false;
   /** A save existed at boot but couldn't be read (corrupt / incompatible). */
   private saveWasCorrupt = false;
@@ -222,7 +239,16 @@ class GameApp {
         showImportReport: (report, cb) => this.ui.showImportReport(report, cb),
         showExportReport: (report, cb) => this.ui.showExportReport(report, cb),
       },
-      showBootMessage,
+      // SaveLoad owns the crash shape and the reload action; the app supplies
+      // the context only it has (version, the live sim, the frame-error ring).
+      showCrashScreen: (info) =>
+        showCrashScreen({
+          ...info,
+          version: APP_VERSION,
+          speed: this.speed,
+          getSim: () => this.sim,
+          frameErrors: this.frameErrors,
+        }),
       armOnboarding: () => {
         this.onboarding.arm(this.sim);
       },
@@ -687,6 +713,13 @@ class GameApp {
         if (now - this.lastTickErrorLog > 2000) {
           this.lastTickErrorLog = now;
           console.error("[tick] frame error, continuing:", err);
+          // Same throttle for the crash-report ring buffer: a repeating throw
+          // records one entry per window, not one per frame.
+          this.frameErrors.push({
+            at: new Date().toISOString(),
+            message: err instanceof Error ? `${err.message}\n${err.stack ?? ""}`.trim() : String(err),
+          });
+          if (this.frameErrors.length > MAX_FRAME_ERRORS) this.frameErrors.shift();
         }
       }
     };
@@ -699,6 +732,12 @@ class GameApp {
 
   private bindKeys(): void {
     window.addEventListener("keydown", (e) => {
+      // The crash screen owns all input while it is up: the renderer is dead
+      // and the tower was just flushed, so game shortcuts (undo especially)
+      // must not silently mutate the sim behind the card. Checked before the
+      // undo/redo block below, which deliberately runs ahead of the #modal
+      // guard and would otherwise stay live.
+      if (document.getElementById(CRASH_SCREEN_ID)) return;
       // Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Shift+Z or +Y) — handled BEFORE the
       // modifier bail below so it isn't swallowed; skipped while typing in a field
       // (which keeps its own edit history, e.g. the rename box).
@@ -908,6 +947,16 @@ class GameApp {
     // the speed buttons keep their meaning.
     const pace = this.prefs.steadyClock ? 1 : paceFactor(this.sim.clock.minuteOfDay);
     this.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
+    // Cap the catch-up debt. Owed minutes grow with real frame time, so on a
+    // device that can't simulate the fastest speed in real time every frame
+    // would carry ever more sim work, stretching frames toward seconds of
+    // sustained CPU+GPU load, the profile under which Android reclaims the
+    // WebGL context (the Pixel 8a "random crash"). Dropping the excess trades
+    // clock accuracy for survival: the game visibly runs slower than the
+    // speed button promises on hardware that can't keep up, and a tab restored
+    // from the background resumes with one bounded step instead of replaying
+    // the whole absence.
+    if (this.accMinutes > MAX_CATCHUP_MINUTES) this.accMinutes = MAX_CATCHUP_MINUTES;
     // Step the simulation in small chunks so hourly/daily boundaries fire.
     const minutesBeforeTicks = this.sim.clock.minutes;
     let guard = 0;
@@ -1155,6 +1204,9 @@ class GameApp {
     this.lastStar = sim.star;
     this.accMinutes = 0;
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
+    // A crash report pairs the CURRENT tower's save with these entries; errors
+    // recorded against a previous tower would point triage at the wrong state.
+    this.frameErrors.length = 0;
     this.engine.setSim(sim);
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.

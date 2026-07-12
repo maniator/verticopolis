@@ -236,7 +236,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
         adopted.push(s);
       },
       ui: f.ui,
-      showBootMessage: () => {},
+      showCrashScreen: () => {},
       armOnboarding: () => {},
     });
   });

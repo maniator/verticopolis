@@ -752,6 +752,26 @@ a.btn {
   padding: 7px 14px;
 }
 
+/* ---- Crash screen ----
+   The card shown when the GPU drops the WebGL context (see
+   src/ui/crashScreen.ts). A real dialog opened with showModal(), so it wins
+   the top layer even when another dialog was open at crash time; the canvas
+   is dead, so everything here must render without it. */
+.crash-card {
+  max-width: 440px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+dialog.crash-card::backdrop {
+  background: rgba(0, 0, 0, 0.55);
+}
+.crash-card .crash-status {
+  min-height: 1.2em;
+  color: var(--muted);
+}
+
 /* ---- New Tower rule-set picker ----
  * Two selectable mode cards. The chosen rule-set is permanent for the tower, so
  * the lede spells that out and the cards read as a deliberate, one-time choice. */
