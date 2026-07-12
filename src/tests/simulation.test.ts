@@ -1073,6 +1073,19 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     expect(r.reason).toBe("Clear the floor tiles or rooms here first, then place your sky lobby.");
   });
 
+  it("refuses a sky lobby over plain floor tiles too (lay lobbies first, or clear the tiles)", () => {
+    // The exact silent-degradation mode that rotted the phase2 endgame fixture:
+    // floor tiles laid across a sky-lobby floor, then a lobby placed on top.
+    // Every tile of the lobby must be refused, loudly, so a fixture (or player)
+    // that skips checking ok ends up with NO sky lobby rather than a partial one.
+    const sim = Simulation.newGame(7);
+    const x0 = towerToFloor(sim, 15); // lays plain floor tiles up through 15
+    const r = sim.build("lobby", 15, x0);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("Clear the floor tiles or rooms here first, then place your sky lobby.");
+    expect(sim.tower.floorHasLobby(15)).toBe(false);
+  });
+
   it("does not restrict a plain floor on an unclaimed sky-lobby floor", () => {
     const sim = Simulation.newGame(7);
     const x0 = towerToFloor(sim, 14); // support up through floor 14, floor 15 empty
