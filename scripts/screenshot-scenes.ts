@@ -301,23 +301,31 @@ export const SCENES: Scene[] = [
         setup: async (page) => {
           // Fire the same hook the engine raises when the GPU drops the WebGL
           // context; the recovery flow flushes the autosave and opens the card.
-          // The hook is nullable on TowerEngine, so fail with a message that
-          // names the real problem instead of a bare TypeError if the wiring
-          // in main.ts ever changes.
+          // Both links are asserted with messages that name the real problem
+          // (the hook is nullable on TowerEngine, and a silently skipped clock
+          // stop would leave the backdrop advancing between runs).
           await page.evaluate(() => {
             const engine = (window as any).game?.engine;
-            if (typeof engine?.onContextLost !== "function") throw new Error("game.engine.onContextLost is not wired; crash-screen scene needs the recovery hook");
+            if (typeof engine?.onContextLost !== "function") {
+              throw new Error("game.engine.onContextLost is not wired; the crash-screen scene needs the recovery hook");
+            }
             // Match the real context-loss path: TowerEngine.handleContextLost
             // stops the Excalibur clock BEFORE raising the hook, so the frame
-            // under the card is frozen. Doing the same keeps the capture true
-            // to the crash state and deterministic.
-            engine.engine?.clock?.stop?.();
+            // under the card is frozen exactly as in a real crash.
+            const clock = engine.engine?.clock;
+            if (typeof clock?.stop !== "function") {
+              throw new Error("game.engine.engine.clock is unavailable; the crash-screen scene needs to freeze the frame");
+            }
+            clock.stop();
             engine.onContextLost();
           });
           // Fail the shot (keep the committed image) if the card never mounts.
           await page.waitForSelector("dialog#crash-screen[open]", { timeout: 4000 });
         },
-        wait: 400,
+        // Capture exactly at the verified state: a 0ms settle steps zero
+        // frames, so nothing advances behind the frozen card (after a real
+        // context loss no further frames run either).
+        wait: 0,
       },
     ],
   },

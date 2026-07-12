@@ -87,9 +87,9 @@ reflow skipped ("before") and once applied ("after"), so the change is honest.
 
 ## Crash screen (context-loss recovery with a crash report)
 
-Captured from the built app via the unified generator (`scripts/screenshots.ts`, `crash-screen` scene) on a
-phone-sized viewport: a full canon tower running, then the same hook the engine raises when the GPU drops
-the WebGL context.
+Captured from the built app via the unified generator (entrypoint `scripts/screenshots.ts`; the
+`crash-screen` scene is defined in `scripts/screenshot-scenes.ts`) on a phone-sized viewport: a full canon
+tower running, then the same hook the engine raises when the GPU drops the WebGL context.
 
 | Screenshot | Shows |
 |---|---|
