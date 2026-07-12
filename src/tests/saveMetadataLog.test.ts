@@ -157,30 +157,36 @@ describe("bulletin-log persistence", () => {
   it("the save cap equals the ring cap, so an undo never trims scrollback", () => {
     // Regression for the deferred review finding: with LOG_SAVE_CAP below the
     // ring cap, undoing while the ring held more entries silently dropped the
-    // older lines. Overfill the ring so the test pins EQUALITY: everything
-    // the live ring holds (and only what it holds) survives the round trip;
-    // any save cap below the ring cap fails the length assertion.
+    // older lines. Overfill the ring so the test pins EQUALITY: the live
+    // ring's own length must equal LOG_SAVE_CAP (that IS the ruling), and
+    // everything the ring holds survives the round trip. All expectations
+    // derive from the constant so the test tracks the contract, not a number.
+    const overflow = 50;
+    const total = LOG_SAVE_CAP + overflow;
     const sim = new Simulation();
-    for (let i = 0; i < 350; i++) sim.emit(`line ${i}`, "info");
-    expect(sim.log).toHaveLength(300); // the live ring after 350 emits
+    for (let i = 0; i < total; i++) sim.emit(`line ${i}`, "info");
+    expect(sim.log).toHaveLength(LOG_SAVE_CAP); // ring cap == save cap, the ruling itself
     const snap = JSON.stringify(sim.serialize());
     const restored = Simulation.deserialize(JSON.parse(snap) as SerializedGame);
     expect(restored.log.map((e) => e.text)).toEqual(sim.log.map((e) => e.text));
-    expect(restored.log[0].text).toBe("line 50");
-    expect(restored.log[299].text).toBe("line 349");
+    expect(restored.log[0].text).toBe(`line ${overflow}`);
+    expect(restored.log[LOG_SAVE_CAP - 1].text).toBe(`line ${total - 1}`);
   });
 
   it("serialize's own tail slice keeps the newest entries even past the cap", () => {
     // The live ring normally keeps log.length at the cap, which would leave
     // the serialize slice untestable; hand-build an over-cap log to pin the
     // slice contract (newest LOG_SAVE_CAP entries, in order) independently
-    // of the ring, so the two caps can never silently diverge again.
+    // of the ring, so the two caps can never silently diverge again. The
+    // expectations derive from the constant so they track the contract.
+    const overflow = 50;
+    const total = LOG_SAVE_CAP + overflow;
     const sim = new Simulation();
-    sim.log = Array.from({ length: 350 }, (_, i) => ({ minute: i, text: `hand ${i}`, kind: "info" as const }));
+    sim.log = Array.from({ length: total }, (_, i) => ({ minute: i, text: `hand ${i}`, kind: "info" as const }));
     const data = sim.serialize();
     expect(data.log).toHaveLength(LOG_SAVE_CAP);
-    expect(data.log![0].text).toBe("hand 50");
-    expect(data.log![LOG_SAVE_CAP - 1].text).toBe("hand 349");
+    expect(data.log![0].text).toBe(`hand ${overflow}`);
+    expect(data.log![LOG_SAVE_CAP - 1].text).toBe(`hand ${total - 1}`);
   });
 
   it("hardens hostile log input: junk drops, text truncates, kinds and minutes coerce, count caps", () => {
