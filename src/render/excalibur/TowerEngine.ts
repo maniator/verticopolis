@@ -317,7 +317,7 @@ export class TowerEngine {
    *  change, or when the mode flips — never per frame (it scans the unit list). */
   private heatmap: HeatCell[] = [];
   private heatmapHour = -1;
-  private heatmapRev = -1;
+  private heatmapRev = "";
   private heatmapMode: HeatmapMode | null = null;
   /** The busiest floor's raw congestion ratio when the congestion overlay was
    *  last (re)built — surfaced in the legend so an all-green map still reports
@@ -1111,7 +1111,14 @@ export class TowerEngine {
   private drawStatsMap(ctx: CanvasRenderingContext2D): void {
     if (!this.overlayMode) return;
     const hour = this.sim.clock.hour;
-    const rev = this.sim.tower.revision;
+    // The congestion source reads live commercial customers (censusCount ->
+    // customersIn), which move as meal round-trippers arrive and leave, so the
+    // congestion overlay must also invalidate on the meal-overlay revision or
+    // its cells and peak legend trail the traffic chip by up to an hour during
+    // a meal window. The other overlay modes stay hour-and-structure keyed.
+    const rev = `${this.sim.tower.revision}:${
+      this.overlayMode === "congestion" ? this.sim.tower.mealOverlayRevision : 0
+    }`;
     if (this.overlayMode !== this.heatmapMode || hour !== this.heatmapHour || rev !== this.heatmapRev) {
       this.heatmap = this.sim.floorHeatmap(this.overlayMode);
       this.heatmapPeakCongestion = this.overlayMode === "congestion" ? this.sim.peakCongestion() : 0;

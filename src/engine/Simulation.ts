@@ -1970,9 +1970,11 @@ export class Simulation implements SimContext {
   }
 
   /** Non-hotel occupant census: office workers, condo residents, and live
-   * commercial venue customers (`customersIn`). This is the rating population
-   * once hotels drop out (4★+) and the figure each 5★/TOWER rung is tested
-   * against in {@link evaluateStar}. */
+   * commercial venue customers (`customersIn`), minus the hotel-origin eaters
+   * (`hotelCustomersIn`): hotel guests drop from this census at 4★+, and a
+   * guest eating at a fastFood must not smuggle back in through the venue
+   * tally. This is the rating population once hotels drop out (4★+) and the
+   * figure each 5★/TOWER rung is tested against in {@link evaluateStar}. */
   private occupantPopulation(): number {
     let pop = 0;
     for (const u of this.tower.units) {
@@ -1980,6 +1982,7 @@ export class Simulation implements SimContext {
         // censusCount: commercial units contribute their live customer tally
         // (cinema excluded via population = 0), everyone else residentCount.
         pop += censusCount(u);
+        if (isCommercialKind(u.kind)) pop -= Math.min(u.hotelCustomersIn ?? 0, u.customersIn ?? 0);
       }
     }
     return pop;
@@ -2458,10 +2461,11 @@ export class Simulation implements SimContext {
           vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
           // Transient crowd counters never survive a load: serializeUnit omits
           // them, and the `...u` spread above would otherwise let a hand-edited
-          // save seed the census/star gating (customersIn) or the visible-
-          // occupancy projection (outForMeal) with forged values. The live
-          // crowd rebuilds both organically.
+          // save seed the census/star gating (customersIn, hotelCustomersIn) or
+          // the visible-occupancy projection (outForMeal) with forged values.
+          // The live crowd rebuilds all of them organically.
           customersIn: undefined,
+          hotelCustomersIn: undefined,
           outForMeal: undefined,
         };
       });
@@ -2601,9 +2605,10 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
+  void _hotelCustomersIn; // Transient: the hotel-origin subset of customersIn.
   const exhaustive: Record<string, never> = unhandled;
   void exhaustive;
   const out: SerializedUnit = { id, kind, floor, x };

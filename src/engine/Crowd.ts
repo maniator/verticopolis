@@ -152,6 +152,10 @@ export interface Person {
    *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
    *  all non-meal persons and for eaters at non-commercial destinations. */
   venueUnitId?: number;
+  /** True when this counted eater came from a HOTEL origin, so finish() also
+   *  decrements the venue's `hotelCustomersIn` (the 4-star-plus census
+   *  exclusion). Captured at eating entry, when the origin still exists. */
+  countedHotelGuest?: boolean;
   /** Unit id of the ORIGIN room for a round-trip meal person (an office,
    *  condo, or hotel room whose visible occupancy dropped by 1 when this
    *  person spawned outbound). Undefined for lobby-centric commuter trips
@@ -1102,6 +1106,16 @@ export class Crowd {
               ) {
                 p.venueUnitId = venueUnit.id;
                 venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
+                // Origin split for the rating census: hotel guests drop out of
+                // the 4-star-plus census, so a guest eating here must not
+                // re-enter it through the venue tally. Flag the person so the
+                // decrement in finish() mirrors exactly even if the origin
+                // room is bulldozed while they eat.
+                const originUnit = this.originUnit(tower, p);
+                if (originUnit && isHotelKind(originUnit.kind)) {
+                  p.countedHotelGuest = true;
+                  venueUnit.hotelCustomersIn = (venueUnit.hotelCustomersIn ?? 0) + 1;
+                }
                 tower.bumpMealOverlayRevision();
               }
             } else {
@@ -1223,9 +1237,15 @@ export class Crowd {
       const venue = tower.getUnit(p.venueUnitId);
       if (venue && (venue.customersIn ?? 0) > 0) {
         venue.customersIn = (venue.customersIn ?? 0) - 1;
+        // Mirror the hotel-origin split taken at eating entry (the flag, not
+        // a fresh origin lookup, so a mid-meal bulldoze cannot unbalance it).
+        if (p.countedHotelGuest && (venue.hotelCustomersIn ?? 0) > 0) {
+          venue.hotelCustomersIn = (venue.hotelCustomersIn ?? 0) - 1;
+        }
         tower.bumpMealOverlayRevision();
       }
       p.venueUnitId = undefined;
+      p.countedHotelGuest = undefined;
     }
     p.state = "done";
   }

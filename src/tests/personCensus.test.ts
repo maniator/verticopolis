@@ -334,3 +334,50 @@ describe("save version is 4 and a v3 save migrates cleanly", () => {
     expect(restored.population).toBe(restored.tower.totalPopulation());
   });
 });
+
+describe("hotel-origin venue customers stay out of the 4-star-plus census", () => {
+  it("hotelCustomersIn is subtracted from ratingPopulation at 4-star and above", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = 10;
+    ff.hotelCustomersIn = 4; // four of the ten eaters are hotel guests
+    sim.star = 3;
+    // Below 4-star: hotels still count, so all ten customers count.
+    expect(sim.ratingPopulation()).toBe(16); // 6 office + 10 customers
+    sim.star = 4;
+    // At 4-star-plus: the four hotel-origin eaters drop with their guests.
+    expect(sim.ratingPopulation()).toBe(12); // 6 office + 6 non-hotel customers
+  });
+
+  it("a breakfast hotel guest is counted at the venue AND flagged as hotel-origin", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 3; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    sim.tower.placeTransport("elevatorStandard", 4, 1, 3);
+    const hotel = sim.tower.place("hotelDouble", 2, 10);
+    const ff = sim.tower.place("fastFood", 3, 0);
+    const hotelUnit = sim.tower.units.find((u) => u.id === hotel.unitId)!;
+    const ffUnit = sim.tower.units.find((u) => u.id === ff.unitId)!;
+    hotelUnit.state = "asleep"; // guests in residence, the breakfast origin gate
+    hotelUnit.occupants = 2;
+    ffUnit.state = "occupied";
+    setHour(sim, 7); // breakfast window, fastFood open
+    let sawHotelEater = false;
+    for (let m = 0; m < 120 && !sawHotelEater; m++) {
+      sim.tick(1);
+      if ((ffUnit.hotelCustomersIn ?? 0) > 0) {
+        sawHotelEater = true;
+        // The subset never exceeds the total, and the eater still counts in
+        // the sub-4-star census via customersIn.
+        expect(ffUnit.hotelCustomersIn ?? 0).toBeLessThanOrEqual(ffUnit.customersIn ?? 0);
+      }
+    }
+    expect(sawHotelEater).toBe(true);
+    // Run the morning out: every counter drains back to zero together.
+    for (let m = 0; m < 240; m++) sim.tick(1);
+    expect(ffUnit.customersIn ?? 0).toBe(0);
+    expect(ffUnit.hotelCustomersIn ?? 0).toBe(0);
+  });
+});

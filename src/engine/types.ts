@@ -230,6 +230,13 @@ export interface Unit {
    *  decremented when they leave. Only meaningful for commercial kinds. See
    *  {@link isCommercialKind}. */
   customersIn?: number;
+  /** Transient subset of {@link customersIn}: how many of the current eaters
+   *  came from a HOTEL origin. The 4-star-plus rating census excludes hotel
+   *  guests, so a guest eating at a fastFood must not re-enter it through the
+   *  venue's customer tally; `occupantPopulation()` subtracts this. Same
+   *  lifecycle as `customersIn`: not persisted, stripped on load, rebuilt by
+   *  the live crowd, and always at most `customersIn`. */
+  hotelCustomersIn?: number;
   /** Transient count of workers/residents currently out on a meal round-trip
    *  originating from THIS unit. Not persisted (a save reload resets it to 0
    *  and the next `updatePresence` hour boundary re-baselines `occupants`).
