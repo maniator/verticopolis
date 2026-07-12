@@ -132,6 +132,18 @@ Triage them into the table above, then delete the raw note._
 - **Pinch-aborted paint run loses its undo step (Edge F4).** `captureUndo` fires in `onActionDown`; a pinch aborts the gesture without `onActionUp`, so the pending pre-paint snapshot is overwritten by the next gesture's capture and the pre-pinch strip can never be undone (immediate Ctrl+Z still works). Documented overwrite semantics in `UndoHistory.capture`; pre-existing, unchanged by the fix. (Low, pre-existing.)
 - **Elevator hover ghost validity ignores dry-run/funds (investigation side finding).** `main.ts` `updateBuildPreview` sets `valid: isUnlocked(kind)` for drag-sized transports, so a desktop hover shows a gold ghost where a drop would refuse. Cosmetic, desktop-only. (Low, pre-existing.)
 
+### Deferred from: code review of story-save-metadata-and-log-tail (`/gds-code-review`, 2026-07-12)
+
+- **Undo/redo trims bulletin scrollback to the save cap (Edge, medium).** Undo
+  snapshots are `sim.serialize()`, which carries only the newest
+  `LOG_SAVE_CAP` (100) log entries, so undoing while the live ring holds more
+  (up to 300) silently drops the older lines from the panel. Deliberate
+  tradeoff for now: the cap was chosen for save-file size, the newest 100
+  lines remain, and a separate uncapped snapshot path just for undo adds API
+  surface. Revisit by raising `LOG_SAVE_CAP` toward the 300 ring cap (a few
+  KB compressed) or by snapshotting the full ring on the undo path only, if
+  players notice the loss. (Low player impact.)
+
 ### Deferred from: code review of PR #184 commercial census takeover (`/gds-code-review` + party, 2026-07-12)
 
 - **Congestion-overlay meal invalidation lacks a direct test (Edge, layouts round).** `drawStatsMap` now invalidates on `mealOverlayRevision` for the congestion mode, but no test drives the private render path across a revision bump; `towerEngineMealOverlay.test.ts` covers the sync trigger only. Add one if a TowerEngine test harness ever exists. (Low, coverage.)

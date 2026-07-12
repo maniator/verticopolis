@@ -335,6 +335,14 @@ export interface SerializedUnit extends Omit<Unit, "width" | "state" | "satisfac
   label?: string;
 }
 
+/** One bulletin-log line. Lives here (not in Simulation.ts) because the save
+ *  schema below carries a log tail; Simulation re-exports it for the UI. */
+export interface LogEntry {
+  minute: number;
+  text: string;
+  kind: "info" | "good" | "bad" | "money";
+}
+
 /** Camera zoom bounds (screen pixels per world pixel). Owned here because the
  *  save schema clamps a restored zoom at the deserialize trust boundary; the
  *  renderer re-exports these as its own MIN_ZOOM/MAX_ZOOM so the range exists
@@ -406,6 +414,19 @@ export interface SerializedGame {
    * {@link SerializedView}). Stamped by the UI layer at save/export time;
    * absent in older saves and fresh towers, which load centered as before. */
   view?: SerializedView;
+  /** When this save was WRITTEN (epoch ms). Provenance of the file, not live
+   * state: the storage layer stamps it on every write (localStorage and
+   * .vctower alike), the engine never writes or reads it, and deserialize
+   * does not carry it onto the sim (the next write re-stamps). */
+  savedAt?: number;
+  /** Which build wrote this save (the Vite-injected app version). Same
+   * write-time provenance contract as {@link savedAt}: stamped by the
+   * storage layer, inert on load, useful for debugging a moved file. */
+  appVersion?: string;
+  /** The tail of the bulletin log (newest last, capped at LOG_SAVE_CAP in
+   * Simulation.ts), so a loaded tower keeps its message history instead of
+   * opening with an empty panel. Absent in older saves (empty log). */
+  log?: LogEntry[];
 }
 
 /** Result of attempting to place a facility. */

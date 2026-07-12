@@ -688,12 +688,19 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 
   it("exportGame downloads a .vctower file named after the tower and toasts the size", async () => {
     sim.tower.towerName = "Vertic Opolis";
-    await saveLoad.exportGame();
-    expect(f.downloads).toHaveLength(1);
-    expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
-    // The controller's contract is "download exactly what SaveGame.export
-    // produces" — the container format itself is pinned by storage.test.ts.
-    expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
+    // Freeze the clock (Date explicitly: the byte-identity below depends on
+    // both exports stamping the same savedAt, not on timer behavior).
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      await saveLoad.exportGame();
+      expect(f.downloads).toHaveLength(1);
+      expect(f.downloads[0].filename).toBe("vertic-opolis.vctower");
+      // The controller's contract is "download exactly what SaveGame.export
+      // produces"; the container format itself is pinned by storage.test.ts.
+      expect(f.downloads[0].contents).toBe(await SaveGame.export(sim));
+    } finally {
+      vi.useRealTimers();
+    }
     expect(f.toasts).toHaveLength(1);
     expect(f.toasts[0].kind).toBe("good");
     expect(f.toasts[0].text).toMatch(/^Tower exported \(\d+\.\d KB\)\. Check your downloads\.$/);

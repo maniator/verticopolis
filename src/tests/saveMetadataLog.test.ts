@@ -1,0 +1,192 @@
+import { describe, expect, it, beforeEach } from "vitest";
+import { deflateSync, inflateSync } from "fflate";
+import towerFile from "./fixtures/towerone_6.vctower?raw";
+import { LOG_SAVE_CAP, Simulation } from "../engine/Simulation";
+import type { SerializedGame } from "../engine/types";
+import { SaveGame } from "../storage/SaveGame";
+
+/**
+ * Save metadata stamps (savedAt + appVersion on every write, including
+ * .vctower exports) and bulletin-log persistence (the tail rides the save and
+ * restores through the trust boundary). See
+ * _bmad-output/implementation-artifacts/story-save-metadata-and-log-tail.md.
+ */
+
+function decodeVctower(text: string): SerializedGame {
+  const b64 = text.slice(text.indexOf("\n") + 1).trim();
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(inflateSync(bytes))) as SerializedGame;
+}
+
+describe("write-time provenance stamps (savedAt + appVersion)", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("serialize() itself is stamp-free (undo snapshots and crash reports carry no wall clock)", () => {
+    const data = new Simulation().serialize();
+    expect("savedAt" in data).toBe(false);
+    expect("appVersion" in data).toBe(false);
+  });
+
+  it("a localStorage save stamps both, and listSlots reads savedAt back", () => {
+    const sim = new Simulation();
+    const before = Date.now();
+    SaveGame.saveSlot(1, sim);
+    const raw = decodeSlot("simtower-clone-slot-1");
+    expect(raw.savedAt).toBeGreaterThanOrEqual(before);
+    expect(raw.appVersion).toMatch(/^\d+\.\d+\.\d+$/); // the Vite-injected build version
+    const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
+    expect(info.savedAt).toBe(raw.savedAt);
+  });
+
+  it("a .vctower export stamps both (a moved file says when and by which build it was written)", async () => {
+    const sim = new Simulation();
+    const before = Date.now();
+    const file = await SaveGame.export(sim);
+    const data = decodeVctower(file);
+    expect(data.savedAt).toBeGreaterThanOrEqual(before);
+    expect(data.appVersion).toMatch(/^\d+\.\d+\.\d+$/);
+  });
+
+  it("treats a forged savedAt as absent so the Saves dialog never shows Invalid Date", () => {
+    const sim = new Simulation();
+    SaveGame.saveSlot(1, sim);
+    // Re-pack the slot with a hostile savedAt (a string) in place.
+    const data = decodeSlot("simtower-clone-slot-1") as Omit<SerializedGame, "savedAt"> & { savedAt: unknown };
+    data.savedAt = "yesterday";
+    localStorage.setItem("simtower-clone-slot-1", repackSlot(data as unknown as SerializedGame));
+    const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
+    expect(info.exists).toBe(true);
+    expect(info.savedAt).toBeUndefined();
+  });
+
+  it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
+    const data = { ...new Simulation().serialize(), savedAt: 12345, appVersion: "9.9.9" };
+    const sim = Simulation.deserialize(data);
+    // Nothing on the sim exposes them, and a re-serialize emits neither.
+    const again = sim.serialize();
+    expect("savedAt" in again).toBe(false);
+    expect("appVersion" in again).toBe(false);
+  });
+});
+
+describe("bulletin-log persistence", () => {
+  it("the log tail rides the save (newest last, capped) and an empty log contributes no key", () => {
+    const sim = new Simulation();
+    expect("log" in sim.serialize()).toBe(false);
+    for (let i = 0; i < LOG_SAVE_CAP + 40; i++) sim.emit(`line ${i}`, i % 2 ? "good" : "info");
+    const data = sim.serialize();
+    expect(data.log).toHaveLength(LOG_SAVE_CAP);
+    expect(data.log![LOG_SAVE_CAP - 1].text).toBe(`line ${LOG_SAVE_CAP + 39}`);
+    expect(data.log![0].text).toBe("line 40");
+  });
+
+  it("save/load round-trips the bulletin, and logSeq stays transient (no toast replay)", () => {
+    const sim = new Simulation();
+    sim.emit("VIP arriving Thursday.", "info");
+    sim.emit("Office leased.", "good");
+    const loaded = Simulation.deserialize(sim.serialize());
+    expect(loaded.log.map((e) => e.text)).toEqual(["VIP arriving Thursday.", "Office leased."]);
+    expect(loaded.log.map((e) => e.kind)).toEqual(["info", "good"]);
+    expect(loaded.logSeq).toBe(0); // the UI rebases on adopt; restored lines never toast
+  });
+
+  it("serialized entries are copies: mutating the live log later cannot rewrite a held snapshot", () => {
+    const sim = new Simulation();
+    sim.emit("original", "info");
+    const data = sim.serialize();
+    sim.log[0].text = "mutated";
+    expect(data.log![0].text).toBe("original");
+  });
+
+  it("the bulletin survives the REAL storage paths: slot save/load and .vctower export/import", async () => {
+    localStorage.clear();
+    const sim = new Simulation();
+    sim.emit("Metro line opened.", "good");
+    sim.emit("Recycling is overdue.", "bad");
+    SaveGame.saveSlot(2, sim);
+    expect(SaveGame.loadSlot(2)!.log.map((e) => e.text)).toEqual([
+      "Metro line opened.",
+      "Recycling is overdue.",
+    ]);
+    const file = await SaveGame.export(sim);
+    const imported = await SaveGame.import(file);
+    expect(imported.log.map((e) => `${e.kind}:${e.text}`)).toEqual([
+      "good:Metro line opened.",
+      "bad:Recycling is overdue.",
+    ]);
+  });
+
+  it("junk padding after real entries cannot evict them: the newest VALID entries restore", () => {
+    const base = new Simulation().serialize();
+    const log = [
+      { minute: 1, text: "real one", kind: "info" },
+      { minute: 2, text: "real two", kind: "good" },
+      ...Array.from({ length: 400 }, () => null),
+    ];
+    const restored = Simulation.deserialize({ ...base, log } as unknown as SerializedGame).log;
+    expect(restored.map((e) => e.text)).toEqual(["real one", "real two"]);
+  });
+
+  it("truncation never tears an astral character in half", () => {
+    const base = new Simulation().serialize();
+    // 399 ASCII chars, then an emoji whose surrogate pair straddles index 400.
+    const text = "x".repeat(399) + "\u{1F3D7}\u{1F3D7}";
+    const restored = Simulation.deserialize({
+      ...base,
+      log: [{ minute: 0, text, kind: "info" }],
+    } as unknown as SerializedGame).log;
+    expect(restored[0].text).toHaveLength(399); // the torn high surrogate is dropped
+    expect(restored[0].text[398]).toBe("x");
+  });
+
+  it("undo snapshots carry the log, so an undo no longer wipes the bulletin", () => {
+    const sim = new Simulation();
+    sim.emit("before the mistake", "info");
+    const snap = JSON.stringify(sim.serialize()); // exactly what UndoHistory stores
+    const restored = Simulation.deserialize(JSON.parse(snap) as SerializedGame);
+    expect(restored.log.map((e) => e.text)).toEqual(["before the mistake"]);
+  });
+
+  it("hardens hostile log input: junk drops, text truncates, kinds and minutes coerce, count caps", () => {
+    const base = new Simulation().serialize();
+    const forged = (log: unknown) =>
+      Simulation.deserialize({ ...base, log } as unknown as SerializedGame).log;
+    expect(forged("not an array")).toEqual([]);
+    expect(forged(42)).toEqual([]);
+    expect(forged([null, 7, "line", [], { minute: 3 }])).toEqual([]); // no string text anywhere
+    const one = forged([
+      { minute: NaN, text: "x".repeat(10_000), kind: "explosive" },
+      { minute: 12, text: 99, kind: "good" }, // numeric text: dropped
+    ]);
+    expect(one).toHaveLength(1);
+    expect(one[0].minute).toBe(0);
+    expect(one[0].text).toHaveLength(400);
+    expect(one[0].kind).toBe("info");
+    const flood = forged(Array.from({ length: 100_000 }, (_, i) => ({ minute: i, text: `l${i}`, kind: "info" })));
+    expect(flood).toHaveLength(300); // the live ring cap, newest kept
+    expect(flood[299].text).toBe("l99999");
+  });
+
+  it("the pre-log fixture still loads with an empty bulletin", () => {
+    const data = decodeVctower(towerFile);
+    expect("log" in data).toBe(false);
+    expect(Simulation.deserialize(data).log).toEqual([]);
+  });
+});
+
+function decodeSlot(key: string): SerializedGame {
+  const raw = localStorage.getItem(key)!;
+  const b64 = raw.slice("VCZ1:".length);
+  const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(inflateSync(bytes))) as SerializedGame;
+}
+
+/** Re-pack a (possibly tampered) save object into the compressed slot format. */
+function repackSlot(data: SerializedGame): string {
+  const bytes = deflateSync(new TextEncoder().encode(JSON.stringify(data)));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return "VCZ1:" + btoa(bin);
+}
