@@ -1532,7 +1532,10 @@ export class TowerEngine {
         // re-raster when the visible dip changes even though canonical
         // `u.occupants` did not. Without this, an office bakes at t=0 with six
         // workers and would keep rendering six through the whole meal peak.
-        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${open}${lateNight}${dead}${liveBits}`;
+        // `subtype` is in the key because retail variants draw differently and
+        // the inspector's "Change variety" action swaps it at runtime; without
+        // it the reroll would not repaint until another signature bit flips.
+        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${u.subtype ?? ""}:${open}${lateNight}${dead}${liveBits}`;
         const isDead = dead === "x";
         const rec = this.roomActors.get(u.id);
         const animated = u.state === "fire" || u.state === "construction";

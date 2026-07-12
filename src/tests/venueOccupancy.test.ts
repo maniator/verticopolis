@@ -173,3 +173,19 @@ describe("v2 spatial congestion reads live customers, never the commercial catal
     expect(sim.congestionAt(2)).toBeGreaterThan(0);
   });
 });
+
+describe("a venue's first open hour shows its ambient crowd", () => {
+  it("an empty (never-visited) shop is lit in the same hour traffic first opens it", () => {
+    // updatePresence runs before collectTrafficIncome inside one onHour, so a
+    // newly built venue used to spend its whole first open hour occupied but
+    // with 0 occupants (dark windows, cold heatmap, no statistical demand).
+    // The economy now stamps the ambient crowd at the empty-to-occupied flip.
+    const { sim, unit } = venueFixture("shop");
+    unit.state = "empty";
+    unit.occupants = 0;
+    setHour(sim, 9); // shop opens at 10
+    triggerHour(sim); // crosses into 10:00: traffic flips it occupied
+    expect(unit.state).toBe("occupied");
+    expect(unit.occupants).toBe(FACILITIES.shop.population);
+  });
+});

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { Clock } from "../engine/Clock";
 import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../engine/Crowd";
+import { FACILITIES } from "../engine/facilities";
 
 /**
  * Per-person meal round-trip regression suite (PR A: person-tracking epic).
@@ -384,5 +385,82 @@ describe("eating customers attach to the venue they were sent to (census attribu
       }
     }
     expect(sawCountedEater).toBe(true);
+  });
+});
+
+describe("venue customer capacity: customersIn never exceeds the catalog population", () => {
+  it("a heavy lunch crowd against one fastFood caps at FACILITIES.fastFood.population", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 5_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 60; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 6; f++) for (let x = 0; x < 60; x++) sim.tower.place("floor", f, x);
+    sim.tower.placeTransport("elevatorStandard", 55, 1, 6);
+    // Six full offices (36 potential eaters), far past the single venue's
+    // catalog capacity.
+    const offices: number[] = [];
+    for (const [floor, x] of [[2, 0], [2, 20], [3, 0], [4, 0], [5, 0], [6, 0]] as const) {
+      const r = sim.tower.place("office", floor, x);
+      offices.push(r.unitId!);
+    }
+    const ff = sim.tower.place("fastFood", 6, 30);
+    for (const id of [...offices, ff.unitId!]) {
+      const u = sim.tower.units.find((x) => x.id === id)!;
+      u.state = "occupied";
+      u.occupants = 6;
+    }
+    const ffUnit = sim.tower.units.find((u) => u.id === ff.unitId)!;
+    ffUnit.occupants = 0;
+    const cap = FACILITIES.fastFood.population;
+    sim.clock = new Clock(12 * 60, sim.clock.calendar);
+    let peak = 0;
+    // A full lunch window plus wind-down; the cap must hold on every tick,
+    // since en-route eaters arrive continuously.
+    for (let m = 0; m < 180; m++) {
+      sim.tick(1);
+      peak = Math.max(peak, ffUnit.customersIn ?? 0);
+      expect(ffUnit.customersIn ?? 0).toBeLessThanOrEqual(cap);
+    }
+    // The crowd genuinely used the venue. Spawn pacing keeps the peak a bit
+    // under the cap in this fixture; the two surgical tests below exercise
+    // the cap mechanics directly.
+    expect(peak).toBeGreaterThan(0);
+  });
+
+  it("an en-route eater arriving at a just-filled venue eats uncounted (arrival clamp)", () => {
+    const sim = officeAndFastFood();
+    setHour(sim, 12);
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    const cap = FACILITIES.fastFood.population;
+    // Wait for one meal round-tripper to be en route to the venue.
+    let traveler;
+    for (let m = 0; m < 30 && !traveler; m++) {
+      sim.tick(1);
+      traveler = sim.crowd.people.find((p) => p.mealVenueId === ff.id && p.state !== "eating");
+    }
+    expect(traveler).toBeDefined();
+    // The venue fills while they travel (stamp the count at capacity, standing
+    // in for other arrivals), so their arrival must NOT push past the cap.
+    ff.customersIn = cap;
+    for (let m = 0; m < 90; m++) {
+      sim.tick(1);
+      expect(ff.customersIn).toBe(cap);
+      if (traveler!.state === "eating") break;
+    }
+    // Whether they made it to the table or gave up en route, they were never
+    // counted: venueUnitId unset means finish() will not decrement either, so
+    // the balanced-accounting contract holds around the clamp.
+    expect(traveler!.venueUnitId).toBeUndefined();
+  });
+
+  it("a full venue attracts no new meal trips (spawn-side filter)", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = FACILITIES.fastFood.population; // full before lunch begins
+    setHour(sim, 12);
+    for (let m = 0; m < 60; m++) {
+      sim.tick(1);
+      expect(sim.crowd.people.some((p) => p.mealVenueId === ff.id)).toBe(false);
+    }
   });
 });

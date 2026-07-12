@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit, Transport } from "../engine/types";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   drawTransport,
@@ -313,5 +314,49 @@ describe("pure sprite helpers", () => {
   it("ACCENTS is a palette of hex colors", () => {
     expect(ACCENTS.length).toBeGreaterThan(0);
     for (const c of ACCENTS) expect(c).toMatch(/^#[0-9a-f]{3,8}$/i);
+  });
+});
+
+describe("retail subtype looks paint distinctly (drawRoom)", () => {
+  // Draw each canon variant through the REAL drawRoom path at an open hour and
+  // compare full paint logs: the variety system's contract is that every
+  // variant of a kind paints differently (colors or geometry), while the kind
+  // silhouette survives. Also exercises every fixture/goods/emblem branch so
+  // the coverage gate keeps guarding this file.
+  const cases: Array<[Unit["kind"], readonly string[], number]> = [
+    ["fastFood", FASTFOOD_SUBTYPES, 12],
+    ["restaurant", RESTAURANT_SUBTYPES, 19],
+    ["shop", SHOP_SUBTYPES, 14],
+  ];
+  for (const [kind, names, hour] of cases) {
+    it(`${kind}: every canon variant paints, and no two variants paint identically`, () => {
+      const sigs = new Map<string, string>();
+      for (const name of names) {
+        const s = spyCtx();
+        // Width comfortably past the emblem gate (w > 40) so signature props draw.
+        drawRoom(draw({ hour, lit: false }, s.ctx), unit({ kind, subtype: name, occupants: 5 }), 0, 0, 144, 26);
+        expect(s.painted(), `${kind} "${name}" painted nothing`).toBe(true);
+        for (const [other, sig] of sigs) {
+          expect(s.sig(), `${kind} "${name}" paints identically to "${other}"`).not.toBe(sig);
+        }
+        sigs.set(name, s.sig());
+      }
+    });
+
+    it(`${kind}: an undefined subtype still paints (legacy fallback)`, () => {
+      const s = spyCtx();
+      drawRoom(draw({ hour, lit: false }, s.ctx), unit({ kind, occupants: 5 }), 0, 0, 144, 26);
+      expect(s.painted()).toBe(true);
+    });
+  }
+
+  it("an unknown (non-canon) subtype falls back to the default look, not a crash", () => {
+    for (const [kind, , hour] of cases) {
+      const withUnknown = spyCtx();
+      drawRoom(draw({ hour, lit: false }, withUnknown.ctx), unit({ kind, subtype: "Not A Real Variety", occupants: 5 }), 0, 0, 144, 26);
+      const withNone = spyCtx();
+      drawRoom(draw({ hour, lit: false }, withNone.ctx), unit({ kind, occupants: 5 }), 0, 0, 144, 26);
+      expect(withUnknown.sig()).toBe(withNone.sig());
+    }
   });
 });

@@ -54,6 +54,68 @@ export interface RoomCtx {
   hour: number;
 }
 
+// ---- Retail subtype looks ------------------------------------------------
+//
+// Each canon retail variant (docs/canon/tdt-format.md §7, names pinned in
+// src/engine/retailSubtypes.ts) gets its own look, keyed by the canonical
+// name. Design rules (party-ratified): the KIND silhouette is sacred (fast
+// food keeps its bold sign band, shops their striped awning, restaurants
+// their white-cloth tables); a subtype varies only the big shapes (band /
+// awning / wall colors) plus at most one signature prop, so the variant
+// reads at play zoom. No RNG anywhere: an undefined or unknown subtype
+// falls back to the pre-variant look, byte-identical, so legacy saves and
+// generic units render exactly as before. `src/tests/subtypeVisuals.test.ts`
+// pins these tables against the canon name lists.
+
+export interface FastFoodLook {
+  band: string;
+  stripe: string;
+  wall: string;
+}
+const FASTFOOD_DEFAULT: FastFoodLook = { band: "#E0452C", stripe: "#FFD24A", wall: "#F0D8B0" };
+export const FASTFOOD_LOOKS: Record<string, FastFoodLook> = {
+  "Japanese Soba": { band: "#3A4E8C", stripe: "#F4F0E4", wall: "#EAE2CC" },
+  "Chinese Cafe": { band: "#8E2424", stripe: "#E8C14A", wall: "#F0DCB8" },
+  "Hamburger Stand": FASTFOOD_DEFAULT,
+  "Ice Cream": { band: "#E88AB0", stripe: "#FFFFFF", wall: "#F6ECF0" },
+  "Coffee Shop": { band: "#6E4A32", stripe: "#E8DCC8", wall: "#EFE4D2" },
+};
+
+export interface RestaurantLook {
+  wall: string;
+  floor: string;
+  fixture: "chandelier" | "lamps" | "lanterns" | "counter" | "ember";
+}
+const RESTAURANT_DEFAULT: RestaurantLook = { wall: "#3A2230", floor: "#2B2238", fixture: "chandelier" };
+export const RESTAURANT_LOOKS: Record<string, RestaurantLook> = {
+  "English Pub": { wall: "#4A3626", floor: "#33251A", fixture: "lamps" },
+  "French": RESTAURANT_DEFAULT,
+  "Chinese": { wall: "#5A2020", floor: "#3A1818", fixture: "lanterns" },
+  "Sushi Bar": { wall: "#C8AA78", floor: "#8A6E48", fixture: "counter" },
+  "Steak House": { wall: "#4A2A22", floor: "#33201A", fixture: "ember" },
+};
+
+export interface ShopLook {
+  awning: string;
+  wall: string;
+  goods: string[];
+  style: "squares" | "spines" | "hanging" | "flowers" | "screens";
+  emblem?: "cross" | "pole" | "brass";
+}
+export const SHOP_LOOKS: Record<string, ShopLook> = {
+  "Men's Clothing": { awning: "#5A6E8C", wall: "#ECEEF2", goods: ["#3E4654", "#5A6E8C", "#6E5A4A", "#F4F0E4"], style: "hanging" },
+  "Pet Store": { awning: "#8C6E50", wall: "#F0EEE2", goods: ["#C99A6E", "#E8C14A", "#5AA85A", "#F4F0E4"], style: "squares" },
+  "Flower Shop": { awning: "#E88AB0", wall: "#F2F5EC", goods: ["#e85d5d", "#E88AB0", "#e8c14a", "#F4F0E4"], style: "flowers" },
+  "Book Store": { awning: "#3E4654", wall: "#F0EAD8", goods: ["#8C3A32", "#3E5A8C", "#4A7A4A", "#B08A3E", "#5A4A6E"], style: "spines" },
+  "Drug Store": { awning: "#3A8A4A", wall: "#F4F7F2", goods: ["#FFFFFF", "#9FD0C8", "#5db4e8", "#E8E4D0"], style: "squares", emblem: "cross" },
+  "Boutique": { awning: "#9A5FB0", wall: "#F5EFF7", goods: ["#E8B8CC", "#C8A8E0", "#F0E0B8", "#F4F0E4"], style: "hanging" },
+  "Electronics": { awning: "#2A2E38", wall: "#3E4654", goods: ["#4FA0C8", "#8FB6FF", "#5db4e8", "#2A2E38"], style: "screens" },
+  "Bank": { awning: "#D8B05A", wall: "#EDE9E2", goods: ["#D8B05A", "#B89040", "#EDE9E2"], style: "squares", emblem: "brass" },
+  "Hair Salon": { awning: "#C24A3A", wall: "#F2ECF0", goods: ["#8FB6D8", "#C8DCE8", "#F4F0E4"], style: "squares", emblem: "pole" },
+  "Post Office": { awning: "#4F6EC8", wall: "#EFEDE4", goods: ["#F4F0E4", "#E0CFA8", "#FFFFFF", "#C8B890"], style: "squares" },
+  "Sports Gear": { awning: "#E88F4A", wall: "#EEF2F0", goods: ["#e85d5d", "#5db4e8", "#6bd47a", "#e8c14a"], style: "squares" },
+};
+
 export { SHIRTS, SKIN };
 
 /**
@@ -360,12 +422,15 @@ function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, 
 
 function fastFood(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
-  const floorY = shell(ctx, x, y, w, h, "#F0D8B0", "#B5742E");
-  // Bold sign band — the fast-food signature.
+  // Subtype look (canon variant); unknown/undefined = the classic burger look.
+  const look = (u.subtype !== undefined && FASTFOOD_LOOKS[u.subtype]) || FASTFOOD_DEFAULT;
+  const floorY = shell(ctx, x, y, w, h, look.wall, "#B5742E");
+  // Bold sign band, the fast-food signature: every subtype keeps it, and only
+  // the colors change so the kind stays recognizable at a glance.
   const band = Math.max(4, h * 0.16);
-  ctx.fillStyle = "#E0452C";
+  ctx.fillStyle = look.band;
   ctx.fillRect(x, y, w, band);
-  ctx.fillStyle = "#FFD24A";
+  ctx.fillStyle = look.stripe;
   for (let sx = x + 3; sx < x + w - 3; sx += 8) ctx.fillRect(sx, y + 2, 4, band - 3);
   // Counter.
   ctx.fillStyle = "#B5742E";
@@ -388,14 +453,66 @@ function fastFood(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: numbe
 
 function restaurant(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
-  const floorY = shell(ctx, x, y, w, h, "#3A2230", "#2B2238");
-  // Chandelier.
-  ctx.fillStyle = "#6a5040";
-  ctx.fillRect(x + w / 2 - 1, y + 2, 2, 4);
-  ctx.fillStyle = d.lit ? "#FFE69A" : "#9a8a60";
-  ctx.beginPath();
-  ctx.arc(x + w / 2, y + 7, 3.5, 0, Math.PI * 2);
-  ctx.fill();
+  // Subtype look (canon variant); unknown/undefined = the French dining room.
+  const look = (u.subtype !== undefined && RESTAURANT_LOOKS[u.subtype]) || RESTAURANT_DEFAULT;
+  const floorY = shell(ctx, x, y, w, h, look.wall, look.floor);
+  // One signature light fixture per subtype; the white-cloth tables below are
+  // the kind's constant so a restaurant always reads as a restaurant.
+  const glow = d.lit ? "#FFE69A" : "#9a8a60";
+  switch (look.fixture) {
+    case "chandelier": {
+      ctx.fillStyle = "#6a5040";
+      ctx.fillRect(x + w / 2 - 1, y + 2, 2, 4);
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(x + w / 2, y + 7, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case "lamps": {
+      // Pub wall sconces at the quarter points (integer coordinates: see the
+      // lanterns note below).
+      for (const raw of [x + w * 0.25, x + w * 0.75]) {
+        const fx = Math.round(raw);
+        ctx.fillStyle = "#2A1E14";
+        ctx.fillRect(fx - 1, y + 4, 2, 5);
+        ctx.fillStyle = glow;
+        ctx.fillRect(fx - 2, y + 3, 4, 3);
+      }
+      break;
+    }
+    case "lanterns": {
+      // Paired hanging lanterns, red with a gold band. Integer coordinates
+      // only: fractional rects antialias into smears on a 2D canvas and break
+      // the crisp pixel style.
+      for (const raw of [x + w * 0.33, x + w * 0.67]) {
+        const fx = Math.round(raw);
+        ctx.fillStyle = "#6a5040";
+        ctx.fillRect(fx, y + 1, 1, 3);
+        ctx.fillStyle = d.lit ? "#E0554A" : "#8a3a34";
+        ctx.fillRect(fx - 3, y + 4, 6, 6);
+        ctx.fillStyle = "#E8C14A";
+        ctx.fillRect(fx - 3, y + 6, 6, 1);
+      }
+      break;
+    }
+    case "counter": {
+      // Sushi bar: a light-wood counter along the back wall with plates.
+      ctx.fillStyle = "#A8865A";
+      ctx.fillRect(x + 4, y + h * 0.34, w - 8, 3);
+      ctx.fillStyle = "#F4F0E4";
+      for (let px = x + 8; px + 3 < x + w - 6; px += 12) ctx.fillRect(px, y + h * 0.34 - 2, 3, 2);
+      break;
+    }
+    case "ember": {
+      // Steak house: a grill on the left with an ember glow.
+      ctx.fillStyle = "#1E1614";
+      ctx.fillRect(x + 4, y + h * 0.3, Math.min(w * 0.16, 16), h * 0.28);
+      ctx.fillStyle = d.lit ? "#E8862A" : "#8a4a20";
+      ctx.fillRect(x + 5, y + h * 0.42, Math.min(w * 0.16, 16) - 2, 3);
+      break;
+    }
+  }
   // White-clothed tables — the restaurant signature against the dark wall.
   let i = 0;
   for (let tx = x + 10; tx + 11 < x + w; tx += 20, i++) {
@@ -415,23 +532,91 @@ function restaurant(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: num
 function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const { ctx } = d;
   if (u.state === "occupied" && !(d.hour >= 10 && d.hour < 21)) return closedShutter(d, x, y, w, h, "#b58ad6");
-  const floorY = shell(ctx, x, y, w, h, "#EFE9F5", "#C8BCD2");
-  // Striped awning — the retail signature.
-  const accent = SHIRTS[(u.id + 2) % SHIRTS.length];
+  // Subtype look (canon variant); unknown/undefined = the legacy generic shop
+  // whose awning accent comes from the unit id (kept byte-identical).
+  const look = u.subtype !== undefined ? SHOP_LOOKS[u.subtype] : undefined;
+  const floorY = shell(ctx, x, y, w, h, look?.wall ?? "#EFE9F5", "#C8BCD2");
+  // Striped awning, the retail signature: every subtype keeps the stripes,
+  // and the accent is the subtype's own so two Flower Shops match and a
+  // variety reroll visibly changes the room.
+  const accent = look?.awning ?? SHIRTS[(u.id + 2) % SHIRTS.length];
   const band = Math.max(3, h * 0.14);
   for (let sx = x; sx < x + w; sx += 10) {
     ctx.fillStyle = Math.floor((sx - x) / 10) % 2 === 0 ? "#FFFFFF" : accent;
     ctx.fillRect(sx, y, 5, band);
   }
-  // Two shelves of colorful goods.
-  const goods = ["#e85d5d", "#5db4e8", "#6bd47a", "#e8c14a", "#b07fe0", "#e88f4a"];
+  // Two shelves of goods, drawn in the subtype's style and palette.
+  const goods = look?.goods ?? ["#e85d5d", "#5db4e8", "#6bd47a", "#e8c14a", "#b07fe0", "#e88f4a"];
+  const style = look?.style ?? "squares";
   for (let row = 0; row < 2; row++) {
     const ry = y + h * 0.34 + row * (h * 0.22);
     ctx.fillStyle = "#A98A6A";
     ctx.fillRect(x + 4, ry + 4, w - 8, 1);
     for (let gx = x + 6, k = 0; gx + 3 < x + w - 5; gx += 6, k++) {
-      ctx.fillStyle = goods[(k + row) % goods.length];
-      ctx.fillRect(gx, ry, 4, 4);
+      const color = goods[(k + row) % goods.length];
+      switch (style) {
+        case "spines":
+          // Book spines: thin upright bars shoulder to shoulder.
+          ctx.fillStyle = color;
+          ctx.fillRect(gx, ry - 1, 2, 5);
+          ctx.fillRect(gx + 3, ry - 1, 2, 5);
+          break;
+        case "hanging":
+          // Garments hanging below the rail.
+          ctx.fillStyle = color;
+          ctx.fillRect(gx, ry + 5, 3, 5);
+          break;
+        case "flowers":
+          // A stem with a colored head standing on the shelf.
+          ctx.fillStyle = "#4A7A4A";
+          ctx.fillRect(gx + 1, ry + 1, 1, 3);
+          ctx.fillStyle = color;
+          ctx.fillRect(gx, ry - 1, 3, 3);
+          break;
+        case "screens":
+          // Glowing display screens in dark bezels.
+          ctx.fillStyle = "#15151C";
+          ctx.fillRect(gx - 1, ry - 1, 6, 6);
+          ctx.fillStyle = color;
+          ctx.fillRect(gx, ry, 4, 4);
+          break;
+        default:
+          ctx.fillStyle = color;
+          ctx.fillRect(gx, ry, 4, 4);
+      }
+    }
+  }
+  // One small signature prop, wide rooms only so it never crowds the shelves.
+  if (look?.emblem && w > 40) {
+    switch (look.emblem) {
+      case "cross": {
+        // Pharmacy cross, high on the wall.
+        ctx.fillStyle = "#3A8A4A";
+        ctx.fillRect(x + w - 12, y + band + 2, 6, 2);
+        ctx.fillRect(x + w - 10, y + band, 2, 6);
+        break;
+      }
+      case "pole": {
+        // Barber pole by the door.
+        ctx.fillStyle = "#F4F0E4";
+        ctx.fillRect(x + w - 8, y + band + 2, 3, 10);
+        for (let py = 0; py < 10; py += 4) {
+          ctx.fillStyle = py % 8 === 0 ? "#C24A3A" : "#4F6EC8";
+          ctx.fillRect(x + w - 8, y + band + 2 + py, 3, 2);
+        }
+        break;
+      }
+      case "brass": {
+        // Bank: a brass coin disc over the counter (integer offsets so the
+        // slot mark stays a crisp pixel, not an antialiased smear).
+        ctx.fillStyle = PAL.brass;
+        ctx.beginPath();
+        ctx.arc(x + w - 10, y + band + 5, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#8A6A28";
+        ctx.fillRect(x + w - 11, y + band + 5, 2, 1);
+        break;
+      }
     }
   }
   if (u.occupants > 0 || hash(u.id) > 0.4) person(ctx, x + w - 9, floorY, 1.5, (u.id * 11) | 0);

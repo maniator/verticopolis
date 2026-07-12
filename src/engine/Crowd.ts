@@ -757,9 +757,17 @@ export class Crowd {
     // The census needs a specific unit to attribute the customer to, and destX
     // must land inside its footprint: destX from pickX is a random corridor
     // tile, so inferring the venue from it at arrival attributes customers to
-    // whatever room the tile happens to sit under (review P2).
+    // whatever room the tile happens to sit under (review P2). Census-counted
+    // venues (population > 0) with a full house are skipped: catalog population
+    // is the venue's customer capacity, so an undersupplied tower self-limits
+    // instead of packing one fastFood past its advertised "up to N" (review P2).
+    // Cinema (population 0, uncapped) is exempt from the fullness check.
     const venueCandidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
-      (u) => venueKinds.includes(u.kind) && isTenanted(u) && isOpenAt(u.kind, hour),
+      (u) =>
+        venueKinds.includes(u.kind) &&
+        isTenanted(u) &&
+        isOpenAt(u.kind, hour) &&
+        (FACILITIES[u.kind].population === 0 || (u.customersIn ?? 0) < FACILITIES[u.kind].population),
     );
     if (venueCandidates.length === 0) return;
     const venue = this.rng.pick(venueCandidates);
@@ -1080,8 +1088,18 @@ export class Crowd {
               // resolves to undefined and the person simply eats uncounted.
               // Gate on population > 0 because cinema is a lateNight meal venue
               // but carries population = 0 and must not count toward the census.
+              // The capacity clamp is the arrival-side half of the spawn-side
+              // fullness filter: several eaters can be en route before any of
+              // them arrives, so the count could otherwise pass the catalog
+              // capacity anyway. An over-capacity arrival eats uncounted
+              // (venueUnitId stays unset, so finish() will not decrement).
               const venueUnit = p.mealVenueId === undefined ? undefined : tower.getUnit(p.mealVenueId);
-              if (venueUnit && isCommercialKind(venueUnit.kind) && FACILITIES[venueUnit.kind].population > 0) {
+              if (
+                venueUnit &&
+                isCommercialKind(venueUnit.kind) &&
+                FACILITIES[venueUnit.kind].population > 0 &&
+                (venueUnit.customersIn ?? 0) < FACILITIES[venueUnit.kind].population
+              ) {
                 p.venueUnitId = venueUnit.id;
                 venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
                 tower.bumpMealOverlayRevision();

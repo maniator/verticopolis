@@ -1512,6 +1512,12 @@ export class Simulation implements SimContext {
     }
     const next = list[idx];
     u.subtype = next;
+    // Retail varieties draw differently, and the renderer only re-compares
+    // room signatures on a sync trigger (hour flip, lighting flip, structural
+    // or meal-overlay change). Bump the meal-overlay channel, the cheap
+    // room-resync signal, so the reroll repaints immediately even on a paused
+    // or quiet tower instead of waiting for the next unrelated trigger.
+    this.tower.bumpMealOverlayRevision();
     return next;
   }
 

@@ -365,10 +365,11 @@ export function censusCount(
 
 /**
  * Star-rating population thresholds — the canonical 1994 values
- * (300 / 1,000 / 5,000 / 10,000). From 4★ up the rating counts only non-hotel
- * occupants (offices/condos); the lot is the canon 375 tiles wide so a well-zoned
- * tower holds well over 15,000 of those, keeping the canonical 10,000 (5★) and
- * 15,000 (TOWER) genuinely reachable.
+ * (300 / 1,000 / 5,000 / 10,000). From 4★ up the rating counts non-hotel
+ * occupants: office workers, condo residents, and live commercial venue
+ * customers (see {@link censusCount}); hotel guests drop out. The lot is the
+ * canon 375 tiles wide so a well-zoned tower holds well over 15,000 of those,
+ * keeping the canonical 10,000 (5★) and 15,000 (TOWER) genuinely reachable.
  */
 export const STAR_THRESHOLDS: Record<number, number> = {
   1: 0,
