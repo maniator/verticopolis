@@ -284,6 +284,43 @@ export const SCENES: Scene[] = [
     assertUnits: 40,
     shots: [{ name: "14-fire", clock: 14, frame: { floor: 5, zoom: 1.2 }, wait: 700 }],
   },
+  // --- Crash screen: the context-loss card (crash report + bug report) --------
+  {
+    id: "crash-screen",
+    outDir: "features",
+    viewport: PHONE,
+    build: buildCanonTower,
+    assertUnits: 200,
+    shots: [
+      {
+        name: "crash-screen",
+        // The card is deliberately shown: skip the transient sweep that would
+        // otherwise try to clear the dialog (it refuses Escape by design).
+        keepDialogs: true,
+        clock: 12,
+        setup: async (page) => {
+          // Fire the same hook the engine raises when the GPU drops the WebGL
+          // context; the recovery flow flushes the autosave and opens the card.
+          // The hook is nullable on TowerEngine, so fail with a message that
+          // names the real problem instead of a bare TypeError if the wiring
+          // in main.ts ever changes.
+          await page.evaluate(() => {
+            const engine = (window as any).game?.engine;
+            if (typeof engine?.onContextLost !== "function") throw new Error("game.engine.onContextLost is not wired; crash-screen scene needs the recovery hook");
+            // Match the real context-loss path: TowerEngine.handleContextLost
+            // stops the Excalibur clock BEFORE raising the hook, so the frame
+            // under the card is frozen. Doing the same keeps the capture true
+            // to the crash state and deterministic.
+            engine.engine?.clock?.stop?.();
+            engine.onContextLost();
+          });
+          // Fail the shot (keep the committed image) if the card never mounts.
+          await page.waitForSelector("dialog#crash-screen[open]", { timeout: 4000 });
+        },
+        wait: 400,
+      },
+    ],
+  },
   // --- Mobile: built tower, stats drawer, palette -----------------------------
   {
     id: "mobile",
