@@ -139,15 +139,14 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of story-save-metadata-and-log-tail (`/gds-code-review`, 2026-07-12)
 
-- **Undo/redo trims bulletin scrollback to the save cap (Edge, medium).** Undo
-  snapshots are `sim.serialize()`, which carries only the newest
-  `LOG_SAVE_CAP` (100) log entries, so undoing while the live ring holds more
-  (up to 300) silently drops the older lines from the panel. Deliberate
-  tradeoff for now: the cap was chosen for save-file size, the newest 100
-  lines remain, and a separate uncapped snapshot path just for undo adds API
-  surface. Revisit by raising `LOG_SAVE_CAP` toward the 300 ring cap (a few
-  KB compressed) or by snapshotting the full ring on the undo path only, if
-  players notice the loss. (Low player impact.)
+- ~~**Undo/redo trims bulletin scrollback to the save cap (Edge, medium).**~~
+  Done 2026-07-12 (owner-delegated party ruling, same day): `LOG_SAVE_CAP`
+  now EQUALS the 300-entry ring cap, so saves and undo snapshots hold
+  exactly what the live ring holds and no scrollback is ever lost. Roughly
+  4-5 KB compressed for a full ring of realistic lines; the forged-input
+  ceiling stays bounded by the restore caps (300 entries x 400 chars) and
+  the import bomb guard. The undo-only snapshot path was rejected as a
+  second serialize behavior to keep in sync forever.
 
 ### Deferred from: code review of PR #184 commercial census takeover (`/gds-code-review` + party, 2026-07-12)
 
