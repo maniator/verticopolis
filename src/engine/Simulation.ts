@@ -910,11 +910,11 @@ export class Simulation implements SimContext {
     this.suiteParkingNudged = suiteShort;
   }
 
-  /** Once-per-day, edge-triggered log nudge when a floor with rentable space is
+  /** Once-per-day, edge-triggered log nudge when a floor with tenant space is
    *  3+ rides from the lobby (invisible otherwise). Uses the wide `rentable`
    *  scope: empty units on such a floor can never move in (see the two-ride
    *  gate in {@link attemptMoveIns}), and with no tenant there is no other
-   *  symptom — the advisory is the only tell. Log-only (never a toast);
+   *  symptom, so the advisory is the only tell. Log-only (never a toast);
    *  de-duped by a latch so it can't repeat while the condition persists. */
   private nudgeStranded(): void {
     const stranded = this.strandedFloors("rentable").length > 0;
@@ -922,7 +922,7 @@ export class Simulation implements SimContext {
       // "info", not "bad": the UI toasts every good/bad log entry, and this
       // advisory is meant to be log-only (a quiet bulletin line, not a toast).
       this.emit(
-        "A floor with rentable space is 3+ elevator rides from the lobby. Nobody will move in or visit. Check it in the inspector.",
+        "A floor with tenant space is 3+ elevator rides from the lobby. Nobody will move in or visit. Check it in the inspector.",
         "info",
       );
     }
@@ -1682,7 +1682,7 @@ export class Simulation implements SimContext {
     const parkingPenalty = this.officeParkingShort() ? 0.5 : 1;
     // Per-pass memo for the ≤2-ride BFS in floorReachable: many empty units
     // share a floor, and the verdict can't change mid-pass. Lives only for
-    // this call — Crowd's adjacency graph is the layer cached by revision.
+    // this call; Crowd's adjacency graph is the layer cached by revision.
     const reachMemo = new Map<number, boolean>();
     const reachable = (floor: number): boolean => {
       let hit = reachMemo.get(floor);
@@ -1699,8 +1699,10 @@ export class Simulation implements SimContext {
       if (!this.tower.isFloorServed(u.floor)) continue; // nobody moves to an unreachable floor
       // Two-ride rule: a served floor 3+ rides from the lobby draws no
       // commuters (Crowd.MAX_RIDES), so nobody can arrive to buy, lease, or
-      // check in. Same gate for every tenant kind; visitor income and office
-      // rent already honor it (EconomySystem), this makes move-ins agree.
+      // check in. Same gate for every tenant kind; commercial visitor income
+      // already honors it (EconomySystem.collectTrafficIncome), this makes
+      // move-ins agree. (Quarterly office rent still gates on isFloorServed
+      // only, a deliberate grandfather for tenants already in place.)
       if (!reachable(u.floor)) continue;
 
       const demand = this.demandFactor(u);
@@ -1992,14 +1994,14 @@ export class Simulation implements SimContext {
   }
 
   /**
-   * Above-ground floors that are served (connected) but NOT ≤2-ride reachable —
+   * Above-ground floors that are served (connected) but NOT ≤2-ride reachable,
    * "stranded". Two scopes, each with one meaning:
-   *  - `"leased"` (default): floors carrying a real tenant — they earn rating
+   *  - `"leased"` (default): floors carrying a real tenant. They earn rating
    *    credit but draw no visitors. The stats modal reads this one.
-   *  - `"rentable"`: also floors whose tenant-capable units are all still
-   *    empty — nothing there will ever move in, so the daily advisory must
-   *    cover them too (an empty condo slab past the second transfer would
-   *    otherwise stall silently).
+   *  - `"rentable"`: also floors whose tenant-capable units are operational
+   *    but untenanted (empty, or a dirty hotel room). Nothing there will ever
+   *    move in, so the daily advisory must cover them too (an empty condo slab
+   *    past the second transfer would otherwise stall silently).
    * BFS-bearing — call only on modal-open or once/day, NEVER in {@link stats}
    * or the tick loop.
    */
@@ -2018,13 +2020,14 @@ export class Simulation implements SimContext {
   }
 
   /** Whether a unit puts its floor in scope for {@link strandedFloors}.
-   *  `rentable` widens `leased` with operational-but-empty tenant space; a
-   *  gutted/burning/under-construction shell can't take a tenant, so it never
-   *  qualifies on its own. */
+   *  `rentable` widens `leased` with any OPERATIONAL tenant-capable unit, so
+   *  empty space and a dirty hotel room (rentable again once housekeeping
+   *  cleans it) both count; a gutted/burning/under-construction shell can't
+   *  take a tenant, so it never qualifies on its own. */
   private isStrandedCandidate(u: Unit, scope: "leased" | "rentable"): boolean {
     if (isTenantFloorUnit(u)) return true;
     if (scope !== "rentable") return false;
-    return u.floor >= 2 && u.state === "empty" && (FACILITIES[u.kind].population > 0 || isHotelKind(u.kind));
+    return u.floor >= 2 && isOperational(u) && (FACILITIES[u.kind].population > 0 || isHotelKind(u.kind));
   }
 
   /** Like {@link hasAny} but only counts a facility that is finished and intact

@@ -154,11 +154,77 @@ describe("Legibility — two-ride rule gates move-ins (Simulation)", () => {
     // Wide scope sees the empty units; the stats-modal (leased) scope does not.
     expect(sim.strandedFloors("rentable")).toContain(40);
     expect(sim.strandedFloors()).toEqual([]);
-    const count = () => sim.log.filter((e) => e.text.includes("3+ elevator rides")).length;
+    const entries = () => sim.log.filter((e) => e.text.includes("3+ elevator rides"));
     sim.tick(DAY);
-    expect(count()).toBe(1); // fired with nothing leased up there
+    expect(entries()).toHaveLength(1); // fired with nothing leased up there
+    expect(entries()[0].kind).toBe("info"); // log-only advisory, never a toast
     sim.tick(DAY);
-    expect(count()).toBe(1); // latched while the condition persists
+    expect(entries()).toHaveLength(1); // latched while the condition persists
+  });
+
+  it("a dirty hotel room keeps its stranded floor in the rentable scope (it is rentable again once cleaned)", () => {
+    const { sim, unit, ids } = strandedMoveInTower(12);
+    const hotel = sim.tower.units.find((u) => u.id === ids.hotel40)!;
+    hotel.state = "dirty"; // guest checked in while reachable, checked out after the shaft was lost
+    // Remove the other floor-40 units so the dirty room alone must carry the scope.
+    for (const id of [ids.condo40, ids.office40]) sim.tower.removeUnit(id);
+    expect(sim.strandedFloors("rentable")).toContain(40);
+    expect(sim.strandedFloors()).toEqual([]); // dirty is not leased
+    sim.tick(DAY);
+    expect(unit(ids.hotel40).state).toBe("dirty"); // and the gate never refills it
+  });
+
+  it("a stranded floor of only gutted/burning/under-construction shells draws no advisory", () => {
+    const { sim } = strandedMoveInTower(13);
+    const floor40 = sim.tower.units.filter((u) => u.floor === 40 && u.kind !== "floor");
+    floor40[0].state = "gutted";
+    floor40[1].state = "construction";
+    floor40[2].state = "fire";
+    expect(sim.strandedFloors("rentable")).toEqual([]); // nothing rentable up there
+    sim.tick(DAY);
+    expect(sim.log.filter((e) => e.text.includes("3+ elevator rides"))).toHaveLength(0);
+  });
+
+  it("shift: a reachable floor that loses its shortcut stops filling, keeps its tenants, and re-nudges", () => {
+    const { sim, unit, ids } = strandedMoveInTower(14);
+    // Make floor 40 reachable (1 → 15 → 40) and let the condo sell.
+    const shortcut = sim.tower.placeTransport("elevatorStandard", C - 10, 15, 45);
+    expect(shortcut.ok).toBe(true);
+    sim.tick(3 * DAY);
+    expect(unit(ids.condo40).everOccupied).toBe(true);
+    const entries = () => sim.log.filter((e) => e.text.includes("3+ elevator rides"));
+    expect(entries()).toHaveLength(0); // nothing stranded yet, latch is unarmed
+
+    // The shortcut goes away: the floor shifts reachable → stranded.
+    sim.tower.removeTransport(shortcut.transportId!);
+    expect(sim.floorReachable(40)).toBe(false);
+    expect(sim.tower.isFloorServed(40)).toBe(true);
+    // Fresh inventory placed after the shift is what the gate must starve
+    // (the units from the reachable era may have legitimately filled).
+    const lateCondo = sim.tower.place("condo", 40, 140).unitId!;
+    sim.tick(3 * DAY);
+    expect(unit(ids.condo40).everOccupied).toBe(true); // no retroactive eviction
+    expect(unit(lateCondo).everOccupied).toBe(false); // and nothing new moves in
+    expect(unit(lateCondo).state).toBe("empty");
+    expect(entries()).toHaveLength(1); // the advisory announced the shift
+  });
+
+  it("shift: the advisory latch re-arms after the floor is fixed, and fires again on a relapse", () => {
+    const { sim } = strandedMoveInTower(15);
+    const entries = () => sim.log.filter((e) => e.text.includes("3+ elevator rides"));
+    sim.tick(DAY);
+    expect(entries()).toHaveLength(1); // stranded from the start → first nudge
+
+    // Fix it: floor 40 becomes reachable, the condition clears, the latch re-arms.
+    const shortcut = sim.tower.placeTransport("elevatorStandard", C - 10, 15, 45);
+    expect(shortcut.ok).toBe(true);
+    sim.tick(DAY);
+    expect(entries()).toHaveLength(1); // cleared → no new nudge
+
+    // Relapse: the shortcut is demolished, the same floor strands again.
+    sim.tower.removeTransport(shortcut.transportId!);
+    sim.tick(DAY);
+    expect(entries()).toHaveLength(2); // a fresh crossing fires a fresh advisory
   });
 });
 

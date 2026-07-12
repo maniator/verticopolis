@@ -105,6 +105,11 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of spec-stranded-floor-move-ins (2026-07-12)
+
+- Stranded-floor advisory latch is a single tower-wide boolean (`Simulation.strandedNudged`): while any stranded floor persists, a different floor going stranded on a later day emits no new advisory. Widened surface since the latch is now held by the `rentable` scope while the stats modal lists only `leased` floors, so an all-empty stranded slab (invisible in the modal) can consume the one-shot nudge a later leased-and-stranded floor would otherwise get. Consider a per-floor or count-based latch.
+
+
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 

@@ -194,7 +194,7 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     // Sky-lobby floors get LOBBY tiles, not floor tiles: a lobby can't be laid
     // over existing floor tiles ("Clear the floor tiles or rooms here first"),
     // so the old lay-floors-then-lobbies order silently left the tower with no
-    // sky lobbies at all — and an express with nothing to stop at.
+    // sky lobbies at all, and an express with nothing to stop at.
     const sky = [15, 30, 45, 60, 75, 90];
     const skyset = new Set(sky);
     lay("lobby", 1);

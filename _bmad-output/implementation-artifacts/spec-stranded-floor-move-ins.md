@@ -2,7 +2,7 @@
 title: 'Stranded-floor move-ins: gate tenancy on the two-ride rule'
 type: 'bugfix'
 created: '2026-07-12'
-status: 'in-review'
+status: 'done'
 baseline_commit: '3afeb401aed443cb655a0d26f11d2acd2a985863'
 context:
   - '{project-root}/_bmad-output/specs/spec-stranded-floor-move-ins/SPEC.md'
@@ -64,6 +64,19 @@ context:
 - Given a serialized tower with `everOccupied` condos on stranded floors, when deserialized and ticked, then those condos remain occupied and no buy-back or eviction fires
 - Given a stranded floor whose only tenant-capable units are empty, when the daily nudge check runs, then the advisory fires once ("info", not toast) and does not repeat while the condition persists
 - Given the stats modal, when it renders, then its stranded count still reflects leased floors only
+
+
+### Review Findings
+
+gds-code-review, 2026-07-12: Blind Hunter + Edge Case Hunter + Acceptance Auditor, all three layers returned.
+
+- [x] [Review][Patch] rentable scope used state === "empty" where the spec said isOperational, so a dirty hotel room on a stranded floor escaped the advisory (found independently by all three layers) [src/engine/Simulation.ts:2028] -- fixed: isOperational admits dirty, still excludes gutted/fire/construction; regression test added
+- [x] [Review][Patch] Gate comment claimed quarterly office rent honors the two-ride rule; collectRent gates on isFloorServed only (Edge Case Hunter, verified) [src/engine/Simulation.ts:1700] -- fixed: comment now documents the deliberate rent grandfather
+- [x] [Review][Patch] Nudge copy "a floor with rentable space" half-fit fully-leased stranded floors (Blind Hunter) [src/engine/Simulation.ts:924] -- fixed: "a floor with tenant space"
+- [x] [Review][Patch] Em-dashes in newly written comments violate the no-em-dash rule for new prose (Acceptance Auditor) [Simulation.ts, phase2.test.ts] -- fixed
+- [x] [Review][Patch] I/O matrix row 6 (gutted/burning/construction-only floor draws no nudge) had no test; AC4's "info" severity clause untested (Acceptance Auditor) -- fixed: both asserted in legibility.test.ts
+- [x] [Review][Defer] Single tower-wide stranded latch: while one stranded floor persists, a second floor going stranded later emits no new advisory; the rentable-superset latch can also consume the nudge for a floor the leased-only stats modal will not list (Edge Case Hunter; mechanism pre-existing, surface widened here) -- deferred, pre-existing
+- Dismissed as noise: basement gate scoping (no basement tenant kinds exist, NO_BASEMENT_KINDS), occupied-hotel scope asymmetry (hotels have population > 0, isTenantFloorUnit covers them), hourly BFS budget (bounded, deduped, same documented pattern as collectTrafficIncome), advisory-vs-stats-modal pointer (the unit inspector does report the access state), floor >= 2 duplication (mirrors the existing shared predicate).
 
 ## Verification
 
