@@ -93,6 +93,11 @@ function autosaveKey(): string {
     : LEGACY_AUTO_KEY;
 }
 
+/** The largest timestamp JS Date can represent (ECMA-262: 8,640,000,000,000,000
+ *  ms either side of the epoch). A finite savedAt beyond this still renders
+ *  "Invalid Date", so the read treats it as absent. */
+const MAX_DATE_MS = 8.64e15;
+
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
   const data = readSlot(key);
   if (!data) return { slot, exists: false };
@@ -109,7 +114,15 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
     star: data.star,
     population,
     funds: data.money,
-    savedAt: (data as SerializedGame & { savedAt?: number }).savedAt,
+    // Same trust posture as every other save field: a forged savedAt (string,
+    // NaN, or a finite value outside the range Date can represent, +/-8.64e15
+    // ms) reads as absent, so the Saves dialog shows an empty timestamp
+    // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
+    // display a confidently wrong date.
+    savedAt:
+      typeof data.savedAt === "number" && Number.isFinite(data.savedAt) && Math.abs(data.savedAt) <= MAX_DATE_MS
+        ? data.savedAt
+        : undefined,
   };
 }
 
@@ -215,9 +228,7 @@ export const SaveGame = {
     // it must not cancel the pending autosave commit; that would leave the
     // autosave slot stale until the next timer tick.
     if (key === AUTO_KEY) latestAsyncSave = null;
-    const data = sim.serialize() as SerializedGame & { savedAt: number };
-    // Stamp save time without relying on a deterministic clock in the engine.
-    data.savedAt = nowMs();
+    const data = stamp(sim.serialize());
     // DEFLATE the JSON so four full-tower slots stay well under the ~5MB
     // localStorage quota (see STORE_MAGIC). Synchronous by design — this runs
     // just before a reload in the crash-recovery path, where an async write
@@ -237,8 +248,7 @@ export const SaveGame = {
     }
     const token = {};
     latestAsyncSave = token;
-    const data = sim.serialize() as SerializedGame & { savedAt: number };
-    data.savedAt = nowMs();
+    const data = stamp(sim.serialize());
     const packed = await deflate(new TextEncoder().encode(JSON.stringify(data)));
     if (latestAsyncSave !== token) return;
     latestAsyncSave = null;
@@ -252,7 +262,9 @@ export const SaveGame = {
     if (!compressionEncodeSupported()) {
       throw new Error("This browser is too old to create tower files. Try a current browser.");
     }
-    const packed = await deflate(new TextEncoder().encode(JSON.stringify(sim.serialize())));
+    // Exports carry the same write-time provenance as local saves: a moved
+    // file says when and by which build it was written.
+    const packed = await deflate(new TextEncoder().encode(JSON.stringify(stamp(sim.serialize()))));
     return TOWER_FILE_MAGIC + "\n" + toBase64(packed) + "\n";
   },
 
@@ -486,4 +498,14 @@ function nowMs(): number {
   // Date is unavailable in the deterministic engine, but the storage layer is
   // UI-side, so a wall-clock stamp here is fine.
   return typeof Date !== "undefined" ? Date.now() : 0;
+}
+
+/** Write-time provenance: when the save was written and by which build. The
+ *  engine never emits these (serialize() is stamp-free); every write path
+ *  (localStorage and .vctower alike) re-stamps here, so the values always
+ *  describe THIS file, never a previous device's. */
+function stamp(data: SerializedGame): SerializedGame {
+  data.savedAt = nowMs();
+  data.appVersion = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+  return data;
 }

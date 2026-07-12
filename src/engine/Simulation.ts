@@ -36,6 +36,7 @@ import {
   transportCarCapacity,
 } from "./facilities";
 import type { FacilityKind, GameMode, SerializedGame, SerializedUnit, SerializedView, Unit, VacateReason, WeatherKind } from "./types";
+import type { LogEntry } from "./types";
 import {
   isDormant,
   isGameMode,
@@ -138,11 +139,23 @@ function storeRent(u: Unit, cfg: { default: number }, clamped: number): void {
   u.rent = clamped === cfg.default ? undefined : clamped;
 }
 
-export interface LogEntry {
-  minute: number;
-  text: string;
-  kind: "info" | "good" | "bad" | "money";
-}
+// LogEntry moved to ./types (the save schema carries a log tail); re-exported
+// here so the UI's existing import path keeps working.
+export type { LogEntry };
+
+/** How many trailing log entries ride a save (see SerializedGame.log). The
+ *  live ring holds up to 300 (see emit); persisting the most recent 100 keeps
+ *  the panel's visible history across a load at a few KB compressed. */
+export const LOG_SAVE_CAP = 100;
+
+/** Hard cap on a RESTORED entry's text length. Our own emits are short
+ *  sentences; a forged save must not smuggle megabytes into the DOM (the
+ *  panel renders via textContent, so this bounds memory, not injection). */
+const LOG_TEXT_CAP = 400;
+
+/** Ring capacity of the live bulletin log (emit pushes + shifts past this),
+ *  and therefore the most entries a restored save may bring back. */
+const LOG_RING_CAP = 300;
 
 /** The metric the colored stats overlay tints floors by. */
 export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
@@ -287,10 +300,15 @@ export class Simulation implements SimContext {
   get hourTicks(): number {
     return this.onHourRuns;
   }
+  /** The bulletin log ring (capped at LOG_RING_CAP by {@link emit}). Its
+   *  trailing LOG_SAVE_CAP entries ride every save so a loaded tower keeps
+   *  its message history; see serialize/deserialize. */
   log: LogEntry[] = [];
   /** Monotonic count of {@link emit} calls this session — the UI's "new entries"
    *  cursor (see emit). NOT `log.length`, which the capped shift pins once the
-   *  ring is full. Transient/not serialized, like `log`. */
+   *  ring is full. Transient/not serialized (unlike the log tail): it resets
+   *  to 0 on load, and the UI rebases its cursor on adopt (resetLog), so a
+   *  restored log repopulates the panel without replaying any toast. */
   logSeq = 0;
 
   /**
@@ -403,12 +421,13 @@ export class Simulation implements SimContext {
     // THIS, never on log.length — the capped shift below makes length
     // non-monotonic (push+shift pins it at the cap once full), which is what
     // froze the toast/bulletin pump after the cap while cosmetics kept animating.
-    // Transient like the log itself (neither is serialized): resets to 0 on load.
+    // Transient (the log's TAIL is serialized, this cursor is not): resets to
+    // 0 on load, and the UI rebases on adopt so nothing replays as a toast.
     this.logSeq++;
     // Bounded ring — a session's worth of scrollback (the UI renders up to
     // LOG_DOM_CAP of it). Cheap in RAM (~100 bytes/entry); the shift is what
     // makes length non-monotonic, hence the logSeq cursor above.
-    if (this.log.length > 300) this.log.shift();
+    if (this.log.length > LOG_RING_CAP) this.log.shift();
   }
 
   // ---- Build / sell ------------------------------------------------------
@@ -2348,6 +2367,9 @@ export class Simulation implements SimContext {
       // Spread so an unstamped view contributes no key at all (undo snapshots
       // and crash reports serialize too, and they must not grow a null field).
       ...(this.view ? { view: this.view } : {}),
+      // The bulletin tail (newest last), so load/import/undo keeps the message
+      // history. Same spread pattern: an empty log contributes no key.
+      ...(this.log.length ? { log: this.log.slice(-LOG_SAVE_CAP).map((e) => ({ ...e })) } : {}),
     };
   }
 
@@ -2396,6 +2418,12 @@ export class Simulation implements SimContext {
     // boundary as everything else: malformed shapes drop to null (the renderer
     // then centers), out-of-range values clamp to the grid and zoom range.
     sim.view = coerceView(data.view);
+    // Restore the bulletin tail (hardened per entry; see coerceLog). logSeq
+    // stays 0 on purpose: the UI rebases its cursor on adopt, so the restored
+    // entries repopulate the panel without replaying as toasts. The write-time
+    // provenance stamps (savedAt, appVersion) are deliberately NOT carried:
+    // they describe the file, and the next write re-stamps them.
+    sim.log = coerceLog(data.log);
     // Reject any unit/transport with an unrecognized kind from untrusted saves,
     // and coerce the numeric fields that drive the loop to finite values so a
     // hand-edited or foreign save can't poison the math with NaN/undefined.
@@ -2660,6 +2688,40 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (subtype !== undefined) out.subtype = subtype;
   if (completeAt !== undefined) out.completeAt = completeAt;
   return out;
+}
+
+/** The four LogEntry kinds, for restore-time coercion (an unknown kind reads
+ *  as the neutral "info" rather than dropping the line). */
+const LOG_KINDS: ReadonlySet<string> = new Set(["info", "good", "bad", "money"]);
+
+/**
+ * Trust-boundary coercion for the restored bulletin tail. A save is untrusted
+ * input: a non-array restores an empty log; an entry without a string text is
+ * dropped; text is truncated to LOG_TEXT_CAP; minute coerces to a finite
+ * number (else 0); kind coerces into the known set (else "info"); at most
+ * LOG_RING_CAP entries restore (the newest, matching the live ring).
+ */
+function coerceLog(v: unknown): LogEntry[] {
+  if (!Array.isArray(v)) return [];
+  // Walk from the newest end and keep the newest LOG_RING_CAP VALID entries:
+  // capping before filtering would let junk padding evict real history.
+  const out: LogEntry[] = [];
+  for (let i = v.length - 1; i >= 0 && out.length < LOG_RING_CAP; i--) {
+    const e: unknown = v[i];
+    if (typeof e !== "object" || e === null) continue;
+    const { minute, text, kind } = e as Record<string, unknown>;
+    if (typeof text !== "string") continue;
+    let t = text.slice(0, LOG_TEXT_CAP);
+    // Never cut through an astral character: a torn surrogate pair would
+    // render as U+FFFD and round-trip as a lone surrogate.
+    if (t.length === LOG_TEXT_CAP && /[\uD800-\uDBFF]$/.test(t)) t = t.slice(0, -1);
+    out.push({
+      minute: typeof minute === "number" && Number.isFinite(minute) ? Math.max(0, minute) : 0,
+      text: t,
+      kind: typeof kind === "string" && LOG_KINDS.has(kind) ? (kind as LogEntry["kind"]) : "info",
+    });
+  }
+  return out.reverse();
 }
 
 /**

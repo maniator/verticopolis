@@ -403,6 +403,11 @@ class GameApp {
     // the splash) would briefly see the full locked catalog before the throttled
     // render loop first hides the locked tools — a visible collapse/reflow.
     this.ui.update(this.sim);
+    // Adopt the boot sim's log baseline the same way adoptSim does for later
+    // swaps: the boot sim is assigned directly (never through adoptSim), and
+    // without this the bulletin history a save carries would sit unrendered
+    // after a plain page reload, the restore path players hit most.
+    this.ui.resetLog(this.sim);
     void this.engine.start();
 
     // Accessibility: apply reduced motion now and whenever the OS pref flips.
