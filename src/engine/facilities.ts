@@ -99,7 +99,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     width: 16,
     cost: 100000,
     minStar: 1,
-    population: 0,
+    population: 25,
     color: "#e87b6e",
     description: "Quick dining. Busy at lunch. Income scales with foot traffic.",
   },
@@ -110,7 +110,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     width: 24,
     cost: 200000,
     minStar: 3,
-    population: 0,
+    population: 35,
     color: "#d4564a",
     description: "Fine dining, busy at lunch and dinner. Needs good elevator access.",
   },
@@ -121,7 +121,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     width: 12,
     cost: 100000,
     minStar: 3,
-    population: 0,
+    population: 20,
     color: "#b58ad6",
     description: "Retail. Earns from shoppers passing by. Thrives near lobbies and offices.",
   },
@@ -363,12 +363,12 @@ export const STAR_THRESHOLDS: Record<number, number> = {
 };
 
 /**
- * Population needed for the final TOWER rating (above 5 stars). A census of
- * OCCUPANTS (office workers + condo residents; hotel guests count while climbing
- * up through 4★, then drop out, our tuned ladder rather than a 1994 parity
- * claim); commercial/visitor traffic never counts. The canonical 15,000: the lot
- * is the canon 375 tiles wide so a well-zoned 100-floor tower comfortably reaches
- * it (with express + banded locals).
+ * Population needed for the final TOWER rating (above 5 stars). The census
+ * counts office workers, condo residents, and commercial venue customers (fast
+ * food 25 / restaurant 35 / shop 20, scaled to footprint); hotel guests count
+ * while climbing up through 4★, then drop out. The canonical value is 15,000. The
+ * lot is the canon 375 tiles wide so a well-zoned 100-floor tower comfortably
+ * reaches it (with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
 

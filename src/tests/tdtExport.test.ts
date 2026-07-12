@@ -557,11 +557,8 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
     expect(records.every((x) => x === 0)).toBe(true); // records re-simulate; content is zero
   });
 
-  it("a commercial-only tower (zero catalog residents) still writes a NONZERO count", () => {
-    // Shops/restaurants/fast food have catalog population 0, so the resident
-    // census sums to 0 -- but the game still populates them with customers, so a
-    // 0 count would fault like an empty people block. The room-count floor keeps
-    // it nonzero.
+  it("a commercial-only tower writes its people census from catalog population", () => {
+    // shop = 20, fastFood = 25 (proportional-to-footprint design values).
     const { bytes } = buildTDT(
       tower([
         unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
@@ -569,7 +566,37 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
         unit({ id: 3, kind: "fastFood", floor: 3, x: 0, width: 16, state: "occupied" }),
       ]),
     );
-    expect(u32(bytes, peopleOffset(bytes))).toBeGreaterThan(0);
+    // shop (20) + fastFood (25) = 45
+    expect(u32(bytes, peopleOffset(bytes))).toBe(20 + 25);
+  });
+
+  it("vacant commercial units do not add their catalog population to the census", () => {
+    // Vacant units (state: empty) are not present; residentCount is never called
+    // for them. The room-count floor still produces a nonzero count (SimTower
+    // needs a nonzero people block for any non-empty tower), but it should be
+    // the small floor value, NOT the catalog population × rooms.
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "shop", floor: 2, x: 0, width: 12, state: "empty" }),
+        unit({ id: 3, kind: "restaurant", floor: 3, x: 0, width: 24, state: "empty" }),
+      ]),
+    );
+    // Room-count floor = 2 (the two vacant commercial rooms), not catalog pop × 2.
+    expect(u32(bytes, peopleOffset(bytes))).toBe(2);
+  });
+
+  it("mixed tower census sums offices, condos, and present commercial correctly", () => {
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "office", floor: 2, x: 0, width: 12, state: "occupied" }), // 6
+        unit({ id: 3, kind: "fastFood", floor: 3, x: 0, width: 16, state: "occupied" }), // 25
+        unit({ id: 4, kind: "restaurant", floor: 4, x: 0, width: 24, state: "occupied" }), // 35
+        unit({ id: 5, kind: "shop", floor: 5, x: 0, width: 12, state: "empty" }), // 0 (vacant)
+      ]),
+    );
+    expect(u32(bytes, peopleOffset(bytes))).toBe(6 + 25 + 35);
   });
 
   it("a forged NaN condo `residents` can't poison the census to 0", () => {

@@ -175,24 +175,123 @@ describe("ghost guard: bulldozing the origin mid-meal does not corrupt the censu
   });
 });
 
-describe("integration: meal census rises during lunch while HUD population stays steady", () => {
-  it("associatedPopulation rises at the lunch peak and returns after", () => {
+describe("integration: meal census rises during lunch while HUD population rises too", () => {
+  it("associatedPopulation rises at the lunch peak; population returns to base after", () => {
     const sim = officeAndFastFood();
     setHour(sim, 11);
-    const base = sim.tower.totalPopulation();
+    const base = sim.tower.totalPopulation(); // office workers only (no customers yet)
     let sawAssociatedRise = false;
+    let sawPopulationRise = false;
     for (let m = 0; m < 180; m++) {
       sim.tick(1);
       if (sim.tower.associatedPopulation() > 0) sawAssociatedRise = true;
-      expect(sim.population).toBe(base);
+      // Population can only stay the same or rise during lunch (customers
+      // arriving at the venue add to the live census).
+      expect(sim.population).toBeGreaterThanOrEqual(base);
+      if (sim.population > base) sawPopulationRise = true;
     }
     expect(sawAssociatedRise).toBe(true);
-    // Run out the window + straggler wind-down: every customer is home, census 0.
+    expect(sawPopulationRise).toBe(true);
+    // Run out the window + straggler wind-down: every customer is home, census returns.
     for (let m = 0; m < 120; m++) sim.tick(1);
     expect(sim.tower.associatedPopulation()).toBe(0);
     expect(sim.population).toBe(base);
   });
 });
+
+describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulation and ratingPopulation", () => {
+  it("a fastFood with no customers yet contributes 0 to totalPopulation", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = undefined; // ensure nothing eating
+    expect(sim.tower.totalPopulation()).toBe(6); // office only (6), no fastFood customers
+  });
+
+  it("fastFood with customersIn = 5 adds exactly 5 to totalPopulation", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = 5;
+    expect(sim.tower.totalPopulation()).toBe(11); // 6 office + 5 customers
+  });
+
+  it("occupied restaurant and shop each add their live customersIn to totalPopulation", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 3; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    const rest = sim.tower.place("restaurant", 2, 0);
+    const sh = sim.tower.place("shop", 3, 0);
+    const restUnit = sim.tower.units.find((u) => u.id === rest.unitId)!;
+    const shUnit = sim.tower.units.find((u) => u.id === sh.unitId)!;
+    restUnit.state = "occupied";
+    restUnit.customersIn = 12;
+    shUnit.state = "occupied";
+    shUnit.customersIn = 8;
+    expect(sim.tower.totalPopulation()).toBe(20);
+  });
+
+  it("commercial census flows into ratingPopulation at all star rungs", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = 10;
+    for (const star of [1, 2, 3, 4, 5] as const) {
+      sim.star = star;
+      // office (6) + fastFood customers (10) = 16
+      expect(sim.ratingPopulation()).toBeGreaterThanOrEqual(10);
+    }
+  });
+
+  it("vacant commercial units (no customersIn) do not contribute to totalPopulation", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = undefined;
+    // only office occupants (6) count
+    expect(sim.tower.totalPopulation()).toBe(6);
+  });
+
+  it("commercial customersIn is not persisted across save/reload", () => {
+    const sim = officeAndFastFood();
+    const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
+    ff.customersIn = 7;
+    const data = sim.serialize();
+    const restored = Simulation.deserialize(data);
+    const ffRestored = restored.tower.units.find((u) => u.kind === "fastFood")!;
+    expect(ffRestored.customersIn ?? 0).toBe(0);
+    expect(restored.tower.totalPopulation()).toBe(restored.population);
+  });
+
+  it("commercial counts in both Classic and Modern modes", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const sim = new Simulation(2024, mode, "realWorld");
+      sim.money = 1_000_000;
+      for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+      for (let x = 0; x < 40; x++) sim.tower.place("floor", 2, x);
+      const r = sim.tower.place("fastFood", 2, 0);
+      const u = sim.tower.units.find((u) => u.id === r.unitId)!;
+      u.state = "occupied";
+      u.customersIn = 3;
+      expect(sim.tower.totalPopulation()).toBe(3);
+    }
+  });
+  it("cinema (lateNight venue, population=0) does not count toward totalPopulation even with customersIn set", () => {
+    // Cinema is isCommercialKind but FACILITIES.cinema.population = 0, so it is
+    // excluded from the census. This test guards against the bug where
+    // isCommercialKind alone was used as the census gate — cinema is a valid
+    // lateNight meal destination so its customersIn would have been incremented
+    // by eating-state entry, and then incorrectly counted as census population.
+    // The fix: all three census reads gate on FACILITIES[kind].population > 0.
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 4; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    const r = sim.tower.place("cinema", 2, 0);
+    const u = sim.tower.units.find((u) => u.id === r.unitId)!;
+    u.state = "occupied";
+    u.customersIn = 10; // simulate late-night cinema-goers
+    expect(sim.tower.totalPopulation()).toBe(0); // cinema excluded from census
+  });
+});
+
 
 describe("save version is 4 and a v3 save migrates cleanly", () => {
   it("SAVE_VERSION is 4 and serialize stamps it", () => {

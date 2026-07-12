@@ -3,7 +3,7 @@ import type { Tower } from "./Tower";
 import type { FacilityKind, Transport, Unit } from "./types";
 import { isOperational, isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
-import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
+import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind, isCommercialKind, FACILITIES } from "./facilities";
 import { HK_SHIFT_END, HK_SHIFT_START } from "./EconomySystem";
 import { ECON } from "./econConfig";
 import { RNG } from "./rng";
@@ -141,6 +141,11 @@ export interface Person {
   staff?: boolean;
   /** Unit id this staffer is dispatched to service (a dirty hotel room). */
   cleanUnitId?: number;
+  /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
+   *  person is currently eating. Set when the person enters `eating` state;
+   *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
+   *  all non-meal persons and for eaters at non-commercial destinations. */
+  venueUnitId?: number;
   /** Unit id of the ORIGIN room for a round-trip meal person (an office,
    *  condo, or hotel room whose visible occupancy dropped by 1 when this
    *  person spawned outbound). Undefined for lobby-centric commuter trips
@@ -1047,6 +1052,16 @@ export class Crowd {
               // ghost or route-fail" belt-and-braces.
               p.age = 0;
               p.eatSecondsLeft = this.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
+              // Track this customer at their venue for the live census.
+              // O(1): unitAt uses an internal Map keyed by floor+tile.
+              // Gate on population > 0 because cinema is a lateNight meal venue
+              // but carries population = 0 and must not count toward the census.
+              const venueUnit = tower.unitAt(p.floor, p.destX);
+              if (venueUnit && isCommercialKind(venueUnit.kind) && FACILITIES[venueUnit.kind].population > 0) {
+                p.venueUnitId = venueUnit.id;
+                venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
+                tower.bumpMealOverlayRevision();
+              }
             } else {
               this.finish(p, tower);
             }
@@ -1158,6 +1173,17 @@ export class Crowd {
     if (origin && (origin.outForMeal ?? 0) > 0) {
       origin.outForMeal = (origin.outForMeal ?? 0) - 1;
       tower.bumpMealOverlayRevision();
+    }
+    // Venue customer: decrement the destination's live customer count on any
+    // despawn path (successful return, mid-eating give-up, ghost origin).
+    // O(1): getUnit uses an internal Map. Guarded the same way as outForMeal.
+    if (p.venueUnitId !== undefined) {
+      const venue = tower.getUnit(p.venueUnitId);
+      if (venue && (venue.customersIn ?? 0) > 0) {
+        venue.customersIn = (venue.customersIn ?? 0) - 1;
+        tower.bumpMealOverlayRevision();
+      }
+      p.venueUnitId = undefined;
     }
     p.state = "done";
   }

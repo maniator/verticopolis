@@ -541,6 +541,31 @@ describe("parseTDT: golden mappings", () => {
     expect(office.satisfaction).toBe(1);
   });
 
+  it("commercial venues import as occupied with state and everOccupied set", () => {
+    // TDT types: 12=fastFood, 10=shop, 6=restaurant
+    const ff = rooms(oneTenant(12, 100, 116))[0]; // fastFood
+    expect(ff.state).toBe("occupied");
+    expect(ff.everOccupied).toBe(true);
+    // customersIn starts at 0 (no meal round-trippers have eaten yet); the
+    // live census builds organically as the simulation runs.
+    expect(ff.customersIn ?? 0).toBe(0);
+    const shop = rooms(oneTenant(10, 100, 112))[0];
+    expect(shop.state).toBe("occupied");
+    expect(shop.everOccupied).toBe(true);
+    expect(shop.customersIn ?? 0).toBe(0);
+    const restaurant = rooms(oneTenant(6, 100, 124))[0];
+    expect(restaurant.state).toBe("occupied");
+    expect(restaurant.everOccupied).toBe(true);
+    expect(restaurant.customersIn ?? 0).toBe(0);
+  });
+
+  it("commercial venue under construction imports as construction with zero occupants", () => {
+    // Negative type = under construction
+    const ff = rooms(oneTenant(-12, 100, 116))[0]; // fastFood under construction
+    expect(ff.state).toBe("construction");
+    expect(ff.occupants).toBe(0);
+  });
+
   it("hotel status flags: asleep guests, dirty rooms, and infested→dirty with a note", () => {
     // Default header clock is 7:00 AM (before checkout), so asleep survives.
     const asleep = rooms(oneTenant(3, 100, 104, 16 | 2))[0];

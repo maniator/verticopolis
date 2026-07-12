@@ -222,6 +222,12 @@ export interface Unit {
   satisfaction: number;
   /** Current number of occupants present right now. */
   occupants: number;
+  /** Transient count of meal customers currently eating at this commercial venue
+   *  (fastFood / restaurant / shop). Not persisted (a save reload resets it to 0;
+   *  meal round-trippers rebuild the count organically). Incremented when a
+   *  person enters the `eating` state at this venue; decremented when they leave.
+   *  Only meaningful for commercial kinds. See {@link isCommercialKind}. */
+  customersIn?: number;
   /** Transient count of workers/residents currently out on a meal round-trip
    *  originating from THIS unit. Not persisted (a save reload resets it to 0
    *  and the next `updatePresence` hour boundary re-baselines `occupants`).

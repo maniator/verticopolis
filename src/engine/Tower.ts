@@ -1,4 +1,4 @@
-import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFixedSpanTransport, isHotelKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor, residentCount } from "./facilities";
+import { BUILD_CAPS, FACILITIES, GRID, POOLED_CAPS, facilityFloors, isCommercialKind, isElevatorKind, isFixedSpanTransport, isHotelKind, isStaffOnlyTransport, isStaffTransportKind, maxCarsFor, maxSpanFor, residentCount } from "./facilities";
 import { isOperational, isPresent } from "./types";
 import type {
   Facility,
@@ -1294,7 +1294,14 @@ export class Tower {
   totalPopulation(): number {
     let pop = 0;
     for (const u of this.units) {
-      if (isPresent(u)) {
+      if (!isPresent(u)) continue;
+      // Commercial venues count their live customer tally (meal round-trippers
+      // currently eating there); everyone else uses the catalog occupant count.
+      // Gate on population > 0: cinema is commercial but intentionally excluded
+      // (it carries population = 0 in FACILITIES and was not in the party decision).
+      if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
+        pop += u.customersIn ?? 0;
+      } else {
         pop += residentCount(u);
       }
     }

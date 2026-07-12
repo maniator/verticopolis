@@ -103,12 +103,20 @@ describe("canon: tenant populations (tdt-format.md §6)", () => {
     expect(FACILITIES.condo.population).toBe(3);
   });
 
-  it("commercial venues carry no census population (customers are not occupants)", () => {
-    // The TDT's fast-food figure of 48 counts workers + CUSTOMERS; the census
-    // metric is occupants only, so commercial kinds must stay at 0 here.
-    expect(FACILITIES.fastFood.population).toBe(0);
-    expect(FACILITIES.restaurant.population).toBe(0);
-    expect(FACILITIES.shop.population).toBe(0);
+  it("commercial venue populations are proportional to footprint (shop 20, fastFood 25, restaurant 35)", () => {
+    // Design note: Verticopolis uses footprint-proportional ambient occupant counts
+    // for the renderer heatmap. The 1994 Finance Window used a flat 35 per venue
+    // (fastFood 5 units × 35 = 175 per inspector data). Our values diverge by design:
+    // shop (12 tiles) = 20, fastFood (16 tiles) = 25, restaurant (24 tiles) = 35.
+    // All three are positive so the census gate (population > 0) is preserved; the
+    // live population census uses u.customersIn (meal round-trippers), not this field.
+    expect(FACILITIES.shop.population).toBe(20);
+    expect(FACILITIES.fastFood.population).toBe(25);
+    expect(FACILITIES.restaurant.population).toBe(35);
+    // Gate invariant: all are positive so isCommercialKind population > 0 check holds.
+    expect(FACILITIES.shop.population).toBeGreaterThan(0);
+    expect(FACILITIES.fastFood.population).toBeGreaterThan(0);
+    expect(FACILITIES.restaurant.population).toBeGreaterThan(0);
   });
 });
 

@@ -27,6 +27,7 @@ import {
   isCommercialKind,
   isElevatorKind,
   isFacilityKind,
+  isOpenAt,
   isStaffOnlyTransport,
   isHotelKind,
   maxCarsFor,
@@ -987,7 +988,14 @@ export class Simulation implements SimContext {
           u.occupants = u.state === "asleep" ? f.population : 0;
           break;
         default:
-          u.occupants = u.state === "occupied" ? f.population : 0;
+          // Commercial venues (fastFood, restaurant, shop) show their ambient
+          // crowd only while open for business; a tenanted but closed venue
+          // shows zero so the heatmap and lit-window sprite go dark after
+          // closing time, matching player expectations.
+          u.occupants =
+            u.state === "occupied" && isOpenAt(u.kind, this.clock.hour)
+              ? f.population
+              : 0;
       }
     }
   }
@@ -1955,7 +1963,13 @@ export class Simulation implements SimContext {
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
-        pop += residentCount(u);
+        // Commercial: live customer tally (mirrors Tower.totalPopulation).
+        // Gate on population > 0: cinema excluded (same as totalPopulation).
+        if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
+          pop += u.customersIn ?? 0;
+        } else {
+          pop += residentCount(u);
+        }
       }
     }
     return pop;
@@ -2568,8 +2582,9 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
+  void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
   const exhaustive: Record<string, never> = unhandled;
   void exhaustive;
   const out: SerializedUnit = { id, kind, floor, x };

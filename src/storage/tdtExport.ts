@@ -4,6 +4,7 @@ import {
   FACILITIES,
   GRID,
   facilityFloors,
+  isCommercialKind,
   isHotelKind,
   maxCarsFor,
   maxSpanFor,
@@ -12,6 +13,7 @@ import {
 } from "../engine/facilities";
 import { frameForMinuteOfDay } from "../engine/timePacing";
 import type { FacilityKind, SerializedGame, SerializedUnit } from "../engine/types";
+import { isPresent } from "../engine/types";
 import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
@@ -317,6 +319,11 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
         status = 1;
         counts.occupied++;
         addResidents(u);
+      } else if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
+        // Census-counted commercial venues (fastFood/restaurant/shop, population > 0):
+        // add catalog customers when the venue is open. Cinema is isCommercialKind
+        // but carries population = 0 and falls through here, matching Tower/Simulation.
+        if (isPresent(u)) addResidents(u);
       } else if (isHotelKind(u.kind)) {
         // Inverse of the importer's flag decode; "booked but out for the day"
         // (a tenanted or ever-booked room without a sleep/dirty flag) is the
@@ -549,16 +556,13 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // invent), but the COUNT must be nonzero for a populated tower or the 1994
   // game faults reading this block (an empty tower loads fine at 0; both
   // confirmed against the game via the SimTower harness). We write the tower's
-  // resident/worker census, clamped to the canon maximum so a forged save can't
+  // resident/worker/customer census (offices, condos, hotels, and commercial
+  // venues when present), clamped to the canon maximum so a forged save can't
   // bloat the file. See TDT_ROUTING_TAIL_SIZE for the companion trailing-region
   // fix that lets the whole file reach the length the game reads.
-  // Commercial venues (shops, restaurants, fast food) draw crowds in the game
-  // but have zero catalog residents, so a tower built only from them sums to a
-  // zero census and would fault like an empty people block. Floor the count at
-  // the emitted room count whenever the tower has rooms: the game rebuilds the
-  // real crowd from the map regardless of this number (our census ran ~77 for a
-  // tower the game repopulated to ~291), so any nonzero value is safe, and a
-  // lobby-only/empty tower correctly stays 0.
+  // The floor at counts.rooms prevents a zero census for a tower that has rooms
+  // but all commercial venues are vacant/construction (finitePop = 0 then), which
+  // would fault like an empty people block. An empty tower stays at 0.
   const finitePop = Number.isFinite(peoplePop) ? Math.round(peoplePop) : 0;
   const peopleCount = Math.max(0, Math.min(Math.max(finitePop, counts.rooms), TDT_MAX_CENSUS));
   i32(peopleCount);
