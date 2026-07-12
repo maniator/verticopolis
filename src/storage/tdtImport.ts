@@ -574,6 +574,15 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
           everOccupied = true;
           counts.hotelBooked++;
         }
+      } else if (!underConstruction && (kind === "fastFood" || kind === "restaurant" || kind === "shop")) {
+        // Commercial venues carry footprint-scaled catalog customers (see the
+        // FACILITIES fastFood/restaurant/shop population values); seed them as
+        // occupied so EconomySystem recognizes them as running on the first
+        // tick. customersIn stays unset (undefined, which census reads treat
+        // as 0): no meal customers have eaten yet; the crowd system builds the
+        // live count organically as the sim runs.
+        state = "occupied";
+        everOccupied = true;
       }
       // Rent class (unit byte 16) → our price band, for priced kinds.
       const rent = rentFromClass(kind, t.rentRate);

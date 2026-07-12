@@ -3,7 +3,7 @@ import type { Tower } from "./Tower";
 import type { FacilityKind, Transport, Unit } from "./types";
 import { isOperational, isTenanted } from "./types";
 import { CAR_FLOORS_PER_MINUTE } from "./ElevatorDispatch";
-import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind } from "./facilities";
+import { isElevatorKind, isHotelKind, isOpenAt, isStaffOnlyTransport, isStaffTransportKind, isCommercialKind, FACILITIES } from "./facilities";
 import { HK_SHIFT_END, HK_SHIFT_START } from "./EconomySystem";
 import { ECON } from "./econConfig";
 import { RNG } from "./rng";
@@ -141,6 +141,21 @@ export interface Person {
   staff?: boolean;
   /** Unit id this staffer is dispatched to service (a dirty hotel room). */
   cleanUnitId?: number;
+  /** Unit id of the meal venue chosen at spawn for a round-trip meal person;
+   *  `destX` points inside this unit's footprint. Distinct from `venueUnitId`:
+   *  this records the intent (set on spawn), while `venueUnitId` records the
+   *  census count actually taken (set on eating entry), so a give-up before
+   *  arrival never decrements a count that was never incremented. */
+  mealVenueId?: number;
+  /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
+   *  person is currently eating. Set when the person enters `eating` state;
+   *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
+   *  all non-meal persons and for eaters at non-commercial destinations. */
+  venueUnitId?: number;
+  /** True when this counted eater came from a HOTEL origin, so finish() also
+   *  decrements the venue's `hotelCustomersIn` (the 4-star-plus census
+   *  exclusion). Captured at eating entry, when the origin still exists. */
+  countedHotelGuest?: boolean;
   /** Unit id of the ORIGIN room for a round-trip meal person (an office,
    *  condo, or hotel room whose visible occupancy dropped by 1 when this
    *  person spawned outbound). Undefined for lobby-centric commuter trips
@@ -698,7 +713,7 @@ export class Crowd {
     for (const pool of originPools) {
       for (let i = 0; i < outboundBase; i++) {
         if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, clock.hour, floors));
+          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, w.venues, clock.hour, floors));
         }
       }
     }
@@ -720,6 +735,7 @@ export class Crowd {
     tower: Tower,
     pool: { originKind: MealOriginKind; floors: number[] },
     venueFloors: number[],
+    venueKinds: FacilityKind[],
     hour: number,
     floors: SpawnFloors,
   ): void {
@@ -740,12 +756,33 @@ export class Crowd {
     if (candidates.length === 0) return;
     const origin = this.rng.pick(candidates);
     const venueFloor = this.rng.pick(venueFloors);
+    // A concrete venue on the chosen floor, matching this window's venue kinds
+    // and open right now (the same gate spawnFloors used to bin the floor).
+    // The census needs a specific unit to attribute the customer to, and destX
+    // must land inside its footprint: destX from pickX is a random corridor
+    // tile, so inferring the venue from it at arrival attributes customers to
+    // whatever room the tile happens to sit under (review P2). Census-counted
+    // venues (population > 0) with a full house are skipped: catalog population
+    // is the venue's customer capacity, so an undersupplied tower self-limits
+    // instead of packing one fastFood past its advertised "up to N" (review P2).
+    // Cinema (population 0, uncapped) is exempt from the fullness check.
+    const venueCandidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
+      (u) =>
+        venueKinds.includes(u.kind) &&
+        isTenanted(u) &&
+        isOpenAt(u.kind, hour) &&
+        (FACILITIES[u.kind].population === 0 || (u.customersIn ?? 0) < FACILITIES[u.kind].population),
+    );
+    if (venueCandidates.length === 0) return;
+    const venue = this.rng.pick(venueCandidates);
     // The route is computed by `this.add`, which may fail (route unreachable
     // from origin to venue). If it fails, no person exists and we must not
     // increment outForMeal. Order: add first, THEN increment on the returned
     // person object.
     const spawned = this.add(tower, originFloor, venueFloor);
     if (!spawned) return;
+    spawned.destX = this.rng.int(venue.x, venue.x + venue.width - 1);
+    spawned.mealVenueId = venue.id;
     spawned.originUnitId = origin.id;
     origin.outForMeal = (origin.outForMeal ?? 0) + 1;
     tower.bumpMealOverlayRevision();
@@ -1047,6 +1084,40 @@ export class Crowd {
               // ghost or route-fail" belt-and-braces.
               p.age = 0;
               p.eatSecondsLeft = this.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
+              // Track this customer at their venue for the live census. The
+              // venue was stamped at spawn time (mealVenueId, with destX inside
+              // its footprint), so the count attaches to the exact venue this
+              // person eats at even when the floor holds several rooms. O(1):
+              // getUnit uses an internal Map. A venue bulldozed mid-trip
+              // resolves to undefined and the person simply eats uncounted.
+              // Gate on population > 0 because cinema is a lateNight meal venue
+              // but carries population = 0 and must not count toward the census.
+              // The capacity clamp is the arrival-side half of the spawn-side
+              // fullness filter: several eaters can be en route before any of
+              // them arrives, so the count could otherwise pass the catalog
+              // capacity anyway. An over-capacity arrival eats uncounted
+              // (venueUnitId stays unset, so finish() will not decrement).
+              const venueUnit = p.mealVenueId === undefined ? undefined : tower.getUnit(p.mealVenueId);
+              if (
+                venueUnit &&
+                isCommercialKind(venueUnit.kind) &&
+                FACILITIES[venueUnit.kind].population > 0 &&
+                (venueUnit.customersIn ?? 0) < FACILITIES[venueUnit.kind].population
+              ) {
+                p.venueUnitId = venueUnit.id;
+                venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
+                // Origin split for the rating census: hotel guests drop out of
+                // the 4-star-plus census, so a guest eating here must not
+                // re-enter it through the venue tally. Flag the person so the
+                // decrement in finish() mirrors exactly even if the origin
+                // room is bulldozed while they eat.
+                const originUnit = this.originUnit(tower, p);
+                if (originUnit && isHotelKind(originUnit.kind)) {
+                  p.countedHotelGuest = true;
+                  venueUnit.hotelCustomersIn = (venueUnit.hotelCustomersIn ?? 0) + 1;
+                }
+                tower.bumpMealOverlayRevision();
+              }
             } else {
               this.finish(p, tower);
             }
@@ -1158,6 +1229,24 @@ export class Crowd {
     if (origin && (origin.outForMeal ?? 0) > 0) {
       origin.outForMeal = (origin.outForMeal ?? 0) - 1;
       tower.bumpMealOverlayRevision();
+    }
+    // Venue customer: decrement the destination's live customer count on any
+    // despawn path (successful return, mid-eating give-up, ghost origin).
+    // O(1): getUnit uses an internal Map. Guarded the same way as outForMeal.
+    if (p.venueUnitId !== undefined) {
+      const venue = tower.getUnit(p.venueUnitId);
+      if (venue && (venue.customersIn ?? 0) > 0) {
+        venue.customersIn = (venue.customersIn ?? 0) - 1;
+        // Mirror the hotel-origin split taken at eating entry (via the flag
+        // rather than a fresh origin lookup, so a mid-meal bulldoze cannot
+        // unbalance it).
+        if (p.countedHotelGuest && (venue.hotelCustomersIn ?? 0) > 0) {
+          venue.hotelCustomersIn = (venue.hotelCustomersIn ?? 0) - 1;
+        }
+        tower.bumpMealOverlayRevision();
+      }
+      p.venueUnitId = undefined;
+      p.countedHotelGuest = undefined;
     }
     p.state = "done";
   }

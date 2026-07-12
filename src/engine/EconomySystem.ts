@@ -3,7 +3,7 @@ import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
+import { FACILITIES, RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
@@ -126,6 +126,13 @@ export class EconomySystem {
         continue;
       }
       u.state = "occupied";
+      // Stamp the ambient crowd at the flip too: updatePresence ran earlier in
+      // this same onHour and saw a newly built or newly reachable venue still
+      // `empty`, so without this the first open hour has dark windows, a cold
+      // heatmap cell, and no statistical elevator demand until the next hour
+      // (review P2). Idempotent for already-occupied venues: it writes the
+      // same value updatePresence just did.
+      u.occupants = FACILITIES[u.kind].population;
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       const rainMult =

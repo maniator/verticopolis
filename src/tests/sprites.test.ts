@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit, Transport } from "../engine/types";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   drawTransport,
@@ -313,5 +314,92 @@ describe("pure sprite helpers", () => {
   it("ACCENTS is a palette of hex colors", () => {
     expect(ACCENTS.length).toBeGreaterThan(0);
     for (const c of ACCENTS) expect(c).toMatch(/^#[0-9a-f]{3,8}$/i);
+  });
+});
+
+describe("retail subtype looks paint distinctly (drawRoom)", () => {
+  // Draw each canon variant through the REAL drawRoom path at an open hour and
+  // compare full paint logs: the variety system's contract is that every
+  // variant of a kind paints differently (colors or geometry), while the kind
+  // anchor shape survives. Also exercises every fixture and interior branch
+  // so the coverage gate keeps guarding this file.
+  const cases: Array<[Unit["kind"], readonly string[], number]> = [
+    ["fastFood", FASTFOOD_SUBTYPES, 12],
+    ["restaurant", RESTAURANT_SUBTYPES, 19],
+    ["shop", SHOP_SUBTYPES, 14],
+  ];
+  for (const [kind, names, hour] of cases) {
+    it(`${kind}: every canon variant paints, and no two variants paint identically`, () => {
+      const sigs = new Map<string, string>();
+      for (const name of names) {
+        const s = spyCtx();
+        // Width comfortably past the emblem gate (w > 40) so signature props draw.
+        drawRoom(draw({ hour, lit: false }, s.ctx), unit({ kind, subtype: name, occupants: 5 }), 0, 0, 144, 26);
+        expect(s.painted(), `${kind} "${name}" painted nothing`).toBe(true);
+        for (const [other, sig] of sigs) {
+          expect(s.sig(), `${kind} "${name}" paints identically to "${other}"`).not.toBe(sig);
+        }
+        sigs.set(name, s.sig());
+      }
+    });
+
+    it(`${kind}: an undefined subtype still paints (legacy fallback)`, () => {
+      const s = spyCtx();
+      drawRoom(draw({ hour, lit: false }, s.ctx), unit({ kind, occupants: 5 }), 0, 0, 144, 26);
+      expect(s.painted()).toBe(true);
+    });
+  }
+
+  it("an unknown (non-canon) subtype falls back to the default look, not a crash", () => {
+    for (const [kind, , hour] of cases) {
+      const withUnknown = spyCtx();
+      drawRoom(draw({ hour, lit: false }, withUnknown.ctx), unit({ kind, subtype: "Not A Real Variety", occupants: 5 }), 0, 0, 144, 26);
+      const withNone = spyCtx();
+      drawRoom(draw({ hour, lit: false }, withNone.ctx), unit({ kind, occupants: 5 }), 0, 0, 144, 26);
+      expect(withUnknown.sig()).toBe(withNone.sig());
+    }
+  });
+});
+
+describe("per-unit geo-seeded variety (party law: geometry first)", () => {
+  const at = (kind: Unit["kind"], floor: number, ux: number, over: Partial<Unit> = {}): Unit =>
+    unit({ kind, floor, x: ux, occupants: 4, ...over });
+
+  it("the same room paints identically twice (pure geo seed, no RNG)", () => {
+    for (const kind of ["office", "condo", "hotelDouble"] as const) {
+      const a = spyCtx();
+      const b = spyCtx();
+      drawRoom(draw({ hour: 12 }, a.ctx), at(kind, 10, 30), 0, 0, 144, 26);
+      drawRoom(draw({ hour: 12 }, b.ctx), at(kind, 10, 30), 0, 0, 144, 26);
+      expect(b.sig()).toBe(a.sig());
+    }
+  });
+
+  it("offices and condos vary across positions (layouts, mirroring, walls)", () => {
+    for (const kind of ["office", "condo"] as const) {
+      const sigs = new Set<string>();
+      for (let ux = 0; ux < 120; ux += 12) {
+        const s = spyCtx();
+        drawRoom(draw({ hour: 12 }, s.ctx), at(kind, 10, ux), 0, 0, 144, 26);
+        sigs.add(s.sig());
+      }
+      // A sweep across one floor must produce several distinct paints; exact
+      // count is seed-dependent, but a cloned row is the regression.
+      expect(sigs.size, `${kind} row paints as clones`).toBeGreaterThan(2);
+    }
+  });
+
+  it("hotel state cues survive every variant (asleep z, dirty tray, ready lamp)", () => {
+    for (let ux = 0; ux < 48; ux += 8) {
+      const asleep = spyCtx();
+      drawRoom(draw({ hour: 1, lit: false }, asleep.ctx), at("hotelDouble", 12, ux, { state: "asleep", occupants: 2 }), 0, 0, 144, 26);
+      expect(asleep.log.some((l) => l.startsWith("fillText"))).toBe(true); // the z
+      const dirty = spyCtx();
+      drawRoom(draw({ hour: 10 }, dirty.ctx), at("hotelDouble", 12, ux, { state: "dirty", occupants: 0 }), 0, 0, 144, 26);
+      expect(dirty.log.some((l) => l.includes("#D4623A"))).toBe(true); // the tray
+      const ready = spyCtx();
+      drawRoom(draw({ hour: 20, lit: true }, ready.ctx), at("hotelDouble", 12, ux, { state: "empty", occupants: 0 }), 0, 0, 144, 26);
+      expect(ready.log.some((l) => l.includes("#FFD86A"))).toBe(true); // the lamp
+    }
   });
 });

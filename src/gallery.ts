@@ -1,4 +1,5 @@
 import { FACILITIES, GRID } from "./engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 
@@ -10,7 +11,7 @@ interface Entry {
   draw(d: DrawCtx, cx: number, cy: number, cw: number, ch: number): void;
 }
 
-function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1): Unit {
+function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string): Unit {
   const f = FACILITIES[kind];
   return {
     id,
@@ -26,10 +27,11 @@ function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 
     everOccupied: true,
     pendingIncome: 0,
     label: f.name,
+    subtype,
   };
 }
 
-function roomEntry(label: string, kind: FacilityKind, state: UnitState = "occupied", occ?: number): Entry {
+function roomEntry(label: string, kind: FacilityKind, state: UnitState = "occupied", occ?: number, subtype?: string): Entry {
   const f = FACILITIES[kind];
   return {
     label,
@@ -42,9 +44,15 @@ function roomEntry(label: string, kind: FacilityKind, state: UnitState = "occupi
       // Floor strip for context.
       const floorU = makeUnit("floor", "occupied", 0, 999);
       drawUnit(d, floorU, x - 6, y, w + 12, h);
-      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0)), x, y, w, h);
+      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype), x, y, w, h);
     },
   };
+}
+
+/** One gallery cell per canon retail variant, labeled with its canon name so
+ *  the catalog teaches the vocabulary the inspector and TDT round-trip use. */
+function retailEntries(kind: FacilityKind, names: readonly string[]): Entry[] {
+  return names.map((name) => roomEntry(`${FACILITIES[kind].name}: ${name}`, kind, "occupied", undefined, name));
 }
 
 function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
@@ -88,9 +96,12 @@ const ENTRIES: Entry[] = [
   roomEntry("Double Room (guest asleep)", "hotelDouble", "asleep"),
   roomEntry("Suite (ready)", "hotelSuite", "empty", 0),
   roomEntry("Hotel Room (needs cleaning)", "hotelDouble", "dirty", 0),
-  roomEntry("Fast Food", "fastFood"),
-  roomEntry("Restaurant", "restaurant"),
-  roomEntry("Retail Shop", "shop"),
+  roomEntry("Fast Food (generic)", "fastFood"),
+  ...retailEntries("fastFood", FASTFOOD_SUBTYPES),
+  roomEntry("Restaurant (generic)", "restaurant"),
+  ...retailEntries("restaurant", RESTAURANT_SUBTYPES),
+  roomEntry("Retail Shop (generic)", "shop"),
+  ...retailEntries("shop", SHOP_SUBTYPES),
   roomEntry("Cinema (playing)", "cinema"),
   roomEntry("Party Hall", "partyHall"),
   roomEntry("Parking (in use)", "parking"),

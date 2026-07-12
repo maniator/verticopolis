@@ -1,9 +1,9 @@
 import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../engine/Simulation";
 import { COMMERCIAL_LOBBY_FLOORS } from "../engine/EconomySystem";
-import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isHotelKind, residentCount } from "../engine/facilities";
+import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, residentCount } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
-import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
+import { isOperational, isTenanted, VACATE_REASON_TEXT } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { escapeHtml } from "../ui/escape";
@@ -201,7 +201,16 @@ export class InspectorController {
         `<h4 class="win-title">${escapeHtml(title)}</h4>` +
           `<div>${labelIsExtra ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
           `<div>Status: ${statusText}</div>` +
-          (f.population ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>` : "") +
+          // Commercial venues contribute their LIVE customers to the census, so
+          // show that number (plus a closed marker), never a static "N/25"
+          // that reads as a flat, always-full population. "(closed)" only for a
+          // tenanted venue outside business hours; vacancy/construction already
+          // reads from the Status row.
+          (isCommercialKind(u.kind) && f.population > 0
+            ? `<div>Customers: ${u.customersIn ?? 0}${isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour) ? " (closed)" : ""}</div>`
+            : f.population
+              ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
+              : "") +
           access +
           hotel +
           parking +

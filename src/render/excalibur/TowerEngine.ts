@@ -317,7 +317,8 @@ export class TowerEngine {
    *  change, or when the mode flips — never per frame (it scans the unit list). */
   private heatmap: HeatCell[] = [];
   private heatmapHour = -1;
-  private heatmapRev = -1;
+  private heatmapTowerRev = -1;
+  private heatmapMealRev = -1;
   private heatmapMode: HeatmapMode | null = null;
   /** The busiest floor's raw congestion ratio when the congestion overlay was
    *  last (re)built — surfaced in the legend so an all-green map still reports
@@ -1111,13 +1112,27 @@ export class TowerEngine {
   private drawStatsMap(ctx: CanvasRenderingContext2D): void {
     if (!this.overlayMode) return;
     const hour = this.sim.clock.hour;
-    const rev = this.sim.tower.revision;
-    if (this.overlayMode !== this.heatmapMode || hour !== this.heatmapHour || rev !== this.heatmapRev) {
+    // The congestion source reads live commercial customers (censusCount ->
+    // customersIn), which move as meal round-trippers arrive and leave, so the
+    // congestion overlay must also invalidate on the meal-overlay revision or
+    // its cells and peak legend trail the traffic chip by up to an hour during
+    // a meal window. The other overlay modes stay hour-and-structure keyed.
+    // Two numeric fields instead of a composite string: this runs every frame
+    // while an overlay is open, and per-frame string building is GC churn.
+    const towerRev = this.sim.tower.revision;
+    const mealRev = this.overlayMode === "congestion" ? this.sim.tower.mealOverlayRevision : 0;
+    if (
+      this.overlayMode !== this.heatmapMode ||
+      hour !== this.heatmapHour ||
+      towerRev !== this.heatmapTowerRev ||
+      mealRev !== this.heatmapMealRev
+    ) {
       this.heatmap = this.sim.floorHeatmap(this.overlayMode);
       this.heatmapPeakCongestion = this.overlayMode === "congestion" ? this.sim.peakCongestion() : 0;
       this.heatmapMode = this.overlayMode;
       this.heatmapHour = hour;
-      this.heatmapRev = rev;
+      this.heatmapTowerRev = towerRev;
+      this.heatmapMealRev = mealRev;
     }
     const z = this.cam.zoom;
     // Visible floor band (computed once) to skip the coordinate transforms for
@@ -1532,7 +1547,10 @@ export class TowerEngine {
         // re-raster when the visible dip changes even though canonical
         // `u.occupants` did not. Without this, an office bakes at t=0 with six
         // workers and would keep rendering six through the whole meal peak.
-        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${open}${lateNight}${dead}${liveBits}`;
+        // `subtype` is in the key because retail variants draw differently and
+        // the inspector's "Change variety" action swaps it at runtime; without
+        // it the reroll would not repaint until another signature bit flips.
+        const sig = `${u.state}:${this.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${u.subtype ?? ""}:${open}${lateNight}${dead}${liveBits}`;
         const isDead = dead === "x";
         const rec = this.roomActors.get(u.id);
         const animated = u.state === "fire" || u.state === "construction";

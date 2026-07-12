@@ -1,7 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Transport, Unit } from "../engine/types";
-import { isOperational } from "../engine/types";
-import { FACILITIES, isElevatorKind, isHotelKind, maxCarsFor, residentCount } from "../engine/facilities";
+import { isOperational, isTenanted } from "../engine/types";
+import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, maxCarsFor, residentCount } from "../engine/facilities";
 import { householdPrice } from "../engine/gameRules";
 import { rentConfig, rentOf, resaleRefund } from "../engine/econConfig";
 import { escapeHtml } from "./escape";
@@ -40,7 +40,17 @@ export function unitEditorVolatile(sim: Simulation, u: Unit): Record<string, str
   };
   // Capacity denominator is the unit's real occupancy (a Modern condo's household,
   // the flat catalog value for everything else) — never a bare `5/3` for a big family.
-  if (f.population) vol.occupants = `${u.occupants}/${residentCount(u)}`;
+  // Commercial venues show their LIVE customer count instead (that is what they
+  // contribute to the population census); a static "N/25" would read as a flat,
+  // always-full population.
+  if (isCommercialKind(u.kind) && f.population > 0) {
+    // "(closed)" only for a tenanted venue outside business hours; a vacant or
+    // under-construction unit already tells that story in its Status row.
+    const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
+    vol.customers = `${u.customersIn ?? 0}${closed ? " (closed)" : ""}`;
+  } else if (f.population) {
+    vol.occupants = `${u.occupants}/${residentCount(u)}`;
+  }
   if (rentConfig(u.kind)) {
     // For a SOLD condo the "Sale price" is what it actually fetched — the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
@@ -64,7 +74,8 @@ export function unitEditorHtml(sim: Simulation, u: Unit): string {
   const rcfg = rentConfig(u.kind);
   const vol = unitEditorVolatile(sim, u);
   const rows: string[] = [kvRow("Location", floorLabel), kvRow("Status", vol.status, "status")];
-  if (f.population) rows.push(kvRow("Occupants", vol.occupants, "occupants"));
+  if (isCommercialKind(u.kind) && f.population > 0) rows.push(kvRow("Customers", vol.customers, "customers"));
+  else if (f.population) rows.push(kvRow("Occupants", vol.occupants, "occupants"));
   rows.push(kvRow("Elevator access", vol.served, "served"));
   rows.push(kvRow("Eval", vol.eval, "eval"));
   if (rcfg) {
