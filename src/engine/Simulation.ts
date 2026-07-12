@@ -35,7 +35,7 @@ import {
   residentCount,
   transportCarCapacity,
 } from "./facilities";
-import type { FacilityKind, GameMode, SerializedGame, SerializedUnit, Unit, VacateReason, WeatherKind } from "./types";
+import type { FacilityKind, GameMode, SerializedGame, SerializedUnit, SerializedView, Unit, VacateReason, WeatherKind } from "./types";
 import {
   isDormant,
   isGameMode,
@@ -45,6 +45,8 @@ import {
   isUnitState,
   isVacateReason,
   VACATE_REASON_TEXT,
+  VIEW_ZOOM_MAX,
+  VIEW_ZOOM_MIN,
 } from "./types";
 // The save-version constant + migration seam are extracted to ./saveMigration.
 import { SAVE_VERSION, migrateSave } from "./saveMigration";
@@ -230,6 +232,14 @@ export class Simulation implements SimContext {
   /** 1..5 stars, 6 == TOWER. */
   star = 1;
   evaluatedTower = false;
+  /**
+   * Where the player was looking when the save was written: inert UI cargo
+   * (see {@link SerializedView}). The engine NEVER reads it: the UI layer
+   * stamps it right before a save/export and the renderer restores it after a
+   * load. Null for fresh towers and pre-view saves (the renderer then centers
+   * as it always has).
+   */
+  view: SerializedView | null = null;
 
   /**
    * Rule-set this tower was founded under — {@link GameMode}. Set once at
@@ -2335,6 +2345,9 @@ export class Simulation implements SimContext {
       blockbusters: this.economy.blockbusterIds,
       milestones: [...this.achievedMilestones],
       ledger: this.ledger.serialize(),
+      // Spread so an unstamped view contributes no key at all (undo snapshots
+      // and crash reports serialize too, and they must not grow a null field).
+      ...(this.view ? { view: this.view } : {}),
     };
   }
 
@@ -2379,6 +2392,10 @@ export class Simulation implements SimContext {
     // Restore the income-breakdown ledger (absent in pre-ledger saves → empty,
     // warming up as play continues).
     sim.ledger = Ledger.restore(data.ledger);
+    // Restore the saved camera view (inert UI cargo) through the same trust
+    // boundary as everything else: malformed shapes drop to null (the renderer
+    // then centers), out-of-range values clamp to the grid and zoom range.
+    sim.view = coerceView(data.view);
     // Reject any unit/transport with an unrecognized kind from untrusted saves,
     // and coerce the numeric fields that drive the loop to finite values so a
     // hand-edited or foreign save can't poison the math with NaN/undefined.
@@ -2642,5 +2659,30 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (filmPolicy !== undefined) out.filmPolicy = filmPolicy;
   if (subtype !== undefined) out.subtype = subtype;
   if (completeAt !== undefined) out.completeAt = completeAt;
+  return out;
+}
+
+/**
+ * Trust-boundary coercion for the saved camera view. A save is untrusted
+ * input, so the whole field drops to null on any malformed member (wrong
+ * type, NaN, Infinity) rather than half-loading; merely out-of-range finite
+ * values clamp, so a view saved on a taller lot or a wider zoom range still
+ * lands somewhere sensible instead of vanishing.
+ */
+function coerceView(v: unknown): SerializedView | null {
+  if (typeof v !== "object" || v === null) return null;
+  const { tile, floor, zoom } = v as Record<string, unknown>;
+  if (typeof tile !== "number" || !Number.isFinite(tile)) return null;
+  if (typeof floor !== "number" || !Number.isFinite(floor)) return null;
+  const out: SerializedView = {
+    tile: Math.max(0, Math.min(GRID.width, tile)),
+    floor: Math.max(GRID.minFloor, Math.min(GRID.maxFloor, floor)),
+  };
+  // A null zoom reads as absent, not malformed: JSON pipelines commonly
+  // encode a missing optional as null, and the tile/floor are still good.
+  if (zoom !== undefined && zoom !== null) {
+    if (typeof zoom !== "number" || !Number.isFinite(zoom)) return null;
+    out.zoom = Math.max(VIEW_ZOOM_MIN, Math.min(VIEW_ZOOM_MAX, zoom));
+  }
   return out;
 }

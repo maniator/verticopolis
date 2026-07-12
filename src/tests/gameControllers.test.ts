@@ -232,6 +232,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
     adopted = [];
     saveLoad = new SaveLoad({
       getSim: () => sim,
+      getView: () => null,
       adoptSim: (s) => {
         adopted.push(s);
       },

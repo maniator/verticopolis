@@ -83,6 +83,9 @@ export interface TdtSpec {
   balance?: number;
   frameTime?: number;
   currentDay?: number;
+  /** Saved view-scroll words at 0x26/0x28 (doc §1); default 0/0 = no view. */
+  viewX?: number;
+  viewY?: number;
   floors?: FloorSpec[];
   /** People records appended to the tail (default 0). */
   peopleCount?: number;
@@ -129,6 +132,9 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
   i32(0); // 0x10 lastQuarterMoney
   u16(spec.frameTime ?? 0); // 0x14 tick
   i32(spec.currentDay ?? 0); // 0x16 currentDay
+  pad(0x26 - chunks.length); // lobbyHeight + undocumented words up to the view
+  u16(spec.viewX ?? 0); // 0x26 saved view-scroll X
+  u16(spec.viewY ?? 0); // 0x28 saved view-scroll Y
   pad(TDT_HEADER_SIZE - chunks.length); // remaining documented counts + undocumented block
 
   // ---- Floor map: 120 records ---------------------------------------------

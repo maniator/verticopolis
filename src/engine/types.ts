@@ -335,6 +335,26 @@ export interface SerializedUnit extends Omit<Unit, "width" | "state" | "satisfac
   label?: string;
 }
 
+/** Camera zoom bounds (screen pixels per world pixel). Owned here because the
+ *  save schema clamps a restored zoom at the deserialize trust boundary; the
+ *  renderer re-exports these as its own MIN_ZOOM/MAX_ZOOM so the range exists
+ *  in exactly one place. */
+export const VIEW_ZOOM_MIN = 0.3;
+export const VIEW_ZOOM_MAX = 3;
+
+/**
+ * The camera view carried inside a save: the camera CENTER in grid units
+ * (tile across, floor up; fractional values are fine) plus the zoom. Inert
+ * UI cargo: the simulation never reads it; it only rides along so a save
+ * opened on another device restores the same view. Zoom is optional because
+ * the 1994 TDT format has no zoom to bring over.
+ */
+export interface SerializedView {
+  tile: number;
+  floor: number;
+  zoom?: number;
+}
+
 export interface SerializedGame {
   version: number;
   seed: number;
@@ -382,6 +402,10 @@ export interface SerializedGame {
   /** Rolling income/expense ledger for the stats breakdown (today's running
    * totals + the trailing per-day window). Optional for pre-ledger saves. */
   ledger?: unknown;
+  /** Where the player was looking when the save was written (see
+   * {@link SerializedView}). Stamped by the UI layer at save/export time;
+   * absent in older saves and fresh towers, which load centered as before. */
+  view?: SerializedView;
 }
 
 /** Result of attempting to place a facility. */

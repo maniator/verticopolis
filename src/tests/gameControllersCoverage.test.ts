@@ -596,6 +596,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     armed = 0;
     saveLoad = new SaveLoad({
       getSim: () => sim,
+      getView: () => null,
       adoptSim: (s) => {
         adopted.push(s);
       },
