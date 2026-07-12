@@ -11,14 +11,52 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
  * exercise everything gated behind `if (!this.started) return`.
  */
 
-/** A self-returning chainable stub for every Tone node: any property access or
+/** What the recording mock captures per node: its Tone class, constructor
+ *  args, where it connected, whether start() ran, and every trigger call.
+ *  Regression tests assert graph SHAPE from this (a no-throw suite would pass
+ *  with the whole feature deleted). */
+type NodeRec = {
+  kind: string;
+  args: unknown[];
+  connects: NodeRec[];
+  started: boolean;
+  triggers: unknown[][];
+};
+
+// Shared holders, hoisted so the vi.mock factory can reach them: the per-beat
+// callback the mocked Transport hands back, and the node registry.
+const beat = vi.hoisted(() => ({ step: null as null | ((t: number) => void) }));
+const graph = vi.hoisted(() => ({ nodes: [] as NodeRec[] }));
+
+/** A self-returning chainable stub for a Tone node: any property access or
  *  call yields the same proxy, so `n.connect(x).connect(y)`, `n.gain.rampTo(…)`,
- *  `n.triggerAttackRelease(…)` and `n.volume.value = …` all no-op safely. */
-function node(): unknown {
+ *  `n.volume.value = …` all no-op safely, while `connect`, `start` and
+ *  `triggerAttackRelease` additionally record onto the node's registry entry
+ *  (sub-property accesses like `.gain` yield the same proxy, so an edge into a
+ *  node's param records as an edge into that node). */
+function node(kind = "anon", args: unknown[] = []): unknown {
+  const rec: NodeRec = { kind, args, connects: [], started: false, triggers: [] };
+  graph.nodes.push(rec);
   const p: any = new Proxy(function () {} as unknown as object, {
     get: (_t, prop) => {
       if (prop === Symbol.toPrimitive) return () => 0; // numeric coercion (Tone.now())
       if (prop === "then") return undefined; // never a thenable
+      if (prop === "__rec") return rec;
+      if (prop === "connect")
+        return (target: any) => {
+          if (target?.__rec) rec.connects.push(target.__rec);
+          return p;
+        };
+      if (prop === "start")
+        return () => {
+          rec.started = true;
+          return p;
+        };
+      if (prop === "triggerAttackRelease")
+        return (...a: unknown[]) => {
+          rec.triggers.push(a);
+          return p;
+        };
       return p;
     },
     apply: () => p,
@@ -27,26 +65,23 @@ function node(): unknown {
   return p;
 }
 
-// Shared holder so the mocked Transport can hand the engine's per-beat callback
-// back to the test — letting us drive the music-step generator directly.
-const beat = vi.hoisted(() => ({ step: null as null | ((t: number) => void) }));
-
 vi.mock("tone", () => {
   // Regular functions (not arrows) so `new Tone.Gain(...)` works; each returns a
   // node, which `new` then yields as the instance.
-  function ctor() {
-    return node();
-  }
+  const ctorFor = (kind: string) =>
+    function (...args: unknown[]) {
+      return node(kind, args);
+    };
   return {
-    Gain: ctor,
-    Filter: ctor,
-    PolySynth: ctor,
-    Synth: ctor,
-    Noise: ctor,
-    Reverb: ctor,
-    NoiseSynth: ctor,
-    MembraneSynth: ctor,
-    LFO: ctor,
+    Gain: ctorFor("Gain"),
+    Filter: ctorFor("Filter"),
+    PolySynth: ctorFor("PolySynth"),
+    Synth: ctorFor("Synth"),
+    Noise: ctorFor("Noise"),
+    Reverb: ctorFor("Reverb"),
+    NoiseSynth: ctorFor("NoiseSynth"),
+    MembraneSynth: ctorFor("MembraneSynth"),
+    LFO: ctorFor("LFO"),
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
       scheduleRepeat: (cb: (t: number) => void) => ((beat.step = cb), 1),
@@ -71,6 +106,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     prevAudioContext = (globalThis as { AudioContext?: unknown }).AudioContext;
     (globalThis as { AudioContext?: unknown }).AudioContext = function () {}; // pass the hasWebAudio gate
     beat.step = null; // each start() must RE-schedule the beat callback — no stale carry-over between tests
+    graph.nodes.length = 0; // fresh node registry per test
   });
   afterEach(() => {
     // Restore whatever the environment had (don't blindly delete a real one).
@@ -153,6 +189,58 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     eng.setVolumes(NaN, 0.25);
     expect(eng.musicVolume).toBe(0.4);
     expect(eng.sfxVolume).toBe(0.25);
+  });
+
+  it("REGRESSION: the rain bed is band-limited with a gust swell (static-on-phones fix)", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const filters = graph.nodes.filter((n) => n.kind === "Filter");
+    const opts = (n: NodeRec) => (n.args[0] ?? {}) as { type?: string; frequency?: number };
+    // Walk the chain from its unique anchor: the 600 Hz highpass (the band's
+    // floor; the bed's distance filter is also lowpass-3000, so start here)...
+    const rainHp = filters.find((n) => opts(n).type === "highpass" && opts(n).frequency === 600);
+    expect(rainHp, "rain highpass (600 Hz) missing").toBeTruthy();
+    // ...into the 3 kHz lowpass that keeps rain from reading as flat hiss...
+    const rainTone = rainHp!.connects[0];
+    expect(rainTone?.kind).toBe("Filter");
+    expect(opts(rainTone!)).toEqual({ type: "lowpass", frequency: 3000, Q: 0.5 });
+    // ...into the swell gain, which a started 0.3 Hz LFO (0.7..1) breathes.
+    const swell = rainTone!.connects[0];
+    expect(swell?.kind).toBe("Gain");
+    const lfo = graph.nodes.find((n) => n.kind === "LFO");
+    expect(lfo, "gust LFO missing").toBeTruthy();
+    expect(lfo!.args[0]).toEqual({ frequency: 0.3, min: 0.7, max: 1 });
+    expect(lfo!.started).toBe(true);
+    expect(lfo!.connects).toContain(swell);
+  });
+
+  it("REGRESSION: the overview melody is doubled two octaves up; other scenes are not", () => {
+    // +24 semitones is exactly a 4x frequency ratio, so a same-step trigger
+    // pair at ratio 4 IS the doubling (the close-up sparkle is +12 = 2x).
+    const pairsAtRatio4 = (eng: ToneAudioEngine, f: ViewFocus): number => {
+      eng.update(f);
+      const synths = graph.nodes.filter((n) => n.kind === "PolySynth");
+      let found = 0;
+      for (let i = 0; i < 200; i++) {
+        const before = synths.map((s) => s.triggers.length);
+        beat.step!(i * 0.25);
+        const stepFreqs = synths
+          .flatMap((s, si) => s.triggers.slice(before[si]))
+          .map((t) => t[0])
+          .filter((x): x is number => typeof x === "number");
+        for (const a of stepFreqs)
+          for (const b of stepFreqs) if (Math.abs(b / a - 4) < 0.001) found++;
+      }
+      return found;
+    };
+    const over = new ToneAudioEngine();
+    over.start();
+    expect(pairsAtRatio4(over, focus({ zoom: 0.3, dominant: "empty", centerFloor: 30 }))).toBeGreaterThan(0);
+    over.dispose();
+    graph.nodes.length = 0;
+    const office = new ToneAudioEngine();
+    office.start();
+    expect(pairsAtRatio4(office, focus({ zoom: 2.2, dominant: "office" }))).toBe(0);
   });
 
   it("rain weather adds an outdoor layer when the sky is visible", () => {
