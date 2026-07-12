@@ -93,6 +93,11 @@ function autosaveKey(): string {
     : LEGACY_AUTO_KEY;
 }
 
+/** The largest timestamp JS Date can represent (ECMA-262: 8,640,000,000,000,000
+ *  ms either side of the epoch). A finite savedAt beyond this still renders
+ *  "Invalid Date", so the read treats it as absent. */
+const MAX_DATE_MS = 8.64e15;
+
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
   const data = readSlot(key);
   if (!data) return { slot, exists: false };
@@ -110,9 +115,14 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
     population,
     funds: data.money,
     // Same trust posture as every other save field: a forged savedAt (string,
-    // NaN, absurd magnitude) reads as absent, so the Saves dialog shows an
-    // empty timestamp instead of "Invalid Date".
-    savedAt: typeof data.savedAt === "number" && Number.isFinite(data.savedAt) ? data.savedAt : undefined,
+    // NaN, or a finite value outside the range Date can represent, +/-8.64e15
+    // ms) reads as absent, so the Saves dialog shows an empty timestamp
+    // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
+    // display a confidently wrong date.
+    savedAt:
+      typeof data.savedAt === "number" && Number.isFinite(data.savedAt) && Math.abs(data.savedAt) <= MAX_DATE_MS
+        ? data.savedAt
+        : undefined,
   };
 }
 

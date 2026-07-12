@@ -59,6 +59,11 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
     const info = SaveGame.listSlots().find((s) => s.slot === 1)!;
     expect(info.exists).toBe(true);
     expect(info.savedAt).toBeUndefined();
+    // Finite but beyond what Date can represent (>8.64e15 ms) is just as
+    // unrenderable: it must read as absent too.
+    data.savedAt = 1e20;
+    localStorage.setItem("simtower-clone-slot-1", repackSlot(data as unknown as SerializedGame));
+    expect(SaveGame.listSlots().find((s) => s.slot === 1)!.savedAt).toBeUndefined();
   });
 
   it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
