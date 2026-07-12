@@ -337,6 +337,11 @@ export class ToneAudioEngine {
   private ambGain: Tone.Gain | null = null;
   private rainNoise: Tone.Noise | null = null;
   private rainFilter: Tone.Filter | null = null;
+  /** Caps the rain band's top end so it reads as rainfall rather than hiss. */
+  private rainTone: Tone.Filter | null = null;
+  /** Slow gust swell on the rain bed (an LFO breathes the level). */
+  private rainSwell: Tone.Gain | null = null;
+  private rainLfo: Tone.LFO | null = null;
   private rainGain: Tone.Gain | null = null;
 
   private repeatId: number | null = null;
@@ -453,10 +458,21 @@ export class ToneAudioEngine {
       this.ambNoise.volume.value = -18;
       this.ambNoise.start();
 
-      // Outdoor rain layer (kept dry, off the distance filter).
+      // Outdoor rain layer (kept dry, off the distance filter). Shaped as a
+      // 600..3000 Hz band with a slow gust swell: on a small phone speaker
+      // the zoomed-out mix lives below what the speaker can reproduce, so an
+      // unshaped highpassed noise bed was the only audible thing and read as
+      // flat static rather than weather.
       this.rainGain = new Tone.Gain(0).connect(this.musicBus);
+      this.rainSwell = new Tone.Gain(1).connect(this.rainGain);
+      this.rainLfo = new Tone.LFO({ frequency: 0.3, min: 0.7, max: 1 });
+      this.rainLfo.connect(this.rainSwell.gain);
+      this.rainLfo.start();
+      this.rainTone = new Tone.Filter({ type: "lowpass", frequency: 3000, Q: 0.5 }).connect(
+        this.rainSwell,
+      );
       this.rainFilter = new Tone.Filter({ type: "highpass", frequency: 600, Q: 0.5 }).connect(
-        this.rainGain,
+        this.rainTone,
       );
       this.rainNoise = new Tone.Noise({ type: "pink", playbackRate: 1.3 }).connect(this.rainFilter);
       this.rainNoise.volume.value = -12;
@@ -646,6 +662,12 @@ export class ToneAudioEngine {
     // Soften the harsher timbres so square/saw leads don't fatigue the ear.
     const vel = def.wave === "square" || def.wave === "sawtooth" ? 0.35 : 0.5;
     this.lead.triggerAttackRelease(midiToFreq(note), "8n", time, vel);
+    // Overview doubling, two octaves up and very quiet: the whole zoomed-out
+    // mix sits below ~500 Hz, which small phone speakers cannot reproduce, so
+    // give them a faint musical partial to render instead of silence.
+    if (this.scene === "overview") {
+      this.lead.triggerAttackRelease(midiToFreq(note + 24), "8n", time + 0.02, 0.18);
+    }
     // A high sparkle on off-beats — but only once you've zoomed in enough to
     // "hear the detail", giving close-ups their own extra shimmer.
     if (this.step % 4 === 2 && def.density > 0.5 && this.detail > 0.45) {
@@ -762,6 +784,9 @@ export class ToneAudioEngine {
       this.ambGain,
       this.rainNoise,
       this.rainFilter,
+      this.rainTone,
+      this.rainLfo,
+      this.rainSwell,
       this.rainGain,
       this.padGain,
       this.bassGain,
@@ -784,6 +809,9 @@ export class ToneAudioEngine {
     this.membrane = null;
     this.noiseAccent = this.ambNoise = this.rainNoise = null;
     this.accentFilter = this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
+    this.rainTone = null;
+    this.rainLfo = null;
+    this.rainSwell = null;
     this.accentGain = this.ambGain = this.rainGain = null;
     this.padGain = this.bassGain = this.musicGain = null;
     this.reverb = null;

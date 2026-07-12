@@ -313,6 +313,16 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   of the gated markers and copy that explains what changes. (Party decision,
   2026-07-12.)
 
+### Deferred from: gds-code-review (rain shaping / overview doubling), 2026-07-12
+
+- **The overview melody doubling passes through the 650 Hz distance lowpass**,
+  which attenuates the upper half of its 523-1975 Hz range by roughly 9-19 dB
+  (the band it exists to supply for phone speakers). Empirically the effect
+  still lands (500-2000 Hz energy rose 5.6x zoomed out in the built app), so
+  shipped as is; if phones still read as too quiet zoomed out, route the
+  doubling dry to the music bus like the rain layer, at the cost of dodging
+  the reverb/scene mix. (Edge Case Hunter, 2026-07-12.)
+
 ### Deferred from: bmad-code-review (settings modal), 2026-07-12
 
 - **The splash can no longer reach the sound/accessibility controls**: the

@@ -46,6 +46,7 @@ vi.mock("tone", () => {
     Reverb: ctor,
     NoiseSynth: ctor,
     MembraneSynth: ctor,
+    LFO: ctor,
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
       scheduleRepeat: (cb: (t: number) => void) => ((beat.step = cb), 1),
