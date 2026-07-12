@@ -32,7 +32,7 @@ export interface SaveLoadDeps {
    *  it only what it owns: the crash shape, the save outcome, and the reload
    *  action that stamps the recovery session flags. */
   showCrashScreen(info: {
-    crash: { kind: "webgl-context-lost"; repeat: boolean; saveFlushed: boolean };
+    crash: { kind: "webgl-context-lost"; repeat: boolean; saveFlushed: boolean; behindSplash: boolean };
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }): void;
@@ -170,7 +170,7 @@ export class SaveLoad {
     const repeat = Date.now() - lastReload < 90_000;
 
     this.deps.showCrashScreen({
-      crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed },
+      crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed, behindSplash },
       save: { flushed, behindSplash, storageBlame, hadPriorSave },
       onReload: () => {
         try {

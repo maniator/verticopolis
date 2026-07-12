@@ -160,7 +160,7 @@ watchdog resets.
 ## Conclusion
 
 **Confidence:** High for the load profile and its source; Medium for the exact device-side kill mechanism (context
-loss vs renderer OOM kill), which only device logs could split — and both share the same fix.
+loss vs renderer OOM kill), which only device logs could split; both share the same fix.
 
 Confirmed by measurement in the real build (Pixel-sized viewport, this exact save):
 

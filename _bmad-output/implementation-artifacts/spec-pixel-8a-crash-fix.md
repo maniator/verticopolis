@@ -8,7 +8,7 @@ context:
   - '{project-root}/_bmad-output/implementation-artifacts/investigations/pixel-8a-fast-speed-crash-investigation.md'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent; do not modify unless human renegotiates">
 
 ## Intent
 

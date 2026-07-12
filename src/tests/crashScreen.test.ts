@@ -10,9 +10,9 @@ import type { CrashScreenOptions } from "../ui/crashScreen";
 
 function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashScreenOptions["save"]> = {}) {
   const opts: CrashScreenOptions = {
-    crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true },
+    crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false },
     save: { flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false, ...save },
-    version: "1.19.0",
+    version: "1.20.0",
     speed: 3,
     getSim: () => new Simulation(),
     frameErrors: [],
@@ -56,7 +56,7 @@ describe("crash screen wording and wiring", () => {
   });
 
   it("a repeat crash adds the close-other-apps advice", () => {
-    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true } });
+    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false } });
     expect(card.textContent).toContain("second crash in a row");
   });
 

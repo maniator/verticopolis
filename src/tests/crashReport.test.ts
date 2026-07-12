@@ -5,7 +5,7 @@ import { SaveGame } from "../storage/SaveGame";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
 import type { CrashDescription } from "../game/crashReport";
 
-const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true };
+const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false };
 
 describe("crash report packaging", () => {
   it("buildCrashDetails captures the build, the tower summary, and the frame-error trail", () => {
@@ -65,10 +65,10 @@ describe("crash report packaging", () => {
   });
 
   it("bugReportUrl targets the bug-report form with the version and attach instructions prefilled", () => {
-    const url = new URL(bugReportUrl({ version: "1.19.0", crash: { ...CRASH, repeat: true } }));
+    const url = new URL(bugReportUrl({ version: "1.20.0", crash: { ...CRASH, repeat: true } }));
     expect(url.origin + url.pathname).toBe("https://github.com/maniator/verticopolis/issues/new");
     expect(url.searchParams.get("template")).toBe("bug_report.yml");
-    expect(url.searchParams.get("version")).toBe("1.19.0");
+    expect(url.searchParams.get("version")).toBe("1.20.0");
     const what = url.searchParams.get("what-happened")!;
     expect(what).toContain("graphics context was lost");
     expect(what).toContain("crashed twice in a row");

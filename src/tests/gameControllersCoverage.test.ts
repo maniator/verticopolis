@@ -578,7 +578,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   let f: ReturnType<typeof fakes>;
   let adopted: Simulation[];
   let crashScreens: {
-    crash: { kind: string; repeat: boolean; saveFlushed: boolean };
+    crash: { kind: string; repeat: boolean; saveFlushed: boolean; behindSplash: boolean };
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }[];
@@ -804,7 +804,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed
     expect(crashScreens).toHaveLength(1);
-    expect(crashScreens[0].crash).toEqual({ kind: "webgl-context-lost", repeat: false, saveFlushed: true });
+    expect(crashScreens[0].crash).toEqual({ kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false });
     expect(crashScreens[0].save).toEqual({ flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false });
     // No silent auto-reload: the reload (and its session stamps) is the
     // player's Reload button.

@@ -1197,6 +1197,9 @@ class GameApp {
     this.lastStar = sim.star;
     this.accMinutes = 0;
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
+    // A crash report pairs the CURRENT tower's save with these entries; errors
+    // recorded against a previous tower would point triage at the wrong state.
+    this.frameErrors.length = 0;
     this.engine.setSim(sim);
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.

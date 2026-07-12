@@ -22,8 +22,15 @@ export interface CrashDescription {
   kind: "webgl-context-lost";
   /** A previous crash happened within the last 90 seconds. */
   repeat: boolean;
-  /** Whether the pre-crash autosave flush succeeded. */
+  /** Whether the tower was persisted going into the crash: the pre-crash
+   *  autosave flush succeeded, or nothing needed flushing (the crash happened
+   *  behind the splash, which pauses the sim). False only when a flush was
+   *  attempted and failed. */
   saveFlushed: boolean;
+  /** The crash happened while the boot splash was still up (no game was in
+   *  progress, no flush was attempted). Lets a report reader tell a boot-time
+   *  driver death from a mid-game crash with a clean flush. */
+  behindSplash: boolean;
 }
 
 /** The crash-details JSON written into the zip. Field names are part of the
