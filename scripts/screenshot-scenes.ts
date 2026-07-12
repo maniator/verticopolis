@@ -294,8 +294,9 @@ export const SCENES: Scene[] = [
     shots: [
       {
         name: "crash-screen",
-        // The card is deliberately shown: skip the transient sweep that would
-        // otherwise try to clear the dialog (it refuses Escape by design).
+        // The card IS the subject: without this, pgClearTransients would close
+        // it before the capture (the sweep clicks close/decline buttons and
+        // calls HTMLDialogElement.close() on whatever dialog is open).
         keepDialogs: true,
         clock: 12,
         setup: async (page) => {
