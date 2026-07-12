@@ -209,6 +209,27 @@ describe("Legibility — two-ride rule gates move-ins (Simulation)", () => {
     expect(entries()).toHaveLength(1); // the advisory announced the shift
   });
 
+  it("canon zoning is 2 rides everywhere: express to a sky lobby + local; losing the express strands the far band", () => {
+    // Shift-left guard for the pattern the heavy phase2 endgame run exercises:
+    // a fresh express must stop at ground + sky lobbies (not just endpoints),
+    // and express + local must put every band floor within the two-ride cap.
+    const sim = Simulation.newGame(16);
+    sim.money = 1e12;
+    const skyset = new Set([15, 30]);
+    layFull(sim, "lobby", 1);
+    for (let f = 2; f <= 45; f++) layFull(sim, skyset.has(f) ? "lobby" : "floor", f);
+    sim.tower.placeTransport("elevatorStandard", C, 1, 15);
+    sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30);
+    sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45);
+    const ex = sim.tower.placeTransport("elevatorExpress", C + 20, 1, 45);
+    expect(ex.ok).toBe(true);
+    for (let f = 2; f <= 45; f++) expect(sim.floorReachable(f)).toBe(true); // lobby → express → local
+    sim.tower.removeTransport(ex.transportId!);
+    expect(sim.floorReachable(30)).toBe(true); // sky lobby still 2 local rides out
+    expect(sim.floorReachable(31)).toBe(false); // ...but the third band is 3 rides again
+    expect(sim.floorReachable(45)).toBe(false);
+  });
+
   it("shift: the advisory latch re-arms after the floor is fixed, and fires again on a relapse", () => {
     const { sim } = strandedMoveInTower(15);
     const entries = () => sim.log.filter((e) => e.text.includes("3+ elevator rides"));

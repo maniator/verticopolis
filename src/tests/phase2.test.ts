@@ -207,8 +207,10 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     // tolerance: 3 shaft GROUPS spread across the lot so no office is a long
     // walk from a lobby-connected shaft, one local per group per 15-floor band
     // (3 parallel locals per band), staggered so adjacent bands sharing a
-    // sky-lobby endpoint never collide, plus 2 lobby-to-lobby express shafts
-    // for the ≤2-ride hop to every band. 23 shafts, inside the 24-shaft pool.
+    // sky-lobby endpoint never collide, plus 2 express shafts that stop at the
+    // ground lobby, every sky lobby, and their own endpoints (endpoints always
+    // stop, so floor 100 is served even without a lobby there), giving the
+    // ≤2-ride hop to every band. 23 shafts, inside the 24-shaft pool.
     sim.star = 5;
     const addShaft = (kind: string, x: number, b: number, t: number) => {
       const r = sim.buildTransport(kind as never, x, b, t);
