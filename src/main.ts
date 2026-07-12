@@ -253,6 +253,10 @@ class GameApp {
         // kind's strip at the old press point.
         this.paintAnchor = null;
         this.build.clearPaint();
+        // A transport anchor abandoned by a pinch (the pinch paths never fire
+        // onActionUp) must not linger either: updateCoastClear() treats it as a
+        // live gesture, which would keep the update prompt suppressed all session.
+        this.transportStart = null;
         this.engine.preview = null;
         this.engine.transportPreview = null;
         // Drop a build-refusal tooltip if one was up, so a tool switch doesn't
