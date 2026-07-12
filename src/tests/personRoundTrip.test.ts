@@ -337,3 +337,52 @@ describe("meal round-trippers respect the two-ride reachability rule", () => {
     expect(officeUnit.outForMeal ?? 0).toBe(0);
   });
 });
+
+describe("eating customers attach to the venue they were sent to (census attribution)", () => {
+  it("counts every eater at the fastFood unit even when the venue floor also holds another room", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 1_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 5; f++) for (let x = 0; x < 40; x++) sim.tower.place("floor", f, x);
+    sim.tower.placeTransport("elevatorStandard", 4, 1, 5);
+    const office = sim.tower.place("office", 2, 10);
+    const ff = sim.tower.place("fastFood", 5, 0);
+    // A second room on the venue floor so most corridor tiles do NOT sit inside
+    // the fastFood footprint. Attribution must come from the spawn-time venue
+    // stamp (mealVenueId), never from whatever room the arrival tile lands on.
+    const decoy = sim.tower.place("office", 5, 24);
+    for (const r of [office, ff, decoy]) {
+      const u = sim.tower.units.find((x) => x.id === r.unitId);
+      if (u) {
+        u.state = "occupied";
+        u.occupants = 6;
+      }
+    }
+    const ffUnit = sim.tower.units.find((u) => u.id === ff.unitId)!;
+    const decoyUnit = sim.tower.units.find((u) => u.id === decoy.unitId)!;
+    setHour(sim, 12);
+    let sawCountedEater = false;
+    for (let m = 0; m < 60; m++) {
+      sim.tick(1);
+      const eaters = sim.crowd.people.filter((p) => p.state === "eating");
+      for (const p of eaters) {
+        // The only census-counted venue in this tower is the fastFood, so every
+        // eater must be counted there; a missed count (venueUnitId undefined)
+        // is the regression this test guards against.
+        expect(p.venueUnitId).toBe(ffUnit.id);
+      }
+      // Exact accounting every tick: customersIn equals the people currently
+      // counted at the venue (venueUnitId set; finish() clears it). That
+      // includes return-leg riders, who stay counted until they despawn; an
+      // inexact bound would let a slow increment leak pass forever.
+      const counted = sim.crowd.people.filter((p) => p.venueUnitId === ffUnit.id).length;
+      expect(ffUnit.customersIn ?? 0).toBe(counted);
+      if (eaters.length > 0) {
+        sawCountedEater = true;
+        expect(decoyUnit.customersIn ?? 0).toBe(0);
+      }
+    }
+    expect(sawCountedEater).toBe(true);
+  });
+});

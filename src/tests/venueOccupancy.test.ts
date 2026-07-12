@@ -9,7 +9,7 @@ import { Clock } from "../engine/Clock";
  *     during open hours (for the renderer heatmap and lit-window sprite).
  *   - The same venue shows 0 outside its open hours so the heatmap goes dark
  *     after closing time.
- *   - Population values are differentiated by footprint:
+ *   - Population values scale with footprint:
  *     shop 20, fastFood 25, restaurant 35.
  */
 
@@ -30,8 +30,8 @@ function triggerHour(sim: Simulation): void {
  * Each call returns a fresh Simulation (lastHour=-1), so the first
  * triggerHour() always fires onHour regardless of the target hour. Do
  * not reuse a fixture for multiple setHour calls that land on the same
- * resulting hour — replace the clock but not lastHour, so onHour would
- * not fire a second time to that same hour.
+ * resulting hour: reuse replaces the clock but not lastHour, so onHour
+ * would not fire a second time for that same hour.
  */
 function venueFixture(kind: "fastFood" | "restaurant" | "shop"): {
   sim: Simulation;
@@ -50,7 +50,7 @@ function venueFixture(kind: "fastFood" | "restaurant" | "shop"): {
 
 // ---- Population values match footprint ----------------------------------------
 
-describe("commercial venue population values are proportional to footprint", () => {
+describe("commercial venue population values scale with footprint", () => {
   it("shop has population 20", () => {
     expect(FACILITIES.shop.population).toBe(20);
   });
@@ -147,5 +147,29 @@ describe("occupants flips at open/close hour boundaries", () => {
     setHour(sim, 6);
     triggerHour(sim); // now at hour 7
     expect(unit.occupants).toBe(FACILITIES.fastFood.population);
+  });
+});
+
+describe("v2 spatial congestion reads live customers, never the commercial catalog value", () => {
+  it("an occupied fastFood with no customers adds zero floor congestion; live customers add pressure", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.simModel = "v2";
+    sim.money = 1_000_000;
+    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < 40; x++) sim.tower.place("floor", 2, x);
+    const r = sim.tower.place("fastFood", 2, 0);
+    const u = sim.tower.units.find((x) => x.id === r.unitId)!;
+    u.state = "occupied";
+    // A single weak shaft so the floor is served (unserved floors are skipped
+    // by the spatial model) and 25 riders visibly stress it.
+    sim.tower.placeTransport("elevatorStandard", 30, 1, 2);
+    sim.tower.setCars(sim.tower.transports[0].id, 1);
+    setHour(sim, 12);
+    // No live customers: the venue must not stress floor 2 with its catalog 25.
+    // The pre-fix code summed residentCount for every present unit, so a lone
+    // occupied fastFood faked a full elevator load around the clock.
+    expect(sim.congestionAt(2)).toBe(0);
+    u.customersIn = 25;
+    expect(sim.congestionAt(2)).toBeGreaterThan(0);
   });
 });

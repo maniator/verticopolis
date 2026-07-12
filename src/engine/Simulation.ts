@@ -23,6 +23,7 @@ import {
   STAR_THRESHOLDS,
   TOWER_POPULATION,
   buildMinutes,
+  censusCount,
   facilityFloors,
   isCommercialKind,
   isElevatorKind,
@@ -1393,7 +1394,11 @@ export class Simulation implements SimContext {
     for (const u of this.tower.units) {
       if (u.kind === "metro" && isOperational(u)) metro++;
       if (isPresent(u)) {
-        const p = residentCount(u);
+        // censusCount, not residentCount: a commercial venue stresses its floor
+        // by its LIVE customers (0 when nobody is eating), never by the catalog
+        // value, or every occupied fast food would fake 25 riders around the
+        // clock (review P2 on the commercial census change).
+        const p = censusCount(u);
         if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
       }
     }
@@ -1946,9 +1951,11 @@ export class Simulation implements SimContext {
    * toward 5★/TOWER (the displayed {@link population} still includes them).
    * {@link evaluateStar} does NOT use this for promotion: it tests each rung on
    * the population appropriate to that rung, so promotion can't leap 3★→5★ on
-   * hotel guests. Meal round-trippers do NOT add on top here: their origin unit's
-   * canonical occupancy still carries them, so they are already present in the
-   * baseline count while they travel/eat. */
+   * hotel guests. A meal round-tripper counts at their origin room (its
+   * canonical occupancy still carries them) AND again at the venue via
+   * `customersIn` while they eat. That double count is deliberate: the 1994
+   * finance window lists venue customers on top of the workers and residents
+   * who are those same customers, so the census swells during meal windows. */
   ratingPopulation(): number {
     if (this.star < 4) {
       return this.tower.totalPopulation();
@@ -1956,20 +1963,17 @@ export class Simulation implements SimContext {
     return this.occupantPopulation();
   }
 
-  /** Non-hotel occupant census: office workers + condo residents only. This is
-   * the rating population once hotels drop out (4★+) and the figure each 5★/TOWER
-   * rung is tested against in {@link evaluateStar}. */
+  /** Non-hotel occupant census: office workers, condo residents, and live
+   * commercial venue customers (`customersIn`). This is the rating population
+   * once hotels drop out (4★+) and the figure each 5★/TOWER rung is tested
+   * against in {@link evaluateStar}. */
   private occupantPopulation(): number {
     let pop = 0;
     for (const u of this.tower.units) {
       if (isPresent(u) && !isHotelKind(u.kind)) {
-        // Commercial: live customer tally (mirrors Tower.totalPopulation).
-        // Gate on population > 0: cinema excluded (same as totalPopulation).
-        if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
-          pop += u.customersIn ?? 0;
-        } else {
-          pop += residentCount(u);
-        }
+        // censusCount: commercial units contribute their live customer tally
+        // (cinema excluded via population = 0), everyone else residentCount.
+        pop += censusCount(u);
       }
     }
     return pop;
@@ -2210,10 +2214,12 @@ export class Simulation implements SimContext {
   }
 
   get population(): number {
-    // Displayed population stays on the canonical room census. A worker out to
-    // lunch still counts via their origin room's baseline occupancy, so meal
-    // round-trips do not make HUD population spike or dip. Delegate to
-    // Tower.totalPopulation() so this metric has a single source of truth.
+    // Displayed population is the canonical room census PLUS live commercial
+    // customers: a worker out to lunch still counts via their origin room's
+    // baseline occupancy and, while eating, again at the venue (customersIn),
+    // so the HUD number deliberately swells during meal windows and settles
+    // between them. Delegate to Tower.totalPopulation() so this metric has a
+    // single source of truth.
     return this.tower.totalPopulation();
   }
 
@@ -2444,6 +2450,13 @@ export class Simulation implements SimContext {
           // deadline from a forged save must not reach the toast / state machine.
           vacateReason: isVacateReason(u.vacateReason) ? u.vacateReason : undefined,
           vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
+          // Transient crowd counters never survive a load: serializeUnit omits
+          // them, and the `...u` spread above would otherwise let a hand-edited
+          // save seed the census/star gating (customersIn) or the visible-
+          // occupancy projection (outForMeal) with forged values. The live
+          // crowd rebuilds both organically.
+          customersIn: undefined,
+          outForMeal: undefined,
         };
       });
     sim.tower.transports = (Array.isArray(data.transports) ? data.transports : [])

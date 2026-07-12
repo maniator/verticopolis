@@ -103,8 +103,9 @@ describe("canon: tenant populations (tdt-format.md §6)", () => {
     expect(FACILITIES.condo.population).toBe(3);
   });
 
-  it("commercial venue populations are proportional to footprint (shop 20, fastFood 25, restaurant 35)", () => {
-    // Design note: Verticopolis uses footprint-proportional ambient occupant counts
+  it("commercial venue populations scale with footprint (shop 20, fastFood 25, restaurant 35)", () => {
+    // Design note: Verticopolis uses footprint-scaled ambient occupant counts
+    // (larger room, more customers; not a strict per-tile ratio)
     // for the renderer heatmap. The 1994 Finance Window used a flat 35 per venue
     // (fastFood 5 units × 35 = 175 per inspector data). Our values diverge by design:
     // shop (12 tiles) = 20, fastFood (16 tiles) = 25, restaurant (24 tiles) = 35.

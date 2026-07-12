@@ -141,6 +141,12 @@ export interface Person {
   staff?: boolean;
   /** Unit id this staffer is dispatched to service (a dirty hotel room). */
   cleanUnitId?: number;
+  /** Unit id of the meal venue chosen at spawn for a round-trip meal person;
+   *  `destX` points inside this unit's footprint. Distinct from `venueUnitId`:
+   *  this records the intent (set on spawn), while `venueUnitId` records the
+   *  census count actually taken (set on eating entry), so a give-up before
+   *  arrival never decrements a count that was never incremented. */
+  mealVenueId?: number;
   /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
    *  person is currently eating. Set when the person enters `eating` state;
    *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
@@ -703,7 +709,7 @@ export class Crowd {
     for (const pool of originPools) {
       for (let i = 0; i < outboundBase; i++) {
         if (pool.weight >= 1 || this.rng.chance(pool.weight)) {
-          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, clock.hour, floors));
+          options.push(() => this.spawnMealOutbound(tower, pool, venueFloors, w.venues, clock.hour, floors));
         }
       }
     }
@@ -725,6 +731,7 @@ export class Crowd {
     tower: Tower,
     pool: { originKind: MealOriginKind; floors: number[] },
     venueFloors: number[],
+    venueKinds: FacilityKind[],
     hour: number,
     floors: SpawnFloors,
   ): void {
@@ -745,12 +752,25 @@ export class Crowd {
     if (candidates.length === 0) return;
     const origin = this.rng.pick(candidates);
     const venueFloor = this.rng.pick(venueFloors);
+    // A concrete venue on the chosen floor, matching this window's venue kinds
+    // and open right now (the same gate spawnFloors used to bin the floor).
+    // The census needs a specific unit to attribute the customer to, and destX
+    // must land inside its footprint: destX from pickX is a random corridor
+    // tile, so inferring the venue from it at arrival attributes customers to
+    // whatever room the tile happens to sit under (review P2).
+    const venueCandidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
+      (u) => venueKinds.includes(u.kind) && isTenanted(u) && isOpenAt(u.kind, hour),
+    );
+    if (venueCandidates.length === 0) return;
+    const venue = this.rng.pick(venueCandidates);
     // The route is computed by `this.add`, which may fail (route unreachable
     // from origin to venue). If it fails, no person exists and we must not
     // increment outForMeal. Order: add first, THEN increment on the returned
     // person object.
     const spawned = this.add(tower, originFloor, venueFloor);
     if (!spawned) return;
+    spawned.destX = this.rng.int(venue.x, venue.x + venue.width - 1);
+    spawned.mealVenueId = venue.id;
     spawned.originUnitId = origin.id;
     origin.outForMeal = (origin.outForMeal ?? 0) + 1;
     tower.bumpMealOverlayRevision();
@@ -1052,11 +1072,15 @@ export class Crowd {
               // ghost or route-fail" belt-and-braces.
               p.age = 0;
               p.eatSecondsLeft = this.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
-              // Track this customer at their venue for the live census.
-              // O(1): unitAt uses an internal Map keyed by floor+tile.
+              // Track this customer at their venue for the live census. The
+              // venue was stamped at spawn time (mealVenueId, with destX inside
+              // its footprint), so the count attaches to the exact venue this
+              // person eats at even when the floor holds several rooms. O(1):
+              // getUnit uses an internal Map. A venue bulldozed mid-trip
+              // resolves to undefined and the person simply eats uncounted.
               // Gate on population > 0 because cinema is a lateNight meal venue
               // but carries population = 0 and must not count toward the census.
-              const venueUnit = tower.unitAt(p.floor, p.destX);
+              const venueUnit = p.mealVenueId === undefined ? undefined : tower.getUnit(p.mealVenueId);
               if (venueUnit && isCommercialKind(venueUnit.kind) && FACILITIES[venueUnit.kind].population > 0) {
                 p.venueUnitId = venueUnit.id;
                 venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;

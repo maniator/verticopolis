@@ -321,8 +321,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
         addResidents(u);
       } else if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) {
         // Census-counted commercial venues (fastFood/restaurant/shop, population > 0):
-        // add catalog customers when the venue is open. Cinema is isCommercialKind
-        // but carries population = 0 and falls through here, matching Tower/Simulation.
+        // add catalog customers when the venue is present (isPresent: occupied,
+        // moving in, vacating, or asleep), regardless of opening hours. Cinema is
+        // isCommercialKind but carries population = 0 and falls through here,
+        // matching Tower/Simulation.
         if (isPresent(u)) addResidents(u);
       } else if (isHotelKind(u.kind)) {
         // Inverse of the importer's flag decode; "booked but out for the day"

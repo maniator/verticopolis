@@ -348,6 +348,22 @@ export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): n
 }
 
 /**
+ * A unit's contribution to the population census and to population-driven
+ * demand models (v2 spatial congestion). Commercial venues contribute their
+ * LIVE customer tally (`customersIn`, 0 when nobody is eating), never the
+ * catalog population; the `population > 0` gate keeps cinema (commercial,
+ * catalog 0) out entirely. Everything else contributes {@link residentCount}.
+ * One seam on purpose: Tower.totalPopulation, Simulation.occupantPopulation,
+ * and Simulation.spatialCongestionByFloor must never drift apart on this rule.
+ */
+export function censusCount(
+  u: Pick<Unit, "kind"> & { residents?: number; customersIn?: number },
+): number {
+  if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) return u.customersIn ?? 0;
+  return residentCount(u);
+}
+
+/**
  * Star-rating population thresholds — the canonical 1994 values
  * (300 / 1,000 / 5,000 / 10,000). From 4★ up the rating counts only non-hotel
  * occupants (offices/condos); the lot is the canon 375 tiles wide so a well-zoned
@@ -364,11 +380,12 @@ export const STAR_THRESHOLDS: Record<number, number> = {
 
 /**
  * Population needed for the final TOWER rating (above 5 stars). The census
- * counts office workers, condo residents, and commercial venue customers (fast
- * food 25 / restaurant 35 / shop 20, scaled to footprint); hotel guests count
- * while climbing up through 4★, then drop out. The canonical value is 15,000. The
- * lot is the canon 375 tiles wide so a well-zoned 100-floor tower comfortably
- * reaches it (with express + banded locals).
+ * counts office workers, condo residents, and LIVE commercial venue customers
+ * (`customersIn` via {@link censusCount}; the catalog values, fast food 25 /
+ * restaurant 35 / shop 20, are what TDT export writes, not a flat census add);
+ * hotel guests count while climbing up through 4★, then drop out. The canonical
+ * value is 15,000. The lot is the canon 375 tiles wide so a well-zoned 100-floor
+ * tower comfortably reaches it (with express + banded locals).
  */
 export const TOWER_POPULATION = 15000;
 

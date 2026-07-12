@@ -1,4 +1,4 @@
-import { ALL_KINDS, FACILITIES } from "../engine/facilities";
+import { ALL_KINDS, FACILITIES, isCommercialKind } from "../engine/facilities";
 import type { Simulation, LogEntry, BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import { TOWER_FILE_EXT, type SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
@@ -418,7 +418,12 @@ export class UI {
       this.el.toolInfo.innerHTML =
         `<div class="ti-name">${f.name}</div>` +
         `<div>Cost: $${f.cost.toLocaleString()}</div>` +
-        (f.population ? `<div>Capacity: ${f.population}</div>` : "") +
+        // Commercial venues never hold a flat population: they add however many
+        // customers are eating right now, up to the catalog value. "Capacity"
+        // stays for the kinds where it is literally the head count.
+        (f.population
+          ? `<div>${isCommercialKind(tool.kind) ? `Customers: up to ${f.population}` : `Capacity: ${f.population}`}</div>`
+          : "") +
         `<p style="margin-top:6px;color:var(--muted)">${f.description}</p>`;
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
@@ -1027,7 +1032,7 @@ export class UI {
         <li><b>Make money.</b> Offices pay quarterly rent, condos sell once, hotels earn nightly, shops &amp; restaurants earn from foot traffic.</li>
         <li><b>Grow your rating.</b> 2★ at 300 pop, 3★ at 1,000 (needs Security), 4★ at 5,000 (needs Medical, enough Recycling, suites &amp; a VIP), 5★ at 10,000 (needs a Metro).</li>
         <li><b>Take out the trash.</b> One <b>Recycling Center</b> processes ~2,500 population. It visibly fills through the day and a garbage truck empties it each morning. Outgrow your centers and 4★ locks until you build more.</li>
-        <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> on floor 100 and pass the VIP inspection. The <b>TOWER</b> rank needs 15,000 occupants (office workers + residents).</li>
+        <li><b>Win.</b> At 5★ with a Metro station, build the <b>Wedding Hall</b> on floor 100 and pass the VIP inspection. The <b>TOWER</b> rank needs 15,000 occupants (office workers, residents, and customers in your venues).</li>
         <li><b>Two rides, tops.</b> People take at most <b>two</b> elevator/stair rides to reach a floor. Add <b>sky lobbies</b> (every ~15 floors) so distant floors are one transfer away, or nobody comes.</li>
         <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>

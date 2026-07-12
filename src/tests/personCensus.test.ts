@@ -236,17 +236,39 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
     ff.customersIn = 10;
     for (const star of [1, 2, 3, 4, 5] as const) {
       sim.star = star;
-      // office (6) + fastFood customers (10) = 16
-      expect(sim.ratingPopulation()).toBeGreaterThanOrEqual(10);
+      // Exactly office (6) + fastFood customers (10) at every rung: below 4 via
+      // totalPopulation, at 4+ via occupantPopulation (no hotels here, and the
+      // customers stay in). An inexact bound would let double counting slip by.
+      expect(sim.ratingPopulation()).toBe(16);
     }
   });
 
-  it("vacant commercial units (no customersIn) do not contribute to totalPopulation", () => {
+  it("a VACANT commercial unit contributes nothing, even with a stale customersIn", () => {
     const sim = officeAndFastFood();
     const ff = sim.tower.units.find((u) => u.kind === "fastFood")!;
-    ff.customersIn = undefined;
+    ff.state = "empty"; // not isPresent: the census must skip it entirely
+    ff.customersIn = 4; // stale count on a vacated unit must not leak in
     // only office occupants (6) count
     expect(sim.tower.totalPopulation()).toBe(6);
+  });
+
+  it("a forged save's customersIn/outForMeal are stripped on load (census stays clean)", () => {
+    const sim = officeAndFastFood();
+    const data = sim.serialize();
+    // Hand-edit the save the way a hostile file would: stamp transient crowd
+    // counters directly onto the serialized units.
+    type Forgeable = { kind: string; customersIn?: number; outForMeal?: number };
+    const ffSaved = (data.units as unknown as Forgeable[]).find((u) => u.kind === "fastFood")!;
+    ffSaved.customersIn = 9999;
+    const officeSaved = (data.units as unknown as Forgeable[]).find((u) => u.kind === "office")!;
+    officeSaved.outForMeal = -50;
+    const restored = Simulation.deserialize(data);
+    const ffRestored = restored.tower.units.find((u) => u.kind === "fastFood")!;
+    const officeRestored = restored.tower.units.find((u) => u.kind === "office")!;
+    expect(ffRestored.customersIn).toBeUndefined();
+    expect(officeRestored.outForMeal).toBeUndefined();
+    // The forged 9999 must not reach the census or star gating.
+    expect(restored.tower.totalPopulation()).toBe(6); // office workers only
   });
 
   it("commercial customersIn is not persisted across save/reload", () => {
@@ -276,7 +298,7 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
   it("cinema (lateNight venue, population=0) does not count toward totalPopulation even with customersIn set", () => {
     // Cinema is isCommercialKind but FACILITIES.cinema.population = 0, so it is
     // excluded from the census. This test guards against the bug where
-    // isCommercialKind alone was used as the census gate — cinema is a valid
+    // isCommercialKind alone was used as the census gate: cinema is a valid
     // lateNight meal destination so its customersIn would have been incremented
     // by eating-state entry, and then incorrectly counted as census population.
     // The fix: all three census reads gate on FACILITIES[kind].population > 0.

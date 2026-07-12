@@ -51,8 +51,11 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 ## Canon rules that are easy to get wrong
 - **Star ladder** (population + gates): 2★ 300 · 3★ 1,000 (Security) · 4★ 5,000
   (Medical + Recycling + >1 Suite + a favorable VIP) · 5★ 10,000 (Metro). **TOWER = 15,000.**
-- **Rating census** counts office workers + condo residents + commercial venue customers
-  (fast food 25 / restaurant 35 / shop 20, scaled to footprint). **Hotel guests count
+- **Rating census** counts office workers + condo residents + commercial venue
+  customers. Commercial counts LIVE customers (`Unit.customersIn`, whoever is
+  eating right now, often 0); the catalog values (fast food 25 / restaurant 35 /
+  shop 20, chosen per footprint) are what TDT export writes, not a flat census
+  add. `censusCount()` in `facilities.ts` owns the rule. **Hotel guests count
   while climbing up through 4★, then drop out** (`ratingPopulation()`).
 - **Two-ride rule:** a trip uses at most **two** transport rides (one sky-lobby transfer);
   floors reachable only via 3+ rides draw no commuters. Sky lobbies go every ~15 floors.
