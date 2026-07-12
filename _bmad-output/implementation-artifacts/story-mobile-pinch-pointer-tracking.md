@@ -19,7 +19,7 @@ so that **the camera never wedges into a broken zoom state and a valid (gold) pl
 3. **Pinch hand-off:** when a pinch ends because one finger lifted, the surviving finger continues as a PAN gesture seeded from its tracked position; its release cannot tap-place (tap slop poisoned) and its movement never enters the mouse hover path, so no stranded gold ghost is painted on touch.
 4. **Third-finger hygiene:** while a pinch is live, adding or removing extra contacts re-baselines the pinch distance/midpoint from the two live contacts, so the camera never jumps from a stale baseline.
 5. **No behavior change for mouse/desktop:** classify/tap/action routing, right-click inspect, extend arrows, wheel zoom are untouched.
-6. **Pure and tested:** the multi-touch state machine (contact map + pinch lifecycle) lives in a DOM-free module under `src/game/`, unit-tested for: id-reshuffle leak, cancel handling, pinch begin/move/end, hand-off pan seed, extra-finger re-baseline.
+6. **Pure and tested:** the multi-touch state machine (contact map + pinch lifecycle) lives in a DOM-free module (shipped as `src/render/pinchTracker.ts`, beside its `cameraBounds.ts` precedent; the draft said `src/game/`, see Completion Notes), unit-tested for: id-reshuffle leak, cancel handling, pinch begin/move/end, hand-off pan seed, extra-finger re-baseline.
 7. **Player-facing patch bump:** `package.json` version 1.18.1 -> 1.18.2.
 8. Quality gates green (`typecheck`, `lint`, `test`, `build`) and `/gds-code-review` run in-session with `patch` findings fixed.
 
@@ -29,6 +29,23 @@ so that **the camera never wedges into a broken zoom state and a valid (gold) pl
 - [x] Delegate `TowerEngine.pointerDown/Move/Up` pointer bookkeeping to the tracker; key everything by `stablePointerId`; on pinch end with a survivor, seed `gesture = "pan"`, `lastSx/lastSy` from the survivor, poison `moved` so release cannot tap. (AC: 1,3,5)
 - [x] Tests `src/tests/pinchTracker.test.ts` covering the AC 6 matrix, including a literal simulation of Excalibur's `_normalizePointerId` renumbering to prove the old keying leaks and the new one does not. (AC: 2,6)
 - [x] Version bump 1.18.2 + gates + `/gds-code-review`. (AC: 7,8)
+
+### Review Findings
+
+`/gds-code-review` 2026-07-12 (Blind Hunter, Edge Case Hunter, Acceptance Auditor), plus Copilot's PR review. Every confirmed finding is fixed on the branch; defers are recorded in `backlog.md`.
+
+- [x] [Review][Patch] Em-dash sweep of new prose/comments (auditor; Copilot x7) [src/tests/pinchTracker.test.ts, src/render/excalibur/TowerEngine.ts]
+- [x] [Review][Patch] Fallback pointer ids mapped into a disjoint negative key space so they can never collide with native ids (blind hunter) [src/render/pinchTracker.ts]
+- [x] [Review][Patch] Live extend-arrow drag terminates on pinch-start instead of resuming with a jump after the hand-off (blind hunter; Copilot) [src/render/excalibur/TowerEngine.ts]
+- [x] [Review][Patch] `setSim` performs a full input reset (tracker, gesture, arrowDrag), wiring the previously-orphaned `reset()` (blind hunter; auditor advisory) [src/render/excalibur/TowerEngine.ts]
+- [x] [Review][Patch] Explicit mid-pinch cancel test, pinning the cancel-routes-through-up contract (auditor, AC 6 matrix) [src/tests/pinchTracker.test.ts]
+- [x] [Review][Patch] Stale `transportStart` from a pinch-aborted elevator gesture cleared on tool switch, unblocking the update prompt (edge hunter F1) [src/main.ts]
+- [x] [Review][Patch] Touch pointers can never drive the mouse hover path, closing the last stranded-ghost window (edge hunter F2) [src/render/excalibur/TowerEngine.ts]
+- [x] [Review][Patch] Story artifact synced with shipped code: status, tasks, File List, AC 6 / design-snippet paths and fallback semantics (auditor; Copilot x3) [story file]
+- [x] [Review][Defer] Swallowed off-window mouse pointerup leaks a transient contact; self-heals (edge hunter F3), deferred, pre-existing
+- [x] [Review][Defer] Pinch-aborted paint run loses its undo step; documented overwrite semantics (edge hunter F4), deferred, pre-existing
+- [x] [Review][Defer] Elevator hover ghost validity ignores dry-run/funds on desktop (investigation side finding), deferred, pre-existing
+- Dismissed as noise: `pan(0,0)` on unrelated moves during a pinch (exact parity with the replaced code; pan+clamp is a no-op) and pinch-start abandoning an action gesture without `onActionUp` (documented design; the controller resets in-flight state on the next gesture).
 
 ## Dev Notes
 
@@ -49,7 +66,7 @@ so that **the camera never wedges into a broken zoom state and a valid (gold) pl
 ### Design (keep the TowerEngine diff a thin delegation)
 
 ```ts
-// src/game/pinchTracker.ts (pure, no imports)
+// src/render/pinchTracker.ts (pure, no imports; shipped path, see Completion Notes)
 export function stablePointerId(exId: number, nativeEvent: unknown): number {
   // Real PointerEvents carry a per-contact-stable pointerId; Excalibur's own id
   // is an index into the live active set and reshuffles when a contact lifts.
@@ -57,7 +74,9 @@ export function stablePointerId(exId: number, nativeEvent: unknown): number {
     const id = (nativeEvent as { pointerId: unknown }).pointerId;
     if (typeof id === "number" && Number.isFinite(id)) return id;
   }
-  return exId;
+  // Shipped refinement: the fallback maps into a disjoint negative key space
+  // (-1 - exId) so it can never collide with a native id.
+  return -1 - exId;
 }
 
 export type PinchMove = { panDx: number; panDy: number; zoom: number; cx: number; cy: number };
@@ -123,6 +142,8 @@ claude-fable-5 (session 2026-07-12)
 
 - `src/render/pinchTracker.ts` (new)
 - `src/tests/pinchTracker.test.ts` (new)
-- `src/render/excalibur/TowerEngine.ts` (pointer handlers delegate to the tracker)
+- `e2e/mobileGestures.spec.ts` (new: browser-level regression, real PointerEvents through Excalibur's receiver with realistic increasing native ids; runs in CI's `npm run e2e` on every PR)
+- `src/render/excalibur/TowerEngine.ts` (pointer handlers delegate to the tracker; touch never drives hover; setSim input reset)
+- `src/main.ts` (tool switch clears a pinch-abandoned `transportStart`)
 - `package.json` (1.18.1 to 1.18.2)
 - `_bmad-output/implementation-artifacts/investigations/mobile-zoom-placement-investigation.md` (case file)

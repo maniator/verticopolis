@@ -16,9 +16,10 @@
  */
 
 /** The per-contact-stable pointer id: the native DOM `pointerId` when the
- *  wrapped event carries one, else the engine's own id. Native ids are stable
- *  for the lifetime of a contact on every PointerEvent browser, which is the
- *  property the contact map needs and Excalibur's renumbered id lacks. */
+ *  wrapped event carries one, else the engine's own id mapped into a disjoint
+ *  negative key space. Native ids are stable for the lifetime of a contact on
+ *  every PointerEvent browser, which is the property the contact map needs
+ *  and Excalibur's renumbered id lacks. */
 export function stablePointerId(engineId: number, nativeEvent: unknown): number {
   if (typeof nativeEvent === "object" && nativeEvent !== null && "pointerId" in nativeEvent) {
     const id = (nativeEvent as { pointerId: unknown }).pointerId;

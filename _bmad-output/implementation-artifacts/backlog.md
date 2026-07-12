@@ -108,6 +108,12 @@ How items flow:
 _Raw `### Deferred from:` sections appended by the review skills land here.
 Triage them into the table above, then delete the raw note._
 
+### Deferred from: code review of story-mobile-pinch-pointer-tracking (`/gds-code-review`, 2026-07-12)
+
+- **Swallowed mouse pointerup outside the window leaks a transient tracker contact (Edge F3).** Mouse-down on the canvas, drag out of the window, release there: no up/cancel reaches Excalibur's canvas listener, so the contact stays tracked and the NEXT one-finger touch press reads as a pinch. Self-heals on the next mouse press (the stable native id overwrites, size stays 1) or a tower swap (`setSim` input reset). Pre-existing in the old `pointers` map; now transient instead of permanent. Follow-up if it ever bites: pointer capture on mouse-down or a window-blur `tracker.reset()`. (Low, pre-existing, hybrid devices only.)
+- **Pinch-aborted paint run loses its undo step (Edge F4).** `captureUndo` fires in `onActionDown`; a pinch aborts the gesture without `onActionUp`, so the pending pre-paint snapshot is overwritten by the next gesture's capture and the pre-pinch strip can never be undone (immediate Ctrl+Z still works). Documented overwrite semantics in `UndoHistory.capture`; pre-existing, unchanged by the fix. (Low, pre-existing.)
+- **Elevator hover ghost validity ignores dry-run/funds (investigation side finding).** `main.ts` `updateBuildPreview` sets `valid: isUnlocked(kind)` for drag-sized transports, so a desktop hover shows a gold ghost where a drop would refuse. Cosmetic, desktop-only. (Low, pre-existing.)
+
 ### Deferred from: code review of tower-wide-meal-cadence (`/gds-code-review`, 2026-07-09)
 
 - **Spawn-vs-updatePresence ordering (Edge F3).** `advanceStep` calls `crowd.spawn` BEFORE `onHour -> updatePresence` runs. On the first tick that crosses into a new hour, spawnFloors sees `u.occupants` from the PRIOR hour. Normally benign because presence was already correct at the previous boundary; the diff's "no explicit isWeekend check needed" claim depends on this invariant, which is not asserted anywhere. Add a targeted regression if a bug ever surfaces on the Saturday-08:00 load edge. (Low, inherited, not caused by this diff.)

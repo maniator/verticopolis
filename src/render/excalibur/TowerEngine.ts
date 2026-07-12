@@ -637,7 +637,11 @@ export class TowerEngine {
       this.lastSy = ev.screenPos.y;
     } else if (this.gesture === "action") {
       this.onActionMove?.(tile, floor, this.pickEntityAt(ev.worldPos));
-    } else {
+    } else if (ev.pointerType !== "Touch") {
+      // Hover is a mouse/pen concept. A touch move can only reach this branch
+      // in odd gestureless states (e.g. a finger held across a setSim input
+      // reset); letting it hover would strand a build-preview ghost that no
+      // later touch event clears.
       this.onHover?.(tile, floor, this.pickEntityAt(ev.worldPos));
     }
   }
