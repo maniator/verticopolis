@@ -51,6 +51,13 @@ export interface UICallbacks {
   getMode(): GameMode;
   onNew(mode: GameMode, modernCalendar: CalendarKind): void;
   onToggleAudio(): boolean; // returns new muted state
+  /** The live muted state, so the toggle's glyph can be initialized at boot
+   *  (persisted mute must show 🔇 without a click). */
+  isMuted(): boolean;
+  /** A volume slider moved: set that channel's level (0..1) and persist it. */
+  onSetVolume(kind: "music" | "sfx", value: number): void;
+  /** The live volume levels (0..1 each), for the sliders' initial positions. */
+  getVolumes(): { music: number; sfx: number };
   onUndo(): void;
   onRedo(): void;
   onEditAction(action: string, root: HTMLElement): void;
@@ -203,6 +210,9 @@ export class UI {
       });
     });
 
+    // Initialize the glyph from the persisted state (the HTML default is 🔊,
+    // wrong for a player who muted last session), then follow every toggle.
+    this.el.audioToggle.textContent = this.cb.isMuted() ? "🔇" : "🔊";
     this.el.audioToggle.addEventListener("click", () => {
       const muted = this.cb.onToggleAudio();
       this.el.audioToggle.textContent = muted ? "🔇" : "🔊";
@@ -224,8 +234,7 @@ export class UI {
       // fold-in abandon warning; the mode choice and the confirm are one step.
       this.newTowerModal({ hasSave: true, onFound: (mode, cal) => this.cb.onNew(mode, cal) });
     });
-    document.getElementById("btn-export")!.addEventListener("click", () => this.confirmExport());
-    document.getElementById("btn-import")!.addEventListener("click", () => this.openImport());
+    document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
     document.getElementById("overlay-mode")?.addEventListener("change", (e) => {
@@ -1038,7 +1047,7 @@ export class UI {
         <li><b>Parking</b> spaces only work when they touch a <b>Parking Ramp</b> or a connected space. Chain them off a ramp, or they sit empty. Offices want a space per ~24 workers (one per four offices) from 3★, and every hotel suite needs one of its own (the VIP drives).</li>
         <li><b>Book the films.</b> Cinemas book a film monthly. A <b>Blockbuster</b> costs twice as much but pulls a far bigger crowd (great in a busy tower, a money-loser in a quiet one). Leave it on <b>Auto</b> or set a policy on the cinema.</li>
         <li><b>Price in bulk.</b> Inspect any office, condo or hotel room and use <b>“Set all …”</b> to re-price every unit of that kind at once (or reset them to the default). No need to edit each room. A preview shows how many change before you apply.</li>
-        <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> below.</li>
+        <li><b>The clock breathes.</b> As in 1994, real time isn't spent evenly: the clock crawls through the lunch crush (watch your elevators earn their keep) and races through the small hours. A full day still takes the same real time, and the speed buttons still multiply it. Prefer an even pace? Toggle <b>Steady clock</b> in Settings.</li>
         <li><b>Rule-set (Classic vs Modern).</b> You pick this when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game: every condo is a family of 3, sells at 2×–2.5× its build cost, and an owner lost to neglect costs you a full-price buy-back. <b>Modern</b> adds <b>variant households</b>: a condo draws a 2–5 person family that sets its sale price and how demanding it is (a big family pays more but bails sooner if the elevators can't cope). Sold condo households also <b>move out on their own</b> now and then, a life event more likely for a bigger family, so you buy the condo back and resell as the tower turns over. It also runs a <b>deeper economy</b>: held space carries a monthly overhead, unsold condos are taxed, and a noisy office neighbor can wear a tenant down to a move-out, so late-game money stays a real decision. Modern also lets you pick the <b>calendar</b> when you found the tower: keep the friendlier real-world length (7-day week, 90-day quarter, 360-day year) or run the authentic 1994 compressed calendar (3-day week, 3-day quarter, 12-day year); Classic always runs the compressed one. Whichever you pick, your income per in-game day stays the same, only the cadence changes. Want the other rule-set? Start a new tower, and if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it below.</li>
       </ul>
       <p style="color:var(--muted)">Mouse: drag to pan, scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
@@ -1055,37 +1064,73 @@ export class UI {
       <p class="help-report"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/maniator/verticopolis/issues/new/choose">Let us know…<span class="visually-hidden"> (opens GitHub in a new tab)</span></a></p>
       <h3>About</h3>
       <p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br>Verticopolis v${escapeHtml(typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev")}</p>
-      <div class="modal-actions"><button class="btn" data-act="reduce-motion"></button><button class="btn" data-act="steady-clock"></button><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
+      <div class="modal-actions"><button class="btn" data-act="replay-onboard"${replayAttr}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `);
     // Inside a native wrapper the report link routes to the system browser
     // through the platform port (see routeExternalInWrapper).
     routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
-    const sc = box.querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
-    const scLabel = (steady: boolean) => {
-      sc.textContent = `Steady clock: ${steady ? "On" : "Off"}`;
-      sc.setAttribute("aria-pressed", String(steady));
-      sc.title = steady
-        ? "The day runs at an even pace. Turn off to restore the 1994 rhythm (slow lunch, fast night)."
-        : "The 1994 rhythm is on: lunch runs slow, night runs fast. Turn on for an even pace.";
-    };
-    scLabel(this.cb.isSteadyClock());
-    sc.addEventListener("click", () => scLabel(this.cb.onToggleSteadyClock()));
-    const rm = box.querySelector<HTMLButtonElement>('[data-act="reduce-motion"]')!;
-    // When the OS forces reduced motion on, the user pref can't override it — show
-    // it as on-by-system and disable the toggle (so it isn't a silent no-op).
-    const osForced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const label = (on: boolean) => {
-      rm.textContent = `Reduced motion: ${on ? "On" : "Off"}${osForced ? " (system)" : ""}`;
-      rm.setAttribute("aria-pressed", String(on));
-    };
-    rm.disabled = osForced;
-    label(document.documentElement.classList.contains("reduce-motion"));
-    rm.addEventListener("click", () => label(this.cb.onToggleReducedMotion()));
     this.wireActions(box);
     // Only wire replay when it can actually run (not while the splash is up).
     if (!onSplash) {
       box.querySelector('[data-act="replay-onboard"]')!.addEventListener("click", () => this.cb.onReplayOnboarding());
     }
+  }
+
+  /** The Settings dialog: sound levels plus the presentation toggles. Player
+   *  options live here; gameplay help stays in showHelp. Opened from the Game
+   *  panel's Settings button (mute stays on the top-bar speaker button). */
+  showSettings(): void {
+    const box = this.openModal(`
+      <h2>Settings</h2>
+      <h3>Sound</h3>
+      <p style="color:var(--muted)">Levels apply right away and are remembered on this device. The 🔊 button up top mutes everything.</p>
+      <div class="vol-row"><label for="vol-music">Music</label><input id="vol-music" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-music" aria-hidden="true"></span></div>
+      <div class="vol-row"><label for="vol-sfx">Effects</label><input id="vol-sfx" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-sfx" aria-hidden="true"></span></div>
+      <h3>Motion and pace</h3>
+      <div class="set-row">
+        <label class="set-switch"><input type="checkbox" id="set-reduce-motion" role="switch" aria-describedby="note-reduce-motion"><span>Reduced motion</span></label>
+        <p class="set-note" id="note-reduce-motion">Calms ambient motion: weather, birds, and other background animation. If your device asks for reduced motion, this stays on.</p>
+      </div>
+      <div class="set-row">
+        <label class="set-switch"><input type="checkbox" id="set-steady-clock" role="switch" aria-describedby="note-steady-clock"><span>Steady clock</span></label>
+        <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
+      </div>
+      <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
+    `);
+    // Volume sliders: initialize from the live levels, apply on every input
+    // tick (live feedback while dragging; persistence is debounced by the
+    // onSetVolume handler in main.ts), and keep the percent readout in step.
+    // Mute is independent; sliders never touch it.
+    const vols = this.cb.getVolumes();
+    const wireVolume = (id: string, kind: "music" | "sfx", initial: number) => {
+      const input = box.querySelector<HTMLInputElement>(`#${id}`)!;
+      const readout = box.querySelector<HTMLElement>(`[data-vol-val="${id}"]`)!;
+      const show = (v: number) => (readout.textContent = `${Math.round(v * 100)}%`);
+      input.value = String(Math.round(initial * 100));
+      show(initial);
+      input.addEventListener("input", () => {
+        const v = Number(input.value) / 100;
+        this.cb.onSetVolume(kind, v);
+        show(v);
+      });
+    };
+    wireVolume("vol-music", "music", vols.music);
+    wireVolume("vol-sfx", "sfx", vols.sfx);
+    // Both switches show the LIVE state and re-read it from the callback's
+    // return after every toggle, so a stuck pref can never desync the UI.
+    const sc = box.querySelector<HTMLInputElement>("#set-steady-clock")!;
+    sc.checked = this.cb.isSteadyClock();
+    sc.addEventListener("change", () => (sc.checked = this.cb.onToggleSteadyClock()));
+    const rm = box.querySelector<HTMLInputElement>("#set-reduce-motion")!;
+    // When the OS forces reduced motion on, the user pref can't override it:
+    // show the switch as on, disable it (so it isn't a silent no-op), and say
+    // why next to the name.
+    const osForced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    rm.checked = osForced || document.documentElement.classList.contains("reduce-motion");
+    rm.disabled = osForced;
+    if (osForced) rm.closest("label")!.querySelector("span")!.textContent = "Reduced motion (system)";
+    rm.addEventListener("change", () => (rm.checked = this.cb.onToggleReducedMotion()));
+    this.wireActions(box);
   }
 
   /** A two-choice emergency modal (fire rescue / bomb ransom). Calls `onResolve`

@@ -161,6 +161,11 @@ class GameApp {
   private panelsAnchored = false;
   /** Per-device accessibility preferences (localStorage, off the save). */
   private prefs: Prefs = loadPrefs();
+  /** Trailing debounce for volume-drag pref writes: slider input events fire
+   *  at pointer-move rate, and a synchronous localStorage write per tick is
+   *  avoidable main-thread churn during the gain ramp. A short trailing delay
+   *  is durable enough for a device-local preference. */
+  private prefsSaveTimer: number | null = null;
   private reduceMq = window.matchMedia("(prefers-reduced-motion: reduce)");
   /** Last shown traffic tier (for boundary hysteresis, so the chip doesn't flicker). */
   private lastTrafficTier: TrafficTier = 0;
@@ -194,6 +199,12 @@ class GameApp {
     if (boot.corrupt) SaveGame.preserveUnreadable();
     this.sim = boot.sim ?? Simulation.newGame(Date.parse("2024-01-01"));
     this.engine = new TowerEngine(this.canvas, this.sim);
+
+    // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
+    // gesture listener exists, so the very first interaction (which starts the
+    // engine) already carries the player's mute/volume choices.
+    this.audio.setMuted(this.prefs.muted === true);
+    this.audio.setVolumes(this.prefs.musicVolume ?? 1, this.prefs.sfxVolume ?? 1);
 
     // Controller modules — built BEFORE the UI because the UI constructor's
     // initial selectTool fires onSelectTool synchronously (which resets the
@@ -301,8 +312,28 @@ class GameApp {
       onToggleAudio: () => {
         this.audio.start();
         this.audio.setMuted(!this.audio.muted);
+        this.prefs.muted = this.audio.muted;
+        savePrefs(this.prefs);
         return this.audio.muted;
       },
+      isMuted: () => this.audio.muted,
+      onSetVolume: (kind, value) => {
+        // A slider drag is a user gesture, so it may be the interaction that
+        // starts the engine (a not-yet-started facade also covers the
+        // retry-after-failed-load path). Once running, skip the call: input
+        // events arrive at pointer-move rate and each start() would allocate
+        // a fresh resume() promise for nothing.
+        if (!this.audio.started) this.audio.start();
+        this.audio.setVolumes(
+          kind === "music" ? value : this.audio.musicVolume,
+          kind === "sfx" ? value : this.audio.sfxVolume,
+        );
+        // Read back the facade's clamped values so prefs never store junk.
+        this.prefs.musicVolume = this.audio.musicVolume;
+        this.prefs.sfxVolume = this.audio.sfxVolume;
+        this.schedulePrefsSave();
+      },
+      getVolumes: () => ({ music: this.audio.musicVolume, sfx: this.audio.sfxVolume }),
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       onEditAction: (action, root) => this.editor.handleEditAction(action, root),
@@ -553,6 +584,28 @@ class GameApp {
       wrapEl?.setAttribute("aria-label", aria);
       wrapEl?.classList.toggle("traffic-warn", tier >= 2); // red is a redundant cue, not the only one
     }
+  }
+
+  /** Persist prefs after a short trailing delay (see {@link prefsSaveTimer}).
+   *  Single-shot writes (the mute toggle, the accessibility buttons) keep
+   *  calling savePrefs directly; this is only for high-frequency sources.
+   *  A pagehide flush (wireEngine) covers unload/reload inside the window. */
+  private schedulePrefsSave(): void {
+    if (this.prefsSaveTimer !== null) window.clearTimeout(this.prefsSaveTimer);
+    this.prefsSaveTimer = window.setTimeout(() => {
+      this.prefsSaveTimer = null;
+      savePrefs(this.prefs);
+    }, 200);
+  }
+
+  /** Write a pending debounced pref save NOW. Wired to pagehide so a slider
+   *  adjustment inside the debounce window survives a tab close or any
+   *  reload (including the app's own update-flow and recovery reloads). */
+  private flushPrefsSave(): void {
+    if (this.prefsSaveTimer === null) return;
+    window.clearTimeout(this.prefsSaveTimer);
+    this.prefsSaveTimer = null;
+    savePrefs(this.prefs);
   }
 
   /** Push the effective reduced-motion state (OS pref OR user pref) to the DOM
@@ -809,6 +862,8 @@ class GameApp {
     const kick = () => this.audio.start();
     window.addEventListener("pointerdown", kick, { once: true });
     window.addEventListener("keydown", kick, { once: true });
+    // Don't let a pending debounced pref write die with the page.
+    window.addEventListener("pagehide", () => this.flushPrefsSave());
   }
 
   /** The gesture-independent placement cases shared by tap, click, and the

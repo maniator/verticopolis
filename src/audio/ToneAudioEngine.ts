@@ -304,6 +304,11 @@ export function sameNotes(a: number[], b: number[]): boolean {
 export class ToneAudioEngine {
   // Master + shared effect chain.
   private master: Tone.Gain | null = null;
+  /** Player-set music & ambience level: everything except the action jingles
+   *  (the whole reverb bed plus accents and rain) flows through this bus. */
+  private musicBus: Tone.Gain | null = null;
+  /** Player-set effects level: the one-shot action jingles only. */
+  private sfxBus: Tone.Gain | null = null;
   /** Distance lowpass on the musical/ambient bed; opens up as you zoom in. */
   private bedFilter: Tone.Filter | null = null;
   private reverb: Tone.Reverb | null = null;
@@ -349,6 +354,10 @@ export class ToneAudioEngine {
   private detail = 0.4;
   private rainTarget = 0;
   muted = false;
+  /** Player-set levels 0..1, kept even while the graph isn't built so start()
+   *  can apply them; independent of `muted` (the master kill switch). */
+  musicVolume = 1;
+  sfxVolume = 1;
   started = false;
 
   /** Lazily create the audio graph. Must be called from a user gesture. */
@@ -373,10 +382,16 @@ export class ToneAudioEngine {
 
       this.master = new Tone.Gain(this.muted ? 0 : 0.35).toDestination();
 
+      // Player volume buses sit between the content and the master: music &
+      // ambience on one, the action jingles on the other. The master keeps its
+      // fixed 0.35 level (and the mute ramp); these two only scale within it.
+      this.musicBus = new Tone.Gain(this.musicVolume).connect(this.master);
+      this.sfxBus = new Tone.Gain(this.sfxVolume).connect(this.master);
+
       // Musical + ambient content flows through a lowpass whose cutoff tracks
       // zoom (far out = muffled, up close = present), then a gentle reverb so
       // scenes feel like rooms rather than oscillators.
-      this.reverb = new Tone.Reverb({ decay: 2.4, wet: 0.16 }).connect(this.master);
+      this.reverb = new Tone.Reverb({ decay: 2.4, wet: 0.16 }).connect(this.musicBus);
       this.bedFilter = new Tone.Filter({ type: "lowpass", frequency: 3000, Q: 0.7 }).connect(
         this.reverb,
       );
@@ -405,10 +420,10 @@ export class ToneAudioEngine {
         envelope: { attack: 0.01, decay: 0.2, sustain: 0.1, release: 0.2 },
       }).connect(this.musicGain);
 
-      // Close-up accents (kept crisp — routed dry to master, not distance-filtered).
+      // Close-up accents (kept crisp: routed dry, not distance-filtered).
       // Held well below the music so they read as distant background detail, not
       // sharp foreground blips.
-      this.accentGain = new Tone.Gain(0.3).connect(this.master);
+      this.accentGain = new Tone.Gain(0.3).connect(this.musicBus);
       this.accentSynth = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "sine" },
         envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.4 },
@@ -438,8 +453,8 @@ export class ToneAudioEngine {
       this.ambNoise.volume.value = -18;
       this.ambNoise.start();
 
-      // Outdoor rain layer (kept dry to master).
-      this.rainGain = new Tone.Gain(0).connect(this.master);
+      // Outdoor rain layer (kept dry, off the distance filter).
+      this.rainGain = new Tone.Gain(0).connect(this.musicBus);
       this.rainFilter = new Tone.Filter({ type: "highpass", frequency: 600, Q: 0.5 }).connect(
         this.rainGain,
       );
@@ -450,7 +465,7 @@ export class ToneAudioEngine {
       // One-shot action jingles.
       this.sfxSynth = new Tone.PolySynth(Tone.Synth, {
         envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
-      }).connect(this.master);
+      }).connect(this.sfxBus);
 
       // Kick off the transport-driven sequencer.
       const transport = Tone.getTransport();
@@ -477,6 +492,17 @@ export class ToneAudioEngine {
     // resume() is async and can reject (e.g. called outside a gesture); catch so
     // unmuting never trips a global unhandled-rejection handler.
     if (!m) Tone.getContext().resume().catch(() => {});
+  }
+
+  /** Player volume levels, 0..1 each (clamped). Ramped so a live drag never
+   *  clicks; safe before start() (stored, applied when the graph builds).
+   *  A non-finite input keeps that channel's current level: NaN would survive
+   *  clamp() and the native AudioParam rejects non-finite ramp targets. */
+  setVolumes(music: number, sfx: number): void {
+    if (Number.isFinite(music)) this.musicVolume = clamp(music, 0, 1);
+    if (Number.isFinite(sfx)) this.sfxVolume = clamp(sfx, 0, 1);
+    this.musicBus?.gain.rampTo(this.musicVolume, 0.08);
+    this.sfxBus?.gain.rampTo(this.sfxVolume, 0.08);
   }
 
   /** Called every frame with the renderer's focus; switches scenes smoothly. */
@@ -742,6 +768,8 @@ export class ToneAudioEngine {
       this.musicGain,
       this.bedFilter,
       this.reverb,
+      this.musicBus,
+      this.sfxBus,
       this.master,
     ];
     for (const n of nodes) {
@@ -759,6 +787,7 @@ export class ToneAudioEngine {
     this.accentGain = this.ambGain = this.rainGain = null;
     this.padGain = this.bassGain = this.musicGain = null;
     this.reverb = null;
+    this.musicBus = this.sfxBus = null;
     this.master = null;
     this.started = false;
   }

@@ -73,6 +73,32 @@ export const SCENES: Scene[] = [
         },
         wait: 300,
       },
+      {
+        name: "02b-settings",
+        keepDialogs: true,
+        setup: async (page) => {
+          await page.evaluate(() => document.getElementById("btn-settings")?.click());
+          // Guard on a Settings-only element: a bare #modal wait would be
+          // satisfied by the Help dialog the previous shot leaves open.
+          await page.waitForSelector("#modal #vol-music", { timeout: 4000 });
+        },
+        wait: 300,
+      },
+      {
+        name: "02c-saves",
+        keepDialogs: true,
+        setup: async (page) => {
+          // Quick-save first so the dialog shows a populated slot, then open
+          // it; this is the only home of Export/Import, so the gallery must
+          // show that footer.
+          await page.evaluate(() => {
+            document.getElementById("btn-save")?.click();
+            document.getElementById("btn-load")?.click();
+          });
+          await page.waitForSelector("#modal .slots", { timeout: 4000 });
+        },
+        wait: 300,
+      },
     ],
   },
   // --- Showcase mobile splash -------------------------------------------------

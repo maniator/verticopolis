@@ -752,6 +752,56 @@ a.btn {
   padding: 7px 14px;
 }
 
+/* ---- Volume sliders (Settings dialog's Sound section) ----
+ * Native range inputs painted with the theme accent; label / slider / percent
+ * readout share one row. */
+.vol-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0;
+}
+.vol-row label {
+  min-width: 64px;
+}
+.vol-row input[type="range"] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--accent);
+}
+.vol-row .vol-val {
+  min-width: 40px;
+  text-align: right;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Settings dialog boolean rows ----
+ * A switch-style checkbox with its name, and a muted explanatory note
+ * underneath, indented to align with the name. */
+.set-row {
+  margin: 8px 0;
+}
+.set-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.set-switch input[type="checkbox"] {
+  accent-color: var(--accent);
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  flex: none;
+}
+/* Scoped under .set-row so the 12px wins over the broader .modal-box p rule. */
+.set-row .set-note {
+  margin: 2px 0 0 23px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 /* ---- Crash screen ----
    The card shown when the GPU drops the WebGL context (see
    src/ui/crashScreen.ts). A real dialog opened with showModal(), so it wins

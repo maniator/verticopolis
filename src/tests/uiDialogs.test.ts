@@ -80,7 +80,7 @@ function mountAppDom(): void {
     <button id="btn-stats"></button>
     <div id="log"></div>
     <button id="btn-save"></button><button id="btn-load"></button>
-    <button id="btn-export"></button><button id="btn-import"></button>
+    <button id="btn-settings"></button>
     <button id="btn-new"></button><button id="btn-help"></button>
     <div id="inspector" class="win hidden"></div>
     <div id="editor" class="win hidden"></div>
@@ -108,6 +108,9 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onToggleReducedMotion: vi.fn(() => true),
     onToggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => false),
+    isMuted: vi.fn(() => false),
+    getVolumes: vi.fn(() => ({ music: 1, sfx: 1 })),
+    onSetVolume: vi.fn(),
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
     onShowStats: vi.fn(),
@@ -127,6 +130,17 @@ const click = (sel: string): void => {
   const el = dialog().querySelector<HTMLElement>(sel);
   expect(el, `expected a "${sel}" element in the open dialog`).not.toBeNull();
   el!.click();
+};
+
+/** The Saves dialog is the only entry to export/import: open it, click the
+ *  footer action (which closes it and opens the confirm dialog / picker). */
+const openExportConfirm = (ui: UI): void => {
+  ui.showSaves([]);
+  click('[data-act="export"]');
+};
+const openImportPicker = (ui: UI): void => {
+  ui.showSaves([]);
+  click('[data-act="import"]');
 };
 
 beforeEach(() => {
@@ -434,8 +448,8 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("Export asks first: the file is only built and downloaded after clicking Export in the confirm dialog", () => {
-    const { cb } = makeUI();
-    document.getElementById("btn-export")!.click();
+    const { ui, cb } = makeUI();
+    openExportConfirm(ui);
     expect(dialog().open).toBe(true);
     expect(cb.onExport).not.toHaveBeenCalled(); // nothing serialized yet
     const primary = dialog().querySelector('[data-act="export"]')!;
@@ -444,15 +458,15 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     click('[data-act="close"]'); // cancel → still no export
     expect(cb.onExport).not.toHaveBeenCalled();
 
-    document.getElementById("btn-export")!.click();
+    openExportConfirm(ui);
     click('[data-act="export"]');
     expect(cb.onExport).toHaveBeenCalledTimes(1);
     expect(dialog().open).toBe(false); // the toast isn't hidden under the modal
   });
 
   it("the confirm dialog's secondary routes to the 1994 export flow, never the .vctower one", () => {
-    const { cb } = makeUI();
-    document.getElementById("btn-export")!.click();
+    const { ui, cb } = makeUI();
+    openExportConfirm(ui);
     click('[data-act="legacy"]');
     expect(cb.onExportLegacy).toHaveBeenCalledTimes(1);
     expect(cb.onExport).not.toHaveBeenCalled();
@@ -460,8 +474,8 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("the 1994 export is disabled for a Modern tower (Classic only)", () => {
-    const { cb } = makeUI({ getMode: () => "modern" as const });
-    document.getElementById("btn-export")!.click();
+    const { ui, cb } = makeUI({ getMode: () => "modern" as const });
+    openExportConfirm(ui);
     const legacy = document.querySelector('[data-act="legacy"]') as HTMLButtonElement;
     expect(legacy.disabled).toBe(true);
     legacy.click(); // a disabled button fires nothing
@@ -471,10 +485,10 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
     expect(cb.onExport).toHaveBeenCalledTimes(1);
   });
 
-  it("the Import button goes straight to the file picker — no modal, no textarea — accepting .vctower first", () => {
-    makeUI();
+  it("Import (from the Saves dialog) goes straight to the file picker, no textarea, accepting .vctower first", () => {
+    const { ui } = makeUI();
     const picker = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    document.getElementById("btn-import")!.click();
+    openImportPicker(ui);
     expect(picker).toHaveBeenCalledTimes(1);
     expect(dialog().open).toBe(false);
     expect(document.querySelector("textarea")).toBeNull();
@@ -498,9 +512,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("a picked .TDT legacy save is read as bytes and routed to onImportLegacy", async () => {
-    const { cb } = makeUI();
+    const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    document.getElementById("btn-import")!.click();
+    openImportPicker(ui);
     const input = document.getElementById("import-file") as HTMLInputElement;
     // The accept list offers exactly .vctower + the legacy .tdt extension,
     // pinned in full so no other extension can sneak back in.
@@ -516,9 +530,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("a UTF-16 (BOM) .vctower still decodes to the same text, like readAsText did", async () => {
-    const { cb } = makeUI();
+    const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    document.getElementById("btn-import")!.click();
+    openImportPicker(ui);
     const input = document.getElementById("import-file") as HTMLInputElement;
     // A save re-saved by an editor as UTF-16LE: BOM FF FE, then 2-byte chars.
     const text = "VCTOWER1\npayload";
@@ -534,9 +548,9 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
   });
 
   it("a RENAMED legacy save (wrong extension, 0x2400 magic) still routes to onImportLegacy", async () => {
-    const { cb } = makeUI();
+    const { ui, cb } = makeUI();
     vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    document.getElementById("btn-import")!.click();
+    openImportPicker(ui);
     const input = document.getElementById("import-file") as HTMLInputElement;
     // DOS-era copies often lost their extension: the header-magic sniff, not
     // the filename, must decide.
@@ -802,43 +816,25 @@ describe("showHelp — the Report an issue link", () => {
     await vi.waitFor(() => expect(open).toHaveBeenCalledExactlyOnceWith(CHOOSER, "_blank", "noopener,noreferrer"));
   });
 
-  it("puts the link in the modal BODY, leaving the footer at its three buttons", () => {
+  it("puts the link in the modal BODY, leaving the footer at its two buttons", () => {
     const { ui } = makeUI();
     ui.showHelp();
     const box = dialog().firstElementChild!;
     const actions = box.querySelector(".modal-actions")!;
     // The report link is a body affordance, never a dialog action.
     expect(actions.querySelector('a[href*="/issues/new"]')).toBeNull();
-    // Footer stays exactly reduce-motion / steady-clock / replay-onboard / close (Got it).
+    // Footer stays exactly replay-onboard / close (Got it); the preference
+    // toggles live in the Settings dialog now.
     const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
-    expect(acts).toEqual(["reduce-motion", "steady-clock", "replay-onboard", "close"]);
+    expect(acts).toEqual(["replay-onboard", "close"]);
   });
 
-  it("wires the Steady clock toggle: label follows the callback's returned state across clicks", () => {
-    // A stateful stub (On, then Off) makes a stuck toggle or a stale-state
-    // regression falsifiable; a constant stub would pass either bug.
-    let steady = false;
-    const toggle = vi.fn(() => (steady = !steady));
-    const { ui, cb } = makeUI({ onToggleSteadyClock: toggle, isSteadyClock: vi.fn(() => steady) });
+  it("hosts no settings controls: no sliders, no preference toggles", () => {
+    const { ui } = makeUI();
     ui.showHelp();
-    const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
-    // Fresh device: breathing clock on, so the "steady" pref reads Off.
-    expect(btn.textContent).toBe("Steady clock: Off");
-    expect(btn.getAttribute("aria-pressed")).toBe("false");
-    btn.click();
-    expect(cb.onToggleSteadyClock).toHaveBeenCalledTimes(1);
-    expect(btn.textContent).toBe("Steady clock: On");
-    expect(btn.getAttribute("aria-pressed")).toBe("true");
-    btn.click();
-    expect(btn.textContent).toBe("Steady clock: Off");
-    expect(btn.getAttribute("aria-pressed")).toBe("false");
-  });
-
-  it("derives the toggle's initial label from the live isSteadyClock callback", () => {
-    const { ui } = makeUI({ isSteadyClock: vi.fn(() => true) });
-    ui.showHelp();
-    const btn = dialog().querySelector<HTMLButtonElement>('[data-act="steady-clock"]')!;
-    expect(btn.textContent).toBe("Steady clock: On");
+    expect(dialog().querySelector("input[type=range]")).toBeNull();
+    expect(dialog().querySelector('[data-act="reduce-motion"]')).toBeNull();
+    expect(dialog().querySelector('[data-act="steady-clock"]')).toBeNull();
   });
 
   it("gives initial focus to the primary 'Got it', not the external link", () => {
@@ -1107,6 +1103,19 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     expect(cb.onToggleAudio).toHaveBeenCalledTimes(2);
   });
 
+  it("audio toggle icon is initialized from the persisted muted state, no click needed", () => {
+    makeUI({ isMuted: vi.fn(() => true) });
+    expect(document.getElementById("audio-toggle")!.textContent).toBe("🔇");
+  });
+
+  it("the Settings button opens the Settings dialog", () => {
+    makeUI();
+    document.getElementById("btn-settings")!.click();
+    expect(dialog().open).toBe(true);
+    // openModal appends its ✕ affordance inside the heading; match the title.
+    expect(dialog().querySelector("h2")!.textContent).toContain("Settings");
+  });
+
   it("undo / redo / save / load / stats each route to their callback", () => {
     const { cb } = makeUI();
     document.getElementById("btn-undo")!.click();
@@ -1149,6 +1158,117 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     name.value = "   ";
     name.dispatchEvent(new Event("change"));
     expect(cb.onRenameTower).toHaveBeenLastCalledWith("Tower One");
+  });
+});
+
+describe("showSettings: the Settings dialog", () => {
+  it("renders both sliders at the current volumes with percent readouts", () => {
+    const { ui } = makeUI({ getVolumes: vi.fn(() => ({ music: 0.8, sfx: 0.55 })) });
+    ui.showSettings();
+    const music = dialog().querySelector<HTMLInputElement>("#vol-music")!;
+    const sfx = dialog().querySelector<HTMLInputElement>("#vol-sfx")!;
+    expect(music.value).toBe("80");
+    expect(sfx.value).toBe("55");
+    expect(dialog().querySelector('[data-vol-val="vol-music"]')!.textContent).toBe("80%");
+    expect(dialog().querySelector('[data-vol-val="vol-sfx"]')!.textContent).toBe("55%");
+  });
+
+  it("slider input reports a 0..1 value to onSetVolume and updates the readout", () => {
+    const { ui, cb } = makeUI();
+    ui.showSettings();
+    const music = dialog().querySelector<HTMLInputElement>("#vol-music")!;
+    music.value = "30";
+    music.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(cb.onSetVolume).toHaveBeenLastCalledWith("music", 0.3);
+    expect(dialog().querySelector('[data-vol-val="vol-music"]')!.textContent).toBe("30%");
+    const sfx = dialog().querySelector<HTMLInputElement>("#vol-sfx")!;
+    sfx.value = "0";
+    sfx.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(cb.onSetVolume).toHaveBeenLastCalledWith("sfx", 0);
+    expect(dialog().querySelector('[data-vol-val="vol-sfx"]')!.textContent).toBe("0%");
+  });
+
+  it("keeps sliders and switches in the modal BODY; the footer is exactly Close", () => {
+    const { ui } = makeUI();
+    ui.showSettings();
+    const actions = dialog().querySelector(".modal-actions")!;
+    expect(actions.querySelector("input")).toBeNull();
+    expect(dialog().querySelectorAll("input[type=range]")).toHaveLength(2);
+    // The two boolean prefs render as switches (checkbox with switch
+    // semantics), each with a visible explanatory note.
+    expect(dialog().querySelectorAll('input[role="switch"]')).toHaveLength(2);
+    expect(dialog().querySelectorAll(".set-note")).toHaveLength(2);
+    const acts = [...actions.querySelectorAll("[data-act]")].map((b) => b.getAttribute("data-act"));
+    expect(acts).toEqual(["close"]);
+  });
+
+  it("explains the 1994 breathing clock in the Steady clock note", () => {
+    const { ui } = makeUI();
+    ui.showSettings();
+    const note = document.getElementById("note-steady-clock")!;
+    // The note must actually explain the behavior, not just name it.
+    expect(note.textContent).toContain("1994");
+    expect(note.textContent!.toLowerCase()).toContain("lunch");
+    expect(dialog().querySelector("#set-steady-clock")!.getAttribute("aria-describedby")).toBe("note-steady-clock");
+    expect(dialog().querySelector("#set-reduce-motion")!.getAttribute("aria-describedby")).toBe("note-reduce-motion");
+  });
+
+  it("the Steady clock switch follows the callback's returned state across toggles", () => {
+    // A stateful stub (on, then off) makes a stuck switch or a stale-state
+    // regression falsifiable; a constant stub would pass either bug.
+    let steady = false;
+    const toggle = vi.fn(() => (steady = !steady));
+    const { ui, cb } = makeUI({ onToggleSteadyClock: toggle, isSteadyClock: vi.fn(() => steady) });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-steady-clock")!;
+    // Fresh device: breathing clock on, so the "steady" pref reads off.
+    expect(sw.checked).toBe(false);
+    sw.click();
+    expect(cb.onToggleSteadyClock).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(true);
+    sw.click();
+    expect(sw.checked).toBe(false);
+  });
+
+  it("derives the switch's initial state from the live isSteadyClock callback", () => {
+    const { ui } = makeUI({ isSteadyClock: vi.fn(() => true) });
+    ui.showSettings();
+    expect(dialog().querySelector<HTMLInputElement>("#set-steady-clock")!.checked).toBe(true);
+  });
+
+  it("wires the Reduced motion switch through onToggleReducedMotion", () => {
+    const { ui, cb } = makeUI({ onToggleReducedMotion: vi.fn(() => true) });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-reduce-motion")!;
+    expect(sw.checked).toBe(false);
+    sw.click();
+    expect(cb.onToggleReducedMotion).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(true);
+  });
+
+  it("disables the Reduced motion switch with a (system) suffix when the OS forces it", () => {
+    const original = window.matchMedia;
+    window.matchMedia = (media: string) =>
+      ({
+        media,
+        matches: media.includes("prefers-reduced-motion"),
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList;
+    try {
+      const { ui } = makeUI();
+      ui.showSettings();
+      const sw = dialog().querySelector<HTMLInputElement>("#set-reduce-motion")!;
+      expect(sw.disabled).toBe(true);
+      expect(sw.checked).toBe(true); // forced on IS on; the switch must not read off
+      expect(sw.closest("label")!.textContent).toContain("(system)");
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
 
