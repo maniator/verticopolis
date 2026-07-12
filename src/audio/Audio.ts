@@ -11,6 +11,7 @@ interface AudioEngineImpl {
   readonly started: boolean;
   start(): void;
   setMuted(m: boolean): void;
+  setVolumes(music: number, sfx: number): void;
   update(focus: ViewFocus): void;
   sfx(name: SfxName): void;
   dispose(): void;
@@ -39,6 +40,11 @@ export class AudioEngine {
   /** Authoritative mute state — read synchronously by the UI toggle, forwarded
    *  to the real engine on load. */
   muted = false;
+  /** Authoritative player volume levels 0..1 (music & ambience / action
+   *  jingles), read synchronously by the settings sliders and forwarded to
+   *  the real engine on load. Independent of `muted`. */
+  musicVolume = 1;
+  sfxVolume = 1;
   /** True once the real engine has loaded and started. */
   started = false;
 
@@ -90,6 +96,7 @@ export class AudioEngine {
         // stays reachable by dispose() rather than leaking as an orphan.
         this.impl = impl;
         impl.setMuted(this.muted);
+        impl.setVolumes(this.musicVolume, this.sfxVolume);
         impl.start();
         this.started = impl.started;
         if (this.lastFocus) impl.update(this.lastFocus);
@@ -104,6 +111,17 @@ export class AudioEngine {
   setMuted(m: boolean): void {
     this.muted = m;
     this.impl?.setMuted(m);
+  }
+
+  /** Set the player volume levels (0..1 each). Inputs are clamped, and a
+   *  non-finite value keeps that channel's current level (NaN would slip
+   *  through a min/max clamp and later blow up the native AudioParam ramp),
+   *  so synchronous readers of the fields always see the same sane values
+   *  the engine gets. */
+  setVolumes(music: number, sfx: number): void {
+    this.musicVolume = saneLevel(music, this.musicVolume);
+    this.sfxVolume = saneLevel(sfx, this.sfxVolume);
+    this.impl?.setVolumes(this.musicVolume, this.sfxVolume);
   }
 
   update(focus: ViewFocus): void {
@@ -124,4 +142,9 @@ export class AudioEngine {
     this.impl = null;
     this.started = false;
   }
+}
+
+/** Clamp a level into 0..1; a non-finite input falls back to `prev`. */
+function saneLevel(v: number, prev: number): number {
+  return Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : prev;
 }

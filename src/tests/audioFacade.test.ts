@@ -17,6 +17,8 @@ class StubEngine {
   started = false;
   muted = false;
   disposed = false;
+  music = 1;
+  sfxVol = 1;
   lastFocus: unknown = null;
   constructor() {
     built.push(this);
@@ -26,6 +28,10 @@ class StubEngine {
   }
   setMuted(m: boolean): void {
     this.muted = m;
+  }
+  setVolumes(music: number, sfx: number): void {
+    this.music = music;
+    this.sfxVol = sfx;
   }
   update(focus: unknown): void {
     this.lastFocus = focus;
@@ -90,6 +96,36 @@ describe("AudioEngine facade lazy loading", () => {
     audio.start();
     await vi.waitFor(() => expect(audio.started).toBe(true));
     expect(built[0].muted).toBe(true);
+  });
+
+  it("forwards pre-load volumes to the engine on load (clamped)", async () => {
+    const audio = new AudioEngine(loader);
+    audio.setVolumes(0.3, 1.7); // set before any load; must land after it
+    expect(audio.musicVolume).toBe(0.3);
+    expect(audio.sfxVolume).toBe(1); // clamped at the facade
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect(built[0].music).toBe(0.3);
+    expect(built[0].sfxVol).toBe(1);
+  });
+
+  it("forwards setVolumes() to the live engine after load", async () => {
+    const audio = new AudioEngine(loader);
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    audio.setVolumes(0.6, 0.2);
+    expect(built[0].music).toBe(0.6);
+    expect(built[0].sfxVol).toBe(0.2);
+  });
+
+  it("ignores non-finite volume inputs, keeping that channel's current level", () => {
+    const audio = new AudioEngine(loader);
+    audio.setVolumes(NaN, 0.5); // NaN must not poison the stored state
+    expect(audio.musicVolume).toBe(1);
+    expect(audio.sfxVolume).toBe(0.5);
+    audio.setVolumes(0.7, Infinity);
+    expect(audio.musicVolume).toBe(0.7);
+    expect(audio.sfxVolume).toBe(0.5);
   });
 
   it("loads the chunk only once across repeated start() calls", async () => {
