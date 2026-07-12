@@ -360,3 +360,46 @@ describe("retail subtype looks paint distinctly (drawRoom)", () => {
     }
   });
 });
+
+describe("per-unit geo-seeded variety (party law: geometry first)", () => {
+  const at = (kind: Unit["kind"], floor: number, ux: number, over: Partial<Unit> = {}): Unit =>
+    unit({ kind, floor, x: ux, occupants: 4, ...over });
+
+  it("the same room paints identically twice (pure geo seed, no RNG)", () => {
+    for (const kind of ["office", "condo", "hotelDouble"] as const) {
+      const a = spyCtx();
+      const b = spyCtx();
+      drawRoom(draw({ hour: 12 }, a.ctx), at(kind, 10, 30), 0, 0, 144, 26);
+      drawRoom(draw({ hour: 12 }, b.ctx), at(kind, 10, 30), 0, 0, 144, 26);
+      expect(b.sig()).toBe(a.sig());
+    }
+  });
+
+  it("offices and condos vary across positions (layouts, mirroring, walls)", () => {
+    for (const kind of ["office", "condo"] as const) {
+      const sigs = new Set<string>();
+      for (let ux = 0; ux < 120; ux += 12) {
+        const s = spyCtx();
+        drawRoom(draw({ hour: 12 }, s.ctx), at(kind, 10, ux), 0, 0, 144, 26);
+        sigs.add(s.sig());
+      }
+      // A sweep across one floor must produce several distinct paints; exact
+      // count is seed-dependent, but a cloned row is the regression.
+      expect(sigs.size, `${kind} row paints as clones`).toBeGreaterThan(2);
+    }
+  });
+
+  it("hotel state cues survive every variant (asleep z, dirty tray, ready lamp)", () => {
+    for (let ux = 0; ux < 48; ux += 8) {
+      const asleep = spyCtx();
+      drawRoom(draw({ hour: 1, lit: false }, asleep.ctx), at("hotelDouble", 12, ux, { state: "asleep", occupants: 2 }), 0, 0, 144, 26);
+      expect(asleep.log.some((l) => l.startsWith("fillText"))).toBe(true); // the z
+      const dirty = spyCtx();
+      drawRoom(draw({ hour: 10 }, dirty.ctx), at("hotelDouble", 12, ux, { state: "dirty", occupants: 0 }), 0, 0, 144, 26);
+      expect(dirty.log.some((l) => l.includes("#D4623A"))).toBe(true); // the tray
+      const ready = spyCtx();
+      drawRoom(draw({ hour: 20, lit: true }, ready.ctx), at("hotelDouble", 12, ux, { state: "empty", occupants: 0 }), 0, 0, 144, 26);
+      expect(ready.log.some((l) => l.includes("#FFD86A"))).toBe(true); // the lamp
+    }
+  });
+});
