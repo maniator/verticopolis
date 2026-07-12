@@ -1,0 +1,114 @@
+# Story: Stable touch-pointer tracking (mobile pinch sticks, taps stop placing)
+
+Status: **ready-for-dev**
+
+<!-- Created 2026-07-12 from the concluded investigation
+     _bmad-output/implementation-artifacts/investigations/mobile-zoom-placement-investigation.md.
+     Root cause is Confirmed (High confidence); this story is the fix. -->
+
+## Story
+
+As a **mobile player**,
+I want **pinch zoom and tap-to-build to keep working no matter which finger I lift first**,
+so that **the camera never wedges into a broken zoom state and a valid (gold) placement always lands when I tap**.
+
+## Acceptance Criteria
+
+1. **Stable ids:** the gesture tracker keys live contacts by the native DOM `pointerId` (from `ev.nativeEvent`) with a fallback to Excalibur's id when no native id exists. Excalibur 0.32's per-event id renumbering (index into the live sorted set of active native ids) can no longer strand an entry in the tracker.
+2. **Leak-proof lifecycle:** the reshuffle sequence (finger A down, finger B down, A up, B's later events arriving under A's old id in Excalibur's numbering) leaves the tracker EMPTY after both fingers lift. Regression-tested headlessly.
+3. **Pinch hand-off:** when a pinch ends because one finger lifted, the surviving finger continues as a PAN gesture seeded from its tracked position; its release cannot tap-place (tap slop poisoned) and its movement never enters the mouse hover path, so no stranded gold ghost is painted on touch.
+4. **Third-finger hygiene:** while a pinch is live, adding or removing extra contacts re-baselines the pinch distance/midpoint from the two live contacts, so the camera never jumps from a stale baseline.
+5. **No behavior change for mouse/desktop:** classify/tap/action routing, right-click inspect, extend arrows, wheel zoom are untouched.
+6. **Pure and tested:** the multi-touch state machine (contact map + pinch lifecycle) lives in a DOM-free module under `src/game/`, unit-tested for: id-reshuffle leak, cancel handling, pinch begin/move/end, hand-off pan seed, extra-finger re-baseline.
+7. **Player-facing patch bump:** `package.json` version 1.18.1 -> 1.18.2.
+8. Quality gates green (`typecheck`, `lint`, `test`, `build`) and `/gds-code-review` run in-session with `patch` findings fixed.
+
+## Tasks / Subtasks
+
+- [ ] New pure module `src/game/pinchTracker.ts`: `stablePointerId(exId, nativeEvent)` + `PinchTracker` (contact map, pinch state, hand-off result). No Excalibur/DOM imports; shapes structural so tests stay headless. (AC: 1,2,3,4,6)
+- [ ] Delegate `TowerEngine.pointerDown/Move/Up` pointer bookkeeping to the tracker; key everything by `stablePointerId`; on pinch end with a survivor, seed `gesture = "pan"`, `lastSx/lastSy` from the survivor, poison `moved` so release cannot tap. (AC: 1,3,5)
+- [ ] Tests `src/tests/pinchTracker.test.ts` covering the AC 6 matrix, including a literal simulation of Excalibur's `_normalizePointerId` renumbering to prove the old keying leaks and the new one does not. (AC: 2,6)
+- [ ] Version bump 1.18.2 + gates + `/gds-code-review`. (AC: 7,8)
+
+## Dev Notes
+
+### Root cause (from the investigation, cited)
+
+- `src/render/excalibur/TowerEngine.ts:268,556,643`: tracker keyed by Excalibur's public `ev.pointerId`.
+- Excalibur 0.32 `_normalizePointerId` (`node_modules/excalibur/build/esm/excalibur.development.js:28735`) recomputes the public id per event as the index of the native id in the sorted active set; `clear()` (`:28643`) prunes on `up` only. Lifting the lower-native-id finger of a pinch first renumbers the survivor from 1 to 0; the game's `pointers.delete(0)` misses the entry stored at key 1 and the map keeps a phantom forever.
+- Phantom makes every later one-finger press read `pointers.size === 2` -> pinch branch (`TowerEngine.ts:557`) -> `gesture = null` -> `onTap`/`onAction*` never fire (silent no-place), and single-finger drags zoom against a static phantom anchor (stuck/erratic zoom).
+- Secondary defect: pinch end leaves `gesture = null`; the survivor's moves fall into `onHover` (`TowerEngine.ts:637-639` -> `main.ts:649`), painting a gold "valid" ghost on touch that nothing commits or clears.
+
+### Current state of files being modified
+
+- `TowerEngine.pointerDown` (`:555-602`): adds to `pointers`, enters pinch at size 2 (clears previews, `gesture=null`), ignores size>2, else classifies via `classifyDown` and fires `onActionDown`.
+- `TowerEngine.pointerMove` (`:604-640`): updates tracked pos if present; pinch branch pans by midpoint delta and zooms by distance ratio (guards `dist > 0`); pan branch accumulates `moved` and pans; action branch forwards; null gesture -> hover.
+- `TowerEngine.pointerUp` (`:642-673`, also bound to `cancel`): deletes id; pinch branch drops pinch when size<2; pan branch fires `onTap` under slop (14 touch / 5 mouse); action branch fires `onActionUp`.
+- `main.ts` wiring must NOT need changes: the hand-off keeps `gesture` non-null on touch so the hover/ghost path is unreachable mid-gesture; `onActionDown`'s existing "fresh gesture" reset (`main.ts:570-574`) still covers the paint anchor.
+
+### Design (keep the TowerEngine diff a thin delegation)
+
+```ts
+// src/game/pinchTracker.ts (pure, no imports)
+export function stablePointerId(exId: number, nativeEvent: unknown): number {
+  // Real PointerEvents carry a per-contact-stable pointerId; Excalibur's own id
+  // is an index into the live active set and reshuffles when a contact lifts.
+  if (typeof nativeEvent === "object" && nativeEvent !== null && "pointerId" in nativeEvent) {
+    const id = (nativeEvent as { pointerId: unknown }).pointerId;
+    if (typeof id === "number" && Number.isFinite(id)) return id;
+  }
+  return exId;
+}
+
+export type PinchMove = { panDx: number; panDy: number; zoom: number; cx: number; cy: number };
+export type PinchEnd = { survivor: { x: number; y: number } | null };
+
+export class PinchTracker {
+  // down(id,x,y): "pinch-start" | "pinch-extra" | "single"
+  // move(id,x,y): PinchMove | null   (null when not pinching or <2 live contacts)
+  // up(id): PinchEnd | null          (non-null exactly when a live pinch ends; also re-baselines
+  //                                   when a pinch continues with 2+ remaining contacts)
+  // size, pinching getters for the engine's classify decisions
+}
+```
+
+- `move` computes pan/zoom deltas and re-baselines internally (mirrors `TowerEngine.ts:606-619`); zoom factor returns 1 when the stored distance is 0.
+- Pinch continues while 2+ contacts remain; dropping to 1 returns `{ survivor }`, to 0 returns `{ survivor: null }`.
+- Both `down` of a 3rd finger and `up` retaining 2+ re-baseline dist/midpoint from the (insertion-order) first two live contacts.
+- TowerEngine on `PinchEnd` with survivor: `gesture = "pan"; lastSx = survivor.x; lastSy = survivor.y; moved = POISON` (any value >= 14 kills the tap; use a named const, e.g. 1e6, not a magic 14 coupling).
+- `cancel` keeps routing through `pointerUp` (already bound at `:521`), so tracker `up()` covers it.
+
+### Guardrails
+
+- `src/engine/` stays untouched; this is input plumbing in `src/game/` + `src/render/`.
+- Per-frame hot-path rule: tracker ops are O(active contacts), no allocation-heavy work per move beyond the existing array spread; do not add per-frame scans.
+- American English, no em-dashes in new prose/comments.
+- Do not change `classifyGesture` (`src/game/gesture.ts`) or the pan/tap slop semantics for single-finger gestures.
+- Do not "fix" Excalibur in node_modules or fork it; the game-side stable-id keying is the contract-proof fix and survives an engine upgrade that fixes the renumbering.
+
+### Testing standards summary
+
+- Vitest, headless, DOM-free (`src/tests/pinchTracker.test.ts` next to `gesture.test.ts`).
+- Include one test that reproduces the Excalibur renumbering literally: drive a fake normalizer (sorted-index over an active set pruned on up only) and assert the tracker keyed by STABLE ids ends empty, while documenting that keying by the normalized ids would leak (the old bug).
+
+### References
+
+- [Source: _bmad-output/implementation-artifacts/investigations/mobile-zoom-placement-investigation.md]
+- [Source: src/render/excalibur/TowerEngine.ts:555-673 (pointer state machine)]
+- [Source: src/main.ts:538-694 (gesture wiring, hover/ghost path)]
+- [Source: src/game/gesture.ts (pure-routing precedent + test style)]
+- [Source: node_modules/excalibur/build/esm/excalibur.development.js:28643,28735 (v0.32.0 id renumbering)]
+
+## Dev Agent Record
+
+### Agent Model Used
+
+claude-fable-5 (session 2026-07-12)
+
+### Completion Notes List
+
+- 2026-07-12: Story created dev-ready from the concluded investigation.
+
+### File List
+
+_(pending implementation)_

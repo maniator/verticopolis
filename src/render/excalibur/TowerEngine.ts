@@ -28,6 +28,7 @@ import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
 import { clampCameraY } from "../cameraBounds";
+import { PinchTracker, stablePointerId } from "../pinchTracker";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 
 /** World pixels per tile / per floor. */
@@ -45,6 +46,11 @@ export const MIN_ZOOM = 0.3;
 export const MAX_ZOOM = 3;
 const clampZoom = (z: number): number =>
   Number.isFinite(z) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) : MIN_ZOOM;
+
+/** Accumulated-movement value far above every tap-slop threshold. Assigned to
+ *  `moved` when a pinch hands off to a single surviving finger, so releasing
+ *  that finger can never register as a tap (and accidentally place). */
+const TAP_SLOP_POISON = 1e6;
 
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
@@ -264,13 +270,15 @@ export class TowerEngine {
   /** Active extend-arrow drag (which end of the shaft is being dragged). */
   private arrowDrag: { end: "up" | "down" } | null = null;
 
-  // Excalibur pointer gesture state.
-  private pointers = new Map<number, { sx: number; sy: number }>();
+  // Excalibur pointer gesture state. Contacts are tracked by their NATIVE
+  // pointer id (stablePointerId), never Excalibur's public id: Excalibur 0.32
+  // renumbers its ids when a contact lifts mid-gesture, which used to strand a
+  // phantom entry that turned every later one-finger press into a bogus pinch
+  // (stuck zoom, taps swallowed before placement). The two-finger pinch pans
+  // by the finger midpoint AND zooms by the finger-distance ratio, so mobile
+  // keeps a pan path while a paint tool owns the one-finger drag.
+  private tracker = new PinchTracker();
   private gesture: "pan" | "action" | null = null;
-  // Two-finger gesture: `dist` drives pinch-zoom, `mx`/`my` the finger midpoint
-  // that drives two-finger PAN (so mobile keeps a pan path while a paint tool
-  // owns the one-finger drag — one finger draws, two fingers pan + zoom).
-  private pinch: { dist: number; mx: number; my: number } | null = null;
   private moved = 0;
   private downTouch = false;
   private lastSx = 0;
@@ -553,20 +561,14 @@ export class TowerEngine {
   }
 
   private pointerDown(ev: ex.PointerEvent): void {
-    this.pointers.set(ev.pointerId, { sx: ev.screenPos.x, sy: ev.screenPos.y });
-    if (this.pointers.size === 2) {
-      const pts = [...this.pointers.values()];
-      this.pinch = {
-        dist: Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy),
-        mx: (pts[0].sx + pts[1].sx) / 2,
-        my: (pts[0].sy + pts[1].sy) / 2,
-      };
+    const contact = this.tracker.down(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
+    if (contact === "pinch-start") {
       this.gesture = null;
       this.preview = null;
       this.transportPreview = null;
       return;
     }
-    if (this.pointers.size > 2) return;
+    if (contact === "pinch-extra") return;
     this.lastSx = ev.screenPos.x;
     this.lastSy = ev.screenPos.y;
     this.moved = 0;
@@ -602,20 +604,14 @@ export class TowerEngine {
   }
 
   private pointerMove(ev: ex.PointerEvent): void {
-    if (this.pointers.has(ev.pointerId)) this.pointers.set(ev.pointerId, { sx: ev.screenPos.x, sy: ev.screenPos.y });
-    if (this.pinch) {
-      const pts = [...this.pointers.values()];
-      if (pts.length < 2) return;
-      const dist = Math.hypot(pts[0].sx - pts[1].sx, pts[0].sy - pts[1].sy);
-      const mx = (pts[0].sx + pts[1].sx) / 2;
-      const my = (pts[0].sy + pts[1].sy) / 2;
-      // Two fingers translate the camera by their midpoint delta (pan) AND scale
-      // by their distance ratio (zoom) — the standard map gesture.
-      this.pan(mx - this.pinch.mx, my - this.pinch.my);
-      if (this.pinch.dist > 0) this.zoomAt(dist / this.pinch.dist, mx, my);
-      this.pinch.dist = dist;
-      this.pinch.mx = mx;
-      this.pinch.my = my;
+    const mv = this.tracker.move(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
+    if (this.tracker.pinching) {
+      if (mv) {
+        // Two fingers translate the camera by their midpoint delta (pan) AND
+        // scale by their distance ratio (zoom) — the standard map gesture.
+        this.pan(mv.panDx, mv.panDy);
+        if (mv.zoom !== 1) this.zoomAt(mv.zoom, mv.cx, mv.cy);
+      }
       return;
     }
     if (this.arrowDrag) {
@@ -640,10 +636,24 @@ export class TowerEngine {
   }
 
   private pointerUp(ev: ex.PointerEvent): void {
-    this.pointers.delete(ev.pointerId);
-    if (this.pinch) {
-      if (this.pointers.size < 2) this.pinch = null;
+    const r = this.tracker.up(stablePointerId(ev.pointerId, ev.nativeEvent));
+    if (r.pinch === "continues") {
       this.gesture = null;
+      return;
+    }
+    if (r.pinch === "ended") {
+      if (r.survivor) {
+        // Hand the surviving finger a pan continuation: seed the pan from its
+        // tracked position and poison the tap slop so its release can neither
+        // tap-place nor fall into the mouse hover path (which used to strand a
+        // gold "valid" ghost on touch that nothing could commit or clear).
+        this.gesture = "pan";
+        this.lastSx = r.survivor.x;
+        this.lastSy = r.survivor.y;
+        this.moved = TAP_SLOP_POISON;
+      } else {
+        this.gesture = null;
+      }
       return;
     }
     if (this.arrowDrag) {
