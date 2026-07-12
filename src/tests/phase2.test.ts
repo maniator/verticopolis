@@ -229,9 +229,11 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     for (let f = 2; f <= 100; f++) expect(sim.floorReachable(f)).toBe(true);
 
     // Services distributed up the tower (coverage radius), a metro, and offices.
-    sim.tower.place("metro", -2, 0);
-    for (let f = 8; f <= 98; f += 15) sim.tower.place("security", f, 60);
-    for (let f = 8; f <= 98; f += 24) sim.tower.place("medical", f, 100);
+    // Asserted like the shafts: the 5★ amenity gates and the congestion relief
+    // depend on these actually landing (AGENTS.md, Testing discipline).
+    expect(sim.tower.place("metro", -2, 0).ok).toBe(true);
+    for (let f = 8; f <= 98; f += 15) expect(sim.tower.place("security", f, 60).ok).toBe(true);
+    for (let f = 8; f <= 98; f += 24) expect(sim.tower.place("medical", f, 100).ok).toBe(true);
 
     let pop = 0;
     for (let f = 2; f <= 99 && pop < TOWER_POPULATION + 600; f++) {

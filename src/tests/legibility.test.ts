@@ -102,14 +102,25 @@ describe("Legibility — two-ride rule gates move-ins (Simulation)", () => {
     sim.money = 1e12;
     layFull(sim, "lobby", 1);
     for (let f = 2; f <= 45; f++) layFull(sim, "floor", f);
-    sim.tower.placeTransport("elevatorStandard", C, 1, 15); // A
-    sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30); // B (transfer at 15)
-    sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45); // C (transfer at 30)
+    // The 3-ride topology and the units under test must actually land: a
+    // silently degraded fixture would test a different tower (AGENTS.md,
+    // Testing discipline).
+    const shaft = (x: number, b: number, t: number) => {
+      expect(sim.tower.placeTransport("elevatorStandard", x, b, t).ok).toBe(true);
+    };
+    shaft(C, 1, 15); // A
+    shaft(C + 6, 15, 30); // B (transfer at 15)
+    shaft(C + 12, 30, 45); // C (transfer at 30)
+    const room = (kind: "condo" | "office" | "hotelSingle", floor: number, x: number) => {
+      const r = sim.tower.place(kind, floor, x);
+      expect(r.ok).toBe(true);
+      return r.unitId!;
+    };
     const ids = {
-      condo40: sim.tower.place("condo", 40, 20).unitId!,
-      office40: sim.tower.place("office", 40, 60).unitId!,
-      hotel40: sim.tower.place("hotelSingle", 40, 100).unitId!,
-      condo14: sim.tower.place("condo", 14, 20).unitId!,
+      condo40: room("condo", 40, 20),
+      office40: room("office", 40, 60),
+      hotel40: room("hotelSingle", 40, 100),
+      condo14: room("condo", 14, 20),
     };
     const unit = (id: number) => sim.tower.units.find((u) => u.id === id)!;
     return { sim, unit, ids };
@@ -218,9 +229,9 @@ describe("Legibility — two-ride rule gates move-ins (Simulation)", () => {
     const skyset = new Set([15, 30]);
     layFull(sim, "lobby", 1);
     for (let f = 2; f <= 45; f++) layFull(sim, skyset.has(f) ? "lobby" : "floor", f);
-    sim.tower.placeTransport("elevatorStandard", C, 1, 15);
-    sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30);
-    sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45);
+    expect(sim.tower.placeTransport("elevatorStandard", C, 1, 15).ok).toBe(true);
+    expect(sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30).ok).toBe(true);
+    expect(sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45).ok).toBe(true);
     const ex = sim.tower.placeTransport("elevatorExpress", C + 20, 1, 45);
     expect(ex.ok).toBe(true);
     for (let f = 2; f <= 45; f++) expect(sim.floorReachable(f)).toBe(true); // lobby → express → local
