@@ -154,6 +154,35 @@ describe("bulletin-log persistence", () => {
     expect(restored.log.map((e) => e.text)).toEqual(["before the mistake"]);
   });
 
+  it("the save cap equals the ring cap, so an undo never trims scrollback", () => {
+    // Regression for the deferred review finding: with LOG_SAVE_CAP below the
+    // ring cap, undoing while the ring held more entries silently dropped the
+    // older lines. Overfill the ring so the test pins EQUALITY: everything
+    // the live ring holds (and only what it holds) survives the round trip;
+    // any save cap below the ring cap fails the length assertion.
+    const sim = new Simulation();
+    for (let i = 0; i < 350; i++) sim.emit(`line ${i}`, "info");
+    expect(sim.log).toHaveLength(300); // the live ring after 350 emits
+    const snap = JSON.stringify(sim.serialize());
+    const restored = Simulation.deserialize(JSON.parse(snap) as SerializedGame);
+    expect(restored.log.map((e) => e.text)).toEqual(sim.log.map((e) => e.text));
+    expect(restored.log[0].text).toBe("line 50");
+    expect(restored.log[299].text).toBe("line 349");
+  });
+
+  it("serialize's own tail slice keeps the newest entries even past the cap", () => {
+    // The live ring normally keeps log.length at the cap, which would leave
+    // the serialize slice untestable; hand-build an over-cap log to pin the
+    // slice contract (newest LOG_SAVE_CAP entries, in order) independently
+    // of the ring, so the two caps can never silently diverge again.
+    const sim = new Simulation();
+    sim.log = Array.from({ length: 350 }, (_, i) => ({ minute: i, text: `hand ${i}`, kind: "info" as const }));
+    const data = sim.serialize();
+    expect(data.log).toHaveLength(LOG_SAVE_CAP);
+    expect(data.log![0].text).toBe("hand 50");
+    expect(data.log![LOG_SAVE_CAP - 1].text).toBe("hand 349");
+  });
+
   it("hardens hostile log input: junk drops, text truncates, kinds and minutes coerce, count caps", () => {
     const base = new Simulation().serialize();
     const forged = (log: unknown) =>

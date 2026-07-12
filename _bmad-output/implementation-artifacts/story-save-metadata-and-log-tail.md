@@ -85,6 +85,9 @@ they are; surfacing appVersion there is a possible later story).
    entries of `sim.log` when the log is non-empty (spread pattern: an empty
    log contributes no key). The constant lives next to the LogEntry ring cap
    in Simulation.ts with the 300-entry ring documented as its ceiling.
+   *(Superseded 2026-07-12, same day: an owner-delegated party ruling raised
+   `LOG_SAVE_CAP` to equal the 300-entry ring cap so undo never trims
+   scrollback; see the backlog's resolved row and the follow-up PR.)*
 4. **Log restores through the trust boundary.** `deserialize` restores
    `sim.log` from `data.log`: a non-array or absent field restores an empty
    log; each entry must be an object with a string `text` (truncated to a
@@ -178,7 +181,8 @@ Patched:
 
 Deferred (backlog): undo/redo trims bulletin scrollback to the 100-entry
 save cap when the live ring holds more; deliberate size tradeoff, revisit if
-noticed.
+noticed. *(Resolved same day: the owner delegated the call, the party ruled
+the caps equal, and the follow-up PR raised `LOG_SAVE_CAP` to 300.)*
 
 Dismissed: the appVersion "dev" fallback being untested under Vite-injected
 test config (the guard exists for non-Vite contexts; the injected path is
@@ -195,7 +199,8 @@ the shipped one); test literals pinning constants (intentional pins).
 - `savedAt` + `appVersion` stamp every write path through one `stamp()` in
   SaveGame.ts (localStorage sync + async, .vctower export). `serialize()` is
   stamp-free, deserialize carries neither, listSlots reads savedAt hardened.
-- The bulletin tail (newest 100) rides every save; restore is hardened at
+- The bulletin tail (newest 100, later raised to the full 300 ring by the
+  same-day cap-unification ruling) rides every save; restore is hardened at
   `coerceLog` (drop, truncate surrogate-safely, coerce kind/minute, cap 300
   newest-valid). `logSeq` stays transient; the UI cursor rebases on adopt
   AND now on boot, so history renders everywhere without toast replay.

@@ -143,19 +143,23 @@ function storeRent(u: Unit, cfg: { default: number }, clamped: number): void {
 // here so the UI's existing import path keeps working.
 export type { LogEntry };
 
-/** How many trailing log entries ride a save (see SerializedGame.log). The
- *  live ring holds up to 300 (see emit); persisting the most recent 100 keeps
- *  the panel's visible history across a load at a few KB compressed. */
-export const LOG_SAVE_CAP = 100;
+/** Ring capacity of the live bulletin log (emit pushes + shifts past this),
+ *  and therefore the most entries a restored save may bring back. */
+const LOG_RING_CAP = 300;
+
+/** How many trailing log entries ride a save (see SerializedGame.log):
+ *  deliberately EQUAL to the ring cap, so a save (and an undo snapshot,
+ *  which reuses serialize) holds exactly what the live ring holds and no
+ *  scrollback is ever lost to a load or an undo. Realistic lines compress
+ *  to roughly 1.5 KB per 100 in a file, so a full ring costs about 4.5 KB;
+ *  the forged-input ceiling stays bounded by the restore caps
+ *  (LOG_RING_CAP entries of LOG_TEXT_CAP chars). */
+export const LOG_SAVE_CAP = LOG_RING_CAP;
 
 /** Hard cap on a RESTORED entry's text length. Our own emits are short
  *  sentences; a forged save must not smuggle megabytes into the DOM (the
  *  panel renders via textContent, so this bounds memory, not injection). */
 const LOG_TEXT_CAP = 400;
-
-/** Ring capacity of the live bulletin log (emit pushes + shifts past this),
- *  and therefore the most entries a restored save may bring back. */
-const LOG_RING_CAP = 300;
 
 /** The metric the colored stats overlay tints floors by. */
 export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
