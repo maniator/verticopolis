@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { deflateSync } from "fflate";
-import { SAVE_VERSION, Simulation } from "../engine/Simulation";
-import { SaveGame } from "../storage/SaveGame";
-import { FACILITIES, GRID } from "../engine/facilities";
+import { SAVE_VERSION, Simulation } from "../../engine/Simulation";
+import { SaveGame } from "../../storage/SaveGame";
+import { FACILITIES, GRID } from "../../engine/facilities";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());

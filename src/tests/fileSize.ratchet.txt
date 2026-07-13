@@ -19,9 +19,9 @@ src/audio/ToneAudioEngine.ts
 src/tests/simulation.test.ts
 src/tests/uiDialogs.test.ts
 src/tests/gameControllersCoverage.test.ts
-src/tests/tdtImport.test.ts
-src/tests/tdtExport.test.ts
-src/tests/storage.test.ts
+src/tests/integration/tdtImport.integration.test.ts
+src/tests/integration/tdtExport.integration.test.ts
+src/tests/integration/storage.integration.test.ts
 src/tests/faqComplete.test.ts
 src/tests/gameControllers.test.ts
 src/tests/tower.test.ts

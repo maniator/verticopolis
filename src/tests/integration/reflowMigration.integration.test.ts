@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // The real v1 save, inlined as a string (vite ?raw) so the test needs no node fs.
-import towerFile from "./fixtures/towerone_6.vctower?raw";
-import { Simulation } from "../engine/Simulation";
-import { SAVE_VERSION, floatingStructureCount } from "../engine/saveMigration";
-import { FACILITIES, facilityFloors } from "../engine/facilities";
-import type { SerializedGame, Unit } from "../engine/types";
+import towerFile from "../fixtures/towerone_6.vctower?raw";
+import { Simulation } from "../../engine/Simulation";
+import { SAVE_VERSION, floatingStructureCount } from "../../engine/saveMigration";
+import { FACILITIES, facilityFloors } from "../../engine/facilities";
+import type { SerializedGame, Unit } from "../../engine/types";
 
 /** Decode a `.vctower` container (magic line + base64 deflate-raw JSON) with
  *  fflate — synchronous and env-agnostic (no DecompressionStream needed). */

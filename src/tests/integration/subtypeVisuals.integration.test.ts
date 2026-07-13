@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
-import { FASTFOOD_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../render/pixelSprites";
-import { buildTDT } from "../storage/tdtExport";
-import { parseTDT } from "../storage/tdtImport";
-import type { FacilityKind } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { FASTFOOD_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
+import { buildTDT } from "../../storage/tdtExport";
+import { parseTDT } from "../../storage/tdtImport";
+import type { FacilityKind } from "../../engine/types";
 
 /**
  * Guards the retail-subtype visual system:

@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // The real 12,975-unit v1 tower (vite ?raw), the same fixture the reflow tests pin.
-import towerFile from "./fixtures/towerone_6.vctower?raw";
-import { SAVE_VERSION, Simulation, serializeUnit } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
-import type { SerializedGame, SerializedUnit, Unit } from "../engine/types";
+import towerFile from "../fixtures/towerone_6.vctower?raw";
+import { SAVE_VERSION, Simulation, serializeUnit } from "../../engine/Simulation";
+import { FACILITIES } from "../../engine/facilities";
+import type { SerializedGame, SerializedUnit, Unit } from "../../engine/types";
 
 /**
  * Sparse v3 unit serialization: `serializeUnit` omits every field whose value

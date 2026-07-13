@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { ECON } from "../engine/econConfig";
-import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
-import { SAVE_VERSION } from "../engine/saveMigration";
-import type { FacilityKind, SerializedGame, Transport } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { ECON } from "../../engine/econConfig";
+import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../../engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { SAVE_VERSION } from "../../engine/saveMigration";
+import type { FacilityKind, SerializedGame, Transport } from "../../engine/types";
 import {
   TDT_HEADER_SIZE,
   TDT_MAX_FILE_BYTES,
   TDT_STAIR_RECORD_SIZE,
   locateStairs,
   parseTdtBinary,
-} from "../storage/tdtFormat";
+} from "../../storage/tdtFormat";
 import {
   LegacyImportError,
   looksLikeLegacyTower,
@@ -19,9 +19,9 @@ import {
   rentFromClass,
   synthesizeTransports,
   towerNameFromFilename,
-} from "../storage/tdtImport";
-import type { TdtSpec } from "./fixtures/tdtBuilder";
-import { buildTdt, sampleTowerSpec } from "./fixtures/tdtBuilder";
+} from "../../storage/tdtImport";
+import type { TdtSpec } from "../fixtures/tdtBuilder";
+import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
 /** Parse a spec through the whole importer (builder → parseTDT). */
 function parse(spec: TdtSpec = {}, filename = "TOWER.TDT") {
