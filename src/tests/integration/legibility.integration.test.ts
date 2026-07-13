@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);

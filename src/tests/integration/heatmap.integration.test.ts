@@ -5,8 +5,8 @@ import {
   CONGESTION_CHURN,
   CONGESTION_GRIDLOCK,
   type HeatCell,
-} from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+} from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../render/sprites/events";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../../render/sprites/events";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 /**
  * Smoke coverage for the event visuals added for parity: they are immediate-mode
