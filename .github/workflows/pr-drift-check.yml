@@ -70,9 +70,72 @@ permissions:
   contents: read
 
 jobs:
+  # Skip the whole check when the PR head commit carries the [update-screenshots]
+  # marker. That marker triggers update-screenshots.yml (on the push event), which
+  # runs this SAME reusable capture and commits the regenerated gallery. Without
+  # this guard a marker push to a PR branch fires BOTH the push event (regen) and
+  # this pull_request event (drift check), so the expensive Playwright capture runs
+  # twice for one push: 2x compute for no extra signal. Skipping here is safe: the
+  # twice-render determinism hard-fail is not lost, it still runs inside
+  # update-screenshots.yml's capture on the push event. The drift check is advisory
+  # and non-required (see the WARNING on the paths filter above), so if this guard
+  # ever errors (API blip) the dependents cascade-skip, i.e. fail-open, which is the
+  # right default for an advisory check backstopped by another workflow.
+  #
+  # The marker is read from the PR HEAD commit via the API (contents:read, no
+  # checkout, so no PR-head code executes here). This must stay the SAME commit
+  # update-screenshots.yml gates on: it keys off `github.event.head_commit.message`
+  # (the head commit of the push), and on a pull_request synchronize the PR head sha
+  # IS that commit, so the two workflows agree on what a "marker push" is. Match its
+  # detection EXACTLY (keep the literal in sync, and match case-insensitively): the
+  # GitHub Actions `contains()` update-screenshots.yml uses is case-insensitive, so
+  # `[Update-Screenshots]` triggers the regen there; if this guard missed it, the
+  # capture would run in both workflows, the exact 2x this change removes.
+  guard:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      head_is_marker: ${{ steps.check.outputs.head_is_marker }}
+    steps:
+      - id: check
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: commit } = await github.rest.repos.getCommit({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: context.payload.pull_request.head.sha,
+            });
+            const message = commit.commit.message || '';
+            // Case-insensitive to match update-screenshots.yml's `contains()`.
+            const isMarker = message.toLowerCase().includes('[update-screenshots]');
+            core.setOutput('head_is_marker', isMarker ? 'true' : 'false');
+            core.info(
+              isMarker
+                ? 'PR head commit carries [update-screenshots]; update-screenshots.yml regenerates the gallery on the push event, so this drift-check capture is skipped to avoid running the Playwright capture twice.'
+                : 'No [update-screenshots] marker on the PR head commit; running the drift check.',
+            );
+
   # Shared, sharded, self-verifying capture (renders each shard twice and hard-
   # fails on nondeterminism). Read-only; runs PR-head code, so no write token.
+  # Skipped on a marker push (see the guard job); its dependents cascade-skip.
+  #
+  # Skip ONLY when update-screenshots.yml actually runs as the backstop for THIS
+  # push, i.e. its `push: branches-ignore: [main]` trigger fires: a same-repo branch
+  # that is not `main`. A fork PR pushes to the fork, so no push event reaches this
+  # repo and no regen runs here; a `main`-headed PR is ignored by that trigger. In
+  # both cases there is no backstop, so keep running the capture (worst case is the
+  # 2x we accept, never a silently skipped determinism check). The asymmetry is
+  # deliberate: failing to skip only costs compute, but skipping without a backstop
+  # would drop the determinism/drift signal. Mirror update-screenshots.yml's trigger
+  # here if it ever changes.
   capture:
+    needs: guard
+    if: >-
+      needs.guard.outputs.head_is_marker != 'true' ||
+      github.event.pull_request.head.repo.full_name != github.repository ||
+      github.event.pull_request.head.ref == 'main'
     uses: ./.github/workflows/screenshot-capture.yml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
