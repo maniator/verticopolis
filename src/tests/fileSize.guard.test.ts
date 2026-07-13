@@ -30,8 +30,6 @@ const SCANNED_DIRS = ["src", "scripts"];
  * Paths are repo-relative with forward slashes.
  */
 const LEGACY_OVERSIZED = new Set<string>([
-  // engine
-  "src/engine/Simulation.ts",
   // render
   "src/render/excalibur/TowerEngine.ts",
   // ui / app spine / audio
