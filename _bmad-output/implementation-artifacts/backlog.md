@@ -110,6 +110,43 @@ How items flow:
 
 ## Deferral inbox
 
+### Followups from: screenshot-determinism (party-vetted 2026-07-12, PR #188)
+
+Both are screenshot-CI hardening. Speed is the enabler that makes the every-PR
+drift-check affordable, so do it first. Design constraints came out of a party
+round-table (Winston/Boundary/Dana/John/Grumbal); keep them or the followup
+quietly reintroduces the very blind spots PR #188 removed.
+
+- **Faster screenshots CI (DONE, PR 1).** Implemented in
+  `spec-shard-screenshots-ci.md`: `scripts/screenshot-shards.ts` holds the
+  explicit 4-shard partition (`showcase`, `slow`, `features`, `misc`) and a
+  `verify` coverage guard (union of shard groups must equal every `SCENES` id,
+  exactly once, checked at the gate before any capture), and
+  `update-screenshots.yml` crosses the `shoot` matrix `run:[a,b]` x `shard`,
+  renders each shard via `ONLY=`, and diffs per shard. Each shard uploads its
+  full rendered set; `verify-and-commit` rebuilds the gallery from the union of
+  run-a shards (pruning removed scenes). The original speed constraints held:
+  4 shards (not 8+), provable coverage, `ONLY=`-based subsetting.
+- **Drift-check on every PR (the valuable one; needs speed first).** Move the
+  guard left to PR time, but split it into TWO signals with TWO verdicts or it
+  becomes a wolf-crier that gets ignored:
+  - **Hard fail = the generator disagrees with ITSELF** (generate twice, diff
+    the two runs against each other, not against the committed set). That is
+    nondeterminism, always a bug, and scope-independent, so it stays valid even
+    as main drifts underneath the PR. This is PR #188's guard, moved to PR time.
+  - **Advisory only = differs from the COMMITTED set** ("this PR changes N
+    screenshots, remember to regen with `[update-screenshots]`"). Expected on any
+    real UI PR, so it must NEVER be a red X, keep it informational and gate it to
+    PRs touching `src/render/**` or `scripts/screenshot*` so it isn't noise.
+  - Do not conflate the two: a naive "differs from committed = fail" turns every
+    legit sprite tweak red, people learn to ignore red, and the day a real
+    nondeterminism leak lands it is the boy who cried wolf.
+
+### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
+
+- **The a/b determinism guard only catches nondeterminism that diverges between two near-simultaneous, same-environment runs.** Both legs render in the same pinned image within the same time window, so entropy that is stable across the pair but varies run-to-run (wall-clock/date-stamped content, font/driver/locale changes) passes the diff yet still drifts. This is a pre-existing property of the two-run design, not introduced by sharding, and PR #188 already removed the known time leak by mocking the clock. If a future env/time leak slips it, the fix is to seed/pin the varying input in the generator, not to add a third run. (Low; inherent to the guard's scope.)
+- **`resolve-image` pin step can throw if Playwright is not a top-level devDependency.** `require('./package.json').devDependencies.playwright.replace(...)` is the fallback when `package-lock.json` has no `node_modules/playwright` entry; if Playwright is only present via `@playwright/test` or under `dependencies`, `.replace` is called on `undefined`. Pre-existing code, unchanged by this PR. Harden with a `?.` + explicit error if it ever bites. (Low; pre-existing, current layout has top-level `playwright`.)
+
 ### Deferred from: spec-pixel-8a-crash-fix (2026-07-12)
 
 - Renderer: the ~935 room actors still cost ~16ms of a paused desktop frame on a
