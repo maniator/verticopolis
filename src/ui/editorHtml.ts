@@ -160,8 +160,11 @@ export function transportEditorVolatile(sim: Simulation, t: Transport, mobile = 
     // An express is locked to (sky) lobbies (1994 parity), so it reads a fixed
     // policy line rather than a free per-floor skip count. Standard/service keep
     // their configurable stop readout.
-    vol.stops =
-      t.kind === "elevatorExpress" ? "lobbies and sky lobbies" : skipped ? `express · skips ${skipped}` : "all floors";
+    if (t.kind === "elevatorExpress") {
+      vol.stops = "lobbies and sky lobbies";
+    } else {
+      vol.stops = skipped ? `express · skips ${skipped}` : "all floors";
+    }
   }
   // Mobile shows one panel, so the editor folds in the card's avg-load line
   // (empty for stairs/escalators and staff-only service elevators).

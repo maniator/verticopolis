@@ -13,7 +13,10 @@ export function shadeAlpha(hex: string, amt: number, alpha: number): string {
   const r = clamp(((n >> 16) & 255) + amt);
   const g = clamp(((n >> 8) & 255) + amt);
   const b = clamp((n & 255) + amt);
-  return `rgba(${r},${g},${b},${alpha})`;
+  // Clamp alpha into [0,1] (and default a non-finite value to opaque) so a
+  // future caller can never emit an invalid rgba() string.
+  const a = Number.isFinite(alpha) ? Math.max(0, Math.min(1, alpha)) : 1;
+  return `rgba(${r},${g},${b},${a})`;
 }
 function clamp(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));

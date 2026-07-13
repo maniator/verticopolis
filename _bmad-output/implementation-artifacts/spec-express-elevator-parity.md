@@ -7,7 +7,7 @@ context: []
 baseline_commit: 'e0bd1d1a885096e062f57cf7aef6087c5700aebe'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent, do not modify unless human renegotiates">
 
 ## Intent
 
@@ -19,9 +19,9 @@ baseline_commit: 'e0bd1d1a885096e062f57cf7aef6087c5700aebe'
 
 **Always:** `src/engine/*` stays DOM-free. The TDT exporter reconstructs footprint from `FACILITIES[kind].width`, so a 6-wide express must round-trip and must not overlap in the exporter's collision check. Standard and service elevators KEEP `Configure stops…` / `All stops` (real-game feature). The widen migration HEALS not HARMS: never leave an overlapping/off-lot/dropped express, never relocate a boxed-in shaft far. American English, no em-dashes in new prose. All four quality gates green.
 
-**Ask First:** Any change that would RELOCATE a boxed-in express to a distant free column (rather than keep it legacy 4-wide) — the migration must not do this without human sign-off.
+**Ask First:** Any change that would RELOCATE a boxed-in express to a distant free column (rather than keep it legacy 4-wide), the migration must not do this without human sign-off.
 
-**Never:** No SAVE_VERSION bump — the v5 re-heal is idempotent and already re-runs on every v5 load (verified). Do not change standard/service width (4 is correct) or their stop config. Do not decompile game binaries.
+**Never:** No SAVE_VERSION bump: the v5 re-heal is idempotent and already re-runs on every v5 load (verified). Do not change standard/service width (4 is correct) or their stop config. Do not decompile game binaries.
 
 ## I/O & Edge-Case Matrix
 

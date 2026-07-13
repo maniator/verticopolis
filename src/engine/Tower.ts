@@ -1129,6 +1129,7 @@ export class Tower {
    * Call after {@link reindex}, when the lobby-tile index is populated.
    */
   coerceExpressStops(): void {
+    let changed = false;
     for (const t of this.transports) {
       if (t.kind !== "elevatorExpress") continue;
       const skip = new Set(t.skipFloors ?? []);
@@ -1140,8 +1141,15 @@ export class Tower {
       // boundary, and stopsAt() reads skipFloors literally for endpoints.
       skip.delete(t.bottom);
       skip.delete(t.top);
-      t.skipFloors = [...skip].sort((a, b) => a - b);
+      const next = [...skip].sort((a, b) => a - b);
+      if (next.join(",") !== (t.skipFloors ?? []).join(",")) {
+        t.skipFloors = next;
+        changed = true;
+      }
     }
+    // Mutating skipFloors invalidates the memoized stop lists (stopsCache is
+    // keyed by revision), so bump it when the coercion actually changed a shaft.
+    if (changed) this.revision++;
   }
 
   removeTransport(id: number): Transport | undefined {
