@@ -656,10 +656,12 @@ describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", ()
   });
 
   it("paves a gutted/burning lobby tile as an ordinary type-24 lobby (state drops on the round trip)", () => {
-    // The importer paves the whole extent and rebuilds each tile's kind from the
-    // floor (isLobbyFloor), with no notion of a gutted tile: the gutted STATE is
-    // lost on the paving round trip, like every state. So the run is NOT split,
-    // and re-export must be byte-identical.
+    // A gutted lobby cannot occur in real play: EventSystem.flammableUnits
+    // excludes floor and lobby, so fire never touches a lobby. This only guards
+    // hand-forged input, which buildTDT accepts. The importer paves the whole
+    // extent and rebuilds each tile's kind from the floor (isLobbyFloor), with no
+    // notion of a gutted tile: the gutted STATE is lost on the paving round trip,
+    // like every state. So the run is NOT split, and re-export must be byte-identical.
     const units: Unit[] = [];
     let id = 1;
     for (let x = 0; x < 10; x++) {

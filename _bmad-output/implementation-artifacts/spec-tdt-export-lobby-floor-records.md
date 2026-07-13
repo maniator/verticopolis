@@ -105,6 +105,11 @@ The importer already re-paves type-0/24 records into width-1 `floor`/`lobby` uni
   exactly like every other unit state. The separate `hasGroundLobby` gutted
   check (which only affects `lobbyHeight`, not paving) is unchanged. The frozen
   block itself is left intact; this entry records the negotiated supersession.
+  NOTE (owner-confirmed 2026-07-13): a gutted lobby cannot occur in real play
+  anyway. `EventSystem.flammableUnits` excludes `floor` and `lobby`, so fire
+  never touches a lobby; the only way to reach a fire/gutted lobby is
+  hand-forged serialized input, which `buildTDT` tolerates. So this supersession
+  is behaviorally moot for real towers.
 
 ## Suggested Review Order
 
