@@ -523,14 +523,17 @@ export class Tower {
    * `auto-floor-build`).
    *
    * The fill kind follows what is being placed: a lobby bridges to a
-   * neighboring lobby with lobby tiles, every room bridges to a neighboring
-   * floor with plain floor. Only empty, supportable tiles are returned: above
-   * ground each bridge tile needs structure directly below (no floating
-   * overhangs), while the ground and basement rest on a run that is flanked by
-   * structure on both ends and so always fills. A multi-story facility's upper
-   * story may rest on the bridge its own lower story will lay, so the stories
-   * are scanned bottom-up and lower planned tiles count as support for the one
-   * above (both walkways of a stacked pair of cinemas fill, not just the base).
+   * neighboring lobby with lobby tiles, every room (and the plain floor tool)
+   * bridges to a neighboring floor with plain floor. A substrate mismatch never
+   * stitches (a floor won't join a lobby, or the reverse), so a floor dropped
+   * beside the ground concourse lobby does not fill into it. Only empty,
+   * supportable tiles are returned: above ground each bridge tile needs
+   * structure directly below (no floating overhangs), while the ground and
+   * basement rest on a run that is flanked by structure on both ends and so
+   * always fills. A multi-story facility's upper story may rest on the bridge
+   * its own lower story will lay, so the stories are scanned bottom-up and lower
+   * planned tiles count as support for the one above (both walkways of a stacked
+   * pair of cinemas fill, not just the base).
    *
    * The plan is exactly the set {@link fillBridge} lays: the scan reads only
    * columns outside the footprint, so laying the footprint (before or after)
@@ -538,10 +541,12 @@ export class Tower {
    * Non-mutating.
    */
   bridgeFillPlan(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): { fl: number; x: number }[] {
-    // Only rooms (plain-floor substrate) and lobbies bridge; a bare floor tool
-    // has its own drag-run and would otherwise fill sideways to any neighbor,
-    // and transports (elevators/stairs) never carry a horizontal substrate.
-    if ((isStructural(kind) && kind !== "lobby") || FACILITIES[kind].transport) return [];
+    // Rooms, lobbies, and the plain floor tool all bridge to a same-substrate
+    // neighbor (owner-requested: dropping a floor tile a few cells from another
+    // floor fills the gap, exactly like the room/lobby behavior). Transports
+    // (elevators/stairs) never carry a horizontal substrate, so they never
+    // bridge.
+    if (FACILITIES[kind].transport) return [];
     const substrate: "floor" | "lobby" = kind === "lobby" ? "lobby" : "floor";
     // Columns this plan will floor on each story, so a story can rest on the
     // bridge the story below it lays (see the stacked-cinema note above).
@@ -847,11 +852,58 @@ export class Tower {
   }
 
   /**
+   * Lay plain floor across `[x, x + width)` on each floor in `floors` that
+   * lacks it, in support order: a retry loop drains an upward run bottom-up
+   * (each floor rests on the one below) and a basement run top-down (each hangs
+   * off the one above), exactly like {@link ensureFloorUnder}. Returns the ids
+   * laid, or `null` if some tile can never be supported (an above-ground gap
+   * with nothing below it), after rolling the whole batch back so the caller
+   * can refuse without leaving an orphan floor. Used by the elevator-extend
+   * auto-floor: extending a shaft past the built structure brings its floor
+   * with it (backlog `auto-floor-build` behavior 1).
+   */
+  private layShaftFloors(floors: number[], x: number, width: number): number[] | null {
+    let remaining: { fl: number; tx: number }[] = [];
+    for (const fl of floors) {
+      for (let i = 0; i < width; i++) {
+        if (!this.structure.has(this.key(fl, x + i))) remaining.push({ fl, tx: x + i });
+      }
+    }
+    if (remaining.length === 0) return [];
+    const placed: number[] = [];
+    let progress = true;
+    while (remaining.length > 0 && progress) {
+      progress = false;
+      const still: { fl: number; tx: number }[] = [];
+      for (const m of remaining) {
+        const r = this.place("floor", m.fl, m.tx);
+        if (r.ok && r.unitId !== undefined) {
+          placed.push(r.unitId);
+          progress = true;
+        } else {
+          still.push(m);
+        }
+      }
+      remaining = still;
+    }
+    if (remaining.length > 0) {
+      for (const id of placed) this.removeUnit(id);
+      return null;
+    }
+    return placed;
+  }
+
+  /**
    * Grow or shrink a transport's served range. Returns the number of floors
    * added (negative if removed) on success, or a failure reason. Newly served
-   * floors are validated against rooms and other shafts.
+   * floors are validated against other shafts; a newly-served floor with no
+   * structure under the shaft auto-lays plain floor behind it (the 1994
+   * behavior where extending a lift past the built structure creates the floor),
+   * rather than refusing. `floorTilesCreated` counts the individual width-1
+   * floor units laid (a 4-wide shaft that grows one story lays 4 of them), not
+   * the number of stories, so the caller can size any structure charge exactly.
    */
-  resizeTransport(id: number, newBottom: number, newTop: number): PlaceResult & { added?: number } {
+  resizeTransport(id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } {
     const t = this.transportById(id);
     if (!t) return { ok: false, reason: "No such transport." };
     if (newTop <= newBottom) return { ok: false, reason: "Transport needs height." };
@@ -863,21 +915,35 @@ export class Tower {
     // stairs grow the whole tower height one extend at a time).
     const spanBad = this.spanReason(t.kind, newBottom, newTop);
     if (spanBad) return { ok: false, reason: spanBad };
-    // Validate only the floors that are being newly added.
+    // First pass over the newly-added floors: refuse on any hard conflict (a
+    // different shaft already occupies the cell) and collect the whole set of
+    // newly-served floors. Every one of them is handed to `layShaftFloors`,
+    // which fills only the still-empty cells across the shaft footprint. Passing
+    // ALL new floors (not just the ones with zero structure) closes the partial-
+    // floor gap: a floor with structure under SOME of the shaft's columns but
+    // not all would otherwise pass the any-tile served check and leave the shaft
+    // floating over the empty columns. Now those columns are completed too, so
+    // the extend always brings a FULL floor with it.
+    const newFloors: number[] = [];
     for (let fl = newBottom; fl <= newTop; fl++) {
       if (fl >= t.bottom && fl <= t.top) continue; // already served
-      // Every newly-served floor needs built structure under the shaft — the
-      // same invariant validateTransport enforces — so an extend can't float
-      // the shaft into empty sky. (Rooms no longer block; it draws in front.)
-      if (!this.shaftHasStructureAt(fl, t.x, t.width)) {
-        return { ok: false, reason: NEEDS_FLOORS };
-      }
       for (const other of this.transports) {
         if (other.id === t.id) continue;
         if (this.transportOverlaps(other, t.x, t.width, fl)) {
           return { ok: false, reason: "Another shaft is in the way." };
         }
       }
+      newFloors.push(fl);
+    }
+    // Auto-lay plain floor across every still-empty cell behind the shaft on the
+    // new floors. `layShaftFloors` returns null when a tile can never be
+    // supported (an above-ground extend into open sky, or a column with nothing
+    // below it), rolling back cleanly, so the shaft and its floor never float;
+    // nothing else was mutated yet, so we refuse with the same message the old
+    // hard structure check used.
+    const createdFloors = this.layShaftFloors(newFloors, t.x, t.width);
+    if (createdFloors === null) {
+      return { ok: false, reason: NEEDS_FLOORS };
     }
     const before = t.top - t.bottom + 1;
     const prevBottom = t.bottom;
@@ -912,7 +978,7 @@ export class Tower {
       t.skipFloors = [...skip].sort((a, b) => a - b);
     }
     this.revision++;
-    return { ok: true, added: newTop - newBottom + 1 - before };
+    return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
   }
 
   /** Change the number of elevator cars (1..max for that elevator type). */

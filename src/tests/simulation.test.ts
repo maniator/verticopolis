@@ -496,15 +496,86 @@ describe("Transport editing", () => {
     expect(res.ok).toBe(true);
   });
 
-  it("won't extend a shaft into floors with no structure (no floating in sky)", () => {
+  it("extends a shaft up past the built structure, auto-laying the floor behind it", () => {
     const sim = base(2); // structure exists on floors 2..10 only
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.buildTransport("elevatorStandard", x0, 1, 6);
     const t = sim.tower.transports[0];
     expect(sim.tower.resizeTransport(t.id, 1, 10).ok).toBe(true); // up to built structure
     expect(t.top).toBe(10);
-    expect(sim.tower.resizeTransport(t.id, 1, 11).ok).toBe(false); // floor 11 is empty sky
-    expect(t.top).toBe(10); // unchanged
+    // Extending into empty sky above the tower now brings the floor with it:
+    // floor 11 rests on floor 10, and plain floor is laid across the shaft's
+    // own 4-tile footprint (the standard elevator's width).
+    const up = sim.tower.resizeTransport(t.id, 1, 11);
+    expect(up.ok).toBe(true);
+    expect(up.floorTilesCreated).toBe(4);
+    expect(t.top).toBe(11);
+    for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(11, x0 + i)).toBe("floor");
+  });
+
+  it("refuses an extend whose new floor can never be fully supported (no floating in sky)", () => {
+    // A width-4 shaft standing over a ONE-tile column: the shaft is served
+    // (any tile under it is built), but extending up would float the three
+    // outer tiles of the new floor, since only the shaft's own column has
+    // structure below. The auto-floor refuses rather than lay a partial,
+    // floating floor, and leaves nothing behind.
+    const sim = Simulation.newGame(2);
+    const c = Math.floor(GRID.width / 2) - 20; // the starter lobby's left edge (floor 1 is lobby here)
+    for (let f = 2; f <= 6; f++) expect(sim.tower.place("floor", f, c).ok).toBe(true); // a 1-wide column on the lobby
+    expect(sim.buildTransport("elevatorStandard", c, 1, 6).ok).toBe(true); // width 4 over a 1-wide column
+    const t = sim.tower.transports.find((tr) => tr.x === c)!;
+    const up = sim.tower.resizeTransport(t.id, 1, 7); // floor 7: tile c rests on 6, but c+1..c+3 float
+    expect(up.ok).toBe(false);
+    expect(t.top).toBe(6); // unchanged
+    expect(sim.tower.structureKindAt(7, c)).toBeUndefined(); // the one supportable tile was rolled back too
+  });
+
+  it("auto-lays multiple floors when an extend jumps several floors up at once", () => {
+    const sim = base(2); // structure on floors 2..10
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.buildTransport("elevatorStandard", x0, 1, 10); // already spans the built structure
+    const t = sim.tower.transports[0];
+    // A drag can jump several floors in one resize: floors 11, 12, 13 are all
+    // open sky, and each rests on the one below it (11 on 10, 12 on 11, ...),
+    // so the whole run auto-floors in support order.
+    const up = sim.tower.resizeTransport(t.id, 1, 13);
+    expect(up.ok).toBe(true);
+    expect(up.floorTilesCreated).toBe(3 * 4); // three stories, four tiles each
+    for (let fl = 11; fl <= 13; fl++)
+      for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(fl, x0 + i)).toBe("floor");
+  });
+
+  it("completes a PARTIAL floor behind the shaft on extend (fills the missing columns)", () => {
+    // A newly-served floor with structure under only SOME of the shaft columns
+    // used to pass the any-tile served check and leave the shaft floating over
+    // the empty columns. The extend now fills those columns too.
+    const sim = base(2); // floors 2..10 at x0, width 20
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.buildTransport("elevatorStandard", x0, 1, 10); // width 4 over the full block
+    const t = sim.tower.transports[0];
+    // Hand-build only two of the four shaft columns on floor 11 (they rest on
+    // floor 10). The other two are open sky.
+    expect(sim.tower.place("floor", 11, x0).ok).toBe(true);
+    expect(sim.tower.place("floor", 11, x0 + 1).ok).toBe(true);
+    const up = sim.tower.resizeTransport(t.id, 1, 11);
+    expect(up.ok).toBe(true);
+    expect(up.floorTilesCreated).toBe(2); // only the two missing columns
+    // All four columns of floor 11 are now floored: no floating shaft cell.
+    for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(11, x0 + i)).toBe("floor");
+  });
+
+  it("auto-lays the floor when an elevator extends DOWN into the basement", () => {
+    const sim = base(2); // floors 2..10 at x0; floor 1 is the starter lobby
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    const t = sim.tower.transports[0];
+    // Extend down to B2 (floor -1). Floor 0 hangs off floor 1 above, floor -1
+    // hangs off floor 0: the basement floors auto-lay top-down in support order.
+    const down = sim.tower.resizeTransport(t.id, -1, 6);
+    expect(down.ok).toBe(true);
+    expect(t.bottom).toBe(-1);
+    for (const fl of [0, -1])
+      for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(fl, x0 + i)).toBe("floor");
   });
 
   it("caps cars per elevator type", () => {
@@ -860,14 +931,46 @@ describe("Auto-floor bridge between modules", () => {
     for (let i = 1; i < 7; i++) expect(sim.tower.structureKindAt(lf, x0 + i)).toBe("lobby");
   });
 
-  it("does not bridge a plain floor tool across a gap", () => {
+  it("bridges a plain floor tool across a gap to a neighboring floor", () => {
     const sim = Simulation.newGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.build("floor", 2, x0);
-    sim.build("floor", 2, x0 + 6); // dropped six tiles away
-    // The floor tool keeps its own drag-run; it must not auto-fill the gap.
-    expect(sim.tower.structureKindAt(2, x0 + 3)).toBeUndefined();
+    expect(sim.build("floor", 2, x0).ok).toBe(true);
+    expect(sim.build("floor", 2, x0 + 6).ok).toBe(true); // dropped six tiles away
+    // Owner-requested: dropping a floor tile a few cells from another floor
+    // fills the gap, exactly like the room/lobby bridge. The five-tile gap
+    // [x0+1, x0+6) is now plain floor.
+    for (let i = 1; i < 6; i++) expect(sim.tower.structureKindAt(2, x0 + i)).toBe("floor");
+  });
+
+  it("charges floor tiles for a floor-tool bridge and blocks one that can't be afforded", () => {
+    const sim = Simulation.newGame(7);
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.build("floor", 2, x0); // the neighbor to bridge back to
+    const can = sim.canBuild("floor", 2, x0 + 6);
+    // The placed tile plus the five gap tiles, all at floor cost.
+    expect(can.cost).toBe(6 * FACILITIES.floor.cost);
+    sim.money = can.cost - 1; // a dollar short of the whole run
+    expect(sim.build("floor", 2, x0 + 6).ok).toBe(false);
+    expect(sim.tower.structureKindAt(2, x0 + 3)).toBeUndefined(); // nothing laid
+    sim.money = can.cost;
+    expect(sim.build("floor", 2, x0 + 6).ok).toBe(true);
+  });
+
+  it("bridges a floor tool on the GROUND, rescuing a placement that isn't yet connected", () => {
+    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // A floor tile right at the lobby's edge connects normally (adjacent to the
+    // lobby structure). A second floor five tiles further out is NOT adjacent to
+    // anything, but the bridge back to the first rescues it (ground-floor
+    // horizontal support), filling the gap with floor. A floor never stitches
+    // into the lobby itself (substrate mismatch), so the bridge stops at the
+    // first floor neighbor.
+    expect(sim.build("floor", 1, x0 + 40).ok).toBe(true); // touches the lobby edge
+    expect(sim.build("floor", 1, x0 + 45).ok).toBe(true); // five-tile gap, rescued
+    for (let i = 41; i < 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("floor");
   });
 
   it("bridges to the nearest neighbor even across a wide gap (no distance cap)", () => {

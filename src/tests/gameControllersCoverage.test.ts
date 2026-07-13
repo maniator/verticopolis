@@ -111,18 +111,21 @@ describe("BuildActions (paint runs, bulldoze gauntlet, transport feedback)", () 
     // Same-floor drag: every cell between the anchor and the pointer fills in.
     build.paintFloorRun("floor", 18, 3);
     for (let x = 13; x <= 18; x++) expect(sim.tower.structureKindAt(3, x)).toBe("floor");
-    // Cross-floor move resets the anchor: floor 4 gets ONE tile at the new
-    // cursor, not a run dragged over from the floor-3 anchor at column 18.
+    // Cross-floor move resets the anchor: floor 4 is empty, so the new cursor
+    // lays ONE tile (no run dragged over from the floor-3 anchor at column 18,
+    // and no bridge, since floor 4 has no other floor to reach yet).
     build.paintFloorRun("floor", 12, 4);
     expect(sim.tower.structureKindAt(4, 12)).toBe("floor");
     for (let x = 13; x <= 17; x++) expect(sim.tower.structureKindAt(4, x)).toBeUndefined();
-    // clearPaint (pointer released): the next paint anchors fresh instead of
-    // filling the gap back to column 12.
+    // clearPaint (pointer released): the next paint anchors fresh, so it does
+    // NOT drag a continuous run back to column 12. It seeds a single tile at the
+    // cursor; the gap then fills by the owner-requested floor-tool bridge (the
+    // engine auto-floors between the seed and the floor-4 neighbor at 12), which
+    // is a separate mechanism from the drag run.
     build.clearPaint();
     build.paintFloorRun("floor", 15, 4);
     expect(sim.tower.structureKindAt(4, 15)).toBe("floor");
-    expect(sim.tower.structureKindAt(4, 13)).toBeUndefined();
-    expect(sim.tower.structureKindAt(4, 14)).toBeUndefined();
+    for (let x = 13; x <= 14; x++) expect(sim.tower.structureKindAt(4, x)).toBe("floor");
   });
 
   it("seedPaint stamps the full brush strip for floor/lobby, so a touch tap matches a desktop click", () => {
@@ -516,7 +519,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(stopsDlg).toBeNull();
   });
 
-  it("extendUp bills one floor when it fits and toasts the engine's reason when it can't", () => {
+  it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", () => {
     sel = { type: "transport", id: lift.id };
     root.innerHTML = transportEditorHtml(sim, lift);
     const before = sim.money;
@@ -526,13 +529,27 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(last(f.sfx)).toBe("build");
     editor.handleEditAction("extendUp", root); // floor 4 built too
     expect(lift.top).toBe(4);
-    editor.handleEditAction("extendUp", root); // floor 5 is open sky → refused
-    expect(lift.top).toBe(4);
+    // Floor 5 is open sky: the extend now brings the floor with it (it rests on
+    // floor 4), still billing the single extend cost, and lays plain floor
+    // across the shaft's 4-tile footprint at 58..61.
+    const mid = sim.money;
+    editor.handleEditAction("extendUp", root);
+    expect(lift.top).toBe(5);
+    expect(mid - sim.money).toBe(ECON.transportFloorCost);
+    expect(last(f.sfx)).toBe("build");
+    for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
+  });
+
+  it("extendUp toasts the engine's reason when another shaft blocks the column", () => {
+    // A second short shaft stacked in the lift's column at floors 3..4 blocks
+    // the extend: the editor surfaces the engine's refusal as an error toast.
+    expect(sim.buildTransport("elevatorStandard", 58, 3, 4).ok).toBe(true);
+    sel = { type: "transport", id: lift.id };
+    root.innerHTML = transportEditorHtml(sim, lift);
+    editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
+    expect(lift.top).toBe(2); // unchanged
     expect(last(f.sfx)).toBe("error");
-    expect(last(f.toasts)).toEqual({
-      text: "Transport must run through built floors. Lay floors first.",
-      kind: "bad",
-    });
+    expect(last(f.toasts)).toEqual({ text: "Another shaft is in the way.", kind: "bad" });
   });
 
   it("extendSelectedTo bills only floors past the drag's high-water mark; wiggles re-bill nothing", () => {
@@ -553,13 +570,15 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const sfxCount = f.sfx.length;
     expect(f.sfx.length).toBe(sfxCount);
     expect(undo.captures).toEqual(["Extend"]); // ONE capture for the whole drag
-    // endExtend closes the gesture: the next drag re-captures, and a blocked
-    // step (floor 5 is open sky) is silent — the shaft simply stops growing.
+    // endExtend closes the gesture: the next drag re-captures. Floor 5 is open
+    // sky, but the extend now auto-lays the floor behind it (rests on floor 4),
+    // so the shaft grows to 5 and bills the one new floor past the fresh hwm.
     editor.endExtend();
     editor.extendSelectedTo("up", 5);
-    expect(lift.top).toBe(4);
-    expect(before - sim.money).toBe(2 * ECON.transportFloorCost);
+    expect(lift.top).toBe(5);
+    expect(before - sim.money).toBe(3 * ECON.transportFloorCost);
     expect(undo.captures).toEqual(["Extend", "Extend"]);
+    for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(5, 58 + i)).toBe("floor");
   });
 
   it("extendSelectedTo guards: no selection, a unit, and a stairway (no extend handles) all bail", () => {
