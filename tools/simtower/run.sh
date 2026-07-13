@@ -39,6 +39,17 @@ ensure_image() {
 # Assemble docker args for the WSLg GUI (X11 + Wayland + Pulse), falling back
 # gracefully when a socket isn't present.
 display_args() {
+  # The headless modes (load/screenshot) run their OWN Xvfb on :99 inside the
+  # container. Mounting the host's /tmp/.X11-unix into them makes that Xvfb fail
+  # to bind its :99 socket ("failed to bind listener"), so the capture silently
+  # falls back to the host WSLg :0 display and screenshots a blank 1024x768
+  # frame. Only the interactive GUI modes (run/shell) need the host display, so
+  # gate the mounts on the mode and leave headless modes with a clean namespace.
+  local mode="${1:-run}"
+  case "$mode" in
+    run|shell) ;;
+    *) return 0 ;;
+  esac
   local args=()
   args+=(-e "DISPLAY=${DISPLAY:-:0}")
   [ -d /tmp/.X11-unix ]        && args+=(-v /tmp/.X11-unix:/tmp/.X11-unix)
@@ -64,23 +75,36 @@ run_container() {
     mkdir -p "$PREFIX/drive_c/windows/system"
     cp -n "$PWD/native/COMMDLG.DLL" "$PREFIX/drive_c/windows/system/COMMDLG.DLL" 2>/dev/null || true
   fi
-  local dargs; mapfile -t dargs < <(display_args)
+  local dargs; mapfile -t dargs < <(display_args "${1:-run}")
   # Request a TTY only when stdin actually is one. The interactive "run" mode
   # wants -it, but the headless load/screenshot modes are commonly invoked with
   # no terminal (a CI step or a background job), where -t aborts with
   # "cannot attach stdin to a TTY-enabled container".
   local ttyflag=""; [ -t 0 ] && ttyflag="-t"
+  # Forward the entrypoint's documented screenshot-tuning hooks when the caller
+  # set them in the host shell. Without this passthrough the entrypoint always
+  # falls back to its defaults (1024x768, no maximize/zoom), so the load/
+  # screenshot modes can't be aimed at a tall/wide tower.
+  local envargs=()
+  for v in SCREEN MAXIMIZE ZOOM_CLICKS CLICK_SECS SHOT_DELAY SHOT_OUT; do
+    [ -n "${!v:-}" ] && envargs+=(-e "$v=${!v}")
+  done
   # Run as the host user so Wine accepts the bind-mounted prefix (it refuses a
   # WINEPREFIX not owned by the running user) and so saves stay host-readable.
   # commdlg,commdlg.dll16=n (in WINEDLLOVERRIDES below): load the genuine 16-bit
   # COMMDLG.DLL (placed in the prefix) instead of Wine's builtin, which crashes
   # SimTower's 16-bit file Open/Save dialog. The .dll16 suffix is the key that
   # matches Wine's 16-bit loader; plain commdlg=n does not.
+  # Expand envargs/dargs with the `${arr[@]+"${arr[@]}"}` guard so an EMPTY array
+  # (headless modes add no display args; no tuning vars set adds no env args)
+  # doesn't trip `set -u` on bash <= 4.3, where a bare "${empty[@]}" is an unbound
+  # variable error. Harmless on 4.4+.
   docker run --rm -i $ttyflag \
     --user "$(id -u):$(id -g)" \
     -e HOME=/wine \
     -e 'WINEDLLOVERRIDES=mscoree,mshtml=;commdlg,commdlg.dll16=n' \
-    "${dargs[@]}" \
+    ${envargs[@]+"${envargs[@]}"} \
+    ${dargs[@]+"${dargs[@]}"} \
     -v "$PREFIX:/wine" \
     -v "$GAMEDATA:/gamedata:ro" \
     -v "$SAVES:/wine/drive_c/saves" \

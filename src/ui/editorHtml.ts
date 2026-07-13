@@ -166,7 +166,7 @@ export function transportEditorVolatile(sim: Simulation, t: Transport, mobile = 
       const skippedLobbies = (t.skipFloors ?? []).filter((fl) => sim.tower.floorHasLobby(fl)).length;
       vol.stops = skippedLobbies ? `lobbies and sky lobbies (${skippedLobbies} skipped)` : "lobbies and sky lobbies";
     } else {
-      vol.stops = skipped ? `express · skips ${skipped}` : "all floors";
+      vol.stops = skipped ? `skips ${skipped} floor${skipped === 1 ? "" : "s"}` : "all floors";
     }
   }
   // Mobile shows one panel, so the editor folds in the card's avg-load line

@@ -68,6 +68,31 @@ extraction happens once. Force a re-pull with `./run.sh extract`.
 ./run.sh extract      # re-pull game files + manuals from the ISO
 ```
 
+**Rebuild after editing `docker/entrypoint.sh`.** The entrypoint is baked into
+the image (`COPY entrypoint.sh`), so edits to it do nothing until you run
+`./run.sh build`. A stale image is the usual cause of a load/screenshot that
+suddenly ignores the tuning vars below or captures a blank frame.
+
+The headless modes accept these host env vars (forwarded into the container).
+`SHOT_OUT` and `SHOT_DELAY` apply to both `load` and `screenshot`; the framing
+vars (`SCREEN`, `MAXIMIZE`, `ZOOM_CLICKS`, `CLICK_SECS`) are honored by `load`
+only (`screenshot` boots a fixed 1024x768 frame):
+
+```bash
+SCREEN=1600x1000    # (load) Xvfb size; widen to fit a tall/wide tower in one shot
+MAXIMIZE=1          # (load) maximize the inner tower window
+ZOOM_CLICKS=1       # (load) zoom the tower out N times so the whole shaft fits
+CLICK_SECS=20       # (load) how long to sweep-click boot dialogs away
+SHOT_DELAY=18       # (load + screenshot) settle seconds before the capture
+SHOT_OUT=/wine/x.png # (load + screenshot) output path
+# e.g.: SCREEN=1600x1000 MAXIMIZE=1 ./run.sh load /wine/drive_c/saves/TOWER5.TDT
+```
+
+Only the interactive `run`/`shell` modes mount the host display; the headless
+modes run their own Xvfb on `:99`, so the host X socket is deliberately not
+mounted into them (mounting it makes that Xvfb fail to bind and the shot falls
+back to a blank frame).
+
 Saves you make in the game (File, then Save) land in `saves/` on the host and
 feed straight into the tests below.
 
