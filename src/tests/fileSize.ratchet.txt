@@ -1,0 +1,42 @@
+# Files over the 500-line ceiling awaiting a split. One repo-relative path per
+# line (forward slashes); blank lines and #-comments are ignored. This is a
+# ratchet: it only ever shrinks. Each split PR deletes its own line here (a
+# one-line data-file change that never conflicts with a parallel split), and the
+# guard then enforces the ceiling on that file. When this list is empty, delete
+# it and the stale-entry check in fileSize.guard.test.ts.
+#
+# engine
+src/engine/Simulation.ts
+src/engine/Tower.ts
+src/engine/Crowd.ts
+src/engine/EconomySystem.ts
+# render
+src/render/pixelSprites.ts
+src/render/sprites/structure.ts
+src/render/excalibur/TowerEngine.ts
+# ui / app spine / audio
+src/main.ts
+src/ui/UI.ts
+src/audio/ToneAudioEngine.ts
+# storage
+src/storage/tdtImport.ts
+src/storage/tdtExport.ts
+src/storage/tdtFormat.ts
+src/storage/SaveGame.ts
+# engine leaves
+src/engine/facilities.ts
+src/engine/saveMigration.ts
+# scripts
+scripts/screenshot-scenes.ts
+scripts/screenshot-builders.ts
+# tests (split last)
+src/tests/simulation.test.ts
+src/tests/uiDialogs.test.ts
+src/tests/gameControllersCoverage.test.ts
+src/tests/tdtImport.test.ts
+src/tests/tdtExport.test.ts
+src/tests/storage.test.ts
+src/tests/faqComplete.test.ts
+src/tests/gameControllers.test.ts
+src/tests/tower.test.ts
+src/tests/calendar.test.ts
