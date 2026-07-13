@@ -16,11 +16,19 @@ export interface TdtTenant {
   /** Status/flags byte at offset 5 (a bit field for hotels; nonzero ⇒
    *  tenanted for offices/condos, per the doc). */
   status: number;
+  /** Retail variant ordinal at offset 6 (the first byte after status). The
+   *  real 1994 game stores a shop/fastFood/restaurant's canon variety HERE, not
+   *  at offset 17 as the docs implied: confirmed against game-written saves
+   *  (my_tower's fastFood read 3,1,2,4,0 = Ice Cream/Chinese Cafe/Hamburger/
+   *  Coffee/Soba, matching the readable "BURGER" stand in the Wine render), while
+   *  offset 17 is 0 in every real save. 0 for non-retail. */
+  variant: number;
   /** Rent/lease rate byte at offset 16: 0 very low … 3 high, 4 no rate
    *  (unused in v1; see the backlog's tdt-importer row). */
   rentRate: number;
-  /** Per-type byte at offset 17 (retail variant / hotel dirty-days;
-   *  unused in v1). */
+  /** Byte at offset 17. Long assumed to be the retail variant (it is not; see
+   *  {@link variant}); 0 in every real save's retail. Hotel dirty-days may live
+   *  here (unconfirmed). Unused in v1. */
   subtype: number;
 }
 

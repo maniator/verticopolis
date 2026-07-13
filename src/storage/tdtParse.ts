@@ -327,14 +327,15 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
       // gets no flag.
       const noRate = t.rentRate === 4 && rentConfig(kind) !== null;
 
-      // Canon retail variant: unit-record byte 17 (§4, stronger evidence than
-      // §7 per the doc). Whitelist-coerce against our canon lists so an
+      // Canon retail variant: unit-record byte 6 (`t.variant`), where the real
+      // 1994 game stores it (byte 17 is 0 in every game-written save; see
+      // TdtTenant.variant). Whitelist-coerce against our canon lists so an
       // out-of-range byte drops to undefined (generic name). Only the three
       // retail kinds carry a canon variant; every other kind stays generic.
       let subtype: string | undefined;
-      if (kind === "shop") subtype = canonicalSubtype(kind, SHOP_SUBTYPES[t.subtype]);
-      else if (kind === "fastFood") subtype = canonicalSubtype(kind, FASTFOOD_SUBTYPES[t.subtype]);
-      else if (kind === "restaurant") subtype = canonicalSubtype(kind, RESTAURANT_SUBTYPES[t.subtype]);
+      if (kind === "shop") subtype = canonicalSubtype(kind, SHOP_SUBTYPES[t.variant]);
+      else if (kind === "fastFood") subtype = canonicalSubtype(kind, FASTFOOD_SUBTYPES[t.variant]);
+      else if (kind === "restaurant") subtype = canonicalSubtype(kind, RESTAURANT_SUBTYPES[t.variant]);
 
       pushUnit(kind, ours, ext.x, ext.right - ext.x, state, {
         everOccupied,

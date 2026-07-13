@@ -36,8 +36,11 @@ export interface TenantSpec {
   status?: number;
   /** Rent/lease byte at offset 16 (0 Very Low … 3 High, 4 No Rate). */
   rentRate?: number;
-  /** Per-type byte at offset 17 (retail variant / hotel days-dirty). */
+  /** Retail variant ordinal, written at byte 6 (where the real game stores it). */
   subtype?: number;
+  /** Decoy value for the old (wrong) variant offset, byte 17. Lets a test prove
+   *  the importer reads byte 6 and ignores byte 17. Defaults to 0 (like a real save). */
+  byte17?: number;
 }
 
 export interface FloorSpec {
@@ -151,9 +154,10 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       u16(t.right);
       u8(t.type); // i8 written via two's complement
       u8(t.status ?? 0);
-      pad(10); // reserved bytes 6–15
-      u8(t.rentRate ?? 2); // Average; imports as the default price
-      u8(t.subtype ?? 0);
+      u8(t.subtype ?? 0); // byte 6: retail variant (where the real game stores it)
+      pad(9); // reserved bytes 7–15
+      u8(t.rentRate ?? 2); // byte 16: Average; imports as the default price
+      u8(t.byte17 ?? 0); // byte 17 (unused; the variant lives at byte 6)
     }
     pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
   }

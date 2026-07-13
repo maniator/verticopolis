@@ -143,12 +143,14 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
       w.u16(t.right);
       w.u8(t.type); // i8 via two's complement
       w.u8(t.status);
-      w.pad(10); // reserved bytes 6–15
-      w.u8(t.rentClass);
-      // Byte 17: canon retail variant (§4 mirror of §7 for shop/fastFood/
-      // restaurant), or 0 for non-retail and for a retail unit whose subtype
-      // was never rolled (legacy save loaded pre-feature).
+      // Byte 6: canon retail variant, where the real 1994 game reads it (for
+      // shop/fastFood/restaurant), or 0 for non-retail and for a retail unit
+      // whose subtype was never rolled. This is NOT byte 17: game-written saves
+      // carry the variety here and leave byte 17 at 0 (see TdtTenant.variant).
       w.u8(t.subtypeIdx ?? 0);
+      w.pad(9); // reserved bytes 7–15
+      w.u8(t.rentClass); // byte 16
+      w.u8(0); // byte 17 (unused; the variant lives at byte 6)
     }
     w.pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
   }

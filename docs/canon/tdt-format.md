@@ -132,10 +132,14 @@ table (94 × u16 indices into the unit array).
 **Unit record (18 bytes):** left/right extents in segments (u16 each; one
 segment = one of our tiles; half-open range); type byte (§5; negative ⇒ under
 construction [OS]); a flags byte (bit-mapped hotel state [TD]: bits for occupant
-count, booked-but-empty, occupied-overnight, dirty, bug-infested); ~10
-undocumented bytes; a **rent/lease byte** (0 = Very Low, 1 = Low, 2 = Average,
-3 = High, 4 = No Rate) [TD]; and a final byte holding **hotel days-dirty (0–2)
-or the shop variant (0–10)** [TD].
+count, booked-but-empty, occupied-overnight, dirty, bug-infested); then **byte 6
+holds the retail variant** (0-10 for shops, 0-4 for fast food/restaurants; §7
+names) — measured against game-written saves (`my_tower` fast-food byte 6 =
+`3,1,2,4,0`, matching the "BURGER" stand in the Wine render); the next ~9 bytes
+are undocumented; a **rent/lease byte** at offset 16 (0 = Very Low, 1 = Low,
+2 = Average, 3 = High, 4 = No Rate) [TD]; and a final byte 17 that earlier notes
+guessed was the variant/hotel-days-dirty, but reads `0` for retail in every real
+save (its true role is unconfirmed; hotel days-dirty may live here).
 
 ## 5. Unit type IDs
 
@@ -199,8 +203,19 @@ floor, a status byte (0–3), and the **variant** byte:
   Drug Store, Boutique, Electronics, Bank, Hair Salon, Post Office, Sports Gear.
 
 The 512-slot fixed table is a file-format artifact; the subtype *names* are
-the canon we care about. (The variant is also mirrored on the unit record's
-final byte, §4.)
+the canon we care about.
+
+**The variant a room actually renders with is the unit record's byte 6** (the
+first byte after the status byte, §4), NOT the record's final byte 17 as earlier
+notes implied. Confirmed against game-written saves via `tools/simtower`:
+`my_tower`'s five fast-food units read byte 6 = `3,1,2,4,0`
+(Ice Cream / Chinese Cafe / Hamburger Stand / Coffee Shop / Japanese Soba), which
+matches the readable "BURGER" stand in the Wine render, while byte 17 is `0` in
+every real save. The importer reads byte 6 (`tdtParse.ts`) and the exporter
+writes it there (`tdtEncoder.ts`). The §7 table's own status/variant bytes do
+NOT line up with byte 6 (`my_tower`'s §7 variant column read `0,1,0,1,0`), so the
+§7 record's internal layout past its floor byte is still unresolved; it is not
+the variant source and is a separate follow-up.
 
 ## 8. Transport pools
 

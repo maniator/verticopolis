@@ -154,8 +154,21 @@ describe("buildTDT: export → import round trip", () => {
 
     const wire = sim.serialize();
     const { bytes } = buildTDT(wire);
-    const back = parseTDT(bytes.buffer as ArrayBuffer, "R.TDT").save;
 
+    // Export-side ground truth (NOT circular via parseTDT): the variant index
+    // must land on unit-record byte 6, where the real 1994 game reads it, and
+    // byte 17 must stay 0. parseTdtBinary reads those fixed offsets literally
+    // (.variant = byte 6, .subtype = byte 17), so this pins the wire bytes.
+    const raw = parseTdtBinary(bytes);
+    const tenantOf = (type: number) => raw.floors.flatMap((fl) => fl.tenants).find((t) => t.type === type);
+    expect(tenantOf(10)?.variant).toBe(3); // shop Book Store at byte 6
+    expect(tenantOf(12)?.variant).toBe(1); // fastFood Chinese Cafe at byte 6
+    expect(tenantOf(6)?.variant).toBe(4); // restaurant Steak House at byte 6
+    expect(tenantOf(10)?.subtype).toBe(0); // byte 17 stays 0 (not the variant)
+    expect(tenantOf(12)?.subtype).toBe(0);
+    expect(tenantOf(6)?.subtype).toBe(0);
+
+    const back = parseTDT(bytes.buffer as ArrayBuffer, "R.TDT").save;
     const backShop = back.units.find((u) => u.kind === "shop");
     const backFf = back.units.find((u) => u.kind === "fastFood");
     const backRest = back.units.find((u) => u.kind === "restaurant");
