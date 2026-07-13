@@ -355,6 +355,68 @@ describe("buildTDT: export → import round trip", () => {
   });
 });
 
+describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
+  /** Little-endian i32 read at a header byte offset. */
+  const i32 = (b: Uint8Array, off: number) =>
+    (b[off] | (b[off + 1] << 8) | (b[off + 2] << 16) | (b[off + 3] << 24)) | 0;
+
+  /** A minimal Classic save carrying `units`. */
+  const tower = (units: Unit[], extra: Partial<SerializedGame> = {}): SerializedGame => ({
+    version: SAVE_VERSION,
+    seed: 1,
+    money: 2_000_000,
+    star: 1,
+    minutes: 7 * 60,
+    mode: "classic",
+    units,
+    transports: [],
+    nextId: units.length + 1,
+    towerName: "NoRate",
+    builtWeddingHall: false,
+    evaluatedTower: false,
+    ...extra,
+  });
+
+  it("a No-Rate office exports rent-class byte 4", () => {
+    const { bytes } = buildTDT(
+      tower([unit({ id: 1, kind: "office", floor: 5, x: 100, width: 9, noRate: true })]),
+    );
+    const tdt = parseTdtBinary(bytes);
+    const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 7);
+    expect(tenant?.rentRate).toBe(4);
+  });
+
+  it("a non-priced kind (no rent band) exports rent-class byte 4, matching real saves", () => {
+    // fast food / security / housekeeping charge no tenant rent; the 1994 game
+    // stores them as class 4 (No Rate). Confirmed in my_tower/mo real saves.
+    const { bytes } = buildTDT(
+      tower([unit({ id: 1, kind: "fastFood", floor: 5, x: 100, width: 16 })]),
+    );
+    const tdt = parseTdtBinary(bytes);
+    const tenant = tdt.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 12);
+    expect(tenant?.rentRate).toBe(4);
+  });
+
+  it("No Rate survives a full round-trip (build -> import -> re-build keeps class 4)", () => {
+    const save = tower([unit({ id: 1, kind: "office", floor: 5, x: 100, width: 9, noRate: true })]);
+    const first = buildTDT(save).bytes;
+    const reimported = parseTDT(first.buffer as ArrayBuffer, "N.TDT").save;
+    const office = reimported.units.find((u) => u.kind === "office")!;
+    expect(office.noRate).toBe(true); // flag came back on import
+    const again = parseTdtBinary(buildTDT(reimported).bytes);
+    const tenant = again.floors.flatMap((f) => f.tenants).find((t) => Math.abs(t.type) === 7);
+    expect(tenant?.rentRate).toBe(4); // and re-export still emits class 4
+  });
+
+  it("writes lastQuarterMoney at header 0x10 (÷100), and 0 when unset", () => {
+    const withSnapshot = buildTDT(tower([], { lastQuarterMoney: 1_500_000 })).bytes;
+    expect(i32(withSnapshot, 0x10)).toBe(15_000); // 1,500,000 / 100
+
+    const unset = buildTDT(tower([])).bytes;
+    expect(i32(unset, 0x10)).toBe(0); // no snapshot -> 0
+  });
+});
+
 describe("buildTDT: review hardening (states, collisions, caps, hostile input)", () => {
   it("vacating and moving-in tenants export as sitting tenants, never as vacancies", () => {
     const save = sampleSave();
@@ -811,7 +873,7 @@ describe("classFromRent / legacyFilename", () => {
     expect(classFromRent("office", 10_000)).toBe(2); // band.default
     expect(classFromRent("office", 20_000)).toBe(3); // band.max
     expect(classFromRent("office", undefined)).toBe(2);
-    expect(classFromRent("security", 123)).toBe(2); // unpriced kind
+    expect(classFromRent("security", 123)).toBe(4); // unpriced kind = No Rate (class 4), per real saves
   });
 
   it("filenames are DOS-safe: A-Z0-9, upper, max 8 chars, never empty or a device name", () => {

@@ -86,7 +86,8 @@ export function rentConfig(kind: string): { default: number; min: number; max: n
 }
 
 /** The effective price for a unit — the player's choice, or the kind default. */
-export function rentOf(u: { kind: string; rent?: number }): number {
+export function rentOf(u: { kind: string; rent?: number; noRate?: boolean }): number {
+  if (u.noRate) return 0; // off-market: charges nothing (SimTower "No Rate")
   return u.rent ?? ECON.rent[u.kind]?.default ?? 0;
 }
 

@@ -624,6 +624,23 @@ describe("parseTDT: golden mappings", () => {
     expect(highOffice.rent).toBe(band.max);
   });
 
+  it("rent class 4 (No Rate) flags a priced unit off-market and leaves rent at default", () => {
+    const office = rooms({
+      floors: [{ index: 20, tenants: [{ left: 100, right: 109, type: 7, rentRate: 4 }] }],
+    })[0];
+    expect(office.kind).toBe("office");
+    expect(office.noRate).toBe(true);
+    expect(office.rent).toBeUndefined(); // left at the kind default, not a magic 0
+  });
+
+  it("rent class 4 on a non-priced kind carries no No-Rate flag (band-less kinds ignore it)", () => {
+    const shop = rooms({
+      floors: [{ index: 20, tenants: [{ left: 100, right: 111, type: 10, rentRate: 4 }] }],
+    })[0];
+    expect(shop.kind).toBe("shop");
+    expect(shop.noRate).toBeUndefined();
+  });
+
   it("geometry: x = left, width = right − left; recorded widths are kept and mismatches reported", () => {
     const odd = parse(oneTenant(7, 100, 112)); // 12 wide vs the catalog's 9
     const office = odd.save.units.find((u) => u.kind === "office")!;

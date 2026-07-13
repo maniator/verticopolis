@@ -151,6 +151,30 @@ describe("sparse v3 unit serialization", () => {
     expect(materialize(serializeUnit(u))).toEqual(u);
   });
 
+  it("legacy load: a save with no noRate/lastQuarterMoney loads on-market with a 0 snapshot (no migration)", () => {
+    const save = sampleSim().serialize();
+    // Emulate a pre-feature save by stripping the new optional fields entirely.
+    const legacy = JSON.parse(JSON.stringify(save)) as SerializedGame & { lastQuarterMoney?: number };
+    delete legacy.lastQuarterMoney;
+    for (const u of legacy.units) delete (u as { noRate?: boolean }).noRate;
+    const sim = Simulation.deserialize(legacy);
+    expect(sim.tower.units.every((u) => u.noRate === undefined)).toBe(true); // all on-market
+    // Missing snapshot restores as 0, and the load matches the fields-present load.
+    const round = sim.serialize();
+    expect(round.lastQuarterMoney).toBe(0);
+    const baseline = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round).toEqual(baseline);
+  });
+
+  it("persists a No-Rate unit and a lastQuarterMoney snapshot across the save seam", () => {
+    const save = sampleSim().serialize();
+    save.lastQuarterMoney = 1_750_000;
+    save.units.find((u) => u.kind === "office")!.noRate = true;
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round.lastQuarterMoney).toBe(1_750_000);
+    expect(round.units.find((u) => u.kind === "office")!.noRate).toBe(true);
+  });
+
   it("shrinks the REAL 12,975-unit tower to under half its full-shape JSON and reloads identically", () => {
     const sim = Simulation.deserialize(decodeVctower(towerFile)); // v1 fixture -> reflow -> live tower
     const sparse = sim.serialize();

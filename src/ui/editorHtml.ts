@@ -57,8 +57,14 @@ export function unitEditorVolatile(sim: Simulation, u: Unit): Record<string, str
     // the base asking. Unsold condos (residents undefined) and every other kind
     // read the plain asking price. householdPrice falls back to the base when
     // there's no household, so Classic and unsold condos are unchanged.
-    const price = u.kind === "condo" ? householdPrice(rentOf(u), u.residents) : rentOf(u);
-    vol.rent = `$${price.toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+    if (u.noRate) {
+      // Off the market: reads "No Rate" where the price normally shows. Display
+      // only here; the full rate dropdown that can set it is deferred.
+      vol.rent = "No Rate";
+    } else {
+      const price = u.kind === "condo" ? householdPrice(rentOf(u), u.residents) : rentOf(u);
+      vol.rent = `$${price.toLocaleString()}${isHotelKind(u.kind) ? "/night" : ""}`;
+    }
   }
   if (u.kind === "cinema") {
     // A mid-build / burning / gutted cinema books no film — show "—", not a fake feature.

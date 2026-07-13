@@ -130,3 +130,53 @@ describe("Batch pricing", () => {
     expect(res.changed).toBe(3);
   });
 });
+
+describe("No-Rate units earn nothing until repriced", () => {
+  it("rentOf returns 0 for a No-Rate unit of every priced kind, ignoring any stored rent", () => {
+    for (const kind of PRICED_KINDS) {
+      expect(rentOf({ kind, noRate: true })).toBe(0);
+      // An override is inert while the unit is off the market.
+      expect(rentOf({ kind, rent: 99_999, noRate: true })).toBe(0);
+    }
+    // Flag clear (undefined/false) reads the price normally.
+    expect(rentOf({ kind: "office", rent: 12_000 })).toBe(12_000);
+    expect(rentOf({ kind: "office", rent: 12_000, noRate: false })).toBe(12_000);
+  });
+
+  it("adjusting a No-Rate unit's price clears the flag and resumes rent", () => {
+    const { sim, offices } = officeTower(1, 1);
+    const office = offices[0];
+    office.noRate = true;
+    expect(rentOf(office)).toBe(0);
+    sim.adjustRent(office.id, 1); // any explicit reprice returns it to market
+    expect(office.noRate).toBeUndefined();
+    expect(rentOf(office)).toBeGreaterThan(0);
+  });
+
+  it("a batch reprice also clears No-Rate (never a permanent $0 trap)", () => {
+    const { sim, offices } = officeTower(1, 2);
+    offices[0].noRate = true;
+    sim.applyRentBatch("office", 15_000);
+    expect(offices.every((u) => u.noRate === undefined)).toBe(true);
+    expect(offices.every((u) => rentOf(u) === 15_000)).toBe(true);
+  });
+
+  it("a batch reprice clears No-Rate only on repriced units; a skipped sold condo keeps it", () => {
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
+    sim.buildTransport("elevatorStandard", x0, 1, 2);
+    sim.money = 1e9;
+    sim.build("condo", 2, x0);
+    sim.build("condo", 2, x0 + 16); // condo width 16
+    const condos = sim.tower.units.filter((u) => u.kind === "condo");
+    condos[0].everOccupied = true; // sold → ineligible for reprice
+    condos[0].noRate = true;
+    condos[1].noRate = true; // unsold → will be repriced
+    const res = sim.applyRentBatch("condo", 200_000)!;
+    expect(res.skippedSold).toBe(1);
+    expect(condos[0].noRate).toBe(true); // skipped unit KEEPS its flag
+    expect(condos[1].noRate).toBeUndefined(); // repriced unit cleared it
+    expect(rentOf(condos[1])).toBe(200_000);
+  });
+});
