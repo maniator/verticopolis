@@ -459,24 +459,30 @@ export class Simulation implements SimContext {
     if (!this.isUnlocked(kind)) return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.`, cost: f.cost };
 
     if (!this.isRoomKind(kind)) {
-      // A lobby auto-fills the gap to a neighboring lobby with lobby tiles, so
-      // its total charge includes them. A plain floor tool never bridges (empty
-      // plan), so this branch only adds cost for the lobby case.
+      // A lobby auto-fills the gap to a neighboring lobby with lobby tiles, and
+      // the plain floor tool auto-fills the gap to a neighboring floor with
+      // floor tiles, so the total charge covers the bridge run in the tile's own
+      // substrate (lobby tiles for a lobby, floor tiles for a floor).
       const bridge = this.tower.bridgeFillPlan(kind, floor, x, f.width, facilityFloors(kind)).length;
+      const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
       const c = this.tower.canPlace(kind, floor, x);
       if (!c.ok) {
-        // Rescue a GROUND concourse lobby that fails only because it isn't
-        // connected yet: if an auto-lobby bridge reaches it (bridge > 0 means the
-        // fill runs up to the tile next to it), it lands connected once the
-        // bridge is laid. Kept to the ground floor because that is the only case
-        // where a bridge can substitute for support: sky lobbies (floor 15+) rest
-        // on the story below, and a bridge does not build that vertical support,
-        // so an unsupported sky-lobby tile must still refuse.
+        // Rescue a structural tile that fails only because it isn't connected
+        // yet: if its bridge reaches a same-substrate neighbor (bridge > 0 means
+        // the fill runs up to the tile next to it), it lands connected once the
+        // bridge is laid. This only works where support is HORIZONTAL (a tile
+        // connects by touching a flank), which is where `Tower.isSupported` uses
+        // adjacency rather than the story-below rule: the ground floor for a
+        // lobby, and the ground floor OR any basement for a plain floor
+        // (basements hang off flanking structure too). Above ground (floor >= 2)
+        // a tile rests on the story below, which a bridge does not build, so an
+        // unsupported upper tile must still refuse.
+        const horizontalSupport = kind === "lobby" ? floor === 1 : floor < 2;
         const bridgeable =
-          kind === "lobby" && floor === 1 && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
+          horizontalSupport && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
         if (!bridgeable) return { ok: false, reason: c.reason, cost: f.cost };
       }
-      const cost = f.cost + bridge * FACILITIES.lobby.cost;
+      const cost = f.cost + bridge * substrateCost;
       const afford = this.money >= cost;
       return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
     }

@@ -72,7 +72,15 @@ export class EditorActions {
 
   /** Drag-extend the selected shaft so `end` reaches `targetFloor`. Charges
    *  $5,000 per floor, but only for floors beyond the drag's high-water mark
-   *  (so dragging out and back doesn't bill twice). Shrinking is free. */
+   *  (so dragging out and back doesn't bill twice). Shrinking is free.
+   *  When an extend runs past the built structure the engine auto-lays the floor
+   *  behind the shaft (see `Tower.resizeTransport`); that floor is folded into
+   *  the per-floor extend charge rather than billed on top, so a shaft-floor is
+   *  one priced action (matching the 1994 "no separate floor-build step"). The
+   *  convenience saves the separate floor-build step, not money: at $5,000 per
+   *  shaft-floor the extend is strictly more expensive per floor than laying the
+   *  footprint with the floor tool (4 x $500 for a standard elevator), so it is
+   *  never an exploit. */
   extendSelectedTo(end: "up" | "down", targetFloor: number): void {
     const selected = this.deps.selected();
     if (!selected || selected.type !== "transport") return;
