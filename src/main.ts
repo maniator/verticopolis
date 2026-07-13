@@ -642,6 +642,12 @@ class GameApp {
       this.audio.start();
       if (this.tool.type === "inspect") {
         this.selectPicked(picked);
+        // Touch has no hover stream, so the tap itself must raise the inspector
+        // card a desktop shows on hover (its mobile-only ✕-close exists for
+        // exactly this). selectPicked opens the editor; this adds the quick-info
+        // card for the same facility, and hides it when the tap lands on empty
+        // space (picked is null). On mouse the hover already shows the card.
+        if (touch) this.inspector.inspectPicked(picked);
         return;
       }
       if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
