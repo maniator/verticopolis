@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Tower } from "../engine/Tower";
-import { Clock } from "../engine/Clock";
-import { Crowd } from "../engine/Crowd";
-import { ElevatorDispatch } from "../engine/ElevatorDispatch";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { Tower } from "../../engine/Tower";
+import { Clock } from "../../engine/Clock";
+import { Crowd } from "../../engine/Crowd";
+import { ElevatorDispatch } from "../../engine/ElevatorDispatch";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 /**
  * The Crowd is SimTower's signature: real people who route through the tower.

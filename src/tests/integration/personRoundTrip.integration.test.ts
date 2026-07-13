@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { Clock } from "../engine/Clock";
-import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../engine/Crowd";
-import { FACILITIES } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { Clock } from "../../engine/Clock";
+import { visibleOccupants, CROWD_SECONDS_PER_MINUTE, EAT_SECONDS_MIN, EAT_SECONDS_MAX } from "../../engine/Crowd";
+import { FACILITIES } from "../../engine/facilities";
 
 /**
  * Per-person meal round-trip regression suite (PR A: person-tracking epic).

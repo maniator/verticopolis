@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, RECYCLING_POP_PER_CENTER } from "../engine/facilities";
-import type { FacilityKind, Unit, UnitState } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { FACILITIES, GARBAGE_COLLECT_HOUR, GRID, RECYCLING_POP_PER_CENTER } from "../../engine/facilities";
+import type { FacilityKind, Unit, UnitState } from "../../engine/types";
 
 /** Canon waste & parking demand mechanics: the recycling centers FILL with the
  * tower's daily garbage (emptied by the morning truck), demand scales with
