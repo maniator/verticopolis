@@ -36,12 +36,10 @@ export interface TenantSpec {
   status?: number;
   /** Rent/lease byte at offset 16 (0 Very Low … 3 High, 4 No Rate). */
   rentRate?: number;
-  /** Retail variant ordinal. Written to unit-record **byte 6**, where the real
-   *  game stores the variety and where the importer reads it. NOTE the naming
-   *  collision: this is NOT `TdtTenant.subtype` (which is byte 17); the spec
-   *  field is named `subtype` for historical continuity with older fixtures. To
-   *  set the byte-17 slot, use {@link byte17}. */
-  subtype?: number;
+  /** Retail variant ordinal, written to unit-record **byte 6** (where the real
+   *  game stores the variety and where the importer reads it). Matches
+   *  `TdtTenant.variant`. To set the byte-17 slot instead, use {@link byte17}. */
+  variant?: number;
   /** Decoy value for the old (wrong) variant offset, byte 17 (== `TdtTenant.subtype`).
    *  Lets a test prove the importer reads the variant from byte 6 and ignores
    *  byte 17. Defaults to 0 (like a real save). */
@@ -159,7 +157,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       u16(t.right);
       u8(t.type); // i8 written via two's complement
       u8(t.status ?? 0);
-      u8(t.subtype ?? 0); // byte 6: retail variant (where the real game stores it)
+      u8(t.variant ?? 0); // byte 6: retail variant (where the real game stores it)
       pad(9); // reserved bytes 7–15
       u8(t.rentRate ?? 2); // byte 16: Average; imports as the default price
       u8(t.byte17 ?? 0); // byte 17 (unused; the variant lives at byte 6)

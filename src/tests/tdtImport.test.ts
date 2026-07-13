@@ -268,8 +268,8 @@ describe("parseTDT: golden mappings", () => {
     // Import a single tenant of the given retail type with the given variant
     // byte on unit-record byte 6 (where the real game stores it, NOT byte 17),
     // and return the imported unit.
-    const importOne = (type: number, subtype: number, byte17 = 0) => {
-      const spec = { floors: [{ index: 20, tenants: [{ left: 100, right: 109, type, subtype, byte17 }] }] };
+    const importOne = (type: number, variant: number, byte17 = 0) => {
+      const spec = { floors: [{ index: 20, tenants: [{ left: 100, right: 109, type, variant, byte17 }] }] };
       return rooms(spec).find((u) => u.kind === "shop" || u.kind === "fastFood" || u.kind === "restaurant");
     };
 

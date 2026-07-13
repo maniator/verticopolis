@@ -160,7 +160,8 @@ describe("buildTDT: export → import round trip", () => {
     // byte 17 must stay 0. parseTdtBinary reads those fixed offsets literally
     // (.variant = byte 6, .subtype = byte 17), so this pins the wire bytes.
     const raw = parseTdtBinary(bytes);
-    const tenantOf = (type: number) => raw.floors.flatMap((fl) => fl.tenants).find((t) => t.type === type);
+    const allTenants = raw.floors.flatMap((fl) => fl.tenants);
+    const tenantOf = (type: number) => allTenants.find((t) => t.type === type);
     expect(tenantOf(10)?.variant).toBe(3); // shop Book Store at byte 6
     expect(tenantOf(12)?.variant).toBe(1); // fastFood Chinese Cafe at byte 6
     expect(tenantOf(6)?.variant).toBe(4); // restaurant Steak House at byte 6
