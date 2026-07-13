@@ -27,8 +27,6 @@ src/storage/SaveGame.ts
 src/engine/facilities.ts
 src/engine/saveMigration.ts
 # scripts
-scripts/screenshot-scenes.ts
-scripts/screenshot-builders.ts
 # tests (split last)
 src/tests/simulation.test.ts
 src/tests/uiDialogs.test.ts
