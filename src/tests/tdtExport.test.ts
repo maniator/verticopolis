@@ -94,6 +94,35 @@ describe("buildTDT: export → import round trip", () => {
     expect(again).toEqual(first);
   });
 
+  it("the built-shaft payload size is car-count INDEPENDENT (guards the cars*348 desync)", () => {
+    // The appended built-shaft block is a SINGLE fixed 348-byte car block, one
+    // per shaft, NOT one per car (harness-confirmed on the real 1994 game).
+    // Sizing it `cars * 348` overran every multi-car shaft and desynced the
+    // retail game's whole elevator table after the first one (only one elevator
+    // rendered, and the parking/basement block after it mis-read). The
+    // exporter, importer skip, and tdtBuilder fixture all share one constant, so
+    // a revert to `* cars` would move together and leave every OTHER test green;
+    // this is the only automated guard. Two exports identical except the car
+    // count (same floor range -> same serviced floors) MUST be the same length.
+    const shaft = (cars: number) => ({
+      id: 100,
+      kind: "elevatorStandard" as FacilityKind,
+      x: 100,
+      width: 4,
+      bottom: 1,
+      top: 10,
+      cars,
+      carPositions: Array.from({ length: cars }, () => 1),
+      carDir: Array.from({ length: cars }, () => 0),
+      load: 0,
+    });
+    const oneCar = sampleSave();
+    oneCar.transports.push(shaft(1));
+    const eightCars = sampleSave();
+    eightCars.transports.push(shaft(8));
+    expect(buildTDT(eightCars).bytes.length).toBe(buildTDT(oneCar).bytes.length);
+  });
+
   it("a modern-mode tower is refused with a typed error", () => {
     const save = { ...sampleSave(), mode: "modern" as const };
     expect(() => buildTDT(save)).toThrow(LegacyExportError);

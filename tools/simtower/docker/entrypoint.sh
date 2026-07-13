@@ -99,15 +99,24 @@ load_tdt() {
   local win_path
   win_path="$(winepath -w "$tdt" 2>/dev/null || echo "$tdt")"
   echo "[harness] loading $win_path under Xvfb ..."
-  Xvfb :99 -screen 0 1024x768x24 >/dev/null 2>&1 &
+  local screen="${SCREEN:-1024x768}"
+  # SCREEN is a WxH value (the depth is appended below as x24). Reject an
+  # Xvfb-style "WxHxD" or any non-WxH input rather than feed a malformed
+  # geometry to Xvfb / the desktop.
+  if ! [[ "$screen" =~ ^[0-9]+x[0-9]+$ ]]; then
+    echo "[harness] invalid SCREEN='${screen}' (want WxH, e.g. 1024x768); using 1024x768" >&2
+    screen="1024x768"
+  fi
+  Xvfb :99 -screen 0 "${screen}x24" >/dev/null 2>&1 &
   local xvfb=$!
   export DISPLAY=:99
   sleep 2
   # Launch inside a Wine virtual desktop (a single managed top-level window), so
   # the main tower window reliably composites onto the Xvfb root; plain
   # `wine simtower.exe` leaves the main window unmapped without a window manager
-  # (only its modal dialogs show), which screenshots as black.
-  ( cd "$INSTALL" && wine explorer /desktop=SimTower,1024x768 simtower.exe "$win_path" >/dev/null 2>&1 ) &
+  # (only its modal dialogs show), which screenshots as black. A wider SCREEN
+  # (e.g. 1900x1000) fits more of a tall/wide tower in one shot.
+  ( cd "$INSTALL" && wine explorer "/desktop=SimTower,${screen}" simtower.exe "$win_path" >/dev/null 2>&1 ) &
   local game=$!
   # The disc's wavmix16.dll pops a sequence of modal boxes on boot (a "not
   # installed" warning, a GetModuleFileName debug box) plus the "no sound card"
@@ -127,12 +136,47 @@ load_tdt() {
     echo "[harness] invalid CLICK_SECS=${click_secs}; defaulting to 30" >&2
     click_secs=30
   fi
+  # Dialogs center on the Xvfb screen; derive the center from SCREEN so the
+  # OK/Yes clicks land at any resolution (default 1024x768 -> 512,384). Buttons
+  # sit just below and to either side of center, so sweep a 2D grid around it.
+  local sw="${screen%%x*}"; local sh="${screen##*x}"
+  [[ "$sw" =~ ^[0-9]+$ ]] || sw=1024; [[ "$sh" =~ ^[0-9]+$ ]] || sh=768
+  local cx=$(( sw / 2 )); local cy=$(( sh / 2 ))
   for _ in $(seq 1 "$click_secs"); do
-    for xy in "514 453" "512 416" "478 416" "512 433"; do
-      xdotool mousemove $xy click 1 >/dev/null 2>&1 || true
+    for dx in -60 -30 0 30 60; do
+      for dy in 20 35 50 70; do
+        xdotool mousemove $(( cx + dx )) $(( cy + dy )) click 1 >/dev/null 2>&1 || true
+      done
     done
     sleep 1
   done
+  # Optional: maximize the inner tower window to fill a wide SCREEN so the whole
+  # tower width fits one shot. The main window's title bar sits just under the
+  # top status strip; a double-click there toggles maximize. Its default
+  # position is near the desktop's left, title bar around y 68.
+  if [ "${MAXIMIZE:-0}" = "1" ]; then
+    # The window launches near the desktop's top-left at its default ~808px
+    # width (title bar ~y68). Click its maximize button (top-right ~x985) and
+    # also double-click the title bar center as a fallback.
+    xdotool mousemove 985 68 click 1 >/dev/null 2>&1 || true
+    sleep 1
+    xdotool mousemove 600 68 click --repeat 2 --delay 120 1 >/dev/null 2>&1 || true
+    sleep 2
+  fi
+  # Optional zoom-out for tall towers: ZOOM_CLICKS>0 selects the palette
+  # magnifier tool, then clicks the tower to toggle SimTower's zoomed-out view
+  # so the whole tower (and every elevator shaft) fits one screenshot. The
+  # magnifier sits in the floating tool palette; the tower fills the desktop
+  # center. Diagnostic only; default 0 leaves the saved zoom untouched.
+  local zoom_clicks="${ZOOM_CLICKS:-0}"
+  if [[ "$zoom_clicks" =~ ^[0-9]+$ ]] && [ "$zoom_clicks" -ge 1 ]; then
+    for _ in $(seq 1 "$zoom_clicks"); do
+      xdotool mousemove 187 229 click 1 >/dev/null 2>&1 || true  # select magnifier tool
+      sleep 1
+      xdotool mousemove 600 350 click 1 >/dev/null 2>&1 || true  # click tower to toggle zoom
+      sleep 2
+    done
+  fi
   sleep "$delay"
   import -window root "$out" || true
   echo "[harness] saved $out"

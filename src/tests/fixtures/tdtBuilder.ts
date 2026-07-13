@@ -199,9 +199,12 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       if (stops) servicedCount++;
     }
     for (let c = 0; c < 8; c++) u8(e.carHomes?.[c] ?? e.bottomFloor);
-    // Built-shaft payload (live passenger state); zero-filled, sized exactly
-    // as the parser skips it.
-    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + e.cars * TDT_ELEVATOR_PER_CAR_SIZE);
+    // Built-shaft payload (live passenger state); zero-filled, sized exactly as
+    // the parser skips it: a fixed block, one per-floor entry per SERVICED
+    // floor, then a SINGLE car block (cars-INDEPENDENT, harness-confirmed on the
+    // real 1994 game). NOT `cars *`: that overran multi-car shafts and desynced
+    // the retail game's elevator table. See tdtFormat.ts / tdtExport.ts.
+    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE);
   }
 
   // ---- Finance + parking + stairs -------------------------------------------
