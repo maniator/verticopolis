@@ -2369,12 +2369,34 @@ export class TowerEngine {
     return { centerFloor, dominant, night, zoom: this.cam.zoom, weather: this.sim.weather };
   }
 
+  /** True when the engine draws through WebGL. Excalibur's constructor
+   *  silently falls back to a Canvas2D context when `webgl2` creation fails
+   *  (GPU still wedged after a loss), and that fallback never receives the
+   *  context-loss handlers, so a "recovered" 2D engine would run degraded
+   *  with the whole crash pipeline dead. The rebuild path checks this and
+   *  treats the fallback as a failed recovery. */
+  rendersWithWebGL(): boolean {
+    return this.engine.graphicsContext instanceof ex.ExcaliburGraphicsContextWebGL;
+  }
+
   /** Full teardown, used by in-place context-loss recovery before a rebuild:
    *  Excalibur's dispose stops the loop, force-collects GPU resources,
    *  disables input, and releases the engine singleton slot so a fresh
    *  TowerEngine can be constructed cleanly. Safe on a lost context (GL calls
    *  on one are no-ops per spec). */
   dispose(): void {
+    // Engine.dispose()'s internal stop() is guarded by clock.isRunning(),
+    // and on the recovery path the context-loss handler has already stopped
+    // the clock, so that stop() would skip the texture GC and the browser
+    // teardown: the GC's requestIdleCallback loop would respawn forever and
+    // the per-engine window/document listeners (resize, visibilitychange)
+    // would keep the dead engine graph reachable for the page's life. Run
+    // both explicitly; each is idempotent, so the path where dispose()'s own
+    // stop() also runs them stays correct. The GC handle is private in
+    // Excalibur 0.32, hence the cast; if a future version renames it the
+    // optional chain degrades to the old leak instead of a crash.
+    (this.engine as unknown as { _garbageCollector?: { stop(): void } })._garbageCollector?.stop();
+    this.engine.browser.clear();
     this.engine.dispose();
   }
 }

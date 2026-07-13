@@ -7,6 +7,7 @@ import type { BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { shouldArm } from "../ui/Onboarding";
+import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 import type { UI } from "../ui/UI";
 
 /**
@@ -39,7 +40,13 @@ export interface SaveLoadDeps {
    *  it only what it owns: the crash shape, the save outcome, and the reload
    *  action that stamps the recovery session flags. */
   showCrashScreen(info: {
-    crash: { kind: "webgl-context-lost"; repeat: boolean; saveFlushed: boolean; behindSplash: boolean };
+    crash: {
+      kind: "webgl-context-lost";
+      repeat: boolean;
+      saveFlushed: boolean;
+      behindSplash: boolean;
+      recoveryFailed: boolean;
+    };
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }): void;
@@ -63,11 +70,34 @@ export interface SaveLoadDeps {
  */
 export const RESUME_AFTER_RECOVERY_KEY = "vc-resume-after-recovery";
 
+/**
+ * sessionStorage key holding the time of the last context loss (or recovery
+ * completion, or recovery reload). Two losses inside 90s of each other read
+ * as a "repeat": the device is genuinely struggling, and the crash screen's
+ * advice matters more than a silent recovery would.
+ */
+const GL_LOSS_STAMP_KEY = "vc-gl-lost-reload";
+
 export class SaveLoad {
   private autosaveRun: Promise<void> | null = null;
   private autosaveQueued = false;
+  /** In-memory shadow of {@link GL_LOSS_STAMP_KEY}, so the repeat guard still
+   *  trips when sessionStorage is unavailable (otherwise a flapping GPU would
+   *  loop flush, toast, and rebuild forever without ever reaching the crash
+   *  screen's advice). */
+  private lastLossAt = 0;
 
   constructor(private readonly deps: SaveLoadDeps) {}
+
+  /** Record a context-loss event time in both stores (see lastLossAt). */
+  private stampLoss(at: number): void {
+    this.lastLossAt = at;
+    try {
+      sessionStorage.setItem(GL_LOSS_STAMP_KEY, String(at));
+    } catch {
+      /* best effort; the in-memory shadow still counts */
+    }
+  }
 
   /** Stamp the live camera onto the sim before a save/export. A null camera
    *  (headless context) stamps nothing rather than null, so it can never
@@ -142,7 +172,7 @@ export class SaveLoad {
    *   swap in a fresh engine the moment the browser restores the context.
    *   Mobile systems reset GL contexts routinely (memory pressure elsewhere,
    *   GPU process restarts, backgrounding); a one-off reset should cost the
-   *   player a beat, never the session.
+   *   player a moment of stillness and nothing more.
    * - Repeat loss (within 90s), a loss behind the splash, a failed flush, or
    *   a failed/timed-out recovery: the full crash screen. It says what
    *   happened and whether the tower was saved, offers the crash-report zip
@@ -195,36 +225,29 @@ export class SaveLoad {
 
     // A second loss within 90 seconds of the previous one (or of the last
     // recovery reload) means recovering alone isn't fixing it; the screen adds
-    // advice to close other tabs/apps. Stamped at LOSS time so an in-place
-    // recovery cycle counts toward the window too, and re-stamped by the
-    // reload action so the old reload-anchored window keeps working.
-    const KEY = "vc-gl-lost-reload";
-    let lastLoss = 0;
+    // advice to close other tabs/apps. Every loss stamps the window, on every
+    // path, so an in-place recovery cycle counts toward it too.
+    let lastLoss = this.lastLossAt;
     try {
-      lastLoss = Number(sessionStorage.getItem(KEY)) || 0;
+      lastLoss = Math.max(lastLoss, Number(sessionStorage.getItem(GL_LOSS_STAMP_KEY)) || 0);
     } catch {
-      /* storage may be unavailable; treat as first loss */
+      /* storage may be unavailable; the in-memory shadow still applies */
     }
     const now = Date.now();
     const repeat = now - lastLoss < 90_000;
-    try {
-      sessionStorage.setItem(KEY, String(now));
-    } catch {
-      /* best effort */
-    }
+    this.stampLoss(now);
 
-    const showScreen = (): void =>
+    const showScreen = (recoveryFailed: boolean): void =>
       this.deps.showCrashScreen({
-        crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed, behindSplash },
+        crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed, behindSplash, recoveryFailed },
         save: { flushed, behindSplash, storageBlame, hadPriorSave },
         onReload: () => {
+          this.stampLoss(Date.now());
           try {
-            const stamp = String(Date.now());
-            sessionStorage.setItem(KEY, stamp);
             // Tell the fresh boot this reload was a recovery, so it resumes the
             // tower rather than showing the title screen (see resolveBootScreen
             // in src/bootScreen.ts, consumed by the boot branch in main.ts).
-            sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, stamp);
+            sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, String(Date.now()));
           } catch {
             /* best effort */
           }
@@ -238,21 +261,40 @@ export class SaveLoad {
     // would); behind the splash there is no session to preserve; and a failed
     // flush is storage news the player must see, on the screen that words it.
     if (repeat || behindSplash || !flushed) {
-      showScreen();
+      showScreen(false);
       return;
     }
+    // Captured so a tower swap during the wait (Load/New stay reachable) is
+    // detectable at completion: the "your tower was saved" trace belongs to
+    // THIS tower, and must not land in a different one's bulletin log.
+    const simAtLoss = this.deps.getSim();
     this.deps.ui.toast("The device reset the game's graphics. Recovering...", "info");
     this.deps.attemptGraphicsRecovery((recovered) => {
+      // Re-anchor the repeat window at the attempt's END too: a background
+      // eviction can restore minutes after the loss, and a fresh loss soon
+      // after play resumes must still read as a repeat.
+      this.stampLoss(Date.now());
       if (!recovered) {
-        showScreen();
+        showScreen(true);
         return;
       }
-      // Leave a durable trace in the bulletin log (the old silent reload
-      // erased all evidence; recovering must not repeat that mistake).
-      this.deps
-        .getSim()
-        .emit("The device reset the game's graphics; the game recovered on the spot. Your tower was saved first.", "info");
-      this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
+      // A parallel loss may have already put the crash screen up (a flapping
+      // GPU); the screen owns the session then, so stay quiet rather than
+      // contradict it with a success toast.
+      if (document.getElementById(CRASH_SCREEN_ID)) return;
+      if (this.deps.getSim() === simAtLoss) {
+        // Leave a durable trace in the bulletin log (the old silent reload
+        // erased all evidence; recovering must not repeat that mistake).
+        simAtLoss.emit(
+          "The device reset the game's graphics; the game recovered on the spot. Your tower was saved first.",
+          "info",
+        );
+        this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
+      } else {
+        // The player swapped towers during the wait; the saved-tower claim
+        // would be about the previous one, so keep the toast to the facts.
+        this.deps.ui.toast("Graphics recovered.", "good");
+      }
     });
   }
 

@@ -656,15 +656,51 @@ class GameApp {
     // schema's optional field (a TDT import carries no zoom).
     const { tile, floor, zoom = 0.9 } = this.engine.viewState();
     const overlay = this.engine.overlayMode;
-    this.engine.dispose();
+    // Silence the dying engine BEFORE dispose: its canvas can outlive the
+    // swap (a detached canvas keeps its restored GL context), and a later
+    // eviction of that zombie context would otherwise fire onContextLost and
+    // throw a crash screen over a perfectly healthy rebuilt game.
+    const old = this.engine;
+    old.onContextLost = null;
+    old.onContextRestored = null;
+    old.dispose();
     // A canvas whose WebGL context was lost hands the same dead context back
     // from getContext() forever, so the rebuild needs a fresh element.
     // cloneNode copies the id and attributes but no listeners; wireEngine
     // re-binds ours below, and the old element's listeners die with it.
-    const fresh = this.canvas.cloneNode(false) as HTMLCanvasElement;
-    this.canvas.replaceWith(fresh);
+    const oldCanvas = this.canvas;
+    const fresh = oldCanvas.cloneNode(false) as HTMLCanvasElement;
+    oldCanvas.replaceWith(fresh);
+    // Release the zombie context's GPU hold. The restore that triggered this
+    // rebuild revived the OLD context too; explicitly losing it frees its
+    // GPU memory now and keeps recovered sessions from creeping toward the
+    // browser's per-page context cap. An extension-forced loss never
+    // auto-restores, and the engine's hooks were nulled above, so this can't
+    // re-enter the recovery flow.
+    try {
+      (oldCanvas.getContext("webgl2") as WebGL2RenderingContext | null)
+        ?.getExtension("WEBGL_lose_context")
+        ?.loseContext();
+    } catch {
+      /* best effort; some drivers refuse the extension */
+    }
+    // The loss severed any in-flight gesture (the old canvas's pointerup
+    // died with it), so drop gesture state that would otherwise linger: a
+    // stale transportStart suppresses the update prompt session-long, and a
+    // stale paint anchor would extend the next touch drag across the gap.
+    this.paintAnchor = null;
+    this.transportStart = null;
+    this.build.clearPaint();
+    this.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
     this.canvas = fresh;
     this.engine = new TowerEngine(fresh, this.sim);
+    if (!this.engine.rendersWithWebGL()) {
+      // Excalibur silently fell back to Canvas2D: the GPU is still wedged.
+      // That mode is degraded AND blind to further context losses, so treat
+      // it as a failed recovery (the crash screen path takes over).
+      this.engine.dispose();
+      throw new Error("webgl unavailable after context restore");
+    }
     this.wireEngine();
     this.applyReducedMotion();
     this.engine.paused = SPEEDS[this.speed] === 0;

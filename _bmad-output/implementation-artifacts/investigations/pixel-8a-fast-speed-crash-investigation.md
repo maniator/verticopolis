@@ -268,7 +268,7 @@ TileMap + pacing fixes).
 
 ### Additional Findings
 
-#### Finding 5: The remaining player pain is the recovery UX, not a code defect
+#### Finding 5: The remaining player pain lives in the recovery UX
 
 **Evidence:** report JSON (healthy heap, no frame errors, repeat:false); Finding 2 (sim clean);
 2026-07-12 follow-up measurements (no leak, texture count plateaus, frame p50 halved).

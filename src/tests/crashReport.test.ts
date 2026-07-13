@@ -5,7 +5,7 @@ import { SaveGame } from "../storage/SaveGame";
 import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
 import type { CrashDescription } from "../game/crashReport";
 
-const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false };
+const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false };
 
 describe("crash report packaging", () => {
   it("buildCrashDetails captures the build, the tower summary, and the frame-error trail", () => {

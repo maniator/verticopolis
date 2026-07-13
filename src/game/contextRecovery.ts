@@ -8,10 +8,13 @@
  *
  * Timeout policy: waiting forever would strand the player on a dead canvas
  * with no explanation, so recovery gives up after {@link DEFAULT_TIMEOUT_MS}
- * of VISIBLE time. The countdown only runs while the tab is visible: Android
+ * of accumulated VISIBLE time. The countdown only runs while the tab is
+ * visible, and time already spent visible is remembered across hides: Android
  * routinely evicts a backgrounded tab's GL context and restores it on return
  * to the foreground, which can be minutes later, and the crash screen must
- * not appear (and burn the session) while nobody is looking.
+ * not appear (and burn the session) while nobody is looking. Once the
+ * restored signal arrives the countdown stops for good; a slow rebuild is
+ * never interrupted by it, even across visibility flips.
  *
  * Pure orchestration with injected ports so the whole state machine is unit
  * testable without a GPU: the caller supplies the restored-signal
@@ -19,7 +22,8 @@
  */
 export interface ContextRecoveryDeps {
   /** Subscribe to the browser's context-restored signal. Returns the
-   *  unsubscribe. Called exactly once, before any timer is armed. */
+   *  unsubscribe. Called exactly once. The callback may fire at any moment,
+   *  including synchronously during subscription. */
   onRestored(cb: () => void): () => void;
   /** Tear down the dead engine and build a fresh one. Resolves when the new
    *  engine is running; a throw or rejection means recovery failed. */
@@ -30,10 +34,10 @@ export interface ContextRecoveryDeps {
   timeoutMs?: number;
 }
 
-/** How long (visible time) to wait for the browser to restore the context
- *  before falling back to the crash screen. Restoration after a GPU process
- *  restart typically lands well under a second; several seconds of visible
- *  silence means the GPU is genuinely wedged. */
+/** How long (accumulated visible time) to wait for the browser to restore the
+ *  context before falling back to the crash screen. Restoration after a GPU
+ *  process restart typically lands well under a second; several seconds of
+ *  visible silence means the GPU is genuinely wedged. */
 export const DEFAULT_TIMEOUT_MS = 8000;
 
 /**
@@ -45,7 +49,15 @@ export function attemptContextRecovery(deps: ContextRecoveryDeps, done: (recover
   const doc = deps.doc ?? document;
   const timeoutMs = deps.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let settled = false;
+  /** Latched by the first restored signal: suppresses the give-up countdown
+   *  for the rest of the attempt (a visibility flip during a slow rebuild
+   *  must not re-arm it over a healthy new engine) and makes a second
+   *  restored signal a no-op instead of a second concurrent rebuild. */
+  let rebuilding = false;
   let timer: ReturnType<typeof setTimeout> | null = null;
+  /** Visible-time budget left; each disarm banks the time already spent. */
+  let remainingMs = timeoutMs;
+  let armedAt = 0;
   let unsubscribe: (() => void) | null = null;
 
   const finish = (ok: boolean): void => {
@@ -55,26 +67,32 @@ export function attemptContextRecovery(deps: ContextRecoveryDeps, done: (recover
     timer = null;
     doc.removeEventListener("visibilitychange", onVisibility);
     unsubscribe?.();
+    unsubscribe = null;
     done(ok);
   };
 
   const arm = (): void => {
-    if (timer === null && !doc.hidden) timer = setTimeout(() => finish(false), timeoutMs);
+    if (timer !== null || rebuilding || settled || doc.hidden) return;
+    armedAt = Date.now();
+    timer = setTimeout(() => finish(false), remainingMs);
   };
   const disarm = (): void => {
-    if (timer !== null) clearTimeout(timer);
+    if (timer === null) return;
+    clearTimeout(timer);
     timer = null;
+    remainingMs = Math.max(0, remainingMs - (Date.now() - armedAt));
   };
   const onVisibility = (): void => {
     if (doc.hidden) disarm();
     else arm();
   };
 
-  unsubscribe = deps.onRestored(() => {
-    if (settled) return;
-    // The GPU is back. Stop the countdown before the (possibly slow) rebuild
-    // so a timeout can't fire mid-rebuild and stack the crash screen on top
-    // of a healthy new engine.
+  const onRestoredSignal = (): void => {
+    if (settled || rebuilding) return;
+    // The GPU is back. Stop the countdown for good before the (possibly
+    // slow) rebuild so a timeout can't fire mid-rebuild and stack the crash
+    // screen on top of a healthy new engine.
+    rebuilding = true;
     disarm();
     let started: Promise<void>;
     try {
@@ -87,7 +105,15 @@ export function attemptContextRecovery(deps: ContextRecoveryDeps, done: (recover
       () => finish(true),
       () => finish(false),
     );
-  });
+  };
+
   doc.addEventListener("visibilitychange", onVisibility);
   arm();
+  unsubscribe = deps.onRestored(onRestoredSignal);
+  // The signal may have fired synchronously inside the subscription call and
+  // settled the attempt before `unsubscribe` existed; release it now.
+  if (settled) {
+    unsubscribe();
+    unsubscribe = null;
+  }
 }

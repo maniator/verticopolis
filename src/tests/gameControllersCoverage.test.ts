@@ -597,7 +597,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   let f: ReturnType<typeof fakes>;
   let adopted: Simulation[];
   let crashScreens: {
-    crash: { kind: string; repeat: boolean; saveFlushed: boolean; behindSplash: boolean };
+    crash: { kind: string; repeat: boolean; saveFlushed: boolean; behindSplash: boolean; recoveryFailed: boolean };
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }[];
@@ -860,7 +860,15 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(recoveries).toHaveLength(1);
     recoveries[0](false);
     expect(crashScreens).toHaveLength(1);
-    expect(crashScreens[0].crash).toEqual({ kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false });
+    // recoveryFailed rides along so the screen can add the device-distress
+    // advice even though repeat is false (crashScreen.test pins the wording).
+    expect(crashScreens[0].crash).toEqual({
+      kind: "webgl-context-lost",
+      repeat: false,
+      saveFlushed: true,
+      behindSplash: false,
+      recoveryFailed: true,
+    });
     expect(crashScreens[0].save).toEqual({ flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false });
     // No silent auto-reload: the reload (and its session stamps) is the
     // player's Reload button.
@@ -891,6 +899,84 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(recoveries).toHaveLength(1); // no second attempt
     expect(crashScreens).toHaveLength(1);
     expect(crashScreens[0].crash.repeat).toBe(true);
+    // The screen followed a repeat gate, never a recovery attempt.
+    expect(crashScreens[0].crash.recoveryFailed).toBe(false);
+  });
+
+  it("a loss more than 90s after the previous one leaves the repeat window: recovery is attempted again", () => {
+    stubReload();
+    sessionStorage.setItem("vc-gl-lost-reload", String(Date.now() - 91_000));
+    saveLoad.recoverFromContextLoss();
+    expect(crashScreens).toHaveLength(0);
+    expect(recoveries).toHaveLength(1); // treated as a fresh first loss
+  });
+
+  it("the repeat window re-anchors when the recovery COMPLETES, so a slow background restore doesn't defeat it", () => {
+    stubReload();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(1_000_000);
+      saveLoad.recoverFromContextLoss(); // loss stamped at T0
+      // Android restores the context ten minutes later (backgrounded gap).
+      vi.setSystemTime(1_000_000 + 10 * 60_000);
+      recoveries[0](true);
+      // A fresh loss 30s into resumed play is genuine distress: repeat.
+      vi.setSystemTime(1_000_000 + 10 * 60_000 + 30_000);
+      saveLoad.recoverFromContextLoss();
+      expect(recoveries).toHaveLength(1); // no second silent attempt
+      expect(crashScreens).toHaveLength(1);
+      expect(crashScreens[0].crash.repeat).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("with sessionStorage unavailable the in-memory shadow still trips the repeat guard (no endless recover loop)", () => {
+    stubReload();
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+      setItem: () => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    } as unknown as Storage);
+    saveLoad.recoverFromContextLoss(); // first loss: recovery attempted
+    expect(recoveries).toHaveLength(1);
+    recoveries[0](true);
+    saveLoad.recoverFromContextLoss(); // seconds later: must escalate
+    expect(recoveries).toHaveLength(1);
+    expect(crashScreens).toHaveLength(1);
+    expect(crashScreens[0].crash.repeat).toBe(true);
+  });
+
+  it("a recovery that resolves under an already-open crash screen stays quiet (no contradictory success toast)", () => {
+    stubReload();
+    saveLoad.recoverFromContextLoss();
+    // A parallel loss flow put the crash card up while the rebuild ran.
+    const card = document.createElement("dialog");
+    card.id = "crash-screen";
+    document.body.appendChild(card);
+    try {
+      const toastCount = f.toasts.length;
+      recoveries[0](true);
+      expect(f.toasts.length).toBe(toastCount); // the screen owns the session
+      expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
+    } finally {
+      card.remove();
+    }
+  });
+
+  it("a tower swap during the recovery wait keeps the saved-tower claim out of the new tower's bulletin", () => {
+    stubReload();
+    const simAtLoss = sim;
+    saveLoad.recoverFromContextLoss();
+    sim = new Simulation(); // player loaded/founded a different tower while waiting
+    recoveries[0](true);
+    // Generic toast only: "your tower was saved" would be about the old tower.
+    expect(last(f.toasts)).toEqual({ text: "Graphics recovered.", kind: "good" });
+    expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
+    expect(simAtLoss.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
   });
 
   it("a context loss whose save fails says so on the screen, keeps the prior tower, and blames storage", () => {
