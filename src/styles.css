@@ -577,6 +577,22 @@ a.btn {
   padding: 4px 6px;
   font-size: 11px;
 }
+/* Mobile only: the inspector card's diagnostics folded into the editor (access
+   warnings, patronage, on-notice). A hair smaller than the stat rows, with a
+   divider above so it reads as its own block; hidden entirely when empty (a
+   well-placed, non-retail unit with nothing to warn about). */
+#editor .ed-diagnostics {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+#editor .ed-diagnostics:empty {
+  display: none;
+}
 
 /* ---- Sidebar (each panel reads as a little window) ---- */
 #sidebar {

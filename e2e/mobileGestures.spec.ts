@@ -164,8 +164,8 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
   });
 });
 
-test.describe("mobile inspect: a tap raises the hover card", () => {
-  test("tapping a facility with the inspect tool shows the inspector card (touch has no hover)", async ({ page }) => {
+test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded in", () => {
+  test("a touch tap opens the editor (with the card's diagnostics), never the floating card", async ({ page }) => {
     const errors: string[] = [];
     page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
 
@@ -184,9 +184,10 @@ test.describe("mobile inspect: a tap raises the hover card", () => {
       g.sim.money = 1e9;
     });
 
-    // Build an office to inspect (a touch tap with the build tool). Compare the
-    // unit count before and after so the assertion proves THIS tap placed a
-    // room, not that the tower merely already had units.
+    // Build an office to inspect, then switch to the inspect tool — both at the
+    // default (desktop) width where the tool palette is docked and clickable.
+    // Compare the unit count before/after so the assertion proves THIS tap placed
+    // a room, not that the tower merely already had units.
     await page.click('.pal-item[data-kind="office"]');
     const spot = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -200,22 +201,33 @@ test.describe("mobile inspect: a tap raises the hover card", () => {
     await dispatchTouch(page, "pointerup", 8001, spot.x, spot.y);
     const unitsAfter = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
     expect(unitsAfter).toBeGreaterThan(unitsBefore);
-
-    // Switch to the inspect tool. The card starts hidden: touch has no hover to
-    // raise it, and before this fix a tap only opened the editor.
     await page.click('.pal-item[data-tool="inspect"]');
+
+    // Drop to a PHONE viewport (< 767px, the mobileMq breakpoint) so the tap
+    // takes the one-panel mobile path. Both panels start hidden.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(page.locator("#editor")).toHaveClass(/hidden/);
     await expect(page.locator("#inspector")).toHaveClass(/hidden/);
 
-    // Tap the office. The tap must stand in for the missing hover and raise the
-    // inspector card for that facility.
-    await dispatchTouch(page, "pointerdown", 8002, spot.x, spot.y);
-    await dispatchTouch(page, "pointerup", 8002, spot.x, spot.y);
-    const insp = page.locator("#inspector");
-    await expect(insp).not.toHaveClass(/hidden/);
-    await expect(insp).toContainText("Satisfaction:"); // the unit card rendered
+    // Re-derive the tap point (the resize changed world-to-screen), then tap.
+    const spot2 = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const e = g.engine;
+      const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
+      return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
+    });
+    await dispatchTouch(page, "pointerdown", 8002, spot2.x, spot2.y);
+    await dispatchTouch(page, "pointerup", 8002, spot2.x, spot2.y);
 
-    // Tapping empty space (same on-screen floor, well left of the office where
-    // nothing is built) dismisses the card again.
+    // The editor opens with the card's diagnostics folded in (the office has no
+    // elevator/stair to floor 2, so the access line is present). The floating
+    // hover card is NEVER raised on touch — one panel, not two.
+    await expect(page.locator("#editor")).not.toHaveClass(/hidden/);
+    await expect(page.locator("#editor")).toContainText("Access:");
+    await expect(page.locator("#inspector")).toHaveClass(/hidden/);
+
+    // Tapping empty space (well left of the office, nothing built) closes it.
     const empty = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = (window as any).game;
@@ -225,6 +237,7 @@ test.describe("mobile inspect: a tap raises the hover card", () => {
     });
     await dispatchTouch(page, "pointerdown", 8003, empty.x, empty.y);
     await dispatchTouch(page, "pointerup", 8003, empty.x, empty.y);
+    await expect(page.locator("#editor")).toHaveClass(/hidden/);
     await expect(page.locator("#inspector")).toHaveClass(/hidden/);
 
     expect(errors).toEqual([]);
