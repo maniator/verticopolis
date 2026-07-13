@@ -184,7 +184,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
       g.sim.money = 1e9;
     });
 
-    // Build an office to inspect, then switch to the inspect tool — both at the
+    // Build an office to inspect, then switch to the inspect tool, both at the
     // default (desktop) width where the tool palette is docked and clickable.
     // Compare the unit count before/after so the assertion proves THIS tap placed
     // a room, not that the tower merely already had units.
@@ -222,7 +222,7 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
 
     // The editor opens with the card's diagnostics folded in (the office has no
     // elevator/stair to floor 2, so the access line is present). The floating
-    // hover card is NEVER raised on touch — one panel, not two.
+    // hover card is NEVER raised on touch: one panel, not two.
     await expect(page.locator("#editor")).not.toHaveClass(/hidden/);
     await expect(page.locator("#editor")).toContainText("Access:");
     await expect(page.locator("#inspector")).toHaveClass(/hidden/);

@@ -152,7 +152,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): string {
       : `<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`
     : "";
   // Silent rule: a parking space only works when it chains to a ramp. Skip
-  // the verdict while it's still building (or on fire) — "Status" covers that.
+  // the verdict while it's still building (or on fire); "Status" covers that.
   // One flood-fill for the whole parking card: its `.has(id)` gives ramp
   // connectivity and its `.size` feeds the demand line, so a hover never
   // runs the fill twice.
@@ -168,7 +168,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): string {
         ? `<div style="color:var(--good)">Ramp access: connected.</div>` + parkingDemandLine(sim, parkingSet.size)
         : `<div style="color:var(--bad)">Ramp access: none. This space is dead (no relief). Chain it to a Parking Ramp.</div>`;
   // W1: a served office whose nearest stairs/elevator is beyond the walking
-  // tolerance is silently eroding — surface it always (like the W3 line below),
+  // tolerance is silently eroding, so surface it always (like the W3 line below),
   // not only once the tenant is already on notice, and name the concrete fix.
   const walkFar =
     u.kind === "office" &&
@@ -178,7 +178,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): string {
       ? `<div style="color:var(--bad)">Long walk to transport. Tenants tire of the hike. Put a stairway, escalator, or passenger elevator within reach.</div>`
       : "";
   // W3: a canon commercial venue (not partyHall) more than two floors from a
-  // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix — lobbies only
+  // (sky) lobby loses half its shoppers. Name the ACHIEVABLE fix: lobbies only
   // go on the ground and every 15th floor, so "add a lobby here" is usually
   // impossible; the real move is to sit within 2 floors of one of those levels.
   const commercialLobby =
@@ -189,7 +189,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): string {
   // tower has outgrown its centers (the canon 4★ gate).
   const recycling = u.kind === "recycling" && isOperational(u) ? recyclingLine(sim) : "";
   // A tenant on notice: spell out that they're leaving, why, how long is left,
-  // and the exact recovery bar they must clear — the "inform before you hurt
+  // and the exact recovery bar they must clear, the "inform before you hurt
   // them" contract, so the eviction is never a surprise. The countdown and the
   // current-vs-target read recompute on every render, so they tick down live as
   // the game clock advances. A relocation is a life event (Modern condos), not a
@@ -201,7 +201,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): string {
     const minsLeft = Math.max(0, (u.vacateAt ?? 0) - sim.clock.minutes);
     // Framed as an honest UPPER bound ("under N") using ceil, so the block
     // never implies the tenant has *more* time than they do. Once the notice
-    // has elapsed, say so plainly — they leave on the next hourly tick.
+    // has elapsed, say so plainly: they leave on the next hourly tick.
     const left =
       minsLeft <= 0
         ? "any moment now"
