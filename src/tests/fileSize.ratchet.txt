@@ -8,7 +8,6 @@
 # engine
 src/engine/Simulation.ts
 src/engine/Tower.ts
-src/engine/Crowd.ts
 src/engine/EconomySystem.ts
 # render
 src/render/pixelSprites.ts
