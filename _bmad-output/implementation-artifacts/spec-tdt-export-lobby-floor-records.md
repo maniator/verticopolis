@@ -28,13 +28,13 @@ context:
 
 | Scenario | Input / State | Expected Output / Behavior | Error Handling |
 |----------|--------------|---------------------------|----------------|
-| Ground lobby | contiguous `lobby` tiles on floor 1, no room over them | one type-24 record spanning the run (status 0, rentClass 4) | — |
-| Sky lobby | `lobby` tiles on floor 15/30/... | type-24 record(s) per contiguous run | — |
-| Empty paved gap | `floor` tiles between rooms | type-0 record per contiguous run (status 2, rentClass 4) | — |
-| Tile under a room | `floor`/`lobby` tile covered by a room footprint | no floor/lobby record there (room record wins) | — |
-| Lobby broken by a room/elevator | lobby run split by an occupied tile | one type-24 record per sub-run | — |
-| Gutted/burning lobby | lobby unit `state` fire/gutted | excluded (as today); no type-24 record | — |
-| Round-trip | our export -> parseTDT -> re-export | byte-identical; zero importer warnings | — |
+| Ground lobby | contiguous `lobby` tiles on floor 1, no room over them | one type-24 record spanning the run (status 0, rentClass 4) | n/a |
+| Sky lobby | `lobby` tiles on floor 15/30/... | type-24 record(s) per contiguous run | n/a |
+| Empty paved gap | `floor` tiles between rooms | type-0 record per contiguous run (status 2, rentClass 4) | n/a |
+| Tile under a room | `floor`/`lobby` tile covered by a room footprint | no floor/lobby record there (room record wins) | n/a |
+| Lobby broken by a room/elevator | lobby run split by an occupied tile | one type-24 record per sub-run | n/a |
+| Gutted/burning lobby | lobby unit `state` fire/gutted | excluded (as today); no type-24 record | n/a |
+| Round-trip | our export -> parseTDT -> re-export | byte-identical; zero importer warnings | n/a |
 | Over cap | a floor's total records (rooms + spans) > 256 | LegacyExportError (existing guard, unchanged) | throw |
 
 </frozen-after-approval>

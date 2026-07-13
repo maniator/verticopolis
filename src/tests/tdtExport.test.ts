@@ -722,6 +722,68 @@ describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", ()
       { left: 0, right: 8, type: 24, status: 0, rentClass: 4, subtype: 0 },
     ]);
   });
+
+  it("a forged floor width (Infinity) can't hang the export, and paving stays within the grid", () => {
+    // floor/lobby units arrive unclamped from serialized input; a forged width
+    // widens the extent to Infinity. The paving loop must clamp to finite tiles
+    // in [0, GRID.width] and return promptly, not spin forever.
+    const started = Date.now();
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "floor", floor: 2, x: 0, width: Number.POSITIVE_INFINITY }),
+      ]),
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+    // No emitted record on any floor extends past the grid's right edge.
+    for (let idx = 0; idx < 120; idx++) {
+      for (const t of floorTenants(bytes, idx)) {
+        expect(t.right).toBeLessThanOrEqual(GRID.width);
+        expect(t.left).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("a multi-story unit's part records are never overlapped by a paving span", () => {
+    // A Wedding Hall crowns floor 100 as a 5-part cathedral (PART_STACKS emits
+    // types 36..40 DOWNWARD onto floors 96-100), yet facilityFloors(weddingHall)
+    // is 1. So the old input-footprint coverage marked only floor 100 and let a
+    // paving span overlap the parts on floors 96-99. Coverage is now rebuilt
+    // from the EMITTED records, so no type-0/24 span overlaps a part on ANY of
+    // the five floors, and the tower round-trips byte-identically.
+    const units: Unit[] = [];
+    let id = 1;
+    // Full-extent paving on floors 96-100 (under the cathedral too), plus gaps.
+    for (let fl = 96; fl <= 100; fl++) {
+      for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
+    }
+    units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 })); // parts cover [5, 21)
+    const save = tower(units);
+    const { bytes } = buildTDT(save);
+
+    // Each of floors 96-100 carries one cathedral part (types 36..40); assert no
+    // type-0 span overlaps the part's [5, 21) footprint on any of them.
+    const cathedralIds = new Set([36, 37, 38, 39, 40]);
+    for (let ourFloor = 96; ourFloor <= 100; ourFloor++) {
+      const recs = floorTenants(bytes, ourFloor + 9);
+      const parts = recs.filter((t) => cathedralIds.has(Math.abs(t.type)));
+      expect(parts.length, `cathedral part on floor ${ourFloor}`).toBe(1);
+      const paving = recs.filter((t) => t.type === 0 || t.type === 24);
+      for (const p of parts) {
+        for (const s of paving) {
+          const overlaps = s.left < p.right && p.left < s.right;
+          expect(
+            overlaps,
+            `span [${s.left},${s.right}) overlaps part [${p.left},${p.right}) on floor ${ourFloor}`,
+          ).toBe(false);
+        }
+      }
+    }
+
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    const again = buildTDT(parseTDT(bytes.buffer as ArrayBuffer, "C.TDT").save).bytes;
+    expect(again).toEqual(bytes);
+  });
 });
 
 describe("shared-table tripwires: the writer's inversions match the importer", () => {

@@ -198,9 +198,12 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // ---- Gather rooms, paving extents, and per-floor tenant records ---------
   const tenantsByTdt = new Map<number, OutTenant[]>();
   const extents = new Map<number, { left: number; right: number }>();
-  // Tiles a room footprint covers, per OUR floor: a paved tile under a room
-  // carries no floor/lobby record (the room record wins), matching a real save
-  // where type-0 records are only the gaps between rooms.
+  // Tiles an emitted tenant record covers, per OUR floor: a paved tile under a
+  // record carries no floor/lobby span (the record wins, so type-0/24 spans are
+  // only the gaps between records). Rebuilt from the emitted records themselves
+  // (below), not the input footprints, so it exactly matches every record we
+  // wrote, including multi-story PART_STACKS parts on their lower floors and
+  // burned shells; a footprint-based set would miss those and let a span overlap.
   const coveredTiles = new Map<number, Set<number>>();
   // Rows for the §7 retail table: one per emitted shop / fastFood / restaurant,
   // carrying the TDT-space floor byte and the canon variant. Filled in tenant
@@ -300,17 +303,6 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     if (!fitsTdtRows(u.floor, facilityFloors(u.kind))) {
       counts.outOfRange++;
       continue;
-    }
-    // Mark this in-range room's footprint so the paving pass emits no floor/
-    // lobby span under it (type-0 records are the gaps between rooms). Same
-    // footprint the extent widening uses: [x, x+width) across the room's stories.
-    for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
-      let set = coveredTiles.get(fl);
-      if (!set) {
-        set = new Set();
-        coveredTiles.set(fl, set);
-      }
-      for (let xTile = u.x; xTile < u.x + u.width; xTile++) set.add(xTile);
     }
     // A burned-out shell (or a room mid-fire) is not a healthy tenant: the
     // format has its own marker (type 48), which the importer clears back to
@@ -474,23 +466,48 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     counts.rooms++;
   }
 
+  // Coverage for the paving pass, rebuilt from the records ACTUALLY emitted
+  // above (single-story rooms, multi-story PART_STACKS parts on their lower
+  // floors, burned shells): a paving span is emitted only where no record sits,
+  // so a span can never overlap a record on any floor. Bounds are clamped to
+  // finite tiles in [0, GRID.width] so a forged record extent cannot spin the
+  // mark loop. Keyed by OUR floor to match the paving pass below.
+  for (const [tdt, records] of tenantsByTdt) {
+    const floor = tdt - TDT_FLOOR_OFFSET;
+    let set = coveredTiles.get(floor);
+    for (const r of records) {
+      const lo = Math.max(0, Math.min(GRID.width, Math.floor(Number.isFinite(r.left) ? r.left : 0)));
+      const hi = Math.max(lo, Math.min(GRID.width, Math.floor(Number.isFinite(r.right) ? r.right : 0)));
+      if (hi === lo) continue;
+      if (!set) {
+        set = new Set();
+        coveredTiles.set(floor, set);
+      }
+      for (let xTile = lo; xTile < hi; xTile++) set.add(xTile);
+    }
+  }
+
   // Emit the paving as span records, the exact inverse of the importer's read:
   // it paves each floor's ENTIRE extent [left, right) as one solid block, then
   // reconstructs every paved tile's kind from the FLOOR (isLobbyFloor), never
   // from the record type. So we walk the same extent we write to the floor
-  // header, skip tiles under a room (their record wins; type-0/24 records are
-  // the gaps between rooms), and coalesce each contiguous non-covered run into
+  // header, skip tiles under a record (its record wins; type-0/24 records are
+  // the gaps between records), and coalesce each contiguous non-covered run into
   // one span. Kind is by floor: lobby floors export type 24 (status 0), all
   // others type 0 (status 2); both carry rentClass 4 (No Rate) and no subtype.
   // Status is round-trip-immaterial (the importer ignores it) but mirrors the
   // real save's bytes. Records go through pushTenant, so they count toward the
-  // per-floor cap enforced below. Reserved rows 110-119 carry no paving.
+  // per-floor cap enforced below. Reserved rows 110-119 carry no paving. The
+  // iteration bounds are clamped to finite tiles in [0, GRID.width] so a forged
+  // floor/lobby unit width (Infinity or huge) cannot make this loop run forever.
   const TDT_LOBBY_TYPE = 24;
   const TDT_FLOOR_TYPE = 0;
   for (const [floor, ext] of extents) {
     if (!fitsTdtRows(floor, 1)) continue;
     const lobby = isLobbyFloor(floor);
     const covered = coveredTiles.get(floor);
+    const lo = Math.max(0, Math.min(GRID.width, Math.floor(Number.isFinite(ext.left) ? ext.left : 0)));
+    const hi = Math.max(lo, Math.min(GRID.width, Math.floor(Number.isFinite(ext.right) ? ext.right : 0)));
     let runStart = -1;
     const flush = (end: number): void => {
       if (runStart === -1) return;
@@ -504,14 +521,14 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       });
       runStart = -1;
     };
-    for (let xTile = ext.left; xTile < ext.right; xTile++) {
+    for (let xTile = lo; xTile < hi; xTile++) {
       if (covered?.has(xTile)) {
         flush(xTile);
       } else if (runStart === -1) {
         runStart = xTile;
       }
     }
-    flush(ext.right);
+    flush(hi);
   }
 
   // ---- Encode ---------------------------------------------------------------
