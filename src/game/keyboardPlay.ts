@@ -85,14 +85,17 @@ export class KeyboardPlay {
       const kind = tool.kind;
       const bottom = Math.min(this.kbAnchor.floor, c.floor);
       const top = Math.max(this.kbAnchor.floor, c.floor);
-      this.deps.engine().transportPreview = {
+      // Capture the live renderer once: the instance can swap under a
+      // context-loss recovery, so both writes must target the SAME engine.
+      const engine = this.deps.engine();
+      engine.transportPreview = {
         kind,
         x: this.kbAnchor.tile,
         bottom,
         top,
         valid: sim.tower.placeTransportDryRun(kind, this.kbAnchor.tile, bottom, top) && sim.isUnlocked(kind),
       };
-      this.deps.engine().preview = null;
+      engine.preview = null;
     } else {
       this.deps.updateBuildPreview(c.tile, c.floor);
     }
