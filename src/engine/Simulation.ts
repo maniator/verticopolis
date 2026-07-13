@@ -369,6 +369,11 @@ export class Simulation implements SimContext {
   /** Bookkeeping for period boundaries. */
   private lastDay = 0;
   private lastQuarter = -1;
+  /** Balance entering the current quarter, snapshotted at each quarter rollover
+   *  before rent is collected. Feeds the TDT header's `lastQuarterMoney`. Starts
+   *  at 0 (no snapshot yet), so a fresh tower that has not crossed a quarter
+   *  boundary exports 0 there, matching the real game. */
+  private lastQuarterMoney = 0;
   private lastMonth = -1;
   private lastHour = -1;
   /** Move-ins since the last daily summary (offices leased, condos sold, hotel
@@ -909,6 +914,9 @@ export class Simulation implements SimContext {
     const q = this.clock.quarter;
     if (q !== this.lastQuarter) {
       this.lastQuarter = q;
+      // Snapshot the balance ENTERING the quarter (before rent lands), matching
+      // the real game's finance-window "Last Quarter's Balance".
+      this.lastQuarterMoney = this.money;
       this.economy.collectRent();
     }
 
@@ -1758,6 +1766,10 @@ export class Simulation implements SimContext {
     };
     for (const u of this.tower.units) {
       if (u.state !== "empty") continue;
+      // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
+      // attracts no tenants and never seats one at $0 (which would stamp rent 0,
+      // set everOccupied, and, for a condo, lock the sold-reprice gate forever).
+      if (u.noRate) continue;
       const f = FACILITIES[u.kind];
       if (f.population === 0 && !isHotelKind(u.kind)) continue; // non-tenant facility
       if (!this.tower.isFloorServed(u.floor)) continue; // nobody moves to an unreachable floor
@@ -1790,6 +1802,10 @@ export class Simulation implements SimContext {
   private demandFactor(u: Unit): number {
     const cfg = rentConfig(u.kind);
     if (!cfg) return 1;
+    // Off-market: zero demand, so the $0 price never reads as an irresistible
+    // bargain (ratio 0 would otherwise clamp to the 1.6 maximum). Defensive
+    // partner to the `noRate` skip in attemptMoveIns.
+    if (u.noRate) return 0;
     const ratio = rentOf(u) / cfg.default;
     return Math.max(0.15, Math.min(1.6, 2 - ratio));
   }
@@ -1805,6 +1821,9 @@ export class Simulation implements SimContext {
     if (u.kind === "condo" && u.everOccupied) return null; // already sold
     const clamped = clampRent(cfg, target);
     storeRent(u, cfg, clamped);
+    // Any explicit reprice puts the unit back on the market, so an imported
+    // No-Rate unit is never a permanent $0 trap.
+    u.noRate = undefined;
     return clamped;
   }
 
@@ -1875,13 +1894,22 @@ export class Simulation implements SimContext {
       const before = rentOf(u);
       if (target === "default") {
         if (before !== cfg.default) r.changed++;
-        if (mutate) u.rent = undefined; // clear the override → falls back to default
+        if (mutate) {
+          u.rent = undefined; // clear the override → falls back to default
+          // An explicit reprice returns a No-Rate unit to the market. Scoped to
+          // the actually-repriced branch (skipped sold/custom units already
+          // continued above), matching priceUnit, so a skip keeps its flag.
+          u.noRate = undefined;
+        }
       } else {
         if (target < cfg.min) r.clampedLow++;
         else if (target > cfg.max) r.clampedHigh++;
         const clamped = clampRent(cfg, target);
         if (before !== clamped) r.changed++;
-        if (mutate) storeRent(u, cfg, clamped);
+        if (mutate) {
+          storeRent(u, cfg, clamped);
+          u.noRate = undefined; // same explicit-reprice clear as the default branch
+        }
       }
     }
     return r;
@@ -2354,6 +2382,7 @@ export class Simulation implements SimContext {
       minutes: this.clock.minutes,
       mode: this.mode,
       modernCalendar: this.modernCalendar,
+      lastQuarterMoney: this.lastQuarterMoney,
       units: this.tower.units.map(serializeUnit),
       transports: this.tower.transports.map((t) => ({
         ...t,
@@ -2526,6 +2555,14 @@ export class Simulation implements SimContext {
           // deadline from a forged save must not reach the toast / state machine.
           vacateReason: isVacateReason(u.vacateReason) ? u.vacateReason : undefined,
           vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
+          // Off-market flag, sanitized through the rule-set seam (like
+          // `coerceResidents`): Classic keeps a literal-true flag and hardens a
+          // forged non-boolean away; Modern never holds the state, so it coerces
+          // the flag off entirely. Gated to priced kinds, mirroring import and
+          // export: No Rate is a priced-unit concept, so a forged `true` on an
+          // unpriced kind (shop, fast food) drops to undefined and never reaches
+          // the move-in gate.
+          noRate: rentConfig(u.kind as FacilityKind) ? sim.rules.coerceNoRate(u.noRate) : undefined,
           // Transient crowd counters never survive a load: serializeUnit omits
           // them, and the `...u` spread above would otherwise let a hand-edited
           // save seed the census/star gating (customersIn, hotelCustomersIn) or
@@ -2661,6 +2698,9 @@ export class Simulation implements SimContext {
     sim.weather = Simulation.weatherFor(sim.clock.day);
     sim.lastDay = sim.clock.day;
     sim.lastQuarter = sim.clock.quarter;
+    // Legacy saves predate this field, so a missing value restores as 0
+    // (no snapshot), matching a fresh tower.
+    sim.lastQuarterMoney = num(data.lastQuarterMoney, 0); // sanitize like every other numeric field: a forged NaN/string must not persist back out
     sim.lastMonth = Math.floor(sim.clock.day / sim.clock.calendar.maintPeriodDays);
     sim.lastHour = sim.clock.hour;
     // Silently adopt any milestone already satisfied at load time (e.g. a save
@@ -2708,7 +2748,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
   void _hotelCustomersIn; // Transient: the hotel-origin subset of customersIn.
@@ -2730,6 +2770,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (label !== FACILITIES[kind].name) out.label = label;
   if (residents !== undefined) out.residents = residents;
   if (rent !== undefined) out.rent = rent;
+  if (noRate) out.noRate = true;
   if (vacateReason !== undefined) out.vacateReason = vacateReason;
   if (vacateAt !== undefined) out.vacateAt = vacateAt;
   if (filmPolicy !== undefined) out.filmPolicy = filmPolicy;

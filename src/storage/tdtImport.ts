@@ -589,6 +589,11 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
       // Rent class (unit byte 16) → our price band, for priced kinds.
       const rent = rentFromClass(kind, t.rentRate);
       if (rent !== undefined) counts.rentsApplied++;
+      // Rent class 4 ("No Rate") on a priced kind: the unit is deliberately off
+      // the market, charging nothing. Leave `rent` at default and flag it, so
+      // `rentOf` yields $0. Class 4 on a non-priced kind carries no band, so it
+      // gets no flag.
+      const noRate = t.rentRate === 4 && rentConfig(kind) !== null;
 
       // Canon retail variant: unit-record byte 17 (§4, stronger evidence than
       // §7 per the doc). Whitelist-coerce against our canon lists so an
@@ -603,6 +608,7 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
         everOccupied,
         occupants,
         rent,
+        ...(noRate ? { noRate: true } : {}),
         ...(subtype !== undefined ? { subtype } : {}),
         ...(underConstruction ? { completeAt: minutes + buildMinutes(kind) } : {}),
       });

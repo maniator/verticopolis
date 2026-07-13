@@ -122,12 +122,19 @@ const PART_STACKS: Readonly<Partial<Record<FacilityKind, readonly number[]>>> = 
   weddingHall: [36, 37, 38, 39, 40],
 };
 
-/** Inverse of {@link rentFromClass}: a unit's rent → the nearest of the four
- *  1994 lease classes. Unset (or unpriced kinds) export as 2 (Average), which
- *  the importer reads back as "keep the default". */
+/** Inverse of {@link rentFromClass}: a unit's rent maps to the nearest of the
+ *  four 1994 rent-level classes (0 to 3), plus class 4 (No Rate) for kinds that
+ *  charge no rent. A priced kind sitting on its default exports as 2 (Average),
+ *  which the importer reads back as "keep the default"; an unpriced kind (no
+ *  rent band) exports as 4 (No Rate), matching what real saves store. */
 export function classFromRent(kind: FacilityKind, rent: number | undefined): number {
   const band = rentConfig(kind);
-  if (!band || rent === undefined) return 2;
+  // A kind with no rent band charges no tenant rent, which the 1994 game stores
+  // as class 4 (No Rate): confirmed against real saves (fast food, security,
+  // housekeeping, retail all carry class 4). A priced kind sitting on its
+  // default reads back as 2 (Average).
+  if (!band) return 4;
+  if (rent === undefined) return 2;
   // Anchors come from the SAME function the importer applies on read-back, so
   // "nearest class" is measured against what the class will actually become.
   const values: [number, number][] = [
@@ -356,7 +363,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     } else {
       counts.construction++;
     }
-    const rentClass = classFromRent(u.kind, u.rent);
+    // A No-Rate unit (off the market) emits lease class 4, overriding the
+    // rent-derived class, so it round-trips as "No Rate". Only priced kinds
+    // carry the flag, matching the importer.
+    const rentClass = u.noRate && rentConfig(u.kind) ? 4 : classFromRent(u.kind, u.rent);
     if (u.rent !== undefined) {
       // What the class reads back as on import: class 2 means "the default".
       const back = rentClass === 2 ? rentConfig(u.kind)?.default : rentFromClass(u.kind, rentClass);
@@ -419,7 +429,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
             right: u.x + u.width,
             type: construction ? -parts[i] : parts[i],
             status: 0,
-            rentClass: 2,
+            rentClass,
           });
         }
       } else {
@@ -429,7 +439,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
             right: u.x + u.width,
             type: construction ? -stack[i] : stack[i],
             status: 0,
-            rentClass: 2,
+            rentClass,
           });
         }
       }
@@ -553,6 +563,11 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // never claim a rating the bytes don't carry.
   const money = Number.isFinite(save.money) ? save.money : 0;
   const balance = Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(money / 100)));
+  // Balance entering the current quarter (finance-window "Last Quarter's
+  // Balance"). Absent on legacy saves and fresh towers, which write 0. Same
+  // /100 scale + i32 clamp as `balance`.
+  const lastQuarterRaw = Number.isFinite(save.lastQuarterMoney) ? (save.lastQuarterMoney as number) : 0;
+  const lastQuarterMoney = Math.max(-0x80000000, Math.min(0x7fffffff, Math.round(lastQuarterRaw / 100)));
   const star = Number.isFinite(save.star) ? Math.max(1, Math.min(6, Math.round(save.star))) : 1;
   const minuteOfDay = ((save.minutes % 1440) + 1440) % 1440;
   u16(TDT_MAGIC);
@@ -560,7 +575,7 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   i32(balance);
   i32(0); // otherIncome
   i32(0); // constructionCosts
-  i32(0); // lastQuarterMoney
+  i32(lastQuarterMoney); // 0x10
   u16(frameForMinuteOfDay(minuteOfDay));
   i32(Math.max(0, Math.floor(save.minutes / 1440)));
   pad(TDT_HEADER_SIZE - chunks.length);

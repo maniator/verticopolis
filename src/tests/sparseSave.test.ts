@@ -151,6 +151,68 @@ describe("sparse v3 unit serialization", () => {
     expect(materialize(serializeUnit(u))).toEqual(u);
   });
 
+  it("legacy load: a save with no noRate/lastQuarterMoney loads on-market with a 0 snapshot (no migration)", () => {
+    const save = sampleSim().serialize();
+    // Emulate a pre-feature save by stripping the new optional fields entirely.
+    const legacy = JSON.parse(JSON.stringify(save)) as SerializedGame & { lastQuarterMoney?: number };
+    delete legacy.lastQuarterMoney;
+    for (const u of legacy.units) delete (u as { noRate?: boolean }).noRate;
+    const sim = Simulation.deserialize(legacy);
+    expect(sim.tower.units.every((u) => u.noRate === undefined)).toBe(true); // all on-market
+    // Missing snapshot restores as 0, and the load matches the fields-present load.
+    const round = sim.serialize();
+    expect(round.lastQuarterMoney).toBe(0);
+    const baseline = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round).toEqual(baseline);
+  });
+
+  /** A minimal served Classic tower with one office, for No-Rate seam tests. */
+  function classicOfficeSim(): { sim: Simulation; officeId: number } {
+    const sim = Simulation.newGame(1, "classic");
+    sim.money = 1e9;
+    const w = FACILITIES.office.width;
+    const x0 = 200;
+    for (let x = 0; x < 375; x++) sim.tower.place("lobby", 1, x);
+    for (let i = 0; i < w + 2; i++) sim.tower.place("floor", 2, x0 + i);
+    sim.buildTransport("elevatorStandard", x0, 1, 2);
+    const r = sim.tower.place("office", 2, x0);
+    if (!r.ok || r.unitId === undefined) throw new Error(`office placement failed: ${r.reason}`);
+    return { sim, officeId: r.unitId };
+  }
+
+  it("persists a Classic No-Rate unit and a lastQuarterMoney snapshot across the save seam", () => {
+    const { sim, officeId } = classicOfficeSim();
+    sim.tower.getUnit(officeId)!.noRate = true;
+    const save = sim.serialize();
+    save.lastQuarterMoney = 1_750_000;
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round.lastQuarterMoney).toBe(1_750_000);
+    expect(round.units.find((u) => u.kind === "office")!.noRate).toBe(true); // Classic keeps it
+  });
+
+  it("sanitizes a forged non-finite lastQuarterMoney to 0 on load (never persisted back)", () => {
+    const { sim } = classicOfficeSim();
+    const forged = { ...sim.serialize(), lastQuarterMoney: "not a number" } as unknown as SerializedGame;
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(forged)) as SerializedGame).serialize();
+    expect(round.lastQuarterMoney).toBe(0);
+  });
+
+  it("coerces a forged non-boolean noRate away on a Classic save (only literal true counts)", () => {
+    const { sim, officeId } = classicOfficeSim();
+    const save = sim.serialize();
+    // Forge a truthy non-boolean the way a hand-edited save might.
+    (save.units.find((u) => u.id === officeId) as { noRate?: unknown }).noRate = "no";
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round.units.find((u) => u.kind === "office")!.noRate).toBeUndefined();
+  });
+
+  it("coerces No-Rate away for a MODERN save (Modern never holds the state)", () => {
+    const save = sampleSim().serialize(); // sampleSim founds a Modern tower
+    save.units.find((u) => u.kind === "office")!.noRate = true; // forged Modern flag
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round.units.find((u) => u.kind === "office")!.noRate).toBeUndefined();
+  });
+
   it("shrinks the REAL 12,975-unit tower to under half its full-shape JSON and reloads identically", () => {
     const sim = Simulation.deserialize(decodeVctower(towerFile)); // v1 fixture -> reflow -> live tower
     const sparse = sim.serialize();

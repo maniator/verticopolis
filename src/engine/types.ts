@@ -272,6 +272,12 @@ export interface Unit {
   /** Player-set price for this unit — office quarterly rent, hotel nightly
    *  rate, or condo sale price. Undefined falls back to the kind's default. */
   rent?: number;
+  /** A unit deliberately off the rental market, charging nothing (SimTower's
+   *  "No Rate", rent class 4). `undefined`/`false` = on market at `rent`/default.
+   *  Routed through `rentOf`, so a No-Rate unit yields $0 for every income site
+   *  (office rent, hotel checkout, condo sale, condo hold-tax). Any explicit
+   *  reprice clears it, returning the unit to the market. */
+  noRate?: boolean;
   /** Name shown when inspected (e.g. tenant company / guest). */
   label: string;
   /** Why the current tenant gave notice — set while `state === "vacating"`, and
@@ -378,6 +384,12 @@ export interface SerializedGame {
    *  written before the calendar toggle, and on all legacy Modern saves, so a
    *  missing value loads as `realWorld` — the shipped 7/90/360 behavior. */
   modernCalendar?: CalendarKind;
+  /** Balance entering the current quarter (snapshotted at each quarter rollover
+   *  before rent is collected), so the TDT exporter can write the header's
+   *  `lastQuarterMoney` (0x10). `serialize()` always writes it (0 on a fresh
+   *  tower that has not crossed a quarter boundary yet); only legacy saves
+   *  written before this field omit it, and those load as 0. */
+  lastQuarterMoney?: number;
   units: SerializedUnit[];
   transports: Transport[];
   nextId: number;

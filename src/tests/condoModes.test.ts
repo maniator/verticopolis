@@ -76,6 +76,41 @@ describe("Classic mode condos", () => {
   });
 });
 
+describe("No-Rate units stay off-market (no move-in, no sale, $0)", () => {
+  it("an empty No-Rate condo never sells and earns nothing over a long run", () => {
+    const sim = Simulation.newGame(3, "classic");
+    const condo = servedCondo(sim);
+    condo.noRate = true; // off the market (imported class 4)
+    const before = sim.money;
+    // Far past the ~40 in-game hours a normal served condo takes to sell.
+    for (let i = 0; i < 24 * 80; i++) sim.tick(60);
+    expect(condo.everOccupied).toBe(false); // no buyer seated at $0
+    expect(condo.state).toBe("empty");
+    expect(condo.rent).toBeUndefined(); // no $0 sale stamped a magic rent
+    expect(rentOf(condo)).toBe(0);
+    expect(sim.log.some((e) => /sold/.test(e.text))).toBe(false); // never sold
+    expect(sim.money).toBeLessThanOrEqual(before); // gained no income (only overhead)
+  });
+
+  it("an empty No-Rate office never leases", () => {
+    const sim = Simulation.newGame(3, "classic");
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    const r = sim.tower.place("office", 2, C + 4);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "empty";
+    office.satisfaction = 1;
+    office.noRate = true;
+    for (let i = 0; i < 24 * 40; i++) sim.tick(60);
+    expect(office.everOccupied).toBe(false); // never leased
+    expect(office.state).toBe("empty");
+    expect(rentOf(office)).toBe(0);
+  });
+});
+
 describe("Modern mode condos — variant households", () => {
   it("draw a 2-5 person household on sale and count its real size", () => {
     const sim = Simulation.newGame(3, "modern");
