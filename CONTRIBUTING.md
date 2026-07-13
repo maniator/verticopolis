@@ -47,11 +47,28 @@ is breached. Run it locally when you touch measured code.
 
 Verticopolis has **two test tiers**:
 
-- **Tier-1: vitest unit tests** (`src/tests/**/*.test.ts`). Fast, headless, run
-  under a **happy-dom** environment (formerly jsdom). This is what `npm test`
-  runs. It covers the engine, game controllers, UI logic, sprites, audio, and
-  storage. The suite has generous timeouts (30s) because a few tests drive many
-  in-game days of the full simulation over a tall tower.
+- **Tier-1: vitest** (`npm test`, i.e. `vitest run`). Fast, headless, run under a
+  **happy-dom** environment (formerly jsdom). Covers the engine, game
+  controllers, UI logic, sprites, audio, and storage. The suite has generous
+  timeouts (30s) because a few tests drive many in-game days of the full
+  simulation over a tall tower. It is split by filename into two **vitest
+  projects** (`vite.config.ts` `test.projects`):
+  - **unit** (`*.test.ts`): sits next to the module it covers (`foo.ts` +
+    `foo.test.ts`) and mocks its collaborators. `npm run test:unit` runs only
+    these.
+  - **integration** (`*.integration.test.ts`): drives several modules or a whole
+    `Sim`/`Tower` (golden-master round-trips, playthroughs, subsystem flows).
+    These typically live under `src/tests/integration/`, but the `.integration`
+    suffix (not the directory) is what assigns the tier: the two projects split
+    on filename, so a `*.integration.test.ts` anywhere under `src/` runs in this
+    tier and never in unit, and the pair covers every test with no gap.
+    `npm run test:integration` runs only these.
+
+  `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
+  stays a single root-level measurement across both projects (see Coverage
+  floors below), so the ratchet still scores the whole app. Colocation is rolling
+  out per area, so many unit tests still live under `src/tests/` today; write new
+  ones next to their source.
 - **Tier-2: Playwright end-to-end** (`e2e/*.spec.ts`). Drives the **real, built
   app** in a live browser (Chromium via `vite preview`), reaching into the game
   through the public `window.game` API. Run it with `npm run e2e` after a build.
@@ -295,7 +312,7 @@ alone.
 | `src/audio/` | Sound (`ToneAudioEngine.ts`), independent of rendering. |
 | `src/storage/` | Save/load, `.vctower` tower-file import/export. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
-| `src/tests/` | Tier-1 vitest unit tests + fixtures. |
+| `src/tests/` | Vitest fixtures and integration suites (`*.integration.test.ts`); unit tests colocate next to their source. |
 | `e2e/` | Tier-2 Playwright end-to-end specs. |
 | `docs/` | Contributor docs, including `screenshots.md`. |
 

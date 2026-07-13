@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { noticeBadge, vacancy, closedShutter, type RoomCtx } from "../render/pixelSprites/common";
+import { noticeBadge, vacancy, closedShutter, type RoomCtx } from "./common";
 
 /**
  * Gap-fill coverage for the pixelSprites/common draw helpers that the broader

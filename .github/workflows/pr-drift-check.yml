@@ -36,9 +36,13 @@ on:
     # determinism guard exists to watch), the render path (src/render/**), DOM
     # chrome (src/ui/**, src/main.ts, styles, index.html), and the save-loading
     # scenes (src/storage/**). So gate on all of src/, not a narrow subset. Tests
-    # never render, so exclude them, BUT re-include the fixtures the screenshot
-    # scenes load (e.g. the migration scene reads a real save under fixtures), or
-    # a fixture-only PR could change committed pixels with no check. Plus the
+    # never render, so exclude them: both the legacy `src/tests/**` home and the
+    # colocated `*.test.ts` files that now sit next to their source (the test
+    # reorg spreads them across src/render/**, src/engine/**, and so on). BUT
+    # re-include the fixtures the screenshot scenes load (e.g. the migration
+    # scene reads a real save under fixtures), or a fixture-only PR could change
+    # committed pixels with no check. The `!*.test.ts` exclude sits last so no
+    # colocated test can slip back in through the fixtures re-include. Plus the
     # generator, this workflow, and the reusable capture it calls. Also gate on the
     # version/build inputs that reach the splash: vite.config.ts injects
     # package.json's version into __APP_VERSION__, which the 00-splash shot renders,
@@ -53,6 +57,7 @@ on:
       - "src/**"
       - "!src/tests/**"
       - "src/tests/fixtures/**"
+      - "!src/**/*.test.ts"
       - "scripts/screenshots.ts"
       - "scripts/screenshot-*.ts"
       - "package.json"

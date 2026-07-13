@@ -533,6 +533,26 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   a `storage`-event listener that folds remote changes into `this.prefs`.
   (Edge Case Hunter, 2026-07-12.)
 
+### Deferred from: bmad-code-review (test-reorg infra, PR #229, 2026-07-13)
+
+Two-tier Vitest projects (unit + integration) plus the colocation pilot. Blind
+Hunter and Edge Case Hunter ran (Copilot also reviewed). The confirmed findings
+were all patched in the PR: the drift-check path filter now excludes colocated
+`*.test.ts`; the stale CONTRIBUTING/copilot docs were corrected; and the `unit`
+project's `exclude` now spreads Vitest's default excludes back in before adding
+`**/*.integration.test.ts` (Blind Hunter and Copilot both noted that a bare
+project `exclude` drops the built-in `node_modules`/`dist` excludes; unreachable
+today under the `src/**`-scoped include, but cheap to harden). One low residual
+parked here:
+
+- **Nothing enforces the `.integration.test.ts` naming convention.** Tier
+  membership is decided purely by the filename suffix, so a mistyped suffix
+  (`.integrations.`, `.integration.spec.ts`) silently lands a heavy multi-module
+  test in the `unit` project. The full `vitest run` gate still executes it, so it
+  is never lost, but it defeats the tier split and can blow the unit tier's
+  timing assumptions. Consider a small naming check (a guard test or lint rule)
+  as the per-area colocation reorg spreads. (Blind Hunter, Low.)
+
 ## Completed / superseded
 
 - ~~**P2, `service-elevator-width`: standard (3) vs service/express (4) footprint mismatch**~~,
