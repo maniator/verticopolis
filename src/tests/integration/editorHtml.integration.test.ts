@@ -1,8 +1,8 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "../ui/editorHtml";
-import { buildStatsHtml, buildMilestonesHtml } from "../ui/statsHtml";
-import type { Transport, Unit } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "../../ui/editorHtml";
+import { buildStatsHtml, buildMilestonesHtml } from "../../ui/statsHtml";
+import type { Transport, Unit } from "../../engine/types";
 
 /** The editor/stats HTML builders are pure functions of (sim, entity) since
  *  the module split — these tests pin the structure the DOM patcher and the
