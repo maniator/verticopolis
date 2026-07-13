@@ -154,9 +154,11 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
   };
 }
 
-/** Ceiling on the day shown in the Saves dialog, mirroring the TDT importer's
- *  MAX_IMPORT_DAY (~1,000 in-game years): a forged minutes beyond it would
- *  render a screen-wide number, so it reads as absent instead. */
+/** Ceiling on the save's day COUNTER (minutes / 1440, zero-indexed), mirroring
+ *  the TDT importer's MAX_IMPORT_DAY (~1,000 in-game years). The dialog shows
+ *  1-indexed days, so the largest label this admits is "Day 360,001"; a forged
+ *  minutes beyond the ceiling would render a screen-wide number and reads as
+ *  absent instead. */
 const MAX_SLOT_DAY = 360_000;
 
 export const SaveGame = {
