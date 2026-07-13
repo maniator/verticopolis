@@ -114,6 +114,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of mobile-tap-hover (`/gds-code-review`, 2026-07-13)
+
+- **A mobile inspect-tap now raises both the editor and the inspector card, so the facility name and floor render twice at once.** The tap opens the editor (docked bottom-left) and the quick-info card (docked top-left), which duplicates the header. It matches desktop (hover card plus selected editor coexist) and the two panels dock to opposite corners, so it reads as minor clutter, not a bug. A future mobile-UX pass could dedupe (suppress the card's header when the editor is open for the same facility, or slim the mobile card to the stats the editor lacks: access, patronage, satisfaction). Low, both hunters. (Blind Hunter L3 + Edge Case Hunter.)
+
 ### Deferred from: code review of commercial-venue-inspector (`/gds-code-review`, 2026-07-13, PR #205)
 
 - **`rollOverRetailDay` skips a non-operational venue, so a burning-across-midnight unit keeps a stale `patronageToday`.** The `isOperational` gate (added to preserve the "no data yet" state for gutted/mid-build units) also skips a unit that traded, then caught fire, but is not yet gutted, across a midnight; its `patronageToday` is not rolled. Mitigated: the verdict now reads `patronageYest` (the last completed day), the fire status shows separately, and `gut` resets the fields once the unit is gutted. Revisit only if a burning venue's stale card reads wrong in playtest. (Blind Hunter, Low, largely mitigated.)
