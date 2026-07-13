@@ -300,8 +300,11 @@ export const SCENES: Scene[] = [
         keepDialogs: true,
         clock: 12,
         setup: async (page) => {
-          // Fire the same hook the engine raises when the GPU drops the WebGL
-          // context; the recovery flow flushes the autosave and opens the card.
+          // Trip the recovery flow the engine runs when the GPU drops the WebGL
+          // context. A FIRST loss now recovers in place (no card); the card only
+          // appears on a repeat, so fire the hook twice. The second loss lands
+          // inside the 90s window and escalates to the crash card, the same
+          // two-strikes path e2e/contextRecovery.spec.ts exercises with real losses.
           // Both links are asserted with messages that name the real problem
           // (the hook is nullable on TowerEngine, and a silently skipped clock
           // stop would leave the backdrop advancing between runs).
@@ -318,7 +321,8 @@ export const SCENES: Scene[] = [
               throw new Error("game.engine.engine.clock is unavailable; the crash-screen scene needs to freeze the frame");
             }
             clock.stop();
-            engine.onContextLost();
+            engine.onContextLost(); // first loss: recovers in place, no card
+            engine.onContextLost(); // repeat within 90s: escalates to the card
           });
           // Fail the shot (keep the committed image) if the card never mounts.
           await page.waitForSelector("dialog#crash-screen[open]", { timeout: 4000 });
