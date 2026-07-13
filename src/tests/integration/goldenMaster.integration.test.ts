@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
-import { Simulation } from "../engine/Simulation";
-import type { FacilityKind } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import type { FacilityKind } from "../../engine/types";
 
 /**
  * Golden-master determinism net for the large-file split refactor.

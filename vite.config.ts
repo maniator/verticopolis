@@ -141,12 +141,35 @@ export default defineConfig({
     globals: true,
     environment: "happy-dom",
     root: ".",
-    include: ["src/**/*.test.ts"],
     // A few end-to-end tests drive many in-game days of the full hourly v2
     // simulation over a tall tower; they pass quickly locally but can exceed the
     // 5s default on slower CI runners. Give the suite generous headroom.
     testTimeout: 30000,
     hookTimeout: 30000,
+    // Two tiers, split by filename suffix (see CONTRIBUTING.md → "Testing &
+    // coverage"). UNIT tests sit next to the module they cover (`foo.ts` +
+    // `foo.test.ts`) and mock their collaborators; INTEGRATION tests drive
+    // several modules or a whole Sim/Tower and carry the `.integration.test.ts`
+    // suffix. `vitest run` runs both (the CI gate); `vitest --project unit` /
+    // `--project integration` runs one. Coverage stays at the root config below
+    // so the single ratchet still measures the whole app across both projects.
+    projects: [
+      {
+        extends: true,
+        test: {
+          name: "unit",
+          include: ["src/**/*.test.ts"],
+          exclude: ["**/*.integration.test.ts"],
+        },
+      },
+      {
+        extends: true,
+        test: {
+          name: "integration",
+          include: ["src/**/*.integration.test.ts"],
+        },
+      },
+    ],
     coverage: {
       provider: "v8",
       reporter: ["text", "json", "html"],
@@ -161,6 +184,12 @@ export default defineConfig({
       exclude: [
         "**/*.d.ts",
         "**/*.config.*",
+        // Test files never count as measured source. Colocated unit tests
+        // (`foo.test.ts` next to `foo.ts`) make this glob load-bearing: the
+        // custom exclude array REPLACES Vitest's defaults, so without it every
+        // colocated test would be scored as uncovered source and sink the floors.
+        "**/*.test.ts",
+        // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
         "src/gallery.ts",
         "src/preview.ts",
