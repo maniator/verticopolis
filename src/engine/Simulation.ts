@@ -2558,8 +2558,11 @@ export class Simulation implements SimContext {
           // Off-market flag, sanitized through the rule-set seam (like
           // `coerceResidents`): Classic keeps a literal-true flag and hardens a
           // forged non-boolean away; Modern never holds the state, so it coerces
-          // the flag off entirely.
-          noRate: sim.rules.coerceNoRate(u.noRate),
+          // the flag off entirely. Gated to priced kinds, mirroring import and
+          // export: No Rate is a priced-unit concept, so a forged `true` on an
+          // unpriced kind (shop, fast food) drops to undefined and never reaches
+          // the move-in gate.
+          noRate: rentConfig(u.kind as FacilityKind) ? sim.rules.coerceNoRate(u.noRate) : undefined,
           // Transient crowd counters never survive a load: serializeUnit omits
           // them, and the `...u` spread above would otherwise let a hand-edited
           // save seed the census/star gating (customersIn, hotelCustomersIn) or

@@ -123,9 +123,10 @@ const PART_STACKS: Readonly<Partial<Record<FacilityKind, readonly number[]>>> = 
 };
 
 /** Inverse of {@link rentFromClass}: a unit's rent maps to the nearest of the
- *  four 1994 lease classes. A priced kind sitting on its default exports as 2
- *  (Average), which the importer reads back as "keep the default"; an unpriced
- *  kind (no rent band) exports as 4 (No Rate), matching what real saves store. */
+ *  four 1994 rent-level classes (0 to 3), plus class 4 (No Rate) for kinds that
+ *  charge no rent. A priced kind sitting on its default exports as 2 (Average),
+ *  which the importer reads back as "keep the default"; an unpriced kind (no
+ *  rent band) exports as 4 (No Rate), matching what real saves store. */
 export function classFromRent(kind: FacilityKind, rent: number | undefined): number {
   const band = rentConfig(kind);
   // A kind with no rent band charges no tenant rent, which the 1994 game stores
