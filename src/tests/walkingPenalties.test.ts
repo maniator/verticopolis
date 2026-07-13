@@ -41,9 +41,9 @@ function unit(sim: Simulation, id: number | undefined) {
 describe("W1 — transport-too-far (79-tile walk penalty)", () => {
   it("erodes a served office beyond 79 tiles of a shaft while a near one stays happy", () => {
     const sim = Simulation.newGame(4);
-    servedTower(sim, 2, 3); // shaft cols [3,6)
-    const near = unit(sim, sim.tower.place("office", 2, 8).unitId); // ~2 tiles away
-    const far = unit(sim, sim.tower.place("office", 2, 260).unitId); // ~254 tiles away
+    servedTower(sim, 2, 3); // shaft cols [3,7)
+    const near = unit(sim, sim.tower.place("office", 2, 8).unitId); // ~1 tile away
+    const far = unit(sim, sim.tower.place("office", 2, 260).unitId); // ~253 tiles away
     for (const u of [near, far]) {
       u.state = "occupied";
       u.satisfaction = 1;
@@ -55,9 +55,9 @@ describe("W1 — transport-too-far (79-tile walk penalty)", () => {
 
   it("nearestTransportDistance is the horizontal gap, 0 when abutting, ∞ with no reachable shaft", () => {
     const sim = Simulation.newGame(1);
-    servedTower(sim, 2, 3); // shaft cols [3,6) ⇒ right edge at 6
-    const abut = unit(sim, sim.tower.place("office", 2, 6).unitId); // touches the shaft
-    const gap = unit(sim, sim.tower.place("office", 2, 106).unitId); // 100 tiles right of edge
+    servedTower(sim, 2, 3); // shaft cols [3,7) ⇒ right edge at 7
+    const abut = unit(sim, sim.tower.place("office", 2, 7).unitId); // touches the shaft
+    const gap = unit(sim, sim.tower.place("office", 2, 107).unitId); // 100 tiles right of edge
     expect(sim.tower.nearestTransportDistance(abut)).toBe(0);
     expect(sim.tower.nearestTransportDistance(gap)).toBe(100);
 
@@ -74,7 +74,7 @@ describe("W1 — transport-too-far (79-tile walk penalty)", () => {
     // One office per tower so their width-9 footprints can't overlap at the seam.
     const at = (x: number) => {
       const sim = Simulation.newGame(6);
-      servedTower(sim, 2, 3); // shaft right edge at 6 ⇒ gap = x - 6
+      servedTower(sim, 2, 3); // shaft right edge at 7 ⇒ gap = x - 7
       const o = unit(sim, sim.tower.place("office", 2, x).unitId);
       o.state = "occupied";
       o.satisfaction = 1;
@@ -82,8 +82,8 @@ describe("W1 — transport-too-far (79-tile walk penalty)", () => {
       for (let i = 0; i < 8; i++) sim.tick(60);
       return { dist, sat: o.satisfaction };
     };
-    const ok = at(85); // gap 79 → tolerated
-    const over = at(86); // gap 80 → penalized
+    const ok = at(86); // gap 79 → tolerated
+    const over = at(87); // gap 80 → penalized
     expect(ok.dist).toBe(79);
     expect(over.dist).toBe(80);
     expect(ok.sat).toBeGreaterThan(0.9);
@@ -107,12 +107,12 @@ describe("W1 — transport-too-far (79-tile walk penalty)", () => {
 
   it("ignores staff-only service elevators — a far office beside one still counts as far", () => {
     const sim = Simulation.newGame(5);
-    servedTower(sim, 2, 3); // passenger shaft at [3,6)
+    servedTower(sim, 2, 3); // passenger shaft at [3,7)
     // A service elevator abuts the far office, but tenants can't ride it, so it
     // must NOT shrink the measured walk (mirrors servedFloors excluding staff shafts).
     expect(sim.buildTransport("elevatorService", 258, 1, 2).ok).toBe(true);
     const far = unit(sim, sim.tower.place("office", 2, 260).unitId);
-    expect(sim.tower.nearestTransportDistance(far)).toBe(254); // to the passenger shaft, not the service one
+    expect(sim.tower.nearestTransportDistance(far)).toBe(253); // to the passenger shaft, not the service one
   });
 
   it("attributes a bottomed-out far office's departure to transportFar", () => {

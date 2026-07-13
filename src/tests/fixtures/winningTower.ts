@@ -1,5 +1,5 @@
 import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { FACILITIES, GRID } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 
 /**
@@ -48,7 +48,12 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
   for (let f = 0; f >= GRID.minFloor; f--) for (let x = 0; x < GRID.width; x++) t.place("floor", f, x);
 
   // Overlapping standard elevators (cap 30 floors each) that chain service
-  // B1 -> 100 by sharing a boundary floor with the next band.
+  // B1 -> 100 by sharing a boundary floor with the next band. Columns step by
+  // the shaft's real catalog width so adjacent bands abut without overlapping
+  // (overlap would silently reject the placement and leave floors unserved),
+  // and each placement is asserted so a degraded fixture can never pass for
+  // the fully-served tower it claims to be.
+  const shaftW = FACILITIES.elevatorStandard.width;
   const bands: [number, number][] = [
     [0, 1],
     [1, 30],
@@ -56,7 +61,10 @@ export function buildWinningTower(sim: Simulation, opts: WinTowerOpts = {}): voi
     [60, 90],
     [90, 100],
   ];
-  bands.forEach(([b, tp], i) => t.placeTransport("elevatorStandard", LEFT + i * 3, b, tp));
+  bands.forEach(([b, tp], i) => {
+    const r = t.placeTransport("elevatorStandard", LEFT + i * shaftW, b, tp);
+    if (!r.ok) throw new Error(`winningTower: elevator band ${b}-${tp} failed to place: ${r.reason}`);
+  });
 
   // Rating gates (each skippable to test that it blocks the ladder). Rooms may
   // not sit on the lobby (floor 1) — amenities go on standard floor 2; the metro

@@ -31,15 +31,11 @@ import { clampCameraY } from "../cameraBounds";
 import { PinchTracker, stablePointerId } from "../pinchTracker";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 
-/** World pixels per tile / per floor. */
-export const TILE = 11;
-export const FLOOR = 34;
+// World-scale constants live in ../scale (a pure module unit tests can import
+// without pulling in Excalibur); re-exported here for the existing consumers.
+import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 
-/** Max floors drawn into a single shaft-graphic band. A shaft's backing bitmap
- *  is `floors * FLOOR` px tall; a mobile GPU's MAX_TEXTURE_SIZE is often 4096 and
- *  sometimes 2048, and a bitmap past that fails to upload (renders black). 48
- *  floors → 1632px, safely under both, so tall shafts are split into bands. */
-const TRANSPORT_BAND_FLOORS = 48;
+export { FLOOR, TILE };
 
 /** Camera zoom range (screen pixels per world pixel). The values live in
  *  engine/types (VIEW_ZOOM_MIN/MAX) because the save schema clamps a restored
