@@ -36,7 +36,8 @@ The codebase is layered, and the layering is load-bearing. Keep it intact:
 - `src/ui/`: DOM controls (palette, status bar, dialogs); uses native `<dialog>`.
 - `src/audio/`, `src/storage/`: sound and save/load, independent of rendering.
 - `src/main.ts`: wires everything together (input, game loop).
-- `src/tests/`: Vitest suites covering the engine.
+- `src/tests/`: Vitest fixtures and integration suites (`*.integration.test.ts`);
+  unit tests colocate next to their source (`foo.ts` + `foo.test.ts`).
 
 **Golden rule:** keep `src/engine/` free of DOM/rendering concerns so it stays
 deterministic and testable. Rendering and UI read engine state; they don't drive it.
