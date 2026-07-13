@@ -57,9 +57,12 @@ Verticopolis has **two test tiers**:
     `foo.test.ts`) and mocks its collaborators. `npm run test:unit` runs only
     these.
   - **integration** (`*.integration.test.ts`): drives several modules or a whole
-    `Sim`/`Tower` (golden-master round-trips, playthroughs, subsystem flows) and
-    lives under `src/tests/integration/`. `npm run test:integration` runs only
-    these.
+    `Sim`/`Tower` (golden-master round-trips, playthroughs, subsystem flows).
+    These typically live under `src/tests/integration/`, but the `.integration`
+    suffix (not the directory) is what assigns the tier: the two projects split
+    on filename, so a `*.integration.test.ts` anywhere under `src/` runs in this
+    tier and never in unit, and the pair covers every test with no gap.
+    `npm run test:integration` runs only these.
 
   `npm test` (`vitest run`) runs **both** projects and is the CI gate. Coverage
   stays a single root-level measurement across both projects (see Coverage
