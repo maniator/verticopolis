@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "../engine/gameRules";
-import { FACILITIES } from "../engine/facilities";
-import { ECON } from "../engine/econConfig";
-import { RNG } from "../engine/rng";
+import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "./gameRules";
+import { FACILITIES } from "./facilities";
+import { ECON } from "./econConfig";
+import { RNG } from "./rng";
 
 /**
  * The rule-set strategy object in isolation — the one place Classic and Modern

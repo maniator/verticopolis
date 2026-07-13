@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { ECON, rentConfig } from "../engine/econConfig";
-import type { GameMode } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { ECON, rentConfig } from "../../engine/econConfig";
+import type { GameMode } from "../../engine/types";
 
 /**
  * In-game minutes spanning one 30-day month, matching the sim's own month

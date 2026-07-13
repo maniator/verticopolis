@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { rentOf, PRICED_KINDS } from "../engine/econConfig";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
 
 /** A served floor-2 tower with `n` offices (all still on the default price). */
 function officeTower(seed = 1, n = 4) {
