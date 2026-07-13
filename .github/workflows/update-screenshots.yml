@@ -126,6 +126,12 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ needs.resolve-image.outputs.image }}
+    # Inside a container the default shell for `run:` steps is `sh` (dash); the
+    # capture and stage steps below use bash features (process substitution,
+    # `read -d ''`), so pin bash for the whole job.
+    defaults:
+      run:
+        shell: bash
     strategy:
       fail-fast: false
       matrix:
@@ -236,15 +242,20 @@ jobs:
           # For each shard, run a and run b must have produced byte-identical
           # rendered sets. Both legs render the same scenes and stage every shot
           # they render, so any per-file byte difference, or a file present in one
-          # leg only, can only be nondeterminism. Compare the `shots` subtree; a
-          # shard that rendered nothing has no `shots` dir in either leg.
+          # leg only, can only be nondeterminism. Every shard renders at least one
+          # shot, so BOTH legs must have a `shots` subtree: a missing one means a
+          # shard's artifact never arrived (a job or upload/download failure), and
+          # is a HARD failure, never a silent pass, so an incomplete set can never
+          # slip through to the rebuild below.
           fail=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
             a="/tmp/dl/shots-a-$shard/shots"
             b="/tmp/dl/shots-b-$shard/shots"
-            # Materialize a missing side as empty so an asymmetry (one leg
-            # rendered a file the other didn't) still surfaces as a diff.
-            mkdir -p "$a" "$b"
+            if [ ! -d "$a" ] || [ ! -d "$b" ]; then
+              echo "::error::screenshot shard '$shard' is missing an artifact (run a: $([ -d "$a" ] && echo present || echo MISSING), run b: $([ -d "$b" ] && echo present || echo MISSING)); every shard must upload both runs. Refusing to proceed."
+              fail=1
+              continue
+            fi
             if ! diff -rq "$a" "$b"; then
               echo "::error::screenshot shard '$shard' is nondeterministic: its two parallel runs in the same pinned image produced different pixels. A wall-clock read leaked into a capture (likely a new time-driven decoration in the engine render path); fix it before committing."
               fail=1
@@ -260,20 +271,21 @@ jobs:
           # Rebuild the gallery from the run-a shards (identical to run b by the
           # check above). Each shard artifact holds the FULL set of shots that
           # shard rendered, so the union across shards is exactly a whole fresh
-          # generation. Rebuilding from scratch (rm -rf, then overlay every shard)
-          # is what prunes a removed scene's stale file, matching the unsharded
-          # generator. Refuse to touch the tree if no shard gallery arrived, so a
-          # download failure can never commit a wiped gallery.
-          present=0
+          # generation. Require EVERY expected shard to be present before touching
+          # the tree, so a download failure can never commit a partial gallery.
+          expected=$(echo "$SHARDS_JSON" | jq 'length')
+          assembled=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            [ -d "/tmp/dl/shots-a-$shard/shots/docs/screenshots" ] && present=$((present + 1))
+            [ -d "/tmp/dl/shots-a-$shard/shots/docs/screenshots" ] && assembled=$((assembled + 1))
           done
-          if [ "$present" -eq 0 ]; then
-            echo "::error::no run-a shard galleries were downloaded; refusing to rebuild (a download or upload step must have failed)."
+          if [ "$assembled" -ne "$expected" ]; then
+            echo "::error::expected $expected shard galleries but found $assembled; refusing to rebuild a partial gallery (a download or upload step must have failed)."
             exit 1
           fi
-          rm -rf docs/screenshots
-          mkdir -p docs/screenshots
+          # Prune only the GENERATED images (so a removed scene's stale PNG goes
+          # away, matching the unsharded generator) while preserving tracked
+          # non-generated files under docs/screenshots, e.g. features/README.md.
+          find docs/screenshots -type f -name '*.png' -delete
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
             src="/tmp/dl/shots-a-$shard/shots/docs/screenshots"
             [ -d "$src" ] && cp -a "$src/." docs/screenshots/

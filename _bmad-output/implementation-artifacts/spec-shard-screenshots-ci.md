@@ -7,7 +7,7 @@ baseline_commit: '8ff1bfb'
 context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent: do not modify unless human renegotiates">
 
 ## Intent
 
