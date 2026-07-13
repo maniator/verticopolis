@@ -174,14 +174,19 @@ export default defineConfig({
       // strong siblings. Draw code gets lower BRANCH floors (visual variants are
       // the e2e visual tier's job). See CONTRIBUTING.md → "Coverage floors".
       thresholds: {
-        statements: 85,
-        lines: 85,
-        functions: 80,
-        branches: 80,
+        statements: 91,
+        lines: 92,
+        functions: 90,
+        branches: 85,
+        // Per-file lines are EXEMPTIONS only: the audio graph and the procedural
+        // draw code genuinely can't reach the branch/line floor from unit tests
+        // (audio wiring and per-pixel visual variants are the Playwright e2e
+        // tier's job), so those files get a lower floor. A file that already
+        // clears the global gets no line: a per-file threshold that just
+        // restates the global earns nothing and is left off.
         "src/audio/ToneAudioEngine.ts": { statements: 82, lines: 82, functions: 80, branches: 72 },
-        "src/render/sprites.ts": { statements: 88, lines: 88, functions: 90, branches: 82 },
-        "src/render/sprites/**": { statements: 90, lines: 90, functions: 90, branches: 60 },
-        "src/render/pixelSprites.ts": { statements: 78, lines: 78, functions: 80, branches: 65 },
+        "src/render/sprites/**": { branches: 72 },
+        "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
       },
     },
   },
