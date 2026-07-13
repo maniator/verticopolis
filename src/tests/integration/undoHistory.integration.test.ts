@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { UndoHistory, towerStateSig } from "../engine/UndoHistory";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { UndoHistory, towerStateSig } from "../../engine/UndoHistory";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 // A tiny in-memory "world" so the stack logic can be exercised with no
 // simulation at all — the snapshot is just the JSON of a single number.

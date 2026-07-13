@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { CLASSIC_RULES, MODERN_RULES } from "../engine/gameRules";
-import { ECON } from "../engine/econConfig";
-import type { GameMode } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
+import { ECON } from "../../engine/econConfig";
+import type { GameMode } from "../../engine/types";
 
 /**
  * Household-aware condo departures (Modern only). A sold Modern condo's family
