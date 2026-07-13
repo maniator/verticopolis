@@ -39,8 +39,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/render/excalibur/TowerEngine.ts",
   "src/render/pixelSprites.ts",
   "src/render/sprites/structure.ts",
-  // storage
-  "src/storage/tdtExport.ts",
   // ui / app spine / audio
   "src/main.ts",
   "src/ui/UI.ts",
@@ -61,11 +59,16 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/tests/calendar.test.ts",
 ]);
 
-/** Count lines the way `wc -l` does: the number of newline characters. */
+/** Count logical lines: newline characters, plus one for a final line that is
+ *  not newline-terminated. (Plain `wc -l` counts only newlines, so a file whose
+ *  501st line lacks a trailing newline would read as 500 and slip under the
+ *  ceiling; counting the last line closes that bypass.) */
 function lineCount(absPath: string): number {
   const text = readFileSync(absPath, "utf8");
+  if (text.length === 0) return 0;
   let n = 0;
   for (let i = 0; i < text.length; i++) if (text.charCodeAt(i) === 10) n++;
+  if (text.charCodeAt(text.length - 1) !== 10) n++; // final unterminated line
   return n;
 }
 
