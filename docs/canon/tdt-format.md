@@ -134,7 +134,7 @@ segment = one of our tiles; half-open range); type byte (§5; negative ⇒ under
 construction [OS]); a flags byte (bit-mapped hotel state [TD]: bits for occupant
 count, booked-but-empty, occupied-overnight, dirty, bug-infested); then **byte 6
 holds the retail variant** (0-10 for shops, 0-4 for fast food/restaurants; §7
-names) — measured against game-written saves (`my_tower` fast-food byte 6 =
+names), measured against game-written saves (`my_tower` fast-food byte 6 =
 `3,1,2,4,0`, matching the "BURGER" stand in the Wine render); the next ~9 bytes
 are undocumented; a **rent/lease byte** at offset 16 (0 = Very Low, 1 = Low,
 2 = Average, 3 = High, 4 = No Rate) [TD]; and a final byte 17 that earlier notes

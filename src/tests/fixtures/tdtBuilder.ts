@@ -36,10 +36,15 @@ export interface TenantSpec {
   status?: number;
   /** Rent/lease byte at offset 16 (0 Very Low … 3 High, 4 No Rate). */
   rentRate?: number;
-  /** Retail variant ordinal, written at byte 6 (where the real game stores it). */
+  /** Retail variant ordinal. Written to unit-record **byte 6**, where the real
+   *  game stores the variety and where the importer reads it. NOTE the naming
+   *  collision: this is NOT `TdtTenant.subtype` (which is byte 17); the spec
+   *  field is named `subtype` for historical continuity with older fixtures. To
+   *  set the byte-17 slot, use {@link byte17}. */
   subtype?: number;
-  /** Decoy value for the old (wrong) variant offset, byte 17. Lets a test prove
-   *  the importer reads byte 6 and ignores byte 17. Defaults to 0 (like a real save). */
+  /** Decoy value for the old (wrong) variant offset, byte 17 (== `TdtTenant.subtype`).
+   *  Lets a test prove the importer reads the variant from byte 6 and ignores
+   *  byte 17. Defaults to 0 (like a real save). */
   byte17?: number;
 }
 
