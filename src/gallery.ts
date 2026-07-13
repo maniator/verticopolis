@@ -1,7 +1,7 @@
 import { FACILITIES, GRID } from "./engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
-import { drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
+import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 
 void GRID;
 
@@ -82,6 +82,16 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
         drawUnit(d, makeUnit("floor", "occupied", 0, 500 + i), x - 8, topY + i * floorH, w + 16, floorH);
       }
       drawTransport(d.ctx, t, x, topY, w, floorH);
+      // Elevator entries also show their cars so the per-kind cab dressing
+      // (standard / service / express) is visible in the catalog.
+      for (let i = 0; i < cars; i++) {
+        d.ctx.save();
+        // Integer translate so the cab's 1px dressing rows (hazard stripes,
+        // livery pinstripe) land on whole pixels instead of antialiasing.
+        d.ctx.translate(Math.round(x), Math.round(topY + (t.top - t.carPositions[i]) * floorH));
+        drawCar(d.ctx, i * 7 + 1, w, floorH, i === 0 ? 2 : 0, i === 0 ? "up" : "down", false, kind);
+        d.ctx.restore();
+      }
     },
   };
 }

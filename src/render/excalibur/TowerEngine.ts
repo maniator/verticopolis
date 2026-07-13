@@ -304,6 +304,8 @@ export class TowerEngine {
     i: number;
     seed: number;
     w: number;
+    /** Elevator kind, threaded to drawCar so each cab wears its type's look. */
+    kind: FacilityKind;
     /** Lazily-built cab graphics keyed by indicator state (riders:arrow:full). */
     gfx: Map<string, ex.Canvas>;
     shown: string;
@@ -2016,18 +2018,20 @@ export class TowerEngine {
   }
 
   /** Get-or-create the cab graphic for a given indicator state. Keying and
-   *  drawing both derive from the one {@link CarIndicator}, so the cache key and
-   *  the painted cab can't fall out of sync. */
-  private carGfx(entry: { seed: number; w: number; gfx: Map<string, ex.Canvas> }, ind: CarIndicator): ex.Canvas {
+   *  drawing both derive from the one {@link CarIndicator} plus the entry's
+   *  fixed kind; the key can skip the kind only because each cache map belongs
+   *  to a single car whose shaft never changes kind (any rebuild goes through
+   *  syncMotion, which recreates the entry). */
+  private carGfx(entry: { seed: number; w: number; kind: FacilityKind; gfx: Map<string, ex.Canvas> }, ind: CarIndicator): ex.Canvas {
     const key = this.carKey(ind);
     let cv = entry.gfx.get(key);
     if (!cv) {
-      const { seed, w } = entry;
+      const { seed, w, kind } = entry;
       cv = new ex.Canvas({
         width: w,
         height: FLOOR,
         cache: true,
-        draw: (ctx) => drawCar(ctx, seed, w, FLOOR, ind.riders, ind.arrow, ind.full),
+        draw: (ctx) => drawCar(ctx, seed, w, FLOOR, ind.riders, ind.arrow, ind.full, kind),
       });
       entry.gfx.set(key, cv);
     }
@@ -2045,9 +2049,9 @@ export class TowerEngine {
         // count, direction lantern, FULL) so we only ever draw each variant once.
         const gfx = new Map<string, ex.Canvas>();
         const a = new ex.Actor({ pos: ex.vec(this.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: 2 });
-        a.graphics.use(this.carGfx({ seed, w, gfx }, IDLE_CAR));
+        a.graphics.use(this.carGfx({ seed, w, kind: t.kind, gfx }, IDLE_CAR));
         this.engine.add(a);
-        this.carActors.push({ actor: a, t, i, seed, w, gfx, shown: this.carKey(IDLE_CAR) });
+        this.carActors.push({ actor: a, t, i, seed, w, kind: t.kind, gfx, shown: this.carKey(IDLE_CAR) });
       }
     }
     for (const u of this.sim.tower.units) {
