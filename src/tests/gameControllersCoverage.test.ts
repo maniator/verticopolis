@@ -535,6 +535,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("the express inspector hides stop-config buttons and reads a fixed lobby policy; standard keeps both", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
     const html = transportEditorHtml(sim, ex);
     expect(html).not.toContain('data-edit="allstops"');
@@ -543,6 +544,24 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const stdHtml = transportEditorHtml(sim, lift);
     expect(stdHtml).toContain('data-edit="allstops"');
     expect(stdHtml).toContain('data-edit="stops"');
+  });
+
+  it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", () => {
+    // A legacy/forged save may skip an interior sky lobby (coerceExpressStops
+    // preserves it), so the readout must not overstate "lobbies and sky lobbies".
+    const s = new Simulation();
+    for (let x = 40; x < 52; x++) expect(s.tower.place("lobby", 1, x).ok).toBe(true);
+    // Build bottom-up. Floor 15 is the sky lobby (no plain floor tiles there, per
+    // sky-lobby canon), and it must be laid before floor 16 so 16 has support.
+    for (let fl = 2; fl <= 14; fl++) for (let x = 40; x < 52; x++) expect(s.tower.place("floor", fl, x).ok).toBe(true);
+    for (let x = 40; x < 52; x++) expect(s.tower.place("lobby", 15, x).ok).toBe(true); // interior sky lobby
+    for (let fl = 16; fl <= 30; fl++) for (let x = 40; x < 52; x++) expect(s.tower.place("floor", fl, x).ok).toBe(true);
+    const r = s.tower.placeTransport("elevatorExpress", 42, 1, 30);
+    expect(r.ok).toBe(true);
+    const ex = s.tower.transports.find((t) => t.id === r.transportId)!;
+    expect(transportEditorHtml(s, ex)).toContain("lobbies and sky lobbies");
+    expect(s.tower.setStop(ex.id, 15, false)).toBe(true); // skip the interior sky lobby
+    expect(transportEditorHtml(s, ex)).toContain("lobbies and sky lobbies (1 skipped)");
   });
 
   it("openStopsDialog lists floors top-down and each toggle is its own undo-bracketed setStop", () => {

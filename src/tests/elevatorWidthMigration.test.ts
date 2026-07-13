@@ -61,6 +61,9 @@ describe("canon elevator widths", () => {
     const std = sim.tower.placeTransport("elevatorStandard", 42, 1, 10);
     const svc = sim.tower.placeTransport("elevatorService", 50, 1, 10);
     const exp = sim.tower.placeTransport("elevatorExpress", 60, 1, 10);
+    expect(std.ok).toBe(true);
+    expect(svc.ok).toBe(true);
+    expect(exp.ok).toBe(true);
     const widthOf = (r: { transportId?: number }) => sim.tower.transports.find((t) => t.id === r.transportId)?.width;
     expect(widthOf(std)).toBe(4);
     expect(widthOf(svc)).toBe(4);

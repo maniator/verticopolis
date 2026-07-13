@@ -158,10 +158,13 @@ export function transportEditorVolatile(sim: Simulation, t: Transport, mobile = 
     vol.cars = `${t.cars} / ${maxCars} max`;
     vol.capacity = `${sim.transportCapacity(t)} riders/trip`;
     // An express is locked to (sky) lobbies (1994 parity), so it reads a fixed
-    // policy line rather than a free per-floor skip count. Standard/service keep
-    // their configurable stop readout.
+    // policy line rather than a free per-floor skip count. A legacy/forged save
+    // may still carry a deliberately skipped lobby (coerceExpressStops preserves
+    // those), so surface that count honestly instead of overstating the policy.
+    // Standard/service keep their configurable stop readout.
     if (t.kind === "elevatorExpress") {
-      vol.stops = "lobbies and sky lobbies";
+      const skippedLobbies = (t.skipFloors ?? []).filter((fl) => sim.tower.floorHasLobby(fl)).length;
+      vol.stops = skippedLobbies ? `lobbies and sky lobbies (${skippedLobbies} skipped)` : "lobbies and sky lobbies";
     } else {
       vol.stops = skipped ? `express · skips ${skipped}` : "all floors";
     }
