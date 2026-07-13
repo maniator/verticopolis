@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import type { FacilityKind, SerializedGame, Transport, Unit } from "../engine/types";
-import { SAVE_VERSION } from "../engine/saveMigration";
+import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
+import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
@@ -8,13 +8,13 @@ import {
   TDT_PERSON_RECORD_SIZE,
   TDT_ROUTING_TAIL_SIZE,
   parseTdtBinary,
-} from "../storage/tdtFormat";
-import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../storage/tdtExport";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
-import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../storage/tdtImport";
-import { buildTdt, sampleTowerSpec } from "./fixtures/tdtBuilder";
+} from "../../storage/tdtFormat";
+import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../../storage/tdtExport";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../../storage/tdtImport";
+import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
 /** A bare room unit for hand-built saves. */
 function unit(partial: Partial<Unit> & Pick<Unit, "id" | "kind" | "floor" | "x" | "width">): Unit {
