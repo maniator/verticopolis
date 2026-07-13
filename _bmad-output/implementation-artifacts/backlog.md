@@ -122,26 +122,55 @@ quietly reintroduces the very blind spots PR #188 removed.
   `spec-shard-screenshots-ci.md`: `scripts/screenshot-shards.ts` holds the
   explicit 4-shard partition (`showcase`, `slow`, `features`, `misc`) and a
   `verify` coverage guard (union of shard groups must equal every `SCENES` id,
-  exactly once, checked at the gate before any capture), and
-  `update-screenshots.yml` crosses the `shoot` matrix `run:[a,b]` x `shard`,
-  renders each shard via `ONLY=`, and diffs per shard. Each shard uploads its
-  full rendered set; `verify-and-commit` rebuilds the gallery from the union of
-  run-a shards (pruning removed scenes). The original speed constraints held:
-  4 shards (not 8+), provable coverage, `ONLY=`-based subsetting.
-- **Drift-check on every PR (the valuable one; needs speed first).** Move the
-  guard left to PR time, but split it into TWO signals with TWO verdicts or it
-  becomes a wolf-crier that gets ignored:
+  exactly once, checked at the gate before any capture). PR 1 originally crossed
+  the `shoot` matrix `run:[a,b]` x `shard`; PR 2's reusable-capture refactor
+  (see below) collapsed a/b INTO each shard job (each shard renders TWICE in one
+  container, each leg from its OWN build + preview server, and self-compares), so
+  the current shape is one job per shard, not eight. (Independent builds per leg,
+  after a Codex finding, keep the guard catching build-time nondeterminism; the
+  saving vs the 8-job matrix is the second checkout + npm ci, not the build.)
+  Each shard uploads its verified `run-a` set plus a `.shard-complete`
+  marker; the commit job rebuilds the gallery from the union of shards (pruning
+  removed scenes). The original speed constraints held: 4 shards (not 8+),
+  provable coverage, `ONLY=`-based subsetting.
+- **Drift-check on every PR (IN PROGRESS, PR 2).** Speced in
+  `spec-pr-drift-check.md` (approval-gated). Move the guard left to PR time, split
+  into TWO signals with TWO verdicts or it becomes a wolf-crier that gets ignored:
   - **Hard fail = the generator disagrees with ITSELF** (generate twice, diff
     the two runs against each other, not against the committed set). That is
     nondeterminism, always a bug, and scope-independent, so it stays valid even
     as main drifts underneath the PR. This is PR #188's guard, moved to PR time.
-  - **Advisory only = differs from the COMMITTED set** ("this PR changes N
-    screenshots, remember to regen with `[update-screenshots]`"). Expected on any
-    real UI PR, so it must NEVER be a red X, keep it informational and gate it to
-    PRs touching `src/render/**` or `scripts/screenshot*` so it isn't noise.
+  - **Differs from the COMMITTED set = a one-click APPROVAL GATE, not a red X.**
+    Evolved from the original "advisory comment" after a user request: instead of
+    telling the author to go do a marker push, the PR run (which already generated
+    the canonical pinned-container pixels) waits at a GitHub Environment approval
+    (`screenshot-approval`); on the maintainer's click it commits the regenerated
+    gallery to the PR branch in the SAME run. Drift never turns the PR red on its
+    own. Path-gated to `src/render/**` / `scripts/screenshot*` so it isn't noise.
   - Do not conflate the two: a naive "differs from committed = fail" turns every
     legit sprite tweak red, people learn to ignore red, and the day a real
     nondeterminism leak lands it is the boy who cried wolf.
+- **Keep the `[update-screenshots]` marker; do NOT retire it in PR 2** (party
+  round-tabled 2026-07-13: Winston/Dana/Boundary/John/Grumbal). The marker/
+  `workflow_dispatch` and the PR drift-check are COMPLEMENTARY, not redundant: the
+  marker is imperative + unconditional (regen on any branch, with no open PR, a
+  force-refresh, or a pixel change that arrives via a non-gated path such as a
+  Playwright/font/dep bump), while the drift-check is PR-diff-reactive + path-
+  gated. The genuine duplication is the CAPTURE logic, which PR 2 (after the user
+  renegotiated the "do not edit update-screenshots.yml" constraint) extracted
+  into a shared reusable `workflow_call`, `screenshot-capture.yml`, that BOTH
+  `update-screenshots.yml` and `pr-drift-check.yml` call, so they can never drift
+  on how pixels are generated or how nondeterminism is caught. The commit logic
+  stays per-caller (marker-commit vs approval-gated commit), since the two differ.
+  Retirement of the marker is deferred, not denied: now that the shared capture
+  is collapsed into one place, reconsider dropping the marker once the drift-check
+  has real-PR mileage (keep `workflow_dispatch` regardless). That is a PR 3
+  candidate.
+
+### Deferred from: code review of spec-pr-drift-check (`/bmad-code-review`, 2026-07-13)
+
+- **The `screenshot-approval` environment fails OPEN if it is deleted or its required reviewer is removed.** Referencing an undefined GitHub Environment auto-creates it with no protection rules, so `commit-on-approval` would then run with no human gate and auto-commit on every drift. The workflow cannot detect an unprotected environment from within a run, so this stays a repo-configuration invariant (documented in the workflow header as a PREREQUISITE). Mitigation if it ever bites: an org-level environment policy, or a preflight job that calls the REST API (`GET /repos/{o}/{r}/environments/{name}`) to assert `protection_rules` includes a required-reviewer rule and hard-fails otherwise. (Low; the maintainer configured the environment, and the header flags the risk.)
+- **Fork-PR advisory comment is a silent no-op.** A `pull_request` from a fork gets a read-only `GITHUB_TOKEN`, so the sticky comment 403s and is swallowed by `continue-on-error`; the fork author sees no drift guidance, and `commit-on-approval` (correctly) never gates on forks anyway. This repo's PRs come from same-repo `claude/*` branches, so it does not bite today. Follow-up if forks become common: post the drift guidance via a `pull_request_target`-scoped commenter, or surface it in the check summary instead of a comment. (Low; repo uses same-repo branches.)
 
 ### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
 

@@ -1,49 +1,29 @@
 name: Update screenshots
 
-# Regenerates the committed docs gallery (docs/screenshots/**) with the SINGLE
-# generator, scripts/screenshots.ts, running INSIDE the official Playwright
-# Docker image pinned to the repo's own Playwright version. Chromium build +
-# container fonts decide antialiasing, so regenerating here (not on a laptop) is
-# what keeps the committed PNGs reproducible. The local `npm run screenshots` is
-# only a host-Chromium preview and its pixels are NOT canonical. The refreshed
-# shots come back as a bot commit on the same branch.
+# Regenerates the committed docs gallery (docs/screenshots/**) via the SHARED
+# reusable capture (screenshot-capture.yml), the SAME one pr-drift-check.yml uses,
+# so the two workflows can never drift on HOW pixels are generated or how
+# nondeterminism is caught. The generator (scripts/screenshots.ts) runs inside the
+# official Playwright Docker image pinned to the repo's own Playwright version:
+# Chromium build + container fonts decide antialiasing, so regenerating here (not
+# on a laptop) is what keeps the committed PNGs reproducible. The local
+# `npm run screenshots` is only a host-Chromium preview and is NOT canonical.
 #
 # Trigger by pushing so the HEAD commit's message contains "[update-screenshots]"
 # (only the head commit of the push is checked), or run it by hand from the
-# Actions tab. The bot pushes with GITHUB_TOKEN, which never triggers workflows,
-# so the screenshot commit gets no CI run of its own, push once more after
-# pulling it to get a green check on the final head.
+# Actions tab. This marker path is DELIBERATELY KEPT (it is complementary to the
+# per-PR pr-drift-check.yml, not redundant): it regenerates on any branch, with no
+# open PR, as a force-refresh, or for a pixel change that arrives via a non-gated
+# path (a Playwright/font/dependency bump). The bot pushes with GITHUB_TOKEN,
+# which never triggers workflows, so the screenshot commit gets no CI run of its
+# own; push once more after pulling it to get a green check on the final head.
 #
-# SHARDED CAPTURE (why the matrix has two dimensions): the gallery is ~70 shots
-# rendered with no GPU (software raster) in the container, and the determinism
-# guard below renders every shot TWICE, so a serial regen is slow. scripts/
-# screenshot-shards.ts partitions SCENES into a few explicit groups; the `shoot`
-# matrix crosses those shards with the two guard runs (a, b), so each job renders
-# only its shard's scenes (via the generator's ONLY= env) and the shards run in
-# parallel. Wall-clock drops to roughly one shard's worth instead of the whole
-# set. The shard list is READ FROM the script (resolve-image emits it as the
-# matrix), never hand-listed here, and a coverage check fails the run unless every
-# SCENES id is in exactly one shard, so a shard can never silently drop a scene.
-# The sharded pipeline is deliberately EQUIVALENT to a single unsharded run: each
-# shard uploads the FULL set of shots it rendered, and verify-and-commit rebuilds
-# the gallery from the union of run-a's shards, so the committed result matches
-# what the whole-set generator would produce (including pruning a removed scene's
-# stale file, which an overlay-only assembly would leave behind).
-#
-# DETERMINISM GUARD (do NOT delete without understanding why it exists): the
-# generator is meant to be a pure function of the seeded sim + step count, so a
-# regen only changes pixels when the UI actually changed. That property has no
-# other enforcement (code review twice missed a wall-clock leak that recommitted
-# churn on every nightly run). This workflow proves it by generating every shot
-# TWICE (the `run: [a, b]` matrix legs) and failing if a shard's two runs differ
-# byte-for-byte (`verify-and-commit`, PER shard). The likeliest future regression
-# is not an edit to scripts/: it is someone adding a time-reading decoration to
-# the ENGINE render path, never touching this generator, and going green. The
-# both-runs comparison of every shot is what catches that. Sharding keeps the
-# both-runs coverage intact (every scene is owned by exactly one shard and that
-# shard renders it in BOTH legs); do NOT "optimize" it down to a subset of
-# scenes, which would go blind exactly when a new live scene is added, and do NOT
-# weaken it to a single generation.
+# DETERMINISM GUARD (do NOT weaken): a regen must only change pixels when the UI
+# actually changed. The shared `capture` renders every shard TWICE and FAILS if
+# the two renders differ byte-for-byte (nondeterminism, e.g. a wall-clock read
+# leaking into a capture: code review twice missed exactly that). So this workflow
+# only ever commits a set proven deterministic by the capture. Do NOT "optimize"
+# the capture down to a single render or a subset of scenes.
 
 on:
   push:
@@ -53,241 +33,74 @@ on:
 # SHARED with update-visual-baselines.yml: the two bot workflows both commit to
 # this branch, so they must never run at the same time or they'd race on push.
 # One group + cancel-in-progress:false serializes them (the second queues behind
-# the first); the second then checks out the first's commit (ref below) and
-# fast-forwards. cancel-in-progress is false so a queued regen is never dropped.
+# the first); the second then checks out the first's commit and fast-forwards.
 concurrency:
   group: regen-ci-artifacts-${{ github.ref }}
   cancel-in-progress: false
 
+# Default read-only; only the commit job requests contents:write.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
-  # Resolve the container tag from the repo's Playwright version so the image can
-  # never drift from the browser `npm ci` installs, the whole basis of stable
-  # pixels. (container.image is set before steps run, so it must come from a
-  # prior job's output, not a step in the same job.) This job also gates the
-  # whole run on shard coverage: if the union of shard groups != every SCENES id
-  # (a scene added to SCENES but to no shard, or listed twice), `verify` fails
-  # HERE, before any expensive capture, naming the uncovered/duplicated scene.
-  # It also emits the shard matrix so the shoot jobs are derived from the same
-  # SHARDS map that coverage is checked against. `verify`/`matrix` load the real
-  # SCENES (which pulls in node_modules), so this job runs `npm ci` first; the
-  # browser download is skipped since this job never renders.
-  resolve-image:
+  # Shared, sharded, self-verifying capture. Gated on the marker/dispatch. It
+  # renders each shard twice and hard-fails on nondeterminism, so nothing is
+  # committed unless the generator agreed with itself. Read-only (runs the
+  # generator, i.e. repo code, so no write token).
+  capture:
     if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[update-screenshots]')
+    uses: ./.github/workflows/screenshot-capture.yml
+    with:
+      ref: ${{ github.ref_name }}
+    permissions:
+      contents: read
+
+  # Assemble the verified shard sets into the committed gallery and push. Rebuilds
+  # from scratch (rm the generated PNGs, then overlay every shard) so a removed
+  # scene's stale file is pruned while tracked non-generated files (e.g.
+  # features/README.md) are preserved. Runs no repo code beyond git/jq/cp, so its
+  # write token is never exposed to generator execution.
+  commit:
+    needs: capture
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     env:
-      # This job resolves metadata only; never download Playwright's browsers.
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-    outputs:
-      image: ${{ steps.pin.outputs.image }}
-      shards: ${{ steps.shards.outputs.shards }}
-    steps:
-      - uses: actions/checkout@v4
-
-      # scripts/screenshot-shards.ts is run directly (native TS type-stripping),
-      # which needs Node >= 22.18; the runner's default is older.
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-
-      # The shard script imports the real SCENES manifest, which transitively
-      # imports node_modules deps (fflate, playwright), so its dependencies must
-      # be installed before `verify`/`matrix` can run.
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Verify shard coverage
-        run: node scripts/screenshot-shards.ts verify
-
-      - id: shards
-        name: Emit the shard matrix
-        run: echo "shards=$(node scripts/screenshot-shards.ts matrix)" >> "$GITHUB_OUTPUT"
-
-      - id: pin
-        run: |
-          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
-          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
-
-  # One job per (run, shard): the two determinism-guard legs (a, b) crossed with
-  # the shard partition, all on separate runners of the SAME pinned image. Each
-  # job renders ONLY its shard's scenes (ONLY= from the shard script), then
-  # uploads the FULL set of shots it rendered as shots-<run>-<shard>. It captures
-  # exactly what it rendered (files touched during the capture step, found via a
-  # timestamp marker) so verify-and-commit can rebuild the whole gallery from the
-  # union of the shards and prune anything no scene renders anymore. Because all
-  # jobs share the image (one Chromium build + fonts), a byte difference between
-  # run a and run b for the same shard can only come from a nondeterministic input
-  # (a wall-clock read leaking into a capture), not from the environment.
-  shoot:
-    needs: resolve-image
-    runs-on: ubuntu-latest
-    container:
-      image: ${{ needs.resolve-image.outputs.image }}
-    # Inside a container the default shell for `run:` steps is `sh` (dash); the
-    # capture and stage steps below use bash features (process substitution,
-    # `read -d ''`), so pin bash for the whole job.
-    defaults:
-      run:
-        shell: bash
-    strategy:
-      fail-fast: false
-      matrix:
-        run: [a, b]
-        shard: ${{ fromJSON(needs.resolve-image.outputs.shards) }}
-    env:
-      # Browsers already ship in the image; don't re-download them on npm ci.
-      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
-    steps:
-      # Check out the branch TIP (not the triggering SHA) with full history so
-      # every leg generates from the same source. (Only verify-and-commit pushes.)
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.ref_name }}
-          fetch-depth: 0
-
-      # A container checkout trips git's dubious-ownership guard; mark the tree safe.
-      - name: Trust the workspace
-        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-
-      # The Playwright jammy image ships Node 20, but scripts/screenshots.ts is
-      # run directly (native TS type-stripping) which needs Node >= 22.18, install
-      # the repo's pinned Node over the image's, keeping the image's browsers.
-      - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@v4
-        with:
-          node-version-file: ".nvmrc"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build
-        run: npm run build
-
-      # Pass the shard name through an env var (not `${{ }}` inside the script) so
-      # a shard name can never break out of the shell command.
-      - name: Capture this shard's screenshots
-        env:
-          SHARD: ${{ matrix.shard }}
-        run: |
-          export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
-          ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
-          echo "shard '$SHARD' renders: $ONLY"
-          # Marker a hair in the past so EVERY file the generator writes next
-          # (it rewrites each shot it renders, even byte-identical ones) sorts as
-          # newer; the stage step below reads back exactly this shard's output.
-          touch -d '1 second ago' /tmp/render-marker
-          RUN_SERVER=1 ONLY="$ONLY" node scripts/screenshots.ts
-
-      # Collect the FULL set of shots this shard rendered (every PNG under
-      # docs/screenshots touched during capture), not just the ones that differ
-      # from the committed base. Uploading the full set is what lets
-      # verify-and-commit rebuild the gallery from scratch (pruning orphans) and
-      # byte-compare every rendered shot between the two legs. The .shard-complete
-      # marker keeps the artifact non-empty for a shard that rendered nothing.
-      - name: Stage this shard's rendered screenshots
-        env:
-          RUN: ${{ matrix.run }}
-          SHARD: ${{ matrix.shard }}
-        run: |
-          stage=/tmp/stage
-          mkdir -p "$stage/shots"
-          touch "$stage/.shard-complete"
-          count=0
-          while IFS= read -r -d '' f; do
-            mkdir -p "$stage/shots/$(dirname "$f")"
-            cp -a "$f" "$stage/shots/$f"
-            count=$((count + 1))
-          done < <(find docs/screenshots -type f -name '*.png' -newer /tmp/render-marker -print0)
-          echo "shard '$SHARD' run '$RUN' staged $count rendered file(s)"
-
-      - name: Upload this shard's rendered screenshots
-        uses: actions/upload-artifact@v4
-        with:
-          name: shots-${{ matrix.run }}-${{ matrix.shard }}
-          path: /tmp/stage
-          retention-days: 1
-          if-no-files-found: error
-          include-hidden-files: true
-
-  # Determinism guard + commit. Downloads every shard's two runs, diffs run a vs
-  # run b PER shard, and only if every shard matches byte-for-byte rebuilds the
-  # committed gallery from the run-a shards and pushes it. A mismatch fails the
-  # workflow (nothing committed) rather than letting a nondeterministic generator
-  # recommit wall-clock churn. See the header note above. The authoritative shard
-  # list comes from resolve-image's `shards` output (parsed with jq), so this job
-  # needs no Node or npm ci of its own.
-  verify-and-commit:
-    needs: [resolve-image, shoot]
-    runs-on: ubuntu-latest
-    env:
-      SHARDS_JSON: ${{ needs.resolve-image.outputs.shards }}
+      SHARDS_JSON: ${{ needs.capture.outputs.shards }}
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
 
-      # Grab every shots-<run>-<shard> artifact under one dir (nested by name).
-      - name: Download all shard artifacts
+      - name: Download the shard artifacts
         uses: actions/download-artifact@v4
         with:
           path: /tmp/dl
           pattern: shots-*
 
-      - name: Verify the generator is deterministic (per shard)
-        run: |
-          # For each shard, run a and run b must have produced byte-identical
-          # rendered sets. Both legs render the same scenes and stage every shot
-          # they render, so any per-file byte difference, or a file present in one
-          # leg only, can only be nondeterminism. Every shard renders at least one
-          # shot, so BOTH legs must have a `shots` subtree: a missing one means a
-          # shard's artifact never arrived (a job or upload/download failure), and
-          # is a HARD failure, never a silent pass, so an incomplete set can never
-          # slip through to the rebuild below.
-          fail=0
-          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            a="/tmp/dl/shots-a-$shard/shots"
-            b="/tmp/dl/shots-b-$shard/shots"
-            if [ ! -d "$a" ] || [ ! -d "$b" ]; then
-              echo "::error::screenshot shard '$shard' is missing an artifact (run a: $([ -d "$a" ] && echo present || echo MISSING), run b: $([ -d "$b" ] && echo present || echo MISSING)); every shard must upload both runs. Refusing to proceed."
-              fail=1
-              continue
-            fi
-            if ! diff -rq "$a" "$b"; then
-              echo "::error::screenshot shard '$shard' is nondeterministic: its two parallel runs in the same pinned image produced different pixels. A wall-clock read leaked into a capture (likely a new time-driven decoration in the engine render path); fix it before committing."
-              fail=1
-            fi
-          done
-          if [ "$fail" -ne 0 ]; then exit 1; fi
-          echo "Generator is deterministic: every shard's two independent runs in the pinned image matched byte-for-byte."
-
       - name: Commit refreshed screenshots
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          # Rebuild the gallery from the run-a shards (identical to run b by the
-          # check above). Each shard artifact holds the FULL set of shots that
-          # shard rendered, so the union across shards is exactly a whole fresh
-          # generation. Require EVERY expected shard to be present before touching
-          # the tree, so a download failure can never commit a partial gallery.
+          # Require EVERY expected shard present before touching the tree, so a
+          # download failure can never commit a partial gallery.
+          # Count via the .shard-complete marker each shard uploads, NOT the pixel
+          # directory: a shard that legitimately renders nothing still finished and
+          # must count as present, or a genuinely-empty shard would be misread as a
+          # missing artifact and abort the commit.
           expected=$(echo "$SHARDS_JSON" | jq 'length')
           assembled=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            [ -d "/tmp/dl/shots-a-$shard/shots/docs/screenshots" ] && assembled=$((assembled + 1))
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
           done
           if [ "$assembled" -ne "$expected" ]; then
-            echo "::error::expected $expected shard galleries but found $assembled; refusing to rebuild a partial gallery (a download or upload step must have failed)."
+            echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step must have failed."
             exit 1
           fi
-          # Prune only the GENERATED images (so a removed scene's stale PNG goes
-          # away, matching the unsharded generator) while preserving tracked
-          # non-generated files under docs/screenshots, e.g. features/README.md.
           find docs/screenshots -type f -name '*.png' -delete
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            src="/tmp/dl/shots-a-$shard/shots/docs/screenshots"
+            src="/tmp/dl/shots-$shard/shots/docs/screenshots"
             [ -d "$src" ] && cp -a "$src/." docs/screenshots/
           done
           git add -A docs/screenshots
