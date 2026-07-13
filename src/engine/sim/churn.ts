@@ -1,4 +1,4 @@
-import { Simulation } from "../Simulation";
+import type { Simulation } from "../Simulation";
 
 import { REAL_WORLD } from "../calendar";
 
@@ -120,6 +120,15 @@ export function attemptMoveIns(sim: Simulation): void {
   }
 }
 
+/** Monthly, Modern-only: a sold condo's household may relocate on its own, a
+ *  life event (a job move, an upsize or downsize) unrelated to how well the
+ *  tower serves it, so it can fire even on a perfectly happy condo. The chance
+ *  scales with family size (bigger families are a bigger flight risk). Classic
+ *  returns 0 and never rolls: the `<= 0` guard short-circuits BEFORE any RNG
+ *  draw, so a Classic tower's seeded stream is byte-identical to one without
+ *  this feature. A relocation enters the standard `vacating` notice with a
+ *  non-rescindable "relocation" reason; when the notice elapses the existing
+ *  buy-back reclaims the unit at its household-scaled price and re-lists it. */
 export function rollCondoRelocations(sim: Simulation): void {
   const days = Math.ceil(VACATE_NOTICE_MINUTES / (24 * 60));
   for (const u of sim.tower.units) {
@@ -151,15 +160,6 @@ export function rollCondoRelocations(sim: Simulation): void {
   }
 }
 
-/** Monthly, Modern-only: a sold condo's household may relocate on its own, a
- *  life event (a job move, an upsize or downsize) unrelated to how well the
- *  tower serves it, so it can fire even on a perfectly happy condo. The chance
- *  scales with family size (bigger families are a bigger flight risk). Classic
- *  returns 0 and never rolls: the `<= 0` guard short-circuits BEFORE any RNG
- *  draw, so a Classic tower's seeded stream is byte-identical to one without
- *  this feature. A relocation enters the standard `vacating` notice with a
- *  non-rescindable "relocation" reason; when the notice elapses the existing
- *  buy-back reclaims the unit at its household-scaled price and re-lists it. */
 /**
  * Draw a canon retail variant name from `sim.rng` for the given kind, or
  * undefined when the kind carries no canon subtype. Short-circuits BEFORE

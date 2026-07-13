@@ -1,4 +1,4 @@
-import { Simulation } from "../Simulation";
+import type { Simulation } from "../Simulation";
 
 import { rentOf, rentConfig } from "../econConfig";
 

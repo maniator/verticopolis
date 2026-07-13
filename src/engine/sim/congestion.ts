@@ -1,4 +1,4 @@
-import { Simulation } from "../Simulation";
+import type { Simulation } from "../Simulation";
 
 import { FACILITIES, censusCount, facilityFloors, isElevatorKind, isStaffOnlyTransport, isHotelKind, transportCarCapacity } from "../facilities";
 import type { FacilityKind } from "../types";
@@ -18,8 +18,9 @@ import { HeatmapMode, congestionSeverity, HeatCell } from "./constants";
  */
 export function congestion(sim: Simulation): number {
   if (sim.simModel === "v2") {
-    // Population-weighted average of the per-floor spatial congestion, a single
-    // HUD-friendly summary of a model that is really per-floor.
+    // The mean of the per-floor spatial congestion (an unweighted average over
+    // occupied floors), a single HUD-friendly summary of a model that is really
+    // per-floor.
     const map = sim.spatialCongestionByFloor();
     if (map.size === 0) return 0;
     let sum = 0, n = 0;
