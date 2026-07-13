@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { ECON } from "../engine/econConfig";
-import { FACILITIES, GRID, MAX_CARS, maxSpanFor } from "../engine/facilities";
+import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import { SAVE_VERSION } from "../engine/saveMigration";
 import type { FacilityKind, SerializedGame, Transport } from "../engine/types";
@@ -940,7 +940,7 @@ describe("transport synthesis: the fallback when the save's blocks are unreadabl
     const ts: Transport[] = parse(tallSpec).save.transports;
     expect(ts.length).toBeLessThanOrEqual(24); // the shared elevator pool
     for (const t of ts) {
-      expect(t.cars).toBeLessThanOrEqual(MAX_CARS[t.kind]);
+      expect(t.cars).toBeLessThanOrEqual(maxCarsFor(t.kind));
       expect(t.top - t.bottom).toBeLessThanOrEqual(maxSpanFor(t.kind));
       expect(t.top).toBeGreaterThan(t.bottom);
       expect(t.x).toBeGreaterThanOrEqual(0);

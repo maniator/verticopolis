@@ -11,7 +11,7 @@ export function facilityFloors(kind: FacilityKind): number {
 }
 
 /**
- * How long a facility takes to build, in in-game minutes. Structure goes up
+ * The number of in-game minutes a facility takes to build. Structure goes up
  * instantly; rooms take a while (bigger/pricier → longer), like the original's
  * construction phase. Driven entirely by the global clock, no per-room timers.
  */
