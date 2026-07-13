@@ -32,15 +32,21 @@
 import { SCENES } from "./screenshot-scenes.ts";
 
 // The partition: explicit scene-id groups, NOT a count/index split. Grouped by
-// rough capture cost so the shards finish together (migration + milestones are
-// ~50s/shot; showcase carries the most shots). This is the ONLY place the split
-// is defined; correctness is enforced by `verify` against SCENES, so a rebalance
-// here is safe as long as `verify` still passes.
+// MEASURED capture cost (from a CI run) so the shards finish together. The
+// `migration` scene is the long pole on its own: 4 shots at ~90s each (~6.2 min)
+// building large save-parity towers, and a single scene cannot be split across
+// shards, so it sets the wall-clock floor and gets its own shard. `features`
+// (~5 min) is the next heaviest and is isolated too; the remaining light scenes
+// (milestones ~2.9 min, showcase, mobile, and the small misc scenes) are merged
+// to fit under that floor. This is the ONLY place the split is defined;
+// correctness is enforced by `verify` against SCENES, so a rebalance here is safe
+// as long as `verify` still passes.
 export const SHARDS: Record<string, string[]> = {
-  showcase: ["showcase", "mobile"],
-  slow: ["migration", "milestones"],
+  migration: ["migration"],
   features: ["overlays", "basement", "stats", "palette-unlock", "condo-modes", "crash-screen"],
+  showcase: ["showcase", "milestones"],
   misc: [
+    "mobile",
     "first-run",
     "first-run-mobile",
     "construction",
