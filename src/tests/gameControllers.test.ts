@@ -184,6 +184,49 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(sel).toBeNull();
   });
 
+  it("mobile editor folds in the card's diagnostics and drops the duplicate access row", () => {
+    const { sim, office } = fixture();
+    const mobile = unitEditorHtml(sim, office, true);
+    const desktop = unitEditorHtml(sim, office, false);
+    // Mobile folds in the card's richer access reachability line as a live
+    // block, so the plain "Elevator access: Yes/No" row that would duplicate it
+    // is dropped.
+    expect(mobile).toContain('data-field="diagnostics"');
+    expect(mobile).toContain("Access:"); // the served office reads "Access: reachable…"
+    expect(mobile).not.toContain("Elevator access");
+    // Desktop keeps the plain access row and leaves the diagnostics to the
+    // hover card, so it carries neither the block nor the reachability line.
+    expect(desktop).toContain("Elevator access");
+    expect(desktop).not.toContain("Access:");
+    expect(desktop).not.toContain('data-field="diagnostics"');
+  });
+
+  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
+    const sim = new Simulation();
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("security", 2, 12);
+    expect(r.ok).toBe(true);
+    const sec = sim.tower.units.find((u) => u.id === r.unitId)!;
+    sec.state = "occupied";
+    // Security has no population and no traffic income, so facilityDiagnostics
+    // emits no access line: the mobile editor keeps the plain "Elevator access"
+    // row so its connectivity still shows (parity with desktop, not a silent drop).
+    expect(unitEditorHtml(sim, sec, true)).toContain("Elevator access");
+  });
+
+  it("mobile editor folds the retail patronage block into a shop's panel", () => {
+    const sim = new Simulation();
+    for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("shop", 2, 12);
+    expect(r.ok).toBe(true);
+    const shop = sim.tower.units.find((u) => u.id === r.unitId)!;
+    shop.state = "occupied";
+    expect(unitEditorHtml(sim, shop, true)).toContain("patronage");
+    expect(unitEditorHtml(sim, shop, false)).not.toContain("patronage");
+  });
+
   it("rentUp/rentDown clamp a real office to the engine's rent band", () => {
     sel = { type: "unit", id: office.id };
     root.innerHTML = unitEditorHtml(sim, office);

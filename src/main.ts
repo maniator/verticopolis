@@ -730,13 +730,11 @@ class GameApp {
     this.engine.onTap = (tile, floor, touch, picked) => {
       this.audio.start();
       if (this.tool.type === "inspect") {
+        // Touch has no hover stream, so mobile shows ONE panel: the tap opens
+        // the editor, which folds in the inspector card's diagnostics on mobile
+        // (see refreshEditor / editorHtml). The floating card stays a
+        // desktop-hover affordance and is never raised on touch.
         this.selectPicked(picked);
-        // Touch has no hover stream, so the tap itself must raise the inspector
-        // card a desktop shows on hover (its mobile-only ✕-close exists for
-        // exactly this). selectPicked opens the editor; this adds the quick-info
-        // card for the same facility, and hides it when the tap lands on empty
-        // space (picked is null). On mouse the hover already shows the card.
-        if (touch) this.inspector.inspectPicked(picked);
         return;
       }
       if (!touch) return; // mouse pan-taps with a build/bulldoze tool do nothing
@@ -839,7 +837,10 @@ class GameApp {
       } else {
         this.engine.preview = null;
         this.engine.transportPreview = null;
-        if (this.tool.type === "inspect") this.inspector.inspectPicked(picked);
+        // The floating card is a desktop affordance only: on a phone-width
+        // viewport we show ONE panel (the editor, with diagnostics folded in),
+        // so a hybrid mouse+touch device never raises the card there either.
+        if (this.tool.type === "inspect" && !this.mobileMq.matches) this.inspector.inspectPicked(picked);
       }
     };
 
@@ -1324,6 +1325,12 @@ class GameApp {
     // shape only changes when a control appears/disappears (a condo sells and
     // loses its price adjuster; a car button hits its disabled bound), so
     // rebuilds are rare and the buttons/input survive every stat tick.
+    // Mobile folds the inspector card's diagnostics into the editor (one panel,
+    // no hover). It changes the editor's row SHAPE (the access row drops, a
+    // diagnostics block appears), so it belongs in the render key: a viewport
+    // that crosses the mobile breakpoint rebuilds instead of stale-patching.
+    const mobile = this.mobileMq.matches;
+    const m = mobile ? ":m" : "";
     if (this.selected.type === "unit") {
       const u = this.selectedUnit();
       if (!u) return this.clearSelection();
@@ -1338,14 +1345,14 @@ class GameApp {
       // for scrap/bulldoze rows. Fold exactly those two bits into the key so
       // a construction finish, fire, or gut mid-view triggers a rebuild.
       const op = isOperational(u) ? "" : u.state === "gutted" ? ":g" : ":x";
-      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}${op}`, () => unitEditorHtml(this.sim, u), unitEditorVolatile(this.sim, u));
+      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}${op}${m}`, () => unitEditorHtml(this.sim, u, mobile), unitEditorVolatile(this.sim, u, mobile));
     } else {
       const t = this.selectedTransport();
       if (!t) return this.clearSelection();
       this.engine.selectedId = t.id; // outlines the shaft + shows extend arrows
       const maxCars = maxCarsFor(t.kind);
       const shape = `${t.cars <= 1 ? "-" : ""}${t.cars >= maxCars ? "+" : ""}`;
-      this.ui.renderEditor(`transport:${t.id}:${shape}`, () => transportEditorHtml(this.sim, t), transportEditorVolatile(this.sim, t));
+      this.ui.renderEditor(`transport:${t.id}:${shape}${m}`, () => transportEditorHtml(this.sim, t, mobile), transportEditorVolatile(this.sim, t, mobile));
     }
   }
 
