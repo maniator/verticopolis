@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { deflateSync, inflateSync } from "fflate";
-import towerFile from "./fixtures/towerone_6.vctower?raw";
-import { LOG_SAVE_CAP, Simulation } from "../engine/Simulation";
-import type { SerializedGame } from "../engine/types";
-import { SaveGame } from "../storage/SaveGame";
+import towerFile from "../fixtures/towerone_6.vctower?raw";
+import { LOG_SAVE_CAP, Simulation } from "../../engine/Simulation";
+import type { SerializedGame } from "../../engine/types";
+import { SaveGame } from "../../storage/SaveGame";
 
 /**
  * Save metadata stamps (savedAt + appVersion on every write, including

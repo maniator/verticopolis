@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 import {
   ONBOARD_STEPS,
   firstIncompleteStep,
@@ -8,7 +8,7 @@ import {
   isOnboarded,
   markOnboarded,
   clearOnboarded,
-} from "../ui/Onboarding";
+} from "../../ui/Onboarding";
 
 const C = Math.floor(GRID.width / 2);
 
@@ -69,7 +69,7 @@ describe("Onboarding — steps advance on real progress", () => {
   });
 });
 
-import { OnboardingController } from "../ui/Onboarding";
+import { OnboardingController } from "../../ui/Onboarding";
 
 function makeController(mobile = false) {
   document.body.innerHTML = '<div id="hint"></div><div id="palette-scroll"></div><div id="speed"></div>';

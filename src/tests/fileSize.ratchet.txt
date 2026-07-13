@@ -17,7 +17,7 @@ src/audio/ToneAudioEngine.ts
 # scripts
 # tests (split last)
 src/tests/simulation.test.ts
-src/tests/uiDialogs.test.ts
+src/tests/integration/uiDialogs.integration.test.ts
 src/tests/gameControllersCoverage.test.ts
 src/tests/integration/tdtImport.integration.test.ts
 src/tests/integration/tdtExport.integration.test.ts

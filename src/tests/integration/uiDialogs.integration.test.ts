@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { UI, type UICallbacks } from "../ui/UI";
-import { Simulation } from "../engine/Simulation";
-import * as platformModule from "../platform";
+import { UI, type UICallbacks } from "../../ui/UI";
+import { Simulation } from "../../engine/Simulation";
+import * as platformModule from "../../platform";
 
 /**
  * Pins the dialog/window wiring contracts in src/ui/UI.ts — the layer where

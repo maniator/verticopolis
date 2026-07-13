@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { showCrashScreen } from "../ui/crashScreen";
-import type { CrashScreenOptions } from "../ui/crashScreen";
+import { Simulation } from "../../engine/Simulation";
+import { showCrashScreen } from "../../ui/crashScreen";
+import type { CrashScreenOptions } from "../../ui/crashScreen";
 
 /** The player-facing wording contract for the crash card. The save-status
  *  flags are computed in SaveLoad (covered by gameControllersCoverage); this

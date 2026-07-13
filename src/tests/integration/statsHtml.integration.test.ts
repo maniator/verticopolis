@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { buildIncomeHtml } from "../ui/statsHtml";
+import { Simulation } from "../../engine/Simulation";
+import { buildIncomeHtml } from "../../ui/statsHtml";
 
 describe("buildIncomeHtml (income breakdown)", () => {
   it("Net sums only the shown rows, excluding hidden sub-dollar lines", () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { strFromU8, unzipSync } from "fflate";
-import { Simulation } from "../engine/Simulation";
-import { SaveGame } from "../storage/SaveGame";
-import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../game/crashReport";
-import type { CrashDescription } from "../game/crashReport";
+import { Simulation } from "../../engine/Simulation";
+import { SaveGame } from "../../storage/SaveGame";
+import { buildCrashDetails, buildCrashReportZip, bugReportUrl } from "../../game/crashReport";
+import type { CrashDescription } from "../../game/crashReport";
 
 const CRASH: CrashDescription = { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false };
 
