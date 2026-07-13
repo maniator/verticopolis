@@ -95,12 +95,16 @@ run_container() {
   # COMMDLG.DLL (placed in the prefix) instead of Wine's builtin, which crashes
   # SimTower's 16-bit file Open/Save dialog. The .dll16 suffix is the key that
   # matches Wine's 16-bit loader; plain commdlg=n does not.
+  # Expand envargs/dargs with the `${arr[@]+"${arr[@]}"}` guard so an EMPTY array
+  # (headless modes add no display args; no tuning vars set adds no env args)
+  # doesn't trip `set -u` on bash <= 4.3, where a bare "${empty[@]}" is an unbound
+  # variable error. Harmless on 4.4+.
   docker run --rm -i $ttyflag \
     --user "$(id -u):$(id -g)" \
     -e HOME=/wine \
     -e 'WINEDLLOVERRIDES=mscoree,mshtml=;commdlg,commdlg.dll16=n' \
-    "${envargs[@]}" \
-    "${dargs[@]}" \
+    ${envargs[@]+"${envargs[@]}"} \
+    ${dargs[@]+"${dargs[@]}"} \
     -v "$PREFIX:/wine" \
     -v "$GAMEDATA:/gamedata:ro" \
     -v "$SAVES:/wine/drive_c/saves" \

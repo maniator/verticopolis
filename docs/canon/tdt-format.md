@@ -341,8 +341,10 @@ linking mechanism is undocumented.
 `.vctower` is our lossless save; TDT is the lossy 1994 interop format. Exporting
 to TDT and reading it back can return a tower that differs from the source in
 ways the format cannot represent, so the importer canonicalizes to what TDT
-*can* mean. Two known, benign cases (measured via `tools/simtower` round-trips,
-both engine-behavior only, not data loss):
+*can* mean. Two known, benign cases (observed in the engine's own
+`buildTDT`/`parseTDT` round-trips and pinned by the storage unit tests; live-game
+confirmation of the first is still pending, see below), both engine-behavior
+only, not data loss:
 
 - **Sky-lobby stories normalize to lobbies.** A plain floor tile placed on a
   sky-lobby story (floors 15, 30, 45…) exports byte-identically to a sky lobby
@@ -361,5 +363,5 @@ export → import is byte-identical (the round-trip reaches a fixed point after 
 first import). Do **not** "fix" these by teaching `parseTDT` to reconstruct the
 pre-canonical state; that would encode a tower the format cannot hold and the
 game will not show. The first case is still pending a live-game confirmation (see
-the backlog e1-roundtrip defer) once the harness `winevdm` boot flake is worked
-around.
+the backlog `tdt-roundtrip-canonicalization` defer) once the harness `winevdm`
+boot flake is worked around.
