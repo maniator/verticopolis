@@ -23,13 +23,13 @@
 
 // ---- More scene builders (folded in from the old shot-*.mjs generators) -----
 
-/** The end-to-end engine proof: a mid-size mixed tower centred by the engine. */
+/** The end-to-end engine proof: a mid-size mixed tower centered by the engine. */
 export function buildEngineTower(): void {
   const g = (window as unknown as { game: any }).game;
   const sim = g.sim;
-  // Centre on the seeded lobby (newGame seeds a 40-tile strip at the grid
-  // centre); a ground row only connects by touching the tower, so it must grow
-  // outward from centre, not from a far edge.
+  // Center on the seeded lobby (newGame seeds a 40-tile strip at the grid
+  // center); a ground row only connects by touching the tower, so it must grow
+  // outward from center, not from a far edge.
   const cx = Math.floor(g.grid.width / 2);
   const left = cx - 30;
   for (let x = cx; x < left + 60; x++) sim.tower.place("lobby", 1, x);
@@ -74,7 +74,7 @@ export function buildCrowdTower(): void {
   g.sim = Sim.newGame(3);
   const s = g.sim;
   const cx = Math.floor(g.grid.width / 2);
-  const left = cx - 25; // centre on the seeded lobby; grow the ground row outward
+  const left = cx - 25; // center on the seeded lobby; grow the ground row outward
   for (let x = cx; x < left + 50; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 10; f++) for (let x = left + 4; x < left + 46; x++) s.tower.place("floor", f, x);
@@ -300,7 +300,7 @@ export function buildOverlayTower(): void {
   const cx = Math.floor(W / 2);
   const left = cx - 46;
   const right = cx + 46;
-  // Ground lobby grows outward from the seeded centre; a sky lobby at 15.
+  // Ground lobby grows outward from the seeded center; a sky lobby at 15.
   for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 28; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);

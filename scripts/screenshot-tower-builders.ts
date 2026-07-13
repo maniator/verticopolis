@@ -194,7 +194,7 @@ export function pgGrowToStar(target: number): number {
   const right = W - 3;
   const perFloor = Math.floor((right - left) / 9); // ~40 offices across the lot
   const top = Math.max(2, Math.ceil(wantOffices / perFloor) + 1);
-  // Ground lobby grows outward from the seeded centre strip (a ground tile only
+  // Ground lobby grows outward from the seeded center strip (a ground tile only
   // connects by touching the tower), then upper floors rest on the full story
   // beneath; laying either from a far edge would clip the tower's left side.
   for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);

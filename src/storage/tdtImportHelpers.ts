@@ -3,13 +3,15 @@
  * derivation, and the deterministic seed hash. Extracted from `tdtImport.ts`
  * so the parse pass stays under the readable ceiling.
  */
+import { TDT_MAGIC } from "./tdtConstants";
 
 /** Heuristic for the import UI: is this picked file an original SimTower
  *  save? The .TDT extension first; else sniff the header magic, so a renamed
- *  or extension-less copy of a real save still routes here. */
+ *  or extension-less copy of a real save still routes here. The magic is the
+ *  little-endian u16 at offset 0, single-sourced from {@link TDT_MAGIC}. */
 export function looksLikeLegacyTower(filename: string, bytes?: Uint8Array): boolean {
   if (/\.tdt$/i.test(filename)) return true;
-  return !!bytes && bytes.byteLength >= 2 && bytes[0] === 0x00 && bytes[1] === 0x24;
+  return !!bytes && bytes.byteLength >= 2 && (bytes[0] | (bytes[1] << 8)) === TDT_MAGIC;
 }
 
 /** Tower name from the FILENAME (never from file bytes): basename minus

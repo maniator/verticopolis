@@ -224,7 +224,7 @@ export function pgSetOverlay(mode: string): void {
   }
 }
 
-/** Centre the Excalibur camera on the lot. */
+/** Center the Excalibur camera on the lot. */
 export function pgFrame(arg: { tile: number | null; floor: number; zoom: number }): void {
   const g = (window as unknown as { game: any }).game;
   const tile = arg.tile ?? Math.floor(g.grid.width / 2);
