@@ -1,9 +1,11 @@
 import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../engine/Simulation";
-import { COMMERCIAL_LOBBY_FLOORS } from "../engine/EconomySystem";
+import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, residentCount } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
+import { subtypeListFor } from "../engine/retailSubtypes";
 import { isOperational, isTenanted, VACATE_REASON_TEXT } from "../engine/types";
+import type { FacilityKind } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import { escapeHtml } from "../ui/escape";
@@ -51,6 +53,72 @@ function recyclingLine(sim: Simulation): string {
     (pop <= cap
       ? `<div style="color:var(--good)">Capacity: ${pop.toLocaleString()}/${cap.toLocaleString()} population; demand met.</div>`
       : `<div style="color:var(--bad)">Over capacity: ${pop.toLocaleString()} population vs ${cap.toLocaleString()} processed. Build another center (4★ requires demand met).</div>`)
+  );
+}
+
+/** The retail-only inspector block: today's customer count, the tier verdict
+ *  vs baseline, yesterday's profit, and a rain note when weather is dragging
+ *  down traffic. Kept as a pure function so the HTML is exercised by unit
+ *  tests without a DOM shell (see `inspectorRetailStats.test.ts`). The tier
+ *  bands were tuned in the party consult (Samus, Cloud, Sally, 2026-07-09);
+ *  see the spec's Player-Facing Copy section for the canonical strings. */
+export function retailStatsLines(
+  kind: FacilityKind,
+  patronageToday: number | undefined,
+  patronageYest: number | undefined,
+  profitYest: number | undefined,
+  isRaining: boolean,
+): string {
+  const spend = ECON.retailSpendPerCustomer[kind];
+  const daily = ECON.dailyTrafficIncome[kind];
+  if (spend === undefined || spend <= 0 || daily === undefined) return "";
+  // The reference is an "average good day": a venue at full appeal, well placed,
+  // on a dry day. `daily / spend` is the theoretical ceiling where every hourly
+  // multiplier is 1, but the foot-traffic factor averages TRAFFIC_FACTOR_MEAN
+  // (0.8), never 1, so real patronage tops out around that fraction of the
+  // ceiling. Baking the mean into the baseline keeps the verdict measuring the
+  // levers a player controls (appeal, placement, weather) rather than the daily
+  // dice; otherwise the top band was unreachable and the green verdict was dead
+  // code.
+  const baseline = (daily / spend) * TRAFFIC_FACTOR_MEAN;
+  const today = Math.max(0, patronageToday ?? 0);
+  // The "Today's patronage" number is the running count so far today; its bar
+  // fills as the trading day progresses (a progress indicator, not a verdict).
+  const barWidth = Math.min(100, Math.round((baseline > 0 ? today / baseline : 0) * 100));
+  const custRounded = Math.round(today);
+  // The VERDICT judges the last COMPLETED day (`patronageYest`), never the
+  // partial current day: `patronageToday` resets to 0 at the midnight rollover,
+  // so scoring the current day would flash a false red "Very few customers." on
+  // a booming shop hovered in the early hours before it has traded. Until the
+  // first rollover gives a full day of data, the venue reads "just opened".
+  // 3-band against the average-good-day baseline: <0.5 red (appeal, placement,
+  // or weather is dragging trade well below par), 0.5-0.85 neutral, >0.85 green
+  // (near-ideal conditions: high appeal, well placed, dry). A mature tower with
+  // a metro pushes appeal to 1, so the green band is genuinely reachable.
+  const yRatio = patronageYest === undefined ? undefined : baseline > 0 ? Math.max(0, patronageYest) / baseline : 0;
+  const tier =
+    yRatio === undefined
+      ? { color: "", verdict: "Just opened, no data yet." }
+      : yRatio < 0.5
+        ? { color: "var(--bad)", verdict: "Very few customers." }
+        : yRatio > 0.85
+          ? { color: "var(--good)", verdict: "Business is booming." }
+          : { color: "", verdict: "Business is average." };
+  // Yesterday's line is skipped on day 1 (no rollover yet) so the card doesn't
+  // read "$0" for a fresh tower. Once at least one rollover has fired the
+  // field is defined (>= 0) and the line shows even when yesterday earned
+  // nothing (a genuine slow day is honest to name).
+  const yestLine =
+    patronageYest !== undefined || profitYest !== undefined
+      ? `<div>Yesterday's profit: $${Math.round(Math.max(0, profitYest ?? 0)).toLocaleString()}.</div>`
+      : "";
+  const rainLine = isRaining ? `<div>Rain might cause fewer customers.</div>` : "";
+  return (
+    `<div>Today's patronage: ${custRounded.toLocaleString()} customer${custRounded === 1 ? "" : "s"}` +
+    ` <span class="evalbar"><span style="width:${barWidth}%"></span></span></div>` +
+    `<div${tier.color ? ` style="color:${tier.color}"` : ""}>${tier.verdict}</div>` +
+    yestLine +
+    rainLine
   );
 }
 
@@ -186,6 +254,18 @@ export class InspectorController {
             `<div>Fix the cause and get satisfaction to ${target}% to keep them (now ${now}%).</div>`;
         }
       }
+      // Retail-only patronage / profit card (shop / fastFood / restaurant): the
+      // in-day customer count, yesterday's profit, and a 3-band verdict against
+      // the per-kind baseline (`dailyTrafficIncome / retailSpendPerCustomer`,
+      // canceling spend so the ratio is stable if the tunables change together).
+      // Shown for every OPERATIONAL retail venue; a legacy unit (from a save
+      // predating these fields) still gets the card, reading "just opened" until
+      // it trades. Only a gutted / on-fire / mid-build venue is skipped, via the
+      // isOperational gate.
+      const retailStats =
+        subtypeListFor(u.kind) !== null && isOperational(u) && ECON.dailyTrafficIncome[u.kind] !== undefined && ECON.retailSpendPerCustomer[u.kind] !== undefined
+          ? retailStatsLines(u.kind, u.patronageToday, u.patronageYest, u.profitYest, sim.weather === "rain")
+          : "";
       // Canon retail variant (§7): a shop / fastFood / restaurant with a
       // subtype titles as its specific name ("Chinese Cafe"), not the generic
       // kind name. Legacy retail units and every non-retail kind keep the
@@ -218,6 +298,7 @@ export class InspectorController {
           commercialLobby +
           recycling +
           notice +
+          retailStats +
           `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
       );
     } else {

@@ -3,6 +3,7 @@ import { Simulation, ECON, VACATE_RESCIND } from "../engine/Simulation";
 import { ElevatorDispatch } from "../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../engine/facilities";
 import type { FacilityKind, SerializedUnit, Unit } from "../engine/types";
+import { isOperational } from "../engine/types";
 import { SHOP_SUBTYPES } from "../engine/retailSubtypes";
 
 describe("Rent / price controls", () => {
@@ -1473,5 +1474,178 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
     const revived = Simulation.deserialize(doc);
     const revivedShop = revived.tower.unitAt(2, x0);
     expect(revivedShop?.subtype).toBeUndefined();
+  });
+});
+
+describe("Commercial-venue inspector: patronage/profit accumulation, rollover, save shape", () => {
+  function buildOne(sim: Simulation, kind: FacilityKind, x: number): Unit {
+    sim.money = 1e12;
+    // Star 3 unlocks the shop / cinema / party hall this suite builds. Drop it
+    // back to 1 right after the build so the tick loop stays BELOW the 2-star
+    // random-event threshold (`EventSystem.maybeRandomEvent` returns early under
+    // 2 stars): no fire or bomb can ever fire, so no emergency can gut a venue
+    // and reset the fields under test, whatever the RNG stream does. Star is only
+    // gated at build time, not during ticks, and retail traffic income does not
+    // read the star, so the drop is inert for what these tests measure.
+    sim.star = 3;
+    const r = sim.build(kind, 2, x);
+    expect(r.ok).toBe(true);
+    const u = sim.tower.unitAt(2, x);
+    if (!u) throw new Error("placement failed");
+    sim.star = 1;
+    return u;
+  }
+
+  it("accumulates today's patronage and profit on retail units through the trading hours", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    // Advance a full day so the shop trades through its whole open window.
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    // Note: onDay fires when the clock crosses midnight, resetting today into
+    // yesterday. We assert yesterday's slot is populated instead.
+    expect(shop.patronageYest ?? 0).toBeGreaterThan(0);
+    expect(shop.profitYest ?? 0).toBeGreaterThan(0);
+  });
+
+  it("keeps an operational but idle venue as 'no data' through midnight, never a false 0", () => {
+    // An operational shop that never draws a customer all day (here stranded by
+    // removing every transport, so its floor is unreachable) must NOT wake to a
+    // defined patronageYest = 0 at the rollover: that would read as a red "very
+    // few customers" verdict on a venue that simply never had a trading day. Its
+    // fields stay undefined so the inspector keeps saying "just opened".
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    for (const t of [...sim.tower.transports]) sim.tower.removeTransport(t.id); // strand the floor
+    // Cross two midnights so construction finishes (the shop turns operational)
+    // and at least one rollover runs while it is idle.
+    for (let i = 0; i < 48; i++) sim.tick(60);
+    expect(isOperational(shop)).toBe(true);
+    expect(shop.patronageToday).toBeUndefined();
+    expect(shop.patronageYest).toBeUndefined();
+    expect(shop.profitYest).toBeUndefined();
+  });
+
+  it("leaves patronage/profit undefined on non-retail kinds (cinema, partyHall, office)", () => {
+    // Office draws no traffic income at all; cinema and partyHall DO earn
+    // foot-traffic income (the loop processes them), but neither carries a canon
+    // subtype, so `isRetail` is false and none of the three ever accrues the
+    // retail fields. Each gets its own tower because a 31-wide cinema and a
+    // 24-wide party hall don't share one floor.
+    for (const kind of ["office", "cinema", "partyHall"] as const) {
+      const sim = builtTower(11);
+      const x0 = Math.floor(GRID.width / 2) - 20;
+      const u = buildOne(sim, kind, x0);
+      for (let i = 0; i < 24; i++) sim.tick(60);
+      expect(u.patronageToday, kind).toBeUndefined();
+      expect(u.patronageYest, kind).toBeUndefined();
+      expect(u.profitToday, kind).toBeUndefined();
+      expect(u.profitYest, kind).toBeUndefined();
+    }
+  });
+
+  it("rolls today into yesterday and resets today at day change", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    // Sim starts at 07:00. Advance 8 hours -> 15:00, well inside the trading
+    // window and before midnight, so today's slot is real and yesterday's is
+    // still undefined (no rollover yet).
+    for (let i = 0; i < 8; i++) sim.tick(60);
+    const midToday = shop.patronageToday ?? 0;
+    expect(midToday).toBeGreaterThan(0);
+    expect(shop.patronageYest).toBeUndefined();
+    // Advance 24 more hours: 15:00 -> next-day 15:00, crossing exactly one
+    // midnight so onDay fires exactly once. Yesterday captures the previous
+    // full day; today has been reset and started earning again.
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(shop.patronageYest ?? 0).toBeGreaterThan(0);
+    // Today's counter starts at 0 after the rollover; trading between the
+    // 00:00 rollover and 15:00 the next day fills it partially, but it must
+    // be strictly less than a full trading day's yesterday.
+    expect(shop.patronageToday ?? 0).toBeLessThan(shop.patronageYest ?? 0);
+  });
+
+  it("cosmetic invariant: money + pendingIncome unchanged when patronage/profit are read only from render", () => {
+    // Two towers, identical seed and script. One runs on the shipped code
+    // (accumulators active); the other has its accumulators forcibly cleared
+    // every hour. If any economy path READ the accumulators, this would drift.
+    const drive = (clearEveryHour: boolean): { money: number; pending: number[] } => {
+      const sim = builtTower(11);
+      const x0 = Math.floor(GRID.width / 2) - 20;
+      buildOne(sim, "office", x0);
+      buildOne(sim, "shop", x0 + 12);
+      for (let i = 0; i < 24 * 7; i++) {
+        sim.tick(60);
+        if (clearEveryHour) {
+          for (const u of sim.tower.units) {
+            u.patronageToday = undefined;
+            u.patronageYest = undefined;
+            u.profitToday = undefined;
+            u.profitYest = undefined;
+          }
+        }
+      }
+      const pending = sim.tower.units.map((u) => u.pendingIncome ?? 0);
+      return { money: sim.money, pending };
+    };
+    const withAccum = drive(false);
+    const cleared = drive(true);
+    expect(cleared.money).toBe(withAccum.money);
+    expect(cleared.pending).toEqual(withAccum.pending);
+  });
+
+  it("round-trip: patronage/profit fields survive serialize + deserialize", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    const shop = buildOne(sim, "shop", x0);
+    for (let i = 0; i < 26; i++) sim.tick(60); // cross midnight to populate yesterday
+    const t = shop.patronageToday ?? 0;
+    const y = shop.patronageYest ?? 0;
+    const p = shop.profitYest ?? 0;
+    const wire = sim.serialize();
+    const revived = Simulation.deserialize(wire);
+    const revivedShop = revived.tower.unitAt(2, x0)!;
+    expect(revivedShop.patronageToday).toBeCloseTo(t);
+    expect(revivedShop.patronageYest).toBeCloseTo(y);
+    expect(revivedShop.profitYest).toBeCloseTo(p);
+  });
+
+  it("whitelist coerce: fields leaked onto a non-retail kind drop to undefined on load", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    buildOne(sim, "office", x0);
+    const wire = sim.serialize();
+    const doc = JSON.parse(JSON.stringify(wire));
+    // Force the fields onto the office record (as a forged save might do).
+    for (const u of doc.units as SerializedUnit[]) {
+      if (u.kind === "office") {
+        u.patronageToday = 999;
+        u.profitYest = 999;
+      }
+    }
+    const revived = Simulation.deserialize(doc);
+    const office = revived.tower.unitAt(2, x0)!;
+    expect(office.patronageToday).toBeUndefined();
+    expect(office.profitYest).toBeUndefined();
+  });
+
+  it("whitelist coerce: NaN / Infinity forgery clamps to 0", () => {
+    const sim = builtTower(11);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    buildOne(sim, "shop", x0);
+    const wire = sim.serialize();
+    const doc = JSON.parse(JSON.stringify(wire));
+    for (const u of doc.units as SerializedUnit[]) {
+      if (u.kind === "shop") {
+        u.patronageToday = Number.NaN;
+        u.profitYest = Number.POSITIVE_INFINITY;
+      }
+    }
+    const revived = Simulation.deserialize(doc);
+    const shop = revived.tower.unitAt(2, x0)!;
+    expect(shop.patronageToday).toBe(0);
+    expect(shop.profitYest).toBe(0);
   });
 });

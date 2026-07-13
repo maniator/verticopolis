@@ -112,6 +112,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of commercial-venue-inspector (`/gds-code-review`, 2026-07-13, PR #205)
+
+- **`rollOverRetailDay` skips a non-operational venue, so a burning-across-midnight unit keeps a stale `patronageToday`.** The `isOperational` gate (added to preserve the "no data yet" state for gutted/mid-build units) also skips a unit that traded, then caught fire, but is not yet gutted, across a midnight; its `patronageToday` is not rolled. Mitigated: the verdict now reads `patronageYest` (the last completed day), the fire status shows separately, and `gut` resets the fields once the unit is gutted. Revisit only if a burning venue's stale card reads wrong in playtest. (Blind Hunter, Low, largely mitigated.)
+
 ### Followups from: screenshot-determinism (party-vetted 2026-07-12, PR #188)
 
 Both are screenshot-CI hardening. Speed is the enabler that makes the every-PR

@@ -927,8 +927,40 @@ export class Simulation implements SimContext {
     this.checkMilestones();
     this.nudgeStranded();
     this.nudgeServiceShortfalls();
+    this.rollOverRetailDay();
     // Close the day's ledger so the income breakdown averages over whole days.
     this.ledger.endDay();
+  }
+
+  /** Retail-only: roll today's per-unit patronage + profit accumulators into
+   *  the "yesterday" slot the inspector reads, and reset today. Runs at the
+   *  end of {@link onDay} so a mid-day save preserves the day-in-progress
+   *  counter and a rebuilt-just-now unit reads 0 until it earns its first
+   *  hour of income. Non-operational units (mid-build, on-fire, gutted) are
+   *  skipped so the "undefined = no data yet" invariant survives midnight: a
+   *  shop still under construction at 23:00 must not wake to a defined
+   *  "Yesterday's profit: $0" line, and `EventSystem.gut`'s undefined reset
+   *  must not be silently upgraded to 0 by the very next `onDay`. A venue that
+   *  is operational but never traded (built after its closing hour, or stranded
+   *  and unreachable all day) has every field still `undefined`; it too is left
+   *  alone, so it keeps reading "just opened" instead of a false 0 verdict on
+   *  its first midnight. A venue with ANY field set (it traded today, or it has
+   *  a prior day) does roll over, so a genuine idle day correctly records 0. */
+  private rollOverRetailDay(): void {
+    for (const u of this.tower.units) {
+      if (subtypeListFor(u.kind) === null) continue;
+      if (!isOperational(u)) continue;
+      const hasData =
+        u.patronageToday !== undefined ||
+        u.patronageYest !== undefined ||
+        u.profitToday !== undefined ||
+        u.profitYest !== undefined;
+      if (!hasData) continue;
+      u.patronageYest = u.patronageToday ?? 0;
+      u.patronageToday = 0;
+      u.profitYest = u.profitToday ?? 0;
+      u.profitToday = 0;
+    }
   }
 
   /** Edge-triggered log bulletins (same latch pattern as {@link nudgeStranded})
@@ -2550,6 +2582,15 @@ export class Simulation implements SimContext {
           // §7 list, so a scrambled save or a subtype from a kind that doesn't
           // carry one drops to undefined (unit renders as the generic name).
           subtype: canonicalSubtype(u.kind as FacilityKind, u.subtype),
+          // Retail-only running totals: kept only on kinds that carry a canon
+          // subtype so a hand-edited save can't leak the fields onto a hotel or
+          // office. `num` clamps non-finite / negative-infinity forgeries; a
+          // legitimate absence stays absent (undefined) so a legacy save is
+          // indistinguishable from a fresh retail unit that hasn't earned yet.
+          patronageToday: subtypeListFor(u.kind as FacilityKind) === null || u.patronageToday === undefined ? undefined : Math.max(0, num(u.patronageToday, 0)),
+          patronageYest: subtypeListFor(u.kind as FacilityKind) === null || u.patronageYest === undefined ? undefined : Math.max(0, num(u.patronageYest, 0)),
+          profitToday: subtypeListFor(u.kind as FacilityKind) === null || u.profitToday === undefined ? undefined : Math.max(0, num(u.profitToday, 0)),
+          profitYest: subtypeListFor(u.kind as FacilityKind) === null || u.profitYest === undefined ? undefined : Math.max(0, num(u.profitYest, 0)),
           // Preserve an in-progress eviction across save/reload, hardened like
           // every other loop-driving field: an out-of-set reason or a non-finite
           // deadline from a forged save must not reach the toast / state machine.
@@ -2748,7 +2789,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, patronageToday, patronageYest, profitToday, profitYest, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
   void _hotelCustomersIn; // Transient: the hotel-origin subset of customersIn.
@@ -2775,6 +2816,17 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (vacateAt !== undefined) out.vacateAt = vacateAt;
   if (filmPolicy !== undefined) out.filmPolicy = filmPolicy;
   if (subtype !== undefined) out.subtype = subtype;
+  // Retail patronage/profit persist only for kinds that carry a canon subtype
+  // (shop / fastFood / restaurant), mirroring the kind guard `deserialize`
+  // applies, so a field erroneously set on a non-retail unit can never reach a
+  // save. The engine only ever sets them on retail kinds anyway; this hardens
+  // the write side against a future in-memory mutation.
+  if (subtypeListFor(kind) !== null) {
+    if (patronageToday !== undefined) out.patronageToday = patronageToday;
+    if (patronageYest !== undefined) out.patronageYest = patronageYest;
+    if (profitToday !== undefined) out.profitToday = profitToday;
+    if (profitYest !== undefined) out.profitYest = profitYest;
+  }
   if (completeAt !== undefined) out.completeAt = completeAt;
   return out;
 }

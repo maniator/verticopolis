@@ -11,6 +11,21 @@ export const ECON = {
     cinema: 8_000,
     partyHall: 3_000,
   } as Record<string, number>,
+  /** Assumed average ticket per customer, used by the commercial-venue
+   *  inspector to convert a venue's traffic income into a customer estimate
+   *  (see `EconomySystem.collectTrafficIncome`). Cosmetic-only: the money loop
+   *  never divides by these. The baseline count for the "Business is booming"
+   *  tier is `dailyTrafficIncome[kind] / retailSpendPerCustomer[kind]`, so any
+   *  retune here shifts customer readouts but never dollars.
+   *  Typed as `Partial` so a lookup for a kind we haven't tabled reads
+   *  `undefined` (not a spurious `number`), forcing every caller to guard
+   *  before dividing. `src/tests/canon.test.ts` pins that every retail kind
+   *  with a canon subtype list is tabled here. */
+  retailSpendPerCustomer: {
+    fastFood: 10,
+    restaurant: 30,
+    shop: 20,
+  } as Partial<Record<string, number>>,
   maintenancePerCarMonthly: 600,
   /**
    * Meal-cadence origin weights (arch-tower-wide-meal-cadence-2026-07-09 §3).

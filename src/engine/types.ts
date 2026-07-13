@@ -294,6 +294,15 @@ export interface Unit {
    *  and on legacy retail units from saves that predate this field, so they
    *  keep the generic name. Cosmetic-only: the economy never reads it. */
   subtype?: string;
+  /** Retail-only running totals for today's inspector card: customer estimate
+   *  and gross traffic income earned so far this day. Reset in `Simulation.onDay`
+   *  after being rolled into `*Yest`, and by `EventSystem.gut`. `undefined` on
+   *  every non-retail kind, and on legacy retail units from saves that predate
+   *  the field. Display-only: the money loop never reads them back. */
+  patronageToday?: number;
+  patronageYest?: number;
+  profitToday?: number;
+  profitYest?: number;
   /** Game-clock minute at which construction finishes (for the build phase). */
   completeAt?: number;
 }
