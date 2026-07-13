@@ -7,6 +7,14 @@ export function shade(hex: string, amt: number): string {
   const b = clamp((n & 255) + amt);
   return `rgb(${r},${g},${b})`;
 }
+/** Like {@link shade}, but returns a translucent `rgba()` for a glass fill. */
+export function shadeAlpha(hex: string, amt: number, alpha: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  const r = clamp(((n >> 16) & 255) + amt);
+  const g = clamp(((n >> 8) & 255) + amt);
+  const b = clamp((n & 255) + amt);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 function clamp(v: number): number {
   return Math.max(0, Math.min(255, Math.round(v)));
 }

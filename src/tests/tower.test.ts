@@ -362,14 +362,17 @@ describe("Express elevator sky-lobby stops", () => {
     expect(t.stopsAt(ex, 15)).toBe(false); // no longer a lobby → skipped again
   });
 
-  it("only re-syncs the changed floor, preserving manual stops elsewhere", () => {
-    const t = tower(30); // all plain floors between endpoints
-    const ex = express(t, 1, 30);
-    t.setStop(ex.id, 10, true); // player forces a stop at a non-lobby floor
-    expect(t.stopsAt(ex, 10)).toBe(true);
-    makeSkyLobby(t, 15); // build a sky lobby elsewhere
-    expect(t.stopsAt(ex, 15)).toBe(true); // new lobby served
-    expect(t.stopsAt(ex, 10)).toBe(true); // manual stop untouched
+  it("only re-syncs the changed floor, preserving a deliberate lobby-skip elsewhere", () => {
+    // An express is locked to (sky) lobbies, so the only "manual" stop choice a
+    // player can make is to SKIP a lobby it would otherwise serve. A floor flip
+    // elsewhere must not disturb that deliberate skip.
+    const t = tower(45, [15]); // sky lobby at 15; floor 30 is plain for now
+    const ex = express(t, 1, 45);
+    t.setStop(ex.id, 15, false); // player deliberately skips the sky lobby at 15
+    expect(t.stopsAt(ex, 15)).toBe(false);
+    makeSkyLobby(t, 30); // build a sky lobby elsewhere
+    expect(t.stopsAt(ex, 30)).toBe(true); // new lobby served
+    expect(t.stopsAt(ex, 15)).toBe(false); // deliberate skip untouched
   });
 
   it("leaves non-express elevators alone", () => {
@@ -389,19 +392,21 @@ describe("Express elevator sky-lobby stops", () => {
     expect((low.skipFloors ?? []).includes(15)).toBe(false); // untouched (out of range)
   });
 
-  it("preserves manual stops on other floors when a sky lobby is REMOVED", () => {
-    // Mirror of the "manual stops preserved" test — this time the trigger is a
-    // lobby *removal*. Only the floor whose lobby-ness flipped is touched.
-    const t = tower(30, [15]);
-    const ex = express(t, 1, 30);
-    t.setStop(ex.id, 20, true); // player forces a stop at a non-lobby floor
+  it("preserves a deliberate lobby-skip on another floor when a sky lobby is REMOVED", () => {
+    // Mirror of the "deliberate lobby-skip preserved" test, this time the
+    // trigger is a lobby *removal*. Only the floor whose lobby-ness flipped is
+    // touched, so the deliberate skip of a DIFFERENT sky lobby survives.
+    const t = tower(45, [15, 30]);
+    const ex = express(t, 1, 45);
+    t.setStop(ex.id, 30, false); // player deliberately skips the sky lobby at 30
+    expect(t.stopsAt(ex, 30)).toBe(false);
     // Bulldoze the sky lobby at 15.
     for (let x = 0; x < W; x++) {
       const u = t.unitAt(15, x);
       if (u) t.removeUnit(u.id);
     }
     expect(t.stopsAt(ex, 15)).toBe(false); // 15 no longer served
-    expect(t.stopsAt(ex, 20)).toBe(true); // manual stop still honoured
+    expect(t.stopsAt(ex, 30)).toBe(false); // deliberate skip still honored
   });
 
   it("never adds an endpoint to skipFloors on a lobby flip AT the endpoint", () => {
@@ -469,16 +474,17 @@ describe("Express elevator sky-lobby stops", () => {
     expect(t.stopsAt(ex, 16)).toBe(true);
   });
 
-  it("resize preserves manual stops the player set inside the old span", () => {
-    const t = tower(30, [15]);
-    const ex = express(t, 1, 12); // skipFloors seeded 2..11
-    t.setStop(ex.id, 8, true); // player wants a stop at 8
-    expect((ex.skipFloors ?? []).includes(8)).toBe(false);
+  it("resize preserves a deliberate lobby-skip the player set inside the old span", () => {
+    const t = tower(45, [15]); // sky lobby at 15
+    const ex = express(t, 1, 20); // spans the sky lobby at 15 (a stop by default)
+    expect(t.stopsAt(ex, 15)).toBe(true);
+    t.setStop(ex.id, 15, false); // player deliberately skips the sky lobby at 15
+    expect(t.stopsAt(ex, 15)).toBe(false);
     // Grow the express upward.
-    t.resizeTransport(ex.id, 1, 30);
-    // Player's stop at 8 (in the OLD span) is untouched.
-    expect((ex.skipFloors ?? []).includes(8)).toBe(false);
-    expect(t.stopsAt(ex, 8)).toBe(true);
+    t.resizeTransport(ex.id, 1, 45);
+    // The deliberate lobby-skip at 15 (in the OLD span) is untouched.
+    expect(t.stopsAt(ex, 15)).toBe(false);
+    expect((ex.skipFloors ?? []).includes(15)).toBe(true);
   });
 
   it("setStop refuses to skip an endpoint (they must always stop)", () => {

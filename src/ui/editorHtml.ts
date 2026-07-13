@@ -157,7 +157,11 @@ export function transportEditorVolatile(sim: Simulation, t: Transport, mobile = 
   if (isEl) {
     vol.cars = `${t.cars} / ${maxCars} max`;
     vol.capacity = `${sim.transportCapacity(t)} riders/trip`;
-    vol.stops = skipped ? `express · skips ${skipped}` : "all floors";
+    // An express is locked to (sky) lobbies (1994 parity), so it reads a fixed
+    // policy line rather than a free per-floor skip count. Standard/service keep
+    // their configurable stop readout.
+    vol.stops =
+      t.kind === "elevatorExpress" ? "lobbies and sky lobbies" : skipped ? `express · skips ${skipped}` : "all floors";
   }
   // Mobile shows one panel, so the editor folds in the card's avg-load line
   // (empty for stairs/escalators and staff-only service elevators).
@@ -185,8 +189,13 @@ export function transportEditorHtml(sim: Simulation, t: Transport, mobile = fals
         `<button class="btn" data-edit="removecar"${t.cars <= 1 ? " disabled" : ""}>– Car</button><button class="btn" data-edit="addcar"${t.cars >= maxCars ? " disabled" : ""}>+ Car</button>`,
       ),
     );
-    actions.push(edRow(`<button class="btn" data-edit="stops">Configure stops…</button>`));
-    actions.push(edRow(`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`));
+    // Standard/service keep the free per-floor stop config and All stops
+    // (real-game feature). An express is locked to (sky) lobbies, so it offers
+    // no stop-config buttons, just the fixed policy in the Stops row above.
+    if (t.kind !== "elevatorExpress") {
+      actions.push(edRow(`<button class="btn" data-edit="stops">Configure stops…</button>`));
+      actions.push(edRow(`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`));
+    }
     // Extend arrows are an elevator affordance: stairs/escalators are a
     // fixed two-floor flight by rule and never reach this branch.
     actions.push(edRow(`<button class="btn" data-edit="extendDown">▼ Extend down</button><button class="btn" data-edit="extendUp">▲ Extend up</button>`));

@@ -492,6 +492,58 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(undo.commits).toBe(3);
   });
 
+  it("an express is locked to lobbies: the engine refuses a non-lobby stop and clearStops stays lobby-only", () => {
+    const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    expect(r.ok).toBe(true);
+    const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
+    // Seeded lobby-only on placement: floors 1 & 4 are endpoints, 2 & 3 are
+    // non-lobby middles and start skipped.
+    expect(ex.skipFloors).toEqual([2, 3]);
+    // The engine lock refuses turning a non-lobby middle into a stop.
+    expect(sim.tower.setStop(ex.id, 2, true)).toBe(false);
+    expect(sim.tower.stopsAt(ex, 2)).toBe(false);
+    // clearStops on an express restores the lobby-only skip list, NOT all floors.
+    expect(sim.tower.clearStops(ex.id)).toBe(true);
+    expect(ex.skipFloors).toEqual([2, 3]);
+  });
+
+  it("a forged non-lobby express stop is coerced back to lobby-only on load", () => {
+    const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    expect(r.ok).toBe(true);
+    const data = sim.serialize();
+    // Forge the save so the express stops at every floor (empty skip list): the
+    // import path writes skipFloors directly, bypassing setStop.
+    const forged = data.transports.find((t) => t.id === r.transportId)!;
+    forged.skipFloors = [];
+    const loaded = Simulation.deserialize(data);
+    const ex = loaded.tower.transports.find((t) => t.kind === "elevatorExpress")!;
+    // The trust-boundary coercion re-skips the non-lobby middles after load.
+    expect(ex.skipFloors).toEqual([2, 3]);
+  });
+
+  it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", () => {
+    const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    const data = sim.serialize();
+    // Forge the top endpoint (floor 4) into the skip list: a shaft must never
+    // skip its own endpoint. Coercion removes it and still skips the non-lobby
+    // middles.
+    data.transports.find((t) => t.id === r.transportId)!.skipFloors = [4];
+    const ex = Simulation.deserialize(data).tower.transports.find((t) => t.kind === "elevatorExpress")!;
+    expect(ex.skipFloors).toEqual([2, 3]);
+  });
+
+  it("the express inspector hides stop-config buttons and reads a fixed lobby policy; standard keeps both", () => {
+    const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
+    const html = transportEditorHtml(sim, ex);
+    expect(html).not.toContain('data-edit="allstops"');
+    expect(html).not.toContain('data-edit="stops"');
+    expect(html).toContain("lobbies and sky lobbies");
+    const stdHtml = transportEditorHtml(sim, lift);
+    expect(stdHtml).toContain('data-edit="allstops"');
+    expect(stdHtml).toContain('data-edit="stops"');
+  });
+
   it("openStopsDialog lists floors top-down and each toggle is its own undo-bracketed setStop", () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
