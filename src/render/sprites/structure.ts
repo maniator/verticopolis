@@ -1,6 +1,7 @@
 /**
- * Structure and ground-floor sprites. This file is a barrel; the draw functions
- * live in cohesive siblings under `structure/` and are re-exported here so every
+ * Structure sprites: the floor shell, lobby, entrances, and rooftop dressing.
+ * This file is a barrel; the draw functions live in cohesive siblings under
+ * `structure/` and are re-exported here so every
  * existing `import { … } from "./structure"` (and the `sprites.ts` barrel) keeps
  * working unchanged:
  *   - `structure/shell.ts`: the bare floor, construction scaffold, burned shell.

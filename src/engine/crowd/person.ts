@@ -39,7 +39,9 @@ export interface Person {
   x: number;
   /** Per-leg transport route: floors[0]=origin … floors[n]=destination. */
   floors: number[];
-  /** shaft id used for leg i (floors[i] → floors[i+1]); -1 if unreachable. */
+  /** shaft id used for leg i (floors[i] → floors[i+1]); always a valid id. An
+   *  unreachable destination yields no route at all (routing returns null), so
+   *  this array never holds a sentinel. */
   shafts: number[];
   leg: number;
   shaftId: number | null;
