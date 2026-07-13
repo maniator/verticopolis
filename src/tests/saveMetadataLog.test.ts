@@ -66,6 +66,51 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
     expect(SaveGame.listSlots().find((s) => s.slot === 1)!.savedAt).toBeUndefined();
   });
 
+  it("listSlots reports the founded mode and in-game day for the Saves dialog", () => {
+    SaveGame.saveSlot(1, new Simulation()); // classic by default
+    SaveGame.saveSlot(2, Simulation.newGame(7, "modern"));
+    const slots = SaveGame.listSlots();
+    const slot1 = slots.find((s) => s.slot === 1)!;
+    const slot2 = slots.find((s) => s.slot === 2)!;
+    expect(slot1.mode).toBe("classic");
+    expect(slot2.mode).toBe("modern");
+    expect(slot1.day).toBe(1); // a fresh tower is on its first day
+    expect(slot2.day).toBe(1);
+  });
+
+  it("the day math holds deep into a tower's life, not just on day one", () => {
+    // Pin the division, the +1, and the 1440 minutes-per-day invariant
+    // (calendar.ts: a day is 1440 minutes in EVERY calendar) against a save
+    // 813 full days in, mid-afternoon.
+    SaveGame.saveSlot(1, new Simulation());
+    const data = decodeSlot("simtower-clone-slot-1");
+    data.minutes = 813 * 1440 + 500;
+    localStorage.setItem("simtower-clone-slot-1", repackSlot(data));
+    expect(SaveGame.listSlots().find((s) => s.slot === 1)!.day).toBe(814);
+  });
+
+  it("a forged mode or minutes cannot reach the Saves dialog raw", () => {
+    SaveGame.saveSlot(1, new Simulation());
+    const data = decodeSlot("simtower-clone-slot-1") as Omit<SerializedGame, "mode" | "minutes"> & {
+      mode: unknown;
+      minutes: unknown;
+    };
+    data.mode = "<img onerror=alert(1)>";
+    const forgedDay = (minutes: unknown) => {
+      data.minutes = minutes;
+      localStorage.setItem("simtower-clone-slot-1", repackSlot(data as unknown as SerializedGame));
+      return SaveGame.listSlots().find((s) => s.slot === 1)!;
+    };
+    const info = forgedDay("yesterday");
+    expect(info.mode).toBe("classic"); // coerced, never the raw file string
+    expect(info.day).toBeUndefined();
+    // Same absent-not-clamped posture as savedAt: a negative or absurdly
+    // large finite minutes must not render as a confident wrong day.
+    expect(forgedDay(-5000).day).toBeUndefined();
+    expect(forgedDay(1e300).day).toBeUndefined();
+    expect(forgedDay(360_001 * 1440).day).toBeUndefined(); // just past the ceiling
+  });
+
   it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
     const data = { ...new Simulation().serialize(), savedAt: 12345, appVersion: "9.9.9" };
     const sim = Simulation.deserialize(data);

@@ -336,8 +336,21 @@ export class UI {
       ms ? new Date(ms).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";
     const row = (s: SlotInfo): string => {
       const name = s.slot === "auto" ? "Auto-save" : `Slot ${s.slot}`;
+      // The rule-set chip reuses the New Tower dialog's badge language (muted
+      // Classic, green Modern). SlotInfo's mode is already coerced, so the
+      // chip text is one of two literals, never raw file content.
+      const modeChip =
+        s.mode === "modern"
+          ? '<span class="nt-badge alt">Modern</span>'
+          : '<span class="nt-badge">Classic</span>';
+      // Plain integer, no locale grouping: the day is an ordinal, and the
+      // finiteness guard keeps any non-numeric SlotInfo producer from ever
+      // reaching the template raw (storage already bounds the value).
+      const when = [Number.isFinite(s.day) ? `Day ${Math.floor(s.day!)}` : "", fmtWhen(s.savedAt)]
+        .filter(Boolean)
+        .join(" · ");
       const detail = s.exists
-        ? `<div class="slot-detail">${escapeHtml(s.towerName ?? "Tower")} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br><span class="slot-when">${fmtWhen(s.savedAt)}</span></div>`
+        ? `<div class="slot-detail">${escapeHtml(s.towerName ?? "Tower")} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br><span class="slot-when">${when}</span></div>`
         : `<div class="slot-detail slot-empty">empty</div>`;
       const saveBtn =
         s.slot === "auto" ? "" : `<button class="btn" data-save="${s.slot}">Save</button>`;
