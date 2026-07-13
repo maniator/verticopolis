@@ -37,7 +37,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/engine/EconomySystem.ts",
   // render
   "src/render/excalibur/TowerEngine.ts",
-  "src/render/pixelSprites.ts",
   // ui / app spine / audio
   "src/main.ts",
   "src/ui/UI.ts",
