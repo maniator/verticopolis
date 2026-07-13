@@ -43,6 +43,11 @@ export interface SaveLoadDeps {
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }): void;
+  /** Try to rebuild the renderer in place after a context loss (GameApp waits
+   *  for the browser's restored signal, then swaps in a fresh engine; see
+   *  src/game/contextRecovery.ts). Reports exactly one outcome: `true` when
+   *  the fresh engine is running, `false` on failure or timeout. */
+  attemptGraphicsRecovery(done: (recovered: boolean) => void): void;
   /** Arm first-run onboarding on the just-adopted sim. */
   armOnboarding(): void;
 }
@@ -128,13 +133,22 @@ export class SaveLoad {
   }
 
   /**
-   * The WebGL context is gone and Excalibur can't rebuild its GPU resources in
-   * place, so this session can no longer draw. Flush the tower to the autosave
-   * slot, then show the crash screen: what happened, a crash-report zip
-   * download, a bug-report link, and a Reload button. The reload is the
-   * player's choice (no more silent auto-reload, which erased every trace of
-   * the crash); their reload stamps the recovery flag so the fresh boot drops
-   * them straight back into the tower.
+   * The WebGL context is gone: the running Excalibur engine can't rebuild its
+   * GPU resources, so nothing draws until a fresh engine exists. Flush the
+   * tower to the autosave slot first, then pick the recovery path:
+   *
+   * - First mid-game loss with a clean flush: recover IN PLACE. The sim is
+   *   intact in memory and every graphic is code-generated, so GameApp can
+   *   swap in a fresh engine the moment the browser restores the context.
+   *   Mobile systems reset GL contexts routinely (memory pressure elsewhere,
+   *   GPU process restarts, backgrounding); a one-off reset should cost the
+   *   player a beat, never the session.
+   * - Repeat loss (within 90s), a loss behind the splash, a failed flush, or
+   *   a failed/timed-out recovery: the full crash screen. It says what
+   *   happened and whether the tower was saved, offers the crash-report zip
+   *   and a prefilled bug-report link, and reloads only when the player
+   *   chooses; their reload stamps the recovery flag so the fresh boot drops
+   *   them straight back into the tower.
    */
   recoverFromContextLoss(): void {
     // Same guard as the autosave timer: never persist the throwaway boot sim
@@ -179,34 +193,66 @@ export class SaveLoad {
       }
     }
 
-    // A second loss within 90 seconds of the last recovery reload means
-    // reloading alone isn't fixing it; the screen adds advice to close other
-    // tabs/apps. (The timestamp is stamped by the reload action below.)
+    // A second loss within 90 seconds of the previous one (or of the last
+    // recovery reload) means recovering alone isn't fixing it; the screen adds
+    // advice to close other tabs/apps. Stamped at LOSS time so an in-place
+    // recovery cycle counts toward the window too, and re-stamped by the
+    // reload action so the old reload-anchored window keeps working.
     const KEY = "vc-gl-lost-reload";
-    let lastReload = 0;
+    let lastLoss = 0;
     try {
-      lastReload = Number(sessionStorage.getItem(KEY)) || 0;
+      lastLoss = Number(sessionStorage.getItem(KEY)) || 0;
     } catch {
       /* storage may be unavailable; treat as first loss */
     }
-    const repeat = Date.now() - lastReload < 90_000;
+    const now = Date.now();
+    const repeat = now - lastLoss < 90_000;
+    try {
+      sessionStorage.setItem(KEY, String(now));
+    } catch {
+      /* best effort */
+    }
 
-    this.deps.showCrashScreen({
-      crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed, behindSplash },
-      save: { flushed, behindSplash, storageBlame, hadPriorSave },
-      onReload: () => {
-        try {
-          const now = String(Date.now());
-          sessionStorage.setItem(KEY, now);
-          // Tell the fresh boot this reload was a recovery, so it resumes the
-          // tower rather than showing the title screen (see resolveBootScreen
-          // in src/bootScreen.ts, consumed by the boot branch in main.ts).
-          sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, now);
-        } catch {
-          /* best effort */
-        }
-        location.reload();
-      },
+    const showScreen = (): void =>
+      this.deps.showCrashScreen({
+        crash: { kind: "webgl-context-lost", repeat, saveFlushed: flushed, behindSplash },
+        save: { flushed, behindSplash, storageBlame, hadPriorSave },
+        onReload: () => {
+          try {
+            const stamp = String(Date.now());
+            sessionStorage.setItem(KEY, stamp);
+            // Tell the fresh boot this reload was a recovery, so it resumes the
+            // tower rather than showing the title screen (see resolveBootScreen
+            // in src/bootScreen.ts, consumed by the boot branch in main.ts).
+            sessionStorage.setItem(RESUME_AFTER_RECOVERY_KEY, stamp);
+          } catch {
+            /* best effort */
+          }
+          location.reload();
+        },
+      });
+
+    // In-place recovery is reserved for the healthy one-off case: a first
+    // mid-game loss whose flush succeeded. A repeat says the device is
+    // genuinely struggling (the screen's advice matters more than seamlessness
+    // would); behind the splash there is no session to preserve; and a failed
+    // flush is storage news the player must see, on the screen that words it.
+    if (repeat || behindSplash || !flushed) {
+      showScreen();
+      return;
+    }
+    this.deps.ui.toast("The device reset the game's graphics. Recovering...", "info");
+    this.deps.attemptGraphicsRecovery((recovered) => {
+      if (!recovered) {
+        showScreen();
+        return;
+      }
+      // Leave a durable trace in the bulletin log (the old silent reload
+      // erased all evidence; recovering must not repeat that mistake).
+      this.deps
+        .getSim()
+        .emit("The device reset the game's graphics; the game recovered on the spot. Your tower was saved first.", "info");
+      this.deps.ui.toast("Graphics recovered. Your tower was saved.", "good");
     });
   }
 

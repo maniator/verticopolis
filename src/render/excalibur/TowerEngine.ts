@@ -249,6 +249,12 @@ export class TowerEngine {
    *  render clock is already stopped when this fires. */
   onContextLost: (() => void) | null = null;
 
+  /** The browser restored the GPU context (we `preventDefault()` the loss, so
+   *  it retries). This engine's own textures and shaders are still gone; the
+   *  signal means a FRESH engine can be built now. The controller listens
+   *  during in-place recovery and rebuilds on it. */
+  onContextRestored: (() => void) | null = null;
+
   // Controller-supplied input hooks (the controller owns tool semantics). The
   // `picked` argument is the entity Excalibur found under the pointer, or null.
   classifyDown: ((button: number, touch: boolean, space: boolean) => "pan" | "action") | null = null;
@@ -512,6 +518,7 @@ export class TowerEngine {
         this.engine.clock.stop(); // every GL call is dead now — stop the loop
         this.onContextLost?.();
       },
+      handleContextRestored: () => this.onContextRestored?.(),
     });
     this.d = { ctx: null as unknown as CanvasRenderingContext2D, lit: false, anim: 0, hour: 9, stress: 0 };
     this.engine.currentScene.onPostUpdate = (_e: ex.Engine, elapsed: number) => this.tick(elapsed);
@@ -2362,8 +2369,13 @@ export class TowerEngine {
     return { centerFloor, dominant, night, zoom: this.cam.zoom, weather: this.sim.weather };
   }
 
+  /** Full teardown, used by in-place context-loss recovery before a rebuild:
+   *  Excalibur's dispose stops the loop, force-collects GPU resources,
+   *  disables input, and releases the engine singleton slot so a fresh
+   *  TowerEngine can be constructed cleanly. Safe on a lost context (GL calls
+   *  on one are no-ops per spec). */
   dispose(): void {
-    this.engine.stop();
+    this.engine.dispose();
   }
 }
 

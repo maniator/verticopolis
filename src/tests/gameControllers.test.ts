@@ -238,6 +238,7 @@ describe("SaveLoad (tower-swap contracts)", () => {
       },
       ui: f.ui,
       showCrashScreen: () => {},
+      attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     });
   });
@@ -370,13 +371,14 @@ describe("KeyboardPlay (commit announcements)", () => {
       build.tryBuild(kind, floor, snapX(kind, tile));
       return { what: "room", ok: sim.tower.units.length > before };
     };
+    const fakeEngine = {
+      ensureVisible: () => {},
+      preview: null as TowerEngine["preview"],
+      transportPreview: null as TowerEngine["transportPreview"],
+    };
     keyboard = new KeyboardPlay({
       getSim: () => sim,
-      engine: {
-        ensureVisible: () => {},
-        preview: null as TowerEngine["preview"],
-        transportPreview: null as TowerEngine["transportPreview"],
-      },
+      engine: () => fakeEngine,
       audio: f.audio,
       ui: f.ui,
       build,
