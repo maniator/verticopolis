@@ -8,7 +8,7 @@ context:
   - '{project-root}/docs/canon/tdt-format.md'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent, do not modify unless human renegotiates">
 
 ## Intent
 
@@ -18,7 +18,7 @@ context:
 
 ## Boundaries & Constraints
 
-**Always:** Parity with SimTower 1994 (lobbies are canon). COALESCE contiguous same-kind tiles into one span record per run (per-tile would blow the 256-records-per-floor cap and mismatch the game). A span is emitted only for paved tiles NOT covered by a room footprint on that floor (type-0 records are the gaps between rooms, matching the real save). Mirror the real save's record bytes: lobby type 24 `status 0`, floor type 0 `status 2`, both `rentClass 4` (No Rate) and `subtype 0`, `type` positive (never construction). Cover the ground lobby AND every sky lobby; keep excluding a gutted/burning lobby. The `export -> parseTDT -> re-export` byte-identical test and the ZERO-importer-warnings test must stay green (coalescing must be deterministic, left-to-right per floor). Keep the extent header (`widen`) and `hasGroundLobby`/`lobbyHeight` as they are. American English, no em-dashes in new prose; `src/storage`, engine stays DOM-free.
+**Always:** Parity with SimTower 1994 (lobbies are canon). COALESCE contiguous same-kind tiles into one span record per run (per-tile would blow the 256-records-per-floor cap and mismatch the game). A span is emitted only for paved tiles NOT covered by a room footprint on that floor (type-0 records are the gaps between rooms, matching the real save). Mirror the real save's record bytes: lobby type 24 `status 0`, floor type 0 `status 2`, both `rentClass 4` (No Rate) and `subtype 0`, `type` positive (never construction). Cover the ground lobby AND every sky lobby (a gutted/burning lobby was originally excluded, but that is SUPERSEDED during review: it now paves as an ordinary type-24 record for byte-identical round-trip, and cannot occur in real play; see the Spec Change Log). The `export -> parseTDT -> re-export` byte-identical test and the ZERO-importer-warnings test must stay green (coalescing must be deterministic, left-to-right per floor). Keep the extent header (`widen`) and `hasGroundLobby`/`lobbyHeight` as they are. American English, no em-dashes in new prose; `src/storage`, engine stays DOM-free.
 
 **Ask First:** If a real save turns out to write a lobby/floor record spanning tiles that ARE under a room (so "gaps only" is wrong), or writes per-lobby-floor counts differing from one-span-per-contiguous-run, surface it before widening the model.
 
@@ -94,7 +94,7 @@ The importer already re-paves type-0/24 records into width-1 `floor`/`lobby` uni
   `tdtImport.ts` and imported by `tdtExport.ts` (single source, no drift). A
   hand-built non-normalized round-trip test was added (the existing fixtures were
   import-normalized fixed points and could not expose this). Version corrected to
-  a patch bump (1.24.1), since this is a player-noticeable fix, not a new
+  a patch bump (1.25.1, above main's 1.25.0 after rebase), since this is a player-noticeable fix, not a new
   capability.
 - **2026-07-12 (frozen row superseded).** The I/O matrix row "Gutted/burning
   lobby -> excluded; no type-24 record" is SUPERSEDED by the round-trip
