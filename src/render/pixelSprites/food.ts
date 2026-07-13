@@ -7,8 +7,8 @@ import { PAL, geoVariant, hash, person, shade, shell, type RoomCtx } from "./com
  * `pixelSprites.ts`. Each KIND keeps one anchor shape (the fast-food sign band,
  * the restaurant's dark dining room), and the subtype furnishes the rest. No
  * RNG: an undefined or unknown subtype falls back to the pre-variant look,
- * byte-identical. `src/tests/subtypeVisuals.test.ts` pins these tables against
- * the canon name lists.
+ * byte-identical. `src/tests/integration/subtypeVisuals.integration.test.ts`
+ * pins these tables against the canon name lists.
  */
 
 export interface FastFoodLook {
