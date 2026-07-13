@@ -136,7 +136,16 @@ jobs:
         env:
           SHARD: ${{ matrix.shard }}
         run: |
-          export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
+          # Locate the image's pinned Chromium and fail fast if it is not there:
+          # an empty PW_CHROME would let Playwright fall back to some other browser,
+          # silently breaking the "pinned browser" guarantee (and the committed
+          # pixels). An image-layout change surfaces here with a clear error.
+          PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | head -1)"
+          if [ -z "$PW_CHROME" ] || [ ! -x "$PW_CHROME" ]; then
+            echo "::error::could not locate the pinned Chromium under /ms-playwright/chromium-*/chrome-linux*/chrome; the Playwright image layout may have changed. Refusing to render with a non-pinned browser."
+            exit 1
+          fi
+          export PW_CHROME
           ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
           echo "shard '$SHARD' renders: $ONLY"
           render_into() {
@@ -152,7 +161,7 @@ jobs:
             npm run build
             npx vite preview --port "$port" --strictPort &
             local server_pid=$!
-            if ! node -e 'const u="http://localhost:"+process.argv[1];(async()=>{for(let i=0;i<120;i++){try{await fetch(u);process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up on "+u);process.exit(1)})()' "$port"; then
+            if ! node -e 'const u="http://localhost:"+process.argv[1];(async()=>{for(let i=0;i<120;i++){try{const res=await fetch(u);if(res.ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up (200) on "+u);process.exit(1)})()' "$port"; then
               kill "$server_pid" 2>/dev/null || true
               exit 1
             fi
