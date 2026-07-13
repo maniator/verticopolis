@@ -34,7 +34,7 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   loosen the parity scope: no new mechanics, `primary_platform` stays `web`.
 
 ## Where the truth lives (engine)
-- `src/engine/facilities.ts`: **the tuning source of truth**: `GRID` (lot 340 wide, floors
+- `src/engine/facilities.ts`: **the tuning source of truth**: `GRID` (lot 375 wide, floors
   −9…100), `STAR_THRESHOLDS`, `TOWER_POPULATION`, per-facility cost/width/minStar/population,
   build caps. Quote numbers from here, never hard-code duplicates.
 - `src/engine/Simulation.ts`: clock/tick, star evaluation, VIP, congestion (v1 + v2 spatial).
