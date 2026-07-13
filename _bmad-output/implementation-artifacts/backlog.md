@@ -491,19 +491,15 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 ### Deferred from: bmad-code-review (test-reorg infra, PR #229, 2026-07-13)
 
 Two-tier Vitest projects (unit + integration) plus the colocation pilot. Blind
-Hunter and Edge Case Hunter ran; the confirmed findings (drift-check path filter
-missing a `!src/**/*.test.ts` exclude, and the stale CONTRIBUTING/copilot docs)
-were patched in the PR. Two low residuals parked here:
+Hunter and Edge Case Hunter ran (Copilot also reviewed). The confirmed findings
+were all patched in the PR: the drift-check path filter now excludes colocated
+`*.test.ts`; the stale CONTRIBUTING/copilot docs were corrected; and the `unit`
+project's `exclude` now spreads Vitest's default excludes back in before adding
+`**/*.integration.test.ts` (Blind Hunter and Copilot both noted that a bare
+project `exclude` drops the built-in `node_modules`/`dist` excludes; unreachable
+today under the `src/**`-scoped include, but cheap to harden). One low residual
+parked here:
 
-- **The `unit` vitest project's `exclude` replaces Vitest's default excludes
-  rather than extending them.** `test.projects[unit].exclude` is
-  `["**/*.integration.test.ts"]`, so the built-in `**/node_modules/**` /
-  `**/dist/**` excludes no longer apply to that project. Not reachable today: the
-  `unit` include is scoped to `src/**/*.test.ts` and there is no `node_modules/`
-  or `dist/` under `src/`, so no vendored or emitted `*.test.ts` can be
-  collected. Harden by spreading `configDefaults.exclude` into the project's
-  `exclude` if the include is ever broadened past `src/**`, or if a `src/`-level
-  `node_modules` ever appears. (Blind Hunter, Low.)
 - **Nothing enforces the `.integration.test.ts` naming convention.** Tier
   membership is decided purely by the filename suffix, so a mistyped suffix
   (`.integrations.`, `.integration.spec.ts`) silently lands a heavy multi-module

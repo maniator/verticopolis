@@ -1,4 +1,5 @@
 import { defineConfig, type Plugin } from "vite";
+import { configDefaults } from "vitest/config";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
@@ -159,7 +160,13 @@ export default defineConfig({
         test: {
           name: "unit",
           include: ["src/**/*.test.ts"],
-          exclude: ["**/*.integration.test.ts"],
+          // Setting `exclude` on a project REPLACES Vitest's built-in defaults
+          // (node_modules, dist, etc.), so spread them back in before adding our
+          // own. The `include` is scoped to `src/**` today so nothing vendored is
+          // reachable, but the colocation reorg keeps moving test files around;
+          // keeping the defaults means a stray `*.test.ts` under a future
+          // `src/**/node_modules` or build-output dir can never be collected.
+          exclude: [...configDefaults.exclude, "**/*.integration.test.ts"],
         },
       },
       {
