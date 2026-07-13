@@ -1,7 +1,17 @@
-import { deflateSync, Inflate } from "fflate";
+import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedGame } from "../engine/types";
 import { isGameMode } from "../engine/types";
+import {
+  compressionDecodeSupported,
+  compressionEncodeSupported,
+  deflate,
+  fromBase64,
+  inflate,
+  inflateCapped,
+  toBase64,
+  TowerTooLargeError,
+} from "./saveCompression";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -355,23 +365,6 @@ export const SaveGame = {
   },
 };
 
-// Base64 over raw bytes, chunked so String.fromCharCode never sees an argument
-// list long enough to blow the stack.
-function toBase64(bytes: Uint8Array): string {
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
-  }
-  return btoa(bin);
-}
-
-function fromBase64(b64: string): Uint8Array {
-  const bin = atob(b64);
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
 function writeSlot(key: string, value: string): void {
   if (key !== AUTO_KEY) {
     localStorage.setItem(key, value);
@@ -422,111 +415,6 @@ function writeSlot(key: string, value: string): void {
 
 function writeAutosaveValue(value: string): void {
   localStorage.setItem(AUTO_KEY, value);
-}
-
-// Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
-// of JSON; 32MB is generous headroom. localStorage is quota-bounded and
-// same-origin, but a corrupt or tampered VCZ1 value could still inflate
-// enormously and hang the tab at boot — so, like the .vctower import path, we
-// bound it. fflate's streaming Inflate lets us abort as soon as the output
-// passes the cap (inflateSync would allocate the whole buffer first).
-const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
-
-class SaveTooLargeError extends Error {}
-
-function inflateCapped(packed: Uint8Array): Uint8Array {
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  const inflater = new Inflate((chunk) => {
-    total += chunk.length;
-    if (total > MAX_SAVE_INFLATED_BYTES) throw new SaveTooLargeError();
-    chunks.push(chunk);
-  });
-  inflater.push(packed, true); // ondata fires synchronously; a throw aborts here
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.length;
-  }
-  return out;
-}
-
-// Per-direction support probes, built by actually constructing the streams:
-// the "deflate-raw" format string is newer than CompressionStream itself
-// (Chrome had the API before the format), so a `typeof` check alone would pass
-// on browsers that then throw at use. Probed separately because each caller
-// needs only one direction (export/saveToAsync encode, import decodes), and a
-// browser missing one must not be blocked from the operation it can perform.
-function compressionEncodeSupported(): boolean {
-  try {
-    new CompressionStream("deflate-raw");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function compressionDecodeSupported(): boolean {
-  try {
-    new DecompressionStream("deflate-raw");
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// Hard ceiling on a decompressed tower. A real maxed-out tower is comfortably
-// under 2MB of JSON; 64MB is generous headroom while still defusing a
-// decompression bomb (a few-KB file that would otherwise inflate to gigabytes
-// and hang the tab before validation ever runs).
-const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
-
-/** Thrown by inflate() when a decompressing stream exceeds MAX_INFLATED_BYTES. */
-class TowerTooLargeError extends Error {}
-
-// deflate-raw via the native streams API (no zlib/gzip framing — the magic
-// line already identifies the format, and raw deflate is the smallest).
-function deflate(bytes: Uint8Array): Promise<Uint8Array> {
-  // Compressing our own bounded JSON — no cap needed on the output.
-  return pipe(bytes, new CompressionStream("deflate-raw"));
-}
-
-function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-  // Decompressing untrusted input — cap the output to bound bombs.
-  return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
-}
-
-async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxBytes = Infinity): Promise<Uint8Array> {
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(bytes);
-      controller.close();
-    },
-  }).pipeThrough(transform);
-  // Read chunk by chunk so a bomb is aborted mid-inflation, before it can
-  // materialize a giant buffer — rather than Response().arrayBuffer(), which
-  // would buffer the whole (unbounded) output first.
-  const reader = stream.getReader();
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    total += value.byteLength;
-    if (total > maxBytes) {
-      await reader.cancel();
-      throw new TowerTooLargeError();
-    }
-    chunks.push(value);
-  }
-  const out = new Uint8Array(total);
-  let offset = 0;
-  for (const chunk of chunks) {
-    out.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  return out;
 }
 
 function nowMs(): number {

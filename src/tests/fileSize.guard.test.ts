@@ -34,8 +34,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/engine/Simulation.ts",
   "src/engine/Tower.ts",
   "src/engine/Crowd.ts",
-  "src/engine/facilities.ts",
-  "src/engine/saveMigration.ts",
   "src/engine/EconomySystem.ts",
   // render
   "src/render/excalibur/TowerEngine.ts",
@@ -44,8 +42,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   // storage
   "src/storage/tdtImport.ts",
   "src/storage/tdtExport.ts",
-  "src/storage/tdtFormat.ts",
-  "src/storage/SaveGame.ts",
   // ui / app spine / audio
   "src/main.ts",
   "src/ui/UI.ts",
