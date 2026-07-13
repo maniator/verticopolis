@@ -41,8 +41,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/main.ts",
   "src/ui/UI.ts",
   "src/audio/ToneAudioEngine.ts",
-  // scripts
-  "scripts/screenshot-scenes.ts",
   // tests (split last)
   "src/tests/simulation.test.ts",
   "src/tests/uiDialogs.test.ts",
