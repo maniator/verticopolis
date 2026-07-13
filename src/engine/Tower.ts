@@ -480,23 +480,28 @@ export class Tower {
   }
 
   /**
-   * Auto-lay the floor tiles under a room's footprint, building outward so each
-   * new tile stays supported. Returns the number of tiles created, or fails
-   * (rolling back) if the footprint can't be connected to the tower.
+   * Place a set of structural `kind` tiles with a support-ordered retry loop: a
+   * tile that can't rest yet is retried after its neighbors land, so a run
+   * drains in whatever order support becomes available (a grow bottom-up, a
+   * basement top-down, a flanked ground/basement run outward from the neighbor).
+   * Returns the ids placed and any `stuck` tiles that could never be supported.
+   * Does NOT roll back; the caller decides (a hard rollback for the room and
+   * shaft auto-flooring, best-effort for the bridge, whose plan is exact). The
+   * single home for this loop so room, bridge, and shaft auto-flooring can never
+   * drift apart on the support or retry rules.
    */
-  ensureFloorUnder(floor: number, x: number, width: number, hgt: number): { ok: boolean; reason?: string; count: number } {
-    let remaining: { fl: number; x: number }[] = [];
-    for (let fl = floor; fl < floor + hgt; fl++) {
-      for (let i = 0; i < width; i++) if (!this.structure.has(this.key(fl, x + i))) remaining.push({ fl, x: x + i });
-    }
-    if (remaining.length === 0) return { ok: true, count: 0 };
+  private placeStructureRun(
+    tiles: { fl: number; x: number }[],
+    kind: FacilityKind,
+  ): { placed: number[]; stuck: { fl: number; x: number }[] } {
+    let remaining = tiles;
     const placed: number[] = [];
     let progress = true;
     while (remaining.length > 0 && progress) {
       progress = false;
       const still: { fl: number; x: number }[] = [];
       for (const m of remaining) {
-        const r = this.place("floor", m.fl, m.x);
+        const r = this.place(kind, m.fl, m.x);
         if (r.ok && r.unitId !== undefined) {
           placed.push(r.unitId);
           progress = true;
@@ -506,7 +511,22 @@ export class Tower {
       }
       remaining = still;
     }
-    if (remaining.length > 0) {
+    return { placed, stuck: remaining };
+  }
+
+  /**
+   * Auto-lay the floor tiles under a room's footprint, building outward so each
+   * new tile stays supported. Returns the number of tiles created, or fails
+   * (rolling back) if the footprint can't be connected to the tower.
+   */
+  ensureFloorUnder(floor: number, x: number, width: number, hgt: number): { ok: boolean; reason?: string; count: number } {
+    const tiles: { fl: number; x: number }[] = [];
+    for (let fl = floor; fl < floor + hgt; fl++) {
+      for (let i = 0; i < width; i++) if (!this.structure.has(this.key(fl, x + i))) tiles.push({ fl, x: x + i });
+    }
+    if (tiles.length === 0) return { ok: true, count: 0 };
+    const { placed, stuck } = this.placeStructureRun(tiles, "floor");
+    if (stuck.length > 0) {
       for (const id of placed) this.removeUnit(id);
       return { ok: false, reason: "Build next to the tower. You can't build in midair.", count: 0 };
     }
@@ -608,24 +628,11 @@ export class Tower {
    */
   fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number[] {
     const substrate: FacilityKind = kind === "lobby" ? "lobby" : "floor";
-    let remaining = this.bridgeFillPlan(kind, floor, x, width, hgt);
-    const placed: number[] = [];
-    let progress = true;
-    while (remaining.length > 0 && progress) {
-      progress = false;
-      const still: { fl: number; x: number }[] = [];
-      for (const m of remaining) {
-        const r = this.place(substrate, m.fl, m.x);
-        if (r.ok && r.unitId !== undefined) {
-          placed.push(r.unitId);
-          progress = true;
-        } else {
-          still.push(m);
-        }
-      }
-      remaining = still;
-    }
-    return placed;
+    // The plan is exact (every tile is reachable in support order), so the
+    // shared retry loop always drains and `stuck` is empty; the bridge is
+    // best-effort by contract, so we take the placed ids and let the caller
+    // (`Simulation.build`) roll them back if the primary still fails.
+    return this.placeStructureRun(this.bridgeFillPlan(kind, floor, x, width, hgt), substrate).placed;
   }
 
   /**
@@ -863,30 +870,15 @@ export class Tower {
    * with it (backlog `auto-floor-build` behavior 1).
    */
   private layShaftFloors(floors: number[], x: number, width: number): number[] | null {
-    let remaining: { fl: number; tx: number }[] = [];
+    const tiles: { fl: number; x: number }[] = [];
     for (const fl of floors) {
       for (let i = 0; i < width; i++) {
-        if (!this.structure.has(this.key(fl, x + i))) remaining.push({ fl, tx: x + i });
+        if (!this.structure.has(this.key(fl, x + i))) tiles.push({ fl, x: x + i });
       }
     }
-    if (remaining.length === 0) return [];
-    const placed: number[] = [];
-    let progress = true;
-    while (remaining.length > 0 && progress) {
-      progress = false;
-      const still: { fl: number; tx: number }[] = [];
-      for (const m of remaining) {
-        const r = this.place("floor", m.fl, m.tx);
-        if (r.ok && r.unitId !== undefined) {
-          placed.push(r.unitId);
-          progress = true;
-        } else {
-          still.push(m);
-        }
-      }
-      remaining = still;
-    }
-    if (remaining.length > 0) {
+    if (tiles.length === 0) return [];
+    const { placed, stuck } = this.placeStructureRun(tiles, "floor");
+    if (stuck.length > 0) {
       for (const id of placed) this.removeUnit(id);
       return null;
     }

@@ -973,6 +973,21 @@ describe("Auto-floor bridge between modules", () => {
     for (let i = 41; i < 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("floor");
   });
 
+  it("bridges a floor tool in the BASEMENT, rescuing a detached tile the same as the ground", () => {
+    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // A B1 (floor 0) tile under the lobby's edge hangs off the lobby above it and
+    // connects normally. A second B1 tile a few cells BEYOND the lobby span is
+    // not adjacent to anything and has no structure above it, so it fails the
+    // plain support check. But a basement uses the same horizontal (flank)
+    // support as the ground, so the bridge back to the first tile rescues it,
+    // just as on floor 1 (regression for the floor-1-only rescue gate).
+    expect(sim.build("floor", 0, x0 + 38).ok).toBe(true); // under the lobby, supported from above
+    expect(sim.build("floor", 0, x0 + 45).ok).toBe(true); // past the lobby, detached, rescued by the bridge
+    for (let i = 39; i < 45; i++) expect(sim.tower.structureKindAt(0, x0 + i)).toBe("floor");
+  });
+
   it("bridges to the nearest neighbor even across a wide gap (no distance cap)", () => {
     const sim = Simulation.newGame(7);
     sim.money = 10_000_000;

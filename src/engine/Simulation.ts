@@ -467,19 +467,19 @@ export class Simulation implements SimContext {
       const substrateCost = kind === "lobby" ? FACILITIES.lobby.cost : FACILITIES.floor.cost;
       const c = this.tower.canPlace(kind, floor, x);
       if (!c.ok) {
-        // Rescue a GROUND structural tile (a concourse lobby OR a plain floor)
-        // that fails only because it isn't connected yet: if its bridge reaches
-        // a same-substrate neighbor (bridge > 0 means the fill runs up to the
-        // tile next to it), it lands connected once the bridge is laid. Kept to
-        // the ground floor because that is the only place a horizontal bridge can
-        // substitute for support: above ground (sky lobbies at floor 15+, or any
-        // upper-story floor) the tile rests on the story below, which a bridge
-        // does not build, so an unsupported tile up there must still refuse.
+        // Rescue a structural tile that fails only because it isn't connected
+        // yet: if its bridge reaches a same-substrate neighbor (bridge > 0 means
+        // the fill runs up to the tile next to it), it lands connected once the
+        // bridge is laid. This only works where support is HORIZONTAL (a tile
+        // connects by touching a flank), which is where `Tower.isSupported` uses
+        // adjacency rather than the story-below rule: the ground floor for a
+        // lobby, and the ground floor OR any basement for a plain floor
+        // (basements hang off flanking structure too). Above ground (floor >= 2)
+        // a tile rests on the story below, which a bridge does not build, so an
+        // unsupported upper tile must still refuse.
+        const horizontalSupport = kind === "lobby" ? floor === 1 : floor < 2;
         const bridgeable =
-          (kind === "lobby" || kind === "floor") &&
-          floor === 1 &&
-          bridge > 0 &&
-          this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
+          horizontalSupport && bridge > 0 && this.tower.canPlaceStructureIgnoringSupport(kind, floor, x).ok;
         if (!bridgeable) return { ok: false, reason: c.reason, cost: f.cost };
       }
       const cost = f.cost + bridge * substrateCost;
