@@ -1,0 +1,253 @@
+name: PR screenshot drift-check
+
+# Moves the screenshot determinism guard LEFT, onto the pull request, and turns a
+# pixel change into a one-click update instead of a separate marker push. It calls
+# the SHARED reusable capture (screenshot-capture.yml) that both this workflow and
+# update-screenshots.yml use, so the two never drift on how pixels are generated
+# or how nondeterminism is caught. Two deliberately separate signals:
+#
+#   1. HARD FAIL: the reusable `capture` renders every shard TWICE and fails if the
+#      two renders differ (nondeterminism, the exact leak PR #188 chased). If it
+#      fails, this whole workflow is red and nothing below runs.
+#
+#   2. APPROVAL GATE (`commit-on-approval`), NOT a red X: when the freshly
+#      generated (pinned-container, canonical) pixels differ from the committed
+#      gallery, the run pauses at the `screenshot-approval` Environment. On the
+#      maintainer's one click it commits the regenerated gallery straight to the PR
+#      branch in the SAME run: no marker push, no second run. Drift alone never
+#      turns the PR red (that would be the boy-who-cried-wolf trap: every legit
+#      sprite tweak red, people learn to ignore red, a real leak lands unnoticed).
+#
+# COMPLEMENTARY to update-screenshots.yml's `[update-screenshots]` marker, not a
+# replacement: the marker is imperative + unconditional (any branch, no PR,
+# force-refresh, non-gated pixel changes); this check is PR-diff-reactive and
+# path-gated.
+#
+# PREREQUISITE: the `screenshot-approval` Environment must exist with a required
+# reviewer (repo Settings -> Environments). Without a required reviewer the gate
+# does NOT gate, so treat a missing/unprotected environment as a setup error, not
+# a silent auto-commit.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    # Committed pixels can change from almost any app code: the engine sim state
+    # that gets rendered (src/engine/** is the "engine render path" blind spot the
+    # determinism guard exists to watch), the render path (src/render/**), DOM
+    # chrome (src/ui/**, src/main.ts, styles, index.html), and the save-loading
+    # scenes (src/storage/**). So gate on all of src/, not a narrow subset. Tests
+    # never render, so exclude them, BUT re-include the fixtures the screenshot
+    # scenes load (e.g. the migration scene reads a real save under fixtures), or
+    # a fixture-only PR could change committed pixels with no check. Plus the
+    # generator, this workflow, and the reusable capture it calls. Also gate on the
+    # version/build inputs that reach the splash: vite.config.ts injects
+    # package.json's version into __APP_VERSION__, which the 00-splash shot renders,
+    # so a version-only bump changes committed pixels. (A Playwright/font bump via
+    # package-lock.json also can, but that is the [update-screenshots] marker's job;
+    # gating on the lockfile would regen on every dependency PR, so it is left out.)
+    # WARNING: do NOT make any job here a REQUIRED status check while this
+    # top-level `paths:` filter is in place, or a PR touching none of these paths
+    # hangs "pending" forever. To require it, drop this filter and gate internally
+    # (a `changes` job + a final always-run reporter). See the spec Design Notes.
+    paths:
+      - "src/**"
+      - "!src/tests/**"
+      - "src/tests/fixtures/**"
+      - "scripts/screenshots.ts"
+      - "scripts/screenshot-*.ts"
+      - "package.json"
+      - "vite.config.ts"
+      - ".github/workflows/pr-drift-check.yml"
+      - ".github/workflows/screenshot-capture.yml"
+
+# One run per PR; a new push supersedes a run still waiting at the approval gate.
+concurrency:
+  group: pr-drift-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+# Default read-only; the two downstream jobs request the narrow write they need.
+permissions:
+  contents: read
+
+jobs:
+  # Shared, sharded, self-verifying capture (renders each shard twice and hard-
+  # fails on nondeterminism). Read-only; runs PR-head code, so no write token.
+  capture:
+    uses: ./.github/workflows/screenshot-capture.yml
+    with:
+      ref: ${{ github.event.pull_request.head.sha }}
+    permissions:
+      contents: read
+
+  # Signal 2's detector: assemble the verified run over the PR's committed gallery
+  # and record whether anything changed (has_drift), WITHOUT committing. Posts a
+  # best-effort advisory comment. Never fails on drift.
+  verify-drift:
+    needs: capture
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    outputs:
+      has_drift: ${{ steps.drift.outputs.has_drift }}
+      drift_count: ${{ steps.drift.outputs.drift_count }}
+    env:
+      SHARDS_JSON: ${{ needs.capture.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download the shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/dl
+          pattern: shots-*
+
+      - id: drift
+        name: Detect drift vs the committed gallery (no commit)
+        run: |
+          # Rebuild the gallery from the verified shard sets over the PR's committed
+          # set and see whether git records any change. Require every shard present,
+          # counted via the .shard-complete marker (not the pixel dir), so a shard
+          # that legitimately renders nothing still counts as present.
+          expected=$(echo "$SHARDS_JSON" | jq 'length')
+          assembled=0
+          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
+          done
+          if [ "$assembled" -ne "$expected" ]; then
+            echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step must have failed."
+            exit 1
+          fi
+          find docs/screenshots -type f -name '*.png' -delete
+          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
+            src="/tmp/dl/shots-$shard/shots/docs/screenshots"
+            [ -d "$src" ] && cp -a "$src/." docs/screenshots/
+          done
+          git add -A docs/screenshots
+          if git diff --cached --quiet; then
+            echo "has_drift=false" >> "$GITHUB_OUTPUT"
+            echo "drift_count=0" >> "$GITHUB_OUTPUT"
+            echo "No screenshot drift: the committed gallery already matches a fresh deterministic generation."
+          else
+            n=$(git diff --cached --name-only -- docs/screenshots | wc -l | tr -d ' ')
+            echo "has_drift=true" >> "$GITHUB_OUTPUT"
+            echo "drift_count=$n" >> "$GITHUB_OUTPUT"
+            echo "$n committed screenshot(s) would change; the approval gate will offer to commit them."
+          fi
+          # Discard the working-tree changes: this job only reports, never commits.
+          git reset -q --hard
+
+      # Advisory only (best-effort): a single sticky comment pointing the author at
+      # the pending approval. Only posts when drift was actually computed, so a
+      # failed capture (nondeterminism) never yields a misleading "no drift".
+      - name: Advisory sticky comment
+        if: ${{ !cancelled() && steps.drift.outcome == 'success' }}
+        continue-on-error: true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- screenshot-drift-check -->';
+            const hasDrift = '${{ steps.drift.outputs.has_drift }}' === 'true';
+            const count = '${{ steps.drift.outputs.drift_count }}';
+            const body = hasDrift
+              ? `${marker}\n### 📸 Screenshot drift detected\nThis PR would change **${count}** committed screenshot(s). The generator is deterministic (the hard check passed), so this is the expected result of a UI change, not a bug.\n\nTo refresh the committed gallery **without a marker push**: a maintainer approves the \`commit-on-approval\` job for this run (Actions tab → this run → **Review deployments** → approve **screenshot-approval**). The regenerated, pinned-container pixels are then committed to this branch in the same run.`
+              : `${marker}\n### 📸 Screenshot drift check\nNo drift: the committed screenshots already match a fresh deterministic generation. ✅`;
+            // Paginate: on a busy PR the marker comment can be past the first 30,
+            // and a first-page-only search would post a duplicate sticky each run.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, per_page: 100,
+            });
+            const existing = comments.find((c) => c.body && c.body.includes(marker));
+            if (existing) {
+              await github.rest.issues.updateComment({ owner: context.repo.owner, repo: context.repo.repo, comment_id: existing.id, body });
+            } else {
+              await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number, body });
+            }
+
+  # Signal 2 (the approval gate). Runs ONLY when there is drift and the PR is from a
+  # branch on this repo (a fork PR gets a read-only token and cannot be pushed to).
+  # The `screenshot-approval` environment pauses the run until a required reviewer
+  # approves; on approval it rebuilds the gallery and commits it to the PR branch.
+  commit-on-approval:
+    needs: [capture, verify-drift]
+    if: >-
+      needs.verify-drift.outputs.has_drift == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: screenshot-approval
+    # Earns write: it pushes the approved commit. It runs no PR-head code (only
+    # git/jq/cp over downloaded artifacts), so the write token is never exposed to
+    # PR-controlled execution.
+    permissions:
+      contents: write
+    env:
+      SHARDS_JSON: ${{ needs.capture.outputs.shards }}
+      HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    steps:
+      # Check out the exact SHA the screenshots were rendered from (what verify-drift
+      # measured against), NOT the branch tip. The approval gate can hold this job
+      # for a while, and a non-gated push landing meanwhile would not trigger a fresh
+      # run to supersede this one, so committing onto the tip could bury newer code
+      # under stale pixels. The push step refuses if the branch advanced past HEAD_SHA.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Download the shard artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: /tmp/dl
+          pattern: shots-*
+
+      - name: Assemble and commit the regenerated gallery
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Count via the .shard-complete marker (not the pixel dir) so a shard that
+          # legitimately renders nothing still counts as present.
+          expected=$(echo "$SHARDS_JSON" | jq 'length')
+          assembled=0
+          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
+          done
+          if [ "$assembled" -ne "$expected" ]; then
+            echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step failed, or the artifacts expired (retention window) before this approval. Re-run the drift-check to regenerate."
+            exit 1
+          fi
+          # Prune only generated PNGs (so a removed scene's stale image goes) while
+          # preserving tracked non-generated files under docs/screenshots.
+          find docs/screenshots -type f -name '*.png' -delete
+          for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
+            src="/tmp/dl/shots-$shard/shots/docs/screenshots"
+            [ -d "$src" ] && cp -a "$src/." docs/screenshots/
+          done
+          git add -A docs/screenshots
+          if git diff --cached --quiet; then
+            echo "Nothing to commit (the gallery already matches)."
+            exit 0
+          fi
+          git commit -m "Update screenshots from CI (approved on PR #${{ github.event.pull_request.number }})"
+          # The commit's parent is HEAD_SHA. Push only as a fast-forward: if the tip
+          # advanced during the approval wait, refuse rather than bury newer code
+          # under stale pixels. Retry only transient (non-advance) push failures. The
+          # bot pushes with GITHUB_TOKEN, which does not re-trigger workflows;
+          # re-approve/re-run the PR's other checks on this commit as needed.
+          for attempt in 1 2 3; do
+            if git push origin "HEAD:${HEAD_REF}"; then exit 0; fi
+            git fetch origin "${HEAD_REF}"
+            tip="$(git rev-parse "origin/${HEAD_REF}")"
+            if [ "$tip" != "${HEAD_SHA}" ]; then
+              echo "::error::the PR branch advanced past ${HEAD_SHA} (now ${tip}) since these screenshots were rendered; refusing to commit stale pixels over newer code. Re-run the drift-check so it regenerates from the current tip."
+              exit 1
+            fi
+            echo "push failed but the branch tip is unchanged; retrying ($attempt)"
+            sleep $((attempt * 2))
+          done
+          echo "could not push refreshed screenshots after retries" >&2
+          exit 1

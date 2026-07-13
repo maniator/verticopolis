@@ -73,10 +73,6 @@ Commit the PNGs; don't leave them as throwaway files:
   folder's [`README.md`](screenshots/features/README.md) saying what it shows.
 - **Milestone** (star-ladder) shots live in `docs/screenshots/milestones/`.
 
-A few historical before/after shots capture a *pre-fix* build the current code
-can no longer reproduce (`traffic-chip-before`, `tablet-*-before`); the generator
-skips them and leaves the committed files untouched.
-
 ## Embedding in a pull request
 
 Any PR with a visual or gameplay change should **show** the change, not just

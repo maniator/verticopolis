@@ -42,9 +42,8 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 
 | Screenshot | Shows |
 |---|---|
-| `traffic-chip-before.png` | Pre-fix build: the HUD chip reads **Smooth** on a genuinely jammed tower, because it tiered on the tower-wide *average*, which stays under the old 1.0 threshold. |
-| `traffic-chip-after.png` | This change: **Gridlock · 11F**: the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
-| `traffic-chip-after-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
+| `traffic-chip.png` | **Gridlock · 11F**: the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
+| `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
 
 ## Build palette: unlock visibility (locked tiers hidden until earned)
 
@@ -68,10 +67,9 @@ bottom-strip + drawer, and wraps the top bar so nothing clips.
 
 | Screenshot | Shows |
 |---|---|
-| `tablet-portrait-before.png` | 768×1024 (portrait tablet) **before**: the phone UI (tools in a bottom strip, panels hidden behind the ☰ drawer). |
-| `tablet-portrait-after.png` | 768×1024 **after**: the tablet layout (Tools docked left, SELECTED/TOWER/BULLETIN/GAME docked right, stats on a tidy second row). |
-| `tablet-compact-before.png` | 900×700 (compact band) **before**: desktop layout cramming. The brand wraps to two lines and the right speed buttons clip off. |
-| `tablet-compact-after.png` | 900×700 **after**: the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
+| `tablet-portrait.png` | 834×1112 (portrait tablet): the tablet layout (Tools docked left, SELECTED/TOWER/BULLETIN/GAME docked right, stats on a tidy second row). |
+| `tablet-compact.png` | 1000×720 (compact band): the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
+
 ## SimTower-1994 segment-width parity + save migration (`towerone_6`)
 
 Captured from the built app via the unified generator (`scripts/screenshots.ts`, `migration` scene) on the real
