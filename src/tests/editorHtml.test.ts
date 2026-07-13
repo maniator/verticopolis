@@ -59,6 +59,21 @@ describe("editor & stats HTML builders", () => {
     expect(Object.keys(vol)).toEqual(expect.arrayContaining(["cars", "capacity", "stops"]));
   });
 
+  it("a standard elevator's Stops readout names its skips plainly, not as 'express'", () => {
+    // A standard/service shaft with custom per-floor skips is NOT an express, so
+    // its readout must not borrow the word "express" (that copy is the express's).
+    const s = new Simulation();
+    for (let x = 10; x < 30; x++) expect(s.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 4; fl++) for (let x = 10; x < 30; x++) expect(s.tower.place("floor", fl, x).ok).toBe(true);
+    expect(s.buildTransport("elevatorStandard", 12, 1, 4).ok).toBe(true);
+    const std = s.tower.transports[s.tower.transports.length - 1];
+    expect(transportEditorVolatile(s, std).stops).toBe("all floors");
+    expect(s.tower.setStop(std.id, 3, false)).toBe(true); // skip one interior floor
+    const stops = transportEditorVolatile(s, std).stops;
+    expect(stops).toBe("skips 1 floor");
+    expect(stops).not.toContain("express");
+  });
+
   it("every data-field the render emits has a volatile key to patch it", () => {
     // The reverse direction of the first test: a rendered span whose field is
     // missing from the volatile map never patches and goes silently stale.

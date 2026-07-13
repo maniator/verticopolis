@@ -335,3 +335,31 @@ linking mechanism is undocumented.
 - Everything after the floor map floats; walk, don't seek.
 - Where the sources conflict ([OS] vs [TD]), this page names the better-evidenced
   reading; keep both tags when editing so future verification knows what to check.
+
+## 14. Round-trip canonicalization (export → import is not always the identity)
+
+`.vctower` is our lossless save; TDT is the lossy 1994 interop format. Exporting
+to TDT and reading it back can return a tower that differs from the source in
+ways the format cannot represent, so the importer canonicalizes to what TDT
+*can* mean. Two known, benign cases (measured via `tools/simtower` round-trips,
+both engine-behavior only, not data loss):
+
+- **Sky-lobby stories normalize to lobbies.** A plain floor tile placed on a
+  sky-lobby story (floors 15, 30, 45…) exports byte-identically to a sky lobby
+  there (the format carries no floor-vs-lobby distinction at those stories), so
+  it reads back as a lobby. This only surfaces when a source tower has bare floor
+  tiles on a sky-lobby story with no lobby, which the running game does not
+  produce; a real save's sky-lobby stories already carry their lobby.
+- **Built retail arrives tenanted.** A freshly placed, never-simulated shop with
+  no `subtype`/tenant yet (the "legacy look" state) comes back `occupied` with a
+  concrete retail `subtype`, because TDT has no representation for a vacant built
+  retail cell (canon retail is always tenanted). A simulated tower's shops
+  already carry their subtype, so a normal save round-trips unchanged.
+
+Both are one-way to the canonical form and stable thereafter: a second
+export → import is byte-identical (the round-trip reaches a fixed point after the
+first import). Do **not** "fix" these by teaching `parseTDT` to reconstruct the
+pre-canonical state; that would encode a tower the format cannot hold and the
+game will not show. The first case is still pending a live-game confirmation (see
+the backlog e1-roundtrip defer) once the harness `winevdm` boot flake is worked
+around.
