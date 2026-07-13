@@ -100,6 +100,13 @@ load_tdt() {
   win_path="$(winepath -w "$tdt" 2>/dev/null || echo "$tdt")"
   echo "[harness] loading $win_path under Xvfb ..."
   local screen="${SCREEN:-1024x768}"
+  # SCREEN is a WxH value (the depth is appended below as x24). Reject an
+  # Xvfb-style "WxHxD" or any non-WxH input rather than feed a malformed
+  # geometry to Xvfb / the desktop.
+  if ! [[ "$screen" =~ ^[0-9]+x[0-9]+$ ]]; then
+    echo "[harness] invalid SCREEN='${screen}' (want WxH, e.g. 1024x768); using 1024x768" >&2
+    screen="1024x768"
+  fi
   Xvfb :99 -screen 0 "${screen}x24" >/dev/null 2>&1 &
   local xvfb=$!
   export DISPLAY=:99
