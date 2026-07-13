@@ -117,6 +117,51 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: party consultation on audio baking (2026-07-13)
+
+Owner follow-up to the Tone.js audio work: should we bake WAV files into the
+PWA cache instead of generating tones on the fly? Party (dev + UX voices,
+general-purpose research on how comparable browser games ship audio) returned a
+clear verdict with three separate threads:
+
+- **Music stays procedural. Baked WAV for the ambient score is rejected,
+  unconditionally.** The three streaming scene beds are generated live by the
+  Tone graph today; pre-rendering them to WAV is a net loss on every axis. Bytes:
+  a few minutes of looping stereo WAV dwarfs the 66 KB gzipped Tone.js chunk and
+  would blow well past the 6 MB Workbox precache ceiling (or force runtime
+  fetches the offline install is meant to avoid). Feel: the procedural beds
+  crossfade and re-voice per zoom scene (`OVERVIEW_ZOOM`/`DETAIL_ZOOM`), which a
+  fixed loop cannot do without a much larger sample set. CPU: decoding and
+  scheduling a large buffer is not obviously cheaper than the current synths on
+  the target phones. No measurement could flip this one, so it is a closed
+  decision, not a gated one.
+
+- **Jingle-bake is a GATED follow-up, not scheduled work.** The one place baking
+  could help is the short one-shot cues (build-complete, star-up, error, etc.):
+  bake those ~6 jingles once (via `Tone.Offline` into an `AudioBuffer`, or ship
+  small compressed Opus/Ogg assets) so a cue can fire from a decoded buffer
+  instead of spinning up synth voices. The ONLY justification is first-gesture
+  latency on a mid Android device: if the first click/build cue is audibly late
+  or dropped while the Tone graph warms, baked buffers fix it. The gate is a real
+  measurement of that first-cue latency on mid Android hardware, which cannot be
+  taken in this headless environment. Per the dev voice: if the measurement comes
+  back fine, the correct action is status quo and we ship nothing. Do not bake on
+  spec. If we do bake the jingles, add them to `globPatterns` (currently
+  `js,css,html,ico,png,svg,woff,woff2`, no audio) and re-check the precache
+  budget.
+
+- **First-gesture-silence bug (fix regardless of the bake decision).**
+  `ToneAudioEngine.sfx()` no-ops until `this.started` is true, so the very first
+  click or build cue before the Tone graph is unlocked is silent. This is a
+  latent bug independent of baking (baking would mask it, but the graph should
+  simply queue or arm the first cue on unlock). Fix it on its own small PR; it is
+  the concrete deliverable this consultation surfaced.
+
+- **Sampled stems into the existing mixer is a SEPARATE future project.** Feeding
+  recorded instrument samples through the current Tone mixer for richer timbre is
+  a different idea from "cache WAV to skip synthesis" and was not evaluated here.
+  Park it as its own future exploration if the procedural palette ever feels thin.
+
 ### Deferred from: code review of express-elevator-parity (`gds-quick-dev` step-04, 2026-07-13)
 
 - **Express build time rises 172 -> 188 in-game minutes as a side effect of the width 4->6 change.** `facilities.ts` `buildMinutes = round(60 + width*8 + cost/5000)`, so a 6-wide express takes 16 min longer to build. Arguably correct (bigger footprint = longer build) and never surfaced as a bug, but it is an un-called-out player-facing behavior change. Confirm the value reads fine in play; if not, decouple build time from width for elevators. Low. (Edge Case Hunter.)
