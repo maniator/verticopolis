@@ -184,7 +184,9 @@ test.describe("mobile inspect: a tap raises the hover card", () => {
       g.sim.money = 1e9;
     });
 
-    // Build an office to inspect (a touch tap with the build tool).
+    // Build an office to inspect (a touch tap with the build tool). Compare the
+    // unit count before and after so the assertion proves THIS tap placed a
+    // room, not that the tower merely already had units.
     await page.click('.pal-item[data-kind="office"]');
     const spot = await page.evaluate(() => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -193,10 +195,11 @@ test.describe("mobile inspect: a tap raises the hover card", () => {
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
     });
+    const unitsBefore = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
     await dispatchTouch(page, "pointerdown", 8001, spot.x, spot.y);
     await dispatchTouch(page, "pointerup", 8001, spot.x, spot.y);
-    const placed = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
-    expect(placed).toBeGreaterThan(0);
+    const unitsAfter = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(unitsAfter).toBeGreaterThan(unitsBefore);
 
     // Switch to the inspect tool. The card starts hidden: touch has no hover to
     // raise it, and before this fix a tap only opened the editor.
