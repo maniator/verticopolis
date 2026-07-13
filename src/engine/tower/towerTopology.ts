@@ -29,7 +29,7 @@ export function isSkyLobbyFloor(floor: number): boolean {
  * (shop/fast food/restaurant), entertainment, and service facilities may go
  * underground; people don't live or work down there.
  */
-export const NO_BASEMENT_KINDS = new Set<FacilityKind>([
+export const NO_BASEMENT_KINDS: ReadonlySet<FacilityKind> = new Set<FacilityKind>([
   "office",
   "condo",
   "hotelSingle",

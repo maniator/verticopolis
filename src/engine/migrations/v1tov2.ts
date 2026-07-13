@@ -11,9 +11,9 @@ import type { FacilityKind, SerializedGame, SerializedUnit } from "../types";
  * v1 → v2 migration with a safety net. Runs the reflow ({@link reflowV1toV2}); if
  * it throws OR produces an invalid layout (a room overlap or an off-lot room the
  * per-unit hardening couldn't have caused), it falls back to simply stamping v2
- * on the ORIGINAL units. That fallback is always safe, units persist their own
+ * on the ORIGINAL units. That fallback is always safe: units persist their own
  * width and `deserialize` trusts it, so an un-reflowed old tower loads at its
- * legacy footprints with no corruption (arch §1). Better a tower that keeps
+ * legacy footprints with no corruption (arch §1). Better a tower that keeps its
  * legacy widths than a lost or scrambled save.
  */
 export function upgradeV1toV2(data: SerializedGame): SerializedGame {

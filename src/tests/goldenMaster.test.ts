@@ -80,9 +80,11 @@ function stableStringify(value: unknown): string {
 function runFixedScenario(): Simulation {
   const sim = Simulation.newGame(20260713, "classic");
   buildFixedTower(sim);
-  // Drive three full in-game days in hourly steps: exercises onHour/onDay,
+  // Drive three full in-game days in hourly steps. `tick` takes MINUTES, so 60
+  // is one hour and 24*3 iterations is three days: exercises onHour/onDay,
   // move-ins, rent, crowd spawning, housekeeping, star evaluation.
-  for (let i = 0; i < 24 * 3; i++) sim.tick(60);
+  const MINUTES_PER_HOUR = 60;
+  for (let i = 0; i < 24 * 3; i++) sim.tick(MINUTES_PER_HOUR);
   sim.evaluateStar();
   return sim;
 }

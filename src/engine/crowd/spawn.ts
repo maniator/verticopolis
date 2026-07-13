@@ -26,11 +26,11 @@ import {
  * methods that delegate here.
  */
 
-// Shared empty result for the no-work path (avoids a per-tick allocation). Frozen
-// so a caller that accidentally mutates it fails fast instead of leaking state
-// into a later read; the sole caller only iterates.
-const NO_RESULTS: { unitId: number; ok: boolean }[] = [];
-Object.freeze(NO_RESULTS);
+// Shared empty result for the no-work path (avoids a per-tick allocation). Typed
+// AND frozen readonly so a caller that tries to mutate it fails at compile time
+// (and at runtime as a backstop) instead of leaking state into a later read; the
+// sole caller only iterates.
+const NO_RESULTS: readonly { unitId: number; ok: boolean }[] = Object.freeze([]);
 
 export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const hour = clock.hour;
@@ -377,7 +377,7 @@ export function spawnStaff(
 }
 
 /** Drain the staff jobs that ended since the last call (arrived or failed). */
-export function takeStaffResults(crowd: Crowd): { unitId: number; ok: boolean }[] {
+export function takeStaffResults(crowd: Crowd): readonly { unitId: number; ok: boolean }[] {
   if (crowd.staffDone.length === 0) return NO_RESULTS;
   const out = crowd.staffDone;
   crowd.staffDone = [];

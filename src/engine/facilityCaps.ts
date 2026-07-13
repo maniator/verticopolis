@@ -6,7 +6,7 @@ import { FACILITIES, GRID } from "./facilitiesData";
  *  elevator's header (docs/canon/tdt-format.md §8): express 42, standard 21,
  *  service 10. Escalator/stairs are our own throughput figures; the save's
  *  separate walkway table stores occupant counts, not a capacity. */
-export const TRANSPORT_CAPACITY: Record<string, number> = {
+export const TRANSPORT_CAPACITY: Partial<Record<FacilityKind, number>> = {
   elevatorStandard: 21,
   elevatorService: 10, // canon: the smallest cab (staff-only)
   elevatorExpress: 42, // canon: PC 1.0 express car carries 42 (standard 21)
@@ -30,7 +30,7 @@ export function transportCarCapacity(kind: FacilityKind): number {
  *  supports up to 8 cars per shaft in the 1994 original, service is not an
  *  exception (it is a staff-only standard elevator: same 8 cars, same 30-floor
  *  span). */
-export const MAX_CARS: Record<string, number> = {
+export const MAX_CARS: Partial<Record<FacilityKind, number>> = {
   elevatorStandard: 8,
   elevatorService: 8,
   elevatorExpress: 8,
@@ -38,7 +38,7 @@ export const MAX_CARS: Record<string, number> = {
 
 /** Max cars for a shaft kind. The single home for the missing-kind fallback,
  *  so the editor's guards and the engine's clamp can't drift apart. */
-export function maxCarsFor(kind: string): number {
+export function maxCarsFor(kind: FacilityKind): number {
   return MAX_CARS[kind] ?? 8;
 }
 

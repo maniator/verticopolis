@@ -131,7 +131,10 @@ const MODULES: Record<string, Record<string, unknown>> = {
 describe("barrel surface: every re-exported value binding resolves", () => {
   for (const [mod, names] of Object.entries(RUNTIME_EXPORTS)) {
     it(`${mod} exposes its value bindings`, () => {
-      const missing = names.filter((n) => MODULES[mod][n] === undefined);
+      // Check binding PRESENCE, not truthiness: an export whose value is
+      // legitimately `undefined` still exists as a binding, so key `in` the
+      // namespace is the honest test that a name is actually re-exported.
+      const missing = names.filter((n) => !(n in MODULES[mod]));
       expect(missing, `${mod} is missing value exports: ${missing.join(", ")}`).toEqual([]);
     });
   }

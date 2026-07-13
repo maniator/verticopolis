@@ -122,7 +122,7 @@ export class Crowd {
   }
 
   /** Drain the staff jobs that ended since the last call (arrived or failed). */
-  takeStaffResults(): { unitId: number; ok: boolean }[] {
+  takeStaffResults(): readonly { unitId: number; ok: boolean }[] {
     return crowdSpawn.takeStaffResults(this);
   }
 
