@@ -97,7 +97,7 @@ describe("buildTDT: export → import round trip", () => {
   it("the built-shaft payload size is car-count INDEPENDENT (guards the cars*348 desync)", () => {
     // The appended built-shaft block is a SINGLE fixed 348-byte car block, one
     // per shaft, NOT one per car (harness-confirmed on the real 1994 game).
-    // Sizing it `cars * 348` over-ran every multi-car shaft and desynced the
+    // Sizing it `cars * 348` overran every multi-car shaft and desynced the
     // retail game's whole elevator table after the first one (only one elevator
     // rendered, and the parking/basement block after it mis-read). The
     // exporter, importer skip, and tdtBuilder fixture all share one constant, so
