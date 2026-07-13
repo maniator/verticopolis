@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { ECON, rentOf } from "../engine/econConfig";
-import { FACILITIES, GRID, residentCount } from "../engine/facilities";
-import type { GameMode, Unit } from "../engine/types";
-import { buildStatsHtml } from "../ui/statsHtml";
-import { unitEditorVolatile } from "../ui/editorHtml";
+import { Simulation } from "../../engine/Simulation";
+import { ECON, rentOf } from "../../engine/econConfig";
+import { FACILITIES, GRID, residentCount } from "../../engine/facilities";
+import type { GameMode, Unit } from "../../engine/types";
+import { buildStatsHtml } from "../../ui/statsHtml";
+import { unitEditorVolatile } from "../../ui/editorHtml";
 
 /**
  * Condo rule-sets: the Classic price/buy-back parity fixes (all towers) and the
