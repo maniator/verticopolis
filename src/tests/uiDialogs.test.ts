@@ -1498,3 +1498,46 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     expect(apply).toHaveBeenCalledOnce();
   });
 });
+
+describe("Saved Towers rows (mode chip + in-game day)", () => {
+  it("shows a coerced rule-set chip and the day on every existing slot; empty slots get neither", () => {
+    const { ui } = makeUI();
+    ui.showSaves([
+      { slot: "auto", exists: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
+      { slot: 1, exists: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
+      { slot: 2, exists: false },
+    ]);
+    const rows = Array.from(dialog().querySelectorAll(".slot"));
+    expect(rows[0].querySelector(".nt-badge")!.textContent).toBe("Classic");
+    expect(rows[0].querySelector(".nt-badge.alt")).toBeNull(); // classic uses the muted badge
+    expect(rows[1].querySelector(".nt-badge.alt")!.textContent).toBe("Modern");
+    // Structural pins on the when-line, not substring scans of the whole row.
+    expect(rows[0].querySelector(".slot-when")!.textContent).toMatch(/\bDay 42\b/);
+    expect(rows[1].querySelector(".slot-when")!.textContent).toMatch(/\bDay 7\b/);
+    expect(rows[2].querySelector(".nt-badge")).toBeNull();
+    expect(rows[2].querySelector(".slot-when")).toBeNull(); // empty rows carry no when-line at all
+  });
+
+  it("omits the day when the save's minutes were malformed, keeping the timestamp", () => {
+    const { ui } = makeUI();
+    ui.showSaves([
+      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
+    ]);
+    const when = dialog().querySelector(".slot-when")!.textContent!;
+    expect(when).not.toMatch(/\bDay\b/);
+    expect(when.length).toBeGreaterThan(0); // the fmtWhen timestamp still renders
+  });
+
+  it("a non-numeric day smuggled past the types never reaches the template raw", () => {
+    const { ui } = makeUI();
+    ui.showSaves([
+      // A hostile producer bypassing SlotInfo's types (the storage layer
+      // already bounds day; this pins the render-side finiteness guard).
+      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
+    ]);
+    const when = dialog().querySelector(".slot-when")!.textContent!;
+    expect(when).not.toContain("<img>");
+    expect(dialog().querySelector(".slot-when img")).toBeNull();
+    expect(when).not.toMatch(/\bDay\b/);
+  });
+});

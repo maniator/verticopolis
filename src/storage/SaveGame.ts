@@ -1,6 +1,7 @@
 import { deflateSync, Inflate } from "fflate";
 import { Simulation } from "../engine/Simulation";
-import type { SerializedGame } from "../engine/types";
+import type { GameMode, SerializedGame } from "../engine/types";
+import { isGameMode } from "../engine/types";
 
 /**
  * Persistence. Games are stored in localStorage: one auto-save slot plus a
@@ -67,6 +68,16 @@ export interface SlotInfo {
   population?: number;
   funds?: number;
   savedAt?: number;
+  /** Rule-set the tower was founded under. Optional only because an empty
+   *  slot has no tower; infoFrom sets it on every EXISTING slot (a save
+   *  without the field, pre-fork, or with a forged value reads as classic).
+   *  The UI renders a missing mode as Classic, which is only correct for
+   *  producers that coerce like infoFrom does. */
+  mode?: GameMode;
+  /** In-game day (1-indexed, from the save's minutes), so the Saves dialog
+   *  can show a tower's age. Absent when the save's minutes are malformed:
+   *  wrong type, non-finite, negative, or past the ~1,000-year ceiling. */
+  day?: number;
 }
 
 function readSlot(key: string): SerializedGame | null {
@@ -123,8 +134,30 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
       typeof data.savedAt === "number" && Number.isFinite(data.savedAt) && Math.abs(data.savedAt) <= MAX_DATE_MS
         ? data.savedAt
         : undefined,
+    // Founded mode, run through the same isGameMode coercion deserialize
+    // uses (absent/forged = classic), so the dialog's chip can never carry a
+    // raw file string.
+    mode: isGameMode(data.mode) ? data.mode : "classic",
+    // 1-indexed in-game day, matching the TDT import report's convention. A
+    // day is 1440 minutes in EVERY calendar (see src/engine/calendar.ts), so
+    // this cannot disagree with the in-game date for either mode. Same
+    // absent-not-clamped posture as savedAt: negative or absurdly large
+    // minutes (past ~1,000 in-game years, the TDT importer's own ceiling)
+    // read as absent rather than as a confidently wrong day.
+    day:
+      typeof data.minutes === "number" &&
+      Number.isFinite(data.minutes) &&
+      data.minutes >= 0 &&
+      data.minutes / 1440 <= MAX_SLOT_DAY
+        ? Math.floor(data.minutes / 1440) + 1
+        : undefined,
   };
 }
+
+/** Ceiling on the day shown in the Saves dialog, mirroring the TDT importer's
+ *  MAX_IMPORT_DAY (~1,000 in-game years): a forged minutes beyond it would
+ *  render a screen-wide number, so it reads as absent instead. */
+const MAX_SLOT_DAY = 360_000;
 
 export const SaveGame = {
   // ---- Auto-save slot (used on startup) --------------------------------

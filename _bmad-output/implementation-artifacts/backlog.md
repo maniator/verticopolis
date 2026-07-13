@@ -190,6 +190,14 @@ Triage them into the table above, then delete the raw note._
 - **Pinch-aborted paint run loses its undo step (Edge F4).** `captureUndo` fires in `onActionDown`; a pinch aborts the gesture without `onActionUp`, so the pending pre-paint snapshot is overwritten by the next gesture's capture and the pre-pinch strip can never be undone (immediate Ctrl+Z still works). Documented overwrite semantics in `UndoHistory.capture`; pre-existing, unchanged by the fix. (Low, pre-existing.)
 - **Elevator hover ghost validity ignores dry-run/funds (investigation side finding).** `main.ts` `updateBuildPreview` sets `valid: isUnlocked(kind)` for drag-sized transports, so a desktop hover shows a gold ghost where a drop would refuse. Cosmetic, desktop-only. (Low, pre-existing.)
 
+### Deferred from: saves-modal party ruling (2026-07-13)
+
+- **Tower thumbnails in the Saves dialog, rendered FROM save data.** The save
+  already carries every unit, so the modal could draw a small silhouette per
+  slot at display time (no new save field, no stored image). Ruled a future
+  UI story, owned by UX (Sally's IOU); sizing, caching per savedAt, and the
+  cost of deserializing four slots at open time are the design questions.
+
 ### Deferred from: code review of story-save-metadata-and-log-tail (`/gds-code-review`, 2026-07-12)
 
 - ~~**Undo/redo trims bulletin scrollback to the save cap (Edge, medium).**~~
