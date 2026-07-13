@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
-import { Clock } from "../engine/Clock";
+import { Simulation } from "../../engine/Simulation";
+import { FACILITIES } from "../../engine/facilities";
+import { Clock } from "../../engine/Clock";
 
 /**
  * Guards commercial venue occupant behavior:
@@ -35,7 +35,7 @@ function triggerHour(sim: Simulation): void {
  */
 function venueFixture(kind: "fastFood" | "restaurant" | "shop"): {
   sim: Simulation;
-  unit: import("../engine/types").Unit;
+  unit: import("../../engine/types").Unit;
 } {
   const sim = new Simulation(2024, "classic", "realWorld");
   sim.money = 5_000_000;

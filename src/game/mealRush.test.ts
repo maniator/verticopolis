@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { decideMealRush } from "../game/mealRush";
+import { decideMealRush } from "./mealRush";
 
 /**
  * Guards the "Breakfast/Lunch/Dinner rush!" bulletin decision logic against

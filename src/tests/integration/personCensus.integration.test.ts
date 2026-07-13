@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation, SAVE_VERSION } from "../engine/Simulation";
-import { Clock } from "../engine/Clock";
+import { Simulation, SAVE_VERSION } from "../../engine/Simulation";
+import { Clock } from "../../engine/Clock";
 
 /**
  * Venue-population census regression suite.
