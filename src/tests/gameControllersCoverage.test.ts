@@ -523,6 +523,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("coercion scrubs a forged endpoint out of an express skip list (endpoints always stop)", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
+    expect(r.ok).toBe(true);
     const data = sim.serialize();
     // Forge the top endpoint (floor 4) into the skip list: a shaft must never
     // skip its own endpoint. Coercion removes it and still skips the non-lobby
