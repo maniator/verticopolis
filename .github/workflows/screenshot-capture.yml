@@ -43,6 +43,42 @@ on:
         description: "The pinned Playwright image tag used."
         value: ${{ jobs.resolve-image.outputs.image }}
 
+# Give the EXPENSIVE capture its OWN concurrency group so a superseding run
+# actually cancels these jobs. A caller's top-level `cancel-in-progress` only
+# gates the caller's own jobs; it does NOT reliably cancel a called reusable
+# workflow's in-progress jobs (GitHub community discussion #30708). Since the
+# render matrix below (`shoot`: two full builds + renders per shard, in the
+# pinned Playwright container) is the only thing here that costs real minutes,
+# without this a new commit on a PR would leave the previous run's captures
+# burning compute even though the caller `pr-drift-check.yml` already superseded
+# it. The `github` context inside a reusable workflow reflects the CALLER's
+# triggering event, so this key sees the caller's event.
+#
+# Key per caller-event + PR/branch. Use a hardcoded `screenshot-capture-` prefix,
+# NEVER `github.workflow` (which resolves to the CALLER's workflow name and would
+# collide with the caller's own group, deadlocking or self-cancelling the run,
+# discussion #30708). The prefix keeps this group distinct from every caller's own
+# top-level group (`pr-drift-*`, `regen-ci-artifacts-*`), so a reusable run never
+# contends with its caller's group: no caller/callee deadlock. Cancel ONLY for
+# `pull_request` runs (the PR drift-check, where a new push means new pixels
+# anyway). The push/dispatch caller `update-screenshots.yml` deliberately
+# serializes with `cancel-in-progress: false` to avoid racing on the branch it
+# pushes to, so its capture must never be cancelled: the expression below keeps
+# that path non-cancelling.
+#
+# INVARIANTS this key relies on (nothing enforces them, so honor them when adding
+# a caller): the group distinguishes runs by event + PR/branch, NOT by caller, so
+# there must be at most ONE caller per (event_name, ref); today that holds (only
+# `update-screenshots.yml` triggers on push/dispatch, only `pr-drift-check.yml` on
+# pull_request). A second push-event caller on the same branch would share
+# `screenshot-capture-push-<ref>` and serialize against an unrelated run. And a
+# new caller on any event where a fresh push SHOULD supersede the capture would
+# get no cancellation here (only `pull_request` cancels); extend the expression if
+# you add one.
+concurrency:
+  group: screenshot-capture-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 

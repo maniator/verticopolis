@@ -60,7 +60,14 @@ on:
       - ".github/workflows/pr-drift-check.yml"
       - ".github/workflows/screenshot-capture.yml"
 
-# One run per PR; a new push supersedes a run still waiting at the approval gate.
+# One run per PR; a new push supersedes the previous run. This cancels THIS
+# workflow's own jobs (the guard, verify-drift, and a commit-on-approval still
+# waiting at the gate). It does NOT reliably cancel the jobs of the reusable
+# `screenshot-capture.yml` this calls (a caller's cancel-in-progress does not
+# propagate into a called workflow's in-progress jobs, GitHub discussion #30708),
+# so that reusable workflow carries its OWN concurrency group to cancel its
+# expensive Playwright captures on a new push. The two groups are deliberately
+# distinct (`pr-drift-*` vs `screenshot-capture-*`) so they never deadlock.
 concurrency:
   group: pr-drift-${{ github.event.pull_request.number }}
   cancel-in-progress: true
