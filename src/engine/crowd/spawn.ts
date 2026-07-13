@@ -26,7 +26,11 @@ import {
  * methods that delegate here.
  */
 
+// Shared empty result for the no-work path (avoids a per-tick allocation). Frozen
+// so a caller that accidentally mutates it fails fast instead of leaking state
+// into a later read; the sole caller only iterates.
 const NO_RESULTS: { unitId: number; ok: boolean }[] = [];
+Object.freeze(NO_RESULTS);
 
 export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const hour = clock.hour;
