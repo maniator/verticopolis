@@ -147,12 +147,18 @@ export const TDT_ELEVATOR_HEADER_SIZE = 194;
 // Built shafts append a fixed block whose true size (3140 B) was measured from
 // real 1994 saves via the tools/simtower round-trip harness: walking the three
 // shafts in my_tower.TDT, the record stride
-//   194-byte header + 3140 + 324 * servicedFloors + 348 * cars
+//   194-byte header + 3140 + 324 * servicedFloors + 348
 // reproduces every shaft's exact file offset. The earlier 480 + 2 * 120 = 720
 // estimate undercounted this block by 2420 B, which desynced the whole table
 // after the first shaft and forced the importer to synthesize fakes instead.
+// The trailing 348-byte block is cars-INDEPENDENT (one per shaft, NOT `* cars`):
+// harness-confirmed against the retail game in 2026-07-13. See TDT_ELEVATOR_PER_CAR_SIZE.
 export const TDT_ELEVATOR_BUILT_FIXED = 3140;
 export const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
+/** The single 348-byte car block appended per BUILT shaft. Named "per car" for
+ *  historical reasons, but it appears exactly ONCE per shaft regardless of the
+ *  car count (harness-confirmed on the real 1994 game): never multiply by cars.
+ *  A rename to `..._CAR_BLOCK_SIZE` is a logged follow-up (backlog). */
 export const TDT_ELEVATOR_PER_CAR_SIZE = 348;
 /**
  * The 56-byte per-shaft schedule/config block (bytes 4–59 of an elevator
