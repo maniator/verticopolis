@@ -6,7 +6,8 @@
  */
 
 /** One tenant record, mirrored raw from the file (doc §4 / tower-docs unit
- *  record: extents, type, status byte, 10 reserved bytes, rent, subtype). */
+ *  record: extents, type, status byte, retail variant (byte 6), 9 reserved
+ *  bytes, rent (byte 16), byte 17). */
 export interface TdtTenant {
   /** Left/right extents in 8-pixel segments == our tiles (half-open range). */
   left: number;
