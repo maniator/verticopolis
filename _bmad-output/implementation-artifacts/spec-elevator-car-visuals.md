@@ -48,7 +48,7 @@ baseline_commit: 'cab5f888597e6d3546123b2a2b923c39d6c8c34d'
 - `src/gallery.ts:58-87` -- `transportEntry` draws each elevator entry's cars with the new per-kind cab (translate to the existing `carPositions`, call `drawCar` with the entry's kind); stairs/escalators unaffected (cars=0)
 - `src/tests/sprites.test.ts:144` -- extend: the three kinds render pairwise-different signatures; the standard cab's signature is unchanged when the kind argument is omitted vs passed explicitly; FULL/arrow still alter every kind's output
 - `_bmad-output/implementation-artifacts/backlog.md:101` -- `service-elevator-car-color` row resolves
-- `package.json` -- patch bump on top of main at merge time (currently 1.24.1 over 1.24.0)
+- `package.json` -- patch bump on top of main at merge time (currently 1.25.1 over main's 1.25.0; re-resolves the same way if main moves again)
 - `e2e/visual.spec.ts-snapshots/sprite-gallery-chromium-linux.png`, `docs/screenshots/**` -- re-mint via bot workflows: final commit message carries `[update-baselines]` and `[update-screenshots]`
 
 ## Tasks & Acceptance
@@ -59,7 +59,7 @@ baseline_commit: 'cab5f888597e6d3546123b2a2b923c39d6c8c34d'
 - [x] `src/gallery.ts` -- elevator entries draw their cars with the kind's cab
 - [x] `src/tests/sprites.test.ts` -- pairwise-difference + standard-unchanged + indicator-still-visible regression tests (red first: pairwise test failed against the single-look cab, green after)
 - [x] `_bmad-output/implementation-artifacts/backlog.md` -- resolve the `service-elevator-car-color` row
-- [x] `package.json` -- patch bump (1.24.0 -> 1.24.1)
+- [x] `package.json` -- patch bump on top of main at merge time (1.25.1 over 1.25.0 as of the ready-for-review merge; was 1.24.1 over 1.24.0 pre-merge)
 - [x] Quality gates: `npm run typecheck`, `npm run lint`, `npm test` (78 files / 1279 tests), `npm run build` -- all green
 - [x] Review round (BMGD 3-layer, `/gds-code-review`) -- 7 patch findings, all fixed and re-verified (gates green); 0 defers; 4 dismissed as noise -- see Review Findings and Spec Change Log
 - [ ] Final commit message carries `[update-baselines]` and `[update-screenshots]` so the pinned-container bots re-mint any changed pixels
@@ -82,6 +82,8 @@ baseline_commit: 'cab5f888597e6d3546123b2a2b923c39d6c8c34d'
 - Given the full quality gates, when run, then all four pass.
 
 ## Spec Change Log
+
+- 2026-07-13 (ready-for-review merge, version re-resolution): the owner merged main into the branch (PRs #199/#201 landed; main moved 1.24.0 -> 1.25.0) and the patch bump re-resolved to 1.25.1 over 1.25.0, per the merge-time rule in the Code Map. The three Copilot threads flagging the stale 1.24.1 references in this spec and the backlog row are fixed by this entry's commit.
 
 - 2026-07-13 (review round, BMGD 3-layer): all three layers ran (Blind Hunter, Edge Case Hunter, Acceptance Auditor); the auditor confirmed full spec compliance, including byte-identity of the standard cab against HEAD. Seven patch findings fixed in-branch (see Review Findings): the biggest was the express shade clamp (strip +197 saturated to pure white, erasing the hue leg of the triple-encoded cue; re-tuned to interior +160 / strip +190, verified in a preview screenshot to keep a visible blue cast). Dismissed as noise: a floorH<8 degenerate no caller can hit (engine 44, gallery 24), a FacilityKind-import doubt (the import exists), the patch-vs-minor bump question (legibility fix of an owner-observed problem, patch per the versioning rule; flagged for the owner in the PR), and the absent golden signature of the standard cab (the pinned-container visual baseline is the pixel-level pin). Zero defers, so no backlog inbox entries. Gates re-run green after the patches.
 
