@@ -77,6 +77,13 @@ export interface GameRules {
    */
   coerceResidents(raw: unknown): number | undefined;
   /**
+   * Sanitize a persisted No-Rate (off-market) flag on load. Classic preserves a
+   * real flag, hardened so only a literal `true` survives (a forged non-boolean
+   * cannot park a unit at $0). Modern NEVER holds the No-Rate state, so it
+   * coerces the flag away entirely (a forged Modern save loads on-market).
+   */
+  coerceNoRate(raw: unknown): boolean | undefined;
+  /**
    * Multiplier on a condo's NEGATIVE satisfaction pressures (access/congestion),
    * never on recovery. 1 is neutral. Classic is always 1 (its condos are
    * uniform); Modern sharpens for big families and softens slightly for small.
@@ -125,6 +132,9 @@ export const CLASSIC_RULES: GameRules = {
   coerceResidents() {
     return undefined;
   },
+  coerceNoRate(raw) {
+    return raw === true ? true : undefined; // preserve a real flag; only true counts
+  },
   churnMultiplier() {
     return 1;
   },
@@ -157,6 +167,9 @@ export const MODERN_RULES: GameRules = {
       HOUSEHOLD_SIZES[0],
       Math.min(HOUSEHOLD_SIZES[HOUSEHOLD_SIZES.length - 1], Math.round(isFiniteNum(raw) ? raw : CLASSIC_HOUSEHOLD)),
     );
+  },
+  coerceNoRate() {
+    return undefined; // Modern never holds the No-Rate state (roadmap seam law)
   },
   churnMultiplier(residents) {
     if (residents === undefined) return 1;

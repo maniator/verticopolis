@@ -9,7 +9,7 @@ context:
   - '{project-root}/_bmad-output/planning-artifacts/design/gdd-classic-modern-pricing-roadmap-2026-07-08.md'
 ---
 
-<frozen-after-approval reason="human-owned intent — do not modify unless human renegotiates">
+<frozen-after-approval reason="human-owned intent, do not modify unless human renegotiates">
 
 ## Intent
 

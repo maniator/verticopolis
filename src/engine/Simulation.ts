@@ -2555,9 +2555,11 @@ export class Simulation implements SimContext {
           // deadline from a forged save must not reach the toast / state machine.
           vacateReason: isVacateReason(u.vacateReason) ? u.vacateReason : undefined,
           vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
-          // Off-market flag: only a literal `true` counts, so a forged noRate
-          // (e.g. the string "no") can't silently park a unit at $0.
-          noRate: u.noRate === true ? true : undefined,
+          // Off-market flag, sanitized through the rule-set seam (like
+          // `coerceResidents`): Classic keeps a literal-true flag and hardens a
+          // forged non-boolean away; Modern never holds the state, so it coerces
+          // the flag off entirely.
+          noRate: sim.rules.coerceNoRate(u.noRate),
           // Transient crowd counters never survive a load: serializeUnit omits
           // them, and the `...u` spread above would otherwise let a hand-edited
           // save seed the census/star gating (customersIn, hotelCustomersIn) or
