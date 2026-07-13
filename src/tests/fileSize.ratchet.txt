@@ -14,10 +14,6 @@ src/main.ts
 src/ui/UI.ts
 src/audio/ToneAudioEngine.ts
 # storage
-src/storage/tdtImport.ts
-src/storage/tdtExport.ts
-src/storage/tdtFormat.ts
-src/storage/SaveGame.ts
 # engine leaves
 # scripts
 # tests (split last)
