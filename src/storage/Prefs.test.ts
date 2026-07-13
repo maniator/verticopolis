@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { loadPrefs, savePrefs, reducedMotionActive } from "../storage/Prefs";
+import { loadPrefs, savePrefs, reducedMotionActive } from "./Prefs";
 
 describe("Prefs (accessibility preferences)", () => {
   beforeEach(() => localStorage.clear());

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { retailStatsLines } from "../game/inspector";
+import { retailStatsLines } from "./inspector";
 
 // Shop verdict baseline = dailyTrafficIncome.shop (2500) / retailSpendPerCustomer.shop (20)
 // × TRAFFIC_FACTOR_MEAN (0.8) = 100 customers on an average good day. Folding the

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { resolveBootScreen } from "../bootScreen";
+import { resolveBootScreen } from "./bootScreen";
 
 /**
  * The pure boot-screen decision, extracted from the GameApp constructor (which
