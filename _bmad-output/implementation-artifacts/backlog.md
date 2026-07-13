@@ -121,12 +121,14 @@ quietly reintroduces the very blind spots PR #188 removed.
   `spec-shard-screenshots-ci.md`: `scripts/screenshot-shards.ts` holds the
   explicit 4-shard partition (`showcase`, `slow`, `features`, `misc`) and a
   `verify` coverage guard (union of shard groups must equal every `SCENES` id,
-  exactly once, checked at the gate before any capture), and
-  `update-screenshots.yml` crosses the `shoot` matrix `run:[a,b]` x `shard`,
-  renders each shard via `ONLY=`, and diffs per shard. Each shard uploads its
-  full rendered set; `verify-and-commit` rebuilds the gallery from the union of
-  run-a shards (pruning removed scenes). The original speed constraints held:
-  4 shards (not 8+), provable coverage, `ONLY=`-based subsetting.
+  exactly once, checked at the gate before any capture). PR 1 originally crossed
+  the `shoot` matrix `run:[a,b]` x `shard`; PR 2's reusable-capture refactor
+  (see below) collapsed a/b INTO each shard job (each shard renders TWICE in one
+  container and self-compares), so the current shape is one job per shard, not
+  eight. Each shard uploads its verified `run-a` set plus a `.shard-complete`
+  marker; the commit job rebuilds the gallery from the union of shards (pruning
+  removed scenes). The original speed constraints held: 4 shards (not 8+),
+  provable coverage, `ONLY=`-based subsetting.
 - **Drift-check on every PR (IN PROGRESS, PR 2).** Speced in
   `spec-pr-drift-check.md` (approval-gated). Move the guard left to PR time, split
   into TWO signals with TWO verdicts or it becomes a wolf-crier that gets ignored:
@@ -150,12 +152,16 @@ quietly reintroduces the very blind spots PR #188 removed.
   marker is imperative + unconditional (regen on any branch, with no open PR, a
   force-refresh, or a pixel change that arrives via a non-gated path such as a
   Playwright/font/dep bump), while the drift-check is PR-diff-reactive + path-
-  gated. The genuine duplication is the commit logic (`verify-and-commit`), which
-  PR 2 mirrors rather than editing `update-screenshots.yml` (frozen constraint).
-  Retirement is deferred, not denied: after a `workflow_call`/composite collapses
-  the shared capture+commit into one place AND the drift-check has real-PR
-  mileage, reconsider dropping the marker (keep `workflow_dispatch` regardless).
-  That is a PR 3 candidate.
+  gated. The genuine duplication is the CAPTURE logic, which PR 2 (after the user
+  renegotiated the "do not edit update-screenshots.yml" constraint) extracted
+  into a shared reusable `workflow_call`, `screenshot-capture.yml`, that BOTH
+  `update-screenshots.yml` and `pr-drift-check.yml` call, so they can never drift
+  on how pixels are generated or how nondeterminism is caught. The commit logic
+  stays per-caller (marker-commit vs approval-gated commit), since the two differ.
+  Retirement of the marker is deferred, not denied: now that the shared capture
+  is collapsed into one place, reconsider dropping the marker once the drift-check
+  has real-PR mileage (keep `workflow_dispatch` regardless). That is a PR 3
+  candidate.
 
 ### Deferred from: code review of spec-pr-drift-check (`/bmad-code-review`, 2026-07-13)
 

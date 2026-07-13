@@ -134,13 +134,25 @@ jobs:
           export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
           ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
           echo "shard '$SHARD' renders: $ONLY"
+          # Start ONE preview server for BOTH renders. Two RUN_SERVER=1 generator
+          # invocations would each spawn AND kill `vite preview` on the fixed port
+          # 4173; the kill (SIGTERM to the npx wrapper) can orphan vite still bound
+          # to :4173, so the second spawn races the port (EADDRINUSE, or the
+          # generator ends up talking to the stale first server). One shared server
+          # rendered against with RUN_SERVER unset sidesteps that entirely. The
+          # trap tears it down at step end (and the container dies with the job).
+          npx vite preview --port 4173 --strictPort &
+          server_pid=$!
+          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
+          node -e 'const u="http://localhost:4173";(async()=>{for(let i=0;i<120;i++){try{await fetch(u);process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up on :4173");process.exit(1)})()'
           render_into() {
-            # Render the shard's scenes and copy exactly this run's output (files
-            # touched during it) into $1, preserving the docs/screenshots/... path.
+            # Render the shard's scenes against the shared server and copy exactly
+            # this run's output (files touched during it) into $1, preserving the
+            # docs/screenshots/... path.
             local dest="$1"
             rm -rf "$dest"; mkdir -p "$dest"
             touch -d '1 second ago' /tmp/render-marker
-            RUN_SERVER=1 ONLY="$ONLY" node scripts/screenshots.ts
+            ONLY="$ONLY" node scripts/screenshots.ts
             while IFS= read -r -d '' f; do
               mkdir -p "$dest/$(dirname "$f")"
               cp -a "$f" "$dest/$f"
@@ -153,8 +165,10 @@ jobs:
             exit 1
           fi
           echo "shard '$SHARD' is deterministic ($(find /tmp/run-a -type f -name '*.png' | wc -l) shot(s))."
-          # Stage the verified run-a set for upload (the .shard-complete marker
-          # keeps the artifact non-empty for a shard that rendered nothing).
+          # Stage the verified run-a set for upload. The .shard-complete marker is
+          # the authoritative "this shard finished" signal (the consumers count it),
+          # so a shard that legitimately renders nothing still uploads a marker and
+          # is not mistaken for a missing artifact.
           stage=/tmp/stage
           rm -rf "$stage"; mkdir -p "$stage/shots"
           touch "$stage/.shard-complete"

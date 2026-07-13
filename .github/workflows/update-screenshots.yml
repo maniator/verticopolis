@@ -85,10 +85,14 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # Require EVERY expected shard present before touching the tree, so a
           # download failure can never commit a partial gallery.
+          # Count via the .shard-complete marker each shard uploads, NOT the pixel
+          # directory: a shard that legitimately renders nothing still finished and
+          # must count as present, or a genuinely-empty shard would be misread as a
+          # missing artifact and abort the commit.
           expected=$(echo "$SHARDS_JSON" | jq 'length')
           assembled=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            [ -d "/tmp/dl/shots-$shard/shots/docs/screenshots" ] && assembled=$((assembled + 1))
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
           done
           if [ "$assembled" -ne "$expected" ]; then
             echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step must have failed."

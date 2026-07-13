@@ -103,11 +103,13 @@ jobs:
         name: Detect drift vs the committed gallery (no commit)
         run: |
           # Rebuild the gallery from the verified shard sets over the PR's committed
-          # set and see whether git records any change. Require every shard present.
+          # set and see whether git records any change. Require every shard present,
+          # counted via the .shard-complete marker (not the pixel dir), so a shard
+          # that legitimately renders nothing still counts as present.
           expected=$(echo "$SHARDS_JSON" | jq 'length')
           assembled=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            [ -d "/tmp/dl/shots-$shard/shots/docs/screenshots" ] && assembled=$((assembled + 1))
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
           done
           if [ "$assembled" -ne "$expected" ]; then
             echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step must have failed."
@@ -198,10 +200,12 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # Count via the .shard-complete marker (not the pixel dir) so a shard that
+          # legitimately renders nothing still counts as present.
           expected=$(echo "$SHARDS_JSON" | jq 'length')
           assembled=0
           for shard in $(echo "$SHARDS_JSON" | jq -r '.[]'); do
-            [ -d "/tmp/dl/shots-$shard/shots/docs/screenshots" ] && assembled=$((assembled + 1))
+            [ -f "/tmp/dl/shots-$shard/.shard-complete" ] && assembled=$((assembled + 1))
           done
           if [ "$assembled" -ne "$expected" ]; then
             echo "::error::expected $expected shard galleries but found $assembled; a capture, upload, or download step failed, or the artifacts expired (retention window) before this approval. Re-run the drift-check to regenerate."
