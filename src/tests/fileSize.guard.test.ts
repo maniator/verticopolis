@@ -40,7 +40,6 @@ const LEGACY_OVERSIZED = new Set<string>([
   "src/render/pixelSprites.ts",
   "src/render/sprites/structure.ts",
   // storage
-  "src/storage/tdtImport.ts",
   "src/storage/tdtExport.ts",
   // ui / app spine / audio
   "src/main.ts",
