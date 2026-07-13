@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { craneAnchorTile } from "../render/sprites";
-import { facadeGeometry } from "../render/facadeGeometry";
+import { craneAnchorTile } from "./sprites";
+import { facadeGeometry } from "./facadeGeometry";
 import type { FacilityKind, Unit } from "../engine/types";
 
 /**

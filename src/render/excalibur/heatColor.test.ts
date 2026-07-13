@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { heatColor, HEAT_STOPS } from "../render/excalibur/TowerEngine";
-import { congestionSeverity, CONGESTION_CHURN, CONGESTION_GRIDLOCK } from "../engine/Simulation";
+import { heatColor, HEAT_STOPS } from "./TowerEngine";
+import { congestionSeverity, CONGESTION_CHURN, CONGESTION_GRIDLOCK } from "../../engine/Simulation";
 
 const rgba = (s: readonly number[]) => `rgba(${s[0]},${s[1]},${s[2]},0.4)`;
 

@@ -16,10 +16,10 @@ import {
   drawMetroTrain,
   drawStreetCar,
   type DrawCtx,
-} from "../render/sprites";
-import { shade, rand, ACCENTS } from "../render/sprites/common";
-import { PAL, person, drawRoom, sampleState } from "../render/pixelSprites";
-import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../render/sprites/events";
+} from "./sprites";
+import { shade, rand, ACCENTS } from "./sprites/common";
+import { PAL, person, drawRoom, sampleState } from "./pixelSprites";
+import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
 
 /**
  * The procedural sprite layer draws every facility from shapes into a 2D
