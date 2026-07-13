@@ -254,7 +254,9 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
     // so its far/near income gap should be ~0, unlike a fast food, which W3 halves.
     const earn = (kind: "partyHall" | "fastFood", floor: number): number => {
       const sim = Simulation.newGame(11);
-      servedTower(sim, 8, 3);
+      // Build to floor 9 so the two-story party hall placed at floor 8 has its
+      // upper story (floor 9). The measured floors (2 and 8) are unchanged.
+      servedTower(sim, 9, 3);
       const v = unit(sim, sim.tower.place(kind, floor, 40).unitId);
       v.state = "occupied";
       const before = sim.money;

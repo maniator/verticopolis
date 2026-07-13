@@ -730,7 +730,7 @@ describe("SaveGame", () => {
     const data = sim.serialize();
     (data as { version: number }).version = 2;
     const loaded = Simulation.deserialize(data);
-    expect(SAVE_VERSION).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.serialize().version).toBe(SAVE_VERSION);
   });

@@ -8,6 +8,20 @@ import { FACILITIES, GRID, facilityFloors, isFacilityKind } from "../facilities"
 import type { FacilityKind, SerializedGame, SerializedUnit } from "../types";
 
 /**
+ * Facility height AS OF a given save-schema version. The party hall only became
+ * two stories at v6; a v1..v5 save still holds a one-story hall (the v5 -> v6
+ * migration expands it later). Validity and reflow checks must judge a layout at
+ * the height it actually has at its own version, or a pre-v6 save is measured
+ * against a two-story footprint it does not yet occupy: that would let the v1->v2
+ * reflow's guard see a phantom overlap above a still-one-story hall and discard
+ * the whole reflow, and would validate a v6 layout as if the hall were flat.
+ */
+export function storiesAtVersion(kind: FacilityKind, version: number | undefined): number {
+  if (kind === "partyHall" && (version ?? 0) < 6) return 1;
+  return facilityFloors(kind);
+}
+
+/**
  * v1 → v2 migration with a safety net. Runs the reflow ({@link reflowV1toV2}); if
  * it throws OR produces an invalid layout (a room overlap or an off-lot room the
  * per-unit hardening couldn't have caused), it falls back to simply stamping v2
@@ -49,7 +63,7 @@ export function migrationLooksValid(data: SerializedGame): boolean {
     // through the same catalog fallback deserialize uses so the check can't crash.
     const width = r.width ?? FACILITIES[r.kind].width;
     if (r.x < 0 || r.x + width > GRID.width) return false; // off-lot
-    for (let f = r.floor; f < r.floor + facilityFloors(r.kind); f++) {
+    for (let f = r.floor; f < r.floor + storiesAtVersion(r.kind, data.version); f++) {
       const arr = byFloor.get(f) ?? [];
       arr.push({ x: r.x, w: width });
       byFloor.set(f, arr);
@@ -177,7 +191,11 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
       others.push(u);
       continue;
     }
-    rooms.push({ u, kind: u.kind, floor, x0, w0, w: canonW(u.kind), fl: facilityFloors(u.kind) });
+    // The reflow produces a v2 layout, where the party hall is still one story
+    // (its two-story expansion is the later v5 -> v6 migration). Reserving its
+    // upper story here would repack the floor above it for a height it does not
+    // yet have.
+    rooms.push({ u, kind: u.kind, floor, x0, w0, w: canonW(u.kind), fl: storiesAtVersion(u.kind, 2) });
   }
 
   const nx = new Map<SerializedUnit, number>(); // room -> new x

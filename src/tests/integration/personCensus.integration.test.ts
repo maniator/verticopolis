@@ -315,11 +315,11 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
 });
 
 
-describe("save version is 5 and a v3 save migrates cleanly", () => {
-  it("SAVE_VERSION is 5 and serialize stamps it", () => {
+describe("save version is 6 and a v3 save migrates cleanly", () => {
+  it("SAVE_VERSION is 6 and serialize stamps it", () => {
     const sim = officeAndFastFood();
-    expect(SAVE_VERSION).toBe(5);
-    expect(sim.serialize().version).toBe(5);
+    expect(SAVE_VERSION).toBe(6);
+    expect(sim.serialize().version).toBe(SAVE_VERSION);
   });
 
   it("a v3 save loads at the current version with the census resetting to zero", () => {

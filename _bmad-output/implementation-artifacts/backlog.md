@@ -574,6 +574,19 @@ parked here:
   plus an `Array.isArray(...)` container guard (a bmad-code-review Blind Hunter catch, a
   forged non-array `units`/`transports` still threw), with corrupt-save tests. A corrupt
   save now drops the bad entries and loads instead of hard-crashing.
+- ~~**Party Hall two-story footprint + v5->v6 migration (gds-code-review)**~~, done
+  2026-07-13: catalog `floors: 2`, and `migrations/v5tov6.ts` expands each legacy
+  one-story hall in place, else relocates it to the nearest supported two-story
+  slot (attaching to existing structure, never onto a lobby concourse or bare
+  lot), else drops it with a bulletin line. The adversarial review's confirmed
+  findings were all patched in-session: the ground-concourse straddle and
+  sky-lobby overlap are blocked (`lobbyCols` in `spanClear`); the v1->v2 reflow no
+  longer discards itself over a phantom two-story overlap (`storiesAtVersion`
+  treats the hall as one story pre-v6); the runtime validity net (drop-all-halls
+  fallback) is delta-based so a pre-existing overlap is never blamed on the
+  migration. Accepted trade-off (not a defect): a boxed-in hall may relocate to a
+  distant floor or the basement and needs its transport reconnected; the drop is
+  a one-shot last resort that does not restore the hall if space is later freed.
 - ~~**P2, `QuotaExceededError` unhandled on the pre-reload save paths (pr-110-compress-saves)**~~
  , fixed here: `recoverFromContextLoss` now guards its pre-reload flush and, on a storage
   failure, shows the boot card (Reload button) instead of letting the throw abort the reload

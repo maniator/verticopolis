@@ -20,9 +20,11 @@ import { isGameMode } from "./types";
 import type { SerializedGame } from "./types";
 import { upgradeV1toV2 } from "./migrations/v1tov2";
 import { upgradeV4toV5, widenLegacyElevatorShafts } from "./migrations/v4tov5";
+import { upgradeV5toV6 } from "./migrations/v5tov6";
 
 export { upgradeV1toV2, migrationLooksValid, floatingStructureCount, reflowV1toV2 } from "./migrations/v1tov2";
 export { upgradeV4toV5, widenLegacyElevatorShafts } from "./migrations/v4tov5";
+export { upgradeV5toV6, expandLegacyPartyHalls } from "./migrations/v5tov6";
 
 /**
  * Current save-format version. `serialize()` always stamps this; `deserialize()`
@@ -30,7 +32,7 @@ export { upgradeV4toV5, widenLegacyElevatorShafts } from "./migrations/v4tov5";
  * load — not merely written — and a future format bump has exactly one place to
  * grow.
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 /**
  * The condo sale price BEFORE this build re-anchored the band (old default 2×
@@ -111,12 +113,19 @@ export function migrateSave(data: SerializedGame): SerializedGame {
   // with a keep-legacy fallback, mirroring the v1→v2 reflow's rule that a
   // migration may never scramble or lose a tower.
   if (migrated.version === 4) migrated = upgradeV4toV5(migrated);
-  // A v5 save may still carry a kept-legacy shaft (boxed in when it migrated).
+  // v5 → v6: grow every one-story party hall into the two-story room canon (and
+  // the TDT format's 29/30 top/bottom halves) always intended. In place where
+  // the story above is clear; nearest two-story slot when it is boxed in; a
+  // last-resort drop (logged) when the tower has no room. Runs once per hop; a
+  // v6 hall already owns a clear upper story (placement blocks the floor above
+  // it), so there is nothing to re-run on later loads.
+  if (migrated.version === 5) migrated = upgradeV5toV6(migrated);
+  // A v6 save may still carry a kept-legacy shaft (boxed in when it migrated).
   // Re-run the widening on every load: it is idempotent (an at-canon shaft is
   // skipped; a still-boxed one keeps legacy again), so a shaft heals to canon
   // on the first load after the player demolishes whatever boxed it in, instead
   // of being frozen narrow forever by the one-shot version hop.
-  else if (migrated.version === 5) migrated = widenLegacyElevatorShafts(migrated);
+  if (migrated.version === 6) migrated = widenLegacyElevatorShafts(migrated);
   // A save from a newer build (version > SAVE_VERSION) can't be downgraded, so
   // it loads best-effort — the coercion below guards it — rather than throwing
   // away the player's tower.
