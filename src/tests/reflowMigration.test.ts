@@ -3,7 +3,7 @@ import { inflateSync } from "fflate";
 // The real v1 save, inlined as a string (vite ?raw) so the test needs no node fs.
 import towerFile from "./fixtures/towerone_6.vctower?raw";
 import { Simulation } from "../engine/Simulation";
-import { floatingStructureCount } from "../engine/saveMigration";
+import { SAVE_VERSION, floatingStructureCount } from "../engine/saveMigration";
 import { FACILITIES, facilityFloors } from "../engine/facilities";
 import type { SerializedGame, Unit } from "../engine/types";
 
@@ -107,7 +107,7 @@ describe("v1 → v2 reflow migration", () => {
     const units: Partial<Unit>[] = [...pave("floor", 2, 0, 375)];
     for (let x = 0; x + 12 <= 375; x += 12) units.push({ kind: "fastFood", floor: 2, x, width: 12 });
     const sim = Simulation.deserialize(v1Save(units)); // must not throw
-    expect(sim.serialize().version).toBe(4);
+    expect(sim.serialize().version).toBe(SAVE_VERSION);
     const ff = sim.tower.units.filter((u) => u.kind === "fastFood").map((r) => ({ x: r.x, w: r.width })).sort((a, b) => a.x - b.x);
     for (const r of ff) expect(r.x + r.w).toBeLessThanOrEqual(375); // on-lot
     for (let i = 1; i < ff.length; i++) expect(ff[i].x).toBeGreaterThanOrEqual(ff[i - 1].x + ff[i - 1].w); // no overlap
@@ -145,7 +145,7 @@ describe("v1 → v2 reflow migration", () => {
       { kind: "office", floor: 3, x: 16, width: 9 },
     ]);
     const sim = Simulation.deserialize(save);
-    expect(sim.serialize().version).toBe(4);
+    expect(sim.serialize().version).toBe(SAVE_VERSION);
     // Zero floating floors: every floor tile rests on the story below.
     expect(floatingStructureCount(sim.serialize())).toBe(0);
     // Nothing off-lot, no overlap, and no room paved beyond floor 2's x=30 support.
@@ -173,16 +173,16 @@ describe("v1 → v2 reflow migration", () => {
     expect(sim.tower.functionalParkingSpots()).toBe(2); // both spaces still chained
   });
 
-  it("stamps version 4 and leaves a current save untouched", () => {
+  it("stamps the current version and leaves a current save untouched", () => {
     const sim = Simulation.newGame(7);
     sim.money = 1e9;
     sim.tower.place("lobby", 1, 0);
     const current = sim.serialize();
-    expect(current.version).toBe(4);
+    expect(current.version).toBe(SAVE_VERSION);
     // Round-trip a current save: the migration must NOT alter units again (idempotent).
     const before = JSON.stringify(current.units);
     const reloaded = Simulation.deserialize(current).serialize();
-    expect(reloaded.version).toBe(4);
+    expect(reloaded.version).toBe(SAVE_VERSION);
     expect(JSON.stringify(reloaded.units)).toBe(before);
   });
 
@@ -194,7 +194,7 @@ describe("v1 → v2 reflow migration", () => {
     const origW = new Map(raw.units.map((u) => [u.id, u.width]));
 
     const sim = Simulation.deserialize(raw); // runs upgradeV1toV2
-    expect(sim.serialize().version).toBe(4);
+    expect(sim.serialize().version).toBe(SAVE_VERSION);
 
     const rooms = sim.tower.units.filter((u) => u.kind !== "floor" && u.kind !== "lobby");
     // (a) Every room is EITHER at its canon width or its original legacy width —

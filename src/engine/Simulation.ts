@@ -28,6 +28,7 @@ import {
   isCommercialKind,
   isElevatorKind,
   isFacilityKind,
+  isFixedSpanTransport,
   isOpenAt,
   isStaffOnlyTransport,
   isHotelKind,
@@ -35,7 +36,7 @@ import {
   residentCount,
   transportCarCapacity,
 } from "./facilities";
-import type { FacilityKind, GameMode, SerializedGame, SerializedUnit, SerializedView, Unit, VacateReason, WeatherKind } from "./types";
+import type { FacilityKind, GameMode, SerializedGame, SerializedUnit, SerializedView, Transport, Unit, VacateReason, WeatherKind } from "./types";
 import type { LogEntry } from "./types";
 import {
   isDormant,
@@ -2528,6 +2529,7 @@ export class Simulation implements SimContext {
           outForMeal: undefined,
         };
       });
+    const keptTransports: Transport[] = [];
     sim.tower.transports = (Array.isArray(data.transports) ? data.transports : [])
       // Same null/non-object guard as units: never read `.kind` off a `null`
       // entry, or one corrupt transport aborts the entire load.
@@ -2547,13 +2549,16 @@ export class Simulation implements SimContext {
         // never deserialize a zero-height shaft from a corrupt save.
         const top = Math.max(bottom + 1, Math.min(GRID.maxFloor, Math.round(num(t.top, bottom + 1))));
         // Shaft width is normally fixed per kind, but a legacy save keeps its own
-        // stored width (canon widths changed over time — e.g. stairs 4→8) and the
-        // consumers trust it, so preserve a valid stored width. Fall back to the
-        // catalog width only when a corrupt/hand-edited save gives a non-positive
-        // or non-finite one, which would otherwise NaN-poison the W1 span scan
-        // (Tower.transportColumns) and make the shaft unpickable (hit-testing).
+        // stored width (canon widths only ever GREW: stairs 4→8, standard
+        // elevator 3→4) and the consumers trust it, so preserve a valid stored
+        // width up to the catalog's. A width ABOVE the catalog is always forged
+        // (no canon width ever shrank), and trusting it would let one corrupt
+        // entry shadow every transport under its bogus footprint through the
+        // overlap filter below (and rasterize an oversized texture), so clamp
+        // down to the catalog. Non-positive/non-finite falls back to the
+        // catalog too (it would NaN-poison the W1 span scan and hit-testing).
         const w0 = Math.round(num(t.width, FACILITIES[t.kind].width));
-        const width = w0 > 0 ? w0 : FACILITIES[t.kind].width;
+        const width = w0 > 0 ? Math.min(w0, FACILITIES[t.kind].width) : FACILITIES[t.kind].width;
         const fixLen = (arr: unknown, fill: number) =>
           Array.from({ length: cars }, (_, i) =>
             Array.isArray(arr) ? num(arr[i], fill) : fill,
@@ -2561,10 +2566,11 @@ export class Simulation implements SimContext {
         return {
           ...t,
           // Same geometry hardening as units: keep the shaft's whole width on
-          // the lot (x is clamped by the catalog width, not the save-controlled
-          // stored width, so a legacy over-wide shaft still can't be forged past
-          // the lot edge).
-          x: Math.max(0, Math.min(GRID.width - FACILITIES[t.kind].width, Math.round(num(t.x, 0)))),
+          // the lot. `width` is already bounded by the catalog above, so
+          // clamping by it keeps a kept-legacy 3-wide shaft at the right lot
+          // edge at its exact saved x (never shoved one tile into the neighbor
+          // that boxed it in).
+          x: Math.max(0, Math.min(GRID.width - width, Math.round(num(t.x, 0)))),
           width,
           bottom,
           top,
@@ -2576,6 +2582,31 @@ export class Simulation implements SimContext {
             ? t.skipFloors.filter((n) => typeof n === "number" && Number.isFinite(n))
             : undefined,
         };
+      })
+      // Overlap cross-check: `validateTransport` can never produce two shafts
+      // sharing a cell, but a forged or hand-edited save can, and everything
+      // downstream (hit-testing, selection, dispatch) assumes the invariant.
+      // Drop a shaft that overlaps an earlier KEPT one (checking against kept
+      // shafts only, so one bad entry can't shadow-block healthy later ones),
+      // with the one legal exception mirrored from placement: exact-footprint
+      // stacked walkway flights sharing their landing floor.
+      .filter((t) => {
+        for (const p of keptTransports) {
+          if (t.x >= p.x + p.width || p.x >= t.x + t.width) continue;
+          if (t.bottom > p.top || p.bottom > t.top) continue;
+          if (
+            isFixedSpanTransport(t.kind) &&
+            isFixedSpanTransport(p.kind) &&
+            t.x === p.x &&
+            t.width === p.width &&
+            (t.bottom === p.top || t.top === p.bottom)
+          ) {
+            continue; // stacked flights sharing exactly the landing floor
+          }
+          return false; // overlaps an earlier-kept shaft: drop this one
+        }
+        keptTransports.push(t);
+        return true;
       });
     // Ids drive every by-id lookup — and the renderer keys its retained actors
     // by them — so they must be sane and unique, and the id counter must sit

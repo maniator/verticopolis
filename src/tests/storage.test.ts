@@ -113,18 +113,40 @@ describe("SaveGame", () => {
     expect(t.top).toBeGreaterThan(t.bottom);
   });
 
-  it("preserves a legacy transport width but falls back to catalog width for a corrupt one", () => {
-    // A transport's stored width is trusted so legacy shafts survive a catalog
-    // width change (e.g. stairs 4→8). But a non-finite/non-positive width from a
-    // corrupt save must not reach the consumers: it would NaN-poison the W1 span
-    // scan (Tower.transportColumns) and make the shaft unpickable (hit-testing).
+  it("preserves a legacy (narrower) transport width, clamps an over-wide one, and falls back for a corrupt one", () => {
+    // A transport's stored width is trusted BELOW the catalog width so legacy
+    // shafts survive a catalog width change (canon widths only ever grew:
+    // stairs 4→8, standard elevator 3→4). Pinned with a WALKWAY because the
+    // v5 heal-on-load pass deliberately re-widens narrow elevators; walkways
+    // keep their stored width forever. A width ABOVE the catalog is always
+    // forged and clamps down, or one corrupt entry could shadow-drop every
+    // transport under its bogus footprint via the load-time overlap filter.
+    // And a non-finite/non-positive width must not reach the consumers: it
+    // would NaN-poison the W1 span scan (Tower.transportColumns) and make the
+    // shaft unpickable (hit-testing).
     const legacy = sampleGame();
     const legacyData = legacy.serialize();
-    const kind = legacyData.transports[0].kind;
-    const legacyWidth = FACILITIES[kind].width + 3; // a since-changed canon width
-    (legacyData.transports[0] as { width: unknown }).width = legacyWidth;
+    legacyData.transports.push({
+      ...legacyData.transports[0],
+      id: 9_001,
+      kind: "stairs",
+      x: 5,
+      width: 4, // the pre-E1b legacy flight width (catalog is 8)
+      bottom: 1,
+      top: 2,
+      cars: 0,
+      carPositions: [],
+      carDir: [],
+    });
     const legacyLoaded = Simulation.deserialize(legacyData);
-    expect(legacyLoaded.tower.transports[0].width).toBe(legacyWidth);
+    expect(legacyLoaded.tower.transports.find((t) => t.kind === "stairs")?.width).toBe(4);
+
+    const kind = legacyData.transports[0].kind;
+    const forged = sampleGame();
+    const forgedData = forged.serialize();
+    (forgedData.transports[0] as { width: unknown }).width = FACILITIES[kind].width + 3;
+    const forgedLoaded = Simulation.deserialize(forgedData);
+    expect(forgedLoaded.tower.transports[0].width).toBe(FACILITIES[kind].width);
 
     for (const bad of [NaN, Infinity, -4, 0, "8" as unknown as number]) {
       const sim = sampleGame();
@@ -708,12 +730,12 @@ describe("SaveGame", () => {
     const data = sim.serialize();
     (data as { version: number }).version = 2;
     const loaded = Simulation.deserialize(data);
-    expect(SAVE_VERSION).toBe(4);
+    expect(SAVE_VERSION).toBe(5);
     expect(loaded.money).toBe(sim.money);
-    expect(loaded.serialize().version).toBe(4);
+    expect(loaded.serialize().version).toBe(SAVE_VERSION);
   });
 
-  it("migrates a v3 save to v4 (venue-census bump): re-stamps version, tower intact", () => {
+  it("migrates a v3 save up the ladder (venue-census bump): re-stamps version, tower intact", () => {
     // v3 -> v4 is additive/no-op data-wise: the meal-customer census reads a
     // transient overlay that is never serialized, so a v3 save is already valid
     // v4 data. The migration only re-stamps the version; the tower round-trips
@@ -723,7 +745,7 @@ describe("SaveGame", () => {
     (data as { version: number }).version = 3;
     const beforeUnits = JSON.stringify(data.units);
     const loaded = Simulation.deserialize(data);
-    expect(loaded.serialize().version).toBe(4);
+    expect(loaded.serialize().version).toBe(SAVE_VERSION);
     expect(loaded.money).toBe(sim.money);
     expect(loaded.tower.totalPopulation()).toBe(sim.tower.totalPopulation());
     // Units survive the hop byte-for-byte (only the version stamp changed).
