@@ -496,7 +496,7 @@ export class Tower {
    */
   private placeStructureRun(
     tiles: { fl: number; x: number }[],
-    kind: FacilityKind,
+    kind: "floor" | "lobby",
   ): { placed: number[]; stuck: { fl: number; x: number }[] } {
     let remaining = tiles;
     const placed: number[] = [];
@@ -631,7 +631,7 @@ export class Tower {
    * lower/adjacent tile it rests on is being laid, never permanently.
    */
   fillBridge(kind: FacilityKind, floor: number, x: number, width: number, hgt: number): number[] {
-    const substrate: FacilityKind = kind === "lobby" ? "lobby" : "floor";
+    const substrate: "floor" | "lobby" = kind === "lobby" ? "lobby" : "floor";
     // The plan is exact (every tile is reachable in support order), so the
     // shared retry loop always drains and `stuck` is empty; the bridge is
     // best-effort by contract, so we take the placed ids and let the caller
@@ -871,7 +871,7 @@ export class Tower {
    * with nothing below it), after rolling the whole batch back so the caller
    * can refuse without leaving an orphan floor. Used by the elevator-extend
    * auto-floor: extending a shaft past the built structure brings its floor
-   * with it (backlog `auto-floor-build` behavior 1).
+   * with it (the `auto-floor-build` backlog item's elevator-extend behavior).
    */
   private layShaftFloors(floors: number[], x: number, width: number): number[] | null {
     const tiles: { fl: number; x: number }[] = [];
