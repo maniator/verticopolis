@@ -12,7 +12,7 @@ import { test, expect } from "@playwright/test";
  * exercises the escalation path for real: the crash screen with the repeat
  * advice.
  */
-test.describe("WebGL context loss — in-place recovery", () => {
+test.describe("WebGL context loss: in-place recovery", () => {
   test("a first loss recovers in place; a rapid second loss escalates to the crash screen", async ({ page }) => {
     await page.goto("/");
     await page.waitForFunction(() => {
