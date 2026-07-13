@@ -386,8 +386,9 @@ export interface SerializedGame {
   modernCalendar?: CalendarKind;
   /** Balance entering the current quarter (snapshotted at each quarter rollover
    *  before rent is collected), so the TDT exporter can write the header's
-   *  `lastQuarterMoney` (0x10). Absent in saves written before this field and on
-   *  fresh towers that have not crossed a quarter boundary, which load as 0. */
+   *  `lastQuarterMoney` (0x10). `serialize()` always writes it (0 on a fresh
+   *  tower that has not crossed a quarter boundary yet); only legacy saves
+   *  written before this field omit it, and those load as 0. */
   lastQuarterMoney?: number;
   units: SerializedUnit[];
   transports: Transport[];
