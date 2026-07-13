@@ -192,9 +192,8 @@ describe("sparse v3 unit serialization", () => {
 
   it("sanitizes a forged non-finite lastQuarterMoney to 0 on load (never persisted back)", () => {
     const { sim } = classicOfficeSim();
-    const save = sim.serialize() as SerializedGame & { lastQuarterMoney?: unknown };
-    save.lastQuarterMoney = "not a number";
-    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    const forged = { ...sim.serialize(), lastQuarterMoney: "not a number" } as unknown as SerializedGame;
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(forged)) as SerializedGame).serialize();
     expect(round.lastQuarterMoney).toBe(0);
   });
 
