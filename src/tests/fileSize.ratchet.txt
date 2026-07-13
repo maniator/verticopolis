@@ -21,8 +21,6 @@ src/storage/tdtExport.ts
 src/storage/tdtFormat.ts
 src/storage/SaveGame.ts
 # engine leaves
-src/engine/facilities.ts
-src/engine/saveMigration.ts
 # scripts
 # tests (split last)
 src/tests/simulation.test.ts
