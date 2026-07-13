@@ -5,6 +5,7 @@ import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { FACILITIES, RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
+import { subtypeListFor } from "./retailSubtypes";
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
  *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). Exported so
@@ -14,6 +15,18 @@ export const COMMERCIAL_LOBBY_FLOORS = 2;
  *  {@link COMMERCIAL_LOBBY_FLOORS} of a lobby — poor placement starves its trade,
  *  the same way an unserved floor already earns nothing. */
 const COMMERCIAL_LOBBY_FAR_MULT = 0.5;
+
+/** Each open hour multiplies a venue's take by a foot-traffic factor drawn
+ *  uniformly in [MIN, MIN + SPAN). It is pure day-to-day noise, so its mean is
+ *  what a venue earns "on an average day". The inspector normalizes patronage
+ *  against that mean (see {@link TRAFFIC_FACTOR_MEAN}) so its verdict measures
+ *  the levers a player controls (appeal, placement, weather), not the dice. */
+export const TRAFFIC_FACTOR_MIN = 0.6;
+export const TRAFFIC_FACTOR_SPAN = 0.4;
+/** Expected foot-traffic factor over a full trading day (the midpoint of the
+ *  draw's range). A venue at full appeal, well placed, on a dry day settles
+ *  here, so it is the reference the inspector scores against. */
+export const TRAFFIC_FACTOR_MEAN = TRAFFIC_FACTOR_MIN + TRAFFIC_FACTOR_SPAN / 2;
 
 /** Rooms one housekeeping crew can turn over per day. */
 const HK_ROOMS_PER_CREW = 20;
@@ -158,20 +171,42 @@ export class EconomySystem {
       // Spread the headline DAILY take across the venue's actual open hours so a
       // full day earns ≈ `daily * appeal`, not a per-hour multiple of it. (Before,
       // dividing by a flat 8 while open 9–15 h/day inflated income 2–3x.)
+      const trafficFactor = TRAFFIC_FACTOR_MIN + this.sim.rng.next() * TRAFFIC_FACTOR_SPAN;
+      const openH = openHoursPerDay(u.kind);
       const hourly =
-        (daily / openHoursPerDay(u.kind)) *
+        (daily / openH) *
         appeal *
         rainMult *
         filmMult *
         lobbyMult *
-        (0.6 + this.sim.rng.next() * 0.4);
+        trafficFactor;
       u.pendingIncome += hourly;
+      // Retail-only "today's patronage" for the inspector card. The one RNG
+      // draw above feeds BOTH the money loop and the customer estimate, so the
+      // stream stays byte-identical: this accumulator must not perturb the
+      // seeded economy. Cinema/partyHall have traffic income but no canon
+      // subtype, so they skip this seam too. Guard on `spend > 0` (not just
+      // `!== undefined`) so a config forgery of 0 can't emit `Infinity` into
+      // the field.
+      const spend = ECON.retailSpendPerCustomer[u.kind];
+      const isRetail = subtypeListFor(u.kind) !== null && spend !== undefined && spend > 0;
+      if (isRetail) {
+        const custPerHourAtBaseline = daily / (spend * openH);
+        u.patronageToday =
+          (u.patronageToday ?? 0) +
+          custPerHourAtBaseline * appeal * rainMult * lobbyMult * trafficFactor;
+      }
       if (u.pendingIncome >= 1) {
         const earned = Math.floor(u.pendingIncome);
         u.pendingIncome -= earned;
         this.sim.money += earned;
         const cat = ledgerCatFor(u.kind);
         if (cat) this.sim.recordMoney?.(cat, earned);
+        // Sum the flushed integer dollars (never the pre-flush float) so
+        // "Yesterday's profit" mirrors the day's actual ledger contribution
+        // to the penny, not a fractional projection. A shop whose hourly take
+        // stays under $1 all day banks $0 and reads $0, honest.
+        if (isRetail) u.profitToday = (u.profitToday ?? 0) + earned;
       }
     }
   }

@@ -167,6 +167,13 @@ export class EventSystem {
     u.residents = undefined;
     u.satisfaction = 0;
     u.pendingIncome = 0;
+    // A gutted retail unit earned nothing today, and yesterday's stats are no
+    // longer trustworthy (the customers walked out with the flames). Drop the
+    // whole slot so the inspector shows the generic "no data yet" state.
+    u.patronageToday = undefined;
+    u.patronageYest = undefined;
+    u.profitToday = undefined;
+    u.profitYest = undefined;
     u.label = FACILITIES[u.kind].name;
   }
 

@@ -11,7 +11,7 @@ import {
   maxSpanFor,
 } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES, subtypeListFor } from "../engine/retailSubtypes";
 
 /**
  * Canon tripwire — engine constants asserted against the 1994 original's
@@ -165,5 +165,19 @@ describe("canon: retail subtypes (tdt-format.md §7)", () => {
       "Post Office",
       "Sports Gear",
     ]);
+  });
+
+  // The commercial-venue inspector converts a venue's traffic income into a
+  // customer estimate via `ECON.retailSpendPerCustomer[kind]`. Every kind that
+  // carries a canon subtype list MUST be tabled there, or that venue's whole
+  // inspector block silently disappears (the guard returns "" on an undefined
+  // spend). This pins the coupling so a new retail kind can't ship half-wired.
+  it("tables a positive spend-per-customer for every retail subtype kind", () => {
+    for (const kind of ["shop", "fastFood", "restaurant"] as const) {
+      expect(subtypeListFor(kind)).not.toBeNull();
+      const spend = ECON.retailSpendPerCustomer[kind];
+      expect(spend).toBeDefined();
+      expect(spend!).toBeGreaterThan(0);
+    }
   });
 });
