@@ -2697,7 +2697,7 @@ export class Simulation implements SimContext {
     sim.lastQuarter = sim.clock.quarter;
     // Legacy saves predate this field, so a missing value restores as 0
     // (no snapshot), matching a fresh tower.
-    sim.lastQuarterMoney = data.lastQuarterMoney ?? 0;
+    sim.lastQuarterMoney = num(data.lastQuarterMoney, 0); // sanitize like every other numeric field: a forged NaN/string must not persist back out
     sim.lastMonth = Math.floor(sim.clock.day / sim.clock.calendar.maintPeriodDays);
     sim.lastHour = sim.clock.hour;
     // Silently adopt any milestone already satisfied at load time (e.g. a save

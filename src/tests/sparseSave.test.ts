@@ -190,6 +190,14 @@ describe("sparse v3 unit serialization", () => {
     expect(round.units.find((u) => u.kind === "office")!.noRate).toBe(true); // Classic keeps it
   });
 
+  it("sanitizes a forged non-finite lastQuarterMoney to 0 on load (never persisted back)", () => {
+    const { sim } = classicOfficeSim();
+    const save = sim.serialize() as SerializedGame & { lastQuarterMoney?: unknown };
+    save.lastQuarterMoney = "not a number";
+    const round = Simulation.deserialize(JSON.parse(JSON.stringify(save)) as SerializedGame).serialize();
+    expect(round.lastQuarterMoney).toBe(0);
+  });
+
   it("coerces a forged non-boolean noRate away on a Classic save (only literal true counts)", () => {
     const { sim, officeId } = classicOfficeSim();
     const save = sim.serialize();
