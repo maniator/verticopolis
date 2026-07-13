@@ -90,8 +90,15 @@ export function drawTransport(
       ctx.fillStyle = "rgba(255,255,255,0.05)";
       ctx.fillRect(sx + 1, fy, w - 2, 1); // per-floor stop line
       const label = num >= 1 ? String(num) : `B${1 - num}`;
-      ctx.fillStyle = "rgba(255,255,255,0.28)";
-      ctx.fillText(label, sx + w / 2, fy + floorH / 2);
+      const lx = sx + w / 2;
+      const ly = fy + floorH / 2;
+      // A dark drop-shadow behind a brighter glyph so the number reads on any
+      // shaft tint (standard/service/express all darken to near-black, where a
+      // faint fill washed out at the small font a tall tower uses).
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      ctx.fillText(label, lx + 1, ly + 1);
+      ctx.fillStyle = "rgba(255,255,255,0.62)";
+      ctx.fillText(label, lx, ly);
     }
     // Motor/machinery housings cap the shaft top and bottom, as in the original
     // (where the extend-taller arrows also live — that interaction is a planned
