@@ -20,6 +20,7 @@ import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
 import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
+import { attemptContextRecovery } from "./game/contextRecovery";
 import { decideMealRush } from "./game/mealRush";
 import { InspectorController } from "./game/inspector";
 import { escapeHtml } from "./ui/escape";
@@ -261,13 +262,30 @@ class GameApp {
           getSim: () => this.sim,
           frameErrors: this.frameErrors,
         }),
+      attemptGraphicsRecovery: (done) =>
+        attemptContextRecovery(
+          {
+            onRestored: (cb) => {
+              // Subscribe on the engine that lost its context. Unsubscribe
+              // clears that same instance (this.engine points at the fresh
+              // one after a rebuild).
+              const lost = this.engine;
+              lost.onContextRestored = cb;
+              return () => {
+                lost.onContextRestored = null;
+              };
+            },
+            rebuild: () => this.rebuildEngine(),
+          },
+          done,
+        ),
       armOnboarding: () => {
         this.onboarding.arm(this.sim);
       },
     });
     this.keyboard = new KeyboardPlay({
       getSim: () => this.sim,
-      engine: this.engine,
+      engine: () => this.engine,
       audio: this.audio,
       ui: { toast: (text, kind) => this.ui.toast(text, kind) },
       build: this.build,
@@ -623,6 +641,77 @@ class GameApp {
     const on = reducedMotionActive(this.prefs, this.reduceMq.matches);
     document.documentElement.classList.toggle("reduce-motion", on);
     this.engine.setReducedMotion(on);
+  }
+
+  /**
+   * Swap in a fresh renderer after a WebGL context loss, once the browser has
+   * restored GPU access (see attemptContextRecovery). The simulation and the
+   * whole DOM shell stay put; only the Excalibur engine and its canvas are
+   * replaced. Resolves when the new engine is running with the player's
+   * camera, selection, overlay, speed and motion prefs carried over.
+   */
+  private rebuildEngine(): Promise<void> {
+    // Read the CPU-side view state before tearing the old engine down.
+    // viewState always stamps zoom; the default only satisfies the save
+    // schema's optional field (a TDT import carries no zoom).
+    const { tile, floor, zoom = 0.9 } = this.engine.viewState();
+    const overlay = this.engine.overlayMode;
+    // Silence the dying engine BEFORE dispose: its canvas can outlive the
+    // swap (a detached canvas keeps its restored GL context), and a later
+    // eviction of that zombie context would otherwise fire onContextLost and
+    // throw a crash screen over a perfectly healthy rebuilt game.
+    const old = this.engine;
+    old.onContextLost = null;
+    old.onContextRestored = null;
+    old.dispose();
+    // A canvas whose WebGL context was lost hands the same dead context back
+    // from getContext() forever, so the rebuild needs a fresh element.
+    // cloneNode copies the id and attributes but no listeners; wireEngine
+    // re-binds ours below, and the old element's listeners die with it.
+    const oldCanvas = this.canvas;
+    const fresh = oldCanvas.cloneNode(false) as HTMLCanvasElement;
+    oldCanvas.replaceWith(fresh);
+    // Release the zombie context's GPU hold. The restore that triggered this
+    // rebuild revived the OLD context too; explicitly losing it frees its
+    // GPU memory now and keeps recovered sessions from creeping toward the
+    // browser's per-page context cap. An extension-forced loss never
+    // auto-restores, and the engine's hooks were nulled above, so this can't
+    // re-enter the recovery flow.
+    try {
+      (oldCanvas.getContext("webgl2") as WebGL2RenderingContext | null)
+        ?.getExtension("WEBGL_lose_context")
+        ?.loseContext();
+    } catch {
+      /* best effort; some drivers refuse the extension */
+    }
+    // The loss severed any in-flight gesture (the old canvas's pointerup
+    // died with it), so drop gesture state that would otherwise linger: a
+    // stale transportStart suppresses the update prompt session-long, and a
+    // stale paint anchor would extend the next touch drag across the gap.
+    this.paintAnchor = null;
+    this.transportStart = null;
+    this.build.clearPaint();
+    this.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
+    this.canvas = fresh;
+    this.engine = new TowerEngine(fresh, this.sim);
+    if (!this.engine.rendersWithWebGL()) {
+      // Excalibur silently fell back to Canvas2D: the GPU is still wedged.
+      // That mode is degraded AND blind to further context losses, so treat
+      // it as a failed recovery (the crash screen path takes over).
+      this.engine.dispose();
+      throw new Error("webgl unavailable after context restore");
+    }
+    this.wireEngine();
+    this.applyReducedMotion();
+    this.engine.paused = SPEEDS[this.speed] === 0;
+    this.engine.overlayMode = overlay;
+    this.engine.selectedId = this.selected?.id ?? null;
+    return this.engine.start().then(() => {
+      // start() adopted the sim's saved view (stamped by the pre-crash
+      // flush); re-apply the live camera exactly so the player can't tell
+      // the renderer changed.
+      this.engine.setCamera(tile, floor, zoom);
+    });
   }
 
   // ---- Engine wiring (all input/camera goes through Excalibur) ------------

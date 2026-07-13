@@ -22,7 +22,9 @@ import type { BuildActions } from "./buildActions";
 export interface KeyboardPlayDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
-  engine: Pick<TowerEngine, "ensureVisible" | "preview" | "transportPreview">;
+  /** The live renderer (never cached: context-loss recovery swaps the
+   *  instance, same contract as getSim). */
+  engine(): Pick<TowerEngine, "ensureVisible" | "preview" | "transportPreview">;
   audio: Pick<AudioEngine, "sfx">;
   ui: Pick<UI, "toast">;
   /** Bulldoze shares the pointer path's refund/feedback rules. */
@@ -69,7 +71,7 @@ export class KeyboardPlay {
 
   moveCursor(dTile: number, dFloor: number): void {
     this.kbCursor = stepCursor(this.kbCursor, dTile, dFloor);
-    this.deps.engine.ensureVisible(this.kbCursor.tile, this.kbCursor.floor);
+    this.deps.engine().ensureVisible(this.kbCursor.tile, this.kbCursor.floor);
     this.refreshCursorPreview();
     this.announceCursor();
   }
@@ -83,14 +85,17 @@ export class KeyboardPlay {
       const kind = tool.kind;
       const bottom = Math.min(this.kbAnchor.floor, c.floor);
       const top = Math.max(this.kbAnchor.floor, c.floor);
-      this.deps.engine.transportPreview = {
+      // Capture the live renderer once: the instance can swap under a
+      // context-loss recovery, so both writes must target the SAME engine.
+      const engine = this.deps.engine();
+      engine.transportPreview = {
         kind,
         x: this.kbAnchor.tile,
         bottom,
         top,
         valid: sim.tower.placeTransportDryRun(kind, this.kbAnchor.tile, bottom, top) && sim.isUnlocked(kind),
       };
-      this.deps.engine.preview = null;
+      engine.preview = null;
     } else {
       this.deps.updateBuildPreview(c.tile, c.floor);
     }
@@ -143,7 +148,7 @@ export class KeyboardPlay {
         const top = Math.max(this.kbAnchor.floor, c.floor);
         const res = this.deps.getSim().buildTransport(kind, this.kbAnchor.tile, bottom, top);
         this.kbAnchor = null;
-        this.deps.engine.transportPreview = null;
+        this.deps.engine().transportPreview = null;
         if (res.ok) {
           this.deps.audio.sfx("build");
           this.deps.announce(`${FACILITIES[kind].name} built, floors ${bottom} to ${top}`);

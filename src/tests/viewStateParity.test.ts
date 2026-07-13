@@ -121,6 +121,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
         showExportReport: () => {},
       },
       showCrashScreen: () => {},
+      attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     });
   });
@@ -138,6 +139,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
       adoptSim: () => {},
       ui: { toast: () => {}, downloadFile: () => {}, showImportReport: () => {}, showExportReport: () => {} },
       showCrashScreen: () => {},
+      attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     });
     saveLoad.save(true);
@@ -165,6 +167,7 @@ describe("SaveLoad stamps the live camera onto the CURRENT tower's saves", () =>
         showExportReport: () => {},
       },
       showCrashScreen: () => {},
+      attemptGraphicsRecovery: () => {},
       armOnboarding: () => {},
     });
     await saveLoad.exportGame();

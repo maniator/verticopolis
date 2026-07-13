@@ -244,3 +244,62 @@ Fix implemented and measured on the same save and viewport (spec:
 
 Root-cause fixes shipped on branch `claude/pixel-8a-save-crashes-bx77b2`. The missing-evidence gap (no device-side
 crash data) is closed by the crash-report zip for any future crash.
+
+## Follow-up: 2026-07-13
+
+### New Evidence
+
+The crash-report feature delivered its first field report: the player uploaded the zip
+(crash-report.json created 2026-07-13T13:05:10Z, tower.vctower alongside) from the same
+Pixel 8a and the same tower (SixSeven), now on 1.26.0 (a build that includes the 2026-07-12
+TileMap + pacing fixes).
+
+- `crash.kind: webgl-context-lost`, `repeat: false`, `saveFlushed: true`, `behindSplash: false`.
+  The recovery pipeline worked exactly as designed: flush succeeded, the crash screen showed,
+  and the report reached us (Confirmed, report JSON).
+- Device state at the loss is HEALTHY: JS heap 92MB used / 109MB allocated against a 2,060MB
+  limit; `recentFrameErrors` is empty, so no tick-guard throws preceded it (Confirmed).
+- The save decodes clean: 12,776 units (10,753 floor + 878 lobby in the TileMap; 1,145 room
+  actors), 15 elevator shafts / 84 cars, 3-star, population 3,401. Saved view: zoom 0.3 (fully
+  zoomed out, most of the tower framed) at speed 3 (Confirmed, decoded tower.vctower).
+- Time base: the save's clock advanced ~136,000 game-minutes since the 2026-07-12 case save
+  (1,171,357 to 1,307,540). At fastest pacing that is on the order of 19 hours of real play on
+  the fixed build before a single, non-repeating loss (Deduced from the two saves' `minutes`).
+
+### Additional Findings
+
+#### Finding 5: The remaining player pain lives in the recovery UX
+
+**Evidence:** report JSON (healthy heap, no frame errors, repeat:false); Finding 2 (sim clean);
+2026-07-12 follow-up measurements (no leak, texture count plateaus, frame p50 halved).
+
+**Detail:** One context loss after many hours of fastest-speed play on a phone is within
+normal Android/Chrome behavior: the OS reclaims or resets the GPU context under system-wide
+memory pressure, GPU process restarts, or backgrounding, and no client change can drive that
+probability to zero. What the player experiences today is a full-screen crash card and a
+manual reload for an event the app could survive in place: the simulation is intact in memory,
+every graphic is code-generated (no assets to refetch), and the browser offers
+`webglcontextrestored` after our `preventDefault()` in the loss handler.
+
+### Updated Hypotheses
+
+- Hypothesis 2 (renderer texture/memory leak): **Refuted** for this crash. Heap was 92MB at the
+  loss and the 2026-07-12 soak showed texture counts plateau; the report shows no growth signal.
+- Hypothesis 3 (burst work stalls the GPU): remains **Open** but demoted: bursts measured only
+  ~12% over plain frames post-fix, and this loss took ~19 hours of play to appear once.
+
+### Backlog Changes
+
+- New fix direction: auto-recover the renderer in place on a first context loss (rebuild the
+  Excalibur engine on a fresh canvas when the browser restores the context), keeping the crash
+  screen for repeated losses (within 90s) and for failed or timed-out recovery, so genuine
+  device distress still surfaces advice and the crash-report download.
+
+### Updated Conclusion
+
+**Confidence: High.** The 1.26.0 fixes hold: no leak, no frame errors, healthy heap, and crash
+frequency dropped from "random, frequent" to one environmental loss in ~19 hours of play. The
+remaining defect is that a survivable one-off GPU reset ends the session behind a dead-end
+crash card (the project invariant says context loss should recover in place). Fix: attempt
+automatic in-place renderer recovery on first loss; fall back to the crash screen on repeat,
+failure, or timeout.

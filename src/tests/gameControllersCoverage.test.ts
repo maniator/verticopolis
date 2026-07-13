@@ -597,11 +597,15 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   let f: ReturnType<typeof fakes>;
   let adopted: Simulation[];
   let crashScreens: {
-    crash: { kind: string; repeat: boolean; saveFlushed: boolean; behindSplash: boolean };
+    crash: { kind: string; repeat: boolean; saveFlushed: boolean; behindSplash: boolean; recoveryFailed: boolean };
     save: { flushed: boolean; behindSplash: boolean; storageBlame: boolean; hadPriorSave: boolean };
     onReload: () => void;
   }[];
   let armed: number;
+  /** Pending in-place recovery attempts: each entry is the outcome callback
+   *  SaveLoad handed over; a test settles it with true/false to simulate the
+   *  rebuild succeeding or failing. */
+  let recoveries: ((recovered: boolean) => void)[];
   let saveLoad: SaveLoad;
 
   beforeEach(() => {
@@ -613,6 +617,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     adopted = [];
     crashScreens = [];
     armed = 0;
+    recoveries = [];
     saveLoad = new SaveLoad({
       getSim: () => sim,
       getView: () => null,
@@ -621,6 +626,7 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
       },
       ui: f.ui,
       showCrashScreen: (info) => crashScreens.push(info),
+      attemptGraphicsRecovery: (done) => recoveries.push(done),
       armOnboarding: () => armed++,
     });
   });
@@ -826,17 +832,47 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(last(f.toasts).text).toMatch(/All save slots are full/);
   });
 
-  it("first context loss: autosave written, crash screen shown, nothing reloads until the player asks", () => {
+  it("first mid-game context loss: autosave written, then in-place recovery is attempted (no crash screen)", () => {
     const reload = stubReload();
     saveLoad.recoverFromContextLoss();
-    expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed
+    expect(SaveGame.hasSave()).toBe(true); // no splash → the tower was flushed first
+    // The healthy one-off case recovers in place: no crash screen, no reload,
+    // just the "recovering" toast while the rebuild waits on the browser.
+    expect(crashScreens).toHaveLength(0);
+    expect(recoveries).toHaveLength(1);
+    expect(reload).not.toHaveBeenCalled();
+    expect(last(f.toasts)).toEqual({ text: "The device reset the game's graphics. Recovering...", kind: "info" });
+    // The loss itself is stamped, so a second loss inside 90s reads as a
+    // repeat even when no reload ever happens.
+    expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
+
+    // The rebuild succeeds: the player gets a confirmation toast and a durable
+    // bulletin entry (the old silent reload erased all evidence of the crash).
+    recoveries[0](true);
+    expect(crashScreens).toHaveLength(0);
+    expect(last(f.toasts)).toEqual({ text: "Graphics recovered. Your tower was saved.", kind: "good" });
+    expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(true);
+  });
+
+  it("a failed in-place recovery falls back to the crash screen; reload stays the player's choice", () => {
+    const reload = stubReload();
+    saveLoad.recoverFromContextLoss();
+    expect(recoveries).toHaveLength(1);
+    recoveries[0](false);
     expect(crashScreens).toHaveLength(1);
-    expect(crashScreens[0].crash).toEqual({ kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false });
+    // recoveryFailed rides along so the screen can add the device-distress
+    // advice even though repeat is false (crashScreen.test pins the wording).
+    expect(crashScreens[0].crash).toEqual({
+      kind: "webgl-context-lost",
+      repeat: false,
+      saveFlushed: true,
+      behindSplash: false,
+      recoveryFailed: true,
+    });
     expect(crashScreens[0].save).toEqual({ flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false });
     // No silent auto-reload: the reload (and its session stamps) is the
     // player's Reload button.
     expect(reload).not.toHaveBeenCalled();
-    expect(sessionStorage.getItem("vc-gl-lost-reload")).toBeNull();
     crashScreens[0].onReload();
     expect(Number(sessionStorage.getItem("vc-gl-lost-reload"))).toBeGreaterThan(0);
     // The recovery resume flag is stamped so the fresh boot drops the player back
@@ -845,13 +881,102 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     expect(reload).toHaveBeenCalledTimes(1);
   });
 
-  it("a second loss within 90s of the last recovery reload is flagged as a repeat", () => {
+  it("a second loss within 90s of the last one is a repeat: crash screen immediately, no recovery attempt", () => {
     stubReload();
     sessionStorage.setItem("vc-gl-lost-reload", String(Date.now()));
     saveLoad.recoverFromContextLoss();
+    expect(recoveries).toHaveLength(0); // the device is struggling; don't loop
     expect(crashScreens).toHaveLength(1);
     expect(crashScreens[0].crash.repeat).toBe(true);
     expect(SaveGame.hasSave()).toBe(true); // the tower is still saved first
+  });
+
+  it("a loss soon after a successful in-place recovery is a repeat (the loss stamp, not a reload, anchors the window)", () => {
+    stubReload();
+    saveLoad.recoverFromContextLoss();
+    recoveries[0](true); // first loss recovered in place, no reload anywhere
+    saveLoad.recoverFromContextLoss();
+    expect(recoveries).toHaveLength(1); // no second attempt
+    expect(crashScreens).toHaveLength(1);
+    expect(crashScreens[0].crash.repeat).toBe(true);
+    // The screen followed a repeat gate, never a recovery attempt.
+    expect(crashScreens[0].crash.recoveryFailed).toBe(false);
+  });
+
+  it("a loss more than 90s after the previous one leaves the repeat window: recovery is attempted again", () => {
+    stubReload();
+    sessionStorage.setItem("vc-gl-lost-reload", String(Date.now() - 91_000));
+    saveLoad.recoverFromContextLoss();
+    expect(crashScreens).toHaveLength(0);
+    expect(recoveries).toHaveLength(1); // treated as a fresh first loss
+  });
+
+  it("the repeat window re-anchors when the recovery COMPLETES, so a slow background restore doesn't defeat it", () => {
+    stubReload();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(1_000_000);
+      saveLoad.recoverFromContextLoss(); // loss stamped at T0
+      // Android restores the context ten minutes later (backgrounded gap).
+      vi.setSystemTime(1_000_000 + 10 * 60_000);
+      recoveries[0](true);
+      // A fresh loss 30s into resumed play is genuine distress: repeat.
+      vi.setSystemTime(1_000_000 + 10 * 60_000 + 30_000);
+      saveLoad.recoverFromContextLoss();
+      expect(recoveries).toHaveLength(1); // no second silent attempt
+      expect(crashScreens).toHaveLength(1);
+      expect(crashScreens[0].crash.repeat).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("with sessionStorage unavailable the in-memory shadow still trips the repeat guard (no endless recover loop)", () => {
+    stubReload();
+    vi.stubGlobal("sessionStorage", {
+      getItem: () => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+      setItem: () => {
+        throw new DOMException("The operation is insecure.", "SecurityError");
+      },
+    } as unknown as Storage);
+    saveLoad.recoverFromContextLoss(); // first loss: recovery attempted
+    expect(recoveries).toHaveLength(1);
+    recoveries[0](true);
+    saveLoad.recoverFromContextLoss(); // seconds later: must escalate
+    expect(recoveries).toHaveLength(1);
+    expect(crashScreens).toHaveLength(1);
+    expect(crashScreens[0].crash.repeat).toBe(true);
+  });
+
+  it("a recovery that resolves under an already-open crash screen stays quiet (no contradictory success toast)", () => {
+    stubReload();
+    saveLoad.recoverFromContextLoss();
+    // A parallel loss flow put the crash card up while the rebuild ran.
+    const card = document.createElement("dialog");
+    card.id = "crash-screen";
+    document.body.appendChild(card);
+    try {
+      const toastCount = f.toasts.length;
+      recoveries[0](true);
+      expect(f.toasts.length).toBe(toastCount); // the screen owns the session
+      expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
+    } finally {
+      card.remove();
+    }
+  });
+
+  it("a tower swap during the recovery wait keeps the saved-tower claim out of the new tower's bulletin", () => {
+    stubReload();
+    const simAtLoss = sim;
+    saveLoad.recoverFromContextLoss();
+    sim = new Simulation(); // player loaded/founded a different tower while waiting
+    recoveries[0](true);
+    // Generic toast only: "your tower was saved" would be about the old tower.
+    expect(last(f.toasts)).toEqual({ text: "Graphics recovered.", kind: "good" });
+    expect(sim.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
+    expect(simAtLoss.log.some((e) => e.text.includes("recovered on the spot"))).toBe(false);
   });
 
   it("a context loss whose save fails says so on the screen, keeps the prior tower, and blames storage", () => {
@@ -868,6 +993,9 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.recoverFromContextLoss();
     expect(spy).toHaveBeenCalledTimes(1);
     expect(reload).not.toHaveBeenCalled();
+    // A failed flush is storage news the player must see: no silent in-place
+    // recovery, straight to the screen that words the failure.
+    expect(recoveries).toHaveLength(0);
     expect(crashScreens).toHaveLength(1);
     // A prior autosave exists, so the screen reassures the player it's safe
     // (don't imply total loss and send them off to clear the very save that
@@ -940,6 +1068,8 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     document.body.appendChild(splash);
     saveLoad.recoverFromContextLoss();
     expect(SaveGame.hasSave()).toBe(false);
+    // No session to preserve behind the splash, so no in-place recovery.
+    expect(recoveries).toHaveLength(0);
     expect(crashScreens).toHaveLength(1);
     // Nothing needed flushing (the splash pauses the sim); the screen words
     // this case separately instead of claiming a tower was saved.
@@ -1015,7 +1145,7 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     };
     keyboard = new KeyboardPlay({
       getSim: () => sim,
-      engine,
+      engine: () => engine,
       audio: f.audio,
       ui: f.ui,
       build,

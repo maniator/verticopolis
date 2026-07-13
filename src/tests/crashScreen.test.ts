@@ -10,7 +10,7 @@ import type { CrashScreenOptions } from "../ui/crashScreen";
 
 function show(overrides: Partial<CrashScreenOptions> = {}, save: Partial<CrashScreenOptions["save"]> = {}) {
   const opts: CrashScreenOptions = {
-    crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false },
+    crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false },
     save: { flushed: true, behindSplash: false, storageBlame: false, hadPriorSave: false, ...save },
     version: "1.20.0",
     speed: 3,
@@ -56,8 +56,20 @@ describe("crash screen wording and wiring", () => {
   });
 
   it("a repeat crash adds the close-other-apps advice", () => {
-    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false } });
+    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: true, saveFlushed: true, behindSplash: false, recoveryFailed: false } });
     expect(card.textContent).toContain("second crash in a row");
+  });
+
+  it("a failed in-place recovery adds the same device-distress advice on a first loss", () => {
+    const { card } = show({ crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: true } });
+    expect(card.textContent).toContain("tried to restart its graphics");
+    expect(card.textContent).toContain("Closing other tabs or apps");
+    expect(card.textContent).not.toContain("second crash in a row"); // it was one crash; stay honest
+  });
+
+  it("a first loss with no recovery attempt shows no distress advice", () => {
+    const { card } = show();
+    expect(card.textContent).not.toContain("Closing other tabs or apps");
   });
 
   it("Reload fires the recovery callback, the report link is prefilled, and focus lands in the dialog", () => {

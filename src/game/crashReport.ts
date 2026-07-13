@@ -22,6 +22,11 @@ export interface CrashDescription {
   kind: "webgl-context-lost";
   /** A previous crash happened within the last 90 seconds. */
   repeat: boolean;
+  /** An in-place renderer recovery was attempted for this loss and failed
+   *  (rebuild error or the restore signal never came inside the visible-time
+   *  budget). False when the crash screen showed without an attempt (repeat,
+   *  behind the splash, or a failed flush). */
+  recoveryFailed: boolean;
   /** Whether the tower was persisted going into the crash: the pre-crash
    *  autosave flush succeeded, or nothing needed flushing (the crash happened
    *  behind the splash, which pauses the sim). False only when a flush was
