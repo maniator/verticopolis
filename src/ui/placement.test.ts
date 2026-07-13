@@ -8,7 +8,7 @@ import {
   dragRunTiles,
   snapX,
   stepCursor,
-} from "../ui/placement";
+} from "./placement";
 
 /** The placement helpers are pure functions of (kind, tile, floor) since the
  *  module split — these tests pin the geometry every gesture path (mouse,

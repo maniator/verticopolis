@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect } from "vitest";
-import { patchVolatile } from "../ui/UI";
+import { patchVolatile } from "./UI";
 
 describe("patchVolatile — editor updates in place", () => {
   it("updates volatile cells but keeps the buttons the SAME elements (no swallowed clicks)", () => {

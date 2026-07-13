@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { resaleRefund, carResaleRefund, extendBill, ECON } from "../engine/econConfig";
-import { FACILITIES } from "../engine/facilities";
-import type { FacilityKind } from "../engine/types";
+import { resaleRefund, carResaleRefund, extendBill, ECON } from "./econConfig";
+import { FACILITIES } from "./facilities";
+import type { FacilityKind } from "./types";
 
 describe("resaleRefund", () => {
   it("is half the build cost (floored) for every facility kind", () => {
