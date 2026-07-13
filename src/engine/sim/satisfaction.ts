@@ -285,7 +285,7 @@ export function vacateCause(sim: Simulation, u: Unit, served: boolean, cong: num
  *  must NOT shield), and an **open-air gap** of unbuilt tiles (noise needs
  *  floor to travel). Distance 0 is the shared-wall case, so this subsumes the
  *  old ±1 rule with no double-count. O(maxTiles) per side, bounded and cheap. */
-export function nearestKindWithin(sim: Simulation, 
+export function nearestKindWithin(sim: Simulation,
   u: Unit,
   isSource: (kind: FacilityKind) => boolean,
   maxTiles: number,

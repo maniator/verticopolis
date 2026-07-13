@@ -153,7 +153,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   return { ok: true };
 }
 
-export function buildTransport(sim: Simulation, 
+export function buildTransport(sim: Simulation,
   kind: FacilityKind,
   x: number,
   bottom: number,

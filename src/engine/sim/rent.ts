@@ -65,7 +65,7 @@ export function applyRentBatch(sim: Simulation, kind: FacilityKind, target: Batc
   return sim.computeBatch(kind, target, opts, true);
 }
 
-export function computeBatch(sim: Simulation, 
+export function computeBatch(sim: Simulation,
   kind: FacilityKind,
   target: BatchTarget,
   opts: BatchRentOptions,
