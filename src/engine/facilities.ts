@@ -206,7 +206,13 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "elevatorExpress",
     category: "transport",
     name: "Express Elevator",
-    width: 4,
+    // Canon footprint: 6 tiles, wider than the standard/service elevators (both
+    // 4). The 1994 retail game builds the express at 6 tiles; harness pixel
+    // measurement confirms standard 4, service 4, express 6. The TDT format
+    // carries no width field, so the exporter reconstructs footprint from this
+    // catalog value: a 6 here is what keeps a round-tripped express from losing
+    // shafts to a too-tight reconstruction.
+    width: 6,
     cost: 400000,
     minStar: 3,
     population: 0,

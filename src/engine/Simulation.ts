@@ -2726,6 +2726,13 @@ export class Simulation implements SimContext {
     sim.tower.towerName = data.towerName;
     sim.tower.builtWeddingHall = data.builtWeddingHall;
     sim.tower.reindex();
+    // Re-assert the express lobby-stop lock at the trust boundary: the import
+    // path above writes `skipFloors` directly (bypassing setStop), so a forged
+    // or foreign save could otherwise carry a non-lobby express stop. Runs after
+    // reindex so the lobby-tile index is populated (floorHasLobby is live), and
+    // only ADDS forbidden non-lobby floors to each express's skip list, keeping
+    // a player's deliberate lobby-skip intact.
+    sim.tower.coerceExpressStops();
     // Resume any in-progress construction and ongoing fires.
     for (const u of sim.tower.units) {
       if (u.state === "construction") sim.constructing.add(u.id);

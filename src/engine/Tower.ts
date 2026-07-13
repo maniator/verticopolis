@@ -1045,6 +1045,12 @@ export class Tower {
     // success — the request was valid and the endpoint is already stopping —
     // regardless of the requested `stop` value.
     if (floor === t.bottom || floor === t.top) return true;
+    // Express elevators are locked to (sky) lobbies and endpoints (1994 parity):
+    // a floor may become a stop only if it hosts a lobby tile. Reject a request
+    // to stop at any other floor (leave it skipped), so the invariant holds
+    // against every caller. syncExpressStopsForFloor only ever passes stop=true
+    // for a floor that has a lobby, so this never blocks a legitimate resync.
+    if (t.kind === "elevatorExpress" && stop && !this.floorHasLobby(floor)) return false;
     const skip = new Set(t.skipFloors ?? []);
     if (stop) skip.delete(floor);
     else skip.add(floor);
@@ -1100,13 +1106,50 @@ export class Tower {
     return true;
   }
 
-  /** Make a transport stop at every floor again. */
+  /** Make a transport stop at every floor again. An express is locked to
+   *  lobby-only stops (1994 parity), so "clear" restores its lobby-only skip
+   *  list (setExpressStops) rather than a stop-at-every-floor list. */
   clearStops(id: number): boolean {
     const t = this.transportById(id);
     if (!t) return false;
+    if (t.kind === "elevatorExpress") return this.setExpressStops(id);
     t.skipFloors = [];
     this.revision++;
     return true;
+  }
+
+  /**
+   * Trust-boundary defense for the express lobby-stop lock. The import and
+   * deserialize paths write `skipFloors` directly, bypassing {@link setStop},
+   * so a forged or foreign save could otherwise smuggle a non-lobby express
+   * stop past the engine invariant. Force every in-span, non-endpoint floor
+   * WITHOUT a (sky) lobby onto each express's skip list. Existing skips are
+   * preserved (a player may deliberately skip a lobby, which reindex keeps), so
+   * this only ever ADDS the forbidden non-lobby floors, never restores one.
+   * Call after {@link reindex}, when the lobby-tile index is populated.
+   */
+  coerceExpressStops(): void {
+    let changed = false;
+    for (const t of this.transports) {
+      if (t.kind !== "elevatorExpress") continue;
+      const skip = new Set(t.skipFloors ?? []);
+      for (let fl = t.bottom + 1; fl < t.top; fl++) {
+        if (!this.floorHasLobby(fl)) skip.add(fl);
+      }
+      // Endpoints always stop (a shaft can't disconnect from itself), so scrub a
+      // forged bottom/top out of the skip set too: the coercion is the trust
+      // boundary, and stopsAt() reads skipFloors literally for endpoints.
+      skip.delete(t.bottom);
+      skip.delete(t.top);
+      const next = [...skip].sort((a, b) => a - b);
+      if (next.join(",") !== (t.skipFloors ?? []).join(",")) {
+        t.skipFloors = next;
+        changed = true;
+      }
+    }
+    // Mutating skipFloors invalidates the memoized stop lists (stopsCache is
+    // keyed by revision), so bump it when the coercion actually changed a shaft.
+    if (changed) this.revision++;
   }
 
   removeTransport(id: number): Transport | undefined {

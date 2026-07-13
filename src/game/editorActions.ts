@@ -223,7 +223,11 @@ export class EditorActions {
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
       } else if (action === "stops") {
-        this.openStopsDialog();
+        // The free per-floor stop dialog is a standard/service feature only; an
+        // express is locked to (sky) lobbies and hides this button, so guard the
+        // action too (the engine's setStop lock would refuse a non-lobby stop
+        // regardless, but never even open the dialog for an express).
+        if (t.kind !== "elevatorExpress") this.openStopsDialog();
       } else if (action === "express") {
         sim.tower.setExpressStops(t.id);
         this.deps.audio.sfx("click");

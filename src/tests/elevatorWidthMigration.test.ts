@@ -46,10 +46,28 @@ function v4Save(transports: Partial<Transport>[]): SerializedGame {
 }
 
 describe("canon elevator widths", () => {
-  it("standard and service elevators share the canon 4-tile footprint", () => {
+  it("standard and service elevators are 4 tiles; the express is a wider 6 (1994 parity)", () => {
     expect(FACILITIES.elevatorStandard.width).toBe(4);
     expect(FACILITIES.elevatorService.width).toBe(4);
-    expect(FACILITIES.elevatorExpress.width).toBe(4);
+    expect(FACILITIES.elevatorExpress.width).toBe(6);
+  });
+
+  it("a freshly placed express occupies 6 tiles, standard/service still 4", () => {
+    const sim = new Simulation();
+    // Lay a ground lobby, then floors above, so the shafts run through built
+    // structure across their whole span.
+    for (let x = 40; x < 80; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 10; fl++) for (let x = 40; x < 80; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+    const std = sim.tower.placeTransport("elevatorStandard", 42, 1, 10);
+    const svc = sim.tower.placeTransport("elevatorService", 50, 1, 10);
+    const exp = sim.tower.placeTransport("elevatorExpress", 60, 1, 10);
+    expect(std.ok).toBe(true);
+    expect(svc.ok).toBe(true);
+    expect(exp.ok).toBe(true);
+    const widthOf = (r: { transportId?: number }) => sim.tower.transports.find((t) => t.id === r.transportId)?.width;
+    expect(widthOf(std)).toBe(4);
+    expect(widthOf(svc)).toBe(4);
+    expect(widthOf(exp)).toBe(6);
   });
 });
 
@@ -151,13 +169,13 @@ describe("v4 → v5 shaft widening migration", () => {
     const dropped = { id: 9, kind: "notAFacility", x: 200, width: 3, bottom: 1, top: 5 };
     const save = v4Save([
       { kind: "stairs", x: 50, width: 4 }, // pre-E1b walkway width: not this migration's business
-      { kind: "elevatorExpress", x: 60, width: 4 },
+      { kind: "elevatorExpress", x: 60, width: 6 }, // already the canon 6: untouched
       { x: Number.NaN, width: 3, bottom: 1, top: 5 },
     ]);
     (save.transports as unknown as unknown[]).push(dropped);
     const out = upgradeV4toV5(save);
     expect(out.transports[0]).toMatchObject({ x: 50, width: 4, kind: "stairs" });
-    expect(out.transports[1]).toMatchObject({ x: 60, width: 4 });
+    expect(out.transports[1]).toMatchObject({ x: 60, width: 6 });
     expect(out.transports[2]).toMatchObject({ x: 0, width: 4 }); // coerced to x=0, then widened there
     expect(out.transports[3]).toBe(dropped as unknown as Transport);
   });
@@ -212,6 +230,47 @@ describe("v4 → v5 shaft widening migration", () => {
     expect(out.transports[0]).toMatchObject({ x: 98, width: 4 });
   });
 
+  it("widens a legacy 4-wide express to the canon 6, growing right in place", () => {
+    const out = upgradeV4toV5(v4Save([{ kind: "elevatorExpress", x: 100, width: 4 }]));
+    expect(out.transports[0]).toMatchObject({ x: 100, width: 6 });
+  });
+
+  it("widens a 4-wide express by shifting up to 2 tiles left when boxed on the right", () => {
+    // Express delta is 6-4 = 2, so the widen tries x, x-1, x-2. A neighbor flush
+    // on the right forces the maximum 2-tile left shift.
+    const out = upgradeV4toV5(
+      v4Save([
+        { kind: "elevatorExpress", x: 100, width: 4 },
+        { kind: "elevatorService", x: 104, width: 4 },
+      ]),
+    );
+    expect(out.transports[0]).toMatchObject({ x: 98, width: 6 });
+    expect(out.transports[1]).toMatchObject({ x: 104, width: 4 });
+  });
+
+  it("keeps a boxed-in 4-wide express at legacy width, with no overlap or off-lot", () => {
+    // Both sides occupied within the 2-tile shift window: no 6-wide candidate
+    // fits, so the express grandfathers at 4 and the tower stays valid.
+    const out = upgradeV4toV5(
+      v4Save([
+        { kind: "elevatorService", x: 96, width: 4 },
+        { kind: "elevatorExpress", x: 100, width: 4 },
+        { kind: "elevatorService", x: 104, width: 4 },
+      ]),
+    );
+    expect(out.transports[1]).toMatchObject({ x: 100, width: 4 });
+    for (const a of out.transports) {
+      for (const b of out.transports) {
+        if (a === b) continue;
+        const xOverlap = a.x < b.x + b.width && b.x < a.x + a.width;
+        const floorOverlap = a.bottom <= b.top && b.bottom <= a.top;
+        expect(xOverlap && floorOverlap).toBe(false);
+      }
+      expect(a.x).toBeGreaterThanOrEqual(0);
+      expect(a.x + a.width).toBeLessThanOrEqual(GRID.width);
+    }
+  });
+
   it("migrateSave chains a v4 save through the widening to the current version", () => {
     const out = migrateSave(v4Save([{ x: 100 }]));
     expect(out.version).toBe(SAVE_VERSION);
@@ -229,11 +288,12 @@ describe("golden fixture: the SixSeven tower (real v4 save)", () => {
     expect(legacy).toHaveLength(9);
   });
 
-  it("every standard shaft widens to 4 in place, and no two shafts overlap afterward", () => {
+  it("every standard shaft widens to 4 and every express to 6 in place, and no two shafts overlap afterward", () => {
     const out = migrateSave(data);
     expect(out.version).toBe(SAVE_VERSION);
     const elevators = out.transports.filter((t) => isElevatorKind(t.kind));
-    for (const t of elevators) expect(t.width).toBe(4);
+    // Standard/service reach the canon 4; the express reaches its wider canon 6.
+    for (const t of elevators) expect(t.width).toBe(t.kind === "elevatorExpress" ? 6 : 4);
     // In this save every widen fits by growing right, so x never moves.
     for (let i = 0; i < out.transports.length; i++) {
       expect(out.transports[i].x).toBe(data.transports[i].x);
@@ -255,6 +315,9 @@ describe("golden fixture: the SixSeven tower (real v4 save)", () => {
     const standards = reloaded.transports.filter((t) => t.kind === "elevatorStandard");
     expect(standards.length).toBeGreaterThan(0);
     for (const t of standards) expect(t.width).toBe(4);
+    const expresses = reloaded.transports.filter((t) => t.kind === "elevatorExpress");
+    expect(expresses.length).toBeGreaterThan(0);
+    for (const t of expresses) expect(t.width).toBe(6);
     // The tower still runs: tick a full in-game hour without throwing.
     for (let i = 0; i < 60; i++) sim.tick(1);
   });

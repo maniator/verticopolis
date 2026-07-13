@@ -2,7 +2,7 @@ import { FACILITIES, isElevatorKind } from "../../engine/facilities";
 import type { FacilityKind, Transport } from "../../engine/types";
 import { person } from "../pixelSprites";
 import type { CarArrow } from "../carIndicator";
-import { shade } from "./common";
+import { shade, shadeAlpha } from "./common";
 
 // ---- Transport ----------------------------------------------------------
 
@@ -68,8 +68,17 @@ export function drawTransport(
   }
 
   if (isElevatorKind(t.kind)) {
-    // Dark shaft tinted by elevator type, with rails and floor stops.
-    ctx.fillStyle = shade(f.color, -34);
+    // Shaft backing tinted by elevator type, with rails and floor stops.
+    // Standard/service draw an OPAQUE dark column. The express is a see-through
+    // glass shaft in the retail game (harness pixel check: the express column
+    // reads statistically like the office floor behind it),
+    // so its backing is a low-alpha tint the rooms and people show through. The
+    // rails, stop lines, floor numbers, motor caps and car are still drawn.
+    if (t.kind === "elevatorExpress") {
+      ctx.fillStyle = shadeAlpha(f.color, -34, 0.35); // express glass backing
+    } else {
+      ctx.fillStyle = shade(f.color, -34);
+    }
     ctx.fillRect(sx, topY, w, height);
     ctx.fillStyle = "rgba(0,0,0,0.5)";
     ctx.fillRect(sx + 1, topY, 1, height);
