@@ -218,10 +218,23 @@ position; top/bottom floor; the serviced-floors bitmap (per-floor stop
 configuration!); and the 8 per-car home floors. Built shafts append a fixed
 **3,140-byte block** (see the measured note below), then **324-byte per-floor
 entries** (per serviced floor: waiting-up/down counts + up to 40 queued person
-indices each way), then **348-byte per-car entries** (per car: current floor,
+indices each way), then a **single 348-byte car block** (current floor,
 passenger count, turnaround floor, up to 42 passenger indices, their destination
 floors, and per-floor destination counts). So one built shaft's record stride is
-`194 + 3140 + 324 * servicedFloors + 348 * cars`.
+`194 + 3140 + 324 * servicedFloors + 348` (the 348 block is **cars-INDEPENDENT**,
+NOT `* cars`).
+
+> **Corrected (Verticopolis RE, 2026-07-13, Wine harness vs the real 1994
+> game):** the appended 348-byte block appears **ONCE per built shaft, not once
+> per car**. The old `* cars` stride was only ever validated on 1-car saves
+> (my_tower and every other native reference save we have is cars=1), where
+> `* cars == * 1` is indistinguishable from a fixed block. On a multi-car tower
+> (the owner's "six seven": shafts up to 8 cars), `348 * cars` over-sized every
+> multi-car shaft, so the retail game desynced the whole elevator table after the
+> first such shaft: **only one elevator rendered, and the parking/basement block
+> that follows the table mis-read too.** Forcing the payload to the fixed size
+> (car count kept in the header) made all shafts render in the real game.
+> Fixed in `tdtExport.ts` + `tdtFormat.ts` (and the `tdtBuilder` test fixture).
 
 > **Measured (Verticopolis RE, tools/simtower round-trip vs the real 1994 game):**
 > the fixed appended block is **3,140 bytes**, not the 480 + 2 * 120 = 720 this

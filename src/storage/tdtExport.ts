@@ -781,11 +781,13 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       const home = Number.isFinite(raw) ? Math.round(raw) : e.bottom;
       u8(Math.max(e.bottom, Math.min(e.top, home)) + TDT_FLOOR_OFFSET);
     }
-    pad(
-      TDT_ELEVATOR_BUILT_FIXED +
-        servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE +
-        cars * TDT_ELEVATOR_PER_CAR_SIZE,
-    );
+    // The appended built-shaft block is cars-INDEPENDENT: a fixed block, one
+    // 324-byte entry per SERVICED floor, then a SINGLE 348-byte car block (NOT
+    // one per car). Harness-confirmed against the real 1994 game: writing
+    // `cars * 348` overran every multi-car shaft and desynced the retail game's
+    // elevator table (only one shaft rendered, and the parking/basement block
+    // after it mis-read). Must match parseTdtBinary's skip. See tdtFormat.ts.
+    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE);
   }
 
   // Finance history: not modeled; zero-filled at the documented size.

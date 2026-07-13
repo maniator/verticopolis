@@ -641,12 +641,18 @@ function walkTolerantTail(r: ByteReader): TdtTail {
       return tail;
     }
     // Built shafts append live passenger/queue state we deliberately skip:
-    // our crowd re-simulates. One 324-byte entry per SERVICED floor and one
-    // 348-byte entry per car, after a fixed unknown+per-floor block.
+    // our crowd re-simulates. One 324-byte entry per SERVICED floor, then a
+    // SINGLE 348-byte car block (NOT one per car). Harness-confirmed against the
+    // real 1994 game (tools/simtower Wine loads): the appended block is
+    // cars-INDEPENDENT. A `cars * 348` size (the old extrapolation, only ever
+    // validated on 1-car saves like my_tower) overruns every multi-car shaft, so
+    // the retail game desynced the whole elevator table after the first such
+    // shaft and rendered a single elevator (and mis-read the parking/basement
+    // block that follows). See docs/canon/tdt-format.md and the backlog.
     let servicedCount = 0;
     for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) servicedCount++;
     const payload =
-      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + cars * TDT_ELEVATOR_PER_CAR_SIZE;
+      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE;
     if (r.remaining() < payload) {
       warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
       return tail;
