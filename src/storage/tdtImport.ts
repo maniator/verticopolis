@@ -146,8 +146,10 @@ export const HOTEL_DIRTY_FLAG = 32;
 const HOTEL_INFESTED_FLAG = 64;
 
 /** The ground floor (1) and every 15th floor above host a (sky) lobby;
- *  mirrors Tower.ts's isLobbyFloor, which is not exported. */
-function isLobbyFloor(floor: number): boolean {
+ *  mirrors Tower.ts's isLobbyFloor, which is not exported. Exported so the TDT
+ *  exporter can pave floors as the importer reconstructs them (kind by floor,
+ *  never by record type): one source, so reader and writer cannot drift. */
+export function isLobbyFloor(floor: number): boolean {
   return floor === 1 || (floor > 1 && floor % GRID.lobbyInterval === 0);
 }
 

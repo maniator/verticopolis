@@ -47,6 +47,7 @@ import {
   TDT_BURNED,
   TDT_FLOOR_OFFSET,
   TENANT_KIND,
+  isLobbyFloor,
   rentFromClass,
 } from "./tdtImport";
 
@@ -197,6 +198,10 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   // ---- Gather rooms, paving extents, and per-floor tenant records ---------
   const tenantsByTdt = new Map<number, OutTenant[]>();
   const extents = new Map<number, { left: number; right: number }>();
+  // Tiles a room footprint covers, per OUR floor: a paved tile under a room
+  // carries no floor/lobby record (the room record wins), matching a real save
+  // where type-0 records are only the gaps between rooms.
+  const coveredTiles = new Map<number, Set<number>>();
   // Rows for the §7 retail table: one per emitted shop / fastFood / restaurant,
   // carrying the TDT-space floor byte and the canon variant. Filled in tenant
   // gathering, drained by the retail-table write loop. Bounded at 512 slots.
@@ -295,6 +300,17 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     if (!fitsTdtRows(u.floor, facilityFloors(u.kind))) {
       counts.outOfRange++;
       continue;
+    }
+    // Mark this in-range room's footprint so the paving pass emits no floor/
+    // lobby span under it (type-0 records are the gaps between rooms). Same
+    // footprint the extent widening uses: [x, x+width) across the room's stories.
+    for (let fl = u.floor; fl < u.floor + facilityFloors(u.kind); fl++) {
+      let set = coveredTiles.get(fl);
+      if (!set) {
+        set = new Set();
+        coveredTiles.set(fl, set);
+      }
+      for (let xTile = u.x; xTile < u.x + u.width; xTile++) set.add(xTile);
     }
     // A burned-out shell (or a room mid-fire) is not a healthy tenant: the
     // format has its own marker (type 48), which the importer clears back to
@@ -456,6 +472,46 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
       }
     }
     counts.rooms++;
+  }
+
+  // Emit the paving as span records, the exact inverse of the importer's read:
+  // it paves each floor's ENTIRE extent [left, right) as one solid block, then
+  // reconstructs every paved tile's kind from the FLOOR (isLobbyFloor), never
+  // from the record type. So we walk the same extent we write to the floor
+  // header, skip tiles under a room (their record wins; type-0/24 records are
+  // the gaps between rooms), and coalesce each contiguous non-covered run into
+  // one span. Kind is by floor: lobby floors export type 24 (status 0), all
+  // others type 0 (status 2); both carry rentClass 4 (No Rate) and no subtype.
+  // Status is round-trip-immaterial (the importer ignores it) but mirrors the
+  // real save's bytes. Records go through pushTenant, so they count toward the
+  // per-floor cap enforced below. Reserved rows 110-119 carry no paving.
+  const TDT_LOBBY_TYPE = 24;
+  const TDT_FLOOR_TYPE = 0;
+  for (const [floor, ext] of extents) {
+    if (!fitsTdtRows(floor, 1)) continue;
+    const lobby = isLobbyFloor(floor);
+    const covered = coveredTiles.get(floor);
+    let runStart = -1;
+    const flush = (end: number): void => {
+      if (runStart === -1) return;
+      pushTenant(floor, {
+        left: runStart,
+        right: end,
+        type: lobby ? TDT_LOBBY_TYPE : TDT_FLOOR_TYPE,
+        status: lobby ? 0 : 2,
+        rentClass: 4,
+        subtypeIdx: undefined,
+      });
+      runStart = -1;
+    };
+    for (let xTile = ext.left; xTile < ext.right; xTile++) {
+      if (covered?.has(xTile)) {
+        flush(xTile);
+      } else if (runStart === -1) {
+        runStart = xTile;
+      }
+    }
+    flush(ext.right);
   }
 
   // ---- Encode ---------------------------------------------------------------
