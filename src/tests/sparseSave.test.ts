@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { inflateSync } from "fflate";
 // The real 12,975-unit v1 tower (vite ?raw), the same fixture the reflow tests pin.
 import towerFile from "./fixtures/towerone_6.vctower?raw";
-import { Simulation, serializeUnit } from "../engine/Simulation";
+import { SAVE_VERSION, Simulation, serializeUnit } from "../engine/Simulation";
 import { FACILITIES } from "../engine/facilities";
 import type { SerializedGame, SerializedUnit, Unit } from "../engine/types";
 
@@ -154,7 +154,7 @@ describe("sparse v3 unit serialization", () => {
   it("shrinks the REAL 12,975-unit tower to under half its full-shape JSON and reloads identically", () => {
     const sim = Simulation.deserialize(decodeVctower(towerFile)); // v1 fixture -> reflow -> live tower
     const sparse = sim.serialize();
-    expect(sparse.version).toBe(4);
+    expect(sparse.version).toBe(SAVE_VERSION);
     const sparseJson = JSON.stringify(sparse);
     const fullJson = JSON.stringify({ ...sparse, units: sparse.units.map(materialize) });
     expect(sparseJson.length).toBeLessThan(fullJson.length * 0.5);

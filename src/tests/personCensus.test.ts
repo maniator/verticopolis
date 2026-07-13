@@ -14,7 +14,7 @@ import { Clock } from "../engine/Clock";
  *   - ratingPopulation keeps the canon hotel exclusion via the room-side hotel
  *     gate at 4★+.
  *   - Ghost guard: an origin bulldozed mid-meal does not corrupt the census.
- *   - SAVE_VERSION is 4 and a v3 save migrates cleanly.
+ *   - SAVE_VERSION is 5 and a v3 save migrates cleanly.
  */
 
 /** A fixture with one served office (6 workers) + a fastFood venue. Star gate
@@ -315,21 +315,21 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
 });
 
 
-describe("save version is 4 and a v3 save migrates cleanly", () => {
-  it("SAVE_VERSION is 4 and serialize stamps it", () => {
+describe("save version is 5 and a v3 save migrates cleanly", () => {
+  it("SAVE_VERSION is 5 and serialize stamps it", () => {
     const sim = officeAndFastFood();
-    expect(SAVE_VERSION).toBe(4);
-    expect(sim.serialize().version).toBe(4);
+    expect(SAVE_VERSION).toBe(5);
+    expect(sim.serialize().version).toBe(5);
   });
 
-  it("a v3 save loads as v4 with the census resetting to zero", () => {
+  it("a v3 save loads at the current version with the census resetting to zero", () => {
     const sim = officeAndFastFood();
     const office = sim.tower.units.find((u) => u.kind === "office")!;
     office.outForMeal = 3; // transient, must not survive the round-trip
     const data = sim.serialize();
     (data as { version: number }).version = 3; // pretend it is a v3 save
     const restored = Simulation.deserialize(data);
-    expect(restored.serialize().version).toBe(4);
+    expect(restored.serialize().version).toBe(SAVE_VERSION);
     expect(restored.tower.associatedPopulation()).toBe(0);
     expect(restored.population).toBe(restored.tower.totalPopulation());
   });

@@ -770,6 +770,54 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
     const type = stairRecords[slot].type;
     flightsDropped += type <= 1 ? 1 : type <= 3 ? 2 : 3;
   }
+  // The 1994 format has no transport-width field: every exported elevator and
+  // walkway reconstructs at the fixed catalog footprint on load. A kept-legacy
+  // NARROWER transport (a boxed-in 3-wide standard the v5 migration preserved,
+  // or a pre-E1b 4-wide flight) abutting a neighbor therefore round-trips as
+  // overlapping rects, and the importer's no-overlap rule drops one. Emulate
+  // that rule here (greedy first-kept-wins with the importer's exact-footprint
+  // stacked-walkway exemption) so the count matches what a re-import would
+  // actually lose. The rects come from the EMITTED tables: the first 24
+  // elevator slots and the first 64 COLLAPSED stair records expanded to their
+  // story spans. Scanning the raw pre-collapse flight list instead would
+  // inspect the wrong set whenever more than 64 flights collapse into fewer
+  // records, and the report must describe the bytes actually written.
+  interface OutRect {
+    x: number;
+    w: number;
+    bottom: number;
+    top: number;
+    walkway: boolean;
+  }
+  const outRects: OutRect[] = [
+    ...elevators.slice(0, TDT_ELEVATOR_SLOTS).map((e) => ({
+      x: e.x,
+      w: FACILITIES[e.kind].width,
+      bottom: e.bottom,
+      top: e.top,
+      walkway: false,
+    })),
+    ...stairRecords.slice(0, TDT_STAIR_SLOTS).map((s) => {
+      const stories = s.type <= 1 ? 1 : s.type <= 3 ? 2 : 3;
+      const kind = s.type % 2 === 1 ? "stairs" : "escalator";
+      const bottom = s.floor - TDT_FLOOR_OFFSET;
+      return { x: s.x, w: FACILITIES[kind].width, bottom, top: bottom + stories, walkway: true };
+    }),
+  ];
+  let shaftsColliding = 0;
+  const surviving: OutRect[] = [];
+  for (const r of outRects) {
+    const clash = surviving.some(
+      (p) =>
+        r.x < p.x + p.w &&
+        p.x < r.x + r.w &&
+        r.bottom <= p.top &&
+        p.bottom <= r.top &&
+        !(r.walkway && p.walkway && r.x === p.x && r.w === p.w && (r.bottom === p.top || r.top === p.bottom)),
+    );
+    if (clash) shaftsColliding++;
+    else surviving.push(r);
+  }
   for (let slot = 0; slot < TDT_STAIR_SLOTS; slot++) {
     const s = stairRecords[slot];
     if (!s) {
@@ -829,6 +877,11 @@ export function buildTDT(save: SerializedGame): BuiltLegacyTower {
   if (shaftsDropped > 0) {
     staysBehind.push(
       `${shaftsDropped} elevator shaft${shaftsDropped === 1 ? "" : "s"} past 1994's 24-shaft limit stayed behind.`,
+    );
+  }
+  if (shaftsColliding > 0) {
+    staysBehind.push(
+      `${shaftsColliding} transport${shaftsColliding === 1 ? "" : "s"} overlap${shaftsColliding === 1 ? "s" : ""} a neighbor at 1994's fixed footprint widths and may be dropped when the save loads.`,
     );
   }
   if (flightsDropped > 0) {

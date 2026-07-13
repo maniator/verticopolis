@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { SerializedGame, Transport, Unit } from "../engine/types";
+import type { FacilityKind, SerializedGame, Transport, Unit } from "../engine/types";
 import { SAVE_VERSION } from "../engine/saveMigration";
 import {
   TDT_DEFAULT_VIEW_X,
@@ -259,6 +259,59 @@ describe("buildTDT: export → import round trip", () => {
     expect(halls).toHaveLength(1);
     expect(halls[0].floor).toBe(100);
     expect(back.builtWeddingHall).toBe(true);
+  });
+
+  it("warns when a kept-legacy narrow shaft would collide at 1994's fixed elevator width", () => {
+    // A boxed-in 3-wide standard the v5 migration preserved sits flush against
+    // a 4-wide service shaft: legal in-engine, but the 1994 format has no
+    // width field, so both export at the fixed footprint and overlap. The
+    // report must say so instead of claiming every shaft made the trip.
+    const save = sampleSave();
+    const shaft = (kind: "elevatorStandard" | "elevatorService", x: number, width: number) => ({
+      id: x,
+      kind: kind as FacilityKind,
+      x,
+      width,
+      bottom: 1,
+      top: 10,
+      cars: 1,
+      carPositions: [1],
+      carDir: [0],
+      load: 0,
+    });
+    save.transports.push(shaft("elevatorStandard", 100, 3), shaft("elevatorService", 103, 4));
+    const { report } = buildTDT(save);
+    expect(report.staysBehind.join(" ")).toMatch(/overlaps a neighbor at 1994's fixed footprint widths/);
+
+    // Control: the same pair with a clear tile between full-width footprints
+    // raises no warning.
+    const clear = sampleSave();
+    clear.transports.push(shaft("elevatorStandard", 100, 3), shaft("elevatorService", 105, 4));
+    expect(buildTDT(clear).report.staysBehind.join(" ")).not.toMatch(/at 1994's fixed footprint widths/);
+  });
+
+  it("the overlap warning inspects the emitted (collapsed) stair records, not the raw flight list", () => {
+    // 66 stacked one-floor flights in one column collapse into 22 three-story
+    // records, all comfortably inside the 64-slot table; a colliding escalator
+    // beside the run would be sliced out of a raw-flight scan capped at 64
+    // entries, silently hiding the warning for bytes that ARE exported.
+    const save = sampleSave();
+    const flight = (kind: "stairs" | "escalator", x: number, bottom: number, id: number) => ({
+      id,
+      kind: kind as FacilityKind,
+      x,
+      width: 8,
+      bottom,
+      top: bottom + 1,
+      cars: 0,
+      carPositions: [],
+      carDir: [],
+      load: 0,
+    });
+    for (let i = 0; i < 66; i++) save.transports.push(flight("stairs", 300, 1 + i, 9_000 + i));
+    save.transports.push(flight("escalator", 304, 1, 9_999)); // overlaps the run at full width
+    const { report } = buildTDT(save);
+    expect(report.staysBehind.join(" ")).toMatch(/at 1994's fixed footprint widths/);
   });
 
   it("stacked walkway flights collapse into multi-story records and come back apart", () => {

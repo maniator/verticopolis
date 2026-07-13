@@ -753,6 +753,11 @@ describe("transport decode: the save's own shafts and flights", () => {
     const t = save.transports[0];
     expect(t.kind).toBe("elevatorStandard");
     expect(t.x).toBe(150);
+    // Canon footprint: the real game's shaft occupies 4 tiles, and import maps
+    // width from the catalog - a narrower catalog would shrink every imported
+    // shaft one tile and leave a gap the source save does not have.
+    expect(t.width).toBe(FACILITIES.elevatorStandard.width);
+    expect(FACILITIES.elevatorStandard.width).toBe(4);
     expect(t.bottom).toBe(0); // TDT 9 = B1
     expect(t.top).toBe(30);
     expect(t.cars).toBe(3);

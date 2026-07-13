@@ -176,9 +176,11 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     kind: "elevatorStandard",
     category: "transport",
     name: "Standard Elevator",
-    // 3 tiles ≈ one floor tall (3·11 ≈ 34), so the car is square as in the
-    // original, rather than the previous wide 4-tile cab.
-    width: 3,
+    // Canon footprint: 4 tiles, the same as the service elevator (a service
+    // elevator is a staff-only standard elevator, not a reduced one). The
+    // render floor height is 4 tiles (44px) so the car reads square, as in
+    // the original.
+    width: 4,
     cost: 200000,
     minStar: 1,
     population: 0,
