@@ -83,7 +83,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     // whose callback fires on the browser's own schedule, NOT the stepped clock.
     // If we start stepping before it runs, the resize (canvas dims + camera) lands
     // at a wall-dependent moment relative to the frames and the capture, so a
-    // viewport-override shot on a live engine (e.g. tablet-compact-after) drifts
+    // viewport-override shot on a live engine (e.g. tablet-compact) drifts
     // run to run. Flush the observer with two rAFs first (observers deliver
     // before paint; the stopped Excalibur clock means this advances no sim or
     // animation time) so the new size is fully applied before the settle steps.
