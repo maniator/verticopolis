@@ -138,8 +138,12 @@ names), measured against game-written saves (`my_tower` fast-food byte 6 =
 `3,1,2,4,0`, matching the "BURGER" stand in the Wine render); the next ~9 bytes
 are undocumented; a **rent/lease byte** at offset 16 (0 = Very Low, 1 = Low,
 2 = Average, 3 = High, 4 = No Rate) [TD]; and a final byte 17 that earlier notes
-guessed was the variant/hotel-days-dirty, but reads `0` for retail in every real
-save (its true role is unconfirmed; hotel days-dirty may live here).
+guessed was the retail variant or hotel days-dirty. It is neither: it reads `0`
+in every real save for BOTH retail AND hotels (measured across TOWER5's 338 hotel
+rooms and every game-written retail unit we have). Its role is unknown and it
+carries no data we import; a hotel's dirty/asleep/booked state and its occupant
+count all live in the flags byte (offset 5), which the importer decodes. There is
+no persisted "days-dirty" counter in the unit record.
 
 ## 5. Unit type IDs
 

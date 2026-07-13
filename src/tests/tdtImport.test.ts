@@ -595,6 +595,25 @@ describe("parseTDT: golden mappings", () => {
     expect(fresh.everOccupied).toBe(false);
   });
 
+  it("decodes the real-game hotel status set observed in TOWER5 (booked=1, asleep+N=17/18/19)", () => {
+    // The exact byte-5 status values in the game-written TOWER5 save. Byte 17 is
+    // 0 for all 338 of its hotels (NOT days-dirty), so status is the only source.
+    // Default clock is 7:00 AM (pre-checkout), so asleep guests survive.
+    const booked = rooms(oneTenant(3, 100, 104, 1))[0]; // occupant bit, not asleep -> guest out
+    expect(booked.state).toBe("empty");
+    expect(booked.everOccupied).toBe(true);
+    for (const [status, occ] of [
+      [17, 1],
+      [18, 2],
+      [19, 3],
+    ] as const) {
+      const u = rooms(oneTenant(3, 100, 104, status))[0]; // HOTEL_ASLEEP_FLAG(16) | occupant count
+      expect(u.state).toBe("asleep");
+      expect(u.occupants).toBe(occ);
+      expect(u.everOccupied).toBe(true);
+    }
+  });
+
   it("a booked room whose guests are out arrives empty but ever-booked, with a note", () => {
     const { save, report } = parse(oneTenant(3, 100, 104, 8));
     const room = save.units.find((u) => u.kind === "hotelSingle")!;
