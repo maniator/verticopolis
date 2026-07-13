@@ -17,11 +17,11 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 
 ## Boundaries & Constraints
 
-**Always:** The two signals stay separate. The hard check diffs run a vs run b against EACH OTHER (never the committed set), so it stays valid as `main` drifts under the PR, and it gates the commit: only a set that passed a==b can ever be committed. The commit job targets a protected Environment (`screenshot-approval`) so it CANNOT run without an explicit human approval; it commits only the run-a assembled gallery (identical to update-screenshots' output) with `GITHUB_TOKEN` + the same rebase-retry push. Reuse `scripts/screenshot-shards.ts` (`matrix`/`print`/`verify`) and the pinned-image resolution. Path-gate to render-affecting changes. Least privilege: `contents: write` (commit), `pull-requests: write` (a pointer comment); nothing more.
+**Always:** The two signals stay separate. The hard check (in the SHARED reusable capture) renders every shard TWICE and diffs the two renders against EACH OTHER (never the committed set), so it stays valid as `main` drifts under the PR, and it gates the commit: only a set proven deterministic can ever be committed. The commit job targets a protected Environment (`screenshot-approval`) so it CANNOT run without an explicit human approval; it commits only the verified assembled gallery with `GITHUB_TOKEN` + a fast-forward-guarded push. The sharded, self-verifying capture is a reusable `workflow_call` (`screenshot-capture.yml`) shared by BOTH this workflow and `update-screenshots.yml`, so they never drift on how pixels are generated or how nondeterminism is caught. Reuse `scripts/screenshot-shards.ts` (`matrix`/`print`/`verify`) and the pinned-image resolution. Path-gate to render-affecting changes. Least privilege: read-only by default, `contents: write` only on the commit job, `pull-requests: write` only on the comment job; PR-code-running jobs use `persist-credentials: false`.
 
-**Ask First:** Making the hard check a REQUIRED status check (needs the always-run-then-skip pattern or a path-filtered required check hangs "pending"). Refactoring `update-screenshots.yml` into a shared `workflow_call`/composite for the capture+commit (the DRY endgame).
+**Ask First:** Making the hard check a REQUIRED status check (needs the always-run-then-skip pattern or a path-filtered required check hangs "pending").
 
-**Never:** Do not conflate the two signals ("differs from committed = red X" is the boy-who-cried-wolf trap). Do not commit the regenerated set WITHOUT the environment approval (an unconfigured environment must be treated as a setup error, see Design Notes, not a license to auto-commit). Do not weaken or edit `update-screenshots.yml`. Do not sample or drop scenes (coverage `verify` still gates).
+**Never:** Do not conflate the two signals ("differs from committed = red X" is the boy-who-cried-wolf trap). Do not commit the regenerated set WITHOUT the environment approval (an unconfigured environment must be treated as a setup error, see Design Notes, not a license to auto-commit). Do not weaken the determinism guard (single render, or a subset of scenes). Do not sample or drop scenes (coverage `verify` still gates).
 
 ## I/O & Edge-Case Matrix
 
@@ -31,16 +31,17 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 | Deterministic, pixels match committed | render paths touched, a==b, no drift | hard check green; commit job skipped (no drift) | N/A |
 | Deterministic, pixels changed, NOT approved | a==b, drift vs committed, author has not approved | hard check green; commit job waits in "Waiting for review"; nothing committed | stays pending until approved/rejected |
 | Deterministic, pixels changed, APPROVED | author clicks Approve on the `screenshot-approval` env | same run commits the run-a gallery to the PR branch (GITHUB_TOKEN, rebase-retry) | N/A |
-| Nondeterministic | run a != run b for some shard | hard check FAILS naming the shard; commit job never reached | `::error::`, exit non-zero |
+| Nondeterministic | a shard's two renders differ | shared capture FAILS naming the shard; drift + commit jobs never reached | `::error::`, exit non-zero |
 
 </frozen-after-approval>
 
 ## Code Map
 
-- `.github/workflows/pr-drift-check.yml` -- NEW. `resolve-image` (coverage `verify` + shard `matrix` + pinned image, mirrors update-screenshots), `shoot` matrix `run:[a,b] x shard` (render each shard via `ONLY=`, upload its rendered set), `verify` (per-shard run-a vs run-b: hard fail on nondeterminism; also assemble run-a and diff vs committed to set a `has_drift` output), `commit-on-approval` (`environment: screenshot-approval`, `if: needs.verify.outputs.has_drift == 'true'`; rebuild run-a gallery, commit + push to the PR branch).
+- `.github/workflows/screenshot-capture.yml` -- NEW, reusable (`workflow_call`). `resolve-image` (coverage `verify` + shard `matrix` + pinned image) + `shoot` (one job per shard: render the shard TWICE, diff the two renders, hard-fail on nondeterminism, upload the verified `shots-<shard>`). Read-only. Consumed by both callers.
+- `.github/workflows/pr-drift-check.yml` -- NEW caller. `capture` (uses the reusable), `verify-drift` (assemble the verified sets over the PR's committed gallery, set `has_drift`, post the sticky comment), `commit-on-approval` (`environment: screenshot-approval`, `if: has_drift` + same-repo; rebuild + fast-forward-guarded push to the PR branch).
+- `.github/workflows/update-screenshots.yml` -- REFACTORED to a caller. `capture` (uses the reusable, gated on the `[update-screenshots]` marker/dispatch) + `commit` (assemble + push on the branch). Its old inline capture + verify-and-commit are replaced by the shared capture; the marker trigger is kept.
 - `scripts/screenshot-shards.ts` -- read-only reuse: `matrix`, `print <shard>`, `verify`. No change.
-- `.github/workflows/update-screenshots.yml` -- reference only; its capture + `verify-and-commit` are mirrored here, NOT edited.
-- `_bmad-output/implementation-artifacts/backlog.md` -- design of record; mark this followup done.
+- `_bmad-output/implementation-artifacts/backlog.md` -- design of record; drift-check + keep-the-marker + the reuse decision.
 
 ## Tasks & Acceptance
 
@@ -55,13 +56,19 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 - Given a PR that changes pixels but is never approved, when CI finishes, then nothing is committed and the PR is not turned red by the drift alone.
 - Given a PR touching no render-affecting paths, when CI runs, then the capture is skipped and no approval gate appears.
 
+## Spec Change Log
+
+- **2026-07-13, human renegotiation (party-vetted):** the frozen "Ask First: workflow_call refactor" and "Never: edit update-screenshots.yml" were both approved by the user, who asked to reuse the same capture jobs across both workflows. Amended: the sharded, self-verifying capture is now a reusable `workflow_call` (`screenshot-capture.yml`) that both `pr-drift-check.yml` and `update-screenshots.yml` call. A party round-table (Winston/Dana/Boundary/John/Grumbal) also converged on rendering each shard TWICE in one container (a/b-in-shard) instead of a `run:[a,b]` matrix: same determinism strength, half the `npm ci`+build overhead. KEEP across any re-derivation: the two signals stay separate; the determinism guard renders twice and byte-compares every shot; the commit is environment-approval-gated and never auto-commits; least-privilege per job with `persist-credentials:false` on PR-code jobs; the `[update-screenshots]` marker is retained. Also re-included `src/tests/fixtures/**` in the path gate (screenshot scenes load save fixtures) after a Codex finding.
+
 ## Design Notes
 
 Approval mechanism: a job with `environment: screenshot-approval` cannot start until a required reviewer approves it in the Actions UI, so the gate is native GitHub, same-run, one click. PREREQUISITE (repo setting, one-time): create that Environment with the maintainer as a required reviewer. If the environment does not exist or has no reviewer, the gate does NOT gate and the job would commit unreviewed; the workflow must not silently auto-commit, so treat a missing/unprotected environment as a configuration error to fix, not a fallback. The `if: has_drift` guard means the approval prompt only appears when there is actually something to commit (no gate on no-drift PRs).
 
 GITHUB_TOKEN is deliberate for the commit: its push does not re-trigger workflows, which both avoids a drift-check loop and is fine here (the maintainer can re-approve/re-run the PR's other checks on the bot commit).
 
-Reuse vs DRY: v1 mirrors update-screenshots' capture + `verify-and-commit` rather than editing that just-merged workflow ("do not weaken"). The shared partition/coverage brain (`screenshot-shards.ts`) is genuinely reused. A `workflow_call`/composite that both consume is the DRY endgame (Ask First).
+Reuse vs DRY: the sharded, self-verifying capture is a reusable `workflow_call` (`screenshot-capture.yml`) that BOTH this workflow and `update-screenshots.yml` call, so there is one place that defines how pixels are generated and how nondeterminism is caught. The determinism guard renders each shard TWICE in the SAME container and diffs the two renders (a/b-in-shard), rather than a `run:[a,b]` matrix of separate jobs: same pinned image, so it is exactly as strong a guard, while halving the `npm ci` + build overhead (4 shard jobs, not 8). Wall-clock grows to ~2x the slowest shard's render (acceptable for a background check). If that ever bites, the follow-up is build-once + dep-cache, not more jobs.
+
+Path fixtures: `!src/tests/**` excludes tests, but the screenshot scenes LOAD real save fixtures under `src/tests/fixtures/**` (the `migration` scene reads one), so those are re-included after the negation, or a fixture-only PR could change committed pixels with no check.
 
 Required-check pitfall: a path-filtered workflow that is also a required check hangs "pending" on skipped PRs. If the hard check is made required, drop the top-level `paths:` filter and gate internally (a `changes` job outputs a boolean; a final always-run job reports success when skipped). v1 keeps the simple `paths:` filter and is not required.
 

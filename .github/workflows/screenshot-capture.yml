@@ -1,0 +1,170 @@
+name: Screenshot capture (reusable)
+
+# The SHARED, sharded, self-verifying screenshot capture. Called (workflow_call)
+# by both update-screenshots.yml (the marker/dispatch regen) and pr-drift-check.yml
+# (the per-PR check), so the two never drift on HOW pixels are generated or how
+# nondeterminism is caught. The caller supplies the git ref to render and, after
+# this returns, does its own thing with the artifacts (commit on a marker, or
+# detect drift + commit on approval).
+#
+# For each shard (scripts/screenshot-shards.ts partitions SCENES; the `verify`
+# coverage gate here fails the run if any scene is in no shard or two), ONE job:
+#   - renders the shard's scenes TWICE in the same pinned Playwright image, and
+#   - diffs the two renders against EACH OTHER. A byte difference is
+#     nondeterminism (a wall-clock read leaking into a capture, the exact leak
+#     PR #188 chased), always a bug: the job FAILS, so nothing downstream commits.
+# a/b in the SAME container is as strong a determinism guard as a/b in two jobs
+# (same pinned image; generator nondeterminism surfaces within one container),
+# and it halves the npm ci + build overhead vs a run:[a,b] matrix. The verified
+# run-a set is uploaded as shots-<shard> for the caller to assemble.
+#
+# This job is READ-ONLY: it checks out and executes PR-head code (npm ci, build,
+# the screenshot scripts), so it must never hold a write-scoped token, and its
+# checkouts set persist-credentials:false. The caller grants write only to its
+# own downstream commit job.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: "Git ref or SHA to render (the caller's branch tip or PR head sha)."
+        required: true
+        type: string
+    outputs:
+      shards:
+        description: "JSON array of shard names (for the caller to loop over the shots-<shard> artifacts)."
+        value: ${{ jobs.resolve-image.outputs.shards }}
+      image:
+        description: "The pinned Playwright image tag used."
+        value: ${{ jobs.resolve-image.outputs.image }}
+
+permissions:
+  contents: read
+
+jobs:
+  # Resolve the pinned container tag from the repo's Playwright version and gate
+  # on shard coverage before any capture. `verify`/`matrix` load the real SCENES
+  # (which pulls in node_modules), so install deps first; no browser download
+  # since this job never renders.
+  resolve-image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    outputs:
+      image: ${{ steps.pin.outputs.image }}
+      shards: ${{ steps.shards.outputs.shards }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify shard coverage
+        run: node scripts/screenshot-shards.ts verify
+
+      - id: shards
+        name: Emit the shard matrix
+        run: echo "shards=$(node scripts/screenshot-shards.ts matrix)" >> "$GITHUB_OUTPUT"
+
+      - id: pin
+        run: |
+          ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
+          echo "image=mcr.microsoft.com/playwright:v${ver}-jammy" >> "$GITHUB_OUTPUT"
+
+  # One job per shard: render its scenes twice, prove the two renders match, and
+  # upload the verified set. The whole determinism guard lives here.
+  shoot:
+    needs: resolve-image
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    container:
+      image: ${{ needs.resolve-image.outputs.image }}
+    # Inside a container the default shell is `sh` (dash); the render step uses
+    # bash features (functions, process substitution, `read -d ''`), so pin bash.
+    defaults:
+      run:
+        shell: bash
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.resolve-image.outputs.shards) }}
+    env:
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      # A container checkout trips git's dubious-ownership guard; mark the tree safe.
+      - name: Trust the workspace
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # Render the shard TWICE and prove the two renders are byte-identical. Each
+      # render is captured via a `find -newer` marker (the generator rewrites every
+      # shot it renders, so every rendered file sorts as newer). SHARD comes in via
+      # an env var (not `${{ }}` in the script) so a shard name can never break out.
+      - name: Render this shard twice and prove it is deterministic
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
+          ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
+          echo "shard '$SHARD' renders: $ONLY"
+          render_into() {
+            # Render the shard's scenes and copy exactly this run's output (files
+            # touched during it) into $1, preserving the docs/screenshots/... path.
+            local dest="$1"
+            rm -rf "$dest"; mkdir -p "$dest"
+            touch -d '1 second ago' /tmp/render-marker
+            RUN_SERVER=1 ONLY="$ONLY" node scripts/screenshots.ts
+            while IFS= read -r -d '' f; do
+              mkdir -p "$dest/$(dirname "$f")"
+              cp -a "$f" "$dest/$f"
+            done < <(find docs/screenshots -type f -name '*.png' -newer /tmp/render-marker -print0)
+          }
+          render_into /tmp/run-a
+          render_into /tmp/run-b
+          if ! diff -rq /tmp/run-a /tmp/run-b; then
+            echo "::error::screenshot shard '$SHARD' is nondeterministic: two renders in the same pinned image produced different pixels. A wall-clock read leaked into a capture (likely a new time-driven decoration in the engine render path); fix it before screenshots can update."
+            exit 1
+          fi
+          echo "shard '$SHARD' is deterministic ($(find /tmp/run-a -type f -name '*.png' | wc -l) shot(s))."
+          # Stage the verified run-a set for upload (the .shard-complete marker
+          # keeps the artifact non-empty for a shard that rendered nothing).
+          stage=/tmp/stage
+          rm -rf "$stage"; mkdir -p "$stage/shots"
+          touch "$stage/.shard-complete"
+          [ -d /tmp/run-a ] && cp -a /tmp/run-a/. "$stage/shots/"
+
+      - name: Upload this shard's verified screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: shots-${{ matrix.shard }}
+          path: /tmp/stage
+          retention-days: 5
+          if-no-files-found: error
+          include-hidden-files: true
