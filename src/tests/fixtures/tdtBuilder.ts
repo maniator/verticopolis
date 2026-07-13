@@ -1,7 +1,7 @@
 import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
   TDT_FINANCE_SIZE,
@@ -36,8 +36,14 @@ export interface TenantSpec {
   status?: number;
   /** Rent/lease byte at offset 16 (0 Very Low … 3 High, 4 No Rate). */
   rentRate?: number;
-  /** Per-type byte at offset 17 (retail variant / hotel days-dirty). */
-  subtype?: number;
+  /** Retail variant ordinal, written to unit-record **byte 6** (where the real
+   *  game stores the variety and where the importer reads it). Matches
+   *  `TdtTenant.variant`. To set the byte-17 slot instead, use {@link byte17}. */
+  variant?: number;
+  /** Decoy value for the old (wrong) variant offset, byte 17 (== `TdtTenant.subtype`).
+   *  Lets a test prove the importer reads the variant from byte 6 and ignores
+   *  byte 17. Defaults to 0 (like a real save). */
+  byte17?: number;
 }
 
 export interface FloorSpec {
@@ -151,9 +157,10 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
       u16(t.right);
       u8(t.type); // i8 written via two's complement
       u8(t.status ?? 0);
-      pad(10); // reserved bytes 6–15
-      u8(t.rentRate ?? 2); // Average; imports as the default price
-      u8(t.subtype ?? 0);
+      u8(t.variant ?? 0); // byte 6: retail variant (where the real game stores it)
+      pad(9); // reserved bytes 7–15
+      u8(t.rentRate ?? 2); // byte 16: Average; imports as the default price
+      u8(t.byte17 ?? 0); // byte 17 (unused; the variant lives at byte 6)
     }
     pad(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor remap table
   }
@@ -204,7 +211,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // floor, then a SINGLE car block (cars-INDEPENDENT, harness-confirmed on the
     // real 1994 game). NOT `cars *`: that overran multi-car shafts and desynced
     // the retail game's elevator table. See tdtFormat.ts / tdtExport.ts.
-    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE);
+    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE);
   }
 
   // ---- Finance + parking + stairs -------------------------------------------

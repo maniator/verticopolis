@@ -8,7 +8,7 @@ import { ByteReader } from "./tdtByteReader";
 import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
   TDT_FINANCE_SIZE,
@@ -147,9 +147,10 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
   let occupied = 0;
   for (let slot = 0; slot < TDT_RETAIL_SLOTS; slot++) {
     // Byte 0 is the row's floor, 0xFF marks empty (doc §7); the rest of the
-    // 18-byte row (status, variant, and reserved bytes) is not consumed here.
-    // The importer keys retail variants off the unit-record byte 17 (§4),
-    // which the tenant parser already captures.
+    // 18-byte row is not consumed here (its status/variant columns don't line up
+    // with the real variant anyway). The importer keys retail variants off the
+    // unit-record byte 6 (§4, `TdtTenant.variant`), which the tenant parser
+    // already captures.
     const floor = r.u8();
     r.skip(TDT_RETAIL_RECORD_SIZE - 1);
     if (floor !== 0xff) occupied++;
@@ -195,7 +196,7 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
     let servicedCount = 0;
     for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) servicedCount++;
     const payload =
-      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE;
+      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
     if (r.remaining() < payload) {
       warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
       return tail;

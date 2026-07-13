@@ -266,9 +266,10 @@ describe("parseTDT: golden mappings", () => {
 
   describe("retail subtypes (§7 order): canon variant byte adopts onto Unit.subtype", () => {
     // Import a single tenant of the given retail type with the given variant
-    // byte on unit-record byte 17 (§4), and return the imported unit.
-    const importOne = (type: number, subtype: number) => {
-      const spec = { floors: [{ index: 20, tenants: [{ left: 100, right: 109, type, subtype }] }] };
+    // byte on unit-record byte 6 (where the real game stores it, NOT byte 17),
+    // and return the imported unit.
+    const importOne = (type: number, variant: number, byte17 = 0) => {
+      const spec = { floors: [{ index: 20, tenants: [{ left: 100, right: 109, type, variant, byte17 }] }] };
       return rooms(spec).find((u) => u.kind === "shop" || u.kind === "fastFood" || u.kind === "restaurant");
     };
 
@@ -294,6 +295,14 @@ describe("parseTDT: golden mappings", () => {
       const u = importOne(10, 200);
       expect(u?.kind).toBe("shop");
       expect(u?.subtype).toBeUndefined();
+    });
+
+    it("reads the variant from byte 6, NOT byte 17 (guards the real-game read bug)", () => {
+      // Byte 6 carries the real variety; byte 17 is a decoy. If the importer
+      // regresses to byte 17, it would read SHOP_SUBTYPES[1] ('Pet Store').
+      // Every game-written save leaves byte 17 = 0, so this pins the fix.
+      const u = importOne(10, 3, /* byte17 decoy */ 1);
+      expect(u?.subtype).toBe(SHOP_SUBTYPES[3]); // 'Book Store' from byte 6, not 'Pet Store' from byte 17
     });
   });
 

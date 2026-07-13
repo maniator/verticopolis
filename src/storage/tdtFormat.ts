@@ -101,10 +101,11 @@ export function parseTdtBinary(bytes: Uint8Array): TdtTower {
       const right = r.u16();
       const type = r.i8();
       const status = r.u8();
-      r.skip(10); // reserved bytes 6–15 (tower-docs)
-      const rentRate = r.u8();
-      const subtype = r.u8();
-      tenants.push({ left, right, type, status, rentRate, subtype });
+      const variant = r.u8(); // byte 6: retail variant (the real game's variety byte)
+      r.skip(9); // reserved bytes 7–15 (tower-docs)
+      const rentRate = r.u8(); // byte 16
+      const subtype = r.u8(); // byte 17 (0 in every real save's retail; not the variant)
+      tenants.push({ left, right, type, status, variant, rentRate, subtype });
     }
     r.skip(TDT_FLOOR_INDEX_ENTRIES * 2); // per-floor index map into the tenant array
     floors.push({ index, leftEdge, rightEdge, tenants });
@@ -142,7 +143,7 @@ export {
   TDT_ELEVATOR_HEADER_SIZE,
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
   TDT_FINANCE_SIZE,
   TDT_PARKING_SIZE,
