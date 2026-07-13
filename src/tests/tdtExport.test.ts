@@ -524,6 +524,268 @@ describe("buildTDT: review hardening (states, collisions, caps, hostile input)",
   });
 });
 
+// The 1994 game paves each floor with type-24 (lobby) and type-0 (empty floor)
+// unit records; without them an exported tower shows the city backdrop through
+// floor 1 and every sky lobby, and elevators cannot connect. These pin that the
+// exporter now emits those records: one coalesced span per contiguous run, only
+// where a tile is not under a room, matching a real save's bytes.
+describe("buildTDT: lobby (type 24) and empty-floor (type 0) paving records", () => {
+  const u16 = (b: Uint8Array, off: number) => b[off] | (b[off + 1] << 8);
+  const i8 = (b: number) => (b << 24) >> 24;
+
+  interface FloorTenant {
+    left: number;
+    right: number;
+    type: number;
+    status: number;
+    rentClass: number;
+    subtype: number;
+  }
+  /** Walk the 120-record floor map and return the tenant records at a TDT index. */
+  function floorTenants(b: Uint8Array, tdtIndex: number): FloorTenant[] {
+    let o = 0x230;
+    for (let i = 0; i < 120; i++) {
+      const count = u16(b, o);
+      const recStart = o + 6;
+      if (i === tdtIndex) {
+        const out: FloorTenant[] = [];
+        for (let r = 0; r < count; r++) {
+          const rec = recStart + r * 18;
+          out.push({
+            left: u16(b, rec),
+            right: u16(b, rec + 2),
+            type: i8(b[rec + 4]),
+            status: b[rec + 5],
+            rentClass: b[rec + 16],
+            subtype: b[rec + 17],
+          });
+        }
+        return out;
+      }
+      o = recStart + count * 18 + 94 * 2;
+    }
+    return [];
+  }
+
+  const tower = (units: Unit[]): SerializedGame => ({
+    version: SAVE_VERSION,
+    seed: 1,
+    money: 2_000_000,
+    star: 2,
+    minutes: 7 * 60,
+    mode: "classic",
+    units,
+    transports: [],
+    nextId: units.length + 1,
+    towerName: "Paving",
+    builtWeddingHall: false,
+    evaluatedTower: false,
+  });
+
+  /** A tower whose paving mirrors an imported/real save: width-1 floor/lobby
+   *  tiles across the full extent of every floor (INCLUDING under rooms), a
+   *  ground lobby, a sky lobby on floor 15, and two rooms on floor 2 split by a
+   *  two-tile empty paved gap. */
+  function pavedTower(): SerializedGame {
+    const units: Unit[] = [];
+    let id = 1;
+    const paveRow = (kind: "floor" | "lobby", floor: number, from: number, to: number) => {
+      for (let x = from; x < to; x++) units.push(unit({ id: id++, kind, floor, x, width: 1 }));
+    };
+    // Ground lobby: contiguous lobby run [0, 10) on floor 1.
+    paveRow("lobby", 1, 0, 10);
+    // Sky lobby: contiguous lobby run [0, 10) on floor 15 (a lobby floor).
+    paveRow("lobby", 15, 0, 10);
+    // Floor 2: two office rooms [0,9) and [11,20) with an empty paved gap [9,11).
+    // Paving spans the whole extent [0, 20), under the rooms too, exactly as a
+    // re-imported tower is laid out.
+    paveRow("floor", 2, 0, 20);
+    units.push(unit({ id: id++, kind: "office", floor: 2, x: 0, width: 9, state: "occupied" }));
+    units.push(unit({ id: id++, kind: "office", floor: 2, x: 11, width: 9, state: "occupied" }));
+    return tower(units);
+  }
+
+  it("emits a single type-24 span for the ground lobby run (status 0, rentClass 4)", () => {
+    const { bytes } = buildTDT(pavedTower());
+    const ground = floorTenants(bytes, 1 + 9); // our floor 1 -> TDT index 10
+    expect(ground).toEqual([{ left: 0, right: 10, type: 24, status: 0, rentClass: 4, subtype: 0 }]);
+  });
+
+  it("emits a type-24 span for the sky lobby on floor 15", () => {
+    const { bytes } = buildTDT(pavedTower());
+    const sky = floorTenants(bytes, 15 + 9); // our floor 15 -> TDT index 24
+    const lobbies = sky.filter((t) => t.type === 24);
+    expect(lobbies).toEqual([{ left: 0, right: 10, type: 24, status: 0, rentClass: 4, subtype: 0 }]);
+  });
+
+  it("emits a type-0 span for each empty paved gap, and none under a room", () => {
+    const { bytes } = buildTDT(pavedTower());
+    const floor2 = floorTenants(bytes, 2 + 9); // our floor 2 -> TDT index 11
+    const floorGaps = floor2.filter((t) => t.type === 0);
+    // Exactly one gap record spanning [9, 11); no type-0 under either office.
+    expect(floorGaps).toEqual([{ left: 9, right: 11, type: 0, status: 2, rentClass: 4, subtype: 0 }]);
+    // The two office ROOM records use the same exclusive-`right` (x + width)
+    // convention as the paving spans: [0, 9) and [11, 20).
+    const offices = floor2.filter((t) => t.type === 7).map((t) => [t.left, t.right]);
+    expect(offices).toEqual([
+      [0, 9],
+      [11, 20],
+    ]);
+  });
+
+  it("raises zero importer warnings and re-exports byte-identically", () => {
+    const first = buildTDT(pavedTower()).bytes;
+    expect(parseTdtBinary(first).warnings).toEqual([]);
+    const again = buildTDT(parseTDT(first.buffer as ArrayBuffer, "P.TDT").save).bytes;
+    expect(again).toEqual(first);
+  });
+
+  it("splits a lobby run broken by a room into one type-24 span per sub-run", () => {
+    // A room sits mid-lobby on floor 1: the lobby paving [0, 20) is split into
+    // [0, 6) and [10, 20) around the room's footprint [6, 10).
+    const units: Unit[] = [];
+    let id = 1;
+    for (let x = 0; x < 20; x++) units.push(unit({ id: id++, kind: "lobby", floor: 1, x, width: 1 }));
+    units.push(unit({ id: id++, kind: "security", floor: 1, x: 6, width: 4 }));
+    const { bytes } = buildTDT(tower(units));
+    const ground = floorTenants(bytes, 1 + 9).filter((t) => t.type === 24);
+    expect(ground).toEqual([
+      { left: 0, right: 6, type: 24, status: 0, rentClass: 4, subtype: 0 },
+      { left: 10, right: 20, type: 24, status: 0, rentClass: 4, subtype: 0 },
+    ]);
+  });
+
+  it("paves a gutted/burning lobby tile as an ordinary type-24 lobby (state drops on the round trip)", () => {
+    // A gutted lobby cannot occur in real play: EventSystem.flammableUnits
+    // excludes floor and lobby, so fire never touches a lobby. This only guards
+    // hand-forged input, which buildTDT accepts. The importer paves the whole
+    // extent and rebuilds each tile's kind from the floor (isLobbyFloor), with no
+    // notion of a gutted tile: the gutted STATE is lost on the paving round trip,
+    // like every state. So the run is NOT split, and re-export must be byte-identical.
+    const units: Unit[] = [];
+    let id = 1;
+    for (let x = 0; x < 10; x++) {
+      const state = x === 4 || x === 5 ? "gutted" : "empty";
+      units.push(unit({ id: id++, kind: "lobby", floor: 1, x, width: 1, state }));
+    }
+    const first = buildTDT(tower(units)).bytes;
+    const ground = floorTenants(first, 1 + 9).filter((t) => t.type === 24);
+    expect(ground).toEqual([{ left: 0, right: 10, type: 24, status: 0, rentClass: 4, subtype: 0 }]);
+    // The gutted-tile save still round-trips byte-identically and warning-free.
+    expect(parseTdtBinary(first).warnings).toEqual([]);
+    const again = buildTDT(parseTDT(first.buffer as ArrayBuffer, "G.TDT").save).bytes;
+    expect(again).toEqual(first);
+  });
+
+  // The regression the adversarial review hit: earlier code coalesced the
+  // ACTUAL paved tiles (with gaps) and derived kind from each unit, so a tower
+  // with an unpaved corridor gap, a laterally-separated room, or a lobby tile
+  // on the "wrong" floor failed byte-identity, because the importer paves the
+  // WHOLE extent as one block and reconstructs kind from isLobbyFloor. A
+  // hand-built (non-import-normalized) save is the only thing that exposes it:
+  // an import-normalized fixture is already a fixed point.
+  it("a non-normalized tower (unpaved gaps, separated runs) round-trips byte-identically", () => {
+    const units: Unit[] = [];
+    let id = 1;
+    // Floor 3: floor paving only on [0, 5), plus an office at [20, 29). The
+    // extent is [0, 29); the importer bridges the unpaved [5, 20) into one block
+    // and re-export must coalesce the same [0, 20) span (minus the room).
+    for (let x = 0; x < 5; x++) units.push(unit({ id: id++, kind: "floor", floor: 3, x, width: 1 }));
+    units.push(unit({ id: id++, kind: "office", floor: 3, x: 20, width: 9, state: "occupied" }));
+    // Floor 4: two laterally-separated corridor runs [0, 5) and [10, 15). The
+    // importer paves the whole extent [0, 15) as one block.
+    for (let x = 0; x < 5; x++) units.push(unit({ id: id++, kind: "floor", floor: 4, x, width: 1 }));
+    for (let x = 10; x < 15; x++) units.push(unit({ id: id++, kind: "floor", floor: 4, x, width: 1 }));
+    // A sky lobby confirms type-24 paving survives the same round trip.
+    for (let x = 0; x < 8; x++) units.push(unit({ id: id++, kind: "lobby", floor: 15, x, width: 1 }));
+    const save = tower(units);
+
+    const first = buildTDT(save).bytes;
+    expect(parseTdtBinary(first).warnings).toEqual([]);
+    const reimported = parseTDT(first.buffer as ArrayBuffer, "N.TDT").save;
+    const again = buildTDT(reimported).bytes;
+    expect(again).toEqual(first);
+
+    // After the round trip the type-0 spans match the importer's post-import
+    // shape: the whole extent minus the room footprint, not the original tiles.
+    const floor3 = floorTenants(first, 3 + 9);
+    expect(floor3.filter((t) => t.type === 0)).toEqual([
+      { left: 0, right: 20, type: 0, status: 2, rentClass: 4, subtype: 0 },
+    ]);
+    expect(floor3.filter((t) => t.type === 7).map((t) => [t.left, t.right])).toEqual([[20, 29]]);
+    const floor4 = floorTenants(first, 4 + 9);
+    expect(floor4.filter((t) => t.type === 0)).toEqual([
+      { left: 0, right: 15, type: 0, status: 2, rentClass: 4, subtype: 0 },
+    ]);
+    const sky = floorTenants(first, 15 + 9);
+    expect(sky.filter((t) => t.type === 24)).toEqual([
+      { left: 0, right: 8, type: 24, status: 0, rentClass: 4, subtype: 0 },
+    ]);
+  });
+
+  it("a forged floor width (Infinity) can't hang the export, and paving stays within the grid", () => {
+    // floor/lobby units arrive unclamped from serialized input; a forged width
+    // widens the extent to Infinity. The paving loop must clamp to finite tiles
+    // in [0, GRID.width] and return promptly, not spin forever.
+    const started = Date.now();
+    const { bytes } = buildTDT(
+      tower([
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "floor", floor: 2, x: 0, width: Number.POSITIVE_INFINITY }),
+      ]),
+    );
+    expect(Date.now() - started).toBeLessThan(2000);
+    // No emitted record on any floor extends past the grid's right edge.
+    for (let idx = 0; idx < 120; idx++) {
+      for (const t of floorTenants(bytes, idx)) {
+        expect(t.right).toBeLessThanOrEqual(GRID.width);
+        expect(t.left).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("a multi-story unit's part records are never overlapped by a paving span", () => {
+    // A Wedding Hall crowns floor 100 as a 5-part cathedral (PART_STACKS emits
+    // types 36..40 DOWNWARD onto floors 96-100), yet facilityFloors(weddingHall)
+    // is 1. So the old input-footprint coverage marked only floor 100 and let a
+    // paving span overlap the parts on floors 96-99. Coverage is now rebuilt
+    // from the EMITTED records, so no type-0/24 span overlaps a part on ANY of
+    // the five floors, and the tower round-trips byte-identically.
+    const units: Unit[] = [];
+    let id = 1;
+    // Full-extent paving on floors 96-100 (under the cathedral too), plus gaps.
+    for (let fl = 96; fl <= 100; fl++) {
+      for (let x = 0; x < 40; x++) units.push(unit({ id: id++, kind: "floor", floor: fl, x, width: 1 }));
+    }
+    units.push(unit({ id: id++, kind: "weddingHall", floor: 100, x: 5, width: 16 })); // parts cover [5, 21)
+    const save = tower(units);
+    const { bytes } = buildTDT(save);
+
+    // Each of floors 96-100 carries one cathedral part (types 36..40); assert no
+    // type-0 span overlaps the part's [5, 21) footprint on any of them.
+    const cathedralIds = new Set([36, 37, 38, 39, 40]);
+    for (let ourFloor = 96; ourFloor <= 100; ourFloor++) {
+      const recs = floorTenants(bytes, ourFloor + 9);
+      const parts = recs.filter((t) => cathedralIds.has(Math.abs(t.type)));
+      expect(parts.length, `cathedral part on floor ${ourFloor}`).toBe(1);
+      const paving = recs.filter((t) => t.type === 0 || t.type === 24);
+      for (const p of parts) {
+        for (const s of paving) {
+          const overlaps = s.left < p.right && p.left < s.right;
+          expect(
+            overlaps,
+            `span [${s.left},${s.right}) overlaps part [${p.left},${p.right}) on floor ${ourFloor}`,
+          ).toBe(false);
+        }
+      }
+    }
+
+    expect(parseTdtBinary(bytes).warnings).toEqual([]);
+    const again = buildTDT(parseTDT(bytes.buffer as ArrayBuffer, "C.TDT").save).bytes;
+    expect(again).toEqual(bytes);
+  });
+});
+
 describe("shared-table tripwires: the writer's inversions match the importer", () => {
   it("every PART_STACKS id maps back to its kind, with the family's full story count", () => {
     // PART_STACKS is module-private; assert through behavior: each multi-story
