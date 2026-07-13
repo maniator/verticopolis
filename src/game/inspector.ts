@@ -77,8 +77,9 @@ export function retailStatsLines(
   // multiplier is 1, but the foot-traffic factor averages TRAFFIC_FACTOR_MEAN
   // (0.8), never 1, so real patronage tops out around that fraction of the
   // ceiling. Baking the mean into the baseline keeps the verdict measuring the
-  // levers a player controls (appeal, placement, weather), not the daily dice —
-  // otherwise the top band was unreachable and the green verdict was dead code.
+  // levers a player controls (appeal, placement, weather) rather than the daily
+  // dice; otherwise the top band was unreachable and the green verdict was dead
+  // code.
   const baseline = (daily / spend) * TRAFFIC_FACTOR_MEAN;
   const today = Math.max(0, patronageToday ?? 0);
   // The "Today's patronage" number is the running count so far today; its bar
