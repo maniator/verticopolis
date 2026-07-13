@@ -163,3 +163,67 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
     expect(errors).toEqual([]);
   });
 });
+
+test.describe("mobile inspect: a tap raises the hover card", () => {
+  test("tapping a facility with the inspect tool shows the inspector card (touch has no hover)", async ({ page }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const canvas = document.querySelector<HTMLCanvasElement>("#view");
+      return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
+    });
+    await page.evaluate(() => {
+      document.getElementById("splash")?.remove();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      g.speed = 0;
+      g.sim.money = 1e9;
+    });
+
+    // Build an office to inspect (a touch tap with the build tool).
+    await page.click('.pal-item[data-kind="office"]');
+    const spot = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const e = g.engine;
+      const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
+      return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
+    });
+    await dispatchTouch(page, "pointerdown", 8001, spot.x, spot.y);
+    await dispatchTouch(page, "pointerup", 8001, spot.x, spot.y);
+    const placed = await page.evaluate(() => (window as any).game.sim.tower.units.length); // eslint-disable-line @typescript-eslint/no-explicit-any
+    expect(placed).toBeGreaterThan(0);
+
+    // Switch to the inspect tool. The card starts hidden: touch has no hover to
+    // raise it, and before this fix a tap only opened the editor.
+    await page.click('.pal-item[data-tool="inspect"]');
+    await expect(page.locator("#inspector")).toHaveClass(/hidden/);
+
+    // Tap the office. The tap must stand in for the missing hover and raise the
+    // inspector card for that facility.
+    await dispatchTouch(page, "pointerdown", 8002, spot.x, spot.y);
+    await dispatchTouch(page, "pointerup", 8002, spot.x, spot.y);
+    const insp = page.locator("#inspector");
+    await expect(insp).not.toHaveClass(/hidden/);
+    await expect(insp).toContainText("Satisfaction:"); // the unit card rendered
+
+    // Tapping empty space (same on-screen floor, well left of the office where
+    // nothing is built) dismisses the card again.
+    const empty = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const e = g.engine;
+      const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
+      return { x: e.worldToScreenX(g.grid.width / 2 - 30), y: e.worldToScreenY(2) + zoomPx / 2 };
+    });
+    await dispatchTouch(page, "pointerdown", 8003, empty.x, empty.y);
+    await dispatchTouch(page, "pointerup", 8003, empty.x, empty.y);
+    await expect(page.locator("#inspector")).toHaveClass(/hidden/);
+
+    expect(errors).toEqual([]);
+  });
+});
