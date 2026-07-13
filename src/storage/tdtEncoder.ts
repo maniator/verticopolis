@@ -7,7 +7,7 @@ import {
   TDT_DEFAULT_VIEW_Y,
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
   TDT_ELEVATOR_SLOTS,
@@ -293,7 +293,7 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     // `cars * 348` overran every multi-car shaft and desynced the retail game's
     // elevator table (only one shaft rendered, and the parking/basement block
     // after it mis-read). Must match walkTolerantTail's skip. See tdtConstants.ts.
-    w.pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE);
+    w.pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE);
   }
 
   // Finance history: not modeled; zero-filled at the documented size.

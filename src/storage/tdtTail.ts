@@ -8,7 +8,7 @@ import { ByteReader } from "./tdtByteReader";
 import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
   TDT_FINANCE_SIZE,
@@ -195,7 +195,7 @@ export function walkTolerantTail(r: ByteReader): TdtTail {
     let servicedCount = 0;
     for (let i = 0; i < serviced.length; i++) if (serviced[i] !== 0) servicedCount++;
     const payload =
-      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE;
+      TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE;
     if (r.remaining() < payload) {
       warnings.push("The elevator table is cut short, so elevators were rebuilt from the floor layout and the save's stairways couldn't be read.");
       return tail;

@@ -1,7 +1,7 @@
 import {
   TDT_ELEVATOR_BUILT_FIXED,
   TDT_ELEVATOR_HEADER_SIZE,
-  TDT_ELEVATOR_PER_CAR_SIZE,
+  TDT_ELEVATOR_CAR_BLOCK_SIZE,
   TDT_ELEVATOR_PER_FLOOR_SIZE,
   TDT_ELEVATOR_SLOTS,
   TDT_FINANCE_SIZE,
@@ -204,7 +204,7 @@ export function buildTdt(spec: TdtSpec = {}): Uint8Array {
     // floor, then a SINGLE car block (cars-INDEPENDENT, harness-confirmed on the
     // real 1994 game). NOT `cars *`: that overran multi-car shafts and desynced
     // the retail game's elevator table. See tdtFormat.ts / tdtExport.ts.
-    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_PER_CAR_SIZE);
+    pad(TDT_ELEVATOR_BUILT_FIXED + servicedCount * TDT_ELEVATOR_PER_FLOOR_SIZE + TDT_ELEVATOR_CAR_BLOCK_SIZE);
   }
 
   // ---- Finance + parking + stairs -------------------------------------------

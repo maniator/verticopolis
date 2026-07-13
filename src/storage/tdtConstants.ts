@@ -94,14 +94,15 @@ export const TDT_ELEVATOR_HEADER_SIZE = 194;
 // estimate undercounted this block by 2420 B, which desynced the whole table
 // after the first shaft and forced the importer to synthesize fakes instead.
 // The trailing 348-byte block is cars-INDEPENDENT (one per shaft, NOT `* cars`):
-// harness-confirmed against the retail game in 2026-07-13. See TDT_ELEVATOR_PER_CAR_SIZE.
+// harness-confirmed against the retail game in 2026-07-13. See TDT_ELEVATOR_CAR_BLOCK_SIZE.
 export const TDT_ELEVATOR_BUILT_FIXED = 3140;
 export const TDT_ELEVATOR_PER_FLOOR_SIZE = 324;
-/** The single 348-byte car block appended per BUILT shaft. Named "per car" for
- *  historical reasons, but it appears exactly ONCE per shaft regardless of the
- *  car count (harness-confirmed on the real 1994 game): never multiply by cars.
- *  A rename to `..._CAR_BLOCK_SIZE` is a logged follow-up (backlog). */
-export const TDT_ELEVATOR_PER_CAR_SIZE = 348;
+/** The single 348-byte car block appended per BUILT shaft. It appears exactly
+ *  ONCE per shaft regardless of the car count (harness-confirmed on the real
+ *  1994 game): never multiply by cars. The former name `TDT_ELEVATOR_PER_CAR_SIZE`
+ *  wrongly implied a per-car block and invited a `* cars` regression, so it was
+ *  renamed to `..._CAR_BLOCK_SIZE`. */
+export const TDT_ELEVATOR_CAR_BLOCK_SIZE = 348;
 /**
  * The 56-byte per-shaft schedule/config block (bytes 4–59 of an elevator
  * header) the 1994 game reads to dispatch cars. Every built shaft in a sampled
