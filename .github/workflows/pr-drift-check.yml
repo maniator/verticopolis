@@ -77,10 +77,14 @@ jobs:
   # this pull_request event (drift check), so the expensive Playwright capture runs
   # twice for one push: 2x compute for no extra signal. Skipping here is safe: the
   # twice-render determinism hard-fail is not lost, it still runs inside
-  # update-screenshots.yml's capture on the push event. The drift check is advisory
-  # and non-required (see the WARNING on the paths filter above), so if this guard
-  # ever errors (API blip) the dependents cascade-skip, i.e. fail-open, which is the
-  # right default for an advisory check backstopped by another workflow.
+  # update-screenshots.yml's capture on the push event. The guard reads the marker
+  # defensively: on ANY error (a fork head SHA not resolvable in this repo, or a
+  # transient API failure) the step catches it and defaults head_is_marker=false, so
+  # the capture still RUNS. That is the safe default for an advisory, non-required
+  # check (see the WARNING on the paths filter above): the worst case is running the
+  # capture once more, never a silently skipped determinism check. A guard job that
+  # threw instead would fail `capture` through `needs: guard` and skip the check even
+  # for the fork and main-headed PRs the capture `if:` below means to keep running.
   #
   # The marker is read from the PR HEAD commit via the API (contents:read, no
   # checkout, so no PR-head code executes here). This must stay the SAME commit
@@ -102,14 +106,26 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const { data: commit } = await github.rest.repos.getCommit({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              ref: context.payload.pull_request.head.sha,
-            });
-            const message = commit.commit.message || '';
-            // Case-insensitive to match update-screenshots.yml's `contains()`.
-            const isMarker = message.toLowerCase().includes('[update-screenshots]');
+            // Fail SAFE toward running the capture: any failure to read the commit
+            // (fork head SHA not in this repo, transient API error) leaves isMarker
+            // false, so the capture runs rather than the guard job throwing and
+            // skipping it via `needs`.
+            let isMarker = false;
+            try {
+              const { data: commit } = await github.rest.repos.getCommit({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: context.payload.pull_request.head.sha,
+              });
+              const message = commit.commit.message || '';
+              // Case-insensitive to match update-screenshots.yml's `contains()`.
+              isMarker = message.toLowerCase().includes('[update-screenshots]');
+            } catch (err) {
+              core.warning(
+                `Could not read the PR head commit message (${err.message}); ` +
+                  'defaulting head_is_marker=false so the capture runs.',
+              );
+            }
             core.setOutput('head_is_marker', isMarker ? 'true' : 'false');
             core.info(
               isMarker
