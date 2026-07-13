@@ -32,7 +32,6 @@ const SCANNED_DIRS = ["src", "scripts"];
 const LEGACY_OVERSIZED = new Set<string>([
   // engine
   "src/engine/Simulation.ts",
-  "src/engine/Tower.ts",
   // render
   "src/render/excalibur/TowerEngine.ts",
   // ui / app spine / audio
