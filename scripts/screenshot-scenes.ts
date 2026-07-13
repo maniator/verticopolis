@@ -304,7 +304,7 @@ export const SCENES: Scene[] = [
           // context. A FIRST loss now recovers in place (no card); the card only
           // appears on a repeat, so fire the hook twice. The second loss lands
           // inside the 90s window and escalates to the crash card, the same
-          // two-strikes path contextRecovery.spec.ts exercises with real losses.
+          // two-strikes path e2e/contextRecovery.spec.ts exercises with real losses.
           // Both links are asserted with messages that name the real problem
           // (the hook is nullable on TowerEngine, and a silently skipped clock
           // stop would leave the backdrop advancing between runs).
