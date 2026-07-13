@@ -5,7 +5,7 @@ import {
   frameForMinuteOfDay,
   minuteOfDayForFrame,
   paceFactor,
-} from "../engine/timePacing";
+} from "./timePacing";
 
 /** Wrap-aware distance between two minutes-of-day. */
 function minuteDiff(a: number, b: number): number {

@@ -25,4 +25,4 @@ src/tests/storage.test.ts
 src/tests/faqComplete.test.ts
 src/tests/gameControllers.test.ts
 src/tests/tower.test.ts
-src/tests/calendar.test.ts
+src/tests/integration/calendar.integration.test.ts

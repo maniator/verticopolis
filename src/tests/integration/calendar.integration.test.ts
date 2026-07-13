@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { Clock } from "../engine/Clock";
-import { CANON, REAL_WORLD, resolveCalendar, coerceCalendarKind } from "../engine/calendar";
-import { Simulation } from "../engine/Simulation";
-import { EconomySystem } from "../engine/EconomySystem";
-import { Tower } from "../engine/Tower";
-import { RNG } from "../engine/rng";
-import { ECON } from "../engine/econConfig";
-import type { SimContext } from "../engine/SimContext";
-import type { FacilityKind } from "../engine/types";
+import { Clock } from "../../engine/Clock";
+import { CANON, REAL_WORLD, resolveCalendar, coerceCalendarKind } from "../../engine/calendar";
+import { Simulation } from "../../engine/Simulation";
+import { EconomySystem } from "../../engine/EconomySystem";
+import { Tower } from "../../engine/Tower";
+import { RNG } from "../../engine/rng";
+import { ECON } from "../../engine/econConfig";
+import type { SimContext } from "../../engine/SimContext";
+import type { FacilityKind } from "../../engine/types";
 
 /** A day-N clock on a given calendar. Clock treats minutes===0 as 07:00 day 0,
  *  so seed a day from its minute count (day 0 uses a tiny non-zero offset). */
