@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Clock } from "../engine/Clock";
+import { Clock } from "./Clock";
 
 describe("Clock", () => {
   it("starts on Monday morning", () => {
