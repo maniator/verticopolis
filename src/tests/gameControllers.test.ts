@@ -201,6 +201,20 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(desktop).not.toContain('data-field="diagnostics"');
   });
 
+  it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
+    const sim = new Simulation();
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("security", 2, 12);
+    expect(r.ok).toBe(true);
+    const sec = sim.tower.units.find((u) => u.id === r.unitId)!;
+    sec.state = "occupied";
+    // Security has no population and no traffic income, so facilityDiagnostics
+    // emits no access line: the mobile editor keeps the plain "Elevator access"
+    // row so its connectivity still shows (parity with desktop, not a silent drop).
+    expect(unitEditorHtml(sim, sec, true)).toContain("Elevator access");
+  });
+
   it("mobile editor folds the retail patronage block into a shop's panel", () => {
     const sim = new Simulation();
     for (let x = 10; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);

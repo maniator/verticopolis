@@ -837,7 +837,10 @@ class GameApp {
       } else {
         this.engine.preview = null;
         this.engine.transportPreview = null;
-        if (this.tool.type === "inspect") this.inspector.inspectPicked(picked);
+        // The floating card is a desktop affordance only: on a phone-width
+        // viewport we show ONE panel (the editor, with diagnostics folded in),
+        // so a hybrid mouse+touch device never raises the card there either.
+        if (this.tool.type === "inspect" && !this.mobileMq.matches) this.inspector.inspectPicked(picked);
       }
     };
 

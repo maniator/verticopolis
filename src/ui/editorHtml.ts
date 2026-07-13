@@ -4,7 +4,7 @@ import { isOperational, isTenanted } from "../engine/types";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, maxCarsFor, residentCount } from "../engine/facilities";
 import { householdPrice } from "../engine/gameRules";
 import { rentConfig, rentOf, resaleRefund } from "../engine/econConfig";
-import { facilityDiagnostics, transportDiagnostics } from "../game/facilityDiagnostics";
+import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../game/facilityDiagnostics";
 import { escapeHtml } from "./escape";
 import { floorTag } from "./format";
 
@@ -90,8 +90,10 @@ export function unitEditorHtml(sim: Simulation, u: Unit, mobile = false): string
   if (isCommercialKind(u.kind) && f.population > 0) rows.push(kvRow("Customers", vol.customers, "customers"));
   else if (f.population) rows.push(kvRow("Occupants", vol.occupants, "occupants"));
   // On mobile the folded-in diagnostics carry the richer access reachability
-  // line, so the plain Yes/No access row would just duplicate it; drop it there.
-  if (!mobile) rows.push(kvRow("Elevator access", vol.served, "served"));
+  // line, so the plain Yes/No row would duplicate it: drop it there. But keep
+  // it for a zero-population service kind (security/medical/housekeeping/metro),
+  // whose diagnostics emit NO access line, so its connectivity still shows.
+  if (!mobile || !hasAccessDiagnostic(u)) rows.push(kvRow("Elevator access", vol.served, "served"));
   rows.push(kvRow("Eval", vol.eval, "eval"));
   if (rcfg) {
     const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Quarterly rent";

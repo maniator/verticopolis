@@ -112,6 +112,21 @@ export function retailStatsLines(
 }
 
 /**
+ * Whether {@link facilityDiagnostics} emits an access-reachability line for this
+ * unit: only kinds that actually draw commuters/visitors (tenants + venues) get
+ * one, since parking/service facilities work via ramp-chaining/coverage, not
+ * passenger trips, so an access warning on them would be a false alarm. The
+ * mobile editor reads this to decide whether its plain "Elevator access" row
+ * would just duplicate the diagnostics line (drop it) or is the only
+ * connectivity signal for a zero-population service kind (keep it). One source,
+ * so the editor and the diagnostics can never disagree on which kinds carry it.
+ */
+export function hasAccessDiagnostic(u: Unit): boolean {
+  const f = FACILITIES[u.kind];
+  return f.population > 0 || ECON.dailyTrafficIncome[u.kind] !== undefined;
+}
+
+/**
  * The concatenated diagnostic lines for a unit, in card order: access, hotel
  * star-count, parking ramp/demand, office long-walk, commercial lobby distance,
  * recycling capacity, the on-notice countdown, and the retail patronage block.
@@ -119,13 +134,9 @@ export function retailStatsLines(
  * well-placed, non-retail unit with nothing to warn about.
  */
 export function facilityDiagnostics(sim: Simulation, u: Unit): string {
-  const f = FACILITIES[u.kind];
-  // Access — the whole truth, not just "served": a floor can be connected yet
-  // sit 3+ rides from the lobby, in which case no commuter ever comes. Only
-  // shown for units that actually draw commuters/visitors (tenants + venues);
-  // parking/service work via ramp-chaining/coverage, not passenger trips, so
-  // an access warning on them would be a false alarm.
-  const needsAccess = f.population > 0 || ECON.dailyTrafficIncome[u.kind] !== undefined;
+  // Access is the whole truth, not just "served": a floor can be connected yet
+  // sit 3+ rides from the lobby, in which case no commuter ever comes.
+  const needsAccess = hasAccessDiagnostic(u);
   const served = sim.tower.isFloorServed(u.floor);
   const access = !needsAccess
     ? ""
