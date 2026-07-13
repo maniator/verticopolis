@@ -13,7 +13,7 @@ export function facilityFloors(kind: FacilityKind): number {
 /**
  * How long a facility takes to build, in in-game minutes. Structure goes up
  * instantly; rooms take a while (bigger/pricier → longer), like the original's
- * construction phase. Driven entirely by the global clock — no per-room timers.
+ * construction phase. Driven entirely by the global clock, no per-room timers.
  */
 export function buildMinutes(kind: FacilityKind): number {
   const f = FACILITIES[kind];
@@ -48,10 +48,10 @@ export function openHoursPerDay(kind: FacilityKind): number {
   return h || 1;
 }
 
-/** The canon foot-traffic commercial kinds — fast food, restaurant, retail
+/** The canon foot-traffic commercial kinds, fast food, restaurant, retail
  *  (shop), cinema. This is the exact set the 1994 noise (W2) and lobby-proximity
  *  (W3) rules name. `partyHall` earns traffic income too but is deliberately NOT
- *  in the canon commercial set, so it is exempt from both — keep W2 and W3 keyed
+ *  in the canon commercial set, so it is exempt from both, keep W2 and W3 keyed
  *  off this one predicate so they can never drift apart. */
 export function isCommercialKind(kind: FacilityKind): boolean {
   return kind === "fastFood" || kind === "restaurant" || kind === "shop" || kind === "cinema";
@@ -77,7 +77,7 @@ export function isElevatorKind(kind: FacilityKind): boolean {
 }
 
 /** True for staff-only transports (no tenants/visitors ever ride them). The
- *  single source of truth for every passenger-side exclusion — routing,
+ *  single source of truth for every passenger-side exclusion, routing,
  *  serving, capacity, dispatch demand. */
 export function isStaffOnlyTransport(kind: FacilityKind): boolean {
   return FACILITIES[kind]?.staffOnly === true;

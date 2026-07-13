@@ -16,7 +16,7 @@ export const TRANSPORT_CAPACITY: Record<string, number> = {
 
 /**
  * Per-car passenger capacity for a transport kind. The single source of truth
- * for the whole engine — dispatch load-clamping, the simulation's capacity /
+ * for the whole engine, dispatch load-clamping, the simulation's capacity /
  * congestion math, and the renderer's rider-fill / FULL indicator all route
  * through here, so they can never disagree on the number (an unknown kind
  * conservatively carries nobody). Distinct from `Simulation.transportCapacity`,
@@ -27,7 +27,7 @@ export function transportCarCapacity(kind: FacilityKind): number {
 }
 
 /** Maximum cars allowed per shaft, by elevator type. Canon: every elevator kind
- *  supports up to 8 cars per shaft in the 1994 original — service is not an
+ *  supports up to 8 cars per shaft in the 1994 original, service is not an
  *  exception (it is a staff-only standard elevator: same 8 cars, same 30-floor
  *  span). */
 export const MAX_CARS: Record<string, number> = {
@@ -45,7 +45,7 @@ export function maxCarsFor(kind: string): number {
 /**
  * Hard per-tower build limits, mirroring the 1994 original's caps. A kind absent
  * here is uncapped. Elevator shafts (all three kinds) share a single 24-shaft
- * pool; stairs and escalators share a 64-link pool — see {@link POOLED_CAPS}.
+ * pool; stairs and escalators share a 64-link pool, see {@link POOLED_CAPS}.
  */
 export const BUILD_CAPS: Partial<Record<FacilityKind, number>> = {
   metro: 1,
@@ -75,7 +75,7 @@ export function maxSpanFor(kind: FacilityKind): number {
 
 /** True for transports that are a FIXED two-floor unit (stairs, escalators):
  *  placed with one tap, never dragged to size, never extended. The single
- *  home for the concept — placement, gestures, ghosts, editor buttons and
+ *  home for the concept, placement, gestures, ghosts, editor buttons and
  *  span messages all key off this, so a new kind can't flip half of them. */
 export function isFixedSpanTransport(kind: FacilityKind): boolean {
   return FACILITIES[kind]?.transport === true && maxSpanFor(kind) === 1;

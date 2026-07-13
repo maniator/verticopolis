@@ -3,10 +3,10 @@ import { FACILITIES, GRID, facilityFloors, isHotelKind } from "../engine/facilit
 import type { FacilityKind } from "../engine/types";
 
 /**
- * Shared semantic tables and placement helpers for the `.TDT` codec — the ONE
+ * Shared semantic tables and placement helpers for the `.TDT` codec: the ONE
  * source of truth the reader (`tdtImport`) and writer (`tdtExport`) both depend
  * on, so their type/flag mappings cannot drift. The exporter inverts these
- * tables; extracting them into this leaf breaks the old import↔export coupling
+ * tables; extracting them into this leaf breaks the old import/export coupling
  * (export used to import them from import).
  */
 

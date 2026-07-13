@@ -20,11 +20,11 @@
  * This file is the entry point + barrel. The pieces live in cohesive siblings
  * and are re-exported here so every existing `import { … } from "./tdtFormat"`
  * keeps working unchanged:
- *   - `tdtConstants.ts`  — LegacyImportError + all size/offset constants.
- *   - `tdtViewMapping.ts` — the pure view/camera word mapping.
- *   - `tdtTypes.ts`      — the raw Tdt* interfaces.
- *   - `tdtByteReader.ts` — the bounds-checked ByteReader.
- *   - `tdtTail.ts`       — locateStairs + the tolerant tail walk.
+ *   - `tdtConstants.ts`: LegacyImportError + all size/offset constants.
+ *   - `tdtViewMapping.ts`: the pure view/camera word mapping.
+ *   - `tdtTypes.ts`: the raw Tdt* interfaces.
+ *   - `tdtByteReader.ts`: the bounds-checked ByteReader.
+ *   - `tdtTail.ts`: locateStairs + the tolerant tail walk.
  */
 import { ByteReader } from "./tdtByteReader";
 import {

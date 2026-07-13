@@ -32,7 +32,7 @@ export function fromBase64(b64: string): Uint8Array {
 // Cap on a decompressed localStorage save. A maxed-out tower is well under 2MB
 // of JSON; 32MB is generous headroom. localStorage is quota-bounded and
 // same-origin, but a corrupt or tampered VCZ1 value could still inflate
-// enormously and hang the tab at boot — so, like the .vctower import path, we
+// enormously and hang the tab at boot, so, like the .vctower import path, we
 // bound it. fflate's streaming Inflate lets us abort as soon as the output
 // passes the cap (inflateSync would allocate the whole buffer first).
 const MAX_SAVE_INFLATED_BYTES = 32 * 1024 * 1024;
@@ -90,15 +90,15 @@ const MAX_INFLATED_BYTES = 64 * 1024 * 1024;
 /** Thrown by {@link inflate} when a decompressing stream exceeds MAX_INFLATED_BYTES. */
 export class TowerTooLargeError extends Error {}
 
-// deflate-raw via the native streams API (no zlib/gzip framing — the magic
+// deflate-raw via the native streams API (no zlib/gzip framing, the magic
 // line already identifies the format, and raw deflate is the smallest).
 export function deflate(bytes: Uint8Array): Promise<Uint8Array> {
-  // Compressing our own bounded JSON — no cap needed on the output.
+  // Compressing our own bounded JSON, no cap needed on the output.
   return pipe(bytes, new CompressionStream("deflate-raw"));
 }
 
 export function inflate(bytes: Uint8Array): Promise<Uint8Array> {
-  // Decompressing untrusted input — cap the output to bound bombs.
+  // Decompressing untrusted input, cap the output to bound bombs.
   return pipe(bytes, new DecompressionStream("deflate-raw"), MAX_INFLATED_BYTES);
 }
 
@@ -110,7 +110,7 @@ async function pipe(bytes: Uint8Array, transform: GenericTransformStream, maxByt
     },
   }).pipeThrough(transform);
   // Read chunk by chunk so a bomb is aborted mid-inflation, before it can
-  // materialize a giant buffer — rather than Response().arrayBuffer(), which
+  // materialize a giant buffer, rather than Response().arrayBuffer(), which
   // would buffer the whole (unbounded) output first.
   const reader = stream.getReader();
   const chunks: Uint8Array[] = [];

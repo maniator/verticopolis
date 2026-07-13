@@ -3,17 +3,17 @@
  *
  * Extracted from Simulation so the (growing) migration surface lives in one
  * discoverable, independently-testable place. Everything here is a PURE function
- * on `SerializedGame` — no DOM, no class state — run by `Simulation.deserialize`
+ * on `SerializedGame` (no DOM, no class state), run by `Simulation.deserialize`
  * via {@link migrateSave}. Each `upgradeVNtoVN1` is a standalone step and
  * `migrateSave` just chains them.
  *
  * This file is the dispatcher. The two heaviest steps live in cohesive siblings
  * and are re-exported here so every existing `import { … } from "./saveMigration"`
  * keeps working unchanged:
- *   - `migrations/v1tov2.ts` — the segment-parity reflow (`reflowV1toV2`) and its
+ *   - `migrations/v1tov2.ts`: the segment-parity reflow (`reflowV1toV2`) and its
  *     validity guards (`upgradeV1toV2`, `migrationLooksValid`,
  *     `floatingStructureCount`).
- *   - `migrations/v4tov5.ts` — the elevator-shaft widening (`upgradeV4toV5`,
+ *   - `migrations/v4tov5.ts`: the elevator-shaft widening (`upgradeV4toV5`,
  *     `widenLegacyElevatorShafts`).
  */
 import { isGameMode } from "./types";

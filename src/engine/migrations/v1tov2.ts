@@ -11,7 +11,7 @@ import type { FacilityKind, SerializedGame, SerializedUnit } from "../types";
  * v1 → v2 migration with a safety net. Runs the reflow ({@link reflowV1toV2}); if
  * it throws OR produces an invalid layout (a room overlap or an off-lot room the
  * per-unit hardening couldn't have caused), it falls back to simply stamping v2
- * on the ORIGINAL units. That fallback is always safe — units persist their own
+ * on the ORIGINAL units. That fallback is always safe, units persist their own
  * width and `deserialize` trusts it, so an un-reflowed old tower loads at its
  * legacy footprints with no corruption (arch §1). Better a tower that keeps
  * legacy widths than a lost or scrambled save.
@@ -26,7 +26,7 @@ export function upgradeV1toV2(data: SerializedGame): SerializedGame {
   }
   // Reject a reflow that overlaps/runs off-lot, OR that introduces a NEW floating
   // floor (a slab the reflow padded over a setback where the story below ends).
-  // The delta — not an absolute count — is what matters: an odd hand-built save
+  // The delta, not an absolute count, is what matters: an odd hand-built save
   // may already float, and the migration must not be blamed for that; it must only
   // never make it worse. The safe fallback keeps legacy widths, which never float.
   if (!migrationLooksValid(out)) return safe;
@@ -37,7 +37,7 @@ export function upgradeV1toV2(data: SerializedGame): SerializedGame {
 /**
  * The invariants the reflow must never violate: no two ROOM footprints overlap on
  * a shared floor, and no room runs off the lot. Structural (`floor`/`lobby`) and
- * transport units are ignored — transports overlay rooms, floor tiles are width 1.
+ * transport units are ignored, transports overlay rooms, floor tiles are width 1.
  * Per-floor bucketing keeps it near-linear for a one-time load-time check.
  */
 export function migrationLooksValid(data: SerializedGame): boolean {
@@ -66,7 +66,7 @@ export function migrationLooksValid(data: SerializedGame): boolean {
  * Count structure tiles (floor/lobby) that hang in mid-air: an above-ground tile
  * with no structure directly below it, or a basement tile with none directly
  * above (the ground floor rests on the earth and never counts). Used to guard the
- * reflow — it must never ADD a floating slab versus the original save (a
+ * reflow, it must never ADD a floating slab versus the original save (a
  * pre-existing float in a hand-built/unusual save is left as-is, not blamed on the
  * migration). Cheap: one pass to index structure, one to test each tile.
  */
@@ -94,12 +94,12 @@ export function floatingStructureCount(data: SerializedGame): number {
  * overlap neighbours or break parking chains. Two passes, validated against real
  * saves (see arch-simtower-parity §1):
  *
- *  - **Pass 1 — parking (ramp-anchored).** For each contiguous parking+ramp run,
+ *  - **Pass 1, parking (ramp-anchored).** For each contiguous parking+ramp run,
  *    anchor the ramp at its ORIGINAL x and pack its chained spaces flush on both
  *    sides, then sweep the runs so widened ramps never collide. Ramp columns stay
  *    vertically aligned; every space stays chained; the repositioning of identical
  *    spaces is cosmetically invisible.
- *  - **Pass 2 — every other room (minimal-disruption).** Keep each room at its
+ *  - **Pass 2, every other room (minimal-disruption).** Keep each room at its
  *    original x, growing a widened room into the paved gap already beside it;
  *    shove a neighbour only when the local gap is too small. If a room would be
  *    flung far (boxed in by a widened neighbour, a multi-floor room from below,
@@ -108,11 +108,11 @@ export function floatingStructureCount(data: SerializedGame): number {
  *
  * Transports overlay rooms (they never block a room and keep their own stored
  * width), so they are untouched. Structural `floor` tiles are added under any new
- * room-footprint tile that wasn't already paved. Pure and deterministic — the
+ * room-footprint tile that wasn't already paved. Pure and deterministic, the
  * golden fixture (`towerone_6`) pins 0 overlaps / 0 dead parking / aligned ramps.
  *
  * Wrapped by {@link upgradeV1toV2}, which falls back to the un-reflowed save if
- * this ever throws or yields an invalid layout — a bad migration must never lose
+ * this ever throws or yields an invalid layout, a bad migration must never lose
  * or scramble a player's tower.
  */
 export function reflowV1toV2(data: SerializedGame): SerializedGame {
@@ -123,7 +123,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   const LOT = GRID.width;
 
   // Split units: structural paving (kept, plus we may add more), well-formed rooms
-  // (reflowed), and anything unrecognized/garbled (passed through untouched — the
+  // (reflowed), and anything unrecognized/garbled (passed through untouched, the
   // deserialize hardening still guards it).
   interface R {
     u: SerializedUnit;
@@ -141,7 +141,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   // tiles the reflow pads under it would hang in mid-air (a "floating floor").
   // Above ground (floor ≥ 2) rests on the floor below; basements (≤ 0) rest on the
   // story above; the ground floor (1) rests on the earth. Built from ORIGINAL
-  // structure only — the reflow never removes a floor tile, so this can only be an
+  // structure only, the reflow never removes a floor tile, so this can only be an
   // under-count of support, never an over-count (safe: it never OKs a float).
   const origStruct = new Set<string>();
   for (const u of src) {
@@ -159,7 +159,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     return origStruct.has(`${floor >= 2 ? floor - 1 : floor + 1}:${x}`);
   };
   // A footprint column is safe to occupy when placing it can't leave a floor tile
-  // hanging: either this floor is ALREADY paved there (no new tile — its original
+  // hanging: either this floor is ALREADY paved there (no new tile, its original
   // support stands) OR the story below supports the fresh tile the reflow would
   // pad. Only genuinely-new-and-unsupported tiles float, so this blocks exactly
   // those without over-constraining a room growing within already-built floor.
@@ -185,7 +185,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
 
   // Obstacles a placed room presents, bucketed by every floor it spans. Pass 2
   // reads only its own floor's footprints instead of re-scanning every room, so the
-  // whole migration stays polynomial — O(rooms) placements, each an
+  // whole migration stays polynomial, O(rooms) placements, each an
   // O(footprints-on-that-floor) sweep. Nothing here is exponential.
   const obstaclesByFloor = new Map<number, [number, number][]>();
   const addObstacle = (floor: number, fl: number, x: number, w: number): void => {
@@ -248,12 +248,12 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     else byBase.set(r.floor, [r]);
   }
   // First column ≥ startX where the next `w` columns are all FREE in the floor's
-  // occupancy bitmap (`blocked[x] === 0`) — i.e. supported and unoccupied — or null
+  // occupancy bitmap (`blocked[x] === 0`), i.e. supported and unoccupied, or null
   // if none fits before the lot edge. When a run of free columns is cut short by a
   // blocked one at `x+k`, no window starting in `[x, x+k]` can fit (each still spans
   // the blocked column), so we resume at `x+k+1`. Every column is thus visited O(1)
   // times as x only moves forward: an honest O(LOT) scan per room, no per-step
-  // obstacle search or re-sort — dense floors stay linear.
+  // obstacle search or re-sort, dense floors stay linear.
   const firstFit = (blocked: Uint8Array, startX: number, w: number): number | null => {
     let x = Math.max(0, startX);
     while (x + w <= LOT) {
@@ -273,15 +273,15 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
     for (const [o0, o1] of obstaclesByFloor.get(F) ?? [])
       for (let x = Math.max(0, o0); x < Math.min(LOT, o1); x++) floorBlocked[x] = 1;
     // Try to canon-ize the WHOLE floor: place every room at its canon width in the
-    // first supported + clear column at/after home. All-or-nothing — a single room
+    // first supported + clear column at/after home. All-or-nothing, a single room
     // that can't fit (an over-packed floor) fails the attempt, because widening
     // some rooms but clamping others onto unsupported ground is exactly what pads a
     // floating floor. A floor that can't all fit at canon keeps its ORIGINAL layout
-    // instead (legacy widths at legacy columns — supported and non-overlapping by
+    // instead (legacy widths at legacy columns, supported and non-overlapping by
     // construction, since that's how the tower was built). Per-floor, so only the
     // genuinely-too-tight floors miss canon, not the whole tower.
     const tryCanon = (): { r: R; x: number; w: number }[] | null => {
-      const blocked = floorBlocked.slice(); // tentative — mutated as rooms place
+      const blocked = floorBlocked.slice(); // tentative, mutated as rooms place
       const placed: { r: R; x: number; w: number }[] = [];
       let cursor = 0;
       for (const r of here) {
@@ -306,7 +306,7 @@ export function reflowV1toV2(data: SerializedGame): SerializedGame {
   // wasn't already paved (so a grown/shifted room never floats over bare space).
   const paved = new Set<string>();
   for (const u of others) if (isStruct(u.kind)) for (let i = 0; i < (u.width ?? 1); i++) paved.add(`${u.floor}:${u.x + i}`);
-  // Fresh floor tiles get ids past the highest existing id — a missing/garbled
+  // Fresh floor tiles get ids past the highest existing id, a missing/garbled
   // `nextId` must never collide with an existing unit id.
   let nextId = Number.isFinite(data.nextId) ? data.nextId : 1;
   for (const u of src) if (u && Number.isFinite(u.id)) nextId = Math.max(nextId, Math.floor(u.id) + 1);

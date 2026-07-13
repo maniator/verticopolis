@@ -7,7 +7,7 @@ import type { Facility, FacilityKind } from "./types";
  * In the original, a single office is the base unit of "width". We use a tile
  * grid where the smallest commercial unit is a few tiles wide.
  */
-/** The buildable lot width in tiles — the canon 1994 map is 375 segments wide.
+/** The buildable lot width in tiles, the canon 1994 map is 375 segments wide.
  *  Shared by {@link GRID}.width and the full-lot metro so the two can't drift. */
 export const LOT_WIDTH = 375;
 
@@ -86,7 +86,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     width: 10,
     cost: 100000,
     minStar: 3,
-    // A suite houses a larger party than a double — matching the 1994 original
+    // A suite houses a larger party than a double, matching the 1994 original
     // (review F36).
     population: 3,
     color: "#d99a2e",
@@ -245,7 +245,7 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     name: "Security",
     width: 8,
     cost: 100000,
-    // Buildable at 2★ — it is the facility that GATES 3★, so it must be placeable
+    // Buildable at 2★, it is the facility that GATES 3★, so it must be placeable
     // before the tower is 3★ or the rating deadlocks at 2★ forever.
     minStar: 2,
     population: 0,
@@ -339,7 +339,7 @@ export const GRID = {
    * floor: floor 1 = ground, floor 0 = B1, -1 = B2 … -9 = B10 (no gap at 0).
    */
   minFloor: -9,
-  /** Total buildable width in tiles — the canon 1994 map is 375 segments wide. */
+  /** Total buildable width in tiles, the canon 1994 map is 375 segments wide. */
   width: LOT_WIDTH,
   /** Floors between required (sky) lobbies. */
   lobbyInterval: 15,

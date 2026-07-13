@@ -16,7 +16,7 @@ import type { FacilityKind } from "../engine/types";
  *
  * It is seeded and deterministic (seeded rng, deterministic clock), so the hash
  * is stable run-to-run. If the sim's behavior legitimately changes in some
- * OTHER PR, update PINNED_STATE_HASH in that PR with intent — never in a
+ * OTHER PR, update PINNED_STATE_HASH in that PR with intent, never in a
  * refactor that claims to change nothing.
  */
 

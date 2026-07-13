@@ -5,14 +5,14 @@
  * This file is a barrel. The definitions live in cohesive siblings and are
  * re-exported here so every existing `import { … } from "./facilities"` keeps
  * working unchanged:
- *   - `facilitiesData.ts`  — LOT_WIDTH, GRID, the FACILITIES catalog, ALL_KINDS,
- *                            isFacilityKind.
- *   - `facilityPredicates.ts` — kind predicates, build minutes, open hours.
- *   - `facilityCaps.ts`    — canon build caps + transport capacity/spans
- *                            (BUILD_CAPS, POOLED_CAPS, MAX_CARS, maxSpanFor …),
- *                            the single home for the 1994 caps.
- *   - `census.ts`          — residentCount/censusCount + the star/population
- *                            thresholds and service-demand constants.
+ *   - `facilitiesData.ts`: LOT_WIDTH, GRID, the FACILITIES catalog, ALL_KINDS,
+ *                          isFacilityKind.
+ *   - `facilityPredicates.ts`: kind predicates, build minutes, open hours.
+ *   - `facilityCaps.ts`: canon build caps + transport capacity/spans
+ *                        (BUILD_CAPS, POOLED_CAPS, MAX_CARS, maxSpanFor …),
+ *                        the single home for the 1994 caps.
+ *   - `census.ts`: residentCount/censusCount + the star/population
+ *                  thresholds and service-demand constants.
  */
 export { LOT_WIDTH, FACILITIES, ALL_KINDS, isFacilityKind, GRID } from "./facilitiesData";
 export {
