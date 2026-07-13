@@ -929,6 +929,17 @@ export class Tower {
           return { ok: false, reason: SHAFT_OVERLAP };
         }
       }
+      // A sky-lobby floor (15/30/45…) is a player-placed concourse: its only
+      // valid structure is lobby tiles (the concourse-purity rule in canPlace).
+      // The auto-floor lays plain FLOOR, which would both pollute the concourse
+      // and later block the player's lobby there, so refuse to extend through an
+      // unbuilt sky-lobby story and tell them to place the lobby first, rather
+      // than auto-committing a permanent lobby they never asked for. A floor
+      // that already carries a full lobby under the shaft needs no fill and
+      // passes (`spanHasFloor` counts lobby tiles as structure).
+      if (isSkyLobbyFloor(fl) && !this.spanHasFloor(fl, t.x, t.width)) {
+        return { ok: false, reason: `Build the sky lobby on floor ${fl} first, then extend through it.` };
+      }
       newFloors.push(fl);
     }
     // Auto-lay plain floor across every still-empty cell behind the shaft on the

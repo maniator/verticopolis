@@ -460,7 +460,7 @@ describe("Transport editing", () => {
   it("adds and removes elevator cars within bounds", () => {
     const sim = base(1);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 6).ok).toBe(true);
     const t = sim.tower.transports[0];
     const start = t.cars;
     expect(sim.tower.setCars(t.id, start + 1)).toBe(true);
@@ -475,7 +475,7 @@ describe("Transport editing", () => {
   it("resizes a transport; rooms no longer block extension (shaft overlaps them)", () => {
     const sim = base(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 6).ok).toBe(true);
     const t = sim.tower.transports[0];
     const ok = sim.tower.resizeTransport(t.id, 1, 8);
     expect(ok.ok).toBe(true);
@@ -499,7 +499,7 @@ describe("Transport editing", () => {
   it("extends a shaft up past the built structure, auto-laying the floor behind it", () => {
     const sim = base(2); // structure exists on floors 2..10 only
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 6).ok).toBe(true);
     const t = sim.tower.transports[0];
     expect(sim.tower.resizeTransport(t.id, 1, 10).ok).toBe(true); // up to built structure
     expect(t.top).toBe(10);
@@ -533,7 +533,7 @@ describe("Transport editing", () => {
   it("auto-lays multiple floors when an extend jumps several floors up at once", () => {
     const sim = base(2); // structure on floors 2..10
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 10); // already spans the built structure
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 10).ok).toBe(true); // already spans the built structure
     const t = sim.tower.transports[0];
     // A drag can jump several floors in one resize: floors 11, 12, 13 are all
     // open sky, and each rests on the one below it (11 on 10, 12 on 11, ...),
@@ -551,7 +551,7 @@ describe("Transport editing", () => {
     // the empty columns. The extend now fills those columns too.
     const sim = base(2); // floors 2..10 at x0, width 20
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 10); // width 4 over the full block
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 10).ok).toBe(true); // width 4 over the full block
     const t = sim.tower.transports[0];
     // Hand-build only two of the four shaft columns on floor 11 (they rest on
     // floor 10). The other two are open sky.
@@ -567,7 +567,7 @@ describe("Transport editing", () => {
   it("auto-lays the floor when an elevator extends DOWN into the basement", () => {
     const sim = base(2); // floors 2..10 at x0; floor 1 is the starter lobby
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 6).ok).toBe(true);
     const t = sim.tower.transports[0];
     // Extend down to B2 (floor -1). Floor 0 hangs off floor 1 above, floor -1
     // hangs off floor 0: the basement floors auto-lay top-down in support order.
@@ -576,6 +576,29 @@ describe("Transport editing", () => {
     expect(t.bottom).toBe(-1);
     for (const fl of [0, -1])
       for (let i = 0; i < 4; i++) expect(sim.tower.structureKindAt(fl, x0 + i)).toBe("floor");
+  });
+
+  it("refuses to auto-floor through an unbuilt sky-lobby story, asking for the lobby first", () => {
+    // A sky-lobby floor (15) is a player-placed concourse: the auto-floor must
+    // not pollute it with plain floor (which would also block the sky lobby the
+    // player still has to place). So extending through an unbuilt floor 15
+    // refuses and names the fix, instead of auto-committing a lobby or laying
+    // plain floor there.
+    const sim = Simulation.newGame(2);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let f = 2; f <= 14; f++) for (let i = 0; i < 4; i++) expect(sim.tower.place("floor", f, x0 + i).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 14).ok).toBe(true);
+    const t = sim.tower.transports[0];
+    const up = sim.tower.resizeTransport(t.id, 1, 15); // floor 15 is an unbuilt sky lobby
+    expect(up.ok).toBe(false);
+    expect(up.reason).toBe("Build the sky lobby on floor 15 first, then extend through it.");
+    expect(t.top).toBe(14); // unchanged
+    expect(sim.tower.structureKindAt(15, x0)).toBeUndefined(); // nothing laid on the concourse
+    // Once the player places the sky lobby on 15, the extend goes through.
+    for (let i = 0; i < 4; i++) expect(sim.tower.place("lobby", 15, x0 + i).ok).toBe(true);
+    const up2 = sim.tower.resizeTransport(t.id, 1, 15);
+    expect(up2.ok).toBe(true);
+    expect(t.top).toBe(15);
   });
 
   it("caps cars per elevator type", () => {
@@ -610,7 +633,7 @@ describe("Transport editing", () => {
   it("computes capacity and congestion from transports", () => {
     const sim = base(4);
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.buildTransport("elevatorStandard", x0, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", x0, 1, 6).ok).toBe(true);
     const t = sim.tower.transports[0];
     sim.tower.setCars(t.id, 2);
     expect(sim.transportCapacity(t)).toBe(2 * 21);
@@ -947,7 +970,7 @@ describe("Auto-floor bridge between modules", () => {
     const sim = Simulation.newGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    sim.build("floor", 2, x0); // the neighbor to bridge back to
+    expect(sim.build("floor", 2, x0).ok).toBe(true); // the neighbor to bridge back to
     const can = sim.canBuild("floor", 2, x0 + 6);
     // The placed tile plus the five gap tiles, all at floor cost.
     expect(can.cost).toBe(6 * FACILITIES.floor.cost);
