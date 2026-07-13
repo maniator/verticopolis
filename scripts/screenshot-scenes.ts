@@ -661,7 +661,7 @@ export const SCENES: Scene[] = [
     assertUnits: 100,
     shots: [
       {
-        name: "traffic-chip-after",
+        name: "traffic-chip",
         crop: "#topbar",
         // Capture exactly at the verified state: `wait: 0` is a 0ms settle that
         // steps 0 frames (settle ceils 0/FRAME_MS to 0), so the pre-capture
@@ -694,7 +694,7 @@ export const SCENES: Scene[] = [
         // #scrim live in separate DOM), so the touch flags wouldn't change these
         // pixels. A shot that needs real mobile chrome must live in a PHONE-viewport
         // *scene* instead, not just override the viewport here.
-        name: "traffic-chip-after-mobile",
+        name: "traffic-chip-mobile",
         crop: "#topbar",
         viewport: PHONE,
         // Reflow-only shot: the viewport change is pure DOM, so step no frames
@@ -749,7 +749,7 @@ export const SCENES: Scene[] = [
       },
     ],
   },
-  // --- Responsive layout (tablet after-fix) -----------------------------------
+  // --- Responsive layout (docked-tablet band) ---------------------------------
   {
     id: "tablet",
     outDir: "features",
@@ -760,8 +760,8 @@ export const SCENES: Scene[] = [
       // Both viewports sit inside the docked-tablet band (min-width:768 /
       // max-width:1023 / min-height:600, styles.css) so they exercise the
       // wrap-topbar + narrowed-dock breakpoint: portrait tall, compact wide.
-      { name: "tablet-portrait-after", viewport: { width: 834, height: 1112 }, wait: 500 },
-      { name: "tablet-compact-after", viewport: { width: 1000, height: 720 }, wait: 500 },
+      { name: "tablet-portrait", viewport: { width: 834, height: 1112 }, wait: 500 },
+      { name: "tablet-compact", viewport: { width: 1000, height: 720 }, wait: 500 },
     ],
   },
   // --- Save-migration before/after (real towerone_6 v1 save) ------------------
