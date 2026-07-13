@@ -298,6 +298,24 @@ describe("golden fixture: the SixSeven tower (real v4 save)", () => {
     expect(out[3]).toMatchObject({ x: 250, width: 8 });
   });
 
+  it("a forged transport flood is capped at the pooled build limits before the overlap scan", () => {
+    // A legit tower can never exceed 24 shafts + 64 walkway links (Tower.capReason),
+    // so the loader bounds the list at that sum before its quadratic overlap
+    // pass; a crafted million-entry array must not hang the load.
+    const flood = v4Save(
+      Array.from({ length: 500 }, (_, i) => ({
+        // Disjoint floors so nothing overlaps: the cap alone must do the trimming.
+        bottom: 1 + (i % 40) * 2,
+        top: 2 + (i % 40) * 2,
+        x: 4 * Math.floor(i / 40),
+        width: 4,
+      })),
+    );
+    flood.version = 5;
+    const out = Simulation.deserialize(flood).serialize().transports;
+    expect(out.length).toBeLessThanOrEqual(24 + 64);
+  });
+
   it("the loader drops a forged shaft that overlaps a kept one, but keeps stacked walkway flights", () => {
     // validateTransport can never produce overlapping shafts, and everything
     // downstream assumes the invariant, so a forged/hand-edited save must not

@@ -19,6 +19,7 @@ import {
   GARBAGE_COLLECT_HOUR,
   GRID,
   PARKING_WORKERS_PER_SPACE,
+  POOLED_CAPS,
   RECYCLING_POP_PER_CENTER,
   STAR_THRESHOLDS,
   TOWER_POPULATION,
@@ -2583,6 +2584,12 @@ export class Simulation implements SimContext {
             : undefined,
         };
       })
+      // Bound the list before the quadratic overlap pass below: a legit tower
+      // can never exceed the pooled build caps (24 shafts + 64 walkway links,
+      // enforced at placement by Tower.capReason), so anything past their sum
+      // is forged padding that would otherwise turn the O(n^2) scan into a
+      // load-time hang on a crafted save.
+      .slice(0, POOLED_CAPS.reduce((sum, pool) => sum + pool.cap, 0))
       // Overlap cross-check: `validateTransport` can never produce two shafts
       // sharing a cell, but a forged or hand-edited save can, and everything
       // downstream (hit-testing, selection, dispatch) assumes the invariant.

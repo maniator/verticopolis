@@ -8,7 +8,7 @@
  * `migrateSave` just chains them, so a future per-version file split is a trivial
  * move (party decision, 2026-07-07: ship as one module, structured for that).
  */
-import { FACILITIES, GRID, facilityFloors, isElevatorKind, isFacilityKind } from "./facilities";
+import { FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFacilityKind } from "./facilities";
 import { isGameMode } from "./types";
 import type { FacilityKind, SerializedGame, SerializedUnit, Transport } from "./types";
 
@@ -141,6 +141,12 @@ export function upgradeV4toV5(data: SerializedGame): SerializedGame {
 export function widenLegacyElevatorShafts(data: SerializedGame): SerializedGame {
   const stamped: SerializedGame = { ...data };
   if (!Array.isArray(data.transports)) return stamped;
+  // A legit tower can never exceed the pooled build caps (24 shafts + 64
+  // walkway links), and the widen's fit check is quadratic, so a forged flood
+  // of transports skips the widening outright rather than hanging the load.
+  // The loader caps the same flood right after this, so a legitimate shaft
+  // buried in forged padding heals on the NEXT load of the then-capped save.
+  if (data.transports.length > POOLED_CAPS.reduce((sum, pool) => sum + pool.cap, 0)) return stamped;
   // Live footprints, updated as shafts widen so later decisions see earlier
   // ones. Each footprint is built with the SAME coercion `Simulation.deserialize`
   // applies afterward (finite-or-fallback, floor clamps, on-lot x clamp), so a
