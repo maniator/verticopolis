@@ -38,9 +38,15 @@ name: PR screenshot drift-check
 on:
   pull_request:
     types: [opened, synchronize, reopened]
-    # Path-gated so unrelated PRs are not charged the ~7 min. These are the only
-    # surfaces that can change committed pixels: the engine render path, the
-    # generator/scenes, and this workflow itself (so it self-tests).
+    # Path-gated so unrelated PRs are not charged the ~7 min. Committed pixels can
+    # change from almost any app code: the engine sim state that gets rendered
+    # (src/engine/** is the exact "engine render path" blind spot the DETERMINISM
+    # GUARD note in update-screenshots.yml warns about), the render path
+    # (src/render/**), DOM chrome (src/ui/**, src/main.ts, styles, index.html),
+    # and the save-loading scenes (src/storage/**). So gate on all of src/, not a
+    # narrow subset, or the guard goes blind exactly where a leak is likeliest.
+    # Tests never render, so exclude them. Plus the generator and this workflow
+    # (so it self-tests).
     # WARNING: do NOT make any job here a REQUIRED status check while this
     # top-level `paths:` filter is in place. A path-filtered workflow never
     # reports on a PR that touches none of these paths, so a required check would
@@ -48,7 +54,8 @@ on:
     # (a `changes` job diffs base...head; a final always-run job reports success
     # when skipped). See spec-pr-drift-check.md Design Notes.
     paths:
-      - "src/render/**"
+      - "src/**"
+      - "!src/tests/**"
       - "scripts/screenshots.ts"
       - "scripts/screenshot-*.ts"
       - ".github/workflows/pr-drift-check.yml"
@@ -60,11 +67,15 @@ concurrency:
   group: pr-drift-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
-# Least privilege: contents:write only so `commit-on-approval` can push the
-# refreshed gallery; pull-requests:write only for the advisory sticky comment.
+# Default to READ-ONLY for the whole workflow. resolve-image/shoot/verify check
+# out and (resolve-image/shoot) EXECUTE PR-head code (npm ci, build, the
+# screenshot scripts) before any approval, so they must not hold a write-scoped
+# token. Write is granted per-job only where earned: pull-requests:write on
+# `verify` (the advisory comment) and contents:write on `commit-on-approval` (the
+# approved push). The code-executing jobs also set persist-credentials:false so
+# no token is left in git config for PR code to reach.
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 jobs:
   # Resolve the pinned image + shard matrix and gate on coverage, exactly as
@@ -82,6 +93,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event.pull_request.head.sha }}
+          persist-credentials: false
 
       - name: Use Node.js (from .nvmrc)
         uses: actions/setup-node@v4
@@ -130,6 +142,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Trust the workspace
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -195,6 +208,10 @@ jobs:
   verify:
     needs: [resolve-image, shoot]
     runs-on: ubuntu-latest
+    # Reads + posts the advisory PR comment; never pushes.
+    permissions:
+      contents: read
+      pull-requests: write
     outputs:
       has_drift: ${{ steps.drift.outputs.has_drift }}
       drift_count: ${{ steps.drift.outputs.drift_count }}
@@ -205,6 +222,7 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Download all shard artifacts
         uses: actions/download-artifact@v4
@@ -212,7 +230,7 @@ jobs:
           path: /tmp/dl
           pattern: shots-*
 
-      - name: Hard gate — the generator must agree with itself (per shard)
+      - name: "Hard gate: the generator must agree with itself (per shard)"
         run: |
           # Every shard renders at least one shot, so BOTH legs must have a `shots`
           # subtree; a missing one is a job/upload failure and a hard failure, never
@@ -310,6 +328,11 @@ jobs:
       github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     environment: screenshot-approval
+    # Earns write: it pushes the approved commit. It runs no PR-head code (only
+    # git/jq/cp over downloaded artifacts), so the write token is never exposed to
+    # PR-controlled execution.
+    permissions:
+      contents: write
     env:
       SHARDS_JSON: ${{ needs.resolve-image.outputs.shards }}
       HEAD_REF: ${{ github.event.pull_request.head.ref }}

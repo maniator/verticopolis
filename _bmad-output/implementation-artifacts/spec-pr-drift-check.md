@@ -21,7 +21,7 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 
 **Ask First:** Making the hard check a REQUIRED status check (needs the always-run-then-skip pattern or a path-filtered required check hangs "pending"). Refactoring `update-screenshots.yml` into a shared `workflow_call`/composite for the capture+commit (the DRY endgame).
 
-**Never:** Do not conflate the two signals ("differs from committed = red X" is the boy-who-cried-wolf trap). Do not commit the regenerated set WITHOUT the environment approval (an unconfigured environment must be treated as a setup error, see Design Notes, not a licence to auto-commit). Do not weaken or edit `update-screenshots.yml`. Do not sample or drop scenes (coverage `verify` still gates).
+**Never:** Do not conflate the two signals ("differs from committed = red X" is the boy-who-cried-wolf trap). Do not commit the regenerated set WITHOUT the environment approval (an unconfigured environment must be treated as a setup error, see Design Notes, not a license to auto-commit). Do not weaken or edit `update-screenshots.yml`. Do not sample or drop scenes (coverage `verify` still gates).
 
 ## I/O & Edge-Case Matrix
 
