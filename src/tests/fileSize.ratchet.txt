@@ -11,8 +11,6 @@ src/engine/Tower.ts
 src/engine/Crowd.ts
 src/engine/EconomySystem.ts
 # render
-src/render/pixelSprites.ts
-src/render/sprites/structure.ts
 src/render/excalibur/TowerEngine.ts
 # ui / app spine / audio
 src/main.ts
