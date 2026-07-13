@@ -1,0 +1,413 @@
+import type { Clock } from "../Clock";
+import type { Tower } from "../Tower";
+import type { FacilityKind, Unit } from "../types";
+import { isOperational, isTenanted } from "../types";
+import { isHotelKind, isOpenAt, FACILITIES } from "../facilities";
+import { ECON } from "../econConfig";
+import type { Crowd } from "../Crowd";
+import type { Person, Route, SpawnFloors, StaffKind } from "./person";
+import { MAX_PEOPLE, MAX_STAFF, visibleOccupants } from "./person";
+import {
+  MEAL_WINDOWS,
+  mealWindowFor,
+  staffOnShift,
+  MEAL_MIX,
+  matchesMealOriginKind,
+  outboundWeight,
+  type MealOriginKind,
+} from "./meals";
+
+/**
+ * The crowd's spawn cadence, pulled out of `Crowd.ts` as friend functions that
+ * take the {@link Crowd} instance. They read/advance `crowd.spawnAcc`, append to
+ * `crowd.people`, mint ids from `crowd.nextId`, and draw from `crowd.rng`; the
+ * meal-window overlay folds into the same weighted option pool. Behavior is
+ * unchanged; the class keeps thin `spawn` / `spawnStaff` / `takeStaffResults`
+ * methods that delegate here.
+ */
+
+const NO_RESULTS: { unitId: number; ok: boolean }[] = [];
+
+export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
+  const hour = clock.hour;
+  const weekend = clock.isWeekend;
+  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "cinema";
+  const isStaffKind = (k: FacilityKind): k is StaffKind =>
+    k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
+  const leased = new Set<number>();
+  const staffed = new Set<number>();
+  const homes = new Set<number>();
+  const venues = new Set<number>();
+  // Meal-cadence bins: condos and hotels tracked separately (arch §2).
+  const condoFloors = new Set<number>();
+  const hotelFloors = new Set<number>();
+  const staffFloors: { kind: StaffKind; floor: number }[] = [];
+  const seenStaff = new Set<string>(); // dedupe kind:floor pairs.
+  // Set per kind so dedupe stays O(1) per unit; a large tower with many
+  // same-kind venues on one floor would otherwise make binning O(units^2).
+  const venuesByKindSet: Partial<Record<FacilityKind, Set<number>>> = {};
+  const unitsByFloor = new Map<number, Unit[]>();
+  const addVenueByKind = (kind: FacilityKind, floor: number) => {
+    const set = venuesByKindSet[kind] ?? (venuesByKindSet[kind] = new Set());
+    set.add(floor);
+  };
+  for (const u of tower.units) {
+    const floorUnits = unitsByFloor.get(u.floor);
+    if (floorUnits) floorUnits.push(u);
+    else unitsByFloor.set(u.floor, [u]);
+    // Staff floors read the OPERATIONAL predicate rather than tenant/asleep
+    // because staff facilities are not tenanted; they exist and function
+    // whenever they are built and not on fire / under construction.
+    if (isStaffKind(u.kind)) {
+      if (isOperational(u)) {
+        const key = `${u.kind}:${u.floor}`;
+        if (!seenStaff.has(key)) {
+          seenStaff.add(key);
+          staffFloors.push({ kind: u.kind, floor: u.floor });
+        }
+      }
+      continue;
+    }
+    if (!(isTenanted(u) || u.state === "asleep")) continue;
+    if (u.kind === "office") {
+      // Offices are leased year-round but only staffed on weekdays, so inbound
+      // workers only head to weekday offices; outbound trips need workers
+      // actually present right now (presence zeroes occupants after 18:00 /
+      // at weekends).
+      if (!weekend) leased.add(u.floor);
+      if (u.occupants > 0) staffed.add(u.floor);
+    } else if (u.kind === "condo") {
+      homes.add(u.floor);
+      condoFloors.add(u.floor);
+    } else if (isHotelKind(u.kind)) {
+      homes.add(u.floor);
+      hotelFloors.add(u.floor);
+    } else if (isVenue(u.kind) && isOpenAt(u.kind, hour)) {
+      // Venues are destinations only while open for business.
+      venues.add(u.floor);
+      addVenueByKind(u.kind, u.floor);
+    }
+  }
+  // Materialize the Sets into insertion-order arrays for the returned bin,
+  // preserving the deterministic `rng.pick` behavior the pool relies on.
+  const venuesByKind: Partial<Record<FacilityKind, number[]>> = {};
+  for (const [kind, set] of Object.entries(venuesByKindSet) as [FacilityKind, Set<number>][]) {
+    if (set) venuesByKind[kind] = [...set];
+  }
+  return {
+    leasedOffices: [...leased],
+    staffedOffices: [...staffed],
+    homes: [...homes],
+    openVenues: [...venues],
+    condoFloors: [...condoFloors],
+    hotelFloors: [...hotelFloors],
+    staffFloors,
+    venuesByKind,
+    unitsByFloor,
+  };
+}
+
+/** Decide who travels right now, based on the time of day. */
+export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: SpawnFloors): void {
+  if (crowd.people.length >= MAX_PEOPLE) return;
+  // Reuse the Clock's own commute windows so peak hours never drift out of
+  // sync between the simulation and the crowd.
+  const morning = clock.isMorning();
+  const evening = clock.isEvening();
+  const day = !morning && !evening && !clock.isNight();
+  const { leasedOffices, staffedOffices, homes, openVenues } = floors;
+
+  const trip = (from: number, to: number) => add(crowd, tower, from, to);
+  // Each call makes one trip, chosen at random from whatever movements fit
+  // the hour, so the evening rush is a genuine mix of workers leaving,
+  // residents/guests arriving home and diners heading out, rather than only
+  // ever emptying the offices (the old if/else chain starved the others).
+  const options: Array<() => void> = [];
+  if (morning) {
+    if (leasedOffices.length) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
+    if (homes.length) options.push(() => trip(crowd.rng.pick(homes), 1)); // residents head out
+  } else if (evening) {
+    if (staffedOffices.length) options.push(() => trip(crowd.rng.pick(staffedOffices), 1));
+    if (homes.length) options.push(() => trip(1, crowd.rng.pick(homes)));
+    if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
+  } else if (day) {
+    if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
+    if (leasedOffices.length && crowd.rng.chance(0.3)) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
+  } else if (openVenues.length) {
+    options.push(() => trip(crowd.rng.pick(openVenues), 1)); // late-night stragglers leaving
+  }
+
+  // Meal-cadence overlay: add outbound `origin -> venue` options during the
+  // active meal window. Round-trippers self-schedule their own return leg
+  // after an eating pause (PR A); no `venue -> origin` options are pushed
+  // here. The existing branches above stay untouched; meal options fold into
+  // the same weighted pool `rng.pick` fires from. `MAX_PEOPLE` at the top
+  // of the method caps the whole thing so tuning meal weights alone bounds
+  // saturation.
+  pushMealOptions(crowd, tower, clock, floors, options);
+
+  if (options.length) crowd.rng.pick(options)();
+}
+
+/** Contribute meal-window options to `options` when the clock is inside a
+ *  meal window. Kept separate from the branch tree above so meal cadence is
+ *  clearly additive over the shipped morning/evening/day/night flow. */
+export function pushMealOptions(
+  crowd: Crowd,
+  tower: Tower,
+  clock: Clock,
+  floors: SpawnFloors,
+  options: Array<() => void>,
+): void {
+  const window = mealWindowFor(clock.hour);
+  if (!window) return;
+  const w = MEAL_WINDOWS[window];
+  // Normalized position across the window, [0..1). At the start of the
+  // window the outbound weight is 1 and only outbound trips spawn; returns
+  // are self-scheduled by round-trippers on eating-timer expiry (PR A), so
+  // no separate returnWeight is applied here. Include the sub-hour fraction
+  // so the profile shifts within an hour, not in one-hour steps.
+  const hourFrac = clock.minuteOfDay / 60 - w.start;
+  const t = Math.max(0, Math.min(1, hourFrac / (w.end - w.start)));
+  const outbound = outboundWeight(t);
+
+  // Meal venues open this window (arch §1). If the tower has none, the whole
+  // meal path yields nothing (players see no meal trips until they build
+  // food; that is correct behavior).
+  const venueFloors = w.venues.flatMap((k) => floors.venuesByKind[k] ?? []);
+  if (!venueFloors.length) return;
+
+  // The origins pool: every eligible meal-origin bin, tagged with its
+  // per-population weight, its floor list, AND the origin KIND so
+  // spawnMealOutbound can pick a specific matching unit on the floor and
+  // attribute the round-trip identity to it.
+  type MealPool = { originKind: MealOriginKind; floors: number[]; weight: number };
+  const originPools: MealPool[] = [];
+  const push = (originKind: MealOriginKind, list: number[], weight: number): void => {
+    if (list.length && weight > 0) originPools.push({ originKind, floors: list, weight });
+  };
+  const { office, condo, hotel, staff } = ECON.mealPopulationWeights;
+  for (const kind of MEAL_MIX[window].origins) {
+    switch (kind) {
+      case "office":
+        // Weekday-only comes for free: staffedOffices is empty on weekends
+        // (updatePresence zeros office occupants), so no redundant isWeekend
+        // check is needed here.
+        push("office", floors.staffedOffices, office);
+        break;
+      case "condo":
+        push("condo", floors.condoFloors, condo);
+        break;
+      case "hotel":
+        // Hotels declared as origins for every meal window per the arch, but
+        // `hotelFloors` is gated by `isTenanted(u) || u.state === "asleep"`
+        // (same as the shipped `homes` bin). Guests are only `asleep`
+        // between evening move-in (17:00+) and checkout (08:00), so
+        // `hotelFloors` is EMPTY during lunch (11-14) and mostly empty
+        // during dinner (17-20 fills gradually). Breakfast and late-night
+        // see full hotel participation. Broadening the gate is a follow-up
+        // (backlog `per-person-meal-round-trips` post-PR-A note); keeping
+        // the origin declared here documents the design intent in one place.
+        push("hotel", floors.hotelFloors, hotel);
+        break;
+      case "staff": {
+        const onShift = floors.staffFloors
+          .filter((s) => staffOnShift(s.kind, clock.hour))
+          .map((s) => s.floor);
+        push("staff", onShift, staff);
+        break;
+      }
+    }
+  }
+  if (!originPools.length) return;
+
+  // Per-window contribution. Outbound spawns REAL round-trip persons who
+  // handle their own return leg after an eating pause (see spawnMealOutbound,
+  // advance's `eating` case, and transitionToReturn). The aggregate return
+  // branch that pushed `venue -> origin` options was retired in PR A.
+  //
+  // The base coefficient is 3 to preserve the shipped pool weight against
+  // the morning/evening/night branches; `rng.chance(pool.weight)` gates each
+  // option so a low-weight population (condos, 0.3x) contributes with the
+  // right probability at every phase, not on/off in coarse chunks.
+  const outboundBase = Math.max(0, Math.round(outbound * 3));
+  for (const pool of originPools) {
+    for (let i = 0; i < outboundBase; i++) {
+      if (pool.weight >= 1 || crowd.rng.chance(pool.weight)) {
+        options.push(() => spawnMealOutbound(crowd, tower, pool, venueFloors, w.venues, clock.hour, floors));
+      }
+    }
+  }
+}
+
+/**
+ * Fire a single meal-round-trip outbound. Picks a random floor from the
+ * pool, then finds a candidate origin unit on that floor of the pool's
+ * kind whose `visibleOccupants > 0` (a worker still IN the room, not
+ * already out). Increments the origin's `outForMeal` and stamps
+ * `originUnitId` on the spawned person; the person self-transitions to
+ * `eating` on arrival and to a return trip on eat-timer expiry.
+ *
+ * If no candidate exists (all workers already out), the call is a no-op:
+ * the caller's `rng.pick` fired but no person spawns. The `MAX_PEOPLE` cap
+ * self-balances the pool.
+ */
+export function spawnMealOutbound(
+  crowd: Crowd,
+  tower: Tower,
+  pool: { originKind: MealOriginKind; floors: number[] },
+  venueFloors: number[],
+  venueKinds: FacilityKind[],
+  hour: number,
+  floors: SpawnFloors,
+): void {
+  const originFloor = crowd.rng.pick(pool.floors);
+  // Candidate units on the chosen floor of the right kind with at least one
+  // available (in-room) occupant. For the "staff" bucket, ALSO gate on
+  // on-shift status per unit kind: an off-shift housekeeping room can be on
+  // the same floor as an on-shift security room, and the pool-floor bin only
+  // guarantees at least one on-shift kind exists; the per-unit filter here
+  // makes sure the picked unit is itself on shift (review Blind #5).
+  const floorUnits = floors.unitsByFloor.get(originFloor) ?? [];
+  const candidates = floorUnits.filter(
+    (u) =>
+      matchesMealOriginKind(u, pool.originKind) &&
+      (pool.originKind !== "staff" || staffOnShift(u.kind as StaffKind, hour)) &&
+      visibleOccupants(u) > 0,
+  );
+  if (candidates.length === 0) return;
+  const origin = crowd.rng.pick(candidates);
+  const venueFloor = crowd.rng.pick(venueFloors);
+  // A concrete venue on the chosen floor, matching this window's venue kinds
+  // and open right now (the same gate spawnFloors used to bin the floor).
+  // The census needs a specific unit to attribute the customer to, and destX
+  // must land inside its footprint: destX from pickX is a random corridor
+  // tile, so inferring the venue from it at arrival attributes customers to
+  // whatever room the tile happens to sit under (review P2). Census-counted
+  // venues (population > 0) with a full house are skipped: catalog population
+  // is the venue's customer capacity, so an undersupplied tower self-limits
+  // instead of packing one fastFood past its advertised "up to N" (review P2).
+  // Cinema (population 0, uncapped) is exempt from the fullness check.
+  const venueCandidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
+    (u) =>
+      venueKinds.includes(u.kind) &&
+      isTenanted(u) &&
+      isOpenAt(u.kind, hour) &&
+      (FACILITIES[u.kind].population === 0 || (u.customersIn ?? 0) < FACILITIES[u.kind].population),
+  );
+  if (venueCandidates.length === 0) return;
+  const venue = crowd.rng.pick(venueCandidates);
+  // The route is computed by `add`, which may fail (route unreachable
+  // from origin to venue). If it fails, no person exists and we must not
+  // increment outForMeal. Order: add first, THEN increment on the returned
+  // person object.
+  const spawned = add(crowd, tower, originFloor, venueFloor);
+  if (!spawned) return;
+  spawned.destX = crowd.rng.int(venue.x, venue.x + venue.width - 1);
+  spawned.mealVenueId = venue.id;
+  spawned.originUnitId = origin.id;
+  origin.outForMeal = (origin.outForMeal ?? 0) + 1;
+  tower.bumpMealOverlayRevision();
+}
+
+/** Build a person on `route`, walking to `destX` at the end. Shared by
+ *  tenant and staff spawns so the two can never drift field-by-field. */
+export function makePerson(crowd: Crowd, tower: Tower, route: Route, destX: number): Person {
+  const from = route.floors[0];
+  const seed = (crowd.nextId * 2654435761) | 0;
+  const person: Person = {
+    id: crowd.nextId++,
+    seed,
+    // A route with no rides (same floor) goes straight to the stroll leg.
+    state: route.shafts.length === 0 ? "toDest" : "toShaft",
+    floor: from,
+    fy: from,
+    x: pickX(tower, from, seed),
+    floors: route.floors,
+    shafts: route.shafts,
+    leg: 0,
+    shaftId: route.shafts[0] ?? null,
+    carIndex: null,
+    wait: 0,
+    age: 0,
+    linger: 0,
+    destX,
+  };
+  crowd.people.push(person);
+  return person;
+}
+
+export function add(crowd: Crowd, tower: Tower, from: number, to: number): Person | null {
+  const r = crowd.route(tower, from, to);
+  // Only a null route is unreachable. A same-floor trip is a valid walk-only
+  // route (`bfsRoute` returns `{ floors: [from], shafts: [] }` when
+  // from === to), and `makePerson` already starts those in `state: "toDest"`,
+  // so a meal origin and venue on the same floor still spawns and strolls.
+  if (!r) return null;
+  return makePerson(crowd, tower, r, pickX(tower, to, (crowd.nextId * 2654435761) | 0));
+}
+
+/**
+ * Dispatch a staff member (housekeeper) from `from` to `to` over the STAFF
+ * network, walking to `destX` (the room being serviced). The two failure
+ * modes are distinct so the caller reacts correctly: "full" (staff pool at
+ * cap, retry later) vs "no-route" (the network can't get there, surface
+ * it, don't retry silently).
+ */
+export function spawnStaff(
+  crowd: Crowd,
+  tower: Tower,
+  from: number,
+  to: number,
+  destX: number,
+  cleanUnitId: number,
+): "sent" | "full" | "no-route" {
+  if (crowd.staffCount >= MAX_STAFF) return "full";
+  const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
+  if (!r) return "no-route";
+  const p = makePerson(crowd, tower, r, destX);
+  p.staff = true;
+  p.cleanUnitId = cleanUnitId;
+  crowd.staffCount++;
+  return "sent";
+}
+
+/** Drain the staff jobs that ended since the last call (arrived or failed). */
+export function takeStaffResults(crowd: Crowd): { unitId: number; ok: boolean }[] {
+  if (crowd.staffDone.length === 0) return NO_RESULTS;
+  const out = crowd.staffDone;
+  crowd.staffDone = [];
+  return out;
+}
+
+/** An actual built structural tile of a floor (so people stand on solid
+ * ground, never in a gap between separate corridor runs). Falls back to a
+ * sensible spot if the floor is bare. */
+export function pickX(tower: Tower, floor: number, seed: number): number {
+  const tiles: number[] = [];
+  for (const u of tower.units) {
+    if ((u.kind === "floor" || u.kind === "lobby") && u.floor === floor) {
+      for (let i = 0; i < u.width; i++) tiles.push(u.x + i);
+    }
+  }
+  if (tiles.length === 0) return 2 + (Math.abs(seed) % 40);
+  return tiles[Math.abs(seed) % tiles.length];
+}
+
+export function spawnStep(crowd: Crowd, dtSec: number, tower: Tower, clock: Clock): void {
+  // Spawn at a rate that scales with how busy the hour is AND how populated the
+  // tower is (review F39): a 6-office tower and a 12,000-pop tower no longer
+  // spawn identically. The MAX_PEOPLE cap in spawnTrips still bounds the total.
+  const timeRate = clock.isNight() ? 0.3 : clock.isWeekend ? 1.2 : 2.2;
+  const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
+  crowd.spawnAcc += dtSec * timeRate * popFactor;
+  if (crowd.spawnAcc < 1) return;
+  // Categorize floors once per outer step: the drain loop below only adds
+  // people (never units), so the four lists are stable across its iterations.
+  const floors = spawnFloors(tower, clock);
+  let guard = 0;
+  while (crowd.spawnAcc >= 1 && guard++ < 8) {
+    crowd.spawnAcc -= 1;
+    spawnTrips(crowd, tower, clock, floors);
+  }
+}
