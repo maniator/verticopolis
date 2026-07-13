@@ -549,7 +549,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
     expect(lift.top).toBe(2); // unchanged
     expect(last(f.sfx)).toBe("error");
-    expect(last(f.toasts)).toEqual({ text: "Another shaft is in the way.", kind: "bad" });
+    expect(last(f.toasts)).toEqual({ text: "Transport shafts cannot overlap.", kind: "bad" });
   });
 
   it("extendSelectedTo bills only floors past the drag's high-water mark; wiggles re-bill nothing", () => {

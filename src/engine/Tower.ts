@@ -46,6 +46,10 @@ function coversGroundFloor(floor: number, hgt: number): boolean {
 
 /** Shared placement/resize refusal — one string so the two paths can't drift. */
 const NEEDS_FLOORS = "Transport must run through built floors. Lay floors first.";
+/** Shared "a shaft is already here" refusal, used by both the placement
+ *  ({@link Tower.validateTransport}) and the extend ({@link Tower.resizeTransport})
+ *  paths so the toast copy is identical however the collision is reached. */
+const SHAFT_OVERLAP = "Transport shafts cannot overlap.";
 
 /**
  * The Tower owns the spatial model. Cells have two layers: a structural layer
@@ -758,7 +762,7 @@ export class Tower {
           ) {
             continue;
           }
-          return { ok: false, reason: "Transport shafts cannot overlap." };
+          return { ok: false, reason: SHAFT_OVERLAP };
         }
       }
     }
@@ -922,7 +926,7 @@ export class Tower {
       for (const other of this.transports) {
         if (other.id === t.id) continue;
         if (this.transportOverlaps(other, t.x, t.width, fl)) {
-          return { ok: false, reason: "Another shaft is in the way." };
+          return { ok: false, reason: SHAFT_OVERLAP };
         }
       }
       newFloors.push(fl);
