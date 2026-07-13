@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { drawTransport } from "../render/sprites";
+import { drawTransport } from "./sprites";
 import type { Transport } from "../engine/types";
 
 /**

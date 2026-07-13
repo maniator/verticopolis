@@ -115,7 +115,7 @@ These layers were once waved off as "device-only." They are unit-tested here, so
 **follow the pattern** rather than adding new exclusions:
 
 - **Procedural sprite painters** are driven against a **spy 2D context**
-  (`src/tests/sprites.test.ts`). The draw calls are asserted without a real
+  (`src/render/sprites.test.ts`). The draw calls are asserted without a real
   canvas.
 - **The Web-Audio engine's** real control flow runs against a **mocked Tone.js +
   a fake `AudioContext`** (`src/tests/toneAudioEngineGraph.test.ts`), with its
