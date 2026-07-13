@@ -118,6 +118,15 @@ How items flow:
 
 - **A mobile inspect-tap now raises both the editor and the inspector card, so the facility name and floor render twice at once.** The tap opens the editor (docked bottom-left) and the quick-info card (docked top-left), which duplicates the header. It matches desktop (hover card plus selected editor coexist) and the two panels dock to opposite corners, so it reads as minor clutter, not a bug. A future mobile-UX pass could dedupe (suppress the card's header when the editor is open for the same facility, or slim the mobile card to the stats the editor lacks: access, patronage, satisfaction). Low, both hunters. (Blind Hunter L3 + Edge Case Hunter.)
 
+### Deferred from: code review of large-file split (`/gds-code-review`, 2026-07-13, branch `claude/refactor-large-files-tests-4uguue`)
+
+Three adversarial layers (Blind Hunter, Edge Case Hunter, Acceptance Auditor) reviewed the Stage-0 nets + the four Stage-1 pure-leaf splits (`facilities`, `saveMigration`, `tdtFormat`, `SaveGame`). One patch finding was fixed in-branch; the rest are staged, not defects.
+
+- **PATCH (fixed):** the barrel-surface tripwire's runtime `tdtFormat` value list was a curated subset (10 of ~35), so a dropped constant like `TDT_WORLD_W` would not trip it. Made exhaustive in `src/tests/barrelSurface.test.ts`.
+- **Staged, not a defect:** `ByteWriter` unit tests (CAP-1) land with **Stage 2** (`tdtExport` decomposition), because the class does not exist until that split. Add them when `tdtExport` is split.
+- **Remaining >500-line files** (engine giants `Simulation`/`Tower`/`Crowd`/`EconomySystem`, render `TowerEngine`/`pixelSprites`/`sprites/structure`, storage `tdtImport`/`tdtExport`, shell `main`/`UI`/`ToneAudioEngine`, `scripts/screenshot-*`, and the 10 oversized test files) stay in the `fileSize.guard` ratchet (`LEGACY_OVERSIZED`) and are specified in `_bmad-output/specs/spec-refactor-large-files/split-plan.md`. The guard fails if any is regrown or dropped-then-not-removed, so the refactor completes over follow-up PRs without regressing.
+- **Observation (intentional, per SPEC scope):** the size guard scans only `src/` and `scripts/`; a future >500-line file under `e2e/` or `tools/` would not be caught. Matches the SPEC's stated scope.
+
 ### Deferred from: code review of commercial-venue-inspector (`/gds-code-review`, 2026-07-13, PR #205)
 
 - **`rollOverRetailDay` skips a non-operational venue, so a burning-across-midnight unit keeps a stale `patronageToday`.** The `isOperational` gate (added to preserve the "no data yet" state for gutted/mid-build units) also skips a unit that traded, then caught fire, but is not yet gutted, across a midnight; its `patronageToday` is not rolled. Mitigated: the verdict now reads `patronageYest` (the last completed day), the fire status shows separately, and `gut` resets the fields once the unit is gutted. Revisit only if a burning venue's stale card reads wrong in playtest. (Blind Hunter, Low, largely mitigated.)

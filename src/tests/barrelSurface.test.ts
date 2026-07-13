@@ -86,8 +86,21 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
     "upgradeV1toV2", "upgradeV2toV3", "upgradeV3toV4", "upgradeV4toV5", "widenLegacyElevatorShafts",
   ],
   tdtFormat: [
-    "ByteReader", "LegacyImportError", "TDT_ELEVATOR_SCHEDULE_DEFAULT", "TDT_FLOOR_OFFSET",
-    "TDT_HEADER_SIZE", "TDT_MAGIC", "locateStairs", "parseTdtBinary", "viewFromViewWords", "viewWordsFromView",
+    // The full value surface: every TDT_* constant + the reader, error, view
+    // mapping, and parse/locate functions. Exhaustive on purpose (a review
+    // finding: a curated subset let a dropped constant like TDT_WORLD_W slip
+    // past this net), so any silent removal from the barrel trips the test.
+    "ByteReader", "LegacyImportError", "locateStairs", "parseTdtBinary",
+    "viewFromViewWords", "viewWordsFromView",
+    "TDT_MAGIC", "TDT_HEADER_SIZE", "TDT_FLOOR_COUNT", "TDT_TENANT_RECORD_SIZE",
+    "TDT_FLOOR_INDEX_ENTRIES", "TDT_MAX_TENANTS_PER_FLOOR", "TDT_MAX_FILE_BYTES", "TDT_MAX_PEOPLE",
+    "TDT_PERSON_RECORD_SIZE", "TDT_MAX_CENSUS", "TDT_DEFAULT_VIEW_X", "TDT_DEFAULT_VIEW_Y",
+    "TDT_FLOOR_OFFSET", "TDT_TILE_PX", "TDT_FLOOR_PX", "TDT_WORLD_W", "TDT_WORLD_H",
+    "TDT_VIEW_W", "TDT_VIEW_H", "TDT_RETAIL_SLOTS", "TDT_RETAIL_RECORD_SIZE", "TDT_ELEVATOR_SLOTS",
+    "TDT_ELEVATOR_HEADER_SIZE", "TDT_ELEVATOR_BUILT_FIXED", "TDT_ELEVATOR_PER_FLOOR_SIZE",
+    "TDT_ELEVATOR_PER_CAR_SIZE", "TDT_ELEVATOR_SCHEDULE_DEFAULT", "TDT_FINANCE_SIZE", "TDT_PARKING_SIZE",
+    "TDT_STAIR_SLOTS", "TDT_STAIR_RECORD_SIZE", "TDT_ROUTING_TAIL_SIZE", "TDT_MAX_TILE",
+    "TDT_MAX_STAIR_CROWD", "TDT_STAIR_SCAN_WINDOW",
   ],
   tdtImport: [
     "ELEVATOR_KINDS", "FAMILY_STORIES", "HOTEL_ASLEEP_FLAG", "HOTEL_DIRTY_FLAG", "HOTEL_OCCUPANT_MASK",
