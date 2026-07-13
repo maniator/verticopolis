@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { carIndicator } from "../render/carIndicator";
+import { carIndicator } from "./carIndicator";
 
 describe("carIndicator", () => {
   it("maps direction to the lantern arrow", () => {

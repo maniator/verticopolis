@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../render/scale";
+import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "./scale";
 import { FACILITIES } from "../engine/facilities";
 
 /**
