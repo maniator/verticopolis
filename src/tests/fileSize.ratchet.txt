@@ -6,7 +6,6 @@
 # it and the stale-entry check in fileSize.guard.test.ts.
 #
 # engine
-src/engine/Simulation.ts
 # render
 src/render/excalibur/TowerEngine.ts
 # ui / app spine / audio
