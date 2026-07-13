@@ -150,6 +150,46 @@ describe("transport, crane & event sprites paint", () => {
     expect(busy.sig()).not.toBe(idle.sig());
   });
 
+  it("each elevator kind draws its own cab: standard, service, and express differ pairwise", () => {
+    const std = spyCtx();
+    const svc = spyCtx();
+    const exp2 = spyCtx();
+    drawCar(std.ctx, 1, 44, 44, 2, "up", false, "elevatorStandard");
+    drawCar(svc.ctx, 1, 44, 44, 2, "up", false, "elevatorService");
+    drawCar(exp2.ctx, 1, 44, 44, 2, "up", false, "elevatorExpress");
+    expect(svc.sig()).not.toBe(std.sig());
+    expect(exp2.sig()).not.toBe(std.sig());
+    expect(exp2.sig()).not.toBe(svc.sig());
+  });
+
+  it("omitting the kind draws the standard cab, so existing call sites are unchanged", () => {
+    const implicit = spyCtx();
+    const explicit = spyCtx();
+    drawCar(implicit.ctx, 1, 44, 44, 3, "down", false);
+    drawCar(explicit.ctx, 1, 44, 44, 3, "down", false, "elevatorStandard");
+    expect(explicit.sig()).toBe(implicit.sig());
+  });
+
+  it("the standard cab keeps its established frame, interior, and light-strip colors", () => {
+    const s = spyCtx();
+    drawCar(s.ctx, 1, 44, 44, 0);
+    expect(s.log).toContain("fillStyle=#8e94a0");
+    expect(s.log).toContain("fillStyle=#d8dce2");
+    expect(s.log).toContain("fillStyle=#f3f6fa");
+  });
+
+  it("FULL and the direction lantern still change every kind's cab", () => {
+    // Riders held constant so only the top-edge indicators can make the
+    // difference; a kind branch that swallowed them would fail this.
+    for (const kind of ["elevatorStandard", "elevatorService", "elevatorExpress"] as const) {
+      const idle = spyCtx();
+      const busy = spyCtx();
+      drawCar(idle.ctx, 1, 44, 44, 0, null, false, kind);
+      drawCar(busy.ctx, 1, 44, 44, 0, "up", true, kind);
+      expect(busy.sig()).not.toBe(idle.sig());
+    }
+  });
+
   it("drawEscapeStairs, drawCrane, and the moving-vehicle sprites all paint", () => {
     for (const run of [
       (c: CanvasRenderingContext2D) => drawEscapeStairs(c, "left", 0, 34),

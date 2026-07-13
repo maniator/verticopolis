@@ -1,5 +1,5 @@
 import { FACILITIES, isElevatorKind } from "../../engine/facilities";
-import type { Transport } from "../../engine/types";
+import type { FacilityKind, Transport } from "../../engine/types";
 import { person } from "../pixelSprites";
 import type { CarArrow } from "../carIndicator";
 import { shade } from "./common";
@@ -111,8 +111,10 @@ export function drawTransport(
 
 /** A single elevator car graphic, drawn at (0,0) into a w×floorH rect, carrying
  *  `riders` passengers. `arrow` is the direction lantern (null when idle) and
- *  `full` flags a car at capacity. The car is its own Excalibur Actor that the
- *  engine moves along the shaft (and swaps as it loads / changes direction). */
+ *  `full` flags a car at capacity. `kind` dresses the cab per elevator type
+ *  (anything but service/express renders the standard cab). The car is its own
+ *  Excalibur Actor that the engine moves along the shaft (and swaps as it
+ *  loads / changes direction). */
 export function drawCar(
   ctx: CanvasRenderingContext2D,
   seed: number,
@@ -121,15 +123,48 @@ export function drawCar(
   riders: number,
   arrow: CarArrow = null,
   full = false,
+  kind: FacilityKind = "elevatorStandard",
 ): void {
-  // Cab frame, then the lit interior inset within it.
-  ctx.fillStyle = "#8e94a0";
+  // Per-kind cab dressing, keyed to the catalog palette so the cab echoes its
+  // shaft and toolbar identity. The standard cab keeps its original literals;
+  // the kind cue is triple-encoded (brightness, bottom-edge pattern, hue) so
+  // no single channel has to carry it. The top edge stays reserved for the
+  // FULL bar and the direction lantern on every kind.
+  const svc = kind === "elevatorService";
+  const express = kind === "elevatorExpress";
+  // Always a real color (unused on the standard path) so no branch can ever
+  // feed shade() an empty string, which canvas would swallow silently.
+  const accent = FACILITIES[kind].color;
+  // Cab frame, then the lit interior inset within it. Service reads as a dark
+  // flat staff freight cab; express as the bright liveried shuttle. Shade
+  // amounts stay low enough that the catalog hue survives the 0..255 clamp.
+  ctx.fillStyle = svc ? shade(accent, 30) : express ? shade(accent, 70) : "#8e94a0";
   ctx.fillRect(1, 1, w - 2, floorH - 2);
-  ctx.fillStyle = "#d8dce2";
+  ctx.fillStyle = svc ? shade(accent, 95) : express ? shade(accent, 160) : "#d8dce2";
   ctx.fillRect(2, 2, w - 4, floorH - 4);
-  // Ceiling light strip.
-  ctx.fillStyle = "#f3f6fa";
+  // Ceiling light strip (dim in the service cab, brightest in the express).
+  ctx.fillStyle = svc ? shade(accent, 130) : express ? shade(accent, 190) : "#f3f6fa";
   ctx.fillRect(3, 2, w - 6, 2);
+  if (svc) {
+    // Hazard-striped kick plate across the cab bottom: the staff-only cue.
+    ctx.fillStyle = shade(accent, -16);
+    ctx.fillRect(2, floorH - 5, w - 4, 3);
+    ctx.fillStyle = "#bfa04a";
+    for (let r = 0; r < 3; r++) {
+      // Bound each 2px stripe to the plate's right edge at x = w-2, which a
+      // fractional w (the gallery's scaled cabs) would otherwise let it cross.
+      for (let x = 2 + ((r + 2) % 4); x <= w - 4; x += 4) {
+        ctx.fillRect(x, floorH - 5 + r, 2, 1);
+      }
+    }
+  }
+  if (express) {
+    // Solid express-blue band with a light pinstripe: the shuttle livery.
+    ctx.fillStyle = shade(accent, 20);
+    ctx.fillRect(2, floorH - 5, w - 4, 3);
+    ctx.fillStyle = shade(accent, 120);
+    ctx.fillRect(2, floorH - 5, w - 4, 1);
+  }
   // Riders stand on the cab floor.
   for (let p = 0; p < riders; p++) {
     person(ctx, 3 + p * 3.5, floorH - 3, 1.0, (p * 13 + seed) | 0);
