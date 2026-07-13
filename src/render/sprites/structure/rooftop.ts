@@ -12,13 +12,13 @@ export const CRANE_H = 76;
  * Where to perch the rooftop crane along the top floor, in world-tile units
  * (the mid-tile of the widest run of built tiles). Anchoring to the plain
  * (min,max) midpoint floats the crane over open sky when the top floor is
- * built in disjoint blocks — a setback, or a partly-leased top office row —
+ * built in disjoint blocks (a setback, or a partly-leased top office row),
  * because the midpoint then lands in the gap between blocks. Centering on the
  * widest CONTIGUOUS run keeps the crane over actual structure; for a
  * fully-built row the widest run IS the whole span, so the result is the same
  * midpoint as before. Ties keep the leftmost run. `builtTiles` must be
  * non-empty (callers only invoke this for a floor that has structure); it may
- * repeat indices — duplicates are collapsed so a repeated tile can't be read
+ * repeat indices; duplicates are collapsed so a repeated tile can't be read
  * as a one-wide gap that splits a run.
  */
 export function craneAnchorTile(builtTiles: Iterable<number>): number {
@@ -45,7 +45,7 @@ export function craneAnchorTile(builtTiles: Iterable<number>): number {
  * climbing (it comes down once the 100th floor caps the tower, as in the
  * original). Drawn fresh each frame into a CRANE_W×CRANE_H rect: the trolley
  * rides the jib, the hook reels a girder up and down, and a red aircraft
- * beacon blinks at the apex after dark — all on the decorative clock, so
+ * beacon blinks at the apex after dark, all on the decorative clock, so
  * pause/reduced-motion freezes it with everything else.
  */
 export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean): void {

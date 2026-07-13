@@ -65,4 +65,15 @@ describe("ByteWriter", () => {
     w.setU16(0, 0x1_2345); // only the low 16 bits land
     expect([...w.toBytes()]).toEqual([0x45, 0x23]);
   });
+
+  it("setU16 throws instead of patching past the end (no silent sparse holes)", () => {
+    const w = new ByteWriter();
+    w.pad(4);
+    expect(() => w.setU16(3, 1)).toThrow(RangeError); // second byte (index 4) is unwritten
+    expect(() => w.setU16(4, 1)).toThrow(RangeError); // both bytes past the end
+    expect(() => w.setU16(-1, 1)).toThrow(RangeError); // negative offset
+    // A valid back-patch at the last two bytes still works, and the buffer stays dense.
+    w.setU16(2, 0x0102);
+    expect([...w.toBytes()]).toEqual([0, 0, 0x02, 0x01]);
+  });
 });

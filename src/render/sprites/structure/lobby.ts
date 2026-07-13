@@ -73,7 +73,7 @@ export function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, 
   // caller renders a tile as (the engine bakes at TILE px; the gallery draws
   // bigger). Keyed by absolute tile x so runs stay aligned however sliced.
   // The slice count is capped by the pixel span so a forged width can't turn
-  // this into a near-endless loop (deserialize clamps width too — second belt).
+  // this into a near-endless loop (deserialize clamps width too, a second belt).
   const tiles = Math.max(1, Math.min(Math.round(u.width) || 1, Math.ceil(w)));
   const pitch = w / tiles;
   for (let t = 0; t < tiles; t++) {
@@ -85,7 +85,7 @@ export function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, 
 
 /**
  * One 11px slice of the lobby concourse. The ground lobby (floor 1) is the
- * tower's grand entrance — warm marble, gilded cornice, red carpet, fluted
+ * tower's grand entrance: warm marble, gilded cornice, red carpet, fluted
  * columns and chandeliers that glow in the evening. Sky lobbies read as their
  * cooler, airier cousins: pale stone, planters and framed art instead of
  * chandeliers, same gold trim so they still read as "lobby" at a glance.
@@ -122,7 +122,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
   }
 
   // Decorations center on the slice and stay inside it, whatever the caller's
-  // tile scale — in-engine each slice is its own 11px baked canvas, so anything
+  // tile scale; in-engine each slice is its own 11px baked canvas, so anything
   // painted past the edge would be clipped into a visible seam.
   const cx = x + Math.floor(w / 2);
   if (variant === 0) {
@@ -137,7 +137,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
     ctx.fillRect(cx - 2, y + 3, 5, 2);
     ctx.fillRect(cx - 2, y + h - 7, 5, 2);
   } else if (variant === 2 && ground) {
-    // Chandelier — gold tiers on a chain, aglow after dark.
+    // Chandelier: gold tiers on a chain, aglow after dark.
     ctx.fillStyle = "#8a7430";
     ctx.fillRect(cx, y + 3, 1, 3);
     ctx.fillStyle = lit ? "#ffd76b" : "#c8a343";

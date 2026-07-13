@@ -35,8 +35,16 @@ export class ByteWriter {
   }
 
   /** Back-patch a little-endian u16 at an absolute byte offset already written
-   *  (used for the header aggregate counts after the header is zero-padded). */
+   *  (used for the header aggregate counts after the header is zero-padded).
+   *  Both target bytes must already exist: patching past the end would leave
+   *  sparse array holes that `toBytes` silently reads as 0, so an out-of-range
+   *  offset fails loudly instead. */
   setU16(off: number, v: number): void {
+    if (off < 0 || off + 2 > this.chunks.length) {
+      throw new RangeError(
+        `ByteWriter.setU16 offset ${off} is out of range for a ${this.chunks.length}-byte buffer; it only back-patches bytes already written`,
+      );
+    }
     this.chunks[off] = v & 0xff;
     this.chunks[off + 1] = (v >> 8) & 0xff;
   }
