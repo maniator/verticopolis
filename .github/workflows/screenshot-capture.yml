@@ -9,14 +9,19 @@ name: Screenshot capture (reusable)
 #
 # For each shard (scripts/screenshot-shards.ts partitions SCENES; the `verify`
 # coverage gate here fails the run if any scene is in no shard or two), ONE job:
-#   - renders the shard's scenes TWICE in the same pinned Playwright image, and
+#   - renders the shard's scenes TWICE in the same pinned Playwright image, each
+#     leg from its OWN `npm run build` + its OWN preview server, and
 #   - diffs the two renders against EACH OTHER. A byte difference is
-#     nondeterminism (a wall-clock read leaking into a capture, the exact leak
-#     PR #188 chased), always a bug: the job FAILS, so nothing downstream commits.
-# a/b in the SAME container is as strong a determinism guard as a/b in two jobs
-# (same pinned image; generator nondeterminism surfaces within one container),
-# and it halves the npm ci + build overhead vs a run:[a,b] matrix. The verified
-# run-a set is uploaded as shots-<shard> for the caller to assemble.
+#     nondeterminism (a wall-clock read leaking into a BUILD or a capture, the
+#     exact leak PR #188 chased), always a bug: the job FAILS, so nothing
+#     downstream commits.
+# Each leg builds independently so the diff covers build-time and startup
+# nondeterminism (a value baked into the bundle at build, or set at server start),
+# not only render-time leaks: rendering one shared build twice would show such a
+# value identically in both legs and pass, then churn on the next run. a/b in the
+# SAME container is as strong a guard as a/b in two separate jobs (same pinned
+# image), while saving the second checkout + npm ci vs a run:[a,b] matrix. The
+# verified run-a set is uploaded as shots-<shard> for the caller to assemble.
 #
 # This job is READ-ONLY: it checks out and executes PR-head code (npm ci, build,
 # the screenshot scripts), so it must never hold a write-scoped token, and its
@@ -120,48 +125,50 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build
-        run: npm run build
-
-      # Render the shard TWICE and prove the two renders are byte-identical. Each
-      # render is captured via a `find -newer` marker (the generator rewrites every
-      # shot it renders, so every rendered file sorts as newer). SHARD comes in via
-      # an env var (not `${{ }}` in the script) so a shard name can never break out.
-      - name: Render this shard twice and prove it is deterministic
+      # Render the shard TWICE, each leg from its OWN build + fresh preview server,
+      # and prove the two renders are byte-identical. Independent builds are what let
+      # the diff catch build-time / startup nondeterminism, not just render-time
+      # leaks (see the header). Each render is captured via a `find -newer` marker
+      # (the generator rewrites every shot it renders, so every rendered file sorts as
+      # newer). SHARD comes in via an env var (not `${{ }}` in the script) so a shard
+      # name can never break out.
+      - name: Render this shard twice from independent builds and prove it is deterministic
         env:
           SHARD: ${{ matrix.shard }}
         run: |
           export PW_CHROME="$(ls -d /ms-playwright/chromium-*/chrome-linux*/chrome | head -1)"
           ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
           echo "shard '$SHARD' renders: $ONLY"
-          # Start ONE preview server for BOTH renders. Two RUN_SERVER=1 generator
-          # invocations would each spawn AND kill `vite preview` on the fixed port
-          # 4173; the kill (SIGTERM to the npx wrapper) can orphan vite still bound
-          # to :4173, so the second spawn races the port (EADDRINUSE, or the
-          # generator ends up talking to the stale first server). One shared server
-          # rendered against with RUN_SERVER unset sidesteps that entirely. The
-          # trap tears it down at step end (and the container dies with the job).
-          npx vite preview --port 4173 --strictPort &
-          server_pid=$!
-          trap 'kill "$server_pid" 2>/dev/null || true' EXIT
-          node -e 'const u="http://localhost:4173";(async()=>{for(let i=0;i<120;i++){try{await fetch(u);process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up on :4173");process.exit(1)})()'
           render_into() {
-            # Render the shard's scenes against the shared server and copy exactly
-            # this run's output (files touched during it) into $1, preserving the
-            # docs/screenshots/... path.
-            local dest="$1"
+            # $1 = dest dir, $2 = port. Clean build, start `vite preview` on THIS
+            # leg's own port, wait for readiness, render against it (RUN_SERVER unset,
+            # so the generator uses the external server at BASE_URL), copy exactly this
+            # leg's output into $1 (files touched during it, preserving the
+            # docs/screenshots/... path), then tear the server down. Each leg has its
+            # own port so a lingering server from leg a can never be mistaken for leg
+            # b's; --strictPort makes a genuine port clash fail loudly instead.
+            local dest="$1" port="$2"
             rm -rf "$dest"; mkdir -p "$dest"
+            npm run build
+            npx vite preview --port "$port" --strictPort &
+            local server_pid=$!
+            if ! node -e 'const u="http://localhost:"+process.argv[1];(async()=>{for(let i=0;i<120;i++){try{await fetch(u);process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up on "+u);process.exit(1)})()' "$port"; then
+              kill "$server_pid" 2>/dev/null || true
+              exit 1
+            fi
             touch -d '1 second ago' /tmp/render-marker
-            ONLY="$ONLY" node scripts/screenshots.ts
+            BASE_URL="http://localhost:$port" ONLY="$ONLY" node scripts/screenshots.ts
             while IFS= read -r -d '' f; do
               mkdir -p "$dest/$(dirname "$f")"
               cp -a "$f" "$dest/$f"
             done < <(find docs/screenshots -type f -name '*.png' -newer /tmp/render-marker -print0)
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
           }
-          render_into /tmp/run-a
-          render_into /tmp/run-b
+          render_into /tmp/run-a 4173
+          render_into /tmp/run-b 4174
           if ! diff -rq /tmp/run-a /tmp/run-b; then
-            echo "::error::screenshot shard '$SHARD' is nondeterministic: two renders in the same pinned image produced different pixels. A wall-clock read leaked into a capture (likely a new time-driven decoration in the engine render path); fix it before screenshots can update."
+            echo "::error::screenshot shard '$SHARD' is nondeterministic: two independent builds+renders in the same pinned image produced different pixels. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update."
             exit 1
           fi
           echo "shard '$SHARD' is deterministic ($(find /tmp/run-a -type f -name '*.png' | wc -l) shot(s))."

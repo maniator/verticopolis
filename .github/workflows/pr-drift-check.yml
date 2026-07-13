@@ -39,7 +39,12 @@ on:
     # never render, so exclude them, BUT re-include the fixtures the screenshot
     # scenes load (e.g. the migration scene reads a real save under fixtures), or
     # a fixture-only PR could change committed pixels with no check. Plus the
-    # generator, this workflow, and the reusable capture it calls.
+    # generator, this workflow, and the reusable capture it calls. Also gate on the
+    # version/build inputs that reach the splash: vite.config.ts injects
+    # package.json's version into __APP_VERSION__, which the 00-splash shot renders,
+    # so a version-only bump changes committed pixels. (A Playwright/font bump via
+    # package-lock.json also can, but that is the [update-screenshots] marker's job;
+    # gating on the lockfile would regen on every dependency PR, so it is left out.)
     # WARNING: do NOT make any job here a REQUIRED status check while this
     # top-level `paths:` filter is in place, or a PR touching none of these paths
     # hangs "pending" forever. To require it, drop this filter and gate internally
@@ -50,6 +55,8 @@ on:
       - "src/tests/fixtures/**"
       - "scripts/screenshots.ts"
       - "scripts/screenshot-*.ts"
+      - "package.json"
+      - "vite.config.ts"
       - ".github/workflows/pr-drift-check.yml"
       - ".github/workflows/screenshot-capture.yml"
 

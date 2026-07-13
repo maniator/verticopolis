@@ -124,8 +124,11 @@ quietly reintroduces the very blind spots PR #188 removed.
   exactly once, checked at the gate before any capture). PR 1 originally crossed
   the `shoot` matrix `run:[a,b]` x `shard`; PR 2's reusable-capture refactor
   (see below) collapsed a/b INTO each shard job (each shard renders TWICE in one
-  container and self-compares), so the current shape is one job per shard, not
-  eight. Each shard uploads its verified `run-a` set plus a `.shard-complete`
+  container, each leg from its OWN build + preview server, and self-compares), so
+  the current shape is one job per shard, not eight. (Independent builds per leg,
+  after a Codex finding, keep the guard catching build-time nondeterminism; the
+  saving vs the 8-job matrix is the second checkout + npm ci, not the build.)
+  Each shard uploads its verified `run-a` set plus a `.shard-complete`
   marker; the commit job rebuilds the gallery from the union of shards (pruning
   removed scenes). The original speed constraints held: 4 shards (not 8+),
   provable coverage, `ONLY=`-based subsetting.
