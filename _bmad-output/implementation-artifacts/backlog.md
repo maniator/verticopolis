@@ -152,6 +152,53 @@ untouched. Two findings deferred, both watch-only:
   the same stand-in. If the honesty model tightens (real per-shop occupancy), revisit
   whether the salon client should gate on a real occupant rather than the stand-in.
   Watch-only, no behavior change wanted now.
+### Deferred from: E3 pixel-art food and entertainment (`/gds-code-review`, 2026-07-14)
+
+Change: enriched the food and entertainment rooms (5 fast-food subtypes, 5
+restaurants, the two-floor cinema, and `drawPartyHall`) and tied every visible
+figure to real occupancy. Bookkeeping and open follow-ups from this PR:
+
+- DONE here: the party-hall `scatterPeople` ghost crowd is retired. Dancers
+  (standing build), the DJ, and banquet guests (seated build) now gate on the
+  hall's `u.occupants` and fill in seed order, so an empty hall draws none.
+- OPEN (entertainment honest-attendance, cinema AND party hall): both kinds are
+  population 0 (`facilitiesData.ts`), so `occupants` (and thus
+  `visibleOccupants`) is pinned to 0, and the occupancy-gated audience/dancers
+  render an EMPTY house on every real cinema and party hall. Per the frozen spec
+  this is the honest read (n === 0 draws empty; "do not leave a constant
+  crowd"), and it is exactly what the acceptance matrix states, so E3 ships it as
+  drawn. The real fix is engine-side, not draw-code: give entertainment venues a
+  visible-attendance count (a foot-traffic or booking-derived number), then feed
+  it to the room as a reviewed bake-signature input (spec "Ask First"). Until
+  then the cinema and party hall read empty. Flagged by the E3 `/gds-code-review`
+  Edge Case Hunter. Do not reintroduce a population-independent ghost crowd to
+  paper over it.
+- OPEN (metro-platform `scatterPeople`): the metro-platform `scatterPeople`
+  call (`src/render/sprites/facilities/service.ts`) is out of scope for E3 and
+  still uses the seeded-scatter crowd idiom. It stays with the
+  people-system/structure work and its own backlog follow-up.
+
+Second review pass (three adversarial layers) on the finished branch:
+
+- PATCHED here (Edge Case Hunter): person-implying props were drawn outside the
+  occupancy gate, so an empty venue showed a floating prop. The seat filler now
+  reports whether it drew an occupant, and the sushi chef's hat, the teahouse
+  boba cups, the coffee-shop lounge laptop, and the coffee-shop window-bench cup
+  all gate on that, matching the party-hall pattern (furniture always draws;
+  person-implying props only when the seat fills). Re-verified with the gates.
+- PATCHED here (Acceptance Auditor): `drawPartyHall` left the bottom ~6px of its
+  two-floor 88px rect unpainted (the food rooms cover it with `pfloor`). Added a
+  floor base band so the composition now fills the full rect height.
+- DEFER (minor, Blind Hunter): the `f` / `glow` / `box` / `twall` primitives and
+  the `(floor * 131 + x * 17)` geography seed are duplicated between
+  `pixelSprites/food.interiors.ts` and `sprites/facilities/venue.ts` (different
+  render modules). Left as-is to avoid cross-module coupling; a shared
+  low-level helper module is the eventual cleanup. No behavior risk today.
+- DEFER (low, Acceptance Auditor): the ice-cream parlor wall clock uses
+  `#E8A050`. This is not the reserved notice amber `#E8A030` (blue differs by
+  0x20, outside the within-10 collision band) and reads as a gold clock, not a
+  state cue, so it passes the reserved-color rule. Noted for a future glance if
+  the amber hue family is ever tightened.
 
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
