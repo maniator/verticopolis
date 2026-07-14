@@ -90,6 +90,10 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
   }
   ctx.fillStyle = interior;
   ctx.fillRect(x, glassTop, w, glassBot - glassTop);
+  // A cool skyline recedes behind the top of the glass so the frontage reads
+  // "warm light within, cool world outside" (the board's storefront beat, and
+  // the tall glass skyline the ground lobby I/O calls for).
+  storefrontSkyline(ctx, x, glassTop, w, lit);
   // Interior carpet visible through the very bottom of the glass, so the
   // carpet visually continues from outside the doors right through the display
   // window (a signature grand-hotel beat).
@@ -99,6 +103,26 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
     drawGrandFacadeLeftInterior(d, x, y, w, glassTop, glassBot, frameColor, goldTrim);
   } else {
     drawGrandFacadeRightInterior(d, x, y, w, h, glassTop, glassBot, frameColor, goldTrim);
+  }
+}
+
+/** A shallow recessed skyline behind the top of the storefront glass: a cool
+ *  day or night sky band with distant building blocks, warm distant windows
+ *  glowing only after dark. Keeps the frontage reading "warm within, cool
+ *  world outside" without competing with the doors or the chandelier drawn over
+ *  it. Keys only on `lit`, so both baked slices stay in step. */
+function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: number, w: number, lit: boolean): void {
+  const skyH = 6;
+  ctx.fillStyle = lit ? "#2A3350" : "#9CC4DE"; // night vs day sky
+  ctx.fillRect(x, glassTop, w, skyH);
+  ctx.fillStyle = lit ? "#1E2740" : "#7EA0C0"; // distant building blocks
+  for (let bx = x; bx < x + w; bx += 4) {
+    const bh = 2 + ((bx * 3) % 4);
+    ctx.fillRect(bx, glassTop + skyH - bh, 3, bh);
+  }
+  if (lit) {
+    ctx.fillStyle = "#F3D08A"; // warm distant windows at night only
+    for (let bx = x + 1; bx < x + w; bx += 4) ctx.fillRect(bx, glassTop + 2, 1, 1);
   }
 }
 
