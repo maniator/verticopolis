@@ -142,7 +142,8 @@ describe("service facilities — reserved colors, integer pixels, and state cues
       for (const [rf, pd, lit] of [[0, false, true], [0.8, false, false], [1, false, true], [0.5, true, true]] as const) {
         const s = spyCtx();
         drawUnit(draw({ recycleFill: rf, parkingUse: 1, parkingDead: pd, lit }, s.ctx), unit(over), 0, 0, 176, 88);
-        for (const r of RESERVED) expect(s.log, `${String(over.kind)} painted reserved ${r}`).not.toContain(`fillStyle=${r}`);
+        const fills = s.log.filter((x) => x.startsWith("fillStyle=")).map((x) => x.slice("fillStyle=".length).toLowerCase());
+        for (const r of RESERVED) expect(fills, `${String(over.kind)} painted reserved ${r}`).not.toContain(r.toLowerCase());
         for (const l of s.log.filter((x) => x.startsWith("fillRect:")))
           for (const n of JSON.parse(l.slice("fillRect:".length)) as number[]) expect(Number.isInteger(n), `${String(over.kind)} non-integer ${l}`).toBe(true);
       }

@@ -29,10 +29,11 @@ export function refMap(ctx: CanvasRenderingContext2D, x: number, y: number, w: n
     if (rw <= 0 || rh <= 0) return;
     const x0 = sx(rx);
     const y0 = sy(ry);
+    const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
     ctx.fillRect(x0, y0, Math.max(1, sx(rx + rw) - x0), Math.max(1, sy(ry + rh) - y0));
-    if (alpha !== 1) ctx.globalAlpha = 1;
+    if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
   };
   return { F, sx, sy };
 }

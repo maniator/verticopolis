@@ -307,10 +307,16 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   const W = Math.max(1, w);
   const H = Math.max(1, h);
   const f: Fill = (px, py, pw, ph, color, alpha = 1) => {
+    const rw = Math.round(pw);
+    const rh = Math.round(ph);
+    // A rounded-to-zero (or negative) size paints nothing, matching refMap's
+    // zero-size guard, rather than promoting an empty rect into a stray pixel.
+    if (rw <= 0 || rh <= 0) return;
+    const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x + px), Math.round(y + py), Math.max(1, Math.round(pw)), Math.max(1, Math.round(ph)));
-    if (alpha !== 1) ctx.globalAlpha = 1;
+    ctx.fillRect(Math.round(x + px), Math.round(y + py), rw, rh);
+    if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
   };
   const platY = Math.round(H * 0.82);
   const band = Math.round(H / 3);
