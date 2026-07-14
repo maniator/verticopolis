@@ -73,6 +73,11 @@ describe("reconcileCrowd draws one actor per live person", () => {
     expect(e.engine.add).toHaveBeenCalledTimes(1);
     const rec = e.crowdActors.get(1);
     expect(rec.actor.pos.x).toBeCloseTo(10 * TILE, 6);
+    // Regression guard on the figure footprint: the crowd actor is sized to the
+    // finalized 24px walker bake (9x25), not the legacy 8x14. A silent shrink
+    // back would reintroduce the miniature-crowd bug.
+    expect(rec.actor.width).toBeCloseTo(9, 6);
+    expect(rec.actor.height).toBeCloseTo(25, 6);
 
     // Next pass: the person is gone, so its actor is reaped.
     e.sim.crowd.people = [];

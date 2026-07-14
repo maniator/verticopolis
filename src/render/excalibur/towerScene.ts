@@ -199,9 +199,10 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   // occupants at, instead of the legacy half-height figure that read as a
   // miniature next to a full-scale concourse. `personFigure` takes an explicit
   // fill, so the one-canvas-per-shirt scheme (indexed by seed) is unchanged.
-  // Geometry: the walker's feet sit at footY = PERSON_H - 1, one pixel above
-  // the canvas floor, and each actor is anchored bottom-center, so the figure
-  // grows upward from the same ground line the old bake used.
+  // Geometry: personFigure draws the 1px contact shadow on the bottom canvas
+  // row (footY = PERSON_H - 1) with the feet one pixel above it, and each actor
+  // is anchored bottom-center, so the figure grows upward from the same ground
+  // line the old bake used.
   const PERSON_W = 9;
   const PERSON_H = 25; // 24px walker + a 1px contact-shadow row at the foot
   const PERSON_FOOT = PERSON_H - 1;
