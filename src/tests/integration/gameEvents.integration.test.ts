@@ -12,9 +12,9 @@ import type { FacilityKind } from "../../engine/types";
  * daily roll in {@link EventSystem.maybeRandomEvent} and the player's
  * emergency choice ({@link EventSystem.resolveChoice}). The individual event
  * mechanics (fire spread/containment, thief, Santa, weather, buried treasure,
- * the VIP inspection) are pinned elsewhere — fire.test.ts, phase2.test.ts,
- * weatherEvents.test.ts, simulation.test.ts, reviewFixes.test.ts,
- * parity.test.ts. What was NOT covered, and is here, are the interactive
+ * the VIP inspection) are pinned elsewhere — fire.integration.test.ts, phase2.integration.test.ts,
+ * weatherEvents.integration.test.ts, simulation.integration.test.ts, reviewFixes.integration.test.ts,
+ * parity.integration.test.ts. What was NOT covered, and is here, are the interactive
  * choice flows and the star gating that decides which emergency can fire:
  *
  *  - a fire arriving on the daily roll and offering a rescue, then ACCEPT

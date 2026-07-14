@@ -111,7 +111,7 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
   });
 
   it("unearthing buried treasure fires the sparkle trigger at the dig site", () => {
-    // Mirrors simulation.test's deterministic treasure dig (seed 42): digging
+    // Mirrors simulation.integration.test's deterministic treasure dig (seed 42): digging
     // parking into a fresh B1 slab turns up treasure, which must also bump the
     // cosmetic treasureFx the renderer polls.
     const sim = Simulation.newGame(42);

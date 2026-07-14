@@ -975,7 +975,7 @@ class GameApp {
    *  keyboard cursor: paint a structure strip, drop a fixed two-floor flight,
    *  or place a room. Returns null for drag-sized shafts — that anchor
    *  gesture belongs to the caller.
-   *  NOTE: src/tests/gameControllers.test.ts mirrors this body (and pickedAt /
+   *  NOTE: src/tests/integration/gameControllers.integration.test.ts mirrors this body (and pickedAt /
    *  isTransportTool) to drive KeyboardPlay headlessly — keep the mirror in
    *  sync when editing. */
   private placeSimpleBuild(kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null {

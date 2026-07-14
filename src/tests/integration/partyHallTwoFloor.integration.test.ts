@@ -11,7 +11,7 @@ import type { SerializedGame, Unit } from "../../engine/types";
  * legacy save loads end-to-end through `Simulation.deserialize` with the hall
  * indexed across both stories, and a built hall survives an export/import trip as
  * a single two-story room. The pure catalog/placement/migration unit tests live
- * in `src/tests/partyHallTwoFloor.test.ts`.
+ * in `src/engine/partyHallTwoFloor.test.ts`.
  */
 
 /** A minimal v5 SerializedGame carrying the given units. */

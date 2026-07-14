@@ -1,17 +1,17 @@
 import { describe, expect, it, beforeEach } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GRID, isFixedSpanTransport } from "../engine/facilities";
-import { ECON, rentConfig, rentOf, carResaleRefund, resaleRefund } from "../engine/econConfig";
-import type { FacilityKind, Transport, Unit } from "../engine/types";
-import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
-import type { Tool } from "../ui/UI";
-import { unitEditorHtml, transportEditorHtml } from "../ui/editorHtml";
-import { announceForPlacement, snapX, type PlaceOutcome } from "../ui/placement";
-import { BuildActions } from "../game/buildActions";
-import { EditorActions } from "../game/editorActions";
-import { SaveLoad } from "../game/saveLoad";
-import { InspectorController } from "../game/inspector";
-import { KeyboardPlay } from "../game/keyboardPlay";
+import { Simulation } from "../../engine/Simulation";
+import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
+import { ECON, rentConfig, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
+import type { FacilityKind, Transport, Unit } from "../../engine/types";
+import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
+import type { Tool } from "../../ui/UI";
+import { unitEditorHtml, transportEditorHtml } from "../../ui/editorHtml";
+import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";
+import { BuildActions } from "../../game/buildActions";
+import { EditorActions } from "../../game/editorActions";
+import { SaveLoad } from "../../game/saveLoad";
+import { InspectorController } from "../../game/inspector";
+import { KeyboardPlay } from "../../game/keyboardPlay";
 
 /** The src/game/ controllers extracted from the GameApp class run against the
  *  real (headless) Simulation with minimal fake ui/audio ports — these tests

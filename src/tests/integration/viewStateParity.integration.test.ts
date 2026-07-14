@@ -1,22 +1,22 @@
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { inflateSync } from "fflate";
-import towerFile from "./fixtures/towerone_6.vctower?raw";
-import { Simulation } from "../engine/Simulation";
-import { FLOOR, TILE, TowerEngine } from "../render/excalibur/TowerEngine";
-import { GRID } from "../engine/facilities";
-import type { SerializedGame, SerializedView } from "../engine/types";
-import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../engine/types";
-import { SaveGame } from "../storage/SaveGame";
-import { SaveLoad } from "../game/saveLoad";
+import towerFile from "../fixtures/towerone_6.vctower?raw";
+import { Simulation } from "../../engine/Simulation";
+import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
+import { GRID } from "../../engine/facilities";
+import type { SerializedGame, SerializedView } from "../../engine/types";
+import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
+import { SaveGame } from "../../storage/SaveGame";
+import { SaveLoad } from "../../game/saveLoad";
 import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
   viewFromViewWords,
   viewWordsFromView,
-} from "../storage/tdtFormat";
-import { buildTDT } from "../storage/tdtExport";
-import { parseTDT } from "../storage/tdtImport";
-import { buildTdt, sampleTowerSpec } from "./fixtures/tdtBuilder";
+} from "../../storage/tdtFormat";
+import { buildTDT } from "../../storage/tdtExport";
+import { parseTDT } from "../../storage/tdtImport";
+import { buildTdt, sampleTowerSpec } from "../fixtures/tdtBuilder";
 
 /**
  * View-state save parity: the camera (tile/floor/zoom) rides inside every

@@ -1,24 +1,24 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
-import { FACILITIES, GRID, maxCarsFor } from "../engine/facilities";
-import { ECON, rentConfig, rentOf, resaleRefund } from "../engine/econConfig";
-import type { Transport, Unit } from "../engine/types";
-import type { Picked, TowerEngine } from "../render/excalibur/TowerEngine";
-import type { Tool } from "../ui/UI";
-import { unitEditorHtml, transportEditorHtml } from "../ui/editorHtml";
-import { SaveGame } from "../storage/SaveGame";
-import type { ExportReport } from "../storage/tdtExport";
-import type { ImportReport } from "../storage/tdtImport";
-import { buildTdt } from "./fixtures/tdtBuilder";
-import { BuildActions } from "../game/buildActions";
-import { brushTiles } from "../ui/placement";
-import { EditorActions } from "../game/editorActions";
-import { SaveLoad } from "../game/saveLoad";
-import { InspectorController } from "../game/inspector";
-import { KeyboardPlay } from "../game/keyboardPlay";
+import { Simulation } from "../../engine/Simulation";
+import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
+import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
+import { ECON, rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
+import type { Transport, Unit } from "../../engine/types";
+import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
+import type { Tool } from "../../ui/UI";
+import { unitEditorHtml, transportEditorHtml } from "../../ui/editorHtml";
+import { SaveGame } from "../../storage/SaveGame";
+import type { ExportReport } from "../../storage/tdtExport";
+import type { ImportReport } from "../../storage/tdtImport";
+import { buildTdt } from "../fixtures/tdtBuilder";
+import { BuildActions } from "../../game/buildActions";
+import { brushTiles } from "../../ui/placement";
+import { EditorActions } from "../../game/editorActions";
+import { SaveLoad } from "../../game/saveLoad";
+import { InspectorController } from "../../game/inspector";
+import { KeyboardPlay } from "../../game/keyboardPlay";
 
-/** Coverage companion to gameControllers.test.ts: the same harness idioms
+/** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
  *  aimed at the branches that file leaves dark — save/load persistence and
  *  GPU-loss recovery, the editor card's dialogs and extend billing, the

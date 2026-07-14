@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { Tower } from "../engine/Tower";
-import { FACILITIES, GRID, facilityFloors } from "../engine/facilities";
-import { expandLegacyPartyHalls, migrationLooksValid, floatingStructureCount } from "../engine/saveMigration";
-import type { SerializedGame, Unit } from "../engine/types";
+import { Tower } from "./Tower";
+import { FACILITIES, GRID, facilityFloors } from "./facilities";
+import { expandLegacyPartyHalls, migrationLooksValid, floatingStructureCount } from "./saveMigration";
+import type { SerializedGame, Unit } from "./types";
 
 /**
  * Party Hall is a two-story room (canon: TDT tile codes 29/30 "top/bottom half",
