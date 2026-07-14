@@ -12,6 +12,7 @@ import { paceFactor } from "./engine/timePacing";
 import { UI, type Tool } from "./ui/UI";
 import { classifyGesture, isPaintKind } from "./game/gesture";
 import { unitEditorTemplate, transportEditorTemplate } from "./ui/templates/editor";
+import { buildRefusalTemplate } from "./ui/templates/inspector";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
 import { statsTemplate } from "./ui/templates/stats";
 import { OnboardingController } from "./ui/Onboarding";
@@ -22,7 +23,6 @@ import { attemptContextRecovery } from "./game/contextRecovery";
 import { decideMealRush } from "./game/mealRush";
 import { InspectorController } from "./game/inspector";
 import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
-import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { resolveBootScreen } from "./bootScreen";
@@ -1094,14 +1094,12 @@ class GameApp implements GameAppPorts {
   private updateBuildRefusal(reason: string | undefined, floor: number, anchorX: number): void {
     if (reason) {
       this.inspectAnchor = { x: anchorX, floor };
-      // Wrap the tooltip in the standard <h4 class="win-title"> so
-      // UI.showInspector attaches its mobile-only ✕ close (UI.ts:554). On
-      // desktop the tooltip clears as soon as the pointer moves off an invalid
-      // cell, but on the phone tier there is no such hover trail, so a pinned
-      // card needs an explicit dismiss affordance.
-      this.ui.showInspector(
-        `<h4 class="win-title">Can't build here</h4><div class="preview-refuse">${escapeHtml(reason)}</div>`,
-      );
+      // The template wraps the tooltip in the standard <h4 class="win-title">
+      // so UI.showInspector attaches its mobile-only ✕ close. On desktop the
+      // tooltip clears as soon as the pointer moves off an invalid cell, but
+      // on the phone tier there is no such hover trail, so a pinned card
+      // needs an explicit dismiss affordance.
+      this.ui.showInspector(buildRefusalTemplate(reason));
       this.buildRefusalShowing = true;
     } else {
       this.clearBuildRefusal();

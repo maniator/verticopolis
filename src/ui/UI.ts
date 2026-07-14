@@ -375,8 +375,8 @@ export class UI {
     panels.clearPanelAnchors(this);
   }
 
-  showInspector(html: string | null): void {
-    panels.showInspector(this, html);
+  showInspector(tpl: TemplateResult | null): void {
+    panels.showInspector(this, tpl);
   }
 
   showStats(body: TemplateResult): void {

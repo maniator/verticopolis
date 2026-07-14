@@ -12,6 +12,7 @@ import { EditorActions } from "../../game/editorActions";
 import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
+import { render, type TemplateResult } from "lit-html";
 
 /** The src/game/ controllers extracted from the GameApp class run against the
  *  real (headless) Simulation with minimal fake ui/audio ports — these tests
@@ -21,6 +22,14 @@ import { KeyboardPlay } from "../../game/keyboardPlay";
 /** The most recent entry (tsconfig's lib predates Array.prototype.at). */
 function last<T>(arr: T[]): T {
   return arr[arr.length - 1];
+}
+
+/** The inspector card is a lit template since E6-S2; render it detached and
+ *  hand back the text so the content assertions keep reading plain strings. */
+function renderedText(tpl: TemplateResult): string {
+  const div = document.createElement("div");
+  render(tpl, div);
+  return div.textContent ?? "";
 }
 
 /** Recording fakes for the narrow ui/audio ports the controllers take. */
@@ -322,7 +331,9 @@ describe("InspectorController (✕-dismissal latch)", () => {
     anchor = null;
     inspector = new InspectorController({
       getSim: () => sim,
-      ui: { showInspector: (html) => shown.push(html) },
+      // The card is a lit template since E6-S2; record its rendered text so
+      // the latch assertions keep reading plain content.
+      ui: { showInspector: (tpl) => shown.push(tpl && renderedText(tpl)) },
       setAnchor: (a) => (anchor = a),
     });
     officePick = { type: "unit", id: office.id, kind: "office" };
@@ -502,7 +513,7 @@ describe("InspectorController (data-rich cards: parking, recycling, notice)", ()
     const shown: (string | null)[] = [];
     const inspector = new InspectorController({
       getSim: () => sim,
-      ui: { showInspector: (html) => shown.push(html) },
+      ui: { showInspector: (tpl) => shown.push(tpl && renderedText(tpl)) },
       setAnchor: () => {},
     });
     return { inspector, shown };

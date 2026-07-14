@@ -1153,11 +1153,13 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
 describe("InspectorController (stale-pick hygiene)", () => {
   it("a pick whose entity has been removed hides the card instead of rendering a ghost", () => {
     const { sim, office, lift } = fixture();
-    const shown: (string | null)[] = [];
+    // Only the null (hide) calls matter here, so record the raw values; the
+    // card itself is a lit template since E6-S2.
+    const shown: unknown[] = [];
     let anchor: { x: number; floor: number } | null = null;
     const inspector = new InspectorController({
       getSim: () => sim,
-      ui: { showInspector: (html) => shown.push(html) },
+      ui: { showInspector: (tpl) => shown.push(tpl) },
       setAnchor: (a) => (anchor = a),
     });
     sim.tower.removeUnit(office.id);
