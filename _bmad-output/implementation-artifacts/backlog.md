@@ -1109,3 +1109,18 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
 - **Pre-existing input behaviors unchanged by E2-S2**: an empty-string note renders a
   blank bullet; a malformed non-array `notes` (bad version.json) would throw in both
   the old and new code. Candidates for a later validation pass.
+
+### Deferred from: code review of E2-S3 (settings lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E2-S3 migrates the Settings dialog structure (`settingsHtml`) onto the E0
+`openModalTemplate` seam with a STATIC lit `settingsTemplate`. Settings is stateful,
+so the controller (`showSettings`) keeps all the wiring verbatim: the volume sliders
+initialize from live volumes and apply on input, both switches re-read the live
+state after every toggle, and the OS-forced reduced-motion path disables and
+relabels the switch. The Close button remains wired by the shared `wireActions` pass (its loud
+`[data-act]` lookup is retained). Residual defers (behavior-preserving):
+
+- **`settingsHtml` joins the transitional string-builder retirement list**
+  (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`): it is now
+  dead production code kept only to feed its `assertDomEquivalent` guard; retire it
+  and its transitional test when the last string dialog converts (E6/E7).

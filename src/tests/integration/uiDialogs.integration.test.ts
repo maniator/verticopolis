@@ -1371,10 +1371,19 @@ describe("showSettings: the Settings dialog", () => {
       const sw = dialog().querySelector<HTMLInputElement>("#set-reduce-motion")!;
       expect(sw.disabled).toBe(true);
       expect(sw.checked).toBe(true); // forced on IS on; the switch must not read off
-      expect(sw.closest("label")!.textContent).toContain("(system)");
+      // Pin the full relabel string (not just the suffix) so a prefix regression is caught.
+      expect(sw.closest("label")!.textContent).toContain("Reduced motion (system)");
     } finally {
       window.matchMedia = original;
     }
+  });
+
+  it("the Close button dismisses the Settings dialog", () => {
+    const { ui } = makeUI();
+    ui.showSettings();
+    expect(dialog().open).toBe(true);
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
   });
 });
 

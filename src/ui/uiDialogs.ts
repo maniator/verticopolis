@@ -3,6 +3,7 @@ import * as tpl from "./uiTemplates";
 import { confirmTemplate } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
+import { settingsTemplate } from "./templates/settings";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -332,7 +333,7 @@ export function showHelp(ui: UI): void {
 
 /** The Settings dialog: sound levels plus the presentation toggles. */
 export function showSettings(ui: UI): void {
-  const box = ui.openModal(tpl.settingsHtml());
+  const box = ui.openModalTemplate(settingsTemplate());
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -364,6 +365,9 @@ export function showSettings(ui: UI): void {
   rm.disabled = osForced;
   if (osForced) rm.closest("label")!.querySelector("span")!.textContent = "Reduced motion (system)";
   rm.addEventListener("change", () => (rm.checked = ui.cb.onToggleReducedMotion()));
+  // The controller wires every stateful control above; the plain Close action is
+  // the one [data-act] button, so wireActions binds it (its loud lookup throws at
+  // open if the button is ever dropped).
   ui.wireActions(box);
 }
 
