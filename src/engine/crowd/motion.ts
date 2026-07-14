@@ -107,8 +107,11 @@ const QUEUE_GAP = 0.8;
 const QUEUE_SPACING = 0.6;
 
 /** Built horizontal span [min, max) of each floor's floor/lobby tiles, so a
- *  landing line can be laid out on solid ground and clamped to it. */
-function floorExtents(tower: Tower): Map<number, { min: number; max: number }> {
+ *  landing line can be laid out on solid ground and clamped to it. Memoized on
+ *  the crowd by `tower.revision` (like the routing adjacency graphs): the scan
+ *  of `tower.units` only reruns after a build edit, not on every advance slice. */
+function floorExtents(crowd: Crowd, tower: Tower): Map<number, { min: number; max: number }> {
+  if (crowd.floorExt && crowd.floorExtRev === tower.revision) return crowd.floorExt;
   const ext = new Map<number, { min: number; max: number }>();
   for (const u of tower.units) {
     if (u.kind !== "floor" && u.kind !== "lobby") continue;
@@ -120,6 +123,8 @@ function floorExtents(tower: Tower): Map<number, { min: number; max: number }> {
       if (right > e.max) e.max = right;
     }
   }
+  crowd.floorExt = ext;
+  crowd.floorExtRev = tower.revision;
   return ext;
 }
 
@@ -162,7 +167,7 @@ function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
     g.people.push(p);
   }
   if (byShaft.size === 0) return slots;
-  const extents = floorExtents(tower);
+  const extents = floorExtents(crowd, tower);
   for (const [, byFloor] of byShaft) {
     for (const [floor, g] of byFloor) {
       // Longest-waiting at the front (ties keep array order): the line reads as

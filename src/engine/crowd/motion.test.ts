@@ -5,11 +5,13 @@ import type { Person } from "./person";
 import type { FacilityKind } from "../types";
 
 /**
- * Crowd motion placement: the elevator-landing queue. Waiting and approaching
- * riders line up beside the shaft (on the side with more built floor, clamped
- * to that floor's structure) instead of stacking on the car's column. Boarding
- * is position-independent, so these pin the visual placement, not the boarding
- * math (that lives in queueView.test.ts, driven through the same advance()).
+ * Crowd motion placement: the elevator-landing queue. Waiting riders fan into a
+ * line beside the shaft (on the side with more built floor, clamped to that
+ * floor's structure) instead of stacking on the car's column; riders still
+ * walking in (`toShaft`) head to the shaft face and only fan out once they
+ * become `waiting`. Boarding is position-independent, so these pin the visual
+ * placement, not the boarding math (that lives in queueView.test.ts, driven
+ * through the same advance()).
  */
 describe("Crowd landing queue: waiters line up beside the shaft", () => {
   /** A tower with a ground lobby and plain floors 2..top across tiles 0..39. */
