@@ -1212,3 +1212,34 @@ relabels the switch. The Close button remains wired by the shared `wireActions` 
   (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`): it is now
   dead production code kept only to feed its `assertDomEquivalent` guard; retire it
   and its transitional test when the last string dialog converts (E6/E7).
+
+### Deferred from: code review of E2-S4 (help lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E2-S4 migrates the Help / How-to-play dialog (`helpHtml`) onto the E0
+`openModalTemplate` seam with a lit `helpTemplate`. The large body is authored
+verbatim as static markup (only the app `version` is interpolated, auto-escaped by
+lit); the Replay button is disabled with an explaining `title` while the splash is
+up (via `?disabled`/`title` bindings and lit's `nothing` sentinel) and binds its
+action inline via `@click`. Binding is unconditional because two real backstops
+make a splash-time trigger a no-op: a browser suppresses click events on a
+`disabled` button, and `onReplayOnboarding` itself no-ops behind `#splash`. (Blind
+Hunter noted the guarantee is behavioral, not structural: a synthetic `click()` in
+happy-dom still reaches the handler, so the code comments say "behavioral" and the
+disabled state is pinned by an integration test rather than a unit no-op assertion.)
+The controller (`showHelp`) keeps routing the report link through the platform
+wrapper (`routeExternalInWrapper`) and wires the plain Close via `wireActions`.
+Residual defers (behavior-preserving):
+
+- **`helpHtml` joins the transitional string-builder retirement list**
+  (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`):
+  it is now dead production code kept only to feed its `assertDomEquivalent` guard;
+  retire it and its transitional test when the last string dialog converts (E6/E7).
+  With E2 complete, the remaining string dialogs live in E3 onward (saves, stops,
+  new-tower, import/export reports, statistics, batch pricing, editor/inspector).
+- **`showHelp`'s `.help-report a` lookup is a non-null assertion** (pre-existing):
+  it would throw if the body ever lost the report link. Behavior-preserving today
+  (the link is always in the template); a defensive guard can wait until the body
+  becomes conditional.
+- **Double-activation of Replay is not de-duplicated** (pre-existing): `@click`
+  fires per click, matching the old `addEventListener` wiring. `onReplayOnboarding`
+  is idempotent enough that a fast double-click is harmless; no change needed now.

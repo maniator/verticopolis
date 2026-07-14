@@ -955,6 +955,35 @@ describe("showHelp — the Report an issue link", () => {
     expect(box.querySelector('[data-act="close"]')!.hasAttribute("autofocus")).toBe(true);
     expect(box.querySelector('a[href*="/issues/new"]')!.hasAttribute("autofocus")).toBe(false);
   });
+
+  it("disables Replay while the title screen is up (replaying the intro is meaningless there)", () => {
+    // showHelp reads #splash to gate the button. With the splash mounted the
+    // Replay button must render disabled, which is the real production backstop
+    // (a browser then suppresses the click) against replaying mid-title.
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.appendChild(splash);
+    try {
+      const { ui } = makeUI();
+      ui.showHelp();
+      const replay = dialog().querySelector<HTMLButtonElement>('[data-act="replay-onboard"]')!;
+      expect(replay.disabled).toBe(true);
+    } finally {
+      splash.remove();
+    }
+  });
+
+  it("wires Replay to onReplayOnboarding once the splash is gone", () => {
+    // Off the splash the button is enabled and its inline @click must reach the
+    // callback: this pins the controller closure that replaced the old manual
+    // addEventListener wiring.
+    const { ui, cb } = makeUI();
+    ui.showHelp();
+    const replay = dialog().querySelector<HTMLButtonElement>('[data-act="replay-onboard"]')!;
+    expect(replay.disabled).toBe(false);
+    replay.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(cb.onReplayOnboarding).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("newTowerModal — the rule-set picker", () => {
