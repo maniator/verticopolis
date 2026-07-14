@@ -118,6 +118,11 @@ export class UI {
   /** The shape currently built into the editor card (see renderEditor's key).
    *  @internal friend-module access (uiPanels). */
   editorKey: string | null = null;
+  /** Dirty-gate key for the palette lock/afford scan: the star plus the
+   *  per-kind affordability bitmask last applied to the DOM. The ~6 Hz pump
+   *  rescans only when this changes (a star or affordability crossing).
+   *  @internal friend-module access (uiStatus). */
+  paletteScanKey: string | null = null;
 
   constructor(cb: UICallbacks) {
     this.cb = cb;

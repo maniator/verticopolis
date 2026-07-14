@@ -1191,6 +1191,37 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     expect(header("Special").hidden).toBe(true);
   });
 
+  it("dirty-gates the lock/afford scan: rescans only on a star or affordability crossing", () => {
+    // E5-S3: the ~6 Hz pump must not walk the palette DOM when neither the star
+    // nor any kind's affordability changed. The scan is observable through the
+    // palette's querySelectorAll walks.
+    const { ui } = makeUI();
+    const sim = Simulation.newGame(1);
+    sim.star = 1;
+    // Mid-band funds: the costliest kinds sit at 1M and 3M, so 2M puts every
+    // affordability comparison well away from a boundary.
+    sim.money = 2_000_000;
+    const scans = vi.spyOn(document.getElementById("palette-scroll")!, "querySelectorAll");
+    ui.update(sim); // first pump after construction: always scans (2 walks)
+    const afterFirst = scans.mock.calls.length;
+    expect(afterFirst).toBeGreaterThan(0);
+    ui.update(sim); // identical snapshot: skipped
+    sim.money -= 1; // moves, but crosses no kind's cost boundary
+    ui.update(sim);
+    expect(scans.mock.calls.length).toBe(afterFirst);
+    sim.money = 100; // crosses (nearly) every affordability boundary
+    ui.update(sim);
+    const afterCrossing = scans.mock.calls.length;
+    expect(afterCrossing).toBeGreaterThan(afterFirst);
+    // The DOM caught up with the crossing: offices are now unaffordable.
+    expect(item("office").classList.contains("unaffordable")).toBe(true);
+    sim.star = 3; // a star crossing rescans too
+    ui.update(sim);
+    expect(scans.mock.calls.length).toBeGreaterThan(afterCrossing);
+    expect(item("restaurant").classList.contains("locked")).toBe(false);
+    scans.mockRestore();
+  });
+
   it("renders the tool-info panel through selectTool for every tool shape", () => {
     // Pins the E5-S2 wiring: lit renders into #tool-info on tool select. Covers
     // the boot default (the constructor clears the static placeholder and
