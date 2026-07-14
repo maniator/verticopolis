@@ -17,7 +17,10 @@ import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
  */
 
 /** A small built Classic tower with a lobby row, a floor, an occupied office,
- *  and one standard elevator (so the elevator/tenancy sections are non-empty). */
+ *  and one standard elevator (so the elevator/tenancy sections are non-empty).
+ *  One milestone is forced achieved so the Milestones `done` (✓ / `ms-done`)
+ *  markup and a non-zero progress-bar width render (both builders read the same
+ *  `milestoneProgress`, so the equivalence guard covers that branch). */
 function builtTower(): Simulation {
   const sim = new Simulation();
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
@@ -26,24 +29,29 @@ function builtTower(): Simulation {
   expect(r.ok).toBe(true);
   sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
   expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
+  sim.achievedMilestones.add("pop-500");
   return sim;
 }
 
-/** A Modern tower with one present, sold condo carrying a 4-person household, so
- *  the Households section renders its populated size mix. Lay a lobby + floor
- *  across the grid (tolerating the starter tower's existing tiles), then place a
- *  condo near center and force it occupied with a household. */
+/** A Modern tower with two present, sold condos carrying DIFFERENT household
+ *  sizes (4 and 2), so the Households "Size mix" line joins more than one size
+ *  with " · ". Lay a lobby + floor across the grid (tolerating the starter
+ *  tower's existing tiles), then place the condos and force them occupied. */
 function modernWithHousehold(): Simulation {
   const sim = Simulation.newGame(3, "modern");
   const C = Math.floor(GRID.width / 2);
   for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
   for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", 2, x);
-  const r = sim.tower.place("condo", 2, C + 4);
-  expect(r.ok).toBe(true);
-  const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
-  condo.state = "occupied";
-  condo.everOccupied = true;
-  condo.residents = 4;
+  const occupy = (col: number, size: number): void => {
+    const r = sim.tower.place("condo", 2, col);
+    expect(r.ok).toBe(true);
+    const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.residents = size;
+  };
+  occupy(C + 4, 4);
+  occupy(C + 24, 2);
   return sim;
 }
 

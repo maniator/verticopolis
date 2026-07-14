@@ -56,7 +56,7 @@ describe("stopsTemplate inline @change reports the floor and new state", () => {
     const frag = renderToFragment(stopsTemplate("Express", floors, onToggle));
     const box = frag.querySelector<HTMLInputElement>('[data-floor="5"]')!;
     box.checked = false;
-    box.dispatchEvent(new Event("change"));
+    box.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
     expect(onToggle).toHaveBeenCalledExactlyOnceWith(5, false);
   });
 
@@ -66,7 +66,7 @@ describe("stopsTemplate inline @change reports the floor and new state", () => {
     const frag = renderToFragment(stopsTemplate("Express", floors, onToggle));
     const box = frag.querySelector<HTMLInputElement>('[data-floor="-2"]')!;
     box.checked = true;
-    box.dispatchEvent(new Event("change"));
+    box.dispatchEvent(new Event("change", { bubbles: true, cancelable: true }));
     expect(onToggle).toHaveBeenCalledExactlyOnceWith(-2, true);
   });
 });
