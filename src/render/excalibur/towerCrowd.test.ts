@@ -17,8 +17,10 @@ import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./t
  * no-throw.
  */
 
-const gfx = () => ({}) as ex.Graphic;
-const actor = () => new ex.Actor({ pos: ex.vec(0, 0), width: 8, height: 14 });
+const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
+// Match the walker bake footprint (9x25) the production actors adopt from their
+// canvas, so fixtures never encode the legacy 8x14 size.
+const actor = () => new ex.Actor({ pos: ex.vec(0, 0), width: 9, height: 25 });
 const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.full ? "f" : "e"}`;
 
 /** A fake engine carrying the fields the motion/crowd functions read, plus the
@@ -73,6 +75,13 @@ describe("reconcileCrowd draws one actor per live person", () => {
     expect(e.engine.add).toHaveBeenCalledTimes(1);
     const rec = e.crowdActors.get(1);
     expect(rec.actor.pos.x).toBeCloseTo(10 * TILE, 6);
+    // Regression guard on the figure footprint: the crowd actor adopts the
+    // baked canvas dimensions (9x25 for the finalized walker), so it can never
+    // drift back to the legacy 8x14 miniature or desync from the sprite.
+    expect(rec.actor.width).toBeCloseTo(rec.gfx.width, 6);
+    expect(rec.actor.height).toBeCloseTo(rec.gfx.height, 6);
+    expect(rec.gfx.width).toBeCloseTo(9, 6);
+    expect(rec.gfx.height).toBeCloseTo(25, 6);
 
     // Next pass: the person is gone, so its actor is reaped.
     e.sim.crowd.people = [];

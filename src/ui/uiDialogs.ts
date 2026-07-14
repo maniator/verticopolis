@@ -10,7 +10,8 @@ import { stopsTemplate } from "./templates/stops";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
-import type { TemplateResult } from "lit-html";
+import { render, type TemplateResult } from "lit-html";
+import { batchPricingTemplate, batchPriceText, batchPreviewMessage, type BatchPricingState, type BatchPricingCtx } from "./templates/batchPricing";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -102,66 +103,87 @@ export function showBatchPricingDialog(
   const { kind, band } = ctx;
   const noun = ctx.kindLabel.toLowerCase() + "s";
   const priceWord = kind === "condo" ? "price" : "rent";
-  const money = (n: number) => `$${n.toLocaleString()}`;
-  const box = ui.openModal(tpl.batchPricingHtml(noun, priceWord, band));
-  const priceEl = box.querySelector<HTMLInputElement>("#bp-price")!;
-  const onlyEl = box.querySelector<HTMLInputElement>("#bp-only")!;
-  const previewEl = box.querySelector<HTMLElement>("#bp-preview")!;
-  const applyBtn = box.querySelector<HTMLButtonElement>("#bp-apply")!;
-  const mode = () => box.querySelector<HTMLInputElement>('input[name="bp-mode"]:checked')!.value;
+  const tctx: BatchPricingCtx = { noun, priceWord, band };
   // Snap a typed price to the band's step grid, so batch matches the ± adjuster's
   // granularity (a typed 12,345 becomes 12,000 for a $1,000-step office).
   const snap = (v: number) => {
     const stepped = Math.round((v - band.min) / band.step) * band.step + band.min;
     return Math.max(band.min, Math.min(band.max, stepped));
   };
-  const target = (): BatchTarget => (mode() === "default" ? "default" : snap(Number(priceEl.value) || 0));
-  const opts = (): BatchRentOptions => ({ onlyDefaultPriced: onlyEl.checked });
-  const priceText = (t: BatchTarget) => (t === "default" ? `the default (${money(band.default)})` : money(t as number));
-
-  let resetArmed = false; // bulk "Reset to default" needs a confirming second click
-  const refresh = () => {
-    priceEl.disabled = mode() === "default";
-    resetArmed = false;
-    applyBtn.textContent = "Apply";
-    const r = cb.preview(target(), opts());
-    let msg = `Set ${r.changed} of ${r.matched} ${noun} to ${priceText(target())}.`;
-    if (r.skippedCustom) msg += ` ${r.skippedCustom} custom-priced left as-is.`;
-    if (r.customOverwritten) msg += ` ${r.customOverwritten} custom price${r.customOverwritten === 1 ? "" : "s"} will be overwritten.`;
-    if (r.skippedSold) msg += ` ${r.skippedSold} sold skipped.`;
-    if (r.clampedHigh) msg += ` Clamped to the ${money(band.max)} max.`;
-    if (r.clampedLow) msg += ` Clamped to the ${money(band.min)} min.`;
-    previewEl.textContent = msg;
-    applyBtn.disabled = r.changed === 0;
+  const clampStep = (v: number) => Math.max(band.min, Math.min(band.max, v));
+  // The dialog's whole visible state. Every event mutates this and re-renders,
+  // replacing the old hand-written refresh() that mutated the DOM in place.
+  const state: BatchPricingState = {
+    mode: "set",
+    priceRaw: String(band.default),
+    only: false,
+    resetArmed: false,
+    previewMsg: "",
+    applyDisabled: false,
+  };
+  const targetOf = (): BatchTarget => (state.mode === "default" ? "default" : snap(Number(state.priceRaw) || 0));
+  const optsOf = (): BatchRentOptions => ({ onlyDefaultPriced: state.only });
+  // Recompute the honest preview sentence and the Apply-disabled flag from state
+  // (the same engine core as apply), so the render is a pure view of `state`.
+  const recompute = () => {
+    const t = targetOf();
+    const r = cb.preview(t, optsOf());
+    state.previewMsg = batchPreviewMessage(tctx, t, r);
+    state.applyDisabled = r.changed === 0;
+  };
+  // Re-render the whole dialog from `state` into the modal box. lit patches in
+  // place, and the title-bar close that finishModal appends after the h2 (outside
+  // lit's managed region) survives the re-render.
+  function rerender(): void {
+    render(batchPricingTemplate(tctx, state, handlers), box);
+  }
+  // Any input disarms a pending bulk reset (as the old refresh() did), then
+  // re-previews and re-renders.
+  const afterInput = () => {
+    state.resetArmed = false;
+    recompute();
+    rerender();
   };
   const step = (dir: 1 | -1) => {
-    priceEl.value = String(Math.max(band.min, Math.min(band.max, (Number(priceEl.value) || 0) + dir * band.step)));
-    refresh();
+    state.priceRaw = String(clampStep((Number(state.priceRaw) || 0) + dir * band.step));
+    afterInput();
   };
-  box.querySelector('[data-bp="inc"]')!.addEventListener("click", () => step(1));
-  box.querySelector('[data-bp="dec"]')!.addEventListener("click", () => step(-1));
-  priceEl.addEventListener("input", refresh);
-  // On commit (blur/Enter), normalize the field to the snapped value it will
-  // actually apply, so the input never shows a number different from the result.
-  priceEl.addEventListener("change", () => {
-    if (mode() !== "default") priceEl.value = String(snap(Number(priceEl.value) || 0));
-    refresh();
-  });
-  onlyEl.addEventListener("change", refresh);
-  box.querySelectorAll('input[name="bp-mode"]').forEach((el) => el.addEventListener("change", refresh));
-  ui.wireActions(box);
-  applyBtn.addEventListener("click", () => {
-    // A bulk reset clears everyone's custom price, require a confirming click.
-    if (mode() === "default" && !resetArmed) {
-      resetArmed = true;
-      applyBtn.textContent = "Confirm reset";
-      return;
-    }
-    const r = cb.apply(target(), opts());
-    cb.onApplied(`Set ${r.changed} ${noun} to ${priceText(target())}.`);
-    ui.closeModal();
-  });
-  refresh();
+  const handlers = {
+    onDec: () => step(-1),
+    onInc: () => step(1),
+    onPriceInput: (e: Event) => {
+      state.priceRaw = (e.target as HTMLInputElement).value;
+      afterInput();
+    },
+    // On commit (blur/Enter), normalize the field to the snapped value it will
+    // actually apply, so the input never shows a number different from the result.
+    onPriceChange: () => {
+      if (state.mode !== "default") state.priceRaw = String(snap(Number(state.priceRaw) || 0));
+      afterInput();
+    },
+    onModeChange: (e: Event) => {
+      state.mode = (e.target as HTMLInputElement).value === "default" ? "default" : "set";
+      afterInput();
+    },
+    onOnlyChange: (e: Event) => {
+      state.only = (e.target as HTMLInputElement).checked;
+      afterInput();
+    },
+    onApply: () => {
+      // A bulk reset clears everyone's custom price, require a confirming click.
+      if (state.mode === "default" && !state.resetArmed) {
+        state.resetArmed = true;
+        rerender();
+        return;
+      }
+      const r = cb.apply(targetOf(), optsOf());
+      cb.onApplied(`Set ${r.changed} ${noun} to ${batchPriceText(tctx, targetOf())}.`);
+      ui.closeModal();
+    },
+    onCancel: () => ui.closeModal(),
+  };
+  recompute();
+  const box = ui.openModalTemplate(batchPricingTemplate(tctx, state, handlers));
 }
 
 export function confirmModal(

@@ -1420,3 +1420,33 @@ Residual defers (behavior-preserving):
   progress-bar width; and the household `mix` with two or more distinct sizes. Add
   these fixtures before `buildStatsHtml` is retired in the final sweep, or fold them
   into the ported tests then.
+
+### Deferred from: code review of E4 (batch-pricing reactive lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E4 migrates the batch-pricing dialog (`batchPricingHtml`) onto the E0
+`openModalTemplate` seam and, per the E4 story, replaces the imperative `refresh()`
+with a re-render from local dialog state on every input event. The controller holds
+`{ mode, priceRaw, only, resetArmed, previewMsg, applyDisabled }`, recomputes the
+honest preview via `cb.preview`, and calls lit `render()` into the box; the pure
+`batchPreviewMessage` / `batchPriceText` helpers moved to the template module (also
+keeping `uiDialogs.ts` under the 500-line ceiling). Blind Hunter confirmed
+byte-for-byte structural fidelity and exact behavior parity (snap-on-commit, the ±
+adjuster, the only-default filter, the message chain, Apply-disabled, and the
+two-click confirm-reset). The three Edge Case Hunter `patch` gaps are fixed:
+`batchPreviewMessage` / `batchPriceText` now have direct unit tests (every clause +
+singular/plural overwrite + both clamp clauses), snap-on-commit through the new
+`@change` is pinned by an integration test (type `12345`, commit, snaps to `12000`),
+and the reset-disarm is pinned (arm, then any input reverts to "Apply"). The caret
+concern both hunters raised (writing `.value` on every keystroke would jerk the
+caret to the end on a mid-number edit) is fixed with the lit `live()` directive,
+which skips the write when the DOM already matches. Residual defers
+(behavior-preserving):
+
+- **`batchPricingHtml` joins the transitional string-builder retirement list**: dead
+  production code kept only to feed its `assertDomEquivalent` guard.
+- **Reset-arming is not announced to screen readers**: the story flags announcing the
+  bulk-reset arming as a deferred a11y WIN, intentionally NOT added here.
+- **Low-value reactive paths covered only structurally**: the set to default to set
+  mode round-trip (priceRaw persistence + field re-enable), the only-default filter
+  re-preview opts, and inc/dec from an empty/NaN field are each near-verbatim mirrors
+  of the old controller; low regression risk, defer.

@@ -12,7 +12,8 @@ import {
   LOBBY_VARIANTS,
 } from "../sprites";
 import { drawSanta } from "../sprites/events";
-import { person, SHIRTS } from "../pixelSprites";
+import { SHIRTS } from "../pixelSprites";
+import { personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
 import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
@@ -192,37 +193,35 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
     });
   engine.awningGfx = { left: bakeAwning("left"), right: bakeAwning("right") };
 
-  // The tenant/staff bake recipe (one home for the magic person() args).
-  // The fed-up variant below is taller and shifts the figure to fit its
-  // marker, so it hand-rolls the same args, keep the two in step.
+  // The tenant/staff bake recipe. The routed crowd is the tower's foreground
+  // layer, so it uses the finalized `walker` build (24px tall, art bible pages
+  // 06 to 07), the same human scale the repainted rooms draw their standing
+  // occupants at, instead of the legacy half-height figure that read as a
+  // miniature next to a full-scale concourse. `personFigure` takes an explicit
+  // fill, so the one-canvas-per-shirt scheme (indexed by seed) is unchanged.
+  // Geometry: personFigure draws the 1px contact shadow on the bottom canvas
+  // row (footY = PERSON_H - 1) with the feet one pixel above it, and each actor
+  // is anchored bottom-center, so the figure grows upward from the same ground
+  // line the old bake used.
+  const PERSON_W = 9;
+  const PERSON_H = 25; // 24px walker + a 1px contact-shadow row at the foot
+  const PERSON_FOOT = PERSON_H - 1;
+  const PERSON_X = 1; // centers the 7px-wide build in the 9px canvas
   const bakePerson = (color: string): ex.Canvas =>
     new ex.Canvas({
-      width: 8,
-      height: 14,
+      width: PERSON_W,
+      height: PERSON_H,
       cache: true,
-      draw: (ctx) => person(ctx, 2.5, 13, 1.1, 7, false, color),
+      draw: (ctx) => personFigure(ctx, PERSON_X, PERSON_FOOT, "walker", color),
     });
   for (const color of SHIRTS) engine.personGfx.push(bakePerson(color));
   // Housekeepers wear a single work uniform, so staff read at a glance.
   engine.personGfxStaff = bakePerson("#E8E4DA");
-  // Fed-up figure carries BOTH the red tint AND a shape marker (a "!" with a
-  // white halo above the head), so "this tenant is fed up" reads without color.
-  engine.personGfxRed = new ex.Canvas({
-    width: 8,
-    height: 16,
-    cache: true,
-    draw: (ctx) => {
-      ctx.save();
-      ctx.translate(0, 2); // shift the figure down to make room for the marker
-      person(ctx, 2.5, 13, 1.1, 7, false, "#C24A3A");
-      ctx.restore();
-      ctx.fillStyle = "#ffffff"; // halo
-      ctx.fillRect(2, 0, 4, 5);
-      ctx.fillStyle = "#000000"; // "!"
-      ctx.fillRect(3, 0, 2, 2);
-      ctx.fillRect(3, 3, 2, 1);
-    },
-  });
+  // Fed-up figure: the reserved stress red is the whole cue. The waiting crowd
+  // massing red-shirted at an overwhelmed elevator landing reads as "these
+  // tenants are fed up" on its own, so a per-figure "!" badge would only add
+  // noise; the red walker uses the same bake and canvas as every other figure.
+  engine.personGfxRed = bakePerson("#C24A3A");
 }
 
 export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {

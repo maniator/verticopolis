@@ -46,6 +46,11 @@ export function update(crowd: Crowd, dtSec: number, tower: Tower, clock: Clock):
 export function advance(crowd: Crowd, dtSec: number, tower: Tower): void {
   let frustrated = 0;
   let travelling = 0;
+  // Place each elevator-bound person in its landing's line so waiters form a
+  // queue at the doors instead of stacking on the shaft center. Computed once
+  // per slice; because it recomputes every advance, the line advances as riders
+  // board (each boarder frees the front and everyone behind steps forward).
+  const slots = landingSlots(crowd, tower);
   for (const p of crowd.people) {
     p.age += dtSec;
     // Give up if the journey drags on too long: a fed-up traveller who
@@ -69,7 +74,7 @@ export function advance(crowd: Crowd, dtSec: number, tower: Tower): void {
       finish(crowd, p, tower);
       continue;
     }
-    step(crowd, p, dtSec, tower);
+    step(crowd, p, dtSec, tower, slots);
     // Staff never count toward tenant stress: a housekeeper waiting for the
     // service elevator is payroll, not an unhappy customer.
     if (!p.staff && (p.state === "waiting" || p.state === "riding" || p.state === "toShaft" || p.state === "climbing")) {
@@ -95,11 +100,108 @@ function tripFloors(p: Person): number {
   return n;
 }
 
-function step(crowd: Crowd, p: Person, dt: number, tower: Tower): void {
+// Elevator-landing queue geometry, in tiles: the front of the line stands
+// QUEUE_GAP off the shaft face and each waiter behind is QUEUE_SPACING further
+// out, so the line reads as a row at the doors rather than a stack on the car.
+const QUEUE_GAP = 0.8;
+const QUEUE_SPACING = 0.6;
+
+// Max tiles a landing line is laid out across, from the shaft face. It bounds
+// the contiguous-structure scan below (a floor can be hundreds of tiles wide)
+// and caps the line's spread: a landing can hold more than a car's worth of
+// waiters (they accumulate up to MAX_PEOPLE), so a very long queue clamps its
+// tail onto the far built tile instead of trailing on indefinitely.
+const QUEUE_REACH = 16;
+
+/** Length of the contiguous built (floor/lobby) run starting at `startX` and
+ *  stepping by `dir`, capped at {@link QUEUE_REACH}. Used to pick the roomier
+ *  side of a shaft and to keep the line on solid ground: unlike a floor-wide
+ *  min/max, this stops at the first gap, so a floor with disjoint segments never
+ *  seats a waiter over an unbuilt hole. `hasStructure` is an O(1) tile lookup,
+ *  and the run is bounded, so no per-tower-units scan runs on the hot path. */
+function builtRun(tower: Tower, floor: number, startX: number, dir: number): number {
+  let n = 0;
+  for (let x = startX; n < QUEUE_REACH && tower.hasStructure(floor, x); x += dir) n++;
+  return n;
+}
+
+/** The tile x each person waiting at an elevator landing should stand at, keyed
+ *  by person id, so waiters fan into a line at the doors instead of stacking on
+ *  the shaft center. The longest-waiting person holds the front, so the order
+ *  reflects arrival, not spawn, and a fresh arrival (wait 0) joins the back
+ *  rather than shoving those ahead outward. The line extends onto whichever side
+ *  of the shaft has the longer contiguous run of built floor and is clamped to
+ *  that run, so it never trails into unbuilt space (shaft x is a lot coordinate,
+ *  not tower-relative, so the side must come from the real layout, not a fixed
+ *  threshold). Only `waiting` people are placed; people still walking in
+ *  (`toShaft`) head to the shaft face and fan out once they arrive, so this
+ *  never changes the toShaft -> waiting timing the sim depends on. Stairs and
+ *  escalators are walked, not queued. */
+function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
+  const slots = new Map<number, number>();
+  // Resolve each shaft to an elevator (or not) once per slice, so a busy
+  // landing does not repeat the lookup and kind-check per waiter.
+  const elevatorOf = new Map<number, Transport | null>();
+  const resolve = (id: number): Transport | null => {
+    const cached = elevatorOf.get(id);
+    if (cached !== undefined) return cached;
+    const shaft = shaftOf(tower, id);
+    const ok = shaft && isElevatorKind(shaft.kind) ? shaft : null;
+    elevatorOf.set(id, ok);
+    return ok;
+  };
+  // Group waiting people per (shaft, floor) landing. Nested numeric maps keep
+  // the grouping allocation-light on the per-slice hot path.
+  const byShaft = new Map<number, Map<number, { shaft: Transport; people: Person[] }>>();
+  for (const p of crowd.people) {
+    if (p.state !== "waiting" || p.shaftId == null) continue;
+    const shaft = resolve(p.shaftId);
+    if (!shaft) continue;
+    let byFloor = byShaft.get(p.shaftId);
+    if (!byFloor) byShaft.set(p.shaftId, (byFloor = new Map()));
+    let g = byFloor.get(p.floor);
+    if (!g) byFloor.set(p.floor, (g = { shaft, people: [] }));
+    g.people.push(p);
+  }
+  if (byShaft.size === 0) return slots;
+  for (const [, byFloor] of byShaft) {
+    for (const [floor, g] of byFloor) {
+      // Longest-waiting at the front; break ties by id so equal waits (several
+      // riders arriving in one slice) never reorder or flicker across runtimes.
+      g.people.sort((a, b) => b.wait - a.wait || a.id - b.id);
+      const leftFace = g.shaft.x;
+      const rightFace = g.shaft.x + g.shaft.width;
+      // Contiguous built run just outside each shaft face (the right run starts
+      // at rightFace, the left one tile further out at leftFace - 1). Queue
+      // toward the longer run and clamp to the run's OUTER edge so a short or
+      // gappy floor bunches the tail at the wall instead of trailing off the
+      // edge, while still leaving the front rider room for QUEUE_GAP on a
+      // one-tile run.
+      const leftRun = builtRun(tower, floor, leftFace - 1, -1);
+      const rightRun = builtRun(tower, floor, rightFace, 1);
+      const side = rightRun >= leftRun ? 1 : -1;
+      const run = side > 0 ? rightRun : leftRun;
+      const face = side > 0 ? rightFace : leftFace;
+      const far = side > 0 ? rightFace + run : leftFace - run;
+      g.people.forEach((p, rank) => {
+        const raw = face + side * (QUEUE_GAP + rank * QUEUE_SPACING);
+        slots.set(p.id, side > 0 ? Math.min(raw, far) : Math.max(raw, far));
+      });
+    }
+  }
+  return slots;
+}
+
+function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<number, number>): void {
   switch (p.state) {
     case "toShaft": {
       const shaft = shaftOf(tower, p.shaftId);
       if (!shaft) return finish(crowd, p, tower);
+      // Approach the shaft face (unchanged): riders then fan into the landing
+      // line once they are `waiting`. Targeting the queue slot here instead
+      // would change the walk distance and so the toShaft -> waiting timing,
+      // which feeds the frustration/satisfaction the sim serializes; the queue
+      // must stay a purely visual placement, so the spread happens in `waiting`.
       const targetX = shaft.x + shaft.width / 2;
       if (walkTo(p, targetX, dt)) {
         // Elevators are boarded (wait for a car); stairs/escalators are
@@ -140,6 +242,11 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower): void {
       p.wait += dt;
       const shaft = shaftOf(tower, p.shaftId);
       if (!shaft) return finish(crowd, p, tower);
+      // Edge forward to the current slot as the line advances: when a rider
+      // ahead boards, this waiter's slot moves toward the doors, so they step up
+      // rather than teleport. Position never gates boarding (that is purely
+      // car-at-floor plus capacity), so drifting here is safe.
+      walkTo(p, slots.get(p.id) ?? shaft.x + shaft.width / 2, dt);
       // Board a car of this shaft that's stopped at our floor with room.
       for (let i = 0; i < shaft.cars; i++) {
         if (Math.abs(shaft.carPositions[i] - p.floor) > 0.25) continue;
