@@ -121,6 +121,32 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: E3 pixel-art food and entertainment (`/gds-code-review`, 2026-07-14)
+
+Change: enriched the food and entertainment rooms (5 fast-food subtypes, 5
+restaurants, the two-floor cinema, and `drawPartyHall`) and tied every visible
+figure to real occupancy. Bookkeeping and open follow-ups from this PR:
+
+- DONE here: the party-hall `scatterPeople` ghost crowd is retired. Dancers
+  (standing build), the DJ, and banquet guests (seated build) now gate on the
+  hall's `u.occupants` and fill in seed order, so an empty hall draws none.
+- OPEN (entertainment honest-attendance, cinema AND party hall): both kinds are
+  population 0 (`facilitiesData.ts`), so `occupants` (and thus
+  `visibleOccupants`) is pinned to 0, and the occupancy-gated audience/dancers
+  render an EMPTY house on every real cinema and party hall. Per the frozen spec
+  this is the honest read (n === 0 draws empty; "do not leave a constant
+  crowd"), and it is exactly what the acceptance matrix states, so E3 ships it as
+  drawn. The real fix is engine-side, not draw-code: give entertainment venues a
+  visible-attendance count (a foot-traffic or booking-derived number), then feed
+  it to the room as a reviewed bake-signature input (spec "Ask First"). Until
+  then the cinema and party hall read empty. Flagged by the E3 `/gds-code-review`
+  Edge Case Hunter. Do not reintroduce a population-independent ghost crowd to
+  paper over it.
+- OPEN (metro-platform `scatterPeople`): the metro-platform `scatterPeople`
+  call (`src/render/sprites/facilities/service.ts`) is out of scope for E3 and
+  still uses the seeded-scatter crowd idiom. It stays with the
+  people-system/structure work and its own backlog follow-up.
+
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into

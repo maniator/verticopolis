@@ -92,6 +92,6 @@ export function sampleState(kind: FacilityKind): UnitState {
 }
 
 // ---- Barrel: preserve the original public surface of this module. ----
-export { PAL, SHIRTS, SKIN, person, type RoomCtx } from "./pixelSprites/common";
+export { PAL, SHIRTS, SKIN, person, personSeated, personStanding, type RoomCtx } from "./pixelSprites/common";
 export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, type FastFoodLook, type RestaurantLook } from "./pixelSprites/food";
 export { SHOP_LOOKS, type ShopLook } from "./pixelSprites/shop";

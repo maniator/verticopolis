@@ -128,6 +128,29 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     drawUnit(draw({}, b.ctx), unit({ kind: "lobby", x: xb }), 0, 0, 60, 34);
     expect(b.sig()).not.toBe(a.sig());
   });
+
+  it("a party hall gates its figures on hall occupancy (two-floor 88px rect)", () => {
+    const empty = spyCtx();
+    const full = spyCtx();
+    // The catalog gives the party hall two floors (88px). Occupancy drives the
+    // dancers, DJ, and banquet guests; an empty hall draws none, a full one does.
+    drawUnit(draw({}, empty.ctx), unit({ kind: "partyHall", occupants: 0 }), 0, 0, 264, 88);
+    drawUnit(draw({}, full.ctx), unit({ kind: "partyHall", occupants: 8 }), 0, 0, 264, 88);
+    // A person build lays a 1px contact shadow at rgba(0,0,0,0.24): its presence
+    // marks a drawn occupant. The shell/windows/fixtures paint either way.
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    expect(empty.log).not.toContain(occupant);
+    expect(full.log).toContain(occupant);
+    expect(empty.log.some((l) => l.startsWith("fillRect"))).toBe(true);
+  });
+
+  it("a cinema paints green EXIT signage on its two-floor rect without throwing", () => {
+    const s = spyCtx();
+    // A cinema is open at hour 20 (the default), so the auditorium draws rather
+    // than the closed shutter; EXIT green #6bd47a is a non-reserved canon color.
+    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "cinema" }), 0, 0, 341, 88)).not.toThrow();
+    expect(s.log).toContain("fillStyle=#6bd47a");
+  });
 });
 
 describe("transport, crane & event sprites paint", () => {
