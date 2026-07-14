@@ -11,6 +11,6 @@ project_knowledge: "{project-root}/docs"
 # Core Configuration Values
 user_name: BMad
 output_folder: _bmad-output
-project_name: Tower Tycoon
+project_name: Verticopolis
 communication_language: English
 document_output_language: English
