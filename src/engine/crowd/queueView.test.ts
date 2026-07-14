@@ -17,8 +17,12 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
   /** A tower with a ground lobby and plain floors 2..top across the whole lot. */
   function baseTower(top = 10): Tower {
     const tower = new Tower();
-    for (let x = 0; x < 40; x++) tower.place("lobby", 1, x);
-    for (let f = 2; f <= top; f++) for (let x = 0; x < 40; x++) tower.place("floor", f, x);
+    const must = (kind: FacilityKind, f: number, x: number) => {
+      const r = tower.place(kind, f, x);
+      if (!r.ok) throw new Error(`fixture place ${kind} @ floor ${f}, x ${x} failed`);
+    };
+    for (let x = 0; x < 40; x++) must("lobby", 1, x);
+    for (let f = 2; f <= top; f++) for (let x = 0; x < 40; x++) must("floor", f, x);
     return tower;
   }
 
@@ -55,15 +59,14 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     const s = placeShaft(tower, "elevatorStandard", 4, 1, 10);
     const crowd = new Crowd();
     crowd.people.push(
-      waiter(1, s, 3, { wait: 0 }), // tier 0
-      waiter(2, s, 3, { wait: 15 }), // tier 1 (>= STRESS_WAIT / 2)
-      waiter(3, s, 3, { wait: 30 }), // tier 2 (>= STRESS_WAIT)
+      waiter(1, s, 3, { wait: 0 }), // tier 0 (below STRESS_WAIT / 2)
+      waiter(2, s, 3, { wait: STRESS_WAIT / 2 }), // tier 1 (>= STRESS_WAIT / 2)
+      waiter(3, s, 3, { wait: STRESS_WAIT }), // tier 2 (>= STRESS_WAIT)
       waiter(4, s, 5), // a different landing
       waiter(5, s, 3, { state: "toShaft" }), // not waiting yet: excluded
       waiter(6, s, 3, { state: "riding", carIndex: 0 }), // aboard: excluded
       waiter(7, s, 3, { shaftId: null, shafts: [] }), // no shaft assigned: excluded
     );
-    expect(STRESS_WAIT).toBe(25); // guards the tier thresholds below
 
     const view = crowd.queueView(tower);
     const floor3 = view.landings.get(s)?.get(3);
