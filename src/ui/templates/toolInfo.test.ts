@@ -21,7 +21,8 @@ describe("toolInfoTemplate rows", () => {
   it("renders name, formatted cost, capacity, and description for a residential kind", () => {
     const frag = renderToFragment(toolInfoTemplate(office, false));
     expect(frag.querySelector(".ti-name")!.textContent).toBe("Office");
-    expect(frag.textContent).toContain("Cost: $40,000");
+    // Locale-agnostic: compare against the same toLocaleString the template uses.
+    expect(frag.textContent).toContain(`Cost: $${office.cost.toLocaleString()}`);
     expect(frag.textContent).toContain("Capacity: 6");
     expect(frag.querySelector("p")!.textContent).toBe(office.description);
   });

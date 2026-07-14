@@ -1200,8 +1200,9 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     // the bulldoze body.
     const { ui } = makeUI();
     const info = (): HTMLElement => document.getElementById("tool-info")!;
-    // Boot: the constructor's initial selectTool painted the Inspect body.
-    expect(info().textContent).toContain("Hover the tower");
+    // Boot: the constructor's initial selectTool painted the Inspect body. Pin
+    // the stable .ti-name header, not the descriptive copy.
+    expect(info().querySelector(".ti-name")!.textContent).toBe("Inspect");
     ui.selectTool({ type: "build", kind: "office" });
     expect(info().querySelector(".ti-name")!.textContent).toBe("Office");
     expect(info().textContent).toContain("Cost: $");
