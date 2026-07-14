@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Simulation, ECON, VACATE_RESCIND } from "../engine/Simulation";
-import { ElevatorDispatch } from "../engine/ElevatorDispatch";
-import { FACILITIES, GRID } from "../engine/facilities";
-import type { FacilityKind, SerializedUnit, Unit } from "../engine/types";
-import { isOperational } from "../engine/types";
-import { SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
+import { ElevatorDispatch } from "../../engine/ElevatorDispatch";
+import { FACILITIES, GRID } from "../../engine/facilities";
+import type { FacilityKind, SerializedUnit, Unit } from "../../engine/types";
+import { isOperational } from "../../engine/types";
+import { SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 
 describe("Rent / price controls", () => {
   it("steps and clamps a unit's price within its band", () => {

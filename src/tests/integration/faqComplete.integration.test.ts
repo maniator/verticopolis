@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID, FACILITIES } from "../engine/facilities";
-import type { Unit } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { GRID, FACILITIES } from "../../engine/facilities";
+import type { Unit } from "../../engine/types";
 
 /** FAQ-parity (complete) tests: the canon star ladder, office noise, the
  * hotel-population rule and the VIP-in-suite gate. */
@@ -343,7 +343,7 @@ describe("Interactive event choices (FAQ): fire rescue / bomb ransom", () => {
   });
 });
 
-import { STAR_THRESHOLDS, TOWER_POPULATION } from "../engine/facilities";
+import { STAR_THRESHOLDS, TOWER_POPULATION } from "../../engine/facilities";
 
 describe("Deep-review regressions (must not come back)", () => {
   it("D1: cockroaches spread even with ZERO housekeeping (worst case isn't immune)", () => {
@@ -484,7 +484,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 });
 
-import { ECON } from "../engine/econConfig";
+import { ECON } from "../../engine/econConfig";
 
 describe("Fine FAQ mechanics", () => {
   it("≤2-ride limit: a trip needing 3 rides doesn't route; a 2-ride trip does", () => {
