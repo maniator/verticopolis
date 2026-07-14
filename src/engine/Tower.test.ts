@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Tower } from "../engine/Tower";
-import { GRID } from "../engine/facilities";
-import type { Transport } from "../engine/types";
+import { Tower } from "./Tower";
+import { GRID } from "./facilities";
+import type { Transport } from "./types";
 
 describe("Tower placement", () => {
   let tower: Tower;

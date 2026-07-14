@@ -24,7 +24,7 @@ async function importPwa() {
   // Import fresh each test so the top-level `registerSW` binding rebinds
   // against the current mock (safe with resetModules; harmless otherwise).
   vi.resetModules();
-  return import("../pwa");
+  return import("./pwa");
 }
 
 // happy-dom leaves `isSecureContext` undefined and doesn't ship a service-worker
