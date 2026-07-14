@@ -1624,3 +1624,28 @@ evenly spaced lanes with an explicit multiple-of-7 non-collapse test.
 Follow-up (owner + party ratified): a 60px "1.5 floor" metro train on a redrawn
 high-platform station, plus real routed platform commuters (task #24), since the
 metro platform draws empty today (the crowd never routes there as a destination).
+
+### Decisions + deferrals: E6-S2 (inspector card + build refusal via lit) (`/bmad-code-review`, 2026-07-14)
+
+Change: the hover inspector card and the Modern build-refusal tooltip render
+through lit templates (`templates/inspector.ts`, PR #291); the mobile ✕ still
+comes from the one shared `titleBarClose` recipe, appended after the h4's
+lit-managed content and guarded against duplication. The triage confirmed no
+correctness, fidelity, or lifecycle bugs; every flag was closed in-PR: the
+retained ✕ is click-proven live after a same-card re-render and a hide/re-show
+round trip (its lifecycle changed from fresh-per-show, so liveness is pinned,
+not assumed); the ✕-survival test's h4 carries a binding like the production
+title so it pins the exact child-part behavior the retained button rests on;
+and the label-equals-subtype suppression, undefined customer count, and
+vacant-venue closed-marker arms joined the legacy-replica equivalence suite.
+Decisions and residual notes:
+
+- **No retained oracle**: the deleted strings were inline, so the equivalence
+  guards compare against verbatim replicas kept only in the test file; they
+  retire with the transitional guards in the final sweep.
+- **Hide keeps parking the stale card** (hidden class only, no clear), exactly
+  the legacy surface; lit renders over it on the next show. No CSS relies on
+  the container being empty (verified: no :empty/child-count selectors).
+- **Diagnostics stay HTML strings bridged by unsafeHTML** on this surface too;
+  their template form is a final-sweep/E7 question, shared with the editor's
+  mobile fold-in.

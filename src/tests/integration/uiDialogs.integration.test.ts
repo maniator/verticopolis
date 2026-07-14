@@ -228,7 +228,7 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     expect(x.getAttribute("aria-label")).toBe("Close");
     expect(x.textContent).toBe("✕");
     x.click();
-    // Routed through the app (which latches the dismissal) — not a local hide.
+    // Routed through the app (which latches the dismissal), never a local hide.
     expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
   });
 
@@ -241,10 +241,14 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     // it still FIRES after a re-render and after a hide/re-show round trip,
     // not merely that it is the same element.
     const { ui, cb } = makeUI();
-    const card = (status: string) => html`<h4>Office 12F</h4><div>${status}</div>`;
-    ui.showInspector(card("occupied"));
+    // The h4 carries a BINDING like the production card's title (its child
+    // part extends to the h4's end, where the appended ✕ sits), so this pins
+    // the exact lit behavior the retained ✕ rests on, not a weaker static h4.
+    const card = (title: string, status: string) => html`<h4>${title}</h4><div>${status}</div>`;
+    ui.showInspector(card("Office 12F", "occupied"));
     const x = document.querySelector<HTMLButtonElement>("#inspector h4 > button")!;
-    ui.showInspector(card("vacating"));
+    ui.showInspector(card("Office 14F", "vacating"));
+    expect(document.querySelector("#inspector h4")!.textContent).toContain("Office 14F");
     expect(document.querySelector("#inspector div")!.textContent).toBe("vacating");
     const xs = document.querySelectorAll("#inspector h4 > button");
     expect(xs.length).toBe(1);
@@ -253,7 +257,7 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
 
     ui.showInspector(null); // ✕ tap hides; content (and button) stay parked
-    ui.showInspector(card("occupied")); // re-show over the retained DOM
+    ui.showInspector(card("Office 12F", "occupied")); // re-show over the retained DOM
     const again = document.querySelectorAll<HTMLButtonElement>("#inspector h4 > button");
     expect(again.length).toBe(1);
     again[0].click(); // the retained ✕ must still dismiss on the re-shown card
