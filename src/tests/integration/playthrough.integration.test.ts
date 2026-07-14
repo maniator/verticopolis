@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { TOWER_POPULATION } from "../engine/facilities";
-import { buildWinningTower, runVipInspection, buildWeddingHall } from "./fixtures/winningTower";
+import { Simulation } from "../../engine/Simulation";
+import { TOWER_POPULATION } from "../../engine/facilities";
+import { buildWinningTower, runVipInspection, buildWeddingHall } from "../fixtures/winningTower";
 
 /**
  * End-to-end "can a player finish the game?" guarantee. A real, fully-served,

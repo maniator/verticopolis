@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
-import { isOperational } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
+import { isOperational } from "../../engine/types";
 
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only
  *  flammable rooms, so `startFire()` ignites an office deterministically. */

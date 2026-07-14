@@ -5,7 +5,7 @@ import type { FacilityKind } from "./types";
  * `docs/canon/tdt-format.md` §7 (Commercial retail table). Order is
  * load-bearing: the TDT format writes an ORDINAL byte, not a string, so
  * SHOP_SUBTYPES[3] must be the same name the 1994 game reads at index 3.
- * `src/tests/canon.test.ts` pins length and order against the canon doc.
+ * `src/tests/integration/canon.integration.test.ts` pins length and order against the canon doc.
  */
 export const RESTAURANT_SUBTYPES = [
   "English Pub",

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { Simulation, ECON } from "../engine/Simulation";
-import { EconomySystem } from "../engine/EconomySystem";
-import { Tower } from "../engine/Tower";
-import { Clock } from "../engine/Clock";
-import { RNG } from "../engine/rng";
-import { FACILITIES, GRID } from "../engine/facilities";
-import type { FacilityKind } from "../engine/types";
+import { Simulation, ECON } from "../../engine/Simulation";
+import { EconomySystem } from "../../engine/EconomySystem";
+import { Tower } from "../../engine/Tower";
+import { Clock } from "../../engine/Clock";
+import { RNG } from "../../engine/rng";
+import { FACILITIES, GRID } from "../../engine/facilities";
+import type { FacilityKind } from "../../engine/types";
 
 /**
  * Regression tests for the BMAD-review findings fixed in this PR. Each `it` pins

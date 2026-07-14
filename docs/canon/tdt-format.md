@@ -32,7 +32,7 @@ commentary) are fair inspiration.
 internals: it confirms (or corrects) numbers our engine treats as canon, and it
 is the specification for the importer of original saves
 (`src/storage/tdtFormat.ts` + `src/storage/tdtImport.ts`; see PARITY.md).
-`src/tests/canon.test.ts` asserts our engine constants against this page so
+`src/tests/integration/canon.integration.test.ts` asserts our engine constants against this page so
 drift gets caught in CI.
 
 **Reliability.** Both sources analyzed the Windows version (little-endian);
@@ -268,7 +268,7 @@ NOT `* cars`).
 > the engine's canon table (`transportCarCapacity`), not from byte 2.
 
 > **Resolved (v1.9.5):** the canon per-car capacities are express 42, standard
-> 21, service 10 (`src/tests/canon.test.ts` pins all three). Note the on-disk
+> 21, service 10 (`src/tests/integration/canon.integration.test.ts` pins all three). Note the on-disk
 > capacity byte @2 does not reliably carry these per kind (see the measured note),
 > so we do not read the kind from it.
 
