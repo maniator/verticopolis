@@ -364,10 +364,13 @@ export interface LogEntry {
  *  in exactly one place.
  *
  *  `VIEW_ZOOM_MIN` is the absolute HARD floor: low enough that the tallest legal
- *  tower (basement B10 up to floor 100, ~116 floors with sky/dirt margins) fits
- *  even a small phone held in LANDSCAPE (the manifest allows any orientation, so
- *  a short viewport must still frame the whole tower: ~116 floors x 44px x 0.06
- *  is about 306px, under any real device height). It is not the everyday
+ *  tower fits even a small phone held in LANDSCAPE (the manifest allows any
+ *  orientation, so a short viewport must still frame the whole tower). The span
+ *  that has to fit is the 110 buildable floors (basement B10 up to floor 100)
+ *  plus `fitZoom`'s own 6-floor sky headroom (FIT_SKY_FLOORS), i.e. 116 floors
+ *  (this is the renderer's fit-span, not clampCameraY's dirt-margin math): ~116
+ *  floors x 44px x 0.06 is about 306px, under any real device height. It is not
+ *  the everyday
  *  zoom-out limit a player feels; the renderer layers a tower-aware fit floor on
  *  top of it (see `fitZoom` in render/cameraBounds), so pinch/wheel/keyboard
  *  zoom-out stops when the whole tower plus a breath of sky is in frame rather

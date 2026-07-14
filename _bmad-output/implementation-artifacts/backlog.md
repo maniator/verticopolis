@@ -121,21 +121,6 @@ How items flow:
 
 ## Deferral inbox
 
-### Deferred from: gds-code-review of the mobile zoom-out change (2026-07-14)
-
-- **`dynamicMinZoom()` re-scans all units twice per gesture frame (perf, P3).**
-  `TowerEngine.dynamicMinZoom` reads `sim.tower.highestFloor` and `lowestFloor`,
-  and each getter (`src/engine/Tower.ts`) is an unmemoized linear scan over
-  `units`. `clampGestureZoom` runs on every wheel tick and every pinch-move
-  frame, so a large save (~13k units) does two full passes per frame while
-  pinching (~26k iterations, roughly 0.1 ms). No behavioral defect and unlikely
-  to jank, so parked, but it is the one spot the new per-gesture path adds an
-  uncached O(units) read where the codebase elsewhere revision-caches hot
-  per-frame reads (`servedFloors`, `transportColumns`, `staffComponents`). Fix
-  when convenient: a revision-cached built-floor span on `Tower` (single pass,
-  invalidated on build/bulldoze), or compute the floor once per gesture rather
-  than per move-frame. Found by the Edge Case Hunter layer.
-
 ### Deferred from: party consultation on audio baking (2026-07-13)
 
 Owner follow-up to the Tone.js audio work: should we bake WAV files into the
