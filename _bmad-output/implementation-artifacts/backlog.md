@@ -948,3 +948,58 @@ skin-tone figure of the finalized family is baked. One defer:
   behavior. Captured so that if the people-system traffic seam ever composites
   figures at a non-bake scale, figure sizing is handled there, not re-derived per
   facility. Type: review-deferral / render-consistency.
+
+## E9 integration (PR #266): cross-cutting review defers and shipping followups
+
+The six art epics merged into the integration branch and shipped as one overhaul
+PR. Two defers came out of the cross-cutting `/gds-code-review` over the whole
+integrated diff, and a set of E6 art-quality followups were split out so the
+strong overhaul (E2 through E8) could ship without waiting on the E6 polish.
+
+Cross-cutting review defers (both log-only, integration was otherwise clean):
+
+- **Wedding-hall composition test lives in `sprites.transport.test.ts`.** After
+  the `sprites.test.ts` split, the wedding-hall paint test sits in the transport
+  sibling file. Harmless (it is grouped with structure and event coverage) but an
+  odd home for a venue test. Relocate to `sprites.test.ts` next time these files
+  are touched. Type: test-organization.
+- **Reserved-color / integer-pixel sweep does not cover the venue kinds or
+  cinema.** The `sprites.test.ts` guard sweeps the seven service kinds but not
+  `partyHall` / `weddingHall` (in `venue.ts`) or `cinema`, which only get
+  occupancy and paints-without-throw assertions. Venue colors were verified by
+  hand at merge, but a guard over the venues would harden the merge-resolved
+  `venue.ts` against future edits. Add a venue reserved-color guard next touch.
+  Type: test-coverage.
+
+E6 structure and transport art followups (owner-flagged from live play, split
+into a fast-follow so the overhaul could ship). E2 (offices, hotels, condos) and
+the other kinds read well in game; these are contained to the ground lobby and
+the stair / escalator sprites:
+
+- **Ground lobby repeats the seated receptionist at every fourth tile.** The
+  lobby tiles four baked variants by `x % 4`, and variant 1 is a staffed
+  reception desk (`receptionDesk` with `personSeated`), so the same attendant
+  reappears every four structural tiles across a wide concourse. A staffed
+  reception is a once-per-lobby feature, not a tiling motif. Move the reception
+  desk and attendant out of the repeating cycle (into the grand-entrance tile,
+  which is placed once), and make variant 1 a tile-friendly architectural element
+  (a wall panel or bench) instead. `src/render/sprites/structure/lobby.ts`.
+- **Stair flight geometry reads badly.** `drawStairFlight`
+  (`src/render/sprites/transport.ts`) renders a broken, jagged diagonal that does
+  not read as a clean staircase and sits awkwardly over the lobby floor. Rework
+  the flight so the treads, risers, stringer, and handrail compose a readable
+  staircase at play zoom.
+- **Escalator run reads badly.** `drawEscalatorRun` (same file) reads as a long
+  shallow zigzag ramp rather than an escalator. Rework toward a clean inclined
+  belt with a handrail and legible step edges.
+- **Grand entrance / awning is not prominent in play.** The enriched grand
+  storefront and doorman (`src/render/sprites/structure/entrance.ts`) do not read
+  as a grand entrance at the lobby's frontage edge in game (it appears as a small
+  green sliver). Confirm the grand-entrance tiles are being placed and consider a
+  projecting marquee or awning so the entrance reads as grand.
+- **Gallery squishes multi-floor kinds.** `src/gallery.ts` sizes every cell to
+  about one floor, so genuinely multi-floor kinds (cinema, party hall, recycling,
+  housekeeping floors 2; metro floors 3) render vertically crushed and cannot be
+  judged in the baseline. Size each gallery cell by the facility's `floors` so
+  multi-floor compositions show at their true proportion (clamp to the cell,
+  scale width to preserve aspect). Regenerate the baseline and screenshots after.
