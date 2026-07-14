@@ -26,7 +26,7 @@ import {
 function spyCtx() {
   const log: string[] = [];
   const grad = { addColorStop: (...a: unknown[]) => log.push("stop:" + JSON.stringify(a)) };
-   
+
   const ctx: any = {};
   const methods = [
     "save", "restore", "beginPath", "closePath", "moveTo", "lineTo", "arc", "arcTo",
@@ -57,9 +57,9 @@ const CELLS = [
 /** A fake TowerEngine for the overlay painters. Screen transforms are simple
  *  and consistent so cells land on-screen; every field the painters read has a
  *  sane default that individual tests override. */
- 
+
 function eng(over: Record<string, any> = {}): any {
-   
+
   const e: any = {
     viewWidth: 800,
     viewHeight: 600,
@@ -293,7 +293,7 @@ describe("preview and selection painters", () => {
 
 describe("syncEventFx event-visual state machine", () => {
   function fxEngine(over: Record<string, unknown> = {}) {
-     
+
     const e: any = {
       d: { anim: 10 },
       santaStart: null,
@@ -378,7 +378,7 @@ describe("syncEventFx event-visual state machine", () => {
 
 describe("reduced motion and the decorative clock", () => {
   it("setReducedMotion(true) drops every in-flight event visual", () => {
-     
+
     const e: any = {
       reducedMotion: false,
       santaStart: 5,
@@ -399,7 +399,7 @@ describe("reduced motion and the decorative clock", () => {
   });
 
   it("setReducedMotion(false) leaves visuals untouched", () => {
-     
+
     const e: any = { reducedMotion: true, santaStart: 5, explosions: [], thiefStart: null, treasures: [], vipStart: null };
     setReducedMotion(e, false);
     expect(e.reducedMotion).toBe(false);
@@ -407,7 +407,7 @@ describe("reduced motion and the decorative clock", () => {
   });
 
   it("resetDecorativeClock zeroes both the clock and the published anim value", () => {
-     
+
     const e: any = { animClock: 42, d: { anim: 42 } };
     resetDecorativeClock(e);
     expect(e.animClock).toBe(0);

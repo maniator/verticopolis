@@ -23,9 +23,9 @@ const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.f
 
 /** A fake engine carrying the fields the motion/crowd functions read, plus the
  *  two pure world-coordinate helpers the class exposes. */
- 
+
 function eng(over: Record<string, any> = {}): any {
-   
+
   const e: any = {
     engine: { add: vi.fn() },
     d: { anim: 0, stress: 0 },

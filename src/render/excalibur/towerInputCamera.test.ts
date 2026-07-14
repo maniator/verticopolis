@@ -31,7 +31,7 @@ import {
 
 /** A fake TowerEngine carrying just the fields the camera/coord functions read,
  *  plus the same centered-camera transform the real getters funnel through. */
- 
+
 function eng(over: Record<string, any> = {}): any {
   const e: any = {
     cam: { pos: ex.vec(0, 0), zoom: 0.9 },

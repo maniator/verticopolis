@@ -20,7 +20,7 @@ type Handlers = Record<string, (ev: unknown) => void>;
  *  the coordinate reads behave like the real getters. */
 function inputEng(over: Record<string, unknown> = {}) {
   const handlers: Handlers = {};
-   
+
   const e: any = {
     cam: { pos: ex.vec(1000, -1000), zoom: 1 },
     viewWidth: 800,
