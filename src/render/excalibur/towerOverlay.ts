@@ -15,14 +15,14 @@ import type { TowerEngine } from "./TowerEngine";
  */
 
 /** How long Santa takes to cross the sky, and how long a bomb flash lingers
- *  (seconds of the decorative anim clock — so both freeze under pause /
+ *  (seconds of the decorative anim clock, so both freeze under pause /
  *  reduced motion, like every other decoration). */
 export const SANTA_FLIGHT_SECONDS = 7;
 export const EXPLOSION_SECONDS = 0.9;
 export const THIEF_RUN_SECONDS = 4;
 export const TREASURE_SECONDS = 1.8;
 export const VIP_VISIT_SECONDS = 6.5;
-/** Hard cap on simultaneous flashes/sparkles — the events are rare, but never
+/** Hard cap on simultaneous flashes/sparkles, the events are rare, but never
  *  let the lists grow unbounded (immediate-mode draws, no actors, so this is the
  *  only bound needed). */
 export const MAX_EXPLOSIONS = 8;
@@ -42,7 +42,7 @@ export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfa
  *  waypoint gives the green→amber leg real resolution, so the lived-in low end
  *  of a metric (e.g. a healthy tower's congestion) reads as a gradient rather
  *  than one flat green. The congestion overlay pins its amber stop (⅔) to the
- *  churn threshold — see `CONGESTION_AMBER_SEVERITY` in the engine. Module-level
+ *  churn threshold, see `CONGESTION_AMBER_SEVERITY` in the engine. Module-level
  *  so the color mixer doesn't rebuild the table on every call (it runs once per
  *  visible floor per frame while an overlay is active). */
 export const HEAT_STOPS: readonly (readonly [number, number, number])[] = [
@@ -61,7 +61,7 @@ const HEAT_SEGS = HEAT_STOPS.length - 1;
  *  Exported for the overlay test that locks the "amber = churn" invariant: the
  *  congestion ramp's `CONGESTION_AMBER_SEVERITY` (⅔) must land exactly on the
  *  amber stop, which holds only while the palette keeps amber at position
- *  ⅔ — i.e. a 4-stop ramp. A test asserts that so a palette edit can't silently
+ *  ⅔, i.e. a 4-stop ramp. A test asserts that so a palette edit can't silently
  *  break the anchor. */
 export function heatColor(severity: number): string {
   // Clamp to [0,1]; the `> 0` form also folds NaN to 0 so a poisoned severity
@@ -107,7 +107,7 @@ export function resetDecorativeClock(engine: TowerEngine): void {
  * visuals. New visuals only begin while animating (reduced motion / pause
  * suppress fresh motion, matching every other decoration); in-flight ones
  * retire when their window on the anim clock elapses. No Excalibur actors are
- * involved — these are immediate-mode draws — so there is nothing to leak.
+ * involved, these are immediate-mode draws, so there is nothing to leak.
  */
 export function syncEventFx(engine: TowerEngine, animating: boolean): void {
   if (engine.sim.santaFxSeq !== engine.lastSantaSeq) {
@@ -215,7 +215,7 @@ function renderVip(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 
 /** A thief slinking along a tower floor (a guard trails him if caught). He
  *  sweeps left→right across the viewport, but his feet are pinned to the
- *  floor he's prowling (world-space Y, like the VIP limo) — so he walks the
+ *  floor he's prowling (world-space Y, like the VIP limo), so he walks the
  *  tower and scrolls with the camera instead of floating at mid-screen. */
 function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.thiefStart === null) return;
@@ -227,7 +227,7 @@ function renderThief(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 }
 
 /** The colored stats overlay: draw each heatmap cell by the active metric
- *  (green = good … red = bad) with a legend — one cell per floor for
+ *  (green = good … red = bad) with a legend, one cell per floor for
  *  congestion/occupancy, one per present unit for satisfaction (so a floor can
  *  show several tints). The heatmap is recomputed only when its inputs change
  *  (hour / layout / mode), never per frame. */
@@ -343,7 +343,7 @@ function drawRain(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 }
 
 /** The translucent placement ghost: gold when valid, red when not. One
- *  explicit stroke width for both ghost kinds — the old transport ghost
+ *  explicit stroke width for both ghost kinds, the old transport ghost
  *  never set its own and inherited whatever the overlay context last used
  *  (1, 1.5, or 2 depending on rain/selection), a nondeterminism this pins. */
 function drawGhostRect(ctx: CanvasRenderingContext2D, sx: number, sy: number, sw: number, sh: number, valid: boolean): void {
@@ -413,7 +413,7 @@ function drawTransportSelection(engine: TowerEngine, ctx: CanvasRenderingContext
   strokeSelection(ctx, sx, top, sw, bottom - top);
   if (!isElevatorKind(t.kind)) return; // only lifts extend by a tappable arrow
 
-  // Small, subtle tabs centered on the shaft — discoverable without dominating
+  // Small, subtle tabs centered on the shaft, discoverable without dominating
   // the view. The hit rect is a touch larger than the drawn tab for easy use.
   const cx = sx + sw / 2;
   const tabW = Math.min(sw, 18);

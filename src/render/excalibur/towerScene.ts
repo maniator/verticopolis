@@ -38,8 +38,8 @@ export function makeGround(engine: TowerEngine): void {
   // One rectangle this wide (~11k px) would rasterize to a bitmap past the GPU
   // texture limit (4096 on mobile) and render as a black band. It needs the
   // full width to cover the dirt when zoomed out at the camera's edge, so tile
-  // it into texture-safe segments instead (seamless — same solid color).
-  // Keep each segment under 2048px — the lowest MAX_TEXTURE_SIZE on older
+  // it into texture-safe segments instead (seamless, same solid color).
+  // Keep each segment under 2048px, the lowest MAX_TEXTURE_SIZE on older
   // mobile GPUs (the transport-shaft cap stays under this too).
   const MAX_SEG = 2000;
   const segments = Math.ceil(total / MAX_SEG);
@@ -71,15 +71,15 @@ export function makeGround(engine: TowerEngine): void {
 /**
  * Sun/moon on a screen-space layer placed *below* the world ground and tower
  * (a z under the dirt). They hang in the open sky, and as you pan, the dirt
- * and the building slide over them and hide them at the horizon — so it pans
+ * and the building slide over them and hide them at the horizon, so it pans
  * correctly with no manual clipping.
  */
 export function makeSky(engine: TowerEngine): void {
   // cache:false is deliberate (like the overlay below): this is a full-viewport
-  // screen layer whose pixels change every frame — the sun/moon arc and clouds
+  // screen layer whose pixels change every frame, the sun/moon arc and clouds
   // drift on the decorative clock. A cached canvas would have to flagDirty()
   // every frame, which re-rasterizes AND re-uploads the whole texture anyway
-  // (see the RoomRec cache note) — no reuse to gain, just extra plumbing.
+  // (see the RoomRec cache note), no reuse to gain, just extra plumbing.
   engine.skyCanvas = new ex.Canvas({
     width: engine.viewWidth,
     height: engine.viewHeight,
@@ -93,11 +93,11 @@ export function makeSky(engine: TowerEngine): void {
 
 export function makeOverlay(engine: TowerEngine): void {
   // cache:false is deliberate: this full-viewport screen layer changes every
-  // frame — the ruler always draws, the build-preview ghost tracks the cursor,
+  // frame, the ruler always draws, the build-preview ghost tracks the cursor,
   // rain animates, and the stats heatmap's tints follow the camera (their
   // screen coords come from worldToScreen). Nothing here is stable across
   // frames, so a cached canvas would need a per-frame flagDirty() that
-  // re-rasterizes and re-uploads the whole texture regardless — equal cost to
+  // re-rasterizes and re-uploads the whole texture regardless, equal cost to
   // cache:false, plus extra plumbing and a staleness-bug risk. The *expensive*
   // input (the per-hour heatmap scan) is cached separately in drawStatsMap.
   engine.overlayCanvas = new ex.Canvas({
@@ -194,7 +194,7 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
 
   // The tenant/staff bake recipe (one home for the magic person() args).
   // The fed-up variant below is taller and shifts the figure to fit its
-  // marker, so it hand-rolls the same args — keep the two in step.
+  // marker, so it hand-rolls the same args, keep the two in step.
   const bakePerson = (color: string): ex.Canvas =>
     new ex.Canvas({
       width: 8,

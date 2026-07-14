@@ -61,7 +61,7 @@ export interface Walker {
 }
 
 /** Draw the engine-owned commuters: add/remove/position one actor per live
- * person, by stable id. Read-only — the engine advances the crowd in tick(). */
+ * person, by stable id. Read-only, the engine advances the crowd in tick(). */
 export function reconcileCrowd(engine: TowerEngine): void {
   const seen = new Set<number>();
   for (const p of engine.sim.crowd.people) {
@@ -81,7 +81,7 @@ export function reconcileCrowd(engine: TowerEngine): void {
 }
 
 function positionPerson(engine: TowerEngine, p: Person, rec: { actor: ex.Actor; gfx: ex.Canvas; red: boolean }): void {
-  // While riding, a tenant is inside a car — the cab's own rider count shows
+  // While riding, a tenant is inside a car, the cab's own rider count shows
   // them, so we hide the standalone figure to avoid drawing them twice.
   // Staff stay visible while riding: a lone housekeeper in a 16-person
   // service cab rounds to zero on the cab's load indicator, and watching
@@ -93,7 +93,7 @@ function positionPerson(engine: TowerEngine, p: Person, rec: { actor: ex.Actor; 
   // smoothly between floors; for every other state fy equals the floor.
   rec.actor.pos = ex.vec(engine.worldX(p.x), engine.worldYTop(p.fy) + FLOOR - 3);
   // Long waits redden the figure, the original's "this tenant is fed up" cue.
-  // Staff never redden — they're on the clock, not an unhappy tenant.
+  // Staff never redden, they're on the clock, not an unhappy tenant.
   const red = !p.staff && p.wait > 25;
   if (red !== rec.red) {
     rec.red = red;
@@ -208,7 +208,7 @@ export function syncMotion(engine: TowerEngine): void {
   for (const [floor, r] of runs) {
     const x0w = engine.worldX(r.min) + 2;
     const x1w = engine.worldX(r.max) - 18;
-    // A run too short for the car to travel gets none — bail BEFORE creating
+    // A run too short for the car to travel gets none, bail BEFORE creating
     // the actor, so an untracked actor is never added to the engine (it would
     // leak: clearMotion only kills what's in this.garageCars).
     if (x1w <= x0w) continue;
@@ -252,12 +252,12 @@ function buildWalkers(engine: TowerEngine): void {
           spawnWalker(engine, x0w, x1w, foot, foot, seed, speed, rank, floor, false);
         } else {
           // Corridor: loiter in a short stretch around a spread-out anchor, so a
-          // lone figure shuffles in place instead of sprinting the whole floor —
+          // lone figure shuffles in place instead of sprinting the whole floor , 
           // and only appears when this floor actually has occupants.
           const anchor = x0w + rank * runW;
           const half = Math.min(14, runW / 2);
           // Clamp the loiter span to the run so a figure never paces past the
-          // corridor ends — robust even if the count/density constants change.
+          // corridor ends, robust even if the count/density constants change.
           const segX0 = Math.max(x0w, anchor - half);
           const segX1 = Math.min(x1w, anchor + half);
           spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, true);
@@ -274,7 +274,7 @@ function buildWalkers(engine: TowerEngine): void {
     const n = t.kind === "escalator" ? 3 : 2;
     for (let i = 0; i < n; i++) {
       const seed = (t.id * 17 + i * 29) | 0;
-      // Low ranks so stairs/escalators show climbers even in a modest tower —
+      // Low ranks so stairs/escalators show climbers even in a modest tower , 
       // otherwise the routed crowd (elevators only) makes stairs look unused.
       spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, t.bottom, false);
     }
@@ -363,12 +363,12 @@ export function updateMotion(engine: TowerEngine): void {
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's
-  // bottom story, loads, and drives off — pausing the game freezes it.
+  // bottom story, loads, and drives off, pausing the game freezes it.
   const clock = engine.sim.clock;
   const truckHour = clock.hour === GARBAGE_COLLECT_HOUR;
   for (const tk of engine.truckActors) {
     // No collection at a center that isn't running (under construction, on
-    // fire, or a gutted shell) — a non-operational plant processes no waste.
+    // fire, or a gutted shell), a non-operational plant processes no waste.
     const show = truckHour && isOperational(tk.u);
     if (tk.actor.graphics.visible !== show) tk.actor.graphics.visible = show;
     if (!show) continue;
@@ -411,7 +411,7 @@ export function updateMotion(engine: TowerEngine): void {
     p -= Math.floor(p);
     // Ping-pong 0→1→0 so figures pace back and forth (and stair climbers go
     // up *and* down) instead of teleporting from the far end back to the
-    // start each loop — the old sawtooth made people look like they spawned on
+    // start each loop, the old sawtooth made people look like they spawned on
     // one side, ran across, then vanished.
     const tt = 1 - Math.abs(2 * p - 1);
     w.actor.pos = ex.vec(w.x0w + tt * (w.x1w - w.x0w), w.y0w + tt * (w.y1w - w.y0w));

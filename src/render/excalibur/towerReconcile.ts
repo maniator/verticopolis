@@ -31,7 +31,7 @@ import type { TowerEngine } from "./TowerEngine";
  *  fresh canvas + texture. At top speed a big tower flips ~100 room
  *  signatures per real second (hour/lighting/occupancy churn), and the
  *  old kill-and-recreate path let dead canvases and GPU textures pile up
- *  faster than Excalibur's 60s texture GC could drain them — enough sustained
+ *  faster than Excalibur's 60s texture GC could drain them, enough sustained
  *  memory pressure that phones killed (and auto-reloaded) the tab. */
 export interface RoomRec {
   actor: ex.Actor;
@@ -39,7 +39,7 @@ export interface RoomRec {
   /** Burning/under-construction rooms animate (cache:false, redrawn every
    *  frame); a transition into or out of an animated state still rebuilds. */
   animated: boolean;
-  /** Mutable inputs the draw closure reads live — currently just the "dead
+  /** Mutable inputs the draw closure reads live, currently just the "dead
    *  parking space" flag (red X overlay). A separate holder (not a field on
    *  the record) so the closure can capture it before the actor/canvas exist
    *  and the record stays fully typed with no placeholder casts. */
@@ -55,14 +55,14 @@ export function syncScene(engine: TowerEngine): void {
   // the tiles they're about to bake, so a newly-placed leftmost tile picks
   // up the grand-entrance graphic on the same frame it's added.
   refreshFloor1EntranceMap(engine);
-  // Fresh flood-fill (not cached — it depends on unit state); read ONCE here
+  // Fresh flood-fill (not cached, it depends on unit state); read ONCE here
   // per sync. A parking space absent from this set is "dead" and gets a red X.
   // The dead-bit joins the room signature, so a connectivity flip triggers a
-  // re-bake alongside the existing state/lighting/hour bits — it adds no
+  // re-bake alongside the existing state/lighting/hour bits, it adds no
   // per-frame work of its own.
   const parkingOK = tower.functionalParkingSet();
   // Garage/waste display fractions, refreshed here (not per frame) and reusing
-  // the flood-fill just done — so they're exactly as fresh as the sprite
+  // the flood-fill just done, so they're exactly as fresh as the sprite
   // re-bake below and the garage-car motion visibility that reads them.
   engine.displayParkingUse = engine.sim.parkingUsage(parkingOK.size);
   engine.displayRecycleFill = engine.sim.recyclingFill();
@@ -90,12 +90,12 @@ export function syncScene(engine: TowerEngine): void {
       seenR.add(u.id);
       // The signature must capture every input the room sprite draws from, so
       // it re-bakes exactly when its look changes. Crucially that includes the
-      // hour-dependent bits — a commercial unit's open/closed shutter and a
-      // condo's late-night "asleep" look — otherwise a shop baked closed at
+      // hour-dependent bits, a commercial unit's open/closed shutter and a
+      // condo's late-night "asleep" look, otherwise a shop baked closed at
       // dawn would wrongly stay shuttered all day until the next lighting flip.
       const open = hasBusinessHours(u.kind) ? (isOpenAt(u.kind, engine.d.hour) ? "o" : "c") : "";
       const lateNight = u.kind === "condo" && (engine.d.hour >= 23 || engine.d.hour < 6) ? "s" : "";
-      // Only mark a SETTLED space dead — a mid-build (or burning) space is
+      // Only mark a SETTLED space dead, a mid-build (or burning) space is
       // excluded from the set for other reasons and isn't a connectivity fault.
       const dead =
         u.kind === "parking" && u.state !== "construction" && u.state !== "fire" && !parkingOK.has(u.id) ? "x" : "";
@@ -127,13 +127,13 @@ export function syncScene(engine: TowerEngine): void {
         if (animated === rec.animated && rec.cv.width === u.width * TILE) {
           // Repaint in place: the draw closure reads the unit's live state, so
           // flagging the canvas dirty re-bakes the SAME bitmap into the SAME
-          // GPU texture. No actor churn, no new allocations — see RoomRec.
+          // GPU texture. No actor churn, no new allocations, see RoomRec.
           rec.live.dead = isDead;
           rec.cv.flagDirty();
         } else {
           // Rebuild (rare): animated↔static flips the canvas cache mode, which
           // is fixed at construction (fire ignition/extinguish, build done);
-          // the width guard is belt-and-braces — the sig treats width as a
+          // the width guard is belt-and-braces, the sig treats width as a
           // repaint trigger, but only a rebuild can re-derive the bitmap size,
           // actor footprint and collider (no engine path resizes a unit today).
           rec.actor.kill();
@@ -181,8 +181,8 @@ export function syncScene(engine: TowerEngine): void {
 }
 
 /**
- * Reconcile the building's exterior dressing — escape stairs and the roof
- * crane — to the tower silhouette. Runs only on structural changes (like
+ * Reconcile the building's exterior dressing, escape stairs and the roof
+ * crane, to the tower silhouette. Runs only on structural changes (like
  * syncMotion): the silhouette can't move on an hour tick or a lighting flip.
  */
 export function syncFacade(engine: TowerEngine): void {
@@ -237,7 +237,7 @@ function syncEscapes(engine: TowerEngine, edges: Map<number, FloorEdge>): void {
 
 /** Keep the rooftop crane perched over the highest built floor's run. It
  *  comes down once the tower tops out at the 100th floor (and stays away
- *  unless the top is demolished back below it — the crane is derived state,
+ *  unless the top is demolished back below it, the crane is derived state,
  *  not a latch). No above-ground floors → no crane (empty/basement lots). */
 function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void {
   // No above-ground structure on the top row (basement-only/empty lot) or the
@@ -251,8 +251,8 @@ function syncCrane(engine: TowerEngine, hi: number, topTiles: Set<number>): void
     return;
   }
   // Center over the widest CONTIGUOUS built run on the top floor, not the
-  // (min,max) midpoint: a top row built in disjoint sections — a setback, or
-  // a partly-leased office row — leaves the midpoint hovering in the gap
+  // (min,max) midpoint: a top row built in disjoint sections, a setback, or
+  // a partly-leased office row, leaves the midpoint hovering in the gap
   // between blocks, floating the crane over open sky. For a fully-built row
   // the widest run IS the whole span, so this matches the old midpoint.
   const pos = ex.vec(craneAnchorTile(topTiles) * TILE, engine.worldYTop(hi));
@@ -390,7 +390,7 @@ function refreshFloor1EntranceMap(engine: TowerEngine): void {
 }
 
 /** Build and retain a room actor. `animated` (burning / under construction:
- *  redraws every frame; the rest bake once and re-bake in place — see
+ *  redraws every frame; the rest bake once and re-bake in place, see
  *  RoomRec) is computed by syncScene, the only caller with a unit in hand,
  *  so the repaint-vs-rebuild gate and the canvas cache mode can never drift
  *  apart on two copies of the predicate. */
@@ -411,11 +411,11 @@ function addRoom(engine: TowerEngine, u: Unit, deadParking: boolean, animated: b
       // room bake writes it, so one unit's flag can't leak into the next.
       engine.d.parkingDead = live.dead;
       drawUnit(engine.d, u, 0, 0, w, h);
-      // Canon "red X" on a parking space that isn't chained to a ramp (dead —
+      // Canon "red X" on a parking space that isn't chained to a ramp (dead , 
       // no relief). Baked into the sprite; the dead-bit participates in the room
       // signature, so this re-bakes when the signature changes (state/lighting/
       // hour or the dead-bit). live.dead is refreshed on each sync from the
-      // caller's single functionalParkingSet() read — no per-unit recompute.
+      // caller's single functionalParkingSet() read, no per-unit recompute.
       if (live.dead) {
         // Dark under-stroke so the X reads as a SHAPE independent of hue
         // (color-blind cue), then the red X on top.
@@ -449,7 +449,7 @@ function addTransport(engine: TowerEngine, t: Transport): void {
  * limit. A tall shaft is `floors * FLOOR` px high, which on a mobile GPU
  * (MAX_TEXTURE_SIZE often 4096, sometimes 2048) can fail to upload and render
  * as a black rectangle. A tall shaft is therefore split into stacked bands,
- * each its own small cached Canvas, composed onto one GraphicsGroup — a single
+ * each its own small cached Canvas, composed onto one GraphicsGroup, a single
  * actor, so the rest of the engine (sync, removal, collider) is unchanged.
  */
 function transportGraphic(engine: TowerEngine, t: Transport, w: number, totalFloors: number): ex.Graphic {

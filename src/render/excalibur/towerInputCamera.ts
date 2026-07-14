@@ -165,7 +165,7 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     }
   }
   // Right-click always inspects what's under the cursor, whatever tool is
-  // active — it never pans or builds.
+  // active, it never pans or builds.
   if (buttonNum(ev) === 2 && engine.onSecondary) {
     engine.onSecondary(pickEntityAt(engine, ev.worldPos));
     engine.gesture = null;
@@ -352,7 +352,7 @@ export function zoomBy(engine: TowerEngine, factor: number): void {
 }
 
 /** Pan the camera the minimum amount so tile/floor sits within the viewport
- *  (with a margin) — used to follow the keyboard build cursor. */
+ *  (with a margin), used to follow the keyboard build cursor. */
 export function ensureVisible(engine: TowerEngine, tile: number, floor: number): void {
   const wx = tile * TILE;
   const wy = -floor * FLOOR;
