@@ -9,9 +9,9 @@ import {
   TOWER_POPULATION,
   TRANSPORT_CAPACITY,
   maxSpanFor,
-} from "../engine/facilities";
-import { ECON } from "../engine/econConfig";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES, subtypeListFor } from "../engine/retailSubtypes";
+} from "../../engine/facilities";
+import { ECON } from "../../engine/econConfig";
+import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES, subtypeListFor } from "../../engine/retailSubtypes";
 
 /**
  * Canon tripwire — engine constants asserted against the 1994 original's

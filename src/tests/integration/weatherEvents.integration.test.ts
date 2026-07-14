@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { EventSystem } from "../engine/EventSystem";
-import { Tower } from "../engine/Tower";
-import { Clock } from "../engine/Clock";
-import { RNG } from "../engine/rng";
-import type { FacilityKind, WeatherKind } from "../engine/types";
+import { Simulation } from "../../engine/Simulation";
+import { EventSystem } from "../../engine/EventSystem";
+import { Tower } from "../../engine/Tower";
+import { Clock } from "../../engine/Clock";
+import { RNG } from "../../engine/rng";
+import type { FacilityKind, WeatherKind } from "../../engine/types";
 
 /** A mutable SimContext-shaped holder for driving EventSystem in isolation. */
 function makeCtx(tower: Tower, star: number, money = 1_000_000) {

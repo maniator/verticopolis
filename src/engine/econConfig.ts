@@ -19,7 +19,7 @@ export const ECON = {
    *  retune here shifts customer readouts but never dollars.
    *  Typed as `Partial` so a lookup for a kind we haven't tabled reads
    *  `undefined` (not a spurious `number`), forcing every caller to guard
-   *  before dividing. `src/tests/canon.test.ts` pins that every retail kind
+   *  before dividing. `src/tests/integration/canon.integration.test.ts` pins that every retail kind
    *  with a canon subtype list is tabled here. */
   retailSpendPerCustomer: {
     fastFood: 10,

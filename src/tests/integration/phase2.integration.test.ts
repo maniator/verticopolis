@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 const W = GRID.width;
 const C = Math.floor(W / 2);
@@ -181,7 +181,7 @@ describe("F15 / Step 3 — service coverage radius (v2): placement matters", () 
   });
 });
 
-import { TOWER_POPULATION, FACILITIES } from "../engine/facilities";
+import { TOWER_POPULATION, FACILITIES } from "../../engine/facilities";
 
 describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins under the real hourly clock", () => {
   it("a properly-zoned tower reaches TOWER and does NOT mass-vacate under hourly simulation", () => {

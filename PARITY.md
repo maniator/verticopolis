@@ -100,4 +100,4 @@ abstraction · ⬜ not present.
 economy, ratings gates, the housekeeping/fire/bomb events, elevator dispatch,
 the individually-routed **crowd's BFS routing and movement**
 (`src/tests/integration/crowd.integration.test.ts`), save/load, and an
-**end-to-end run to the TOWER victory** (`src/tests/parity.test.ts`).
+**end-to-end run to the TOWER victory** (`src/tests/integration/parity.integration.test.ts`).

@@ -1,11 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { EventSystem } from "../engine/EventSystem";
-import { Tower } from "../engine/Tower";
-import { Clock } from "../engine/Clock";
-import { RNG } from "../engine/rng";
-import type { LogKind } from "../engine/SimContext";
-import { isOperational } from "../engine/types";
-import type { FacilityKind } from "../engine/types";
+import { EventSystem } from "../../engine/EventSystem";
+import { Tower } from "../../engine/Tower";
+import { Clock } from "../../engine/Clock";
+import { RNG } from "../../engine/rng";
+import type { LogKind } from "../../engine/SimContext";
+import { isOperational } from "../../engine/types";
+import type { FacilityKind } from "../../engine/types";
 
 /**
  * End-to-end coverage of every random EVENT through its real trigger — the

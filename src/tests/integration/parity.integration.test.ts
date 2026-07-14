@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { FACILITIES, GRID, TOWER_POPULATION } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { FACILITIES, GRID, TOWER_POPULATION } from "../../engine/facilities";
 
 /**
  * End-to-end "can you actually win?" tests covering the original SimTower
@@ -22,7 +22,7 @@ describe("Gameplay parity: rating progression & the TOWER win", () => {
     const sim = Simulation.newGame(1);
     // These are constructed-tower rating/VIP-gate checks with no transport, so
     // they pin the legacy v1 (sampled, global) model. The honest, served, v2
-    // organic-progression win is covered in src/tests/phase2.test.ts (Step 5).
+    // organic-progression win is covered in src/tests/integration/phase2.integration.test.ts (Step 5).
     sim.simModel = "v1";
     sim.money = 1_000_000_000;
     // Ground lobby across the lot, extended outward from the starter strip so

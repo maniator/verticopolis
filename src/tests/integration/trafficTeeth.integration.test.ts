@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { GRID } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { GRID } from "../../engine/facilities";
 
 const C = Math.floor(GRID.width / 2);
 const DAY = 60 * 24;

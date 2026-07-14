@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../engine/Simulation";
-import { MILESTONES } from "../engine/milestones";
-import { GRID, FACILITIES } from "../engine/facilities";
+import { Simulation } from "../../engine/Simulation";
+import { MILESTONES } from "../../engine/milestones";
+import { GRID, FACILITIES } from "../../engine/facilities";
 
 const predicate = (id: string) => MILESTONES.find((m) => m.id === id)!.test;
 
