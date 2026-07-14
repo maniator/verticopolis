@@ -1545,3 +1545,24 @@ container exclusively after that. Residual defers:
   `name`/`description` raw; lit auto-escapes them. The catalog is trusted static
   copy (one bare `&` in the wedding-hall description parses identically both ways),
   so this is a hardening, not a behavior change.
+
+### Decisions + deferrals: E5-S3 (palette lock/afford dirty-gate) (`/bmad-code-review`, 2026-07-14)
+
+Change: E5-S3 banks the free win. The palette lock/afford scan in `uiStatus.update`
+is dirty-gated on a key of the star plus the per-kind affordability bitmask (both
+pure engine reads, no DOM): the ~6 Hz pump now skips the two `querySelectorAll`
+walks and the class writes unless the star or an affordability boundary crossed.
+The scan body itself is unchanged, so the a11y checklist holds by construction:
+`.locked` still hides items out of layout and tab order, and the keyboard wiring
+(`role=button`, `tabindex`, Enter/Space, the `e.repeat` guard, `stopPropagation`)
+lives in `uiPalette` and is untouched. The locked-tool fallback to Inspect is
+gated with the scan: a tool can only become locked when the star drops, always a
+key change. The palette is built once (the UI constructor), so no rebuild path
+can strand fresh items behind an unchanged key. Decisions per the story:
+
+- **The `classMap` binding move is NOT taken**: the story allows it only if it
+  measures clean on a phone tier, which cannot be measured here; the imperative
+  class pass stays, per the story's record-the-decision option.
+- **Key covers a superset of the palette kinds**: it iterates all FACILITIES keys,
+  so a boundary crossing on a non-palette kind causes a spurious (harmless,
+  correct) rescan, never a missed one.
