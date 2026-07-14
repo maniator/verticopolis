@@ -1,0 +1,416 @@
+[
+  {
+    "page": "page-01-utilities-service",
+    "count": 7,
+    "tiles": [
+      {
+        "name": "Medical",
+        "file": "tiles/page-01-medical.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Security",
+        "file": "tiles/page-01-security.png",
+        "w": 264,
+        "h": 132
+      },
+      {
+        "name": "Parking",
+        "file": "tiles/page-01-parking.png",
+        "w": 132,
+        "h": 132
+      },
+      {
+        "name": "ParkingRamp",
+        "file": "tiles/page-01-parkingramp.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Recycling",
+        "file": "tiles/page-01-recycling.png",
+        "w": 660,
+        "h": 264
+      },
+      {
+        "name": "Metro",
+        "file": "tiles/page-01-metro.png",
+        "w": 990,
+        "h": 396
+      },
+      {
+        "name": "Housekeeping",
+        "file": "tiles/page-01-housekeeping.png",
+        "w": 264,
+        "h": 132
+      }
+    ]
+  },
+  {
+    "page": "page-02-offices-residential",
+    "count": 14,
+    "tiles": [
+      {
+        "name": "Office (cubicle row)",
+        "file": "tiles/page-02-office-cubicle-row.png",
+        "w": 297,
+        "h": 132
+      },
+      {
+        "name": "Office (meeting room)",
+        "file": "tiles/page-02-office-meeting-room.png",
+        "w": 297,
+        "h": 132
+      },
+      {
+        "name": "Office (executive)",
+        "file": "tiles/page-02-office-executive.png",
+        "w": 297,
+        "h": 132
+      },
+      {
+        "name": "Office (vacant)",
+        "file": "tiles/page-02-office-vacant.png",
+        "w": 297,
+        "h": 132
+      },
+      {
+        "name": "Office (night)",
+        "file": "tiles/page-02-office-night.png",
+        "w": 297,
+        "h": 132
+      },
+      {
+        "name": "Condo (living room)",
+        "file": "tiles/page-02-condo-living-room.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Condo (dining)",
+        "file": "tiles/page-02-condo-dining.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Condo (study)",
+        "file": "tiles/page-02-condo-study.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Condo (for sale)",
+        "file": "tiles/page-02-condo-for-sale.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Single Room (ready)",
+        "file": "tiles/page-02-single-room-ready.png",
+        "w": 132,
+        "h": 132
+      },
+      {
+        "name": "Double Room (ready)",
+        "file": "tiles/page-02-double-room-ready.png",
+        "w": 198,
+        "h": 132
+      },
+      {
+        "name": "Suite (ready)",
+        "file": "tiles/page-02-suite-ready.png",
+        "w": 330,
+        "h": 132
+      },
+      {
+        "name": "Single (asleep)",
+        "file": "tiles/page-02-single-asleep.png",
+        "w": 132,
+        "h": 132
+      },
+      {
+        "name": "Double (needs cleaning)",
+        "file": "tiles/page-02-double-needs-cleaning.png",
+        "w": 198,
+        "h": 132
+      }
+    ]
+  },
+  {
+    "page": "page-03-food-entertainment",
+    "count": 12,
+    "tiles": [
+      {
+        "name": "Fast Food: Hamburger",
+        "file": "tiles/page-03-fast-food-hamburger.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Fast Food: Japanese Soba",
+        "file": "tiles/page-03-fast-food-japanese-soba.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Fast Food: Chinese Cafe",
+        "file": "tiles/page-03-fast-food-chinese-cafe.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Fast Food: Ice Cream",
+        "file": "tiles/page-03-fast-food-ice-cream.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Fast Food: Coffee Shop",
+        "file": "tiles/page-03-fast-food-coffee-shop.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Restaurant: French",
+        "file": "tiles/page-03-restaurant-french.png",
+        "w": 792,
+        "h": 132
+      },
+      {
+        "name": "Restaurant: English Pub",
+        "file": "tiles/page-03-restaurant-english-pub.png",
+        "w": 792,
+        "h": 132
+      },
+      {
+        "name": "Restaurant: Chinese",
+        "file": "tiles/page-03-restaurant-chinese.png",
+        "w": 792,
+        "h": 132
+      },
+      {
+        "name": "Restaurant: Sushi Bar",
+        "file": "tiles/page-03-restaurant-sushi-bar.png",
+        "w": 792,
+        "h": 132
+      },
+      {
+        "name": "Restaurant: Steak House",
+        "file": "tiles/page-03-restaurant-steak-house.png",
+        "w": 792,
+        "h": 132
+      },
+      {
+        "name": "Cinema  ·  31 tiles x 2 floors",
+        "file": "tiles/page-03-cinema.png",
+        "w": 1023,
+        "h": 264
+      },
+      {
+        "name": "Party Hall  ·  24 tiles x 2 floors",
+        "file": "tiles/page-03-party-hall.png",
+        "w": 792,
+        "h": 264
+      }
+    ]
+  },
+  {
+    "page": "page-04-retail",
+    "count": 12,
+    "tiles": [
+      {
+        "name": "Shop: Men's Clothing",
+        "file": "tiles/page-04-shop-men-s-clothing.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Pet Store",
+        "file": "tiles/page-04-shop-pet-store.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Flower Shop",
+        "file": "tiles/page-04-shop-flower-shop.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Book Store",
+        "file": "tiles/page-04-shop-book-store.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Drug Store",
+        "file": "tiles/page-04-shop-drug-store.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Boutique",
+        "file": "tiles/page-04-shop-boutique.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Electronics",
+        "file": "tiles/page-04-shop-electronics.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Bank",
+        "file": "tiles/page-04-shop-bank.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Hair Salon",
+        "file": "tiles/page-04-shop-hair-salon.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Post Office",
+        "file": "tiles/page-04-shop-post-office.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Sports Gear",
+        "file": "tiles/page-04-shop-sports-gear.png",
+        "w": 396,
+        "h": 132
+      },
+      {
+        "name": "Shop: Generic (no subtype)",
+        "file": "tiles/page-04-shop-generic-no-subtype.png",
+        "w": 396,
+        "h": 132
+      }
+    ]
+  },
+  {
+    "page": "page-05-structure-transport",
+    "count": 13,
+    "tiles": [
+      {
+        "name": "Standard Elevator",
+        "file": "tiles/page-05-standard-elevator.png",
+        "w": 528,
+        "h": 396
+      },
+      {
+        "name": "Service Elevator",
+        "file": "tiles/page-05-service-elevator.png",
+        "w": 528,
+        "h": 396
+      },
+      {
+        "name": "Stairway  ·  2 floors",
+        "file": "tiles/page-05-stairway.png",
+        "w": 264,
+        "h": 264
+      },
+      {
+        "name": "Escalator  ·  2 floors",
+        "file": "tiles/page-05-escalator.png",
+        "w": 264,
+        "h": 264
+      },
+      {
+        "name": "Floor / Corridor (empty)",
+        "file": "tiles/page-05-floor-corridor-empty.png",
+        "w": 330,
+        "h": 132
+      },
+      {
+        "name": "Under Construction (state)",
+        "file": "tiles/page-05-under-construction-state.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Lobby (ground concourse) + grand entrance",
+        "file": "tiles/page-05-lobby-ground-concourse-grand-entrance.png",
+        "w": 660,
+        "h": 132
+      },
+      {
+        "name": "Lobby (sky lobby)",
+        "file": "tiles/page-05-lobby-sky-lobby.png",
+        "w": 660,
+        "h": 132
+      },
+      {
+        "name": "Grand Entrance (front + canopy)",
+        "file": "tiles/page-05-grand-entrance-front-canopy.png",
+        "w": 264,
+        "h": 132
+      },
+      {
+        "name": "Service Entrance (back door)",
+        "file": "tiles/page-05-service-entrance-back-door.png",
+        "w": 264,
+        "h": 132
+      },
+      {
+        "name": "Standard Entrance",
+        "file": "tiles/page-05-standard-entrance.png",
+        "w": 165,
+        "h": 132
+      },
+      {
+        "name": "Wedding Hall  ·  16 tiles",
+        "file": "tiles/page-05-wedding-hall.png",
+        "w": 528,
+        "h": 132
+      },
+      {
+        "name": "Express Elevator",
+        "file": "tiles/page-05-express-elevator.png",
+        "w": 528,
+        "h": 396
+      }
+    ]
+  },
+  {
+    "page": "page-08-actors-events",
+    "count": 5,
+    "tiles": [
+      {
+        "name": "Garbage Truck",
+        "file": "tiles/page-08-garbage-truck.png",
+        "w": 204,
+        "h": 102
+      },
+      {
+        "name": "Metro Train",
+        "file": "tiles/page-08-metro-train.png",
+        "w": 264,
+        "h": 60
+      },
+      {
+        "name": "Street Car",
+        "file": "tiles/page-08-street-car.png",
+        "w": 96,
+        "h": 54
+      },
+      {
+        "name": "Thief",
+        "file": "tiles/page-08-thief.png",
+        "w": 96,
+        "h": 120
+      },
+      {
+        "name": "Santa",
+        "file": "tiles/page-08-santa.png",
+        "w": 96,
+        "h": 132
+      }
+    ]
+  }
+]
