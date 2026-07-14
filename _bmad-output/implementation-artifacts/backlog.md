@@ -672,3 +672,26 @@ parked here:
 - ~~**`escapeAttr` used for text content / raw engine-string interpolation**~~,
   done 2026-07-02: single shared `escapeHtml` in `src/ui/escape.ts`; the
   previously raw user-controlled `u.label` in the inspector card is now escaped.
+
+### Deferred from: code review of E1 pixel-art shared language (`/gds-code-review`, 2026-07-14)
+
+Change: E1 adds the finalized `person()` build family, `moodTint`, new `PAL`
+keys, and the shared helpers (`windowView`, `roomGlow`, `ceilingFixture`,
+`dado`, `castShadow`) to `pixelSprites/common.ts`, plus the food/shop
+look-table splits into `food.looks.ts` / `shop.looks.ts`. Three review layers
+(Blind Hunter, Edge Case Hunter; the Acceptance Auditor timed out, and its
+spec-conformance scope was independently re-verified by the Edge Case Hunter:
+build heights 15/18/24/17/22, new `PAL` keys vs the art bible, byte-identical
+look data, barrel surface). Patched in-PR: the width-6 leg-gap bug (fixed leg
+columns), the `windowView` `lit` inversion plus night-gating of the city
+lights, the `RESERVED_COLORS` docstring overstatement, and per-wrapper build
+tests. Parked here:
+
+- **The exported `personFigure` / `dado` / `ceilingFixture` take a bare
+  `string` color and pass it straight into `shade()`, which does
+  `parseInt(hex.slice(1), 16)` and yields `rgb(NaN,NaN,NaN)` for a non-hex
+  argument.** Every shipped caller passes a hex (`moodTint` output or a `PAL`
+  value), so there is no live defect; the risk is only a future per-kind spec
+  handing one of these helpers an `rgb(...)` string or a named color. Fix when
+  convenient: validate or normalize in `shade()` once, or narrow the helper
+  params to a hex type. (Low, Edge Case Hunter.)
