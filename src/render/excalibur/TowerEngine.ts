@@ -27,7 +27,7 @@ import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import { person, SHIRTS } from "../pixelSprites";
 import type { Person } from "../../engine/Crowd";
-import { clampCameraY } from "../cameraBounds";
+import { clampCameraY, fitZoom } from "../cameraBounds";
 import { PinchTracker, stablePointerId } from "../pinchTracker";
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 
@@ -117,10 +117,11 @@ export interface ViewFocus {
   dominant: FacilityKind | "outside" | "lobby" | "empty";
   night: boolean;
   /**
-   * Current camera zoom (world pixels multiplier). ~0.3 is fully zoomed out
-   * — the whole tower in frame — and 3 is a tight close-up. Audio uses this to
-   * pull back to a wide "tower overview" bed when zoomed out and to fade in
-   * area-specific detail (crowd, kitchen clatter, elevator dings) up close.
+   * Current camera zoom (world pixels multiplier). Low values are zoomed out
+   * (the whole tower in frame; the tower-aware fit floor lets a tall tower reach
+   * ~0.15 or lower) and 3 is a tight close-up. Audio uses this to pull back to a
+   * wide "tower overview" bed when zoomed out and to fade in area-specific detail
+   * (crowd, kitchen clatter, elevator dings) up close.
    */
   zoom: number;
   /** Today's sky weather; drives an outdoor rain layer in the ambient bed. */
@@ -938,10 +939,42 @@ export class TowerEngine {
   }
   zoomAt(factor: number, sx: number, sy: number): void {
     const before = this.screenToWorld(sx, sy);
-    this.cam.zoom = clampZoom(this.cam.zoom * factor);
+    this.cam.zoom = this.clampGestureZoom(this.cam.zoom * factor);
     const after = this.screenToWorld(sx, sy);
     this.cam.pos = ex.vec(this.cam.pos.x + (before.x - after.x), this.cam.pos.y + (before.y - after.y));
     this.clamp();
+  }
+
+  /** The tower-aware zoom-out floor for the CURRENT tower and viewport: a pinch
+   *  or wheel can pull back until the whole built tower plus a breath of sky
+   *  fits, then stops, rather than drifting into empty void. Recomputed per
+   *  gesture because it moves as the tower grows and as the viewport resizes.
+   *  Basements count: the span runs from the highest built floor to the lowest,
+   *  so a deep tower frames its cellars too. See {@link fitZoom}. */
+  private dynamicMinZoom(): number {
+    const span = this.sim.tower.highestFloor - this.sim.tower.lowestFloor + 1;
+    return fitZoom(this.viewHeight, span, FLOOR, MIN_ZOOM);
+  }
+
+  /** Clamp a gesture-driven zoom to `[effectiveMin, MAX_ZOOM]`. The static
+   *  {@link clampZoom} (trust-boundary floor) still guards the save-restore path
+   *  in {@link setCamera}; the tighter tower-aware floor applies only to live
+   *  pinch/wheel/keyboard zoom so the player can't zoom out past their tower.
+   *
+   *  The floor only ever stops further zoom-OUT; it must never FORCE a zoom-in.
+   *  The camera can legitimately sit below the current floor after a rotation
+   *  that grew the viewport (a taller screen raises the floor) or a cross-device
+   *  save whose zoom was set on a different viewport. Snapping such a view inward
+   *  on the player's next pinch, especially a pinch-OUT, reads as the camera
+   *  fighting them. So the effective floor drops to the current zoom when the
+   *  camera is already below `lo`: the player still cannot zoom out any further,
+   *  can zoom in freely, and the normal tower-aware floor re-engages the moment
+   *  they climb back above it. */
+  private clampGestureZoom(z: number): number {
+    const lo = this.dynamicMinZoom();
+    const cur = this.cam.zoom;
+    const effectiveLo = Number.isFinite(cur) && cur < lo ? cur : lo;
+    return Number.isFinite(z) ? Math.max(effectiveLo, Math.min(MAX_ZOOM, z)) : effectiveLo;
   }
   private clamp(): void {
     const x = Math.max(0, Math.min(GRID.width * TILE, this.cam.pos.x));
@@ -974,7 +1007,7 @@ export class TowerEngine {
 
   /** Zoom by a factor about the current center (keyboard +/- zoom). */
   zoomBy(factor: number): void {
-    this.cam.zoom = clampZoom(this.cam.zoom * factor);
+    this.cam.zoom = this.clampGestureZoom(this.cam.zoom * factor);
     this.clamp(); // bound both axes, same as pointer zoom
   }
 

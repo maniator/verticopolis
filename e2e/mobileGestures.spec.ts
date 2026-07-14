@@ -243,3 +243,94 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
     expect(errors).toEqual([]);
   });
 });
+
+/** True camera zoom (screen px per world px): the on-screen height of one floor
+ *  divided by its world height (FLOOR = 44). */
+async function trueZoom(page: import("@playwright/test").Page): Promise<number> {
+  return page.evaluate(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const e = (window as any).game.engine;
+    return Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2)) / 44;
+  });
+}
+
+/** Drive one pinch-OUT gesture (fingers start far apart, close toward the
+ *  center) about the canvas midpoint, then lift both. */
+async function pinchOut(
+  page: import("@playwright/test").Page,
+  cx: number,
+  cy: number,
+  id: number,
+): Promise<void> {
+  await dispatchTouch(page, "pointerdown", id, cx - 130, cy);
+  await dispatchTouch(page, "pointerdown", id + 1, cx + 130, cy);
+  await dispatchTouch(page, "pointermove", id, cx - 30, cy);
+  await dispatchTouch(page, "pointermove", id + 1, cx + 30, cy);
+  await dispatchTouch(page, "pointerup", id, cx - 30, cy);
+  await dispatchTouch(page, "pointerup", id + 1, cx + 30, cy);
+}
+
+test.describe("mobile pinch: zoom out frames the whole tower", () => {
+  test("a tall tower can be pulled fully into frame, and the floor holds (no void drift)", async ({
+    page,
+  }) => {
+    const errors: string[] = [];
+    page.on("pageerror", (e) => errors.push(`pageerror: ${e.message}`));
+
+    await page.goto("/");
+    await page.waitForFunction(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      const canvas = document.querySelector<HTMLCanvasElement>("#view");
+      return Boolean(g?.sim && g.engine && canvas && canvas.width > 0 && canvas.height > 0);
+    });
+
+    // Freeze time, fund, and build an 82-floor tower straight through the Tower
+    // API: a ground lobby plus a single supported column of floors up to 82. The
+    // dynamic zoom floor only needs the tower's built floor extent, which this
+    // gives us without hand-placing a whole city.
+    const top = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const g = (window as any).game;
+      document.getElementById("splash")?.remove();
+      g.speed = 0;
+      g.sim.money = 1e9;
+      const t = g.sim.tower;
+      const x = Math.floor(g.grid.width / 2);
+      t.place("lobby", 1, x);
+      for (let f = 2; f <= 82; f++) t.place("floor", f, x);
+      return t.highestFloor as number;
+    });
+    expect(top).toBe(82);
+
+    const cx = await page.evaluate(() => (document.getElementById("view") as HTMLCanvasElement).clientWidth / 2);
+    const cy = await page.evaluate(() => (document.getElementById("view") as HTMLCanvasElement).clientHeight / 2);
+
+    // Pinch out hard several times to drive the camera down to its floor.
+    let id = 7100;
+    for (let round = 0; round < 8; round++) await pinchOut(page, cx, cy, (id += 2));
+
+    // The tower-aware floor is far past the old fixed 0.3 minimum...
+    const floorZoom = await trueZoom(page);
+    expect(floorZoom).toBeLessThan(0.3);
+
+    // ...and at it, the whole 82-floor tower is within the viewport.
+    const visibleFloors = await page.evaluate(() => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const e = (window as any).game.engine;
+      const canvas = document.getElementById("view") as HTMLCanvasElement;
+      return canvas.clientHeight / Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
+    });
+    expect(visibleFloors).toBeGreaterThan(82);
+
+    // Pinching out again does NOT keep shrinking the tower into empty sky: the
+    // floor holds. (Old behavior would either stop early at 0.3 or, with a naive
+    // fix, drift on out into void.)
+    const before = await trueZoom(page);
+    await pinchOut(page, cx, cy, 7300);
+    const after = await trueZoom(page);
+    expect(after).toBeCloseTo(before, 2);
+
+    expect(errors).toEqual([]);
+  });
+});

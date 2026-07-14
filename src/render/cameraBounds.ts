@@ -49,3 +49,51 @@ export function clampCameraY(
   // Keep the visible window inside [topY, bottomY].
   return Math.max(topY + halfH, Math.min(bottomY - halfH, target));
 }
+
+/** A little sky above the tower's top floor at the fully-fit zoom, so the roof
+ *  isn't jammed against the status bar when you pinch all the way out. */
+export const FIT_SKY_FLOORS = 6;
+
+/** Smallest span the fit zoom pretends the tower has. Two jobs: it stops an
+ *  empty or tiny tower from dividing by ~0 (which would let the fit zoom out to
+ *  nothing and fling the camera), and it gives a short starter tower comfortable
+ *  framing instead of an ocean of empty sky. */
+export const MIN_FIT_SPAN_FLOORS = 24;
+
+/** The fit floor never rises ABOVE this, so zooming out always does something.
+ *  Without it, a tiny tower on a tall viewport (a tablet in portrait) could
+ *  compute a fit zoom above the resting zoom and lock the player out of zooming
+ *  out at all. Past this the tower already fits with room to spare, so any
+ *  further pull-back is pure overview and safe to allow. */
+export const MAX_FIT_ZOOM = 0.6;
+
+/**
+ * The most-zoomed-out (smallest) zoom the camera should reach for a tower of a
+ * given built span: far enough that the whole tower plus a breath of sky fits
+ * the viewport, but never so far that a short tower drifts into empty void, and
+ * never so restrictive that a small tower can't zoom out at all.
+ *
+ * This is the tower-aware GESTURE floor the renderer layers on top of the fixed
+ * trust-boundary floor (`VIEW_ZOOM_MIN`). It computes the limit from the world
+ * the way {@link clampCameraY} does, rather than hardcoding a single number that
+ * fits every tower badly.
+ *
+ * @param viewHeight viewport height in screen pixels; a non-positive or
+ *                   non-finite value falls back to 1 so the result stays finite
+ * @param spanFloors built tower height in floors (top built floor minus bottom
+ *                   built floor, basements included); values below
+ *                   {@link MIN_FIT_SPAN_FLOORS} (or non-finite) are lifted to it
+ * @param floorPx    height of one floor in world pixels
+ * @param hardFloor  the absolute minimum zoom (the trust-boundary floor); the
+ *                   result is never below this
+ */
+export function fitZoom(viewHeight: number, spanFloors: number, floorPx: number, hardFloor: number): number {
+  const safeH = Number.isFinite(viewHeight) && viewHeight > 0 ? viewHeight : 1;
+  const span = Math.max(MIN_FIT_SPAN_FLOORS, Number.isFinite(spanFloors) ? spanFloors : 0);
+  const framed = (span + FIT_SKY_FLOORS) * floorPx; // world height to fit on screen
+  const z = safeH / framed;
+  // Keep the fit floor inside [hardFloor, MAX_FIT_ZOOM]: never below the hard
+  // floor (so a pathological span can't underflow), never above the ceiling (so
+  // a small tower on a tall screen can still be zoomed out).
+  return Math.max(hardFloor, Math.min(MAX_FIT_ZOOM, z));
+}
