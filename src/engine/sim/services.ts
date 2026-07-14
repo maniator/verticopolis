@@ -43,8 +43,13 @@ export function recyclingFill(sim: Simulation): number {
 
 /** Functional parking spaces the tower NEEDS: one per ~24 office workers
  *  (canon: offices demand parking from 3★) plus one per hotel suite (canon:
- *  suite guests, and the VIP, arrive by car). */
+ *  suite guests, and the VIP, arrive by car). Below parking's own unlock star
+ *  the demand is zero by definition: the player cannot build a ramp or space
+ *  yet, so no advisory driven by this may tell them to build one. */
 export function parkingDemand(sim: Simulation): { officePop: number; offices: number; suites: number; total: number } {
+  if (sim.star < FACILITIES.parking.minStar) {
+    return { officePop: 0, offices: 0, suites: 0, total: 0 };
+  }
   let officePop = 0;
   let suites = 0;
   for (const u of sim.tower.units) {
@@ -67,7 +72,7 @@ export function suiteParkingShort(sim: Simulation): boolean {
  * Suites reserve their one-space-each FIRST (canon), so a lot full of suite
  * cars gives the offices nothing. */
 export function officeParkingShort(sim: Simulation): boolean {
-  if (sim.star < 3) return false;
+  if (sim.star < FACILITIES.parking.minStar) return false;
   const d = sim.parkingDemand();
   // Only ramp-chained spaces count (canon), and suites reserve theirs first,
   // clamp at 0 so a suite-heavy lot leaves offices "0 spaces", never a
@@ -85,6 +90,12 @@ export function officeParkingShort(sim: Simulation): boolean {
  */
 export function parkingUsage(sim: Simulation, spots: number = sim.tower.functionalParkingSpots()): number {
   if (spots === 0) return 0;
+  // Below parking's unlock star nothing demands the lot (see parkingDemand),
+  // so nothing parks in it either: an imported or forged sub-3★ tower that
+  // carries spaces must not draw suite cars while every demand surface reads
+  // zero. Legitimate towers never hit this (spaces require 3★ to build and the
+  // star never decreases).
+  if (sim.star < FACILITIES.parking.minStar) return 0;
   const h = sim.clock.hour;
   const d = sim.parkingDemand();
   const officeCars = !sim.clock.isWeekend && h >= 8 && h < 18 ? d.offices : 0;

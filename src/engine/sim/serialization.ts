@@ -81,7 +81,10 @@ export function deserialize(raw: SerializedGame): Simulation {
     coerceCalendarKind(data.modernCalendar),
   );
   sim.money = data.money;
-  sim.star = data.star;
+  // Clamp the star to the real ladder (1..6, TOWER included): a forged NaN or
+  // out-of-range value would otherwise poison every star compare downstream,
+  // e.g. reading parking demand while the build gate refuses to sell parking.
+  sim.star = Math.max(1, Math.min(6, Math.floor(typeof data.star === "number" && Number.isFinite(data.star) ? data.star : 1)));
   // Reuse the calendar the constructor already resolved from mode + choice, so
   // the restored clock reads the same week/quarter/year as a fresh tower would.
   sim.clock = new Clock(data.minutes, sim.clock.calendar);

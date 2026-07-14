@@ -48,11 +48,18 @@ export function statsTemplate(sim: Simulation): TemplateResult {
       : nothing;
   // VIPs start calling at 3★, so the row appears with them (or with any
   // recorded visit, so a loaded late-game tower always shows its history).
+  // The review verdict trusts vipFavorable alone (it is what gates 4★), so a
+  // favorable flag with no recorded visits (fixtures, tampered saves) still
+  // reads "Review earned" in the good color; only the count goes unspoken.
+  const vipText =
+    sim.vipVisits === 0
+      ? sim.vipFavorable
+        ? "Review earned"
+        : "None yet"
+      : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
   const vipRow =
     sim.vipVisits > 0 || sim.vipFavorable || s.star >= 3
-      ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable && sim.vipVisits > 0 ? "var(--good)" : "var(--muted)"}">${
-          sim.vipVisits === 0 ? "None yet" : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`
-        }</span>`
+      ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable ? "var(--good)" : "var(--muted)"}">${vipText}</span>`
       : nothing;
   return html`<div class="stats-grid">
       <div class="stats-section win-title sm">Overview</div>
