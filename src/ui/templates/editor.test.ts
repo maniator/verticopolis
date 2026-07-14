@@ -198,6 +198,13 @@ describe("transport editor row and action branches", () => {
     expect(stops).not.toContain("express");
   });
 
+  it("serves and height cells read the span in plain copy", () => {
+    const { sim, lift } = withLift("elevatorStandard");
+    const frag = renderToFragment(transportEditorTemplate(sim, lift));
+    expect(frag.querySelector('[data-field="serves"]')!.textContent).toBe("1 – 2");
+    expect(frag.querySelector('[data-field="height"]')!.textContent).toBe("2 floors");
+  });
+
   it("mobile folds the transport diagnostics block in", () => {
     const { sim, lift } = withLift("elevatorStandard", 4);
     expect(renderToFragment(transportEditorTemplate(sim, lift, true)).querySelector(".ed-diagnostics")).not.toBeNull();

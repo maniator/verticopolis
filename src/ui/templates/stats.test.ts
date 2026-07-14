@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { nothing } from "lit-html";
 import { statsTemplate, incomeSection } from "./stats";
 import { renderToFragment } from "../testing/litTestUtils";
 
@@ -175,15 +176,21 @@ describe("statsTemplate sections across fixture towers", () => {
   });
 
   it("a sold Modern household renders the multi-size mix", () => {
+    // Scope to the Size mix VALUE cell: the elevator and VIP rows also join
+    // with the same separator, so a whole-dialog probe could pass vacuously.
     const frag = renderToFragment(statsTemplate(modernWithHousehold()));
-    expect(frag.textContent).toContain("Size mix");
-    expect(frag.textContent).toContain(" · "); // two distinct sizes joined
+    const key = [...frag.querySelectorAll("span.k")].find((el) => el.textContent === "Size mix")!;
+    expect(key).toBeTruthy();
+    expect(key.nextElementSibling!.textContent).toMatch(/×.+·.+×/); // two buckets joined
   });
 
-  it("a multi-shaft tower fills both Elevator columns; income history renders rows and Net", () => {
+  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", () => {
     const shafts = manyShafts();
-    expect(shafts.elevatorStats().length).toBeGreaterThan(2);
-    expect(renderToFragment(statsTemplate(shafts)).textContent).toContain("Standard");
+    expect(shafts.elevatorStats().length).toBe(4);
+    const frag = renderToFragment(statsTemplate(shafts));
+    // All four shafts render a "% full" value cell (the two-column split holds
+    // every row, none silently dropped).
+    expect([...frag.querySelectorAll("span.v")].filter((v) => /% full$/.test(v.textContent ?? "")).length).toBe(4);
     const income = withIncome();
     expect(income.incomeBreakdown().hasData).toBe(true);
     expect(renderToFragment(statsTemplate(income)).textContent).toContain("Net");
@@ -222,7 +229,7 @@ describe("incomeSection (income breakdown)", () => {
     sim.recordMoney("food", 0.3); // rounds to $0, hidden row
     sim.recordMoney("retail", 0.3); // rounds to $0, hidden row
 
-    const text = renderToFragment(incomeSection(sim) as Parameters<typeof renderToFragment>[0]).textContent!;
+    const text = renderToFragment(incomeSection(sim) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
 
     // The big line shows; the sub-dollar lines are omitted from the list.
     expect(text).toContain("Offices");
@@ -244,8 +251,10 @@ describe("incomeSection (income breakdown)", () => {
   });
 
   it("renders nothing before any money has been recorded", () => {
-    // `nothing` renders no nodes: the whole section is absent from the dialog.
+    // `nothing` renders no nodes: the whole section is absent from the dialog,
+    // and the section function itself returns the sentinel (not an empty shell).
     const sim = Simulation.newGame(92);
+    expect(incomeSection(sim)).toBe(nothing);
     expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("Income (avg / day");
   });
 });

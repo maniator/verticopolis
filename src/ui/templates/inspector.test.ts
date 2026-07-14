@@ -50,7 +50,7 @@ describe("unit inspector card branches", () => {
     expect(frag.querySelector("h4.win-title")!.textContent).toBe("Office");
     expect(frag.textContent).toContain("Floor 2");
     expect(frag.textContent).toContain("Status: occupied");
-    expect(frag.textContent).toContain("Occupants: ");
+    expect(frag.textContent).toMatch(/Occupants: \d+\/\d+/);
     expect(frag.textContent).toContain("Satisfaction: 73%");
   });
 

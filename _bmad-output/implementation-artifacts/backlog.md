@@ -1681,8 +1681,9 @@ two live pieces moved out first: `shortMoney` to `ui/format.ts`, and the
 TOWER-win congratulations modal (the one dialog outside the epic list) onto
 the `openModalTemplate` seam as `templates/congrats.ts`. Before the oracle
 died, the two stats branches the E3-S5 triage left unexercised (the 4-star
-rating divergence row and the Express shaft label) gained proven-equivalent
-fixtures, kept as structural pins. Consumers ported: `condoModes` and the two
+rating divergence row and the Express shaft label) gained fixtures run against
+the live oracle in the sweep PR's first commit (af03790), then kept as
+structural pins once the deletion commit removed the guards. Consumers ported: `condoModes` and the two
 `gameControllers` suites render the lit templates where they read builder
 strings, the income Net behavior tests moved beside `incomeSection`, and the
 `editorHtml` integration suite retired with the volatile-map protocol it
