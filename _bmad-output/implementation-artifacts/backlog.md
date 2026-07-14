@@ -121,6 +121,30 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
+
+Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into
+`facilities/service.ts` (in-tower service kinds), `facilities/vehicles.ts` (moving
+actors), and `facilities/venue.ts` (event venues), with the original file kept as a
+thin re-export barrel so no importer changed. Pure move, verified byte-for-byte
+identical function bodies; zero pixel/behavior change. Two review layers (Blind
+Hunter, Edge Case Hunter). The one patch finding (the new barrel was missing from
+`barrelSurface.test.ts`) was fixed in-PR, and the stale `drawMetro` doc pointer to
+`drawMetroTrain` (now a sibling in `vehicles.ts`) was corrected. Two findings
+deferred, both cosmetic and both pre-existing to the move:
+
+- **`facilities/service.ts` is a broad bucket** (Blind Hunter, subjective cohesion):
+  it holds the true services (security, medical, housekeeping, recycling) alongside
+  the metro station and the parking space/ramp, which are arguably their own
+  transit/garage domains. Grouped this way deliberately (all in-tower, non-actor,
+  non-venue kinds) and it sits comfortably under the 500-line ceiling at 252 lines.
+  If it grows, consider a finer `transit.ts` / `garage.ts` cut. (Low; cosmetic.)
+- **Dead `u: Unit` param on `drawParkingRamp`** (Blind Hunter): the function takes a
+  unit it never reads and discards it with `void u;`. Pre-existing; preserved
+  verbatim by the pure move (changing the signature would touch the `drawInterior`
+  call site in `sprites.ts` and widen the diff past a pure relocation). Drop the
+  param when the parking-ramp draw is next touched for real. (Low; cosmetic.)
+
 ### Follow-up: evaluate a Preact (or similar) UI rendering layer (2026-07-14, from Wave C-2)
 
 While splitting `UI.ts`, the owner raised moving the DOM generation to
