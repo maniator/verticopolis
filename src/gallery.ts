@@ -11,14 +11,15 @@ interface Entry {
   draw(d: DrawCtx, cx: number, cy: number, cw: number, ch: number): void;
 }
 
-function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string): Unit {
+function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 1, subtype?: string, floorOverride?: number): Unit {
   const f = FACILITIES[kind];
   return {
     id,
     kind,
     // Lobbies style by floor (1 = the grand ground concourse, else the sky-
-    // lobby look); show the ground lobby, the one the starter tower builds.
-    floor: kind === "lobby" ? 1 : 5,
+    // lobby look). Default to the ground lobby, the one the starter tower
+    // builds; `floorOverride` lets the catalog show the sky-lobby variant too.
+    floor: floorOverride ?? (kind === "lobby" ? 1 : 5),
     x: 0,
     width: f.width,
     state,
@@ -31,20 +32,37 @@ function makeUnit(kind: FacilityKind, state: UnitState, occupants: number, id = 
   };
 }
 
-function roomEntry(label: string, kind: FacilityKind, state: UnitState = "occupied", occ?: number, subtype?: string): Entry {
+function roomEntry(
+  label: string,
+  kind: FacilityKind,
+  state: UnitState = "occupied",
+  occ?: number,
+  subtype?: string,
+  floorOverride?: number,
+): Entry {
   const f = FACILITIES[kind];
   return {
     label,
     draw(d, cx, cy, cw, ch) {
+      // Size the cell by the facility's own floor count so a genuinely multi-
+      // floor kind (cinema, party hall, metro) shows at its true proportion
+      // instead of squished into one floor. Scale the width down to preserve
+      // aspect if the full height would overflow the cell.
+      const floors = f.floors ?? 1;
       const tile = Math.min(9 * 2.0, (cw - 16) / f.width);
-      const w = f.width * tile;
-      const h = Math.min(ch - 26, 26 * (tile / 9));
+      let w = f.width * tile;
+      let h = 26 * (tile / 9) * floors;
+      const maxH = ch - 26;
+      if (h > maxH) {
+        w *= maxH / h;
+        h = maxH;
+      }
       const x = cx + (cw - w) / 2;
       const y = cy + (ch - 26 - h) / 2 + 4;
       // Floor strip for context.
       const floorU = makeUnit("floor", "occupied", 0, 999);
       drawUnit(d, floorU, x - 6, y, w + 12, h);
-      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype), x, y, w, h);
+      drawUnit(d, makeUnit(kind, state, occ ?? (state === "occupied" ? f.population : 0), 1, subtype, floorOverride), x, y, w, h);
     },
   };
 }
@@ -97,7 +115,8 @@ function transportEntry(label: string, kind: FacilityKind, span = 3): Entry {
 }
 
 const ENTRIES: Entry[] = [
-  roomEntry("Lobby", "lobby"),
+  roomEntry("Lobby (ground)", "lobby"),
+  roomEntry("Sky Lobby", "lobby", "occupied", undefined, undefined, 5),
   roomEntry("Floor / Corridor", "floor"),
   roomEntry("Office (occupied)", "office"),
   roomEntry("Office (vacant)", "office", "empty", 0),
@@ -131,7 +150,9 @@ const ENTRIES: Entry[] = [
 
 const COLS = 3;
 const CELL_W = 300;
-const CELL_H = 130;
+// Tall enough that a two-floor kind (cinema, party hall) shows at full height
+// and a three-floor kind (metro) still gets most of its proportion.
+const CELL_H = 170;
 const PAD = 12;
 
 const canvas = document.getElementById("gallery") as HTMLCanvasElement;

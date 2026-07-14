@@ -28,7 +28,7 @@ export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.fillStyle = "#8A8478";
   ctx.fillRect(x0, y0, ww, ceil);
   ctx.fillStyle = "#6E6A60";
-  ctx.fillRect(x0, y0 + ceil, ww, 1);
+  if (ceil < hh) ctx.fillRect(x0, y0 + ceil, ww, 1); // seam only when it lands inside the tile
   // Faint ceiling texture ticks.
   ctx.fillStyle = "#7A7468";
   for (let px = x0; px < x0 + ww; px += 8) ctx.fillRect(px, y0 + 1, 2, Math.min(3, ceil - 1));
@@ -54,7 +54,8 @@ export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w
   }
   // Faint grout ticks down the slab so the deck reads tiled, not poured.
   ctx.fillStyle = "rgba(0,0,0,0.06)";
-  for (let gx = x0 + 5; gx < x0 + ww; gx += 9) ctx.fillRect(gx, fy + 1, 1, slabH - 2);
+  const groutH = Math.max(0, slabH - 2); // never negative on a degenerate short rect
+  for (let gx = x0 + 5; gx < x0 + ww; gx += 9) ctx.fillRect(gx, fy + 1, 1, groutH);
 }
 
 export function drawConstruction(d: DrawCtx, x: number, y: number, w: number, h: number) {
