@@ -203,17 +203,33 @@ export default defineConfig({
         "src/excalibur-main.ts",
         "src/pwa.ts",
         "src/main.ts",
-        "src/render/excalibur/**",
+        // The Excalibur/WebGL render layer was split into friend-modules; the
+        // headless-testable ones are now MEASURED (towerInputCamera, towerOverlay,
+        // towerCrowd) with per-file floors below. What stays excluded genuinely
+        // can't run under happy-dom: its logic funnels through `new ex.Canvas`
+        // (which needs a real 2D context) and the live Excalibur engine.
+        //   - TowerEngine.ts: the class ctor boots the WebGL engine; its methods
+        //     are thin delegations to the measured friend-modules.
+        //   - towerScene.ts: bakeSharedGraphics / makeSky / makeOverlay and the
+        //     dispose/teardown lifecycle all allocate ex.Canvas or drive engine
+        //     teardown; only two trivial pure exports are reachable.
+        //   - towerReconcile.ts: every reconciler funnels through addRoom /
+        //     addTransport / transportGraphic / syncCrane, all of which bake an
+        //     ex.Canvas, so nothing here can run headless.
+        // These are integration-covered by the Playwright e2e tier.
+        "src/render/excalibur/TowerEngine.ts",
+        "src/render/excalibur/towerScene.ts",
+        "src/render/excalibur/towerReconcile.ts",
       ],
       // Enforced floors (a ratchet, not a vanity ceiling). Global floor holds the
       // logic layers; per-file globs stop a weak painter/synth file hiding behind
       // strong siblings. Draw code gets lower BRANCH floors (visual variants are
       // the e2e visual tier's job). See CONTRIBUTING.md → "Coverage floors".
       thresholds: {
-        statements: 91,
-        lines: 92,
-        functions: 90,
-        branches: 85,
+        statements: 93,
+        lines: 94,
+        functions: 94,
+        branches: 86,
         // Per-file lines are EXEMPTIONS only: the audio graph and the procedural
         // draw code genuinely can't reach the branch/line floor from unit tests
         // (audio wiring and per-pixel visual variants are the Playwright e2e
@@ -229,6 +245,13 @@ export default defineConfig({
         "src/audio/toneVoices.ts": { statements: 68, lines: 68, branches: 72 },
         "src/render/sprites/**": { branches: 72 },
         "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
+        // towerCrowd.ts is MEASURED, but roughly half of it (syncMotion,
+        // buildWalkers, spawnWalker) bakes ex.Canvas cab/train/walker graphics,
+        // which needs a real 2D context and can't run under happy-dom; that half
+        // is the Playwright tier's job. The reconcile/clear/updateMotion paths
+        // ARE unit-covered here, so it gets an honest lower floor rather than
+        // staying fully excluded.
+        "src/render/excalibur/towerCrowd.ts": { statements: 46, lines: 46, functions: 50, branches: 45 },
       },
     },
   },
