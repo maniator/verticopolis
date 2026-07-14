@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { Crowd } from "../../engine/Crowd";
-import { attendanceCap, censusCount, syncAttendanceOccupants, FACILITIES, GRID } from "../../engine/facilities";
+import { attendanceCap, censusCount, syncAttendanceOccupants, ALL_KINDS, FACILITIES, GRID } from "../../engine/facilities";
 import { spawnFloors } from "../../engine/crowd/spawn";
+import { dwellSecondsRange, EAT_SECONDS_MIN, EAT_SECONDS_MAX, CROWD_SECONDS_PER_MINUTE } from "../../engine/crowd/person";
 import {
   pushVenueVisitOptions,
   spawnVenueVisit,
@@ -67,6 +68,59 @@ describe("attendance ledger is census-inert", () => {
     expect(sim.tower.totalPopulation()).toBe(before);
   });
 
+  it("ratingPopulation and spatialCongestionByFloor are identical with and without attendees", () => {
+    const sim = partyHallTower();
+    const hall = hallOf(sim);
+    const ratingBefore = sim.ratingPopulation();
+    const congBefore = [...sim.spatialCongestionByFloor().entries()].sort();
+    hall.customersIn = 5;
+    syncAttendanceOccupants(hall);
+    expect(sim.ratingPopulation()).toBe(ratingBefore);
+    expect([...sim.spatialCongestionByFloor().entries()].sort()).toEqual(congBefore);
+  });
+
+  it("the occupants mirror feeds no statistical elevator demand (attendees already place real calls)", () => {
+    const sim = partyHallTower();
+    const hall = hallOf(sim);
+    hall.customersIn = attendanceCap("partyHall")!;
+    syncAttendanceOccupants(hall);
+    expect(hall.occupants).toBeGreaterThan(0);
+    sim.elevators.accumulate(sim.tower, 10, 1.45);
+    // The hall sits alone on floor 2: a full house must not raise the
+    // statistical waiting estimate there (the drawn visitors' hall calls are
+    // the only demand attendance may create).
+    expect(sim.elevators.waitingAt(2)).toBe(0);
+  });
+
+  it("every kind with an attendance cap has catalog population 0 (mutual exclusivity)", () => {
+    for (const kind of ALL_KINDS) {
+      if (FACILITIES[kind].attendance !== undefined) {
+        expect(FACILITIES[kind].population, `${kind} must stay census-inert`).toBe(0);
+        expect(FACILITIES[kind].attendance).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it("dwell windows: attendance kinds get their showing/party/wedding spans, meals keep 30-60", () => {
+    const m = CROWD_SECONDS_PER_MINUTE;
+    expect(dwellSecondsRange("cinema")).toEqual({ min: 90 * m, max: 120 * m });
+    expect(dwellSecondsRange("partyHall")).toEqual({ min: 60 * m, max: 120 * m });
+    expect(dwellSecondsRange("weddingHall")).toEqual({ min: 120 * m, max: 180 * m });
+    expect(dwellSecondsRange("fastFood")).toEqual({ min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX });
+    expect(dwellSecondsRange(undefined)).toEqual({ min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX });
+  });
+
+  it("the mirror writes 0 onto a non-operational venue even while the tally drains", () => {
+    const sim = partyHallTower();
+    const hall = hallOf(sim);
+    hall.customersIn = 4;
+    syncAttendanceOccupants(hall);
+    expect(hall.occupants).toBe(4);
+    hall.state = "gutted"; // fire aftermath while attendees were inside
+    syncAttendanceOccupants(hall); // a departing attendee's decrement path re-syncs
+    expect(hall.occupants).toBe(0); // no audience art on a ruin
+  });
+
   it("catalog attendance caps exist exactly for the three entertainment venues", () => {
     expect(attendanceCap("cinema")).toBe(30);
     expect(attendanceCap("partyHall")).toBe(20);
@@ -116,7 +170,7 @@ describe("party hall receives routed evening visitors", () => {
     expect(sawAttendance).toBe(true);
   });
 
-  it("hotel guests mingle: a hotel-origin visitor thins their room", () => {
+  it("hotel guests mingle: a hotel-origin visitor thins their room, with no hotel census split", () => {
     const sim = partyHallTower();
     setClock(sim, 18);
     const hall = hallOf(sim);
@@ -124,12 +178,91 @@ describe("party hall receives routed evening visitors", () => {
     let sawMingle = false;
     for (let m = 0; m < 360 && !sawMingle; m++) {
       sim.tick(1);
+      // Attendance venues never track the hotel-origin census split: the
+      // tally is census-inert, so there is nothing to exclude at 4 stars.
+      expect(hall.hotelCustomersIn ?? 0).toBe(0);
       if (sim.crowd.people.some((p) => p.mealVenueId === hall.id && p.originUnitId === room.id)) {
         sawMingle = true;
         expect(room.outForMeal ?? 0).toBeGreaterThan(0);
       }
     }
     expect(sawMingle).toBe(true);
+  });
+
+  it("the house fills and drains: attendance returns to zero after closing", () => {
+    const sim = partyHallTower();
+    setClock(sim, 18);
+    const hall = hallOf(sim);
+    let peak = 0;
+    // 18:00 through 04:00 next day: spawns stop binning at the 24:00 close,
+    // the longest dwell (120 game-min) plus the ride home fits well inside.
+    for (let m = 0; m < 600; m++) {
+      sim.tick(1);
+      peak = Math.max(peak, hall.customersIn ?? 0);
+    }
+    expect(peak).toBeGreaterThan(0);
+    expect(hall.customersIn ?? 0).toBe(0);
+    expect(hall.occupants).toBe(0);
+  });
+
+  it("a lobby-origin visitor's return leg targets their spawn floor (floor 1)", () => {
+    const sim = partyHallTower();
+    setClock(sim, 18);
+    const hall = hallOf(sim);
+    let returner: (typeof sim.crowd.people)[number] | undefined;
+    for (let m = 0; m < 600 && !returner; m++) {
+      sim.tick(1);
+      returner = sim.crowd.people.find(
+        (p) => p.mealVenueId === hall.id && p.originUnitId === undefined && p.returning,
+      );
+    }
+    expect(returner).toBeDefined();
+    expect(returner!.floors[returner!.floors.length - 1]).toBe(1);
+  });
+
+  it("mid-dwell bulldoze: the hall is removed while attended, everyone winds down cleanly", () => {
+    const sim = partyHallTower();
+    setClock(sim, 18);
+    const hall = hallOf(sim);
+    let counted = false;
+    for (let m = 0; m < 360 && !counted; m++) {
+      sim.tick(1);
+      counted = (hall.customersIn ?? 0) > 0;
+    }
+    expect(counted).toBe(true);
+    sim.tower.removeUnit(hall.id);
+    // Dwellers finish their timer, the guarded decrement no-ops on the gone
+    // unit, and every visitor despawns without an exception.
+    for (let m = 0; m < 500; m++) sim.tick(1);
+    expect(sim.crowd.people.some((p) => p.mealVenueId === hall.id)).toBe(false);
+  });
+
+  it("give-up balance: losing the only elevator mid-visit still drains the tally to zero", () => {
+    const sim = partyHallTower();
+    setClock(sim, 18);
+    const hall = hallOf(sim);
+    let counted = false;
+    for (let m = 0; m < 360 && !counted; m++) {
+      sim.tick(1);
+      counted = (hall.customersIn ?? 0) > 0;
+    }
+    expect(counted).toBe(true);
+    const shaft = sim.tower.transports[0];
+    sim.tower.removeTransport(shaft.id);
+    // Return routes now fail (finish() fires straight from the dwell) and
+    // in-transit visitors hit the give-up valve; every path decrements.
+    for (let m = 0; m < 600; m++) sim.tick(1);
+    expect(hall.customersIn ?? 0).toBe(0);
+    expect(hall.occupants).toBe(0);
+  });
+
+  it("the traffic loop itself tenants a reachable hall at opening time (no hand stamping)", () => {
+    const sim = partyHallTower();
+    const hall = hallOf(sim);
+    hall.state = "empty"; // undo the fixture pin: the real loop must do it
+    setClock(sim, 16);
+    for (let m = 0; m < 120; m++) sim.tick(1); // crosses the 17:00 open
+    expect(hall.state).toBe("occupied");
   });
 
   it("a closed party hall (outside 17:00-24:00) contributes no visit options", () => {
@@ -265,6 +398,25 @@ describe("weekend wedding", () => {
     }
     expect(sawGuestTrip).toBe(true);
     expect(sawAttendance).toBe(true);
+  });
+
+  it("an unreachable wedding hall receives nobody", () => {
+    const sim = new Simulation(2024, "modern", "realWorld");
+    sim.money = 100_000_000;
+    sim.star = 1;
+    for (let x = 0; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let f = 2; f <= GRID.maxFloor; f++) {
+      for (let x = 0; x < 20; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
+    }
+    // No express: floor 100 is unreachable from the ground lobby.
+    const hall = sim.tower.place("weddingHall", GRID.maxFloor, 0);
+    expect(hall.ok).toBe(true);
+    setClock(sim, WEDDING_ARRIVAL_START, 5); // Saturday, inside the window
+    const floors = spawnFloors(sim.tower, sim.clock);
+    expect(floors.venuesByKind.weddingHall?.length).toBe(1); // binned (it exists)...
+    spawnVenueVisit(sim.crowd, sim.tower, "weddingHall", floors.venuesByKind.weddingHall!, floors, WEDDING_ARRIVAL_START, 1);
+    expect(sim.crowd.people.length).toBe(0); // ...but no route means no guest
+    expect(sim.tower.units.find((u) => u.kind === "weddingHall")!.customersIn ?? 0).toBe(0);
   });
 
   it("updatePresence keeps a mid-wedding house on the never-tenanted (empty) hall", () => {

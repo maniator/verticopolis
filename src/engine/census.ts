@@ -1,4 +1,5 @@
 import type { Unit } from "./types";
+import { isOperational } from "./types";
 import { FACILITIES } from "./facilitiesData";
 import { isCommercialKind } from "./facilityPredicates";
 
@@ -46,9 +47,14 @@ export function censusCount(
  * from the hourly presence/traffic passes, so neither side can stamp the
  * other out. Census-inert by construction: `censusCount` above never reads
  * `occupants`, and these kinds' catalog population stays 0.
+ *
+ * A non-operational venue (mid-build, on fire, gutted) always mirrors 0: a
+ * lingering tally on a ruin (attendees despawning after a fire) must never
+ * re-stamp audience art onto the burned shell between presence passes.
  */
 export function syncAttendanceOccupants(u: Unit): void {
-  if (FACILITIES[u.kind].attendance !== undefined) u.occupants = u.customersIn ?? 0;
+  if (FACILITIES[u.kind].attendance === undefined) return;
+  u.occupants = isOperational(u) ? (u.customersIn ?? 0) : 0;
 }
 
 /**

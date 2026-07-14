@@ -52,13 +52,18 @@ export function pushVenueVisitOptions(
   const hour = clock.hour;
   const cinemas = floors.venuesByKind.cinema;
   if (cinemas?.length) {
-    const visit = () => spawnVenueVisit(crowd, tower, "cinema", cinemas, floors, hour, 1);
-    options.push(visit);
+    options.push(() => spawnVenueVisit(crowd, tower, "cinema", cinemas, floors, hour, 1));
     // A blockbuster month draws a bigger crowd (canon): one extra option
-    // contribution while any open cinema is showing one; the candidate
-    // weighting in spawnVenueVisit then steers the extra visitors toward the
-    // blockbuster house itself.
-    if (crowd.blockbusters.size > 0 && anyBlockbusterCinema(crowd, floors, cinemas)) options.push(visit);
+    // contribution, aimed at the FLOORS that hold a blockbuster house so the
+    // boost lands there and not uniformly across every cinema floor; the
+    // candidate doubling in spawnVenueVisit then settles ties on a floor
+    // holding both a blockbuster and a plain cinema.
+    if (crowd.blockbusters.size > 0) {
+      const bbFloors = blockbusterCinemaFloors(crowd, floors, cinemas);
+      if (bbFloors.length) {
+        options.push(() => spawnVenueVisit(crowd, tower, "cinema", bbFloors, floors, hour, 1));
+      }
+    }
   }
   const halls = floors.venuesByKind.partyHall;
   if (halls?.length) {
@@ -80,15 +85,19 @@ export function pushVenueVisitOptions(
   }
 }
 
-/** True when any binned cinema is showing a blockbuster this month. Bounded by
+/** The binned cinema floors holding a blockbuster house this month. Bounded by
  *  the 16-cinema build cap, and only consulted while blockbusters exist. */
-function anyBlockbusterCinema(crowd: Crowd, floors: SpawnFloors, cinemaFloors: number[]): boolean {
+function blockbusterCinemaFloors(crowd: Crowd, floors: SpawnFloors, cinemaFloors: number[]): number[] {
+  const out: number[] = [];
   for (const f of cinemaFloors) {
     for (const u of floors.unitsByFloor.get(f) ?? []) {
-      if (u.kind === "cinema" && crowd.blockbusters.has(u.id)) return true;
+      if (u.kind === "cinema" && crowd.blockbusters.has(u.id)) {
+        out.push(f);
+        break;
+      }
     }
   }
-  return false;
+  return out;
 }
 
 /**
@@ -207,13 +216,21 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
       venueUnit.hotelCustomersIn = (venueUnit.hotelCustomersIn ?? 0) + 1;
     }
     tower.bumpMealOverlayRevision();
-  } else if (venueUnit && cap !== undefined && (venueUnit.customersIn ?? 0) < cap) {
+  } else if (
+    venueUnit &&
+    cap !== undefined &&
+    isOperational(venueUnit) &&
+    (venueUnit.customersIn ?? 0) < cap
+  ) {
     // Attendance venue (cinema / party hall / wedding hall): the tally
     // clamps at the catalog attendance cap, fills the occupancy-gated
     // interior art through the occupants mirror, and is census-inert
     // (population 0 keeps censusCount's gate closed), so there is no
     // hotel-origin split to track here. Over-cap arrivals attend uncounted,
-    // mirroring the census venues' clamp above.
+    // mirroring the census venues' clamp above. The isOperational recheck
+    // covers the ride: a venue that caught fire (or was gutted) after the
+    // spawn-side gate passed must not have an audience stamped onto the
+    // ruin; the visitor simply dwells uncounted and leaves.
     p.venueUnitId = venueUnit.id;
     venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
     syncAttendanceOccupants(venueUnit);

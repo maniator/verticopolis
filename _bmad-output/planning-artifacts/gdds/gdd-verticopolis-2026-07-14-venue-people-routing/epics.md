@@ -32,7 +32,9 @@ derive honest visible attendance from them. Review skill: `/gds-code-review`
   outbound origin floor (`floors[0]`) after dwell instead of despawning at
   the venue; ghost-origin behavior (origin unit bulldozed) is unchanged.
 - Per-kind dwell windows (cinema 90-120 game-min, party hall 60-120) applied
-  at dwell entry; meal venues keep the 30-60 eating window.
+  at dwell entry; food venues keep the 30-60 eating window. The dwell keys on
+  the VENUE kind, so a late-night meal trip whose venue is the cinema adopts
+  the showing window (you stay for the film), a reviewed decision.
 - Cinema leaves the one-way `openVenues` ambient pool; late-night meal
   round-trips to cinema now register attendance via the S1 gate.
 - Blockbuster weighting: a cinema showing a blockbuster contributes its visit

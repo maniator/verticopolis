@@ -45,3 +45,34 @@
   an immediate implementation, and the review skill's adversarial layers
   audit the acceptance criteria against the code).
 - Artifacts: gdd.md, epics.md, decision-log.md in this folder.
+
+2026-07-14 post-implementation review (/gds-code-review, same session)
+
+- Three adversarial layers ran (Blind Hunter, Edge Case Hunter, Acceptance
+  Auditor). Patched findings, all fixed and re-verified on the branch:
+  - The occupants mirror leaked into ElevatorDispatch's statistical demand,
+    double-counting attendees who already place real hall/cab calls (and
+    keeping phantom demand alive after closing). Fixed: the dispatch's
+    per-unit demand loop skips attendance kinds; pinned by a test.
+  - beginDwell could register attendance on a venue that caught fire or was
+    gutted mid-trip, and syncAttendanceOccupants could re-stamp audience art
+    onto a ruin while a stale tally drained. Fixed: arrival recheck on
+    isOperational, and the mirror writes 0 for non-operational venues.
+  - The blockbuster boost picked a cinema floor uniformly before weighting
+    candidates, so multi-floor layouts sent most of the boost to plain
+    cinemas. Fixed: the extra option targets only blockbuster floors.
+  - The epics' promised regression tests were missing (drain-to-zero,
+    give-up balance, mid-dwell bulldoze, return-to-floor-1,
+    ratingPopulation + spatialCongestionByFloor neutrality, hotel-origin
+    split stays zero, unreachable wedding hall, traffic-loop tenancy,
+    dwell-window pins, population/attendance mutual exclusivity). Added.
+- DECISION (was flagged as a deviation): dwell keys on the venue kind, so a
+  late-night meal round-trip to the CINEMA adopts the 90-120 min showing
+  window instead of the 30-60 meal window; food venues keep 30-60. Rationale:
+  at a cinema you stay for the film regardless of why you came. Epics wording
+  updated; dwell windows pinned by test.
+- Deferred (recorded in implementation-artifacts/backlog.md): party hall 2:1
+  option weight in hotel towers, hotel-mingle floor-first sampling, and the
+  single-decrement-path rule for the tally.
+- Dismissed: TDT import phantom audience (import derives occupants from the
+  catalog population, which is 0 for attendance kinds).
