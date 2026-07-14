@@ -15,7 +15,7 @@ src/audio/ToneAudioEngine.ts
 # storage
 # engine leaves
 # scripts
-# tests (split last)
+# tests (split last; grouped by type, so colocated test paths may live outside src/tests/)
 src/tests/simulation.test.ts
 src/tests/integration/uiDialogs.integration.test.ts
 src/tests/gameControllersCoverage.test.ts
