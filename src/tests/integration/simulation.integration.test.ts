@@ -1286,6 +1286,22 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     expect(classic.rules.showsPreviewReason).toBe(false);
     expect(modern.rules.showsPreviewReason).toBe(true);
   });
+
+  it("hands the tower the mode's rule-set, so escalator placement follows the mode", () => {
+    const classic = Simulation.newGame(7, "classic");
+    const modern = Simulation.newGame(7, "modern");
+    expect(classic.tower.rules).toBe(classic.rules);
+    expect(modern.tower.rules).toBe(modern.rules);
+    // Build the same second story on the seeded ground-lobby strip.
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (const sim of [classic, modern]) {
+      for (let i = 0; i < 20; i++) sim.tower.place("floor", 2, x0 + i);
+      expect(sim.tower.place("office", 2, x0).ok).toBe(true);
+    }
+    // Same layout, same gesture: Classic refuses (1994 canon), Modern builds.
+    expect(classic.tower.validateTransport("escalator", x0 + 12, 1, 2).ok).toBe(false);
+    expect(modern.tower.validateTransport("escalator", x0 + 12, 1, 2).ok).toBe(true);
+  });
 });
 
 // Pinned golden subtype sequences per seed for the determinism test below.

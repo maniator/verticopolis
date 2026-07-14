@@ -1,4 +1,5 @@
 import { facilityFloors } from "./facilities";
+import { CLASSIC_RULES, type GameRules } from "./gameRules";
 import type { Facility, FacilityKind, PlaceResult, Transport, Unit } from "./types";
 import { isStructural } from "./tower/towerTopology";
 import * as placement from "./tower/placement";
@@ -7,6 +8,10 @@ import * as expressStops from "./tower/expressStops";
 import * as routing from "./tower/routing";
 
 export class Tower {
+  /** The mode's rule-set, assigned by {@link Simulation}'s constructor so
+   *  mode-dependent placement checks (the Classic-only escalator/office rule)
+   *  match the sim. A bare `new Tower()` defaults to canon-faithful Classic. */
+  rules: GameRules = CLASSIC_RULES;
   units: Unit[] = [];
   transports: Transport[] = [];
   nextId = 1;

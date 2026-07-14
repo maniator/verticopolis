@@ -17,6 +17,11 @@ describe("makeRules", () => {
     expect(makeRules("classic")).toBe(CLASSIC_RULES);
     expect(makeRules("modern")).toBe(MODERN_RULES);
   });
+
+  it("gates the escalator office-floor rule by mode", () => {
+    expect(CLASSIC_RULES.allowsEscalatorOnOfficeFloors).toBe(false); // 1994 canon
+    expect(MODERN_RULES.allowsEscalatorOnOfficeFloors).toBe(true);
+  });
 });
 
 describe("householdPrice", () => {

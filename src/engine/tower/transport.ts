@@ -20,7 +20,8 @@ export function validateTransport(tower: Tower, kind: FacilityKind, x: number, b
   if (spanBad) return { ok: false, reason: spanBad };
   // Canon: escalators serve commercial spaces (shops/food/theatres), not office
   // complexes, so they may not be placed on a floor that holds an office.
-  if (kind === "escalator") {
+  // Classic keeps the 1994 refusal; Modern lifts it (see GameRules).
+  if (kind === "escalator" && !tower.rules.allowsEscalatorOnOfficeFloors) {
     for (const fl of [bottom, top]) {
       if (tower.units.some((u) => u.kind === "office" && u.floor === fl)) {
         return { ok: false, reason: "Escalators can't serve office floors. They link commercial floors only." };

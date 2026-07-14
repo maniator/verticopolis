@@ -194,6 +194,9 @@ export class Simulation implements SimContext {
     this.rng = new RNG(seed);
     this.mode = mode;
     this.rules = makeRules(mode);
+    // Hand the tower the same strategy object, so mode-dependent placement
+    // checks (the Classic-only escalator/office rule) agree with the sim.
+    this.tower.rules = this.rules;
     // Classic ALWAYS runs canon, so the modernCalendar field is meaningless
     // for it. Clamp the persisted value to the harmless default so a
     // hand-edited or UI-drifted "canon" hint can never survive on disk in a

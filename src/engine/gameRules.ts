@@ -64,6 +64,11 @@ export interface GameRules {
    *  clicks refuse with a toast, the player learns by doing. Purely a UI gate;
    *  the engine's placement rules are identical either way. */
   readonly showsPreviewReason: boolean;
+  /** True when an escalator may land on a floor that holds an office. The 1994
+   *  game restricts escalators to commercial space (its players even bulldozed
+   *  offices around a landing to sneak one in), so Classic keeps the refusal;
+   *  Modern drops the restriction and lets escalators serve office floors. */
+  readonly allowsEscalatorOnOfficeFloors: boolean;
   /**
    * Decide a condo's household and sale price the moment it sells. Classic sells
    * to the flat family of 3 at the asking price (no household stored); Modern
@@ -123,6 +128,7 @@ export const CLASSIC_RULES: GameRules = {
   mode: "classic",
   hasVariantHouseholds: false,
   showsPreviewReason: false, // canon-faithful pedagogy: click-to-refuse, learn by doing
+  allowsEscalatorOnOfficeFloors: false, // canon: escalators link commercial floors only
   sellCondo(base) {
     // Flat family of 3, sold at the asking price — no household stored, so the
     // census reads the catalog 3. Never touches the RNG, so a Classic tower's
@@ -157,6 +163,7 @@ export const MODERN_RULES: GameRules = {
   mode: "modern",
   hasVariantHouseholds: true,
   showsPreviewReason: true, // Modern surfaces refusal reasons on the invalid preview
+  allowsEscalatorOnOfficeFloors: true, // Modern lifts the commercial-only escalator rule
   sellCondo(base, rng) {
     const residents = rollHousehold(rng);
     return { price: householdPrice(base, residents), residents };
