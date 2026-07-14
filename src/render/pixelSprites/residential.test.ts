@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Unit } from "../../engine/types";
 import { drawRoom } from "../pixelSprites";
 import { geoVariant, RESERVED_COLORS, type RoomCtx } from "./common";
-import { CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
+import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
 
 /**
  * Behavior coverage for the enriched tenant-room art (office, condo, and the
@@ -68,7 +68,7 @@ describe("residential look tables", () => {
   });
 
   it("no wall or picture look equals a reserved state color", () => {
-    const all = [...OFFICE_WALLS, ...CONDO_WALLS, ...HOTEL_WALLS, ...SUITE_WALLS];
+    const all = [...OFFICE_WALLS, ...CONDO_WALLS, ...HOTEL_WALLS, ...SUITE_WALLS, ...CONDO_PICTURES];
     for (const c of all) expect(RESERVED_COLORS as readonly string[]).not.toContain(c.toUpperCase());
   });
 });
