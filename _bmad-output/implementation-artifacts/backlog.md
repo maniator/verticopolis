@@ -1741,3 +1741,37 @@ departed while culled never flashes at a stale position). Standing defers:
   loads rebuild the sim and strip the tally). The standing rule for future
   work: any new despawn shortcut MUST route through `finish()`, or add a
   reconciliation pass first. No repair pass exists by design today.
+## Metro platform commuters + high-platform station (v1.33.0)
+
+The metro station and the party hall became real routed crowd destinations
+(engine: `crowd/venueTrips.ts` spawners, `spawnFloors` bins, `Person.dwell`),
+the train grew to the party-ratified 60px consist, and `drawMetro` was redrawn
+as the high-platform composition (deck on the middle story's floor line, where
+the crowd stands routed commuters). A `metro` screenshot scene captures the
+platform with and without the train; the hero tower's first elevator bank now
+reaches the platform. Before/after comparison screenshot groups were removed
+at the owner's request (save-migration parity, parking day/predawn, condo
+Classic vs Modern, palette unlock).
+
+Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
+
+- **Metro ridership economy**: commuters are visual-and-routing only; no
+  income, congestion, or census coupling changed. The catalog's transit
+  bonuses (+60 arrival capacity, congestion relief) stay statistical. A
+  per-rider ridership model is a separate design question.
+- **Hall attendance census**: party guests route and dwell but are not
+  counted in any census (`population 0` kind, deliberately outside
+  `customersIn`). If the hall ever earns per-guest income, wire it through
+  the meal-venue counting pattern, not a new one.
+- **Unroutable-venue spawn no-ops (review Edge #4)**: a metro with no shaft
+  to its platform (or an unroutable hall) still contributes options to the
+  spawn pool; picked options route null and consume the spawn budget as
+  no-ops. Consistent with the pre-existing null-route behavior for
+  unreachable floors, so deferred; a spawn-side routability pre-check per
+  bin (or a bulletin hint, "your metro platform has no elevator") would
+  close it and double as player guidance.
+- **Hall guest flow asymmetry (review Edge #9)**: arrivals and late-night
+  leavers are unlinked (a guest-less hall can emit leavers; arrived guests
+  despawn in place when their dwell expires instead of walking out).
+  Presentational only, consistent with every other trip's despawn; a
+  per-hall guest count could link them if it ever reads wrong on screen.

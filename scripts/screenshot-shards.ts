@@ -39,7 +39,7 @@ import { SCENES } from "./screenshot-scenes.ts";
 // correctness is enforced by `verify` against SCENES, so a rebalance here is safe
 // as long as `verify` still passes.
 export const SHARDS: Record<string, string[]> = {
-  features: ["overlays", "basement", "stats", "crash-screen"],
+  features: ["overlays", "basement", "stats", "metro", "crash-screen"],
   showcase: ["showcase", "milestones"],
   misc: [
     "mobile",

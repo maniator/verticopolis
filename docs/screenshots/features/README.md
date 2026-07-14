@@ -23,6 +23,18 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-satisfaction.png` | **Satisfaction** mode: green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
 | `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 
+## Metro station (routed commuters + the train)
+
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `metro` scene) on the hero
+tower during the morning rush. The station is the high-platform composition: a
+double-height concourse over a one-story track trough, with the platform deck
+on the module's middle story, where the crowd engine stands routed commuters.
+
+| Screenshot | Shows |
+|---|---|
+| `metro-platform-waiting.png` | The platform mid-rush with the track empty: commuters who rode down (or just stepped off the last train) wait at the yellow edge among the benches, posters, and vending machines. |
+| `metro-station-train.png` | The consist pulled in: coupled cars with lit window bands and door pairs at the crowd, the red livery stripe running the platform's length. |
+
 ## Traffic congestion chip (peak-driven + hotspot floor)
 
 Captured from the built app via the unified generator (`scripts/screenshots.ts`, `traffic` scene) on an identical jammed

@@ -311,15 +311,21 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   const W = Math.max(1, w);
   const H = Math.max(1, h);
   const f: Fill = (px, py, pw, ph, color, alpha = 1) => {
-    const rw = Math.round(pw);
-    const rh = Math.round(ph);
-    // A rounded-to-zero (or negative) size paints nothing, matching refMap's
+    // Clip every rect to the unit box. In-game the bake canvas is exactly
+    // W x H so this changes nothing, but the gallery paints entries onto one
+    // shared canvas, where the fixed-y furniture on its (deliberately
+    // squished) metro cell would otherwise bleed into the neighboring cells.
+    // A clipped-to-zero (or negative) size paints nothing, matching refMap's
     // zero-size guard, rather than promoting an empty rect into a stray pixel.
-    if (rw <= 0 || rh <= 0) return;
+    const x0 = Math.max(0, Math.round(px));
+    const y0 = Math.max(0, Math.round(py));
+    const x1 = Math.min(W, Math.round(px + pw));
+    const y1 = Math.min(H, Math.round(py + ph));
+    if (x1 <= x0 || y1 <= y0) return;
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x + px), Math.round(y + py), rw, rh);
+    ctx.fillRect(Math.round(x) + x0, Math.round(y) + y0, x1 - x0, y1 - y0);
     if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
   };
   const deckY = Math.round(H * (2 / 3)); // platform deck = middle story's floor line

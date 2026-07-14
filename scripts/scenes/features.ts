@@ -133,6 +133,48 @@ export const FEATURE_SCENES: Scene[] = [
       },
     ],
   },
+  // --- Metro station: routed commuters on the platform, train in and out ------
+  {
+    id: "metro",
+    outDir: "features",
+    build: buildCanonTower,
+    assertUnits: 100,
+    viewport: { width: 1600, height: 560 },
+    shots: [
+      {
+        name: "metro-platform-waiting",
+        setup: async (page) => {
+          // Let the morning rush route commuters down first (the crowd moves on
+          // stepped frames), then park the train's ambient cycle just BEFORE it
+          // enters, so the platform reads with the track honestly empty.
+          await page.evaluate(pgStep, 330);
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
+            g.engine.animClock = 252; // cycle start: the train is still off-lot
+          });
+        },
+        // anim lands at exactly 252.5 (settle steps the TestClock in whole
+        // frames): entry runs 252..255, so the nose is at world x ~692 while
+        // the camera frame starts at ~1586, an off-screen margin of ~900px.
+        wait: 500,
+      },
+      {
+        name: "metro-station-train",
+        setup: async (page) => {
+          // A little more crowd, then re-base the cycle so the settle lands
+          // mid-dwell: the consist parked at the platform, doors at the crowd.
+          await page.evaluate(pgStep, 60);
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
+            g.engine.animClock = 240; // parked window spans +3s to +9s from here
+          });
+        },
+        wait: 6000, // anim 246: train parked; six more seconds of arrivals
+      },
+    ],
+  },
   // --- Traffic HUD chip (desktop + mobile) ------------------------------------
   {
     id: "traffic",

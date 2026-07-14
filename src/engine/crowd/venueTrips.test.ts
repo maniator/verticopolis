@@ -32,7 +32,9 @@ const must = (tower: Tower, kind: FacilityKind, f: number, x: number): number =>
  *  origins and destinations besides the venue under test. The metro spans the
  *  WHOLE 375-tile lot on three basement stories, so `withBasement` lays a
  *  full-lot ground line and digs B1..B4 across it (basements hang off the
- *  level above, exactly the screenshot builder's recipe). */
+ *  level above; the fixture anchors its metro at B4/floor -3, one story
+ *  shallower than the hero screenshot tower's B5 anchor, so the platform
+ *  here is floor -2). */
 function baseTower(withBasement = false): Tower {
   const tower = new Tower();
   const groundW = withBasement ? 375 : 40;
@@ -165,6 +167,18 @@ describe("the dwell timer", () => {
     const crowd = new Crowd(3);
     crowd.people.push(arrived());
     for (let i = 0; i < 6; i++) crowd.advance(0.5, tower); // 3s > the default 2s
+    expect(crowd.people).toHaveLength(0);
+  });
+
+  it("a long dwell outlives the give-up valve (the arrived state is exempt)", () => {
+    // The valve culls travellers past GIVE_UP (120s) but exempts `toDest`;
+    // pin that so a party guest's stay can never be culled mid-event.
+    const tower = baseTower();
+    const crowd = new Crowd(3);
+    crowd.people.push(arrived(200));
+    for (let i = 0; i < 28; i++) crowd.advance(5, tower); // 140s: past GIVE_UP, still standing
+    expect(crowd.people).toHaveLength(1);
+    for (let i = 0; i < 14; i++) crowd.advance(5, tower); // 210s: the dwell expired
     expect(crowd.people).toHaveLength(0);
   });
 });
