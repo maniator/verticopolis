@@ -56,15 +56,15 @@ describe("createUICallbacks delegates every callback to its port", () => {
     const cb = createUICallbacks(ports);
     const tool = { type: "bulldoze" } as const;
     cb.onSelectTool(tool);
-    expect(ports.handleSelectTool).toHaveBeenCalledWith(tool);
+    expect(ports.handleSelectTool).toHaveBeenCalledExactlyOnceWith(tool);
     cb.onSpeed(2);
-    expect(ports.setSpeed).toHaveBeenCalledWith(2);
+    expect(ports.setSpeed).toHaveBeenCalledExactlyOnceWith(2);
     cb.onUndo();
     expect(ports.undo).toHaveBeenCalledTimes(1);
     cb.onRedo();
     expect(ports.redo).toHaveBeenCalledTimes(1);
     cb.onSetOverlay("congestion");
-    expect(ports.setOverlay).toHaveBeenCalledWith("congestion");
+    expect(ports.setOverlay).toHaveBeenCalledExactlyOnceWith("congestion");
   });
 
   it("save/load/export/import via the saveLoad port", () => {
@@ -77,14 +77,14 @@ describe("createUICallbacks delegates every callback to its port", () => {
     cb.onExport();
     expect(ports.saveLoad.exportGame).toHaveBeenCalledTimes(1);
     cb.onImport("data");
-    expect(ports.saveLoad.importGame).toHaveBeenCalledWith("data");
+    expect(ports.saveLoad.importGame).toHaveBeenCalledExactlyOnceWith("data");
     const buf = new ArrayBuffer(4);
     cb.onImportLegacy(buf, "tower.TDT");
-    expect(ports.saveLoad.importLegacy).toHaveBeenCalledWith(buf, "tower.TDT");
+    expect(ports.saveLoad.importLegacy).toHaveBeenCalledExactlyOnceWith(buf, "tower.TDT");
     cb.onExportLegacy();
     expect(ports.saveLoad.exportLegacy).toHaveBeenCalledTimes(1);
     cb.onNew("modern", "realWorld");
-    expect(ports.saveLoad.newGame).toHaveBeenCalledWith("modern", "realWorld");
+    expect(ports.saveLoad.newGame).toHaveBeenCalledExactlyOnceWith("modern", "realWorld");
   });
 
   it("getMode reads the live sim's mode", () => {
