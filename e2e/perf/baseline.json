@@ -2,9 +2,9 @@
   "uiUpdate": {
     "n": 4000,
     "batch": 40,
-    "medianMs": 0.5649999999997817,
-    "p95Ms": 0.65,
-    "meanMs": 0.5760999999999985
+    "medianMs": 0.65,
+    "p95Ms": 1,
+    "meanMs": 0.6851750000000102
   },
   "simSpeed": {
     "simMinutesPerRealSecond": 0.2682030396348826,
