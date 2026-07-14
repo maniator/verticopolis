@@ -2,14 +2,15 @@
   "uiUpdate": {
     "n": 4000,
     "batch": 40,
-    "medianMs": 0.65,
-    "p95Ms": 0.9125,
-    "meanMs": 0.6663499999999984
+    "medianMs": 0.5649999999997817,
+    "p95Ms": 0.65,
+    "meanMs": 0.5760999999999985
   },
   "simSpeed": {
-    "simMinutesPerRealSecond": 0.26520639442127186,
+    "simMinutesPerRealSecond": 0.2682030396348826,
     "cpuThrottle": 4,
     "speed": 120,
-    "windowMs": 4000
+    "windowMs": 4000,
+    "windows": 5
   }
 }
