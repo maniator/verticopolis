@@ -1243,3 +1243,36 @@ Residual defers (behavior-preserving):
 - **Double-activation of Replay is not de-duplicated** (pre-existing): `@click`
   fires per click, matching the old `addEventListener` wiring. `onReplayOnboarding`
   is idempotent enough that a fast double-click is harmless; no change needed now.
+
+### Deferred from: code review of E3-S1 (saves lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E3-S1 migrates the Saved Towers slot manager (`savesHtml`) onto the E0
+`openModalTemplate` seam with a lit `savesTemplate`. Slot rows are nested
+`TemplateResult`s (not a joined string), the tower name auto-escapes (no
+`escapeHtml`), and the Delete button keeps its per-row `aria-label`. The template
+is static structure only: the per-row Save/Load/Delete buttons and the
+export/import/close actions stay wired imperatively by the controller
+(`showSaves`), so the re-render-on-save flow is unchanged. Blind Hunter confirmed
+the body is byte-for-byte equivalent to `savesHtml`; the Acceptance Auditor
+confirmed all eight ACs. The two Edge Case Hunter `patch` gaps (mid-range star
+glyph, and the `towerName`-absent → "Tower" / mode-absent → Classic fallbacks) are
+fixed in `saves.test.ts`. Residual defers (behavior-preserving):
+
+- **`savesHtml` joins the transitional string-builder retirement list**
+  (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`,
+  `savesHtml`): it is now dead production code kept only to feed its
+  `assertDomEquivalent` guard; retire it and its transitional test when the last
+  string dialog converts (E6/E7).
+- **`when`-line boundaries are covered only structurally** (pre-existing): the
+  `Number.isFinite(s.day)` guard (a `NaN`/`Infinity` day drops the "Day N" segment)
+  and `Math.floor` (a fractional day floors) are exercised only via the equivalence
+  guard, not asserted directly. `SlotInfo.day`'s producer (`infoFrom`) already
+  bounds the value (finite, non-negative, under the ceiling), so these are
+  unreachable in practice; a direct assertion can wait.
+- **`population`/`funds` absent → 0 and `Math.round(funds)` rounding are unexercised**
+  (pre-existing): every test slot supplies integers, and `infoFrom` always sets both
+  on an existing slot. Low regression risk; defer.
+- **Literal locale formatting is deliberately not asserted**: `fmtWhen`'s date and
+  the pop/funds `toLocaleString` grouping are locale/timezone-dependent, so the suite
+  leans on `assertDomEquivalent` for the formatting path rather than brittle literal
+  strings. This is intentional, not a gap.

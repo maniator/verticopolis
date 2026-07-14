@@ -5,6 +5,7 @@ import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
+import { savesTemplate } from "./templates/saves";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -30,7 +31,7 @@ export function showStats(ui: UI, html: string): void {
 
 /** Saves manager: auto-save + numbered slots, plus export/import. */
 export function showSaves(ui: UI, slots: SlotInfo[]): void {
-  const box = ui.openModal(tpl.savesHtml(slots));
+  const box = ui.openModalTemplate(savesTemplate(slots));
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onSaveSlot(Number(b.dataset.save));
