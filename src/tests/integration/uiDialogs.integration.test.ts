@@ -1191,6 +1191,30 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     expect(header("Special").hidden).toBe(true);
   });
 
+  it("renders the tool-info panel through selectTool for every tool shape", () => {
+    // Pins the E5-S2 wiring: lit renders into #tool-info on tool select. Covers
+    // the boot default (the constructor clears the static placeholder and
+    // selects Inspect), a build kind with a capacity row, a zero-population
+    // structure kind (the conditional row drops to nothing), the same-template
+    // value patch back to a populated kind, and the template-identity swap to
+    // the bulldoze body.
+    const { ui } = makeUI();
+    const info = (): HTMLElement => document.getElementById("tool-info")!;
+    // Boot: the constructor's initial selectTool painted the Inspect body.
+    expect(info().textContent).toContain("Hover the tower");
+    ui.selectTool({ type: "build", kind: "office" });
+    expect(info().querySelector(".ti-name")!.textContent).toBe("Office");
+    expect(info().textContent).toContain("Cost: $");
+    expect(info().textContent).toContain("Capacity:");
+    ui.selectTool({ type: "build", kind: "floor" });
+    expect(info().textContent).not.toContain("Capacity:"); // zero-pop row gone
+    ui.selectTool({ type: "build", kind: "office" });
+    expect(info().textContent).toContain("Capacity:"); // and back, same template
+    ui.selectTool({ type: "bulldoze" });
+    expect(info().querySelector(".ti-name")!.textContent).toBe("Bulldoze");
+    expect(info().textContent).not.toContain("Office"); // full body swapped
+  });
+
   it("falls back to Inspect when the active build tool becomes locked after a lower-star swap", () => {
     const { ui, cb } = makeUI();
     const sim = Simulation.newGame(1);

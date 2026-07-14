@@ -1526,3 +1526,22 @@ dirty-check rather than project code, and a corrupted-container guard would pin
 an invariant no current writer can violate (the container ships empty and
 `uiStatus.update` is its only writer); the cheapest belt-and-suspenders form, if
 ever wanted, is asserting `#tower-stats` is empty at UI construction.
+
+### Deferred from: code review of E5-S2 (tool-info lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E5-S2 renders the tool-info panel through lit on tool select (event-driven,
+not a pump path). `UI.selectTool` calls `render()` into `#tool-info` with
+`toolInfoTemplate` (build kinds, with the capacity/customers conditional) or the
+`BULLDOZE_TOOL_INFO` / `INSPECT_TOOL_INFO` constants, replacing the three
+`innerHTML` writes. The UI constructor clears the container's static HTML
+placeholder before the initial selectTool so lit's first render never appends
+after it (invisible: selectTool repaints immediately); `#tool-info` is lit's
+container exclusively after that. Residual defers:
+
+- **`buildToolInfoHtml`, `BULLDOZE_TOOL_INFO_HTML`, `INSPECT_TOOL_INFO_HTML` join
+  the transitional string-builder retirement list**: dead production code kept only
+  to feed their `assertDomEquivalent` guards.
+- **Catalog copy escaping tightened for free**: the legacy builder interpolated
+  `name`/`description` raw; lit auto-escapes them. The catalog is trusted static
+  copy (one bare `&` in the wedding-hall description parses identically both ways),
+  so this is a hardening, not a behavior change.
