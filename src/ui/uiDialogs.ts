@@ -8,6 +8,7 @@ import { helpTemplate } from "./templates/help";
 import { savesTemplate } from "./templates/saves";
 import { stopsTemplate } from "./templates/stops";
 import { newTowerTemplate } from "./templates/newTower";
+import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -222,7 +223,7 @@ export function confirmExport(ui: UI): void {
   // The 1994 .TDT path is Classic only: buildTDT refuses a Modern tower, so
   // disable the button up front (with the reason) rather than let it fail.
   const isModern = ui.cb.getMode() === "modern";
-  const box = ui.openModal(tpl.exportConfirmHtml(isModern));
+  const box = ui.openModalTemplate(exportConfirmTemplate(isModern));
   ui.wireActions(box, {
     export: () => {
       ui.closeModal();
@@ -285,7 +286,7 @@ export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () 
     ui.toast("Close the open dialog first, then import again.", "info");
     return;
   }
-  const box = ui.openModal(tpl.importReportHtml(report));
+  const box = ui.openModalTemplate(importReportTemplate(report));
   // Announce for screen readers (the modal takes focus, but the polite region
   // tells them WHY a dialog appeared).
   const live = document.getElementById("a11y-live");
@@ -307,7 +308,7 @@ export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload:
     ui.toast("Close the open dialog first, then export again.", "info");
     return;
   }
-  const box = ui.openModal(tpl.exportReportHtml(report));
+  const box = ui.openModalTemplate(exportReportTemplate(report));
   const live = document.getElementById("a11y-live");
   if (live) live.textContent = "SimTower export summary ready.";
   ui.wireActions(box, {

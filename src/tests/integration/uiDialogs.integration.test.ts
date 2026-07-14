@@ -687,6 +687,9 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     const onOpen = vi.fn();
     ui.showImportReport(report(), { onOpen });
     expect(dialog().open).toBe(true);
+    // The modal takes focus, but the polite region tells a screen reader WHY a
+    // dialog appeared when the file finishes reading.
+    expect(document.getElementById("a11y-live")!.textContent).toBe("SimTower import report ready.");
     const text = dialog().textContent!;
     expect(text).toContain("GRAND");
     expect(text).toContain("Brought over");
@@ -750,6 +753,7 @@ describe("export fidelity report: nothing downloads until the player confirms", 
     const onDownload = vi.fn();
     ui.showExportReport(exportReport(), { onDownload });
     expect(dialog().open).toBe(true);
+    expect(document.getElementById("a11y-live")!.textContent).toBe("SimTower export summary ready.");
     const text = dialog().textContent!;
     expect(text).toContain("GRAND");
     expect(text).toContain("Comes along");

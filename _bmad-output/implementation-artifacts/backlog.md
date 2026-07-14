@@ -1332,3 +1332,27 @@ byte-for-byte equivalence (incl. the `2×–2.5×` / `2–5` numeric-range glyph
   calendar node between `.nt-modes` and the footer), but real focus traversal is
   verifiable only in an e2e. Confirm the e2e suite covers the new-tower dialog's tab
   order; add one if it does not.
+
+### Deferred from: code review of E3-S4 (TDT reports lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E3-S4 migrates the export-choice modal and the TDT import/export fidelity
+reports (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`) onto the E0
+`openModalTemplate` seam with lit templates in `reports.ts`. Fact lines and the
+brought-over/couldn't-bring (and export twin) lists are nested `TemplateResult`s
+(not joined strings), report strings and filenames auto-escape (no `escapeHtml`),
+and the Modern-gated legacy `.TDT` button keeps its `disabled` + `title` via
+`?disabled` / the `nothing` sentinel. The controllers keep their `isModalOpen()`
+clobber guard, the `#a11y-live` announcement, and `wireActions`. Blind Hunter
+confirmed byte-for-byte equivalence for all three templates; the Acceptance Auditor
+confirmed the ACs once the two missing assertions were added. The Edge Case Hunter
+`patch` (the import-rounds / export-does-not asymmetry was unpinned) is fixed with
+direct `money: 100.6` unit tests on both templates, and the AC5 gap (`#a11y-live`
+announcement not asserted after open) is fixed with integration assertions on both
+report dialogs. Residual defers (behavior-preserving):
+
+- **The three report builders join the transitional string-builder retirement list**
+  (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`): dead production code
+  kept only to feed their `assertDomEquivalent` guards; retire with the rest.
+- **`#a11y-live` was previously unasserted for these reports** (pre-existing, now
+  fixed): before this PR no test read the polite region for the report dialogs; the
+  new integration assertions close that standing gap.
