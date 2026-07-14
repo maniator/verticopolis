@@ -121,6 +121,55 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of spec-pixelart-structure-transport (`gds-code-review`, 2026-07-14)
+
+Change: E6 structure and transport pixel art. Ports the page-05 board
+composition into `structure/shell.ts` (banded deck), `structure/lobby.ts`
+(marble concourse, reception/info desk, sky-lobby glass), `structure/entrance.ts`
+(storefront skyline), `facilities/venue.ts` (two-floor wedding hall), and
+`transport.ts` (stairs/escalator single-flight-plus-landing, warm elevator
+shaft, brass-and-walnut car). Three review layers (Blind Hunter, Edge Case
+Hunter, Acceptance Auditor). All eight frozen invariants verified preserved
+(LOBBY_VARIANTS=4 and the four entrance sentinels, the `u.floor===1` ground
+key with decoration reading only `lit`/`variant`/`ground`, the express
+see-through glass backing, floor-number legibility, the FULL red bar, the
+direction lantern, one flight per two-floor unit, no mode branch / no save
+change). No reserved state-cue color used decoratively. Patched in-PR: the
+wedding aisle runner (was red, spec mandates white) plus its test; the wedding
+garland color rotation (`Math.abs(ax)%4` was constant); the storefront skyline
+block heights (`(bx*3)%4` was constant); the wedding pilaster loop step (could
+round to 0 and hang at a degenerate width); the floor-slab clamp (could paint
+above a very short tile). Four findings deferred:
+
+- **`scatterPeople` is still drawn on the metro platform and in the party
+  hall** (`facilities/service.ts:156`, `facilities/venue.ts:28`). The E6 spec
+  calls to retire or gate the ambient crowd so an empty tower reads empty, but
+  that gating is owned by `spec-pixelart-people-system.md` and rides the E6
+  read-only occupancy seam (`ElevatorQueueView` / real-occupant projection),
+  which is not wired here. The enriched lobby and sky-lobby tiles already draw
+  no ambient pedestrians; only these two venue/platform calls remain. Pick up
+  with the people-system overlay story so the retirement and the real-occupant
+  draw land together. (Medium; cross-spec, gated on the E6 seam.)
+- **Stairs and escalator bake no ~17px rider** (`transport.ts` flight
+  helpers). AC 151 and the I/O matrix describe a climbing rider on the incline,
+  but the flight sprites are static `cache:true` art; baking a rider would show
+  a phantom climber on empty stairs, contradicting the "empty tower reads
+  empty" AC. The engine's routed climbers ride over the flight instead.
+  Revisit if the people-system overlay wants a baked rider on the incline.
+  (Low; reconciliation with the empty-tower invariant.)
+- **The reception/info desk occupies lobby variant slot 1** (`structure/lobby.ts`),
+  which the frozen I/O matrix line enumerates as "plain." The spec's own Ground
+  and Sky I/O rows and Code Map both call for the desk, and `LOBBY_VARIANTS`
+  and the sentinels are untouched, so this is a content realization, not a
+  contract change; flagged as a spec internal inconsistency to reconcile in a
+  spec touch-up. (Low; cosmetic / doc.)
+- **Two 2px full-height guide-rail fills on the opaque elevator shafts**
+  (`transport.ts`, non-express only) are drawn at full shaft height. They
+  mirror the pre-existing full-height edge shadows and backing fill on the same
+  shaft, so the incremental texture-safety cost is negligible, but they are
+  additional full-height fills. If a future pass bands the shaft backing into
+  per-floor strips, fold these in too. (Low; cosmetic, pre-existing pattern.)
+
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into

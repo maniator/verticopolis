@@ -116,8 +116,11 @@ function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: n
   ctx.fillStyle = lit ? "#2A3350" : "#9CC4DE"; // night vs day sky
   ctx.fillRect(x, glassTop, w, skyH);
   ctx.fillStyle = lit ? "#1E2740" : "#7EA0C0"; // distant building blocks
-  for (let bx = x; bx < x + w; bx += 4) {
-    const bh = 2 + ((bx * 3) % 4);
+  // Vary each block's height off a per-block counter (offset by x so adjacent
+  // baked slices do not tile into an identical run); stepping bx by 4 alone
+  // leaves (bx*3)%4 constant, which would flatten the skyline.
+  for (let bx = x, bi = 0; bx < x + w; bx += 4, bi++) {
+    const bh = 2 + ((bi * 3 + x) % 4);
     ctx.fillRect(bx, glassTop + skyH - bh, 3, bh);
   }
   if (lit) {

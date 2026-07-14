@@ -217,8 +217,9 @@ describe("transport, crane & event sprites paint", () => {
     expect(s.painted()).toBe(true);
     // The couple: a dark-suited seated figure at the altar.
     expect(s.log.some((l) => l.includes("#2A2E38"))).toBe(true);
-    // The white aisle runner is a distinct fill from the plain party hall.
-    expect(s.log.some((l) => l.includes("#9A2E38"))).toBe(true);
+    // The white aisle runner the couple walks down (spec calls for white, not
+    // a red carpet).
+    expect(s.log.some((l) => l.includes("#F4F0EC"))).toBe(true);
   });
 
   it("drawEscapeStairs, drawCrane, and the moving-vehicle sprites all paint", () => {

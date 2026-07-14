@@ -22,8 +22,9 @@ export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w
   // Warm base wash for the whole tile (a small per-tile fill, not a monolith).
   ctx.fillStyle = "#B7B0A0";
   ctx.fillRect(x0, y0, ww, hh);
-  // Ceiling strip and its seam along the top band.
-  const ceil = Math.max(3, Math.round(hh * 0.11));
+  // Ceiling strip and its seam along the top band. Bounded to the tile height
+  // so a degenerate (very short) rect never paints past the tile.
+  const ceil = Math.min(hh, Math.max(3, Math.round(hh * 0.11)));
   ctx.fillStyle = "#8A8478";
   ctx.fillRect(x0, y0, ww, ceil);
   ctx.fillStyle = "#6E6A60";
@@ -32,7 +33,8 @@ export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.fillStyle = "#7A7468";
   for (let px = x0; px < x0 + ww; px += 8) ctx.fillRect(px, y0 + 1, 2, Math.min(3, ceil - 1));
   // Floor slab band across the bottom, with a polished top edge and dark base.
-  const slabH = Math.max(4, Math.round(hh * 0.23));
+  // Bounded to the tile height so `fy` can never rise above `y0`.
+  const slabH = Math.min(hh, Math.max(4, Math.round(hh * 0.23)));
   const fy = y0 + hh - slabH;
   const slab = "#9A9486";
   ctx.fillStyle = slab;
@@ -41,11 +43,15 @@ export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w
   ctx.fillRect(x0, fy, ww, 1);
   ctx.fillStyle = shade(slab, -24);
   ctx.fillRect(x0, y0 + hh - 1, ww, 1);
-  // Baseboard band where the wall meets the slab, with wall-base ticks above it.
-  ctx.fillStyle = "#8A8478";
-  ctx.fillRect(x0, fy - 2, ww, 2);
-  ctx.fillStyle = "#7E786C";
-  for (let px = x0 + 4; px < x0 + ww; px += 12) ctx.fillRect(px, fy - 4, 2, 4);
+  // Baseboard band where the wall meets the slab, with wall-base ticks above
+  // it. Only when there is room above the slab, so the band and its ticks stay
+  // inside the tile on a short rect.
+  if (fy - 4 >= y0) {
+    ctx.fillStyle = "#8A8478";
+    ctx.fillRect(x0, fy - 2, ww, 2);
+    ctx.fillStyle = "#7E786C";
+    for (let px = x0 + 4; px < x0 + ww; px += 12) ctx.fillRect(px, fy - 4, 2, 4);
+  }
   // Faint grout ticks down the slab so the deck reads tiled, not poured.
   ctx.fillStyle = "rgba(0,0,0,0.06)";
   for (let gx = x0 + 5; gx < x0 + ww; gx += 9) ctx.fillRect(gx, fy + 1, 1, slabH - 2);

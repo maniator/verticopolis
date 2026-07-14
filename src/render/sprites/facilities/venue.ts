@@ -75,8 +75,10 @@ export function drawWeddingHall(ctx: CanvasRenderingContext2D, x: number, y: num
   ctx.fillStyle = "#C8B896";
   ctx.fillRect(x0, y0 + 3, ww, 1);
 
-  // Gold pilasters down the side walls.
-  for (let px = x0 + Math.round(ww * 0.32); px < x0 + ww * 0.7; px += Math.round(ww * 0.36)) {
+  // Gold pilasters down the side walls. The step is floored at 1px so a
+  // degenerate (near-zero-width) rect can never stall the loop.
+  const pilasterStep = Math.max(1, Math.round(ww * 0.36));
+  for (let px = x0 + Math.round(ww * 0.32); px < x0 + ww * 0.7; px += pilasterStep) {
     ctx.fillStyle = "#C9A24B";
     ctx.fillRect(px, y0 + 4, 3, fy - y0 - 6);
     ctx.fillStyle = "#E8C860";
@@ -117,16 +119,17 @@ export function drawWeddingHall(ctx: CanvasRenderingContext2D, x: number, y: num
     ctx.fillRect(wx + 1, y0 + 12, 10, 1);
   }
 
-  // Floor + the red aisle runner with gold edges.
+  // Floor + the white aisle runner with gold edges (the board's ivory runner
+  // the couple walks down, not a red carpet).
   ctx.fillStyle = "#7A5A3A";
   ctx.fillRect(x0, fy, ww, y0 + hh - fy);
   ctx.fillStyle = "#8C6A44";
   ctx.fillRect(x0, fy, ww, 1);
-  ctx.fillStyle = "#9A2E38";
+  ctx.fillStyle = "#F4F0EC"; // white runner
   ctx.fillRect(acx - 12, fy, 24, y0 + hh - fy);
-  ctx.fillStyle = "#B84450";
+  ctx.fillStyle = "#FFFFFF"; // lit near edge
   ctx.fillRect(acx - 12, fy, 24, 1);
-  ctx.fillStyle = "#C9A24B";
+  ctx.fillStyle = "#C9A24B"; // gold edges
   ctx.fillRect(acx - 12, fy, 2, y0 + hh - fy);
   ctx.fillRect(acx + 10, fy, 2, y0 + hh - fy);
 
@@ -137,8 +140,9 @@ export function drawWeddingHall(ctx: CanvasRenderingContext2D, x: number, y: num
   ctx.fillRect(acx - 16, fy - 2, 3, postBase);
   ctx.fillRect(acx + 13, fy - 2, 3, postBase);
   ctx.fillRect(acx - 16, y0 + 10, 32, 3);
-  for (let ax = acx - 16; ax < acx + 16; ax += 4) {
-    bloom(ctx, ax, y0 + 8, ["#E88AB0", "#F4D0A0", "#F0F0F0", "#E0A0C0"][Math.abs(ax) % 4]);
+  const garland = ["#E88AB0", "#F4D0A0", "#F0F0F0", "#E0A0C0"];
+  for (let ax = acx - 16, gi = 0; ax < acx + 16; ax += 4, gi++) {
+    bloom(ctx, ax, y0 + 8, garland[gi % garland.length]);
   }
   for (let ay = y0 + 12; ay < fy - 6; ay += 6) {
     bloom(ctx, acx - 16, ay, "#E88AB0");
