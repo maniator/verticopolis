@@ -109,8 +109,9 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
 });
 
 /** sha256 of the stable-stringified serialize() output of the fixed scenario.
- *  Re-pinned intentionally when the VIP visit counter (`vipVisits`) joined the
- *  save payload. This fixture never reaches 3★, so the only changed byte is the
- *  new always-written `vipVisits: 0` field; the tower's behavior is otherwise
+ *  Re-pinned intentionally when the VIP visit counter joined the save payload.
+ *  This fixture never reaches 3★ (no suites, no wedding hall), so the payload
+ *  differs only by the new always-written fields at their fresh-tower defaults
+ *  (`vipVisits: 0`, `lastVipNagDay: -100`); the tower's behavior is otherwise
  *  unchanged. */
-const PINNED_STATE_HASH = "f793dc4fec1b1889c4b2cd151b5223f054bdcc149eabaadd74c23c3c7329c873";
+const PINNED_STATE_HASH = "89d7e814686638b816d497018e804a4a12ba3eece71de2da39bf9b2c832d5326";

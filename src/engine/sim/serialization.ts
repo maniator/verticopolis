@@ -17,6 +17,12 @@ import { SAVE_VERSION, migrateSave } from "../saveMigration";
 
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE, LOG_SAVE_CAP } from "./constants";
 
+/** Ceiling for the persisted VIP-visit counter. Visits accrue at most every
+ *  few in-game days, so even a millennium-old tower sits orders of magnitude
+ *  below this; anything above is a forged save that would otherwise blow out
+ *  the stats layout (and, far enough, break ++ precision). */
+const VIP_VISITS_CAP = 1_000_000;
+
 /** serialize / deserialize / newGame for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
 
@@ -47,6 +53,7 @@ export function serialize(sim: Simulation): SerializedGame {
     vipVisitDay: sim.vipVisitDay,
     vipFavorable: sim.vipFavorable,
     vipVisits: sim.vipVisits,
+    lastVipNagDay: sim.lastVipNagDay,
     treasuresFound: sim.treasuresFound,
     events: sim.events.saveState(),
     excavated: [...sim.excavated],
@@ -83,16 +90,35 @@ export function deserialize(raw: SerializedGame): Simulation {
   // window doesn't permanently cancel the TOWER evaluation.
   sim.vipVisitDay = data.vipVisitDay ?? -1;
   sim.vipFavorable = data.vipFavorable ?? false;
-  // Clamp to a non-negative integer (untrusted save): a forged negative or
-  // fractional count would render nonsense in the stats dialog forever.
+  // Clamp to a bounded non-negative integer (untrusted save): a forged
+  // negative, fractional, or absurd count would render nonsense in the stats
+  // dialog forever, and past 2^53 the ++ would stop incrementing (same
+  // precision trap ID_CAP guards below).
   sim.vipVisits = Math.max(
     0,
-    Math.floor(typeof data.vipVisits === "number" && Number.isFinite(data.vipVisits) ? data.vipVisits : 0),
+    Math.min(
+      VIP_VISITS_CAP,
+      Math.floor(typeof data.vipVisits === "number" && Number.isFinite(data.vipVisits) ? data.vipVisits : 0),
+    ),
   );
   // Saves written before the counter (and TDT imports, which synthesize
-  // vipFavorable from the star) carry no visits, yet a favorable review proves
-  // a VIP stayed at least once; adopt 1 so the stats row can't contradict it.
-  if (sim.vipFavorable && sim.vipVisits === 0) sim.vipVisits = 1;
+  // vipFavorable from the star) carry no visits at all, yet a favorable review
+  // proves a VIP stayed at least once, and a won tower adds the winning TOWER
+  // inspection on top; adopt those so the stats row can't contradict the
+  // recorded flags. Only when the FIELD IS ABSENT: an explicit 0 (however it
+  // arose) round-trips unchanged, keeping serialize/deserialize idempotent.
+  if (data.vipVisits === undefined && (sim.vipFavorable || sim.evaluatedTower)) {
+    sim.vipVisits = sim.evaluatedTower ? 2 : 1;
+  }
+  // Restore the unfavorable-VIP nag day so a reload can't reopen the 5-day
+  // window early (that would both re-nag and inflate the persisted vipVisits).
+  // Clamped to the save's own day so a forged future value can't mute the VIP
+  // for years; missing (legacy) restores the fresh-tower default, at worst
+  // re-nagging once after load.
+  sim.lastVipNagDay = Math.min(
+    sim.clock.day,
+    typeof data.lastVipNagDay === "number" && Number.isFinite(data.lastVipNagDay) ? Math.floor(data.lastVipNagDay) : -100,
+  );
   // Clamp ≥0 (untrusted save): a negative value would keep `treasuresFound < 3`
   // true forever and re-open the treasure farm.
   sim.treasuresFound = Math.max(

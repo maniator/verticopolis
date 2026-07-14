@@ -426,8 +426,12 @@ export interface SerializedGame {
   vipFavorable?: boolean;
   /** How many VIP visits the player has been told about (suite stays, drive-offs,
    * TOWER inspections). Optional: saves written before the counter load as 0,
-   * except that a favorable review implies at least one visit. */
+   * except that a favorable review implies at least one visit (a won tower two). */
   vipVisits?: number;
+  /** Day of the last unfavorable-VIP bulletin, persisted so a save/reload can't
+   * reopen the 5-day nag window early (which would also inflate `vipVisits`).
+   * Optional: older saves load as -100, the fresh-tower default. */
+  lastVipNagDay?: number;
   /** Seasonal-event state (Santa guard + dedicated RNG position). Optional for
    * backward compatibility with saves written before it was persisted. */
   events?: {

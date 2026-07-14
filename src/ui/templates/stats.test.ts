@@ -161,4 +161,11 @@ describe("statsTemplate matches the legacy buildStatsHtml structure", () => {
     sim.vipFavorable = true;
     expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
   });
+
+  it("holds for a tower with visits but no review yet (the struggling 3★ state)", () => {
+    const sim = builtTower();
+    sim.star = 3;
+    sim.vipVisits = 2;
+    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  });
 });

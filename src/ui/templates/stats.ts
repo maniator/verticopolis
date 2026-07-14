@@ -50,7 +50,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   // recorded visit, so a loaded late-game tower always shows its history).
   const vipRow =
     sim.vipVisits > 0 || sim.vipFavorable || s.star >= 3
-      ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable ? "var(--good)" : "var(--muted)"}">${
+      ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable && sim.vipVisits > 0 ? "var(--good)" : "var(--muted)"}">${
           sim.vipVisits === 0 ? "None yet" : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`
         }</span>`
       : nothing;
