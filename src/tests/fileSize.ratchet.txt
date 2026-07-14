@@ -7,7 +7,6 @@
 #
 # engine
 # render
-src/render/excalibur/TowerEngine.ts
 # ui / app spine
 src/main.ts
 # storage
