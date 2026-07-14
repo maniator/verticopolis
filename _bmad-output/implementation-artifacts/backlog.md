@@ -1600,3 +1600,27 @@ comment updated. Residual defers:
   change: per-frame anchoring still reads the cache; the forced read rides the
   ~6 Hz pump whose status-bar writes already dirty layout. Revisit only if a
   phone-tier profile ever blames it.
+## Crowd + vehicle read-right fast-follow (v1.32.1)
+
+Read-right pass over the in-tower vehicles and crowd, driven by the owner's prod
+screenshots:
+
+- Metro train rescaled from a 9px sliver to 20px (`METRO_TRAIN_H`).
+- Garbage truck rescaled from 16px to 42px (`GARBAGE_TRUCK_H`), filling most of
+  the recycling center's bottom story; redrawn so the body/cab/wheel rows derive
+  their vertical extents from the height constant.
+- Ambient walkers no longer float on the upper stories of multi-floor facilities.
+- Lobby walkers fan into evenly spaced lanes instead of clumping at the ping-pong
+  ends (layout math in `towerCrowdLayout.ts`, unit-tested).
+- Elevator landing queues: per-waiter spacing widened from 0.6 to 1.1 tiles and
+  reach from 16 to 30, and a jammed landing now compresses its line to fit the
+  built floor instead of piling the overflow onto one wall tile.
+
+`/gds-code-review` (Blind Hunter + Edge Case Hunter) ran across two rounds with
+no confirmed findings. Copilot's real catch (a `(i * 7 + 3) % count` lane
+interleave that collapses at counts divisible by 7) was fixed by switching to
+evenly spaced lanes with an explicit multiple-of-7 non-collapse test.
+
+Follow-up (owner + party ratified): a 60px "1.5 floor" metro train on a redrawn
+high-platform station, plus real routed platform commuters (task #24), since the
+metro platform draws empty today (the crowd never routes there as a destination).

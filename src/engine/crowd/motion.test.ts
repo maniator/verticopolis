@@ -126,7 +126,35 @@ describe("Crowd landing queue: waiters line up beside the shaft", () => {
       expect(p.x).toBeGreaterThanOrEqual(30); // never left of the narrow floor
       expect(p.x).toBeLessThanOrEqual(39); // never right of it
     }
-    // The clamp actually engaged: the tail bunches at the left wall.
+    // The clamp actually engaged: the tail reaches the left wall.
     expect(crowd.people.some((p) => p.x <= 30.5)).toBe(true);
+  });
+
+  it("compresses a jammed landing into a distributed line, not a wall stack", () => {
+    // Narrow landing floor (tiles 30..39) with the shaft at its right end and
+    // far more waiters than fit at the natural spacing, so the line must
+    // compress. They should still hold distinct spots across the built floor
+    // rather than piling the overflow onto a single wall tile.
+    const tower = new Tower();
+    const must = (kind: FacilityKind, f: number, x: number) => {
+      const r = tower.place(kind, f, x);
+      if (!r.ok) throw new Error(`fixture place ${kind} @ floor ${f}, x ${x} failed`);
+    };
+    for (let x = 0; x < 40; x++) must("lobby", 1, x);
+    for (let x = 0; x < 40; x++) must("floor", 2, x);
+    for (let x = 30; x < 40; x++) must("floor", 3, x);
+    const s = placeShaft(tower, 36, 1, 3);
+    const crowd = new Crowd();
+    for (let id = 1; id <= 20; id++) crowd.people.push(waiter(id, s, 3));
+    for (let i = 0; i < 20; i++) crowd.advance(0.5, tower);
+    const xs = crowd.people.map((p) => p.x);
+    for (const x of xs) {
+      expect(x).toBeGreaterThanOrEqual(30);
+      expect(x).toBeLessThanOrEqual(39);
+    }
+    // Distributed, not stacked: nearly every waiter holds its own spot instead
+    // of overlapping on the clamp tile.
+    const distinct = new Set(xs.map((x) => Math.round(x * 10))).size;
+    expect(distinct).toBeGreaterThanOrEqual(18);
   });
 });
