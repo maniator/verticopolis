@@ -1487,6 +1487,32 @@ describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome"
     chip.click();
     expect(onClick).toHaveBeenCalledOnce();
   });
+
+  it("showUpdateChip clears #a11y-live then re-announces on the next frame, on EVERY call", () => {
+    const { ui } = makeUI();
+    const live = document.getElementById("a11y-live")!;
+    // Capture the rAF callback so the clear (sync) and the re-set (next frame) are
+    // both observable, proving an identical message re-fires for screen readers.
+    const raf = { cb: null as FrameRequestCallback | null };
+    const win = window as unknown as { requestAnimationFrame: (cb: FrameRequestCallback) => number };
+    const orig = win.requestAnimationFrame;
+    win.requestAnimationFrame = (cb: FrameRequestCallback) => ((raf.cb = cb), 1);
+    try {
+      live.textContent = "An update is ready."; // pretend a prior announcement is still parked
+      ui.showUpdateChip(() => {});
+      expect(live.textContent).toBe(""); // cleared synchronously
+      raf.cb!(0);
+      expect(live.textContent).toBe("An update is ready."); // re-set on the next frame
+
+      // A second call while the chip is already visible must re-announce, not skip.
+      ui.showUpdateChip(() => {});
+      expect(live.textContent).toBe(""); // cleared again
+      raf.cb!(0);
+      expect(live.textContent).toBe("An update is ready.");
+    } finally {
+      win.requestAnimationFrame = orig;
+    }
+  });
 });
 
 describe("showUpdatePrompt — Later / Update now, resolved once", () => {
@@ -1547,6 +1573,46 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
     dialog().dispatchEvent(new Event("cancel")); // the single-resolve guard holds
     await flush();
     expect(onLater).toHaveBeenCalledOnce();
+  });
+
+  it("a backdrop click also resolves as Later, exactly once", async () => {
+    const onUpdate = vi.fn();
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    dialog().click(); // backdrop: the click's target is the dialog itself
+    await flush();
+    expect(onLater).toHaveBeenCalledOnce();
+    expect(onUpdate).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("a mixed second dismissal cannot double-resolve (Update then backdrop)", async () => {
+    const onUpdate = vi.fn();
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    click('[data-act="update"]');
+    dialog().click(); // a racing backdrop click after the update; the latch blocks it
+    await flush();
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onLater).not.toHaveBeenCalled();
+  });
+
+  it("a throwing Update handler is contained: the modal still closes, no error escapes", async () => {
+    const onUpdate = vi.fn(() => {
+      throw new Error("update failed");
+    });
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    // fireAndForget wraps the handler in Promise.resolve().then().catch(), so a
+    // synchronous throw is contained (never an unhandledrejection) and the click
+    // handler does not throw.
+    expect(() => click('[data-act="update"]')).not.toThrow();
+    await flush();
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(dialog().open).toBe(false);
   });
 });
 
