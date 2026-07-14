@@ -207,7 +207,7 @@ function drawThiefFigure(ctx: CanvasRenderingContext2D, x: number, footY: number
 
 /** The security guard trailing a caught thief, feet at (x, footY), sized by `s`:
  *  a bespoke integer-rect figure in a navy uniform with a peaked cap and a
- *  flashing alert beacon (a functional caught-state cue, not decoration). */
+ *  static red alert beacon (a functional caught-state cue, not decoration). */
 function drawGuardFigure(ctx: CanvasRenderingContext2D, x: number, footY: number, s: number): void {
   const px = (ax: number, ay: number, aw: number, ah: number, c: string): void => {
     ctx.fillStyle = c;

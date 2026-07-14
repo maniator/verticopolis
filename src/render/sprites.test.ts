@@ -285,8 +285,14 @@ describe("transport, crane & event sprites paint", () => {
     expect(on.log).toContain("fillStyle=#FFE27A"); // headlight lit
     const off = spyCtx();
     drawMetroTrain(off.ctx, 120, false);
-    expect(off.log).toContain("fillStyle=#9FC0E0"); // headlight dark
-    expect(off.log).not.toContain("fillStyle=#FFE27A");
+    expect(off.log).not.toContain("fillStyle=#FFE27A"); // no lit headlight in the off state
+    // The window glint also paints #9FC0E0, so a wide-carriage color check would
+    // pass regardless of the headlight branch. Draw a narrow carriage where the
+    // window loop (wx + 5 < w) yields zero glints, isolating the dark headlight.
+    const offNarrow = spyCtx();
+    drawMetroTrain(offNarrow.ctx, 8, false);
+    expect(offNarrow.log).toContain("fillStyle=#9FC0E0"); // dark headlight, isolated from any glint
+    expect(offNarrow.log).not.toContain("fillStyle=#FFE27A");
 
     const car = spyCtx();
     drawStreetCar(car.ctx, 3);
