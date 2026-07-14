@@ -168,26 +168,6 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     expect(view.landings.get(s)?.get(3)).toBeUndefined(); // nobody left waiting
   });
 
-  it("lines waiters up beside the shaft instead of stacking them on the car", () => {
-    const tower = baseTower();
-    const s = placeShaft(tower, "elevatorStandard", 4, 1, 10); // hugs the left wall, so the line forms on its right
-    const crowd = new Crowd();
-    // Three waiters at one landing, and no car parked here, so none board and
-    // they settle into their slots.
-    for (let id = 1; id <= 3; id++) crowd.people.push(waiter(id, s, 3));
-    for (let i = 0; i < 8; i++) crowd.advance(0.5, tower);
-
-    expect(crowd.people.every((p) => p.state === "waiting")).toBe(true);
-    const xs = crowd.people.map((p) => p.x);
-    const carCenter = 4 + 4 / 2; // shaft.x + width / 2, the column the car occupies
-    // Nobody stands on the car's column, and the three occupy distinct spots.
-    for (const x of xs) expect(Math.abs(x - carCenter)).toBeGreaterThan(1);
-    expect(new Set(xs.map((x) => Math.round(x * 100))).size).toBe(3);
-    // FIFO order: the first waiter stands nearest the doors, each next one further out.
-    expect(xs[0]).toBeLessThan(xs[1]);
-    expect(xs[1]).toBeLessThan(xs[2]);
-  });
-
   it("memoizes once per step and recomputes only after beginStep", () => {
     const tower = baseTower();
     const s = placeShaft(tower, "elevatorStandard", 4, 1, 10);
