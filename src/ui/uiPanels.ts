@@ -34,7 +34,10 @@ export function renderEditor(ui: UI, tpl: TemplateResult): void {
 export function wireEditorActions(ui: UI): void {
   ui.el.editor.addEventListener("click", (e) => {
     const target = e.target as Element;
-    if (target.closest(".ed-close")) return hideEditor(ui);
+    // Both closest() walks are containment-guarded: closest can escape above
+    // the card, and a match outside it must not act.
+    const x = target.closest(".ed-close");
+    if (x && ui.el.editor.contains(x)) return hideEditor(ui);
     const b = target.closest<HTMLElement>("[data-edit]");
     if (b && ui.el.editor.contains(b)) ui.cb.onEditAction(b.dataset.edit!, ui.el.editor);
   });

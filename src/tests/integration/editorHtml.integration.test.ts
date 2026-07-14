@@ -75,10 +75,10 @@ describe("editor & stats HTML builders", () => {
   });
 
   it("every data-field the render emits has a volatile key to patch it", () => {
-    // The reverse direction of the first test: a rendered span whose field is
-    // missing from the volatile map never patches and goes silently stale.
-    // Volatile keys without a rendered span are fine (patchVolatile skips
-    // them) — the editor key in main.ts owns when those rows appear.
+    // The reverse direction of the first test: every rendered span's field must
+    // have a volatile key. These legacy builders are retained as the equivalence
+    // oracle for the lit templates (see templates/editor.test.ts), so their own
+    // internal consistency stays pinned until the final sweep retires them.
     const grab = (html: string) => [...html.matchAll(/data-field="([^"]+)"/g)].map((m) => m[1]);
     for (const state of ["occupied", "gutted"] as const) {
       office.state = state;
