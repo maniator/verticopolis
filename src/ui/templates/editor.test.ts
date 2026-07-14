@@ -2,26 +2,27 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, maxCarsFor } from "../../engine/facilities";
 import type { Transport, Unit } from "../../engine/types";
-import { unitEditorHtml, transportEditorHtml } from "../editorHtml";
 import { unitEditorTemplate, transportEditorTemplate } from "./editor";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The editor card bodies (E6-S1). Package: the title bar's ✕ a11y contract,
  * the `data-edit`/`data-field` markers main.ts and the action dispatch read,
  * the rename input's value binding, the disabled bounds on the car buttons,
- * hostile-label escaping, and the transitional `assertDomEquivalent` guards
- * against `unitEditorHtml`/`transportEditorHtml` across every row/action
- * branch: office (rename + adjuster), sold and unsold condos, hotel room rate,
- * a closed venue's customer count, cinema operational/gutted, No Rate, the
- * mobile diagnostics fold-in, elevator car bounds, express vs standard stops,
- * and fixed-span stairs. The diff/identity mechanics live in
- * `editorPatch.test.ts`; the UI wiring in the integration spec.
+ * hostile-label escaping, and every row/action branch: office (rename +
+ * adjuster), sold and unsold condos, hotel room rate, a closed venue's
+ * customer count, cinema operational/gutted, No Rate, the mobile diagnostics
+ * fold-in, elevator car bounds, express vs standard stops, and fixed-span
+ * stairs. The templates were proven structurally equivalent to the retired
+ * `unitEditorHtml`/`transportEditorHtml` by transitional guards (removed with
+ * the string builders in the final sweep; see git history). The diff/identity
+ * mechanics live in `editorPatch.test.ts`; the UI wiring in the integration
+ * spec.
  */
 
 /** A built tower carrying one unit of the requested kind (full-width floors so
  *  any catalog width fits), plus a standard elevator. Placements are asserted:
- *  a silent fixture failure would make the equivalence pass for the wrong
+ *  a silent fixture failure would make the assertions pass for the wrong
  *  reason. */
 function simWith(kind: Parameters<Simulation["tower"]["place"]>[0], floors = 2): { sim: Simulation; unit: Unit } {
   const sim = new Simulation();
@@ -50,8 +51,6 @@ function withLift(
   return { sim, lift };
 }
 
-const equivalent = (legacy: string, lit: Parameters<typeof assertDomEquivalent>[1]): void =>
-  expect(() => assertDomEquivalent(legacy, lit)).not.toThrow();
 
 describe("unit editor template structure", () => {
   it("title bar ✕ keeps the shared recipe and its aria-label; cells carry data-field markers", () => {
@@ -111,98 +110,122 @@ describe("transport editor template structure", () => {
   });
 });
 
-describe("unit editor matches the legacy builder", () => {
-  it("office: desktop and the mobile diagnostics fold-in", () => {
+describe("unit editor row and action branches", () => {
+  it("office: desktop keeps the access row; the mobile fold-in swaps it for diagnostics", () => {
     const { sim, unit } = simWith("office");
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
-    equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
+    const desktop = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(desktop.querySelector('[data-field="served"]')).not.toBeNull();
+    expect(desktop.querySelector(".ed-diagnostics")).toBeNull();
+    const mobile = renderToFragment(unitEditorTemplate(sim, unit, true));
+    expect(mobile.querySelector('[data-field="served"]')).toBeNull();
+    expect(mobile.querySelector(".ed-diagnostics")).not.toBeNull();
   });
 
   it("security (zero-population service kind): mobile keeps the plain access row", () => {
     // Service kinds' diagnostics emit no access line, so the mobile fold-in
-    // keeps the Yes/No row (the !hasAccessDiagnostic branch); pin the branch
-    // on the lit path, then its equivalence.
+    // keeps the Yes/No row (the !hasAccessDiagnostic branch).
     const { sim, unit } = simWith("security");
     const frag = renderToFragment(unitEditorTemplate(sim, unit, true));
     expect(frag.querySelector('[data-field="served"]')).not.toBeNull();
-    equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
   });
 
-  it("office: gutted rows and the No Rate readout", () => {
+  it("office: gutted swaps resale for scrap rows; No Rate reads where the price shows", () => {
     const { sim, unit } = simWith("office");
     unit.state = "gutted";
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
+    const gutted = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(gutted.textContent).toContain("Scrap value");
+    expect(gutted.textContent).toContain("Gutted: bulldoze and rebuild.");
+    expect(gutted.textContent).not.toContain("Resale value");
     unit.state = "occupied";
     unit.noRate = true;
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
+    const offMarket = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(offMarket.querySelector('[data-field="rent"]')!.textContent).toBe("No Rate");
   });
 
-  it("condo: unsold (price adjuster) and sold (household-scaled price, no adjuster)", () => {
+  it("condo: unsold offers the price adjuster and batch action; sold drops them", () => {
     const unsold = simWith("condo");
     unsold.unit.state = "empty"; // built, never sold: the adjuster stays offered
-    equivalent(unitEditorHtml(unsold.sim, unsold.unit), unitEditorTemplate(unsold.sim, unsold.unit));
+    const uFrag = renderToFragment(unitEditorTemplate(unsold.sim, unsold.unit));
+    expect(uFrag.textContent).toContain("Sale price");
+    expect(uFrag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
+    expect(uFrag.querySelector('[data-edit="batchKind"]')).not.toBeNull();
     const sold = simWith("condo");
     sold.unit.everOccupied = true;
     sold.unit.residents = 4;
-    equivalent(unitEditorHtml(sold.sim, sold.unit), unitEditorTemplate(sold.sim, sold.unit));
+    const sFrag = renderToFragment(unitEditorTemplate(sold.sim, sold.unit));
+    expect(sFrag.querySelector('[data-edit="rentUp"]')).toBeNull();
+    expect(sFrag.querySelector('[data-edit="batchKind"]')).toBeNull();
   });
 
   it("hotel single: nightly room rate", () => {
     const { sim, unit } = simWith("hotelSingle");
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
+    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(frag.textContent).toContain("Room rate");
+    expect(frag.querySelector('[data-field="rent"]')!.textContent).toContain("/night");
   });
 
-  it("fast food: open and closed customer readouts, desktop and mobile", () => {
+  it("fast food: open and closed customer readouts", () => {
     const { sim, unit } = simWith("fastFood");
     unit.customersIn = 7;
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit)); // 07:00, open
+    const open = renderToFragment(unitEditorTemplate(sim, unit)); // 07:00, open
+    expect(open.querySelector('[data-field="customers"]')!.textContent).toBe("7");
     sim.clock.minutes = 23 * 60; // 23:00, closed
-    // Pin that the fixture actually reached the closed branch: an equivalence
-    // check alone would pass if both builders silently stayed on the open one.
-    const frag = renderToFragment(unitEditorTemplate(sim, unit));
-    expect(frag.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
-    equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
+    const closed = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(closed.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
   });
 
-  it("cinema: operational (film policy action) and gutted (no showing row)", () => {
+  it("cinema: operational shows the film row and booking action; gutted drops the row", () => {
     const { sim, unit } = simWith("cinema", 3);
     unit.filmPolicy = "blockbuster";
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
+    const op = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(op.textContent).toContain("Now showing");
+    expect(op.querySelector('[data-edit="filmPolicy"]')!.textContent).toContain("Blockbuster");
     unit.state = "gutted";
-    equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
+    expect(renderToFragment(unitEditorTemplate(sim, unit)).textContent).not.toContain("Now showing");
   });
 });
 
-describe("transport editor matches the legacy builder", () => {
-  it("standard elevator: both car bounds, a skipped floor, desktop and mobile", () => {
+describe("transport editor row and action branches", () => {
+  it("standard elevator: a skipped floor reads plainly (never borrowing the express copy)", () => {
     const { sim, lift } = withLift("elevatorStandard", 4);
-    equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
-    if (lift.cars !== 1) expect(sim.tower.setCars(lift.id, 1)).toBe(true); // removecar disabled
-    expect(sim.tower.setStop(lift.id, 3, false)).toBe(true); // "skips 1 floor"
-    equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
-    expect(sim.tower.setCars(lift.id, maxCarsFor(lift.kind))).toBe(true); // addcar disabled at the pool max
-    equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
-    equivalent(transportEditorHtml(sim, lift, true), transportEditorTemplate(sim, lift, true));
+    expect(renderToFragment(transportEditorTemplate(sim, lift)).querySelector('[data-field="stops"]')!.textContent).toBe(
+      "all floors",
+    );
+    expect(sim.tower.setStop(lift.id, 3, false)).toBe(true);
+    const stops = renderToFragment(transportEditorTemplate(sim, lift)).querySelector('[data-field="stops"]')!
+      .textContent!;
+    expect(stops).toBe("skips 1 floor");
+    expect(stops).not.toContain("express");
   });
 
-  it("express elevator (with and without a preserved skipped lobby) and stairs", () => {
+  it("mobile folds the transport diagnostics block in", () => {
+    const { sim, lift } = withLift("elevatorStandard", 4);
+    expect(renderToFragment(transportEditorTemplate(sim, lift, true)).querySelector(".ed-diagnostics")).not.toBeNull();
+    expect(renderToFragment(transportEditorTemplate(sim, lift)).querySelector(".ed-diagnostics")).toBeNull();
+  });
+
+  it("express elevator surfaces a preserved skipped lobby honestly", () => {
     const express = withLift("elevatorExpress", 3);
-    equivalent(transportEditorHtml(express.sim, express.lift), transportEditorTemplate(express.sim, express.lift));
+    expect(
+      renderToFragment(transportEditorTemplate(express.sim, express.lift)).querySelector('[data-field="stops"]')!
+        .textContent,
+    ).toBe("lobbies and sky lobbies");
     // A legacy/forged save can carry a deliberately skipped lobby; the Stops
-    // readout surfaces the count honestly. Pin the branch, then its equivalence.
+    // readout surfaces the count instead of overstating the policy.
     express.lift.skipFloors = [1];
     const frag = renderToFragment(transportEditorTemplate(express.sim, express.lift));
     expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and sky lobbies (1 skipped)");
-    equivalent(transportEditorHtml(express.sim, express.lift), transportEditorTemplate(express.sim, express.lift));
-    const stairs = withLift("stairs");
-    equivalent(transportEditorHtml(stairs.sim, stairs.lift), transportEditorTemplate(stairs.sim, stairs.lift));
   });
 
-  it("service elevator and escalator", () => {
+  it("service elevator keeps the elevator rows; an escalator is a fixed-span flight", () => {
     const service = withLift("elevatorService");
-    equivalent(transportEditorHtml(service.sim, service.lift), transportEditorTemplate(service.sim, service.lift));
+    const sFrag = renderToFragment(transportEditorTemplate(service.sim, service.lift));
+    expect(sFrag.querySelector('[data-field="cars"]')).not.toBeNull();
+    expect(sFrag.querySelector('[data-edit="stops"]')).not.toBeNull(); // staff-only still configures stops
     const esc = withLift("escalator", 2, "shop");
-    equivalent(transportEditorHtml(esc.sim, esc.lift), transportEditorTemplate(esc.sim, esc.lift));
+    const eFrag = renderToFragment(transportEditorTemplate(esc.sim, esc.lift));
+    expect(eFrag.querySelector('[data-field="cars"]')).toBeNull();
+    expect(eFrag.querySelector('[data-edit="extendUp"]')).toBeNull();
+    expect(eFrag.querySelector('[data-edit="sell"]')).not.toBeNull();
   });
 });

@@ -8,7 +8,7 @@ import type { BatchTarget, BatchRentResult } from "../../engine/Simulation";
  * (`showBatchPricingDialog`) on every input event, replacing the old hand-written
  * `refresh()` that mutated the preview text and `disabled` in place. Authored to
  * match `batchPricingHtml` structurally at the initial state (proven by the
- * transitional `assertDomEquivalent` test): the two rule-set radios, the ± price
+ * retired transitional guards): the two rule-set radios, the ± price
  * adjuster, the only-default-priced filter, the live `aria-live` preview, and the
  * Apply / Cancel footer.
  *

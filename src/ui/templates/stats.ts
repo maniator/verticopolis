@@ -6,18 +6,17 @@ import { isPresent } from "../../engine/types";
 import { floorTag } from "../format";
 
 /**
- * The Tower Statistics dialog body as a lit template. Authored to match
- * `buildStatsHtml` (and its `buildElevatorHtml` / `buildIncomeHtml` /
- * `buildMilestonesHtml` friends in `statsHtml.ts`) structurally, proven by the
- * transitional `assertDomEquivalent` test across many sim configurations.
+ * The Tower Statistics dialog body as a lit template. It was authored to match
+ * the retired `buildStatsHtml` string builders structurally, proven by
+ * transitional `assertDomEquivalent` guards across many sim configurations
+ * before those builders were deleted in the final sweep (see git history).
  *
  * E3-S5 decision (recorded in the backlog): the "worst string-composition case"
  * is migrated FULLY to nested `TemplateResult`s rather than left as an imperative
- * `innerHTML` blob. This keeps a single rendering path (lit everywhere), lets the
- * `statsHtml.ts` string builders retire with the rest, and avoids any
- * `unsafeHTML`. Every string interpolation that used `escapeHtml` (tower name,
- * elevator labels, milestone label/desc) is now auto-escaped by lit; the numbers
- * and static copy carry over verbatim.
+ * `innerHTML` blob. This keeps a single rendering path (lit everywhere) and
+ * avoids any `unsafeHTML`. Every string interpolation that used `escapeHtml`
+ * (tower name, elevator labels, milestone label/desc) is auto-escaped by lit;
+ * the numbers and static copy carried over verbatim.
  *
  * A pure function of the sim, so it unit-tests headlessly exactly like the string
  * builder it replaces.
@@ -135,7 +134,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
 }
 
 /** Passenger-elevator utilization, busiest shaft first, mirroring
- *  `buildElevatorHtml`. */
+ *  the retired string builder. */
 export function elevatorSection(sim: Simulation): TemplateResult | typeof nothing {
   const shafts = sim.elevatorStats();
   if (shafts.length === 0) return nothing;
@@ -156,7 +155,7 @@ export function elevatorSection(sim: Simulation): TemplateResult | typeof nothin
   return html`<div class="stats-section win-title sm">Elevators (avg load, busiest first)</div>${col(shown.slice(0, half))}${col(shown.slice(half))}`;
 }
 
-/** The per-category income breakdown, mirroring `buildIncomeHtml`. */
+/** The per-category income breakdown, the lone renderer since the string builders retired. */
 export function incomeSection(sim: Simulation): TemplateResult | typeof nothing {
   const { averages, hasData } = sim.incomeBreakdown();
   if (!hasData) return nothing;
@@ -211,7 +210,7 @@ function householdSection(sim: Simulation): TemplateResult {
   return html`${head}<div class="col kv"><span class="k">People housed</span><span class="v">${residents.toLocaleString()}</span><span class="k">Avg household</span><span class="v">${avg}</span></div><div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`;
 }
 
-/** The optional-goals checklist, mirroring `buildMilestonesHtml`. */
+/** The optional-goals checklist, the lone renderer since the string builders retired. */
 export function milestonesSection(sim: Simulation): TemplateResult {
   const mp = sim.milestoneProgress();
   const half = Math.ceil(mp.list.length / 2);

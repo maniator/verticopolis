@@ -1,14 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { confirmHtml } from "../uiTemplates";
 import { confirmTemplate } from "./confirm";
-import { renderToFragment, assertDomEquivalent, click } from "../testing/litTestUtils";
+import { renderToFragment, click } from "../testing/litTestUtils";
 
 /**
  * The E0 proof dialog. `confirmTemplate` is the first lit conversion, so it
  * carries the migration's per-aspect test package: a semantic structure check,
- * the inline `@click` dispatch (`onYes`/`onCancel`), hostile input rendered as
- * text (lit auto-escape, the security win over the old string path), and the
- * transitional `assertDomEquivalent` guard against `confirmHtml`. The live
+ * the inline `@click` dispatch (`onYes`/`onCancel`), and hostile input rendered
+ * as text (lit auto-escape, the security win over the old string path). The live
  * behavior (open/confirm/cancel/close, no close button) is pinned by
  * `uiDialogs.integration.test.ts`.
  */
@@ -69,22 +67,5 @@ describe("confirmTemplate escapes interpolated copy as text", () => {
     expect(frag.querySelector("h2 b")).toBeNull();
     expect(frag.querySelector("h2")?.textContent).toBe(hostile);
     expect(frag.querySelector("p")?.textContent).toBe(`<b>bold</b>`);
-  });
-});
-
-describe("confirmTemplate matches the legacy confirmHtml structure", () => {
-  it("assertDomEquivalent holds for trusted copy (the transitional regression guard)", () => {
-    const title = "Start a new tower?";
-    const body = "This abandons your current tower.";
-    const yesLabel = "Confirm";
-    expect(() =>
-      assertDomEquivalent(confirmHtml(title, body, yesLabel), confirmTemplate(title, body, yesLabel, noop)),
-    ).not.toThrow();
-  });
-
-  it("holds for a different primary label too", () => {
-    expect(() =>
-      assertDomEquivalent(confirmHtml("Demolish?", "No undo.", "Demolish"), confirmTemplate("Demolish?", "No undo.", "Demolish", noop)),
-    ).not.toThrow();
   });
 });

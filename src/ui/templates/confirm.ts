@@ -2,7 +2,7 @@ import { html, type TemplateResult } from "lit-html";
 
 /**
  * lit-html templates for the UI dialogs, the declarative replacement for the
- * string builders in `uiTemplates.ts` (see the plan of record,
+ * retired string builders (see the plan of record,
  * `_bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/`).
  * Unlike the string builders, a template binds its actions inline with `@click`,
  * so the dialog controller no longer needs a separate `wireActions` pass. lit
@@ -23,7 +23,7 @@ export interface ConfirmActions {
 
 /**
  * The generic confirm modal body, authored to match `confirmHtml` structurally
- * (proven by the transitional `assertDomEquivalent` test): an `h2` title, a `p`
+ * (proven by transitional guards, retired with the string builders): an `h2` title, a `p`
  * body, and a `.modal-actions` row with the Cancel (`data-act="no"`) and primary
  * Confirm (`data-act="yes"`) buttons, adjacent with no space between them. The
  * `title`/`body`/`yesLabel` are trusted developer copy and are auto-escaped by

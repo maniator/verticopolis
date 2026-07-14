@@ -761,7 +761,7 @@ class GameApp implements GameAppPorts {
       if (this.tool.type === "inspect") {
         // Touch has no hover stream, so mobile shows ONE panel: the tap opens
         // the editor, which folds in the inspector card's diagnostics on mobile
-        // (see refreshEditor / editorHtml). The floating card stays a
+        // (see refreshEditor / templates/editor). The floating card stays a
         // desktop-hover affordance and is never raised on touch.
         this.selectPicked(picked);
         return;

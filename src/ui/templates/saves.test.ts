@@ -1,17 +1,15 @@
 import { describe, it, expect } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { savesHtml } from "../uiTemplates";
 import { savesTemplate } from "./saves";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The Saved Towers slot manager. Package: the per-row action gating (auto has no
  * Save/Delete, an empty slot shows Save only, a filled numbered slot shows all
  * three), the rule-set chip, the TOWER/star + pop/funds detail line, the Delete
- * button's per-row aria-label, the auto-escaped tower name, and the transitional
- * `assertDomEquivalent` guard against `savesHtml`. The Save/Load/Delete dispatch
- * and export/import/close wiring live in the controller and are pinned by the
- * showSaves integration tests.
+ * button's per-row aria-label, and the auto-escaped tower name. The
+ * Save/Load/Delete dispatch and export/import/close wiring live in the controller
+ * and are pinned by the showSaves integration tests.
  */
 
 const AT = 1_700_000_000_000;
@@ -93,21 +91,5 @@ describe("savesTemplate escapes the tower name as text", () => {
     const frag = renderToFragment(savesTemplate([{ slot: 1, exists: true, towerName: hostile, star: 2, population: 1, funds: 1, savedAt: AT }]));
     expect(frag.querySelector(".slot-detail img")).toBeNull();
     expect(frag.querySelector(".slot-detail")!.textContent).toContain(hostile);
-  });
-});
-
-describe("savesTemplate matches the legacy savesHtml structure", () => {
-  const mixed: SlotInfo[] = [
-    { slot: "auto", exists: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: AT, mode: "classic", day: 12 },
-    { slot: 1, exists: true, towerName: "One & Only", star: 6, population: 15000, funds: 1_000_000, savedAt: AT, mode: "modern", day: 400 },
-    { slot: 2, exists: false },
-  ];
-
-  it("holds across auto, filled (both modes), and empty rows", () => {
-    expect(() => assertDomEquivalent(savesHtml(mixed), savesTemplate(mixed))).not.toThrow();
-  });
-
-  it("holds for an empty slot list", () => {
-    expect(() => assertDomEquivalent(savesHtml([]), savesTemplate([]))).not.toThrow();
   });
 });

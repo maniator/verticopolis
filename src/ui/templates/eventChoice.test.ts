@@ -1,15 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { eventChoiceHtml } from "../uiTemplates";
 import { eventChoiceTemplate } from "./eventChoice";
-import { renderToFragment, assertDomEquivalent, click } from "../testing/litTestUtils";
+import { renderToFragment, click } from "../testing/litTestUtils";
 
 /**
  * The emergency event-choice dialog. Its per-aspect package: a semantic structure
- * check, the inline `@click` dispatch (accept/decline), hostile input rendered as
- * text (lit auto-escape), and the transitional `assertDomEquivalent` guard against
- * `eventChoiceHtml`. The live single-resolve behavior across all four dismissal
- * paths (buttons, Esc, backdrop, x) lives in the controller and is pinned by
- * `uiDialogs.integration.test.ts`.
+ * check, the inline `@click` dispatch (accept/decline), and hostile input rendered
+ * as text (lit auto-escape). The live single-resolve behavior across all four
+ * dismissal paths (buttons, Esc, backdrop, x) lives in the controller and is
+ * pinned by `uiDialogs.integration.test.ts`.
  */
 
 const noop = { onAccept: () => {}, onDecline: () => {} };
@@ -74,26 +72,5 @@ describe("eventChoiceTemplate escapes interpolated copy as text", () => {
     const frag = renderToFragment(eventChoiceTemplate("T", hostile, noop));
     expect(frag.querySelector('[data-act="accept"] b')).toBeNull();
     expect(frag.querySelector('[data-act="accept"]')?.textContent).toBe(`Pay ${hostile}`);
-  });
-});
-
-describe("eventChoiceTemplate matches the legacy eventChoiceHtml structure", () => {
-  it("assertDomEquivalent holds for a real multi-word message (the transitional guard)", () => {
-    expect(() =>
-      assertDomEquivalent(eventChoiceHtml("A fire has broken out!", "$50,000"), eventChoiceTemplate("A fire has broken out!", "$50,000", noop)),
-    ).not.toThrow();
-  });
-
-  it("holds for a message with an apostrophe and emoji (the production input class)", () => {
-    // The real EventSystem messages carry apostrophes/emoji but no HTML entities,
-    // so the legacy raw interpolation and lit's escaping still agree.
-    const msg = "Your tower's sprinklers failed! 🔥";
-    expect(() =>
-      assertDomEquivalent(eventChoiceHtml(msg, "$12,500"), eventChoiceTemplate(msg, "$12,500", noop)),
-    ).not.toThrow();
-  });
-
-  it("holds at the boundary: empty message and cost", () => {
-    expect(() => assertDomEquivalent(eventChoiceHtml("", ""), eventChoiceTemplate("", "", noop))).not.toThrow();
   });
 });

@@ -1,5 +1,4 @@
 import type { UI } from "./UI";
-import * as tpl from "./uiTemplates";
 import { confirmTemplate } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
@@ -10,6 +9,7 @@ import { stopsTemplate } from "./templates/stops";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
+import { congratsTemplate } from "./templates/congrats";
 import { render, type TemplateResult } from "lit-html";
 import { batchPricingTemplate, batchPriceText, batchPreviewMessage, type BatchPricingState, type BatchPricingCtx } from "./templates/batchPricing";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
@@ -24,7 +24,7 @@ import { routeExternalInWrapper } from "./externalLink";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
- * UI instance. Each one asks {@link uiTemplates} for its HTML body, opens it
+ * UI instance. Each one builds its lit template body from `./templates/`, opens it
  * through the UI's shared modal primitives, and wires the interactive handlers.
  * Extracted from `UI.ts`; the class keeps thin delegations so `main.ts` and the
  * rest of the app keep calling `ui.showHelp()` etc. unchanged.
@@ -493,6 +493,5 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
 }
 
 export function congratsTower(ui: UI): void {
-  const box = ui.openModal(tpl.congratsHtml());
-  ui.wireActions(box);
+  ui.openModalTemplate(congratsTemplate(() => ui.closeModal()));
 }

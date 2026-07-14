@@ -6,7 +6,8 @@ import { ECON, rentConfig, rentOf, resaleRefund } from "../../engine/econConfig"
 import type { Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { unitEditorHtml, transportEditorHtml } from "../../ui/editorHtml";
+import { unitEditorTemplate, transportEditorTemplate } from "../../ui/templates/editor";
+import { render, type TemplateResult } from "lit-html";
 import { SaveGame } from "../../storage/SaveGame";
 import type { ExportReport } from "../../storage/tdtExport";
 import type { ImportReport } from "../../storage/tdtImport";
@@ -28,6 +29,15 @@ import { KeyboardPlay } from "../../game/keyboardPlay";
 /** The most recent entry (tsconfig's lib predates Array.prototype.at). */
 function last<T>(arr: T[]): T {
   return arr[arr.length - 1];
+}
+
+/** An editor template rendered into a detached container: the action tests
+ *  hand this to handleEditAction the way production hands it the live card
+ *  (the string builders these tests once read retired with the final sweep). */
+function renderedCard(tpl: TemplateResult): HTMLElement {
+  const div = document.createElement("div");
+  render(tpl, div);
+  return div;
 }
 
 /** Recording fakes for the narrow ui/audio ports the controllers take. */
@@ -383,7 +393,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   it("sell on a burning unit refuses: the unit survives and the undo step never commits", () => {
     office.state = "fire";
     sel = { type: "unit", id: office.id };
-    root.innerHTML = unitEditorHtml(sim, office);
+    render(unitEditorTemplate(sim, office), root);
     editor.handleEditAction("sell", root);
     expect(sim.tower.units.some((u) => u.id === office.id)).toBe(true);
     expect(undo.captures).toEqual(["Sell"]);
@@ -393,7 +403,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("rename takes #ed-name's trimmed value and falls back to the facility name when blank", () => {
     sel = { type: "unit", id: office.id };
-    root.innerHTML = unitEditorHtml(sim, office);
+    render(unitEditorTemplate(sim, office), root);
     const input = root.querySelector<HTMLInputElement>("#ed-name")!;
     input.value = "  Corner Office  ";
     editor.handleEditAction("rename", root);
@@ -407,7 +417,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   it("a sold condo can't be repriced: rent nudges are silent no-ops", () => {
     condo.everOccupied = true; // sold — the engine's priceUnit returns null
     sel = { type: "unit", id: condo.id };
-    root.innerHTML = unitEditorHtml(sim, condo);
+    render(unitEditorTemplate(sim, condo), root);
     const before = rentOf(condo);
     editor.handleEditAction("rentDown", root);
     expect(rentOf(condo)).toBe(before);
@@ -416,7 +426,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("filmPolicy cycles auto → feature → blockbuster → auto on a cinema", () => {
     sel = { type: "unit", id: cinema.id };
-    root.innerHTML = unitEditorHtml(sim, cinema);
+    render(unitEditorTemplate(sim, cinema), root);
     editor.handleEditAction("filmPolicy", root);
     expect(cinema.filmPolicy).toBe("feature");
     editor.handleEditAction("filmPolicy", root);
@@ -428,7 +438,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("batchKind opens the batch-pricing dialog wired to the engine's preview/apply, with undo around apply", () => {
     sel = { type: "unit", id: office.id };
-    root.innerHTML = unitEditorHtml(sim, office);
+    render(unitEditorTemplate(sim, office), root);
     editor.handleEditAction("batchKind", root);
     expect(batchDlg).not.toBeNull();
     const band = rentConfig("office")!;
@@ -455,14 +465,14 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("batchKind on a kind without a rent band does nothing", () => {
     sel = { type: "unit", id: cinema.id };
-    root.innerHTML = unitEditorHtml(sim, cinema);
+    render(unitEditorTemplate(sim, cinema), root);
     editor.handleEditAction("batchKind", root);
     expect(batchDlg).toBeNull();
   });
 
   it("addcar refuses at the car cap (before any money talk) and when broke", () => {
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     lift.cars = maxCarsFor(lift.kind);
     const before = sim.money;
     editor.handleEditAction("addcar", root);
@@ -479,7 +489,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   it("stops/express/allstops: express skips non-lobby middles, allstops restores them", () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     editor.handleEditAction("express", root);
     expect(lift.skipFloors).toEqual([2, 3]); // endpoints always stop; 2–3 aren't lobbies
     expect(sim.tower.stopsAt(lift, 2)).toBe(false);
@@ -537,13 +547,13 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
-    const html = transportEditorHtml(sim, ex);
-    expect(html).not.toContain('data-edit="allstops"');
-    expect(html).not.toContain('data-edit="stops"');
-    expect(html).toContain("lobbies and sky lobbies");
-    const stdHtml = transportEditorHtml(sim, lift);
-    expect(stdHtml).toContain('data-edit="allstops"');
-    expect(stdHtml).toContain('data-edit="stops"');
+    const card = renderedCard(transportEditorTemplate(sim, ex));
+    expect(card.querySelector('[data-edit="allstops"]')).toBeNull();
+    expect(card.querySelector('[data-edit="stops"]')).toBeNull();
+    expect(card.textContent).toContain("lobbies and sky lobbies");
+    const std = renderedCard(transportEditorTemplate(sim, lift));
+    expect(std.querySelector('[data-edit="allstops"]')).not.toBeNull();
+    expect(std.querySelector('[data-edit="stops"]')).not.toBeNull();
   });
 
   it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", () => {
@@ -559,9 +569,9 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     const r = s.tower.placeTransport("elevatorExpress", 42, 1, 30);
     expect(r.ok).toBe(true);
     const ex = s.tower.transports.find((t) => t.id === r.transportId)!;
-    expect(transportEditorHtml(s, ex)).toContain("lobbies and sky lobbies");
+    expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies");
     expect(s.tower.setStop(ex.id, 15, false)).toBe(true); // skip the interior sky lobby
-    expect(transportEditorHtml(s, ex)).toContain("lobbies and sky lobbies (1 skipped)");
+    expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies (1 skipped)");
   });
 
   it("openStopsDialog lists floors top-down and each toggle is its own undo-bracketed setStop", () => {
@@ -593,7 +603,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
 
   it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", () => {
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     const before = sim.money;
     editor.handleEditAction("extendUp", root); // floor 3 is built → grows
     expect(lift.top).toBe(3);
@@ -617,7 +627,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     // the extend: the editor surfaces the engine's refusal as an error toast.
     expect(sim.buildTransport("elevatorStandard", 58, 3, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     editor.handleEditAction("extendUp", root); // floor 3 is occupied by the other shaft
     expect(lift.top).toBe(2); // unchanged
     expect(last(f.sfx)).toBe("error");

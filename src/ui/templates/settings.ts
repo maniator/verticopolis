@@ -2,8 +2,8 @@ import { html, type TemplateResult } from "lit-html";
 
 /**
  * The Settings dialog body: sound levels plus the presentation toggles. Authored
- * to match `settingsHtml` structurally (proven by the transitional
- * `assertDomEquivalent` test), including the `role="switch"` + `aria-describedby`
+ * to match `settingsHtml` structurally (proven by the
+ * retired transitional guards), including the `role="switch"` + `aria-describedby`
  * toggles and the `aria-hidden` volume readouts. This is a STATIC structure only:
  * Settings is stateful, so the controller (`showSettings`) owns all the wiring:
  * the volume sliders initialize from the live levels and apply on input; both
