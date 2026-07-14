@@ -1,5 +1,5 @@
 import type { Unit } from "../../../engine/types";
-import { scatterPeople, shade, type DrawCtx } from "../common";
+import { shade, type DrawCtx } from "../common";
 import { personFigure, personSeated, personStanding } from "../../pixelSprites/common";
 
 /**
