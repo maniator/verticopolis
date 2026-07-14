@@ -12,7 +12,7 @@ import * as scene from "./towerScene";
 import * as reconcile from "./towerReconcile";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
-import * as overlay from "./towerOverlay";
+import * as overlayFx from "./towerOverlay";
 import type { RoomRec } from "./towerReconcile";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
@@ -208,7 +208,7 @@ export class TowerEngine {
    *  `d.anim`), so functional motion keeps running while the animation stops. */
   reducedMotion = false;
   setReducedMotion(on: boolean): void {
-    overlay.setReducedMotion(this, on);
+    overlayFx.setReducedMotion(this, on);
   }
 
   /** Frame-clock-derived animation time that only advances while unpaused.
@@ -216,7 +216,7 @@ export class TowerEngine {
   animClock = 0;
   /** Reset the decorative animation clock to zero (see towerOverlay). */
   resetDecorativeClock(): void {
-    overlay.resetDecorativeClock(this);
+    overlayFx.resetDecorativeClock(this);
   }
 
   // Individually-routed commuters (SimTower's signature) are owned and advanced
@@ -381,7 +381,7 @@ export class TowerEngine {
 
   // Frame-pump steps. tick() dispatches through these so a controller can drive
   // tick on a fake and observe the repaint-trigger contract by stubbing them.
-  private syncEventFx(animating: boolean): void { overlay.syncEventFx(this, animating); }
+  private syncEventFx(animating: boolean): void { overlayFx.syncEventFx(this, animating); }
   private syncScene(): void { reconcile.syncScene(this); }
   private syncFacade(): void { reconcile.syncFacade(this); }
   private syncMotion(): void { crowd.syncMotion(this); }

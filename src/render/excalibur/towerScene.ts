@@ -14,7 +14,7 @@ import {
 import { drawSanta } from "../sprites/events";
 import { person, SHIRTS } from "../pixelSprites";
 import { FLOOR, TILE } from "../scale";
-import * as overlay from "./towerOverlay";
+import * as overlayFx from "./towerOverlay";
 import * as crowd from "./towerCrowd";
 import type { TowerEngine } from "./TowerEngine";
 
@@ -104,7 +104,7 @@ export function makeOverlay(engine: TowerEngine): void {
     width: engine.viewWidth,
     height: engine.viewHeight,
     cache: false,
-    draw: (ctx) => overlay.drawOverlay(engine, ctx),
+    draw: (ctx) => overlayFx.drawOverlay(engine, ctx),
   });
   engine.overlay = new ex.ScreenElement({ x: 0, y: 0, z: 100 });
   engine.overlay.graphics.use(engine.overlayCanvas);
@@ -257,7 +257,7 @@ function drawSky(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
 /** Santa's sleigh crossing the sky during a holiday cameo (see syncEventFx). */
 function renderSanta(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   if (engine.santaStart === null) return;
-  const p = (engine.d.anim - engine.santaStart) / overlay.SANTA_FLIGHT_SECONDS;
+  const p = (engine.d.anim - engine.santaStart) / overlayFx.SANTA_FLIGHT_SECONDS;
   if (p < 0 || p > 1) return;
   // Slide fully across, offscreen to offscreen, with a gentle bob.
   const x = -160 + p * (engine.viewWidth + 320);
