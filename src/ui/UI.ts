@@ -14,7 +14,7 @@ import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
 import { render, type TemplateResult } from "lit-html";
-import * as tpl from "./uiTemplates";
+import { toolInfoTemplate, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./templates/toolInfo";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
@@ -123,6 +123,10 @@ export class UI {
     this.cb = cb;
     buildPalette(this);
     this.wireControls();
+    // selectTool below renders the tool-info panel through lit; clear the static
+    // HTML placeholder first so lit's first render never appends after it (one
+    // container, one renderer). Invisible: selectTool repaints it immediately.
+    this.el.toolInfo.replaceChildren();
     this.selectTool({ type: "inspect" });
     // While the pointer is pressed inside the editor card, suppress the periodic
     // rebuild — otherwise a refresh landing between press and release would
@@ -190,11 +194,10 @@ export class UI {
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
       const f = FACILITIES[tool.kind];
-      this.el.toolInfo.innerHTML = tpl.buildToolInfoHtml(f, isCommercialKind(tool.kind));
+      render(toolInfoTemplate(f, isCommercialKind(tool.kind)), this.el.toolInfo);
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
-      this.el.toolInfo.innerHTML =
-        tool.type === "bulldoze" ? tpl.BULLDOZE_TOOL_INFO_HTML : tpl.INSPECT_TOOL_INFO_HTML;
+      render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);
     }
   }
 
