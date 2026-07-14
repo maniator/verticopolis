@@ -152,6 +152,14 @@ test.describe("E5-S0 perf gate @perf", () => {
     expect(nodeIdentity.towerStatsContainerStable, "the tower-stats container persists across pumps").toBe(true);
 
     if (CAPTURE || !fs.existsSync(BASELINE_PATH)) {
+      // In enforce mode a missing baseline is a hard failure, not a bootstrap:
+      // otherwise deleting baseline.json would silently disable the gate in CI.
+      // The bootstrap capture-and-skip remains for local runs and for the
+      // capture workflow itself (PERF_CAPTURE=1).
+      expect(
+        CAPTURE || !ENFORCE,
+        `no committed baseline at ${BASELINE_PATH}; mint one with the update-perf-baseline workflow`,
+      ).toBe(true);
       fs.mkdirSync(path.dirname(BASELINE_PATH), { recursive: true });
       fs.writeFileSync(BASELINE_PATH, JSON.stringify(current, null, 2) + "\n");
       test.info().annotations.push({

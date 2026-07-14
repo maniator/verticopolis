@@ -1475,11 +1475,11 @@ run-to-run. Residual defers:
   accepted structural-only guarantee) when it introduces the first live render.
 - **The committed baseline is minted by CI, not by hand**: `baseline.json` lands
   on the E5-S0 branch as a bot commit from `update-perf-baseline.yml` (the pinned
-  container), never from a local capture; the spec bootstrap-captures-and-skips
-  only while the file is absent. Because that bootstrap exists, **E5-S1 must
-  assert `fs.existsSync` of the baseline** (fail, not skip) so the gate can never
-  fall back to silently toothless if the file is ever deleted or a fresh branch
-  misses it.
+  container), never from a local capture. The gate itself now closes the
+  silent-hole risk: in enforce mode (CI, or `PERF_ENFORCE=1`) a missing baseline
+  is a hard failure with a mint pointer, while the bootstrap capture-and-skip
+  remains for local runs and the capture workflow. E5-S1 need only keep this
+  behavior; no extra exists-assertion is required there.
 - **`towerStatsChildStable` is reported, not asserted**: the pre-E5 `innerHTML =`
   rebuilds the stats children every pump, so E5-S1 promotes this to an assertion
   once the grid renders on change.

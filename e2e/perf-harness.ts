@@ -30,6 +30,10 @@ export interface UiUpdateSample {
  */
 export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateSample {
   const { n, batch } = opts;
+  // The loop below runs whole batches, so a non-divisible n would silently pump
+  // more than asked and report a misleading count. The spec also guards this at
+  // collection; enforcing it here keeps the helper honest for any other caller.
+  if (n % batch !== 0) throw new Error(`n (${n}) must be divisible by batch (${batch})`);
   const g = (window as any).game;
   for (let i = 0; i < 50; i++) {
     g.sim.clock.advance(1);
