@@ -18,7 +18,9 @@ import { reap, reconcileCrowd, clearCrowd, clearMotion, updateMotion } from "./t
  */
 
 const gfx = () => ({ width: 9, height: 25 }) as ex.Graphic;
-const actor = () => new ex.Actor({ pos: ex.vec(0, 0), width: 8, height: 14 });
+// Match the walker bake footprint (9x25) the production actors adopt from their
+// canvas, so fixtures never encode the legacy 8x14 size.
+const actor = () => new ex.Actor({ pos: ex.vec(0, 0), width: 9, height: 25 });
 const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.full ? "f" : "e"}`;
 
 /** A fake engine carrying the fields the motion/crowd functions read, plus the

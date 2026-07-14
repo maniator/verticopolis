@@ -6,9 +6,9 @@ import type { FacilityKind } from "../types";
 
 /**
  * Crowd motion placement: the elevator-landing queue. Waiting riders fan into a
- * line beside the shaft (on the side with more built floor, clamped to that
- * floor's structure) instead of stacking on the car's column; riders still
- * walking in (`toShaft`) head to the shaft face and only fan out once they
+ * line beside the shaft (on the side with the longer contiguous run of built
+ * floor, clamped to that run) instead of stacking on the car's column; riders
+ * still walking in (`toShaft`) head to the shaft face and only fan out once they
  * become `waiting`. Boarding is position-independent, so these pin the visual
  * placement, not the boarding math (that lives in queueView.test.ts, driven
  * through the same advance()).
@@ -32,8 +32,9 @@ describe("Crowd landing queue: waiters line up beside the shaft", () => {
     return res.transportId;
   }
 
-  /** A person parked in the `waiting` state at a shaft landing on `floor`. */
-  function waiter(id: number, shaftId: number, floor: number): Person {
+  /** A person parked in the `waiting` state at a shaft landing on `floor`, having
+   *  already waited `wait` seconds (so arrival order can be staged). */
+  function waiter(id: number, shaftId: number, floor: number, wait = 0): Person {
     return {
       id,
       seed: id,
@@ -47,28 +48,37 @@ describe("Crowd landing queue: waiters line up beside the shaft", () => {
       shaftId,
       carIndex: null,
       destX: 20,
-      wait: 0,
+      wait,
       age: 0,
       linger: 0,
     };
   }
 
-  /** Settle three waiters (no car parked at their floor, so none board). */
-  function settle(shaftX: number): { crowd: Crowd; tower: Tower; xs: number[]; carCenter: number } {
+  /** The tile column the car occupies, derived from the placed shaft so the
+   *  fixture survives a change to elevator geometry. */
+  function carColumn(tower: Tower, shaftId: number): number {
+    const shaft = tower.getTransport(shaftId)!;
+    return shaft.x + shaft.width / 2;
+  }
+
+  /** Settle three equal-wait waiters (no car parked at their floor, so none
+   *  board). With equal waits, the id tie-break orders them (id 1 at the front). */
+  function settle(shaftX: number): { xs: number[]; carCenter: number } {
     const tower = baseTower();
     const s = placeShaft(tower, shaftX, 1, 10);
     const crowd = new Crowd();
     for (let id = 1; id <= 3; id++) crowd.people.push(waiter(id, s, 3));
     for (let i = 0; i < 8; i++) crowd.advance(0.5, tower);
     expect(crowd.people.every((p) => p.state === "waiting")).toBe(true);
-    return { crowd, tower, xs: crowd.people.map((p) => p.x), carCenter: shaftX + 4 / 2 };
+    return { xs: crowd.people.map((p) => p.x), carCenter: carColumn(tower, s) };
   }
 
   it("forms the line to the RIGHT of a shaft at the floor's left end", () => {
     const { xs, carCenter } = settle(4); // more floor to the right, so the line runs right
     for (const x of xs) expect(Math.abs(x - carCenter)).toBeGreaterThan(1); // off the car column
     expect(new Set(xs.map((x) => Math.round(x * 100))).size).toBe(3); // distinct spots
-    expect(xs[0]).toBeLessThan(xs[1]); // FIFO: front nearest the doors
+    // Equal waits, so the id tie-break stands id 1 at the front (nearest doors).
+    expect(xs[0]).toBeLessThan(xs[1]);
     expect(xs[1]).toBeLessThan(xs[2]);
   });
 
@@ -76,8 +86,24 @@ describe("Crowd landing queue: waiters line up beside the shaft", () => {
     const { xs, carCenter } = settle(34); // more floor to the left, so the line runs left
     for (const x of xs) expect(Math.abs(x - carCenter)).toBeGreaterThan(1);
     expect(new Set(xs.map((x) => Math.round(x * 100))).size).toBe(3);
-    expect(xs[0]).toBeGreaterThan(xs[1]); // front nearest the doors, line extends left
+    // Equal waits: id 1 at the front, and the line extends left (decreasing x).
+    expect(xs[0]).toBeGreaterThan(xs[1]);
     expect(xs[1]).toBeGreaterThan(xs[2]);
+  });
+
+  it("stands the longest-waiting rider at the front, ahead of fresher arrivals", () => {
+    const tower = baseTower();
+    const s = placeShaft(tower, 4, 1, 10); // queues right, so the front is the smallest x
+    const crowd = new Crowd();
+    // Distinct waits that do NOT match id order: id 2 has waited longest, id 1
+    // the least, so ordering by wait (not id) is what the assertion pins.
+    crowd.people.push(waiter(1, s, 3, 1), waiter(2, s, 3, 9), waiter(3, s, 3, 5));
+    for (let i = 0; i < 8; i++) crowd.advance(0.5, tower);
+    const x = new Map(crowd.people.map((p) => [p.id, p.x]));
+    // Front (nearest the doors) is the longest-waiting rider, then next, then the
+    // freshest, regardless of id.
+    expect(x.get(2)!).toBeLessThan(x.get(3)!);
+    expect(x.get(3)!).toBeLessThan(x.get(1)!);
   });
 
   it("keeps a long line on the built floor instead of trailing off the edge", () => {
