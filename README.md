@@ -197,8 +197,12 @@ src/
     excalibur/TowerEngine.ts  Excalibur.js scene: actors, camera, pan/zoom, input
     sprites.ts      procedural per-facility drawing (drawn into Excalibur canvases)
     pixelSprites.ts dollhouse room interiors + walking/seated people
-  ui/UI.ts     # palette, status bar, editor panel, modals, toasts
+  ui/          # DOM controls: palette, status bar, editor panel, modals, toasts
+    UI.ts           shell class; delegates to friend-modules below
+    uiTemplates.ts  pure HTML builders; uiDialogs.ts dialog controllers
+    uiPanels.ts     editor/inspector panels; uiStatus.ts status+log pump; uiPalette.ts palette build
   audio/Audio.ts  # location-based procedural soundtrack + SFX
+    # ToneAudioEngine (orchestrator) + toneScenes (data/math) + toneVoices (synthesis)
   storage/SaveGame.ts  # localStorage + .vctower export/import
   main.ts      # GameApp: tool semantics, sim tick, glue (input/camera via Excalibur)
   gallery.ts   # standalone sprite-catalog page (docs/screenshots)

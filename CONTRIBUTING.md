@@ -87,7 +87,7 @@ that are easy to test.
 - **Global floor:** 85% statements / 85% lines / 80% functions / 80% branches,
   aggregated over the measured set.
 - **Per-file floors** for the render and audio layers (the sprite painters, the
-  pixel-sprite code, and `ToneAudioEngine`). These exist so a single weak file
+  pixel-sprite code, and the audio synthesis in `toneVoices`). These exist so a single weak file
   **can't hide behind strong siblings**. There is no cross-file masking. Draw
   code carries deliberately **lower BRANCH floors** because visual variants a spy
   2D context can't judge are the job of the Tier-2 Playwright visual tier, not
@@ -144,9 +144,14 @@ diagrams). The prose conventions below are the source of truth.
 - **`src/render/`**: canvas rendering and pixel-art sprites. Reads engine state,
   never mutates it.
 - **`src/ui/`**: DOM controls (palette, status bar, dialogs), using native
-  `<dialog>` for modals.
+  `<dialog>` for modals. The `UI` class is a thin shell over friend-modules that
+  take the instance: the pure HTML builders (`uiTemplates`), the dialog
+  controllers (`uiDialogs`), the editor/inspector panels (`uiPanels`), the
+  status/log pump (`uiStatus`), and the palette build (`uiPalette`).
 - **`src/audio/`, `src/storage/`**: sound and save/load, independent of
-  rendering.
+  rendering. The audio engine splits into the live orchestrator
+  (`ToneAudioEngine`), its scene/pitch data and math (`toneScenes`), and the
+  melody/accent/jingle synthesis (`toneVoices`).
 - **`src/main.ts`**: the composition root that wires input, engine, and the
   game loop together.
 
@@ -308,8 +313,8 @@ alone.
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
-| `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. |
-| `src/audio/` | Sound (`ToneAudioEngine.ts`), independent of rendering. |
+| `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `uiTemplates` (HTML), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
+| `src/audio/` | Sound, independent of rendering: `ToneAudioEngine` (orchestrator) + `toneScenes` (data/math) + `toneVoices` (synthesis). |
 | `src/storage/` | Save/load, `.vctower` tower-file import/export. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |
 | `src/tests/` | Vitest fixtures and integration suites (`*.integration.test.ts`); unit tests colocate next to their source. |
