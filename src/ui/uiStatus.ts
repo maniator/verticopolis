@@ -15,7 +15,8 @@ import { towerStatsTemplate } from "./templates/towerStats";
  * the lit migration; rationale in the implementation backlog): they are
  * append-only streams with deliberate performance structure (constant DOM
  * node count via append+prune, self-removing toasts), not markup for a
- * value diff, and their `role=log` / `aria-live` announcements must never
+ * value diff, and their live-region announcements (`role=log` on the
+ * bulletin, `role=status` on the toast rail, both `aria-live`) must never
  * be batched or throttled to fit a frame budget.
  */
 

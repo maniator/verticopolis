@@ -217,4 +217,34 @@ describe("statsTemplate matches the legacy buildStatsHtml structure", () => {
     sim.vipFavorable = true;
     expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
   });
+
+  it("holds for a 4-star tower whose hotel guests diverge the rating count (ratingRow + explainer)", () => {
+    // The last unexercised Overview branch before the oracle retires: at 4 stars
+    // and above, hotel guests drop out of the star rating, so the "Counts
+    // toward stars" row and its explainer render only when the two counts
+    // actually diverge.
+    const sim = builtTower();
+    const r = sim.tower.place("hotelSingle", 2, 22);
+    expect(r.ok).toBe(true);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "asleep"; // guest in residence tonight
+    room.occupants = 1;
+    sim.star = 4;
+    // Guard the fixture: the divergence must be real or the row never renders.
+    expect(sim.ratingPopulation()).toBeLessThan(sim.stats().population);
+    const frag = renderToFragment(statsTemplate(sim));
+    expect(frag.textContent).toContain("Counts toward stars");
+    expect(frag.textContent).toContain("Hotel guests count toward your star rating");
+    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  });
+
+  it("holds for a tower with an express shaft (the Express kindName label)", () => {
+    const sim = builtTower();
+    // Tower-level placement: the star/money gates live in sim.buildTransport
+    // and are not what this guard pins.
+    expect(sim.tower.placeTransport("elevatorExpress", 16, 1, 2).ok).toBe(true);
+    const frag = renderToFragment(statsTemplate(sim));
+    expect(frag.textContent).toContain("Express");
+    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  });
 });

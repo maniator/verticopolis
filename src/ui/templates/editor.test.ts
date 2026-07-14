@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { GRID, maxCarsFor } from "../../engine/facilities";
 import type { Transport, Unit } from "../../engine/types";
 import { unitEditorHtml, transportEditorHtml } from "../editorHtml";
 import { unitEditorTemplate, transportEditorTemplate } from "./editor";
@@ -91,7 +91,7 @@ describe("transport editor template structure", () => {
     let frag = renderToFragment(transportEditorTemplate(sim, lift));
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(true);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(false);
-    expect(sim.tower.setCars(lift.id, 8)).toBe(true); // MAX_CARS for every elevator kind
+    expect(sim.tower.setCars(lift.id, maxCarsFor(lift.kind))).toBe(true); // addcar disabled at the pool max
     frag = renderToFragment(transportEditorTemplate(sim, lift));
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!.disabled).toBe(false);
     expect(frag.querySelector<HTMLButtonElement>('[data-edit="addcar"]')!.disabled).toBe(true);
@@ -181,7 +181,7 @@ describe("transport editor matches the legacy builder", () => {
     if (lift.cars !== 1) expect(sim.tower.setCars(lift.id, 1)).toBe(true); // removecar disabled
     expect(sim.tower.setStop(lift.id, 3, false)).toBe(true); // "skips 1 floor"
     equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
-    expect(sim.tower.setCars(lift.id, 8)).toBe(true); // MAX_CARS: addcar disabled
+    expect(sim.tower.setCars(lift.id, maxCarsFor(lift.kind))).toBe(true); // addcar disabled at the pool max
     equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
     equivalent(transportEditorHtml(sim, lift, true), transportEditorTemplate(sim, lift, true));
   });
