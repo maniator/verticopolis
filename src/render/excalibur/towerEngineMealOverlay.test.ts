@@ -13,6 +13,9 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
         clock: { hour: 12, isNight: () => false, isEvening: () => false },
         tower: { revision: 7, mealOverlayRevision: 1 },
         congestion: () => 1,
+        // The tick threads the read-only queue projection onto d.elevatorQueue;
+        // stub the memoized view so this whitebox tick harness has one to read.
+        crowd: { queueView: () => ({ landings: new Map(), boarded: new Map() }) },
       },
       d: { lit: false, anim: 0, hour: 12, stress: 0 },
       craneGfx: null,

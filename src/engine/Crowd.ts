@@ -1,7 +1,7 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
 import { RNG } from "./rng";
-import type { Person, Route, ElevatorCalls } from "./crowd/person";
+import type { Person, Route, ElevatorCalls, ElevatorQueueView } from "./crowd/person";
 import * as routing from "./crowd/routing";
 import * as motion from "./crowd/motion";
 import * as crowdSpawn from "./crowd/spawn";
@@ -44,6 +44,19 @@ export class Crowd {
   staffDone: { unitId: number; ok: boolean }[] = [];
   /** @internal Live staff on shift (a counter so the spawn cap never scans all). */
   staffCount = 0;
+  /** @internal Monotonic outer-step counter, bumped once per sim step by
+   *  {@link beginStep} (called right after ElevatorDispatch.accumulate). It keys
+   *  the per-step memo of the read-only {@link queueView}, the way tower.revision
+   *  keys Tower.stopsCache: queue contents change every step, not per structural
+   *  edit, so the token advances per step rather than per revision. */
+  step = 0;
+  /** @internal Memoized queue projection and the (step, revision) key it was
+   *  built for. Keyed on the outer-step token AND tower.revision, so a
+   *  structural edit made while the sim is paused (step frozen, revision bumped)
+   *  still invalidates it instead of serving a stale projection for the pause. */
+  private queueCache: ElevatorQueueView | null = null;
+  /** @internal */ private queueStep = -1;
+  /** @internal */ private queueRev = -1;
 
   constructor(seed = 1) {
     this.rng = new RNG(seed);
@@ -63,6 +76,10 @@ export class Crowd {
     this.staffAdjRev = -1;
     this.staffDone = [];
     this.staffCount = 0;
+    this.step = 0;
+    this.queueCache = null;
+    this.queueStep = -1;
+    this.queueRev = -1;
   }
 
   /** 0..1: how stressed the current crowd is by elevator waits. */
@@ -93,6 +110,34 @@ export class Crowd {
   /** Live elevator calls from real people, for the dispatch (routing module). */
   elevatorCalls(tower: Tower): ElevatorCalls {
     return routing.elevatorCalls(this, tower);
+  }
+
+  /** Open a new outer sim step: invalidates the per-step {@link queueView} memo.
+   *  Called once per step from the sim loop, right after
+   *  ElevatorDispatch.accumulate, so the projection is derived at most once per
+   *  step and never inside the car/crowd sub-step loop. */
+  beginStep(): void {
+    this.step++;
+  }
+
+  /** Read-only elevator queue + car-fill projection for the render layer
+   *  (routing module), memoized on the (step, revision) key. The sim loop primes
+   *  it once per outer step (right after {@link beginStep}), so the single
+   *  `crowd.people` scan lands in the sim step; a render frame calling this only
+   *  reads the cached snapshot and never scans, mirroring how
+   *  {@link Tower.stopsOf} caches by revision. */
+  queueView(tower: Tower): ElevatorQueueView {
+    if (this.queueCache && this.queueStep === this.step && this.queueRev === tower.revision) {
+      return this.queueCache;
+    }
+    // Build into a local FIRST, then stamp the key and cache together: if the
+    // builder throws, neither the token nor the cache advances, so a same-step
+    // retry rebuilds instead of returning a stale-but-same-step snapshot.
+    const view = routing.elevatorQueueView(this, tower);
+    this.queueStep = this.step;
+    this.queueRev = tower.revision;
+    this.queueCache = view;
+    return view;
   }
 
   /** Fewest-transfer passenger route (two-ride cap), delegated to routing. */
@@ -148,5 +193,7 @@ export {
   type PersonState,
   type StaffKind,
   type ElevatorCalls,
+  type ElevatorQueueView,
+  type QueueLanding,
 } from "./crowd/person";
 export { MEAL_WINDOWS, mealWindowFor, staffOnShift, type MealWindow } from "./crowd/meals";

@@ -1,8 +1,9 @@
 import type { Tower } from "../Tower";
 import type { Transport } from "../types";
-import { isStaffOnlyTransport, isStaffTransportKind } from "../facilities";
+import { isStaffOnlyTransport, isStaffTransportKind, isElevatorKind } from "../facilities";
 import type { Crowd } from "../Crowd";
-import type { Route, ElevatorCalls } from "./person";
+import { STRESS_WAIT } from "./person";
+import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./person";
 
 /**
  * Transport routing for the crowd, pulled out of `Crowd.ts` as friend functions
@@ -178,4 +179,73 @@ export function elevatorCalls(crowd: Crowd, tower: Tower): ElevatorCalls {
     }
   }
   return { hall, cab };
+}
+
+/**
+ * Read-only elevator queue + car-fill projection for the render layer, a
+ * sibling to {@link elevatorCalls}. Where `elevatorCalls` feeds the dispatch,
+ * this feeds the queue and cab-fill visuals: per shaft landing the waiter count
+ * and a bounded wait-tier, and per car the boarded count.
+ *
+ * It is a pure VIEW of state the crowd already tracks (the same `waiting` people
+ * `elevatorCalls` counts, and each car's `carLoad`), so it re-simulates no
+ * boarding. It walks `crowd.people` once and the shaft list once;
+ * {@link Crowd.queueView} memoizes the result on the (step, revision) key and
+ * the sim loop primes it once per outer step, so the scan lands in the sim step
+ * and no render frame or car sub-step re-derives it, honoring the "one scan per
+ * outer step" rule. It stays a distinct pass from `elevatorCalls` rather than
+ * folded into it because `elevatorCalls` is re-run fresh every car sub-step to
+ * track mid-step boarding, while this snapshot must stay stable across the step.
+ *
+ * `boarded` reads the dispatch's statistical `t.carLoad` (the value the cab fill
+ * draws today), while `landings` reads the drawn `crowd.people`. Those are two
+ * populations; tying the drawn per-car occupancy to the queue is deferred to the
+ * queue-render story (E6-S7). See the backlog note.
+ */
+export function elevatorQueueView(crowd: Crowd, tower: Tower): ElevatorQueueView {
+  const landings = new Map<number, Map<number, QueueLanding>>();
+  for (const p of crowd.people) {
+    if (p.state !== "waiting" || p.shaftId == null) continue;
+    const shaft = tower.getTransport(p.shaftId);
+    if (!shaft) continue;
+    // Only elevator landings hold a waiting line: a stair/escalator leg is
+    // walked ("climbing"), never "waiting", so a waiter's shaft should already
+    // be an elevator. Gate defensively so a mis-set shaftId can never surface a
+    // stair/escalator as an elevator queue (mirrors the boarded loop's gate).
+    if (!isElevatorKind(shaft.kind)) continue;
+    // Staff-only shafts (service elevators) show ONLY staff waiters: a service
+    // elevator carries no tenants, so a stray tenant is never queued there.
+    if (isStaffOnlyTransport(shaft.kind) && !p.staff) continue;
+    // Express skip-stops draw a blank shaft band and no queue: never surface a
+    // landing on a floor this shaft does not stop at.
+    if (!tower.stopsAt(shaft, p.floor)) continue;
+    let floors = landings.get(p.shaftId);
+    if (!floors) landings.set(p.shaftId, (floors = new Map()));
+    let landing = floors.get(p.floor);
+    if (!landing) floors.set(p.floor, (landing = { count: 0, tier: 0 }));
+    landing.count++;
+    const tier = waitTier(p.wait);
+    if (tier > landing.tier) landing.tier = tier;
+  }
+  const boarded = new Map<number, Map<number, number>>();
+  for (const t of tower.transports) {
+    if (!isElevatorKind(t.kind)) continue;
+    // Iterate the shaft's real car count, not carLoad.length: carLoad is lazily
+    // sized by the dispatch (undefined until the first moveCars, and only then
+    // normalized to t.cars), so a fresh or just-resized shaft still reports one
+    // entry per car, defaulting a missing slot to an empty car.
+    const cars = new Map<number, number>();
+    for (let i = 0; i < t.cars; i++) cars.set(i, t.carLoad?.[i] ?? 0);
+    boarded.set(t.id, cars);
+  }
+  return { landings, boarded };
+}
+
+/** Bounded wait-tier for a landing waiter: tier 2 once the wait crosses the
+ *  fed-up threshold {@link STRESS_WAIT}, tier 1 at half of it, else tier 0.
+ *  Matches the three moods the render layer tints waiters by. */
+function waitTier(wait: number): 0 | 1 | 2 {
+  if (wait >= STRESS_WAIT) return 2;
+  if (wait >= STRESS_WAIT / 2) return 1;
+  return 0;
 }
