@@ -255,6 +255,24 @@ fires when the backstop workflow actually runs. Residuals parked here:
 - **A marker head reached via `opened`/`reopened` (no concurrent push), or after an `update-screenshots` run that hard-failed or committed nothing, has its PR drift check skipped with no regen in that same triggering.** The skip trusts that `update-screenshots.yml` ran and succeeded for this head. Determinism was already verified at the original push that carried the marker, and a hard-failed sibling run stays red on the same head SHA (its checks attach to the PR head commit), so the signal is visible, just not as this workflow's own job. Inherent to any "trust the sibling workflow" dedup and not cleanly detectable from within this run. Revisit only if a skipped-but-undrifted PR is observed in practice. (Low, Edge Case Hunter.)
 - **Substring collision: a head commit that merely mentions `[update-screenshots]` in prose (a revert, a workflow-editing commit quoting the marker) trips the skip.** Kept intentionally: the guard must match `update-screenshots.yml`'s substring `contains` exactly, or a stricter word-boundary match would re-introduce the 2x divergence on real marker pushes. For same-repo non-`main` heads both workflows fire together, so they stay consistent. If the marker convention is ever tightened, tighten it in both files at once. (Low, both hunters, intentional.)
 
+### Deferred from: code review of ToneAudioEngine split (`bmad-code-review` adversarial, 2026-07-14, Wave C-1)
+
+Change: `ToneAudioEngine.ts` (831 lines) split into `toneScenes.ts` (data + pure
+math), `toneVoices.ts` (synthesis free functions), and the orchestrator class.
+Behavior-preserving. Two review layers (Blind Hunter, Edge Case Hunter) plus
+Copilot. Nothing left deferred; both findings were patched in-PR:
+
+- Throwaway `AccentNodes` allocation on zoomed-in no-accent scenes, now
+  short-circuited before node resolution (`onStep` checks `def.accent !== "none"`).
+- **`scheduleStep` NaN on an empty `def.scale`** (Edge Case Hunter + Copilot):
+  the else branch indexed `def.scale[degree]` with no length guard, so an empty
+  scale would produce a NaN note. Unreachable for the built-in `SCENES` (all 12
+  have non-empty scales), but `scheduleStep` is now an exported helper whose
+  `SceneDef` param does not constrain the scale to non-empty, so the extraction
+  changed the risk profile. Fixed with a behavior-preserving `if (!def.scale.length) return;`
+  guard (never fires for the shipped scenes) plus a `toneVoices.test.ts` case
+  covering both the finite-frequency contract and the empty-scale short-circuit.
+
 ### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
 
 - **The a/b determinism guard only catches nondeterminism that diverges between two near-simultaneous, same-environment runs.** Both legs render in the same pinned image within the same time window, so entropy that is stable across the pair but varies run-to-run (wall-clock/date-stamped content, font/driver/locale changes) passes the diff yet still drifts. This is a pre-existing property of the two-run design, not introduced by sharding, and PR #188 already removed the known time leak by mocking the clock. If a future env/time leak slips it, the fix is to seed/pin the varying input in the generator, not to add a third run. (Low; inherent to the guard's scope.)

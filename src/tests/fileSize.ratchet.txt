@@ -8,10 +8,9 @@
 # engine
 # render
 src/render/excalibur/TowerEngine.ts
-# ui / app spine / audio
+# ui / app spine
 src/main.ts
 src/ui/UI.ts
-src/audio/ToneAudioEngine.ts
 # storage
 # engine leaves
 # scripts

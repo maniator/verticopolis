@@ -58,6 +58,8 @@ import * as saveGame from "../storage/SaveGame";
 import * as pixelSprites from "../render/pixelSprites";
 import * as structure from "../render/sprites/structure";
 import * as audio from "../audio/ToneAudioEngine";
+import * as toneScenes from "../audio/toneScenes";
+import * as toneVoices from "../audio/toneVoices";
 
 const RUNTIME_EXPORTS: Record<string, string[]> = {
   facilities: [
@@ -120,12 +122,17 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
     "drawConstruction", "drawCrane", "drawEscapeStairs", "drawFlames", "drawFloor", "drawLobby",
     "drawLobbyEntrance", "lobbyVariant",
   ],
-  audio: ["ToneAudioEngine", "clamp", "detailFor", "lerp", "midiToFreq", "sameNotes", "sceneFor"],
+  audio: ["ToneAudioEngine"],
+  toneScenes: [
+    "DETAIL_ZOOM", "OVERVIEW_EXIT", "OVERVIEW_ZOOM", "SCENES", "clamp", "detailFor", "lerp",
+    "midiToFreq", "sameNotes", "sceneFor",
+  ],
+  toneVoices: ["accentHit", "maybeAccent", "playSfx", "scheduleStep"],
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {
   facilities, simulation, tower, crowd, economy, migration, tdtFormat, tdtImport, tdtExport,
-  saveGame, pixelSprites, structure, audio,
+  saveGame, pixelSprites, structure, audio, toneScenes, toneVoices,
 };
 
 describe("barrel surface: every re-exported value binding resolves", () => {

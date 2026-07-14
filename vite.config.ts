@@ -220,7 +220,13 @@ export default defineConfig({
         // tier's job), so those files get a lower floor. A file that already
         // clears the global gets no line: a per-file threshold that just
         // restates the global earns nothing and is left off.
-        "src/audio/ToneAudioEngine.ts": { statements: 82, lines: 82, functions: 80, branches: 72 },
+        // ToneAudioEngine.ts is now the graph/lifecycle orchestrator; it clears
+        // the global on statements and lines, so only its function and branch
+        // floors remain. The procedural synthesis it used to hold moved to
+        // toneVoices.ts, which keeps the lower synth floor (the mocked-Tone graph
+        // test drives it end to end, but units can't reach every voice branch).
+        "src/audio/ToneAudioEngine.ts": { functions: 80, branches: 72 },
+        "src/audio/toneVoices.ts": { statements: 68, lines: 68, branches: 72 },
         "src/render/sprites/**": { branches: 72 },
         "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
       },

@@ -1,15 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
-import {
-  ToneAudioEngine,
-  sceneFor,
-  detailFor,
-  midiToFreq,
-  clamp,
-  lerp,
-  sameNotes,
-  type SfxName,
-} from "./ToneAudioEngine";
+import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
+import { sceneFor, detailFor, midiToFreq, clamp, lerp, sameNotes } from "./toneScenes";
 
 /**
  * ToneAudioEngine is the Web-Audio synthesis layer. This file unit-tests (1) the
