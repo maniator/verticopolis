@@ -1,12 +1,15 @@
 import type { Unit } from "../../engine/types";
-import { PAL, SHIRTS, closedShutter, hash, person, shell, type RoomCtx } from "./common";
+import { SHIRTS, closedShutter, hash, person, shell, type RoomCtx } from "./common";
 import { SHOP_LOOKS } from "./shop.looks";
+import { drawShopInterior, drawShopSignage, type ShopGeom } from "./shop.interiors";
 
 /**
- * Retail shop art plus its canon subtype look table. Extracted verbatim from
- * `pixelSprites.ts`. Every shop keeps the striped awning anchor shape, and each
- * trade furnishes its own interior. An undefined subtype falls back to the
- * legacy generic shop, byte-identical.
+ * Retail shop art plus its canon subtype look table. Every shop keeps the two
+ * anchor shapes the player names a store by: the striped awning, and (on the
+ * subtyped path) a lit sign board below it. Each of the eleven canon trades
+ * then furnishes its own interior, ported from its board tile in
+ * `page-04-retail.build.js` (see `shop.interiors.ts`). An undefined or unknown
+ * subtype falls back to the legacy generic shop, byte-identical.
  */
 
 // The canon look table lives in `shop.looks.ts` (split out for file-size
@@ -48,237 +51,24 @@ export function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: nu
     if (u.occupants > 0 || hash(u.id) > 0.4) person(ctx, x + w - 9, floorY, 1.5, (u.id * 11) | 0);
     return;
   }
-  // Each trade furnishes its own room; the goods palette colors the details.
-  const g = look.goods;
-  const midY = Math.round(y + h * 0.36);
-  switch (look.interior) {
-    case "racks": {
-      // Two clothing rails with hanging garments, and a dressed mannequin.
-      for (const railY of [midY, Math.round(y + h * 0.6)]) {
-        ctx.fillStyle = "#8A8A92";
-        ctx.fillRect(x + 5, railY, Math.round(w * 0.6), 1);
-        for (let gx = x + 7, k = 0; gx + 3 < x + Math.round(w * 0.6); gx += 5, k++) {
-          ctx.fillStyle = g[k % g.length];
-          ctx.fillRect(gx, railY + 1, 3, 6);
-        }
-      }
-      const mx = x + w - 12;
-      ctx.fillStyle = "#C8C8C8"; // plinth
-      ctx.fillRect(mx, floorY - 2, 6, 2);
-      ctx.fillStyle = g[0]; // suited mannequin
-      ctx.fillRect(mx + 1, floorY - 9, 4, 7);
-      ctx.fillStyle = "#E8E4DA";
-      ctx.fillRect(mx + 2, floorY - 11, 2, 2);
-      break;
-    }
-    case "pets": {
-      // A cage stack and a glowing aquarium.
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < 2; col++) {
-          const cx = x + 6 + col * 11;
-          const cy = midY + row * 8;
-          ctx.fillStyle = "#B8A890";
-          ctx.fillRect(cx, cy, 9, 6);
-          ctx.fillStyle = "#8A7A64"; // bars
-          for (let bx = cx + 1; bx < cx + 9; bx += 2) ctx.fillRect(bx, cy + 1, 1, 4);
-          ctx.fillStyle = g[(row * 2 + col) % g.length]; // the resident
-          ctx.fillRect(cx + 3, cy + 3, 3, 2);
-        }
-      }
-      const ax = x + Math.max(30, Math.round(w * 0.55));
-      ctx.fillStyle = "#2A4A64"; // aquarium
-      ctx.fillRect(ax, floorY - 9, 14, 7);
-      ctx.fillStyle = "#4FA0C8";
-      ctx.fillRect(ax + 1, floorY - 8, 12, 5);
-      ctx.fillStyle = "#E88F4A"; // fish
-      ctx.fillRect(ax + 3, floorY - 6, 2, 1);
-      ctx.fillRect(ax + 8, floorY - 7, 2, 1);
-      break;
-    }
-    case "florist": {
-      // Tiered flower stands and floor buckets in bloom.
-      for (const [tierY, tierX, tierW] of [
-        [midY, x + 5, Math.round(w * 0.5)],
-        [Math.round(y + h * 0.58), x + 8, Math.round(w * 0.4)],
-      ] as const) {
-        ctx.fillStyle = "#A98A6A";
-        ctx.fillRect(tierX, tierY + 4, tierW, 1);
-        for (let gx = tierX + 2, k = 0; gx + 3 < tierX + tierW; gx += 5, k++) {
-          ctx.fillStyle = "#4A7A4A"; // stem
-          ctx.fillRect(gx + 1, tierY + 1, 1, 3);
-          ctx.fillStyle = g[k % g.length]; // bloom
-          ctx.fillRect(gx, tierY - 1, 3, 3);
-        }
-      }
-      for (let bx = x + w - 18, k = 0; k < 2; bx += 8, k++) {
-        ctx.fillStyle = "#8A8A92"; // bucket
-        ctx.fillRect(bx, floorY - 4, 5, 4);
-        ctx.fillStyle = g[(k + 1) % g.length];
-        ctx.fillRect(bx, floorY - 6, 5, 2);
-      }
-      break;
-    }
-    case "books": {
-      // Two full bookcases of spines and a reading table.
-      for (const cx of [x + 5, x + Math.round(w * 0.4)]) {
-        const cw = Math.min(18, Math.round(w * 0.26));
-        ctx.fillStyle = "#6A5240"; // case
-        ctx.fillRect(cx, midY - 3, cw, floorY - midY + 3);
-        for (let row = 0; row < 2; row++) {
-          for (let bx = cx + 2, k = 0; bx + 2 < cx + cw - 1; bx += 3, k++) {
-            ctx.fillStyle = g[(k + row) % g.length];
-            ctx.fillRect(bx, midY - 1 + row * 6, 2, 5);
-          }
-        }
-      }
-      ctx.fillStyle = "#8C6E50"; // reading table
-      ctx.fillRect(x + w - 16, floorY - 5, 10, 2);
-      ctx.fillStyle = g[1];
-      ctx.fillRect(x + w - 13, floorY - 6, 3, 1);
-      break;
-    }
-    case "pharmacy": {
-      // Dispensing counter with a white-coated pharmacist, one aisle, the cross.
-      ctx.fillStyle = "#3A8A4A";
-      ctx.fillRect(x + w - 12, y + band + 2, 6, 2);
-      ctx.fillRect(x + w - 10, y + band, 2, 6);
-      const cw = Math.round(w * 0.36);
-      ctx.fillStyle = "#F4F4F0"; // counter
-      ctx.fillRect(x + 5, floorY - 7, cw, 5);
-      person(ctx, x + 5 + Math.round(cw / 2), floorY - 7, 1.2, (u.id * 17) | 0, false, "#F4F0E4");
-      ctx.fillStyle = "#A98A6A"; // aisle shelf
-      ctx.fillRect(x + cw + 12, midY + 4, Math.round(w * 0.3), 1);
-      for (let gx = x + cw + 14, k = 0; gx + 3 < x + cw + 12 + Math.round(w * 0.3); gx += 6, k++) {
-        ctx.fillStyle = g[k % g.length];
-        ctx.fillRect(gx, midY, 4, 4);
-      }
-      break;
-    }
-    case "boutique": {
-      // Sparse chic: one short rail, a mannequin, a tall mirror.
-      ctx.fillStyle = "#8A8A92";
-      ctx.fillRect(x + 6, midY, Math.round(w * 0.3), 1);
-      for (let gx = x + 9, k = 0; k < 3; gx += 8, k++) {
-        ctx.fillStyle = g[k % g.length];
-        ctx.fillRect(gx, midY + 1, 3, 6);
-      }
-      const mx = x + Math.round(w * 0.55);
-      ctx.fillStyle = "#C8C8C8";
-      ctx.fillRect(mx, floorY - 2, 6, 2);
-      ctx.fillStyle = g[0];
-      ctx.fillRect(mx + 1, floorY - 9, 4, 7);
-      ctx.fillStyle = "#E8E4DA";
-      ctx.fillRect(mx + 2, floorY - 11, 2, 2);
-      ctx.fillStyle = "#B8C8D4"; // tall mirror
-      ctx.fillRect(x + w - 10, midY - 2, 4, floorY - midY);
-      ctx.fillStyle = "#8A8A92";
-      ctx.fillRect(x + w - 11, midY - 3, 6, 1);
-      break;
-    }
-    case "screens": {
-      // A wall of glowing demo screens over a gadget counter.
-      for (let row = 0; row < 2; row++) {
-        for (let col = 0; col < Math.max(2, Math.floor((w - 16) / 10)); col++) {
-          const sx = x + 6 + col * 10;
-          if (sx + 7 > x + w - 6) break;
-          ctx.fillStyle = "#15151C"; // bezel
-          ctx.fillRect(sx, midY - 4 + row * 7, 7, 5);
-          ctx.fillStyle = g[(row + col) % 3];
-          ctx.fillRect(sx + 1, midY - 3 + row * 7, 5, 3);
-        }
-      }
-      ctx.fillStyle = "#2A2E38"; // demo counter
-      ctx.fillRect(x + 6, floorY - 4, w - 12, 3);
-      ctx.fillStyle = g[1];
-      ctx.fillRect(x + 10, floorY - 5, 3, 1);
-      ctx.fillRect(x + Math.round(w / 2), floorY - 5, 3, 1);
-      break;
-    }
-    case "bank": {
-      // Teller counter with divider windows, a vault door, the brass coin.
-      const cw = Math.round(w * 0.5);
-      ctx.fillStyle = "#D8D4C8"; // counter
-      ctx.fillRect(x + 5, floorY - 7, cw, 5);
-      for (const wx of [x + 9, x + 9 + Math.round(cw / 2)]) {
-        ctx.fillStyle = "#6A5240"; // teller window
-        ctx.fillRect(wx, floorY - 12, 6, 5);
-        ctx.fillStyle = "#E8E4DA";
-        ctx.fillRect(wx + 1, floorY - 11, 4, 3);
-      }
-      const vx = x + w - 12;
-      ctx.fillStyle = "#8A8A92"; // vault door
-      ctx.beginPath();
-      ctx.arc(vx, floorY - 6, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#5A5A62";
-      ctx.beginPath();
-      ctx.arc(vx, floorY - 6, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = PAL.brass; // the coin over the counter
-      ctx.beginPath();
-      ctx.arc(x + 8 + Math.round(cw / 2), y + band + 5, 3, 0, Math.PI * 2);
-      ctx.fill();
-      break;
-    }
-    case "salon": {
-      // Two styling stations (mirror + chair) and the barber pole.
-      for (const sx of [x + 7, x + 7 + Math.round(w * 0.3)]) {
-        ctx.fillStyle = "#C8DCE8"; // mirror
-        ctx.fillRect(sx, midY - 3, 5, 6);
-        ctx.fillStyle = "#8A8A92";
-        ctx.fillRect(sx - 1, midY - 4, 7, 1);
-        ctx.fillStyle = "#3E4654"; // chair
-        ctx.fillRect(sx, floorY - 6, 4, 4);
-        ctx.fillRect(sx + 1, floorY - 2, 2, 2);
-      }
-      const px = x + w - 9;
-      ctx.fillStyle = "#F4F0E4"; // pole
-      ctx.fillRect(px, y + band + 2, 3, 10);
-      for (let py = 0; py < 10; py += 4) {
-        ctx.fillStyle = py % 8 === 0 ? "#B84848" : "#4F6EC8";
-        ctx.fillRect(px, y + band + 2 + py, 3, 2);
-      }
-      break;
-    }
-    case "post": {
-      // Service counter, a stagger of parcels, and the mail drop box.
-      const cw = Math.round(w * 0.34);
-      ctx.fillStyle = "#D8D4C8";
-      ctx.fillRect(x + 5, floorY - 7, cw, 5);
-      person(ctx, x + 5 + Math.round(cw / 2), floorY - 7, 1.2, (u.id * 19) | 0);
-      const pxs = x + cw + 12;
-      ctx.fillStyle = "#C8A87A"; // parcels
-      ctx.fillRect(pxs, floorY - 4, 6, 4);
-      ctx.fillRect(pxs + 7, floorY - 4, 5, 4);
-      ctx.fillStyle = "#B8986A";
-      ctx.fillRect(pxs + 3, floorY - 8, 6, 4);
-      ctx.fillStyle = "#4F6EC8"; // drop box
-      ctx.fillRect(x + w - 11, floorY - 8, 5, 8);
-      ctx.fillStyle = "#2A3A6A";
-      ctx.fillRect(x + w - 10, floorY - 6, 3, 1);
-      break;
-    }
-    case "sports": {
-      // A ball bin, a stick rack, and a jersey on the wall.
-      ctx.fillStyle = "#8A8A92"; // bin
-      ctx.fillRect(x + 6, floorY - 5, 10, 5);
-      for (let k = 0; k < 3; k++) {
-        ctx.fillStyle = g[k % g.length];
-        ctx.beginPath();
-        ctx.arc(x + 9 + k * 3, floorY - 5, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      for (let rx = x + Math.round(w * 0.42), k = 0; k < 4; rx += 3, k++) {
-        ctx.fillStyle = k % 2 === 0 ? "#C8A87A" : "#A8845C"; // bats and sticks
-        ctx.fillRect(rx, floorY - 9, 1, 9);
-      }
-      const jx = x + w - 13;
-      ctx.fillStyle = g[0]; // jersey
-      ctx.fillRect(jx, midY - 2, 7, 6);
-      ctx.fillRect(jx - 1, midY - 2, 2, 3);
-      ctx.fillRect(jx + 6, midY - 2, 2, 3);
-      break;
-    }
-  }
-  if (u.occupants > 0 || hash(u.id) > 0.4) person(ctx, x + w - 9, floorY, 1.5, (u.id * 11) | 0);
+  // Subtyped shop: the enriched awning trim and lit sign, then the trade's own
+  // interior. The draw reads only bake-signature inputs (subtype via the look,
+  // occupants, lit, and the deterministic id hash), so a static room stays
+  // cacheable and re-bakes on a variety reroll.
+  const awningBottom = Math.round(y + band);
+  const geom: ShopGeom = {
+    x,
+    y,
+    w,
+    h,
+    floorY,
+    awningBottom,
+    railY: awningBottom + 8,
+    busy: u.occupants > 0 || hash(u.id) > 0.4,
+    occupants: u.occupants,
+    seed: (u.id * 11) | 0,
+    lit: d.lit,
+  };
+  drawShopSignage(ctx, geom, accent);
+  drawShopInterior(ctx, look, geom);
 }

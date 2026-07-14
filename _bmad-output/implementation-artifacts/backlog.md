@@ -121,6 +121,38 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of spec-pixelart-retail (E4) (`gds-code-review` adversarial, 2026-07-14)
+
+Change: enriched the eleven canon retail interiors in `src/render/pixelSprites/shop.ts`
+plus a new `src/render/pixelSprites/shop.interiors.ts` (per-trade draws, a lit sign
+board, a board-faithful `pen()` rect helper), ported tile for tile from
+`page-04-retail.build.js`. Three review layers (Blind Hunter, Edge Case Hunter,
+Acceptance Auditor). No `patch`-level finding: the one applied fix was reverting a
+comment inside the byte-stable generic branch so that branch stays literally
+untouched. Two findings deferred, both watch-only:
+
+- **Latent geometry underflow at non-shipping shop sizes** (Edge Case Hunter, Blind
+  Hunter): the interiors and the `railY = awningBottom + 8` band assume the fixed
+  shipping footprint (`shop` is catalog `width: 12` = 132px, 1 floor = 44px, so
+  `fy=39`, `railY=14`). For a shop narrower than ~16px or shorter than ~11px, fixed
+  offsets (counters at `w-16`, the electronics clerk at `x + w - 16`, tall props at
+  `fy-16`) underflow or overrun and `pen.F` clamps them to 1px slivers or draws off
+  the room's left edge. NOT reachable today: shops are fixed 132x44 and each room
+  bakes into its own `w x h` canvas (any overrun is clipped, never bleeds into a
+  neighbor). Only `screens()` carries an explicit right-edge break. If shops ever
+  become variable-size, add an interior-band guard (`railY < floorY`) and clamp the
+  fixed-offset props. Watch-only. (Ready, cheap, gated on shops becoming resizable.)
+- **Salon renders the hash stand-in as a seated (mid-haircut) client, not a standing
+  browser** (Edge Case Hunter, acceptance-flavored): when `u.occupants === 0` and
+  `hash(u.id) > 0.4`, station 0 draws a seated client while both stylists always
+  draw as staff. This is spec-compliant (the I/O matrix lists the Hair Salon client
+  as a sanctioned seated figure, gated on the same single hash signal every shop
+  uses; the client count is monotonic and never yields a second ghost), but it reads
+  as a stronger presence than the "single browsing customer" other trades show for
+  the same stand-in. If the honesty model tightens (real per-shop occupancy), revisit
+  whether the salon client should gate on a real occupant rather than the stand-in.
+  Watch-only, no behavior change wanted now.
+
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into
