@@ -103,47 +103,98 @@ export function drawStreetCar(ctx: CanvasRenderingContext2D, seed: number): void
   ctx.fillRect(14, 3, 1, 2);
 }
 
-/** Height of the metro train car, in px. Sized to sit in the station's platform
- *  trough (roughly one basement floor tall) rather than the old 9px sliver, so
- *  the train reads as a real subway car. The Excalibur actor bakes at this
- *  height and positions the car on the track just below the platform edge; the
- *  draw below sizes its body, stripe, and undercarriage off this height (a few
- *  details like the window band and headlight stay fixed). (A party-ratified
- *  60px "1.5 floor" train on a redrawn high-platform station is a follow-up.) */
-export const METRO_TRAIN_H = 20;
+/** Height of the metro train, in px: the party-ratified "one and a half
+ *  floor" consist for the high-platform station. The train's base rides the
+ *  track bed at the station's bottom edge; at this height its window band
+ *  clears the raised platform deck (one story up, see METRO_DECK_STORIES in
+ *  the station draw) so waiting commuters stand face-to-face with the cars.
+ *  The body, window band, stripe, and undercarriage all size off this
+ *  constant; the headlight and coupling gaps stay fixed. */
+export const METRO_TRAIN_H = 60;
 
-/** The subway carriage graphic, drawn at (0,0) into a w x METRO_TRAIN_H rect.
- *  It is its own Excalibur Actor; the engine slides it in and out along the
- *  platform. */
+/** Length of one carriage, in px. The train actor spans the whole lot, so the
+ *  body is drawn as a consist of coupled cars rather than one endless tube. */
+const METRO_CAR_W = 150;
+
+/** The subway consist, drawn at (0,0) into a w x METRO_TRAIN_H rect: coupled
+ *  silver cars with lit window bands, sliding door pairs, roof pods, a red
+ *  livery stripe, and bogies under each car. It is its own Excalibur Actor;
+ *  the engine slides it in and out along the platform (it enters from the
+ *  left, so the cab and headlight face right-of-travel at the left end). */
 export function drawMetroTrain(ctx: CanvasRenderingContext2D, w: number, headlightOn: boolean): void {
   const H = METRO_TRAIN_H;
-  // Silver carriage body above the undercarriage skirt, with a lit roof edge.
-  ctx.fillStyle = "#C6CCD4"; // silver carriage
-  ctx.fillRect(0, 0, w, H - 3);
-  ctx.fillStyle = "#E0E6EC"; // roof highlight
-  ctx.fillRect(0, 0, w, 2);
-  ctx.fillStyle = "#AEB6C0"; // lower body shade above the stripe
-  ctx.fillRect(0, H - 8, w, 2);
-  // Row of lit windows down the carriage.
-  for (let wx = 5; wx + 6 < w; wx += 12) {
-    ctx.fillStyle = "#2A3440"; // lit window
-    ctx.fillRect(wx, 4, 7, 7);
-    ctx.fillStyle = "#9FC0E0"; // glass glint
-    ctx.fillRect(wx, 4, 3, 2);
+  const skirtY = H - 8; // undercarriage top
+  const stripeY = H - 22; // red livery band
+  const bandY = Math.round(H * 0.22); // window band top
+  const bandH = Math.round(H * 0.3);
+  for (let cx = 0; cx < w; cx += METRO_CAR_W) {
+    const cw = Math.min(METRO_CAR_W, w - cx) - 4; // 4px coupling gap per car
+    if (cw <= 0) break;
+    // Car body: silver shell with a lit roof edge and a shaded lower flank.
+    ctx.fillStyle = "#C6CCD4";
+    ctx.fillRect(cx, 2, cw, skirtY - 2);
+    ctx.fillStyle = "#E0E6EC"; // roof highlight
+    ctx.fillRect(cx + 1, 2, cw - 2, 2);
+    ctx.fillStyle = "#AEB6C0"; // lower body shade
+    ctx.fillRect(cx, stripeY + 5, cw, skirtY - stripeY - 5);
+    // Roof equipment: an AC pod per car and a thin conduit line.
+    ctx.fillStyle = "#9AA2AC";
+    ctx.fillRect(cx + Math.max(6, cw >> 1) - 10, 0, 20, 2);
+    ctx.fillStyle = "#7E8894";
+    ctx.fillRect(cx + 4, 1, cw - 8, 1);
+    // Window band with glass glints, interrupted by sliding door pairs.
+    for (let wx = cx + 10; wx + 12 < cx + cw; wx += 24) {
+      const doorSlot = Math.floor((wx - cx) / 24) % 3 === 2;
+      if (doorSlot) {
+        // Door pair: two leaves, center seam, tall door windows.
+        ctx.fillStyle = "#B4BCC6";
+        ctx.fillRect(wx, bandY - 2, 12, skirtY - bandY - 2);
+        ctx.fillStyle = "#16181C"; // center seam
+        ctx.fillRect(wx + 5, bandY - 2, 1, skirtY - bandY - 2);
+        ctx.fillStyle = "#2A3440"; // door windows
+        ctx.fillRect(wx + 1, bandY, 3, bandH - 2);
+        ctx.fillRect(wx + 7, bandY, 3, bandH - 2);
+      } else {
+        ctx.fillStyle = "#2A3440"; // lit saloon window
+        ctx.fillRect(wx, bandY, 12, bandH);
+        ctx.fillStyle = "#9FC0E0"; // glass glint
+        ctx.fillRect(wx, bandY, 4, 2);
+      }
+    }
+    // Red livery stripe with a light catch, full car length.
+    ctx.fillStyle = "#D0392B";
+    ctx.fillRect(cx, stripeY, cw, 4);
+    ctx.fillStyle = "#E85D4A";
+    ctx.fillRect(cx, stripeY, cw, 1);
+    // Undercarriage skirt and two bogies (wheel trucks) per car.
+    ctx.fillStyle = "#1A2028";
+    ctx.fillRect(cx + 2, skirtY, cw - 4, H - skirtY);
+    ctx.fillStyle = "#0E1116";
+    for (const bx of [cx + 14, cx + cw - 34]) {
+      if (bx > cx && bx + 20 < cx + cw) {
+        ctx.fillRect(bx, H - 6, 20, 6);
+        ctx.fillStyle = "#2E3640"; // wheel glint
+        ctx.fillRect(bx + 3, H - 4, 4, 2);
+        ctx.fillRect(bx + 13, H - 4, 4, 2);
+        ctx.fillStyle = "#0E1116";
+      }
+    }
+    // Coupling diaphragm in the gap to the next car.
+    if (cx + METRO_CAR_W < w) {
+      ctx.fillStyle = "#3A4048";
+      ctx.fillRect(cx + cw, Math.round(H * 0.3), 4, Math.round(H * 0.4));
+    }
   }
-  // Red livery stripe low on the body.
-  ctx.fillStyle = "#D0392B"; // red livery stripe
-  ctx.fillRect(0, H - 6, w, 3);
-  ctx.fillStyle = "#E85D4A"; // lighter livery highlight
-  ctx.fillRect(0, H - 6, w, 1);
-  // Dark undercarriage skirt with wheel trucks.
-  ctx.fillStyle = "#1A2028";
-  ctx.fillRect(0, H - 3, w, 3);
-  ctx.fillStyle = "#0E1116";
-  for (let cx = 10; cx + 5 < w; cx += 30) {
-    ctx.fillRect(cx, H - 2, 5, 2);
-    ctx.fillRect(cx + 16, H - 2, 5, 2);
-  }
+  // Cab nose at the leading (left) end: windshield, destination board, and the
+  // headlight keyed on state (#9FC0E0 stays the one dark-headlight literal the
+  // narrow-carriage test isolates; the window loop above starts at x 10 with a
+  // 12px guard, so a w=8 bake paints no glints).
+  ctx.fillStyle = "#B4BCC6";
+  ctx.fillRect(0, 4, 5, skirtY - 6);
+  ctx.fillStyle = "#20262E"; // windshield
+  ctx.fillRect(1, bandY - 2, 4, Math.round(bandH * 0.8));
+  ctx.fillStyle = "#E8C14A"; // destination board
+  ctx.fillRect(1, 6, 4, 3);
   ctx.fillStyle = headlightOn ? "#FFE27A" : "#9FC0E0"; // headlight, keyed on state
-  ctx.fillRect(1, 6, 2, 3);
+  ctx.fillRect(0, stripeY - 6, 3, 4);
 }
