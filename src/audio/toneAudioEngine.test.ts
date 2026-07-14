@@ -9,7 +9,7 @@ import {
   lerp,
   sameNotes,
   type SfxName,
-} from "../audio/ToneAudioEngine";
+} from "./ToneAudioEngine";
 
 /**
  * ToneAudioEngine is the Web-Audio synthesis layer. This file unit-tests (1) the

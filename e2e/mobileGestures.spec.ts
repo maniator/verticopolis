@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
  * sorted active set). Lifting the FIRST-placed finger of a pinch first made
  * the survivor's up arrive under a different id than its down, stranding a
  * phantom contact; every later one-finger press then read as a two-finger
- * pinch (stuck zoom, dead taps). The unit layer (src/tests/pinchTracker.test.ts)
+ * pinch (stuck zoom, dead taps). The unit layer (src/render/pinchTracker.test.ts)
  * pins the pure state machine; THIS spec drives the real browser pipeline
  * (native PointerEvents through Excalibur's receiver into TowerEngine), so an
  * Excalibur upgrade or input-wiring change that reintroduces the class of bug

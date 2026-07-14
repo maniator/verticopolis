@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { TowerEngine } from "../render/excalibur/TowerEngine";
+import { TowerEngine } from "./TowerEngine";
 
 describe("TowerEngine meal-overlay repaint trigger", () => {
   it("re-runs syncScene when the transient meal overlay changes mid-hour", () => {

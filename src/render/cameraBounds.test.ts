@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { clampCameraY } from "../render/cameraBounds";
+import { clampCameraY } from "./cameraBounds";
 import { GRID } from "../engine/facilities";
 // Pull the buildable bounds from the real GRID and FLOOR from the pure
 // render/scale module so the test can't drift if the tower geometry or the
 // render scale changes (the helper itself is parameterized by floorPx).
-import { FLOOR } from "../render/scale";
+import { FLOOR } from "./scale";
 const MIN_FLOOR = GRID.minFloor; // deepest buildable (B10)
 const MAX_FLOOR = GRID.maxFloor;
 const VIEW_H = 800;

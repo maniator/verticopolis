@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
-import { AudioEngine } from "../audio/Audio";
+import { AudioEngine } from "./Audio";
 
 /**
  * The AudioEngine facade (src/audio/Audio.ts) is a thin synchronous shell that
