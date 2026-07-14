@@ -1726,6 +1726,36 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     applyBtn.click(); // confirms
     expect(apply).toHaveBeenCalledOnce();
   });
+
+  it("an armed reset is disarmed by any subsequent input (reverts to Apply)", () => {
+    const { apply } = open();
+    const def = dialog().querySelector<HTMLInputElement>('input[name="bp-mode"][value="default"]')!;
+    dialog().querySelector<HTMLInputElement>('input[name="bp-mode"][value="set"]')!.checked = false;
+    def.checked = true;
+    def.dispatchEvent(new Event("change", { bubbles: true }));
+    const applyBtn = dialog().querySelector<HTMLButtonElement>("#bp-apply")!;
+    applyBtn.click(); // arm
+    expect(applyBtn.textContent).toBe("Confirm reset");
+    // Any input disarms: toggle the only-default filter.
+    const only = dialog().querySelector<HTMLInputElement>("#bp-only")!;
+    only.checked = true;
+    only.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(dialog().querySelector<HTMLButtonElement>("#bp-apply")!.textContent).toBe("Apply");
+    // The next Apply arms again rather than applying immediately.
+    dialog().querySelector<HTMLButtonElement>("#bp-apply")!.click();
+    expect(apply).not.toHaveBeenCalled();
+    expect(dialog().querySelector<HTMLButtonElement>("#bp-apply")!.textContent).toBe("Confirm reset");
+  });
+
+  it("snaps a typed off-grid price to the step grid on commit (blur/Enter)", () => {
+    open();
+    const price = dialog().querySelector<HTMLInputElement>("#bp-price")!;
+    price.value = "12345";
+    price.dispatchEvent(new Event("input", { bubbles: true })); // typing: not snapped yet
+    expect(dialog().querySelector<HTMLInputElement>("#bp-price")!.value).toBe("12345");
+    price.dispatchEvent(new Event("change", { bubbles: true })); // commit: snaps to the $1,000 grid
+    expect(dialog().querySelector<HTMLInputElement>("#bp-price")!.value).toBe("12000");
+  });
 });
 
 describe("Saved Towers rows (mode chip + in-game day)", () => {
