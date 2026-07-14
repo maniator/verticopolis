@@ -2,7 +2,8 @@ import type { Simulation, LogEntry } from "../engine/Simulation";
 import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind } from "../engine/types";
 import type { UI } from "./UI";
-import { towerStatsHtml } from "./uiTemplates";
+import { render } from "lit-html";
+import { towerStatsTemplate } from "./templates/towerStats";
 
 /**
  * Status-bar, palette-lock, tower-stats and bulletin-log rendering for
@@ -59,7 +60,10 @@ export function update(ui: UI, sim: Simulation): void {
 
   ui.setTowerName(sim.tower.towerName);
 
-  ui.el.towerStats.innerHTML = towerStatsHtml(sim.stats());
+  // lit render, not innerHTML: patches the changed text in place each pump, so
+  // the grid's nodes keep their identity (E5-S0 gate) instead of a full reparse.
+  // #tower-stats is lit's container exclusively (one container, one renderer).
+  render(towerStatsTemplate(sim.stats()), ui.el.towerStats);
 
   renderLog(ui, sim.log, sim.logSeq);
 }

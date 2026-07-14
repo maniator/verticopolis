@@ -101,9 +101,9 @@ export function measureSimSpeed(windowMs: number): Promise<number> {
  * Profile (C): pump the UI `pumps` times (advancing the clock so the snapshot
  * actually changes) and report whether the key DOM nodes keep their identity. The
  * status leaf spans (money/pop/star/time/date) are textContent writes and must
- * NEVER be replaced. The tower-stats CONTAINER must also persist; its CHILDREN are
- * rebuilt by the pre-E5 `innerHTML =` and become stable only once E5-S1 lands, so
- * `towerStatsChildStable` is reported (not asserted) here and flips true then.
+ * NEVER be replaced. The tower-stats CONTAINER must persist, and since E5-S1 its
+ * CHILDREN must too: the grid renders through lit, which patches text in place,
+ * so `towerStatsChildStable` is asserted by the gate alongside the other flags.
  */
 export function checkNodeIdentity(pumps: number): {
   statusLeavesStable: boolean;
