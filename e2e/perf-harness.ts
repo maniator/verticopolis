@@ -46,7 +46,10 @@ export function benchmarkUiUpdate(opts: { n: number; batch: number }): UiUpdateS
     samples.push((performance.now() - t0) / batch);
   }
   samples.sort((a, b) => a - b);
-  const pct = (p: number): number => samples[Math.min(samples.length - 1, Math.floor((p / 100) * samples.length))];
+  // Map the percentile onto the 0-based sorted array via (length - 1): flooring
+  // p/100 * length would bias p95 toward the 96th percentile and skew an
+  // even-count median high.
+  const pct = (p: number): number => samples[Math.floor((p / 100) * (samples.length - 1))];
   return { n: iters * batch, batch, medianMs: pct(50), p95Ms: pct(95), meanMs: samples.reduce((s, x) => s + x, 0) / samples.length };
 }
 
@@ -66,9 +69,11 @@ export function measureSimSpeed(windowMs: number): Promise<number> {
     const startClock = g.sim.clock.minutes as number;
     const startWall = performance.now();
     let done = false;
+    let fallback = 0;
     const finish = (): void => {
       if (done) return;
       done = true;
+      clearTimeout(fallback); // no stray timer bleeding into the next window
       const elapsed = performance.now() - startWall;
       const simMinutes = (g.sim.clock.minutes as number) - startClock;
       resolve(simMinutes / (elapsed / 1000));
@@ -84,7 +89,7 @@ export function measureSimSpeed(windowMs: number): Promise<number> {
     requestAnimationFrame(tick);
     // Belt-and-braces: if rAF never fires (starved/backgrounded), still resolve a
     // little after the window so the measurement can't hang.
-    setTimeout(finish, windowMs + 2000);
+    fallback = setTimeout(finish, windowMs + 2000) as unknown as number;
   });
 }
 

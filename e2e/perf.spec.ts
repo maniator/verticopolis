@@ -24,6 +24,13 @@ import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-ha
 const dir = path.dirname(fileURLToPath(import.meta.url));
 const BASELINE_PATH = path.join(dir, "perf", "baseline.json");
 const CAPTURE = process.env.PERF_CAPTURE === "1";
+// The committed baseline is minted on CI hardware, so comparing against it is
+// only meaningful there: a slower local machine would always fail and a faster
+// one would hide regressions. Mirror of the visual-snapshot convention
+// (ignoreSnapshots outside CI): locally the measurements still RUN and are
+// reported, but the baseline comparison is skipped; set PERF_ENFORCE=1 to
+// compare anyway (e.g. to eyeball a diff in progress).
+const ENFORCE = !!process.env.CI || process.env.PERF_ENFORCE === "1";
 
 // (A) 4000 pumps, timed in batches of 40 so each sample (~30ms) clears the
 // ~0.1ms performance.now() floor and averages out GC jitter; (B) the fastest
@@ -82,16 +89,20 @@ test.describe("E5-S0 perf gate @perf", () => {
     try {
       await client.send("Emulation.setCPUThrottlingRate", { rate: CPU_THROTTLE });
       // Resume the real frame loop at full speed: dismiss the splash (it pauses
-      // the sim), clear any pending emergency so it cannot re-arm and freeze the
-      // clock (accMinutes = 0), suppress the one-shot TOWER congrats modal, stub
-      // the autosave so a mid-window serialize of the huge tower cannot perturb
-      // the measurement, and unpause the engine at the fastest speed.
+      // the sim), neutralize emergencies (clear the EventSystem's pending choice,
+      // `sim.pendingChoice` is only a getter over it, and stub `showEventChoice`
+      // to instantly decline so a NEW mid-window emergency resolves instead of
+      // freezing the clock via the shownChoice modal gate), suppress the one-shot
+      // TOWER congrats modal, stub the autosave so a mid-window serialize of the
+      // huge tower cannot perturb the measurement, and unpause the engine at the
+      // fastest speed.
       await page.evaluate((s) => {
         const g = (window as unknown as {
           game: {
             speed: number;
             engine: { paused: boolean };
-            sim: { pendingChoice: unknown };
+            sim: { events: { pending: unknown } };
+            ui: { showEventChoice: (m: string, c: string, onResolve: (opt: "accept" | "decline") => void) => void };
             prefs: { steadyClock: boolean };
             saveLoad?: { autosave: () => void };
             shownWin: boolean;
@@ -100,7 +111,8 @@ test.describe("E5-S0 perf gate @perf", () => {
           };
         }).game;
         document.getElementById("splash")?.remove();
-        g.sim.pendingChoice = null;
+        g.sim.events.pending = null;
+        g.ui.showEventChoice = (_m, _c, onResolve) => onResolve("decline");
         g.shownWin = true;
         g.shownChoice = false;
         g.shownUpdate = false;
@@ -142,7 +154,37 @@ test.describe("E5-S0 perf gate @perf", () => {
       return;
     }
 
+    if (!ENFORCE) {
+      // Local hardware differs from the CI runner that minted the baseline, so
+      // the comparison would be meaningless here; report the measurements and
+      // stop (see the ENFORCE note at the top).
+      test.info().annotations.push({
+        type: "perf-measured",
+        description: `measured (comparison skipped outside CI; PERF_ENFORCE=1 to compare): ${JSON.stringify(current)}`,
+      });
+      return;
+    }
+
     const baseline = JSON.parse(fs.readFileSync(BASELINE_PATH, "utf8")) as Baseline;
+    // The baseline is only comparable if it was minted with the SAME harness
+    // parameters; a constant change (or a stale file) must demand a re-mint via
+    // [update-perf-baseline], never a silent apples-to-oranges comparison.
+    expect(
+      {
+        n: baseline.uiUpdate.n,
+        batch: baseline.uiUpdate.batch,
+        cpuThrottle: baseline.simSpeed.cpuThrottle,
+        speed: baseline.simSpeed.speed,
+        windowMs: baseline.simSpeed.windowMs,
+      },
+      "baseline metadata must match the harness parameters; re-mint with [update-perf-baseline]",
+    ).toEqual({
+      n: N_PUMPS,
+      batch: A_BATCH,
+      cpuThrottle: CPU_THROTTLE,
+      speed: SPEED_MINUTES_PER_SEC,
+      windowMs: SPEED_WINDOW_MS,
+    });
     // (A) median must not rise more than 5%; p95 not more than 10%.
     expect(uiUpdate.medianMs, `ui.update median ${uiUpdate.medianMs.toFixed(4)}ms vs baseline ${baseline.uiUpdate.medianMs.toFixed(4)}ms`)
       .toBeLessThanOrEqual(baseline.uiUpdate.medianMs * A_MEDIAN_TOL);
