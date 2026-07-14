@@ -179,4 +179,3 @@ migration can follow.
   then collapse. Confirm this is the intended end state (assumed: yes).
 - Confirm the **no-version-bump** policy for this and every behavior-preserving
   phase (assumed: none).
-</content>

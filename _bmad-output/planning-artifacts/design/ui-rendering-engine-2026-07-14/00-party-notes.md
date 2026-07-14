@@ -53,7 +53,7 @@ string` builders in `src/ui/uiTemplates.ts` (and siblings `statsHtml.ts`,
 - **No structural safety.** Nothing stops the next contributor from growing a
   new god-template or forgetting a prune step.
 
-Not a problem: the per-frame status pump (`uiStatus.update`) is already surgical
+Not a problem: the throttled (~6 Hz) status pump (`uiStatus.update`) is already surgical
 (targeted `textContent`/`classList` writes, never an `innerHTML` rebuild). Any
 replacement must preserve that property, not regress it.
 

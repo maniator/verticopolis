@@ -68,7 +68,7 @@ Every review finding, and where it now lives in the plan.
 
 | # | Finding | Folded into |
 |---|---|---|
-| UX-1 | Invariant: most a11y here lives in controller side effects, not templates, so a mechanical port drops it; every story enumerates its a11y behaviors as acceptance criteria. | `20` invariant 7 (a11y-in-controllers); `30` per-story a11y checklist; `50`. |
+| UX-1 | Invariant: most a11y here lives in controller side effects, not templates, so a mechanical port drops it; every story enumerates its a11y behaviors as acceptance criteria. | `20` invariant 5 (a11y-in-controllers); `30` per-story a11y checklist; `50`. |
 | UX-2 | R1 (high, sim-deadlock): the fire-once emergency/update modals resolve once across button/Esc/backdrop/x by assigning `dialog.onclick`/`oncancel` PROPERTIES. The shared modal helper sets these by property assignment, never `addEventListener`; test all four dismissal paths per fire-once modal. A dropped resolve deadlocks the frozen sim. | `20` section 4 and Risks R1; `30` E2-S1/S2 checklist; `40` modal-mount constraints; `50` fire-once matrix. |
 | UX-3 | R2: `#a11y-live` polite announcements (import/export reports, and the update chip's clear-then-rAF re-announce-every-call) are controller side effects; make them explicit acceptance criteria with a test asserting the region text after open. | `30` E3-S4 and E2-S2 checklists; `50`. |
 | UX-4 | R3: E5 status bar renders the individual leaf spans (money/pop/star/time/date), NOT a wrapper that also owns `#traffic` (updated imperatively in `main.ts` with a hysteresis aria-label), else lit and `main.ts` clobber each other. Pin render-target granularity in E5-S1. | `20` section 5 and invariant 1 note; `30` E5-S1; `50`. |
@@ -139,5 +139,3 @@ not hidden.
   `renderEditor` integration block and `editorPatch.test.ts` encode the exact
   `key`/`patchVolatile` mechanism E6 removes. Those are rewritten in E6, with a
   new test pinning the surviving mid-click invariant.
-</content>
-</invoke>

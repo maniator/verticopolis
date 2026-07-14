@@ -164,4 +164,3 @@ pin. Every aspect also carries parts (1), (2), (3), and (5) of the package;
 - Structural perf mitigation (decouple `ui.update` from the sim's dt accounting)
   is applied only if E5-S0 profile B regresses; otherwise it stays a recorded
   option.
-</content>

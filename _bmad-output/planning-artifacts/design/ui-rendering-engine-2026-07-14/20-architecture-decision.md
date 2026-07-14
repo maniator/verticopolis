@@ -480,4 +480,3 @@ The full contract is in `50-testing-strategy.md`; the load-bearing points, inlin
 - **Dependency surface (low).** Importing `lit` broadly could pull `LitElement`.
   Mitigation: import from `lit-html` directly; verify the built chunk includes no
   web-component code and is the production build.
-</content>

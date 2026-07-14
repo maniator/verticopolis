@@ -109,8 +109,8 @@ The UI works today. The goal is to make it cheaper and safer to keep working.
   bug before a baseline is regenerated via the pinned image.
 - No `escapeHtml` call remains in a migrated template (escaping is the renderer's
   job); any surviving raw-HTML insertion is explicit and reviewed.
-- The per-frame `ui.update(sim)` path stays surgical: no full-subtree
-  `innerHTML` rebuild per frame, no regression against the 60fps loop.
+- The throttled `ui.update(sim)` path stays surgical: no full-subtree
+  `innerHTML` rebuild per pump, no regression against the 60fps loop.
 - The `main.ts` `UICallbacks` split is landed.
 - Bundle: the new runtime dependency adds no more than a few KB gzipped to the
   game precache (target: under ~6 KB; lit-html is ~3.7 KB).

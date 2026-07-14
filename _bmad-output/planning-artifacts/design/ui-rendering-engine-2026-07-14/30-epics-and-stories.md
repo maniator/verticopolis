@@ -363,4 +363,3 @@ Log all three to `_bmad-output/implementation-artifacts/backlog.md`.
 - E6 depends on E0 and is done last (highest coupling); it rewrites the panel and
   editor-patch tests.
 - E7 is a decision, runnable any time after E5.
-</content>
