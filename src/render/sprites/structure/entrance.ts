@@ -26,10 +26,14 @@ type Filler = (cx: number, ry: number, cw: number, ch: number, color: string, al
 
 function makeFiller(ctx: CanvasRenderingContext2D, x: number, y: number, off: number): Filler {
   return (cx, ry, cw, ch, color, alpha = 1) => {
-    ctx.globalAlpha = alpha;
+    const rw = Math.round(cw);
+    const rh = Math.round(ch);
+    if (rw <= 0 || rh <= 0) return; // skip a degenerate rect instead of flooring it to a stray 1px
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = prevAlpha * alpha; // composite with the caller's alpha, do not clobber a fade
     ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x + cx - off), Math.round(y + ry), Math.max(1, Math.round(cw)), Math.max(1, Math.round(ch)));
-    ctx.globalAlpha = 1;
+    ctx.fillRect(Math.round(x + cx - off), Math.round(y + ry), rw, rh);
+    ctx.globalAlpha = prevAlpha; // restore instead of assuming the caller was at 1
   };
 }
 
