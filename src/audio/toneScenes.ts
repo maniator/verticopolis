@@ -220,7 +220,7 @@ export const DETAIL_ZOOM = 1.7;
 export const OVERVIEW_EXIT = OVERVIEW_ZOOM + 0.08;
 
 export function sceneFor(focus: ViewFocus, overview: boolean): Scene {
-  // Zoomed all the way out — you're looking at the whole building, so play the
+  // Zoomed all the way out: you're looking at the whole building, so play the
   // wide overview theme regardless of what happens to be centered. The caller
   // resolves `overview` with hysteresis so hovering near the zoom threshold
   // doesn't flip scenes (and churn the pad) frame to frame.

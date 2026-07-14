@@ -62,7 +62,7 @@ export function scheduleStep(
   if (scene === "overview") {
     lead.triggerAttackRelease(midiToFreq(note + 24), "8n", time + 0.02, 0.18);
   }
-  // A high sparkle on off-beats — but only once you've zoomed in enough to
+  // A high sparkle on off-beats, but only once you've zoomed in enough to
   // "hear the detail", giving close-ups their own extra shimmer.
   if (step % 4 === 2 && def.density > 0.5 && detail > 0.45) {
     lead.triggerAttackRelease(midiToFreq(note + 12), "16n", time + 0.04, 0.18);
