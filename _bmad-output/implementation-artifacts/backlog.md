@@ -1046,3 +1046,37 @@ composition root):
   `deleteSlot` with an out-of-range slot, and `renameTower` with a blank name. Not
   hardened here because E1 is behavior-preserving; candidates for a separate
   input-validation pass.
+
+### Deferred from: code review of E2-S1 (event-choice lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E2-S1 migrates `showEventChoice` (the emergency modal) onto the E0
+`openModalTemplate` seam with a lit `eventChoiceTemplate` and inline `@click`,
+keeping the resolve-exactly-once `finish` guard and the Esc/backdrop/x decline
+paths in the controller. Three adversarial layers ran; all confirmed the code is
+correct (override ordering, `closeModal()` not re-firing cancel, pixel parity, no
+churn). Patched in-PR: the previously-missing fire-once path tests (backdrop click
+resolves decline once and closes; a first-action Esc/cancel resolves decline once;
+accept closes the modal; a button-vs-button double-tap cannot double-resolve), the
+`costLabel` auto-escape unit test, a broadened `assertDomEquivalent` (apostrophe/
+emoji production input class + empty boundary), the exact accept class-set
+assertion, and the "trusted plain text" + `data-act`-retention docstring notes.
+Residual defers (real but intentionally not actioned, behavior-preserving):
+
+- **Transitional string-builder retirement is untracked and accumulating.**
+  `eventChoiceHtml` (and `confirmHtml` from E0) are now dead production code kept
+  alive only so their `assertDomEquivalent` guards have a legacy string to compare
+  against. This matches the plan (retire the builder in the PR that retires its
+  guard), but there is no running list of which builders await retirement. When the
+  last string dialog is converted (E6/E7), delete every orphaned `*Html` builder
+  and its transitional test in one sweep. Builders parked so far: `confirmHtml`,
+  `eventChoiceHtml`.
+- **The loud `[data-act]` lookup safety net is gone for migrated dialogs.** The old
+  `wireActions` path threw at open if a `[data-act]` button was renamed/dropped;
+  inline `@click` cannot "miss," so that fail-loud-on-first-open guarantee no longer
+  applies to lit-migrated dialogs. Low severity (the binding is co-located with the
+  element), inherent to the inline-dispatch model. No action.
+- **Pre-existing input behaviors unchanged by E2-S1** (matching the original
+  `eventChoiceHtml`/`showEventChoice`): no `isModalOpen` guard before opening (the
+  sim is frozen while a choice is open, so emergencies cannot stack); an empty
+  `message`/`costLabel` renders an empty `<p>` / a dangling "Pay "; `onResolve`
+  throwing escapes the handler. Candidates for a later hardening pass, not here.
