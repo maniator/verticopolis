@@ -111,7 +111,10 @@ export function checkNodeIdentity(pumps: number): {
   const before = { money: el.money, pop: el.pop, star: el.star, time: el.time, date: el.date, towerStats: el.towerStats };
   const beforeChild = el.towerStats.firstElementChild;
   for (let i = 0; i < pumps; i++) {
-    g.sim.clock.advance(60);
+    // One minute per pump: enough to change the time leaf (the change path)
+    // without shoving the tower hours into a different time-of-day regime for
+    // the measurements that follow in the same run.
+    g.sim.clock.advance(1);
     g.ui.update(g.sim);
   }
   const statusLeavesStable =

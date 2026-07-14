@@ -1473,12 +1473,13 @@ run-to-run. Residual defers:
   synchronous reflow. It is only meaningfully assertable once a live-view write
   path exists, so E5-S1 should add a forced-layout probe (or record it as an
   accepted structural-only guarantee) when it introduces the first live render.
-- **The committed baseline is minted by CI, not by hand**: E5-S0 ships no
-  `baseline.json`; the spec bootstrap-captures-and-skips when the file is absent,
-  and `update-perf-baseline.yml` commits the reference set on the pre-E5 commit.
-  Until that runs the gate is inert, so **E5-S1 must assert `fs.existsSync` of the
-  baseline** (fail, not skip) so the gate can never stay silently toothless once a
-  live view is in play.
+- **The committed baseline is minted by CI, not by hand**: `baseline.json` lands
+  on the E5-S0 branch as a bot commit from `update-perf-baseline.yml` (the pinned
+  container), never from a local capture; the spec bootstrap-captures-and-skips
+  only while the file is absent. Because that bootstrap exists, **E5-S1 must
+  assert `fs.existsSync` of the baseline** (fail, not skip) so the gate can never
+  fall back to silently toothless if the file is ever deleted or a fresh branch
+  misses it.
 - **`towerStatsChildStable` is reported, not asserted**: the pre-E5 `innerHTML =`
   rebuilds the stats children every pump, so E5-S1 promotes this to an assertion
   once the grid renders on change.

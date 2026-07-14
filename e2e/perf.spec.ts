@@ -55,9 +55,16 @@ const A_MEDIAN_TOL = 1.05;
 const A_P95_TOL = 1.1;
 const B_FLOOR_TOL = 0.9;
 
+// benchmarkUiUpdate rounds n up to whole batches; a non-divisible configuration
+// would silently run more pumps than N_PUMPS while the metadata check still
+// expects exactly N_PUMPS. Fail fast at collection instead.
+if (N_PUMPS % A_BATCH !== 0) {
+  throw new Error(`N_PUMPS (${N_PUMPS}) must be divisible by A_BATCH (${A_BATCH})`);
+}
+
 interface Baseline {
   uiUpdate: { medianMs: number; p95Ms: number; meanMs: number; n: number; batch: number };
-  simSpeed: { simMinutesPerRealSecond: number; cpuThrottle: number; speed: number; windowMs: number };
+  simSpeed: { simMinutesPerRealSecond: number; cpuThrottle: number; speed: number; windowMs: number; windows: number };
 }
 
 test.describe("E5-S0 perf gate @perf", () => {
@@ -134,7 +141,7 @@ test.describe("E5-S0 perf gate @perf", () => {
 
     const current: Baseline = {
       uiUpdate,
-      simSpeed: { simMinutesPerRealSecond, cpuThrottle: CPU_THROTTLE, speed: SPEED_MINUTES_PER_SEC, windowMs: SPEED_WINDOW_MS },
+      simSpeed: { simMinutesPerRealSecond, cpuThrottle: CPU_THROTTLE, speed: SPEED_MINUTES_PER_SEC, windowMs: SPEED_WINDOW_MS, windows: SPEED_WINDOWS },
     };
 
     // The status leaf spans are textContent writes and must never be replaced;
@@ -176,6 +183,7 @@ test.describe("E5-S0 perf gate @perf", () => {
         cpuThrottle: baseline.simSpeed.cpuThrottle,
         speed: baseline.simSpeed.speed,
         windowMs: baseline.simSpeed.windowMs,
+        windows: baseline.simSpeed.windows,
       },
       "baseline metadata must match the harness parameters; re-mint with [update-perf-baseline]",
     ).toEqual({
@@ -184,6 +192,7 @@ test.describe("E5-S0 perf gate @perf", () => {
       cpuThrottle: CPU_THROTTLE,
       speed: SPEED_MINUTES_PER_SEC,
       windowMs: SPEED_WINDOW_MS,
+      windows: SPEED_WINDOWS,
     });
     // (A) median must not rise more than 5%; p95 not more than 10%.
     expect(uiUpdate.medianMs, `ui.update median ${uiUpdate.medianMs.toFixed(4)}ms vs baseline ${baseline.uiUpdate.medianMs.toFixed(4)}ms`)
