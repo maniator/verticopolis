@@ -2,6 +2,7 @@ import type { UI } from "./UI";
 import * as tpl from "./uiTemplates";
 import { confirmTemplate } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
+import { updatePromptTemplate } from "./templates/updatePrompt";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -409,7 +410,6 @@ export function showUpdatePrompt(
   onLater: () => void | Promise<void>,
   info?: UpdateInfo | null,
 ): void {
-  const box = ui.openModal(tpl.updatePromptHtml(info));
   const dialog = ui.el.modal as HTMLDialogElement;
   let done = false;
   // The handlers may be async (Update now saves then reloads); invoke them
@@ -433,7 +433,9 @@ export function showUpdatePrompt(
     ui.closeModal();
     fireAndForget(onUpdateNow);
   };
-  ui.wireActions(box, { later, update }, { close: false });
+  // Actions bind inline in the template; the controller keeps the fire-once logic
+  // and the dismissal paths. No wireActions pass, no [data-act="close"].
+  ui.openModalTemplate(updatePromptTemplate(info, { onLater: later, onUpdate: update }));
   dialog.onclick = (e) => {
     if (e.target === dialog) later();
   }; // backdrop

@@ -1080,3 +1080,32 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
   sim is frozen while a choice is open, so emergencies cannot stack); an empty
   `message`/`costLabel` renders an empty `<p>` / a dangling "Pay "; `onResolve`
   throwing escapes the handler. Candidates for a later hardening pass, not here.
+### Deferred from: code review of E2-S2 (update-prompt lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E2-S2 migrates `showUpdatePrompt` onto the E0 `openModalTemplate` seam with
+a lit `updatePromptTemplate` (inline `@click`, nested sub-templates for the
+optional What's-new and build-id blocks), keeping the fire-once `done` guard, the
+`fireAndForget` async containment, and the Esc/backdrop/x "Later" paths in the
+controller; the update chip is unchanged. Three adversarial layers ran; all
+confirmed the template port is byte-faithful (no DOM divergence, override ordering
+correct, pixel parity). Patched in-PR: the previously-missing tests the story
+demands (backdrop click resolves Later once; a mixed Update-then-backdrop second
+dismissal cannot double-resolve; a throwing Update handler is contained and the
+modal still closes; the chip clears `#a11y-live` then re-announces on the next
+frame on EVERY call), plus the version-absent/sha-present build line, a hostile-note
+`assertDomEquivalent` case (proving lit escaping equals the old escapeHtml), and the
+4-notes cap boundary; the template uses lit's `nothing` sentinel for absent blocks.
+Residual defers (real but intentionally not actioned, behavior-preserving):
+
+- **`updatePromptHtml` joins the transitional string-builder retirement list.** Like
+  `confirmHtml`/`eventChoiceHtml`, it is now dead production code kept only to feed
+  its `assertDomEquivalent` guard. Delete it and its transitional test when the last
+  string dialog converts (E6/E7). Builders parked so far: `confirmHtml`,
+  `eventChoiceHtml`, `updatePromptHtml`.
+- **`fireAndForget` swallows a failed Update silently** (`.catch(() => {})`,
+  unchanged from origin/main): if the save-then-reload throws or rejects, the modal
+  closes and the player sees nothing. A later hardening pass could surface a toast or
+  log; not changed here (behavior-preserving).
+- **Pre-existing input behaviors unchanged by E2-S2**: an empty-string note renders a
+  blank bullet; a malformed non-array `notes` (bad version.json) would throw in both
+  the old and new code. Candidates for a later validation pass.
