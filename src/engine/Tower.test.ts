@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Tower } from "./Tower";
 import { GRID } from "./facilities";
+import { MODERN_RULES } from "./gameRules";
 import type { Transport } from "./types";
 
 describe("Tower placement", () => {
@@ -233,6 +234,40 @@ describe("Tower transport", () => {
   it("limits stairs to a single floor span", () => {
     expect(tower.placeTransport("stairs", 8, 1, 5).ok).toBe(false);
     expect(tower.placeTransport("stairs", 8, 1, 2).ok).toBe(true);
+  });
+
+  it("refuses an escalator touching an office floor under Classic rules (the default)", () => {
+    expect(tower.place("office", 2, 0).ok).toBe(true);
+    // Both endpoints are checked: office on the top floor (1..2) and on the
+    // bottom floor (2..3) refuse alike; a span clear of offices is fine.
+    const below = tower.placeTransport("escalator", 20, 1, 2);
+    expect(below.ok).toBe(false);
+    expect(below.reason).toBe("Escalators can't serve office floors. They link commercial floors only.");
+    expect(tower.placeTransport("escalator", 20, 2, 3).ok).toBe(false);
+    expect(tower.placeTransport("escalator", 20, 3, 4).ok).toBe(true);
+  });
+
+  it("allows escalators on office floors under Modern rules", () => {
+    tower.rules = MODERN_RULES;
+    expect(tower.place("office", 2, 0).ok).toBe(true);
+    expect(tower.placeTransport("escalator", 20, 1, 2).ok).toBe(true);
+    expect(tower.placeTransport("escalator", 30, 2, 3).ok).toBe(true);
+  });
+
+  it("supports the 1994 escalator trick: bulldoze the office, place, rebuild", () => {
+    // Office at x 16..24 so the rebuild genuinely overlaps the escalator
+    // placed at x 20..27 (shafts may share cells with rooms, as in 1994).
+    const office = tower.place("office", 2, 16);
+    expect(office.ok).toBe(true);
+    expect(tower.placeTransport("escalator", 20, 1, 2).ok).toBe(false);
+    // The rule is placement-time only, exactly like the original: clear the
+    // office, sneak the escalator in, then rebuild the office around it.
+    expect(tower.removeUnit(office.unitId!)).toBeDefined();
+    expect(tower.placeTransport("escalator", 20, 1, 2).ok).toBe(true);
+    expect(tower.place("office", 2, 16).ok).toBe(true);
+    // The rebuilt office shares cells with the shaft; neither evicts the other.
+    expect(tower.transportAt(2, 20)?.kind).toBe("escalator");
+    expect(tower.roomAt(2, 20)?.kind).toBe("office");
   });
 
   it("extend arrows can't stretch stairs or escalators beyond one floor", () => {
