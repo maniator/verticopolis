@@ -25,8 +25,10 @@ import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
  *  reason. */
 function simWith(kind: Parameters<Simulation["tower"]["place"]>[0], floors = 2): { sim: Simulation; unit: Unit } {
   const sim = new Simulation();
-  for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
-  for (let fl = 2; fl <= floors; fl++) for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", fl, x);
+  for (let x = 0; x < GRID.width; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+  for (let fl = 2; fl <= floors; fl++) {
+    for (let x = 0; x < GRID.width; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+  }
   const r = sim.tower.place(kind, 2, 40);
   expect(r.ok).toBe(true);
   const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
@@ -140,6 +142,10 @@ describe("unit editor matches the legacy builder", () => {
     unit.customersIn = 7;
     equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit)); // 07:00, open
     sim.clock.minutes = 23 * 60; // 23:00, closed
+    // Pin that the fixture actually reached the closed branch: an equivalence
+    // check alone would pass if both builders silently stayed on the open one.
+    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(frag.querySelector('[data-field="customers"]')!.textContent).toBe("7 (closed)");
     equivalent(unitEditorHtml(sim, unit), unitEditorTemplate(sim, unit));
     equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
   });
@@ -154,17 +160,25 @@ describe("unit editor matches the legacy builder", () => {
 });
 
 describe("transport editor matches the legacy builder", () => {
-  it("standard elevator: car bounds, a skipped floor, desktop and mobile", () => {
+  it("standard elevator: both car bounds, a skipped floor, desktop and mobile", () => {
     const { sim, lift } = withLift("elevatorStandard", 4);
     equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
     if (lift.cars !== 1) expect(sim.tower.setCars(lift.id, 1)).toBe(true); // removecar disabled
     expect(sim.tower.setStop(lift.id, 3, false)).toBe(true); // "skips 1 floor"
     equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
+    expect(sim.tower.setCars(lift.id, 8)).toBe(true); // MAX_CARS: addcar disabled
+    equivalent(transportEditorHtml(sim, lift), transportEditorTemplate(sim, lift));
     equivalent(transportEditorHtml(sim, lift, true), transportEditorTemplate(sim, lift, true));
   });
 
-  it("express elevator and stairs", () => {
+  it("express elevator (with and without a preserved skipped lobby) and stairs", () => {
     const express = withLift("elevatorExpress", 3);
+    equivalent(transportEditorHtml(express.sim, express.lift), transportEditorTemplate(express.sim, express.lift));
+    // A legacy/forged save can carry a deliberately skipped lobby; the Stops
+    // readout surfaces the count honestly. Pin the branch, then its equivalence.
+    express.lift.skipFloors = [1];
+    const frag = renderToFragment(transportEditorTemplate(express.sim, express.lift));
+    expect(frag.querySelector('[data-field="stops"]')!.textContent).toBe("lobbies and sky lobbies (1 skipped)");
     equivalent(transportEditorHtml(express.sim, express.lift), transportEditorTemplate(express.sim, express.lift));
     const stairs = withLift("stairs");
     equivalent(transportEditorHtml(stairs.sim, stairs.lift), transportEditorTemplate(stairs.sim, stairs.lift));

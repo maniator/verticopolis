@@ -11,8 +11,8 @@ import { unitEditorTemplate, transportEditorTemplate } from "./templates/editor"
  * recreate a button mid-click; lit's binding diff now carries that guarantee,
  * so these tests pin it against the REAL templates: re-rendering with changed
  * values patches only the affected text/attributes, while every button and the
- * rename input keep their element identity. (The UI-level wiring — delegation,
- * editorBusy, hide/close — is pinned by the renderEditor integration block.)
+ * rename input keep their element identity. The UI-level wiring (delegation,
+ * editorBusy, hide/close) is pinned by the renderEditor integration block.
  */
 
 /** A small built tower with an occupied office (rename + rent adjuster) and a
@@ -50,6 +50,27 @@ describe("editor card lit diffing — updates in place, element identity survive
     expect(card.querySelector('[data-edit="rentUp"]')).toBe(btn);
     expect(card.querySelector("#ed-name")).toBe(name);
     expect(card.querySelector('[data-field="eval"]')).toBe(evalCell);
+  });
+
+  it("selecting a DIFFERENT entity mints a fresh rename input (no half-typed text carryover)", () => {
+    // The legacy protocol keyed the rebuild on the entity id; the templates
+    // carry that identity via lit's `keyed`. Without it, the reused input's
+    // dirty (mid-edit) value would survive the attribute update and unit A's
+    // half-typed text would show, and commit, on unit B.
+    const { sim, office } = fixture();
+    const r2 = sim.tower.place("office", 2, 21); // 9 wide → spans 21..29 on the 10..29 floor
+    expect(r2.ok).toBe(true);
+    const officeB = sim.tower.units.find((u) => u.id === r2.unitId)!;
+    officeB.state = "occupied";
+    const card = document.createElement("div");
+    render(unitEditorTemplate(sim, office), card);
+    const inputA = card.querySelector<HTMLInputElement>("#ed-name")!;
+    inputA.value = "half-typed"; // player is mid-rename when the selection moves
+
+    render(unitEditorTemplate(sim, officeB), card);
+    const inputB = card.querySelector<HTMLInputElement>("#ed-name")!;
+    expect(inputB).not.toBe(inputA); // new selection, new input
+    expect(inputB.value).toBe(officeB.label);
   });
 
   it("a click listener attached before a refresh still fires on the same button after it", () => {

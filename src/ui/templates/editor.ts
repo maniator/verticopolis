@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { keyed } from "lit-html/directives/keyed.js";
 import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import type { Simulation } from "../../engine/Simulation";
 import type { Transport, Unit } from "../../engine/types";
@@ -46,13 +47,21 @@ const kv = (label: string, value: unknown, field?: string): TemplateResult =>
 const edRow = (inner: TemplateResult): TemplateResult => html`<div class="ed-row">${inner}</div>`;
 
 /** The shared editor-card frame: title bar + stat grid + an optional full-width
- *  block (the mobile diagnostics fold-in) + action rows. */
+ *  block (the mobile diagnostics fold-in) + action rows. `key` is the selected
+ *  entity's identity ("unit:7" / "transport:3"): `keyed` clears and rebuilds
+ *  the card when the SELECTION changes, exactly the legacy id-keyed rebuild.
+ *  Without it, lit would reuse the rename input across entities, and a dirty
+ *  (mid-edit) input's live value survives attribute updates, so half-typed
+ *  text from unit A would show, and commit, on unit B. Within one entity the
+ *  key is constant and lit's diff patches values in place as usual. */
 const editorShell = (
+  key: string,
   name: string,
   rows: TemplateResult[],
   actions: TemplateResult[],
   diagnostics: unknown = nothing,
-): TemplateResult => html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`;
+): TemplateResult =>
+  html`${keyed(key, html`${titleBar(name)}<div class="ed-stats kv">${rows}</div>${diagnostics}${actions}`)}`;
 
 export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): TemplateResult {
   const f = FACILITIES[u.kind];
@@ -158,7 +167,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     ? html`<div class="ed-diagnostics" data-field="diagnostics">${unsafeHTML(facilityDiagnostics(sim, u))}</div>`
     : nothing;
   // Canon retail variant titles the editor card too, matching the inspector.
-  return editorShell(u.subtype ?? f.name, rows, actions, diagnostics);
+  return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);
 }
 
 export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = false): TemplateResult {
@@ -220,5 +229,5 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
   const diagnostics = mobile
     ? html`<div class="ed-diagnostics" data-field="diagnostics">${unsafeHTML(transportDiagnostics(sim, t))}</div>`
     : nothing;
-  return editorShell(f.name, rows, actions, diagnostics);
+  return editorShell(`transport:${t.id}`, f.name, rows, actions, diagnostics);
 }
