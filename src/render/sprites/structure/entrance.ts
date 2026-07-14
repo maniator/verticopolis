@@ -1,4 +1,5 @@
 import type { DrawCtx } from "../common";
+import { personSeated } from "../../pixelSprites/common";
 
 /**
  * The ground-floor grand and service entrance facades: the wide two-tile
@@ -100,10 +101,39 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
   ctx.fillStyle = "#a3243c";
   ctx.fillRect(x, glassBot - 2, w, 2);
   if (side === "left") {
-    drawGrandFacadeLeftInterior(d, x, y, w, glassTop, glassBot, frameColor, goldTrim);
+    drawGrandFacadeLeftInterior(d, x, y, w, h, glassTop, glassBot, frameColor, goldTrim);
   } else {
     drawGrandFacadeRightInterior(d, x, y, w, h, glassTop, glassBot, frameColor, goldTrim);
   }
+  // A projecting marquee juts over the whole frontage LAST, so both 11px slices
+  // carry the same canopy band and the 22px composite reads as one grand
+  // entrance rather than a plain storefront.
+  drawEntranceMarquee(ctx, x, y, w);
+}
+
+/** The grand entrance's projecting marquee: a deep-green gilded canopy over the
+ *  doors, echoing the corner awnings and the lobby's gold cornice. Drawn across
+ *  the slice's full width (both slices use the same band) so the wide facade
+ *  shows one continuous canopy; a soft shadow under it sells the projection. The
+ *  green and gold match `drawDoorman`'s tunic so the doorman reads as staff of
+ *  this entrance. Integer pixels; static (no `anim`). */
+function drawEntranceMarquee(ctx: CanvasRenderingContext2D, x: number, y: number, w: number): void {
+  const mTop = y + 3; // just under the gilded cornice
+  const bodyH = 4;
+  // Soft shadow the canopy casts onto the glass below it.
+  ctx.fillStyle = "rgba(90,64,56,0.34)";
+  ctx.fillRect(x, mTop + bodyH + 1, w, 2);
+  // Canopy body, deep hunter green.
+  ctx.fillStyle = "#234b39";
+  ctx.fillRect(x, mTop, w, bodyH);
+  ctx.fillStyle = "#2f6149"; // sheen just under the rail
+  ctx.fillRect(x, mTop + 1, w, 1);
+  ctx.fillStyle = "#c9a94c"; // gilded top piping
+  ctx.fillRect(x, mTop, w, 1);
+  ctx.fillStyle = "#c9a94c"; // gilded valance along the outer lip
+  ctx.fillRect(x, mTop + bodyH, w, 1);
+  ctx.fillStyle = "#e6cf82"; // small entrance lights along the valance
+  for (let dx = x + 1; dx < x + w; dx += 3) ctx.fillRect(dx, mTop + bodyH + 1, 1, 1);
 }
 
 /** A shallow recessed skyline behind the top of the storefront glass: a cool
@@ -132,14 +162,21 @@ function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: n
 }
 
 /** The LEFT slice's decoration: outer storefront frame at x=0, big glass panel
- *  with a chandelier hanging inside, and a slim door jamb at the RIGHT edge
- *  (which composes with the right slice's door leaf into one full-height door
- *  boundary). No door leaf on this slice; the doors start in the right slice. */
+ *  with a chandelier hanging inside and a staffed reception counter at the
+ *  bottom, and a slim door jamb at the RIGHT edge (which composes with the right
+ *  slice's door leaf into one full-height door boundary). No door leaf on this
+ *  slice; the doors start in the right slice. The reception sits here, next to
+ *  the doors. The wide grand entrance is placed once per lobby (on the leftmost
+ *  frontage run of width >= 2), so a wide lobby shows exactly one attendant
+ *  rather than one every fourth concourse tile. A 1-tile lobby uses the compact
+ *  grand-solo fallback (drawGrandCompact), which has no room for a counter and
+ *  shows none. */
 function drawGrandFacadeLeftInterior(
   d: DrawCtx,
   x: number,
   y: number,
   w: number,
+  h: number,
   glassTop: number,
   glassBot: number,
   frameColor: string,
@@ -149,26 +186,45 @@ function drawGrandFacadeLeftInterior(
   // Outer storefront frame post along the LEFT edge of the tile.
   ctx.fillStyle = frameColor;
   ctx.fillRect(x, glassTop, 1, glassBot - glassTop);
-  // Chandelier visible through the glass, centered in the display window.
+  // Chandelier visible through the glass, hung below the marquee band so the
+  // canopy (drawn last) does not bury it.
   const cx = x + Math.floor(w / 2);
   ctx.fillStyle = "#8a7430";
-  ctx.fillRect(cx, y + 5, 1, 3); // chain
+  ctx.fillRect(cx, y + 10, 1, 3); // chain
   ctx.fillStyle = lit ? "#ffd76b" : "#c8a343";
-  ctx.fillRect(cx - 2, y + 8, 5, 2);
-  ctx.fillRect(cx - 3, y + 11, 7, 2);
+  ctx.fillRect(cx - 2, y + 13, 5, 2);
+  ctx.fillRect(cx - 3, y + 16, 7, 2);
   ctx.fillStyle = lit ? "#fff1b0" : "#a3873a";
-  for (const dx of [-3, 0, 3]) ctx.fillRect(cx + dx, y + 10, 1, 1);
+  for (const dx of [-3, 0, 3]) ctx.fillRect(cx + dx, y + 15, 1, 1);
   if (lit) {
     ctx.fillStyle = "rgba(255,214,110,0.28)";
     ctx.beginPath();
-    ctx.arc(cx + 0.5, y + 11, 4.5, 0, Math.PI * 2);
+    ctx.arc(cx + 0.5, y + 16, 4.5, 0, Math.PI * 2);
     ctx.fill();
   }
-  // Gold horizontal accent rail across the display window (a decorative brass
-  // bar, like real hotel storefronts have running under the window at head
-  // height). Ties the two slices together visually.
+  // Reception counter with a single seated attendant, standing on the interior
+  // carpet at the bottom of the display window. The desk face is drawn over the
+  // figure so only the head and shoulders read above the counter.
+  const deskL = x + 1;
+  const deskW = w - 3;
+  const deskH = 8;
+  const deskTop = y + h - 5 - deskH; // meets the polished floor's top row
+  personSeated(ctx, cx - 3, deskTop + deskH - 1, 4);
+  ctx.fillStyle = "#6B4A2B"; // walnut counter
+  ctx.fillRect(deskL, deskTop, deskW, deskH);
+  ctx.fillStyle = "#8A6440"; // lit top rail
+  ctx.fillRect(deskL, deskTop, deskW, 1);
+  ctx.fillStyle = "#4E3620"; // shaded base so the counter sits on the floor
+  ctx.fillRect(deskL, deskTop + deskH - 1, deskW, 1);
+  if (lit) {
+    ctx.fillStyle = "#F8E2B4"; // a warm desk lamp glow at night
+    ctx.fillRect(deskL + 1, deskTop - 2, 2, 2);
+  }
+  // Gold horizontal accent rail across the display window (a brass bar like real
+  // hotel storefronts run under the glass), set above the chandelier and below
+  // the marquee so it stays a clean horizontal accent.
   ctx.fillStyle = goldTrim;
-  ctx.fillRect(x + 1, glassTop + 12, w - 1, 1);
+  ctx.fillRect(x + 1, glassTop + 8, w - 1, 1);
   // Door jamb along the RIGHT edge of the tile: this is where the double doors
   // start. The doors' left leaf lives in the right slice starting at x=1.
   ctx.fillStyle = frameColor;
@@ -330,6 +386,9 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
   // pixel outside the door frame, and drawDoorman's 2-wide sprite fits inside
   // the remaining 3 pixels of tile without clipping on either sway frame.
   drawDoorman(ctx, frameR + 1, y + h - 4, anim);
+  // Projecting marquee over the door so even the compact 1-tile fallback reads
+  // as a grand entrance, matching the wide storefront's canopy.
+  drawEntranceMarquee(ctx, x, y, w);
 }
 
 /**

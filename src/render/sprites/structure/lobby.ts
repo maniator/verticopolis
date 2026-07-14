@@ -1,6 +1,6 @@
 import type { Unit } from "../../../engine/types";
 import type { DrawCtx } from "../common";
-import { personSeated, windowView } from "../../pixelSprites/common";
+import { hash } from "../../pixelSprites/common";
 import { drawGrandCompact, drawGrandFacadeLeft, drawGrandFacadeRight, drawServiceEntrance } from "./entrance";
 
 /**
@@ -91,11 +91,14 @@ export function drawLobby(d: DrawCtx, u: Unit, x: number, y: number, w: number, 
 /**
  * One 11px slice of the lobby concourse. The ground lobby (floor 1) is the
  * tower's grand entrance: warm veined marble, a gilded cornice, a red carpet,
- * fluted columns and chandeliers that glow in the evening, and a staffed
- * reception counter. Sky lobbies read as their airy transfer-floor cousins:
+ * fluted columns and chandeliers that glow in the evening, and a low console
+ * with a lamp. Sky lobbies read as their airy transfer-floor cousins:
  * floor-to-ceiling skyline windows, the same gold trim, planters and framed
- * prints instead of chandeliers, an info desk with an attendant. Decoration
- * reads only `lit`, `variant`, and `ground`.
+ * prints instead of chandeliers, a low bench with a plant. The single staffed
+ * reception is NOT a repeating tile: it lives in the grand-entrance tile (see
+ * `entrance.ts`), so a wide lobby shows one attendant in its storefront, not one
+ * every fourth column. A degenerate 1-tile lobby uses the compact grand-solo
+ * fallback and shows none. Decoration reads only `lit`, `variant`, `ground`.
  */
 function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, variant: number, ground: boolean) {
   const { ctx, lit } = d;
@@ -119,11 +122,15 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
     ctx.fillRect(x0 + 3, y0 + 6, 1, hh - 16);
     ctx.fillRect(x0 + ww - 4, y0 + 10, 1, hh - 20);
   } else {
-    ctx.fillStyle = "#E8E6DE"; // pale stone behind the glass
+    // Muted warm stone reveal around the glass. Darker and warmer than the old
+    // near-white stone so the sky lobby sits in the same tonal family as the
+    // offices and hotels around it, instead of glaring as a bright band at night.
+    ctx.fillStyle = "#C4BCA8";
     ctx.fillRect(x0, y0, ww, floorTop - y0);
-    // A tall skyline window: cool day/night sky behind an ink + slate mullion
-    // grid, receding so it never competes with a foreground prop.
-    windowView(ctx, x0 + 1, y0 + 5, ww - 2, floorTop - y0 - 8, lit, variant + 1);
+    // A tall skyline window that recedes into the wall: dark warm glass at night
+    // with only sparse, dim city lights (not a bright blue band), a muted day sky
+    // otherwise. A dedicated draw so the offices' cooler `windowView` is untouched.
+    skyGlass(ctx, x0 + 1, y0 + 5, ww - 2, floorTop - y0 - 8, lit, variant + 1);
   }
 
   // Gilded cornice along the ceiling (identical on every variant so the top
@@ -133,12 +140,13 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
   ctx.fillStyle = "#8A7430";
   ctx.fillRect(x0, y0 + 3, ww, 1);
 
-  // Polished floor with a sheen line and a dark base.
-  ctx.fillStyle = ground ? "#DCD2B8" : "#DCD6C6";
+  // Polished floor with a sheen line and a dark base. The sky lobby's floor is
+  // toned down (dimmer slab, softer sheen) so it does not add to the bright band.
+  ctx.fillStyle = ground ? "#DCD2B8" : "#CBC3B0";
   ctx.fillRect(x0, floorTop, ww, 5);
-  ctx.fillStyle = ground ? "#F0E8D0" : "#F0ECDC";
+  ctx.fillStyle = ground ? "#F0E8D0" : "#D8D2C2";
   ctx.fillRect(x0, floorTop, ww, 1);
-  ctx.fillStyle = ground ? "#8F7A48" : "#9A8E72";
+  ctx.fillStyle = ground ? "#8F7A48" : "#8A7E64";
   ctx.fillRect(x0, y0 + hh - 1, ww, 1);
   if (ground) {
     // Red carpet with a gilded edge, running the whole concourse.
@@ -156,7 +164,7 @@ function drawLobbyTile(d: DrawCtx, x: number, y: number, w: number, h: number, v
   if (variant === 0) {
     fluteColumn(ctx, cx, y0, hh, ground);
   } else if (variant === 1) {
-    receptionDesk(ctx, x0, ww, floorTop, ground, lit);
+    consolePanel(ctx, x0, ww, y0, floorTop, ground, lit);
   } else if (variant === 2) {
     if (ground) chandelier(ctx, cx, y0, lit, ww);
     else planter(ctx, cx, floorTop);
@@ -187,41 +195,106 @@ function fluteColumn(ctx: CanvasRenderingContext2D, cx: number, y0: number, hh: 
   ctx.fillRect(cx - 2, y0 + hh - 7, 5, 2);
 }
 
-/** A staffed reception (ground) or info (sky) counter: a warm walnut desk with
- *  a lamp and a seated attendant behind it. The desk face is drawn over the
- *  figure so only the receptionist's head and shoulders read above the counter,
- *  the "behind-the-counter staff" build from the people system. */
-function receptionDesk(ctx: CanvasRenderingContext2D, x0: number, ww: number, floorTop: number, ground: boolean, lit: boolean): void {
-  const dl = x0 + 1;
-  const dw = ww - 2;
-  const deskH = 9;
-  const deskTop = floorTop - deskH;
-  // The attendant sits behind the counter (drawn first so the desk occludes the
-  // lower body). Seed is fixed so the same slot always seats the same figure.
-  personSeated(ctx, x0 + Math.floor(ww / 2) - 3, floorTop - 1, ground ? 4 : 7);
-  // Walnut desk body with a lit top rail.
-  ctx.fillStyle = "#6B4A2B";
-  ctx.fillRect(dl, deskTop, dw, deskH);
-  ctx.fillStyle = "#8A6440";
-  ctx.fillRect(dl, deskTop, dw, 1);
-  ctx.fillStyle = "#4E3620"; // shaded base so the desk sits on the floor
-  ctx.fillRect(dl, floorTop - 1, dw, 1);
-  if (ground) {
-    // A brass desk lamp that glows warm in the evening.
-    ctx.fillStyle = "#7A6A50";
-    ctx.fillRect(dl + 1, deskTop - 3, 1, 3);
-    ctx.fillStyle = lit ? "#F8E2B4" : "#8A7A5C";
-    ctx.fillRect(dl, deskTop - 4, 3, 2);
-    if (lit) {
-      ctx.fillStyle = "rgba(248,226,180,0.3)";
-      ctx.fillRect(dl - 1, deskTop - 4, 5, 4);
+/** A tall skyline window that recedes into the sky-lobby wall. Dedicated to the
+ *  sky lobby (the offices and hotels keep their cooler shared `windowView`, which
+ *  reads well and must not change). At night it is dark warm glass with only a
+ *  few dim city lights, so the transfer floor no longer glares as a bright blue
+ *  band against the muted floors around it; by day it is a low-contrast muted
+ *  sky. A recessed slate mullion grid keeps the glass reading as background. */
+function skyGlass(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, lit: boolean, seed: number): void {
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
+  const ww = Math.max(1, Math.round(w));
+  const hh = Math.max(1, Math.round(h));
+  const g = ctx.createLinearGradient(0, y0, 0, y0 + hh);
+  if (lit) {
+    g.addColorStop(0, "#2E2C34"); // dark warm glass, night
+    g.addColorStop(1, "#26242C");
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, y0, ww, hh);
+    ctx.fillStyle = "#B89A62"; // sparse, dim warm city lights
+    for (let gx = 2; gx < ww - 1; gx += 4) {
+      for (let gy = 2; gy < hh - 2; gy += 4) {
+        if (hash(seed * 131 + gx * 17 + gy * 7) > 0.82) ctx.fillRect(x0 + gx, y0 + gy, 1, 1);
+      }
     }
   } else {
-    // A small monitor on the info desk instead of a lamp.
-    ctx.fillStyle = "#3A4250";
-    ctx.fillRect(dl + dw - 4, deskTop + 2, 3, 3);
-    ctx.fillStyle = "#8FB6D8";
-    ctx.fillRect(dl + dw - 4, deskTop + 2, 3, 2);
+    g.addColorStop(0, "#93A6B4"); // muted day sky, low contrast
+    g.addColorStop(1, "#A6B2B8");
+    ctx.fillStyle = g;
+    ctx.fillRect(x0, y0, ww, hh);
+  }
+  ctx.fillStyle = "rgba(40,42,54,0.55)"; // recessed frame
+  ctx.fillRect(x0, y0, ww, 1);
+  ctx.fillRect(x0, y0 + hh - 1, ww, 1);
+  ctx.fillRect(x0, y0, 1, hh);
+  ctx.fillRect(x0 + ww - 1, y0, 1, hh);
+  ctx.fillStyle = "rgba(70,74,92,0.5)"; // muted mullion cross
+  ctx.fillRect(x0 + (ww >> 1), y0, 1, hh);
+  ctx.fillRect(x0, y0 + (hh >> 1), ww, 1);
+}
+
+/** Variant-1 slice: a tile-friendly architectural element that repeats cleanly
+ *  across a wide concourse. Ground = a recessed wall panel over the marble with a
+ *  low walnut console and a warm lamp; sky = a low bench with a small plant in
+ *  front of the glass. No person: the single staffed reception moved into the
+ *  grand-entrance tile (ground lobby), so the attendant no longer tiles every
+ *  fourth column. Sky lobbies have no single-tile placement path, so they now
+ *  show no attendant at all (a logged followup). */
+function consolePanel(ctx: CanvasRenderingContext2D, x0: number, ww: number, y0: number, floorTop: number, ground: boolean, lit: boolean): void {
+  const cx = x0 + Math.floor(ww / 2);
+  const topY = floorTop - 5; // top of the console/bench, sitting on the floor
+  if (ground) {
+    // Recessed wall panel: a quiet framed inset high on the marble back wall
+    // (kept short so it reads as wall paneling, not a door), over the console.
+    const panelL = x0 + 3;
+    const panelW = Math.max(3, ww - 6);
+    const panelT = y0 + 8;
+    const panelB = Math.min(floorTop - 12, y0 + 22);
+    if (panelB > panelT) {
+      ctx.fillStyle = "rgba(105,90,55,0.16)"; // recess shadow
+      ctx.fillRect(panelL, panelT, panelW, panelB - panelT);
+      ctx.fillStyle = "#C9A24B"; // gold panel trim
+      ctx.fillRect(panelL, panelT, panelW, 1);
+      ctx.fillRect(panelL, panelB - 1, panelW, 1);
+      ctx.fillRect(panelL, panelT, 1, panelB - panelT);
+      ctx.fillRect(panelL + panelW - 1, panelT, 1, panelB - panelT);
+    }
+    // Low walnut console with slim legs.
+    const cw = Math.min(panelW, 9);
+    const cl = cx - Math.floor(cw / 2);
+    ctx.fillStyle = "#6B4A2B";
+    ctx.fillRect(cl, topY, cw, 2);
+    ctx.fillStyle = "#8A6440";
+    ctx.fillRect(cl, topY, cw, 1);
+    ctx.fillStyle = "#4E3620";
+    ctx.fillRect(cl + 1, topY + 2, 1, 3);
+    ctx.fillRect(cl + cw - 2, topY + 2, 1, 3);
+    // A small brass lamp that glows warm in the evening.
+    ctx.fillStyle = "#7A6A50";
+    ctx.fillRect(cx, topY - 3, 1, 3);
+    ctx.fillStyle = lit ? "#F8E2B4" : "#8A7A5C";
+    ctx.fillRect(cx - 1, topY - 4, 3, 2);
+    if (lit) {
+      ctx.fillStyle = "rgba(248,226,180,0.26)";
+      ctx.fillRect(cx - 2, topY - 5, 5, 4);
+    }
+  } else {
+    // Sky lobby: a low waiting bench in front of the glass, with a small plant.
+    const bw = Math.min(ww - 2, 9);
+    const bl = cx - Math.floor(bw / 2);
+    ctx.fillStyle = "#5C4A38"; // bench frame
+    ctx.fillRect(bl, topY, bw, 4);
+    ctx.fillStyle = "#7C6A50"; // seat top
+    ctx.fillRect(bl, topY, bw, 1);
+    ctx.fillStyle = "#3A2E22"; // base shadow
+    ctx.fillRect(bl, topY + 3, bw, 1);
+    ctx.fillStyle = "#8C5A3A"; // brass pot at one end
+    ctx.fillRect(bl + bw - 3, topY - 3, 3, 3);
+    ctx.fillStyle = "#4E7A3E"; // greenery
+    ctx.fillRect(bl + bw - 3, topY - 5, 3, 2);
+    ctx.fillStyle = "#5AA85A";
+    ctx.fillRect(bl + bw - 2, topY - 6, 1, 1);
   }
 }
 

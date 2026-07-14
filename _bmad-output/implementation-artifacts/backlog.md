@@ -976,6 +976,12 @@ into a fast-follow so the overhaul could ship). E2 (offices, hotels, condos) and
 the other kinds read well in game; these are contained to the ground lobby and
 the stair / escalator sprites:
 
+> RESOLVED on branch `claude/pixelart-e6-followup`: the ground-lobby receptionist
+> repeat, the sky-lobby night glare, the stair and escalator geometry, and the
+> grand-entrance prominence are all fixed in that PR. The gallery multi-floor
+> sizing shipped in part 1 of the same branch. Review defers from that PR are in
+> the "code review of E6 structure/transport art followup" section below.
+
 - **Ground lobby repeats the seated receptionist at every fourth tile.** The
   lobby tiles four baked variants by `x % 4`, and variant 1 is a staffed
   reception desk (`receptionDesk` with `personSeated`), so the same attendant
@@ -1003,3 +1009,51 @@ the stair / escalator sprites:
   judged in the baseline. Size each gallery cell by the facility's `floors` so
   multi-floor compositions show at their true proportion (clamp to the cell,
   scale width to preserve aspect). Regenerate the baseline and screenshots after.
+
+### Deferred from: code review of E6 structure/transport art followup (`gds-code-review`, 2026-07-14)
+
+Change: `src/render/sprites/structure/lobby.ts` (reception moved out of repeating
+variant 1 into a person-free console/bench; `skyGlass` tones down the sky lobby),
+`src/render/sprites/structure/entrance.ts` (one reception desk + attendant in the
+grand-left slice; a projecting marquee on the wide and compact grand entrances),
+and `src/render/sprites/transport.ts` (clean figure-free stair flight and
+escalator run that land on the second-floor deck). Three review layers (Blind
+Hunter, Edge Case Hunter, Acceptance Auditor). Patch findings fixed and
+re-verified: the stair/escalator drop shadow no longer paints the `bandBottom`
+row (height reduced to 1 so the deepest column stays inside the band), the newel
+post is drawn after the top landing so it reads, and the once-per-lobby comments
+were corrected to note the compact 1-tile fallback shows no receptionist. Defers:
+
+- **Sky lobby shows zero attendants after de-repeat.** The frozen structure /
+  transport I/O matrix wants "an info desk with an attendant" on the sky lobby,
+  but de-repeating removed the tiled attendant and there is no single-placement
+  path for sky lobbies (the floor-1 entrance map that hosts the ground lobby's
+  one reception is `u.floor === 1` only). Owner to decide whether to add a single
+  sky-lobby info-desk attendant, which would need a sky-lobby single-tile
+  placement mechanism parallel to the floor-1 entrance map. Do not build the
+  placement mechanism speculatively. (Acceptance Auditor. Medium; needs owner
+  decision + a new placement seam.)
+- **Stairs/escalator no longer bake a rider; the frozen AC should be amended.**
+  The frozen structure/transport spec AC and I/O matrix say the incline carries
+  the ~17px rider build, but per the owner directive the flights bake no
+  climber/rider (empty tower reads empty; the engine's routed sims ride over the
+  static flight). This is an intentional renegotiation, not a defect. The frozen
+  `spec-pixelart-structure-transport.md` AC should be amended to record it. Do not
+  edit the frozen spec without the human renegotiation ritual. (Acceptance
+  Auditor; supersedes the earlier "Stairs and escalator bake no ~17px rider"
+  defer above. Low; spec traceability.)
+- **Marquee overpaints the compact grand-solo door's top header row.** In
+  `drawGrandCompact` the marquee is drawn last across the full tile; its body
+  (y+3..y+6) meets the compact door header at `doorTop = y+6`, so the canopy sits
+  over the door's top row. It reads correctly as "canopy in front of the door"
+  and the wide facade avoids it by lowering its chandelier, but the compact path
+  did not nudge the door top. Nudge `doorTop` down a pixel or trim the marquee on
+  the solo tile if a future pass wants the door header fully clear. (Blind Hunter
+  / Edge Case Hunter. Very low; cosmetic.)
+- **A narrow (1-tile) floor-1 lobby run shows no receptionist.** The wide grand
+  entrance (leftmost run of width >= 2) hosts the single reception; a 1-tile run
+  maps to `grand-solo`, which has no room for a counter. Reachable for a toy
+  lobby or a lobby whose leftmost contiguous run is split to width 1 by a gap.
+  Both reviewers judged it acceptable for a degenerate lobby; revisit only if the
+  owner wants a compact reception on the solo tile. (Edge Case Hunter. Low;
+  degenerate-case cosmetic.)

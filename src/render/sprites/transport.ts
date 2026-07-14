@@ -113,130 +113,184 @@ export function drawTransport(
   }
 }
 
-/** One warm-tan stair flight, ported from page-05's `stairs`: bright treads
- *  over dark risers on a shaded stringer, a walnut handrail with balusters, and
- *  top and bottom landings. Confined to the band `[bandTop, bandBottom)` (the
- *  departure floor's band) so the arrival band above stays the landing, never a
- *  second stacked flight. The flight is an open structure with no solid
- *  backing; the engine's routed climbers ride over it, so no rider is baked in.
- *  Integer coordinates. */
+/** One warm-tan stair flight: even treads over dark risers on a solid diagonal
+ *  stringer, a walnut handrail on balusters, and top and bottom landings, all
+ *  sitting on the floor line and confined to the band `[bandTop, bandBottom)`
+ *  (the departure floor's band) so the arrival band above stays the landing,
+ *  never a second stacked flight. The flight is drawn strictly inside
+ *  `[sx, sx + w]` so it never overpaints a neighbor. Structure only, NO baked
+ *  climber: the engine's routed sims ride over it as separate actors, so an empty
+ *  tower shows a bare, unoccupied flight. Integer coordinates. */
 function drawStairFlight(ctx: CanvasRenderingContext2D, sx: number, w: number, bandTop: number, bandBottom: number): void {
-  const x0 = sx + 8;
-  const x1 = sx + w - 20;
-  if (x1 <= x0) return; // too narrow to lay a readable flight (defensive)
-  // Keep every part of the flight inside the band: the handrail rises ~9px over
-  // the incline and the stringer drops ~10px under it, so the incline spans
-  // [bandTop + 9, bandBottom - 11].
-  const yTop = bandTop + 9; // arrival end of the incline (upper deck)
-  const yBot = bandBottom - 11; // departure end of the incline (lower deck)
-  if (yBot <= yTop) return; // band too short for a readable flight
-  const n = 6;
-  const step = (x1 - x0) / n;
-  const rise = (yBot - yTop) / n;
+  const railH = 9; // handrail height above a tread
+  const depth = 7; // stringer thickness under the treads
+  const x0 = sx + 10; // bottom (lower) landing sits on the left
+  const x1 = sx + w - 12; // top (upper) landing sits on the right
+  if (x1 - x0 < 8) return; // too narrow to lay a readable flight (defensive)
+  // Keep the whole flight inside the band: the stringer drops `depth` below the
+  // incline, so the incline bottom clears the band bottom by that much (a flight
+  // that leaked past bandBottom would paint onto the floor below).
+  const yBot = bandBottom - depth - 2; // lower deck (departure), near the floor line
+  // The top tread and top landing reach the arrival deck (bandTop) so the flight
+  // visually connects to the second floor. The upper band is itself a landing, so
+  // meeting bandTop is correct; the handrail is clamped below so nothing rises
+  // past the deck into a "second flight" read.
+  const yTop = bandTop + 2;
+  if (yBot - yTop < 6) return; // band too short for a readable flight
+  const n = 6; // steps
+  const treadW = (x1 - x0) / n;
+  const riseH = (yBot - yTop) / n;
+  // The smooth incline line (used for the stringer underside and the handrail)
+  // and the stepped top surface (flat within each tread, jumping at the front).
   const line = (x: number) => yBot - ((x - x0) / (x1 - x0)) * (yBot - yTop);
-  // Soft drop shadow the flight casts down and to the right.
-  ctx.fillStyle = "rgba(0,0,0,0.30)";
-  for (let x = x0; x < x1; x++) ctx.fillRect(x + 2, Math.round(line(x)) + 3, 1, 6);
-  // Stepped stringer (the solid support under the treads).
-  ctx.fillStyle = "#9A8666";
+  const stepTopY = (x: number) => Math.round(yBot - Math.min(n - 1, Math.floor((x - x0) / treadW)) * riseH) - 2;
+  // Soft drop shadow just under the stringer. Height 1 so the deepest column (at
+  // x0, where line === yBot) ends on bandBottom - 1 and never paints the
+  // bandBottom row, which belongs to the floor below.
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  for (let x = x0; x < x1; x++) ctx.fillRect(x + 1, Math.round(line(x)) + depth + 1, 1, 1);
+  // Solid body: from the stepped top surface down to a straight diagonal stringer
+  // underside, so the treads read as steps on one continuous stringer.
   for (let x = x0; x <= x1; x++) {
-    const si = Math.min(n - 1, Math.floor((x - x0) / step));
-    const ty = Math.round(yBot - si * rise);
-    const under = Math.round(line(x) + 9);
-    ctx.fillRect(x, ty - 2, 1, Math.max(1, under - (ty - 2)));
+    const top = stepTopY(x);
+    const bot = Math.round(line(x)) + depth;
+    ctx.fillStyle = "#8A7454"; // riser/stringer body
+    ctx.fillRect(x, top, 1, Math.max(1, bot - top));
+    ctx.fillStyle = "#2A2018"; // shaded stringer underside edge
+    ctx.fillRect(x, bot, 1, 2);
   }
-  ctx.fillStyle = "#2A2018"; // shaded stringer underside
-  for (let x = x0; x <= x1; x++) ctx.fillRect(x, Math.round(line(x) + 9), 1, 1);
-  // Treads (warm tan) with a lit top edge, and a dark riser at each step front.
+  // Tread caps (warm tan, lit nosing) and a dark riser face at each step front.
   for (let i = 0; i < n; i++) {
-    const stepX = Math.round(x0 + i * step);
-    const ty = Math.round(yBot - i * rise);
-    const sw = Math.ceil(step) + 1;
+    const l = Math.round(x0 + i * treadW);
+    const r = Math.round(x0 + (i + 1) * treadW);
+    const ty = Math.round(yBot - i * riseH) - 2;
     ctx.fillStyle = "#EDE6D2";
-    ctx.fillRect(stepX, ty - 3, sw, 3);
+    ctx.fillRect(l, ty, r - l + 1, 2);
     ctx.fillStyle = "#F8F2E0";
-    ctx.fillRect(stepX, ty - 3, sw, 1);
-    const nx = Math.round(x0 + (i + 1) * step);
+    ctx.fillRect(l, ty, r - l + 1, 1);
+    const nty = Math.round(yBot - (i + 1) * riseH) - 2; // next tread top (higher)
     ctx.fillStyle = "#241E14";
-    ctx.fillRect(nx, Math.round(yBot - (i + 1) * rise) - 3, 1, Math.max(1, Math.round(rise) + 3));
+    ctx.fillRect(r, nty, 1, Math.max(1, ty - nty));
   }
-  // Walnut handrail riding above the flight, on balusters.
-  ctx.fillStyle = "#6B4A2B";
-  for (let x = x0; x < x1; x++) ctx.fillRect(x, Math.round(line(x)) - 9, 1, 2);
+  // Walnut handrail on balusters, riding parallel above the flight. The rail is
+  // clamped so it never rises above the arrival deck (bandTop): near the top it
+  // levels onto the landing and ends in a short newel post, so the flight reads
+  // as meeting the second floor rather than a rail floating past it.
+  const railY = (x: number) => Math.max(bandTop, Math.round(line(x)) - railH);
   ctx.fillStyle = "#5A3E28";
-  for (let i = 1; i < n; i += 2) {
-    const bx = Math.round(x0 + i * step);
-    ctx.fillRect(bx, Math.round(yBot - i * rise) - 9, 1, 8);
+  for (let i = 1; i < n; i++) {
+    const bx = Math.round(x0 + i * treadW);
+    const ry = railY(bx);
+    ctx.fillRect(bx, ry, 1, Math.max(1, Math.round(line(bx)) - ry));
   }
-  // Arrival landing on the upper deck, then a short departure landing below.
+  for (let x = x0; x <= x1; x++) {
+    const ry = railY(x);
+    ctx.fillStyle = "#6B4A2B";
+    ctx.fillRect(x, ry, 1, 2);
+    ctx.fillStyle = "#8A6440";
+    ctx.fillRect(x, ry, 1, 1);
+  }
+  // Bottom landing (lower deck) on the left, top landing (upper deck) on the
+  // right, both inside [sx, sx + w]. The top landing's top edge sits on bandTop
+  // (the arrival deck), so the flight lands flush on the second floor.
   ctx.fillStyle = "#9A8666";
-  ctx.fillRect(x1 - 2, yTop - 3, 22, 3);
+  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 4);
   ctx.fillStyle = "#B49E7A";
-  ctx.fillRect(x1 - 2, yTop - 3, 22, 1);
+  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 1);
+  const rlx = x1;
+  const rlw = sx + w - 2 - x1;
+  ctx.fillStyle = "#9A8666";
+  ctx.fillRect(rlx, bandTop, rlw, 4);
+  ctx.fillStyle = "#B49E7A";
+  ctx.fillRect(rlx, bandTop, rlw, 1);
   ctx.fillStyle = "#2A2018";
-  ctx.fillRect(x1 - 2, yTop, 22, 1);
-  ctx.fillStyle = "#9A8666";
-  ctx.fillRect(sx + 2, yBot - 2, 12, 4);
-  ctx.fillStyle = "#B49E7A";
-  ctx.fillRect(sx + 2, yBot - 2, 12, 1);
+  ctx.fillRect(rlx, bandTop + 4, rlw, 1);
+  // Newel post where the rail meets the top landing, drawn AFTER the landing so
+  // it stands proud of it rather than being overpainted.
+  ctx.fillStyle = "#5A3E28";
+  ctx.fillRect(x1 - 1, bandTop, 2, Math.min(8, yBot - bandTop));
 }
 
-/** One escalator run, ported from page-05's `escalator`: metallic warm-gray
- *  steps, amber edge dots, a glass balustrade and handrail, and top and bottom
- *  landings. Confined to the band `[bandTop, bandBottom)` like the stair flight,
- *  so the arrival band stays the landing. Open structure, no solid backing; the
- *  engine's routed riders ride over it. Integer coordinates. */
+/** One escalator run: a clean inclined belt of metallic warm-gray steps with
+ *  legible amber step edges, a glass side balustrade with a dark moving handrail,
+ *  and comb-plate landings top and bottom. Confined to the band
+ *  `[bandTop, bandBottom)` like the stair flight and drawn strictly inside
+ *  `[sx, sx + w]`. Structure only, NO baked rider: the engine's routed sims ride
+ *  over it, so an empty tower shows a bare, unoccupied run. Integer coordinates. */
 function drawEscalatorRun(ctx: CanvasRenderingContext2D, sx: number, w: number, bandTop: number, bandBottom: number): void {
-  const x0 = sx + 8;
-  const x1 = sx + w - 20;
-  if (x1 <= x0) return;
-  const yTop = bandTop + 11; // handrail + balustrade clear the band top
-  const yBot = bandBottom - 11; // steps clear the band bottom
-  if (yBot <= yTop) return;
+  const railH = 10; // handrail height above the belt top
+  const beltThk = 8; // belt thickness
+  const x0 = sx + 10; // bottom landing on the left
+  const x1 = sx + w - 12; // top landing on the right
+  if (x1 - x0 < 8) return;
+  // Keep the belt inside the band: the belt is `beltThk` thick below the incline
+  // line, so its top clears the band bottom by that much (a run that leaked past
+  // bandBottom would paint onto the floor below).
+  const yBot = bandBottom - beltThk - 2; // belt top at the lower deck
+  // The belt top and top landing reach the arrival deck (bandTop) so the run
+  // connects to the second floor; the handrail is clamped below the deck.
+  const yTop = bandTop + 2; // belt top at the upper deck
+  if (yBot - yTop < 6) return;
   const line = (x: number) => yBot - ((x - x0) / (x1 - x0)) * (yBot - yTop);
-  ctx.fillStyle = "rgba(0,0,0,0.30)"; // drop shadow
-  for (let x = x0; x < x1; x++) ctx.fillRect(x + 2, Math.round(line(x)) + 4, 1, 5);
-  // Metallic step bars along the incline.
+  // Soft drop shadow under the belt. Height 1 so the deepest column (at x0, where
+  // line === yBot) ends on bandBottom - 1 and never paints the bandBottom row,
+  // which belongs to the floor below.
+  ctx.fillStyle = "rgba(0,0,0,0.28)";
+  for (let x = x0; x < x1; x++) ctx.fillRect(x + 1, Math.round(line(x)) + beltThk + 1, 1, 1);
+  // The metal belt: a mid-gray band with a light top edge and a dark underside.
   for (let x = x0; x <= x1; x++) {
-    const tt = Math.round(line(x));
-    ctx.fillStyle = "#141118";
-    ctx.fillRect(x, tt - 1, 1, 1);
+    const t = Math.round(line(x));
     ctx.fillStyle = "#6E747C";
-    ctx.fillRect(x, tt, 1, 8);
-    ctx.fillStyle = "#9AA0A8";
-    ctx.fillRect(x, tt, 1, 1);
-    ctx.fillStyle = "#3A3E46";
-    ctx.fillRect(x, tt + 7, 1, 2);
+    ctx.fillRect(x, t, 1, beltThk);
+    ctx.fillStyle = "#9AA0A8"; // lit top edge of the belt
+    ctx.fillRect(x, t, 1, 1);
+    ctx.fillStyle = "#3A3E46"; // dark underside
+    ctx.fillRect(x, t + beltThk - 1, 1, 1);
   }
-  // Amber step-edge accents.
-  for (let x = x0; x < x1; x += 4) {
-    const tt = Math.round(line(x));
+  // Step edges: a dark groove with a bright amber nose, evenly spaced, so the
+  // moving steps read at a glance.
+  for (let x = x0 + 2; x < x1; x += 4) {
+    const t = Math.round(line(x));
     ctx.fillStyle = "#3A3E46";
-    ctx.fillRect(x, tt + 1, 1, 6);
+    ctx.fillRect(x, t + 1, 1, beltThk - 2);
     ctx.fillStyle = "#F0C24A";
-    ctx.fillRect(x - 1, tt + 1, 1, 6);
+    ctx.fillRect(x - 1, t + 1, 1, beltThk - 2);
   }
-  // Glass balustrade + dark handrail above the steps.
-  ctx.fillStyle = "rgba(191,208,224,0.20)";
-  for (let x = x0; x < x1; x++) ctx.fillRect(x, Math.round(line(x)) - 9, 1, 8);
-  for (let x = x0; x < x1; x++) {
-    const tt = Math.round(line(x));
+  // Glass side balustrade with a dark moving handrail on top. The rail is clamped
+  // so it never rises above the arrival deck (bandTop): near the top it levels
+  // onto the landing and ends in a short newel, so the run reads as reaching the
+  // second floor.
+  const railTop = (x: number) => Math.max(bandTop, Math.round(line(x)) - railH);
+  ctx.fillStyle = "rgba(191,208,224,0.18)";
+  for (let x = x0; x <= x1; x++) {
+    const rt = railTop(x);
+    ctx.fillRect(x, rt, 1, Math.max(1, Math.round(line(x)) - rt));
+  }
+  for (let x = x0; x <= x1; x++) {
+    const rt = railTop(x);
     ctx.fillStyle = "#1A1D24";
-    ctx.fillRect(x, tt - 10, 1, 2);
-    ctx.fillStyle = "#3A3E46";
-    ctx.fillRect(x, tt - 10, 1, 1);
+    ctx.fillRect(x, rt, 1, 2);
+    ctx.fillStyle = "#4A4E56"; // handrail highlight
+    ctx.fillRect(x, rt, 1, 1);
   }
-  // Landings top and bottom.
+  // Comb-plate landings top and bottom, inside [sx, sx + w]. The top comb plate
+  // sits on bandTop (the arrival deck), so the run lands flush on the second floor.
   ctx.fillStyle = "#6A6E76";
-  ctx.fillRect(x1 - 2, yTop - 2, 22, 5);
+  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 5);
   ctx.fillStyle = "#8A8E96";
-  ctx.fillRect(x1 - 2, yTop - 2, 22, 1);
+  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 1);
+  const rlx = x1;
+  const rlw = sx + w - 2 - x1;
+  ctx.fillStyle = "#6A6E76";
+  ctx.fillRect(rlx, bandTop, rlw, 5);
+  ctx.fillStyle = "#8A8E96";
+  ctx.fillRect(rlx, bandTop, rlw, 1);
   ctx.fillStyle = "#3A3E46";
-  ctx.fillRect(x1 - 2, yTop + 3, 22, 1);
-  ctx.fillStyle = "#6A6E76";
-  ctx.fillRect(sx + 2, yBot - 2, 14, 5);
-  ctx.fillStyle = "#8A8E96";
-  ctx.fillRect(sx + 2, yBot - 2, 14, 1);
+  ctx.fillRect(rlx, bandTop + 5, rlw, 1);
+  // Newel where the handrail meets the top landing, drawn AFTER the landing so it
+  // stands proud of it rather than being overpainted.
+  ctx.fillStyle = "#1A1D24";
+  ctx.fillRect(x1 - 1, bandTop, 2, Math.min(8, yBot - bandTop));
 }
 
 /** A single elevator car graphic, drawn at (0,0) into a w×floorH rect, carrying
