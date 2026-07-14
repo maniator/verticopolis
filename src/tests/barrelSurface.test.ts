@@ -57,6 +57,7 @@ import * as tdtExport from "../storage/tdtExport";
 import * as saveGame from "../storage/SaveGame";
 import * as pixelSprites from "../render/pixelSprites";
 import * as structure from "../render/sprites/structure";
+import * as spriteFacilities from "../render/sprites/facilities";
 import * as audio from "../audio/ToneAudioEngine";
 import * as toneScenes from "../audio/toneScenes";
 import * as toneVoices from "../audio/toneVoices";
@@ -122,6 +123,10 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
     "drawConstruction", "drawCrane", "drawEscapeStairs", "drawFlames", "drawFloor", "drawLobby",
     "drawLobbyEntrance", "lobbyVariant",
   ],
+  spriteFacilities: [
+    "drawGarbageTruck", "drawHousekeeping", "drawMedical", "drawMetro", "drawMetroTrain", "drawParking",
+    "drawParkingRamp", "drawPartyHall", "drawRecycling", "drawSecurity", "drawStreetCar", "drawWeddingHall",
+  ],
   audio: ["ToneAudioEngine"],
   toneScenes: [
     "DETAIL_ZOOM", "OVERVIEW_EXIT", "OVERVIEW_ZOOM", "SCENES", "clamp", "detailFor", "lerp",
@@ -132,7 +137,7 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
 
 const MODULES: Record<string, Record<string, unknown>> = {
   facilities, simulation, tower, crowd, economy, migration, tdtFormat, tdtImport, tdtExport,
-  saveGame, pixelSprites, structure, audio, toneScenes, toneVoices,
+  saveGame, pixelSprites, structure, spriteFacilities, audio, toneScenes, toneVoices,
 };
 
 describe("barrel surface: every re-exported value binding resolves", () => {
