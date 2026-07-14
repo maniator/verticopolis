@@ -38,6 +38,12 @@ export function scheduleStep(
   detail: number,
   time: number,
 ): void {
+  // A scene with no scale has no melody source, so the else branch below would
+  // read def.scale[degree] as undefined and pass a NaN note into Tone. Every
+  // built-in SCENES entry has a non-empty scale, so this never fires for them;
+  // the guard hardens the now-public helper against a caller passing an empty
+  // scale (behavior-preserving for the shipped scenes).
+  if (!def.scale.length) return;
   // Seeded-but-varied note choice; seed off the free-running tick so the line
   // evolves bar to bar rather than looping a fixed 16-note pattern.
   const r = pseudo(tick * 2654435761);

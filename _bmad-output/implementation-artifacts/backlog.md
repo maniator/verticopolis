@@ -259,12 +259,19 @@ fires when the backstop workflow actually runs. Residuals parked here:
 
 Change: `ToneAudioEngine.ts` (831 lines) split into `toneScenes.ts` (data + pure
 math), `toneVoices.ts` (synthesis free functions), and the orchestrator class.
-Behavior-preserving. Two review layers (Blind Hunter, Edge Case Hunter). One
-finding patched in-PR (a throwaway `AccentNodes` allocation on zoomed-in
-no-accent scenes, now short-circuited before node resolution). One residual
-parked here:
+Behavior-preserving. Two review layers (Blind Hunter, Edge Case Hunter) plus
+Copilot. Nothing left deferred; both findings were patched in-PR:
 
-- **`scheduleStep` (`toneVoices.ts`) indexes `def.scale[degree]` with no `def.scale.length` guard**, unlike the pad branch's `onBeat && def.pad.length` check. Pre-existing (identical to the old inline method) and unreachable in practice: `def` always comes from the closed `SCENES` table, where every one of the 12 scenes has a non-empty `scale`. Adding a guard would inject a new early-return path into a strictly behavior-preserving PR, so it was left out. Revisit only if `SCENES` ever grows a scale-less entry, or if `scheduleStep` gains a caller outside the engine. (Low, Edge Case Hunter; unreachable given current data.)
+- Throwaway `AccentNodes` allocation on zoomed-in no-accent scenes, now
+  short-circuited before node resolution (`onStep` checks `def.accent !== "none"`).
+- **`scheduleStep` NaN on an empty `def.scale`** (Edge Case Hunter + Copilot):
+  the else branch indexed `def.scale[degree]` with no length guard, so an empty
+  scale would produce a NaN note. Unreachable for the built-in `SCENES` (all 12
+  have non-empty scales), but `scheduleStep` is now an exported helper whose
+  `SceneDef` param does not constrain the scale to non-empty, so the extraction
+  changed the risk profile. Fixed with a behavior-preserving `if (!def.scale.length) return;`
+  guard (never fires for the shipped scenes) plus a `toneVoices.test.ts` case
+  covering both the finite-frequency contract and the empty-scale short-circuit.
 
 ### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
 
