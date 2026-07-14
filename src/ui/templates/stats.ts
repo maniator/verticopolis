@@ -33,7 +33,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   const c = sim.clock;
   const next = sim.nextStarThreshold;
   const fmt = (n: number) => n.toLocaleString();
-  // Modal-only diagnostics — a full scan and a flood-fill, computed here at
+  // Modal-only diagnostics: a full scan and a flood-fill, computed here at
   // modal-build time so they never run on the ~6 Hz HUD stats() path.
   const ratingPop = sim.ratingPopulation();
   const parkingWorking = sim.tower.functionalParkingSet().size;
@@ -118,7 +118,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
     </div>`;
 }
 
-/** Passenger-elevator utilization, busiest shaft first — mirror of
+/** Passenger-elevator utilization, busiest shaft first, mirroring
  *  `buildElevatorHtml`. */
 export function elevatorSection(sim: Simulation): TemplateResult | typeof nothing {
   const shafts = sim.elevatorStats();
@@ -140,7 +140,7 @@ export function elevatorSection(sim: Simulation): TemplateResult | typeof nothin
   return html`<div class="stats-section win-title sm">Elevators (avg load, busiest first)</div>${col(shown.slice(0, half))}${col(shown.slice(half))}`;
 }
 
-/** The per-category income breakdown — mirror of `buildIncomeHtml`. */
+/** The per-category income breakdown, mirroring `buildIncomeHtml`. */
 export function incomeSection(sim: Simulation): TemplateResult | typeof nothing {
   const { averages, hasData } = sim.incomeBreakdown();
   if (!hasData) return nothing;
@@ -166,7 +166,7 @@ export function incomeSection(sim: Simulation): TemplateResult | typeof nothing 
 }
 
 /**
- * Modern-only "Households" readout — mirror of `householdSection`. Gated by the
+ * Modern-only "Households" readout, mirroring `householdSection`. Gated by the
  * caller (only rendered when `sim.rules.hasVariantHouseholds`).
  */
 function householdSection(sim: Simulation): TemplateResult {
@@ -195,7 +195,7 @@ function householdSection(sim: Simulation): TemplateResult {
   return html`${head}<div class="col kv"><span class="k">People housed</span><span class="v">${residents.toLocaleString()}</span><span class="k">Avg household</span><span class="v">${avg}</span></div><div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`;
 }
 
-/** The optional-goals checklist — mirror of `buildMilestonesHtml`. */
+/** The optional-goals checklist, mirroring `buildMilestonesHtml`. */
 export function milestonesSection(sim: Simulation): TemplateResult {
   const mp = sim.milestoneProgress();
   const half = Math.ceil(mp.list.length / 2);
