@@ -121,6 +121,19 @@ How items flow:
 
 ## Deferral inbox
 
+### Follow-up: evaluate a Preact (or similar) UI rendering layer (2026-07-14, from Wave C-2)
+
+While splitting `UI.ts`, the owner raised moving the DOM generation to
+React/Preact instead of hand-built HTML strings + imperative wiring. Deferred to
+its OWN initiative on purpose: the Wave C-2 split is behavior-preserving (the
+view moves to pure `uiTemplates.ts` string builders, the controller stays vanilla
+imperative), whereas adopting a framework is a UI-architecture change (new
+dependency, declarative components replacing `ui.update()/showX()/toast()`, and a
+ripple into the e2e / visual-snapshot baselines). Pick up as a specced, party-run
+initiative after the Wave C splits land: scope the component boundary, the
+imperative-to-declarative bridge for `main.ts`, and a baseline-regeneration plan.
+(Feature-request / architecture; open; owner-requested.)
+
 ### Deferred from: party consultation on audio baking (2026-07-13)
 
 Owner follow-up to the Tone.js audio work: should we bake WAV files into the
