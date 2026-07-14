@@ -38,7 +38,7 @@ flowchart TD
     subgraph view["Presentation"]
         UI["src/ui/<br/>UI shell + friend-modules (uiTemplates · uiDialogs · uiPanels · uiStatus · uiPalette)<br/>Onboarding · editorHtml · statsHtml"]
         Render["src/render/<br/>sprites · pixelSprites"]
-        Engine3D["src/render/excalibur/TowerEngine<br/>render loop · camera · pointer input"]
+        Engine3D["src/render/excalibur/TowerEngine + friend-modules (towerScene · towerReconcile · towerCrowd · towerInputCamera · towerOverlay)<br/>render loop · camera · pointer input"]
         Audio["src/audio/<br/>AudioEngine → ToneAudioEngine (toneScenes · toneVoices)"]
     end
 

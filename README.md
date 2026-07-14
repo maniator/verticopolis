@@ -194,7 +194,12 @@ src/
     Tower.ts        spatial model: two-layer grid, placement rules, reachability
     Simulation.ts   economy, population, satisfaction, ratings, events, save
   render/      # presentation
-    excalibur/TowerEngine.ts  Excalibur.js scene: actors, camera, pan/zoom, input
+    excalibur/TowerEngine.ts  Excalibur.js scene shell; delegates to friend-modules below
+    excalibur/towerScene.ts   scene construction, graphics baking, sky, lifecycle
+    excalibur/towerReconcile.ts  retained-actor reconciliation (rooms, structure, facade)
+    excalibur/towerCrowd.ts   cars, train, garbage/garage traffic, ambient walkers
+    excalibur/towerInputCamera.ts  pointer input, picking, camera, coords, audio focus
+    excalibur/towerOverlay.ts  2D overlay/stats painters + decorative event visuals
     sprites.ts      procedural per-facility drawing (drawn into Excalibur canvases)
     pixelSprites.ts dollhouse room interiors + walking/seated people
   ui/          # DOM controls: palette, status bar, editor panel, modals, toasts
