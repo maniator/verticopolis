@@ -257,6 +257,9 @@ describe("bulletin-log persistence", () => {
   it("the pre-log fixture still loads with an empty bulletin", () => {
     const data = decodeVctower(towerFile);
     expect("log" in data).toBe(false);
+    // The v5 -> v6 party-hall migration relocates this fixture's basement hall
+    // into a free two-story slot (it does not drop it), so no bulletin line is
+    // emitted and the pre-log save still loads with an empty log.
     expect(Simulation.deserialize(data).log).toEqual([]);
   });
 });

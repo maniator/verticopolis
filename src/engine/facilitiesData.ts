@@ -142,11 +142,12 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     category: "entertainment",
     name: "Party Hall",
     width: 24,
+    floors: 2,
     cost: 100000,
     minStar: 3,
     population: 0,
     color: "#cf7fb0",
-    description: "Rentable function space for events. Periodic income.",
+    description: "A two-story rentable function space for events. Guests enter on the lower floor. Periodic income.",
   },
   stairs: {
     kind: "stairs",

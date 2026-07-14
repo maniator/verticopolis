@@ -13,7 +13,7 @@ abstraction · ⬜ not present.
 - ✅ Floors auto-created under a room when placed (no pre-laying bare floor)
 - ✅ No floating overhangs: a room must sit on the floor directly below (or the ground)
 - ✅ Basements (B1…B10) with continuous numbering (floor 0 = B1)
-- ✅ Multi-story facilities (cinema spans 2 floors; recycling 2; metro a whole basement floor)
+- ✅ Multi-story facilities (cinema and party hall span 2 floors; recycling 2; metro a whole basement floor)
 - ✅ Build/sell with construction time and a partial-refund bulldoze
 - ✅ Buildable bounds: 100 floors above, 10 basement levels below (B1…B10)
 
@@ -22,7 +22,7 @@ abstraction · ⬜ not present.
 - ✅ Condominium: one-time sale, residents live in permanently. Priced on the original's construction-cost scale (default ~2× build cost, up to a ~2.5× ceiling; a higher asking price sells slower), and losing an owner to sustained neglect triggers a full-price **buy-back**
 - ✅ Hotel: Single / Double / Suite (nightly revenue, guests check in/out)
 - ✅ Fast Food, Restaurant, Retail Shop (daily traffic income, business hours)
-- ✅ Cinema (multi-floor, evening crowds), Party Hall
+- ✅ Cinema and Party Hall, both two-story rooms (guests enter on the lower floor); evening crowds
 - ✅ Services: Security, Medical Center, Housekeeping, Recycling Center, Parking
 - ✅ Recycling Center **fills daily** with the tower's garbage (one center per ~2,500 population; a pre-dawn garbage truck empties them). 4★ requires demand MET, not merely built
 - ✅ Parking demand: offices want a space per ~12 workers from 3★; **every hotel suite needs a space of its own** (the VIP won't review without it); cars visibly fill the garage with real usage

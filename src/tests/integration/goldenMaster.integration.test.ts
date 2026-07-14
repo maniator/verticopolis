@@ -109,5 +109,8 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
 });
 
 /** sha256 of the stable-stringified serialize() output of the fixed scenario.
- *  Pinned from the pre-refactor baseline. */
-const PINNED_STATE_HASH = "f54d44516f7ebd8b0e6ad16aec2b49bdb615bd8b969cd7a477402458a9993673";
+ *  Re-pinned intentionally when the save schema bumped to v6 (party halls are
+ *  now two-story). This fixture builds no party hall, so the only changed byte
+ *  is the serialized `version` stamp; the tower's behavior is otherwise
+ *  unchanged. */
+const PINNED_STATE_HASH = "27d5e561ff5d16e2726d504eb4e1a5e4c0263cdb7c0a76302fbb26646851cac5";
