@@ -1566,3 +1566,37 @@ can strand fresh items behind an unchanged key. Decisions per the story:
 - **Key covers a superset of the palette kinds**: it iterates all FACILITIES keys,
   so a boundary crossing on a non-palette kind causes a spurious (harmless,
   correct) rescan, never a missed one.
+
+### Decisions + deferrals: E6-S1 (editor card via lit diffing) (`/bmad-code-review`, 2026-07-14)
+
+Change: the editor card's `key`/`patchVolatile` protocol is replaced by lit's
+binding diff (`templates/editor.ts`, PR #289), with the review's confirmed
+findings landed in the follow-up PR #290 (the triage completed minutes after
+auto-merge fired; the unkeyed build never reached a player-facing release).
+Patched there: the card is `keyed` on the selected entity id, restoring the
+legacy per-entity rebuild so a dirty rename input can never carry half-typed
+text onto another unit; the delegated `.ed-close` path gains the same
+containment guard as the `[data-edit]` path; the fast-food closed branch and
+express skipped-lobby readout get direct assertions plus equivalence guards;
+the addcar upper bound joins the equivalence suite; `simWith` asserts every
+placement; one em-dash comment slip reworded; one stale `patchVolatile`
+comment updated. Residual defers:
+
+- **Describe-title "—" separators stay**: the `"subject — behavior"` title
+  pattern appears in 63 pre-existing test files; the rewritten suites keep the
+  house convention rather than diverging. Prose comments follow the no-em-dash
+  rule.
+- **Mobile diagnostics equivalence covers unit + standard elevator only**: the
+  express/stairs mobile fold-ins ride the same `unsafeHTML(transportDiagnostics)`
+  block; full diagnostics-surface coverage belongs to E6-S2, which migrates the
+  inspector that owns those builders.
+- **Zero-population service-kind access row on mobile is unguarded**: the
+  `!mobile || !hasAccessDiagnostic(u)` condition is byte-identical in the legacy
+  builder and the template, so drift requires editing both; add a fixture when a
+  service kind next changes.
+- **`unitEditorHtml`/`transportEditorHtml` join the string-builder retirement
+  list**: retained as the equivalence oracle until the final sweep.
+- **`editorSize` is re-measured per editor pump** instead of only on a shape
+  change: per-frame anchoring still reads the cache; the forced read rides the
+  ~6 Hz pump whose status-bar writes already dirty layout. Revisit only if a
+  phone-tier profile ever blames it.
