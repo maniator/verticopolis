@@ -411,7 +411,7 @@ function addRoom(engine: TowerEngine, u: Unit, deadParking: boolean, animated: b
       // room bake writes it, so one unit's flag can't leak into the next.
       engine.d.parkingDead = live.dead;
       drawUnit(engine.d, u, 0, 0, w, h);
-      // Canon "red X" on a parking space that isn't chained to a ramp (dead , 
+      // Canon "red X" on a parking space that isn't chained to a ramp (dead,
       // no relief). Baked into the sprite; the dead-bit participates in the room
       // signature, so this re-bakes when the signature changes (state/lighting/
       // hour or the dead-bit). live.dead is refreshed on each sync from the
