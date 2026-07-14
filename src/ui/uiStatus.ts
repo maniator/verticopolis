@@ -10,6 +10,13 @@ import { towerStatsTemplate } from "./templates/towerStats";
  * {@link UI}, as friend functions taking the UI instance. This is the per-frame
  * pump ({@link update}) plus the toast rail and log baseline helpers. Extracted
  * from `UI.ts`; the class keeps thin delegations.
+ *
+ * The bulletin log and the toast rail stay IMPERATIVE by decision (E7-S1 of
+ * the lit migration; rationale in the implementation backlog): they are
+ * append-only streams with deliberate performance structure (constant DOM
+ * node count via append+prune, self-removing toasts), not markup for a
+ * value diff, and their `role=log` / `aria-live` announcements must never
+ * be batched or throttled to fit a frame budget.
  */
 
 /** Hard ceiling on rendered bulletin lines. The DOM node count is held CONSTANT

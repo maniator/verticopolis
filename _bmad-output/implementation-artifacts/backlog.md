@@ -1649,3 +1649,22 @@ Decisions and residual notes:
 - **Diagnostics stay HTML strings bridged by unsafeHTML** on this surface too;
   their template form is a final-sweep/E7 question, shared with the editor's
   mobile fold-in.
+
+### Decision: E7-S1 (bulletin log + toast rail stay imperative) (2026-07-14)
+
+Evaluated migrating the last two DOM surfaces to lit and decided to LEAVE BOTH
+IMPERATIVE, per the plan's default. The bulletin log is an append-only stream
+with deliberate performance structure: `renderLog` appends only the fresh
+`logSeq` delta and prunes the oldest past `LOG_DOM_CAP`, so the DOM node count
+stays constant over an arbitrarily long session while scrollback keeps
+flowing under column-reverse. Rendering it through lit would mean handing the
+renderer a window of entries every pump and letting it re-diff the whole list
+to discover one appended child, replacing an O(new entries) append with an
+O(cap) diff and gaining nothing (the lines are inert text divs; nothing ever
+patches in place). The toast rail is a set of self-removing transient nodes
+with their own timers and a hard cap; ownership by a renderer that reconciles
+children would fight the timers' self-removal. Both regions keep their static
+`role=log` / `role=status` + `aria-live` markup (src/index.html), and their
+announcements are never batched or throttled to fit a frame budget. Revisit
+only if either surface grows interactive children. One-line note per the
+story: log + toast stay imperative; lit owns every other UI surface.
