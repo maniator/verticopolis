@@ -1024,15 +1024,14 @@ row (height reduced to 1 so the deepest column stays inside the band), the newel
 post is drawn after the top landing so it reads, and the once-per-lobby comments
 were corrected to note the compact 1-tile fallback shows no receptionist. Defers:
 
-- **Sky lobby shows zero attendants after de-repeat.** The frozen structure /
-  transport I/O matrix wants "an info desk with an attendant" on the sky lobby,
-  but de-repeating removed the tiled attendant and there is no single-placement
-  path for sky lobbies (the floor-1 entrance map that hosts the ground lobby's
-  one reception is `u.floor === 1` only). Owner to decide whether to add a single
-  sky-lobby info-desk attendant, which would need a sky-lobby single-tile
-  placement mechanism parallel to the floor-1 entrance map. Do not build the
-  placement mechanism speculatively. (Acceptance Auditor. Medium; needs owner
-  decision + a new placement seam.)
+- **Sky lobby shows zero attendants after de-repeat. RESOLVED: owner chose to
+  keep the sky lobby UNSTAFFED (zero attendants).** De-repeating removed the tiled
+  attendant, and there is no single-placement path for sky lobbies (the floor-1
+  entrance map that hosts the ground lobby's one reception is `u.floor === 1`
+  only). The owner decided the sky lobby stays unstaffed, so this is closed, not
+  an open item, and the frozen I/O matrix line ("an info desk with an attendant")
+  should be amended to match. No code change; do not add a sky-lobby placement
+  seam. (Acceptance Auditor; owner decision 2026-07-14.)
 - **Stairs/escalator no longer bake a rider; the frozen AC should be amended.**
   The frozen structure/transport spec AC and I/O matrix say the incline carries
   the ~17px rider build, but per the owner directive the flights bake no
@@ -1057,6 +1056,41 @@ were corrected to note the compact 1-tile fallback shows no receptionist. Defers
   Both reviewers judged it acceptable for a degenerate lobby; revisit only if the
   owner wants a compact reception on the solo tile. (Edge Case Hunter. Low;
   degenerate-case cosmetic.)
+
+### Deferred from: code review of E6 grand hotel entrance redraw (`gds-code-review`, 2026-07-14)
+
+Change: `src/render/sprites/structure/entrance.ts` grand forms redrawn from the
+glass storefront + green marquee to the page-05 `grandEnt` grand hotel entrance
+(red scalloped awning, gold double doors, glass curtain wall, red carpet, potted
+palm, doorman) on the wide (`drawGrandFacadeLeft` + `drawGrandFacadeRight`) and
+compact (`drawGrandCompact`) forms; the service entrance is untouched. Three
+review layers. Patch findings fixed and re-verified: the compact doorman was
+moved from `lc + 4` to `lc + 3` so his 2px sway frame no longer clips column 11
+off the 11px tile; the compact palm was resized to fit inside the tile instead of
+spilling off the left edge; the compact door's right handle was mirrored about the
+center split; the wide doorman was nudged to composite `dcx + 3` so both feet stay
+on the carpet and clear of the right palm's pot; and the left reception desk now
+derives its base from the `fy = h - 6` floor line. Defers:
+
+- **Wide grand entrance carries one palm (right flank), not one on each side.**
+  The reference `grandEnt` and the owner directive want a palm flanking the doors
+  on both sides, but the left flank of the wide 2-tile form (22px) hosts the
+  required single relocated reception desk + attendant (6px), which leaves no
+  floor room for a left palm beside the left door leaf. The two requirements
+  (keep the reception AND a palm on each side) conflict in 22px. Shipped with
+  reception on the left, palm on the right, doorman on the carpet. Owner to
+  decide: keep the reception plus one palm, or drop the reception here for a
+  second palm. (Acceptance Auditor. Low; needs an owner decision, not a code fix.)
+- **Door geometry is a fixed 18px tall, not proportional to `h`.** `doorH = 18`
+  and `doorTopY = fy - 18` are constants tuned for the game's `FLOOR = 44`
+  (`fy = 38`, door spans ry 20..38). At the unit tests' `h = 34` the door top
+  rises into the awning band, and for `h <= 24` `doorTopY` would go negative (the
+  `Filler` clamps rect SIZE, not position). Not reachable in production (entrance
+  tiles always bake at `FLOOR = 44`), and the tests only assert `painted()` /
+  `sig()` inequality, so it is test-fidelity / robustness only. Derive the door
+  height from `h` if a future change ever bakes entrances at another height.
+  (Edge Case Hunter. Low; robustness.)
+
 ### Deferred from: code review of E1 (createUICallbacks split) (`/bmad-code-review`, 2026-07-14)
 
 Change: E1 extracts the ~30-callback `UICallbacks` literal out of the `GameApp`
