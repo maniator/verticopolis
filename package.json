@@ -47,6 +47,7 @@
   "dependencies": {
     "excalibur": "^0.32.0",
     "fflate": "^0.8.3",
+    "lit-html": "^3.3.3",
     "tone": "^15.1.22"
   }
 }

@@ -13,6 +13,7 @@ import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
+import { render, type TemplateResult } from "lit-html";
 import * as tpl from "./uiTemplates";
 import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
@@ -207,25 +208,48 @@ export class UI {
   openModal(html: string): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
     dialog.innerHTML = `<div class="modal-box win">${html}</div>`;
-    const box = dialog.firstElementChild as HTMLElement;
-    // Every dialog's TOP-LEVEL h2 is the window title bar; classing it here keeps
-    // the rule in one place. :scope > h2 so an h2 nested in body content is never
-    // skinned.
+    return this.finishModal(dialog, dialog.firstElementChild as HTMLElement);
+  }
+
+  /** Sibling of {@link openModal} for the lit-html migration: renders a lit
+   *  `TemplateResult` into the shared modal with the identical window grammar
+   *  (both paths finish through {@link finishModal}). The template renders into a
+   *  box that is FRESH per open and discarded by closeModal(), so lit's part-cache
+   *  never shares a container with the string path's `innerHTML` writes: one
+   *  container, one renderer. render() only ever touches this child box; innerHTML
+   *  is only ever set on the dialog itself. It renders once per open (no
+   *  re-render), so the ✕ that finishModal appends into the rendered h2 is safe;
+   *  any initial focus is the dialog controller's own explicit side effect, not
+   *  this mount's job.
+   *  @internal friend-module access (uiDialogs). */
+  openModalTemplate(result: TemplateResult): HTMLElement {
+    const dialog = this.el.modal as HTMLDialogElement;
+    dialog.innerHTML = "";
+    const box = document.createElement("div");
+    box.className = "modal-box win";
+    render(result, box);
+    dialog.appendChild(box);
+    return this.finishModal(dialog, box);
+  }
+
+  /** The shared window grammar both mount paths finish with, kept in one place so
+   *  the string path ({@link openModal}) and the template path
+   *  ({@link openModalTemplate}) can never drift: skin the top-level h2 as the
+   *  title bar (`:scope > h2` so a nested h2 is never skinned), show the dialog,
+   *  then append the win-style ✕. The ✕ routes through the dialog's cancel path
+   *  (same as Esc) rather than closeModal() directly, so modals that override
+   *  oncancel to resolve a pending choice still resolve. It is appended AFTER
+   *  showModal() so it is not the first focusable element (keyboard users land on
+   *  the primary action, not the ✕). Backdrop click and Esc/cancel close. */
+  private finishModal(dialog: HTMLDialogElement, box: HTMLElement): HTMLElement {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
     if (!dialog.open) dialog.showModal();
-    // Win-style ✕ in the title bar so long dialogs can be dismissed without
-    // scrolling to the bottom button. It routes through the dialog's cancel path
-    // (same as Esc) rather than closeModal() directly, so modals that override
-    // oncancel to resolve a pending choice still resolve. Appended AFTER
-    // showModal(): it must not be the first focusable element, or keyboard users
-    // would land on ✕ and Enter would dismiss instead of activating the primary.
     if (h2) {
       h2.appendChild(
         this.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
       );
     }
-    // Click outside the box (on the backdrop) closes the dialog.
     dialog.onclick = (e) => {
       if (e.target === dialog) this.closeModal();
     };

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { html } from "lit-html";
 import { UI, type UICallbacks } from "../../ui/UI";
 import { Simulation } from "../../engine/Simulation";
 import * as platformModule from "../../platform";
@@ -313,6 +314,77 @@ describe("openModal — the window grammar", () => {
     ui.showEventChoice("Bomb threat!", "$100,000", onResolve);
     click('[data-act="accept"]');
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("accept");
+  });
+});
+
+describe("openModalTemplate — the lit mount path shares the window grammar", () => {
+  it("wraps a template in .modal-box.win, skins the top-level h2, and shows the dialog", () => {
+    const { ui } = makeUI();
+    const box = ui.openModalTemplate(html`<h2>Title</h2><p>body</p>`);
+    expect(box.classList.contains("modal-box")).toBe(true);
+    expect(box.classList.contains("win")).toBe(true);
+    expect(box.querySelector(":scope > h2")!.classList.contains("win-title")).toBe(true);
+    expect(dialog().open).toBe(true);
+  });
+
+  it("appends exactly one ✕ as the LAST child of the title bar, with the shared recipe", () => {
+    const { ui } = makeUI();
+    const box = ui.openModalTemplate(html`<h2>Title</h2><button class="btn primary">OK</button>`);
+    const title = box.querySelector(":scope > h2")!;
+    const xs = box.querySelectorAll<HTMLButtonElement>(".modal-x");
+    expect(xs.length).toBe(1);
+    expect(title.lastElementChild).toBe(xs[0]);
+    expect([...xs[0].classList].sort()).toEqual(["btn", "modal-x", "xs"]);
+    expect(xs[0].getAttribute("aria-label")).toBe("Close");
+  });
+
+  it("the ✕ closes through the dialog's cancel path", () => {
+    const { ui } = makeUI();
+    ui.openModalTemplate(html`<h2>Title</h2>`);
+    expect(dialog().open).toBe(true);
+    click(".modal-x");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("Esc/cancel closes the template modal", () => {
+    const { ui } = makeUI();
+    ui.openModalTemplate(html`<h2>Title</h2>`);
+    dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
+    expect(dialog().open).toBe(false);
+  });
+
+  it("renders a fresh box per open: reopening leaves exactly one box and one ✕", () => {
+    const { ui } = makeUI();
+    ui.openModalTemplate(html`<h2>First</h2>`);
+    ui.closeModal();
+    const box2 = ui.openModalTemplate(html`<h2>Second</h2>`);
+    expect(dialog().querySelectorAll(".modal-box").length).toBe(1);
+    expect(dialog().querySelectorAll(".modal-x").length).toBe(1);
+    expect(box2.querySelector(":scope > h2")!.textContent).toContain("Second");
+  });
+});
+
+describe("confirmModal — lit template mount", () => {
+  it("closes the dialog BEFORE running onYes, so the callback sees a torn-down modal", () => {
+    const { ui } = makeUI();
+    let openWhenCalled: boolean | null = null;
+    ui.confirmModal("Start over?", "This abandons your tower.", () => {
+      openWhenCalled = dialog().open;
+    });
+    click('[data-act="yes"]');
+    expect(openWhenCalled).toBe(false);
+  });
+
+  it("its title-bar ✕ uses the shared recipe and closes via cancel without firing onYes", () => {
+    const { ui } = makeUI();
+    const onYes = vi.fn();
+    ui.confirmModal("Start over?", "This abandons your tower.", onYes);
+    const x = dialog().querySelector<HTMLButtonElement>("h2 > .modal-x")!;
+    expect(x).not.toBeNull();
+    expect([...x.classList].sort()).toEqual(["btn", "modal-x", "xs"]);
+    x.click();
+    expect(dialog().open).toBe(false);
+    expect(onYes).not.toHaveBeenCalled();
   });
 });
 
