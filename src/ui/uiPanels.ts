@@ -1,45 +1,51 @@
+import { render, nothing, type TemplateResult } from "lit-html";
 import type { UI } from "./UI";
 
 /**
  * Editor and inspector panel rendering and placement for {@link UI}, as friend
- * functions taking the UI instance, plus the two pure placement helpers
- * ({@link anchorBeside}, {@link patchVolatile}) they build on. Extracted from
- * `UI.ts`; the class keeps thin delegations.
+ * functions taking the UI instance, plus the pure placement helper
+ * ({@link anchorBeside}) they build on. Extracted from `UI.ts`; the class
+ * keeps thin delegations.
  */
 
-/** Render the editor for a selection. If its shape (`key`) is unchanged, only
- *  the volatile `data-field` cells are patched in place, the buttons and rename
- *  input keep their identity, so a refresh can never land mid-click and swallow
- *  it. A new shape does a full (re)build. */
-export function renderEditor(
-  ui: UI,
-  key: string,
-  build: () => string,
-  volatile: Record<string, string>,
-): void {
-  if (key !== ui.editorKey) {
-    showEditor(ui, build());
-    ui.editorKey = key;
-  } else {
-    patchVolatile(ui.el.editor, volatile);
-  }
+/** Render the editor card for the current selection through lit (E6-S1). lit's
+ *  binding diff patches only the values that changed since the last pump, so
+ *  the buttons and rename input keep their element identity across refreshes,
+ *  a refresh can never land mid-click and swallow it (the old
+ *  `key`/`patchVolatile` protocol existed to guarantee exactly this).
+ *  `#editor` is lit's container exclusively (one container, one renderer);
+ *  never write its innerHTML around lit's back. */
+export function renderEditor(ui: UI, tpl: TemplateResult): void {
+  render(tpl, ui.el.editor);
+  ui.el.editor.classList.remove("hidden");
+  // Re-measure after every render so per-frame anchoring keeps reading the
+  // cache, never layout. This runs at the ~6 Hz editor pump, not per frame,
+  // and the pump's own status-bar writes already leave layout dirty for the
+  // coming frame, so the forced read here does work that frame was about to
+  // do anyway. (The old builder measured only on a shape-key change and could
+  // serve a stale size after a value-width change; this is simpler and fresher.)
+  ui.editorSize = { w: ui.el.editor.offsetWidth, h: ui.el.editor.offsetHeight };
 }
 
-/** Show the editor card for a selected facility with type-specific actions. */
-export function showEditor(ui: UI, html: string): void {
-  ui.el.editor.innerHTML = html;
-  ui.el.editor.classList.remove("hidden");
-  ui.el.editor.querySelectorAll<HTMLElement>("[data-edit]").forEach((b) => {
-    b.addEventListener("click", () => ui.cb.onEditAction(b.dataset.edit!, ui.el.editor));
+/** Wire the editor card's single delegated click listener (called once, from
+ *  the UI constructor). Delegation on the container survives every lit
+ *  re-render, so actions never need rewiring: any `[data-edit]` element
+ *  dispatches its action, and the title bar's ✕ closes the card. */
+export function wireEditorActions(ui: UI): void {
+  ui.el.editor.addEventListener("click", (e) => {
+    const target = e.target as Element;
+    if (target.closest(".ed-close")) return hideEditor(ui);
+    const b = target.closest<HTMLElement>("[data-edit]");
+    if (b && ui.el.editor.contains(b)) ui.cb.onEditAction(b.dataset.edit!, ui.el.editor);
   });
-  ui.el.editor.querySelector(".ed-close")?.addEventListener("click", () => hideEditor(ui));
-  ui.editorSize = { w: ui.el.editor.offsetWidth, h: ui.el.editor.offsetHeight };
 }
 
 export function hideEditor(ui: UI): void {
   ui.el.editor.classList.add("hidden");
-  ui.el.editor.innerHTML = "";
-  ui.editorKey = null; // force a full rebuild when it's next opened
+  // Clear THROUGH lit, never innerHTML: lit tracks its rendered parts against
+  // the container, and an external wipe would strand that bookkeeping and
+  // break the next render.
+  render(nothing, ui.el.editor);
 }
 
 export function isEditorOpen(ui: UI): boolean {
@@ -100,19 +106,6 @@ export function showInspector(ui: UI, html: string | null): void {
   const h4 = ui.el.inspector.querySelector("h4");
   h4?.appendChild(ui.titleBarClose("insp-close btn xs", () => ui.cb.onInspectorClose()));
   ui.inspectorSize = { w: ui.el.inspector.offsetWidth, h: ui.el.inspector.offsetHeight };
-}
-
-/**
- * Update the volatile cells of a container in place: for each `data-field` key
- * in `volatile`, set that cell's innerHTML (only when it actually changed).
- * Buttons, inputs and static rows are untouched, so an in-flight click is never
- * clobbered. Pure over its `container`, so it's unit-testable without the app.
- */
-export function patchVolatile(container: HTMLElement, volatile: Record<string, string>): void {
-  for (const field in volatile) {
-    const node = container.querySelector<HTMLElement>(`[data-field="${field}"]`);
-    if (node && node.innerHTML !== volatile[field]) node.innerHTML = volatile[field];
-  }
 }
 
 /**

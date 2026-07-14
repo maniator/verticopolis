@@ -1,32 +1,102 @@
 // @vitest-environment happy-dom
-import { describe, it, expect } from "vitest";
-import { patchVolatile } from "./UI";
+import { describe, it, expect, vi } from "vitest";
+import { render } from "lit-html";
+import { Simulation } from "../engine/Simulation";
+import type { Transport, Unit } from "../engine/types";
+import { unitEditorTemplate, transportEditorTemplate } from "./templates/editor";
 
-describe("patchVolatile — editor updates in place", () => {
-  it("updates volatile cells but keeps the buttons the SAME elements (no swallowed clicks)", () => {
+/**
+ * The editor card's update-in-place invariant, rewritten for lit (E6-S1).
+ * The old `key`/`patchVolatile` protocol guaranteed a pump refresh could never
+ * recreate a button mid-click; lit's binding diff now carries that guarantee,
+ * so these tests pin it against the REAL templates: re-rendering with changed
+ * values patches only the affected text/attributes, while every button and the
+ * rename input keep their element identity. (The UI-level wiring — delegation,
+ * editorBusy, hide/close — is pinned by the renderEditor integration block.)
+ */
+
+/** A small built tower with an occupied office (rename + rent adjuster) and a
+ *  standard elevator. Placements are asserted so a silent fixture failure can't
+ *  make the identity assertions pass vacuously. */
+function fixture(): { sim: Simulation; office: Unit; lift: Transport } {
+  const sim = new Simulation();
+  for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+  for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+  const r = sim.tower.place("office", 2, 12);
+  expect(r.ok).toBe(true);
+  const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+  office.state = "occupied";
+  expect(sim.buildTransport("elevatorStandard", 10, 1, 2).ok).toBe(true);
+  const lift = sim.tower.transports[sim.tower.transports.length - 1];
+  return { sim, office, lift };
+}
+
+describe("editor card lit diffing — updates in place, element identity survives", () => {
+  it("patches a changed stat cell without recreating the buttons or the rename input", () => {
+    const { sim, office } = fixture();
+    office.satisfaction = 0.5;
     const card = document.createElement("div");
-    card.innerHTML =
-      `<span class="v" data-field="eval">50%</span>` +
-      `<span class="v" data-field="rent">$10,000</span>` +
-      `<button data-edit="rentUp">+ rent</button>`;
-    const btn = card.querySelector("button")!;
+    render(unitEditorTemplate(sim, office), card);
+    const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
+    const name = card.querySelector<HTMLInputElement>("#ed-name")!;
     const evalCell = card.querySelector('[data-field="eval"]')!;
+    expect(evalCell.textContent).toContain("50%");
 
-    patchVolatile(card, { eval: "78%", rent: "$14,000" });
+    office.satisfaction = 0.78;
+    render(unitEditorTemplate(sim, office), card);
 
-    expect(evalCell.innerHTML).toBe("78%");
-    expect(card.querySelector('[data-field="rent"]')!.innerHTML).toBe("$14,000");
-    // Same element identities → a click that began before the patch still lands.
-    expect(card.querySelector("button")).toBe(btn);
+    expect(evalCell.textContent).toContain("78%");
+    // Same element identities → a click that began before the refresh still lands.
+    expect(card.querySelector('[data-edit="rentUp"]')).toBe(btn);
+    expect(card.querySelector("#ed-name")).toBe(name);
     expect(card.querySelector('[data-field="eval"]')).toBe(evalCell);
   });
 
-  it("ignores unknown fields and skips no-op writes", () => {
+  it("a click listener attached before a refresh still fires on the same button after it", () => {
+    const { sim, office } = fixture();
     const card = document.createElement("div");
-    card.innerHTML = `<span data-field="status">occupied</span>`;
-    const cell = card.querySelector('[data-field="status"]')!;
-    patchVolatile(card, { status: "occupied", nope: "x" });
-    expect(cell.innerHTML).toBe("occupied");
-    expect(card.querySelector('[data-field="nope"]')).toBeNull();
+    render(unitEditorTemplate(sim, office), card);
+    const btn = card.querySelector<HTMLElement>('[data-edit="rentUp"]')!;
+    const onClick = vi.fn();
+    btn.addEventListener("click", onClick);
+
+    office.satisfaction = 0.3; // a stat tick lands "mid-click"
+    render(unitEditorTemplate(sim, office), card);
+
+    btn.click();
+    expect(onClick).toHaveBeenCalledOnce();
+    expect(card.contains(btn)).toBe(true);
+  });
+
+  it("a shape change (gutted) restructures rows while the action buttons keep identity", () => {
+    const { sim, office } = fixture();
+    const card = document.createElement("div");
+    render(unitEditorTemplate(sim, office), card);
+    expect(card.textContent).toContain("Resale value");
+    const sell = card.querySelector<HTMLElement>('[data-edit="sell"]')!;
+    const status = card.querySelector('[data-field="status"]')!;
+
+    office.state = "gutted";
+    render(unitEditorTemplate(sim, office), card);
+
+    expect(status.textContent).toBe("gutted");
+    expect(card.textContent).toContain("Scrap value");
+    expect(card.textContent).not.toContain("Resale value");
+    expect(card.querySelector('[data-edit="sell"]')).toBe(sell);
+  });
+
+  it("a car button crossing its disabled bound flips the attribute on the SAME element", () => {
+    const { sim, lift } = fixture();
+    const card = document.createElement("div");
+    render(transportEditorTemplate(sim, lift), card);
+    const remove = card.querySelector<HTMLButtonElement>('[data-edit="removecar"]')!;
+    // The legacy protocol REBUILT the whole card at this bound (it was part of
+    // the shape key); lit just patches the attribute, so even this refresh can
+    // no longer swallow an in-flight click.
+    expect(remove.disabled).toBe(lift.cars <= 1);
+    expect(sim.tower.setCars(lift.id, lift.cars <= 1 ? 2 : 1)).toBe(true);
+    render(transportEditorTemplate(sim, lift), card);
+    expect(card.querySelector('[data-edit="removecar"]')).toBe(remove);
+    expect(remove.disabled).toBe(lift.cars <= 1);
   });
 });

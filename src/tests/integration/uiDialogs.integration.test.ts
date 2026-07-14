@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { html } from "lit-html";
 import { UI, type UICallbacks } from "../../ui/UI";
 import { Simulation } from "../../engine/Simulation";
+import type { Unit } from "../../engine/types";
+import { unitEditorTemplate } from "../../ui/templates/editor";
 import * as platformModule from "../../platform";
 
 /**
@@ -23,9 +25,11 @@ import * as platformModule from "../../platform";
  *    on the primary action, not on ✕), and the ✕ routes through the dialog's
  *    cancel path — not closeModal() directly — so modals that override
  *    oncancel (the emergency choice) still resolve when dismissed via ✕.
- *  - renderEditor: same shape key patches volatile cells in place (buttons
- *    keep identity → no swallowed clicks); a new key rebuilds and rewires.
- *    (patchVolatile itself is covered by editorPatch.test.ts.)
+ *  - renderEditor: lit's binding diff patches value cells in place (buttons
+ *    keep identity → no swallowed clicks), and the card's [data-edit] actions
+ *    and ✕ dispatch through ONE delegated listener that survives re-renders.
+ *    (The diff/identity mechanics are covered by editorPatch.test.ts, the
+ *    template structure by templates/editor.test.ts.)
  *  - toast: kind class + text land on the toast element; the stack is capped.
  */
 
@@ -422,52 +426,88 @@ describe("confirmModal — lit template mount", () => {
   });
 });
 
-describe("renderEditor — patch in place on same key, rebuild on new key", () => {
+describe("renderEditor — lit diff patches in place; delegated actions dispatch", () => {
   const editorEl = (): HTMLElement => document.getElementById("editor")!;
-  const template = (label: string) =>
-    `<div><span class="v" data-field="rent">${label}</span><button data-edit="rentUp">+ rent</button></div>`;
 
-  it("same key: patches volatile cells without rebuilding (button identity survives)", () => {
+  /** A small built tower with an occupied office, so the card carries the
+   *  rename input, the rent adjuster, and live stat cells. */
+  function officeSim(): { sim: Simulation; office: Unit } {
+    const sim = new Simulation();
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    return { sim, office };
+  }
+
+  it("a refresh patches changed cells in place; buttons and the rename input keep identity", () => {
     const { ui } = makeUI();
-    const build = vi.fn(() => template("$10,000"));
-    ui.renderEditor("office:1", build, { rent: "$10,000" });
-    const btn = editorEl().querySelector("button")!;
-    expect(build).toHaveBeenCalledTimes(1);
+    const { sim, office } = officeSim();
+    office.satisfaction = 0.5;
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    expect(ui.isEditorOpen()).toBe(true);
+    const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
+    const name = editorEl().querySelector<HTMLInputElement>("#ed-name")!;
+    const evalCell = editorEl().querySelector('[data-field="eval"]')!;
+    expect(evalCell.textContent).toContain("50%");
 
-    ui.renderEditor("office:1", build, { rent: "$14,000" });
-    expect(build).toHaveBeenCalledTimes(1); // no rebuild
-    expect(editorEl().querySelector('[data-field="rent"]')!.innerHTML).toBe("$14,000");
-    expect(editorEl().querySelector("button")).toBe(btn); // same element → no swallowed click
+    office.satisfaction = 0.78;
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    expect(evalCell.textContent).toContain("78%");
+    expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn); // no swallowed click
+    expect(editorEl().querySelector("#ed-name")).toBe(name);
   });
 
-  it("new key: rebuilds the card and rewires [data-edit] to onEditAction", () => {
+  it("a refresh landing between pointerdown and pointerup does not recreate the pressed button (the '+ rent' bug)", () => {
     const { ui, cb } = makeUI();
-    ui.renderEditor("office:1", () => template("$10,000"), { rent: "$10,000" });
-    const oldBtn = editorEl().querySelector("button")!;
+    const { sim, office } = officeSim();
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    const btn = editorEl().querySelector<HTMLElement>('[data-edit="rentUp"]')!;
 
-    ui.renderEditor("condo:7", () => template("$80,000"), { rent: "$80,000" });
-    const newBtn = editorEl().querySelector<HTMLElement>("[data-edit]")!;
-    expect(newBtn).not.toBe(oldBtn); // full rebuild
-    newBtn.click();
+    // Press... the main loop's refresh gate (editorBusy) arms,
+    btn.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+    expect(ui.isEditorBusy()).toBe(true);
+    // ...but even a refresh that slips through mid-click keeps the element:
+    office.satisfaction = 0.9;
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    expect(editorEl().querySelector('[data-edit="rentUp"]')).toBe(btn);
+    // ...release, and the click that began before the refresh still lands.
+    document.dispatchEvent(new Event("pointerup", { bubbles: true }));
+    expect(ui.isEditorBusy()).toBe(false);
+    btn.click();
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("rentUp", editorEl());
   });
 
-  it("hideEditor clears the card and forces a rebuild on the next render of the SAME key", () => {
-    const { ui } = makeUI();
-    const build = vi.fn(() => template("$10,000"));
-    ui.renderEditor("office:1", build, { rent: "$10,000" });
-    ui.hideEditor();
-    expect(ui.isEditorOpen()).toBe(false);
-    expect(editorEl().innerHTML).toBe("");
-
-    ui.renderEditor("office:1", build, { rent: "$10,000" });
-    expect(build).toHaveBeenCalledTimes(2); // stale key was dropped
-    expect(ui.isEditorOpen()).toBe(true);
+  it("[data-edit] clicks dispatch through the delegated listener after any re-render", () => {
+    const { ui, cb } = makeUI();
+    const { sim, office } = officeSim();
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    office.state = "gutted"; // shape change: rows restructure
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    editorEl().querySelector<HTMLElement>('[data-edit="sell"]')!.click();
+    expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("sell", editorEl());
   });
 
-  it("the editor card's .ed-close hides it", () => {
+  it("hideEditor clears the card through lit and a later render reopens it", () => {
     const { ui } = makeUI();
-    ui.showEditor('<h4>Office</h4><button class="ed-close">✕</button>');
+    const { sim, office } = officeSim();
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    ui.hideEditor();
+    expect(ui.isEditorOpen()).toBe(false);
+    expect(editorEl().textContent?.trim()).toBe("");
+    expect(editorEl().querySelector("[data-edit]")).toBeNull();
+
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    expect(ui.isEditorOpen()).toBe(true);
+    expect(editorEl().querySelector('[data-edit="sell"]')).not.toBeNull();
+  });
+
+  it("the editor card's title-bar ✕ hides it via the delegated listener", () => {
+    const { ui } = makeUI();
+    const { sim, office } = officeSim();
+    ui.renderEditor(unitEditorTemplate(sim, office));
     expect(ui.isEditorOpen()).toBe(true);
     editorEl().querySelector<HTMLElement>(".ed-close")!.click();
     expect(ui.isEditorOpen()).toBe(false);
