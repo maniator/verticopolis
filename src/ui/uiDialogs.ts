@@ -1,5 +1,6 @@
 import type { UI } from "./UI";
 import * as tpl from "./uiTemplates";
+import { confirmTemplate } from "./templates/confirm";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -161,19 +162,17 @@ export function confirmModal(
   onYes: () => void,
   yesLabel = "Confirm",
 ): void {
-  const box = ui.openModal(tpl.confirmHtml(title, body, yesLabel));
-  ui.wireActions(
-    box,
-    {
-      no: () => ui.closeModal(),
-      yes: () => {
+  // The lit template binds both actions inline with @click, so there is no
+  // wireActions pass. There is no [data-act="close"] button; the title-bar ✕
+  // still exists and closes through the dialog's cancel path.
+  ui.openModalTemplate(
+    confirmTemplate(title, body, yesLabel, {
+      onCancel: () => ui.closeModal(),
+      onYes: () => {
         ui.closeModal();
         onYes();
       },
-    },
-    // No [data-act="close"] button in this template to bind, the title-bar
-    // ✕ still exists and closes through the dialog's cancel path.
-    { close: false },
+    }),
   );
 }
 
