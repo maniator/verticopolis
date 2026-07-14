@@ -172,6 +172,7 @@ describe("pixelSprites/common person family and palette", () => {
     const newKeys = Object.keys(PAL).filter((k) => !ANCHORS.includes(k)) as (keyof typeof PAL)[];
     expect(newKeys.length).toBeGreaterThan(0);
     for (const k of newKeys) expect(RESERVED_COLORS as readonly string[]).not.toContain(PAL[k]);
-    for (const s of SHIRTS) expect(s).not.toBe("#C24A3A"); // the SHIRTS/stress-red invariant
+    // No shirt may be any reserved color (the stress-red case is the load-bearing one).
+    for (const s of SHIRTS) expect(RESERVED_COLORS as readonly string[]).not.toContain(s);
   });
 });

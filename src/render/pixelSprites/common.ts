@@ -23,7 +23,7 @@ export const PAL = {
   wood: "#8C6E50",
   // Overhaul additions (art bible "Canonical palette"). New keys only; the
   // anchors above stay byte-stable because residential/food/shop reference them
-  // directly. None equals a reserved state color (see pixelSpritesCommon guard).
+  // directly. No new key matches a reserved state color (see the guard test).
   warmWall: "#ECDFC2", // warm cream interior wall
   carpetGreen: "#6E7A48", // olive office carpet
   hotelPink: "#E8B7A8", // warm hotel bedding pink
@@ -250,7 +250,7 @@ export function personHiVis(ctx: CanvasRenderingContext2D, x: number, footY: num
 
 // ---- Shared room helpers (added, adopted per kind by later specs) ----------
 //
-// New leverage points every enriched room can import. All key only on `lit` and
+// New shared helpers every enriched room can import. All key only on `lit` and
 // other bake-signature inputs, never `d.anim`, so a static room stays cacheable.
 // Unused by the current rooms; per-kind specs wire them in as they repaint.
 
