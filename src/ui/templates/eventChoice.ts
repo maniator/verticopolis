@@ -3,7 +3,7 @@ import { html, type TemplateResult } from "lit-html";
 /**
  * The emergency event-choice dialog (a fire, a bomb threat, etc.): a message, the
  * cost to accept, and Accept / Decline. Authored to match `eventChoiceHtml`
- * structurally (proven by the transitional `assertDomEquivalent` test), including
+ * structurally (proven by transitional guards, retired with the string builders), including
  * the whitespace between the two action buttons. The actions are bound inline via
  * `@click`; the controller (`showEventChoice`) owns the resolve-exactly-once
  * logic and the Esc/backdrop/x decline paths, so this template stays presentational.

@@ -163,10 +163,16 @@ describe("statsTemplate sections across fixture towers", () => {
     expect(frag.querySelector(".v.money")).not.toBeNull();
   });
 
-  it("splits the milestones checklist into two kv columns with a gauge", () => {
+  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", () => {
+    // builtTower forces one achieved milestone, so the done marker and a
+    // non-zero gauge width must render (the ms-done markup the retired
+    // equivalence guard used to verify).
     const frag = renderToFragment(statsTemplate(builtTower()));
     expect(frag.querySelectorAll(".col.ms.kv").length).toBe(2);
-    expect(frag.querySelector(".evalbar")).not.toBeNull();
+    expect(frag.querySelector(".ms-done")).not.toBeNull();
+    expect(frag.textContent).toContain("\u2713");
+    const gauge = frag.querySelector<HTMLElement>(".evalbar > span")!;
+    expect(gauge.getAttribute("style")).toMatch(/width:\s*[1-9]/); // non-zero progress
   });
 
   it("an empty tower still renders the grid; a Modern tower gains the Households section", () => {

@@ -9,7 +9,7 @@ export interface StopFloor {
 
 /**
  * The per-floor elevator stops dialog body. Authored to match `stopsHtml`
- * structurally (proven by the transitional `assertDomEquivalent` test): the
+ * structurally (proven by transitional guards, retired with the string builders): the
  * title line, the express-service explainer, one `.stop-row` label per floor
  * (with its `data-floor`, checked state, floor/basement label, and the lobby
  * tag), and the Done button. Rows are nested `TemplateResult`s (not a joined

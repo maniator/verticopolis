@@ -53,8 +53,8 @@ buttons may not).
   wider one stretches into a pill (both shipped bugs, since fixed). Instead,
   coarse pointers get an invisible tap halo (`::after { inset: -8px }`) for a
   ~34px effective target with zero visual change. In TS there are exactly two
-  ✕ builders: `UI`'s private `titleBarClose()` for DOM-built ✕s (modal,
-  inspector) and `ui/editorHtml.ts`'s `editorTitleBar()` template for the
+  ✕ builders: `UI`'s `titleBarClose()` for DOM-built ✕s (modal,
+  inspector) and `ui/templates/editor.ts`'s `titleBar` template for the
   editor card. Never hand-write a third copy; extend one of those.
 
 ### `.win`: a floating window

@@ -6,7 +6,7 @@ import type { ExportReport } from "../../storage/tdtExport";
 /**
  * The TDT import/export report dialogs plus the export-choice modal. Authored to
  * match `exportConfirmHtml` / `importReportHtml` / `exportReportHtml`
- * structurally (proven by the transitional `assertDomEquivalent` tests): the
+ * structurally (proven by transitional guards, retired with the string builders): the
  * fact line, the "brought over" / "couldn't bring" (and their export twins)
  * lists as nested `TemplateResult`s (not joined strings), and the footer
  * buttons. Report strings and filenames interpolate as auto-escaped text (no
