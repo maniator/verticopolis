@@ -9,6 +9,8 @@ import { savesTemplate } from "./templates/saves";
 import { stopsTemplate } from "./templates/stops";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
+import { statsModalTemplate } from "./templates/stats";
+import type { TemplateResult } from "lit-html";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -27,8 +29,8 @@ import { routeExternalInWrapper } from "./externalLink";
  * rest of the app keep calling `ui.showHelp()` etc. unchanged.
  */
 
-export function showStats(ui: UI, html: string): void {
-  const box = ui.openModal(tpl.statsModalHtml(html));
+export function showStats(ui: UI, body: TemplateResult): void {
+  const box = ui.openModalTemplate(statsModalTemplate(body));
   ui.wireActions(box);
 }
 

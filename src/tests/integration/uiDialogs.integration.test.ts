@@ -151,7 +151,7 @@ beforeEach(() => {
 describe("wireActions — the anti-dead-button contract", () => {
   it("binds the default close: [data-act=close] dismisses the modal", () => {
     const { ui } = makeUI();
-    ui.showStats("<p>lots of numbers</p>");
+    ui.showStats(html`<p>lots of numbers</p>`);
     expect(dialog().open).toBe(true);
     click('[data-act="close"]');
     expect(dialog().open).toBe(false);
@@ -205,7 +205,7 @@ describe("wireActions — the anti-dead-button contract", () => {
 describe("titleBarClose — the one shared ✕ recipe", () => {
   it("the modal title-bar ✕ is a real button: .modal-x.btn.xs, aria-label Close, ✕ glyph", () => {
     const { ui } = makeUI();
-    ui.showStats("<p>body</p>");
+    ui.showStats(html`<p>body</p>`);
     const x = dialog().querySelector<HTMLButtonElement>("h2 > button")!;
     expect(x).not.toBeNull();
     expect(x.tagName).toBe("BUTTON");
@@ -1502,9 +1502,9 @@ describe("showStopsDialog — per-floor elevator stop toggles", () => {
 });
 
 describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome", () => {
-  it("showStats opens a modal with the supplied HTML and a working Close", () => {
+  it("showStats opens a modal with the supplied body and a working Close", () => {
     const { ui } = makeUI();
-    ui.showStats("<p>ninety-nine floors</p>");
+    ui.showStats(html`<p>ninety-nine floors</p>`);
     expect(dialog().open).toBe(true);
     expect(dialog().textContent).toContain("ninety-nine floors");
     click('[data-act="close"]');
