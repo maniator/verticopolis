@@ -1057,3 +1057,46 @@ were corrected to note the compact 1-tile fallback shows no receptionist. Defers
   Both reviewers judged it acceptable for a degenerate lobby; revisit only if the
   owner wants a compact reception on the solo tile. (Edge Case Hunter. Low;
   degenerate-case cosmetic.)
+### Deferred from: code review of E1 (createUICallbacks split) (`/bmad-code-review`, 2026-07-14)
+
+Change: E1 extracts the ~30-callback `UICallbacks` literal out of the `GameApp`
+constructor into `createUICallbacks(app: GameAppPorts)` in `src/game/uiCallbacks.ts`,
+and moves the private-state-mutating callback bodies into `GameApp` methods. Three
+adversarial layers ran (Blind Hunter, Edge Case Hunter, Acceptance Auditor). The
+Blind Hunter confirmed all 15 moved bodies are byte-for-byte behavior-identical,
+construction order preserved, and the live-re-read pattern survives `adoptSim()`.
+Patched in-PR: the `adoptSim`-swap live-capture test (getMode re-reads per call),
+strengthened `onLoadSlot` call-count assertions, an honest test docstring (it
+guards the wiring; the moved bodies stay covered by the controller integration and
+e2e suites), the corrected `audio` port doc (per-call read is the guarantee, not
+"never swapped"), the restored `onInspectorClose` latch comment, and the
+`renameTower` return-shape note. Residual defers (real but intentionally not
+actioned, as behavior-preserving E1 must not change behavior or over-grow the
+composition root):
+
+- **Public widening of the controller ports and `setSpeed`/`undo`/`redo`/`setOverlay`.**
+  To back `GameAppPorts` via `class GameApp implements GameAppPorts`, `editor`/
+  `saveLoad`/`inspector` widened from `private readonly` to public `readonly` and
+  four private methods became public. The `GameAppPorts` `Pick<>` slices express
+  the intended factory surface, but the concrete class members are the full types,
+  so a `GameApp` (or `window.game`) holder can reach them directly. Accepted for
+  the app spine; the narrower alternative (keep controllers private, add ~9 thin
+  public wrapper methods) was rejected because it adds surface and grows `main.ts`
+  further for no guard benefit. Revisit if a UI-boundary lint/ratchet is added.
+- **`main.ts` did not shrink (1573 -> 1604, +31).** The story's "shrinks" clause is
+  in direct tension with the hardened AC3 ("delegate private-state bodies to
+  GameApp methods"): the ~110-line inline literal left the constructor, but the
+  ~130 lines of extracted methods must live in `GameApp`/`main.ts`. AC3 (the
+  encapsulation point, and the story's real purpose: the `createUICallbacks` seam)
+  won. `main.ts` stays on the file-size ratchet (guard passes; still far above 500).
+- **Boot-order coupling is now separated from its guard.** `handleSelectTool` runs
+  synchronously during `new UI(createUICallbacks(this))` (the UI ctor's initial
+  `selectTool`) and reads `this.keyboard`/`build`/`engine`; the ordering is enforced
+  only by the comment at the `new UI(...)` line, not a test (the boot path needs a
+  full `GameApp` and is e2e-only). Left as prose + e2e coverage.
+- **Pre-existing input-validation gaps surfaced by the Edge Case Hunter, unchanged
+  by E1** (they were the behavior of the inline callbacks): `setVolume` with a
+  `kind` outside `music`/`sfx` (type-guarded by `UICallbacks`), `saveToSlot`/
+  `deleteSlot` with an out-of-range slot, and `renameTower` with a blank name. Not
+  hardened here because E1 is behavior-preserving; candidates for a separate
+  input-validation pass.

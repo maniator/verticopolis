@@ -23,6 +23,7 @@ import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./game/saveLoad";
 import { attemptContextRecovery } from "./game/contextRecovery";
 import { decideMealRush } from "./game/mealRush";
 import { InspectorController } from "./game/inspector";
+import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
 import { escapeHtml } from "./ui/escape";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
@@ -73,7 +74,7 @@ const RESUME_RELOAD_MAX_AGE_MS = 30_000;
  * and `refreshEditor`. Renaming or moving those requires updating all three
  * consumers; TypeScript won't catch it.
  */
-class GameApp {
+class GameApp implements GameAppPorts {
   sim: Simulation;
   engine: TowerEngine;
   audio = new AudioEngine();
@@ -174,9 +175,12 @@ class GameApp {
   /** Controller modules (src/game/): each takes a narrow deps slice of this
    *  app spine, never the GameApp itself (see the modules' own doc comments). */
   private readonly build: BuildActions;
-  private readonly editor: EditorActions;
-  private readonly saveLoad: SaveLoad;
-  private readonly inspector: InspectorController;
+  // editor/saveLoad/inspector are exposed (readonly) as GameAppPorts for
+  // createUICallbacks; build/keyboard stay private (the factory never needs
+  // them, and handleSelectTool reaches them internally).
+  readonly editor: EditorActions;
+  readonly saveLoad: SaveLoad;
+  readonly inspector: InspectorController;
   private readonly keyboard: KeyboardPlay;
 
   /** Undo/redo: snapshot-based history (see {@link UndoHistory}). Built in the
@@ -300,110 +304,12 @@ class GameApp {
       commitUndo: () => this.commitUndo(),
     });
 
-    this.ui = new UI({
-      onSelectTool: (t) => {
-        this.tool = t;
-        this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
-        // Drop any in-flight paint gesture too: onActionUp/onActionMove read the
-        // LIVE tool, so a press-then-switch-then-release would stamp the new
-        // kind's strip at the old press point.
-        this.paintAnchor = null;
-        this.build.clearPaint();
-        // A transport anchor abandoned by a pinch (the pinch paths never fire
-        // onActionUp) must not linger either: updateCoastClear() treats it as a
-        // live gesture, which would keep the update prompt suppressed all session.
-        this.transportStart = null;
-        this.engine.preview = null;
-        this.engine.transportPreview = null;
-        // Drop a build-refusal tooltip if one was up, so a tool switch doesn't
-        // leave a stale Modern hover tip pinned to the old preview cell.
-        this.clearBuildRefusal();
-      },
-      onSpeed: (s) => this.setSpeed(s),
-      onSave: () => this.saveLoad.save(),
-      onLoad: () => this.saveLoad.load(),
-      onExport: () => void this.saveLoad.exportGame(),
-      onImport: (data) => void this.saveLoad.importGame(data),
-      onImportLegacy: (buf, name) => this.saveLoad.importLegacy(buf, name),
-      onExportLegacy: () => this.saveLoad.exportLegacy(),
-      getMode: () => this.sim.mode,
-      onNew: (mode, modernCalendar) => this.saveLoad.newGame(mode, modernCalendar),
-      onToggleAudio: () => {
-        this.audio.start();
-        this.audio.setMuted(!this.audio.muted);
-        this.prefs.muted = this.audio.muted;
-        savePrefs(this.prefs);
-        return this.audio.muted;
-      },
-      isMuted: () => this.audio.muted,
-      onSetVolume: (kind, value) => {
-        // A slider drag is a user gesture, so it may be the interaction that
-        // starts the engine (a not-yet-started facade also covers the
-        // retry-after-failed-load path). Once running, skip the call: input
-        // events arrive at pointer-move rate and each start() would allocate
-        // a fresh resume() promise for nothing.
-        if (!this.audio.started) this.audio.start();
-        this.audio.setVolumes(
-          kind === "music" ? value : this.audio.musicVolume,
-          kind === "sfx" ? value : this.audio.sfxVolume,
-        );
-        // Read back the facade's clamped values so prefs never store junk.
-        this.prefs.musicVolume = this.audio.musicVolume;
-        this.prefs.sfxVolume = this.audio.sfxVolume;
-        this.schedulePrefsSave();
-      },
-      getVolumes: () => ({ music: this.audio.musicVolume, sfx: this.audio.sfxVolume }),
-      onUndo: () => this.undo(),
-      onRedo: () => this.redo(),
-      onEditAction: (action, root) => this.editor.handleEditAction(action, root),
-      onToggleReducedMotion: () => {
-        this.prefs.reducedMotion = !this.prefs.reducedMotion;
-        savePrefs(this.prefs);
-        this.applyReducedMotion();
-        return reducedMotionActive(this.prefs, this.reduceMq.matches);
-      },
-      onToggleSteadyClock: () => {
-        this.prefs.steadyClock = !this.prefs.steadyClock;
-        savePrefs(this.prefs);
-        return this.prefs.steadyClock;
-      },
-      isSteadyClock: () => this.prefs.steadyClock === true,
-      onReplayOnboarding: () => {
-        if (document.getElementById("splash")) return; // never arm behind the splash
-        OnboardingController.clearOnboarded();
-        this.ui.closeModal();
-        if (!this.onboarding.arm(this.sim)) {
-          this.ui.toast("You've already completed Getting Started.", "info");
-        }
-      },
-      onRenameTower: (name) => (this.sim.tower.towerName = name),
-      onShowStats: () => this.ui.showStats(buildStatsHtml(this.sim)),
-      onSetOverlay: (mode) => this.setOverlay(mode),
-      // Latches the dismissal so the next hover pick over the same facility
-      // doesn't instantly re-open the card the user just closed.
-      onInspectorClose: () => this.inspector.dismiss(),
-      onShowSaves: () => this.ui.showSaves(SaveGame.listSlots()),
-      onSaveSlot: (n) => {
-        // Manual slots carry the view too: stamp the live camera the same way
-        // SaveLoad does for the autosave and exports.
-        this.sim.view = this.engine.viewState();
-        SaveGame.saveSlot(n, this.sim);
-        this.ui.toast(`Saved to slot ${n}.`, "good");
-      },
-      onLoadSlot: (slot) => {
-        const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
-        if (loaded) {
-          this.adoptSim(loaded);
-          this.ui.toast("Tower loaded.", "good");
-        } else {
-          this.ui.toast("That slot is empty or corrupt.", "bad");
-        }
-      },
-      onDeleteSlot: (n) => {
-        SaveGame.deleteSlot(n);
-        this.ui.toast(`Deleted slot ${n}.`, "info");
-      },
-    });
+    // The UI command callbacks live in createUICallbacks (src/game/uiCallbacks.ts),
+    // a thin delegation layer over this app spine, so the command boundary the UI
+    // depends on sits in one place a later declarative UI layer can rebind. Built
+    // here, AFTER the controllers above, because the UI ctor's initial selectTool
+    // fires onSelectTool synchronously (which needs this.keyboard/this.build).
+    this.ui = new UI(createUICallbacks(this));
 
     // Undo/redo history — ports close over `this` so snapshot / signature /
     // restore always target the *current* sim (adoptSim swaps it).
@@ -540,10 +446,135 @@ class GameApp {
 
   // ---- App-spine helpers the controllers borrow --------------------------
 
+  // ---- UI command ports (GameAppPorts; createUICallbacks delegates here) ----
+  // The bodies below used to sit inline in the object literal the constructor
+  // passed to `new UI(...)`; moved here so the private state they touch (tool,
+  // prefs, paint/transport anchors, engine previews) stays inside GameApp.
+
+  getSim(): Simulation {
+    return this.sim;
+  }
+
+  /** Switch the active build/inspect tool, dropping any in-flight gesture. */
+  handleSelectTool(tool: Tool): void {
+    this.tool = tool;
+    this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
+    // Drop any in-flight paint gesture too: onActionUp/onActionMove read the
+    // LIVE tool, so a press-then-switch-then-release would stamp the new
+    // kind's strip at the old press point.
+    this.paintAnchor = null;
+    this.build.clearPaint();
+    // A transport anchor abandoned by a pinch (the pinch paths never fire
+    // onActionUp) must not linger either: updateCoastClear() treats it as a
+    // live gesture, which would keep the update prompt suppressed all session.
+    this.transportStart = null;
+    this.engine.preview = null;
+    this.engine.transportPreview = null;
+    // Drop a build-refusal tooltip if one was up, so a tool switch doesn't
+    // leave a stale Modern hover tip pinned to the old preview cell.
+    this.clearBuildRefusal();
+  }
+
+  /** Toggle mute, persist it, and return the new muted state. */
+  toggleMute(): boolean {
+    this.audio.start();
+    this.audio.setMuted(!this.audio.muted);
+    this.prefs.muted = this.audio.muted;
+    savePrefs(this.prefs);
+    return this.audio.muted;
+  }
+
+  /** Set one audio channel's level (0..1) and persist it. */
+  setVolume(kind: "music" | "sfx", value: number): void {
+    // A slider drag is a user gesture, so it may be the interaction that
+    // starts the engine (a not-yet-started facade also covers the
+    // retry-after-failed-load path). Once running, skip the call: input
+    // events arrive at pointer-move rate and each start() would allocate
+    // a fresh resume() promise for nothing.
+    if (!this.audio.started) this.audio.start();
+    this.audio.setVolumes(
+      kind === "music" ? value : this.audio.musicVolume,
+      kind === "sfx" ? value : this.audio.sfxVolume,
+    );
+    // Read back the facade's clamped values so prefs never store junk.
+    this.prefs.musicVolume = this.audio.musicVolume;
+    this.prefs.sfxVolume = this.audio.sfxVolume;
+    this.schedulePrefsSave();
+  }
+
+  /** Toggle reduced motion, persist it, and return the new effective state. */
+  toggleReducedMotion(): boolean {
+    this.prefs.reducedMotion = !this.prefs.reducedMotion;
+    savePrefs(this.prefs);
+    this.applyReducedMotion();
+    return reducedMotionActive(this.prefs, this.reduceMq.matches);
+  }
+
+  /** Toggle the steady-clock pref and return the new steady state. */
+  toggleSteadyClock(): boolean {
+    this.prefs.steadyClock = !this.prefs.steadyClock;
+    savePrefs(this.prefs);
+    return this.prefs.steadyClock;
+  }
+
+  /** The live steady-clock state (the same in-memory prefs the game loop reads). */
+  isSteadyClock(): boolean {
+    return this.prefs.steadyClock === true;
+  }
+
+  /** Replay the Getting Started onboarding, unless the splash is up. */
+  replayOnboarding(): void {
+    if (document.getElementById("splash")) return; // never arm behind the splash
+    OnboardingController.clearOnboarded();
+    this.ui.closeModal();
+    if (!this.onboarding.arm(this.sim)) {
+      this.ui.toast("You've already completed Getting Started.", "info");
+    }
+  }
+
+  renameTower(name: string): void {
+    // The original callback was an assignment expression `(name) => (… = name)`;
+    // as a void method the returned string is dropped, which no caller used.
+    this.sim.tower.towerName = name;
+  }
+
+  showStats(): void {
+    this.ui.showStats(buildStatsHtml(this.sim));
+  }
+
+  showSaves(): void {
+    this.ui.showSaves(SaveGame.listSlots());
+  }
+
+  /** Save the live tower into a manual slot, stamping the live camera view. */
+  saveToSlot(slot: number): void {
+    // Manual slots carry the view too: stamp the live camera the same way
+    // SaveLoad does for the autosave and exports.
+    this.sim.view = this.engine.viewState();
+    SaveGame.saveSlot(slot, this.sim);
+    this.ui.toast(`Saved to slot ${slot}.`, "good");
+  }
+
+  /** Load a manual slot (or the autosave) and adopt it as the live tower. */
+  loadFromSlot(slot: number | "auto"): void {
+    const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
+    if (loaded) {
+      this.adoptSim(loaded);
+      this.ui.toast("Tower loaded.", "good");
+    } else {
+      this.ui.toast("That slot is empty or corrupt.", "bad");
+    }
+  }
+
+  deleteSlot(slot: number): void {
+    SaveGame.deleteSlot(slot);
+    this.ui.toast(`Deleted slot ${slot}.`, "info");
+  }
+
   /** Set the game speed (index into {@link SPEEDS}): updates the engine's pause
    *  state and the toolbar's active button. The single place the three concerns
    *  are kept in lockstep. */
-  private setSpeed(s: number): void {
+  setSpeed(s: number): void {
     this.speed = s;
     this.engine.paused = SPEEDS[s] === 0;
     document.querySelectorAll("#speed button[data-speed]").forEach((b) =>
@@ -1006,7 +1037,7 @@ class GameApp {
   /** Set the colored stats overlay from the picker value ("" = off). An
    *  unrecognized value falls back to off, so a stale/forged value can't push a
    *  bad mode into the renderer. */
-  private setOverlay(mode: string): void {
+  setOverlay(mode: string): void {
     this.engine.overlayMode = (HEATMAP_MODES as readonly string[]).includes(mode) ? (mode as HeatmapMode) : null;
   }
 
@@ -1403,11 +1434,11 @@ class GameApp {
     this.history.commit();
   }
 
-  private undo(): void {
+  undo(): void {
     this.history.undo();
   }
 
-  private redo(): void {
+  redo(): void {
     this.history.redo();
   }
 
