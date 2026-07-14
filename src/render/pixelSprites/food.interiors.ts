@@ -158,14 +158,17 @@ function exitSign(f: Fill, x: number, y: number): void {
  *  next seated occupant only while fewer than `n` have been drawn, so exactly
  *  the first `n` seats fill in seed (draw) order and an empty venue draws none.
  *  The shirt seed is the room GEOGRAPHY plus the seat index, so it survives a
- *  TDT id renumber. */
-function mkSeat(ctx: CanvasRenderingContext2D, ox: number, oy: number, geoSeed: number, n: number): (px: number, footY: number) => void {
+ *  TDT id renumber. Returns whether an occupant was actually drawn, so a
+ *  person-implying prop (a held boba cup, a chef's hat, a laptop) can gate on
+ *  the same count and never float over an empty seat. */
+type Seat = (px: number, footY: number) => boolean;
+
+function mkSeat(ctx: CanvasRenderingContext2D, ox: number, oy: number, geoSeed: number, n: number): Seat {
   let i = 0;
   return (px, footY) => {
-    if (i < n) {
-      personSeated(ctx, ox + px, oy + footY, geoSeed + i);
-      i++;
-    }
+    if (i >= n) return false;
+    personSeated(ctx, ox + px, oy + footY, geoSeed + i++);
+    return true;
   };
 }
 
@@ -193,7 +196,7 @@ export function drawFastFood(ctx: CanvasRenderingContext2D, x: number, y: number
   }
 }
 
-function burger(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: (px: number, footY: number) => void): void {
+function burger(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: Seat): void {
   wtex(f, 0, 7, w, fy - 7, look.wall, "tile");
   pfloor(f, 0, fy, w, h - fy, look.floor, look.floorStyle === "checker");
   signBand(f, w, look.band, look.stripe);
@@ -219,7 +222,7 @@ function burger(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, s
   }
 }
 
-function soba(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: (px: number, footY: number) => void): void {
+function soba(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: Seat): void {
   wtex(f, 0, 7, w, fy - 7, look.wall, "plank");
   pfloor(f, 0, fy, w, h - fy, look.floor);
   signBand(f, w, look.band, look.stripe);
@@ -241,7 +244,7 @@ function soba(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, sea
   for (let sx = 10; sx + 6 < w - 6; sx += 16) { f(sx + 1, fy - 3, 3, 3, "#5A4632"); seat(sx, fy - 3); }
 }
 
-function teahouse(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: (px: number, footY: number) => void): void {
+function teahouse(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: Seat): void {
   const railY = 24;
   wtex(f, 0, 7, w, railY - 7, look.wall, "flat");
   f(0, railY, w, fy - railY, "#3E7D5A"); f(0, railY - 1, w, 1, "#2E5E42"); f(0, railY, w, 1, "#4E9A6E"); // jade wainscot
@@ -263,14 +266,15 @@ function teahouse(f: Fill, w: number, h: number, fy: number, look: FastFoodLook,
   seat(10, fy - 11);
   const bx = cw + 8;
   box(f, bx, fy - 6, w - bx - 4, 2, "#6A4A30");
+  // The boba cup is held by the patron, so it draws only when the stool fills.
   for (let sx = bx + 3, i = 0; sx + 6 < w - 4; sx += 17, i++) {
-    f(sx + 1, fy - 3, 3, 3, "#5A4632"); seat(sx, fy - 3); boba(f, sx + 6, fy - 9, ["#C8A0D0", "#E8C060", "#D0A080"][i % 3]);
+    f(sx + 1, fy - 3, 3, 3, "#5A4632"); if (seat(sx, fy - 3)) boba(f, sx + 6, fy - 9, ["#C8A0D0", "#E8C060", "#D0A080"][i % 3]);
   }
   // Bamboo plant in the corner.
   f(w - 6, fy - 12, 1, 12, "#4E7A3E"); f(w - 8, fy - 14, 3, 2, "#5AA85A"); f(w - 5, fy - 16, 3, 2, "#5AA85A"); box(f, w - 8, fy - 4, 5, 4, "#8C5A3A");
 }
 
-function parlor(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: (px: number, footY: number) => void): void {
+function parlor(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: Seat): void {
   wtex(f, 0, 7, w, fy - 7, look.wall, "flat");
   pfloor(f, 0, fy, w, h - fy, look.floor, look.floorStyle === "checker");
   signBand(f, w, look.band, look.stripe);
@@ -289,7 +293,7 @@ function parlor(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, s
   f(w - 14, fy - 11, 3, 11, "#D87A9A"); box(f, w - 11, fy - 6, 8, 2, "#E8A0B8"); seat(w - 9, fy);
 }
 
-function cafe(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: (px: number, footY: number) => void): void {
+function cafe(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, seat: Seat): void {
   wtex(f, 0, 7, w, fy - 7, look.wall, "flat");
   pfloor(f, 0, fy, w, h - fy, look.floor);
   signBand(f, w, look.band, look.stripe);
@@ -309,9 +313,11 @@ function cafe(f: Fill, w: number, h: number, fy: number, look: FastFoodLook, sea
   // Window bench with seated patrons.
   const bx = cw + 8;
   box(f, bx, fy - 6, Math.round(w * 0.3), 2, "#8C6E48");
-  for (let sx = bx + 2, i = 0; sx + 6 < bx + w * 0.3; sx += 15, i++) { f(sx + 1, fy - 3, 3, 3, "#5A4632"); f(sx, fy - 9, 3, 2, "#F4F0E4"); seat(sx, fy - 3); }
-  // Lounge armchair with a laptop patron.
-  box(f, w - 24, fy - 9, 10, 9, "#7C5A4A"); f(w - 24, fy - 11, 10, 3, "#8C6A5A"); seat(w - 22, fy - 1); box(f, w - 13, fy - 5, 8, 2, "#6B4A2B"); f(w - 11, fy - 8, 4, 2, "#2A2E38");
+  // The takeaway cup belongs to a seated patron, so it gates on the stool fill.
+  for (let sx = bx + 2, i = 0; sx + 6 < bx + w * 0.3; sx += 15, i++) { f(sx + 1, fy - 3, 3, 3, "#5A4632"); if (seat(sx, fy - 3)) f(sx, fy - 9, 3, 2, "#F4F0E4"); }
+  // Lounge armchair (furniture, always drawn); the laptop appears only when a patron sits.
+  box(f, w - 24, fy - 9, 10, 9, "#7C5A4A"); f(w - 24, fy - 11, 10, 3, "#8C6A5A");
+  if (seat(w - 22, fy - 1)) { box(f, w - 13, fy - 5, 8, 2, "#6B4A2B"); f(w - 11, fy - 8, 4, 2, "#2A2E38"); }
 }
 
 // ---- Restaurants ------------------------------------------------------------
@@ -346,7 +352,7 @@ export function drawRestaurant(ctx: CanvasRenderingContext2D, x: number, y: numb
   }
 }
 
-function french(f: Fill, w: number, fy: number, railY: number, lamp: string, seat: (px: number, footY: number) => void): void {
+function french(f: Fill, w: number, fy: number, railY: number, lamp: string, seat: Seat): void {
   // Chandelier, flanking pendants, sconces, framed art, a gilt mirror.
   const cxx = Math.round(w / 2);
   f(cxx - 1, 2, 2, 4, "#6a5040"); f(cxx - 7, 6, 14, 2, "#C9A24B");
@@ -368,7 +374,7 @@ function french(f: Fill, w: number, fy: number, railY: number, lamp: string, sea
   }
 }
 
-function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: (px: number, footY: number) => void): void {
+function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: Seat): void {
   const barW = Math.round(w * 0.3);
   // Back bar with a lit bottle wall.
   box(f, 5, 6, barW, railY - 6, "#2A1C10");
@@ -389,7 +395,7 @@ function pub(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: 
   }
 }
 
-function banquet(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: (px: number, footY: number) => void): void {
+function banquet(f: Fill, w: number, fy: number, railY: number, lit: boolean, seat: Seat): void {
   // Red papered wall.
   for (let px = 0; px < w; px += 14) f(px, 4, 1, railY - 4, "#7A2A2A", 0.5);
   // Paired glowing lanterns.
@@ -410,7 +416,7 @@ function banquet(f: Fill, w: number, fy: number, railY: number, lit: boolean, se
   }
 }
 
-function sushi(f: Fill, w: number, fy: number, seat: (px: number, footY: number) => void): void {
+function sushi(f: Fill, w: number, fy: number, seat: Seat): void {
   // A bottle shelf.
   f(6, 7, w - 12, 3, "#6A4A30");
   for (let k = 0; k < 7; k++) f(10 + k * ((w - 24) / 7), 8, 3, 2, ["#3A5A3A", "#7A2A2A", "#B08A3E"][k % 3]);
@@ -421,11 +427,11 @@ function sushi(f: Fill, w: number, fy: number, seat: (px: number, footY: number)
   // geometry table; the people-system note that called this a standing chef is
   // superseded here). Drawn first, then diners seated along the front.
   const chef = Math.round(w * 0.5);
-  seat(chef, fy - 11); f(chef - 1, fy - 21, 6, 2, "#FFFFFF"); // chef's hat above the seated head
+  if (seat(chef, fy - 11)) f(chef - 1, fy - 21, 6, 2, "#FFFFFF"); // chef's hat, only when the chef is present
   for (let tx = 14; tx + 6 < w - 12; tx += 19) { f(tx, fy - 3, 3, 3, "#5A4632"); seat(tx - 1, fy); }
 }
 
-function steak(f: Fill, w: number, fy: number, railY: number, lit: boolean, lamp: string, seat: (px: number, footY: number) => void): void {
+function steak(f: Fill, w: number, fy: number, railY: number, lit: boolean, lamp: string, seat: Seat): void {
   // A hooded grill glowing orange (ember), framed art.
   box(f, 6, 8, 22, railY - 6, "#1E1614");
   f(8, 15, 18, 3, lit ? "#E8862A" : "#8a4a20"); f(8, 13, 18, 2, "#3A2A1A"); glow(f, 17, 16, lit ? "#E8862A" : "#8a4a20"); f(6, 7, 22, 2, "#2A2018");

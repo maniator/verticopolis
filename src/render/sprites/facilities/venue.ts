@@ -55,6 +55,7 @@ export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   const fy = h - 6, railY = 52;
   twall(0, 0, w, fy, "#3A2A44");
   f(0, railY, w, fy - railY, "#4A2A3A"); // wine-red carpet
+  f(0, fy, w, h - fy, "#2A1A22"); f(0, fy, w, 1, "#5A3A48"); // floor base fills the last rows to the full rect height
   f(0, 0, w, 2, "#241830"); f(0, 2, w, 1, "#5A4468");
   // Tall draped arched windows.
   for (let wx = 10; wx + 22 < w; wx += 44) {

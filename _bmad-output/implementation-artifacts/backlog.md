@@ -147,6 +147,28 @@ figure to real occupancy. Bookkeeping and open follow-ups from this PR:
   still uses the seeded-scatter crowd idiom. It stays with the
   people-system/structure work and its own backlog follow-up.
 
+Second review pass (three adversarial layers) on the finished branch:
+
+- PATCHED here (Edge Case Hunter): person-implying props were drawn outside the
+  occupancy gate, so an empty venue showed a floating prop. The seat filler now
+  reports whether it drew an occupant, and the sushi chef's hat, the teahouse
+  boba cups, the coffee-shop lounge laptop, and the coffee-shop window-bench cup
+  all gate on that, matching the party-hall pattern (furniture always draws;
+  person-implying props only when the seat fills). Re-verified with the gates.
+- PATCHED here (Acceptance Auditor): `drawPartyHall` left the bottom ~6px of its
+  two-floor 88px rect unpainted (the food rooms cover it with `pfloor`). Added a
+  floor base band so the composition now fills the full rect height.
+- DEFER (minor, Blind Hunter): the `f` / `glow` / `box` / `twall` primitives and
+  the `(floor * 131 + x * 17)` geography seed are duplicated between
+  `pixelSprites/food.interiors.ts` and `sprites/facilities/venue.ts` (different
+  render modules). Left as-is to avoid cross-module coupling; a shared
+  low-level helper module is the eventual cleanup. No behavior risk today.
+- DEFER (low, Acceptance Auditor): the ice-cream parlor wall clock uses
+  `#E8A050`. This is not the reserved notice amber `#E8A030` (blue differs by
+  0x20, outside the within-10 collision band) and reads as a gold clock, not a
+  state cue, so it passes the reserved-color rule. Noted for a future glance if
+  the amber hue family is ever tightened.
+
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into
