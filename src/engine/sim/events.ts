@@ -22,11 +22,16 @@ export function maybeVipStay(sim: Simulation): void {
   // car, and a suite hotel without valet parking never earns the review.
   if (happy && !sim.suiteParkingShort()) {
     sim.vipFavorable = true;
+    sim.vipVisits++;
     sim.emit("A VIP enjoyed their suite. Your tower earned a favorable review (4★ unlocked).", "good");
     sim.triggerVip(); // the VIP's limo pulls up (cosmetic)
   } else if (sim.clock.day - sim.lastVipNagDay >= 5) {
     // Throttle the nag lines so they can't spam the log every day.
     sim.lastVipNagDay = sim.clock.day;
+    // Count the visit with the nag, not per day: the stat mirrors the events
+    // the player actually saw, so a struggling tower reads "a few failed
+    // visits", not one per in-game day.
+    sim.vipVisits++;
     sim.emit(
       happy
         ? "🚗 The VIP circled the block and left. Every hotel suite needs a working parking space (chained to a ramp)."
@@ -50,6 +55,7 @@ export function checkVip(sim: Simulation): void {
   }
   if (sim.clock.day < sim.vipVisitDay) return;
   sim.vipVisitDay = -1;
+  sim.vipVisits++; // the inspection is a VIP visit, impressed or not
   sim.triggerVip(); // the inspecting VIP arrives by limo (cosmetic)
   const pop = sim.ratingPopulation();
   const ok =

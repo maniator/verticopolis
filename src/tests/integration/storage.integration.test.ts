@@ -30,6 +30,26 @@ describe("SaveGame", () => {
     expect((loaded as unknown as { vipVisitDay: number }).vipVisitDay).toBe(expected);
   });
 
+  it("persists the VIP visit counter, hardens forged values, and adopts 1 for a legacy favorable save", () => {
+    const sim = sampleGame();
+    sim.vipVisits = 3;
+    sim.vipFavorable = true;
+    expect(Simulation.deserialize(sim.serialize()).vipVisits).toBe(3);
+    // Forged counter: negative / non-finite collapses to 0, then the favorable
+    // review floors it back at 1 (the review proves at least one visit).
+    const data = sim.serialize();
+    (data as { vipVisits: unknown }).vipVisits = -5;
+    expect(Simulation.deserialize(data).vipVisits).toBe(1);
+    (data as { vipVisits: unknown }).vipVisits = NaN;
+    expect(Simulation.deserialize(data).vipVisits).toBe(1);
+    // A save written before the counter existed: favorable implies one visit...
+    delete (data as { vipVisits?: unknown }).vipVisits;
+    expect(Simulation.deserialize(data).vipVisits).toBe(1);
+    // ...and with no review it stays at 0.
+    (data as { vipFavorable: unknown }).vipFavorable = false;
+    expect(Simulation.deserialize(data).vipVisits).toBe(0);
+  });
+
   it("coerces non-finite unit fields from a tampered save to safe values", () => {
     const sim = sampleGame();
     const data = sim.serialize();

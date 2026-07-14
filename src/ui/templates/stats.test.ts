@@ -86,6 +86,19 @@ describe("statsTemplate structure", () => {
     expect(frag.textContent).toContain("Tower name");
   });
 
+  it("shows the VIP visits row from 3★ and reflects the earned review", () => {
+    const sim = builtTower();
+    expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("VIP visits");
+    sim.star = 3;
+    let frag = renderToFragment(statsTemplate(sim));
+    expect(frag.textContent).toContain("VIP visits");
+    expect(frag.textContent).toContain("None yet");
+    sim.vipVisits = 3;
+    sim.vipFavorable = true;
+    frag = renderToFragment(statsTemplate(sim));
+    expect(frag.textContent).toContain("3 · review earned");
+  });
+
   it("escapes a hostile tower name as text, injecting no element", () => {
     const sim = builtTower();
     sim.tower.towerName = `<img src=x onerror="alert(1)">`;
@@ -132,6 +145,20 @@ describe("statsTemplate matches the legacy buildStatsHtml structure", () => {
     const sim = withIncome();
     // Guard the fixture: the Income section only renders once there's data.
     expect(sim.incomeBreakdown().hasData).toBe(true);
+    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  });
+
+  it("holds for a 3★ tower with no VIP visit yet (VIP row empty state)", () => {
+    const sim = builtTower();
+    sim.star = 3;
+    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  });
+
+  it("holds for a tower with VIP visits and the earned review (VIP row populated)", () => {
+    const sim = builtTower();
+    sim.star = 3;
+    sim.vipVisits = 2;
+    sim.vipFavorable = true;
     expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
   });
 });

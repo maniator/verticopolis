@@ -46,6 +46,7 @@ export function serialize(sim: Simulation): SerializedGame {
     evaluatedTower: sim.evaluatedTower,
     vipVisitDay: sim.vipVisitDay,
     vipFavorable: sim.vipFavorable,
+    vipVisits: sim.vipVisits,
     treasuresFound: sim.treasuresFound,
     events: sim.events.saveState(),
     excavated: [...sim.excavated],
@@ -82,6 +83,16 @@ export function deserialize(raw: SerializedGame): Simulation {
   // window doesn't permanently cancel the TOWER evaluation.
   sim.vipVisitDay = data.vipVisitDay ?? -1;
   sim.vipFavorable = data.vipFavorable ?? false;
+  // Clamp to a non-negative integer (untrusted save): a forged negative or
+  // fractional count would render nonsense in the stats dialog forever.
+  sim.vipVisits = Math.max(
+    0,
+    Math.floor(typeof data.vipVisits === "number" && Number.isFinite(data.vipVisits) ? data.vipVisits : 0),
+  );
+  // Saves written before the counter (and TDT imports, which synthesize
+  // vipFavorable from the star) carry no visits, yet a favorable review proves
+  // a VIP stayed at least once; adopt 1 so the stats row can't contradict it.
+  if (sim.vipFavorable && sim.vipVisits === 0) sim.vipVisits = 1;
   // Clamp ≥0 (untrusted save): a negative value would keep `treasuresFound < 3`
   // true forever and re-open the treasure farm.
   sim.treasuresFound = Math.max(
