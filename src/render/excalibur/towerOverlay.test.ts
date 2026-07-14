@@ -190,27 +190,43 @@ describe("weather and event visuals paint", () => {
   });
 
   it("an in-window explosion draws a blast; an elapsed one is skipped", () => {
+    // Baseline with no explosions: the ruler and ambient painting are identical,
+    // so any extra draw calls in the live run come only from the blast. (A plain
+    // painted() check is tautological here because the ruler always paints.)
+    const inWindowBase = spyCtx();
+    drawOverlay(eng({ d: { anim: 0.4 } }), inWindowBase.ctx);
     const live = spyCtx();
     drawOverlay(eng({ explosions: [{ x: 100, floor: 5, start: 0 }], d: { anim: 0.4 } }), live.ctx);
-    expect(live.painted()).toBe(true);
+    expect(live.log.length).toBeGreaterThan(inWindowBase.log.length); // the blast added draws
+
+    // p > 1 (past EXPLOSION_SECONDS) draws nothing for the flash: an elapsed
+    // explosion matches its no-explosion baseline call by call.
+    const elapsedBase = spyCtx();
+    drawOverlay(eng({ d: { anim: 99 } }), elapsedBase.ctx);
     const done = spyCtx();
-    // p > 1 (past EXPLOSION_SECONDS) draws nothing for the flash.
-    const before = done.log.length;
     drawOverlay(eng({ explosions: [{ x: 100, floor: 5, start: 0 }], d: { anim: 99 } }), done.ctx);
-    expect(done.log.length).toBeGreaterThanOrEqual(before); // ruler still paints, blast skipped
+    expect(done.log.length).toBe(elapsedBase.log.length); // blast skipped, no extra draws
   });
 
   it("treasure sparkles paint while their window is open", () => {
+    // Baseline with no treasures proves the sparkle painter adds draws rather
+    // than relying on the always-on ruler.
+    const base = spyCtx();
+    drawOverlay(eng({ d: { anim: 0.5 } }), base.ctx);
     const s = spyCtx();
     drawOverlay(eng({ treasures: [{ x: 120, floor: 6, start: 0 }], d: { anim: 0.5 } }), s.ctx);
-    expect(s.painted()).toBe(true);
+    expect(s.log.length).toBeGreaterThan(base.log.length);
   });
 
   it("the VIP limo paints on arrival, hold and departure legs", () => {
     for (const anim of [0.1, 0.5, 0.9]) {
+      // Compare against a vipStart: null baseline at the same anim time so the
+      // extra draws are provably the limo on this leg, not the ruler.
+      const base = spyCtx();
+      drawOverlay(eng({ vipStart: null, d: { anim } }), base.ctx);
       const s = spyCtx();
       drawOverlay(eng({ vipStart: 0, d: { anim } }), s.ctx);
-      expect(s.painted()).toBe(true);
+      expect(s.log.length).toBeGreaterThan(base.log.length);
     }
   });
 
