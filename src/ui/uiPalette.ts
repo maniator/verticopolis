@@ -83,7 +83,7 @@ function facilityButton(ui: UI, kind: FacilityKind, group: string): HTMLElement 
     `<span class="pal-name">${f.name}</span>` +
     `<span class="pal-cost">$${shortMoney(f.cost)}</span>`;
   // Locked facilities are hidden from the palette entirely (parity with the
-  // original), so a visible button is never locked — no locked toast path.
+  // original), so a visible button is never locked, no locked toast path.
   // (A visible button may still be unaffordable; the engine build guard, not
   // this palette, rejects a placement the player can't pay for.)
   makeActivatable(item, `${f.name}, $${shortMoney(f.cost)}`, () => {

@@ -46,7 +46,7 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
     }),
   );
   // Close the saves dialog first: <dialog>'s top layer paints over the toast
-  // rail, so export feedback would be invisible behind the open modal — and
+  // rail, so export feedback would be invisible behind the open modal, and
   // the confirm dialog / file picker replace it rather than stacking on it.
   ui.wireActions(box, {
     export: () => {
@@ -141,7 +141,7 @@ export function showBatchPricingDialog(
   box.querySelectorAll('input[name="bp-mode"]').forEach((el) => el.addEventListener("change", refresh));
   ui.wireActions(box);
   applyBtn.addEventListener("click", () => {
-    // A bulk reset clears everyone's custom price — require a confirming click.
+    // A bulk reset clears everyone's custom price, require a confirming click.
     if (mode() === "default" && !resetArmed) {
       resetArmed = true;
       applyBtn.textContent = "Confirm reset";
@@ -171,7 +171,7 @@ export function confirmModal(
         onYes();
       },
     },
-    // No [data-act="close"] button in this template to bind — the title-bar
+    // No [data-act="close"] button in this template to bind, the title-bar
     // ✕ still exists and closes through the dialog's cancel path.
     { close: false },
   );
@@ -230,7 +230,7 @@ export function confirmExport(ui: UI): void {
   });
 }
 
-/** Import goes straight to the file picker — exports are .vctower downloads
+/** Import goes straight to the file picker, exports are .vctower downloads
  *  now, so there is deliberately no paste-a-save textarea anymore. */
 export function openImport(ui: UI): void {
   const input = document.getElementById("import-file") as HTMLInputElement;
@@ -375,8 +375,8 @@ export function showEventChoice(
 ): void {
   const box = ui.openModal(tpl.eventChoiceHtml(message, costLabel));
   const dialog = ui.el.modal as HTMLDialogElement;
-  // The choice MUST resolve exactly once, no matter how the modal closes —
-  // buttons, Esc, or a backdrop click — or the sim (frozen while a choice is
+  // The choice MUST resolve exactly once, no matter how the modal closes , 
+  // buttons, Esc, or a backdrop click, or the sim (frozen while a choice is
   // open) would deadlock. Dismissing counts as declining.
   let done = false;
   const finish = (opt: "accept" | "decline") => {
@@ -394,7 +394,7 @@ export function showEventChoice(
 
 /**
  * "A new build is ready" prompt. Dismissing by Esc, the ✕, or a backdrop click
- * all count as "Later" — the safe choice — and, like the emergency modal, the
+ * all count as "Later", the safe choice, and, like the emergency modal, the
  * outcome fires exactly once no matter how the modal closes.
  */
 export function showUpdatePrompt(

@@ -22,9 +22,8 @@ export function shortMoney(n: number): string {
 
 /** The tool-info panel body for a selected build kind. */
 export function buildToolInfoHtml(
-  f: { name: string; cost: number; population: number },
+  f: { name: string; cost: number; population: number; description: string },
   isCommercial: boolean,
-  description: string,
 ): string {
   return (
     `<div class="ti-name">${f.name}</div>` +
@@ -35,7 +34,7 @@ export function buildToolInfoHtml(
     (f.population
       ? `<div>${isCommercial ? `Customers: up to ${f.population}` : `Capacity: ${f.population}`}</div>`
       : "") +
-    `<p style="margin-top:6px;color:var(--muted)">${description}</p>`
+    `<p style="margin-top:6px;color:var(--muted)">${f.description}</p>`
   );
 }
 
@@ -352,7 +351,7 @@ export function eventChoiceHtml(message: string, costLabel: string): string {
 export function updatePromptHtml(info?: UpdateInfo | null): string {
   const notes = (info?.notes ?? []).slice(0, 3);
   // Wrap the heading + list so the `.win-title.sm` strip is a GRANDCHILD of
-  // `.modal-box.win` — a direct child would inherit the dialog title bar's
+  // `.modal-box.win`, a direct child would inherit the dialog title bar's
   // full-bleed and sticky treatment and overlap the body text.
   const notesBlock = notes.length
     ? `<div class="whatsnew"><h3 class="win-title sm">What's new</h3><ul>${notes

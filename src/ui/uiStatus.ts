@@ -12,11 +12,11 @@ import { towerStatsHtml } from "./uiTemplates";
  */
 
 /** Hard ceiling on rendered bulletin lines. The DOM node count is held CONSTANT
- *  at this — append the newest, prune the oldest — so scrollback is generous yet
+ *  at this, append the newest, prune the oldest, so scrollback is generous yet
  *  a long session can never grow the log big enough to jank a slow phone. */
 const LOG_DOM_CAP = 300;
 
-/** Most toasts kept on screen at once — and the most fired in a single render.
+/** Most toasts kept on screen at once, and the most fired in a single render.
  *  A catch-up tick can flush a big batch; only the newest few pop. */
 const TOAST_MAX = 5;
 
@@ -30,12 +30,12 @@ export function update(ui: UI, sim: Simulation): void {
   ui.el.date.textContent = sim.clock.formatRetroDate();
 
   // Palette unlock state. Parity with the original: a locked facility is HIDDEN
-  // (`.locked` -> display:none, out of layout and tab order), not shown dimmed —
+  // (`.locked` -> display:none, out of layout and tab order), not shown dimmed , 
   // the palette grows as stars are earned. Only affordability dims
   // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible. We note
   // which groups have at least one unlocked member in the same pass so a group
   // header can be hidden when everything beneath it is still locked (e.g.
-  // Leisure/Services/Special at 1★) — no dangling section titles.
+  // Leisure/Services/Special at 1★), no dangling section titles.
   const groupsWithUnlocked = new Set<string>();
   ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
     const kind = item.dataset.kind as FacilityKind;
@@ -48,8 +48,8 @@ export function update(ui: UI, sim: Simulation): void {
   ui.el.palette.querySelectorAll<HTMLElement>(".pal-group-title[data-group]").forEach((title) => {
     title.hidden = !groupsWithUnlocked.has(title.dataset.group ?? "");
   });
-  // If the active build tool just became locked — loading, founding, or undoing
-  // into a lower-star tower while a higher-star tool was selected — its palette
+  // If the active build tool just became locked, loading, founding, or undoing
+  // into a lower-star tower while a higher-star tool was selected, its palette
   // button is now hidden, leaving no visible active tool while canvas clicks
   // still attempt the locked facility. Fall back to Inspect so the selection
   // matches what the palette shows. (Fires once: the tool is Inspect afterward.)
@@ -67,7 +67,7 @@ export function update(ui: UI, sim: Simulation): void {
 function renderLog(ui: UI, log: LogEntry[], logSeq: number): void {
   if (logSeq === ui.lastLogSeq) return;
   // Count new entries by the monotonic logSeq, NOT log.length: the engine caps
-  // the log (push+shift), so length stops changing while entries keep flowing —
+  // the log (push+shift), so length stops changing while entries keep flowing , 
   // diffing on length froze this pump (and every toast) after the cap. Clamp to
   // what's still in the buffer: anything older was shifted out.
   const fresh = Math.min(logSeq - ui.lastLogSeq, log.length);
@@ -85,14 +85,14 @@ function renderLog(ui: UI, log: LogEntry[], logSeq: number): void {
     batch.flatMap((e, i) => (e.kind === "good" || e.kind === "bad" ? [i] : [])).slice(-TOAST_MAX),
   );
   batch.forEach((e, i) => {
-    // Append the bulletin line FIRST — it's the durable record; a throwing
+    // Append the bulletin line FIRST, it's the durable record; a throwing
     // toast() must never drop it or stall the rest of the batch.
     ui.el.log.appendChild(logLine(e)); // column-reverse ⇒ newest lands on top
     if (toastAt.has(i)) {
       try {
         ui.toast(e.text, e.kind);
       } catch {
-        /* a toast failure is cosmetic — never let it interrupt the pump */
+        /* a toast failure is cosmetic, never let it interrupt the pump */
       }
     }
   });
@@ -103,7 +103,7 @@ function renderLog(ui: UI, log: LogEntry[], logSeq: number): void {
   while (ui.el.log.childElementCount > LOG_DOM_CAP) ui.el.log.firstElementChild!.remove();
 }
 
-/** One bulletin line. `textContent` auto-escapes — never interpolate engine text
+/** One bulletin line. `textContent` auto-escapes, never interpolate engine text
  *  into innerHTML. */
 function logLine(e: LogEntry): HTMLDivElement {
   const d = document.createElement("div");

@@ -8,7 +8,7 @@ import type { UI } from "./UI";
  */
 
 /** Render the editor for a selection. If its shape (`key`) is unchanged, only
- *  the volatile `data-field` cells are patched in place — the buttons and rename
+ *  the volatile `data-field` cells are patched in place, the buttons and rename
  *  input keep their identity, so a refresh can never land mid-click and swallow
  *  it. A new shape does a full (re)build. */
 export function renderEditor(
@@ -95,7 +95,7 @@ export function showInspector(ui: UI, html: string | null): void {
   ui.el.inspector.innerHTML = html;
   // ✕ in the title strip (shown on mobile only, via CSS): the docked card has
   // no hover-away to dismiss it there. The card itself stays click-through.
-  // Routed through the app so it can latch the dismissal — otherwise the very
+  // Routed through the app so it can latch the dismissal, otherwise the very
   // next hover pick over the same facility re-opens the card.
   const h4 = ui.el.inspector.querySelector("h4");
   h4?.appendChild(ui.titleBarClose("insp-close btn xs", () => ui.cb.onInspectorClose()));

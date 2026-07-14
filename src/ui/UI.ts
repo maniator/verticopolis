@@ -189,7 +189,7 @@ export class UI {
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
       const f = FACILITIES[tool.kind];
-      this.el.toolInfo.innerHTML = tpl.buildToolInfoHtml(f, isCommercialKind(tool.kind), f.description);
+      this.el.toolInfo.innerHTML = tpl.buildToolInfoHtml(f, isCommercialKind(tool.kind));
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       this.el.toolInfo.innerHTML =
