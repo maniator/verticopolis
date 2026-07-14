@@ -976,6 +976,12 @@ into a fast-follow so the overhaul could ship). E2 (offices, hotels, condos) and
 the other kinds read well in game; these are contained to the ground lobby and
 the stair / escalator sprites:
 
+> RESOLVED on branch `claude/pixelart-e6-followup`: the ground-lobby receptionist
+> repeat, the sky-lobby night glare, the stair and escalator geometry, and the
+> grand-entrance prominence are all fixed in that PR. The gallery multi-floor
+> sizing shipped in part 1 of the same branch. Review defers from that PR are in
+> the "code review of E6 structure/transport art followup" section below.
+
 - **Ground lobby repeats the seated receptionist at every fourth tile.** The
   lobby tiles four baked variants by `x % 4`, and variant 1 is a staffed
   reception desk (`receptionDesk` with `personSeated`), so the same attendant
@@ -1003,6 +1009,88 @@ the stair / escalator sprites:
   judged in the baseline. Size each gallery cell by the facility's `floors` so
   multi-floor compositions show at their true proportion (clamp to the cell,
   scale width to preserve aspect). Regenerate the baseline and screenshots after.
+
+### Deferred from: code review of E6 structure/transport art followup (`gds-code-review`, 2026-07-14)
+
+Change: `src/render/sprites/structure/lobby.ts` (reception moved out of repeating
+variant 1 into a person-free console/bench; `skyGlass` tones down the sky lobby),
+`src/render/sprites/structure/entrance.ts` (one reception desk + attendant in the
+grand-left slice; a projecting marquee on the wide and compact grand entrances),
+and `src/render/sprites/transport.ts` (clean figure-free stair flight and
+escalator run that land on the second-floor deck). Three review layers (Blind
+Hunter, Edge Case Hunter, Acceptance Auditor). Patch findings fixed and
+re-verified: the stair/escalator drop shadow no longer paints the `bandBottom`
+row (height reduced to 1 so the deepest column stays inside the band), the newel
+post is drawn after the top landing so it reads, and the once-per-lobby comments
+were corrected to note the compact 1-tile fallback shows no receptionist. Defers:
+
+- **Sky lobby shows zero attendants after de-repeat. RESOLVED: owner chose to
+  keep the sky lobby UNSTAFFED (zero attendants).** De-repeating removed the tiled
+  attendant, and there is no single-placement path for sky lobbies (the floor-1
+  entrance map that hosts the ground lobby's one reception is `u.floor === 1`
+  only). The owner decided the sky lobby stays unstaffed, so this is closed, not
+  an open item, and the frozen I/O matrix line ("an info desk with an attendant")
+  should be amended to match. No code change; do not add a sky-lobby placement
+  seam. (Acceptance Auditor; owner decision 2026-07-14.)
+- **Stairs/escalator no longer bake a rider; the frozen AC should be amended.**
+  The frozen structure/transport spec AC and I/O matrix say the incline carries
+  the ~17px rider build, but per the owner directive the flights bake no
+  climber/rider (empty tower reads empty; the engine's routed sims ride over the
+  static flight). This is an intentional renegotiation, not a defect. The frozen
+  `spec-pixelart-structure-transport.md` AC should be amended to record it. Do not
+  edit the frozen spec without the human renegotiation ritual. (Acceptance
+  Auditor; supersedes the earlier "Stairs and escalator bake no ~17px rider"
+  defer above. Low; spec traceability.)
+- **Marquee overpaints the compact grand-solo door's top header row.** In
+  `drawGrandCompact` the marquee is drawn last across the full tile; its body
+  (y+3..y+6) meets the compact door header at `doorTop = y+6`, so the canopy sits
+  over the door's top row. It reads correctly as "canopy in front of the door"
+  and the wide facade avoids it by lowering its chandelier, but the compact path
+  did not nudge the door top. Nudge `doorTop` down a pixel or trim the marquee on
+  the solo tile if a future pass wants the door header fully clear. (Blind Hunter
+  / Edge Case Hunter. Very low; cosmetic.)
+- **A narrow (1-tile) floor-1 lobby run shows no receptionist.** The wide grand
+  entrance (leftmost run of width >= 2) hosts the single reception; a 1-tile run
+  maps to `grand-solo`, which has no room for a counter. Reachable for a toy
+  lobby or a lobby whose leftmost contiguous run is split to width 1 by a gap.
+  Both reviewers judged it acceptable for a degenerate lobby; revisit only if the
+  owner wants a compact reception on the solo tile. (Edge Case Hunter. Low;
+  degenerate-case cosmetic.)
+
+### Deferred from: code review of E6 grand hotel entrance redraw (`gds-code-review`, 2026-07-14)
+
+Change: `src/render/sprites/structure/entrance.ts` grand forms redrawn from the
+glass storefront + green marquee to the page-05 `grandEnt` grand hotel entrance
+(red scalloped awning, gold double doors, glass curtain wall, red carpet, potted
+palm, doorman) on the wide (`drawGrandFacadeLeft` + `drawGrandFacadeRight`) and
+compact (`drawGrandCompact`) forms; the service entrance is untouched. Three
+review layers. Patch findings fixed and re-verified: the compact doorman was
+moved from `lc + 4` to `lc + 3` so his 2px sway frame no longer clips column 11
+off the 11px tile; the compact palm was resized to fit inside the tile instead of
+spilling off the left edge; the compact door's right handle was mirrored about the
+center split; the wide doorman was nudged to composite `dcx + 3` so both feet stay
+on the carpet and clear of the right palm's pot; and the left reception desk now
+derives its base from the `fy = h - 6` floor line. Defers:
+
+- **Wide grand entrance carries one palm (right flank), not one on each side.**
+  The reference `grandEnt` and the owner directive want a palm flanking the doors
+  on both sides, but the left flank of the wide 2-tile form (22px) hosts the
+  required single relocated reception desk + attendant (6px), which leaves no
+  floor room for a left palm beside the left door leaf. The two requirements
+  (keep the reception AND a palm on each side) conflict in 22px. Shipped with
+  reception on the left, palm on the right, doorman on the carpet. Owner to
+  decide: keep the reception plus one palm, or drop the reception here for a
+  second palm. (Acceptance Auditor. Low; needs an owner decision, not a code fix.)
+- **Door geometry is a fixed 18px tall, not proportional to `h`.** `doorH = 18`
+  and `doorTopY = fy - 18` are constants tuned for the game's `FLOOR = 44`
+  (`fy = 38`, door spans ry 20..38). At the unit tests' `h = 34` the door top
+  rises into the awning band, and for `h <= 24` `doorTopY` would go negative (the
+  `Filler` clamps rect SIZE, not position). Not reachable in production (entrance
+  tiles always bake at `FLOOR = 44`), and the tests only assert `painted()` /
+  `sig()` inequality, so it is test-fidelity / robustness only. Derive the door
+  height from `h` if a future change ever bakes entrances at another height.
+  (Edge Case Hunter. Low; robustness.)
+
 ### Deferred from: code review of E1 (createUICallbacks split) (`/bmad-code-review`, 2026-07-14)
 
 Change: E1 extracts the ~30-callback `UICallbacks` literal out of the `GameApp`

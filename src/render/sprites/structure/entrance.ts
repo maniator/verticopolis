@@ -1,240 +1,161 @@
 import type { DrawCtx } from "../common";
+import { personSeated } from "../../pixelSprites/common";
 
 /**
- * The ground-floor grand and service entrance facades: the wide two-tile
- * storefront (left + right slices), the compact one-tile fallback, the doorman,
- * and the quiet service door. Extracted verbatim from `structure.ts`. Imported
- * by `lobby.ts`, whose `drawLobbyTile` dispatches the entrance-variant tiles
- * here.
+ * The ground-floor grand and service entrance facades: the wide two-tile grand
+ * hotel entrance (left + right slices), the compact one-tile fallback, the
+ * doorman, and the quiet service door. Imported by `lobby.ts`, whose
+ * `drawLobbyTile` dispatches the entrance-variant tiles here.
+ *
+ * The grand entrance is ported from page-05's `grandEnt` reference: a glass
+ * curtain wall behind a red scalloped awning, big gold double doors as the
+ * focal point, a red carpet rolling out from them, a potted palm on the right
+ * flank (the left flank carries the relocated reception), and the doorman on the
+ * carpet. It reads warm and grander after dark (the doors
+ * and awning glow as the tower's lit main entrance). The single relocated
+ * reception desk and attendant (the once-per-lobby staffed counter from the
+ * lobby de-repeat) stands on the left flank of the wide form.
  */
 
+/** A composite-space fill drawer. `cx` is an x in the 22-wide composite facade,
+ *  `ry` is relative to the slice's `y`. `off` shifts the right slice left by one
+ *  tile so both 11px canvases paint the SAME composite; rects that fall off a
+ *  slice's canvas are harmlessly clipped, which keeps the two halves lined up
+ *  pixel-for-pixel at the join. Integer pixels, never a zero-size rect. */
+type Filler = (cx: number, ry: number, cw: number, ch: number, color: string, alpha?: number) => void;
+
+function makeFiller(ctx: CanvasRenderingContext2D, x: number, y: number, off: number): Filler {
+  return (cx, ry, cw, ch, color, alpha = 1) => {
+    const rw = Math.round(cw);
+    const rh = Math.round(ch);
+    if (rw <= 0 || rh <= 0) return; // skip a degenerate rect instead of flooring it to a stray 1px
+    const prevAlpha = ctx.globalAlpha;
+    ctx.globalAlpha = prevAlpha * alpha; // composite with the caller's alpha, do not clobber a fade
+    ctx.fillStyle = color;
+    ctx.fillRect(Math.round(x + cx - off), Math.round(y + ry), rw, rh);
+    ctx.globalAlpha = prevAlpha; // restore instead of assuming the caller was at 1
+  };
+}
+
+/** A potted palm: pot on the floor, a slim trunk, and green fronds. `cx` is the
+ *  trunk's composite x, `fy` the floor line (relative to y). */
+function palm(R: Filler, cx: number, fy: number): void {
+  R(cx - 2, fy - 3, 5, 3, "#5C4A38"); // pot
+  R(cx - 2, fy - 3, 5, 1, "#6A5240"); // pot rim
+  R(cx, fy - 9, 1, 6, "#6A5240"); // trunk
+  R(cx - 2, fy - 13, 5, 4, "#4E7A3E"); // fronds
+  R(cx - 1, fy - 15, 3, 2, "#4E7A3E"); // top fronds
+  R(cx - 3, fy - 11, 2, 1, "#4E7A3E"); // left frond
+  R(cx + 2, fy - 11, 2, 1, "#4E7A3E"); // right frond
+}
+
+/** The shared grand-hotel facade body drawn by BOTH wide slices in composite
+ *  space (each canvas clips to its half): sky and skyline, the glass curtain
+ *  wall, the red scalloped awning, the gold double doors (focal point, glowing
+ *  at night), the floor, the red carpet, and the right potted palm. The doorman
+ *  and the left-flank reception are drawn per slice by the callers. */
+function drawGrandHotelBody(d: DrawCtx, R: Filler, W: number, h: number): void {
+  const { lit } = d;
+  const fy = h - 6; // floor line (reference fy=38 of 44)
+  const dcx = Math.round(W / 2); // doors centered on the slice boundary
+  // Sky band with a distant skyline behind the entrance.
+  R(0, 0, W, 10, lit ? "#2A3350" : "#AFC8DE");
+  for (let bx = 0, bi = 0; bx < W; bx += 4, bi++) {
+    const bh = 3 + ((bi * 3) % 4);
+    R(bx, 10 - bh, 3, bh, lit ? "#1E2740" : "#7EA0C0");
+    if (lit) R(bx + 1, 10 - bh + 1, 1, 1, "#F3D08A"); // warm distant windows at night
+  }
+  R(0, 10, W, 1, "#3A4658"); // sky base line
+  // Gold cornice cap along the very top, matching the concourse ceiling line
+  // (drawLobbyTile), so the whole ground frontage reads as one continuous gilded
+  // top line where the entrance meets the neighboring concourse tiles. The sky
+  // then reads as a clerestory strip below the cornice.
+  R(0, 0, W, 3, "#C9A24B");
+  R(0, 3, W, 1, "#8A7430");
+  // Glass curtain wall above and around the doors: dark frame, glass inner,
+  // slim mullions. Warm interior spill glows at the base after dark.
+  R(2, 11, W - 4, fy - 11, "#3A4658");
+  R(3, 13, W - 6, fy - 14, lit ? "#243447" : "#8FB6C8");
+  for (let gx = 5; gx < W - 4; gx += 5) R(gx, 13, 1, fy - 14, lit ? "#3A5068" : "#5A7E9A", 0.6);
+  if (lit) R(4, fy - 7, W - 8, 6, "#C9A24B", 0.16);
+  // Red scalloped awning across the top, with a small sign and (at night) warm
+  // bulbs along the valance so it reads as the lit main entrance.
+  R(3, 8, W - 6, 3, "#9A2E38");
+  R(3, 8, W - 6, 1, "#B84450");
+  for (let cx2 = 4; cx2 < W - 4; cx2 += 4) {
+    R(cx2, 11, 2, 2, "#9A2E38"); // scalloped valance block
+    if (lit) R(cx2, 12, 1, 1, "#F3D08A"); // warm bulb
+  }
+  R(dcx - 1, 5, 2, 3, "#8A8E96"); // small sign above center
+  // Gold double doors: the focal point. A warm halo behind them at night.
+  const doorL = dcx - 5;
+  const doorW = 10;
+  const doorTopY = fy - 18;
+  const doorH = 18;
+  if (lit) R(doorL - 1, doorTopY - 1, doorW + 2, doorH + 2, "#FFE08A", 0.22);
+  R(doorL, doorTopY, doorW, doorH, lit ? "#D8B24E" : "#C9A24B");
+  R(doorL, doorTopY, doorW, 1, lit ? "#F0D878" : "#E8C860"); // top highlight
+  R(dcx - 1, doorTopY, 2, doorH, "#8A6A2A"); // center split at the boundary
+  R(doorL, doorTopY, 1, doorH, "#8A6A2A"); // left edge
+  R(doorL + doorW - 1, doorTopY, 1, doorH, "#8A6A2A"); // right edge
+  R(dcx - 4, fy - 9, 2, 2, "#8A6A2A"); // left handle
+  R(dcx + 2, fy - 9, 2, 2, "#8A6A2A"); // right handle
+  // Floor and the red carpet rolling out from the doors.
+  R(0, fy, W, h - fy, "#8A8478");
+  R(dcx - 5, fy, 10, h - fy, "#9A2E38");
+  R(dcx - 5, fy, 10, 1, "#B84450"); // carpet edge highlight
+  // Right potted palm flanking the doors (the left flank carries the reception).
+  palm(R, W - 4, fy);
+}
+
 /**
- * Left slice of the wide 2-tile grand entrance. This slice is a floor-to-cornice
- * glass storefront display window: interior visible through the glass, with the
- * lobby's chandelier hanging in the top area and a glimpse of the red carpet at
- * the bottom. The door itself lives in the right slice; here we paint only the
- * glass panel and the left storefront frame.
- *
- * This slice + the right slice compose a 22-pixel-wide facade. Instead of a
- * door painted on the interior wall (which reads as an interior door), the
- * whole two-tile section reads as the tower's street-facing storefront, with
- * the interior seen through big display windows. Sally's storefront reframe;
- * Samus's wayfinding beat.
+ * Left slice of the wide 2-tile grand hotel entrance. Draws the shared facade
+ * body (clipped to this 11px canvas) plus the single relocated reception desk
+ * and attendant on the left flank. The wide grand entrance is placed once per
+ * lobby (on the leftmost frontage run of width >= 2), so a wide lobby shows
+ * exactly one attendant rather than one every fourth concourse tile. A 1-tile
+ * lobby uses the compact grand-solo fallback, which has no room for a counter
+ * and shows none.
  */
 export function drawGrandFacadeLeft(d: DrawCtx, x: number, y: number, w: number, h: number): void {
-  drawGrandStorefrontShared(d, x, y, w, h, "left");
+  const { ctx, lit } = d;
+  const R = makeFiller(ctx, x, y, 0);
+  drawGrandHotelBody(d, R, w * 2, h);
+  // Reception counter with a single seated attendant on the left flank, standing
+  // on the floor beside the doors. The desk face is drawn over the figure so only
+  // the head and shoulders read above the counter.
+  const fy = h - 6; // floor line, matching drawGrandHotelBody
+  const deskL = x;
+  const deskW = 6;
+  const deskH = 8;
+  const deskTop = y + fy - deskH; // desk base sits on the floor top
+  personSeated(ctx, x, deskTop + deskH - 1, 4);
+  ctx.fillStyle = "#6B4A2B"; // walnut counter
+  ctx.fillRect(deskL, deskTop, deskW, deskH);
+  ctx.fillStyle = "#8A6440"; // lit top rail
+  ctx.fillRect(deskL, deskTop, deskW, 1);
+  ctx.fillStyle = "#4E3620"; // shaded base so the counter sits on the floor
+  ctx.fillRect(deskL, deskTop + deskH - 1, deskW, 1);
+  if (lit) {
+    ctx.fillStyle = "#F8E2B4"; // a warm desk lamp glow at night
+    ctx.fillRect(deskL + 1, deskTop - 2, 2, 2);
+  }
 }
 
 /**
- * Right slice of the wide 2-tile grand entrance: the double doors at the
- * boundary with the left slice, a smaller glass panel showing the doorman
- * standing inside on the carpet, and the right storefront frame. The doorman
- * carries a two-frame idle sway keyed to `d.anim`, so this slice draws every
- * frame (see the cache-false bake in TowerEngine).
+ * Right slice of the wide 2-tile grand hotel entrance: the shared facade body
+ * (clipped to this canvas gives the right door leaf, the right palm, and the
+ * carpet) plus the doorman on the carpet by the doors. The doorman carries a
+ * two-frame idle sway keyed to `d.anim`, so this slice bakes with cache: false.
  */
 export function drawGrandFacadeRight(d: DrawCtx, x: number, y: number, w: number, h: number): void {
-  drawGrandStorefrontShared(d, x, y, w, h, "right");
-}
-
-/**
- * The shared skeleton of both wide-facade slices: cornice, storefront frame
- * top/bottom rails, kickplate, floor + carpet. Then dispatches the slice-
- * specific interior (chandelier display window for left, double doors +
- * doorman for right). Sharing the skeleton keeps the two slices lined up
- * pixel-for-pixel at the join, which is the whole point of the split.
- */
-function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, h: number, side: "left" | "right"): void {
-  const { ctx, lit } = d;
-  // Storefront body extents. Both slices use the same rails so the two 11-wide
-  // canvases compose into one continuous 22-wide facade.
-  const railTop = y + 3;
-  const railBot = y + h - 5; // meets the polished floor's top row (see drawLobbyTile)
-  const frameColor = "#3a2a20";
-  const kickColor = "#7a5e33";
-  const goldTrim = "#c9a94c";
-  // Gilded cornice (matches the concourse's other tiles so the top line reads
-  // as one continuous ceiling across the whole lobby).
-  ctx.fillStyle = "#caa84a";
-  ctx.fillRect(x, y, w, 2);
-  ctx.fillStyle = "#8a7430";
-  ctx.fillRect(x, y + 2, w, 1);
-  // Storefront top rail (dark metal), full width.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(x, railTop, w, 1);
-  // Kickplate under the glass, meeting the floor.
-  ctx.fillStyle = kickColor;
-  ctx.fillRect(x, railBot - 2, w, 2);
-  // Polished floor + red carpet (same as the base ground lobby tile so the
-  // entrance blends into the concourse's floor line without a seam).
-  ctx.fillStyle = "#c9b177";
-  ctx.fillRect(x, y + h - 5, w, 5);
-  ctx.fillStyle = "rgba(255,255,255,0.5)";
-  ctx.fillRect(x, y + h - 5, w, 1);
-  ctx.fillStyle = "#8f7a48";
-  ctx.fillRect(x, y + h - 1, w, 1);
-  ctx.fillStyle = "#a3243c"; // red carpet stripe
-  ctx.fillRect(x, y + h - 4, w, 3);
-  ctx.fillStyle = "#d9b356"; // carpet gold edge
-  ctx.fillRect(x, y + h - 5, w, 1);
-  // Warm interior background visible through the glass. Brightens at night so
-  // the whole storefront reads as a hot rectangle of light after dark.
-  const glassTop = railTop + 1;
-  const glassBot = railBot - 2;
-  const interior = ctx.createLinearGradient(0, glassTop, 0, glassBot);
-  if (lit) {
-    interior.addColorStop(0, "#fff2c2");
-    interior.addColorStop(1, "#f0d68a");
-  } else {
-    interior.addColorStop(0, "#f8f1dc");
-    interior.addColorStop(1, "#e3d7b3");
-  }
-  ctx.fillStyle = interior;
-  ctx.fillRect(x, glassTop, w, glassBot - glassTop);
-  // A cool skyline recedes behind the top of the glass so the frontage reads
-  // "warm light within, cool world outside" (the board's storefront beat, and
-  // the tall glass skyline the ground lobby I/O calls for).
-  storefrontSkyline(ctx, x, glassTop, w, lit);
-  // Interior carpet visible through the very bottom of the glass, so the
-  // carpet visually continues from outside the doors right through the display
-  // window (a signature grand-hotel beat).
-  ctx.fillStyle = "#a3243c";
-  ctx.fillRect(x, glassBot - 2, w, 2);
-  if (side === "left") {
-    drawGrandFacadeLeftInterior(d, x, y, w, glassTop, glassBot, frameColor, goldTrim);
-  } else {
-    drawGrandFacadeRightInterior(d, x, y, w, h, glassTop, glassBot, frameColor, goldTrim);
-  }
-}
-
-/** A shallow recessed skyline behind the top of the storefront glass: a cool
- *  day or night sky band with distant building blocks, warm distant windows
- *  glowing only after dark. Keeps the frontage reading "warm within, cool
- *  world outside" without competing with the doors or the chandelier drawn over
- *  it. Keys on `lit` and the slice's `x` (stable per placed unit, so the room
- *  stays cacheable); the `x` term gives each slice deliberate block-height
- *  variety rather than an identical tiled run. */
-function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: number, w: number, lit: boolean): void {
-  const skyH = 6;
-  ctx.fillStyle = lit ? "#2A3350" : "#9CC4DE"; // night vs day sky
-  ctx.fillRect(x, glassTop, w, skyH);
-  ctx.fillStyle = lit ? "#1E2740" : "#7EA0C0"; // distant building blocks
-  // Vary each block's height off a per-block counter (offset by x so adjacent
-  // baked slices do not tile into an identical run); stepping bx by 4 alone
-  // leaves (bx*3)%4 constant, which would flatten the skyline.
-  for (let bx = x, bi = 0; bx < x + w; bx += 4, bi++) {
-    const bh = 2 + ((bi * 3 + x) % 4);
-    ctx.fillRect(bx, glassTop + skyH - bh, 3, bh);
-  }
-  if (lit) {
-    ctx.fillStyle = "#F3D08A"; // warm distant windows at night only
-    for (let bx = x + 1; bx < x + w; bx += 4) ctx.fillRect(bx, glassTop + 2, 1, 1);
-  }
-}
-
-/** The LEFT slice's decoration: outer storefront frame at x=0, big glass panel
- *  with a chandelier hanging inside, and a slim door jamb at the RIGHT edge
- *  (which composes with the right slice's door leaf into one full-height door
- *  boundary). No door leaf on this slice; the doors start in the right slice. */
-function drawGrandFacadeLeftInterior(
-  d: DrawCtx,
-  x: number,
-  y: number,
-  w: number,
-  glassTop: number,
-  glassBot: number,
-  frameColor: string,
-  goldTrim: string,
-): void {
-  const { ctx, lit } = d;
-  // Outer storefront frame post along the LEFT edge of the tile.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(x, glassTop, 1, glassBot - glassTop);
-  // Chandelier visible through the glass, centered in the display window.
-  const cx = x + Math.floor(w / 2);
-  ctx.fillStyle = "#8a7430";
-  ctx.fillRect(cx, y + 5, 1, 3); // chain
-  ctx.fillStyle = lit ? "#ffd76b" : "#c8a343";
-  ctx.fillRect(cx - 2, y + 8, 5, 2);
-  ctx.fillRect(cx - 3, y + 11, 7, 2);
-  ctx.fillStyle = lit ? "#fff1b0" : "#a3873a";
-  for (const dx of [-3, 0, 3]) ctx.fillRect(cx + dx, y + 10, 1, 1);
-  if (lit) {
-    ctx.fillStyle = "rgba(255,214,110,0.28)";
-    ctx.beginPath();
-    ctx.arc(cx + 0.5, y + 11, 4.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // Gold horizontal accent rail across the display window (a decorative brass
-  // bar, like real hotel storefronts have running under the window at head
-  // height). Ties the two slices together visually.
-  ctx.fillStyle = goldTrim;
-  ctx.fillRect(x + 1, glassTop + 12, w - 1, 1);
-  // Door jamb along the RIGHT edge of the tile: this is where the double doors
-  // start. The doors' left leaf lives in the right slice starting at x=1.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(x + w - 1, glassTop, 1, glassBot - glassTop);
-}
-
-/** The RIGHT slice's decoration: door jamb continues from the left slice, then
- *  the double doors with a gold split rail, then a smaller glass panel showing
- *  the doorman, then the right outer frame. The doors get their own brighter
- *  glow to signal the actual entrance opening. */
-function drawGrandFacadeRightInterior(
-  d: DrawCtx,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  glassTop: number,
-  glassBot: number,
-  frameColor: string,
-  goldTrim: string,
-): void {
-  const { ctx, lit, anim } = d;
-  // Door left leaf: x=0..2 (the door jamb from the left slice continues at
-  // world x=w-1 of that slice, and here we start with the door leaf itself).
-  const doorLeftL = x + 0;
-  const splitX = x + 3;
-  const doorRightR = x + 5;
-  const doorJambR = x + 6;
-  const glassPanelL = x + 7;
-  const glassPanelR = x + w - 1;
-  const outerFrame = x + w - 1;
-  // A brighter glow BEHIND the doors so the entrance opening reads hotter than
-  // the display windows either side (that hierarchy is the whole wayfinding
-  // beat).
-  const doorGlow = ctx.createLinearGradient(0, glassTop, 0, glassBot);
-  if (lit) {
-    doorGlow.addColorStop(0, "#fff6d4");
-    doorGlow.addColorStop(1, "#ffe08a");
-  } else {
-    doorGlow.addColorStop(0, "#fff2c2");
-    doorGlow.addColorStop(1, "#f0d68a");
-  }
-  ctx.fillStyle = doorGlow;
-  ctx.fillRect(doorLeftL, glassTop, doorRightR - doorLeftL + 1, glassBot - glassTop);
-  // Gold split rail between the two door leaves.
-  ctx.fillStyle = goldTrim;
-  ctx.fillRect(splitX, glassTop, 1, glassBot - glassTop);
-  // Door jambs / frame between doors and glass.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(doorJambR, glassTop, 1, glassBot - glassTop);
-  // Kickplates at the base of each door leaf so the doors don't dissolve into
-  // the carpet at play zoom.
-  ctx.fillStyle = "#7a5e33";
-  ctx.fillRect(doorLeftL, glassBot - 4, doorRightR - doorLeftL + 1, 2);
-  // Right glass panel showing the interior with the doorman.
-  ctx.fillStyle = frameColor;
-  ctx.fillRect(outerFrame, glassTop, 1, glassBot - glassTop);
-  // Gold accent rail matching the left slice, so the two windows read as
-  // one continuous display band.
-  ctx.fillStyle = goldTrim;
-  ctx.fillRect(glassPanelL, glassTop + 12, glassPanelR - glassPanelL, 1);
-  // The doorman: 2-frame idle sway on a 3-second cycle keyed to `d.anim`, so
-  // this slice bakes with cache: false. Positioned inside the right glass
-  // panel, standing on the carpet visible through the window. Green tunic and
-  // gold trim echo the marquee overhead.
-  drawDoorman(ctx, glassPanelL, y + h - 4, anim);
+  const { ctx, anim } = d;
+  const R = makeFiller(ctx, x, y, w);
+  drawGrandHotelBody(d, R, w * 2, h);
+  // The doorman stands on the carpet at the doors. Composite dcx = w; placing him
+  // at composite dcx + 3 (local x = 3, since off = w) keeps both feet on the red
+  // carpet and clear of the right palm's pot at composite 16.
+  drawDoorman(ctx, Math.round(x + 3), y + h - 4, anim);
 }
 
 /** The green-and-gold doorman as a small pixel figure with a two-frame idle
@@ -262,74 +183,67 @@ function drawDoorman(ctx: CanvasRenderingContext2D, baseX: number, feetY: number
 }
 
 /**
- * The compact 1-tile grand entrance, used only when the lobby is too narrow
- * to fit the wide {@link drawGrandFacadeLeft} + {@link drawGrandFacadeRight}
- * pair (that is, on a 1-tile toy lobby). Compressed door, glow and doorman
- * into an 11-pixel-wide sprite; the wide storefront is the primary form and
- * what most towers show.
+ * The compact 1-tile grand entrance, used only when the lobby is too narrow to
+ * fit the wide {@link drawGrandFacadeLeft} + {@link drawGrandFacadeRight} pair
+ * (that is, on a 1-tile toy lobby). The same grand-hotel grammar compressed into
+ * 11 pixels: sky, red awning, gold double doors, red carpet, one potted palm,
+ * and the doorman. No reception (no room); the wide form is the primary one.
  */
 export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h: number): void {
   const { ctx, lit, anim } = d;
-  // Door well: y from just under the wainscot down to the top of the polished
-  // floor. `doorBot` MUST land on the same row the base tile's floor starts
-  // (`y + h - 5`, see drawLobbyTile), so the door sill visually rests on the
-  // floor. A one-pixel gap here makes the door look like it floats above the
-  // ground with a strip of marble showing through underneath.
-  const doorTop = y + 6;
-  const doorBot = y + h - 5;
-  const cxi = x + Math.floor(w / 2);
-  // Interior glow, wider than the door, so the light "spills" onto the frame
-  // and the wall. Warm and subtle by day, hot and bright after dark: this is
-  // the wayfinding beat that anchors the eye on the frontage after sunset.
-  const glowGrad = ctx.createLinearGradient(0, doorTop, 0, doorBot);
-  if (lit) {
-    glowGrad.addColorStop(0, "rgba(255,224,138,0.45)");
-    glowGrad.addColorStop(1, "rgba(255,214,110,0.28)");
-  } else {
-    glowGrad.addColorStop(0, "rgba(247,227,168,0.22)");
-    glowGrad.addColorStop(1, "rgba(247,227,168,0.10)");
+  const R = makeFiller(ctx, x, y, 0);
+  const fy = h - 6;
+  const lc = Math.floor(w / 2); // local center column
+  // Sky + skyline.
+  R(0, 0, w, 10, lit ? "#2A3350" : "#AFC8DE");
+  for (let bx = 0, bi = 0; bx < w; bx += 4, bi++) {
+    const bh = 3 + ((bi * 3) % 4);
+    R(bx, 10 - bh, 3, bh, lit ? "#1E2740" : "#7EA0C0");
+    if (lit) R(bx + 1, 10 - bh + 1, 1, 1, "#F3D08A");
   }
-  ctx.fillStyle = glowGrad;
-  ctx.fillRect(cxi - 4, doorTop, 9, doorBot - doorTop);
-  // Dark door frame, 5 px wide centered on the tile.
-  const frameL = cxi - 2;
-  const frameR = cxi + 2;
-  ctx.fillStyle = "#3a2a20";
-  ctx.fillRect(frameL, doorTop, frameR - frameL + 1, 1); // header
-  ctx.fillRect(frameL, doorTop, 1, doorBot - doorTop); // left jamb
-  ctx.fillRect(frameR, doorTop, 1, doorBot - doorTop); // right jamb
-  ctx.fillRect(frameL, doorBot - 1, frameR - frameL + 1, 1); // sill
-  // Glass panels: the brighter interior showing through. Two panels split by
-  // a gilded center rail so the eye reads a double door, not a window.
-  const glassL = frameL + 1;
-  const glassR = frameR - 1;
-  const glassTop = doorTop + 1;
-  const glassBot = doorBot - 1;
-  const glassGrad = ctx.createLinearGradient(0, glassTop, 0, glassBot);
-  if (lit) {
-    glassGrad.addColorStop(0, "#fff2c2");
-    glassGrad.addColorStop(1, "#f0d68a");
-  } else {
-    glassGrad.addColorStop(0, "#eef2f7");
-    glassGrad.addColorStop(1, "#d6dee9");
+  R(0, 10, w, 1, "#3A4658");
+  // Gold cornice cap matching the concourse ceiling line (drawLobbyTile).
+  R(0, 0, w, 3, "#C9A24B");
+  R(0, 3, w, 1, "#8A7430");
+  // Glass curtain wall.
+  R(1, 11, w - 2, fy - 11, "#3A4658");
+  R(2, 13, w - 4, fy - 14, lit ? "#243447" : "#8FB6C8");
+  if (lit) R(2, fy - 7, w - 4, 6, "#C9A24B", 0.16);
+  // Red scalloped awning + sign.
+  R(0, 8, w, 3, "#9A2E38");
+  R(0, 8, w, 1, "#B84450");
+  for (let cx2 = 1; cx2 < w - 1; cx2 += 3) {
+    R(cx2, 11, 2, 2, "#9A2E38");
+    if (lit) R(cx2, 12, 1, 1, "#F3D08A");
   }
-  ctx.fillStyle = glassGrad;
-  ctx.fillRect(glassL, glassTop, glassR - glassL + 1, glassBot - glassTop);
-  ctx.fillStyle = "#c9a94c"; // gilded center split
-  ctx.fillRect(cxi, glassTop, 1, glassBot - glassTop);
-  // Kickplate at the base of each door leaf so the doors don't melt into the
-  // carpet at play zoom.
-  ctx.fillStyle = "#7a5e33";
-  ctx.fillRect(glassL, glassBot - 2, glassR - glassL + 1, 2);
-  // Red carpet accent: bump the interior carpet color one pixel higher right
-  // at the base of the doors, so the carpet visibly meets the threshold.
-  ctx.fillStyle = "#a3243c";
-  ctx.fillRect(glassL - 1, y + h - 5, glassR - glassL + 3, 1);
-  // Doorman just outside the right jamb, sharing the wide grand's recipe so
-  // both forms feel like the same figure. baseX = frameR + 1 puts him one
-  // pixel outside the door frame, and drawDoorman's 2-wide sprite fits inside
-  // the remaining 3 pixels of tile without clipping on either sway frame.
-  drawDoorman(ctx, frameR + 1, y + h - 4, anim);
+  R(lc - 1, 5, 2, 3, "#8A8E96");
+  // Gold double doors (7 wide) with a warm halo at night.
+  const doorL = lc - 3;
+  const doorW = 7;
+  const doorTopY = fy - 18;
+  const doorH = 18;
+  if (lit) R(doorL - 1, doorTopY - 1, doorW + 2, doorH + 2, "#FFE08A", 0.22);
+  R(doorL, doorTopY, doorW, doorH, lit ? "#D8B24E" : "#C9A24B");
+  R(doorL, doorTopY, doorW, 1, lit ? "#F0D878" : "#E8C860");
+  R(lc, doorTopY, 1, doorH, "#8A6A2A"); // center split
+  R(doorL, doorTopY, 1, doorH, "#8A6A2A");
+  R(doorL + doorW - 1, doorTopY, 1, doorH, "#8A6A2A");
+  R(lc - 2, fy - 9, 1, 2, "#8A6A2A"); // handles, mirrored about the center split
+  R(lc + 2, fy - 9, 1, 2, "#8A6A2A");
+  // Floor + red carpet.
+  R(0, fy, w, h - fy, "#8A8478");
+  R(lc - 3, fy, 7, h - fy, "#9A2E38");
+  R(lc - 3, fy, 7, 1, "#B84450");
+  // One compact potted palm tucked at the far left, sized to fit the tile so it
+  // is not clipped off the left edge.
+  R(0, fy - 3, 3, 3, "#5C4A38"); // pot (cols 0..2)
+  R(0, fy - 3, 3, 1, "#6A5240"); // pot rim
+  R(1, fy - 8, 1, 5, "#6A5240"); // trunk
+  R(0, fy - 12, 3, 4, "#4E7A3E"); // fronds
+  R(1, fy - 14, 1, 2, "#4E7A3E"); // top frond
+  // Doorman on the carpet just right of the doors. lc + 3 keeps his 2px sway
+  // frame inside the 11px tile (lc + 4 would clip his rightmost column at x=11).
+  drawDoorman(ctx, Math.round(x + lc + 3), y + h - 4, anim);
 }
 
 /**
