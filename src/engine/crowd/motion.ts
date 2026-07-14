@@ -106,26 +106,21 @@ function tripFloors(p: Person): number {
 const QUEUE_GAP = 0.8;
 const QUEUE_SPACING = 0.6;
 
-/** Built horizontal span [min, max) of each floor's floor/lobby tiles, so a
- *  landing line can be laid out on solid ground and clamped to it. Memoized on
- *  the crowd by `tower.revision` (like the routing adjacency graphs): the scan
- *  of `tower.units` only reruns after a build edit, not on every advance slice. */
-function floorExtents(crowd: Crowd, tower: Tower): Map<number, { min: number; max: number }> {
-  if (crowd.floorExt && crowd.floorExtRev === tower.revision) return crowd.floorExt;
-  const ext = new Map<number, { min: number; max: number }>();
-  for (const u of tower.units) {
-    if (u.kind !== "floor" && u.kind !== "lobby") continue;
-    const right = u.x + u.width;
-    const e = ext.get(u.floor);
-    if (!e) ext.set(u.floor, { min: u.x, max: right });
-    else {
-      if (u.x < e.min) e.min = u.x;
-      if (right > e.max) e.max = right;
-    }
-  }
-  crowd.floorExt = ext;
-  crowd.floorExtRev = tower.revision;
-  return ext;
+// How far a landing line may reach from the shaft, in tiles: a queue is at most
+// a car's worth of people, so the contiguous-structure scan below stays bounded
+// no matter how wide the floor is.
+const QUEUE_REACH = 16;
+
+/** Length of the contiguous built (floor/lobby) run starting at `startX` and
+ *  stepping by `dir`, capped at {@link QUEUE_REACH}. Used to pick the roomier
+ *  side of a shaft and to keep the line on solid ground: unlike a floor-wide
+ *  min/max, this stops at the first gap, so a floor with disjoint segments never
+ *  seats a waiter over an unbuilt hole. `hasStructure` is an O(1) tile lookup,
+ *  and the run is bounded, so no per-tower-units scan runs on the hot path. */
+function builtRun(tower: Tower, floor: number, startX: number, dir: number): number {
+  let n = 0;
+  for (let x = startX; n < QUEUE_REACH && tower.hasStructure(floor, x); x += dir) n++;
+  return n;
 }
 
 /** The tile x each person waiting at an elevator landing should stand at, keyed
@@ -133,9 +128,9 @@ function floorExtents(crowd: Crowd, tower: Tower): Map<number, { min: number; ma
  *  the shaft center. The longest-waiting person holds the front, so the order
  *  reflects arrival, not spawn, and a fresh arrival (wait 0) joins the back
  *  rather than shoving those ahead outward. The line extends onto whichever side
- *  of the shaft has more built floor and is clamped to that floor's structure,
- *  so it never trails into unbuilt space (shaft x is a lot coordinate, not
- *  tower-relative, so the side must come from the real layout, not a fixed
+ *  of the shaft has the longer contiguous run of built floor and is clamped to
+ *  that run, so it never trails into unbuilt space (shaft x is a lot coordinate,
+ *  not tower-relative, so the side must come from the real layout, not a fixed
  *  threshold). Only `waiting` people are placed; people still walking in
  *  (`toShaft`) head to the shaft face and fan out once they arrive, so this
  *  never changes the toShaft -> waiting timing the sim depends on. Stairs and
@@ -167,24 +162,26 @@ function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
     g.people.push(p);
   }
   if (byShaft.size === 0) return slots;
-  const extents = floorExtents(crowd, tower);
   for (const [, byFloor] of byShaft) {
     for (const [floor, g] of byFloor) {
-      // Longest-waiting at the front (ties keep array order): the line reads as
-      // arrival order and a new arrival joins the back.
-      g.people.sort((a, b) => b.wait - a.wait);
+      // Longest-waiting at the front; break ties by id so equal waits (several
+      // riders arriving in one slice) never reorder or flicker across runtimes.
+      g.people.sort((a, b) => b.wait - a.wait || a.id - b.id);
       const leftFace = g.shaft.x;
       const rightFace = g.shaft.x + g.shaft.width;
-      const ext = extents.get(floor);
-      const leftRoom = ext ? leftFace - ext.min : 0;
-      const rightRoom = ext ? ext.max - rightFace : 0;
-      const side = rightRoom >= leftRoom ? 1 : -1;
+      // Contiguous built run just outside each shaft face (the right run starts
+      // at rightFace, the left one tile further out at leftFace - 1). Queue
+      // toward the longer run and clamp to its far tile so a short or gappy
+      // floor bunches the tail at the wall instead of trailing off the edge.
+      const leftRun = builtRun(tower, floor, leftFace - 1, -1);
+      const rightRun = builtRun(tower, floor, rightFace, 1);
+      const side = rightRun >= leftRun ? 1 : -1;
+      const run = side > 0 ? rightRun : leftRun;
       const face = side > 0 ? rightFace : leftFace;
-      const lo = ext ? ext.min : face;
-      const hi = ext ? ext.max - 1 : face;
+      const far = side > 0 ? rightFace + Math.max(0, run - 1) : leftFace - run;
       g.people.forEach((p, rank) => {
-        const x = face + side * (QUEUE_GAP + rank * QUEUE_SPACING);
-        slots.set(p.id, Math.max(lo, Math.min(hi, x)));
+        const raw = face + side * (QUEUE_GAP + rank * QUEUE_SPACING);
+        slots.set(p.id, side > 0 ? Math.min(raw, far) : Math.max(raw, far));
       });
     }
   }

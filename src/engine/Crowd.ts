@@ -40,10 +40,6 @@ export class Crowd {
   /** @internal Cached STAFF stop-graph (service elevators / stairs / escalators). */
   staffAdj: Map<number, { f: number; shaft: number }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
-  /** @internal Cached per-floor built-tile extent for the landing queue layout,
-   *  rebuilt when the tower changes (a structural, not per-step, quantity). */
-  floorExt: Map<number, { min: number; max: number }> | null = null;
-  /** @internal */ floorExtRev = -1;
   /** @internal Finished staff jobs since the last drain (unit id + reached-dest). */
   staffDone: { unitId: number; ok: boolean }[] = [];
   /** @internal Live staff on shift (a counter so the spawn cap never scans all). */
@@ -78,8 +74,6 @@ export class Crowd {
     this.adjRev = -1;
     this.staffAdj = null;
     this.staffAdjRev = -1;
-    this.floorExt = null;
-    this.floorExtRev = -1;
     this.staffDone = [];
     this.staffCount = 0;
     this.step = 0;
