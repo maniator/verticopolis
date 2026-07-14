@@ -1582,10 +1582,10 @@ the addcar upper bound joins the equivalence suite; `simWith` asserts every
 placement; one em-dash comment slip reworded; one stale `patchVolatile`
 comment updated. Residual defers:
 
-- **Describe-title "—" separators stay**: the `"subject — behavior"` title
-  pattern appears in 63 pre-existing test files; the rewritten suites keep the
-  house convention rather than diverging. Prose comments follow the no-em-dash
-  rule.
+- **Describe-title em-dash separators stay**: the "subject, separator, behavior"
+  title pattern appears in 63 pre-existing test files; the rewritten suites keep
+  the house convention rather than diverging. Prose comments follow the
+  no-em-dash rule.
 - **Mobile diagnostics equivalence covers unit + standard elevator only**: the
   express/stairs mobile fold-ins ride the same `unsafeHTML(transportDiagnostics)`
   block; full diagnostics-surface coverage belongs to E6-S2, which migrates the

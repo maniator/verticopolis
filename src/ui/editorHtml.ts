@@ -9,10 +9,11 @@ import { escapeHtml } from "./escape";
 import { floorTag } from "./format";
 
 /**
- * The editor card's HTML — pure functions of (sim, entity), split out of the
- * GameApp class so the card can be unit-tested without a DOM game shell.
- * The `*Volatile` maps carry the per-tick values; the editor patches only
- * those `data-field` spans between full rebuilds (see UI.renderEditor).
+ * The LEGACY editor card's HTML — pure functions of (sim, entity). Production
+ * no longer calls these: the live card renders through the lit templates in
+ * `./templates/editor.ts` (E6-S1), and this module is retained only as the
+ * equivalence oracle for their transitional `assertDomEquivalent` guards. It
+ * retires with the other string builders in the final sweep.
  */
 
 /** The editor card's title bar — one template so the two editors can't drift. */

@@ -36,8 +36,13 @@ function simWith(kind: Parameters<Simulation["tower"]["place"]>[0], floors = 2):
   return { sim, unit };
 }
 
-function withLift(kind: "elevatorStandard" | "elevatorExpress" | "stairs", top = 2): { sim: Simulation; lift: Transport } {
-  const { sim } = simWith("office", Math.max(top, 2));
+function withLift(
+  kind: "elevatorStandard" | "elevatorService" | "elevatorExpress" | "stairs" | "escalator",
+  top = 2,
+  // Escalators refuse office floors by canon, so their fixture rides a shop.
+  base: "office" | "shop" = "office",
+): { sim: Simulation; lift: Transport } {
+  const { sim } = simWith(base, Math.max(top, 2));
   // Tower-level placement, like the unit fixture's tower.place: the star and
   // money gates live in sim.buildTransport and are not what this suite pins.
   expect(sim.tower.placeTransport(kind, 10, 1, top).ok).toBe(true);
@@ -113,6 +118,16 @@ describe("unit editor matches the legacy builder", () => {
     equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
   });
 
+  it("security (zero-population service kind): mobile keeps the plain access row", () => {
+    // Service kinds' diagnostics emit no access line, so the mobile fold-in
+    // keeps the Yes/No row (the !hasAccessDiagnostic branch); pin the branch
+    // on the lit path, then its equivalence.
+    const { sim, unit } = simWith("security");
+    const frag = renderToFragment(unitEditorTemplate(sim, unit, true));
+    expect(frag.querySelector('[data-field="served"]')).not.toBeNull();
+    equivalent(unitEditorHtml(sim, unit, true), unitEditorTemplate(sim, unit, true));
+  });
+
   it("office: gutted rows and the No Rate readout", () => {
     const { sim, unit } = simWith("office");
     unit.state = "gutted";
@@ -182,5 +197,12 @@ describe("transport editor matches the legacy builder", () => {
     equivalent(transportEditorHtml(express.sim, express.lift), transportEditorTemplate(express.sim, express.lift));
     const stairs = withLift("stairs");
     equivalent(transportEditorHtml(stairs.sim, stairs.lift), transportEditorTemplate(stairs.sim, stairs.lift));
+  });
+
+  it("service elevator and escalator", () => {
+    const service = withLift("elevatorService");
+    equivalent(transportEditorHtml(service.sim, service.lift), transportEditorTemplate(service.sim, service.lift));
+    const esc = withLift("escalator", 2, "shop");
+    equivalent(transportEditorHtml(esc.sim, esc.lift), transportEditorTemplate(esc.sim, esc.lift));
   });
 });
