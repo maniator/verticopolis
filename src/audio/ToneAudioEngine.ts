@@ -1,6 +1,19 @@
 import * as Tone from "tone";
-import type { FacilityKind } from "../engine/types";
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
+import {
+  SCENES,
+  OVERVIEW_ZOOM,
+  OVERVIEW_EXIT,
+  sceneFor,
+  detailFor,
+  midiToFreq,
+  clamp,
+  lerp,
+  sameNotes,
+  type Scene,
+  type SfxName,
+} from "./toneScenes";
+import { scheduleStep, maybeAccent, playSfx, type AccentNodes } from "./toneVoices";
 
 /**
  * Procedural ambient audio, built on Tone.js. SimTower famously played
@@ -27,279 +40,16 @@ import type { ViewFocus } from "../render/excalibur/TowerEngine";
  * lazily via a dynamic `import()` from the {@link AudioEngine} facade in
  * `./Audio.ts` on the first user gesture — keeping Tone out of the initial
  * bundle. Do not statically import this module from the app boot path.
+ *
+ * The scene tuning data and pure scene/zoom/pitch math live in `./toneScenes.ts`;
+ * the melody, accent, and jingle synthesis routines live in `./toneVoices.ts`.
+ * This class owns the live Tone graph, the lifecycle (start/dispose), and the
+ * per-frame scene state.
  */
 
-/** Action jingles the game can fire on demand. Shared with the facade. */
-export type SfxName = "build" | "sell" | "error" | "promote" | "money" | "click";
-
-type Scene =
-  | "overview"
-  | "outside"
-  | "lobby"
-  | "office"
-  | "residential"
-  | "hotel"
-  | "food"
-  | "retail"
-  | "cinema"
-  | "service"
-  | "metro"
-  | "quiet";
-
-/** The four basic oscillator timbres our scenes use (never "custom"). */
-type BasicWave = "sine" | "square" | "sawtooth" | "triangle";
-
-/** Close-up flavor scheduled only when the camera is zoomed in on a scene. */
-type Accent =
-  | "none"
-  | "ding"
-  | "clatter"
-  | "keys"
-  | "rumble"
-  | "boom"
-  | "register"
-  | "chatter";
-
-interface SceneDef {
-  /** Semitone offsets of the scale, relative to root. */
-  scale: number[];
-  /** Root MIDI note. */
-  root: number;
-  /** Beats per minute. */
-  bpm: number;
-  /** Oscillator timbre for the melody. */
-  wave: BasicWave;
-  /** Chord (semitone offsets) for the sustained pad. */
-  pad: number[];
-  /** 0..1 melody activity. */
-  density: number;
-  /** Overall loudness 0..1. */
-  gain: number;
-  /** Low bass voice presence 0..1 (0 = silent). */
-  bass: number;
-  /** Ambient room-tone bed, shaped by a bandpass/lowpass on looping noise. */
-  amb: { type: BiquadFilterType; freq: number; q: number; gain: number };
-  /** Detail sound heard up close (see {@link Accent}). */
-  accent: Accent;
-}
-
-const SCENES: Record<Scene, SceneDef> = {
-  // A warm, slow, wide "whole tower" theme heard when fully zoomed out.
-  overview: {
-    scale: [0, 2, 4, 7, 9],
-    root: 48,
-    bpm: 58,
-    wave: "triangle",
-    pad: [0, 7, 12, 16, 19],
-    density: 0.3,
-    gain: 0.6,
-    bass: 0.5,
-    amb: { type: "lowpass", freq: 240, q: 0.7, gain: 0.22 },
-    accent: "none",
-  },
-  outside: {
-    scale: [0, 2, 4, 7, 9],
-    root: 64,
-    bpm: 70,
-    wave: "sine",
-    pad: [0, 7, 16],
-    density: 0.35,
-    gain: 0.5,
-    bass: 0.3,
-    amb: { type: "bandpass", freq: 320, q: 0.5, gain: 0.26 },
-    accent: "none",
-  },
-  lobby: {
-    scale: [0, 2, 4, 5, 7, 9, 11],
-    root: 60,
-    bpm: 96,
-    wave: "triangle",
-    pad: [0, 4, 7, 11],
-    density: 0.55,
-    gain: 0.6,
-    bass: 0.35,
-    amb: { type: "bandpass", freq: 520, q: 0.8, gain: 0.24 },
-    accent: "ding",
-  },
-  office: {
-    scale: [0, 2, 3, 5, 7, 9, 10],
-    root: 57,
-    bpm: 116,
-    wave: "square",
-    pad: [0, 3, 7],
-    density: 0.7,
-    gain: 0.45,
-    bass: 0.4,
-    amb: { type: "bandpass", freq: 220, q: 1.2, gain: 0.2 },
-    accent: "keys",
-  },
-  residential: {
-    scale: [0, 2, 4, 7, 9],
-    root: 62,
-    bpm: 80,
-    wave: "triangle",
-    pad: [0, 4, 7],
-    density: 0.4,
-    gain: 0.55,
-    bass: 0.3,
-    amb: { type: "bandpass", freq: 360, q: 0.7, gain: 0.14 },
-    accent: "chatter",
-  },
-  hotel: {
-    scale: [0, 2, 3, 5, 7, 8, 10],
-    root: 55,
-    bpm: 60,
-    wave: "sine",
-    pad: [0, 3, 7, 10],
-    density: 0.3,
-    gain: 0.5,
-    bass: 0.35,
-    amb: { type: "bandpass", freq: 260, q: 0.9, gain: 0.12 },
-    accent: "ding",
-  },
-  food: {
-    scale: [0, 2, 4, 5, 7, 9, 11],
-    root: 65,
-    bpm: 124,
-    wave: "triangle",
-    pad: [0, 4, 7, 9],
-    density: 0.8,
-    gain: 0.55,
-    bass: 0.4,
-    amb: { type: "bandpass", freq: 900, q: 0.6, gain: 0.26 },
-    accent: "clatter",
-  },
-  retail: {
-    scale: [0, 2, 4, 7, 9, 11],
-    root: 67,
-    bpm: 110,
-    wave: "triangle",
-    pad: [0, 4, 7],
-    density: 0.65,
-    gain: 0.55,
-    bass: 0.35,
-    amb: { type: "bandpass", freq: 700, q: 0.7, gain: 0.24 },
-    accent: "register",
-  },
-  cinema: {
-    scale: [0, 2, 3, 5, 7, 8, 11],
-    root: 53,
-    bpm: 88,
-    wave: "sawtooth",
-    pad: [0, 3, 7, 10, 14],
-    density: 0.5,
-    gain: 0.5,
-    bass: 0.5,
-    amb: { type: "lowpass", freq: 110, q: 0.8, gain: 0.28 },
-    accent: "boom",
-  },
-  service: {
-    scale: [0, 2, 4, 5, 7],
-    root: 58,
-    bpm: 90,
-    wave: "sine",
-    pad: [0, 5, 7],
-    density: 0.3,
-    gain: 0.4,
-    bass: 0.3,
-    amb: { type: "bandpass", freq: 180, q: 1.5, gain: 0.18 },
-    accent: "none",
-  },
-  metro: {
-    scale: [0, 3, 5, 7, 10],
-    root: 43,
-    bpm: 76,
-    wave: "sawtooth",
-    pad: [0, 7, 12],
-    density: 0.35,
-    gain: 0.5,
-    bass: 0.55,
-    amb: { type: "lowpass", freq: 90, q: 0.8, gain: 0.32 },
-    accent: "rumble",
-  },
-  quiet: {
-    scale: [0, 4, 7],
-    root: 60,
-    bpm: 64,
-    wave: "sine",
-    pad: [0, 7],
-    density: 0.2,
-    gain: 0.35,
-    bass: 0.2,
-    amb: { type: "bandpass", freq: 400, q: 0.6, gain: 0.09 },
-    accent: "none",
-  },
-};
-
-/** Below this zoom the whole tower is in frame, so we play the overview theme. */
-const OVERVIEW_ZOOM = 0.55;
-/** Zoom at which area detail is fully faded in. */
-const DETAIL_ZOOM = 1.7;
-/** Hysteresis band around OVERVIEW_ZOOM so the overview scene doesn't flicker. */
-const OVERVIEW_EXIT = OVERVIEW_ZOOM + 0.08;
-
-export function sceneFor(focus: ViewFocus, overview: boolean): Scene {
-  // Zoomed all the way out — you're looking at the whole building, so play the
-  // wide overview theme regardless of what happens to be centered. The caller
-  // resolves `overview` with hysteresis so hovering near the zoom threshold
-  // doesn't flip scenes (and churn the pad) frame to frame.
-  if (overview) return "overview";
-  if (focus.dominant === "outside") return "outside";
-  if (focus.centerFloor <= -1) return "metro";
-  const k = focus.dominant as FacilityKind;
-  switch (k) {
-    case "lobby":
-      return "lobby";
-    case "office":
-      return "office";
-    case "condo":
-      return "residential";
-    case "hotelSingle":
-    case "hotelDouble":
-    case "hotelSuite":
-      return "hotel";
-    case "fastFood":
-    case "restaurant":
-      return "food";
-    case "shop":
-      return "retail";
-    case "cinema":
-    case "partyHall":
-      return "cinema";
-    case "security":
-    case "medical":
-    case "housekeeping":
-    case "recycling":
-      return "service";
-    case "metro":
-      return "metro";
-    default:
-      return focus.centerFloor <= 1 ? "lobby" : "quiet";
-  }
-}
-
-/** Map camera zoom to a 0..1 "how close are we" detail factor. */
-export function detailFor(zoom: number): number {
-  return clamp((zoom - OVERVIEW_ZOOM) / (DETAIL_ZOOM - OVERVIEW_ZOOM), 0, 1);
-}
-
-export function midiToFreq(n: number): number {
-  return 440 * Math.pow(2, (n - 69) / 12);
-}
-
-export function clamp(x: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, x));
-}
-
-export function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-export function sameNotes(a: number[], b: number[]): boolean {
-  if (a.length !== b.length) return false;
-  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-  return true;
-}
+// Re-export the jingle name vocabulary from its new home so existing importers
+// (the Audio facade, tests) keep resolving `SfxName` from this module.
+export type { SfxName };
 
 export class ToneAudioEngine {
   // Master + shared effect chain.
@@ -633,8 +383,16 @@ export class ToneAudioEngine {
     // Transport (which would silence the whole engine).
     try {
       const def = SCENES[this.scene];
-      this.scheduleStep(def, time);
-      if (this.detail > 0.5) this.maybeAccent(def, time);
+      if (this.lead) {
+        scheduleStep(this.lead, def, this.scene, this.step, this.tick, this.detail, time);
+      }
+      // Skip the accent path entirely for scenes with no accent, so a zoomed-in
+      // quiet/service scene doesn't resolve (and discard) the voice nodes every
+      // step; maybeAccent re-checks "none" defensively for direct callers.
+      if (this.detail > 0.5 && def.accent !== "none") {
+        const nodes = this.accentNodes();
+        if (nodes) maybeAccent(nodes, def, this.tick, this.detail, time);
+      }
     } catch {
       /* skip this step */
     }
@@ -642,119 +400,22 @@ export class ToneAudioEngine {
     this.tick++;
   }
 
-  private scheduleStep(def: SceneDef, time: number): void {
-    if (!this.lead) return;
-    // Seeded-but-varied note choice; seed off the free-running tick so the line
-    // evolves bar to bar rather than looping a fixed 16-note pattern.
-    const r = pseudo(this.tick * 2654435761);
-    if (r > def.density) return;
-    // Land on chord tones on strong beats so the melody feels grounded.
-    const onBeat = this.step % 4 === 0;
-    let note: number;
-    if (onBeat && def.pad.length) {
-      const pi = Math.floor(pseudo(this.tick * 22695477 + 3) * def.pad.length);
-      note = def.root + def.pad[pi];
-    } else {
-      const degree = Math.floor(pseudo(this.tick * 40503 + 7) * def.scale.length);
-      const octave = pseudo(this.tick * 19349663) > 0.7 ? 12 : 0;
-      note = def.root + def.scale[degree] + octave;
-    }
-    // Soften the harsher timbres so square/saw leads don't fatigue the ear.
-    const vel = def.wave === "square" || def.wave === "sawtooth" ? 0.35 : 0.5;
-    this.lead.triggerAttackRelease(midiToFreq(note), "8n", time, vel);
-    // Overview doubling, two octaves up and very quiet: the whole zoomed-out
-    // mix sits below ~500 Hz, which small phone speakers cannot reproduce, so
-    // give them a faint musical partial to render instead of silence.
-    if (this.scene === "overview") {
-      this.lead.triggerAttackRelease(midiToFreq(note + 24), "8n", time + 0.02, 0.18);
-    }
-    // A high sparkle on off-beats — but only once you've zoomed in enough to
-    // "hear the detail", giving close-ups their own extra shimmer.
-    if (this.step % 4 === 2 && def.density > 0.5 && this.detail > 0.45) {
-      this.lead.triggerAttackRelease(midiToFreq(note + 12), "16n", time + 0.04, 0.18);
-    }
-  }
-
-  /** Occasionally fire a scene-specific close-up accent. */
-  private maybeAccent(def: SceneDef, time: number): void {
-    if (def.accent === "none") return;
-    // Fire sparingly (and only well zoomed in) so accents feel like occasional
-    // life in the room, not a stream of random noises.
-    const g = pseudo(this.tick * 2246822519 + 101);
-    if (g > 0.05 * this.detail) return;
-    this.accentHit(def.accent, time);
-  }
-
-  private accentHit(accent: Accent, time: number): void {
-    if (!this.accentSynth || !this.membrane || !this.noiseAccent || !this.accentFilter) return;
-    switch (accent) {
-      case "ding": // elevator arrival chime
-        this.accentSynth.triggerAttackRelease(midiToFreq(84), "4n", time, 0.5);
-        this.accentSynth.triggerAttackRelease(midiToFreq(79), "4n", time + 0.13, 0.4);
-        break;
-      case "clatter": // dishes / cutlery
-        this.accentFilter.type = "bandpass";
-        this.accentFilter.frequency.value = 2600;
-        this.accentFilter.Q.value = 6;
-        this.noiseAccent.triggerAttackRelease("32n", time, 0.6);
-        this.accentSynth.triggerAttackRelease(midiToFreq(96), "32n", time + 0.02, 0.2);
-        break;
-      case "keys": // keyboard typing
-        this.accentFilter.type = "highpass";
-        this.accentFilter.frequency.value = 3200;
-        this.accentFilter.Q.value = 0.7;
-        this.noiseAccent.triggerAttackRelease("64n", time, 0.4);
-        this.noiseAccent.triggerAttackRelease("64n", time + 0.09, 0.35);
-        break;
-      case "rumble": // a train passing through the metro
-        this.membrane.triggerAttackRelease(midiToFreq(41), "2n", time, 0.9);
-        break;
-      case "boom": // a deep cinema hit
-        this.membrane.triggerAttackRelease(midiToFreq(33), "2n", time, 0.9);
-        break;
-      case "register": // shop register beep
-        this.accentSynth.triggerAttackRelease(midiToFreq(88), "16n", time, 0.4);
-        this.accentSynth.triggerAttackRelease(midiToFreq(83), "16n", time + 0.08, 0.4);
-        break;
-      case "chatter": // muffled conversation
-        this.accentFilter.type = "bandpass";
-        this.accentFilter.frequency.value = 700;
-        this.accentFilter.Q.value = 2;
-        this.noiseAccent.triggerAttackRelease("8n", time, 0.3);
-        break;
-    }
+  /** Resolve the close-up accent voices, or null if the graph isn't built. */
+  private accentNodes(): AccentNodes | null {
+    if (!this.accentSynth || !this.membrane || !this.noiseAccent || !this.accentFilter) return null;
+    return {
+      accentSynth: this.accentSynth,
+      membrane: this.membrane,
+      noiseAccent: this.noiseAccent,
+      accentFilter: this.accentFilter,
+    };
   }
 
   // ---- One-shot action jingles ------------------------------------------
 
   sfx(name: SfxName): void {
     if (!this.started || !this.sfxSynth || this.muted) return;
-    const s = this.sfxSynth;
-    const t = Tone.now();
-    const play = (midi: number, dur: Tone.Unit.Time, offset: number, vel = 0.5) =>
-      s.triggerAttackRelease(midiToFreq(midi), dur, t + offset, vel);
-    switch (name) {
-      case "build":
-        play(72, "16n", 0);
-        play(79, "16n", 0.07);
-        break;
-      case "sell":
-        play(67, "16n", 0);
-        play(60, "16n", 0.08);
-        break;
-      case "error":
-        play(48, "8n", 0, 0.6);
-        break;
-      case "money":
-        [76, 80, 83, 88].forEach((n, i) => play(n, "16n", i * 0.06, 0.45));
-        break;
-      case "promote":
-        [60, 64, 67, 72, 76].forEach((n, i) => play(n, "8n", i * 0.1, 0.55));
-        break;
-      case "click":
-        play(84, "32n", 0, 0.3);
-        break;
-    }
+    playSfx(this.sfxSynth, name);
   }
 
   dispose(): void {
@@ -819,13 +480,4 @@ export class ToneAudioEngine {
     this.master = null;
     this.started = false;
   }
-}
-
-/** Deterministic 0..1 hash so the melody varies without Math.random. */
-function pseudo(n: number): number {
-  let x = n | 0;
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-  x = Math.imul(x ^ (x >>> 16), 0x45d9f3b);
-  x = x ^ (x >>> 16);
-  return ((x >>> 0) % 10000) / 10000;
 }
