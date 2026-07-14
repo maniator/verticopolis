@@ -62,7 +62,7 @@ export interface GameRules {
   /** True when the build preview surfaces the refusal reason on hover (Modern
    *  pedagogy: hover, read, understand, then click). Classic is pixel-faithful:
    *  clicks refuse with a toast, the player learns by doing. Purely a UI gate;
-   *  the engine's placement rules are identical either way. */
+   *  this flag itself never changes what the engine accepts or refuses. */
   readonly showsPreviewReason: boolean;
   /** True when an escalator may land on a floor that holds an office. The 1994
    *  game restricts escalators to commercial space (its players even bulldozed

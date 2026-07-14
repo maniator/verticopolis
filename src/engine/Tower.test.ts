@@ -255,17 +255,19 @@ describe("Tower transport", () => {
   });
 
   it("supports the 1994 escalator trick: bulldoze the office, place, rebuild", () => {
-    const office = tower.place("office", 2, 0);
+    // Office at x 16..24 so the rebuild genuinely overlaps the escalator
+    // placed at x 20..27 (shafts may share cells with rooms, as in 1994).
+    const office = tower.place("office", 2, 16);
     expect(office.ok).toBe(true);
     expect(tower.placeTransport("escalator", 20, 1, 2).ok).toBe(false);
     // The rule is placement-time only, exactly like the original: clear the
     // office, sneak the escalator in, then rebuild the office around it.
     expect(tower.removeUnit(office.unitId!)).toBeDefined();
     expect(tower.placeTransport("escalator", 20, 1, 2).ok).toBe(true);
-    expect(tower.place("office", 2, 0).ok).toBe(true);
-    // The rebuilt office does not evict the escalator; both stand.
-    expect(tower.transports.some((t) => t.kind === "escalator")).toBe(true);
-    expect(tower.units.some((u) => u.kind === "office" && u.floor === 2)).toBe(true);
+    expect(tower.place("office", 2, 16).ok).toBe(true);
+    // The rebuilt office shares cells with the shaft; neither evicts the other.
+    expect(tower.transportAt(2, 20)?.kind).toBe("escalator");
+    expect(tower.roomAt(2, 20)?.kind).toBe("office");
   });
 
   it("extend arrows can't stretch stairs or escalators beyond one floor", () => {

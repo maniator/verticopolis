@@ -1295,12 +1295,14 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     // Build the same second story on the seeded ground-lobby strip.
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (const sim of [classic, modern]) {
-      for (let i = 0; i < 20; i++) sim.tower.place("floor", 2, x0 + i);
+      for (let i = 0; i < 20; i++) expect(sim.tower.place("floor", 2, x0 + i).ok).toBe(true);
       expect(sim.tower.place("office", 2, x0).ok).toBe(true);
     }
     // Same layout, same gesture: Classic refuses (1994 canon), Modern builds.
-    expect(classic.tower.validateTransport("escalator", x0 + 12, 1, 2).ok).toBe(false);
-    expect(modern.tower.validateTransport("escalator", x0 + 12, 1, 2).ok).toBe(true);
+    const refused = classic.tower.placeTransport("escalator", x0 + 12, 1, 2);
+    expect(refused.ok).toBe(false);
+    expect(refused.reason).toBe("Escalators can't serve office floors. They link commercial floors only.");
+    expect(modern.tower.placeTransport("escalator", x0 + 12, 1, 2).ok).toBe(true);
   });
 });
 

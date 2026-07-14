@@ -121,6 +121,27 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of the Modern escalator/office rule gate (`gds-code-review` adversarial, 2026-07-14)
+
+Change: gated the Classic-canon "escalators link commercial floors only" placement
+refusal behind `GameRules.allowsEscalatorOnOfficeFloors` (Classic false, Modern
+true); `Tower` now carries the mode's rule-set, assigned by the `Simulation`
+constructor. Two review layers ran (Blind Hunter, Edge Case Hunter; no spec, so no
+Acceptance Auditor). Four patch findings applied (trick test now exercises real
+office-over-shaft overlap, integration test places instead of only validating and
+asserts every fixture step, `showsPreviewReason` doc no longer claims placement
+rules are mode-identical). One defer:
+
+- **Floor-wide vs landing-local office blocking is unverified canon** (Blind
+  Hunter): `validateTransport` refuses an escalator when ANY office sits anywhere
+  on either endpoint floor, regardless of x-distance to the landing. The 1994
+  exploit folklore ("bulldoze the offices right behind the stairs") hints the
+  original may have only cared about the tiles near the landing, but no FAQ
+  passage settles it. Pre-existing scope, unchanged by this diff, and now pinned
+  by tests as floor-wide. If canon research (faq-canon.md follow-up) ever shows
+  the original was landing-local, narrow the Classic check and loosen the pinned
+  tests; Modern is unaffected either way.
+
 ### Deferred from: code review of spec-pixelart-retail (E4) (`gds-code-review` adversarial, 2026-07-14)
 
 Change: enriched the eleven canon retail interiors in `src/render/pixelSprites/shop.ts`
