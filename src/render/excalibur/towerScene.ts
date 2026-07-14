@@ -216,27 +216,11 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
   for (const color of SHIRTS) engine.personGfx.push(bakePerson(color));
   // Housekeepers wear a single work uniform, so staff read at a glance.
   engine.personGfxStaff = bakePerson("#E8E4DA");
-  // Fed-up figure carries BOTH the red tint AND a shape marker (a "!" with a
-  // white halo above the head), so "this tenant is fed up" reads without color.
-  // The canvas is taller and the figure shifts down by the marker height so the
-  // "!" clears the head; the feet still land one pixel above the canvas floor,
-  // matching the plain bake so a red swap never jumps the figure.
-  const MARKER_H = 4;
-  engine.personGfxRed = new ex.Canvas({
-    width: PERSON_W,
-    height: PERSON_H + MARKER_H,
-    cache: true,
-    draw: (ctx) => {
-      personFigure(ctx, PERSON_X, PERSON_FOOT + MARKER_H, "walker", "#C24A3A");
-      // Halo fills exactly the MARKER_H rows above the head (0..3), so it backs
-      // the "!" without painting over the figure's top hair row at row MARKER_H.
-      ctx.fillStyle = "#ffffff"; // halo
-      ctx.fillRect(3, 0, 4, MARKER_H);
-      ctx.fillStyle = "#000000"; // "!"
-      ctx.fillRect(4, 0, 2, 2);
-      ctx.fillRect(4, 3, 2, 1);
-    },
-  });
+  // Fed-up figure: the reserved stress red is the whole cue. The waiting crowd
+  // massing red-shirted at an overwhelmed elevator landing reads as "these
+  // tenants are fed up" on its own, so a per-figure "!" badge would only add
+  // noise; the red walker uses the same bake and canvas as every other figure.
+  engine.personGfxRed = bakePerson("#C24A3A");
 }
 
 export function fakeStruct(kind: "floor" | "lobby", floor = 1, x = 0): Unit {
