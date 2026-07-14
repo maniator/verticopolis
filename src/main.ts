@@ -1,9 +1,7 @@
 import { Simulation } from "./engine/Simulation";
 import { UndoHistory, towerStateSig } from "./engine/UndoHistory";
-import { FACILITIES, GRID, facilityFloors, isFixedSpanTransport, maxCarsFor } from "./engine/facilities";
-import { rentConfig } from "./engine/econConfig";
+import { FACILITIES, GRID, facilityFloors, isFixedSpanTransport } from "./engine/facilities";
 import type { FacilityKind, Transport, Unit } from "./engine/types";
-import { isOperational } from "./engine/types";
 import { TowerEngine, HEATMAP_MODES, type Picked } from "./render/excalibur/TowerEngine";
 import type { HeatmapMode } from "./engine/Simulation";
 import { AudioEngine } from "./audio/Audio";
@@ -13,7 +11,7 @@ import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph, type Traffic
 import { paceFactor } from "./engine/timePacing";
 import { UI, type Tool } from "./ui/UI";
 import { classifyGesture, isPaintKind } from "./game/gesture";
-import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
+import { unitEditorTemplate, transportEditorTemplate } from "./ui/templates/editor";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
 import { statsTemplate } from "./ui/templates/stats";
 import { OnboardingController } from "./ui/Onboarding";
@@ -1351,39 +1349,25 @@ class GameApp implements GameAppPorts {
 
   private refreshEditor(): void {
     if (!this.selected) return;
-    // The render key encodes the editor's SHAPE (not its live values): same key
-    // → patch the volatile fields in place; different key → full rebuild. The
-    // shape only changes when a control appears/disappears (a condo sells and
-    // loses its price adjuster; a car button hits its disabled bound), so
-    // rebuilds are rare and the buttons/input survive every stat tick.
-    // Mobile folds the inspector card's diagnostics into the editor (one panel,
-    // no hover). It changes the editor's row SHAPE (the access row drops, a
-    // diagnostics block appears), so it belongs in the render key: a viewport
-    // that crosses the mobile breakpoint rebuilds instead of stale-patching.
+    // The template is a pure function of (sim, entity, mobile); lit's binding
+    // diff patches only the values that changed since the last pump, so the
+    // buttons and rename input keep their identity across stat ticks, and a
+    // shape change (a condo sells and loses its price adjuster, a cinema
+    // finishes construction and gains its "Now showing" row, the viewport
+    // crosses the mobile breakpoint) restructures just the affected rows.
+    // Mobile folds the inspector card's diagnostics into the editor (one
+    // panel, no hover).
     const mobile = this.mobileMq.matches;
-    const m = mobile ? ":m" : "";
     if (this.selected.type === "unit") {
       const u = this.selectedUnit();
       if (!u) return this.clearSelection();
       this.engine.selectedId = u.id;
-      const adjuster = !!rentConfig(u.kind) && !(u.kind === "condo" && u.everOccupied);
-      // The Booking button label lives in the built HTML, so fold the policy into
-      // the key — cycling it bumps the key and rebuilds the button.
-      const film = u.kind === "cinema" ? `:${u.filmPolicy ?? "auto"}` : "";
-      // Row SHAPE depends on state in two ways the volatile patcher can't
-      // handle (it only rewrites existing spans): the cinema's "Now showing"
-      // row exists only while operational, and gutted swaps the resale row
-      // for scrap/bulldoze rows. Fold exactly those two bits into the key so
-      // a construction finish, fire, or gut mid-view triggers a rebuild.
-      const op = isOperational(u) ? "" : u.state === "gutted" ? ":g" : ":x";
-      this.ui.renderEditor(`unit:${u.id}:${adjuster ? "r" : ""}${film}${op}${m}`, () => unitEditorHtml(this.sim, u, mobile), unitEditorVolatile(this.sim, u, mobile));
+      this.ui.renderEditor(unitEditorTemplate(this.sim, u, mobile));
     } else {
       const t = this.selectedTransport();
       if (!t) return this.clearSelection();
       this.engine.selectedId = t.id; // outlines the shaft + shows extend arrows
-      const maxCars = maxCarsFor(t.kind);
-      const shape = `${t.cars <= 1 ? "-" : ""}${t.cars >= maxCars ? "+" : ""}`;
-      this.ui.renderEditor(`transport:${t.id}:${shape}${m}`, () => transportEditorHtml(this.sim, t, mobile), transportEditorVolatile(this.sim, t, mobile));
+      this.ui.renderEditor(transportEditorTemplate(this.sim, t, mobile));
     }
   }
 

@@ -115,9 +115,6 @@ export class UI {
   editorSize = { w: 0, h: 0 };
   /** @internal friend-module access (uiPanels). */
   inspectorSize = { w: 0, h: 0 };
-  /** The shape currently built into the editor card (see renderEditor's key).
-   *  @internal friend-module access (uiPanels). */
-  editorKey: string | null = null;
   /** Dirty-gate key for the palette lock/afford scan: the star plus the
    *  per-kind affordability bitmask last applied to the DOM. The ~6 Hz pump
    *  rescans only when this changes (a star or affordability crossing).
@@ -133,10 +130,14 @@ export class UI {
     // container, one renderer). Invisible: selectTool repaints it immediately.
     this.el.toolInfo.replaceChildren();
     this.selectTool({ type: "inspect" });
+    // The editor card's [data-edit] actions and its ✕ dispatch through ONE
+    // delegated listener on the container, so lit re-renders never need
+    // rewiring (E6-S1).
+    panels.wireEditorActions(this);
     // While the pointer is pressed inside the editor card, suppress the periodic
-    // rebuild — otherwise a refresh landing between press and release would
-    // replace the button mid-click and swallow it (the "+ rent sometimes does
-    // nothing" bug). The container itself persists across innerHTML swaps.
+    // refresh. lit's diff already keeps a pressed button's identity (the
+    // "+ rent sometimes does nothing" bug), so this is belt-and-suspenders
+    // through E6, kept so a refresh can't move the card under the pointer.
     this.el.editor.addEventListener("pointerdown", () => (this.editorBusy = true));
     const release = () => (this.editorBusy = false);
     document.addEventListener("pointerup", release);
@@ -346,12 +347,8 @@ export class UI {
     status.toast(this, text, kind);
   }
 
-  renderEditor(key: string, build: () => string, volatile: Record<string, string>): void {
-    panels.renderEditor(this, key, build, volatile);
-  }
-
-  showEditor(html: string): void {
-    panels.showEditor(this, html);
+  renderEditor(tpl: TemplateResult): void {
+    panels.renderEditor(this, tpl);
   }
 
   hideEditor(): void {
@@ -454,7 +451,7 @@ export class UI {
   }
 }
 
-// The two pure placement helpers moved to ./uiPanels with the panel logic that
-// uses them; re-exported here so existing importers (anchor.test.ts,
-// editorPatch.test.ts, and any tooling) keep resolving them from ./UI.
-export { anchorBeside, patchVolatile } from "./uiPanels";
+// The pure placement helper moved to ./uiPanels with the panel logic that
+// uses it; re-exported here so existing importers (anchor.test.ts and any
+// tooling) keep resolving it from ./UI.
+export { anchorBeside } from "./uiPanels";
