@@ -3,9 +3,10 @@ import { html, nothing, type TemplateResult } from "lit-html";
 /**
  * The How-to-play / Help dialog. Authored to match `helpHtml` structurally
  * (proven by the transitional `assertDomEquivalent` test): the long static body,
- * the keyboard-play list, the external report link (with `rel="noopener"` and its
- * visually-hidden "opens in a new tab" span, routed through the platform wrapper
- * by the controller), and the two footer buttons. The Replay button is disabled
+ * the keyboard-play list, the external report link (with
+ * `rel="noopener noreferrer"` and its visually-hidden "opens GitHub in a new tab"
+ * span, routed through the platform wrapper by the controller), and the two
+ * footer buttons. The Replay button is disabled
  * (and gains an explaining `title`) while the title screen is up; the primary
  * "Got it" carries `autofocus` so focus lands on it rather than the report link.
  *
