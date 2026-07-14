@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { attemptContextRecovery, DEFAULT_TIMEOUT_MS } from "../game/contextRecovery";
+import { attemptContextRecovery, DEFAULT_TIMEOUT_MS } from "./contextRecovery";
 
 /**
  * The in-place context-loss recovery state machine: wait for the browser's

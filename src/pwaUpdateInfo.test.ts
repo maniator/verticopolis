@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseUpdateInfo, MAX_NOTE_LEN, MAX_NOTES } from "../pwaUpdateInfo";
+import { parseUpdateInfo, MAX_NOTE_LEN, MAX_NOTES } from "./pwaUpdateInfo";
 
 /**
  * The pure sanitizer that bounds an incoming version.json payload before it

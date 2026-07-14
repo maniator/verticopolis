@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { classifyGesture, isPaintKind } from "../game/gesture";
+import { classifyGesture, isPaintKind } from "./gesture";
 import type { Tool } from "../ui/UI";
 import type { FacilityKind } from "../engine/types";
 

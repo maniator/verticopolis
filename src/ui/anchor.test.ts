@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { anchorBeside } from "../ui/UI";
+import { anchorBeside } from "./UI";
 
 describe("anchorBeside — world-anchored panel placement", () => {
   const size = { w: 200, h: 120 };

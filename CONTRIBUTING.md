@@ -123,7 +123,7 @@ These layers were once waved off as "device-only." They are unit-tested here, so
   (`src/audio/toneAudioEngine.test.ts`).
 - **Pure logic extracted out of an untestable shell** into a measured module and
   tested there, e.g. `pwa.ts`'s payload sanitizer lives in
-  `src/pwaUpdateInfo.ts` (`src/tests/pwaUpdateInfo.test.ts`).
+  `src/pwaUpdateInfo.ts` (`src/pwaUpdateInfo.test.ts`).
 
 The full coverage configuration (floors, includes, excludes) lives in
 [`vite.config.ts`](./vite.config.ts).

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { resolvePlatform, getPlatform } from "../platform";
-import { browserPlatform } from "../platform/browser";
-import type { PlatformPort } from "../platform/types";
+import { resolvePlatform, getPlatform } from "./index";
+import { browserPlatform } from "./browser";
+import type { PlatformPort } from "./types";
 
 /**
  * Pins the platform port seam (src/platform/): the resolution order that
