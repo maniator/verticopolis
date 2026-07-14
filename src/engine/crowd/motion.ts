@@ -106,9 +106,11 @@ function tripFloors(p: Person): number {
 const QUEUE_GAP = 0.8;
 const QUEUE_SPACING = 0.6;
 
-// How far a landing line may reach from the shaft, in tiles: a queue is at most
-// a car's worth of people, so the contiguous-structure scan below stays bounded
-// no matter how wide the floor is.
+// Max tiles a landing line is laid out across, from the shaft face. It bounds
+// the contiguous-structure scan below (a floor can be hundreds of tiles wide)
+// and caps the line's spread: a landing can hold more than a car's worth of
+// waiters (they accumulate up to MAX_PEOPLE), so a very long queue clamps its
+// tail onto the far built tile instead of trailing on indefinitely.
 const QUEUE_REACH = 16;
 
 /** Length of the contiguous built (floor/lobby) run starting at `startX` and
