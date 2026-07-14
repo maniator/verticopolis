@@ -9,7 +9,7 @@ import { test, expect } from "@playwright/test";
  * its neighbor, charges for the bridge tiles, and refuses an unaffordable run.
  * This proves the feature survives bundling and the main.ts <-> engine <-> sim
  * wiring, not just the headless vitest fixture. It complements the exhaustive
- * unit coverage in src/tests/integration/simulation.integration.test.ts.
+ * integration coverage in src/tests/integration/simulation.integration.test.ts.
  */
 test.describe("auto-floor bridge between modules (e2e)", () => {
   test("bridges the gap between two rooms through the real build path, error-free", async ({ page }) => {
