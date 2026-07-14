@@ -110,7 +110,9 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
  *  day or night sky band with distant building blocks, warm distant windows
  *  glowing only after dark. Keeps the frontage reading "warm within, cool
  *  world outside" without competing with the doors or the chandelier drawn over
- *  it. Keys only on `lit`, so both baked slices stay in step. */
+ *  it. Keys on `lit` and the slice's `x` (stable per placed unit, so the room
+ *  stays cacheable); the `x` term gives each slice deliberate block-height
+ *  variety rather than an identical tiled run. */
 function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: number, w: number, lit: boolean): void {
   const skyH = 6;
   ctx.fillStyle = lit ? "#2A3350" : "#9CC4DE"; // night vs day sky

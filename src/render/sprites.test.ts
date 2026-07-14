@@ -193,8 +193,8 @@ describe("transport, crane & event sprites paint", () => {
 
   it("stairs and escalator each draw one flight rising to a second-floor landing", () => {
     // A two-floor stairway/escalator draws exactly one flight (the top band is
-    // the arrival landing), carries a climbing rider, and the two kinds render
-    // as different sprites.
+    // the arrival landing) and the two kinds render as different sprites. The
+    // sprite bakes no rider; climbers are separate engine-driven actors.
     const stair = spyCtx();
     const esc = spyCtx();
     drawTransport(stair.ctx, transport({ kind: "stairs", bottom: 1, top: 2, width: 8 }), 0, 0, 88, 44);
