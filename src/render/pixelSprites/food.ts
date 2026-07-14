@@ -13,10 +13,11 @@ import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS 
  * the look, count the real occupants, and hand off. An undefined or unknown
  * subtype falls back to the `_DEFAULT` look, no throw.
  *
- * Occupancy is honest: figures fill in seed order up to `visibleOccupants(u)`,
- * keyed only on inputs already in the room bake signature (`occupants`,
- * `outForMeal`, `subtype`), so an empty venue reads empty, a full one full, and
- * a TDT id renumber does not reshuffle the crowd.
+ * Occupancy is honest: figures fill in seed order up to `visibleOccupants(u)`
+ * (driven by `occupants` / `outForMeal`), the look by `subtype`, and each
+ * figure's variety by a stable geography seed (`floor`, `x`). All are fixed for
+ * a placed unit, so the room stays cacheable, an empty venue reads empty, a
+ * full one full, and a TDT id renumber does not reshuffle the crowd.
  */
 
 // The canon look tables live in `food.looks.ts` (split out for file-size
