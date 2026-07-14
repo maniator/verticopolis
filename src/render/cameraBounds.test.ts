@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { clampCameraY } from "./cameraBounds";
+import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM } from "./cameraBounds";
+import { VIEW_ZOOM_MIN } from "../engine/types";
 import { GRID } from "../engine/facilities";
 // Pull the buildable bounds from the real GRID and FLOOR from the pure
 // render/scale module so the test can't drift if the tower geometry or the
@@ -72,5 +73,94 @@ describe("clampCameraY", () => {
     const newY = clamp(1e6, zoom);
     expect(newY).toBeLessThan(oldCenterMax);
     expect(bottomEdge(newY, zoom)).toBeLessThan(bottomEdge(oldCenterMax, zoom));
+  });
+});
+
+describe("fitZoom (tower-aware zoom-out floor)", () => {
+  const HARD = VIEW_ZOOM_MIN;
+  const fit = (viewH: number, span: number) => fitZoom(viewH, span, FLOOR, HARD);
+  // How many floors (plus sky) a given zoom frames in a viewport of viewH px.
+  const framedFloors = (viewH: number, zoom: number) => viewH / (FLOOR * zoom);
+
+  it("frames a tall tower plus the sky headroom at the floor", () => {
+    // An 82-floor tower (the owner's save) on a phone-ish viewport: the fit floor
+    // should show the whole tower and the sky margin, and nothing much more.
+    const viewH = 567; // measured from the report: ~43 floors at zoom 0.3
+    const span = 82;
+    const z = fit(viewH, span);
+    // Pin the actual zoom to a number worked out by hand, independent of the
+    // formula under test: 567 / ((82 + 6) * 44) = 567 / 3872 = 0.14644. A wrong
+    // FLOOR or a dropped sky margin would move this; framedFloors alone can't
+    // catch that (the FLOOR term cancels out of it).
+    expect(z).toBeCloseTo(0.14644, 5);
+    expect(framedFloors(viewH, z)).toBeCloseTo(span + FIT_SKY_FLOORS, 5);
+    // ...and that is a lot further out than the old fixed 0.3 min.
+    expect(z).toBeLessThan(0.3);
+  });
+
+  it("counts basements in the span (a deep tower frames its cellars)", () => {
+    // Same above-ground height, but ten basements make the tower taller: the fit
+    // floor must be MORE zoomed out (smaller) to keep the cellars in frame.
+    const viewH = 567;
+    const shallow = fit(viewH, 50); // floors 1..50
+    const deep = fit(viewH, 60); // floors 1..50 plus B1..B10 -> span 60
+    expect(deep).toBeLessThan(shallow);
+  });
+
+  it("does not strand a SMALL tower in empty sky (min span framing)", () => {
+    // A tiny starter tower frames MIN_FIT_SPAN_FLOORS worth, not its literal 1-2
+    // floors, so pinch-out stops at a comfortable frame instead of a thumbnail in
+    // an ocean of blue. The floor is the same for any span at or below the min.
+    const viewH = 567;
+    const empty = fit(viewH, 1);
+    const tiny = fit(viewH, 5);
+    const atMin = fit(viewH, MIN_FIT_SPAN_FLOORS);
+    expect(empty).toBe(tiny);
+    expect(empty).toBe(atMin);
+    expect(framedFloors(viewH, empty)).toBeCloseTo(MIN_FIT_SPAN_FLOORS + FIT_SKY_FLOORS, 5);
+  });
+
+  it("stays finite and framed for an empty tower (no divide-by-zero fling)", () => {
+    for (const span of [0, 1, NaN, -Infinity]) {
+      const z = fit(567, span);
+      expect(Number.isFinite(z)).toBe(true);
+      expect(z).toBeGreaterThan(0);
+    }
+  });
+
+  it("never locks a small tower out of zooming out on a tall screen (ceiling)", () => {
+    // A tiny tower on a big portrait tablet: naive fit math would land ABOVE the
+    // resting zoom and forbid zoom-out entirely. The ceiling keeps the floor low
+    // enough that pulling back always does something.
+    const z = fit(2400, 1); // huge viewport, one-floor tower
+    expect(z).toBeLessThanOrEqual(MAX_FIT_ZOOM);
+  });
+
+  it("never returns below the hard trust-boundary floor", () => {
+    // A pathologically tall span on a short screen bottoms out at the hard floor,
+    // never underflowing past it.
+    const z = fitZoom(200, 5000, FLOOR, HARD);
+    expect(z).toBe(HARD);
+  });
+
+  it("clamps a non-positive / non-finite viewport to a finite floor", () => {
+    for (const bad of [0, -10, NaN, Infinity]) {
+      const z = fitZoom(bad, 40, FLOOR, HARD);
+      expect(Number.isFinite(z)).toBe(true);
+      expect(z).toBeGreaterThanOrEqual(HARD);
+    }
+  });
+
+  it("the hard floor fits the tallest legal tower, even a small phone in landscape", () => {
+    // The whole buildable world (B10..floor 100) with clampCameraY's sky/dirt
+    // margins, on a small phone: the fit floor must not be pinned to the hard
+    // floor, i.e. the hard floor is low enough to frame it. The manifest allows
+    // any orientation, so this has to hold for a SHORT landscape viewport too,
+    // not just a tall portrait one.
+    const worldSpan = GRID.maxFloor - GRID.minFloor + 1; // 110 floors of building
+    for (const viewH of [500 /* portrait-ish */, 360 /* small phone landscape */]) {
+      const z = fitZoom(viewH, worldSpan, FLOOR, HARD);
+      expect(z).toBeGreaterThan(HARD); // fit math wins, hard floor never clips it
+    }
   });
 });
