@@ -1,14 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { buildToolInfoHtml, BULLDOZE_TOOL_INFO_HTML, INSPECT_TOOL_INFO_HTML } from "../uiTemplates";
-import { toolInfoTemplate, BULLDOZE_TOOL_INFO, INSPECT_TOOL_INFO } from "./toolInfo";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { toolInfoTemplate } from "./toolInfo";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The tool-info panel bodies (E5-S2, event-driven). Package: the build-kind
  * body's name/cost/description rows, the capacity-vs-customers conditional row
  * (present for residential capacity, commercial customers, absent at zero
- * population), the auto-escaping of catalog copy, and the transitional
- * `assertDomEquivalent` guards against all three legacy builders. The selectTool
+ * population), and the auto-escaping of catalog copy. The selectTool
  * wiring (render into `#tool-info`, the placeholder clear, the template swap
  * between tools) is pinned by the tool-info integration tests.
  */
@@ -50,18 +48,5 @@ describe("toolInfoTemplate escapes catalog copy as text", () => {
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.querySelector(".ti-name")!.textContent).toBe(hostile);
     expect(frag.querySelector("p")!.textContent).toBe(hostile);
-  });
-});
-
-describe("tool-info templates match the legacy builders", () => {
-  it("build kind: holds for residential, commercial, and zero-population", () => {
-    expect(() => assertDomEquivalent(buildToolInfoHtml(office, false), toolInfoTemplate(office, false))).not.toThrow();
-    expect(() => assertDomEquivalent(buildToolInfoHtml(restaurant, true), toolInfoTemplate(restaurant, true))).not.toThrow();
-    expect(() => assertDomEquivalent(buildToolInfoHtml(lobby, false), toolInfoTemplate(lobby, false))).not.toThrow();
-  });
-
-  it("bulldoze and inspect: hold verbatim", () => {
-    expect(() => assertDomEquivalent(BULLDOZE_TOOL_INFO_HTML, BULLDOZE_TOOL_INFO)).not.toThrow();
-    expect(() => assertDomEquivalent(INSPECT_TOOL_INFO_HTML, INSPECT_TOOL_INFO)).not.toThrow();
   });
 });

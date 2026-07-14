@@ -1668,3 +1668,28 @@ children would fight the timers' self-removal. Both regions keep their static
 announcements are never batched or throttled to fit a frame budget. Revisit
 only if either surface grows interactive children. One-line note per the
 story: log + toast stay imperative; lit owns every other UI surface.
+
+### Final sweep: the legacy string builders and transitional guards retire (2026-07-14)
+
+The lit migration's closing PR. Deleted from production: `ui/uiTemplates.ts`,
+`ui/statsHtml.ts`, and `ui/editorHtml.ts` (every `*Html` dialog/panel builder;
+zero call sites remained). Deleted from the harness: `assertDomEquivalent` and
+its private normalization layer in `ui/testing/litTestUtils.ts` plus its own
+test suites; git history keeps both the oracle code and the full guard suites
+that proved every template structurally equivalent before retirement. The last
+two live pieces moved out first: `shortMoney` to `ui/format.ts`, and the
+TOWER-win congratulations modal (the one dialog outside the epic list) onto
+the `openModalTemplate` seam as `templates/congrats.ts`. Before the oracle
+died, the two stats branches the E3-S5 triage left unexercised (the 4-star
+rating divergence row and the Express shaft label) gained fixtures run against
+the live oracle in the sweep PR's first commit (af03790), then kept as
+structural pins once the deletion commit removed the guards. Consumers ported: `condoModes` and the two
+`gameControllers` suites render the lit templates where they read builder
+strings, the income Net behavior tests moved beside `incomeSection`, and the
+`editorHtml` integration suite retired with the volatile-map protocol it
+pinned (its live assertions live on in `templates/editor.test.ts`). lit now
+owns every dialog and panel; the log and toast rails stay imperative per the
+E7-S1 decision above. Triage defers: `shortMoney` still has no direct unit
+test (pre-existing; its 1M+ branch is uncovered, unchanged by the move), and
+`condoModes` was split (`condoStatsPanel.integration.test.ts`) after landing
+exactly on the 500-line ceiling.

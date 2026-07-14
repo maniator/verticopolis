@@ -1,15 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render } from "lit-html";
-import { towerStatsHtml } from "../uiTemplates";
 import { towerStatsTemplate, type TowerStatsSnapshot } from "./towerStats";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The tower-stats grid (E5-S1, the first live view). Package: the eight k/v rows
- * and their exact values, the dirty-rooms color branch both ways, node identity
- * across re-renders with a changed snapshot (the pump path patches in place, it
- * never rebuilds), and the transitional `assertDomEquivalent` guard against
- * `towerStatsHtml` for both dirty states. The pump wiring itself (render into
+ * and their exact values, the dirty-rooms color branch both ways, and node
+ * identity across re-renders with a changed snapshot (the pump path patches in
+ * place, it never rebuilds). The pump wiring itself (render into
  * `#tower-stats` inside `uiStatus.update`) is priced and identity-checked
  * end-to-end by the E5-S0 perf gate.
  */
@@ -67,17 +65,5 @@ describe("towerStatsTemplate patches in place across pumps", () => {
     expect(vs[0]).toBe("43 / B3");
     expect(vs[4]).toBe("2");
     expect(vs[7]).toBe("10");
-  });
-});
-
-describe("towerStatsTemplate matches the legacy towerStatsHtml structure", () => {
-  it("holds with no dirty rooms", () => {
-    const s = snap({ dirty: 0 });
-    expect(() => assertDomEquivalent(towerStatsHtml(s), towerStatsTemplate(s))).not.toThrow();
-  });
-
-  it("holds with dirty rooms (the color branch)", () => {
-    const s = snap({ dirty: 7 });
-    expect(() => assertDomEquivalent(towerStatsHtml(s), towerStatsTemplate(s))).not.toThrow();
   });
 });

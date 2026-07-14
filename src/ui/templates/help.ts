@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 
 /**
  * The How-to-play / Help dialog. Authored to match `helpHtml` structurally
- * (proven by the transitional `assertDomEquivalent` test): the long static body,
+ * (proven by transitional guards, retired with the string builders): the long static body,
  * the keyboard-play list, the external report link (with
  * `rel="noopener noreferrer"` and its visually-hidden "opens GitHub in a new tab"
  * span, routed through the platform wrapper by the controller), and the two

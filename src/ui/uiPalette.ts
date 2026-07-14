@@ -1,7 +1,7 @@
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import type { Tool, UI } from "./UI";
-import { shortMoney } from "./uiTemplates";
+import { shortMoney } from "./format";
 
 /**
  * Build-palette construction for {@link UI}, as friend functions taking the UI

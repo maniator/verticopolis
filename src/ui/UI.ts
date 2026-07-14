@@ -74,7 +74,7 @@ export interface UICallbacks {
 /**
  * Owns all DOM controls outside the canvas and keeps them in sync. The bulk of
  * the view and behavior lives in friend-modules that take this instance: the
- * HTML bodies in `./uiTemplates`, the dialog controllers in `./uiDialogs`, the
+ * lit template bodies in `./templates/`, the dialog controllers in `./uiDialogs`, the
  * status/log pump in `./uiStatus`, the editor/inspector panels in `./uiPanels`,
  * and the palette build in `./uiPalette`. This class keeps the shared DOM handle
  * map, the modal primitives they build on, the tool selection, and thin

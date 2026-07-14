@@ -21,8 +21,8 @@ export interface TowerStatsSnapshot {
 
 /**
  * The tower-stats grid body (E5-S1, the first live view). Authored to match
- * `towerStatsHtml` structurally (proven by the transitional `assertDomEquivalent`
- * test). Unlike the dialog templates this renders on the ~6 Hz pump path:
+ * `towerStatsHtml` structurally (proven by transitional guards, retired with the
+ * string builders). Unlike the dialog templates this renders on the ~6 Hz pump path:
  * `uiStatus.update` calls lit `render()` into the `#tower-stats` container every
  * pump, and lit patches the changed text in place instead of the old
  * `innerHTML =` reparse, so the grid's DOM nodes keep their identity across

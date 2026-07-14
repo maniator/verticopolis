@@ -3,7 +3,7 @@ import type { UpdateInfo } from "../../pwa";
 
 /**
  * The "a new build is ready" prompt. Authored to match `updatePromptHtml`
- * structurally (proven by the transitional `assertDomEquivalent` test), including
+ * structurally (proven by transitional guards, retired with the string builders), including
  * the optional "What's new" notes block and the build-id line, and the whitespace
  * between the two action buttons. The actions bind inline via `@click`; the
  * controller (`showUpdatePrompt`) owns the resolve-exactly-once logic, the

@@ -1,17 +1,14 @@
 import { describe, it, expect, vi } from "vitest";
-import { updatePromptHtml } from "../uiTemplates";
 import { updatePromptTemplate } from "./updatePrompt";
-import { renderToFragment, assertDomEquivalent, click } from "../testing/litTestUtils";
+import { renderToFragment, click } from "../testing/litTestUtils";
 import type { UpdateInfo } from "../../pwa";
 
 /**
  * The "update available" prompt. Its per-aspect package: a semantic structure
  * check (incl. the optional What's-new and build-id blocks), the inline `@click`
- * dispatch (Later / Update now), hostile input rendered as text, and the
- * transitional `assertDomEquivalent` guard against `updatePromptHtml` across the
- * present/absent/hostile/empty input classes. The live resolve-once behavior
- * across all four dismissal paths lives in the controller and is pinned by
- * `uiDialogs.integration.test.ts`.
+ * dispatch (Later / Update now), and hostile input rendered as text. The live
+ * resolve-once behavior across all four dismissal paths lives in the controller
+ * and is pinned by `uiDialogs.integration.test.ts`.
  */
 
 const noop = { onLater: () => {}, onUpdate: () => {} };
@@ -86,34 +83,5 @@ describe("updatePromptTemplate escapes interpolated copy as text", () => {
     const frag = renderToFragment(updatePromptTemplate(info({ notes: [hostile] }), noop));
     expect(frag.querySelector(".whatsnew img")).toBeNull();
     expect(frag.querySelector(".whatsnew li")?.textContent).toBe(hostile);
-  });
-});
-
-describe("updatePromptTemplate matches the legacy updatePromptHtml structure", () => {
-  it("holds with notes and a build id", () => {
-    const i = info({ notes: ["Faster boot", "Fixed a save bug"] });
-    expect(() => assertDomEquivalent(updatePromptHtml(i), updatePromptTemplate(i, noop))).not.toThrow();
-  });
-
-  it("holds with no info (blocks absent)", () => {
-    expect(() => assertDomEquivalent(updatePromptHtml(null), updatePromptTemplate(null, noop))).not.toThrow();
-  });
-
-  it("holds with a version but no notes and an unknown sha", () => {
-    const i = info({ sha: "unknown", notes: [] });
-    expect(() => assertDomEquivalent(updatePromptHtml(i), updatePromptTemplate(i, noop))).not.toThrow();
-  });
-
-  it("holds for a hostile note: lit auto-escape agrees with the legacy escapeHtml", () => {
-    // The migration's premise is that lit escaping matches the old escapeHtml. Pin
-    // it against a note carrying every character escapeHtml touches, so old and new
-    // provably produce the SAME text (not just that lit escapes).
-    const i = info({ notes: [`<b>bold</b> & "quote" 'apos'`] });
-    expect(() => assertDomEquivalent(updatePromptHtml(i), updatePromptTemplate(i, noop))).not.toThrow();
-  });
-
-  it("holds at the notes cap: 4 notes render 3 on both paths", () => {
-    const i = info({ notes: ["a", "b", "c", "d"] });
-    expect(() => assertDomEquivalent(updatePromptHtml(i), updatePromptTemplate(i, noop))).not.toThrow();
   });
 });

@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { newTowerHtml } from "../uiTemplates";
 import { newTowerTemplate } from "./newTower";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The Found a New Tower rule-set picker. Package: both mode radios (Classic
- * pre-checked), the always-rendered calendar sub-picker with its default, the
- * abandon warning gated on `hasSave`, and the transitional `assertDomEquivalent`
- * guard against `newTowerHtml` for both save states. The Found/Cancel commit
+ * pre-checked), the always-rendered calendar sub-picker with its default, and the
+ * abandon warning gated on `hasSave`. The Found/Cancel commit
  * logic (reading the picked mode and, for Modern, the calendar) lives in the
  * controller and is pinned by the newTowerModal integration tests.
  */
@@ -50,15 +48,5 @@ describe("newTowerTemplate abandon warning, gated on an existing tower", () => {
   it("omits the warning when there is no tower to lose", () => {
     const frag = renderToFragment(newTowerTemplate(false));
     expect(frag.querySelector(".nt-abandon")).toBeNull();
-  });
-});
-
-describe("newTowerTemplate matches the legacy newTowerHtml structure", () => {
-  it("holds with no existing tower (no abandon warning)", () => {
-    expect(() => assertDomEquivalent(newTowerHtml(false), newTowerTemplate(false))).not.toThrow();
-  });
-
-  it("holds with an existing tower (abandon warning present)", () => {
-    expect(() => assertDomEquivalent(newTowerHtml(true), newTowerTemplate(true))).not.toThrow();
   });
 });

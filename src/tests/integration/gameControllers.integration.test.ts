@@ -5,7 +5,7 @@ import { ECON, rentConfig, rentOf, carResaleRefund, resaleRefund } from "../../e
 import type { FacilityKind, Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
-import { unitEditorHtml, transportEditorHtml } from "../../ui/editorHtml";
+import { unitEditorTemplate, transportEditorTemplate } from "../../ui/templates/editor";
 import { announceForPlacement, snapX, type PlaceOutcome } from "../../ui/placement";
 import { BuildActions } from "../../game/buildActions";
 import { EditorActions } from "../../game/editorActions";
@@ -27,9 +27,16 @@ function last<T>(arr: T[]): T {
 /** The inspector card is a lit template since E6-S2; render it detached and
  *  hand back the text so the content assertions keep reading plain strings. */
 function renderedText(tpl: TemplateResult): string {
+  return renderedCard(tpl).textContent ?? "";
+}
+
+/** An editor/inspector template rendered into a detached container, for
+ *  structure assertions (the string builders these tests once read retired
+ *  with the final sweep). */
+function renderedCard(tpl: TemplateResult): HTMLElement {
   const div = document.createElement("div");
   render(tpl, div);
-  return div.textContent ?? "";
+  return div;
 }
 
 /** Recording fakes for the narrow ui/audio ports the controllers take. */
@@ -172,7 +179,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("sell (unit) pays the resale refund, clears the selection, commits the undo step", () => {
     sel = { type: "unit", id: office.id };
-    root.innerHTML = unitEditorHtml(sim, office);
+    render(unitEditorTemplate(sim, office), root);
     const before = sim.money;
     editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("office"));
@@ -185,7 +192,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("sell (transport) routes through the one shared refund path", () => {
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     const before = sim.money;
     editor.handleEditAction("sell", root);
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
@@ -195,19 +202,19 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("mobile editor folds in the card's diagnostics and drops the duplicate access row", () => {
     const { sim, office } = fixture();
-    const mobile = unitEditorHtml(sim, office, true);
-    const desktop = unitEditorHtml(sim, office, false);
+    const mobile = renderedCard(unitEditorTemplate(sim, office, true));
+    const desktop = renderedCard(unitEditorTemplate(sim, office, false));
     // Mobile folds in the card's richer access reachability line as a live
     // block, so the plain "Elevator access: Yes/No" row that would duplicate it
     // is dropped.
-    expect(mobile).toContain('data-field="diagnostics"');
-    expect(mobile).toContain("Access:"); // the served office reads "Access: reachable…"
-    expect(mobile).not.toContain("Elevator access");
+    expect(mobile.querySelector('[data-field="diagnostics"]')).not.toBeNull();
+    expect(mobile.textContent).toContain("Access:"); // the served office reads "Access: reachable…"
+    expect(mobile.textContent).not.toContain("Elevator access");
     // Desktop keeps the plain access row and leaves the diagnostics to the
     // hover card, so it carries neither the block nor the reachability line.
-    expect(desktop).toContain("Elevator access");
-    expect(desktop).not.toContain("Access:");
-    expect(desktop).not.toContain('data-field="diagnostics"');
+    expect(desktop.textContent).toContain("Elevator access");
+    expect(desktop.textContent).not.toContain("Access:");
+    expect(desktop.querySelector('[data-field="diagnostics"]')).toBeNull();
   });
 
   it("mobile editor keeps the access row for a zero-population service kind (no diagnostics access line)", () => {
@@ -221,7 +228,7 @@ describe("EditorActions (editor-card money paths)", () => {
     // Security has no population and no traffic income, so facilityDiagnostics
     // emits no access line: the mobile editor keeps the plain "Elevator access"
     // row so its connectivity still shows (parity with desktop, not a silent drop).
-    expect(unitEditorHtml(sim, sec, true)).toContain("Elevator access");
+    expect(renderedCard(unitEditorTemplate(sim, sec, true)).textContent).toContain("Elevator access");
   });
 
   it("mobile editor folds the retail patronage block into a shop's panel", () => {
@@ -232,13 +239,13 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(r.ok).toBe(true);
     const shop = sim.tower.units.find((u) => u.id === r.unitId)!;
     shop.state = "occupied";
-    expect(unitEditorHtml(sim, shop, true)).toContain("patronage");
-    expect(unitEditorHtml(sim, shop, false)).not.toContain("patronage");
+    expect(renderedCard(unitEditorTemplate(sim, shop, true)).textContent).toContain("patronage");
+    expect(renderedCard(unitEditorTemplate(sim, shop, false)).textContent).not.toContain("patronage");
   });
 
   it("rentUp/rentDown clamp a real office to the engine's rent band", () => {
     sel = { type: "unit", id: office.id };
-    root.innerHTML = unitEditorHtml(sim, office);
+    render(unitEditorTemplate(sim, office), root);
     const band = rentConfig("office")!;
     for (let i = 0; i < 100; i++) editor.handleEditAction("rentUp", root);
     expect(rentOf(office)).toBe(band.max);
@@ -248,7 +255,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("addcar charges and removecar refunds the half-back car resale", () => {
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     const cars0 = lift.cars;
     const before = sim.money;
     editor.handleEditAction("addcar", root);
@@ -261,7 +268,7 @@ describe("EditorActions (editor-card money paths)", () => {
 
   it("extendUp refuses when broke: toast, error sfx, shaft unchanged", () => {
     sel = { type: "transport", id: lift.id };
-    root.innerHTML = transportEditorHtml(sim, lift);
+    render(transportEditorTemplate(sim, lift), root);
     sim.money = 0;
     const { top, bottom } = lift;
     editor.handleEditAction("extendUp", root);

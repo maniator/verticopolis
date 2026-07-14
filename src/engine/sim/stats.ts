@@ -44,7 +44,7 @@ export function stats(sim: Simulation) {
     population: sim.population,
     // Cheap loop-counter field only. The modal-only diagnostics that need a
     // full scan / flood-fill (ratingPopulation, functional parking count) are
-    // computed in buildStatsHtml at modal-build time, NOT here, since stats()
+    // computed in the stats dialog template at modal-build time, NOT here, since stats()
     // runs on the ~6 Hz HUD refresh (UI.update).
     parkingSpaces,
     money: sim.money,

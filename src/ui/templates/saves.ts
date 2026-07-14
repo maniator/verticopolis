@@ -3,7 +3,7 @@ import type { SlotInfo } from "../../storage/SaveGame";
 
 /**
  * The Saved Towers slot manager body. Authored to match `savesHtml` structurally
- * (proven by the transitional `assertDomEquivalent` test): the auto-save row plus
+ * (proven by transitional guards, retired with the string builders): the auto-save row plus
  * one row per numbered slot, each with its rule-set chip, star/pop/funds detail,
  * and per-row Save/Load/Delete actions gated by slot kind and existence. Rows are
  * composed as nested `TemplateResult`s (not a joined string), so the tower name

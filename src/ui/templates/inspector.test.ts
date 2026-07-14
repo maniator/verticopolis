@@ -1,72 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { FACILITIES, GRID, isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../../engine/facilities";
-import { isTenanted } from "../../engine/types";
+import { GRID } from "../../engine/facilities";
 import type { Transport, Unit } from "../../engine/types";
-import { escapeHtml } from "../escape";
-import { floorTag } from "../format";
-import { facilityDiagnostics, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { unitInspectorTemplate, transportInspectorTemplate, buildRefusalTemplate } from "./inspector";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
- * The hover inspector card bodies (E6-S2). Unlike the editor's, the legacy
- * strings were built INLINE in `InspectorController.inspectPicked` and
- * `GameApp.updateBuildRefusal`, so there is no retained production oracle;
- * the transitional guards below compare against verbatim REPLICAS of that
- * deleted string code, kept only here. Package: the replicas' equivalence
- * across every branch (rename subheading shown/suppressed, basement floor
- * text, on-notice statuses, customers open/closed vs occupants, subtype
- * title, elevator cars row, refusal tooltip), the hostile-input hardening,
- * and the templates' contract that the ✕ is NOT theirs (showInspector
- * appends it from the shared titleBarClose recipe; wiring pinned by the
- * integration tests).
+ * The hover inspector card bodies (E6-S2). Package: every branch of the card
+ * (rename subheading shown/suppressed, basement floor text, on-notice
+ * statuses, customers open/closed vs occupants, subtype title, elevator cars
+ * row, refusal tooltip), the hostile-input hardening, and the templates'
+ * contract that the ✕ is NOT theirs (showInspector appends it from the
+ * shared titleBarClose recipe; wiring pinned by the integration tests). The
+ * templates were proven structurally equivalent to the inline strings they
+ * replaced by transitional guards against verbatim replicas of the deleted
+ * code (removed in the final sweep; see git history for the replica oracle).
  */
-
-// ---- Verbatim replicas of the legacy string builders (the oracle) ----------
-
-function legacyUnitCard(sim: Simulation, u: Unit): string {
-  const f = FACILITIES[u.kind];
-  const diagnostics = facilityDiagnostics(sim, u);
-  const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
-  const statusText =
-    u.state === "vacating"
-      ? isRelocation
-        ? "on notice (household relocating)"
-        : "on notice (tenant leaving)"
-      : u.state;
-  const title = u.subtype ?? f.name;
-  const labelIsExtra = u.label !== f.name && u.label !== title;
-  return (
-    `<h4 class="win-title">${escapeHtml(title)}</h4>` +
-    `<div>${labelIsExtra ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
-    `<div>Status: ${statusText}</div>` +
-    (isCommercialKind(u.kind) && f.population > 0
-      ? `<div>Customers: ${u.customersIn ?? 0}${isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour) ? " (closed)" : ""}</div>`
-      : f.population
-        ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
-        : "") +
-    diagnostics +
-    `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`
-  );
-}
-
-function legacyTransportCard(sim: Simulation, t: Transport): string {
-  const f = FACILITIES[t.kind];
-  return (
-    `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
-    (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : "") +
-    transportDiagnostics(sim, t)
-  );
-}
-
-const legacyRefusal = (reason: string): string =>
-  `<h4 class="win-title">Can't build here</h4><div class="preview-refuse">${escapeHtml(reason)}</div>`;
 
 // ---- Fixtures ---------------------------------------------------------------
 
 /** A built tower carrying one unit of the requested kind on full-width floors,
- *  every placement asserted so the equivalence can't pass on a broken fixture. */
+ *  every placement asserted so a broken fixture can't pass silently. */
 function simWith(kind: Parameters<Simulation["tower"]["place"]>[0], floor = 2): { sim: Simulation; unit: Unit } {
   const sim = new Simulation();
   for (let x = 0; x < GRID.width; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
@@ -86,16 +40,18 @@ function withLift(kind: "elevatorStandard" | "stairs"): { sim: Simulation; lift:
   return { sim, lift };
 }
 
-const equivalent = (legacy: string, lit: Parameters<typeof assertDomEquivalent>[1]): void =>
-  expect(() => assertDomEquivalent(legacy, lit)).not.toThrow();
-
 // ---- Tests ------------------------------------------------------------------
 
-describe("unit inspector card matches the legacy inline builder", () => {
+describe("unit inspector card branches", () => {
   it("occupied office: catalog title, floor line, occupants, satisfaction", () => {
     const { sim, unit } = simWith("office");
     unit.satisfaction = 0.73;
-    equivalent(legacyUnitCard(sim, unit), unitInspectorTemplate(sim, unit));
+    const frag = renderToFragment(unitInspectorTemplate(sim, unit));
+    expect(frag.querySelector("h4.win-title")!.textContent).toBe("Office");
+    expect(frag.textContent).toContain("Floor 2");
+    expect(frag.textContent).toContain("Status: occupied");
+    expect(frag.textContent).toMatch(/Occupants: \d+\/\d+/);
+    expect(frag.textContent).toContain("Satisfaction: 73%");
   });
 
   it("rename subheading: shown for a real rename, suppressed when it matches the title", () => {
@@ -103,10 +59,9 @@ describe("unit inspector card matches the legacy inline builder", () => {
     renamed.unit.label = "Acme Corp";
     const fragR = renderToFragment(unitInspectorTemplate(renamed.sim, renamed.unit));
     expect(fragR.textContent).toContain("Acme Corp");
-    equivalent(legacyUnitCard(renamed.sim, renamed.unit), unitInspectorTemplate(renamed.sim, renamed.unit));
     const plain = simWith("office");
-    plain.unit.label = FACILITIES.office.name; // matches the catalog name
-    equivalent(legacyUnitCard(plain.sim, plain.unit), unitInspectorTemplate(plain.sim, plain.unit));
+    plain.unit.label = "Office"; // matches the catalog name
+    expect(renderToFragment(unitInspectorTemplate(plain.sim, plain.unit)).querySelector("br")).toBeNull();
     // The comment's own scenario: a shop renamed to exactly its subtype shown
     // in the title must not render the name twice (the second condition of
     // labelIsExtra is the load-bearing one here).
@@ -116,7 +71,6 @@ describe("unit inspector card matches the legacy inline builder", () => {
     const fragS = renderToFragment(unitInspectorTemplate(shop.sim, shop.unit));
     expect(fragS.querySelector("h4")!.textContent).toBe("Chinese Cafe");
     expect(fragS.querySelector("br")).toBeNull(); // subheading suppressed
-    equivalent(legacyUnitCard(shop.sim, shop.unit), unitInspectorTemplate(shop.sim, shop.unit));
   });
 
   it("on-notice statuses: tenant leaving vs household relocating", () => {
@@ -125,13 +79,11 @@ describe("unit inspector card matches the legacy inline builder", () => {
     leaving.unit.vacateReason = "rent";
     const fragL = renderToFragment(unitInspectorTemplate(leaving.sim, leaving.unit));
     expect(fragL.textContent).toContain("on notice (tenant leaving)");
-    equivalent(legacyUnitCard(leaving.sim, leaving.unit), unitInspectorTemplate(leaving.sim, leaving.unit));
     const moving = simWith("condo");
     moving.unit.state = "vacating";
     moving.unit.vacateReason = "relocation";
     const fragM = renderToFragment(unitInspectorTemplate(moving.sim, moving.unit));
     expect(fragM.textContent).toContain("on notice (household relocating)");
-    equivalent(legacyUnitCard(moving.sim, moving.unit), unitInspectorTemplate(moving.sim, moving.unit));
   });
 
   it("commercial venue: subtype title, live customers, and the closed marker", () => {
@@ -142,12 +94,10 @@ describe("unit inspector card matches the legacy inline builder", () => {
     const frag = renderToFragment(unitInspectorTemplate(sim, unit));
     expect(frag.querySelector("h4")!.textContent).toBe("Chinese Cafe");
     expect(frag.textContent).toContain("Customers: 5 (closed)");
-    equivalent(legacyUnitCard(sim, unit), unitInspectorTemplate(sim, unit));
     sim.clock.minutes = 12 * 60;
     const openFrag = renderToFragment(unitInspectorTemplate(sim, unit));
     expect(openFrag.textContent).toContain("Customers: 5");
     expect(openFrag.textContent).not.toContain("(closed)");
-    equivalent(legacyUnitCard(sim, unit), unitInspectorTemplate(sim, unit));
   });
 
   it("commercial edge arms: an untracked customer count reads 0, and a vacant venue is never 'closed'", () => {
@@ -157,7 +107,6 @@ describe("unit inspector card matches the legacy inline builder", () => {
     fresh.unit.customersIn = undefined;
     const frag = renderToFragment(unitInspectorTemplate(fresh.sim, fresh.unit));
     expect(frag.textContent).toContain("Customers: 0 (closed)");
-    equivalent(legacyUnitCard(fresh.sim, fresh.unit), unitInspectorTemplate(fresh.sim, fresh.unit));
     // A non-tenanted venue outside business hours: the Status row tells the
     // story, so the customers line carries no "(closed)".
     const vacant = simWith("shop");
@@ -166,7 +115,6 @@ describe("unit inspector card matches the legacy inline builder", () => {
     const vFrag = renderToFragment(unitInspectorTemplate(vacant.sim, vacant.unit));
     expect(vFrag.textContent).toContain("Customers: 0");
     expect(vFrag.textContent).not.toContain("(closed)");
-    equivalent(legacyUnitCard(vacant.sim, vacant.unit), unitInspectorTemplate(vacant.sim, vacant.unit));
   });
 
   it("basement facility reads a B floor tag and a zero-population kind has no census row", () => {
@@ -174,7 +122,6 @@ describe("unit inspector card matches the legacy inline builder", () => {
     const frag = renderToFragment(unitInspectorTemplate(sim, unit));
     expect(frag.textContent).toContain("B1");
     expect(frag.textContent).not.toContain("Occupants");
-    equivalent(legacyUnitCard(sim, unit), unitInspectorTemplate(sim, unit));
   });
 
   it("renders a hostile label as literal text, injecting no element, and ships no ✕ of its own", () => {
@@ -189,28 +136,24 @@ describe("unit inspector card matches the legacy inline builder", () => {
   });
 });
 
-describe("transport inspector card matches the legacy inline builder", () => {
+describe("transport inspector card branches", () => {
   it("standard elevator (cars row) and stairs (no cars row)", () => {
     const el = withLift("elevatorStandard");
     const frag = renderToFragment(transportInspectorTemplate(el.sim, el.lift));
     expect(frag.textContent).toContain(`Cars: ${el.lift.cars}`);
-    equivalent(legacyTransportCard(el.sim, el.lift), transportInspectorTemplate(el.sim, el.lift));
     const st = withLift("stairs");
     expect(renderToFragment(transportInspectorTemplate(st.sim, st.lift)).textContent).not.toContain("Cars:");
-    equivalent(legacyTransportCard(st.sim, st.lift), transportInspectorTemplate(st.sim, st.lift));
   });
 });
 
-describe("build-refusal tooltip matches the legacy inline builder", () => {
+describe("build-refusal tooltip", () => {
   it("wraps the reason in the win-title grammar and escapes a hostile reason", () => {
     const frag = renderToFragment(buildRefusalTemplate("Needs a lobby below."));
     expect(frag.querySelector("h4.win-title")!.textContent).toBe("Can't build here");
     expect(frag.querySelector("div.preview-refuse")!.textContent).toBe("Needs a lobby below.");
-    equivalent(legacyRefusal("Needs a lobby below."), buildRefusalTemplate("Needs a lobby below."));
     const hostile = `<img src=x onerror="alert(1)">`;
     const hostileFrag = renderToFragment(buildRefusalTemplate(hostile));
     expect(hostileFrag.querySelector("img")).toBeNull();
     expect(hostileFrag.querySelector(".preview-refuse")!.textContent).toBe(hostile);
-    equivalent(legacyRefusal(hostile), buildRefusalTemplate(hostile));
   });
 });

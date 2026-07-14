@@ -3,8 +3,6 @@ import { Simulation } from "../../engine/Simulation";
 import { ECON, rentOf } from "../../engine/econConfig";
 import { FACILITIES, GRID, residentCount } from "../../engine/facilities";
 import type { GameMode, Unit } from "../../engine/types";
-import { buildStatsHtml } from "../../ui/statsHtml";
-import { unitEditorVolatile } from "../../ui/editorHtml";
 
 /**
  * Condo rule-sets: the Classic price/buy-back parity fixes (all towers) and the
@@ -436,64 +434,5 @@ describe("Save hardening at the trust boundary", () => {
     const rsold = reloaded.tower.units.find((u) => u.id === sold.id)!;
     expect(rentOf(ra)).toBe(200_000); // unsold clamped down to the new max
     expect(rentOf(rsold)).toBe(240_000); // sold left untouched
-  });
-});
-
-describe("Not-present households never ghost the readout (gutted/empty)", () => {
-  it("excludes a gutted sold condo from both population and the Households section", () => {
-    const sim = Simulation.newGame(3, "modern");
-    const condo = servedCondo(sim);
-    tickUntil(sim, () => condo.everOccupied);
-    expect(sim.tower.totalPopulation()).toBe(condo.residents);
-    expect(buildStatsHtml(sim)).toContain("People housed");
-    // A fire guts the only sold condo: it stops being present.
-    condo.state = "gutted";
-    // Population drops it (isPresent false) …
-    expect(sim.tower.totalPopulation()).toBe(0);
-    // … and the Households readout drops it too — no ghost family, back to the
-    // empty-state placeholder rather than a stale "People housed".
-    expect(buildStatsHtml(sim)).toContain("No condos sold yet");
-  });
-});
-
-describe("Stats panel — Households section (Modern only)", () => {
-  it("shows a Households section on a Modern tower, and not on a Classic one", () => {
-    const modern = Simulation.newGame(3, "modern");
-    const mc = servedCondo(modern);
-    tickUntil(modern, () => mc.everOccupied);
-    const modernHtml = buildStatsHtml(modern);
-    expect(modernHtml).toContain("Households");
-    expect(modernHtml).toMatch(/Avg household/);
-
-    const classic = Simulation.newGame(3, "classic");
-    const cc = servedCondo(classic);
-    tickUntil(classic, () => cc.everOccupied);
-    expect(buildStatsHtml(classic)).not.toContain("Households");
-  });
-
-  it("shows a sold Modern condo's editor price as the household-scaled amount (what buy-back reclaims)", () => {
-    const sim = Simulation.newGame(7, "modern");
-    const condo = servedCondo(sim);
-    tickUntil(sim, () => condo.everOccupied);
-    const expected = Math.round((rentOf(condo) * condo.residents!) / 3);
-    expect(unitEditorVolatile(sim, condo).rent).toBe(`$${expected.toLocaleString()}`);
-  });
-
-  it("keeps 'People housed' equal to the census even when a sold condo lacks residents", () => {
-    // A corrupt/hand-edited Modern save: a present, sold condo with no household.
-    // The census (residentCount) falls back to the classic 3, so the readout must
-    // too — otherwise People housed would undercount total population.
-    const sim = Simulation.newGame(3, "modern");
-    const a = servedCondo(sim);
-    tickUntil(sim, () => a.everOccupied); // a real household (2–5)
-    const b = sim.tower.place("condo", 2, C + 24);
-    const bare = sim.tower.units.find((u) => u.id === b.unitId)!;
-    bare.state = "occupied";
-    bare.everOccupied = true;
-    bare.residents = undefined; // sold but no household on the record
-    const pop = sim.tower.totalPopulation();
-    expect(pop).toBe(a.residents! + 3); // census counts the bare condo as 3
-    const housed = Number(/People housed<\/span><span class="v">([\d,]+)</.exec(buildStatsHtml(sim))![1].replace(/,/g, ""));
-    expect(housed).toBe(pop); // readout agrees with the census
   });
 });

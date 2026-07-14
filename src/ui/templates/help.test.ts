@@ -1,14 +1,12 @@
 import { describe, it, expect, vi } from "vitest";
-import { helpHtml } from "../uiTemplates";
 import { helpTemplate } from "./help";
-import { renderToFragment, assertDomEquivalent, click } from "../testing/litTestUtils";
+import { renderToFragment, click } from "../testing/litTestUtils";
 
 /**
  * The Help / How-to-play dialog. Package: the semantic structure and a11y hooks
  * (the splash-gated Replay button, the external report link with rel=noopener and
  * its visually-hidden span, the autofocus primary), the inline Replay `@click`
- * dispatch, the version auto-escape, and the transitional `assertDomEquivalent`
- * guard against `helpHtml` for both splash states. The report-link routing through
+ * dispatch, and the version auto-escape. The report-link routing through
  * the platform wrapper and the Close action live in the controller and are pinned
  * by the showHelp integration tests.
  */
@@ -66,15 +64,5 @@ describe("helpTemplate escapes the interpolated version as text", () => {
     const frag = renderToFragment(helpTemplate(false, hostile, noop));
     expect(frag.querySelector("img")).toBeNull();
     expect(frag.textContent).toContain(`Verticopolis v${hostile}`);
-  });
-});
-
-describe("helpTemplate matches the legacy helpHtml structure", () => {
-  it("holds off the splash (Replay enabled)", () => {
-    expect(() => assertDomEquivalent(helpHtml(false, "1.2.3"), helpTemplate(false, "1.2.3", noop))).not.toThrow();
-  });
-
-  it("holds on the splash (Replay disabled + titled)", () => {
-    expect(() => assertDomEquivalent(helpHtml(true, "1.2.3"), helpTemplate(true, "1.2.3", noop))).not.toThrow();
   });
 });

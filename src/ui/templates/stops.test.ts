@@ -1,15 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
-import { stopsHtml } from "../uiTemplates";
 import { stopsTemplate, type StopFloor } from "./stops";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The per-floor elevator stops dialog. Package: one `.stop-row` per floor with
  * the floor/basement label and the lobby tag, the checkbox `checked` reflecting
- * the stop state, the inline `@change` reporting `(floor, checked)`, the
- * auto-escaped title, and the transitional `assertDomEquivalent` guard against
- * `stopsHtml`. The Done action lives in the controller and is pinned by the
- * showStopsDialog integration test.
+ * the stop state, the inline `@change` reporting `(floor, checked)`, and the
+ * auto-escaped title. The Done action lives in the controller and is pinned by
+ * the showStopsDialog integration test.
  */
 
 const noToggle = () => {};
@@ -77,21 +75,5 @@ describe("stopsTemplate escapes the title as text", () => {
     const frag = renderToFragment(stopsTemplate(hostile, [], noToggle));
     expect(frag.querySelector("h2 img")).toBeNull();
     expect(frag.querySelector("h2")!.textContent).toBe(`${hostile}: Stops`);
-  });
-});
-
-describe("stopsTemplate matches the legacy stopsHtml structure", () => {
-  const floors: StopFloor[] = [
-    { floor: 5, stop: true, lobby: false },
-    { floor: 1, stop: true, lobby: true },
-    { floor: -2, stop: false, lobby: false },
-  ];
-
-  it("holds across positive floors, a lobby row, a basement, and mixed checked state", () => {
-    expect(() => assertDomEquivalent(stopsHtml("Express", floors), stopsTemplate("Express", floors, noToggle))).not.toThrow();
-  });
-
-  it("holds for an empty floor list", () => {
-    expect(() => assertDomEquivalent(stopsHtml("Express", []), stopsTemplate("Express", [], noToggle))).not.toThrow();
   });
 });

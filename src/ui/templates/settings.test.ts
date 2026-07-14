@@ -1,13 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { settingsHtml } from "../uiTemplates";
 import { settingsTemplate } from "./settings";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The Settings dialog structure. It is a STATIC template (no interpolation), so
- * the package here is the semantic structure with its a11y attributes and the
- * transitional `assertDomEquivalent` guard against `settingsHtml`. The stateful
- * behavior lives in the controller and is pinned by `showSettings: the Settings
+ * the package here is the semantic structure with its a11y attributes. The
+ * stateful behavior lives in the controller and is pinned by `showSettings: the Settings
  * dialog` in `uiDialogs.integration.test.ts`: the sliders initialize from live
  * volumes and apply on input; the switches re-read live state after every toggle;
  * and the OS-forced reduced-motion path disables and relabels the switch.
@@ -51,11 +49,5 @@ describe("settingsTemplate structure and a11y", () => {
     expect(close.textContent).toBe("Close");
     expect([...close.classList].sort()).toEqual(["btn", "primary"]); // full set, not just primary
     expect(close.hasAttribute("autofocus")).toBe(true);
-  });
-});
-
-describe("settingsTemplate matches the legacy settingsHtml structure", () => {
-  it("assertDomEquivalent holds (the transitional regression guard)", () => {
-    expect(() => assertDomEquivalent(settingsHtml(), settingsTemplate())).not.toThrow();
   });
 });

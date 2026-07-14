@@ -145,7 +145,7 @@ diagrams). The prose conventions below are the source of truth.
   never mutates it.
 - **`src/ui/`**: DOM controls (palette, status bar, dialogs), using native
   `<dialog>` for modals. The `UI` class is a thin shell over friend-modules that
-  take the instance: the pure HTML builders (`uiTemplates`), the dialog
+  take the instance: the lit-html template bodies (`templates/`), the dialog
   controllers (`uiDialogs`), the editor/inspector panels (`uiPanels`), the
   status/log pump (`uiStatus`), and the palette build (`uiPalette`).
 - **`src/audio/`, `src/storage/`**: sound and save/load, independent of
@@ -313,7 +313,7 @@ alone.
 | `src/game/` | Game controllers: the testable logic behind the composition root. |
 | `src/render/` | Canvas rendering and pixel-art sprites (`sprites.ts`, `sprites/**`, `pixelSprites.ts`). Reads engine state, never mutates it. |
 | `src/render/excalibur/` | The Excalibur/WebGL engine wrapper (unit-exempt, e2e-covered). |
-| `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `uiTemplates` (HTML), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
+| `src/ui/` | DOM controls: palette, status bar, native `<dialog>` modals. The `UI` shell delegates to friend-modules: `templates/` (lit-html bodies), `uiDialogs`, `uiPanels`, `uiStatus`, `uiPalette`. |
 | `src/audio/` | Sound, independent of rendering: `ToneAudioEngine` (orchestrator) + `toneScenes` (data/math) + `toneVoices` (synthesis). |
 | `src/storage/` | Save/load, `.vctower` tower-file import/export. |
 | `src/main.ts` | Composition root: wires input, engine, and the game loop. |

@@ -1,19 +1,18 @@
 import { describe, it, expect } from "vitest";
 import type { ImportReport } from "../../storage/tdtImport";
 import type { ExportReport } from "../../storage/tdtExport";
-import { exportConfirmHtml, importReportHtml, exportReportHtml } from "../uiTemplates";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./reports";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
  * The TDT import/export report dialogs and the export-choice modal. Package: the
  * Modern-gated legacy button (disabled + title), the fact line (stars/TOWER,
  * negative funds, floor pluralization, basements suffix, rooms), the
- * brought-over/couldn't-bring (and export twin) lists as nested list items, the
- * auto-escaped report strings and filename, and the transitional
- * `assertDomEquivalent` guards. The isModalOpen clobber guard, the #a11y-live
- * announcement, and the action wiring live in the controllers and are pinned by
- * the showImportReport / showExportReport / confirmExport integration tests.
+ * brought-over/couldn't-bring (and export twin) lists as nested list items, and
+ * the auto-escaped report strings and filename. The isModalOpen clobber guard,
+ * the #a11y-live announcement, and the action wiring live in the controllers and
+ * are pinned by the showImportReport / showExportReport / confirmExport
+ * integration tests.
  */
 
 const importReport = (over: Partial<ImportReport> = {}): ImportReport => ({
@@ -59,10 +58,6 @@ describe("exportConfirmTemplate: the .TDT gate", () => {
     expect(legacy.getAttribute("title")).toBe("Classic towers only");
   });
 
-  it("matches the legacy exportConfirmHtml for both modes", () => {
-    expect(() => assertDomEquivalent(exportConfirmHtml(false), exportConfirmTemplate(false))).not.toThrow();
-    expect(() => assertDomEquivalent(exportConfirmHtml(true), exportConfirmTemplate(true))).not.toThrow();
-  });
 });
 
 describe("importReportTemplate: the fact line and lists", () => {
@@ -109,15 +104,6 @@ describe("importReportTemplate: the fact line and lists", () => {
     expect(frag.querySelector(".import-facts")!.textContent).toContain("$101");
   });
 
-  it("matches the legacy importReportHtml", () => {
-    const r = importReport();
-    expect(() => assertDomEquivalent(importReportHtml(r), importReportTemplate(r))).not.toThrow();
-  });
-
-  it("matches the legacy importReportHtml with empty lists, a singular floor, and no basements", () => {
-    const r = importReport({ floors: 1, basements: 0, broughtOver: [], couldNotBring: [] });
-    expect(() => assertDomEquivalent(importReportHtml(r), importReportTemplate(r))).not.toThrow();
-  });
 });
 
 describe("exportReportTemplate: the reverse fidelity report", () => {
@@ -157,13 +143,4 @@ describe("exportReportTemplate: the reverse fidelity report", () => {
     expect(frag.textContent).toContain(hostile);
   });
 
-  it("matches the legacy exportReportHtml", () => {
-    const r = exportReport();
-    expect(() => assertDomEquivalent(exportReportHtml(r), exportReportTemplate(r))).not.toThrow();
-  });
-
-  it("matches the legacy exportReportHtml with empty lists and no basements", () => {
-    const r = exportReport({ basements: 0, comesAlong: [], staysBehind: [] });
-    expect(() => assertDomEquivalent(exportReportHtml(r), exportReportTemplate(r))).not.toThrow();
-  });
 });

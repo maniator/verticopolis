@@ -1,5 +1,4 @@
 import { describe, it, expect, vi } from "vitest";
-import { batchPricingHtml } from "../uiTemplates";
 import {
   batchPricingTemplate,
   batchPriceText,
@@ -9,14 +8,14 @@ import {
   type BatchPricingHandlers,
 } from "./batchPricing";
 import type { BatchRentResult } from "../../engine/Simulation";
-import { renderToFragment, assertDomEquivalent, click, change, input } from "../testing/litTestUtils";
+import { renderToFragment, click, change, input } from "../testing/litTestUtils";
 
 /**
  * The batch-pricing dialog (E4). The template is a pure function of `state`; the
- * controller re-renders it on each event. Package: the initial-state equivalence
- * with `batchPricingHtml`, the state-driven bits (Apply label / disabled, the
- * price field's disabled + value, the preview text, the radio/checkbox reflection),
- * and the inline handler wiring. The reactive re-render flow (snap-on-commit, the
+ * controller re-renders it on each event. Package: the state-driven bits (Apply
+ * label / disabled, the price field's disabled + value, the preview text, the
+ * radio/checkbox reflection) and the inline handler wiring. The reactive
+ * re-render flow (snap-on-commit, the
  * two-click reset, live re-preview) lives in the controller and is pinned by the
  * showBatchPricingDialog integration tests.
  */
@@ -138,18 +137,5 @@ describe("batchPreviewMessage reproduces the honest count sentence", () => {
   it("appends the clamp clauses when the target leaves the band", () => {
     expect(batchPreviewMessage(CTX, 20000, baseResult({ clampedHigh: 1 }))).toContain("Clamped to the $20,000 max.");
     expect(batchPreviewMessage(CTX, 5000, baseResult({ clampedLow: 1 }))).toContain("Clamped to the $5,000 min.");
-  });
-});
-
-describe("batchPricingTemplate matches the legacy batchPricingHtml at the initial state", () => {
-  it("holds for the rent band", () => {
-    expect(() => assertDomEquivalent(batchPricingHtml("offices", "rent", BAND), batchPricingTemplate(CTX, initialState(), noop))).not.toThrow();
-  });
-
-  it("holds for a condo price band", () => {
-    const band = { default: 250000, min: 100000, max: 500000, step: 5000 };
-    const ctx: BatchPricingCtx = { noun: "condos", priceWord: "price", band };
-    const state = initialState({ priceRaw: String(band.default) });
-    expect(() => assertDomEquivalent(batchPricingHtml("condos", "price", band), batchPricingTemplate(ctx, state, noop))).not.toThrow();
   });
 });

@@ -21,7 +21,7 @@ import { floorTag } from "../format";
 /**
  * The editor card bodies (E6-S1), pure functions of (sim, entity, mobile).
  * Authored to match `unitEditorHtml` / `transportEditorHtml` structurally
- * (proven by the transitional `assertDomEquivalent` tests) but rendered every
+ * (proven by transitional guards, retired with the string builders) but rendered every
  * pump: lit's binding diff patches only the values that changed, so the
  * buttons and the rename input keep their element identity across refreshes.
  * That diff is what replaces the old `key`/`patchVolatile` protocol, a refresh

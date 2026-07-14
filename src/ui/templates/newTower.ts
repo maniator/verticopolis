@@ -2,7 +2,7 @@ import { html, nothing, type TemplateResult } from "lit-html";
 
 /**
  * The Found a New Tower rule-set picker body. Authored to match `newTowerHtml`
- * structurally (proven by the transitional `assertDomEquivalent` test): the lede,
+ * structurally (proven by transitional guards, retired with the string builders): the lede,
  * the Classic/Modern radio bodies, the calendar sub-picker, and the two footer
  * buttons. Only the abandon warning is conditional (on `hasSave`).
  *

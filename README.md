@@ -204,7 +204,7 @@ src/
     pixelSprites.ts dollhouse room interiors + walking/seated people
   ui/          # DOM controls: palette, status bar, editor panel, modals, toasts
     UI.ts           shell class; delegates to friend-modules below
-    uiTemplates.ts  pure HTML builders; uiDialogs.ts dialog controllers
+    templates/      lit-html template bodies; uiDialogs.ts dialog controllers
     uiPanels.ts     editor/inspector panels; uiStatus.ts status+log pump; uiPalette.ts palette build
   audio/Audio.ts  # location-based procedural soundtrack + SFX
     # ToneAudioEngine (orchestrator) + toneScenes (data/math) + toneVoices (synthesis)

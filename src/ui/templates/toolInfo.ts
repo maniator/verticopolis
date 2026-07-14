@@ -4,8 +4,8 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * The tool-info panel bodies (E5-S2). Event-driven, not a pump path: `UI.
  * selectTool` renders one of these into `#tool-info` when the player picks a
  * tool. Authored to match `buildToolInfoHtml` / `BULLDOZE_TOOL_INFO_HTML` /
- * `INSPECT_TOOL_INFO_HTML` structurally (proven by the transitional
- * `assertDomEquivalent` tests). The catalog `name`/`description` copy is trusted
+ * `INSPECT_TOOL_INFO_HTML` structurally (proven by
+ * transitional guards, retired with the string builders). The catalog `name`/`description` copy is trusted
  * static text and now auto-escapes through lit; the conditional
  * capacity/customers row uses lit's `nothing` in place of the legacy `""`.
  * `#tool-info` is lit's container exclusively after the constructor clears its

@@ -1,26 +1,27 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { buildStatsHtml } from "../statsHtml";
-import { statsTemplate } from "./stats";
-import { renderToFragment, assertDomEquivalent } from "../testing/litTestUtils";
+import { nothing } from "lit-html";
+import { statsTemplate, incomeSection } from "./stats";
+import { renderToFragment } from "../testing/litTestUtils";
 
 /**
- * The Tower Statistics dialog body (E3-S5, the worst string-composition case).
- * Package: the transitional `assertDomEquivalent` guard against `buildStatsHtml`
- * across an empty tower, a built Classic tower with an elevator, a fresh Modern
- * tower (household empty-state), a Modern tower with a sold household (populated
- * size mix), plus the auto-escaped tower name. Because both `buildStatsHtml` and
- * `statsTemplate` are pure functions of the sim, the guard proves the lit body is
- * byte-for-byte equivalent to the string builder the rest of the stats tests
- * already pin.
+ * The Tower Statistics dialog body (E3-S5). Package: the window grammar
+ * (section strips as .win-title.sm, the solvency-styled Funds cell), the
+ * VIP row's visibility/color contract, the parking-demand gate, the 4-star
+ * rating divergence row, the Express shaft label, the household size mix,
+ * the populated Income and multi-shaft Elevator sections, and the
+ * auto-escaped tower name. The lit template was proven structurally
+ * equivalent to the retired `buildStatsHtml` by transitional
+ * `assertDomEquivalent` guards across all of these fixtures (removed with
+ * the string builders in the final sweep; see git history for the guard
+ * suite).
  */
 
 /** A small built Classic tower with a lobby row, a floor, an occupied office,
  *  and one standard elevator (so the elevator/tenancy sections are non-empty).
  *  One milestone is forced achieved so the Milestones `done` (✓ / `ms-done`)
- *  markup and a non-zero progress-bar width render (both builders read the same
- *  `milestoneProgress`, so the equivalence guard covers that branch). */
+ *  markup and a non-zero progress-bar width render. */
 function builtTower(): Simulation {
   const sim = new Simulation();
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
@@ -150,71 +151,116 @@ describe("statsTemplate structure", () => {
   });
 });
 
-describe("statsTemplate matches the legacy buildStatsHtml structure", () => {
-  it("holds for an empty tower (most sections collapse to nothing)", () => {
-    const sim = new Simulation();
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+describe("statsTemplate sections across fixture towers", () => {
+  it("renders every section as a mini title bar with the solvency-styled Funds cell", () => {
+    // The window grammar the design system reads: section strips use the
+    // documented .win-title.sm variant and Funds carries the money class.
+    const frag = renderToFragment(statsTemplate(builtTower()));
+    for (const section of ["Overview", "Tenancy", "Transport & access", "Milestones"]) {
+      expect(frag.textContent).toContain(section);
+    }
+    expect(frag.querySelectorAll(".stats-section.win-title.sm").length).toBeGreaterThanOrEqual(4);
+    expect(frag.querySelector(".v.money")).not.toBeNull();
   });
 
-  it("holds for a built Classic tower with an elevator and an occupied office", () => {
+  it("splits the milestones checklist into two kv columns; the achieved goal reads done with a filled gauge", () => {
+    // builtTower forces one achieved milestone, so the done marker and a
+    // non-zero gauge width must render (the ms-done markup the retired
+    // equivalence guard used to verify).
+    const frag = renderToFragment(statsTemplate(builtTower()));
+    expect(frag.querySelectorAll(".col.ms.kv").length).toBe(2);
+    expect(frag.querySelector(".ms-done")).not.toBeNull();
+    expect(frag.textContent).toContain("\u2713");
+    const gauge = frag.querySelector<HTMLElement>(".evalbar > span")!;
+    expect(gauge.getAttribute("style")).toMatch(/width:\s*[1-9]/); // non-zero progress
+  });
+
+  it("an empty tower still renders the grid; a Modern tower gains the Households section", () => {
+    expect(renderToFragment(statsTemplate(new Simulation())).querySelector(".stats-grid")).not.toBeNull();
+    expect(renderToFragment(statsTemplate(Simulation.newGame(3, "classic"))).textContent).not.toContain("Households");
+    expect(renderToFragment(statsTemplate(Simulation.newGame(3, "modern"))).textContent).toContain("Households");
+  });
+
+  it("a sold Modern household renders the multi-size mix", () => {
+    // Scope to the Size mix VALUE cell: the elevator and VIP rows also join
+    // with the same separator, so a whole-dialog probe could pass vacuously.
+    const frag = renderToFragment(statsTemplate(modernWithHousehold()));
+    const key = [...frag.querySelectorAll("span.k")].find((el) => el.textContent === "Size mix")!;
+    expect(key).toBeTruthy();
+    expect(key.nextElementSibling!.textContent).toMatch(/×.+·.+×/); // two buckets joined
+  });
+
+  it("a multi-shaft tower renders EVERY shaft's utilization row; income history renders rows and Net", () => {
+    const shafts = manyShafts();
+    expect(shafts.elevatorStats().length).toBe(4);
+    const frag = renderToFragment(statsTemplate(shafts));
+    // All four shafts render a "% full" value cell (the two-column split holds
+    // every row, none silently dropped).
+    expect([...frag.querySelectorAll("span.v")].filter((v) => /% full$/.test(v.textContent ?? "")).length).toBe(4);
+    const income = withIncome();
+    expect(income.incomeBreakdown().hasData).toBe(true);
+    expect(renderToFragment(statsTemplate(income)).textContent).toContain("Net");
+  });
+
+  it("a 4-star tower whose hotel guests diverge the rating count shows the row and explainer", () => {
     const sim = builtTower();
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+    const r = sim.tower.place("hotelSingle", 2, 22);
+    expect(r.ok).toBe(true);
+    const room = sim.tower.units.find((u) => u.id === r.unitId)!;
+    room.state = "asleep"; // guest in residence tonight
+    room.occupants = 1;
+    sim.star = 4;
+    // Guard the fixture: the divergence must be real or the row never renders.
+    expect(sim.ratingPopulation()).toBeLessThan(sim.stats().population);
+    const frag = renderToFragment(statsTemplate(sim));
+    expect(frag.textContent).toContain("Counts toward stars");
+    expect(frag.textContent).toContain("Hotel guests count toward your star rating");
   });
 
-  it("holds for a fresh Modern tower (Households empty-state placeholder)", () => {
-    const sim = Simulation.newGame(3, "modern");
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a Modern tower with a sold household (populated size mix)", () => {
-    const sim = modernWithHousehold();
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a fresh Classic tower (no Households section)", () => {
-    const sim = Simulation.newGame(3, "classic");
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a multi-shaft tower (Elevators two-column split, both columns filled)", () => {
-    const sim = manyShafts();
-    // Guard the fixture: enough shafts to fill both columns of the split.
-    expect(sim.elevatorStats().length).toBeGreaterThan(2);
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a tower with income history (Income rows, two columns, and Net)", () => {
-    const sim = withIncome();
-    // Guard the fixture: the Income section only renders once there's data.
-    expect(sim.incomeBreakdown().hasData).toBe(true);
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a 3★ tower with no VIP visit yet (VIP row empty state)", () => {
+  it("an express shaft reads its Express label in the elevator list", () => {
     const sim = builtTower();
-    sim.star = 3;
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+    // Tower-level placement: the star/money gates live in sim.buildTransport
+    // and are not what this pins.
+    expect(sim.tower.placeTransport("elevatorExpress", 16, 1, 2).ok).toBe(true);
+    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("Express");
+  });
+});
+
+describe("incomeSection (income breakdown)", () => {
+  it("Net sums only the shown rows, excluding hidden sub-dollar lines", () => {
+    const sim = Simulation.newGame(91);
+    // One clearly-shown line and two sub-$0.50/day lines that the row filter
+    // hides (a realistic case: a small annual-ish charge amortized over 90 days).
+    sim.recordMoney("offices", 1000);
+    sim.recordMoney("food", 0.3); // rounds to $0, hidden row
+    sim.recordMoney("retail", 0.3); // rounds to $0, hidden row
+
+    const text = renderToFragment(incomeSection(sim) as Exclude<ReturnType<typeof incomeSection>, typeof nothing>).textContent!;
+
+    // The big line shows; the sub-dollar lines are omitted from the list.
+    expect(text).toContain("Offices");
+    expect(text).not.toContain("Food");
+    expect(text).not.toContain("Retail");
+
+    // Net reflects only the shown rows ($1,000), not $1,000.6 rounded to
+    // $1,001 (the old code summed every category, hidden lines included).
+    //
+    // money() formats via toLocaleString, whose thousands separator is
+    // locale-dependent (comma, dot, or a nbsp / narrow-nbsp / thin space).
+    // Collapse any separator sitting between two digits FIRST, so the
+    // discriminating assertion below holds in EVERY locale; otherwise it
+    // would only catch the regression under a comma locale.
+    const norm = text.replace(/(\d)[,.\u00a0\u202f\u2009 ](\d)/g, "$1$2");
+    expect(norm).toContain("Net");
+    expect(norm).toContain("$1000/day"); // Offices row and Net both read $1,000
+    expect(norm).not.toContain("$1001"); // the old, hidden-lines-included Net
   });
 
-  it("holds for a tower with VIP visits and the earned review (VIP row populated)", () => {
-    const sim = builtTower();
-    sim.star = 3;
-    sim.vipVisits = 2;
-    sim.vipFavorable = true;
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a tower with visits but no review yet (the struggling 3★ state)", () => {
-    const sim = builtTower();
-    sim.star = 3;
-    sim.vipVisits = 2;
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
-  });
-
-  it("holds for a favorable review with no recorded visits (fixture/tampered state)", () => {
-    const sim = builtTower();
-    sim.star = 3;
-    sim.vipFavorable = true;
-    expect(() => assertDomEquivalent(buildStatsHtml(sim), statsTemplate(sim))).not.toThrow();
+  it("renders nothing before any money has been recorded", () => {
+    // `nothing` renders no nodes: the whole section is absent from the dialog,
+    // and the section function itself returns the sentinel (not an empty shell).
+    const sim = Simulation.newGame(92);
+    expect(incomeSection(sim)).toBe(nothing);
+    expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("Income (avg / day");
   });
 });
