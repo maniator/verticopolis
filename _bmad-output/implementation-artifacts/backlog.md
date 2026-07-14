@@ -1492,3 +1492,37 @@ run-to-run. Residual defers:
 - **`@perf` grep is a substring match**: a future non-perf test whose title
   contains "@perf" would be miscategorized by `--grep`/`--grep-invert`. Low risk;
   tighten the tag convention if the suite grows.
+
+### Decisions + deferrals: E5-S1 (tower-stats grid live view) (`/bmad-code-review`, 2026-07-14)
+
+Change: E5-S1 migrates the first live view. The tower-stats grid renders through
+lit on the ~6 Hz pump: `uiStatus.update` calls `render(towerStatsTemplate(
+sim.stats()), ui.el.towerStats)` in place of the old `innerHTML = towerStatsHtml(
+...)` full reparse, so the grid's child nodes keep their identity across pumps
+(now ASSERTED by the E5-S0 gate's node-identity probe, promoted from reported).
+The `#tower-stats` container is lit's exclusively (one container, one renderer;
+`uiStatus.update` was its only writer). Decisions per the story's stated options:
+
+- **Status bar stays imperative**: the five leaf writes (`money`/`pop`/`star`/
+  `time`/`date`) remain surgical `textContent` writes, the story's "keep" option.
+  They are already minimal (no parse, no allocation), and the render target
+  question (leaf spans, never a `#traffic` wrapper) does not arise: `#traffic`
+  keeps its own imperative writer (`main.ts` `updateTraffic()` with hysteresis)
+  untouched.
+- **The write-before-`positionPanels`-layout-read ordering rule is recorded as a
+  structural guarantee** (the E5-S0 defer offered probe-or-record): in `main.ts`
+  `update()`, `ui.update(sim)` (all DOM writes, including the new lit render)
+  completes before `positionPanels()` performs its layout reads, and this story
+  adds no layout read to the write path. A dedicated forced-reflow probe stays
+  open for a later story if the write path ever grows a read.
+- **`towerStatsHtml` joins the transitional string-builder retirement list**: dead
+  production code kept only to feed its `assertDomEquivalent` guard.
+
+Review outcome (both layers): 7/7 ACs MET; the one patch (a stale
+perf-harness docstring describing the pre-promotion "reported, not asserted"
+state) was fixed in-PR. Optional notes judged noise by the reviewers, recorded
+for completeness: an identical-snapshot re-render no-op test would pin lit's own
+dirty-check rather than project code, and a corrupted-container guard would pin
+an invariant no current writer can violate (the container ships empty and
+`uiStatus.update` is its only writer); the cheapest belt-and-suspenders form, if
+ever wanted, is asserting `#tower-stats` is empty at UI construction.

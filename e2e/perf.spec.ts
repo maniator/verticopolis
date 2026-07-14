@@ -145,11 +145,13 @@ test.describe("E5-S0 perf gate @perf", () => {
     };
 
     // The status leaf spans are textContent writes and must never be replaced;
-    // this holds pre-E5 and a live-view regression that rebuilds them fails here.
-    // The tower-stats children are rebuilt by the pre-E5 `innerHTML =` and become
-    // stable only at E5-S1, so that flag is reported, not yet asserted.
+    // a live-view regression that rebuilds them fails here.
     expect(nodeIdentity.statusLeavesStable, "status leaf spans keep their identity across pumps").toBe(true);
     expect(nodeIdentity.towerStatsContainerStable, "the tower-stats container persists across pumps").toBe(true);
+    // Since E5-S1 the grid renders through lit, which patches text in place, so
+    // the grid's child nodes must also keep their identity across pumps (the
+    // pre-E5 innerHTML reparse rebuilt them; that regression now fails here).
+    expect(nodeIdentity.towerStatsChildStable, "the tower-stats grid children keep their identity across pumps").toBe(true);
 
     if (CAPTURE || !fs.existsSync(BASELINE_PATH)) {
       // In enforce mode a missing baseline is a hard failure, not a bootstrap:
