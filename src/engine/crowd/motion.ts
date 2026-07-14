@@ -309,10 +309,16 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       break;
     }
     case "toDest": {
-      // Stroll to a spot on the destination floor, linger, then leave.
+      // Stroll to a spot on the destination floor, linger, then leave. The
+      // give-up valve exempts `toDest`, so a held arrival (a dwell, or a
+      // venue stay entered below) is never culled mid-stay.
       if (walkTo(p, p.destX, dt)) {
         p.linger += dt;
-        if (p.linger > 2) {
+        // A person with a dwell (a metro commuter waiting for their train)
+        // holds the arrived pose past the default beat; venue round-trippers
+        // never carry `dwell` (their stationary stay is the eating-state
+        // dwell below), so the two mechanisms cannot stack.
+        if (p.linger > (p.dwell ?? 2)) {
           // Round-tripper (meal or attendance visit): outbound arrival
           // transitions to the stationary dwell (beginDwell registers the
           // person at their venue and sets the kind's dwell timer), then a
