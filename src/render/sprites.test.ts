@@ -241,12 +241,13 @@ describe("transport, crane & event sprites paint", () => {
     expect(explicit.sig()).toBe(implicit.sig());
   });
 
-  it("the standard cab keeps its established frame, interior, and light-strip colors", () => {
+  it("the standard cab keeps its established warm brass-and-walnut colors", () => {
     const s = spyCtx();
     drawCar(s.ctx, 1, 44, 44, 0);
-    expect(s.log).toContain("fillStyle=#8e94a0");
-    expect(s.log).toContain("fillStyle=#d8dce2");
-    expect(s.log).toContain("fillStyle=#f3f6fa");
+    expect(s.log).toContain("fillStyle=#4A4238"); // dark cab frame
+    expect(s.log).toContain("fillStyle=#6B4A2B"); // walnut interior
+    expect(s.log).toContain("fillStyle=#C9A24B"); // brass ceiling rail
+    expect(s.log).toContain("fillStyle=#F8E2B4"); // warm ceiling glow dot
   });
 
   it("FULL and the direction lantern still change every kind's cab", () => {
@@ -259,6 +260,37 @@ describe("transport, crane & event sprites paint", () => {
       drawCar(busy.ctx, 1, 44, 44, 0, "up", true, kind);
       expect(busy.sig()).not.toBe(idle.sig());
     }
+  });
+
+  it("stairs and escalator each draw one flight rising to a second-floor landing", () => {
+    // A two-floor stairway/escalator draws exactly one flight (the top band is
+    // the arrival landing) and the two kinds render as different sprites. The
+    // sprite bakes no rider; climbers are separate engine-driven actors.
+    const stair = spyCtx();
+    const esc = spyCtx();
+    drawTransport(stair.ctx, transport({ kind: "stairs", bottom: 1, top: 2, width: 8 }), 0, 0, 88, 44);
+    drawTransport(esc.ctx, transport({ kind: "escalator", bottom: 1, top: 2, width: 8 }), 0, 0, 88, 44);
+    expect(stair.painted()).toBe(true);
+    expect(esc.painted()).toBe(true);
+    // Warm tan treads vs metallic steps: the two transport kinds are distinct.
+    expect(stair.sig()).not.toBe(esc.sig());
+    // The stairs paint their warm-tan tread color; the routed climbers that ride
+    // the flight are engine-driven actors, not baked into this static sprite.
+    expect(stair.log.some((l) => l.includes("#EDE6D2"))).toBe(true);
+  });
+
+  it("the wedding hall paints its two-floor composition into the full rect", () => {
+    // Floor 100's venue draws into whatever w x h rect the caller gives; drive
+    // it at the two-floor (88px) height to prove the arch, aisle, and couple
+    // scale into a taller rect without throwing.
+    const s = spyCtx();
+    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall" }), 0, 0, 176, 88)).not.toThrow();
+    expect(s.painted()).toBe(true);
+    // The couple: a dark-suited seated figure at the altar.
+    expect(s.log.some((l) => l.includes("#2A2E38"))).toBe(true);
+    // The white aisle runner the couple walks down (spec calls for white, not
+    // a red carpet).
+    expect(s.log.some((l) => l.includes("#F4F0EC"))).toBe(true);
   });
 
   it("drawEscapeStairs, drawCrane, and the moving-vehicle sprites all paint", () => {
