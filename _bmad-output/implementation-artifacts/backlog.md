@@ -672,3 +672,22 @@ parked here:
 - ~~**`escapeAttr` used for text content / raw engine-string interpolation**~~,
   done 2026-07-02: single shared `escapeHtml` in `src/ui/escape.ts`; the
   previously raw user-controlled `u.label` in the inspector card is now escaped.
+
+### Deferred from: code review of E1 pixel-art shared language (`/gds-code-review`, 2026-07-14)
+
+Change: E1 adds the finalized `person()` build family, `moodTint`, new `PAL`
+keys, and the shared helpers (`windowView`, `roomGlow`, `ceilingFixture`,
+`dado`, `castShadow`) to `pixelSprites/common.ts`, plus the food/shop
+look-table splits into `food.looks.ts` / `shop.looks.ts`. Three review layers
+(Blind Hunter, Edge Case Hunter; the Acceptance Auditor timed out, and its
+spec-conformance scope was independently re-verified by the Edge Case Hunter:
+build heights 15/18/24/17/22, new `PAL` keys vs the art bible, byte-identical
+look data, barrel surface). Patched in-PR: the width-6 leg-gap bug (fixed leg
+columns), the `windowView` `lit` inversion plus night-gating of the city
+lights, the `RESERVED_COLORS` docstring overstatement, and per-wrapper build
+tests. No residual defers: the one Edge Case Hunter parking item (the exported
+`personFigure` / `dado` / `ceilingFixture` passing a bare color into `shade()`,
+which yielded `rgb(NaN,...)` for a non-hex argument) was patched in-PR after
+Copilot raised the same point on the PR. `shade()` now returns a non-hex
+argument unchanged, so those helpers degrade gracefully; every shipped caller
+still passes a `#RRGGBB` literal, so current output is byte-identical.
