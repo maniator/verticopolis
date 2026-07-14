@@ -361,8 +361,22 @@ export interface LogEntry {
 /** Camera zoom bounds (screen pixels per world pixel). Owned here because the
  *  save schema clamps a restored zoom at the deserialize trust boundary; the
  *  renderer re-exports these as its own MIN_ZOOM/MAX_ZOOM so the range exists
- *  in exactly one place. */
-export const VIEW_ZOOM_MIN = 0.3;
+ *  in exactly one place.
+ *
+ *  `VIEW_ZOOM_MIN` is the absolute HARD floor: low enough that the tallest legal
+ *  tower fits even a small phone held in LANDSCAPE (the manifest allows any
+ *  orientation, so a short viewport must still frame the whole tower). The span
+ *  that has to fit is the 110 buildable floors (basement B10 up to floor 100)
+ *  plus `fitZoom`'s own 6-floor sky headroom (FIT_SKY_FLOORS), i.e. 116 floors
+ *  (this is the renderer's fit-span, not clampCameraY's dirt-margin math): ~116
+ *  floors x 44px x 0.06 is about 306px, under any real device height. It is not
+ *  the everyday
+ *  zoom-out limit a player feels; the renderer layers a tower-aware fit floor on
+ *  top of it (see `fitZoom` in render/cameraBounds), so pinch/wheel/keyboard
+ *  zoom-out stops when the whole tower plus a breath of sky is in frame rather
+ *  than drifting into empty void. This constant only guards the trust boundary
+ *  (a forged or foreign save's zoom) and backstops the dynamic floor. */
+export const VIEW_ZOOM_MIN = 0.06;
 export const VIEW_ZOOM_MAX = 3;
 
 /**

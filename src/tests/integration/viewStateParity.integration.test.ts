@@ -306,6 +306,58 @@ describe("TowerEngine camera restore (prototype on a fake: no canvas)", () => {
   });
 });
 
+describe("TowerEngine gesture zoom floor (prototype on a fake: no canvas)", () => {
+  /** A fake carrying just what dynamicMinZoom/clampGestureZoom reach: the
+   *  camera zoom, the viewport height, and the tower's built floor extent. */
+  function fake(zoom: number, highestFloor: number, lowestFloor = 1, height = 700) {
+    const f: any = Object.create(TowerEngine.prototype);
+    f.engine = {
+      currentScene: { camera: { pos: { x: 0, y: 0 }, zoom } },
+      screen: { resolution: { width: 400, height } },
+    };
+    f.sim = { tower: { highestFloor, lowestFloor } };
+    return f;
+  }
+  const proto = TowerEngine.prototype as any;
+
+  it("stops zoom-OUT exactly at the tower-aware floor (no drift into void)", () => {
+    const f = fake(0.9, 90); // a 90-floor tower, resting at the default zoom
+    const lo = proto.dynamicMinZoom.call(f);
+    expect(lo).toBeLessThan(0.9); // the floor is further out than the resting view
+    // Pinching hard toward zero lands on the floor, never below it.
+    expect(proto.clampGestureZoom.call(f, 1e-4)).toBeCloseTo(lo, 10);
+  });
+
+  it("counts basements: a deep tower's floor sits further out than a shallow one", () => {
+    const shallow = proto.dynamicMinZoom.call(fake(0.9, 50)); // floors 1..50
+    const deep = proto.dynamicMinZoom.call(fake(0.9, 50, -9)); // plus B1..B10
+    expect(deep).toBeLessThan(shallow);
+  });
+
+  it("never FORCES a zoom-in when the camera is already below the floor", () => {
+    // Small tower -> a high floor (~0.4). The camera sits well below it at 0.1,
+    // as it would after rotating from a shorter landscape viewport or loading a
+    // save whose zoom was set on a different device.
+    const f = fake(0.1, 5);
+    const lo = proto.dynamicMinZoom.call(f);
+    expect(lo).toBeGreaterThan(0.1); // precondition: camera is below the floor
+    // A pinch-OUT must not snap the camera INWARD to the floor; it holds instead.
+    expect(proto.clampGestureZoom.call(f, 0.1 * 0.9)).toBeCloseTo(0.1, 10);
+    // A pinch-IN eases toward the floor smoothly, honoring the exact request.
+    expect(proto.clampGestureZoom.call(f, 0.1 * 1.2)).toBeCloseTo(0.12, 10);
+  });
+
+  it("re-engages the normal floor once the camera climbs back above it", () => {
+    // Same small tower on a shorter viewport (floor ~0.38), camera now above the
+    // floor at 0.5: the full tower-aware floor applies again, stopping further
+    // zoom-out at lo rather than letting the camera drift on out.
+    const f = fake(0.5, 5, 1, 500);
+    const lo = proto.dynamicMinZoom.call(f);
+    expect(lo).toBeLessThan(0.5);
+    expect(proto.clampGestureZoom.call(f, 1e-4)).toBeCloseTo(lo, 10);
+  });
+});
+
 describe("TDT export/import carry the view words", () => {
   /** A realistic serialized tower (the sample fixture through the importer). */
   function sampleSave(): SerializedGame {

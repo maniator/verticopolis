@@ -71,16 +71,35 @@ export class Tower {
     return [...set].sort((a, b) => a - b);
   }
 
+  /** Cached built-floor bounds, keyed by {@link revision} so the min/max scan
+   *  over units runs once per edit, not once per read. The camera's per-gesture
+   *  zoom-out floor reads highest/lowest on every pinch-move frame, so a plain
+   *  scan there would be O(units) twice per frame on a large tower. */
+  private floorBoundsRev = -1;
+  private floorBounds = { min: 1, max: 1 };
+
+  /** Highest and lowest floor any unit occupies, in a single revision-cached
+   *  pass. Both default to 1 (the ground floor) for an empty tower. */
+  private builtFloorBounds(): { min: number; max: number } {
+    if (this.floorBoundsRev !== this.revision) {
+      let min = 1;
+      let max = 1;
+      for (const u of this.units) {
+        if (u.floor > max) max = u.floor;
+        if (u.floor < min) min = u.floor;
+      }
+      this.floorBounds = { min, max };
+      this.floorBoundsRev = this.revision;
+    }
+    return this.floorBounds;
+  }
+
   get highestFloor(): number {
-    let h = 1;
-    for (const u of this.units) if (u.floor > h) h = u.floor;
-    return h;
+    return this.builtFloorBounds().max;
   }
 
   get lowestFloor(): number {
-    let l = 1;
-    for (const u of this.units) if (u.floor < l) l = u.floor;
-    return l;
+    return this.builtFloorBounds().min;
   }
 
   /** True if `pred` holds for EVERY tile key of the span (short-circuits). */
