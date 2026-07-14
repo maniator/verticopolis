@@ -10,7 +10,6 @@
 src/render/excalibur/TowerEngine.ts
 # ui / app spine
 src/main.ts
-src/ui/UI.ts
 # storage
 # engine leaves
 # scripts

@@ -36,10 +36,10 @@ flowchart TD
     end
 
     subgraph view["Presentation"]
-        UI["src/ui/<br/>UI · Onboarding · editorHtml · statsHtml"]
+        UI["src/ui/<br/>UI shell + friend-modules (uiTemplates · uiDialogs · uiPanels · uiStatus · uiPalette)<br/>Onboarding · editorHtml · statsHtml"]
         Render["src/render/<br/>sprites · pixelSprites"]
         Engine3D["src/render/excalibur/TowerEngine<br/>render loop · camera · pointer input"]
-        Audio["src/audio/<br/>AudioEngine → ToneAudioEngine"]
+        Audio["src/audio/<br/>AudioEngine → ToneAudioEngine (toneScenes · toneVoices)"]
     end
 
     subgraph storage["Persistence — src/storage/"]
