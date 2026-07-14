@@ -69,7 +69,9 @@ export function reconcileCrowd(engine: TowerEngine): void {
     let rec = engine.crowdActors.get(p.id);
     if (!rec) {
       const gfx = p.staff ? engine.personGfxStaff : engine.personGfx[Math.abs(p.seed) % engine.personGfx.length];
-      const a = new ex.Actor({ pos: ex.vec(0, 0), width: 9, height: 25, anchor: ex.vec(0.5, 1), z: 3 });
+      // Size the actor from the baked canvas so the collider and ground-line
+      // anchor can never drift from the sprite's real footprint.
+      const a = new ex.Actor({ pos: ex.vec(0, 0), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 3 });
       a.graphics.use(gfx);
       engine.engine.add(a);
       rec = { actor: a, gfx, red: false };
@@ -294,7 +296,8 @@ function spawnWalker(
   perFloor: boolean,
 ): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
-  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: 9, height: 25, anchor: ex.vec(0.5, 1), z: 0.4 });
+  // Actor bounds track the baked canvas footprint (see reconcileCrowd).
+  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 0.4 });
   a.graphics.use(gfx);
   engine.engine.add(a);
   engine.walkers.push({
