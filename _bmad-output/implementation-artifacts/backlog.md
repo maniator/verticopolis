@@ -1276,3 +1276,31 @@ fixed in `saves.test.ts`. Residual defers (behavior-preserving):
   the pop/funds `toLocaleString` grouping are locale/timezone-dependent, so the suite
   leans on `assertDomEquivalent` for the formatting path rather than brittle literal
   strings. This is intentional, not a gap.
+
+### Deferred from: code review of E3-S2 (stops lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E3-S2 migrates the per-floor elevator stops dialog (`stopsHtml`) onto the
+E0 `openModalTemplate` seam with a lit `stopsTemplate`. Rows are nested
+`TemplateResult`s (not a joined string), the title auto-escapes (no `escapeHtml`),
+and each checkbox binds its toggle inline via `@change` (the floor comes from the
+row closure), so the controller (`showStopsDialog`) no longer walks `[data-floor]`
+and only wires the Done action. `data-floor` stays on each input for structural
+parity with the legacy body (it feeds the equivalence guard) and as a debugging
+hook. Blind Hunter confirmed byte-for-byte equivalence; the Acceptance Auditor
+confirmed all seven ACs; Edge Case Hunter found no `patch` gaps. Residual defers
+(behavior-preserving):
+
+- **`stopsHtml` joins the transitional string-builder retirement list**
+  (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`,
+  `savesHtml`, `stopsHtml`): dead production code kept only to feed its
+  `assertDomEquivalent` guard; retire it and its transitional test when the last
+  string dialog converts (E6/E7).
+- **Second `@change` on the same box firing again is not directly pinned**: the old
+  `addEventListener` fired on every change; the new inline `@change` does too, but no
+  test dispatches twice. The modal renders once (no re-render), so a dropped listener
+  is not reachable; low risk, defer.
+- **Only a single lobby row is exercised**: all tests use exactly one `lobby:true`
+  floor. The map is trivial and one lobby run per tower is the norm; low value, defer.
+- **`floor === 0` renders "B0"** (pre-existing, both old and new): the `floor > 0`
+  guard sends 0 to the basement label. Callers index ground as 1 and basements as
+  negative, so floor 0 is unreachable; a latent legacy quirk, not this PR's to pin.

@@ -6,6 +6,7 @@ import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
 import { savesTemplate } from "./templates/saves";
+import { stopsTemplate } from "./templates/stops";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -73,10 +74,9 @@ export function showStopsDialog(
   floors: { floor: number; stop: boolean; lobby: boolean }[],
   onToggle: (floor: number, stop: boolean) => void,
 ): void {
-  const box = ui.openModal(tpl.stopsHtml(title, floors));
-  box.querySelectorAll<HTMLInputElement>("input[data-floor]").forEach((cb) => {
-    cb.addEventListener("change", () => onToggle(Number(cb.dataset.floor), cb.checked));
-  });
+  // Each checkbox binds its @change inline (the floor comes from the row's
+  // closure), so the controller only wires the Done action now.
+  const box = ui.openModalTemplate(stopsTemplate(title, floors, onToggle));
   ui.wireActions(box);
 }
 
