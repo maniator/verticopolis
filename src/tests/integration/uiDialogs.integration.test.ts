@@ -232,12 +232,15 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
   });
 
-  it("the inspector ✕ survives a same-card lit re-render and is never duplicated", () => {
+  it("the inspector ✕ survives a same-card lit re-render, is never duplicated, and STAYS LIVE", () => {
     // Hover picks re-render the card every move; the ✕ is a foreign node
     // appended after the h4's lit-managed content (the finishModal pattern),
     // so it must survive a same-shape re-render, and a re-show must not
-    // append a second one.
-    const { ui } = makeUI();
+    // append a second one. The legacy innerHTML path minted a fresh button
+    // on every show; the retained button changes that lifecycle, so pin that
+    // it still FIRES after a re-render and after a hide/re-show round trip,
+    // not merely that it is the same element.
+    const { ui, cb } = makeUI();
     const card = (status: string) => html`<h4>Office 12F</h4><div>${status}</div>`;
     ui.showInspector(card("occupied"));
     const x = document.querySelector<HTMLButtonElement>("#inspector h4 > button")!;
@@ -246,6 +249,15 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     const xs = document.querySelectorAll("#inspector h4 > button");
     expect(xs.length).toBe(1);
     expect(xs[0]).toBe(x); // same element: a mid-tap ✕ press can't be swallowed
+    x.click();
+    expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
+
+    ui.showInspector(null); // ✕ tap hides; content (and button) stay parked
+    ui.showInspector(card("occupied")); // re-show over the retained DOM
+    const again = document.querySelectorAll<HTMLButtonElement>("#inspector h4 > button");
+    expect(again.length).toBe(1);
+    again[0].click(); // the retained ✕ must still dismiss on the re-shown card
+    expect(cb.onInspectorClose).toHaveBeenCalledTimes(2);
   });
 });
 

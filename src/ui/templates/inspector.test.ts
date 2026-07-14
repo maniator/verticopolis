@@ -107,6 +107,16 @@ describe("unit inspector card matches the legacy inline builder", () => {
     const plain = simWith("office");
     plain.unit.label = FACILITIES.office.name; // matches the catalog name
     equivalent(legacyUnitCard(plain.sim, plain.unit), unitInspectorTemplate(plain.sim, plain.unit));
+    // The comment's own scenario: a shop renamed to exactly its subtype shown
+    // in the title must not render the name twice (the second condition of
+    // labelIsExtra is the load-bearing one here).
+    const shop = simWith("shop");
+    shop.unit.subtype = "Chinese Cafe";
+    shop.unit.label = "Chinese Cafe";
+    const fragS = renderToFragment(unitInspectorTemplate(shop.sim, shop.unit));
+    expect(fragS.querySelector("h4")!.textContent).toBe("Chinese Cafe");
+    expect(fragS.querySelector("br")).toBeNull(); // subheading suppressed
+    equivalent(legacyUnitCard(shop.sim, shop.unit), unitInspectorTemplate(shop.sim, shop.unit));
   });
 
   it("on-notice statuses: tenant leaving vs household relocating", () => {
@@ -138,6 +148,25 @@ describe("unit inspector card matches the legacy inline builder", () => {
     expect(openFrag.textContent).toContain("Customers: 5");
     expect(openFrag.textContent).not.toContain("(closed)");
     equivalent(legacyUnitCard(sim, unit), unitInspectorTemplate(sim, unit));
+  });
+
+  it("commercial edge arms: an untracked customer count reads 0, and a vacant venue is never 'closed'", () => {
+    // customersIn undefined → the ?? 0 fallback; still at the 07:00 boot
+    // clock, so the closed marker also applies (tenanted).
+    const fresh = simWith("shop");
+    fresh.unit.customersIn = undefined;
+    const frag = renderToFragment(unitInspectorTemplate(fresh.sim, fresh.unit));
+    expect(frag.textContent).toContain("Customers: 0 (closed)");
+    equivalent(legacyUnitCard(fresh.sim, fresh.unit), unitInspectorTemplate(fresh.sim, fresh.unit));
+    // A non-tenanted venue outside business hours: the Status row tells the
+    // story, so the customers line carries no "(closed)".
+    const vacant = simWith("shop");
+    vacant.unit.state = "empty";
+    vacant.unit.customersIn = 0;
+    const vFrag = renderToFragment(unitInspectorTemplate(vacant.sim, vacant.unit));
+    expect(vFrag.textContent).toContain("Customers: 0");
+    expect(vFrag.textContent).not.toContain("(closed)");
+    equivalent(legacyUnitCard(vacant.sim, vacant.unit), unitInspectorTemplate(vacant.sim, vacant.unit));
   });
 
   it("basement facility reads a B floor tag and a zero-population kind has no census row", () => {
