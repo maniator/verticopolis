@@ -1656,6 +1656,21 @@ describe("showUpdatePrompt — Later / Update now, resolved once", () => {
     expect(onUpdate).toHaveBeenCalledOnce();
     expect(dialog().open).toBe(false);
   });
+
+  it("a rejecting async Update handler is contained: the modal still closes, the rejection is swallowed", async () => {
+    // A Promise-returning handler that rejects must reach the same fire-and-forget
+    // `.catch(() => {})` as a synchronous throw, so no unhandledrejection escapes
+    // and the modal still closes.
+    const onUpdate = vi.fn(() => Promise.reject(new Error("update failed async")));
+    const onLater = vi.fn();
+    const { ui } = makeUI();
+    ui.showUpdatePrompt(onUpdate, onLater, null);
+    expect(() => click('[data-act="update"]')).not.toThrow();
+    await flush();
+    expect(onUpdate).toHaveBeenCalledOnce();
+    expect(onLater).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
 });
 
 describe("showBatchPricingDialog — set-all rent/price with a reset confirm", () => {
