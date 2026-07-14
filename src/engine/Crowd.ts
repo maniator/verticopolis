@@ -123,8 +123,10 @@ export class Crowd {
   /** Read-only elevator queue + car-fill projection for the render layer
    *  (routing module), memoized on the (step, revision) key. The sim loop primes
    *  it once per outer step (right after {@link beginStep}), so the single
-   *  `crowd.people` scan lands in the sim step; a render frame calling this only
-   *  reads the cached snapshot and never scans, mirroring how
+   *  `crowd.people` scan normally lands in the sim step and a render frame between
+   *  steps reads the cached snapshot without scanning. The one exception: a
+   *  structural edit made while paused bumps `revision` with the step frozen, so
+   *  the next call (possibly a render frame) rebuilds once. Mirrors how
    *  {@link Tower.stopsOf} caches by revision. */
   queueView(tower: Tower): ElevatorQueueView {
     if (this.queueCache && this.queueStep === this.step && this.queueRev === tower.revision) {

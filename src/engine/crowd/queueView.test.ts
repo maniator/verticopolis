@@ -8,10 +8,13 @@ import type { FacilityKind } from "../types";
 /**
  * The read-only elevator queue + car-fill projection (E6 engine seam). It is a
  * VIEW of already-tracked crowd state: per shaft landing the waiter count and a
- * bounded wait-tier, and per car the boarded count from `carLoad`. These tests
- * pin the projection's contract (order preserved, boarded = min(queue,
- * remaining capacity), leftover are the same individuals, staff-only shows only
- * staff, an express skip floor shows no queue) and the once-per-step memo.
+ * bounded wait-tier, and per car the boarded count read straight from `carLoad`.
+ * The projection itself does no boarding or capacity math. These tests pin what
+ * it surfaces (waiter order and count, wait tier, staff-only shafts, express
+ * skip floors, and the (step, revision) memo). The reconciliation itself
+ * (`boarded = min(queue, remaining capacity)` and the leftover being the same
+ * individuals) is a property of the crowd step, driven here through
+ * `crowd.advance(...)`, after which the surfaced `carLoad` is shown to match.
  */
 describe("Crowd.queueView: read-only elevator queue projection", () => {
   /** A tower with a ground lobby and plain floors 2..top across the whole lot. */
