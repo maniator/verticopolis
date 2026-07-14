@@ -724,8 +724,16 @@ to warm variants held within 10 per channel of each anchor); `residential.ts`
 rewritten to compose the shell over the shared E1 helpers (`windowView`,
 `dado`, `ceilingFixture`, `roomGlow`) and to adopt `personSeated`.
 
-All three adversarial layers ran (Blind Hunter, Edge Case Hunter, Acceptance
-Auditor). Patched in-PR (8 findings): the 1px unpainted seam at row `y+3`
+All three adversarial layers ran to completion (Blind Hunter, Edge Case
+Hunter, Acceptance Auditor). Patched in-PR (10 findings). Two from the final
+review pass: the suite coffee table drawn at the bed origin
+(`x + suiteSofaW + 14`) and fully occluded by the bed painted afterward, so a
+spec-required suite element rendered zero pixels (moved into the sitting area,
+in front of the sofa, where it is visible and clear of the bed); and the condo
+study's bottom book-spine row overflowing the bookcase by 1px onto the floor
+line (rows anchored at `railY - 1` so all four 3px rows end at `floorY - 1`).
+The Edge Case Hunter found no genuine unhandled edge cases. The earlier eight:
+the 1px unpainted seam at row `y+3`
 between the ceiling cap and the interior wall (interior wall now butts under
 the cap at `y+3`, with the downlights/ceiling fixture drawn over it); the
 misleading `cueTop` comment plus its single-use indirection (the asleep "z"
@@ -749,6 +757,20 @@ spec I/O matrix wants downlights off for an empty office, with the empty-at-
 night scrim handling the dim); the per-layout seat caps differing by geo
 layout (the spec caps seated figures at the layout's seats, and the executive
 corner is ratified as one exec plus two cubicles); the `w > 44` exclusion of
-the single-grade ceiling light and framed art (mirrors the build's `if(W>44)`);
-and the meeting worker drawn after the table (matches the reference build's
-draw order).
+the single-grade ceiling light and framed art (mirrors the build's `if(W>44)`
+at page-02 lines 50 and 54, the pixel-exact port reference; the single is the
+deliberately plainest grade); the meeting worker drawn after the table
+(matches the reference build's draw order); the hotel asleep sleeper drawn
+inside `maybeMirrored` (the Code Map at spec line 104 directs it to stay in the
+`bed` closure so the sleeper's head tracks the flipped headboard; only the
+corner state cues, tray, ready lamp, and the "z" text, must be pixel-identical
+across the mirror, and those do draw outside); the asleep "z" x-position being
+flip-compensated (`zx = flip ? 2*x + w - zSrc - 5 : zSrc`) rather than literally
+identical (it must float over the flipped bed, and it still draws outside the
+wrapper so the text is never backward; the "identical pixels" AC wording is
+imprecise); and the extracted `residential.looks.ts` tables and `dollhouse.ts`
+helpers not being re-exported through the `pixelSprites.ts` barrel (they are
+consumed directly by `residential.ts` and its test, have no cross-module barrel
+consumer like the food/shop look tables do, and the `barrelSurface.test.ts`
+deliberately curates a minimal barrel surface, so re-exporting would add dead
+surface against an intentional guard).

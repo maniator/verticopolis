@@ -224,7 +224,10 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
       // under the lamp, a seated reader when home, a low cabinet.
       bevelBox(ctx, x + 6, railY - 2, 30, floorY - railY + 2, "#6A5240"); // bookcase
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A", "#5A4A6E"];
-      for (let r = 0; r < 4; r++) for (let k = 0; k < 9; k++) fill(ctx, x + 9 + k * 3, railY + r * 4, 2, 3, spines[(k + r) % 5]);
+      // Rows anchored at railY - 1 so the four 3px spine rows fit within the
+      // bookcase (bottom row ends at floorY - 1) instead of spilling 1px onto
+      // the floor line.
+      for (let r = 0; r < 4; r++) for (let k = 0; k < 9; k++) fill(ctx, x + 9 + k * 3, railY - 1 + r * 4, 2, 3, spines[(k + r) % 5]);
       const dx = x + 48;
       fill(ctx, dx, floorY, 22, 1, "#000000", 0.16);
       bevelBox(ctx, dx, floorY - 7, 22, 3, PAL.wood); // desk
@@ -356,10 +359,13 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
       fill(ctx, x + 5, floorY - 11, suiteSofaW, 3, "#8C6A7A");
       fill(ctx, x + 7, floorY - 10, 6, 3, "#9A7A8A");
       if (suiteSofaW > 14) fill(ctx, x + 15, floorY - 10, 6, 3, "#9A7A8A");
+      // Coffee table in front of the sofa (the sitting area, not the bed): the
+      // bed starts at x + suiteSofaW + 14 and paints last, so a table placed
+      // there would be fully occluded. Keep it inside the sofa's footprint.
+      bevelBox(ctx, x + 7, floorY - 4, Math.min(suiteSofaW - 6, 11), 4, PAL.walnut); // coffee table
       fill(ctx, x + suiteSofaW + 8, floorY - 15, 1, 15, "#7A6A50"); // floor lamp pole
       fill(ctx, x + suiteSofaW + 6, floorY - 18, 5, 3, roomGlow(lit)); // shade
       if (lit) glow(ctx, x + suiteSofaW + 8, floorY - 16, PAL.glowLit);
-      bevelBox(ctx, x + suiteSofaW + 14, floorY - 6, 12, 6, PAL.walnut); // coffee table
     }
     beds.forEach((b, i) => bed(b.bx, b.bw, b.pillows, i));
     if (grade === 2) {
