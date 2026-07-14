@@ -4,6 +4,7 @@ import { confirmTemplate } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
+import { helpTemplate } from "./templates/help";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -320,15 +321,14 @@ export function showHelp(ui: UI): void {
   // disable that button there.
   const onSplash = !!document.getElementById("splash");
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-  const box = ui.openModal(tpl.helpHtml(onSplash, version));
+  // Replay binds inline via @click. While the splash is up the button is
+  // disabled, so a real browser suppresses the click, and onReplayOnboarding
+  // also no-ops behind #splash; both make a splash-time trigger a no-op.
+  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }));
   // Inside a native wrapper the report link routes to the system browser
   // through the platform port (see routeExternalInWrapper).
   routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
   ui.wireActions(box);
-  // Only wire replay when it can actually run (not while the splash is up).
-  if (!onSplash) {
-    box.querySelector('[data-act="replay-onboard"]')!.addEventListener("click", () => ui.cb.onReplayOnboarding());
-  }
 }
 
 /** The Settings dialog: sound levels plus the presentation toggles. */
