@@ -95,7 +95,7 @@ vi.mock("tone", () => {
   };
 });
 
-import { ToneAudioEngine, type SfxName } from "../audio/ToneAudioEngine";
+import { ToneAudioEngine, type SfxName } from "./ToneAudioEngine";
 
 const focus = (over: Partial<ViewFocus> = {}): ViewFocus =>
   ({ centerFloor: 5, dominant: "office", night: false, zoom: 1, ...over }) as ViewFocus;

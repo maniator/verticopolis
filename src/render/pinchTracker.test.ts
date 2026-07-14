@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PinchTracker, stablePointerId } from "../render/pinchTracker";
+import { PinchTracker, stablePointerId } from "./pinchTracker";
 
 /**
  * A faithful miniature of Excalibur 0.32's `_normalizePointerId` + `clear()`:

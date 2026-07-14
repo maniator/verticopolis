@@ -118,9 +118,9 @@ These layers were once waved off as "device-only." They are unit-tested here, so
   (`src/render/sprites.test.ts`). The draw calls are asserted without a real
   canvas.
 - **The Web-Audio engine's** real control flow runs against a **mocked Tone.js +
-  a fake `AudioContext`** (`src/tests/toneAudioEngineGraph.test.ts`), with its
+  a fake `AudioContext`** (`src/audio/toneAudioEngineGraph.test.ts`), with its
   inert-without-audio contract pinned separately
-  (`src/tests/toneAudioEngine.test.ts`).
+  (`src/audio/toneAudioEngine.test.ts`).
 - **Pure logic extracted out of an untestable shell** into a measured module and
   tested there, e.g. `pwa.ts`'s payload sanitizer lives in
   `src/pwaUpdateInfo.ts` (`src/tests/pwaUpdateInfo.test.ts`).
