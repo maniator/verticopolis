@@ -1450,3 +1450,44 @@ which skips the write when the DOM already matches. Residual defers
   mode round-trip (priceRaw persistence + field re-enable), the only-default filter
   re-preview opts, and inc/dec from an empty/NaN field are each near-verbatim mirrors
   of the old controller; low regression risk, defer.
+
+### Deferred from: code review of E5-S0 (perf gate harness) (`/bmad-code-review`, 2026-07-14)
+
+Change: E5-S0 lands the blocking Playwright perf gate ahead of the live-view
+migrations: `e2e/perf-harness.ts` (browser-side measurement helpers),
+`e2e/perf.spec.ts` (the `@perf` gate), the `perf` / `perf:capture` npm scripts,
+a perf step in the test.yml e2e job, and `update-perf-baseline.yml` (marker
+`[update-perf-baseline]`) to mint the committed baseline in the pinned container.
+The three reviewers' PATCH findings were all fixed before landing: (A) is now
+batched (40 pumps/sample) and advances the clock each pump so it clears the
+`performance.now()` ~0.1ms floor and measures the change path, not a no-op; (B)
+clears `sim.pendingChoice` (the freeze that produced the anomalous 0.31 reading),
+sets `steadyClock` to remove the pace-of-day confound, stubs autosave, and takes
+the median of five windows; `retries` is forced to 0 for `@perf`; the CDP throttle
+is reset in a `finally`. Locally the three metrics held to ~1% / ~5% / ~4%
+run-to-run. Residual defers:
+
+- **The write-before-`positionPanels`-layout-read ordering rule (plan §3(C)) is not
+  asserted**: it holds structurally today (`ui.update` at main.ts:1167 precedes
+  `positionPanels()` at :1218), but the harness does not probe for a forced
+  synchronous reflow. It is only meaningfully assertable once a live-view write
+  path exists, so E5-S1 should add a forced-layout probe (or record it as an
+  accepted structural-only guarantee) when it introduces the first live render.
+- **The committed baseline is minted by CI, not by hand**: E5-S0 ships no
+  `baseline.json`; the spec bootstrap-captures-and-skips when the file is absent,
+  and `update-perf-baseline.yml` commits the reference set on the pre-E5 commit.
+  Until that runs the gate is inert, so **E5-S1 must assert `fs.existsSync` of the
+  baseline** (fail, not skip) so the gate can never stay silently toothless once a
+  live view is in play.
+- **`towerStatsChildStable` is reported, not asserted**: the pre-E5 `innerHTML =`
+  rebuilds the stats children every pump, so E5-S1 promotes this to an assertion
+  once the grid renders on change.
+- **B is a coarse guard**: at ~0.25 sim-min/s under the 4x throttle on the TOWER
+  fixture the absolute rate is low; it is stable and sensitive to `ui.update` cost
+  (the fixed-timestep engine falls behind when the pump is heavier), but if CI
+  proves noisier than the local sandbox, widen `B_FLOOR_TOL` based on observed CI
+  variance rather than the render path (mirrors how visual-snapshot thresholds are
+  tuned to the CI renderer).
+- **`@perf` grep is a substring match**: a future non-perf test whose title
+  contains "@perf" would be miscategorized by `--grep`/`--grep-invert`. Low risk;
+  tighten the tag convention if the suite grows.

@@ -91,6 +91,15 @@ jobs:
       - name: Run end-to-end tests
         run: npm run e2e
 
+      # The E5-S0 perf gate: run the ui.update micro-benchmark, the throttled
+      # end-to-end speed probe, and the node-identity check against the committed
+      # baseline (e2e/perf/baseline.json). Runs in the SAME pinned container the
+      # baseline was minted in, so the numbers are comparable. When no baseline is
+      # committed yet, the spec captures one and skips the assertions (bootstrap),
+      # so this is inert until update-perf-baseline.yml mints the reference set.
+      - name: Perf gate (E5-S0)
+        run: npm run perf
+
       # Per-run visual proof of the ★-progression (the committed gallery in
       # docs/screenshots/milestones/ is the human-blessed baseline).
       - name: Upload milestone screenshots
