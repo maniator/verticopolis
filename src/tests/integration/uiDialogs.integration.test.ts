@@ -308,11 +308,45 @@ describe("openModal — the window grammar", () => {
     expect(onResolve).toHaveBeenCalledTimes(1);
   });
 
-  it("emergency modal: accept button resolves accept", () => {
+  it("emergency modal: accept button resolves accept and closes the modal", () => {
     const { ui } = makeUI();
     const onResolve = vi.fn();
     ui.showEventChoice("Bomb threat!", "$100,000", onResolve);
     click('[data-act="accept"]');
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("accept");
+    expect(dialog().open).toBe(false); // finish() closed before resolving
+  });
+
+  it("emergency modal: a backdrop click resolves decline exactly once and closes", () => {
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$50,000", onResolve);
+    // showEventChoice overrides finishModal's default backdrop handler with its
+    // own decline path; fire a backdrop click (target === the dialog itself).
+    dialog().click();
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("emergency modal: a first-action Esc/cancel resolves decline exactly once", () => {
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$50,000", onResolve);
+    dialog().dispatchEvent(new Event("cancel", { cancelable: true })); // Esc
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("emergency modal: a second button press cannot double-resolve the choice", () => {
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("Bomb threat!", "$100,000", onResolve);
+    const accept = dialog().querySelector<HTMLButtonElement>('[data-act="accept"]')!;
+    const decline = dialog().querySelector<HTMLButtonElement>('[data-act="decline"]')!;
+    accept.click(); // resolves accept, closes the modal, and sets the done latch
+    // The decline button is now detached but its @click listener is still live;
+    // a racing double-tap must not resolve a second time.
+    decline.click();
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("accept");
   });
 });

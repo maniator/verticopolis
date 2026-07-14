@@ -1,6 +1,7 @@
 import type { UI } from "./UI";
 import * as tpl from "./uiTemplates";
 import { confirmTemplate } from "./templates/confirm";
+import { eventChoiceTemplate } from "./templates/eventChoice";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -372,11 +373,10 @@ export function showEventChoice(
   costLabel: string,
   onResolve: (opt: "accept" | "decline") => void,
 ): void {
-  const box = ui.openModal(tpl.eventChoiceHtml(message, costLabel));
   const dialog = ui.el.modal as HTMLDialogElement;
-  // The choice MUST resolve exactly once, no matter how the modal closes , 
-  // buttons, Esc, or a backdrop click, or the sim (frozen while a choice is
-  // open) would deadlock. Dismissing counts as declining.
+  // The choice MUST resolve exactly once, no matter how the modal closes
+  // (buttons, Esc, a backdrop click, or the title-bar x), or the sim (frozen
+  // while a choice is open) would deadlock. Dismissing counts as declining.
   let done = false;
   const finish = (opt: "accept" | "decline") => {
     if (done) return;
@@ -384,11 +384,18 @@ export function showEventChoice(
     ui.closeModal();
     onResolve(opt);
   };
-  ui.wireActions(box, { accept: () => finish("accept"), decline: () => finish("decline") }, { close: false });
+  // Actions bind inline in the template; the controller keeps the fire-once
+  // logic and the dismissal paths. No wireActions pass, no [data-act="close"].
+  ui.openModalTemplate(
+    eventChoiceTemplate(message, costLabel, {
+      onAccept: () => finish("accept"),
+      onDecline: () => finish("decline"),
+    }),
+  );
   dialog.onclick = (e) => {
     if (e.target === dialog) finish("decline");
   }; // backdrop
-  dialog.oncancel = () => finish("decline"); // Esc
+  dialog.oncancel = () => finish("decline"); // Esc (the title-bar x routes here too)
 }
 
 /**
