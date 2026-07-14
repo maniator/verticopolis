@@ -5,12 +5,15 @@
  * `import { … } from "./sprites/facilities"` (and the `sprites.ts` barrel)
  * keeps working unchanged:
  *   - `facilities/service.ts`: security, medical, housekeeping, recycling,
- *     metro, parking, and the parking ramp (the in-tower service kinds).
+ *     and metro (the in-tower service kinds), with shared port helpers in
+ *     `facilities/serviceKit.ts`.
+ *   - `facilities/garage.ts`: the parking space and the parking ramp.
  *   - `facilities/vehicles.ts`: the garbage truck, street car, and metro
  *     train (the moving actors).
  *   - `facilities/venue.ts`: the party hall and wedding hall (the event
  *     venues).
  */
-export { drawHousekeeping, drawMedical, drawMetro, drawParking, drawParkingRamp, drawRecycling, drawSecurity } from "./facilities/service";
+export { drawHousekeeping, drawMedical, drawMetro, drawRecycling, drawSecurity } from "./facilities/service";
+export { drawParking, drawParkingRamp } from "./facilities/garage";
 export { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "./facilities/vehicles";
 export { drawPartyHall, drawWeddingHall } from "./facilities/venue";

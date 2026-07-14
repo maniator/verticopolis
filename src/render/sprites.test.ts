@@ -18,6 +18,7 @@ import {
   type DrawCtx,
 } from "./sprites";
 import { shade, rand, ACCENTS } from "./sprites/common";
+import { SKIN } from "./pixelSprites/common";
 import { PAL, person, drawRoom, sampleState } from "./pixelSprites";
 import { RESERVED_COLORS } from "./pixelSprites/common";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
@@ -151,6 +152,52 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // than the closed shutter; EXIT green #6bd47a is a non-reserved canon color.
     expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "cinema" }), 0, 0, 341, 88)).not.toThrow();
     expect(s.log).toContain("fillStyle=#6bd47a");
+  });
+});
+
+describe("service facilities — reserved colors, integer pixels, and state cues", () => {
+  // Reserved state colors must never appear as decoration, every rectangle must
+  // land on integer coordinates, and the recycling FULL gauge is a state cue.
+  const RESERVED = ["#C24A3A", "#C9CCC4", "#B2B0A4", "#E8A030", "#D4623A", "#FFD86A", "#E0556B"];
+  const KINDS: Array<Partial<Unit>> = (["security", "medical", "housekeeping", "recycling", "metro", "parking", "parkingRamp"] as const).map((kind) => ({ kind }));
+
+  it("no reserved decoration color, integer pixels only, across fill/lit/dead states", () => {
+    for (const over of KINDS) {
+      for (const [rf, pd, lit] of [[0, false, true], [0.8, false, false], [1, false, true], [0.5, true, true]] as const) {
+        const s = spyCtx();
+        drawUnit(draw({ recycleFill: rf, parkingUse: 1, parkingDead: pd, lit }, s.ctx), unit(over), 0, 0, 176, 88);
+        const fills = s.log.filter((x) => x.startsWith("fillStyle=")).map((x) => x.slice("fillStyle=".length).toLowerCase());
+        for (const r of RESERVED) expect(fills, `${String(over.kind)} painted reserved ${r}`).not.toContain(r.toLowerCase());
+        for (const l of s.log.filter((x) => x.startsWith("fillRect:")))
+          for (const n of JSON.parse(l.slice("fillRect:".length)) as number[]) expect(Number.isInteger(n), `${String(over.kind)} non-integer ${l}`).toBe(true);
+      }
+    }
+  });
+
+  it("recycling reads green, then amber past 0.7, then red with the FULL label at capacity", () => {
+    const at = (rf: number) => {
+      const s = spyCtx();
+      drawUnit(draw({ recycleFill: rf }, s.ctx), unit({ kind: "recycling" }), 0, 0, 220, 88);
+      return s;
+    };
+    const amber = at(0.85);
+    expect(amber.log).toContain("fillStyle=#e0a94e");
+    expect(amber.log).not.toContain("fillStyle=#d6342f");
+    const full = at(1);
+    expect(full.log).toContain("fillStyle=#d6342f"); // FULL-state red gauge
+    expect(full.log.some((l) => l.startsWith("fillText:") && l.includes("FULL"))).toBe(true);
+  });
+
+  it("the metro platform draws empty — no baked crowd, legacy or finalized (no ghost people)", () => {
+    // scatterPeople paints via legacy person(), whose hair overlay is a unique
+    // literal; its absence proves no legacy crowd rides the station. The skin
+    // tones prove the point for the finalized person() family too: a station
+    // that bakes no figure of either idiom paints no skin, so an empty tower
+    // reads empty and the real commuters ride the traffic overlay instead.
+    const s = spyCtx();
+    drawUnit(draw({}, s.ctx), unit({ kind: "metro" }), 0, 0, 330, 132);
+    expect(s.log).not.toContain("fillStyle=rgba(30,24,20,0.65)");
+    for (const skin of SKIN) expect(s.log, `metro baked a figure (skin ${skin})`).not.toContain(`fillStyle=${skin}`);
   });
 });
 

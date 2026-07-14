@@ -853,3 +853,50 @@ consumed directly by `residential.ts` and its test, have no cross-module barrel
 consumer like the food/shop look tables do, and the `barrelSurface.test.ts`
 deliberately curates a minimal barrel surface, so re-exporting would add dead
 surface against an intentional guard).
+### Deferred from: E5 pixel-art utilities and service (`/gds-code-review`, 2026-07-14)
+
+Change: E5 enriches the seven utilities-and-service looks (recycling, metro,
+medical, security, housekeeping, parking, parking ramp) by porting each from its
+pixel-exact Figma reference build script through a shared `refMap` scaler, maps
+every figure to the finalized `person()` family (`personSeated` guard,
+`personStanding` nurse/doctor/housekeeper with a white-coat overlay for medical
+staff, `personHiVis` recycling hand), keeps the `recycleFill` pile plus green /
+amber / red FULL gauge and the `parkingUse` / `parkingDead` car gate, and splits
+`service.ts` into `service.ts` (five interior kinds), `garage.ts` (parking and
+ramp), and `serviceKit.ts` (shared port helpers).
+
+- **Metro real-commuter platform crowd (follow-up, depends on the people-system
+  traffic seam).** This PR removes the `scatterPeople` ghost crowd from
+  `drawMetro` and leaves the baked platform empty, per spec. The real routed
+  commuters are meant to ride the redraw overlay that the people-system traffic
+  seam owns (walkers at the 24px scale, tinted content then amber then stress red
+  by wait). That overlay is not landed here; when the seam ships, wire the metro
+  platform crowd to it. Until then an empty tower correctly shows an empty
+  platform. Type: review-deferral / feature-dependency.
+- **Party-hall `scatterPeople` retirement is out of scope here.** `drawPartyHall`
+  in `facilities/venue.ts` still calls the ghost `scatterPeople`; that retirement
+  belongs to the food-and-entertainment spec, not this one. Noted so it is not
+  lost.
+
+Review findings (`/gds-code-review`, three layers). The Acceptance Auditor
+returned compliant on every pinned constraint (reserved colors, the
+`recycleFill` gauge, the `parkingUse` / `parkingDead` gate, no ghost crowd,
+figures mapped to the shared family, integer coordinates, no per-frame scan, no
+lease card). Patched in-PR: the `refMap` zero-size guard (a genuine 0-size
+reference rect now paints nothing instead of being floored to a stray 1px, which
+removes both the empty-gauge green sliver and the ramp-foot void pixel and
+restores reference fidelity), `Number.isFinite` normalization of `recycleFill`
+and `parkingUse` (a non-finite input can no longer blank the pile/gauge or
+silently suppress a car), and a tightened metro test that now also asserts no
+skin-tone figure of the finalized family is baked. One defer:
+
+- **Fixed-size figures do not scale with the room rect at non-bake sizes
+  (follow-up, people-system figure scaling).** The shared `person()` builds and
+  the `whiteCoat` overlay draw at native 1x at a scaled anchor, so at the
+  canonical bake size (`w === RW`, `h === RH`, identity map) they align with the
+  furniture exactly, but at a non-identity rect the figures keep their pixel size
+  while the furniture scales. The real render bakes at identity, so this is not a
+  live defect; fixed-size character sprites are also the intended pixel-art
+  behavior. Captured so that if the people-system traffic seam ever composites
+  figures at a non-bake scale, figure sizing is handled there, not re-derived per
+  facility. Type: review-deferral / render-consistency.
