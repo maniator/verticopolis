@@ -208,11 +208,19 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
   it("a well-run served suite WITH its parking space earns a favorable VIP review", () => {
     const { sim, suite } = suiteTower(true);
     expect(sim.vipFavorable).toBe(false);
+    expect(sim.vipVisits).toBe(0);
     for (let i = 0; i < 15; i++) sim.tick(60); // 07:00 → 22:00 (past the 08:00 checkout)
     suite.state = "asleep"; // a guest checks into the suite for the night
     suite.satisfaction = 1;
     for (let i = 0; i < 3; i++) sim.tick(60); // 22:00 → 01:00, crossing midnight (the VIP check)
     expect(sim.vipFavorable).toBe(true);
+    expect(sim.vipVisits).toBe(1); // the favorable stay is a counted visit
+    // Once the review is earned the VIP stops calling: another night with a
+    // guest in the suite adds no further visits.
+    suite.state = "asleep";
+    suite.satisfaction = 1;
+    for (let i = 0; i < 24; i++) sim.tick(60);
+    expect(sim.vipVisits).toBe(1);
   });
 
   it("canon: no parking space per suite → the VIP drives off, no review", () => {
@@ -223,6 +231,32 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
     for (let i = 0; i < 3; i++) sim.tick(60);
     expect(sim.suiteParkingShort()).toBe(true);
     expect(sim.vipFavorable).toBe(false); // blocked purely by the missing space
+    // The drive-off still counts as a visit the player was told about, and the
+    // counter rides the 5-day nag throttle: the next night's failed visit
+    // (guest present at midnight, so the throttle is what blocks) adds nothing.
+    expect(sim.vipVisits).toBe(1);
+    for (let i = 0; i < 21; i++) sim.tick(60); // 01:00 → 22:00
+    suite.state = "asleep";
+    suite.satisfaction = 1;
+    for (let i = 0; i < 3; i++) sim.tick(60); // crosses the next midnight
+    expect(sim.vipVisits).toBe(1);
+    // The throttle survives a save/reload: a fresh Simulation would otherwise
+    // reset the nag day and recount a visit at the very next midnight,
+    // permanently inflating the persisted counter for a player who reloads.
+    const reloaded = Simulation.deserialize(sim.serialize());
+    const suite2 = reloaded.tower.units.find((u) => u.kind === "hotelSuite")!;
+    for (let i = 0; i < 21; i++) reloaded.tick(60);
+    suite2.state = "asleep";
+    suite2.satisfaction = 1;
+    for (let i = 0; i < 3; i++) reloaded.tick(60);
+    expect(reloaded.vipVisits).toBe(1);
+    // Once the 5-day window reopens, the next failed visit counts again.
+    reloaded.lastVipNagDay = reloaded.clock.day - 5;
+    for (let i = 0; i < 21; i++) reloaded.tick(60);
+    suite2.state = "asleep";
+    suite2.satisfaction = 1;
+    for (let i = 0; i < 3; i++) reloaded.tick(60);
+    expect(reloaded.vipVisits).toBe(2);
   });
 });
 

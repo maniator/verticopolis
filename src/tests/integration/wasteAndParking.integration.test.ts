@@ -100,9 +100,37 @@ describe("Recycling fills with population and gates 4★ by DEMAND", () => {
 });
 
 describe("Parking demand: offices (1/~24 workers) + one space per suite", () => {
+  it("parkingDemand is zero below parking's unlock star, then appears at 3★ (the shift)", () => {
+    const sim = Simulation.newGame(15);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");
+    // A suite placed below its star (possible via import or a forged save)
+    // must not demand a space either while parking is unbuildable.
+    mustPlace(sim, "hotelSuite", 2, 40);
+    // Below 3★ the player cannot build a ramp or a space (minStar 3), so no
+    // advisory may claim they need parking: demand reads zero at 1★ and 2★.
+    expect(FACILITIES.parking.minStar).toBe(3); // the gate this test pins
+    for (const star of [1, 2]) {
+      sim.star = star;
+      expect(sim.parkingDemand().total).toBe(0);
+      expect(sim.officeParkingShort()).toBe(false);
+      expect(sim.suiteParkingShort()).toBe(false);
+    }
+    // At 3★ the same units start demanding spaces, and both shortages show.
+    sim.star = 3;
+    expect(sim.parkingDemand().offices).toBe(1);
+    expect(sim.parkingDemand().suites).toBe(1);
+    expect(sim.parkingDemand().total).toBe(2);
+    expect(sim.officeParkingShort()).toBe(true);
+    expect(sim.suiteParkingShort()).toBe(true);
+  });
+
   it("parkingDemand sums both, and suites reserve their spaces first", () => {
     const sim = Simulation.newGame(12);
     sim.money = 1e12;
+    sim.star = 3; // parking (and its demand) unlocks at 3★
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     // 24 occupied office workers → 1 space (1 per 4 offices); 3 suites → 3 more.
@@ -127,6 +155,7 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
   it("suiteParkingShort only when working spaces < suites", () => {
     const sim = Simulation.newGame(13);
     sim.money = 1e12;
+    sim.star = 3; // parking (and its demand) unlocks at 3★
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     mustPlace(sim, "hotelSuite", 2, 0);
@@ -140,6 +169,7 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
   it("parkingUsage: office cars by weekday day, suite cars overnight, none on a dead lot", () => {
     const sim = Simulation.newGame(14);
     sim.money = 1e12;
+    sim.star = 3; // parking (and its demand) unlocks at 3★
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     for (let i = 0; i < 4; i++) occupy(sim, "office", 2, i * 9, "occupied");

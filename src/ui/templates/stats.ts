@@ -46,6 +46,21 @@ export function statsTemplate(sim: Simulation): TemplateResult {
     s.star >= 4 && ratingPop < s.population
       ? html`<span class="k">Counts toward stars</span><span class="v">${fmt(ratingPop)}</span>`
       : nothing;
+  // VIPs start calling at 3★, so the row appears with them (or with any
+  // recorded visit, so a loaded late-game tower always shows its history).
+  // The review verdict trusts vipFavorable alone (it is what gates 4★), so a
+  // favorable flag with no recorded visits (fixtures, tampered saves) still
+  // reads "Review earned" in the good color; only the count goes unspoken.
+  const vipText =
+    sim.vipVisits === 0
+      ? sim.vipFavorable
+        ? "Review earned"
+        : "None yet"
+      : `${fmt(sim.vipVisits)} · review ${sim.vipFavorable ? "earned" : "not yet earned"}`;
+  const vipRow =
+    sim.vipVisits > 0 || sim.vipFavorable || s.star >= 3
+      ? html`<span class="k">VIP visits</span><span class="v" style="color:${sim.vipFavorable ? "var(--good)" : "var(--muted)"}">${vipText}</span>`
+      : nothing;
   return html`<div class="stats-grid">
       <div class="stats-section win-title sm">Overview</div>
       <div class="col kv">
@@ -54,6 +69,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         <span class="k">Population</span><span class="v">${fmt(s.population)}</span>
         ${ratingRow}
         <span class="k">Next star at</span><span class="v">${next ? fmt(next) : "—"}</span>
+        ${vipRow}
         <span class="k">Funds</span><span class="v ${sim.money < 0 ? "loss" : "money"}">$${fmt(Math.round(sim.money))}</span>
         <span class="k">Date</span><span class="v">${c.dayName}, day ${c.day + 1}</span>
       </div>

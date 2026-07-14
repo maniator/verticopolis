@@ -30,6 +30,35 @@ describe("SaveGame", () => {
     expect((loaded as unknown as { vipVisitDay: number }).vipVisitDay).toBe(expected);
   });
 
+  it("persists the VIP visit counter, hardens forged values, and adopts visits for legacy saves", () => {
+    const sim = sampleGame();
+    sim.vipVisits = 3;
+    sim.vipFavorable = true;
+    expect(Simulation.deserialize(sim.serialize()).vipVisits).toBe(3);
+    // Forged counter: negative / non-finite / absurd values clamp. A PRESENT
+    // field never triggers the legacy adopt, so serialize -> deserialize stays
+    // idempotent even for a hand-set favorable-with-zero state.
+    const data = sim.serialize();
+    (data as { vipVisits: unknown }).vipVisits = -5;
+    expect(Simulation.deserialize(data).vipVisits).toBe(0);
+    (data as { vipVisits: unknown }).vipVisits = NaN;
+    expect(Simulation.deserialize(data).vipVisits).toBe(0);
+    (data as { vipVisits: unknown }).vipVisits = 1e300;
+    expect(Simulation.deserialize(data).vipVisits).toBe(1_000_000);
+    (data as { vipVisits: unknown }).vipVisits = 0;
+    expect(Simulation.deserialize(data).vipVisits).toBe(0);
+    // A save written before the counter existed: the favorable review proves
+    // one visit, a won tower two (its winning TOWER inspection also counted)...
+    delete (data as { vipVisits?: unknown }).vipVisits;
+    expect(Simulation.deserialize(data).vipVisits).toBe(1);
+    (data as { evaluatedTower: unknown }).evaluatedTower = true;
+    expect(Simulation.deserialize(data).vipVisits).toBe(2);
+    // ...and with neither flag it stays at 0.
+    (data as { evaluatedTower: unknown }).evaluatedTower = false;
+    (data as { vipFavorable: unknown }).vipFavorable = false;
+    expect(Simulation.deserialize(data).vipVisits).toBe(0);
+  });
+
   it("coerces non-finite unit fields from a tampered save to safe values", () => {
     const sim = sampleGame();
     const data = sim.serialize();

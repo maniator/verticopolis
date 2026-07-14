@@ -184,6 +184,12 @@ export class Simulation implements SimContext {
   vipVisitDay = -1;
   /** Whether a VIP has given the tower a favorable suite review (a 4★ gate). */
   vipFavorable = false;
+  /** VIP visits the player has been told about: the favorable suite stay, each
+   * unfavorable visit that produced a bulletin (at most one per 5-day nag
+   * window; the suppressed nightly retries in between are not counted), and
+   * every TOWER inspection. A recognition stat for the stats dialog, so the
+   * count matches the bulletin events rather than inflating silently each day. */
+  vipVisits = 0;
   /** Day of the last "VIP underwhelming" nag, so it can't spam the log daily. */
   lastVipNagDay = -100;
   /** Buried-treasure finds so far. Capped so a basement dug full of cheap parking

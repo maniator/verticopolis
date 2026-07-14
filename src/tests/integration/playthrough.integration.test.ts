@@ -29,10 +29,12 @@ describe("full playthrough → TOWER win", () => {
     expect(sim.star).toBe(5); // all rungs satisfied → jumps straight to 5★
 
     expect(buildWeddingHall(sim).ok).toBe(true);
+    expect(sim.vipVisits).toBe(0); // fixture grants the review directly, no counted stay
     runVipInspection(sim);
 
     expect(sim.star).toBe(6);
     expect(won(sim)).toBe(true);
+    expect(sim.vipVisits).toBe(1); // the winning TOWER inspection is a counted visit
   });
 
   it("caps at 2★ without Security (3★ gate)", () => {
@@ -79,6 +81,7 @@ describe("full playthrough → TOWER win", () => {
     runVipInspection(sim);
     expect(sim.star).toBe(5);
     expect(won(sim)).toBe(false);
+    expect(sim.vipVisits).toBe(1); // an unimpressed inspection still counts as a visit
   });
 
   it("selling the Metro after 5★ blocks the TOWER (the re-check)", () => {
