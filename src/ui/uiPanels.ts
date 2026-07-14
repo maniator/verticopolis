@@ -95,19 +95,29 @@ function placePanel(el: HTMLElement, left: number, top: number): void {
   el.style.bottom = "auto";
 }
 
-export function showInspector(ui: UI, html: string | null): void {
-  if (!html) {
+export function showInspector(ui: UI, tpl: TemplateResult | null): void {
+  if (!tpl) {
+    // Hide only; the stale card stays in the container (as it always did) and
+    // the next show renders over it through lit.
     ui.el.inspector.classList.add("hidden");
     return;
   }
   ui.el.inspector.classList.remove("hidden");
-  ui.el.inspector.innerHTML = html;
+  // lit render, not innerHTML (E6-S2): #inspector is lit's container
+  // exclusively; hover picks re-render every move and lit patches the changed
+  // text in place.
+  render(tpl, ui.el.inspector);
   // ✕ in the title strip (shown on mobile only, via CSS): the docked card has
   // no hover-away to dismiss it there. The card itself stays click-through.
   // Routed through the app so it can latch the dismissal, otherwise the very
-  // next hover pick over the same facility re-opens the card.
+  // next hover pick over the same facility re-opens the card. Appended from
+  // the one shared recipe AFTER the h4's lit-managed content (the finishModal
+  // pattern): a foreign node at the tail survives same-shape re-renders, and
+  // a card-shape swap replaces the h4, so re-append whenever it's missing.
   const h4 = ui.el.inspector.querySelector("h4");
-  h4?.appendChild(ui.titleBarClose("insp-close btn xs", () => ui.cb.onInspectorClose()));
+  if (h4 && !h4.querySelector(".insp-close")) {
+    h4.appendChild(ui.titleBarClose("insp-close btn xs", () => ui.cb.onInspectorClose()));
+  }
   ui.inspectorSize = { w: ui.el.inspector.offsetWidth, h: ui.el.inspector.offsetHeight };
 }
 

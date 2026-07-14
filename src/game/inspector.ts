@@ -1,11 +1,8 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, facilityFloors, isCommercialKind, isElevatorKind, isOpenAt, residentCount } from "../engine/facilities";
-import { isTenanted } from "../engine/types";
+import { facilityFloors } from "../engine/facilities";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
-import { escapeHtml } from "../ui/escape";
-import { floorTag } from "../ui/format";
-import { facilityDiagnostics, transportDiagnostics } from "./facilityDiagnostics";
+import { unitInspectorTemplate, transportInspectorTemplate } from "../ui/templates/inspector";
 
 // Re-exported from its shared home so existing importers (and the retail-stats
 // unit tests) keep their `../game/inspector` path.
@@ -66,49 +63,13 @@ export class InspectorController {
       }
       this.deps.setAnchor({ x: u.x + u.width, floor: u.floor + facilityFloors(u.kind) - 1 });
       this.inspectTarget = { type: p.type, id: p.id };
-      const f = FACILITIES[u.kind];
-      // Access reachability, placement warnings, the on-notice countdown,
-      // recycling capacity, and the retail patronage block all live in one
-      // shared helper so the mobile editor can fold in the identical lines
-      // (see facilityDiagnostics) without the two surfaces drifting.
-      const diagnostics = facilityDiagnostics(sim, u);
-      // A relocation is a life event (Modern condos), not a complaint, so the
-      // status line reads differently; the diagnostics block explains the rest.
-      const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
-      const statusText =
-        u.state === "vacating"
-          ? isRelocation
-            ? "on notice (household relocating)"
-            : "on notice (tenant leaving)"
-          : u.state;
-      // Canon retail variant (§7): a shop / fastFood / restaurant with a
-      // subtype titles as its specific name ("Chinese Cafe"), not the generic
-      // kind name. Legacy retail units and every non-retail kind keep the
-      // catalog name; the subtype field is whitelist-coerced on load, so
-      // untrusted values never reach this string.
-      const title = u.subtype ?? f.name;
-      // The label subheading only appears when the player-set label is a real
-      // rename: if it matches either the catalog name OR the subtype now shown
-      // in the title, suppress the extra line so a shop renamed "Chinese Cafe"
-      // (matching its subtype) doesn't render the name twice.
-      const labelIsExtra = u.label !== f.name && u.label !== title;
-      this.deps.ui.showInspector(
-        `<h4 class="win-title">${escapeHtml(title)}</h4>` +
-          `<div>${labelIsExtra ? escapeHtml(u.label) + "<br>" : ""}${u.floor >= 1 ? "Floor " + u.floor : "B" + (1 - u.floor)}</div>` +
-          `<div>Status: ${statusText}</div>` +
-          // Commercial venues contribute their LIVE customers to the census, so
-          // show that number (plus a closed marker), never a static "N/25"
-          // that reads as a flat, always-full population. "(closed)" only for a
-          // tenanted venue outside business hours; vacancy/construction already
-          // reads from the Status row.
-          (isCommercialKind(u.kind) && f.population > 0
-            ? `<div>Customers: ${u.customersIn ?? 0}${isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour) ? " (closed)" : ""}</div>`
-            : f.population
-              ? `<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
-              : "") +
-          diagnostics +
-          `<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`,
-      );
+      // The card body (title/label/status/census/diagnostics/satisfaction) is
+      // the lit template in ui/templates/inspector.ts (E6-S2); the access
+      // reachability, placement warnings, on-notice countdown, recycling
+      // capacity, and retail patronage lines all come from facilityDiagnostics
+      // inside it, shared with the mobile editor fold-in so the two surfaces
+      // can't drift.
+      this.deps.ui.showInspector(unitInspectorTemplate(sim, u));
     } else {
       const t = sim.tower.getTransport(p.id);
       if (!t) {
@@ -117,15 +78,7 @@ export class InspectorController {
       }
       this.deps.setAnchor({ x: t.x + t.width, floor: t.top });
       this.inspectTarget = { type: p.type, id: p.id };
-      const f = FACILITIES[t.kind];
-      // Passenger elevators report how full their cars run on average (staff-only
-      // service elevators carry no passenger load, so they show none). Shared
-      // with the mobile transport editor via transportDiagnostics.
-      this.deps.ui.showInspector(
-        `<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>` +
-          (isElevatorKind(t.kind) ? `<div>Cars: ${t.cars}</div>` : "") +
-          transportDiagnostics(sim, t),
-      );
+      this.deps.ui.showInspector(transportInspectorTemplate(sim, t));
     }
   }
 

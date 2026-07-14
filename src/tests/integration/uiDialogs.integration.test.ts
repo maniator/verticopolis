@@ -221,7 +221,7 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
 
   it("the inspector ✕ uses the same recipe (.insp-close.btn.xs) and routes to onInspectorClose", () => {
     const { ui, cb } = makeUI();
-    ui.showInspector("<h4>Office 12F</h4><div>occupied</div>");
+    ui.showInspector(html`<h4>Office 12F</h4><div>occupied</div>`);
     const x = document.querySelector<HTMLButtonElement>("#inspector h4 > button")!;
     expect(x).not.toBeNull();
     expect([...x.classList].sort()).toEqual(["btn", "insp-close", "xs"]);
@@ -230,6 +230,22 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     x.click();
     // Routed through the app (which latches the dismissal) — not a local hide.
     expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("the inspector ✕ survives a same-card lit re-render and is never duplicated", () => {
+    // Hover picks re-render the card every move; the ✕ is a foreign node
+    // appended after the h4's lit-managed content (the finishModal pattern),
+    // so it must survive a same-shape re-render, and a re-show must not
+    // append a second one.
+    const { ui } = makeUI();
+    const card = (status: string) => html`<h4>Office 12F</h4><div>${status}</div>`;
+    ui.showInspector(card("occupied"));
+    const x = document.querySelector<HTMLButtonElement>("#inspector h4 > button")!;
+    ui.showInspector(card("vacating"));
+    expect(document.querySelector("#inspector div")!.textContent).toBe("vacating");
+    const xs = document.querySelectorAll("#inspector h4 > button");
+    expect(xs.length).toBe(1);
+    expect(xs[0]).toBe(x); // same element: a mid-tap ✕ press can't be swallowed
   });
 });
 
