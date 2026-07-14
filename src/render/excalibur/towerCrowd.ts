@@ -252,7 +252,7 @@ function buildWalkers(engine: TowerEngine): void {
           spawnWalker(engine, x0w, x1w, foot, foot, seed, speed, rank, floor, false);
         } else {
           // Corridor: loiter in a short stretch around a spread-out anchor, so a
-          // lone figure shuffles in place instead of sprinting the whole floor , 
+          // lone figure shuffles in place instead of sprinting the whole floor,
           // and only appears when this floor actually has occupants.
           const anchor = x0w + rank * runW;
           const half = Math.min(14, runW / 2);
@@ -274,7 +274,7 @@ function buildWalkers(engine: TowerEngine): void {
     const n = t.kind === "escalator" ? 3 : 2;
     for (let i = 0; i < n; i++) {
       const seed = (t.id * 17 + i * 29) | 0;
-      // Low ranks so stairs/escalators show climbers even in a modest tower , 
+      // Low ranks so stairs/escalators show climbers even in a modest tower,
       // otherwise the routed crowd (elevators only) makes stairs look unused.
       spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, t.bottom, false);
     }
