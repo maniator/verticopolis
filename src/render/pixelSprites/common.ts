@@ -61,6 +61,10 @@ export const SHIRTS = ["#5A6E8C", "#3E4654", "#6E5A4A", "#3F8C84", "#4FA0C8", "#
 export const SKIN = ["#E8C9A0", "#C99A6E", "#A9774E"];
 
 export function shade(hex: string, amt: number): string {
+  // Exported helpers take a bare color string; degrade a non-hex argument
+  // gracefully instead of producing rgb(NaN,...). Every shipped caller passes a
+  // #RRGGBB literal, so this leaves current output byte-identical.
+  if (!/^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
   const n = parseInt(hex.slice(1), 16);
   const c = (v: number) => Math.max(0, Math.min(255, v + amt));
   return `rgb(${c((n >> 16) & 255)},${c((n >> 8) & 255)},${c(n & 255)})`;

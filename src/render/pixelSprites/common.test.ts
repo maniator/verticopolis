@@ -164,10 +164,13 @@ describe("pixelSprites/common person family and palette", () => {
   });
 
   it("no new PAL key and no shirt reuses a reserved state color", () => {
-    const newKeys = [
-      "warmWall", "carpetGreen", "hotelPink", "hotelRed", "skyDay", "skyNight",
-      "cityLight", "awningShadow", "signWarm", "glowLit", "glowDim", "walnut", "oak",
-    ] as const;
+    // Derive the decoration keys from PAL (anchors excluded) so a key added
+    // later is caught without editing this list. The anchor `red` is itself the
+    // reserved stress red and stays a state cue, not decoration.
+    const ANCHORS = ["wall", "floor", "slate", "brass", "red", "blue", "green", "ink", "white", "wood"];
+    for (const a of ANCHORS) expect(Object.keys(PAL)).toContain(a); // anchors still present
+    const newKeys = Object.keys(PAL).filter((k) => !ANCHORS.includes(k)) as (keyof typeof PAL)[];
+    expect(newKeys.length).toBeGreaterThan(0);
     for (const k of newKeys) expect(RESERVED_COLORS as readonly string[]).not.toContain(PAL[k]);
     for (const s of SHIRTS) expect(s).not.toBe("#C24A3A"); // the SHIRTS/stress-red invariant
   });
