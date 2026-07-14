@@ -1304,3 +1304,31 @@ confirmed all seven ACs; Edge Case Hunter found no `patch` gaps. Residual defers
 - **`floor === 0` renders "B0"** (pre-existing, both old and new): the `floor > 0`
   guard sends 0 to the basement label. Callers index ground as 1 and basements as
   negative, so floor 0 is unreachable; a latent legacy quirk, not this PR's to pin.
+
+### Deferred from: code review of E3-S3 (new-tower lit migration) (`/bmad-code-review`, 2026-07-14)
+
+Change: E3-S3 migrates the Found a New Tower rule-set picker (`newTowerHtml`) onto
+the E0 `openModalTemplate` seam with a lit `newTowerTemplate`. Static structure:
+only the abandon warning is conditional (on `hasSave`); the `.nt-calendar`
+sub-picker renders unconditionally in both modes (not collapsed into a mode
+ternary), and the controller (`newTowerModal`) still reads the picked `nt-mode` /
+`nt-cal` radios off the mounted box and wires Cancel/Found. Blind Hunter confirmed
+byte-for-byte equivalence (incl. the `2×–2.5×` / `2–5` numeric-range glyphs and the
+⚠️ warning); the Acceptance Auditor confirmed all ACs; Edge Case Hunter found no
+`patch` gaps. Residual defers (behavior-preserving):
+
+- **`newTowerHtml` joins the transitional string-builder retirement list**
+  (`confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`,
+  `savesHtml`, `stopsHtml`, `newTowerHtml`): dead production code kept only to feed
+  its `assertDomEquivalent` guard; retire it when the last string dialog converts.
+- **Static copy is pinned only transitively by the equivalence guard**: the lede,
+  both mode descriptions, the three Modern feature strings, and the calendar copy
+  are asserted only via `assertDomEquivalent(newTowerHtml(...), ...)`. When
+  `newTowerHtml` is deleted (E6/E7), add a direct text assertion (or a fixture
+  snapshot) for that copy first, so a later typo in `newTower.ts` cannot slip
+  through unguarded.
+- **Calendar tab-order / keyboard reachability is e2e-only**: the "always reachable"
+  invariant is DOM-source-order at the unit tier (the equivalence guard pins the
+  calendar node between `.nt-modes` and the footer), but real focus traversal is
+  verifiable only in an e2e. Confirm the e2e suite covers the new-tower dialog's tab
+  order; add one if it does not.

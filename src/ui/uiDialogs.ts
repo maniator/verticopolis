@@ -7,6 +7,7 @@ import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
 import { savesTemplate } from "./templates/saves";
 import { stopsTemplate } from "./templates/stops";
+import { newTowerTemplate } from "./templates/newTower";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../engine/Simulation";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
@@ -190,7 +191,7 @@ export function newTowerModal(
   ui: UI,
   opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind) => void },
 ): void {
-  const box = ui.openModal(tpl.newTowerHtml(opts.hasSave));
+  const box = ui.openModalTemplate(newTowerTemplate(opts.hasSave));
   ui.wireActions(
     box,
     {
