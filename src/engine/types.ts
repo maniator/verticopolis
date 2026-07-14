@@ -206,6 +206,13 @@ export interface Facility {
   staffOnly?: boolean;
   /** True if the facility may only be built underground (basement floors). */
   basement?: boolean;
+  /** Visible seat capacity for routed attendance visitors at population-0
+   *  entertainment venues (cinema / party hall / wedding hall). Live
+   *  attendance (`Unit.customersIn`) is clamped here and mirrored into
+   *  `occupants` for the occupancy-gated interior art; it never enters the
+   *  census (the kind's `population` stays 0, keeping `censusCount`'s
+   *  commercial gate closed). Design tuning, not a canon figure. */
+  attendance?: number;
   description: string;
 }
 

@@ -68,6 +68,16 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
   );
 }
 
+/** Visible seat capacity for routed attendance visitors at population-0
+ *  entertainment venues (cinema / party hall / wedding hall), or undefined for
+ *  every other kind. Attendance venues track live visitors in `customersIn`
+ *  clamped at this cap and mirrored into `occupants` for the interior art;
+ *  the tally is census-inert (their catalog `population` stays 0, which keeps
+ *  `censusCount`'s commercial gate closed). */
+export function attendanceCap(kind: FacilityKind): number | undefined {
+  return FACILITIES[kind].attendance;
+}
+
 export function isElevatorKind(kind: FacilityKind): boolean {
   return (
     kind === "elevatorStandard" ||

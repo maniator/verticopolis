@@ -38,6 +38,20 @@ export function censusCount(
 }
 
 /**
+ * Mirror a venue's live routed attendance (`customersIn`) into `occupants` so
+ * the occupancy-gated interior art fills honestly. Only population-0
+ * attendance venues (cinema / party hall / wedding hall, the kinds with a
+ * catalog `attendance` cap) mirror; every other kind keeps `occupants` owned
+ * by `updatePresence`. Called at every tally change (arrival/departure) AND
+ * from the hourly presence/traffic passes, so neither side can stamp the
+ * other out. Census-inert by construction: `censusCount` above never reads
+ * `occupants`, and these kinds' catalog population stays 0.
+ */
+export function syncAttendanceOccupants(u: Unit): void {
+  if (FACILITIES[u.kind].attendance !== undefined) u.occupants = u.customersIn ?? 0;
+}
+
+/**
  * Star-rating population thresholds, the canonical 1994 values
  * (300 / 1,000 / 5,000 / 10,000). From 4★ up the rating counts non-hotel
  * occupants: office workers, condo residents, and live commercial venue

@@ -3,7 +3,7 @@ import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { FACILITIES, RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay } from "./facilities";
+import { FACILITIES, RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
@@ -61,6 +61,12 @@ export class EconomySystem {
   /** Snapshot / restore the blockbuster bookings across save/load. */
   get blockbusterIds(): number[] {
     return [...this.blockbusters];
+  }
+
+  /** Live read-only view of the bookings (no copy), for the sim loop to prime
+   *  the crowd's venue-visit weighting each step. */
+  get blockbusterSet(): ReadonlySet<number> {
+    return this.blockbusters;
   }
   restoreBlockbusters(ids: number[]): void {
     this.blockbusters = new Set(ids.filter((n) => typeof n === "number" && Number.isFinite(n)));
@@ -131,16 +137,28 @@ export class EconomySystem {
       const daily = ECON.dailyTrafficIncome[u.kind];
       if (daily === undefined) continue;
       if (!isOperational(u)) continue; // gutted/burning/under-construction earn nothing (and must not be revived to "occupied" below)
+      // Attendance venues (cinema / party hall) keep occupants owned by the
+      // live-attendance mirror on every path below: a stranded or closed
+      // house drains through its visitors' departures, never a stamped 0
+      // over people still inside, and the open-hour stamp must not write the
+      // catalog population (0) over a mid-show mirror.
+      const attends = FACILITIES[u.kind].attendance !== undefined;
       if (!drawsVisitors(u.floor)) {
         // Unreachable within two rides (stranded, or not connected at all) → no
         // patrons. Clear any lingering occupancy so a newly-stranded venue reads
         // empty instead of frozen at its last busy state.
-        if (u.state === "occupied") u.occupants = 0;
+        if (u.state === "occupied") {
+          if (attends) syncAttendanceOccupants(u);
+          else u.occupants = 0;
+        }
         continue;
       }
       if (!isOpenAt(u.kind, this.sim.clock.hour)) {
         // Closed for the night — no patrons.
-        if (u.state === "occupied") u.occupants = 0;
+        if (u.state === "occupied") {
+          if (attends) syncAttendanceOccupants(u);
+          else u.occupants = 0;
+        }
         continue;
       }
       u.state = "occupied";
@@ -150,7 +168,8 @@ export class EconomySystem {
       // heatmap cell, and no statistical elevator demand until the next hour
       // (review P2). Idempotent for already-occupied venues: it writes the
       // same value updatePresence just did.
-      u.occupants = FACILITIES[u.kind].population;
+      if (attends) syncAttendanceOccupants(u);
+      else u.occupants = FACILITIES[u.kind].population;
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       const rainMult =

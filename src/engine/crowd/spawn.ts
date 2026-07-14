@@ -2,10 +2,10 @@ import type { Clock } from "../Clock";
 import type { Tower } from "../Tower";
 import type { FacilityKind, Unit } from "../types";
 import { isOperational, isTenanted } from "../types";
-import { isHotelKind, isOpenAt, FACILITIES } from "../facilities";
+import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
 import type { Crowd } from "../Crowd";
-import type { Person, Route, SpawnFloors, StaffKind } from "./person";
+import type { SpawnFloors, StaffKind } from "./person";
 import { MAX_PEOPLE, MAX_STAFF, visibleOccupants } from "./person";
 import {
   MEAL_WINDOWS,
@@ -16,13 +16,20 @@ import {
   outboundWeight,
   type MealOriginKind,
 } from "./meals";
+import { add, makePerson, venueHasRoom } from "./trips";
+import { pushVenueVisitOptions } from "./visits";
+
+// Re-exported so existing importers (motion.ts, tests) keep their historical
+// entry point; the primitives now live in the `trips.ts` leaf.
+export { add, makePerson, pickX, venueHasRoom } from "./trips";
 
 /**
  * The crowd's spawn cadence, pulled out of `Crowd.ts` as friend functions that
  * take the {@link Crowd} instance. They read/advance `crowd.spawnAcc`, append to
  * `crowd.people`, mint ids from `crowd.nextId`, and draw from `crowd.rng`; the
- * meal-window overlay folds into the same weighted option pool. Behavior is
- * unchanged; the class keeps thin `spawn` / `spawnStaff` / `takeStaffResults`
+ * meal-window and attendance-visit overlays fold into the same weighted option
+ * pool. The trip primitives live in `trips.ts`, the venue-visit flow in
+ * `visits.ts`; the class keeps thin `spawn` / `spawnStaff` / `takeStaffResults`
  * methods that delegate here.
  */
 
@@ -35,7 +42,11 @@ const NO_RESULTS: readonly { unitId: number; ok: boolean }[] = Object.freeze([])
 export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const hour = clock.hour;
   const weekend = clock.isWeekend;
-  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "cinema";
+  // The one-way ambient venue pool: shoppers/diners who stroll in, linger, and
+  // despawn at the venue. Cinema left this set for the round-trip attendance
+  // flow (pushVenueVisitOptions): entertainment visitors register at the house
+  // and travel back, so the audience the art draws is real.
+  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood";
   const isStaffKind = (k: FacilityKind): k is StaffKind =>
     k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
   const leased = new Set<number>();
@@ -72,6 +83,15 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
       }
       continue;
     }
+    if (u.kind === "weddingHall") {
+      // The wedding hall is never tenanted (it earns nothing, so the traffic
+      // loop never stamps it "occupied"); like the staff rooms above it
+      // functions whenever it is built and not mid-build / on fire. The
+      // weekend-and-midday gate lives at option time (pushVenueVisitOptions),
+      // not here: spawnFloors bins what exists, options decide when.
+      if (isOperational(u)) addVenueByKind(u.kind, u.floor);
+      continue;
+    }
     if (!(isTenanted(u) || u.state === "asleep")) continue;
     if (u.kind === "office") {
       // Offices are leased year-round but only staffed on weekdays, so inbound
@@ -89,6 +109,11 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     } else if (isVenue(u.kind) && isOpenAt(u.kind, hour)) {
       // Venues are destinations only while open for business.
       venues.add(u.floor);
+      addVenueByKind(u.kind, u.floor);
+    } else if (attendanceCap(u.kind) !== undefined && isOpenAt(u.kind, hour)) {
+      // Attendance venues (cinema, party hall) take round-trip visits only,
+      // never the one-way ambient pool: bin by kind so both the visit options
+      // and the late-night meal window (cinema) can draw them.
       addVenueByKind(u.kind, u.floor);
     }
   }
@@ -149,6 +174,7 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   // of the method caps the whole thing so tuning meal weights alone bounds
   // saturation.
   pushMealOptions(crowd, tower, clock, floors, options);
+  pushVenueVisitOptions(crowd, tower, clock, floors, options);
 
   if (options.length) crowd.rng.pick(options)();
 }
@@ -287,17 +313,17 @@ export function spawnMealOutbound(
   // The census needs a specific unit to attribute the customer to, and destX
   // must land inside its footprint: destX from pickX is a random corridor
   // tile, so inferring the venue from it at arrival attributes customers to
-  // whatever room the tile happens to sit under (review P2). Census-counted
-  // venues (population > 0) with a full house are skipped: catalog population
-  // is the venue's customer capacity, so an undersupplied tower self-limits
-  // instead of packing one fastFood past its advertised "up to N" (review P2).
-  // Cinema (population 0, uncapped) is exempt from the fullness check.
+  // whatever room the tile happens to sit under (review P2). Full houses are
+  // skipped via venueHasRoom: census venues clamp at their catalog population
+  // (the advertised "up to N", so an undersupplied tower self-limits, review
+  // P2), attendance venues (cinema on the late-night window) at their
+  // attendance cap.
   const venueCandidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
     (u) =>
       venueKinds.includes(u.kind) &&
       isTenanted(u) &&
       isOpenAt(u.kind, hour) &&
-      (FACILITIES[u.kind].population === 0 || (u.customersIn ?? 0) < FACILITIES[u.kind].population),
+      venueHasRoom(u),
   );
   if (venueCandidates.length === 0) return;
   const venue = crowd.rng.pick(venueCandidates);
@@ -312,43 +338,6 @@ export function spawnMealOutbound(
   spawned.originUnitId = origin.id;
   origin.outForMeal = (origin.outForMeal ?? 0) + 1;
   tower.bumpMealOverlayRevision();
-}
-
-/** Build a person on `route`, walking to `destX` at the end. Shared by
- *  tenant and staff spawns so the two can never drift field-by-field. */
-export function makePerson(crowd: Crowd, tower: Tower, route: Route, destX: number): Person {
-  const from = route.floors[0];
-  const seed = (crowd.nextId * 2654435761) | 0;
-  const person: Person = {
-    id: crowd.nextId++,
-    seed,
-    // A route with no rides (same floor) goes straight to the stroll leg.
-    state: route.shafts.length === 0 ? "toDest" : "toShaft",
-    floor: from,
-    fy: from,
-    x: pickX(tower, from, seed),
-    floors: route.floors,
-    shafts: route.shafts,
-    leg: 0,
-    shaftId: route.shafts[0] ?? null,
-    carIndex: null,
-    wait: 0,
-    age: 0,
-    linger: 0,
-    destX,
-  };
-  crowd.people.push(person);
-  return person;
-}
-
-export function add(crowd: Crowd, tower: Tower, from: number, to: number): Person | null {
-  const r = crowd.route(tower, from, to);
-  // Only a null route is unreachable. A same-floor trip is a valid walk-only
-  // route (`bfsRoute` returns `{ floors: [from], shafts: [] }` when
-  // from === to), and `makePerson` already starts those in `state: "toDest"`,
-  // so a meal origin and venue on the same floor still spawns and strolls.
-  if (!r) return null;
-  return makePerson(crowd, tower, r, pickX(tower, to, (crowd.nextId * 2654435761) | 0));
 }
 
 /**
@@ -382,20 +371,6 @@ export function takeStaffResults(crowd: Crowd): readonly { unitId: number; ok: b
   const out = crowd.staffDone;
   crowd.staffDone = [];
   return out;
-}
-
-/** An actual built structural tile of a floor (so people stand on solid
- * ground, never in a gap between separate corridor runs). Falls back to a
- * sensible spot if the floor is bare. */
-export function pickX(tower: Tower, floor: number, seed: number): number {
-  const tiles: number[] = [];
-  for (const u of tower.units) {
-    if ((u.kind === "floor" || u.kind === "lobby") && u.floor === floor) {
-      for (let i = 0; i < u.width; i++) tiles.push(u.x + i);
-    }
-  }
-  if (tiles.length === 0) return 2 + (Math.abs(seed) % 40);
-  return tiles[Math.abs(seed) % tiles.length];
 }
 
 export function spawnStep(crowd: Crowd, dtSec: number, tower: Tower, clock: Clock): void {

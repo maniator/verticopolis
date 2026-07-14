@@ -40,6 +40,12 @@ export class Crowd {
   /** @internal Cached STAFF stop-graph (service elevators / stairs / escalators). */
   staffAdj: Map<number, { f: number; shaft: number }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
+  /** @internal Cinema unit ids showing a blockbuster this month, primed once
+   *  per outer step by the sim loop from the EconomySystem's bookings (the
+   *  crowd never sees the economy directly). Read by the venue-visit spawn
+   *  path to weight the bigger blockbuster crowd; standalone-crowd tests can
+   *  leave it empty or set it directly. */
+  blockbusters: ReadonlySet<number> = new Set();
   /** @internal Finished staff jobs since the last drain (unit id + reached-dest). */
   staffDone: { unitId: number; ok: boolean }[] = [];
   /** @internal Live staff on shift (a counter so the spawn cap never scans all). */
@@ -76,6 +82,7 @@ export class Crowd {
     this.staffAdjRev = -1;
     this.staffDone = [];
     this.staffCount = 0;
+    this.blockbusters = new Set();
     this.step = 0;
     this.queueCache = null;
     this.queueStep = -1;

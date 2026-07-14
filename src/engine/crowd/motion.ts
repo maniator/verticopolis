@@ -1,20 +1,19 @@
 import type { Tower } from "../Tower";
 import type { Clock } from "../Clock";
 import type { Transport, Unit } from "../types";
-import { isElevatorKind, isHotelKind, isCommercialKind, FACILITIES } from "../facilities";
+import { isElevatorKind, syncAttendanceOccupants } from "../facilities";
 import type { Crowd } from "../Crowd";
 import type { Person } from "./person";
 import {
   WALK_SPEED,
   CAR_CAPACITY,
-  EAT_SECONDS_MIN,
-  EAT_SECONDS_MAX,
   STRESS_WAIT,
   GIVE_UP,
   STAFF_GIVE_UP,
   RIDE_SECONDS_PER_FLOOR,
 } from "./person";
-import { pickX } from "./spawn";
+import { pickX } from "./trips";
+import { beginDwell } from "./visits";
 
 /**
  * The per-frame crowd physics (spawn cadence aside), pulled out of `Crowd.ts`
@@ -314,54 +313,16 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       if (walkTo(p, p.destX, dt)) {
         p.linger += dt;
         if (p.linger > 2) {
-          // Meal round-tripper: outbound arrival transitions to a stationary
-          // `eating` pause, then a return trip. `returning` distinguishes
-          // the two `toDest` arrivals a round-tripper has; without it, the
-          // return arrival would loop back into `eating` forever.
-          if (p.originUnitId !== undefined && !p.returning) {
-            p.state = "eating";
-            p.linger = 0;
-            // Reset the give-up age so the outbound trip's accumulated seconds
-            // do not eat into the return-leg patience budget once
-            // `transitionToReturn` fires. `transitionToReturn` ALSO resets
-            // `p.age` when it succeeds; this reset is the "even if we later
-            // ghost or route-fail" belt-and-braces.
-            p.age = 0;
-            p.eatSecondsLeft = crowd.rng.int(EAT_SECONDS_MIN, EAT_SECONDS_MAX);
-            // Track this customer at their venue for the live census. The
-            // venue was stamped at spawn time (mealVenueId, with destX inside
-            // its footprint), so the count attaches to the exact venue this
-            // person eats at even when the floor holds several rooms. O(1):
-            // getUnit uses an internal Map. A venue bulldozed mid-trip
-            // resolves to undefined and the person simply eats uncounted.
-            // Gate on population > 0 because cinema is a lateNight meal venue
-            // but carries population = 0 and must not count toward the census.
-            // The capacity clamp is the arrival-side half of the spawn-side
-            // fullness filter: several eaters can be en route before any of
-            // them arrives, so the count could otherwise pass the catalog
-            // capacity anyway. An over-capacity arrival eats uncounted
-            // (venueUnitId stays unset, so finish() will not decrement).
-            const venueUnit = p.mealVenueId === undefined ? undefined : tower.getUnit(p.mealVenueId);
-            if (
-              venueUnit &&
-              isCommercialKind(venueUnit.kind) &&
-              FACILITIES[venueUnit.kind].population > 0 &&
-              (venueUnit.customersIn ?? 0) < FACILITIES[venueUnit.kind].population
-            ) {
-              p.venueUnitId = venueUnit.id;
-              venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
-              // Origin split for the rating census: hotel guests drop out of
-              // the 4-star-plus census, so a guest eating here must not
-              // re-enter it through the venue tally. Flag the person so the
-              // decrement in finish() mirrors exactly even if the origin
-              // room is bulldozed while they eat.
-              const originUnitRoom = originUnit(tower, p);
-              if (originUnitRoom && isHotelKind(originUnitRoom.kind)) {
-                p.countedHotelGuest = true;
-                venueUnit.hotelCustomersIn = (venueUnit.hotelCustomersIn ?? 0) + 1;
-              }
-              tower.bumpMealOverlayRevision();
-            }
+          // Round-tripper (meal or attendance visit): outbound arrival
+          // transitions to the stationary dwell (beginDwell registers the
+          // person at their venue and sets the kind's dwell timer), then a
+          // return trip. Meal people carry an origin unit (originUnitId);
+          // lobby-origin attendance visitors carry only the venue intent
+          // (mealVenueId). `returning` distinguishes the two `toDest`
+          // arrivals a round-tripper has; without it, the return arrival
+          // would loop back into the dwell forever.
+          if ((p.originUnitId !== undefined || p.mealVenueId !== undefined) && !p.returning) {
+            beginDwell(crowd, tower, p);
           } else {
             finish(crowd, p, tower);
           }
@@ -383,13 +344,13 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
   }
 }
 
-/** Mutate an `eating` person into their return leg. Silent despawn on any
- *  route failure or missing origin unit; the `finish` path will handle the
- *  `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
+/** Mutate a dwelling (`eating`) person into their return leg. Silent despawn
+ *  on any route failure or missing origin unit; the `finish` path will handle
+ *  the `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
  *  decrement a fresh unit built on the same floor after). */
 function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   const origin = originUnit(tower, p);
-  if (!origin) {
+  if (!origin && p.originUnitId !== undefined) {
     // Ghost origin: unit was bulldozed while the person was eating, so there
     // is no origin unit left to decrement. Just despawn.
     p.originUnitId = undefined;
@@ -397,7 +358,11 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
     return;
   }
   const venueFloor = p.floor;
-  const originFloor = origin.floor;
+  // A round-tripper with an origin room heads back to it; a lobby-origin
+  // attendance visitor (no origin unit was ever stamped) heads back to the
+  // floor they spawned on (`floors[0]` still holds the outbound route here)
+  // and despawns there, leaving the tower the way they entered it.
+  const originFloor = origin ? origin.floor : p.floors[0];
   const r = crowd.route(tower, venueFloor, originFloor);
   if (!r) {
     // Return route unreachable (transport degraded while eating). The person
@@ -481,6 +446,9 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
     const venue = tower.getUnit(p.venueUnitId);
     if (venue && (venue.customersIn ?? 0) > 0) {
       venue.customersIn = (venue.customersIn ?? 0) - 1;
+      // Attendance venues keep their occupants mirror in step with the tally
+      // (a no-op for every other kind).
+      syncAttendanceOccupants(venue);
       // Mirror the hotel-origin split taken at eating entry (via the flag
       // rather than a fresh origin lookup, so a mid-meal bulldoze cannot
       // unbalance it).

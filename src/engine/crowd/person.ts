@@ -180,6 +180,26 @@ const EAT_MINUTES_MAX = 60;
 export const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
 export const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
 
+/** Attendance-visit dwell windows per entertainment venue, in in-game minutes:
+ *  a cinema visit spans a showing, a party runs longer, a wedding longer
+ *  still. Design tuning (not canon figures), sized so a visit fits inside the
+ *  venue's open hours with the crowd visibly overlapping into a full house. */
+const ATTEND_MINUTES: Partial<Record<FacilityKind, { min: number; max: number }>> = {
+  cinema: { min: 90, max: 120 },
+  partyHall: { min: 60, max: 120 },
+  weddingHall: { min: 120, max: 180 },
+};
+
+/** The stationary-dwell window (in crowd-seconds) for a round-tripper at a
+ *  venue of `kind`: the attendance window for entertainment venues, the meal
+ *  window for everything else (food venues, and the fallback when the venue
+ *  was bulldozed before arrival and its kind is unknown). */
+export function dwellSecondsRange(kind: FacilityKind | undefined): { min: number; max: number } {
+  const m = kind === undefined ? undefined : ATTEND_MINUTES[kind];
+  if (!m) return { min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX };
+  return { min: m.min * CROWD_SECONDS_PER_MINUTE, max: m.max * CROWD_SECONDS_PER_MINUTE };
+}
+
 /**
  * Visible occupant count for a room, as seen by the renderer and (PR B) the
  * live pop census. Subtracts the transient `outForMeal` overlay from the
