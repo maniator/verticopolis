@@ -15,7 +15,7 @@ import { UI, type Tool } from "./ui/UI";
 import { classifyGesture, isPaintKind } from "./game/gesture";
 import { unitEditorHtml, unitEditorVolatile, transportEditorHtml, transportEditorVolatile } from "./ui/editorHtml";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
-import { buildStatsHtml } from "./ui/statsHtml";
+import { statsTemplate } from "./ui/templates/stats";
 import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
@@ -539,7 +539,7 @@ class GameApp implements GameAppPorts {
   }
 
   showStats(): void {
-    this.ui.showStats(buildStatsHtml(this.sim));
+    this.ui.showStats(statsTemplate(this.sim));
   }
 
   showSaves(): void {

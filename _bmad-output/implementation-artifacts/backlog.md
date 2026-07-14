@@ -1377,3 +1377,46 @@ report dialogs. Residual defers (behavior-preserving):
 - **`#a11y-live` was previously unasserted for these reports** (pre-existing, now
   fixed): before this PR no test read the polite region for the report dialogs; the
   new integration assertions close that standing gap.
+
+### Decision + deferrals: E3-S5 (statistics lit migration) (`/bmad-code-review`, 2026-07-14)
+
+**Decision (the "worst string-composition case").** The Tower Statistics dialog is
+migrated FULLY to nested `TemplateResult`s (Option A of the E3-S5 story), not left
+as an imperative `innerHTML` blob rendered into its own container (Option B). New
+`src/ui/templates/stats.ts` provides `statsTemplate(sim)` (plus `elevatorSection`
+/ `incomeSection` / `milestonesSection` / `householdSection` and the
+`statsModalTemplate` shell), mirroring `buildStatsHtml` and its friends in
+`statsHtml.ts`. Rationale: Option A keeps ONE rendering path (lit everywhere), lets
+the `statsHtml.ts` string builders retire with the rest of the transitional
+builders, and avoids a permanent `unsafeHTML` / `innerHTML` sink. The seam now
+carries a `TemplateResult` instead of a string: `main.ts` calls
+`showStats(statsTemplate(sim))`, `UI.showStats(body: TemplateResult)`, and
+`showStats` opens via `openModalTemplate(statsModalTemplate(body))`. Every
+`escapeHtml` (tower name, elevator labels, milestone label/desc) is now auto-escaped
+by lit. Fidelity is pinned by `assertDomEquivalent(buildStatsHtml(sim),
+statsTemplate(sim))` across an empty tower, a built Classic tower with an elevator,
+a fresh Modern tower (Households empty-state), a Modern tower with a sold household,
+and a fresh Classic tower.
+
+Residual defers (behavior-preserving):
+
+- **`buildStatsHtml` + `buildElevatorHtml` / `buildIncomeHtml` / `buildMilestonesHtml`
+  join the transitional string-builder retirement list**: dead production code kept
+  only to feed the `assertDomEquivalent` guard. NOTE for the final sweep: the
+  `condoModes.integration.test.ts` and `editorHtml.integration.test.ts` suites assert
+  on `buildStatsHtml(sim)` output directly (not as a transitional guard); when the
+  string builder is retired, port those assertions to render `statsTemplate(sim)` to
+  a fragment instead.
+- **Equivalence-guard coverage of the populated branches** (from the Blind Hunter +
+  Edge Case Hunter triage): the guard now exercises the populated Income section
+  (a ticked tower with trailing-quarter data, hitting the rows/two-column split/Net
+  line) and the multi-shaft Elevator two-column split (four Standard shafts). Still
+  unexercised by the guard, and so verified only by Blind Hunter's manual
+  byte-for-byte reading (all confirmed correct), each a near-verbatim mirror of the
+  string builder: the `ratingRow` "Counts toward stars" row + its 4★ hotel-exclusion
+  explainer (needs a hotel-heavy star-4 tower, expensive to reach in a unit test);
+  the Express `kindName` label (express is lobby-locked and would not build in the
+  minimal fixture); the milestone `done` (`✓` / `ms-done`) markup and a non-zero
+  progress-bar width; and the household `mix` with two or more distinct sizes. Add
+  these fixtures before `buildStatsHtml` is retired in the final sweep, or fold them
+  into the ported tests then.
