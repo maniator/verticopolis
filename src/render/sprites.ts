@@ -91,17 +91,17 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
   const ctx = d.ctx;
   switch (u.kind) {
     case "partyHall":
-      return drawPartyHall(ctx, x, y, w, h);
+      return drawPartyHall(d, u, x, y, w, h);
     case "parking":
       return drawParking(d, u, x, y, w, h);
     case "parkingRamp":
       return drawParkingRamp(ctx, u, x, y, w, h);
     case "security":
-      return drawSecurity(ctx, x, y, w, h);
+      return drawSecurity(d, x, y, w, h);
     case "medical":
-      return drawMedical(ctx, x, y, w, h);
+      return drawMedical(d, x, y, w, h);
     case "housekeeping":
-      return drawHousekeeping(ctx, x, y, w, h);
+      return drawHousekeeping(d, x, y, w, h);
     case "recycling":
       return drawRecycling(d, u, x, y, w, h);
     case "metro":

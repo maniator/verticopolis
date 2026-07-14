@@ -1,4 +1,5 @@
 import type { DrawCtx } from "../common";
+import { shade } from "../common";
 
 /**
  * Raw structural and damage shells: the bare floor slab, the under-construction
@@ -6,15 +7,54 @@ import type { DrawCtx } from "../common";
  * `structure.ts`.
  */
 
+/**
+ * The bare deck of a built-but-empty floor or corridor: a warm banded slab
+ * (dark ceiling strip up top, a mid slab band, a dark base band) with faint
+ * grout ticks, ported from page-05's `floorTile`. Drawn in horizontal strips
+ * so a mobile GPU never sees one full-height fill on a tall run, and keyed on
+ * nothing but the rect (baked `cache: true` into `floorGfx`). Integer pixels.
+ */
 export function drawFloor(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-  ctx.fillStyle = "#8c8676";
-  ctx.fillRect(x, y, w, h);
-  ctx.fillStyle = "#9b9685";
-  ctx.fillRect(x, y + 2, w, h - 5);
-  ctx.fillStyle = "#6f6a5c";
-  ctx.fillRect(x, y + h - 3, w, 3);
+  const x0 = Math.round(x);
+  const y0 = Math.round(y);
+  const ww = Math.max(1, Math.round(w));
+  const hh = Math.max(1, Math.round(h));
+  // Warm base wash for the whole tile (a small per-tile fill, not a monolith).
+  ctx.fillStyle = "#B7B0A0";
+  ctx.fillRect(x0, y0, ww, hh);
+  // Ceiling strip and its seam along the top band. Bounded to the tile height
+  // so a degenerate (very short) rect never paints past the tile.
+  const ceil = Math.min(hh, Math.max(3, Math.round(hh * 0.11)));
+  ctx.fillStyle = "#8A8478";
+  ctx.fillRect(x0, y0, ww, ceil);
+  ctx.fillStyle = "#6E6A60";
+  ctx.fillRect(x0, y0 + ceil, ww, 1);
+  // Faint ceiling texture ticks.
+  ctx.fillStyle = "#7A7468";
+  for (let px = x0; px < x0 + ww; px += 8) ctx.fillRect(px, y0 + 1, 2, Math.min(3, ceil - 1));
+  // Floor slab band across the bottom, with a polished top edge and dark base.
+  // Bounded to the tile height so `fy` can never rise above `y0`.
+  const slabH = Math.min(hh, Math.max(4, Math.round(hh * 0.23)));
+  const fy = y0 + hh - slabH;
+  const slab = "#9A9486";
+  ctx.fillStyle = slab;
+  ctx.fillRect(x0, fy, ww, slabH);
+  ctx.fillStyle = shade(slab, 18);
+  ctx.fillRect(x0, fy, ww, 1);
+  ctx.fillStyle = shade(slab, -24);
+  ctx.fillRect(x0, y0 + hh - 1, ww, 1);
+  // Baseboard band where the wall meets the slab, with wall-base ticks above
+  // it. Only when there is room above the slab, so the band and its ticks stay
+  // inside the tile on a short rect.
+  if (fy - 4 >= y0) {
+    ctx.fillStyle = "#8A8478";
+    ctx.fillRect(x0, fy - 2, ww, 2);
+    ctx.fillStyle = "#7E786C";
+    for (let px = x0 + 4; px < x0 + ww; px += 12) ctx.fillRect(px, fy - 4, 2, 4);
+  }
+  // Faint grout ticks down the slab so the deck reads tiled, not poured.
   ctx.fillStyle = "rgba(0,0,0,0.06)";
-  for (let gx = x; gx < x + w; gx += 9) ctx.fillRect(gx, y + 2, 1, h - 5);
+  for (let gx = x0 + 5; gx < x0 + ww; gx += 9) ctx.fillRect(gx, fy + 1, 1, slabH - 2);
 }
 
 export function drawConstruction(d: DrawCtx, x: number, y: number, w: number, h: number) {

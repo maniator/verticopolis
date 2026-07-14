@@ -121,6 +121,133 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: code review of spec-pixelart-retail (E4) (`gds-code-review` adversarial, 2026-07-14)
+
+Change: enriched the eleven canon retail interiors in `src/render/pixelSprites/shop.ts`
+plus a new `src/render/pixelSprites/shop.interiors.ts` (per-trade draws, a lit sign
+board, a board-faithful `pen()` rect helper), ported tile for tile from
+`page-04-retail.build.js`. Three review layers (Blind Hunter, Edge Case Hunter,
+Acceptance Auditor). No `patch`-level finding: the one applied fix was reverting a
+comment inside the byte-stable generic branch so that branch stays literally
+untouched. Two findings deferred, both watch-only:
+
+- **Latent geometry underflow at non-shipping shop sizes** (Edge Case Hunter, Blind
+  Hunter): the interiors and the `railY = awningBottom + 8` band assume the fixed
+  shipping footprint (`shop` is catalog `width: 12` = 132px, 1 floor = 44px, so
+  `fy=39`, `railY=14`). For a shop narrower than ~16px or shorter than ~11px, fixed
+  offsets (counters at `w-16`, the electronics clerk at `x + w - 16`, tall props at
+  `fy-16`) underflow or overrun and `pen.F` clamps them to 1px slivers or draws off
+  the room's left edge. NOT reachable today: shops are fixed 132x44 and each room
+  bakes into its own `w x h` canvas (any overrun is clipped, never bleeds into a
+  neighbor). Only `screens()` carries an explicit right-edge break. If shops ever
+  become variable-size, add an interior-band guard (`railY < floorY`) and clamp the
+  fixed-offset props. Watch-only. (Ready, cheap, gated on shops becoming resizable.)
+- **Salon renders the hash stand-in as a seated (mid-haircut) client, not a standing
+  browser** (Edge Case Hunter, acceptance-flavored): when `u.occupants === 0` and
+  `hash(u.id) > 0.4`, station 0 draws a seated client while both stylists always
+  draw as staff. This is spec-compliant (the I/O matrix lists the Hair Salon client
+  as a sanctioned seated figure, gated on the same single hash signal every shop
+  uses; the client count is monotonic and never yields a second ghost), but it reads
+  as a stronger presence than the "single browsing customer" other trades show for
+  the same stand-in. If the honesty model tightens (real per-shop occupancy), revisit
+  whether the salon client should gate on a real occupant rather than the stand-in.
+  Watch-only, no behavior change wanted now.
+### Deferred from: E3 pixel-art food and entertainment (`/gds-code-review`, 2026-07-14)
+
+Change: enriched the food and entertainment rooms (5 fast-food subtypes, 5
+restaurants, the two-floor cinema, and `drawPartyHall`) and tied every visible
+figure to real occupancy. Bookkeeping and open follow-ups from this PR:
+
+- DONE here: the party-hall `scatterPeople` ghost crowd is retired. Dancers
+  (standing build), the DJ, and banquet guests (seated build) now gate on the
+  hall's `u.occupants` and fill in seed order, so an empty hall draws none.
+- OPEN (entertainment honest-attendance, cinema AND party hall): both kinds are
+  population 0 (`facilitiesData.ts`), so `occupants` (and thus
+  `visibleOccupants`) is pinned to 0, and the occupancy-gated audience/dancers
+  render an EMPTY house on every real cinema and party hall. Per the frozen spec
+  this is the honest read (n === 0 draws empty; "do not leave a constant
+  crowd"), and it is exactly what the acceptance matrix states, so E3 ships it as
+  drawn. The real fix is engine-side, not draw-code: give entertainment venues a
+  visible-attendance count (a foot-traffic or booking-derived number), then feed
+  it to the room as a reviewed bake-signature input (spec "Ask First"). Until
+  then the cinema and party hall read empty. Flagged by the E3 `/gds-code-review`
+  Edge Case Hunter. Do not reintroduce a population-independent ghost crowd to
+  paper over it.
+- OPEN (metro-platform `scatterPeople`): the metro-platform `scatterPeople`
+  call (`src/render/sprites/facilities/service.ts`) is out of scope for E3 and
+  still uses the seeded-scatter crowd idiom. It stays with the
+  people-system/structure work and its own backlog follow-up.
+
+Second review pass (three adversarial layers) on the finished branch:
+
+- PATCHED here (Edge Case Hunter): person-implying props were drawn outside the
+  occupancy gate, so an empty venue showed a floating prop. The seat filler now
+  reports whether it drew an occupant, and the sushi chef's hat, the teahouse
+  boba cups, the coffee-shop lounge laptop, and the coffee-shop window-bench cup
+  all gate on that, matching the party-hall pattern (furniture always draws;
+  person-implying props only when the seat fills). Re-verified with the gates.
+- PATCHED here (Acceptance Auditor): `drawPartyHall` left the bottom ~6px of its
+  two-floor 88px rect unpainted (the food rooms cover it with `pfloor`). Added a
+  floor base band so the composition now fills the full rect height.
+- DEFER (minor, Blind Hunter): the `f` / `glow` / `box` / `twall` primitives and
+  the `(floor * 131 + x * 17)` geography seed are duplicated between
+  `pixelSprites/food.interiors.ts` and `sprites/facilities/venue.ts` (different
+  render modules). Left as-is to avoid cross-module coupling; a shared
+  low-level helper module is the eventual cleanup. No behavior risk today.
+- DEFER (low, Acceptance Auditor): the ice-cream parlor wall clock uses
+  `#E8A050`. This is not the reserved notice amber `#E8A030` (blue differs by
+  0x20, outside the within-10 collision band) and reads as a gold clock, not a
+  state cue, so it passes the reserved-color rule. Noted for a future glance if
+  the amber hue family is ever tightened.
+### Deferred from: code review of spec-pixelart-structure-transport (`gds-code-review`, 2026-07-14)
+
+Change: E6 structure and transport pixel art. Ports the page-05 board
+composition into `structure/shell.ts` (banded deck), `structure/lobby.ts`
+(marble concourse, reception/info desk, sky-lobby glass), `structure/entrance.ts`
+(storefront skyline), `facilities/venue.ts` (two-floor wedding hall), and
+`transport.ts` (stairs/escalator single-flight-plus-landing, warm elevator
+shaft, brass-and-walnut car). Three review layers (Blind Hunter, Edge Case
+Hunter, Acceptance Auditor). All eight frozen invariants verified preserved
+(LOBBY_VARIANTS=4 and the four entrance sentinels, the `u.floor===1` ground
+key with decoration reading only `lit`/`variant`/`ground`, the express
+see-through glass backing, floor-number legibility, the FULL red bar, the
+direction lantern, one flight per two-floor unit, no mode branch / no save
+change). No reserved state-cue color used decoratively. Patched in-PR: the
+wedding aisle runner (was red, spec mandates white) plus its test; the wedding
+garland color rotation (`Math.abs(ax)%4` was constant); the storefront skyline
+block heights (`(bx*3)%4` was constant); the wedding pilaster loop step (could
+round to 0 and hang at a degenerate width); the floor-slab clamp (could paint
+above a very short tile). Four findings deferred:
+
+- **`scatterPeople` is still drawn on the metro platform and in the party
+  hall** (`facilities/service.ts:156`, `facilities/venue.ts:28`). The E6 spec
+  calls to retire or gate the ambient crowd so an empty tower reads empty, but
+  that gating is owned by `spec-pixelart-people-system.md` and rides the E6
+  read-only occupancy seam (`ElevatorQueueView` / real-occupant projection),
+  which is not wired here. The enriched lobby and sky-lobby tiles already draw
+  no ambient pedestrians; only these two venue/platform calls remain. Pick up
+  with the people-system overlay story so the retirement and the real-occupant
+  draw land together. (Medium; cross-spec, gated on the E6 seam.)
+- **Stairs and escalator bake no ~17px rider** (`transport.ts` flight
+  helpers). AC 151 and the I/O matrix describe a climbing rider on the incline,
+  but the flight sprites are static `cache:true` art; baking a rider would show
+  a phantom climber on empty stairs, contradicting the "empty tower reads
+  empty" AC. The engine's routed climbers ride over the flight instead.
+  Revisit if the people-system overlay wants a baked rider on the incline.
+  (Low; reconciliation with the empty-tower invariant.)
+- **The reception/info desk occupies lobby variant slot 1** (`structure/lobby.ts`),
+  which the frozen I/O matrix line enumerates as "plain." The spec's own Ground
+  and Sky I/O rows and Code Map both call for the desk, and `LOBBY_VARIANTS`
+  and the sentinels are untouched, so this is a content realization, not a
+  contract change; flagged as a spec internal inconsistency to reconcile in a
+  spec touch-up. (Low; cosmetic / doc.)
+- **Two 2px full-height guide-rail fills on the opaque elevator shafts**
+  (`transport.ts`, non-express only) are drawn at full shaft height. They
+  mirror the pre-existing full-height edge shadows and backing fill on the same
+  shaft, so the incremental texture-safety cost is negligible, but they are
+  additional full-height fills. If a future pass bands the shaft backing into
+  per-floor strips, fold these in too. (Low; cosmetic, pre-existing pattern.)
+
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into
@@ -712,3 +839,167 @@ which yielded `rgb(NaN,...)` for a non-hex argument) was patched in-PR after
 Copilot raised the same point on the PR. `shade()` now returns a non-hex
 argument unchanged, so those helpers degrade gracefully; every shipped caller
 still passes a `#RRGGBB` literal, so current output is byte-identical.
+
+### Deferred from: code review of E2 pixel-art tenant rooms (`/gds-code-review`, 2026-07-14)
+
+Change: E2 ports office, condo, and the three hotel grades to the ratified
+page-02 warm-dollhouse composition. New `pixelSprites/dollhouse.ts` (the
+composition primitives `fill`, `bevelBox`, `glow`, `interiorWall`,
+`ceilingCap`, `downlights`, `plankFloor`, `curtain`, `framedArt`) and
+`pixelSprites/residential.looks.ts` (the wall and picture look tables, re-tinted
+to warm variants held within 10 per channel of each anchor); `residential.ts`
+rewritten to compose the shell over the shared E1 helpers (`windowView`,
+`dado`, `ceilingFixture`, `roomGlow`) and to adopt `personSeated`.
+
+All three adversarial layers ran to completion (Blind Hunter, Edge Case
+Hunter, Acceptance Auditor). Patched in-PR (10 findings). Two from the final
+review pass: the suite coffee table drawn at the bed origin
+(`x + suiteSofaW + 14`) and fully occluded by the bed painted afterward, so a
+spec-required suite element rendered zero pixels (moved into the sitting area,
+in front of the sofa, where it is visible and clear of the bed); and the condo
+study's bottom book-spine row overflowing the bookcase by 1px onto the floor
+line (rows anchored at `railY - 1` so all four 3px rows end at `floorY - 1`).
+The Edge Case Hunter found no genuine unhandled edge cases. The earlier eight:
+the 1px unpainted seam at row `y+3`
+between the ceiling cap and the interior wall (interior wall now butts under
+the cap at `y+3`, with the downlights/ceiling fixture drawn over it); the
+misleading `cueTop` comment plus its single-use indirection (the asleep "z"
+baseline is now inlined at `floorY - 10`); the duplicated suite `sofaW`
+(hoisted to one `suiteSofaW`); the conditional `globalAlpha` reset in `fill`
+(now unconditional, matching its docstring); the hotel asleep sleeper gating
+on raw `u.occupants` (now `visibleOccupants(u)`, matching office/condo and the
+file's occupancy contract); the asleep "z" not gated on occupancy while the
+sleeper figure was (now both gated on `visibleOccupants(u) > 0`, so an empty
+bed never shows a "z"); the narrow-meeting chair count that could over-claim a
+seat (`Math.max(2, ...)` to `Math.max(1, ...)`, so seated never exceeds the
+chairs that fit); and a documenting comment that a hotel has no vacancy shell
+by design (state "empty" reads as ready-to-rent, the ready lamp lit, which the
+shipped `sprites.test.ts` already pins).
+
+No residual defers. Dismissed as intended-by-design or already-guarded: the
+window off-rect math for sub-production widths (guarded by the `fill` /
+`windowView` min-1 clamps, and production room widths are fixed at 44/66/99/
+110/176px); the office downlights keying on occupancy rather than `d.lit` (the
+spec I/O matrix wants downlights off for an empty office, with the empty-at-
+night scrim handling the dim); the per-layout seat caps differing by geo
+layout (the spec caps seated figures at the layout's seats, and the executive
+corner is ratified as one exec plus two cubicles); the `w > 44` exclusion of
+the single-grade ceiling light and framed art (mirrors the build's `if(W>44)`
+at page-02 lines 50 and 54, the pixel-exact port reference; the single is the
+deliberately plainest grade); the meeting worker drawn after the table
+(matches the reference build's draw order); the hotel asleep sleeper drawn
+inside `maybeMirrored` (the Code Map at spec line 104 directs it to stay in the
+`bed` closure so the sleeper's head tracks the flipped headboard; only the
+corner state cues, tray, ready lamp, and the "z" text, must be pixel-identical
+across the mirror, and those do draw outside); the asleep "z" x-position being
+flip-compensated (`zx = flip ? 2*x + w - zSrc - 5 : zSrc`) rather than literally
+identical (it must float over the flipped bed, and it still draws outside the
+wrapper so the text is never backward; the "identical pixels" AC wording is
+imprecise); and the extracted `residential.looks.ts` tables and `dollhouse.ts`
+helpers not being re-exported through the `pixelSprites.ts` barrel (they are
+consumed directly by `residential.ts` and its test, have no cross-module barrel
+consumer like the food/shop look tables do, and the `barrelSurface.test.ts`
+deliberately curates a minimal barrel surface, so re-exporting would add dead
+surface against an intentional guard).
+### Deferred from: E5 pixel-art utilities and service (`/gds-code-review`, 2026-07-14)
+
+Change: E5 enriches the seven utilities-and-service looks (recycling, metro,
+medical, security, housekeeping, parking, parking ramp) by porting each from its
+pixel-exact Figma reference build script through a shared `refMap` scaler, maps
+every figure to the finalized `person()` family (`personSeated` guard,
+`personStanding` nurse/doctor/housekeeper with a white-coat overlay for medical
+staff, `personHiVis` recycling hand), keeps the `recycleFill` pile plus green /
+amber / red FULL gauge and the `parkingUse` / `parkingDead` car gate, and splits
+`service.ts` into `service.ts` (five interior kinds), `garage.ts` (parking and
+ramp), and `serviceKit.ts` (shared port helpers).
+
+- **Metro real-commuter platform crowd (follow-up, depends on the people-system
+  traffic seam).** This PR removes the `scatterPeople` ghost crowd from
+  `drawMetro` and leaves the baked platform empty, per spec. The real routed
+  commuters are meant to ride the redraw overlay that the people-system traffic
+  seam owns (walkers at the 24px scale, tinted content then amber then stress red
+  by wait). That overlay is not landed here; when the seam ships, wire the metro
+  platform crowd to it. Until then an empty tower correctly shows an empty
+  platform. Type: review-deferral / feature-dependency.
+- **Party-hall `scatterPeople` retirement is out of scope here.** `drawPartyHall`
+  in `facilities/venue.ts` still calls the ghost `scatterPeople`; that retirement
+  belongs to the food-and-entertainment spec, not this one. Noted so it is not
+  lost.
+
+Review findings (`/gds-code-review`, three layers). The Acceptance Auditor
+returned compliant on every pinned constraint (reserved colors, the
+`recycleFill` gauge, the `parkingUse` / `parkingDead` gate, no ghost crowd,
+figures mapped to the shared family, integer coordinates, no per-frame scan, no
+lease card). Patched in-PR: the `refMap` zero-size guard (a genuine 0-size
+reference rect now paints nothing instead of being floored to a stray 1px, which
+removes both the empty-gauge green sliver and the ramp-foot void pixel and
+restores reference fidelity), `Number.isFinite` normalization of `recycleFill`
+and `parkingUse` (a non-finite input can no longer blank the pile/gauge or
+silently suppress a car), and a tightened metro test that now also asserts no
+skin-tone figure of the finalized family is baked. One defer:
+
+- **Fixed-size figures do not scale with the room rect at non-bake sizes
+  (follow-up, people-system figure scaling).** The shared `person()` builds and
+  the `whiteCoat` overlay draw at native 1x at a scaled anchor, so at the
+  canonical bake size (`w === RW`, `h === RH`, identity map) they align with the
+  furniture exactly, but at a non-identity rect the figures keep their pixel size
+  while the furniture scales. The real render bakes at identity, so this is not a
+  live defect; fixed-size character sprites are also the intended pixel-art
+  behavior. Captured so that if the people-system traffic seam ever composites
+  figures at a non-bake scale, figure sizing is handled there, not re-derived per
+  facility. Type: review-deferral / render-consistency.
+
+## E9 integration (PR #266): cross-cutting review defers and shipping followups
+
+The six art epics merged into the integration branch and shipped as one overhaul
+PR. Two defers came out of the cross-cutting `/gds-code-review` over the whole
+integrated diff, and a set of E6 art-quality followups were split out so the
+strong overhaul (E2 through E8) could ship without waiting on the E6 polish.
+
+Cross-cutting review defers (both log-only, integration was otherwise clean):
+
+- **Wedding-hall composition test lives in `sprites.transport.test.ts`.** After
+  the `sprites.test.ts` split, the wedding-hall paint test sits in the transport
+  sibling file. Harmless (it is grouped with structure and event coverage) but an
+  odd home for a venue test. Relocate to `sprites.test.ts` next time these files
+  are touched. Type: test-organization.
+- **Reserved-color / integer-pixel sweep does not cover the venue kinds or
+  cinema.** The `sprites.test.ts` guard sweeps the seven service kinds but not
+  `partyHall` / `weddingHall` (in `venue.ts`) or `cinema`, which only get
+  occupancy and paints-without-throw assertions. Venue colors were verified by
+  hand at merge, but a guard over the venues would harden the merge-resolved
+  `venue.ts` against future edits. Add a venue reserved-color guard next touch.
+  Type: test-coverage.
+
+E6 structure and transport art followups (owner-flagged from live play, split
+into a fast-follow so the overhaul could ship). E2 (offices, hotels, condos) and
+the other kinds read well in game; these are contained to the ground lobby and
+the stair / escalator sprites:
+
+- **Ground lobby repeats the seated receptionist at every fourth tile.** The
+  lobby tiles four baked variants by `x % 4`, and variant 1 is a staffed
+  reception desk (`receptionDesk` with `personSeated`), so the same attendant
+  reappears every four structural tiles across a wide concourse. A staffed
+  reception is a once-per-lobby feature, not a tiling motif. Move the reception
+  desk and attendant out of the repeating cycle (into the grand-entrance tile,
+  which is placed once), and make variant 1 a tile-friendly architectural element
+  (a wall panel or bench) instead. `src/render/sprites/structure/lobby.ts`.
+- **Stair flight geometry reads badly.** `drawStairFlight`
+  (`src/render/sprites/transport.ts`) renders a broken, jagged diagonal that does
+  not read as a clean staircase and sits awkwardly over the lobby floor. Rework
+  the flight so the treads, risers, stringer, and handrail compose a readable
+  staircase at play zoom.
+- **Escalator run reads badly.** `drawEscalatorRun` (same file) reads as a long
+  shallow zigzag ramp rather than an escalator. Rework toward a clean inclined
+  belt with a handrail and legible step edges.
+- **Grand entrance / awning is not prominent in play.** The enriched grand
+  storefront and doorman (`src/render/sprites/structure/entrance.ts`) do not read
+  as a grand entrance at the lobby's frontage edge in game (it appears as a small
+  green sliver). Confirm the grand-entrance tiles are being placed and consider a
+  projecting marquee or awning so the entrance reads as grand.
+- **Gallery squishes multi-floor kinds.** `src/gallery.ts` sizes every cell to
+  about one floor, so genuinely multi-floor kinds (cinema, party hall, recycling,
+  housekeeping floors 2; metro floors 3) render vertically crushed and cannot be
+  judged in the baseline. Size each gallery cell by the facility's `floors` so
+  multi-floor compositions show at their true proportion (clamp to the cell,
+  scale width to preserve aspect). Regenerate the baseline and screenshots after.

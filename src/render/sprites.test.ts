@@ -1,25 +1,16 @@
 import { describe, it, expect } from "vitest";
-import type { Unit, Transport } from "../engine/types";
+import type { Unit } from "../engine/types";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
-  drawTransport,
-  drawAwning,
-  drawCar,
-  drawCrane,
-  drawEscapeStairs,
-  drawLobbyEntrance,
   craneAnchorTile,
   lobbyVariant,
   LOBBY_VARIANTS,
-  drawGarbageTruck,
-  drawMetroTrain,
-  drawStreetCar,
   type DrawCtx,
 } from "./sprites";
 import { shade, rand, ACCENTS } from "./sprites/common";
+import { SKIN } from "./pixelSprites/common";
 import { PAL, person, drawRoom, sampleState } from "./pixelSprites";
-import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
 
 /**
  * The procedural sprite layer draws every facility from shapes into a 2D
@@ -128,160 +119,74 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     drawUnit(draw({}, b.ctx), unit({ kind: "lobby", x: xb }), 0, 0, 60, 34);
     expect(b.sig()).not.toBe(a.sig());
   });
+
+  it("a party hall gates its figures on hall occupancy (two-floor 88px rect)", () => {
+    const empty = spyCtx();
+    const full = spyCtx();
+    // The catalog gives the party hall two floors (88px). Occupancy drives the
+    // dancers, DJ, and banquet guests; an empty hall draws none, a full one does.
+    drawUnit(draw({}, empty.ctx), unit({ kind: "partyHall", occupants: 0 }), 0, 0, 264, 88);
+    drawUnit(draw({}, full.ctx), unit({ kind: "partyHall", occupants: 8 }), 0, 0, 264, 88);
+    // A person build lays a 1px contact shadow at rgba(0,0,0,0.24): its presence
+    // marks a drawn occupant. The shell/windows/fixtures paint either way.
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    expect(empty.log).not.toContain(occupant);
+    expect(full.log).toContain(occupant);
+    expect(empty.log.some((l) => l.startsWith("fillRect"))).toBe(true);
+  });
+
+  it("a cinema paints green EXIT signage on its two-floor rect without throwing", () => {
+    const s = spyCtx();
+    // A cinema is open at hour 20 (the default), so the auditorium draws rather
+    // than the closed shutter; EXIT green #6bd47a is a non-reserved canon color.
+    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "cinema" }), 0, 0, 341, 88)).not.toThrow();
+    expect(s.log).toContain("fillStyle=#6bd47a");
+  });
 });
 
-describe("transport, crane & event sprites paint", () => {
-  function transport(over: Partial<Transport> = {}): Transport {
-    return { id: 1, kind: "elevatorStandard", x: 5, width: 2, bottom: 1, top: 6, cars: 2, carPositions: [1, 4], carDir: [1, -1], carLoad: [3, 0], load: 3, ...over } as Transport;
-  }
+describe("service facilities — reserved colors, integer pixels, and state cues", () => {
+  // Reserved state colors must never appear as decoration, every rectangle must
+  // land on integer coordinates, and the recycling FULL gauge is a state cue.
+  const RESERVED = ["#C24A3A", "#C9CCC4", "#B2B0A4", "#E8A030", "#D4623A", "#FFD86A", "#E0556B"];
+  const KINDS: Array<Partial<Unit>> = (["security", "medical", "housekeeping", "recycling", "metro", "parking", "parkingRamp"] as const).map((kind) => ({ kind }));
 
-  it("drawTransport paints a shaft, honoring skip floors", () => {
-    const s = spyCtx();
-    expect(() => drawTransport(s.ctx, transport({ skipFloors: [3, 4] }), 10, 0, 24, 34)).not.toThrow();
-    expect(s.painted()).toBe(true);
-  });
-
-  it("drawCar paints a cab; a full car with an up arrow differs from an empty idle one", () => {
-    const idle = spyCtx();
-    const busy = spyCtx();
-    drawCar(idle.ctx, 1, 24, 34, 0, null, false);
-    drawCar(busy.ctx, 1, 24, 34, 8, "up", true);
-    expect(idle.painted()).toBe(true);
-    expect(busy.sig()).not.toBe(idle.sig());
-  });
-
-  it("each elevator kind draws its own cab: standard, service, and express differ pairwise", () => {
-    const std = spyCtx();
-    const svc = spyCtx();
-    const exp2 = spyCtx();
-    drawCar(std.ctx, 1, 44, 44, 2, "up", false, "elevatorStandard");
-    drawCar(svc.ctx, 1, 44, 44, 2, "up", false, "elevatorService");
-    drawCar(exp2.ctx, 1, 44, 44, 2, "up", false, "elevatorExpress");
-    expect(svc.sig()).not.toBe(std.sig());
-    expect(exp2.sig()).not.toBe(std.sig());
-    expect(exp2.sig()).not.toBe(svc.sig());
-  });
-
-  it("omitting the kind draws the standard cab, so existing call sites are unchanged", () => {
-    const implicit = spyCtx();
-    const explicit = spyCtx();
-    drawCar(implicit.ctx, 1, 44, 44, 3, "down", false);
-    drawCar(explicit.ctx, 1, 44, 44, 3, "down", false, "elevatorStandard");
-    expect(explicit.sig()).toBe(implicit.sig());
-  });
-
-  it("the standard cab keeps its established frame, interior, and light-strip colors", () => {
-    const s = spyCtx();
-    drawCar(s.ctx, 1, 44, 44, 0);
-    expect(s.log).toContain("fillStyle=#8e94a0");
-    expect(s.log).toContain("fillStyle=#d8dce2");
-    expect(s.log).toContain("fillStyle=#f3f6fa");
-  });
-
-  it("FULL and the direction lantern still change every kind's cab", () => {
-    // Riders held constant so only the top-edge indicators can make the
-    // difference; a kind branch that swallowed them would fail this.
-    for (const kind of ["elevatorStandard", "elevatorService", "elevatorExpress"] as const) {
-      const idle = spyCtx();
-      const busy = spyCtx();
-      drawCar(idle.ctx, 1, 44, 44, 0, null, false, kind);
-      drawCar(busy.ctx, 1, 44, 44, 0, "up", true, kind);
-      expect(busy.sig()).not.toBe(idle.sig());
+  it("no reserved decoration color, integer pixels only, across fill/lit/dead states", () => {
+    for (const over of KINDS) {
+      for (const [rf, pd, lit] of [[0, false, true], [0.8, false, false], [1, false, true], [0.5, true, true]] as const) {
+        const s = spyCtx();
+        drawUnit(draw({ recycleFill: rf, parkingUse: 1, parkingDead: pd, lit }, s.ctx), unit(over), 0, 0, 176, 88);
+        const fills = s.log.filter((x) => x.startsWith("fillStyle=")).map((x) => x.slice("fillStyle=".length).toLowerCase());
+        for (const r of RESERVED) expect(fills, `${String(over.kind)} painted reserved ${r}`).not.toContain(r.toLowerCase());
+        for (const l of s.log.filter((x) => x.startsWith("fillRect:")))
+          for (const n of JSON.parse(l.slice("fillRect:".length)) as number[]) expect(Number.isInteger(n), `${String(over.kind)} non-integer ${l}`).toBe(true);
+      }
     }
   });
 
-  it("drawEscapeStairs, drawCrane, and the moving-vehicle sprites all paint", () => {
-    for (const run of [
-      (c: CanvasRenderingContext2D) => drawEscapeStairs(c, "left", 0, 34),
-      (c: CanvasRenderingContext2D) => drawEscapeStairs(c, "right", 1, 34),
-      (c: CanvasRenderingContext2D) => drawAwning(c, "left", 34),
-      (c: CanvasRenderingContext2D) => drawAwning(c, "right", 34),
-      (c: CanvasRenderingContext2D) => drawCrane(c, 12, true),
-      (c: CanvasRenderingContext2D) => drawGarbageTruck(c, 80),
-      (c: CanvasRenderingContext2D) => drawMetroTrain(c, 120, true),
-      (c: CanvasRenderingContext2D) => drawStreetCar(c, 3),
-    ]) {
+  it("recycling reads green, then amber past 0.7, then red with the FULL label at capacity", () => {
+    const at = (rf: number) => {
       const s = spyCtx();
-      expect(() => run(s.ctx)).not.toThrow();
-      expect(s.painted()).toBe(true);
-    }
-  });
-
-  it("the ground-floor awning mirrors per side and differs from the escape stairs", () => {
-    const awnL = spyCtx();
-    const awnR = spyCtx();
-    const esc = spyCtx();
-    drawAwning(awnL.ctx, "left", 34);
-    drawAwning(awnR.ctx, "right", 34);
-    drawEscapeStairs(esc.ctx, "left", 0, 34);
-    // Left and right canopies are mirror images, so their draw traces differ.
-    expect(awnL.sig()).not.toBe(awnR.sig());
-    // The awning is a distinct sprite from the fire escape it stands in for.
-    expect(awnL.sig()).not.toBe(esc.sig());
-  });
-
-  it("the grand and service entrance tiles differ from each other and from normal lobby variants", () => {
-    const bake = (fn: (c: CanvasRenderingContext2D) => void) => {
-      const s = spyCtx();
-      fn(s.ctx);
+      drawUnit(draw({ recycleFill: rf }, s.ctx), unit({ kind: "recycling" }), 0, 0, 220, 88);
       return s;
     };
-    const ctx = (lit: boolean, anim: number): DrawCtx => ({ ctx: null as unknown as CanvasRenderingContext2D, lit, anim, hour: lit ? 20 : 12 });
-    const grand = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
-    const grandLeft = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-left", 0, 0, 11, 34));
-    const grandSolo = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "grand-solo", 0, 0, 11, 34));
-    const service = bake((c) => drawLobbyEntrance({ ...ctx(true, 0), ctx: c }, "service", 0, 0, 11, 34));
-    const grandDay = bake((c) => drawLobbyEntrance({ ...ctx(false, 0), ctx: c }, "grand-right", 0, 0, 11, 34));
-    // Draw a normal variant-0 lobby tile via drawUnit for comparison.
-    const lobbyUnit: Unit = {
-      id: -1, kind: "lobby", floor: 1, x: 0, width: 1, state: "occupied",
-      satisfaction: 1, occupants: 0, everOccupied: false, pendingIncome: 0, label: "",
-    };
-    const normal = bake((c) => drawUnit({ ...ctx(true, 0), ctx: c }, lobbyUnit, 0, 0, 11, 34));
-    // Both entrance tiles paint, and they don't collapse to the same sprite.
-    expect(grand.painted()).toBe(true);
-    expect(grandLeft.painted()).toBe(true);
-    expect(grandSolo.painted()).toBe(true);
-    expect(service.painted()).toBe(true);
-    expect(grand.sig()).not.toBe(service.sig());
-    // The two slices of the wide storefront are different halves of the same
-    // facade; they must not collapse to the same sprite.
-    expect(grand.sig()).not.toBe(grandLeft.sig());
-    // The compact 1-tile fallback is its own recipe; must not collapse into
-    // either slice of the wide storefront.
-    expect(grandSolo.sig()).not.toBe(grand.sig());
-    expect(grandSolo.sig()).not.toBe(grandLeft.sig());
-    // Neither entrance duplicates the plain lobby variant.
-    expect(grand.sig()).not.toBe(normal.sig());
-    expect(service.sig()).not.toBe(normal.sig());
-    // The grand tile brightens at night, so day and night must differ.
-    expect(grand.sig()).not.toBe(grandDay.sig());
+    const amber = at(0.85);
+    expect(amber.log).toContain("fillStyle=#e0a94e");
+    expect(amber.log).not.toContain("fillStyle=#d6342f");
+    const full = at(1);
+    expect(full.log).toContain("fillStyle=#d6342f"); // FULL-state red gauge
+    expect(full.log.some((l) => l.startsWith("fillText:") && l.includes("FULL"))).toBe(true);
   });
 
-  it("the grand entrance doorman sway advances with d.anim", () => {
-    const bake = (anim: number) => {
-      const s = spyCtx();
-      drawLobbyEntrance({ ctx: s.ctx, lit: true, anim, hour: 20 }, "grand-right", 0, 0, 11, 34);
-      return s;
-    };
-    // Two frames of the 3-second cycle land at t=0 and t=1.6 (each frame is
-    // 1.5s wide, so anywhere in [0,1.5) is frame A and [1.5, 3.0) is frame B).
-    expect(bake(0).sig()).not.toBe(bake(1.6).sig());
-  });
-
-  it("event sprites (santa, explosion, thief, treasure, limo) all paint", () => {
-    for (const run of [
-      (c: CanvasRenderingContext2D) => drawSanta(c, 10, 10, 1),
-      (c: CanvasRenderingContext2D) => drawExplosion(c, 10, 10, 20, 0.5),
-      (c: CanvasRenderingContext2D) => drawThief(c, 10, 10, 1, false),
-      (c: CanvasRenderingContext2D) => drawThief(c, 10, 10, 1, true),
-      (c: CanvasRenderingContext2D) => drawTreasure(c, 10, 10, 1, 0.5),
-      (c: CanvasRenderingContext2D) => drawVipLimo(c, 10, 10, 1),
-    ]) {
-      const s = spyCtx();
-      expect(() => run(s.ctx)).not.toThrow();
-      expect(s.painted()).toBe(true);
-    }
+  it("the metro platform draws empty — no baked crowd, legacy or finalized (no ghost people)", () => {
+    // scatterPeople paints via legacy person(), whose hair overlay is a unique
+    // literal; its absence proves no legacy crowd rides the station. The skin
+    // tones prove the point for the finalized person() family too: a station
+    // that bakes no figure of either idiom paints no skin, so an empty tower
+    // reads empty and the real commuters ride the traffic overlay instead.
+    const s = spyCtx();
+    drawUnit(draw({}, s.ctx), unit({ kind: "metro" }), 0, 0, 330, 132);
+    expect(s.log).not.toContain("fillStyle=rgba(30,24,20,0.65)");
+    for (const skin of SKIN) expect(s.log, `metro baked a figure (skin ${skin})`).not.toContain(`fillStyle=${skin}`);
   });
 });
 

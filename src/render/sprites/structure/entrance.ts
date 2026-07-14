@@ -90,6 +90,10 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
   }
   ctx.fillStyle = interior;
   ctx.fillRect(x, glassTop, w, glassBot - glassTop);
+  // A cool skyline recedes behind the top of the glass so the frontage reads
+  // "warm light within, cool world outside" (the board's storefront beat, and
+  // the tall glass skyline the ground lobby I/O calls for).
+  storefrontSkyline(ctx, x, glassTop, w, lit);
   // Interior carpet visible through the very bottom of the glass, so the
   // carpet visually continues from outside the doors right through the display
   // window (a signature grand-hotel beat).
@@ -99,6 +103,31 @@ function drawGrandStorefrontShared(d: DrawCtx, x: number, y: number, w: number, 
     drawGrandFacadeLeftInterior(d, x, y, w, glassTop, glassBot, frameColor, goldTrim);
   } else {
     drawGrandFacadeRightInterior(d, x, y, w, h, glassTop, glassBot, frameColor, goldTrim);
+  }
+}
+
+/** A shallow recessed skyline behind the top of the storefront glass: a cool
+ *  day or night sky band with distant building blocks, warm distant windows
+ *  glowing only after dark. Keeps the frontage reading "warm within, cool
+ *  world outside" without competing with the doors or the chandelier drawn over
+ *  it. Keys on `lit` and the slice's `x` (stable per placed unit, so the room
+ *  stays cacheable); the `x` term gives each slice deliberate block-height
+ *  variety rather than an identical tiled run. */
+function storefrontSkyline(ctx: CanvasRenderingContext2D, x: number, glassTop: number, w: number, lit: boolean): void {
+  const skyH = 6;
+  ctx.fillStyle = lit ? "#2A3350" : "#9CC4DE"; // night vs day sky
+  ctx.fillRect(x, glassTop, w, skyH);
+  ctx.fillStyle = lit ? "#1E2740" : "#7EA0C0"; // distant building blocks
+  // Vary each block's height off a per-block counter (offset by x so adjacent
+  // baked slices do not tile into an identical run); stepping bx by 4 alone
+  // leaves (bx*3)%4 constant, which would flatten the skyline.
+  for (let bx = x, bi = 0; bx < x + w; bx += 4, bi++) {
+    const bh = 2 + ((bi * 3 + x) % 4);
+    ctx.fillRect(bx, glassTop + skyH - bh, 3, bh);
+  }
+  if (lit) {
+    ctx.fillStyle = "#F3D08A"; // warm distant windows at night only
+    for (let bx = x + 1; bx < x + w; bx += 4) ctx.fillRect(bx, glassTop + 2, 1, 1);
   }
 }
 

@@ -79,12 +79,13 @@ describe("transport sprite geometry", () => {
     expect(bands.has(0)).toBe(false); // top band (arrival landing) stays empty
   });
 
-  it("the escalator belt rises through the bottom band", () => {
-    const { ctx, lines } = recordingCtx();
+  it("the escalator run rises through the bottom band, not the arrival landing", () => {
+    const { ctx, rects } = recordingCtx();
     drawTransport(ctx, transport("escalator", 1, 2), 0, TOP_Y, 40, FLOOR_H);
-    expect(lines.length).toBeGreaterThan(0);
-    // All belt/ridge geometry lives in the bottom band, not the landing.
-    expect(lines.every((p) => p.y >= TOP_Y + FLOOR_H)).toBe(true);
+    expect(rects.length).toBeGreaterThan(0); // steps + rails were drawn
+    // All step/rail/landing geometry lives in the bottom band: the top band is
+    // the arrival landing and must stay empty (no second stacked run).
+    expect(rects.every((p) => p.y >= TOP_Y + FLOOR_H)).toBe(true);
   });
 });
 

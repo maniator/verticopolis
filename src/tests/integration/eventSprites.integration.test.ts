@@ -44,6 +44,7 @@ describe("event sprites", () => {
     expect(() => drawSanta(ctx, 120, 40, 1.15)).not.toThrow();
     expect(calls).toContain("fill");
     expect(calls).toContain("stroke"); // rein line + antlers
+    expect(calls).toContain("fillRect"); // the enriched board rider (integer rects)
     expect(calls.filter((c) => c === "save")).toHaveLength(1);
     expect(calls.filter((c) => c === "restore")).toHaveLength(1); // balanced save/restore
   });
@@ -66,7 +67,8 @@ describe("event sprites", () => {
   it("drawThief draws the figure (and a guard when caught) without throwing", () => {
     const loose = recordingCtx();
     expect(() => drawThief(loose.ctx, 100, 200, 1.1, false)).not.toThrow();
-    expect(loose.calls).toContain("fillText"); // the $ on the loot sack
+    expect(loose.calls).toContain("fillRect"); // the board burglar (integer rects, no $ glyph)
+    expect(loose.calls).not.toContain("fillText"); // the board burglar has no $ glyph
     expect(loose.calls.filter((c) => c === "restore")).toHaveLength(1);
     // Caught → the extra guard figure means strictly more draw calls.
     const caught = recordingCtx();
