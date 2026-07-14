@@ -173,14 +173,16 @@ function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
       const rightFace = g.shaft.x + g.shaft.width;
       // Contiguous built run just outside each shaft face (the right run starts
       // at rightFace, the left one tile further out at leftFace - 1). Queue
-      // toward the longer run and clamp to its far tile so a short or gappy
-      // floor bunches the tail at the wall instead of trailing off the edge.
+      // toward the longer run and clamp to the run's OUTER edge so a short or
+      // gappy floor bunches the tail at the wall instead of trailing off the
+      // edge, while still leaving the front rider room for QUEUE_GAP on a
+      // one-tile run.
       const leftRun = builtRun(tower, floor, leftFace - 1, -1);
       const rightRun = builtRun(tower, floor, rightFace, 1);
       const side = rightRun >= leftRun ? 1 : -1;
       const run = side > 0 ? rightRun : leftRun;
       const face = side > 0 ? rightFace : leftFace;
-      const far = side > 0 ? rightFace + Math.max(0, run - 1) : leftFace - run;
+      const far = side > 0 ? rightFace + run : leftFace - run;
       g.people.forEach((p, rank) => {
         const raw = face + side * (QUEUE_GAP + rank * QUEUE_SPACING);
         slots.set(p.id, side > 0 ? Math.min(raw, far) : Math.max(raw, far));
