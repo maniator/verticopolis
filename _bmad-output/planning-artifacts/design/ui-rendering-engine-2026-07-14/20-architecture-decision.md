@@ -26,9 +26,10 @@ initiative. It changes nothing a player can see.
 
 These hold across every phase. A future contributor gets the red flags first.
 
-1. **The emitted DOM is byte-stable.** Tags, class names, `id`s, `data-*`
-   attributes, attribute order where it is observable, and text content match the
-   pre-migration strings. The design system (`docs/design-system.md`), the e2e
+1. **The emitted DOM is structurally equivalent.** Tags, class names, `id`s,
+   `data-*` and `aria-*` attributes, and text content match the
+   pre-migration strings (normalized DOM equality, not raw `outerHTML`; attribute
+   order is not observable and is not asserted). The design system (`docs/design-system.md`), the e2e
    selectors, and the visual snapshots all key on this. A migrated template that
    changes the markup is a bug, not an improvement. Author markup verbatim, with
    no reflowed whitespace between inline elements (the batch stepper
@@ -159,7 +160,7 @@ Four kinds of unit, in decreasing order of how much they change:
    announcements) stays in the controller (invariant 5).
 3. **Live views** (throttled ~6 Hz, render-on-change from a snapshot). The
    tower-stats grid, the tool-info panel, and optionally the palette lock state.
-   Each is a presentational template rendered from a per-frame **view snapshot**
+   Each is a presentational template rendered from a per-pump **view snapshot**
    (section 5), called from the throttled `ui.update(sim)`, and re-rendered ONLY
    when its slice of the snapshot changed. Per surface (this is the corrected
    framing, not a uniform diffing win):
@@ -272,7 +273,7 @@ full-subtree rebuild, and no contention with the 60fps render loop.
   `positionPanels`-style layout read, so a write never forces a synchronous reflow
   that a later `offsetWidth` read pays for (E5-S0 measurement C).
 - **Reactivity primitive: start snapshot-only.** No signals dependency initially.
-  The per-frame snapshot + render-on-change is sufficient and matches the current
+  The per-pump snapshot + render-on-change is sufficient and matches the current
   model. Add `@lit-labs/signals` only if a specific view later needs fine-grained
   reactivity; that is a separate, gated decision, not part of this plan.
 
@@ -415,7 +416,7 @@ The full contract is in `50-testing-strategy.md`; the load-bearing points, inlin
   builder so it cannot rot; (3) the integration spec stays green (with the E6
   rewrite carve-out); (4) for live views, the E5 perf baselines; (5) zero
   visual/snapshot churn via `git diff --stat`.
-- **The integration spec is the primary behavioral gate (E2-E5).** The 1544-line
+- **The integration spec is the primary behavioral gate (E2-E5).** The large
   `uiDialogs.integration.test.ts` pins `data-act` routing, single-resolve, x/focus
   ordering, hostile-name escaping (which independently validates lit auto-escape),
   the toast cap, the log-freeze regression, and palette lock/afford. "This spec

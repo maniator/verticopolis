@@ -11,8 +11,9 @@ block), `15-party-review-synthesis.md`, `40-spec-first-story.md`.
 This is the standalone testing contract for the migration. It is a hard,
 merge-blocking gate, not guidance. Every touched aspect (each dialog, panel, and
 live view) carries the same five-part test package. The migration is shift-left:
-correctness is proven at the unit tier (happy-dom, runs pre-push before the e2e
-tier) before the slower behavioral and visual tiers run. It is also regression
+correctness is proven at the unit tier (happy-dom): `npm test` runs it as the CI
+merge-blocking gate, and it is fast enough to run locally before pushing, ahead of
+the slower behavioral and visual tiers. It is also regression
 first: an old-vs-new equivalence test rides alongside each migration and is
 retired in the same PR that retires the string builder it guards.
 
@@ -26,8 +27,9 @@ gate, and the coverage ratchet must not fall.
 
 ## 1. E0 shift-left infrastructure (built once, used by every later story)
 
-E0 delivers the harness the whole migration depends on. It is unit tier, runs in
-happy-dom, and runs pre-push before the e2e tier. Three helpers:
+E0 delivers the harness the whole migration depends on. It is unit tier and runs in
+happy-dom under `npm test` (the CI merge-blocking gate); it is also fast enough to
+run locally before pushing, ahead of the e2e tier. Three helpers:
 
 - **`renderToFragment(result: TemplateResult): DocumentFragment`.** Renders a lit
   template into a detached container and returns the resulting nodes, so a unit
@@ -79,8 +81,8 @@ acceptance criteria; a story is not done until each is present and green.
    inputs that matter (empty, populated, hostile, boundary). It is DELETED in the
    same PR that retires the string builder, so it cannot rot into a test of two
    dead code paths. Its whole job is to prove the swap changed nothing observable.
-3. **The integration spec stays green.** `uiDialogs.integration.test.ts` (1544
-   lines) is the primary behavioral gate for E2 through E5: it pins `data-act`
+3. **The integration spec stays green.** `uiDialogs.integration.test.ts` is the
+   primary behavioral gate for E2 through E5: it pins `data-act`
    routing, single-resolve, x/focus ordering, hostile-name escaping (which
    independently validates lit auto-escape), the toast cap, the log-freeze
    regression, and palette lock/afford visibility. It passes UNCHANGED, with one

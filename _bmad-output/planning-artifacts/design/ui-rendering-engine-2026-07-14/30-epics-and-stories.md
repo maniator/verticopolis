@@ -269,7 +269,7 @@ plus new committed perf-baseline JSON and a Playwright perf spec.
 - **E5-S1 Tower-stats grid (migrate) and status bar (keep or render-on-change).**
   Migrate the tower-stats grid: replace `towerStats.innerHTML =
   towerStatsHtml(...)` (a full reparse every pump) with a `render(...)` from the
-  per-frame snapshot, keeping the `lastUiUpdate` throttle. For the status bar, keep
+  per-pump snapshot, keeping the `lastUiUpdate` throttle. For the status bar, keep
   the five leaf writes imperative or gate a `render()` on snapshot-inequality;
   either way target the individual leaf spans (`money`/`pop`/`star`/`time`/`date`),
   NOT a wrapper that also owns `#traffic` (updated imperatively by `main.ts`

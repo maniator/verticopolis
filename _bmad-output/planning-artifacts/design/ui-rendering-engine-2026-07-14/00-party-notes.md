@@ -103,7 +103,7 @@ Why it won the room unanimously:
   (lit only inserts text/attribute values, never parses interpolated strings as
   markup) deletes the `escapeHtml` obligation and closes the injection class.
 - **It cannot fight the loop.** `render(template, container)` diffs only the
-  dynamic bindings and leaves stable DOM in place, so the throttled per-frame
+  dynamic bindings and leaves stable DOM in place, so the throttled (~6 Hz)
   `ui.update(sim)` updates values without rebuilding nodes, preserving the
   surgical property the status pump has today.
 
@@ -159,7 +159,7 @@ and ~66 KB of Tone: ~3.7 KB min+gzip of lit-html rounds to noise in the precache
 
 - Confirm **lit-html standalone** (no `LitElement`/Shadow DOM), to keep the
   global stylesheet intact.
-- Reactive primitive: start with a **plain per-frame snapshot + throttled
+- Reactive primitive: start with a **plain per-pump snapshot + throttled
   `render()`** (no signals dependency), and add `@lit-labs/signals` only if a
   specific view needs fine-grained reactivity. Confirm this staged approach.
 - Do the **bulletin log and toast rail** migrate, or stay imperative permanently?

@@ -21,9 +21,9 @@ changes, all of which are now folded into the plan of record.
 
 | Lens | Verdict | Headline of the required changes |
 |---|---|---|
-| 💻 **Dev** | ENDORSE WITH CHANGES | String-composition builders auto-escape under lit, so several dialogs are not a mechanical port; one-container-one-renderer invariant; the modal-mount decision; harden the E1 factory; E6 rewrites two test files. |
-| 🎨 **Design / UX** | ENDORSE WITH CHANGES | Most a11y lives in controller side effects, not markup, so a mechanical port drops it; per-phase a11y checklist as acceptance criteria; the fire-once modal deadlock risk; render-target granularity so lit and `main.ts` do not clobber `#traffic`. |
-| 🎮 **Game / Perf** | ENDORSE WITH CHANGES | Correct the cadence language (throttled ~6 Hz, not per-frame); per-surface truth instead of a uniform diffing win; a blocking perf-gate story (E5-S0) with committed baselines; name the catch-up-spiral mechanism in Risks. |
+| **Dev** | ENDORSE WITH CHANGES | String-composition builders auto-escape under lit, so several dialogs are not a mechanical port; one-container-one-renderer invariant; the modal-mount decision; harden the E1 factory; E6 rewrites two test files. |
+| **Design / UX** | ENDORSE WITH CHANGES | Most a11y lives in controller side effects, not markup, so a mechanical port drops it; per-phase a11y checklist as acceptance criteria; the fire-once modal deadlock risk; render-target granularity so lit and `main.ts` do not clobber `#traffic`. |
+| **Game / Perf** | ENDORSE WITH CHANGES | Correct the cadence language (throttled ~6 Hz, not per-frame); per-surface truth instead of a uniform diffing win; a blocking perf-gate story (E5-S0) with committed baselines; name the catch-up-spiral mechanism in Risks. |
 
 ## Resolved open questions
 
@@ -34,7 +34,7 @@ and recorded here so no downstream story re-opens them.
    `lit-html`), no `LitElement`, no Shadow DOM, so the global `src/styles.css`
    reaches every node. Confirmed.
 2. **Reactivity primitive:** start **snapshot-only, render-on-change** (shallow
-   compare a per-frame view snapshot, skip `render()` when unchanged). No
+   compare a per-pump view snapshot, skip `render()` when unchanged). No
    `@lit-labs/signals` dependency now; it is a separate, gated decision if a
    specific view later needs fine-grained reactivity. Confirmed.
 3. **Bulletin log and toast rail:** **stay imperative.** They are deliberate
@@ -89,7 +89,7 @@ Every review finding, and where it now lives in the plan.
 | DV-5 | E6 correction: "integration+e2e pass unchanged every phase" is FALSE at E6 by construction; the `renderEditor` describe block in the integration spec and `editorPatch.test.ts` encode the `key`/`patchVolatile` mechanism lit's diff replaces. Carve out: those are REWRITTEN at E6, and a new test pins the surviving invariant (a refresh between `pointerdown` and `pointerup` must not recreate the pressed button, the "+ rent" bug). Keep `editorBusy` as belt-and-suspenders through E6. | `20` section 6 and Risks (E6 test rewrite); `30` E6-S1 carve-out; `50`. |
 | DV-6 | Schedule the Statistics dialog (`showStats`/`statsModalHtml` + `buildStatsHtml`) explicitly (in no epic; worst string-composition case): put it in E3 and decide whether `buildStatsHtml` migrates with it. | `30` new story E3-S5; `20` section 3 example. |
 | DV-7 | E0 bundle ACs: assert no `LitElement` in the built chunk AND that the PROD (not development) lit build is bundled (no lit dev banner in dist); directive imports resolve from `lit-html/directives/*` and tree-shake. Use `map` (unkeyed) not `repeat` for the lists. `ref` not needed (render is synchronous, so post-render `offsetWidth` reads are valid). | `30` E0-S1 ACs; `40` CAP-1; `20` section 7. |
-| DV-8 | The 1544-line `uiDialogs.integration.test.ts` is the STRONGEST per-phase gate (data-act routing, single-resolve, x/focus, hostile-name escaping which validates lit auto-escape, toast cap, log-freeze regression, palette lock/afford). Promote "this spec passes unchanged" to the primary gate for E2-E5; per-template unit tests supplement it. | `20` section 10; `30` cross-cutting DoD and test-package block; `50` (part 3). |
+| DV-8 | The `uiDialogs.integration.test.ts` is the STRONGEST per-phase gate (data-act routing, single-resolve, x/focus, hostile-name escaping which validates lit auto-escape, toast cap, log-freeze regression, palette lock/afford). Promote "this spec passes unchanged" to the primary gate for E2-E5; per-template unit tests supplement it. | `20` section 10; `30` cross-cutting DoD and test-package block; `50` (part 3). |
 
 ### Testing contract (cross-cutting mandate)
 

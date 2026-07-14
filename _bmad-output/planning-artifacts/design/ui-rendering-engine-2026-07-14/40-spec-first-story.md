@@ -2,10 +2,10 @@
 id: SPEC-ui-render-foundation
 title: "E0 - lit-html foundation: dependency, modal-template mount, test harness, and confirmModal proof"
 companions:
-  - ../20-architecture-decision.md
-  - ../30-epics-and-stories.md
-  - ../50-testing-strategy.md
-  - ../15-party-review-synthesis.md
+  - _bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/20-architecture-decision.md
+  - _bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/30-epics-and-stories.md
+  - _bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/50-testing-strategy.md
+  - _bmad-output/planning-artifacts/design/ui-rendering-engine-2026-07-14/15-party-review-synthesis.md
 sources:
   - _bmad-output/implementation-artifacts/backlog.md (Preact follow-up, 2026-07-14)
 intended_target_location: _bmad-output/specs/spec-ui-render-foundation/SPEC.md
@@ -112,9 +112,11 @@ mechanism is validated and E2 onward can proceed with confidence.
   with an explicit `.focus()` on the primary action, NOT the `autofocus` attribute
   surviving lit's diffing. Append the x AFTER `showModal()` and focus. Set
   `onclick`/`oncancel` by PROPERTY ASSIGNMENT, never `addEventListener`.
-- **The emitted DOM is byte-stable.** `confirmTemplate` is authored as the literal
-  markup `confirmHtml` produces: no restructuring, no class renames, no attribute
-  reordering, and no reflowed whitespace between inline elements.
+- **The emitted DOM is structurally equivalent.** `confirmTemplate` is authored as
+  the literal markup `confirmHtml` produces: no restructuring, no class renames, and
+  no reflowed whitespace between inline elements. Equivalence is checked as normalized
+  DOM equality (tag tree, `id`s, classes, `data-*`/`aria-*`), never raw `outerHTML`;
+  attribute order is not observable and is not asserted.
 - **No `escapeHtml`; nested templates, not string interpolation.** lit-html
   auto-escapes interpolations. `confirm`'s `title`/`body`/`yesLabel` are trusted
   today and stay so, now auto-escaped. `unsafeHTML` is not used.

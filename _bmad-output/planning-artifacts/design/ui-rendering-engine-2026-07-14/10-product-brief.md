@@ -72,7 +72,7 @@ The UI works today. The goal is to make it cheaper and safer to keep working.
    the renderer; raw-HTML injection is opt-in and rare, and reviewable.
 4. **Replace the hand-rolled diffing** (batch-pricing `refresh`, editor
    `patchVolatile`) with the renderer's own binding diff, preserving the
-   mid-click-safety and per-frame-surgical behaviors they exist to provide.
+   mid-click-safety and per-pump-surgical behaviors they exist to provide.
 5. **Unblock and land the held `main.ts` / `UICallbacks` split** as part of the
    sequencing.
 6. Keep the new dependency **small enough to be invisible** in the PWA precache.
