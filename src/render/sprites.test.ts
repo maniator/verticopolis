@@ -19,6 +19,7 @@ import {
 } from "./sprites";
 import { shade, rand, ACCENTS } from "./sprites/common";
 import { PAL, person, drawRoom, sampleState } from "./pixelSprites";
+import { RESERVED_COLORS } from "./pixelSprites/common";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "./sprites/events";
 
 /**
@@ -267,6 +268,58 @@ describe("transport, crane & event sprites paint", () => {
     // Two frames of the 3-second cycle land at t=0 and t=1.6 (each frame is
     // 1.5s wide, so anywhere in [0,1.5) is frame A and [1.5, 3.0) is frame B).
     expect(bake(0).sig()).not.toBe(bake(1.6).sig());
+  });
+
+  it("the enriched vehicle sprites issue their signature fills (badge, livery, headlight)", () => {
+    const truck = spyCtx();
+    drawGarbageTruck(truck.ctx, 80);
+    expect(truck.log).toContain("fillStyle=#DCE8C0"); // recycle-arrow badge
+    expect(truck.log).toContain("fillStyle=#4A7A44"); // green hopper
+    expect(truck.log).toContain("fillStyle=#16181C"); // wheel tire
+    expect(truck.log).toContain("fillStyle=#5A5E66"); // wheel hub (two-tone)
+    expect(truck.log.some((l) => l.startsWith("arc"))).toBe(false); // wheels are integer rects, not arcs
+
+    const on = spyCtx();
+    drawMetroTrain(on.ctx, 120, true);
+    expect(on.log).toContain("fillStyle=#D0392B"); // red livery
+    expect(on.log).toContain("fillStyle=#FFE27A"); // headlight lit
+    const off = spyCtx();
+    drawMetroTrain(off.ctx, 120, false);
+    expect(off.log).not.toContain("fillStyle=#FFE27A"); // no lit headlight in the off state
+    // The window glint also paints #9FC0E0, so a wide-carriage color check would
+    // pass regardless of the headlight branch. Draw a narrow carriage where the
+    // window loop (wx + 5 < w) yields zero glints, isolating the dark headlight.
+    const offNarrow = spyCtx();
+    drawMetroTrain(offNarrow.ctx, 8, false);
+    expect(offNarrow.log).toContain("fillStyle=#9FC0E0"); // dark headlight, isolated from any glint
+    expect(offNarrow.log).not.toContain("fillStyle=#FFE27A");
+
+    const car = spyCtx();
+    drawStreetCar(car.ctx, 3);
+    expect(car.log).toContain("fillStyle=#CFE4FF"); // windows
+    expect(car.log).toContain("fillStyle=#FFE27A"); // headlight
+    expect(car.log.some((l) => /^fillStyle=rgb\(/.test(l))).toBe(true); // blue-anchored jittered body
+  });
+
+  it("no enriched actor or event sprite reuses a reserved state color for decoration", () => {
+    const runs: Array<(c: CanvasRenderingContext2D) => void> = [
+      (c) => drawGarbageTruck(c, 80),
+      (c) => drawMetroTrain(c, 120, true),
+      (c) => drawMetroTrain(c, 120, false),
+      (c) => drawStreetCar(c, 3),
+      (c) => drawStreetCar(c, 7),
+      (c) => drawThief(c, 40, 40, 1, false),
+      (c) => drawThief(c, 40, 40, 1, true),
+      (c) => drawSanta(c, 40, 40, 1.15),
+    ];
+    for (const run of runs) {
+      const s = spyCtx();
+      run(s.ctx);
+      const sig = s.log.join("|").toUpperCase();
+      for (const reserved of RESERVED_COLORS) {
+        expect(sig, `reserved literal ${reserved} appeared in an enriched sprite`).not.toContain(reserved.toUpperCase());
+      }
+    }
   });
 
   it("event sprites (santa, explosion, thief, treasure, limo) all paint", () => {
