@@ -100,18 +100,18 @@ function tripFloors(p: Person): number {
   return n;
 }
 
-// Elevator-landing queue geometry, in tiles: the front of the line stands
-// QUEUE_GAP off the shaft face and each waiter behind is QUEUE_SPACING further
-// out, so the line reads as a row at the doors rather than a stack on the car.
+// Elevator-landing queue geometry, in tiles: the front stands QUEUE_GAP off the
+// shaft face and each waiter behind is QUEUE_SPACING further out. A rendered
+// figure is a bit under one tile wide, so a spacing above that clears it and the
+// row reads as distinct people rather than a solid mass.
 const QUEUE_GAP = 0.8;
-const QUEUE_SPACING = 0.6;
+const QUEUE_SPACING = 1.1;
 
-// Max tiles a landing line is laid out across, from the shaft face. It bounds
-// the contiguous-structure scan below (a floor can be hundreds of tiles wide)
-// and caps the line's spread: a landing can hold more than a car's worth of
-// waiters (they accumulate up to MAX_PEOPLE), so a very long queue clamps its
-// tail onto the far built tile instead of trailing on indefinitely.
-const QUEUE_REACH = 16;
+// Max tiles a landing line spreads across, from the shaft face. Bounds the
+// contiguous-structure scan below (a floor can be hundreds of tiles wide) and
+// caps the line so a congested landing (waiters accumulate to MAX_PEOPLE) forms
+// a long readable row before it compresses, rather than trailing on forever.
+const QUEUE_REACH = 30;
 
 /** Length of the contiguous built (floor/lobby) run starting at `startX` and
  *  stepping by `dir`, capped at {@link QUEUE_REACH}. Used to pick the roomier
@@ -130,10 +130,10 @@ function builtRun(tower: Tower, floor: number, startX: number, dir: number): num
  *  the shaft center. The longest-waiting person holds the front, so the order
  *  reflects arrival, not spawn, and a fresh arrival (wait 0) joins the back
  *  rather than shoving those ahead outward. The line extends onto whichever side
- *  of the shaft has the longer contiguous run of built floor and is clamped to
- *  that run, so it never trails into unbuilt space (shaft x is a lot coordinate,
- *  not tower-relative, so the side must come from the real layout, not a fixed
- *  threshold). Only `waiting` people are placed; people still walking in
+ *  of the shaft has the longer contiguous run of built floor and compresses its
+ *  spacing to fit that run, so it never trails into unbuilt space (shaft x is a
+ *  lot coordinate, not tower-relative, so the side must come from the real
+ *  layout, not a fixed threshold). Only `waiting` people are placed; people still walking in
  *  (`toShaft`) head to the shaft face and fan out once they arrive, so this
  *  never changes the toShaft -> waiting timing the sim depends on. Stairs and
  *  escalators are walked, not queued. */
@@ -172,20 +172,31 @@ function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
       const leftFace = g.shaft.x;
       const rightFace = g.shaft.x + g.shaft.width;
       // Contiguous built run just outside each shaft face (the right run starts
-      // at rightFace, the left one tile further out at leftFace - 1). Queue
-      // toward the longer run and clamp to the run's OUTER edge so a short or
-      // gappy floor bunches the tail at the wall instead of trailing off the
-      // edge, while still leaving the front rider room for QUEUE_GAP on a
-      // one-tile run.
+      // at rightFace, the left one tile further out at leftFace - 1). The line
+      // lays out on whichever side has the longer run and stays within it; the
+      // distribution below compresses the spacing to fit that run rather than
+      // trailing off the built floor or bunching the tail on one tile.
       const leftRun = builtRun(tower, floor, leftFace - 1, -1);
       const rightRun = builtRun(tower, floor, rightFace, 1);
       const side = rightRun >= leftRun ? 1 : -1;
       const run = side > 0 ? rightRun : leftRun;
       const face = side > 0 ? rightFace : leftFace;
-      const far = side > 0 ? rightFace + run : leftFace - run;
+      // Lay the line from the shaft face outward. It wants QUEUE_GAP for the
+      // front rider then QUEUE_SPACING per waiter behind, but if that overruns
+      // the built run the step compresses so the WHOLE line still fits on solid
+      // floor: a jammed landing packs its waiters tighter (down to shoulder to
+      // shoulder) rather than piling the overflow on the last tile. This is what
+      // "runs out of space" does on a narrow floor, not a stack at the wall.
+      const n = g.people.length;
+      // The front rider stands QUEUE_GAP off the face, but never past the built
+      // run: a degenerate shaft with no floor beside it (run 0) keeps everyone on
+      // the face rather than one gap out over unbuilt space.
+      const front = Math.min(QUEUE_GAP, run);
+      const naturalDepth = front + Math.max(0, n - 1) * QUEUE_SPACING;
+      const maxDepth = Math.min(naturalDepth, run);
+      const step = n > 1 ? (maxDepth - front) / (n - 1) : 0;
       g.people.forEach((p, rank) => {
-        const raw = face + side * (QUEUE_GAP + rank * QUEUE_SPACING);
-        slots.set(p.id, side > 0 ? Math.min(raw, far) : Math.max(raw, far));
+        slots.set(p.id, face + side * (front + rank * step));
       });
     }
   }

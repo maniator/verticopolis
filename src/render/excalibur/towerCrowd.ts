@@ -3,6 +3,8 @@ import { GARBAGE_COLLECT_HOUR, isElevatorKind, transportCarCapacity } from "../.
 import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
+import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
+import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import type { Person } from "../../engine/Crowd";
 import { FLOOR, TILE } from "../scale";
@@ -169,8 +171,12 @@ export function syncMotion(engine: TowerEngine): void {
   for (const u of engine.sim.tower.units) {
     if (u.kind !== "metro") continue;
     const w = u.width * TILE - 6;
-    const cv = new ex.Canvas({ width: w, height: 9, cache: true, draw: (ctx) => drawMetroTrain(ctx, w, true) });
-    const a = new ex.Actor({ pos: ex.vec(engine.worldX(u.x) + 3, engine.worldYTop(u.floor) + FLOOR - 15), width: w, height: 9, anchor: ex.vec(0, 0), z: 0.6 });
+    // The car sits on the track just below the platform edge: its base is 3px
+    // off the station floor and it stands METRO_TRAIN_H tall (was a 9px sliver
+    // stranded mid-trough).
+    const trainY = engine.worldYTop(u.floor) + FLOOR - 3 - METRO_TRAIN_H;
+    const cv = new ex.Canvas({ width: w, height: METRO_TRAIN_H, cache: true, draw: (ctx) => drawMetroTrain(ctx, w, true) });
+    const a = new ex.Actor({ pos: ex.vec(engine.worldX(u.x) + 3, trainY), width: w, height: METRO_TRAIN_H, anchor: ex.vec(0, 0), z: 0.6 });
     a.graphics.use(cv);
     engine.engine.add(a);
     engine.trainActors.push({ actor: a, u, w });
@@ -180,12 +186,12 @@ export function syncMotion(engine: TowerEngine): void {
   // story, exactly the metro-train pattern).
   for (const u of engine.sim.tower.units) {
     if (u.kind !== "recycling") continue;
-    const w = 44;
-    const cv = new ex.Canvas({ width: w, height: 16, cache: true, draw: (ctx) => drawGarbageTruck(ctx, w) });
+    const w = 68;
+    const cv = new ex.Canvas({ width: w, height: GARBAGE_TRUCK_H, cache: true, draw: (ctx) => drawGarbageTruck(ctx, w) });
     const a = new ex.Actor({
-      pos: ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor) + FLOOR - 16),
+      pos: ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor) + FLOOR - GARBAGE_TRUCK_H),
       width: w,
-      height: 16,
+      height: GARBAGE_TRUCK_H,
       anchor: ex.vec(0, 0),
       z: 0.6,
     });
@@ -226,9 +232,11 @@ export function syncMotion(engine: TowerEngine): void {
 }
 
 function buildWalkers(engine: TowerEngine): void {
+  const coveredRows = coveredUpperStories(engine.sim.tower.units);
   const byFloor = new Map<number, Map<number, "floor" | "lobby">>();
   for (const u of engine.sim.tower.units) {
     if (u.kind === "floor" || u.kind === "lobby") {
+      if (lotCovered(coveredRows, u.floor, u.x)) continue; // upper story of a multi-floor facility
       let row = byFloor.get(u.floor);
       if (!row) byFloor.set(u.floor, (row = new Map()));
       row.set(u.x, u.kind);
@@ -250,8 +258,12 @@ function buildWalkers(engine: TowerEngine): void {
         const rank = (i + 0.5) / count; // only the first few show until it fills
         const speed = 7 + (Math.abs(seed) % 6);
         if (run.kind === "lobby") {
-          // Concourse: figures stroll the whole width, gated on tower busyness.
-          spawnWalker(engine, x0w, x1w, foot, foot, seed, speed, rank, floor, false);
+          // Concourse: each figure paces its own evenly spaced lane, gated on
+          // tower busyness. Confining every figure to a lane keeps a busy lobby
+          // from piling everyone at the ping-pong turnaround ends (the old
+          // full-width sweep bunched them up there).
+          const [segX0, segX1] = lobbyLaneSpan(i, count, x0w, x1w);
+          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, false);
         } else {
           // Corridor: loiter in a short stretch around a spread-out anchor, so a
           // lone figure shuffles in place instead of sprinting the whole floor,
@@ -362,7 +374,7 @@ export function updateMotion(engine: TowerEngine): void {
     if (cycle < 0.25) offset = (1 - cycle / 0.25) * -span;
     else if (cycle < 0.75) offset = 0;
     else offset = ((cycle - 0.75) / 0.25) * span;
-    tr.actor.pos = ex.vec(engine.worldX(tr.u.x) + 3 + offset, engine.worldYTop(tr.u.floor) + FLOOR - 15);
+    tr.actor.pos = ex.vec(engine.worldX(tr.u.x) + 3 + offset, engine.worldYTop(tr.u.floor) + FLOOR - 3 - METRO_TRAIN_H);
   }
   // The garbage truck runs on GAME time (the collection is a sim event, not
   // ambience): during the collection hour it drives in along the center's
@@ -382,7 +394,7 @@ export function updateMotion(engine: TowerEngine): void {
     if (p < 0.25) x = base - 60 + (p / 0.25) * 60; // roll in from the left
     else if (p < 0.7) x = base; // loading at the mouth
     else x = base + ((p - 0.7) / 0.3) * (uw + 20); // drive off across the deck
-    tk.actor.pos = ex.vec(x, engine.worldYTop(tk.u.floor) + FLOOR - 16);
+    tk.actor.pos = ex.vec(x, engine.worldYTop(tk.u.floor) + FLOOR - GARBAGE_TRUCK_H);
   }
   // Garage commute cars: cruise the parking decks during the morning and
   // evening rushes, but only when the garage actually has cars to move.
