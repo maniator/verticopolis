@@ -134,6 +134,32 @@ export interface ElevatorCalls {
   cab: ReadonlyMap<number, ReadonlyMap<number, ReadonlySet<number>>>;
 }
 
+/** One landing's waiting line in an {@link ElevatorQueueView}: how many real
+ *  people wait there and a bounded wait-tier (0 content, 1 impatient, 2 fed up),
+ *  the max over its waiters. */
+export interface QueueLanding {
+  count: number;
+  tier: 0 | 1 | 2;
+}
+
+/**
+ * Read-only projection of the waiting crowd and car fill, sized for the render
+ * layer (see `elevatorQueueView`). A VIEW of state the crowd already tracks (the
+ * same `waiting` people {@link ElevatorCalls} counts, and each car's `carLoad`),
+ * so it re-simulates nothing: it surfaces boarding, it does not perform it.
+ * {@link Crowd.queueView} memoizes it once per outer sim step, so a render frame
+ * reads it without re-scanning the crowd.
+ */
+export interface ElevatorQueueView {
+  /** Landing queues: shaftId → floor → count and wait-tier. The waiters' stable
+   *  order in `crowd.people` is the queue order the render draws; this view
+   *  carries the length and tier, not the identities. */
+  landings: ReadonlyMap<number, ReadonlyMap<number, QueueLanding>>;
+  /** Boarded riders per car: shaftId → carIndex → count, read from
+   *  `t.carLoad[i]` (engine truth, the value the cab fill draws). */
+  boarded: ReadonlyMap<number, ReadonlyMap<number, number>>;
+}
+
 /**
  * Crowd time-base: one in-game minute is worth this many of the crowd's own
  * seconds (small, so a commute spans a few game-minutes and people zip through

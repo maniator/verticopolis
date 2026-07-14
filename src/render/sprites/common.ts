@@ -1,4 +1,5 @@
 import { person } from "../pixelSprites";
+import type { ElevatorQueueView } from "../../engine/Crowd";
 
 export function shade(hex: string, amt: number): string {
   const n = parseInt(hex.slice(1), 16);
@@ -50,6 +51,12 @@ export interface DrawCtx {
   /** 0..1 how full the recycling centers are right now (shared load) —
    *  garbage piles up through the day until the morning truck collection. */
   recycleFill?: number;
+  /** Read-only elevator queue + car-fill projection, memoized once per sim step
+   *  by the engine ({@link ElevatorQueueView}) and threaded here the same way
+   *  `stress` is. A VIEW of tracked crowd state, so the transport render path can
+   *  read landing queues and cab fill without a draw routine calling the engine.
+   *  Populated by TowerEngine; the queue render that consumes it is a follow-up. */
+  elevatorQueue?: ElevatorQueueView;
 }
 
 /** The 7px signage every service facility paints on its back wall; hidden

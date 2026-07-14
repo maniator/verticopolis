@@ -347,6 +347,13 @@ export class TowerEngine {
     // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
     if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
+    // Read-only queue + car-fill projection for the transport render path.
+    // Memoized on the (step, revision) key in the engine, so this per-frame read
+    // returns the cached snapshot without re-scanning the crowd, except on the
+    // first call after the sim steps or the tower structure changes (for example
+    // a paused structural edit), which rebuilds once. The queue render that draws
+    // from it is a follow-up story.
+    this.d.elevatorQueue = this.sim.crowd.queueView(this.sim.tower);
     this.engine.backgroundColor = ex.Color.fromHex(scene.skyColor(c.hour));
     if (this.onUpdate) this.onUpdate(elapsedMs);
 

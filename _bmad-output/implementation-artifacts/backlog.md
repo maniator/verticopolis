@@ -145,6 +145,27 @@ deferred, both cosmetic and both pre-existing to the move:
   call site in `sprites.ts` and widen the diff past a pure relocation). Drop the
   param when the parking-ramp draw is next touched for real. (Low; cosmetic.)
 
+### Deferred from: code review of pixelart-elevator-queue-seam (`/gds-code-review`, 2026-07-14)
+
+- **The queue view's two halves read two different populations: reconcile boarded
+  against the drawn crowd in E6-S7.** `ElevatorQueueView.landings` counts the
+  DRAWN `crowd.people` (real routed sims in the `waiting` state), but
+  `ElevatorQueueView.boarded` reads the dispatch's statistical `t.carLoad`, which
+  comes from the aggregate demand model, not the drawn crowd. The drawn per-car
+  occupancy is `crowd.carRiders`, and a drawn waiter boarding does NOT change
+  `carLoad`, so the two halves are unrelated counts. This seam PR keeps the
+  spec-mandated `boarded = t.carLoad[i]` on purpose (it is the value the cab fill
+  draws today, and nothing consumes `boarded` visually yet: the render consumer
+  is the separate E6-S7 queue-render story). The spec's INTENT ("the leftover
+  line is the same individuals, now shorter") is only truly honored if boarded
+  and the queue are the same population. The engine unit test
+  (`src/engine/crowd/queueView.test.ts`) reconciles boarded against the queue by
+  HAND-WRITING `shaft.carLoad`, which stands in for the dispatch. E6-S7 must
+  decide whether `boarded` reads `carLoad` or `crowd.carRiders` (the drawn
+  occupancy) and add a real, non-hand-written "same individuals" reconciliation
+  test then. Deferred: surfaced by the Edge Case Hunter, kept per the frozen spec
+  for this seam-only PR. (Judgment call, flagged in the PR body.)
+
 ### Follow-up: evaluate a Preact (or similar) UI rendering layer (2026-07-14, from Wave C-2)
 
 While splitting `UI.ts`, the owner raised moving the DOM generation to

@@ -50,6 +50,14 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
   // movement runs per chunk.
   const rush = sim.rushFactor();
   sim.elevators.accumulate(sim.tower, dtMinutes, rush);
+  // Open a new outer-step epoch for the read-only elevator queue projection, at
+  // the same cadence as accumulate, never inside the car/crowd sub-step loop
+  // below. Then derive it eagerly, here in the sim step, so the single
+  // crowd.people scan lands once per step and every render frame only reads the
+  // cached snapshot (I/O matrix: "a render frame runs no scan over crowd.people
+  // or tower.units"). The memo makes this the sole build per step.
+  sim.crowd.beginStep();
+  sim.crowd.queueView(sim.tower);
   // The crowd runs on its own seconds, a few per game-minute, capped so a
   // huge outer tick still can't teleport (or mass-spawn) everyone at once.
   sim.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), sim.tower, sim.clock);
