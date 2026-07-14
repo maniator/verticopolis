@@ -1689,4 +1689,7 @@ strings, the income Net behavior tests moved beside `incomeSection`, and the
 `editorHtml` integration suite retired with the volatile-map protocol it
 pinned (its live assertions live on in `templates/editor.test.ts`). lit now
 owns every dialog and panel; the log and toast rails stay imperative per the
-E7-S1 decision above.
+E7-S1 decision above. Triage defers: `shortMoney` still has no direct unit
+test (pre-existing; its 1M+ branch is uncovered, unchanged by the move), and
+`condoModes` was split (`condoStatsPanel.integration.test.ts`) after landing
+exactly on the 500-line ceiling.
