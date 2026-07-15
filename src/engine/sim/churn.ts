@@ -87,6 +87,9 @@ export function attemptMoveIns(sim: Simulation): void {
     }
     return hit;
   };
+  // One set read per pass instead of a per-unit delegation chain; the set is
+  // already revision-memoized (tower/routing.ts servedFloors).
+  const servedSet = sim.tower.servedFloors();
   for (const u of sim.tower.units) {
     if (u.state !== "empty") continue;
     // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
@@ -95,7 +98,7 @@ export function attemptMoveIns(sim: Simulation): void {
     if (u.noRate) continue;
     const f = FACILITIES[u.kind];
     if (f.population === 0 && !isHotelKind(u.kind)) continue; // non-tenant facility
-    if (!sim.tower.isFloorServed(u.floor)) continue; // nobody moves to an unreachable floor
+    if (!servedSet.has(u.floor)) continue; // nobody moves to an unreachable floor
     // Two-ride rule: a served floor 3+ rides from the lobby draws no
     // commuters (Crowd.MAX_RIDES), so nobody can arrive to buy, lease, or
     // check in. Same gate for every tenant kind; commercial visitor income
