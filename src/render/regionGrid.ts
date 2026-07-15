@@ -45,12 +45,16 @@ export function regionKey(col: number, row: number): number {
 /** Every region key a unit footprint intersects: floors `floor..floor+floors-1`,
  *  tiles `x..x+width-1`. A wide or multi-story unit near a boundary lands in
  *  two (corner case four) regions; each draws the whole unit clipped to its
- *  own rect, so the union renders seamlessly (the transport-band argument). */
+ *  own rect, so the union equals the unclipped draw with no visible seam (the
+ *  transport-band argument). Ranges clamp to the grid: placement and save
+ *  import already reject off-lot footprints, but a raw caller must never be
+ *  handed a key outside `[0, REGION_COLS * REGION_ROWS)`, because column
+ *  overflow would alias into the next row's keys. */
 export function regionsOf(floor: number, x: number, width: number, floors: number): number[] {
-  const c0 = regionCol(x);
-  const c1 = regionCol(x + width - 1);
-  const r0 = regionRow(floor);
-  const r1 = regionRow(floor + floors - 1);
+  const c0 = Math.max(0, regionCol(x));
+  const c1 = Math.min(regionCol(x + width - 1), REGION_COLS - 1);
+  const r0 = Math.max(0, regionRow(floor));
+  const r1 = Math.min(regionRow(floor + floors - 1), REGION_ROWS - 1);
   const keys: number[] = [];
   for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) keys.push(regionKey(c, r));
   return keys;

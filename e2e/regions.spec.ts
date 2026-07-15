@@ -72,7 +72,9 @@ test("regions compose settled rooms, animate fires privately, and drain on budge
   expect(doused).toEqual({ animated: false, inRegions: true });
 
   // A full-tower invalidation (mark every region dirty) drains at most the
-  // budget per frame, never all at once (I2).
+  // budget per frame, never all at once (I2). Precondition: buildToStar left
+  // sim speed at 0 and nothing above restores it, so no hour flip can add
+  // marks mid-observation; the monotone assertion below depends on that.
   const drain = await page.evaluate(
     () =>
       new Promise<{ start: number; steps: number[] }>((resolve) => {

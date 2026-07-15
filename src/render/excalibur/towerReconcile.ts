@@ -151,7 +151,9 @@ export function syncScene(engine: TowerEngine): void {
   // (survivors repaint via the drain; an emptied region evicts whole).
   for (const id of [...engine.regionUnits.keys()]) {
     if (!seenR.has(id)) {
-      dropRegionUnit(engine, id);
+      // Same-frame: a demolition is a player edit, and its baked pixels must
+      // vanish with it instead of queuing behind an hour-flip drain backlog.
+      dropRegionUnit(engine, id, true);
       engine.roomSig.delete(id);
     }
   }
@@ -390,8 +392,10 @@ function refreshFloor1EntranceMap(engine: TowerEngine): void {
  *  construction): cache:false, so the flames and crane flicker redraw every
  *  frame. Settled rooms never come through here (towerRegions composes
  *  them); the dead-parking X never applies to an animated state, so no dead
- *  flag rides along. z 0.5 keeps the flames deterministically over the
- *  region canvas (z 0) and under the transports (z 1). */
+ *  flag rides along. z 0.45 keeps the flames deterministically over the
+ *  region canvas (z 0) and under every crowd sprite: walkers sit at 0.4 or
+ *  lower, garage commute cars at exactly 0.5, so 0.45 avoids the insertion-
+ *  order tie a 0.5 room would have with the cars driving past the flames. */
 function addRoom(engine: TowerEngine, u: Unit): void {
   const hgt = facilityFloors(u.kind);
   const w = u.width * TILE;
@@ -406,7 +410,7 @@ function addRoom(engine: TowerEngine, u: Unit): void {
       drawUnit(engine.d, u, 0, 0, w, h);
     },
   });
-  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.5, cv);
+  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.45, cv);
   engine.animatedRooms.set(u.id, a);
 }
 

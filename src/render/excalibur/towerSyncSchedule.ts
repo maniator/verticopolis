@@ -1,5 +1,6 @@
 import { syncScene, syncFacade } from "./towerReconcile";
 import { syncMotion } from "./towerCrowd";
+import { drainAllRegions } from "./towerRegions";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -99,6 +100,10 @@ export function drainSceneSync(engine: TowerEngine): void {
  *  could not run, whatever the reason, still syncs rather than skips. */
 export function runSceneSync(engine: TowerEngine): void {
   const structural = engine.sim.tower.revision !== engine.builtRev;
+  // A -1 sentinel means setSim just adopted a tower (boot or save load): the
+  // sync below materializes every region fresh, and fresh canvases raster on
+  // their first draw anyway, so the dirty marks it queues are pure waste.
+  const initialBake = engine.builtRev === -1;
   const plan = planSceneSync({
     structural,
     mealOverlay: engine.sim.tower.mealOverlayRevision !== engine.mealOverlayRev,
@@ -111,6 +116,10 @@ export function runSceneSync(engine: TowerEngine): void {
   });
   engine.hourSyncPending = plan.nextPending;
   if (plan.syncNow) applySceneSync(engine);
+  // Clear the queue the initial bake just filled (the load-path exception to
+  // the budgeted drain): flagDirty on a never-rastered canvas costs nothing,
+  // and without this the first ~20 frames re-upload already-correct regions.
+  if (initialBake && plan.syncNow) drainAllRegions(engine);
   // Motion actors and the exterior facade (escape stairs, roof crane) only
   // need reconciling when the layout itself changes, and never defer: the
   // player just placed or demolished something.

@@ -66,6 +66,33 @@ describe("footprint to region mapping", () => {
     expect(regionRow(GRID.minFloor)).toBe(0);
     expect(regionRow(0)).toBe(0); // B1
   });
+
+  it("the extreme lot corners stay inside the key space", () => {
+    expect(regionCol(GRID.width - 1)).toBe(REGION_COLS - 1);
+    expect(regionRow(GRID.maxFloor)).toBe(REGION_ROWS - 1);
+    // Top-right-most legal 9-tile footprint hits exactly the last key.
+    expect(regionsOf(GRID.maxFloor, GRID.width - 9, 9, 1)).toEqual([REGION_COLS * REGION_ROWS - 1]);
+  });
+
+  it("a full-lot-width footprint (the metro) spans every column exactly once", () => {
+    const keys = regionsOf(GRID.minFloor, 0, GRID.width, 3);
+    expect(keys).toHaveLength(REGION_COLS);
+    expect(new Set(keys).size).toBe(REGION_COLS);
+  });
+
+  it("every emitted key stays below COLS * ROWS even for off-lot inputs", () => {
+    // Column overflow would alias into the next row's keys, corrupting a
+    // diagonal neighbor's canvas; the clamp makes that unrepresentable.
+    for (const keys of [
+      regionsOf(GRID.maxFloor, GRID.width - 1, 50, 5), // spills right and up
+      regionsOf(GRID.minFloor - 5, -3, 9, 1), // spills left and below
+    ]) {
+      for (const k of keys) {
+        expect(k).toBeGreaterThanOrEqual(0);
+        expect(k).toBeLessThan(REGION_COLS * REGION_ROWS);
+      }
+    }
+  });
 });
 
 describe("region rects", () => {

@@ -3,6 +3,7 @@ import { facilityFloors } from "../../engine/facilities";
 import { drawUnit } from "../sprites";
 import { FLOOR, TILE } from "../scale";
 import { regionRect, regionsOf } from "../regionGrid";
+import type { Unit } from "../../engine/types";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -20,6 +21,10 @@ import type { TowerEngine } from "./TowerEngine";
  * rasterizes the whole tower (except a fresh canvas's first raster, which is
  * the load path); the draw closure reads live tower state at raster time, so
  * dirty marks coalesce and a drained queue always renders current state.
+ * One honesty note on the budget: it bounds repaint FLAGS per frame, not
+ * rasterizations. A flagged off-screen region defers its actual raster until
+ * it scrolls into view, so a fast pan can raster several at once; per-unit
+ * canvases behaved the same way, so this is no worse than what it replaced.
  */
 
 /** Regions repainted per frame from the dirty queue. The upload micro-bench
@@ -100,11 +105,18 @@ function materialize(engine: TowerEngine, key: number): RegionRec {
 
 /** Ensure the unit is a member of its footprint's regions (idempotent) and
  *  schedule a repaint: queued by default, immediate when `sameFrame` (an
- *  extinguished fire must not leave a one-frame hole). */
-export function markRegionUnit(engine: TowerEngine, u: { id: number; kind: string; floor: number; x: number; width: number }, sameFrame = false): void {
-  let keys = engine.regionUnits.get(u.id);
-  if (!keys) {
-    keys = regionsOf(u.floor, u.x, u.width, facilityFloors(u.kind as never));
+ *  extinguished fire must not leave a one-frame hole). Membership recomputes
+ *  from the live footprint on every call: no engine path moves or resizes a
+ *  placed unit today, but a footprint that silently outgrew its cached
+ *  regions would render a permanent hole, so the four divisions are cheap
+ *  insurance (the old per-unit bake kept a width guard for the same reason). */
+export function markRegionUnit(engine: TowerEngine, u: Unit, sameFrame = false): void {
+  const fresh = regionsOf(u.floor, u.x, u.width, facilityFloors(u.kind));
+  const cached = engine.regionUnits.get(u.id);
+  let keys = cached;
+  if (!keys || keys.length !== fresh.length || keys.some((k, i) => k !== fresh[i])) {
+    if (cached) dropRegionUnit(engine, u.id, sameFrame);
+    keys = fresh;
     engine.regionUnits.set(u.id, keys);
     for (const k of keys) (engine.regions.get(k) ?? materialize(engine, k)).units.add(u.id);
   }
@@ -152,15 +164,31 @@ export function drainRegions(engine: TowerEngine): void {
     const r = regionRect(k);
     return r.x < cx + hw && r.x + r.w > cx - hw && r.y < cy + hh && r.y + r.h > cy - hh;
   };
-  const queue = [...engine.regionDirty].sort((a, b) => Number(visible(b)) - Number(visible(a)));
-  for (const k of queue.slice(0, REGION_DRAIN_BUDGET)) {
+  // Single pass, no sort: take visible regions first, remember the first few
+  // offscreen ones as fallback so the budget is always spent when work exists.
+  const picks: number[] = [];
+  const offscreen: number[] = [];
+  for (const k of engine.regionDirty) {
+    if (visible(k)) {
+      picks.push(k);
+      if (picks.length === REGION_DRAIN_BUDGET) break;
+    } else if (offscreen.length < REGION_DRAIN_BUDGET) offscreen.push(k);
+  }
+  for (const k of offscreen) {
+    if (picks.length === REGION_DRAIN_BUDGET) break;
+    picks.push(k);
+  }
+  for (const k of picks) {
     engine.regionDirty.delete(k);
     engine.regions.get(k)?.cv.flagDirty();
   }
 }
 
-/** Repaint every dirty region NOW: the initial-load exception to I2, spent
- *  behind the splash where a long frame is invisible. */
+/** Repaint every dirty region NOW: the initial-load exception to I2, called
+ *  by runSceneSync right after the boot / save-load bake. Every region there
+ *  is freshly materialized and rasters on its first draw regardless, so this
+ *  is really a queue clear: it stops the budgeted drain from re-uploading
+ *  ~20 frames of already-correct regions after every load. */
 export function drainAllRegions(engine: TowerEngine): void {
   for (const k of engine.regionDirty) engine.regions.get(k)?.cv.flagDirty();
   engine.regionDirty.clear();

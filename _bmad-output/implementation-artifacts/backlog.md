@@ -1849,3 +1849,50 @@ swept). Consciously accepted, on the record:
   (pointer path runs on input events; an O(rooms) scan became O(1), so a
   probe could only show improvement or noise). Precedent: waivers are
   acceptable for PRs with no frame-loop surface, stated in the PR body.
+
+### Render-perf S2b: region composition (2026-07-15, PR #388)
+
+The CAP-2 story (issue #366). Three review layers ran on the branch; every
+patch-graded finding was fixed in the follow-up commit (initial-load queue
+waste wired through `drainAllRegions` after the boot bake, demolition drops
+made same-frame, animated-room z moved off the garage-car tie to 0.45,
+membership recomputed per mark against footprint drift, `regionsOf` range
+clamped with corner tests, the visual-spec settle now waits for queue-empty
+per region-design I4, banned-vocabulary reword). Consciously deferred, on
+the record:
+
+- **Fire-cycle canvas churn in single-member regions (Hunter F3):** ignite
+  evicts the region, extinguish re-materializes it, and the killed texture
+  lingers until Excalibur's GC interval, so a burn/extinguish cycle briefly
+  holds two 352x880 textures. Rare, bounded to one canvas per cycle, and
+  keeping evicted regions alive on a grace period would trade away the
+  eviction guarantee. Accepted cost.
+- **Dead-parking X repaints stagger through the queue (Hunter F4 residual):**
+  a ramp demolition orphans many spaces whose dead bits ride the sig into
+  queued marks, so the X's appear over a few frames under a busy queue.
+  Bounded by the drain budget and invisible outside mass-demolition;
+  revisit only with player reports.
+- **Pan-into-view rasters are unbounded by the drain budget (Hunter F2):**
+  the budget bounds repaint flags; a flagged off-screen region rasters when
+  it scrolls into view, so a fast pan after a full-tower flip can raster
+  several regions in one frame. Per-unit canvases behaved identically;
+  noted in the module header, no action.
+- **towerRegions has no unit-test tier (Edge E6):** eviction-on-empty,
+  sameFrame coalescing, membership idempotence, deadParking plumbing, and
+  visible-first ordering are covered only by the regions e2e plus the CI
+  visual gate. A vitest harness needs an Excalibur engine fake; take it up
+  if towerRegions grows another feature.
+- **Multi-region lifecycle is pixel-unverified (Edge E6):** the metro (12
+  column regions) and a 2-story row-straddler never appear in the star-4
+  baseline fixture or the regions e2e; basic straddle clipping is inside
+  the baselines via the x=34+9k offices. Add a star-5 fixture or a targeted
+  spike if a seam report ever comes in.
+- **The regions e2e hardcodes budget literal 2 (Auditor note):** importing
+  REGION_DRAIN_BUDGET would pull Excalibur into the Playwright node context;
+  the literal carries a comment instead. Drift risk accepted.
+- **Pinned-renderer baseline re-mint (CI e2e):** the four tower-scene
+  baselines moved by ~1,735 px (0.27%) on the pinned Chromium while the
+  local venue decodes byte-identical; re-minted on the branch via the
+  sanctioned workflow, image diff reviewed as the blessing of the new
+  visual truth. Canvas rasterization differing across Chromium builds is
+  the documented reason local mints never bind.
