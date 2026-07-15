@@ -26,8 +26,10 @@ export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } 
  *  `aria-labelledby` at it (see {@link UI.finishModal}). The dialog's DOM is
  *  fully replaced on every open (`openModal`/`openModalTemplate` reset
  *  `dialog.innerHTML`, and only one modal is ever live at a time, guarded by
- *  {@link UI.isModalOpen}), so a single constant id never collides with a
- *  second modal's title the way a page-scoped id normally could. */
+ *  {@link UI.isModalOpen}), so successive modal titles never collide on it. It
+ *  is only a FALLBACK, stamped on a title that brought no id of its own (see
+ *  {@link UI.finishModal}); DOM id uniqueness is document-wide, and no other
+ *  element in the app uses this id, so the fallback is collision-free here. */
 const MODAL_TITLE_ID = "modal-title";
 
 export interface UICallbacks {
@@ -256,8 +258,11 @@ export class UI {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
     if (h2) {
-      h2.id = MODAL_TITLE_ID;
-      dialog.setAttribute("aria-labelledby", MODAL_TITLE_ID);
+      // Keep a title that brought its own id (deep-linking, styling, another
+      // ARIA relationship); only fall back to the shared id when it has none.
+      const titleId = h2.id || MODAL_TITLE_ID;
+      h2.id = titleId;
+      dialog.setAttribute("aria-labelledby", titleId);
     } else {
       dialog.removeAttribute("aria-labelledby");
     }

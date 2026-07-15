@@ -307,6 +307,14 @@ describe("openModalTemplate — the window grammar", () => {
     expect(document.getElementById(labelId)!.textContent).not.toContain("Section heading");
   });
 
+  it("keeps a title's own id instead of clobbering it, and points aria-labelledby there", () => {
+    const { ui } = makeUI();
+    open(ui, '<h2 id="custom-title-id">Titled</h2><p>body</p>');
+    const title = dialog().querySelector<HTMLElement>("h2.win-title")!;
+    expect(title.id).toBe("custom-title-id"); // caller id preserved, not overwritten
+    expect(dialog().getAttribute("aria-labelledby")).toBe("custom-title-id");
+  });
+
   it("clears aria-labelledby rather than leaving it dangling when a modal renders no top-level h2", () => {
     const { ui } = makeUI();
     open(ui, "<p>no title here</p>");
