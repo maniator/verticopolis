@@ -92,8 +92,13 @@ async function settle(page: Page, ms: number, noDraw = false): Promise<void> {
 let captured = 0;
 const failures: string[] = [];
 const perDir: Record<OutDir, number> = { screenshots: 0, features: 0, milestones: 0 };
+// Per-scene wall time, appended as each scene finishes, for the closing "slowest
+// scenes" summary. stdout only: never read back into the page and never written
+// into a PNG, so it cannot move a committed pixel or affect determinism.
+const sceneTimings: { id: string; ms: number }[] = [];
 
 async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
+  const shotStart = Date.now();
   const outDir = shot.outDir ?? scene.outDir;
   const path = join(DIRS[outDir], `${shot.name}.png`);
   const baseVp = scene.viewport ?? DESKTOP;
@@ -145,10 +150,11 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   }
   captured++;
   perDir[outDir]++;
-  console.log(`  ✓ ${outDir}/${shot.name}`);
+  console.log(`  ✓ ${outDir}/${shot.name} (${Date.now() - shotStart} ms)`);
 }
 
 async function runScene(browser: Browser, scene: Scene): Promise<void> {
+  const sceneStart = Date.now();
   console.log(`\n▶ scene: ${scene.id}`);
   const vp = scene.viewport ?? DESKTOP;
   // A phone-sized scene must also present as a touch device, or `@media (pointer:
@@ -232,6 +238,11 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
     }
   } finally {
     await page.close();
+    const sceneMs = Date.now() - sceneStart;
+    sceneTimings.push({ id: scene.id, ms: sceneMs });
+    // The route-not-ready early return above also passes through this finally, so
+    // a skipped scene still gets a (near-zero) row, which is itself a useful signal.
+    console.log(`◀ scene: ${scene.id} (${(sceneMs / 1000).toFixed(1)}s)`);
   }
 }
 
@@ -289,6 +300,12 @@ async function main(): Promise<void> {
 
   console.log(`\n──────── captured ${captured} shots ────────`);
   for (const d of Object.keys(perDir) as OutDir[]) console.log(`  ${d.padEnd(12)} ${perDir[d]}`);
+  // Slowest scenes first, so a CI log makes the render long poles obvious at a
+  // glance (this is what tells us where a shard's time actually goes).
+  const totalMs = sceneTimings.reduce((sum, s) => sum + s.ms, 0);
+  const slowest = [...sceneTimings].sort((a, b) => b.ms - a.ms);
+  console.log(`\n──────── slowest scenes (total ${(totalMs / 1000).toFixed(1)}s) ────────`);
+  for (const s of slowest) console.log(`  ${s.id.padEnd(20)} ${(s.ms / 1000).toFixed(1)}s`);
   if (failures.length) {
     console.log(`\n${failures.length} FAILURE(S):`);
     for (const f of failures) console.log(`  ✗ ${f}`);

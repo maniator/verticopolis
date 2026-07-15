@@ -169,14 +169,17 @@ async function runLeg(
   rmSync(outDir, { recursive: true, force: true });
   mkdirSync(dest, { recursive: true });
 
+  const buildStart = Date.now();
   const buildRc = await runTagged(tag, process.execPath, [VITE_BIN, "build", "--outDir", outDir], {
     cwd: ROOT,
     env: process.env,
   });
+  const buildMs = Date.now() - buildStart;
   if (buildRc !== 0) {
-    process.stdout.write(`[${tag}] build failed (exit ${buildRc})\n`);
+    process.stdout.write(`[${tag}] build failed (exit ${buildRc}) after ${(buildMs / 1000).toFixed(1)}s\n`);
     return buildRc || 1;
   }
+  process.stdout.write(`[${tag}] build: ${(buildMs / 1000).toFixed(1)}s\n`);
 
   const server = spawn(
     process.execPath,
@@ -213,7 +216,16 @@ async function runLeg(
     childEnv.SHOTS_DIR = join(dest, "docs/screenshots");
     childEnv.BASE_URL = `http://localhost:${port}`;
     childEnv.ONLY = only;
-    return await runTagged(tag, process.execPath, [GENERATOR], { cwd: ROOT, env: childEnv });
+    // Time the render alone (server is already up), so the log separates the two
+    // costs: build vs render. renderStart sits AFTER waitForServer, so server-boot
+    // is not counted in either.
+    const renderStart = Date.now();
+    const renderRc = await runTagged(tag, process.execPath, [GENERATOR], { cwd: ROOT, env: childEnv });
+    const renderMs = Date.now() - renderStart;
+    process.stdout.write(
+      `[${tag}] render: ${(renderMs / 1000).toFixed(1)}s  (leg: build ${(buildMs / 1000).toFixed(1)}s + render ${(renderMs / 1000).toFixed(1)}s)\n`,
+    );
+    return renderRc;
   } finally {
     await stopServer(server);
   }
@@ -273,7 +285,12 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
     return false;
   }
   process.stdout.write(`\nchecking '${label}': ${only}\n`);
+  const shardStart = Date.now();
   const [rcA, rcB] = await Promise.all(LEGS.map((leg) => runLeg(leg, only)));
+  // The two legs run concurrently, so this wall time is ~max(legA, legB) plus the
+  // trailing byte-diff, NOT their sum. Printed on its own line so it shows even
+  // when a leg fails or the diff trips below.
+  process.stdout.write(`'${label}' both legs (concurrent) finished in ${((Date.now() - shardStart) / 1000).toFixed(1)}s wall\n`);
   if (rcA !== 0 || rcB !== 0) {
     process.stdout.write(`::error::screenshot check '${label}' failed to render (leg a exit=${rcA}, leg b exit=${rcB}); see the [a]/[b] output above.\n`);
     return false;
