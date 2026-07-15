@@ -32,7 +32,7 @@ abstraction · ⬜ not present.
 ## Transport
 - ✅ Stairs, Escalators (single-floor links, animated climbers)
 - ✅ Standard / Service / Express elevators with multiple cars (service elevators are staff-only: housekeepers ride them, passengers never do)
-- ✅ Per-elevator car count and **per-floor stop configuration** (express / skip)
+- ✅ Per-elevator car count and **per-floor stop configuration** (express / skip); per-shift car scheduling and per-car home/waiting floors are a tracked gap (see Known parity gaps)
 - ✅ Demand-driven car dispatch (SCAN): cars serve waiting passengers, idle at the lobby when empty
 - ✅ Riders board to capacity and alight; cab shows its real load
 - ✅ Elevator-network reachability gates whether a floor is "served"
@@ -40,7 +40,7 @@ abstraction · ⬜ not present.
 ## Economy
 - ✅ Start with $2,000,000
 - ✅ Office rent (quarterly), condo sale (once, at ~2×–2.5× build cost with an owner buy-back on loss), hotel nightly revenue
-- ✅ Food / retail / cinema / party-hall traffic income, scaled by foot traffic + open hours
+- ◑ Food / retail / cinema / party-hall traffic income, scaled by foot traffic + open hours (an aggregate foot-traffic model; per-venue dedicated patronage and cross-venue lift are a tracked gap, see Known parity gaps)
 - ✅ Per-car and per-service monthly maintenance
 - ✅ Buried treasure when excavating basement rooms
 
@@ -94,6 +94,23 @@ abstraction · ⬜ not present.
 - The **Cathedral** is a religion-agnostic **Wedding Hall**.
 - The population census counts **occupants**: office workers + condo residents (hotel guests count up through 4★, then drop out); retail/food/visitors never do. The **TOWER** goal is the canonical **15,000**, kept reachable by the canon **375-tile** buildable lot width (the 1994 map is 375 segments wide; a well-zoned 100-floor tower measures well over 15,000 occupants).
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.
+- **Housekeeping is modeled on rooms-per-crew with staff-network routing and cockroach spread**, not the 1994 "six housekeepers, one floor each, and a service elevator over exactly six floors" geometry. That geometry optimized around a pathfinding quirk (seven-plus floors degraded), which we deliberately do not reproduce.
+- **Commercial patronage is modeled from reachable nearby population** rather than the original's opaque per-venue patron counters (which expert players suspect hide a cap). The transparent per-origin demand-pool refinement that restores the classic diminishing-returns and cross-venue behavior is tracked (#393); the opaque counter itself is not reproduced.
+
+## Known parity gaps (tracked, 2026-07-15)
+
+An r/SimTower optimization-thread review (a four-lens roundtable across game
+design, systems, engineering, and UX) surfaced deeper 1994 behaviors that sit
+under the checkmarks above. They are identified, sorted, and tracked; the full
+analysis is
+`_bmad-output/planning-artifacts/design/gdd-simtower-optimization-gaps-2026-07-15.md`.
+
+- **Deep per-elevator scheduling**: per-shift car schedules and per-car home/waiting floors. Today we expose car count and per-floor stops only. Tracked as `elevator-scheduling` #305 (owner ruling: full parity).
+- **Per-venue demand and cross-venue patronage**: commercial income is an aggregate foot-traffic share today, so it lacks diminishing returns on venue count and the "good to best" cross-venue lift. Tracked #393, with the "leave the tower when no venue is reachable" population pressure as #395.
+- **Graduated far / very-far lobby-distance penalty for all tenants**: today only an office-only single-tier transport-far rule (W1). Tracked #394.
+- **Contiguous sky-lobby transfer requirement**: express-to-standard transfers use implicit shared-stop adjacency today. Tracked #396 (Classic-gated).
+- **Condo demographics (school runs) and office sales-call trips**: today a generic household-departure model, no school entity or sales calls. Tracked #397. Weekend patronage curve: #398.
+- **UI legibility of the above** (next-star blockers, per-unit gripe reason, cleanliness/coverage overlay): #399, #400, #401.
 
 ## Verification
 `npm test` runs **500+ unit/integration tests** covering placement rules,
