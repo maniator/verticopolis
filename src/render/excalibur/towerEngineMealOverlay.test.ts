@@ -33,6 +33,7 @@ describe("TowerEngine meal-overlay repaint trigger", () => {
       litState: false,
       lastSyncHour: 12,
       hourSyncPending: false,
+      regionDirty: new Set(),
       engine: { backgroundColor: null },
       onUpdate: null,
       syncEventFx: vi.fn(),

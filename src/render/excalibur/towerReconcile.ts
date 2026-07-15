@@ -15,6 +15,7 @@ import {
 import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { reap } from "./towerCrowd";
+import { dropRegionUnit, markRegionUnit } from "./towerRegions";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -25,26 +26,13 @@ import type { TowerEngine } from "./TowerEngine";
  * `towerScene`. Pure code move: no reconciliation or scene-graph logic changed.
  */
 
-/** A retained room actor plus the mutable inputs its draw closure reads live.
- *  A signature change repaints IN PLACE (`cv.flagDirty()` re-rasterizes the
- *  same bitmap and re-uploads the same WebGL texture) instead of allocating a
- *  fresh canvas + texture. At top speed a big tower flips ~100 room
- *  signatures per real second (hour/lighting/occupancy churn), and the
- *  old kill-and-recreate path let dead canvases and GPU textures pile up
- *  faster than Excalibur's 60s texture GC could drain them, enough sustained
- *  memory pressure that phones killed (and auto-reloaded) the tab. */
-export interface RoomRec {
-  actor: ex.Actor;
-  cv: ex.Canvas;
-  /** Burning/under-construction rooms animate (cache:false, redrawn every
-   *  frame); a transition into or out of an animated state still rebuilds. */
-  animated: boolean;
-  /** Mutable inputs the draw closure reads live, currently just the "dead
-   *  parking space" flag (red X overlay). A separate holder (not a field on
-   *  the record) so the closure can capture it before the actor/canvas exist
-   *  and the record stays fully typed with no placeholder casts. */
-  live: { dead: boolean };
-}
+// Settled rooms draw through the region compositor (towerRegions.ts, spec
+// CAP-2): repaint-in-place at region granularity keeps the old RoomRec law
+// (stable textures, no canvas churn: churn once built enough sustained
+// memory pressure that phones killed the tab) while the texture population
+// drops from one per unit to one per occupied region. Only ANIMATED rooms
+// (fire, construction: cache:false, redrawn every frame) still own a private
+// per-unit actor, held in engine.animatedRooms.
 
 // ---- Retained-scene reconciliation (no full rebuild) --------------------
 
@@ -70,6 +58,9 @@ export function syncScene(engine: TowerEngine): void {
   engine.d.recycleFill = engine.displayRecycleFill;
   const seenS = new Set<number>();
   const seenR = new Set<number>();
+  // Rebuilt fresh each sync from the one flood-fill read above; the region
+  // draw closures read it live at raster time (dead spaces get the red X).
+  const deadNow = new Set<number>();
   for (const u of tower.units) {
     if (u.kind === "floor" || u.kind === "lobby") {
       seenS.add(u.id);
@@ -117,33 +108,31 @@ export function syncScene(engine: TowerEngine): void {
       // the inspector's "Change variety" action swaps it at runtime; without
       // it the reroll would not repaint until another signature bit flips.
       const sig = `${u.state}:${engine.litState ? 1 : 0}:${u.width}:${u.occupants}:${u.outForMeal ?? 0}:${u.subtype ?? ""}:${open}${lateNight}${dead}${liveBits}`;
-      const isDead = dead === "x";
-      const rec = engine.roomActors.get(u.id);
+      if (dead === "x") deadNow.add(u.id);
       const animated = u.state === "fire" || u.state === "construction";
-      if (!rec) {
-        addRoom(engine, u, isDead, animated);
-        engine.roomSig.set(u.id, sig);
-      } else if (engine.roomSig.get(u.id) !== sig) {
-        if (animated === rec.animated && rec.cv.width === u.width * TILE) {
-          // Repaint in place: the draw closure reads the unit's live state, so
-          // flagging the canvas dirty re-bakes the SAME bitmap into the SAME
-          // GPU texture. No actor churn, no new allocations, see RoomRec.
-          rec.live.dead = isDead;
-          rec.cv.flagDirty();
-        } else {
-          // Rebuild (rare): animated↔static flips the canvas cache mode, which
-          // is fixed at construction (fire ignition/extinguish, build done);
-          // the width guard is belt-and-braces, the sig treats width as a
-          // repaint trigger, but only a rebuild can re-derive the bitmap size,
-          // actor footprint and collider (no engine path resizes a unit today).
-          rec.actor.kill();
-          engine.roomActors.delete(u.id);
-          addRoom(engine, u, isDead, animated);
-        }
-        engine.roomSig.set(u.id, sig);
+      const wasAnimated = engine.animatedRooms.has(u.id);
+      if (animated && !wasAnimated) {
+        // Settled -> animated (ignition, construction start): pull the unit
+        // out of its region THIS frame so nothing stays baked under the
+        // flames, and stand up the private per-frame actor.
+        dropRegionUnit(engine, u.id, true);
+        addRoom(engine, u);
+      } else if (!animated && wasAnimated) {
+        // Animated -> settled (extinguish, build done): retire the private
+        // actor and bake into the region THIS frame, so there is never a
+        // one-frame hole where the room existed in neither layer.
+        engine.animatedRooms.get(u.id)?.kill();
+        engine.animatedRooms.delete(u.id);
+        markRegionUnit(engine, u, true);
+      } else if (!animated && (engine.roomSig.get(u.id) !== sig || !engine.regionUnits.has(u.id))) {
+        // Settled look change (or first sight): membership is idempotent and
+        // the repaint rides the budgeted drain (towerRegions).
+        markRegionUnit(engine, u);
       }
+      engine.roomSig.set(u.id, sig);
     }
   }
+  engine.deadParking = deadNow;
   reap(engine.structTiles, seenS, (cell) => {
     // A dead unit's cell may have been re-claimed IN THIS SAME PASS by its
     // replacement (building a lobby over bare floor removes the floor unit
@@ -154,10 +143,18 @@ export function syncScene(engine: TowerEngine): void {
     const live = tower.unitAt(GRID.maxFloor - cell.y, cell.x);
     if (!live || (live.kind !== "floor" && live.kind !== "lobby")) cell.clearGraphics();
   });
-  reap(engine.roomActors, seenR, (rec, id) => {
-    rec.actor.kill();
+  reap(engine.animatedRooms, seenR, (a, id) => {
+    a.kill();
     engine.roomSig.delete(id);
   });
+  // Region membership reap: a demolished settled unit leaves its regions
+  // (survivors repaint via the drain; an emptied region evicts whole).
+  for (const id of [...engine.regionUnits.keys()]) {
+    if (!seenR.has(id)) {
+      dropRegionUnit(engine, id);
+      engine.roomSig.delete(id);
+    }
+  }
 
   const seenT = new Set<number>();
   for (const t of tower.transports) {
@@ -389,51 +386,28 @@ function refreshFloor1EntranceMap(engine: TowerEngine): void {
   }
 }
 
-/** Build and retain a room actor. `animated` (burning / under construction:
- *  redraws every frame; the rest bake once and re-bake in place, see
- *  RoomRec) is computed by syncScene, the only caller with a unit in hand,
- *  so the repaint-vs-rebuild gate and the canvas cache mode can never drift
- *  apart on two copies of the predicate. */
-function addRoom(engine: TowerEngine, u: Unit, deadParking: boolean, animated: boolean): void {
+/** Build and retain the private actor for an ANIMATED room (fire, under
+ *  construction): cache:false, so the flames and crane flicker redraw every
+ *  frame. Settled rooms never come through here (towerRegions composes
+ *  them); the dead-parking X never applies to an animated state, so no dead
+ *  flag rides along. z 0.5 keeps the flames deterministically over the
+ *  region canvas (z 0) and under the transports (z 1). */
+function addRoom(engine: TowerEngine, u: Unit): void {
   const hgt = facilityFloors(u.kind);
   const w = u.width * TILE;
   const h = hgt * FLOOR;
-  // The draw closure reads `u` and `live.dead` LIVE, so a later signature
-  // change repaints by flagging the canvas dirty instead of rebuilding it.
-  const live = { dead: deadParking };
   const cv = new ex.Canvas({
     width: w,
     height: h,
-    cache: !animated,
+    cache: false,
     draw: (ctx) => {
       engine.d.ctx = ctx;
-      // Set per-unit: a dead (unchained) parking space draws no cars. Every
-      // room bake writes it, so one unit's flag can't leak into the next.
-      engine.d.parkingDead = live.dead;
+      engine.d.parkingDead = false;
       drawUnit(engine.d, u, 0, 0, w, h);
-      // Canon "red X" on a parking space that isn't chained to a ramp (dead,
-      // no relief). Baked into the sprite; the dead-bit participates in the room
-      // signature, so this re-bakes when the signature changes (state/lighting/
-      // hour or the dead-bit). live.dead is refreshed on each sync from the
-      // caller's single functionalParkingSet() read, no per-unit recompute.
-      if (live.dead) {
-        // Dark under-stroke so the X reads as a SHAPE independent of hue
-        // (color-blind cue), then the red X on top.
-        for (const [style, wd] of [["#111", 4] as const, ["#C24A3A", 2] as const]) {
-          ctx.strokeStyle = style;
-          ctx.lineWidth = wd;
-          ctx.beginPath();
-          ctx.moveTo(2, 2);
-          ctx.lineTo(w - 2, h - 2);
-          ctx.moveTo(w - 2, 2);
-          ctx.lineTo(2, h - 2);
-          ctx.stroke();
-        }
-      }
     },
   });
-  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0, cv);
-  engine.roomActors.set(u.id, { actor: a, cv, animated, live });
+  const a = addBoxActor(engine, ex.vec(engine.worldX(u.x), engine.worldYTop(u.floor, hgt)), w, h, 0.5, cv);
+  engine.animatedRooms.set(u.id, a);
 }
 
 function addTransport(engine: TowerEngine, t: Transport): void {
