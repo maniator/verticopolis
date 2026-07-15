@@ -188,19 +188,24 @@ export function elevatorCalls(crowd: Crowd, tower: Tower): ElevatorCalls {
  * and a bounded wait-tier, and per car the boarded count.
  *
  * It is a pure VIEW of state the crowd already tracks (the same `waiting` people
- * `elevatorCalls` counts, and each car's `carLoad`), so it re-simulates no
- * boarding. It walks `crowd.people` once and the shaft list once;
- * {@link Crowd.queueView} memoizes the result on the (step, revision) key and
- * the sim loop primes it once per outer step, so the scan lands in the sim step
- * and no render frame or car sub-step re-derives it, honoring the "one scan per
- * outer step" rule. It stays a distinct pass from `elevatorCalls` rather than
- * folded into it because `elevatorCalls` is re-run fresh every car sub-step to
- * track mid-step boarding, while this snapshot must stay stable across the step.
+ * `elevatorCalls` counts, and each car's drawn occupancy `crowd.carRiders`), so
+ * it re-simulates no boarding. It walks `crowd.people` once and the shaft list
+ * once; {@link Crowd.queueView} memoizes the result on the (step, revision) key
+ * and the sim loop primes it once per outer step, so the scan lands in the sim
+ * step and no render frame or car sub-step re-derives it, honoring the "one scan
+ * per outer step" rule. It stays a distinct pass from `elevatorCalls` rather
+ * than folded into it because `elevatorCalls` is re-run fresh every car sub-step
+ * to track mid-step boarding, while this snapshot must stay stable across the
+ * step.
  *
- * `boarded` reads the dispatch's statistical `t.carLoad` (the value the cab fill
- * draws today), while `landings` reads the drawn `crowd.people`. Those are two
- * populations; tying the drawn per-car occupancy to the queue is deferred to the
- * queue-render story (E6-S7). See the backlog note.
+ * Both halves count ONE population, the drawn crowd. `landings` counts the
+ * routed `crowd.people` waiting at each landing, and `boarded` reads
+ * `crowd.carRiders`, the drawn per-car occupancy the motion step maintains as
+ * those same figures board and alight. So a waiter boarding moves one figure
+ * from a landing into a car: the leftover line is the same individuals, now
+ * shorter. This deliberately does NOT read the dispatch's statistical
+ * `t.carLoad`, an aggregate-demand count unrelated to the drawn figures.
+ * Reconciled in E6-S7 (GH #314); see the backlog note.
  */
 export function elevatorQueueView(crowd: Crowd, tower: Tower): ElevatorQueueView {
   const landings = new Map<number, Map<number, QueueLanding>>();
@@ -230,12 +235,15 @@ export function elevatorQueueView(crowd: Crowd, tower: Tower): ElevatorQueueView
   const boarded = new Map<number, Map<number, number>>();
   for (const t of tower.transports) {
     if (!isElevatorKind(t.kind)) continue;
-    // Iterate the shaft's real car count, not carLoad.length: carLoad is lazily
-    // sized by the dispatch (undefined until the first moveCars, and only then
-    // normalized to t.cars), so a fresh or just-resized shaft still reports one
-    // entry per car, defaulting a missing slot to an empty car.
+    // Boarded is the DRAWN per-car occupancy: the same routed figures the
+    // landings count, now aboard. crowd.carRiders keys "shaftId:carIndex" and
+    // the motion step increments it on board / decrements it on alight, so it
+    // tracks exactly the people the crowd renders, not the dispatch's
+    // statistical carLoad. Iterate the shaft's real car count so a fresh or
+    // just-resized shaft still reports one entry per car, an empty car for any
+    // slot with no riders yet.
     const cars = new Map<number, number>();
-    for (let i = 0; i < t.cars; i++) cars.set(i, t.carLoad?.[i] ?? 0);
+    for (let i = 0; i < t.cars; i++) cars.set(i, crowd.carRiders.get(`${t.id}:${i}`) ?? 0);
     boarded.set(t.id, cars);
   }
   return { landings, boarded };
