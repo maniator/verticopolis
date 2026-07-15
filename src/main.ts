@@ -755,7 +755,8 @@ class GameApp implements GameAppPorts {
     this.engine.classifyDown = (button, touch, space) => classifyGesture(this.tool, button, touch, space);
 
     // A press-without-drag: select (inspect) or, on touch, run the tool. The
-    // picked entity comes from Excalibur's collider hit-testing.
+    // picked entity resolves transports by collider hit-test and units by the
+    // tower's grid lookup (pickEntityAt).
     this.engine.onTap = (tile, floor, touch, picked) => {
       this.audio.start();
       if (this.tool.type === "inspect") {
