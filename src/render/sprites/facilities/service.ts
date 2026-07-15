@@ -298,53 +298,100 @@ export function drawRecycling(d: DrawCtx, u: Unit, x: number, y: number, w: numb
 export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number): void {
   const ctx = d.ctx;
   // The metro spans the whole lot, so the station is width-responsive: the
-  // ceiling, wall, pillars, benches, and platform tile across the real width
-  // while the signage stays centered. Verticals scale with the three-floor
-  // height. The platform sits just above the train trough near the bottom; the
-  // train is a separate Excalibur actor (drawMetroTrain) that slides into it.
-  // The platform draws EMPTY: real routed commuters ride the people-system
-  // traffic overlay, so an empty tower shows an empty platform (no ghost crowd).
+  // ceiling, wall tiles, pillars, posters, benches, and deck tile across the
+  // real width while the signage stays centered. The composition is the
+  // party-ratified high platform: a double-height concourse over a one-story
+  // track trough, with the platform deck on the MIDDLE story's floor line,
+  // exactly where the crowd system stands routed commuters (their platform
+  // floor is the unit's middle story). The train (drawMetroTrain, its own
+  // actor) rides the trough and slides in front of the far-platform scene;
+  // waiting commuters draw in front of it on the near edge. The platform
+  // itself draws EMPTY: real routed commuters are the crowd, so an empty
+  // tower honestly shows an empty platform (no ghost crowd).
   const W = Math.max(1, w);
   const H = Math.max(1, h);
   const f: Fill = (px, py, pw, ph, color, alpha = 1) => {
-    const rw = Math.round(pw);
-    const rh = Math.round(ph);
-    // A rounded-to-zero (or negative) size paints nothing, matching refMap's
+    // Clip every rect to the unit box. In-game the bake canvas is exactly
+    // W x H so this changes nothing, but the gallery paints entries onto one
+    // shared canvas, where the fixed-y furniture on its (deliberately
+    // squished) metro cell would otherwise bleed into the neighboring cells.
+    // A clipped-to-zero (or negative) size paints nothing, matching refMap's
     // zero-size guard, rather than promoting an empty rect into a stray pixel.
-    if (rw <= 0 || rh <= 0) return;
+    const x0 = Math.max(0, Math.round(px));
+    const y0 = Math.max(0, Math.round(py));
+    const x1 = Math.min(W, Math.round(px + pw));
+    const y1 = Math.min(H, Math.round(py + ph));
+    if (x1 <= x0 || y1 <= y0) return;
     const prevAlpha = ctx.globalAlpha;
     ctx.globalAlpha = alpha;
     ctx.fillStyle = color;
-    ctx.fillRect(Math.round(x + px), Math.round(y + py), rw, rh);
+    ctx.fillRect(Math.round(x) + x0, Math.round(y) + y0, x1 - x0, y1 - y0);
     if (alpha !== prevAlpha) ctx.globalAlpha = prevAlpha;
   };
-  const platY = Math.round(H * 0.82);
-  const band = Math.round(H / 3);
+  const deckY = Math.round(H * (2 / 3)); // platform deck = middle story's floor line
   const lamp = roomGlow(d.lit);
-  // Tunnel base and upper wall band.
-  f(0, 0, W, H, "#3A4652");
-  f(0, 0, W, band, "#45525F");
-  // Vaulted ceiling arches.
+  // Warm ivory tiled back wall across the double-height concourse.
+  f(0, 0, W, deckY, "#D8CFB8");
+  f(0, 8, W, 1, "#E6DEC8"); // bright course under the vault
+  for (let px = 0; px < W; px += 10) f(px, 8, 1, deckY - 8, "#C4BAA2");
+  for (let py = 16; py < deckY - 4; py += 8) f(0, py, W, 1, "#C4BAA2");
+  // Vaulted ceiling: dark steel band with arch ribs and hanging twin-globe
+  // lamps (warm when lit).
+  f(0, 0, W, 8, "#2E3038");
   for (let ax = 0; ax < W; ax += 40) {
-    f(ax, 2, 38, 2, "#4E5C6A");
-    f(ax + 18, 0, 2, 6, "#4E5C6A");
+    f(ax, 6, 38, 1, "#3A3D48");
+    f(ax + 18, 0, 2, 8, "#3A3D48");
   }
-  // Ceiling light strips (warm when lit, dim otherwise).
-  for (let lx = 22; lx < W; lx += 46) {
-    f(lx, 6, 10, 2, lamp);
-    glow(f, lx + 5, 9, lamp);
+  for (let lx = 30; lx + 8 < W; lx += 92) {
+    f(lx + 3, 8, 1, 4, "#3A3D48"); // stem
+    f(lx, 12, 7, 3, lamp);
+    glow(f, lx + 3, 14, lamp);
   }
-  // Tiled back wall.
-  for (let px = 0; px < W; px += 10) f(px, band, 1, platY - band, "#33414D");
-  for (let py = band + 6; py < platY - 4; py += 8) f(0, py, W, 1, "#33414D");
-  // Tiled pillars across the concourse (same ~105px cadence as the reference).
+  // The line-color band: a red stripe with white trim running the full width.
+  f(0, 24, W, 1, "#F0EAD8");
+  f(0, 25, W, 3, "#C0392B");
+  f(0, 28, W, 1, "#F0EAD8");
+  // Teal tiled pillars on the reference cadence, with edge light and plinth.
   for (let px = 70; px < W - 20; px += 105) {
-    f(px, 20, 11, platY - 20, "#2E3A44");
-    f(px, 20, 2, platY - 20, "#3E4C58");
-    f(px + 9, 20, 2, platY - 20, "#242E36");
+    f(px, 8, 11, deckY - 8, "#2E5850");
+    f(px, 8, 2, deckY - 8, "#3E6E64");
+    f(px + 9, 8, 2, deckY - 8, "#1F423C");
+    f(px - 1, deckY - 6, 13, 6, "#23343A"); // plinth
+    for (let py = 16; py < deckY - 8; py += 9) f(px + 2, py, 7, 1, "#264A44");
   }
-  // Centered METRO sign with a red M roundel.
+  // Backlit ad posters between the pillars, three designs on rotation: a
+  // sunset travel ad, a soda ad, and a show bill. Color varies second,
+  // geometry first (per the art bible), and none reuses a state literal.
+  let poster = 0;
+  for (let px = 122; px + 18 < W - 20; px += 105, poster++) {
+    box(f, px, 34, 18, 24, "#20242C");
+    f(px + 1, 35, 16, 1, d.lit ? "#F0EAD8" : "#6E6A5E"); // backlight rim
+    if (poster % 3 === 0) {
+      f(px + 2, 37, 14, 12, "#E08A4A"); // sunset sky
+      f(px + 2, 45, 14, 4, "#B05A32");
+      f(px + 5, 40, 5, 5, "#F4D06A"); // sun
+      f(px + 2, 49, 14, 7, "#3A3330"); // skyline silhouette
+      f(px + 5, 47, 2, 4, "#3A3330");
+      f(px + 11, 46, 2, 5, "#3A3330");
+    } else if (poster % 3 === 1) {
+      f(px + 2, 37, 14, 19, "#3E6E9E"); // soda blue
+      f(px + 5, 40, 8, 10, "#E8E4D8"); // bottle
+      f(px + 7, 38, 4, 3, "#E8E4D8");
+      f(px + 6, 43, 6, 3, "#C0392B"); // label
+      f(px + 3, 52, 12, 1, "#E8E4D8"); // script line
+    } else {
+      f(px + 2, 37, 14, 19, "#6E4E86"); // show-bill purple
+      f(px + 8, 41, 2, 6, "#F4D06A"); // starburst
+      f(px + 6, 43, 6, 2, "#F4D06A");
+      f(px + 5, 40, 1, 1, "#F4D06A");
+      f(px + 12, 40, 1, 1, "#F4D06A");
+      f(px + 4, 52, 10, 1, "#E8E4D8"); // title line
+    }
+  }
+  // Centered METRO sign with the red M roundel, hung from the vault.
   const mid = Math.round(W / 2);
+  f(mid - 28, 8, 2, 6, "#3A3D48");
+  f(mid + 26, 8, 2, 6, "#3A3D48");
   box(f, mid - 30, 14, 60, 14, "#1E4E86");
   for (let i = 0; i < 8; i++) f(mid - 24 + i * 6, 18, 3, 6, "#DCE6F0");
   f(mid - 46, 14, 14, 14, "#C0392B");
@@ -352,24 +399,64 @@ export function drawMetro(d: DrawCtx, x: number, y: number, w: number, h: number
   f(mid - 41, 19, 1, 4, "#C0392B");
   f(mid - 39, 19, 1, 4, "#C0392B");
   f(mid - 37, 19, 1, 4, "#C0392B");
-  // Lit route-map board.
-  box(f, 20, 54, 52, 28, "#20303E");
-  f(24, 58, 44, 2, "#5FB0DC");
-  f(24, 64, 32, 1, "#E8C14A");
-  f(24, 68, 38, 1, "#6bd47a");
-  for (let i = 0; i < 6; i++) f(26 + i * 7, 60, 2, 2, "#F4F0E4");
-  // Platform benches, tiled along the platform.
+  // Station clock beside the sign.
+  box(f, mid + 40, 16, 10, 10, "#20242C");
+  f(mid + 42, 18, 6, 6, "#F0EAD8");
+  f(mid + 44, 19, 1, 3, "#20242C");
+  f(mid + 45, 21, 2, 1, "#20242C");
+  // Lit route-map board near the left end.
+  box(f, 20, 34, 52, 26, "#20303E");
+  f(24, 38, 44, 2, "#5FB0DC");
+  f(24, 44, 32, 1, "#E8C14A");
+  f(24, 48, 38, 1, "#6bd47a");
+  for (let i = 0; i < 6; i++) f(26 + i * 7, 40, 2, 2, "#F4F0E4");
+  // Deck furniture on the far platform: wooden benches, a vending machine on
+  // a longer cadence, and a bin. The train slides in FRONT of these.
   for (let bx = 110; bx < W - 24; bx += 100) {
-    box(f, bx, platY - 7, 22, 7, "#6A5240");
-    f(bx + 2, platY - 11, 2, 4, "#4A3A2E");
-    f(bx + 18, platY - 11, 2, 4, "#4A3A2E");
+    box(f, bx, deckY - 8, 22, 8, "#6A5240");
+    f(bx + 1, deckY - 8, 20, 1, "#7A6250");
+    f(bx + 2, deckY - 4, 2, 4, "#4A3A2E");
+    f(bx + 18, deckY - 4, 2, 4, "#4A3A2E");
   }
-  // Yellow-edged platform.
-  f(0, platY, W, 8, "#5A6470");
-  f(0, platY, W, 1, "#6E7A88");
-  f(0, platY + 7, W, 3, "#caa84a");
-  f(0, platY + 7, W, 1, "#E8C14A");
-  // Track bed below (the train actor rides here).
-  f(0, H - 3, W, 3, "#1A2028");
-  f(0, H - 2, W, 1, "#3A4652");
+  for (let vx = 160; vx + 12 < W - 24; vx += 210) {
+    box(f, vx, deckY - 18, 12, 18, "#B04438");
+    f(vx + 2, deckY - 16, 8, 9, d.lit ? "#FFE9B0" : "#6E5A4E"); // lit face
+    for (let r = 0; r < 3; r++) f(vx + 3, deckY - 15 + r * 3, 6, 1, "#B04438");
+    f(vx + 2, deckY - 5, 8, 3, "#3A3330"); // dispense tray
+  }
+  for (let tx = 86; tx < W - 24; tx += 200) {
+    f(tx, deckY - 6, 6, 6, "#4E5A50");
+    f(tx + 1, deckY - 6, 4, 1, "#2E3A30");
+  }
+  // WAY OUT at the right end: green sign over stair steps rising out of frame.
+  const ex = W - 46;
+  box(f, ex, 30, 26, 10, "#3E7E4E");
+  for (let i = 0; i < 4; i++) f(ex + 3 + i * 5, 33, 3, 4, "#E8F4E8");
+  f(ex + 22, 34, 2, 2, "#E8F4E8"); // arrow head
+  for (let s = 0; s < 5; s++) f(ex + 2 + s * 5, deckY - 3 - s * 3, W - ex, 3, "#B8AE96");
+  // The platform deck: light concrete edge, yellow tactile strip, slab face.
+  f(0, deckY, W, 1, "#D8D4C8");
+  f(0, deckY + 1, W, 1, "#E8C14A");
+  f(0, deckY + 2, W, 2, "#caa84a");
+  f(0, deckY + 4, W, 4, "#8A8578");
+  f(0, deckY + 8, W, 2, "#6E6A5E");
+  // The trough: retaining wall with cable conduits and maintenance doors,
+  // grime under the deck lip, and the track bed the train rides.
+  const troughY = deckY + 10;
+  f(0, troughY, W, H - troughY, "#3A4046");
+  f(0, troughY, W, 3, "#2E3238", 0.9); // shadow under the lip
+  f(0, troughY + 8, W, 2, "#2A2E34"); // cable conduits
+  f(0, troughY + 14, W, 1, "#2A2E34");
+  for (let cxp = 24; cxp < W; cxp += 48) f(cxp, troughY + 7, 2, 9, "#22262C"); // clips
+  for (let mx = 240; mx + 14 < W; mx += 480) {
+    box(f, mx, troughY + 4, 14, H - troughY - 12, "#303640");
+    f(mx + 10, troughY + 12, 2, 2, "#5A5E66"); // handle
+  }
+  // Track bed: ballast, sleepers, running rails, and the third rail.
+  f(0, H - 8, W, 8, "#26282E");
+  for (let sxp = 4; sxp < W; sxp += 10) f(sxp, H - 7, 3, 6, "#1C1E24");
+  f(0, H - 6, W, 2, "#6E7686");
+  f(0, H - 6, W, 1, "#9AA2B0");
+  f(0, H - 2, W, 2, "#6E7686");
+  for (let tr = 16; tr < W; tr += 64) f(tr, H - 10, 8, 2, "#50565E"); // third rail
 }

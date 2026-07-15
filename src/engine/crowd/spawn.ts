@@ -18,6 +18,7 @@ import {
 } from "./meals";
 import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
+import { metroArrival, metroDeparture } from "./venueTrips";
 
 // Re-exported so existing importers (motion.ts, tests) keep their historical
 // entry point; the primitives now live in the `trips.ts` leaf.
@@ -53,6 +54,7 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const staffed = new Set<number>();
   const homes = new Set<number>();
   const venues = new Set<number>();
+  const metroStations: Unit[] = [];
   // Meal-cadence bins: condos and hotels tracked separately (arch §2).
   const condoFloors = new Set<number>();
   const hotelFloors = new Set<number>();
@@ -90,6 +92,14 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
       // weekend-and-midday gate lives at option time (pushVenueVisitOptions),
       // not here: spawnFloors bins what exists, options decide when.
       if (isOperational(u)) addVenueByKind(u.kind, u.floor);
+      continue;
+    }
+    // The metro is a destination without being a tenant (population 0, never
+    // leased), so it bins BEFORE the tenant gate below, on the same
+    // operational predicate the staff kinds use. The party hall is NOT binned
+    // here: hall guests ride the attendance-visit flow (pushVenueVisitOptions).
+    if (u.kind === "metro") {
+      if (isOperational(u)) metroStations.push(u);
       continue;
     }
     if (!(isTenanted(u) || u.state === "asleep")) continue;
@@ -133,6 +143,7 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     staffFloors,
     venuesByKind,
     unitsByFloor,
+    metroStations,
   };
 }
 
@@ -144,26 +155,57 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   const morning = clock.isMorning();
   const evening = clock.isEvening();
   const day = !morning && !evening && !clock.isNight();
-  const { leasedOffices, staffedOffices, homes, openVenues } = floors;
+  const { leasedOffices, staffedOffices, homes, openVenues, metroStations } = floors;
 
   const trip = (from: number, to: number) => add(crowd, tower, from, to);
   // Each call makes one trip, chosen at random from whatever movements fit
   // the hour, so the evening rush is a genuine mix of workers leaving,
   // residents/guests arriving home and diners heading out, rather than only
   // ever emptying the offices (the old if/else chain starved the others).
+  //
+  // An operational metro joins each window's mix as a second street door:
+  // arrivals step off the train onto the platform and ride up into the tower,
+  // departures ride down and wait at the platform edge for theirs. Every metro
+  // option is gated on the bin being non-empty, so a tower without one pushes
+  // the exact option list it always did and the shared rng stream is untouched
+  // (the golden master fixture has none). Party hall, cinema, and wedding
+  // guests ride the attendance-visit flow (pushVenueVisitOptions), not this
+  // branch tree.
   const options: Array<() => void> = [];
   if (morning) {
     if (leasedOffices.length) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
     if (homes.length) options.push(() => trip(crowd.rng.pick(homes), 1)); // residents head out
+    if (metroStations.length) {
+      // The commuter rush: trains feed the offices, residents catch one out.
+      if (leasedOffices.length)
+        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(leasedOffices)));
+      if (homes.length) options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(homes)));
+    }
   } else if (evening) {
     if (staffedOffices.length) options.push(() => trip(crowd.rng.pick(staffedOffices), 1));
     if (homes.length) options.push(() => trip(1, crowd.rng.pick(homes)));
     if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
+    if (metroStations.length) {
+      // The evening rush mirrored: workers ride down to the platform,
+      // residents and venue visitors arrive by train.
+      if (staffedOffices.length)
+        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(staffedOffices)));
+      if (homes.length) options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(homes)));
+      if (openVenues.length)
+        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+    }
   } else if (day) {
     if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
     if (leasedOffices.length && crowd.rng.chance(0.3)) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
-  } else if (openVenues.length) {
-    options.push(() => trip(crowd.rng.pick(openVenues), 1)); // late-night stragglers leaving
+    // Day-trippers: the visitors the metro's catalog blurb promises.
+    if (metroStations.length && openVenues.length)
+      options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+  } else {
+    if (openVenues.length) {
+      options.push(() => trip(crowd.rng.pick(openVenues), 1)); // late-night stragglers leaving
+      if (metroStations.length)
+        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+    }
   }
 
   // Meal-cadence overlay: add outbound `origin -> venue` options during the

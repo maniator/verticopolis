@@ -93,6 +93,12 @@ export interface Person {
    *  a round-tripper has (outbound arrival triggers the dwell; return arrival
    *  triggers the outForMeal decrement + despawn). */
   returning?: boolean;
+  /** Extended arrival linger (crowd-seconds): how long to hold the arrived
+   *  pose before despawning. A metro commuter waiting on the platform for
+   *  their train. Unset for ordinary trips, which keep the default 2-second
+   *  linger; distinct from the venue round-trippers' `dwelling` state and
+   *  its `dwellSecondsLeft`. In-memory only, like every Person field. */
+  lingerFor?: number;
 }
 
 /** A transport route as a list of floors and the shaft used between each. */
@@ -125,6 +131,12 @@ export interface SpawnFloors {
    *  outer step so outbound meal spawns can sample candidates without
    *  re-scanning the full `tower.units` array each time. */
   unitsByFloor: Map<number, Unit[]>;
+  /** Operational metro stations (capped at 1 per tower). Kept as units rather
+   *  than floors: commuter spawns stamp their origin/destination x inside the
+   *  station footprint (the platform story has no floor tiles for pickX), and
+   *  the platform story is derived from the unit (floor + 1, the middle of
+   *  the three-story module). */
+  metroStations: Unit[];
 }
 
 /** Live calls the drawn crowd places on the elevators (see elevatorCalls).
@@ -181,6 +193,12 @@ const EAT_MINUTES_MIN = 30;
 const EAT_MINUTES_MAX = 60;
 export const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
 export const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
+/** How long a departing commuter waits on the metro platform before their
+ *  train "takes" them (the despawn stands in for boarding), in crowd-seconds.
+ *  Long enough that a rush hour visibly pools a small waiting crowd at the
+ *  platform edge instead of each figure blinking out on arrival. */
+export const METRO_DWELL_MIN = 8;
+export const METRO_DWELL_MAX = 24;
 
 /** Attendance-visit dwell windows per entertainment venue, in in-game minutes:
  *  a cinema visit spans a showing, a party runs longer, a wedding longer

@@ -139,47 +139,6 @@ export function buildFireTower(): void {
   g.engine.paused = false;
 }
 
-/** A Modern tower whose condos are sold to a spread of household sizes. */
-export function buildModernCondoTower(): void {
-  const g = (window as unknown as { game: any }).game;
-  const Sim = g.sim.constructor;
-  g.sim = Sim.newGame(2024, "modern");
-  const s = g.sim;
-  const W = g.grid.width;
-  const cx = Math.floor(W / 2);
-  s.money = 50_000_000;
-  s.star = 5;
-  const HALF = 30;
-  for (let x = cx; x <= cx + HALF; x++) s.tower.place("lobby", 1, x); // grow outward
-  for (let x = cx - 1; x >= cx - HALF; x--) s.tower.place("lobby", 1, x);
-  const span = 52;
-  const left = cx - Math.floor(span / 2);
-  for (let f = 2; f <= 12; f++) for (let x = left; x < left + span; x++) s.tower.place("floor", f, x);
-  s.tower.placeTransport("elevatorStandard", left + 2, 1, 12);
-  const spread = [3, 2, 4, 3, 5, 3, 2, 4, 3, 5, 4];
-  let i = 0;
-  for (let f = 2; f <= 12; f++) {
-    for (let x = left; x + 1 <= left + span; ) {
-      const r = s.tower.place("condo", f, x);
-      if (!r.ok) {
-        x += 1;
-        continue;
-      }
-      const u = s.tower.getUnit(r.unitId);
-      u.state = "occupied";
-      u.everOccupied = true;
-      u.residents = spread[i % spread.length];
-      i++;
-      x += u.width;
-    }
-  }
-  s.evaluateStar();
-  g.engine.setSim(s);
-  g.engine.setCamera(cx, 7, 0.7);
-  g.speed = 1;
-  g.engine.paused = false;
-}
-
 /** A well-run tower that has earned a quarter of income/elevator data. */
 export function buildStatsTower(): void {
   const g = (window as unknown as { game: any }).game;
