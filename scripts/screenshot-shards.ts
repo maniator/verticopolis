@@ -37,8 +37,10 @@ import { SCENES } from "./screenshot-scenes.ts";
 // own 100-200 unit build, with the two most expensive settles in the gallery:
 // `overlays` re-rendering three full-tower heatmaps and `metro` stepping a
 // 6-second train settle) used to swamp one `features` shard at ~2.5x the others.
-// They are now split across TWO shards with the two heaviest (overlays, metro)
-// deliberately separated, so the four shards run closer to even. The remaining
+// They are now split across TWO shards: `metro`, the single most expensive scene
+// (its 6-second train settle can't be split), gets its own shard, and the other
+// four feature scenes share the sibling, so the shards run closer to even (metro
+// alone is the practical floor). The remaining
 // light scenes (showcase's one build amortized over 13 shots, milestones, and the
 // small/route misc scenes) stay grouped. This is the ONLY place the split is
 // defined; correctness is enforced by `verify` against SCENES, so a rebalance here
@@ -46,8 +48,8 @@ import { SCENES } from "./screenshot-scenes.ts";
 // per-scene structure; confirm it against a CI run and nudge a scene across if a
 // shard still lags.
 export const SHARDS: Record<string, string[]> = {
-  features: ["overlays", "stats", "crash-screen"],
-  "features-b": ["basement", "metro"],
+  features: ["overlays", "stats", "crash-screen", "basement"],
+  metro: ["metro"],
   showcase: ["showcase", "milestones"],
   misc: [
     "mobile",

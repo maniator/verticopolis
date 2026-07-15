@@ -2,7 +2,7 @@ import type { Tower } from "../Tower";
 import type { Unit } from "../types";
 import type { Crowd } from "../Crowd";
 import { METRO_DWELL_MIN, METRO_DWELL_MAX } from "./person";
-import { add } from "./trips";
+import { add, insideX } from "./trips";
 
 /**
  * The metro commuter spawners. `spawnTrips` pushes these into its per-window
@@ -13,19 +13,6 @@ import { add } from "./trips";
  * visits flow: those are round trips with a live attendance ledger, while a
  * metro trip is one-way, the train is the other half of the journey.)
  */
-
-/** A uniformly random tile inside the unit footprint, `inset` tiles off each
- *  edge. Unit widths come from the catalog in a live game, but saves persist
- *  widths verbatim, so BOTH bounds are clamped rather than trusted: `lo` can
- *  never pass the unit's rightmost tile, and `hi` can never fall below `lo`,
- *  so a hand-edited unit narrower than the insets collapses the range onto
- *  its rightmost tile and the result always stays within
- *  `[u.x, u.x + u.width - 1]`. */
-function insideX(crowd: Crowd, u: Unit, inset: number): number {
-  const lo = Math.min(u.x + inset, u.x + u.width - 1);
-  const hi = Math.max(lo, u.x + u.width - inset - 1);
-  return crowd.rng.int(lo, hi);
-}
 
 /** One commuter stepping OFF the train: spawns mid-platform (the station's
  *  middle story, where the deck sits) and routes up into the tower. The origin

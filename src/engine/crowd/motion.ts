@@ -12,7 +12,7 @@ import {
   STAFF_GIVE_UP,
   RIDE_SECONDS_PER_FLOOR,
 } from "./person";
-import { pickX } from "./trips";
+import { pickX, insideX, metroStationForPlatform } from "./trips";
 import { beginDwell } from "./visits";
 
 /**
@@ -390,7 +390,15 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   p.wait = 0;
   p.age = 0;
   p.linger = 0;
-  p.destX = pickX(tower, originFloor, p.seed);
+  // An outside visitor who rode the train in returns to the platform story,
+  // which has no floor tiles for pickX (it would strand them at the lot edge).
+  // Place the return destX inside the station footprint, the same treatment
+  // the outbound origin got. Everyone else (meal round-trippers, lobby-origin
+  // visitors) strolls to a solid tile via pickX. The station lookup does no
+  // rng draw, and insideX only draws when a metro is present, so a metro-less
+  // tower's motion stream is byte-identical to before.
+  const station = origin ? undefined : metroStationForPlatform(tower, originFloor);
+  p.destX = station ? insideX(crowd, station, 2) : pickX(tower, originFloor, p.seed);
   p.returning = true;
 }
 

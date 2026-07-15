@@ -63,6 +63,44 @@ export function pickX(tower: Tower, floor: number, seed: number): number {
   return tiles[Math.abs(seed) % tiles.length];
 }
 
+/** A uniformly random tile inside the unit footprint, `inset` tiles off each
+ *  edge. Unit widths come from the catalog in a live game, but saves persist
+ *  widths verbatim, so BOTH bounds are clamped rather than trusted: `lo` can
+ *  never pass the unit's rightmost tile, and `hi` can never fall below `lo`,
+ *  so a hand-edited unit narrower than the insets collapses the range onto
+ *  its rightmost tile and the result always stays within
+ *  `[u.x, u.x + u.width - 1]`. Shared by the metro commuter spawns
+ *  (venueTrips) and the metro-origin venue visitor (visits): both stamp an
+ *  origin/destination x inside a station footprint, whose platform story has
+ *  no floor tiles for pickX to find. */
+export function insideX(crowd: Crowd, u: Unit, inset: number): number {
+  const lo = Math.min(u.x + inset, u.x + u.width - 1);
+  const hi = Math.max(lo, u.x + u.width - inset - 1);
+  return crowd.rng.int(lo, hi);
+}
+
+/** The metro station whose platform story (`floor + 1`) is `platformFloor`, or
+ *  undefined when none is. Metro is capped at one per tower, so at most one
+ *  matches. Used to place a metro-origin visitor's return destX inside the
+ *  station footprint, the same way the outbound origin x is stamped, since the
+ *  platform story has no floor tiles for pickX. Deliberately NOT gated on
+ *  operational state: the station's footprint still physically exists when it
+ *  catches fire or is gutted, so a visitor who rode in and is returning to a
+ *  now-broken platform must still land on the deck, not the lot-edge fallback.
+ *  The outbound origin gate (pickOutsideStreetDoor) stays operational-only; a
+ *  visitor never originates from a broken metro. Does no rng draw, so a
+ *  metro-less tower's spawn/motion stream is untouched. */
+export function metroStationForPlatform(tower: Tower, platformFloor: number): Unit | undefined {
+  // A metro platform is always a basement story (the station is a below-ground
+  // module, so its middle deck sits below floor 1). Ground-lobby returns pass
+  // platformFloor === 1, the common case; short-circuit them before the linear
+  // scan over every unit (which includes each structural tile). This changes
+  // nothing behaviorally: a floor >= 1 never matched a metro platform anyway,
+  // so it still falls through to pickX exactly as before.
+  if (platformFloor >= 1) return undefined;
+  return tower.units.find((u) => u.kind === "metro" && u.floor + 1 === platformFloor);
+}
+
 /** Spawn-side venue fullness filter, the mirror of the arrival-side clamps in
  *  `visits.ts` (beginDwell): census venues (population > 0) clamp at the
  *  catalog population, attendance venues at their attendance cap, anything

@@ -1881,18 +1881,18 @@ Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
   income, congestion, or census coupling changed. The catalog's transit
   bonuses (+60 arrival capacity, congestion relief) stay statistical. A
   per-rider ridership model is a separate design question.
-- **Metro as an attendance-visit origin**: commuters currently head to
-  offices, homes, and the ambient venue pool. Wiring the platform in as an
-  origin for the visits flow (riding in specifically for a film or a
-  party) would compound both features. The seam is the visits flow's
-  `outside` VisitOrigin (crowd/visits.ts): an outside visitor whose street
-  door is the platform instead of the ground lobby. Small seam, deliberate
-  follow-up (handoff-agreed with the venue-attendance effort).
-  Caution from the integration verify: `lingerFor` and the visit intent
-  (`mealVenueId`) are disjoint today by construction, and nothing clears
-  `lingerFor` on the venue paths, so that follow-up must spawn visit
-  people through the visits flow, never by adding a venue intent to a
-  `metroDeparture`-stamped person (they would double-wait).
+- **Metro as an attendance-visit origin** (SHIPPED v1.39.0, GH #316): the
+  visits flow's `outside` VisitOrigin now picks a second street door for
+  ticketed venues (cinema, party hall). When an operational metro's platform
+  is served by passenger transport (`tower.isFloorServed(u.floor + 1)`), a
+  share of outside visitors originate on the platform and route up to the
+  venue; everyone else keeps the ground-lobby entrance. Implemented in
+  `crowd/visits.ts` (`pickOutsideStreetDoor`), gated so a metro-less tower
+  draws no new rng and stays byte-stable (golden master unchanged). The
+  double-wait hazard is closed by construction: the rider is a plain
+  visits-flow round-tripper spawned through the flow, so it never carries
+  `lingerFor` or a metro-departure hold. Tests in
+  `crowd/metroVisitOrigin.test.ts`.
 - **Unroutable-metro spawn no-ops (review Edge #4)**: a metro with no shaft
   to its platform still contributes options to the spawn pool; picked
   options route null and consume the spawn budget as no-ops. Consistent
@@ -1940,10 +1940,11 @@ ratified order, with rulings:
    "revisit with per-person round-trips" precondition has shipped.
 7. **[[tdt-import-population-seed]] (GH #311):** seed occupants on import (a real 1994
    tower reads ~96 against the 234 written in its own save).
-8. **Metro as visit origin** (metro v1.34.0 defers, GH #316): best payoff-to-effort on
-   the board (outsiders ride the train in for a film), gated behind items 2
-   and 4; spawn through the visits flow and never stamp venue intent on a
-   `lingerFor` person (double-wait hazard).
+8. **Metro as visit origin** (SHIPPED v1.39.0, GH #316): outsiders ride the
+   train in for a film or a party. Spawned through the visits flow (never a
+   venue intent on a `lingerFor` person), gated on an operational,
+   transport-served platform. See the shipped note under the metro defers
+   above.
 9. **`elevator-dispatch-balancing`** (new row in the table above, GH #303): own PR in a
    quiet golden-master window, after item 5 lands.
 10. **Hotel meal gate (GH #304):** the open half of [[per-person-meal-round-trips]].
