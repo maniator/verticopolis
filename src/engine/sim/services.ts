@@ -1,6 +1,8 @@
 import type { Simulation } from "../Simulation";
 
+import { METRO_PLATFORM_CUTOFF_MSG } from "./constants";
 import { isTenantFloorUnit } from "../milestones";
+import { isMetroPlatformServed } from "../tower/routing";
 
 import { FACILITIES, GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER, isHotelKind } from "../facilities";
 import type { FacilityKind, Unit } from "../types";
@@ -146,6 +148,25 @@ export function nudgeStranded(sim: Simulation): void {
     );
   }
   sim.strandedNudged = stranded; // re-arms only after the condition clears
+}
+
+/** Once-per-day, edge-triggered log nudge when an operational metro station has
+ *  no passenger transport reaching its platform (the station's middle story,
+ *  `floor + 1`, per {@link isMetroPlatformServed}). A staff-only service
+ *  elevator does NOT count: it never carries commuters, so a platform reached
+ *  only by one is still orphaned here. Such a metro draws no commuters at all
+ *  (every trip through it null-routes and the spawn side pushes no options for
+ *  it), so without this advisory the player has no tell that their expensive
+ *  metro is inert. Log-only (never a toast), latched like {@link nudgeStranded}
+ *  so it cannot repeat while the condition persists. */
+export function nudgeMetroPlatform(sim: Simulation): void {
+  const orphaned = sim.tower.units.some(
+    (u) => u.kind === "metro" && isOperational(u) && !isMetroPlatformServed(sim.tower, u),
+  );
+  if (orphaned && !sim.metroPlatformNudged) {
+    sim.emit(METRO_PLATFORM_CUTOFF_MSG, "info");
+  }
+  sim.metroPlatformNudged = orphaned; // re-arms only after the condition clears
 }
 
 /**

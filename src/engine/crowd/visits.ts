@@ -15,6 +15,7 @@ import type { Person, SpawnFloors } from "./person";
 import { dwellSecondsRange, visibleOccupants } from "./person";
 import { matchesMealOriginKind } from "./meals";
 import { add, insideX, venueHasRoom } from "./trips";
+import { isMetroPlatformServed } from "../tower/routing";
 
 /**
  * Attendance visits: round-trip trips to the entertainment venues (cinema,
@@ -166,12 +167,12 @@ function pickOutsideStreetDoor(
   if (kind !== "cinema" && kind !== "partyHall") return { floor: GROUND_LOBBY };
   // metroStations already holds only operational stations (spawnFloors gates on
   // isOperational). A platform is a usable street door only when passenger
-  // transport reaches it: the station's middle story, u.floor + 1, matching the
-  // metro commuter spawns. Gating on isFloorServed here (independent of the
-  // separate unroutable-metro spawn guard) keeps this from ever minting a
-  // null-routing visitor.
+  // transport reaches it: the station's middle story, u.floor + 1. Gating on the
+  // shared isMetroPlatformServed predicate (the same one the commuter
+  // spawn guard and the daily cutoff advisory use) keeps this from ever minting
+  // a null-routing visitor, and keeps the three consumers from drifting apart.
   if (floors.metroStations.length === 0) return { floor: GROUND_LOBBY };
-  const served = floors.metroStations.filter((s) => tower.isFloorServed(s.floor + 1));
+  const served = floors.metroStations.filter((s) => isMetroPlatformServed(tower, s));
   if (served.length === 0) return { floor: GROUND_LOBBY };
   if (!crowd.rng.chance(METRO_VISIT_SHARE)) return { floor: GROUND_LOBBY };
   const station = crowd.rng.pick(served);

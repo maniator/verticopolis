@@ -51,6 +51,16 @@ export function isFloorServed(tower: Tower, floor: number): boolean {
   return tower.servedFloors().has(floor);
 }
 
+/** A metro station's platform is the story directly above it (`floor + 1`); it
+ *  is "served" when passenger transport (elevator, stairs, or escalator, never
+ *  a staff-only service elevator) reaches that story. The one predicate shared
+ *  by the commuter spawn guard, the metro visit-origin path, and the daily
+ *  cutoff advisory, so those three consumers cannot drift on what a "reachable
+ *  platform" means. */
+export function isMetroPlatformServed(tower: Tower, station: Unit): boolean {
+  return isFloorServed(tower, station.floor + 1);
+}
+
 /** The full set of ground-connected floors (memoized per revision). Read-only
  * view for the spatial congestion model. */
 export function servedFloorSet(tower: Tower): ReadonlySet<number> {

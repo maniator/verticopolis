@@ -16,6 +16,7 @@ import {
   outboundWeight,
   type MealOriginKind,
 } from "./meals";
+import { isMetroPlatformServed } from "../tower/routing";
 import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
 import { metroArrival, metroDeparture } from "./venueTrips";
@@ -156,6 +157,15 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   const evening = clock.isEvening();
   const day = !morning && !evening && !clock.isNight();
   const { leasedOffices, staffedOffices, homes, openVenues, metroStations } = floors;
+  // A metro contributes commuter options only when passenger transport reaches
+  // its platform. Otherwise every metroArrival/metroDeparture through it
+  // null-routes and spends the spawn budget on guaranteed no-ops (issue #315),
+  // starving the real trips that would have filled those slots. The bin itself
+  // stays inclusive (the visit-origin path needs every operational station);
+  // this gate is the commuter path's own, keyed off the same shared
+  // isMetroPlatformServed predicate the visit path and the daily cutoff advisory
+  // use so they cannot drift.
+  const reachableMetros = metroStations.filter((s) => isMetroPlatformServed(tower, s));
 
   const trip = (from: number, to: number) => add(crowd, tower, from, to);
   // Each call makes one trip, chosen at random from whatever movements fit
@@ -163,48 +173,48 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   // residents/guests arriving home and diners heading out, rather than only
   // ever emptying the offices (the old if/else chain starved the others).
   //
-  // An operational metro joins each window's mix as a second street door:
-  // arrivals step off the train onto the platform and ride up into the tower,
-  // departures ride down and wait at the platform edge for theirs. Every metro
-  // option is gated on the bin being non-empty, so a tower without one pushes
-  // the exact option list it always did and the shared rng stream is untouched
-  // (the golden master fixture has none). Party hall, cinema, and wedding
-  // guests ride the attendance-visit flow (pushVenueVisitOptions), not this
-  // branch tree.
+  // A reachable operational metro joins each window's mix as a second street
+  // door: arrivals step off the train onto the platform and ride up into the
+  // tower, departures ride down and wait at the platform edge for theirs. Every
+  // metro option is gated on `reachableMetros` being non-empty, so a tower with
+  // no metro (or only an unreachable one) pushes the exact option list it always
+  // did and the shared rng stream is untouched (the golden master fixture has
+  // none). Party hall, cinema, and wedding guests ride the attendance-visit flow
+  // (pushVenueVisitOptions), not this branch tree.
   const options: Array<() => void> = [];
   if (morning) {
     if (leasedOffices.length) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
     if (homes.length) options.push(() => trip(crowd.rng.pick(homes), 1)); // residents head out
-    if (metroStations.length) {
+    if (reachableMetros.length) {
       // The commuter rush: trains feed the offices, residents catch one out.
       if (leasedOffices.length)
-        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(leasedOffices)));
-      if (homes.length) options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(homes)));
+        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(leasedOffices)));
+      if (homes.length) options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(homes)));
     }
   } else if (evening) {
     if (staffedOffices.length) options.push(() => trip(crowd.rng.pick(staffedOffices), 1));
     if (homes.length) options.push(() => trip(1, crowd.rng.pick(homes)));
     if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
-    if (metroStations.length) {
+    if (reachableMetros.length) {
       // The evening rush mirrored: workers ride down to the platform,
       // residents and venue visitors arrive by train.
       if (staffedOffices.length)
-        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(staffedOffices)));
-      if (homes.length) options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(homes)));
+        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(staffedOffices)));
+      if (homes.length) options.push(() => metroArrival(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(homes)));
       if (openVenues.length)
-        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+        options.push(() => metroArrival(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(openVenues)));
     }
   } else if (day) {
     if (openVenues.length) options.push(() => trip(1, crowd.rng.pick(openVenues)));
     if (leasedOffices.length && crowd.rng.chance(0.3)) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
     // Day-trippers: the visitors the metro's catalog blurb promises.
-    if (metroStations.length && openVenues.length)
-      options.push(() => metroArrival(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+    if (reachableMetros.length && openVenues.length)
+      options.push(() => metroArrival(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(openVenues)));
   } else {
     if (openVenues.length) {
       options.push(() => trip(crowd.rng.pick(openVenues), 1)); // late-night stragglers leaving
-      if (metroStations.length)
-        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(metroStations), crowd.rng.pick(openVenues)));
+      if (reachableMetros.length)
+        options.push(() => metroDeparture(crowd, tower, crowd.rng.pick(reachableMetros), crowd.rng.pick(openVenues)));
     }
   }
 

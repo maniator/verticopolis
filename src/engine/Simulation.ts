@@ -166,6 +166,12 @@ export class Simulation implements SimContext {
    *  a 0→>0 crossing and re-arms only after the tower is fixed. Advisory only,
    *  intentionally not persisted (re-nudges once after load if still stranded). */
   strandedNudged = false;
+  /** Edge-trigger latch for the "metro platform cut off" log nudge, so it fires
+   *  once when an operational metro has no passenger transport to its platform
+   *  and re-arms only when the cut-off condition clears (the platform becomes
+   *  served, or the metro stops being operational). Advisory only, intentionally
+   *  not persisted (re-nudges once after load if still cut off). */
+  metroPlatformNudged = false;
 
   /** Bookkeeping for period boundaries. */
   lastDay = 0;
@@ -287,6 +293,8 @@ export class Simulation implements SimContext {
   nudgeServiceShortfalls(): void { services.nudgeServiceShortfalls(this); }
 
   nudgeStranded(): void { services.nudgeStranded(this); }
+
+  nudgeMetroPlatform(): void { services.nudgeMetroPlatform(this); }
 
   checkMilestones(): void { star.checkMilestones(this); }
 

@@ -143,6 +143,7 @@ export function onDay(sim: Simulation): void {
   sim.reportMoveIns();
   sim.checkMilestones();
   sim.nudgeStranded();
+  sim.nudgeMetroPlatform();
   sim.nudgeServiceShortfalls();
   sim.rollOverRetailDay();
   // Close the day's ledger so the income breakdown averages over whole days.
