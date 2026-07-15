@@ -45,9 +45,9 @@ context: ['{project-root}/_bmad-output/implementation-artifacts/backlog.md']
 ## Tasks & Acceptance
 
 **Execution:**
-- [ ] `scripts/screenshot-shards.ts` -- add the shard map + `print`/`verify` CLI, importing `SCENES` so the id set is never hand-duplicated; `verify` fails on any scene not in exactly one shard.
-- [ ] `.github/workflows/update-screenshots.yml` -- cross the `shoot` matrix with `shard`, source each job's `ONLY=` from `screenshot-shards.ts print`, name artifacts `shots-<run>-<shard>`; add a `verify` step in `resolve-image` (or a tiny gate job) so coverage is checked once before any capture; rewrite `verify-and-commit` to download every `shots-*`, diff run-a vs run-b per shard, and assemble the committed gallery from the `shots-a-*` artifacts.
-- [ ] `scripts/screenshot-shards.ts` -- self-check invoked in CI covers the coverage edge cases (gap, duplicate) via the `verify` command; a local `node scripts/screenshot-shards.ts verify` is the unit-equivalent.
+- [x] `scripts/screenshot-shards.ts` -- add the shard map + `print`/`verify` CLI, importing `SCENES` so the id set is never hand-duplicated; `verify` fails on any scene not in exactly one shard.
+- [x] `.github/workflows/update-screenshots.yml` -- cross the `shoot` matrix with `shard`, source each job's `ONLY=` from `screenshot-shards.ts print`, name artifacts `shots-<run>-<shard>`; add a `verify` step in `resolve-image` (or a tiny gate job) so coverage is checked once before any capture; rewrite `verify-and-commit` to download every `shots-*`, diff run-a vs run-b per shard, and assemble the committed gallery from the `shots-a-*` artifacts.
+- [x] `scripts/screenshot-shards.ts` -- self-check invoked in CI covers the coverage edge cases (gap, duplicate) via the `verify` command; a local `node scripts/screenshot-shards.ts verify` is the unit-equivalent.
 
 **Acceptance Criteria:**
 - Given the workflow runs, when the shards capture in parallel, then wall-clock for generation is roughly one shard's worth (~1/N) instead of the whole set, and the committed gallery is identical to what the unsharded generator would produce.

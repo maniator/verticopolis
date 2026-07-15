@@ -2,7 +2,8 @@
 title: 'Pixel-art food and entertainment: five distinct fast-food rooms, five dining rooms, and the two-floor cinema and party hall'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: '2edf133'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -129,15 +130,15 @@ Real files and functions, grouped by boundary. Extract for file size first, then
 ## Tasks & Acceptance
 
 **Execution (dependency order: extract, then enrich per kind, then tests):**
-- [ ] Extract `FASTFOOD_LOOKS` / `RESTAURANT_LOOKS` and their types into `pixelSprites/food.looks.ts`; repoint the `pixelSprites.ts:96` barrel re-export. Verify `subtypeVisuals` and `barrelSurface` stay green.
-- [ ] Enrich the look tables (values, and any new field such as fast-food `floor` / `floorStyle`), keeping names and order untouched and every entry pairwise-distinct.
-- [ ] Port the five fast-food interiors (burger, soba, teaCafe, parlor, cafe) with the `visibleOccupants(u)` seed-order fill and the burger `#C24A3A` substitution.
-- [ ] Port the five restaurant interiors (french, pub, chinese, sushi, steak) with the occupancy fill and the French candle `#E8A030` fix.
-- [ ] Enrich cinema: two-floor auditorium, green EXIT on both floors, occupancy-driven audience, geo axis 5 marquee color; keep the marquee `d.anim` and add no other.
-- [ ] Enrich the party hall: `(d, u)` signature plus dispatch update, the two-floor composition, retire `scatterPeople`, occupancy-gated figures.
-- [ ] Extract `food.interiors.ts` and/or `sprites/entertainment.ts` if a file would cross 500 lines.
-- [ ] Tests: extend `sprites.test.ts` coverage; re-verify `subtypeVisuals`, `barrelSurface`, and `fileSize.guard`.
-- [ ] `backlog.md` notes; `package.json` minor bump.
+- [x] Extract `FASTFOOD_LOOKS` / `RESTAURANT_LOOKS` and their types into `pixelSprites/food.looks.ts`; repoint the `pixelSprites.ts:96` barrel re-export. Verify `subtypeVisuals` and `barrelSurface` stay green.
+- [x] Enrich the look tables (values, and any new field such as fast-food `floor` / `floorStyle`), keeping names and order untouched and every entry pairwise-distinct.
+- [x] Port the five fast-food interiors (burger, soba, teaCafe, parlor, cafe) with the `visibleOccupants(u)` seed-order fill and the burger `#C24A3A` substitution.
+- [x] Port the five restaurant interiors (french, pub, chinese, sushi, steak) with the occupancy fill and the French candle `#E8A030` fix.
+- [x] Enrich cinema: two-floor auditorium, green EXIT on both floors, occupancy-driven audience, geo axis 5 marquee color; keep the marquee `d.anim` and add no other.
+- [x] Enrich the party hall: `(d, u)` signature plus dispatch update, the two-floor composition, retire `scatterPeople`, occupancy-gated figures.
+- [x] Extract `food.interiors.ts` and/or `sprites/entertainment.ts` if a file would cross 500 lines.
+- [x] Tests: extend `sprites.test.ts` coverage; re-verify `subtypeVisuals`, `barrelSurface`, and `fileSize.guard`.
+- [x] `backlog.md` notes; `package.json` minor bump.
 
 **Acceptance Criteria:**
 - Given a `fastFood` unit for each of the five canon subtypes, when it bakes, then it draws its own distinct room (not a recolor) under the shared sign band, and an undefined or unknown subtype falls back to the Hamburger look with no throw.

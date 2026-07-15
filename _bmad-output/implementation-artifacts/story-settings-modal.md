@@ -4,7 +4,7 @@ baseline_commit: 8c7627c2935098ebfb2c84ed9b741c02aa9d1ead
 
 # Story: Settings modal + Game panel cleanup
 
-Status: review
+Status: done (merged 2026-07-12 via PR #187, merge ff0d23b)
 
 Grounds: owner request 2026-07-12 ("instead of import export buttons on the
 page, add a settings modal; import export should live in the saves modal"),

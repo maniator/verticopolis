@@ -2,7 +2,8 @@
 title: 'Pixel-art retail: eleven canon trades, each a distinct store, on the striped-awning and lit-sign anchor'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: '2edf133'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -114,13 +115,13 @@ Each `case` in the `shop.ts` switch (`shop.ts:80-308`) is enriched to its board 
 ## Tasks & Acceptance
 
 **Execution (dependency order: extract, then anchor, then interiors, then figures, then bookkeeping):**
-- [ ] Extract `ShopLook` and `SHOP_LOOKS` to `pixelSprites/shop.looks.ts`; re-export through `shop.ts` and the `pixelSprites.ts` barrel; keep keys and order identical to `SHOP_SUBTYPES`.
-- [ ] Add the lit sign board plus the awning valance and `awningShadow` band on the subtyped path in `shop()`, keyed on `lit`, static (no `d.anim`); leave the shared stripe loop and the generic path byte-stable.
-- [ ] Enrich each of the eleven interior `case` blocks to its board tile (racks, pets, florist, books, pharmacy, boutique, screens, bank, salon, post, sports), integer coordinates, reading `look.goods`, avoiding every reserved color for decoration.
-- [ ] Apply the room-occupant `person()` builds at each call site (seated for behind-counter staff and seated clients; standing for open-floor clerks and customers); add the new bank teller, salon stylist and client, and other per-trade figures; keep the browsing-customer occupancy gate.
-- [ ] If `shop.ts` still exceeds 500 lines, split per-interior draws into `pixelSprites/shop.interiors.ts` with a thin dispatcher; no new ratchet entry.
-- [ ] Verify guards: `subtypeVisuals` (key-set, distinctness, round-trip), `fileSize.guard`, `barrelSurface`, `common.test.ts`.
-- [ ] `package.json`: bump minor; close the E4 backlog item.
+- [x] Extract `ShopLook` and `SHOP_LOOKS` to `pixelSprites/shop.looks.ts`; re-export through `shop.ts` and the `pixelSprites.ts` barrel; keep keys and order identical to `SHOP_SUBTYPES`.
+- [x] Add the lit sign board plus the awning valance and `awningShadow` band on the subtyped path in `shop()`, keyed on `lit`, static (no `d.anim`); leave the shared stripe loop and the generic path byte-stable.
+- [x] Enrich each of the eleven interior `case` blocks to its board tile (racks, pets, florist, books, pharmacy, boutique, screens, bank, salon, post, sports), integer coordinates, reading `look.goods`, avoiding every reserved color for decoration.
+- [x] Apply the room-occupant `person()` builds at each call site (seated for behind-counter staff and seated clients; standing for open-floor clerks and customers); add the new bank teller, salon stylist and client, and other per-trade figures; keep the browsing-customer occupancy gate.
+- [x] If `shop.ts` still exceeds 500 lines, split per-interior draws into `pixelSprites/shop.interiors.ts` with a thin dispatcher; no new ratchet entry.
+- [x] Verify guards: `subtypeVisuals` (key-set, distinctness, round-trip), `fileSize.guard`, `barrelSurface`, `common.test.ts`.
+- [x] `package.json`: bump minor; close the E4 backlog item.
 
 **Acceptance Criteria:**
 - Given a shop with a canon `subtype`, when it bakes lit within business hours, then it renders the trade's own awning color, a lit sign board below the awning, an interior of 3 to 5 props matching its board tile, and its shopper or clerk at room-occupant scale, at integer pixels.

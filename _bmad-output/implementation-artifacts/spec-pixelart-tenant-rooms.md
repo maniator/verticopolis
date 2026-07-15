@@ -2,7 +2,8 @@
 title: 'Pixel-art tenant rooms: office, condo, and hotel dollhouse interiors with geo-seeded layouts and reserved state cues'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: 'e3993a8'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -128,13 +129,13 @@ Extend, never reuse an axis integer within a kind (art bible axis map). Current 
 ## Tasks & Acceptance
 
 **Execution (dependency order: palette and shared helpers first, then per-kind routines, then extraction if needed, then tests):**
-- [ ] Add the new `PAL` keys and the shared dollhouse helpers (`bevelBox`, `interiorWall`, `ceilingCap`, `downlights`, `wainscotDado`, `plankFloor`, `windowView`, `roomGlow`, `curtain`, `framedArt`) to `common.ts`, each keyed only on signature inputs.
-- [ ] Port `office` to the page-02 composition: dollhouse shell over `carpetGreen`, curtained skyline window, the three geo layouts, mirror, vacant and night reads, seated staff mapped to `visibleOccupants(u)`.
-- [ ] Port `condo`: three geo layouts, the standing-lamp home-glow (`glowLit` when home, `glowDim` otherwise) in every layout, late-night asleep dimming, for-sale via `vacancy(..., "SALE")`.
-- [ ] Port `hotel` grades 1 to 3: `hotelPink` bedding on a walnut headboard; keep the asleep, dirty, and ready-lamp cues OUTSIDE the mirror at unchanged colors and geometry, adding the ready-lamp ink socket ring.
-- [ ] Extract the residential look tables into `residential.looks.ts` (and the dollhouse helpers into `dollhouse.ts`) if either file approaches 500 lines; re-export through the barrel.
-- [ ] Tests: the `pixelSpritesCommon` literal and luminance guard, the residential render and occupancy test; re-verify `fileSize.guard` and `barrelSurface`.
-- [ ] `package.json`: bump minor.
+- [x] Add the new `PAL` keys and the shared dollhouse helpers (`bevelBox`, `interiorWall`, `ceilingCap`, `downlights`, `wainscotDado`, `plankFloor`, `windowView`, `roomGlow`, `curtain`, `framedArt`) to `common.ts`, each keyed only on signature inputs.
+- [x] Port `office` to the page-02 composition: dollhouse shell over `carpetGreen`, curtained skyline window, the three geo layouts, mirror, vacant and night reads, seated staff mapped to `visibleOccupants(u)`.
+- [x] Port `condo`: three geo layouts, the standing-lamp home-glow (`glowLit` when home, `glowDim` otherwise) in every layout, late-night asleep dimming, for-sale via `vacancy(..., "SALE")`.
+- [x] Port `hotel` grades 1 to 3: `hotelPink` bedding on a walnut headboard; keep the asleep, dirty, and ready-lamp cues OUTSIDE the mirror at unchanged colors and geometry, adding the ready-lamp ink socket ring.
+- [x] Extract the residential look tables into `residential.looks.ts` (and the dollhouse helpers into `dollhouse.ts`) if either file approaches 500 lines; re-export through the barrel.
+- [x] Tests: the `pixelSpritesCommon` literal and luminance guard, the residential render and occupancy test; re-verify `fileSize.guard` and `barrelSurface`.
+- [x] `package.json`: bump minor.
 
 **Acceptance Criteria:**
 - Given an occupied office with `visibleOccupants(u) === n`, when it bakes at any of its three geo layouts, then exactly `min(n, seats)` seated 15px occupants draw in content colors over `carpetGreen`, under a downlit crown-molding ceiling, with a curtained skyline window, and changing `u.occupants` or `u.outForMeal` repaints it through the existing signature with no new input.

@@ -2,7 +2,8 @@
 title: 'Pixel-art utilities and service: recycling, metro, medical, security, housekeeping, and the basement garage'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: '2edf133'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -117,14 +118,14 @@ Real functions and files. Pure render; no engine change.
 ## Tasks & Acceptance
 
 **Execution (dependency order: extract, then port static, then wire live inputs, then the ghost-crowd removal, then tests):**
-- [ ] Extract the seven routines plus the three actors and `star` into `src/render/sprites/utilities.ts`; re-export through `sprites/facilities.ts`; re-verify `fileSize.guard` and `barrelSurface`.
-- [ ] Port `medical`, `security`, `housekeeping` from `page-01-utilities.build.js`; thread `d` into their dispatch cases for the `lit` glow.
-- [ ] Port `parking` and `parkingRamp` from their reference scripts; keep the `parkingUse` / `parkingDead` gate exactly.
-- [ ] Port `recycling`: enriched static plant plus the retained `recycleFill` pile and green/amber/red FULL gauge; substitute the reserved `#C24A3A` bale with a non-reserved color; use `personHiVis`.
-- [ ] Port the `metro` station; remove the `scatterPeople` crowd; leave the platform empty for the traffic overlay; keep the train actor.
-- [ ] Map every figure to the shared `person()` family (`pSeat` to seated, `pStand` to standing with coat, `pWalk` to `personWalker`, the recycling hand to `personHiVis`). Do not re-derive a figure.
-- [ ] Tests: per-kind no-throw and integer coverage; the reserved-color and FULL-gauge guard; re-verify the file-size and barrel guards.
-- [ ] `package.json`: bump minor. Backlog: record the metro-crowd follow-up.
+- [x] Extract the seven routines plus the three actors and `star` into `src/render/sprites/utilities.ts`; re-export through `sprites/facilities.ts`; re-verify `fileSize.guard` and `barrelSurface`.
+- [x] Port `medical`, `security`, `housekeeping` from `page-01-utilities.build.js`; thread `d` into their dispatch cases for the `lit` glow.
+- [x] Port `parking` and `parkingRamp` from their reference scripts; keep the `parkingUse` / `parkingDead` gate exactly.
+- [x] Port `recycling`: enriched static plant plus the retained `recycleFill` pile and green/amber/red FULL gauge; substitute the reserved `#C24A3A` bale with a non-reserved color; use `personHiVis`.
+- [x] Port the `metro` station; remove the `scatterPeople` crowd; leave the platform empty for the traffic overlay; keep the train actor.
+- [x] Map every figure to the shared `person()` family (`pSeat` to seated, `pStand` to standing with coat, `pWalk` to `personWalker`, the recycling hand to `personHiVis`). Do not re-derive a figure.
+- [x] Tests: per-kind no-throw and integer coverage; the reserved-color and FULL-gauge guard; re-verify the file-size and barrel guards.
+- [x] `package.json`: bump minor. Backlog: record the metro-crowd follow-up.
 
 **Acceptance Criteria:**
 - Given a recycling unit with `d.recycleFill` at 0, 0.8, and 1, when it renders, then the plant draws with a small, then stacked, then capped pile, the gauge reads green, amber, then red with the `FULL` label, and no bale or prop paints `#C24A3A`.

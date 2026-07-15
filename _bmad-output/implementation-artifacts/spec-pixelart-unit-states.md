@@ -122,7 +122,7 @@ Real functions and files. This spec pins them and adds the harness; it does not 
 - [ ] Extend `sprites.test.ts` into the cross-kind sweep: for every `ROOM_KIND`, assert the reserved literal for `empty` (office/condo card), `vacating` (notice), and the hotel `asleep` / `dirty` / ready cues under both `lit` values and across several `(floor, x)` positions (position and mirror invariance). Add `construction` / `fire` / `gutted` / closed-hours assertions on the `drawUnit` path.
 - [ ] Pin the two structural invariants in the sweep: each cue emits from outside `maybeMirrored` (identical draw log flipped and unflipped), and no cue path calls `geoVariant` (same log across positions).
 - [ ] Pin the animation invariant: `fire` and `construction` read `d.anim` and re-bake per frame; every other state is a static bake keyed by signature field 1; `gutted` draws no flames.
-- [ ] Pin the distinctness assertion: notice amber `#E8A030` is not the people-system impatient amber `#E8862A`.
+- [x] Pin the distinctness assertion: notice amber `#E8A030` is not the people-system impatient amber `#E8862A`.
 - [ ] Record the `food.ts:315` candle reserved-amber reuse in the backlog as a food-spec follow-up. Do not fix it here.
 - [ ] Build the E7 visual gallery sweep: every kind in each reserved state under lit, unlit, night scrim, and heatmap; regenerate `e2e/visual.spec.ts-snapshots` and `docs/screenshots/**` only via the pinned image.
 - [ ] `package.json`: no bump for the test-plus-pin PR; patch only if a pixel-moving legibility fix ships here.

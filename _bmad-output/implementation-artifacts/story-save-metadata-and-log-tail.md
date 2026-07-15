@@ -4,7 +4,7 @@ baseline_commit: f6149dacc7cf38f424543104201867873f9e2f7a
 
 # Story: Save metadata stamps and bulletin-log persistence
 
-Status: review
+Status: done (merged 2026-07-12 via PR #195, merge ae6617d; log-cap follow-up PR #196, merge aa63d7e)
 
 Grounds: direct owner request (2026-07-12), follow-up to PR #194 (view-state
 save parity): "any other things we should be adding to the vctower save?"
