@@ -6,15 +6,18 @@ import type { Person } from "./person";
 import type { FacilityKind } from "../types";
 
 /**
- * The read-only elevator queue + car-fill projection (E6 engine seam). It is a
- * VIEW of already-tracked crowd state: per shaft landing the waiter count and a
- * bounded wait-tier, and per car the boarded count read straight from `carLoad`.
- * The projection itself does no boarding or capacity math. These tests pin what
- * it surfaces (waiter order and count, wait tier, staff-only shafts, express
- * skip floors, and the (step, revision) memo). The reconciliation itself
- * (`boarded = min(queue, remaining capacity)` and the leftover being the same
- * individuals) is a property of the crowd step, driven here through
- * `crowd.advance(...)`, after which the surfaced `carLoad` is shown to match.
+ * The read-only elevator queue + per-car occupancy projection (E6 engine
+ * seam). It is a VIEW of already-tracked crowd state: per shaft landing the
+ * waiter count and a bounded wait-tier, and per car the boarded count read
+ * from the drawn `crowd.carRiders` occupancy. `boarded` is a derived per-car
+ * occupancy view used only by these tests today (no in-repo render consumer
+ * yet). The projection itself does no boarding or capacity math. These tests
+ * pin what it surfaces (waiter order and count, wait tier, staff-only shafts,
+ * express skip floors, and the (step, revision) memo).
+ * The reconciliation itself (`boarded = min(queue, remaining capacity)` and the
+ * leftover being the same individuals) is a property of the crowd step, driven
+ * here through `crowd.advance(...)`: both halves count ONE population, the drawn
+ * crowd, so a waiter boarding moves the same figure from a landing into a car.
  */
 describe("Crowd.queueView: read-only elevator queue projection", () => {
   /** A tower with a ground lobby and plain floors 2..top across the whole lot. */
@@ -33,6 +36,18 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     const res = tower.placeTransport(kind, x, bottom, top);
     if (!res.ok || res.transportId == null) throw new Error(`placeTransport failed: ${res.reason}`);
     return res.transportId;
+  }
+
+  /** Riders drawn (crowd.people) currently aboard a specific car, keyed the
+   *  same way as crowd.carRiders (`shaftId:carIndex`). Used to independently
+   *  verify the drawn per-car occupancy that queueView.boarded reads, rather
+   *  than asserting against carRiders itself (the read's own source). */
+  function countRidersInCar(crowd: Crowd, shaftId: number, carIndex: number): number {
+    let count = 0;
+    for (const p of crowd.people) {
+      if (p.state === "riding" && p.shaftId === shaftId && p.carIndex === carIndex) count++;
+    }
+    return count;
   }
 
   /** A person parked in the `waiting` state at a shaft landing. */
@@ -77,11 +92,18 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     expect(view.landings.get(s)?.get(5)).toEqual({ count: 1, tier: 0 });
   });
 
-  it("surfaces each car's boarded count straight from carLoad", () => {
+  it("surfaces each car's boarded count from the drawn carRiders", () => {
     const tower = baseTower();
     const s = placeShaft(tower, "elevatorStandard", 4, 1, 10);
-    tower.getTransport(s)!.carLoad = [5, 2];
     const crowd = new Crowd();
+    // carRiders is the drawn per-car occupancy the motion step maintains; set it
+    // directly here to pin the per-car plumbing. A routed-boarding reconciliation
+    // (real people actually boarding) lives in the "same individuals" test below.
+    crowd.carRiders.set(`${s}:0`, 5);
+    crowd.carRiders.set(`${s}:1`, 2);
+    // A stale statistical carLoad must not leak into the view: boarded is the
+    // drawn occupancy, so this value is ignored.
+    tower.getTransport(s)!.carLoad = [99, 99];
 
     const view = crowd.queueView(tower);
     expect(view.boarded.get(s)?.get(0)).toBe(5);
@@ -129,21 +151,19 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     // One crowd step boards riders in order up to capacity; the rest stay put.
     crowd.advance(0.5, tower);
 
-    const boarded = crowd.people.filter((p) => p.state === "riding").length;
-    expect(boarded).toBe(CAR_CAPACITY); // min(queue = n, remaining capacity = CAR_CAPACITY)
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
+    expect(aboardCar0).toBe(CAR_CAPACITY); // min(queue = n, remaining capacity = CAR_CAPACITY)
     const leftover = crowd.people.filter((p) => p.state === "waiting").map((p) => p.id);
     expect(leftover).toEqual([CAR_CAPACITY + 1, CAR_CAPACITY + 2, CAR_CAPACITY + 3]);
 
-    // The cab fill is engine truth (carLoad); mirror the boarded count onto it
-    // the way the dispatch does, then confirm the projection surfaces both the
-    // boarded car and the now-shorter leftover queue. NOTE: carLoad is the
-    // dispatch's statistical count, a different population from the drawn
-    // crowd.people this queue counts, so it is hand-written here as a stand-in.
-    // Tying boarded to the drawn crowd is deferred to E6-S7 (see backlog).
-    shaft.carLoad = [boarded, 0];
+    // boarded reads the DRAWN per-car occupancy (crowd.carRiders), which the
+    // motion step above filled aboard car 0. Assert the view against the
+    // INDEPENDENT count of drawn riders on that car (not against carRiders, the
+    // read's own source), so this proves the same-individuals tie rather than a
+    // passthrough. No hand-written carLoad standing in for the dispatch.
     crowd.beginStep();
     const view = crowd.queueView(tower);
-    expect(view.boarded.get(s)?.get(0)).toBe(CAR_CAPACITY);
+    expect(view.boarded.get(s)?.get(0)).toBe(aboardCar0);
     expect(view.landings.get(s)?.get(3)).toEqual({ count: 3, tier: 0 });
   });
 
@@ -157,15 +177,77 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
 
     crowd.advance(0.5, tower);
 
-    const boarded = crowd.people.filter((p) => p.state === "riding").length;
-    expect(boarded).toBe(4); // min(queue = 4, remaining capacity = CAR_CAPACITY)
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
+    expect(aboardCar0).toBe(4); // min(queue = 4, remaining capacity = CAR_CAPACITY)
     expect(crowd.people.some((p) => p.state === "waiting")).toBe(false);
 
-    shaft.carLoad = [boarded, 0];
     crowd.beginStep();
     const view = crowd.queueView(tower);
-    expect(view.boarded.get(s)?.get(0)).toBe(4);
+    // View surfaces the INDEPENDENT count of drawn riders on car 0.
+    expect(view.boarded.get(s)?.get(0)).toBe(aboardCar0);
     expect(view.landings.get(s)?.get(3)).toBeUndefined(); // nobody left waiting
+  });
+
+  it("boarded counts the SAME drawn individuals as the queue, never the statistical carLoad", () => {
+    // The E6-S7 same-individuals reconciliation (GH #314). Real routed figures
+    // board through the motion step; boarded must read that drawn occupancy
+    // (crowd.carRiders), not a hand-written / dispatch carLoad.
+    const tower = baseTower();
+    const s = placeShaft(tower, "elevatorStandard", 4, 1, 10);
+    const shaft = tower.getTransport(s)!;
+    shaft.carPositions[0] = 3; // car 0 waits at the queued floor
+    // Poison the statistical carLoad with a value that matches NOTHING about the
+    // drawn crowd. If boarded still read carLoad, it would surface this number;
+    // the assertions below prove it reads crowd.carRiders instead.
+    shaft.carLoad = [999, 999];
+
+    const crowd = new Crowd();
+    const n = CAR_CAPACITY + 5;
+    for (let id = 1; id <= n; id++) crowd.people.push(waiter(id, s, 3));
+
+    crowd.advance(0.5, tower); // real boarding: motion moves figures into car 0
+
+    // The drawn truth: who is actually aboard car 0, and who is still queued.
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
+    const stillWaiting = crowd.people.filter((p) => p.state === "waiting").length;
+    expect(aboardCar0).toBe(CAR_CAPACITY);
+    expect(stillWaiting).toBe(n - CAR_CAPACITY);
+    // Every figure is either aboard or queued: one population, conserved.
+    expect(aboardCar0 + stillWaiting).toBe(n);
+
+    crowd.beginStep();
+    const view = crowd.queueView(tower);
+    // boarded surfaces the drawn occupancy (the independently counted riders on
+    // car 0), NOT the poisoned statistical carLoad.
+    expect(view.boarded.get(s)?.get(0)).toBe(aboardCar0);
+    expect(view.boarded.get(s)?.get(0)).not.toBe(999);
+    // The leftover line is the same individuals, now shorter.
+    expect(view.landings.get(s)?.get(3)?.count).toBe(stillWaiting);
+  });
+
+  it("boarded falls as drawn riders alight: it tracks the whole ride, not just the boarding instant", () => {
+    // Guards the full lifecycle of the carRiders read: boarded must drop when
+    // riders step off, not just rise when they board.
+    const tower = baseTower();
+    const s = placeShaft(tower, "elevatorStandard", 4, 1, 10);
+    const shaft = tower.getTransport(s)!;
+    shaft.carPositions[0] = 3; // car 0 at the queued floor
+    const crowd = new Crowd();
+    // waiter() routes floor 3 -> 4 (floors [floor, floor + 1]).
+    for (let id = 1; id <= 4; id++) crowd.people.push(waiter(id, s, 3));
+
+    crowd.advance(0.5, tower); // board onto car 0
+    crowd.beginStep();
+    expect(crowd.queueView(tower).boarded.get(s)?.get(0)).toBe(4);
+
+    // Carry car 0 up to the riders' destination floor and step again: the motion
+    // step alights them (releaseSeat decrements carRiders), so the drawn
+    // occupancy empties and boarded must follow it back to zero.
+    shaft.carPositions[0] = 4;
+    crowd.advance(0.5, tower);
+    expect(crowd.people.some((p) => p.state === "riding")).toBe(false);
+    crowd.beginStep();
+    expect(crowd.queueView(tower).boarded.get(s)?.get(0)).toBe(0);
   });
 
   it("memoizes once per step and recomputes only after beginStep", () => {
