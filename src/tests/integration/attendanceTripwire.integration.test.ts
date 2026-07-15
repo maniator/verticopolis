@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, resolve } from "node:path";
+import { basename, dirname, resolve } from "node:path";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { beginDwell } from "../../engine/crowd/visits";
@@ -109,7 +109,7 @@ describe("attendance tally tripwire", () => {
     for (const f of files) {
       const src = readFileSync(f, "utf8");
       for (const m of src.matchAll(donePattern)) {
-        assignments.push(`${f.split("/").pop()}@${src.slice(0, m.index).split("\n").length}`);
+        assignments.push(`${basename(f)}@${src.slice(0, m.index).split("\n").length}`);
       }
     }
     // Exactly one, and it lives inside finish()'s body in motion.ts. A new
@@ -122,7 +122,9 @@ describe("attendance tally tripwire", () => {
     expect(finishStart, "finish() must exist in motion.ts under that exact name").toBeGreaterThan(-1);
     const nextExport = motion.indexOf("\nexport ", finishStart + 1);
     const finishBody = motion.slice(finishStart, nextExport === -1 ? undefined : nextExport);
-    expect(finishBody).toContain('.state = "done"');
+    // Same tolerant pattern as the scan above, so a harmless quote or
+    // spacing refactor cannot fail one half of the tripwire and not the other.
+    expect(finishBody.match(donePattern)).not.toBeNull();
   });
 
   it("tallies reconcile against live people across a full mixed day", () => {
