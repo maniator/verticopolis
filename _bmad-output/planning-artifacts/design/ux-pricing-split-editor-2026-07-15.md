@@ -3,11 +3,11 @@ title: "UX spec: the Classic rent editor (pricing-split epic gate)"
 game: Verticopolis (browser SimTower clone)
 author: Sally (UX designer)
 date: 2026-07-15
-status: Draft for owner review (this is the editor-UX detail the `pricing-split`
-  backlog row is gated on; GitHub issue #299)
-scope: Editor and dialog UX only. The engine rulings are ratified inputs and are
+status: "Draft for owner review (this is the editor-UX detail the `pricing-split`
+  backlog row is gated on; GitHub issue #299)"
+scope: "Editor and dialog UX only. The engine rulings are ratified inputs and are
   cited, never re-litigated. Folds in the owner-approved editor access IOU
-  (issue #370) because this spec redraws the editor panel anyway.
+  (issue #370) because this spec redraws the editor panel anyway."
 inputs:
   - _bmad-output/planning-artifacts/design/gdd-classic-modern-pricing-roadmap-2026-07-08.md (§0-§2)
   - _bmad-output/planning-artifacts/design/epics-classic-modern-roadmap-2026-07-08.md (Epic 1, FR1-FR8, NFR1-NFR3, AR6, UX-DR1/2/4)
