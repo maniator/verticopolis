@@ -328,7 +328,7 @@ describe("openModalTemplate — the window grammar", () => {
     expect(title.id).toBe("custom-title-id"); // caller id preserved, never read or overwritten
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).not.toBe("custom-title-id");
-    expect(labelId).toBe("modal-title"); // the shared MODAL_TITLE_ID, stamped on the span
+    expect(labelId).toBe("verticopolis-modal-title"); // the shared MODAL_TITLE_ID, stamped on the span
     const titleSpan = document.getElementById(labelId!)!;
     expect(titleSpan.tagName).toBe("SPAN");
     expect(titleSpan.parentElement).toBe(title); // nested inside the caller's own h2

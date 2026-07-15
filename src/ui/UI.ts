@@ -34,7 +34,7 @@ export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } 
  *  successive modal titles never collide on this one constant id. DOM id
  *  uniqueness is document-wide, and no other element in the app uses this id,
  *  so reusing the same constant on every open is collision-free. */
-const MODAL_TITLE_ID = "modal-title";
+const MODAL_TITLE_ID = "verticopolis-modal-title";
 
 export interface UICallbacks {
   onSelectTool(tool: Tool): void;
@@ -265,7 +265,8 @@ export class UI {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
     if (h2) {
-      // Move the title text into its own span and label the dialog at THAT
+      // Move the title CONTENTS (every child node, including any markup a
+      // caller placed inside the h2) into their own span, and label the dialog at THAT
       // span, not the h2 (see MODAL_TITLE_ID). A caller-supplied h2.id (deep-
       // linking, styling, another ARIA relationship) is never touched; only
       // the h2's child nodes move.
@@ -273,7 +274,7 @@ export class UI {
       titleSpan.id = MODAL_TITLE_ID;
       while (h2.firstChild) titleSpan.appendChild(h2.firstChild);
       h2.appendChild(titleSpan);
-      dialog.setAttribute("aria-labelledby", MODAL_TITLE_ID);
+      dialog.setAttribute("aria-labelledby", titleSpan.id);
     } else {
       dialog.removeAttribute("aria-labelledby");
     }
