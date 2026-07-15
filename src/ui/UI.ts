@@ -29,7 +29,7 @@ export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } 
  *  of that span, and if `aria-labelledby` referenced the h2 the dialog's
  *  computed accessible name would run the title together with the ✕'s own
  *  accessible name ("Close"). The dialog's DOM is fully replaced on every open
- *  (`openModal`/`openModalTemplate` reset `dialog.innerHTML`, and only one
+ *  ({@link UI.openModalTemplate} resets `dialog.innerHTML`, and only one
  *  modal is ever live at a time, guarded by {@link UI.isModalOpen}), so
  *  successive modal titles never collide on this one constant id. DOM id
  *  uniqueness is document-wide, and no other element in the app uses this id,

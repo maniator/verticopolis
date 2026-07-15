@@ -290,7 +290,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("points the dialog's aria-labelledby at the title-text span, so a screen reader announces which dialog opened", () => {
     const { ui } = makeUI();
-    const box = open(ui, "<h2>Window Title</h2><p>body</p>");
+    const box = open(ui, html`<h2>Window Title</h2><p>body</p>`);
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
@@ -305,7 +305,7 @@ describe("openModalTemplate — the window grammar", () => {
     // is appended into that same h2, so a screen reader announced the title
     // plus the ✕'s own accessible name ("Close"), e.g. "Settings Close".
     const { ui } = makeUI();
-    open(ui, "<h2>Settings</h2><p>body</p>");
+    open(ui, html`<h2>Settings</h2><p>body</p>`);
     const labelId = dialog().getAttribute("aria-labelledby")!;
     const titleSpan = document.getElementById(labelId)!;
     expect(titleSpan.textContent).toContain("Settings");
@@ -315,7 +315,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("never labels the dialog with a nested (non-title-bar) h2", () => {
     const { ui } = makeUI();
-    open(ui, "<h2>Window Title</h2><div><h2>Section heading</h2></div>");
+    open(ui, html`<h2>Window Title</h2><div><h2>Section heading</h2></div>`);
     const labelId = dialog().getAttribute("aria-labelledby")!;
     expect(document.getElementById(labelId)!.textContent).toContain("Window Title");
     expect(document.getElementById(labelId)!.textContent).not.toContain("Section heading");
@@ -323,7 +323,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("leaves a caller-supplied h2 id untouched; aria-labelledby points at the title-text span, not the caller id", () => {
     const { ui } = makeUI();
-    open(ui, '<h2 id="custom-title-id">Titled</h2><p>body</p>');
+    open(ui, html`<h2 id="custom-title-id">Titled</h2><p>body</p>`);
     const title = dialog().querySelector<HTMLElement>("h2.win-title")!;
     expect(title.id).toBe("custom-title-id"); // caller id preserved, never read or overwritten
     const labelId = dialog().getAttribute("aria-labelledby");
@@ -337,7 +337,7 @@ describe("openModalTemplate — the window grammar", () => {
 
   it("clears aria-labelledby rather than leaving it dangling when a modal renders no top-level h2", () => {
     const { ui } = makeUI();
-    open(ui, "<p>no title here</p>");
+    open(ui, html`<p>no title here</p>`);
     expect(dialog().hasAttribute("aria-labelledby")).toBe(false);
   });
 
@@ -493,7 +493,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
     const titleSpan = document.getElementById(labelId!)!;
-    expect(titleSpan.tagName).toBe("SPAN"); // labeled at the span, not the h2 (same contract as openModal)
+    expect(titleSpan.tagName).toBe("SPAN"); // labeled at the span, not the h2
     expect(titleSpan.parentElement).toBe(title);
     expect(titleSpan.textContent).toContain("Set all offices");
   });
