@@ -1741,3 +1741,38 @@ departed while culled never flashes at a stale position). Standing defers:
   loads rebuild the sim and strip the tally). The standing rule for future
   work: any new despawn shortcut MUST route through `finish()`, or add a
   reconciliation pass first. No repair pass exists by design today.
+
+### Render-perf S3: deferred hour reconcile (2026-07-15)
+
+CAP-3 of the mobile render-perf spec. Review triage patched the confirmed
+findings: the drain moved to frame start ahead of the sim advance (a
+catch-up frame crossing the next hour re-stacked the deferred repaint with
+that hour's scans, found by both Codex and the review layers), meal-overlay
+repaints now dodge hour-crossing frames, the crane no longer double-flags
+on a lit flip, the boot/tick lighting derivation is one shared helper, and
+the module doc states the honest pre-change mechanics (the hour-triggered
+reconcile ran the frame AFTER the scans; the true same-frame stack came
+through the meal-overlay trigger). Standing defers:
+
+- **Deep catch-up residual:** when every frame crosses an hour (throttled
+  top speed), the hourly scans run every frame, so the drain halves the
+  sync cadence instead of fully separating the costs. Full separation needs
+  the engine-side onHour amortization, the recorded spec non-goal.
+- **Sky leads the building by up to two frames at the hour flip:** the sky
+  color reads the live clock while room lighting rides the deferred
+  reconcile. Cosmetic and transient; lockstep would mean deriving the sky
+  from the adopted display hour.
+- **`start()` wiring has no test repo-wide** (pre-existing; the boot bake
+  is behavior-pinned only through the shared displayLit helper's unit test
+  and the deferral tests). A boot-path harness would need a real Excalibur
+  engine; revisit if boot regressions ever surface.
+- **`setSim` mid-deferral safety rests on `Tower.revision` never equaling
+  the -1 reset sentinel** (revision starts at 0 and only increments), which
+  guarantees a structural sync that absorbs any stale pending flag. Not
+  separately pinned; a future setSim variant that adopts the revision
+  directly must clear `hourSyncPending` itself.
+- **Tooling gotcha, recorded for the next contributor:** vitest's mock
+  hoisting detects the literal text "vi.mock (" even inside comments and
+  rewraps the module, which silently broke TowerEngine's FLOOR/TILE
+  re-exports in integration tests until the comment was reworded. Do not
+  name that API with a following parenthesis in prose inside src modules.
