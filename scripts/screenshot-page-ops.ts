@@ -159,9 +159,9 @@ export function pgStep(frames: number): boolean {
  *  crowd/car/train motion) advance byte-for-byte as pgStep would; only the
  *  intermediate DRAW is skipped.
  *
- *  Use with care, and only via a shot's `noDrawSettle` opt-in for a heavy live-crowd
- *  settle (metro's 6s train dwell, the crowd rush): skipping draws is NOT free of
- *  pixel effects, because Excalibur's draw phase is not pure output. Its
+ *  This is the DEFAULT settle path (a shot draws every frame only by opting out via
+ *  `drawSettle`), because skipping draws is NOT free of pixel effects and the fix
+ *  below makes it safe gallery-wide. Excalibur's draw phase is not pure output: its
  *  OffscreenSystem (a DRAW-phase system) culls off-screen entities against the
  *  camera's `drawPos`, and `drawPos` is synced to the logical `pos` ONLY inside
  *  Camera.draw(). setCamera writes `pos` directly, so with the draws suppressed the
@@ -169,9 +169,9 @@ export function pgStep(frames: number): boolean {
  *  shot's camera position, dropping the platform/crowd/underground to the clear
  *  color. We fix that by copying `pos` into `drawPos` right before the final draw,
  *  which reproduces where a full-draw settle leaves drawPos by its last frame. That
- *  covers the camera-cull coupling; it does NOT cover a per-shot viewport resize or
- *  a draw-cumulative effect, which is why the DEFAULT settle draws every frame and
- *  this is confined to the two poles (validated byte-identical in the pinned
+ *  covers the camera-cull coupling, which is nearly every shot. It does NOT cover a
+ *  per-shot viewport resize or a draw-path animation, so those few shots set
+ *  `drawSettle` to draw every frame (all validated byte-identical in the pinned
  *  container). Falls back to a plain full step if the private draw hook is not where
  *  expected, so a future Excalibur rename degrades to slow-but-correct. Returns false
  *  in the same no-clock cases as pgStep. Runs in the browser. */

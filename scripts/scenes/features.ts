@@ -177,10 +177,6 @@ export const FEATURE_SCENES: Scene[] = [
           });
         },
         wait: 6000, // anim 246: train parked; six more seconds of arrivals
-        // The 6s dwell is ~360 software-rastered frames of discarded intermediate
-        // crowd motion; skip their draws (only the final frame is captured). The
-        // pole scene: this is the single biggest CI-capture win. Byte-identical.
-        noDrawSettle: true,
       },
     ],
   },
@@ -292,8 +288,10 @@ export const FEATURE_SCENES: Scene[] = [
       // Both viewports sit inside the docked-tablet band (min-width:768 /
       // max-width:1023 / min-height:600, styles.css) so they exercise the
       // wrap-topbar + narrowed-dock breakpoint: portrait tall, compact wide.
-      { name: "tablet-portrait", viewport: { width: 834, height: 1112 }, wait: 500 },
-      { name: "tablet-compact", viewport: { width: 1000, height: 720 }, wait: 500 },
+      // drawSettle: the per-shot viewport resize is applied through the draw path,
+      // so these must draw every settle frame (a no-draw settle drifts them).
+      { name: "tablet-portrait", viewport: { width: 834, height: 1112 }, wait: 500, drawSettle: true },
+      { name: "tablet-compact", viewport: { width: 1000, height: 720 }, wait: 500, drawSettle: true },
     ],
   },
 ];

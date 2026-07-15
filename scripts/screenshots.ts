@@ -73,18 +73,18 @@ const READY_TIMEOUT_MS = 30_000;
  *  pages (gallery/preview) are frozen by the pinned performance.now set in
  *  runScene, and the composite setContent shots are static markup, so a wall
  *  wait can't shift either. */
-async function settle(page: Page, ms: number, noDraw = false): Promise<void> {
+async function settle(page: Page, ms: number, drawEveryFrame = false): Promise<void> {
   // ceil already yields >= 1 frame for any ms > 0, so no lower clamp is needed;
   // ms <= 0 yields <= 0, which the stepper treats as "no step" (returns false).
-  // Default: draw every frame (pgStep), the robust path. A shot opts into
-  // pgStepNoDraw only when its settle is a heavy live-crowd dwell (metro, crowd);
-  // there the intermediate frames are discarded, so skipping their software raster
-  // is a big CI win, and pgStepNoDraw's drawPos sync keeps the final frame
-  // byte-identical. Skipping draws is deliberately NOT the default: it is
-  // draw-coupled (Excalibur culls off-screen entities against the camera's
-  // draw-phase position), so unconfined it would drift shots that resize the
-  // viewport or animate in the draw path.
-  const step = noDraw ? pgStepNoDraw : pgStep;
+  // Default: skip the intermediate draws (pgStepNoDraw). A settle always draws its
+  // FINAL frame either way; the flag only decides whether the discarded frames
+  // BEFORE it also draw. Skipping them is wasted software raster, and pgStepNoDraw's
+  // drawPos sync keeps the final frame byte-identical, so it is safe gallery-wide
+  // EXCEPT a few draw-coupled shots (per-shot viewport resizes, draw-path animation):
+  // those pass drawEveryFrame=true (via the shot's drawSettle). Route scene-level
+  // settles also draw every frame (see runScene): a live-engine route page is
+  // draw-sensitive.
+  const step = drawEveryFrame ? pgStep : pgStepNoDraw;
   const stepped = await page.evaluate(step, Math.ceil(ms / FRAME_MS));
   if (!stepped) await page.waitForTimeout(Math.max(0, ms));
 }
@@ -92,8 +92,13 @@ async function settle(page: Page, ms: number, noDraw = false): Promise<void> {
 let captured = 0;
 const failures: string[] = [];
 const perDir: Record<OutDir, number> = { screenshots: 0, features: 0, milestones: 0 };
+// Per-scene wall time, appended as each scene finishes, for the closing "slowest
+// scenes" summary. stdout only: never read back into the page and never written
+// into a PNG, so it cannot move a committed pixel or affect determinism.
+const sceneTimings: { id: string; ms: number }[] = [];
 
 async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
+  const shotStart = Date.now();
   const outDir = shot.outDir ?? scene.outDir;
   const path = join(DIRS[outDir], `${shot.name}.png`);
   const baseVp = scene.viewport ?? DESKTOP;
@@ -120,7 +125,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
-    await settle(page, shot.wait ?? 500, shot.noDrawSettle ?? false);
+    await settle(page, shot.wait ?? 500, shot.drawSettle ?? false);
     // Repaint the throttled DOM chrome off the final sim state, then sweep
     // stray toasts / event dialogs the running sim may have popped during the
     // settle, unless this shot is deliberately showing a modal.
@@ -145,10 +150,11 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   }
   captured++;
   perDir[outDir]++;
-  console.log(`  ✓ ${outDir}/${shot.name}`);
+  console.log(`  ✓ ${outDir}/${shot.name} (${Date.now() - shotStart} ms)`);
 }
 
 async function runScene(browser: Browser, scene: Scene): Promise<void> {
+  const sceneStart = Date.now();
   console.log(`\n▶ scene: ${scene.id}`);
   const vp = scene.viewport ?? DESKTOP;
   // A phone-sized scene must also present as a touch device, or `@media (pointer:
@@ -206,7 +212,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if ((await page.evaluate(pgAdoptTestClock)) === "failed") {
         throw new Error("engine present but test-clock adoption failed");
       }
-      await settle(page, 800);
+      // Draw this route settle: a live-engine route page (excalibur.html) is
+      // draw-coupled, and the no-engine routes (gallery/preview) wall-wait here
+      // anyway (no clock), so drawing is the safe choice for both.
+      await settle(page, 800, true);
     } else {
       await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
       // From here on, frames advance only when settle()/pgStep drives them:
@@ -231,7 +240,22 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       }
     }
   } finally {
-    await page.close();
+    // page.close() is cleanup: never let it throw past the finally (that would fail
+    // a scene whose shots all captured) and never let it skip the timing row. Log a
+    // close failure and carry on; the browser is torn down in main's finally anyway.
+    try {
+      await page.close();
+    } catch (e) {
+      console.error(`  page.close failed for scene ${scene.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    const sceneMs = Date.now() - sceneStart;
+    sceneTimings.push({ id: scene.id, ms: sceneMs });
+    // The route-not-ready early return above also passes through this finally, so a
+    // scene that failed to render still gets a timing row. That row reflects the
+    // wall time actually spent, which for a route that never signaled ready is the
+    // readiness wait (up to READY_TIMEOUT_MS), not zero; either way it is a useful
+    // signal that the scene did not capture normally.
+    console.log(`◀ scene: ${scene.id} (${(sceneMs / 1000).toFixed(1)}s)`);
   }
 }
 
@@ -289,6 +313,12 @@ async function main(): Promise<void> {
 
   console.log(`\n──────── captured ${captured} shots ────────`);
   for (const d of Object.keys(perDir) as OutDir[]) console.log(`  ${d.padEnd(12)} ${perDir[d]}`);
+  // Slowest scenes first, so a CI log makes the render long poles obvious at a
+  // glance (this is what tells us where a shard's time actually goes).
+  const totalMs = sceneTimings.reduce((sum, s) => sum + s.ms, 0);
+  const slowest = [...sceneTimings].sort((a, b) => b.ms - a.ms);
+  console.log(`\n──────── slowest scenes (total ${(totalMs / 1000).toFixed(1)}s) ────────`);
+  for (const s of slowest) console.log(`  ${s.id.padEnd(20)} ${(s.ms / 1000).toFixed(1)}s`);
   if (failures.length) {
     console.log(`\n${failures.length} FAILURE(S):`);
     for (const f of failures) console.log(`  ✗ ${f}`);

@@ -52,12 +52,15 @@ export interface Shot {
   fullPage?: boolean;
   viewport?: Viewport; // temporary viewport override for this shot
   wait?: number; // extra settle ms (default 500)
-  // Skip the intermediate draws during this shot's settle (only the final frame
-  // is captured). ONLY for heavy live-crowd settles (metro's 6s train dwell, the
-  // crowd rush) where drawing every one of hundreds of software-rastered frames
-  // dominates CI wall-clock. Off by default: a settle draws every frame, which is
-  // the robust path. See pgStepNoDraw for why this is draw-coupled and confined.
-  noDrawSettle?: boolean;
+  // Force a FULL draw during this shot's settle (draw every frame, not just the
+  // final one). By default a settle skips the intermediate draws (pgStepNoDraw):
+  // only the final frame is captured, so the discarded frames' software raster is
+  // pure waste, and the drawPos sync keeps that final frame byte-identical. That
+  // skip is safe for the whole gallery EXCEPT a few draw-coupled shots: per-shot
+  // viewport resizes (the tablet shots) and shots whose pixels advance in the draw
+  // path (the sky/sun clips, the live-engine previews). Those set drawSettle so
+  // their settle draws every frame. See pgStepNoDraw for the coupling.
+  drawSettle?: boolean;
   keepDialogs?: boolean; // this shot INTENTIONALLY shows a modal, so don't clear it
   setup?: (page: Page) => Promise<void>; // escape hatch for one-off staging
 }

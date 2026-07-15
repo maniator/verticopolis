@@ -102,9 +102,12 @@ export const SHOWCASE_SCENES: Scene[] = [
       // Sun shots frame the tower TOP + open sky so the sun near the horizon is
       // actually in the picture (an interior zoom hides the very subject).
       { name: "21-sun-horizon", clock: 6, frame: { floor: 34, zoom: 0.42 } },
-      { name: "18-sun-clip", clock: 17, frame: { floor: 34, zoom: 0.42 } },
+      // drawSettle: these two frame the sun so a draw-path sun/glare element lands
+      // differently without the intermediate draws (verified in the container). The
+      // other sky/sun shots above/below are nodraw-safe, so only these opt in.
+      { name: "18-sun-clip", clock: 17, frame: { floor: 34, zoom: 0.42 }, drawSettle: true },
       { name: "22-moon", clock: 2, frame: { floor: 30, zoom: 0.5 } },
-      { name: "16-sky", clock: 12, frame: { floor: 30, zoom: 0.9 } },
+      { name: "16-sky", clock: 12, frame: { floor: 30, zoom: 0.9 }, drawSettle: true },
       { name: "05-detail", clock: 12, frame: { floor: 10, zoom: 1.8 } },
       {
         name: "17-select",
@@ -222,7 +225,8 @@ export const SHOWCASE_SCENES: Scene[] = [
         },
         wait: 900,
       },
-      { name: "11-game-tower", setup: async (page) => void (await page.evaluate(buildEngineTower)), wait: 1200 },
+      // drawSettle: a live TowerEngine demo whose pixels advance in the draw path.
+      { name: "11-game-tower", setup: async (page) => void (await page.evaluate(buildEngineTower)), wait: 1200, drawSettle: true },
       {
         name: "12-game-zoom",
         setup: async (page) => void (await page.evaluate(() => (window as any).game.engine.zoomAt(1.6, 640, 400))),
@@ -251,10 +255,7 @@ export const SHOWCASE_SCENES: Scene[] = [
     },
     build: buildCrowdTower,
     assertUnits: 40,
-    // The 6s live rush is ~360 software-rastered frames of discarded intermediate
-    // crowd motion; skip their draws (only the final frame is captured). One of the
-    // two capture poles, alongside metro. Byte-identical (validated in the container).
-    shots: [{ name: "14-crowd-routing", wait: 6000, noDrawSettle: true }],
+    shots: [{ name: "14-crowd-routing", wait: 6000 }],
   },
   // --- Fire emergency ---------------------------------------------------------
   {
@@ -372,7 +373,8 @@ export const SHOWCASE_SCENES: Scene[] = [
     id: "excalibur-preview",
     outDir: "screenshots",
     route: "excalibur.html",
-    shots: [{ name: "excalibur-preview", wait: 1500 }],
+    // drawSettle: a live TowerEngine route page, draw-coupled like 11-game-tower.
+    shots: [{ name: "excalibur-preview", wait: 1500, drawSettle: true }],
   },
   {
     id: "preview-rooms",
