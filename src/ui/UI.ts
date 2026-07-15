@@ -22,6 +22,20 @@ import { buildPalette } from "./uiPalette";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
+/** Id stamped on the shared modal's title-TEXT span so `#modal` can point
+ *  `aria-labelledby` at it (see {@link UI.finishModal}). It lives on a span
+ *  that wraps only the title text, nested one level inside `h2.win-title`,
+ *  never on the h2 itself: the h2 also holds the ✕ close button as a sibling
+ *  of that span, and if `aria-labelledby` referenced the h2 the dialog's
+ *  computed accessible name would run the title together with the ✕'s own
+ *  accessible name ("Close"). The dialog's DOM is fully replaced on every open
+ *  ({@link UI.openModalTemplate} resets `dialog.innerHTML`, and only one
+ *  modal is ever live at a time, guarded by {@link UI.isModalOpen}), so
+ *  successive modal titles never collide on this one constant id. DOM id
+ *  uniqueness is document-wide, and no other element in the app uses this id,
+ *  so reusing the same constant on every open is collision-free. */
+const MODAL_TITLE_ID = "verticopolis-modal-title";
+
 export interface UICallbacks {
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
@@ -235,17 +249,41 @@ export class UI {
 
   /** The shared window grammar {@link openModalTemplate} finishes with: skin the
    *  top-level h2 as the title bar (`:scope > h2` so a nested h2 is never
-   *  skinned), show the dialog,
-   *  then append the win-style ✕. The ✕ routes through the dialog's cancel path
-   *  (same as Esc) rather than closeModal() directly, so modals that override
-   *  oncancel to resolve a pending choice still resolve. It is appended AFTER
-   *  showModal() so it is not the first focusable element (keyboard users land on
-   *  the primary action, not the ✕). Backdrop click and Esc/cancel close. */
+   *  skinned), wrap its title text alone in a span carrying the shared
+   *  {@link MODAL_TITLE_ID} and point the dialog's `aria-labelledby` at that SPAN
+   *  (never at the h2 itself, since the h2 also ends up holding the ✕ below;
+   *  labeling the h2 would fold the ✕'s own accessible name, "Close", into the
+   *  announced title), show the dialog, then append the win-style ✕ into the h2
+   *  as a sibling of the span so it stays excluded from the accessible name.
+   *  Cleared when a modal renders no top-level h2, so the reference is never
+   *  left dangling. The ✕ routes through the dialog's cancel path (same as Esc)
+   *  rather than closeModal() directly, so modals that override oncancel to
+   *  resolve a pending choice still resolve. It is appended AFTER showModal() so
+   *  it is not the first focusable element (keyboard users land on the primary
+   *  action, not the ✕). Backdrop click and Esc/cancel close. */
   private finishModal(dialog: HTMLDialogElement, box: HTMLElement): HTMLElement {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
-    if (!dialog.open) dialog.showModal();
     if (h2) {
+      // Move the title CONTENTS into their own span and label the dialog at
+      // THAT span, not the h2 (see MODAL_TITLE_ID); a caller-supplied h2.id is
+      // never touched. Idempotent: reuse an existing span rather than nesting
+      // a new one, and never sweep the ✕ (.modal-x) into it, so a repeat call
+      // can't nest spans or fold "Close" into the accessible name.
+      let titleSpan = h2.querySelector<HTMLSpanElement>(`#${MODAL_TITLE_ID}`);
+      if (!titleSpan) {
+        titleSpan = document.createElement("span");
+        titleSpan.id = MODAL_TITLE_ID;
+        const close = h2.querySelector(".modal-x");
+        while (h2.firstChild && h2.firstChild !== close) titleSpan.appendChild(h2.firstChild);
+        h2.appendChild(titleSpan);
+      }
+      dialog.setAttribute("aria-labelledby", titleSpan.id);
+    } else {
+      dialog.removeAttribute("aria-labelledby");
+    }
+    if (!dialog.open) dialog.showModal();
+    if (h2 && !h2.querySelector(".modal-x")) {
       h2.appendChild(
         this.titleBarClose("modal-x btn xs", () => dialog.dispatchEvent(new Event("cancel", { cancelable: true }))),
       );
@@ -261,6 +299,10 @@ export class UI {
     const dialog = this.el.modal as HTMLDialogElement;
     if (dialog.open) dialog.close();
     dialog.innerHTML = "";
+    // The title h2 goes with the wiped content; drop the reference to it too,
+    // so aria-labelledby never dangles at a stale/missing id while the dialog
+    // is closed (finishModal re-sets it fresh on the next open).
+    dialog.removeAttribute("aria-labelledby");
   }
 
   /** Bind click handlers to a dialog's [data-act] buttons. Every lookup is loud
