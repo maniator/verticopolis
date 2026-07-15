@@ -58,7 +58,11 @@ export function applyCrowdCull(engine: TowerEngine): boolean {
 
 /** Re-assert the cull after a structural rebuild: {@link syncMotion} recreates
  *  car/walker/vehicle actors visible, so a rebuild while zoomed out must hide
- *  the fresh layer before it can flash for a frame. */
+ *  the fresh layer before it can flash for a frame. Runs the hysteresis step
+ *  itself (not just the latch) so a rebuild that lands before the first
+ *  per-frame pass, e.g. on boot with the camera already zoomed out, still
+ *  hides the fresh actors; the explicit hide covers the already-latched case
+ *  the step's flip branch does not touch. */
 export function reassertCrowdCull(engine: TowerEngine): void {
-  if (engine.crowdCulled) setCrowdLayerVisible(engine, false);
+  if (applyCrowdCull(engine)) setCrowdLayerVisible(engine, false);
 }
