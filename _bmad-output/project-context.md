@@ -124,6 +124,14 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
   `defer` finding in `_bmad-output/implementation-artifacts/backlog.md`. A change
   isn't done until confirmed findings are fixed and re-verified on the branch. Resolve
   Copilot/Codex PR threads.
+- **Backlog rows mirror to GitHub issues (standing rule, 2026-07-15).** Every
+  unresolved curated row in `_bmad-output/implementation-artifacts/backlog.md`
+  carries its issue number in the `GH` column. Create the matching issue when a
+  row lands (template title prefix, `[P1]`-`[P3]` tag in the title, row notes as
+  the body) and close it when the row finishes. The full rule lives in the
+  backlog's "How items flow" section; `src/tests/backlogIssueMirror.test.ts`
+  enforces the row half of the invariant (row shape, status vocabulary, refs
+  present on unresolved rows, cleared on finished rows, and unique).
 - Screenshots regenerate via **`npm run screenshots:docker`** (host Chromium is broken); the
   demo/camera reads the live `GRID.width`.
 
