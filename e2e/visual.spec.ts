@@ -128,7 +128,6 @@ test.describe("dialog chrome", () => {
 });
 
 test.describe("tower scene (region-composition tripwire)", () => {
-  /* eslint-disable @typescript-eslint/no-explicit-any */
   test.use({ viewport: { width: 1280, height: 800 } });
 
   // Full-canvas shots of a real composed tower, the coverage the gallery (one
@@ -149,21 +148,33 @@ test.describe("tower scene (region-composition tripwire)", () => {
       const g = (window as any).game;
       // Freeze every nondeterministic pixel input: buildToStar already holds
       // speed 0; reduced motion pins the decorative clock (walkers, clouds,
-      // crane) at a fixed phase, and the cosmetic weather is forced clear so
-      // the baseline does not depend on which day the fixture lands on.
+      // crane), reset to phase zero so the frozen pose is identical across
+      // runs, and the cosmetic weather is forced clear so the baseline does
+      // not depend on which day the fixture lands on.
       g.engine.setReducedMotion(true);
+      g.engine.resetDecorativeClock();
       g.sim.weather = "clear";
     });
   });
 
-  /** Pin the clock to an hour, then let the deferred hour reconcile drain
-   *  (towerSyncSchedule: the repaint lands a couple of frames after the warp). */
+  /** Pin the clock to an hour, wait for the deferred hour reconcile to adopt
+   *  it (towerSyncSchedule bookkeeping, no fixed sleeps), then sweep the DOM
+   *  chrome that overlays the canvas rect: the star-4 build pops toasts that
+   *  self-remove on timers mid-capture, which defeats the screenshot
+   *  stability loop (the exact failure the first mint hit). */
   const settleAt = async (page: any, hour: number) => {
     await page.evaluate((h: number) => {
       const g = (window as any).game;
       g.sim.clock.minutes = g.sim.clock.day * 24 * 60 + h * 60;
     }, hour);
-    await page.waitForTimeout(500);
+    await page.waitForFunction((h: number) => {
+      const e = (window as any).game.engine;
+      return e.lastSyncHour === h && !e.hourSyncPending;
+    }, hour);
+    await page.evaluate(() => {
+      document.getElementById("toast-wrap")?.replaceChildren();
+      document.getElementById("hint")?.remove();
+    });
   };
 
   test("full tower at minimum zoom, day, matches baseline", async ({ page }) => {
@@ -172,8 +183,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
       const g = (window as any).game;
       g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001); // clamps to MIN_ZOOM
     });
-    await page.waitForTimeout(300);
-    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-day.png");
+    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-day.png", { timeout: 30_000 });
   });
 
   test("full tower at minimum zoom, night, matches baseline", async ({ page }) => {
@@ -182,21 +192,18 @@ test.describe("tower scene (region-composition tripwire)", () => {
       const g = (window as any).game;
       g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001);
     });
-    await page.waitForTimeout(300);
-    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-night.png");
+    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-night.png", { timeout: 30_000 });
   });
 
   test("office floors close up, day, matches baseline", async ({ page }) => {
     await settleAt(page, 10);
     await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
-    await page.waitForTimeout(300);
-    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-day.png");
+    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-day.png", { timeout: 30_000 });
   });
 
   test("office floors close up, night, matches baseline", async ({ page }) => {
     await settleAt(page, 20);
     await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
-    await page.waitForTimeout(300);
-    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-night.png");
+    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-night.png", { timeout: 30_000 });
   });
 });
