@@ -6,12 +6,14 @@ import type { Person } from "./person";
 import type { FacilityKind } from "../types";
 
 /**
- * The read-only elevator queue + car-fill projection (E6 engine seam). It is a
- * VIEW of already-tracked crowd state: per shaft landing the waiter count and a
- * bounded wait-tier, and per car the boarded count read from the drawn
- * `crowd.carRiders` occupancy. The projection itself does no boarding or
- * capacity math. These tests pin what it surfaces (waiter order and count, wait
- * tier, staff-only shafts, express skip floors, and the (step, revision) memo).
+ * The read-only elevator queue + per-car occupancy projection (E6 engine
+ * seam). It is a VIEW of already-tracked crowd state: per shaft landing the
+ * waiter count and a bounded wait-tier, and per car the boarded count read
+ * from the drawn `crowd.carRiders` occupancy. `boarded` is a derived per-car
+ * occupancy view used only by these tests today (no in-repo render consumer
+ * yet). The projection itself does no boarding or capacity math. These tests
+ * pin what it surfaces (waiter order and count, wait tier, staff-only shafts,
+ * express skip floors, and the (step, revision) memo).
  * The reconciliation itself (`boarded = min(queue, remaining capacity)` and the
  * leftover being the same individuals) is a property of the crowd step, driven
  * here through `crowd.advance(...)`: both halves count ONE population, the drawn

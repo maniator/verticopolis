@@ -182,10 +182,12 @@ export function elevatorCalls(crowd: Crowd, tower: Tower): ElevatorCalls {
 }
 
 /**
- * Read-only elevator queue + car-fill projection for the render layer, a
- * sibling to {@link elevatorCalls}. Where `elevatorCalls` feeds the dispatch,
- * this feeds the queue and cab-fill visuals: per shaft landing the waiter count
- * and a bounded wait-tier, and per car the boarded count.
+ * Read-only elevator queue + per-car occupancy projection for the render
+ * layer, a sibling to {@link elevatorCalls}. Where `elevatorCalls` feeds the
+ * dispatch, this derives, per shaft landing, the waiter count and a bounded
+ * wait-tier, and per car the boarded count, reconciled with `landings` onto
+ * one drawn population. `boarded` has no in-repo render consumer yet (only
+ * tests read it today); wiring a render surface to it is a later story.
  *
  * It is a pure VIEW of state the crowd already tracks (the same `waiting` people
  * `elevatorCalls` counts, and each car's drawn occupancy `crowd.carRiders`), so

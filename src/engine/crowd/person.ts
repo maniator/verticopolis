@@ -157,14 +157,14 @@ export interface QueueLanding {
 }
 
 /**
- * Read-only projection of the waiting crowd and car fill, sized for the render
- * layer (see `elevatorQueueView`). A VIEW of state the crowd already tracks (the
- * same `waiting` people {@link ElevatorCalls} counts, and each car's drawn
- * occupancy `crowd.carRiders`), so it re-simulates nothing: it surfaces
- * boarding, it does not perform it. Both halves count ONE population, the drawn
- * crowd, so a waiter boarding moves the same figure from a landing into a car.
- * {@link Crowd.queueView} memoizes it once per outer sim step, so a render frame
- * reads it without re-scanning the crowd.
+ * Read-only projection of the waiting crowd and per-car occupancy, sized for
+ * the render layer (see `elevatorQueueView`). A VIEW of state the crowd
+ * already tracks (the same `waiting` people {@link ElevatorCalls} counts, and
+ * each car's drawn occupancy `crowd.carRiders`), so it re-simulates nothing:
+ * it surfaces boarding, it does not perform it. Both halves count ONE
+ * population, the drawn crowd, so a waiter boarding moves the same figure
+ * from a landing into a car. {@link Crowd.queueView} memoizes it once per
+ * outer sim step, so a render frame reads it without re-scanning the crowd.
  */
 export interface ElevatorQueueView {
   /** Landing queues: shaftId → floor → count and wait-tier. The waiters' stable
