@@ -314,11 +314,11 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       // venue stay entered below) is never culled mid-stay.
       if (walkTo(p, p.destX, dt)) {
         p.linger += dt;
-        // A person with a dwell (a metro commuter waiting for their train)
-        // holds the arrived pose past the default beat; venue round-trippers
-        // never carry `dwell` (their stationary stay is the eating-state
-        // dwell below), so the two mechanisms cannot stack.
-        if (p.linger > (p.dwell ?? 2)) {
+        // A person with `lingerFor` (a metro commuter waiting for their
+        // train) holds the arrived pose past the default beat; venue
+        // round-trippers never carry it (their stationary stay is the
+        // `dwelling` state below), so the two mechanisms cannot stack.
+        if (p.linger > (p.lingerFor ?? 2)) {
           // Round-tripper (meal or attendance visit): outbound arrival
           // transitions to the stationary dwell (beginDwell registers the
           // person at their venue and sets the kind's dwell timer), then a

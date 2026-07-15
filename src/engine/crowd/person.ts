@@ -93,12 +93,12 @@ export interface Person {
    *  a round-tripper has (outbound arrival triggers the dwell; return arrival
    *  triggers the outForMeal decrement + despawn). */
   returning?: boolean;
-  /** Extended stay (crowd-seconds) at the destination before the arrival
-   *  linger completes: a metro commuter waiting on the platform for their
-   *  train. Unset for ordinary trips, which keep the default 2-second linger
-   *  (venue visitors hold their stay in the eating-state dwell instead).
-   *  In-memory only, like every Person field. */
-  dwell?: number;
+  /** Extended arrival linger (crowd-seconds): how long to hold the arrived
+   *  pose before despawning. A metro commuter waiting on the platform for
+   *  their train. Unset for ordinary trips, which keep the default 2-second
+   *  linger; distinct from the venue round-trippers' `dwelling` state and
+   *  its `dwellSecondsLeft`. In-memory only, like every Person field. */
+  lingerFor?: number;
 }
 
 /** A transport route as a list of floors and the shaft used between each. */

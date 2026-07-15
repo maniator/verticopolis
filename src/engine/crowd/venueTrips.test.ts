@@ -10,7 +10,7 @@ import { spawnFloors, spawnTrips } from "./spawn";
 /**
  * Routed metro commuters: the station as a second street door. Arrivals step
  * off the train onto the platform and ride up; departures ride down and wait
- * at the platform edge on a `dwell`. Gated on an operational metro, so a
+ * at the platform edge on a `lingerFor` hold. Gated on an operational metro, so a
  * tower without one pushes the exact spawn options it always did (the golden
  * master's fixture has none and stays byte-stable). Party hall, cinema, and
  * wedding attendance are covered by the visits flow and its own tests.
@@ -113,8 +113,8 @@ describe("metro commuter trips", () => {
     for (const p of departures) {
       expect(p.destX).toBeGreaterThanOrEqual(station.x + 2);
       expect(p.destX).toBeLessThanOrEqual(station.x + station.width - 3);
-      expect(p.dwell).toBeGreaterThanOrEqual(METRO_DWELL_MIN);
-      expect(p.dwell).toBeLessThanOrEqual(METRO_DWELL_MAX);
+      expect(p.lingerFor).toBeGreaterThanOrEqual(METRO_DWELL_MIN);
+      expect(p.lingerFor).toBeLessThanOrEqual(METRO_DWELL_MAX);
     }
   });
 
@@ -128,9 +128,9 @@ describe("metro commuter trips", () => {
   });
 });
 
-describe("the dwell timer", () => {
+describe("the lingerFor hold", () => {
   /** A person already standing at their destination spot. */
-  function arrived(dwell?: number): Person {
+  function arrived(lingerFor?: number): Person {
     return {
       id: 1,
       seed: 1,
@@ -147,11 +147,11 @@ describe("the dwell timer", () => {
       wait: 0,
       age: 0,
       linger: 0,
-      dwell,
+      lingerFor,
     };
   }
 
-  it("holds a dwelling commuter in place, then releases them", () => {
+  it("holds a waiting commuter in place, then releases them", () => {
     const tower = baseTower();
     const crowd = new Crowd(3);
     crowd.people.push(arrived(10));
@@ -170,9 +170,12 @@ describe("the dwell timer", () => {
     expect(crowd.people).toHaveLength(0);
   });
 
-  it("a long dwell outlives the give-up valve (the arrived state is exempt)", () => {
+  it("a long lingerFor outlives the give-up valve (the arrived state is exempt)", () => {
     // The valve culls travellers past GIVE_UP (120s) but exempts `toDest`;
-    // pin that so a party guest's stay can never be culled mid-event.
+    // pin that exemption for platform waiters (real metro holds top out at
+    // METRO_DWELL_MAX; the 200s here just proves the ceiling is the hold,
+    // not the valve). Venue guests are covered separately: their stay is the
+    // `dwelling` state, which the valve also exempts.
     const tower = baseTower();
     const crowd = new Crowd(3);
     crowd.people.push(arrived(200));

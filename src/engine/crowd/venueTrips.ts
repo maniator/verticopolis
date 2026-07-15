@@ -16,12 +16,15 @@ import { add } from "./trips";
 
 /** A uniformly random tile inside the unit footprint, `inset` tiles off each
  *  edge. Unit widths come from the catalog in a live game, but saves persist
- *  widths verbatim, so the upper bound is clamped rather than trusted (a
- *  hand-edited narrow unit degrades to standing at the left inset instead of
- *  stamping x outside the footprint). */
+ *  widths verbatim, so BOTH bounds are clamped rather than trusted: `lo` can
+ *  never pass the unit's rightmost tile, and `hi` can never fall below `lo`,
+ *  so a hand-edited unit narrower than the insets collapses the range onto
+ *  its rightmost tile and the result always stays within
+ *  `[u.x, u.x + u.width - 1]`. */
 function insideX(crowd: Crowd, u: Unit, inset: number): number {
-  const lo = u.x + inset;
-  return crowd.rng.int(lo, Math.max(lo, u.x + u.width - inset - 1));
+  const lo = Math.min(u.x + inset, u.x + u.width - 1);
+  const hi = Math.max(lo, u.x + u.width - inset - 1);
+  return crowd.rng.int(lo, hi);
 }
 
 /** One commuter stepping OFF the train: spawns mid-platform (the station's
@@ -38,10 +41,10 @@ export function metroArrival(crowd: Crowd, tower: Tower, station: Unit, to: numb
 
 /** One commuter heading OUT by train: routes down to the platform, strolls to
  *  a spot inside the station footprint, and waits there until their train
- *  takes them (the dwell expiry stands in for boarding). */
+ *  takes them (the lingerFor expiry stands in for boarding). */
 export function metroDeparture(crowd: Crowd, tower: Tower, station: Unit, from: number): void {
   const p = add(crowd, tower, from, station.floor + 1);
   if (!p) return;
   p.destX = insideX(crowd, station, 2);
-  p.dwell = crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX);
+  p.lingerFor = crowd.rng.int(METRO_DWELL_MIN, METRO_DWELL_MAX);
 }

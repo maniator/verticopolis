@@ -105,8 +105,11 @@ export function buildCanonTower(): void {
   // serves the metro platform (B4, floor -3) through the lobby up to the
   // 15F sky lobby, and can only be placed once the basement floors exist
   // (review Edge #1: the earlier placement was silently rejected, orphaning
-  // the platform AND floors 3-14).
-  s.tower.placeTransport("elevatorStandard", left + 2, -3, 15);
+  // the platform AND floors 3-14). Hard-assert the result: this call is
+  // order-sensitive and load-bearing for the metro scene, so a regression
+  // must fail the capture loudly, not ship an empty platform.
+  const platformBank = s.tower.placeTransport("elevatorStandard", left + 2, -3, 15);
+  if (!platformBank.ok) throw new Error(`hero platform bank failed: ${platformBank.reason}`);
   s.tower.place("parkingRamp", -1, left);
   for (let x = left + 16; x + 1 <= right; ) {
     const r = s.tower.place("parking", -1, x);
