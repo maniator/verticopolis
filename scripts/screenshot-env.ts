@@ -18,10 +18,12 @@ export const ROOT = resolve(__dirname, "..");
 // docs/screenshots tree; SHOTS_DIR relocates the whole set (features/milestones
 // stay relative to it) so two renders can run CONCURRENTLY into separate roots
 // without clobbering each other's PNGs. The determinism guard (screenshot-
-// capture.yml) uses this to render its two independent legs in parallel: leg a
-// into <root-a>/docs/screenshots, leg b into <root-b>/docs/screenshots, then
-// byte-diffs the two trees.
-const SHOTS_DIR = process.env.SHOTS_DIR ? resolve(process.env.SHOTS_DIR) : resolve(ROOT, "docs/screenshots");
+// determinism-check.ts) uses this to render its two independent legs in parallel:
+// leg a into <root-a>/docs/screenshots, leg b into <root-b>/docs/screenshots,
+// then byte-diffs the two trees. A relative SHOTS_DIR resolves against ROOT (not
+// process.cwd()), matching the default above, so the override is stable no matter
+// where the script is launched from; an absolute value is used as-is.
+const SHOTS_DIR = process.env.SHOTS_DIR ? resolve(ROOT, process.env.SHOTS_DIR) : resolve(ROOT, "docs/screenshots");
 export const DIRS = {
   screenshots: SHOTS_DIR,
   features: resolve(SHOTS_DIR, "features"),

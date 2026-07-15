@@ -136,8 +136,8 @@ jobs:
       contents: read
     container:
       image: ${{ needs.resolve-image.outputs.image }}
-    # Inside a container the default shell is `sh` (dash); the render step uses
-    # bash features (functions, process substitution, `read -d ''`), so pin bash.
+    # Inside a container the default shell is `sh` (dash); the staging step uses
+    # bash-isms, so pin bash. (The determinism check itself is a Node script.)
     defaults:
       run:
         shell: bash
@@ -166,20 +166,17 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      # Render the shard TWICE, each leg from its OWN build + fresh preview server,
-      # and prove the two renders are byte-identical. Independent builds are what let
-      # the diff catch build-time / startup nondeterminism, not just render-time
+      # Render the shard TWICE from two independent builds and byte-compare the
+      # renders (the whole determinism guard). The logic lives in a standalone
+      # script (scripts/screenshot-determinism-check.ts) so a person or an agent can
+      # run the exact same check locally, not only in CI. Independent builds are what
+      # let the diff catch build-time / startup nondeterminism, not just render-time
       # leaks (see the header). The two legs run CONCURRENTLY (both build+render at
-      # once) rather than one-after-the-other, so wall-clock is ~1x a leg's
-      # build+render instead of ~2x, WITHOUT sharing a build (a shared build rendered
-      # twice would hide the build-time class this guard exists to catch). Each leg is
-      # fully isolated: its own build outDir, its own preview port (--strictPort makes
-      # a genuine clash fail loudly), and its own SHOTS_DIR output root, so nothing
-      # the two legs touch collides. Each leg renders into a FRESH empty root, so the
-      # root IS exactly that leg's output (no `find -newer` marker needed). SHARD comes
-      # in via an env var (not `${{ }}` in the script) so a shard name can never break
-      # out.
-      - name: Render this shard twice from independent builds in parallel and prove it is deterministic
+      # once), so wall-clock is about one leg's build+render rather than two, WITHOUT
+      # sharing a build (a shared build rendered twice would hide the build-time class
+      # this guard exists to catch). This step only supplies the pinned browser and
+      # stages the verified run-a set to upload; the script does the rest.
+      - name: Render this shard twice in parallel and prove it is deterministic
         env:
           SHARD: ${{ matrix.shard }}
         run: |
@@ -193,82 +190,11 @@ jobs:
             exit 1
           fi
           export PW_CHROME
-          ONLY="$(node scripts/screenshot-shards.ts print "$SHARD")"
-          export ONLY
-          echo "shard '$SHARD' renders: $ONLY"
-          # Reap a leg's preview server. `kill $!` alone is not enough: `npx vite
-          # preview` leaves the actual node server as a process the recorded pid does
-          # not reliably reap, so a plain kill can orphan it for the rest of the job.
-          # A leg-scoped `pkill` keyed on this leg's UNIQUE build outDir finishes the
-          # job and is safe under the two parallel legs: leg a's `/tmp/dist-a` pattern
-          # can never match leg b's `/tmp/dist-b` server.
-          stop_server() {
-            local pid="$1" outdir="$2"
-            kill "$pid" 2>/dev/null || true
-            pkill -f "vite preview --outDir $outdir " 2>/dev/null || true
-            wait "$pid" 2>/dev/null || true
-          }
-          render_leg() {
-            # $1 = output root (ends up holding docs/screenshots/...), $2 = preview
-            # port, $3 = build outDir. Clean build into THIS leg's own outDir, start
-            # `vite preview` on THIS leg's own port serving that outDir, wait for
-            # readiness, then render against it (RUN_SERVER unset, so the generator
-            # uses the external server at BASE_URL) with SHOTS_DIR pointed at this
-            # leg's fresh root, so the whole root is exactly this leg's output. Every
-            # piece of state (outDir, port, SHOTS_DIR) is per-leg, so two legs run at
-            # once without colliding. Returns non-zero on any failure so the caller can
-            # fail the shard.
-            local dest="$1" port="$2" outdir="$3"
-            rm -rf "$dest" "$outdir"; mkdir -p "$dest"
-            npm run build -- --outDir "$outdir" || return 1
-            npx vite preview --outDir "$outdir" --port "$port" --strictPort &
-            local server_pid=$!
-            if ! node -e 'const u="http://localhost:"+process.argv[1];(async()=>{for(let i=0;i<120;i++){try{const res=await fetch(u);if(res.ok)process.exit(0)}catch{}await new Promise(r=>setTimeout(r,500))}console.error("preview server did not come up (200) on "+u);process.exit(1)})()' "$port"; then
-              stop_server "$server_pid" "$outdir"
-              return 1
-            fi
-            # Capture the render's exit WITHOUT letting errexit (GitHub runs bash
-            # with -eo pipefail) abort the subshell first: a bare failing command
-            # would exit the backgrounded leg immediately and skip the teardown
-            # below, orphaning this leg's preview server for the rest of the job.
-            # The `|| rc=$?` guard keeps the exit code and guarantees the teardown
-            # still runs.
-            local rc=0
-            SHOTS_DIR="$dest/docs/screenshots" BASE_URL="http://localhost:$port" node scripts/screenshots.ts || rc=$?
-            stop_server "$server_pid" "$outdir"
-            return "$rc"
-          }
-          # Fire both legs at once and stream their output LIVE, each line tagged
-          # [a]/[b] (the way `concurrently` prefixes commands) so the two overlapping
-          # builds+renders stay readable as they happen instead of being buffered and
-          # dumped only at the end. Each leg is a backgrounded pipeline
-          # `render_leg ... | awk-tagger`; `awk` with fflush() line-buffers so lines
-          # appear in real time, and waiting on the pipeline's awk TAIL drains all of
-          # a leg's output before we move on, so nothing prints out of order after the
-          # diff below. render_leg's real exit code cannot travel back through the
-          # pipe, so each leg records it in /tmp/rc-<leg>: an `if` captures it without
-          # letting errexit abort the leg first, and only that rc echo is redirected
-          # to the file, so render_leg's own stdout still streams to the tagger.
-          # Distinct ports (4173/4174), outDirs (/tmp/dist-a|b), and output roots
-          # (/tmp/run-a|b) keep the two legs isolated.
-          { if render_leg /tmp/run-a 4173 /tmp/dist-a; then echo 0 >/tmp/rc-a; else echo $? >/tmp/rc-a; fi; } 2>&1 \
-            | awk '{ print "[a] " $0; fflush() }' &
-          pid_a=$!
-          { if render_leg /tmp/run-b 4174 /tmp/dist-b; then echo 0 >/tmp/rc-b; else echo $? >/tmp/rc-b; fi; } 2>&1 \
-            | awk '{ print "[b] " $0; fflush() }' &
-          pid_b=$!
-          wait "$pid_a" || true
-          wait "$pid_b" || true
-          rc_a=$(cat /tmp/rc-a); rc_b=$(cat /tmp/rc-b)
-          if [ "$rc_a" -ne 0 ] || [ "$rc_b" -ne 0 ]; then
-            echo "::error::screenshot shard '$SHARD' failed to render (leg a exit=$rc_a, leg b exit=$rc_b); see the [a]/[b] output above."
-            exit 1
-          fi
-          if ! diff -rq /tmp/run-a /tmp/run-b; then
-            echo "::error::screenshot shard '$SHARD' is nondeterministic: two independent builds+renders in the same pinned image produced different pixels. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update."
-            exit 1
-          fi
-          echo "shard '$SHARD' is deterministic ($(find /tmp/run-a -type f -name '*.png' | wc -l) shot(s))."
+          # Render each leg into its own fresh root and byte-diff them. SHARD is passed
+          # as an argument (not interpolated into a script body), so a shard name can
+          # never break out. The script exits non-zero on any render failure or on
+          # nondeterminism, which fails this step.
+          node scripts/screenshot-determinism-check.ts "$SHARD"
           # Stage the verified run-a set for upload. The .shard-complete marker is
           # the authoritative "this shard finished" signal (the consumers count it),
           # so a shard that legitimately renders nothing still uploads a marker and
