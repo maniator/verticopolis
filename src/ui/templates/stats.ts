@@ -235,7 +235,7 @@ export function nextStarSection(sim: Simulation): TemplateResult | typeof nothin
     ),
   ];
   const head = html`<div class="stats-section win-title sm">Next: ${goal}${
-    req.allMet ? html`<span style="color:var(--good)"> · ready</span>` : nothing
+    req.allMet ? html`<span class="nsr-ready"> · ready</span>` : nothing
   }</div>`;
   const half = Math.ceil(rows.length / 2);
   const col = (items: TemplateResult[]) => html`<div class="col nsr kv">${items}</div>`;

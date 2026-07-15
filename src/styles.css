@@ -1010,6 +1010,10 @@ dialog.crash-card::backdrop {
 .stats-grid .col.nsr .v.ms-done {
   color: var(--good);
 }
+/* The "· ready" flag in the Next-star section header (all gates met). */
+.stats-section .nsr-ready {
+  color: var(--good);
+}
 .stats-section .evalbar {
   margin-left: auto;
   width: 84px;

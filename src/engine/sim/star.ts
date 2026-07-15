@@ -135,14 +135,18 @@ export interface NextStarProgress {
   allMet: boolean;
 }
 
-/** The cumulative facility gates that reaching star `rung` (3..5) requires, in
- *  ladder order. evaluateStar re-checks these every tick and the star never
+/** The cumulative facility gates required to reach star `rung`, in ladder order:
+ *  Security from 3★; the amenity set (Medical, Recycling demand met, two-plus
+ *  Suites, favorable VIP) from 4★; Metro from 5★. Total over `number`: it
+ *  returns an empty list below 3★ (population-only rungs) and treats any rung
+ *  above 5 like 5★, so callers cannot pass an out-of-range value into a
+ *  half-defined state. evaluateStar re-checks these each hour and the star never
  *  falls, so reaching rung N needs every gate for rungs 3..N, not just rung N's
  *  own. Shared by {@link evaluateStar} (to cap promotion) and
  *  {@link nextStarRequirements} (to show the checklist) so the two cannot drift.
- *  The TOWER rung is NOT covered here: `checkVip` in events.ts gates it on the
- *  Wedding Hall, the metro, and population instead. A facility counts only once
- *  operational (not under construction, not on fire). */
+ *  The TOWER rung is gated separately by `checkVip` in events.ts (Wedding Hall,
+ *  metro, population), not here. A facility counts only once operational (not
+ *  under construction, not on fire). */
 export function cumulativeStarGates(sim: Simulation, rung: number): StarRequirement[] {
   const gates: StarRequirement[] = [];
   if (rung >= 3) {
