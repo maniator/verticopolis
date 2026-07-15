@@ -126,3 +126,77 @@ test.describe("dialog chrome", () => {
     await expect(page.locator("#speed")).toHaveScreenshot("update-chip.png");
   });
 });
+
+test.describe("tower scene (region-composition tripwire)", () => {
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  test.use({ viewport: { width: 1280, height: 800 } });
+
+  // Full-canvas shots of a real composed tower, the coverage the gallery (one
+  // unit per kind, in isolation) cannot give: cross-room composition, the
+  // structure TileMap, entrances, facade, basements. The CAP-2 region story
+  // redraws every one of these pixels through region canvases, so these
+  // baselines are what "byte-identical" is checked against; without them the
+  // constraint was nearly vacuous (a seam or layering bug between rooms is
+  // invisible to single-unit shots). Day and night both: the night sparkle is
+  // per-room-unique and exercises the lit path the rushes run in.
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await page.waitForFunction(() => Boolean((window as any).game));
+    await page.evaluate(() => document.getElementById("splash")?.remove());
+    const star = await page.evaluate(buildToStar, 4);
+    expect(star).toBe(4);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      // Freeze every nondeterministic pixel input: buildToStar already holds
+      // speed 0; reduced motion pins the decorative clock (walkers, clouds,
+      // crane) at a fixed phase, and the cosmetic weather is forced clear so
+      // the baseline does not depend on which day the fixture lands on.
+      g.engine.setReducedMotion(true);
+      g.sim.weather = "clear";
+    });
+  });
+
+  /** Pin the clock to an hour, then let the deferred hour reconcile drain
+   *  (towerSyncSchedule: the repaint lands a couple of frames after the warp). */
+  const settleAt = async (page: any, hour: number) => {
+    await page.evaluate((h: number) => {
+      const g = (window as any).game;
+      g.sim.clock.minutes = g.sim.clock.day * 24 * 60 + h * 60;
+    }, hour);
+    await page.waitForTimeout(500);
+  };
+
+  test("full tower at minimum zoom, day, matches baseline", async ({ page }) => {
+    await settleAt(page, 10);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001); // clamps to MIN_ZOOM
+    });
+    await page.waitForTimeout(300);
+    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-day.png");
+  });
+
+  test("full tower at minimum zoom, night, matches baseline", async ({ page }) => {
+    await settleAt(page, 20);
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001);
+    });
+    await page.waitForTimeout(300);
+    await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-night.png");
+  });
+
+  test("office floors close up, day, matches baseline", async ({ page }) => {
+    await settleAt(page, 10);
+    await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
+    await page.waitForTimeout(300);
+    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-day.png");
+  });
+
+  test("office floors close up, night, matches baseline", async ({ page }) => {
+    await settleAt(page, 20);
+    await page.evaluate(() => (window as any).game.engine.setCamera(60, 8, 1));
+    await page.waitForTimeout(300);
+    await expect(page.locator("#view")).toHaveScreenshot("scene-detail-night.png");
+  });
+});
