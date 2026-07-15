@@ -254,6 +254,16 @@ export class Simulation implements SimContext {
    *  transient (warms up after load, not serialized). */
   elevatorUtil = new Map<number, number>();
 
+  /** Lazy noise-adjacency memo by unit id, valid for exactly one
+   *  tower.revision (strict equality; -1 forces the first fill). Noise is a
+   *  pure function of layout and every layout mutation bumps revision, so a
+   *  hit is exact; unit STATE (fire, gut, occupancy) is deliberately not an
+   *  input, see the functionalParkingSet precedent in tower/routing.ts.
+   *  Transient like elevatorUtil: never serialized, and load/undo build a
+   *  fresh Simulation, so no stale memo can survive a restore. */
+  noiseMemo = new Map<number, boolean>();
+  noiseMemoRev = -1;
+
   sampleElevatorUtil(): void { congestion.sampleElevatorUtil(this); }
 
   elevatorUtilization(id: number): number | undefined { return congestion.elevatorUtilization(this, id); }
@@ -293,7 +303,7 @@ export class Simulation implements SimContext {
 
   emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void { satisfaction.emitNotices(this, notices); }
 
-  vacateCause(u: Unit, served: boolean, cong: number): VacateReason { return satisfaction.vacateCause(this, u, served, cong); }
+  vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean): VacateReason { return satisfaction.vacateCause(this, u, served, cong, farWalk, noisy); }
 
   nearestKindWithin( u: Unit, isSource: (kind: FacilityKind) => boolean, maxTiles: number, ): boolean { return satisfaction.nearestKindWithin(this, u, isSource, maxTiles); }
 
