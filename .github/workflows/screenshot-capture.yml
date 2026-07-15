@@ -238,21 +238,30 @@ jobs:
             stop_server "$server_pid" "$outdir"
             return "$rc"
           }
-          # Fire both legs at once, each logging to its own file (interleaved live
-          # output from two parallel builds+renders would be unreadable), then print
-          # both logs in full once they finish. Distinct ports (4173/4174), outDirs
-          # (/tmp/dist-a|b), and output roots (/tmp/run-a|b) keep the legs isolated.
-          render_leg /tmp/run-a 4173 /tmp/dist-a >/tmp/leg-a.log 2>&1 &
+          # Fire both legs at once and stream their output LIVE, each line tagged
+          # [a]/[b] (the way `concurrently` prefixes commands) so the two overlapping
+          # builds+renders stay readable as they happen instead of being buffered and
+          # dumped only at the end. Each leg is a backgrounded pipeline
+          # `render_leg ... | awk-tagger`; `awk` with fflush() line-buffers so lines
+          # appear in real time, and waiting on the pipeline's awk TAIL drains all of
+          # a leg's output before we move on, so nothing prints out of order after the
+          # diff below. render_leg's real exit code cannot travel back through the
+          # pipe, so each leg records it in /tmp/rc-<leg>: an `if` captures it without
+          # letting errexit abort the leg first, and only that rc echo is redirected
+          # to the file, so render_leg's own stdout still streams to the tagger.
+          # Distinct ports (4173/4174), outDirs (/tmp/dist-a|b), and output roots
+          # (/tmp/run-a|b) keep the two legs isolated.
+          { if render_leg /tmp/run-a 4173 /tmp/dist-a; then echo 0 >/tmp/rc-a; else echo $? >/tmp/rc-a; fi; } 2>&1 \
+            | awk '{ print "[a] " $0; fflush() }' &
           pid_a=$!
-          render_leg /tmp/run-b 4174 /tmp/dist-b >/tmp/leg-b.log 2>&1 &
+          { if render_leg /tmp/run-b 4174 /tmp/dist-b; then echo 0 >/tmp/rc-b; else echo $? >/tmp/rc-b; fi; } 2>&1 \
+            | awk '{ print "[b] " $0; fflush() }' &
           pid_b=$!
-          rc_a=0; rc_b=0
-          wait "$pid_a" || rc_a=$?
-          wait "$pid_b" || rc_b=$?
-          echo "::group::leg a (run-a) output"; cat /tmp/leg-a.log; echo "::endgroup::"
-          echo "::group::leg b (run-b) output"; cat /tmp/leg-b.log; echo "::endgroup::"
+          wait "$pid_a" || true
+          wait "$pid_b" || true
+          rc_a=$(cat /tmp/rc-a); rc_b=$(cat /tmp/rc-b)
           if [ "$rc_a" -ne 0 ] || [ "$rc_b" -ne 0 ]; then
-            echo "::error::screenshot shard '$SHARD' failed to render (leg a exit=$rc_a, leg b exit=$rc_b); see the per-leg logs above."
+            echo "::error::screenshot shard '$SHARD' failed to render (leg a exit=$rc_a, leg b exit=$rc_b); see the [a]/[b] output above."
             exit 1
           fi
           if ! diff -rq /tmp/run-a /tmp/run-b; then
