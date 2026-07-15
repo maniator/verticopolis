@@ -18,9 +18,9 @@ test("zoom cull hides the moving layer, restores it, and survives a rebuild", as
     // real elevator-car actors to hide and restore.
     if (!g.sim.tower.placeTransport("elevatorStandard", 186, 1, 3).ok) throw new Error("shaft placement failed");
     // The fixture freezes game speed, so no routed people ever spawn; seed a
-    // few walkers directly (the render reads only these fields) so the
-    // crowd-actor half of the cull is exercised for real, not over an empty
-    // map. Speed stays 0, so the sim never touches them.
+    // few directly into sim.crowd.people (the render reads only these fields)
+    // so the crowd-actor half of the cull is exercised for real, not over an
+    // empty map. Speed stays 0, so the sim never touches them.
     for (let i = 0; i < 3; i++) {
       g.sim.crowd.people.push({ id: 9000 + i, seed: i, staff: false, state: "walking", x: 180 + i * 4, fy: 2, wait: 0 });
     }

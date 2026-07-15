@@ -20,8 +20,9 @@ export const CROWD_CULL_ZOOM = 0.125;
  *  a pinch sweeping across the boundary never strobes the crowd. */
 export const CROWD_SHOW_ZOOM = 0.16;
 
-/** Pure hysteresis step for the crowd cull: hide below {@link CROWD_CULL_ZOOM},
- *  stay hidden until the zoom climbs past {@link CROWD_SHOW_ZOOM}. */
+/** Pure hysteresis step for the crowd cull: hide strictly below
+ *  {@link CROWD_CULL_ZOOM}, stay hidden until the zoom climbs back to
+ *  {@link CROWD_SHOW_ZOOM} or above (the re-show threshold is inclusive). */
 export function crowdCullNext(zoom: number, wasCulled: boolean): boolean {
   return wasCulled ? zoom < CROWD_SHOW_ZOOM : zoom < CROWD_CULL_ZOOM;
 }
