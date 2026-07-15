@@ -107,6 +107,15 @@ jobs:
             case "$f" in scripts/screenshot-*.ts) sign=+ ;; esac
             case "$f" in .github/workflows/pr-drift-check.yml) sign=+ ;; esac
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
+            # The pinned Playwright/browser + font versions come from the lockfile, and
+            # a bump there can shift antialiasing across the WHOLE committed gallery.
+            # That pixel source was historically left to the [update-screenshots] marker
+            # (this filter used to exclude the lockfile to avoid a capture on every
+            # dependency PR). With drift now a hard gate, treat it as render-affecting so
+            # a Playwright/font bump is caught and its screenshots refreshed in the PR
+            # rather than silently drifting main. The cost is a capture on lockfile PRs,
+            # which is the price of never missing a dependency-driven pixel change.
+            case "$f" in package-lock.json) sign=+ ;; esac
             if [ "$sign" = "+" ]; then render=true; break; fi
           done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
           echo "render=$render" >> "$GITHUB_OUTPUT"
@@ -360,8 +369,10 @@ jobs:
           # The commit's parent is HEAD_SHA. Push only as a fast-forward: if the tip
           # advanced during the approval wait, refuse rather than bury newer code
           # under stale pixels. Retry only transient (non-advance) push failures. The
-          # bot pushes with GITHUB_TOKEN, which does not re-trigger workflows;
-          # re-approve/re-run the PR's other checks on this commit as needed.
+          # bot pushes with GITHUB_TOKEN, which fires no workflow events on the new
+          # commit, so the required `drift-gate` does not re-run on the refreshed head
+          # automatically. A maintainer re-triggers CI on that new commit; the fresh
+          # run finds no drift and the gate goes green.
           for attempt in 1 2 3; do
             if git push origin "HEAD:${HEAD_REF}"; then exit 0; fi
             git fetch origin "${HEAD_REF}"
@@ -376,15 +387,17 @@ jobs:
           echo "could not push refreshed screenshots after retries" >&2
           exit 1
 
-  # THE required status check. It ALWAYS runs (if: always()), so it always reports
-  # a result and never hangs "pending" the way a path-filtered required check
-  # would. It reflects ONLY the hard determinism guard, never the drift approval
-  # gate:
+  # THE required status check. It runs on every non-cancelled outcome, so it always
+  # reports a result and never hangs "pending" the way a path-filtered required
+  # check would. It gates on TWO things: the hard determinism guard, then drift.
+  #
+  # Determinism gate:
   #   - changes-detection itself failed        -> RED (fail closed: we cannot tell
   #                                                whether a render change went
   #                                                unchecked, so do not pass it).
   #   - no render-affecting paths changed       -> green (nothing to check).
-  #   - capture ran and passed                  -> green.
+  #   - capture ran and passed                  -> determinism OK, fall through to
+  #                                                the drift gate below.
   #   - capture was skipped AND guard succeeded -> green. capture skips by design
   #     only for the [update-screenshots] marker backstop (guard detects the marker
   #     and update-screenshots.yml runs the same determinism capture on the push
@@ -394,12 +407,19 @@ jobs:
   #     closed instead.
   #   - anything else (capture failed: nondeterminism; or capture skipped because
   #     guard did not succeed)                  -> RED.
-  # Drift (freshly generated pixels differ from the committed gallery) is NOT a
-  # failure here: turning every legitimate UI change red is the boy-who-cried-wolf
-  # trap the whole design avoids, so drift stays the separate, human-approved
-  # commit-on-approval gate and never turns this required check red. Mark THIS job
-  # (`drift-gate`) as the required status check in branch protection, not `capture`
-  # or any path-gated job.
+  #
+  # Drift gate (same-repo PRs only): once determinism passes, a drifting committed
+  # gallery is RED. A merge can no longer land committed screenshots that a fresh
+  # deterministic render would change, so a scene removed/edited in a sibling PR (or
+  # a lockfile bump that shifts pixels) cannot leave the gallery stale on main. The
+  # author clears it by approving commit-on-approval for the run, which regenerates
+  # and commits the pinned-container pixels to the branch. Fork PRs are exempt
+  # (SAME_REPO false): a fork cannot run commit-on-approval (read-only token, no
+  # push to the fork from here), so blocking it on drift would strand it with no way
+  # to clear. We also fail closed if verify-drift did not succeed, so a broken
+  # detector cannot pass a possibly-stale gallery.
+  # Mark THIS job (`drift-gate`) as the required status check in branch protection,
+  # not `capture` or any path-gated job.
   # `if: !cancelled()` (not `always()`): it runs on every non-cancelled outcome
   # (success, failure, or skip) so it always reports on the LIVE run, but it is
   # itself skipped when the run is cancelled. That matters because a superseding
@@ -409,17 +429,21 @@ jobs:
   # on cancellation avoids the false red without ever leaving the live head without
   # a status.
   drift-gate:
-    needs: [changes, guard, capture]
+    needs: [changes, guard, capture, verify-drift]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions: {}
     steps:
-      - name: Report the determinism result
+      - name: Report the determinism and drift result
         env:
           CHANGES: ${{ needs.changes.result }}
           RENDER: ${{ needs.changes.outputs.render }}
           GUARD: ${{ needs.guard.result }}
           CAPTURE: ${{ needs.capture.result }}
+          VERIFY_DRIFT: ${{ needs.verify-drift.result }}
+          HAS_DRIFT: ${{ needs.verify-drift.outputs.has_drift }}
+          DRIFT_COUNT: ${{ needs.verify-drift.outputs.drift_count }}
+          SAME_REPO: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
         run: |
           if [ "$CHANGES" != "success" ]; then
             echo "::error::the changes-detection job did not succeed ($CHANGES); cannot tell whether render paths changed, so failing closed rather than passing a possibly-unchecked PR."
@@ -430,17 +454,39 @@ jobs:
             exit 0
           fi
           # Render paths changed, so the determinism capture was expected to run.
-          if [ "$CAPTURE" = "success" ]; then
-            echo "Screenshot determinism check passed. ✅"
-            exit 0
-          fi
           if [ "$CAPTURE" = "skipped" ] && [ "$GUARD" = "success" ]; then
             # Intentional skip: guard ran fine and detected an [update-screenshots]
             # marker, so update-screenshots.yml runs the same capture on the push
             # event. (A skip caused by guard failing is caught by the else below,
-            # because GUARD would not be "success".)
+            # because GUARD would not be "success".) No local gallery was rebuilt,
+            # so there is nothing to drift-check here; the marker workflow owns it.
             echo "Determinism capture intentionally skipped for an [update-screenshots] marker push; the marker workflow runs the same check. ✅"
             exit 0
           fi
-          echo "::error::the screenshot determinism guard did not pass (guard: $GUARD, capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
-          exit 1
+          if [ "$CAPTURE" != "success" ]; then
+            echo "::error::the screenshot determinism guard did not pass (guard: $GUARD, capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
+            exit 1
+          fi
+          echo "Screenshot determinism check passed. ✅"
+
+          # Second gate: drift. A same-repo PR must not leave the committed gallery
+          # stale. A fork PR is exempt (SAME_REPO false): it cannot run commit-on-
+          # approval to clear drift (read-only token, no push to the fork from here),
+          # so blocking it would strand it with no way to go green.
+          if [ "$SAME_REPO" != "true" ]; then
+            if [ "$HAS_DRIFT" = "true" ]; then
+              echo "Drift detected ($DRIFT_COUNT screenshot(s)) on a fork PR, which cannot clear it from here; not blocking. A maintainer refreshes the gallery via the marker workflow before merge. ✅"
+            fi
+            exit 0
+          fi
+          # Fail closed if the detector did not run cleanly, so a broken detector
+          # cannot pass a possibly-stale gallery.
+          if [ "$VERIFY_DRIFT" != "success" ]; then
+            echo "::error::the verify-drift job did not succeed ($VERIFY_DRIFT); cannot tell whether the committed gallery is stale, so failing closed."
+            exit 1
+          fi
+          if [ "$HAS_DRIFT" = "true" ]; then
+            echo "::error::the committed screenshots are stale: a fresh deterministic render changes $DRIFT_COUNT of them. Refresh the gallery by approving the commit-on-approval job for this run (Actions tab -> this run -> Review deployments -> approve screenshot-approval), which regenerates and commits the pinned-container pixels to this branch; the bot commits with GITHUB_TOKEN, so re-trigger CI on that new commit for this gate to re-evaluate the refreshed gallery and go green."
+            exit 1
+          fi
+          echo "No screenshot drift: the committed gallery matches a fresh deterministic generation. ✅"
