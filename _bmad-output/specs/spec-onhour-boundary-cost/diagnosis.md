@@ -40,7 +40,7 @@ synthetic fixture.
   Callers are exactly the hourly sweep and `vacateCause`: a cache harvests
   100% of it.
 - `isFloorServed`: 200ms measured, but the underlying set is ALREADY
-  revision-memoized (`servedFloors`, `tower/routing.ts`); the cost is a
+  revision-memoized (`servedFloors`, `src/engine/tower/routing.ts`); the cost is a
   4-deep delegation chain called once per unit per phase plus instrumentation
   overhead. Fix is call-site hoisting, not a new cache. The
   `ElevatorDispatch.accumulateWaiting` site runs every step, so hoisting
