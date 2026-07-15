@@ -271,6 +271,14 @@ describe("Events & amounts (FAQ Cluster B)", () => {
       sim.buildTransport("elevatorStandard", C, 1, 2);
       const r = sim.tower.place("fastFood", 2, 0);
       sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      // Occupied offices give the venue a demand pool to serve (income is
+      // demand-driven), so there is real income for rain to depress. Identical in
+      // both weather runs, so only the rain multiplier differs.
+      for (const x of [20, 32, 44]) {
+        const o = sim.tower.place("office", 2, x);
+        expect(o.ok, o.reason).toBe(true);
+        sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+      }
       sim.weather = weather; // stays fixed within the day (no day boundary crossed)
       const before = sim.money;
       for (let i = 0; i < 10; i++) sim.tick(60); // 07:00→17:00, fast food open

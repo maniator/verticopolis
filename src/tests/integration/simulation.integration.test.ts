@@ -1514,10 +1514,23 @@ describe("Commercial-venue inspector: patronage/profit accumulation, rollover, s
     return u;
   }
 
+  /** Occupied offices on the served floor 2 give a retail venue a demand pool to
+   *  serve (commercial income is demand-driven), clear of the venue at x0. */
+  function addOffices(sim: Simulation, x0: number): void {
+    for (const x of [x0 + 20, x0 + 30]) {
+      const r = sim.tower.place("office", 2, x);
+      expect(r.ok, r.reason).toBe(true);
+      const o = sim.tower.units.find((u) => u.id === r.unitId);
+      if (!o) throw new Error("office placement failed");
+      o.state = "occupied";
+    }
+  }
+
   it("accumulates today's patronage and profit on retail units through the trading hours", () => {
     const sim = builtTower(11);
     const x0 = Math.floor(GRID.width / 2) - 20;
     const shop = buildOne(sim, "shop", x0);
+    addOffices(sim, x0);
     // Advance a full day so the shop trades through its whole open window.
     for (let i = 0; i < 24; i++) sim.tick(60);
     // Note: onDay fires when the clock crosses midnight, resetting today into
@@ -1567,6 +1580,7 @@ describe("Commercial-venue inspector: patronage/profit accumulation, rollover, s
     const sim = builtTower(11);
     const x0 = Math.floor(GRID.width / 2) - 20;
     const shop = buildOne(sim, "shop", x0);
+    addOffices(sim, x0);
     // Sim starts at 07:00. Advance 8 hours -> 15:00, well inside the trading
     // window and before midnight, so today's slot is real and yesterday's is
     // still undefined (no rollover yet).

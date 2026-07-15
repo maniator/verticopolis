@@ -38,6 +38,19 @@ function unit(sim: Simulation, id: number | undefined) {
   return u;
 }
 
+/** Place `n` occupied offices on a reachable low floor so commercial venues have
+ *  a real demand pool to serve (commercial income is demand-driven now: a venue
+ *  in an empty tower earns nothing). Spread clear of the measured venue at x=40
+ *  and the shaft columns. Identical across compared runs, so the office pool
+ *  cancels and only the venue's own penalty (W3 distance, rain, ...) differs. */
+function addDemand(sim: Simulation, floor = 2, n = 4): void {
+  for (let i = 0; i < n; i++) {
+    const r = sim.tower.place("office", floor, 100 + i * 12);
+    expect(r.ok, r.reason).toBe(true);
+    unit(sim, r.unitId).state = "occupied";
+  }
+}
+
 describe("W1 — transport-too-far (79-tile walk penalty)", () => {
   it("erodes a served office beyond 79 tiles of a shaft while a near one stays happy", () => {
     const sim = Simulation.newGame(4);
@@ -237,6 +250,7 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
     const earn = (floor: number): number => {
       const sim = Simulation.newGame(11);
       servedTower(sim, 8, 3);
+      addDemand(sim);
       const ff = unit(sim, sim.tower.place("fastFood", floor, 40).unitId);
       ff.state = "occupied";
       const before = sim.money;
@@ -257,6 +271,7 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
       // Build to floor 9 so the two-story party hall placed at floor 8 has its
       // upper story (floor 9). The measured floors (2 and 8) are unchanged.
       servedTower(sim, 9, 3);
+      addDemand(sim);
       const v = unit(sim, sim.tower.place(kind, floor, 40).unitId);
       v.state = "occupied";
       const before = sim.money;
@@ -279,6 +294,7 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
     const earn = (skyLobby: boolean): number => {
       const sim = Simulation.newGame(11);
       servedTower(sim, 14, 3);
+      addDemand(sim);
       // Cover floor 15 with lobby tiles (the sky concourse) when the flag is
       // set, else cover it with plain floor tiles so floor 16 above has support
       // in both branches (only the substrate differs). Under sky-lobby canon

@@ -192,34 +192,44 @@ describe("Parking demand: offices (1/~24 workers) + one space per suite", () => 
   });
 });
 
-describe("Over-capacity recycling stops flattering commerce", () => {
-  it("commercial income sags once population outgrows the centers (same layout, more pop)", () => {
-    function shopIncome(centers: number): number {
+describe("Recycling lifts commercial demand (demand-pools model)", () => {
+  // Behavior change (commercial demand pools, #393): the old model gated
+  // commercial APPEAL on recycling and made income SAG once population outgrew
+  // the centers (a capped appeal whose recycling term shrank on overflow). Under
+  // demand pools, commercial income is demand-driven, so it GROWS with
+  // population (up to a venue's daily capacity) instead of sagging, and recycling
+  // is re-homed as a bounded multiplier on the demand pool: it still lifts trade
+  // (the classic reason to run recycling), but no longer caps or sags late-game
+  // commerce. This pins the surviving positive effect; the obsolete
+  // "overflow makes commerce sag" assertion is deliberately dropped.
+  it("a recycling center lifts commercial income via the demand-pool bonus", () => {
+    function shopIncome(withRecycling: boolean): number {
       const sim = Simulation.newGame(15);
       sim.money = 1e12;
       sim.star = 3;
       lay(sim, "lobby", 1);
-      for (let f = 2; f <= 17; f++) lay(sim, "floor", f);
-      sim.buildTransport("elevatorStandard", C, 1, 17);
-      // A big occupied office block: >3,000 population (over one center's 2,500).
-      let placed = 0;
-      for (let f = 2; f <= 16; f++)
-        for (let x = 0; x + 9 <= W && placed < 550; x += 9) {
-          const r = sim.tower.place("office", f, x);
-          if (r.ok) {
-            sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
-            placed++;
-          }
-        }
-      occupy(sim, "shop", 17, 0, "occupied");
-      lay(sim, "floor", 0);
-      lay(sim, "floor", -1);
-      for (let i = 0; i < centers; i++) mustPlace(sim, "recycling", -1, i * 20);
+      lay(sim, "floor", 2);
+      expect(sim.buildTransport("elevatorStandard", C, 1, 2).ok).toBe(true);
+      // A modest occupied office block, population well under the shop's demand
+      // capacity, so the shop is not saturated and the recycling pool bonus is
+      // visible in its income (a saturated venue capped at its daily figure would
+      // hide it). Offices sit clear of the shop at x=0.
+      for (let i = 0; i < 6; i++) {
+        const r = sim.tower.place("office", 2, 20 + i * 10);
+        expect(r.ok, r.reason).toBe(true);
+        sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
+      }
+      occupy(sim, "shop", 2, 0, "occupied");
+      if (withRecycling) {
+        lay(sim, "floor", 0);
+        lay(sim, "floor", -1);
+        mustPlace(sim, "recycling", -1, 0);
+      }
       sim.clock.minutes = 10 * 60; // shops open at 10:00
       const before = sim.money;
       for (let i = 0; i < 8; i++) sim.tick(60); // a shopping day
       return sim.money - before;
     }
-    expect(shopIncome(2)).toBeGreaterThan(shopIncome(1)); // demand met out-earns overflowing
+    expect(shopIncome(true)).toBeGreaterThan(shopIncome(false));
   });
 });

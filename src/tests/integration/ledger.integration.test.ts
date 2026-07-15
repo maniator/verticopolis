@@ -93,6 +93,13 @@ describe("Income breakdown integration", () => {
     sim.buildTransport("elevatorStandard", C, 1, 2);
     const shop = sim.tower.place("shop", 2, 0);
     sim.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
+    // Occupied offices give the shop a demand pool to serve (income is
+    // demand-driven), so the retail line takes real dollars.
+    for (const x of [20, 32, 44]) {
+      const o = sim.tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
+      sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+    }
     // Run a few days so the shop earns during its open hours and days roll over.
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
     const { averages, hasData } = sim.incomeBreakdown();
@@ -109,6 +116,13 @@ describe("Income breakdown integration", () => {
     sim.buildTransport("elevatorStandard", C, 1, 2);
     const shop = sim.tower.place("shop", 2, 0);
     sim.tower.units.find((u) => u.id === shop.unitId)!.state = "occupied";
+    // Occupied offices give the shop a demand pool to serve (income is
+    // demand-driven), so the retail line takes real dollars.
+    for (const x of [20, 32, 44]) {
+      const o = sim.tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
+      sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+    }
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
     const before = sim.incomeBreakdown().averages.retail;
     const reloaded = Simulation.deserialize(sim.serialize());

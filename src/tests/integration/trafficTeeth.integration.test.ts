@@ -24,10 +24,20 @@ function strandedShopTower(seed: number): Simulation {
   sim.money = 1e12;
   layStrip(sim, "lobby", 1);
   for (let f = 2; f <= 45; f++) layStrip(sim, "floor", f);
-  sim.tower.placeTransport("elevatorStandard", C, 1, 15); // A: 1→15
-  sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30); // B: transfer at 15
-  sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45); // C: transfer at 30
+  expect(sim.tower.placeTransport("elevatorStandard", C, 1, 15).ok).toBe(true); // A: 1→15
+  expect(sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30).ok).toBe(true); // B: transfer at 15
+  expect(sim.tower.placeTransport("elevatorStandard", C + 12, 30, 45).ok).toBe(true); // C: transfer at 30
+  // Occupied offices on a reachable low floor give the shop a real demand pool to
+  // serve (commercial income is demand-driven: a shop with no reachable
+  // population earns nothing regardless of its own reachability). Placed clear of
+  // the shafts (C, C+6, C+12) and the shop column (C+30).
+  for (const x of [X0, C + 18]) {
+    const o = sim.tower.place("office", 2, x);
+    expect(o.ok, o.reason).toBe(true);
+    sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+  }
   const r = sim.tower.place("shop", 40, C + 30); // 3 rides up
+  expect(r.ok, r.reason).toBe(true);
   sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
   return sim;
 }

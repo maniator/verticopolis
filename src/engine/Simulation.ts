@@ -29,6 +29,8 @@ import * as build from "./sim/build";
 import * as star from "./sim/star";
 import * as services from "./sim/services";
 import * as events from "./sim/events";
+import * as demand from "./sim/demand";
+import type { DemandMap } from "./sim/demand";
 import * as stats from "./sim/stats";
 
 import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
@@ -270,6 +272,17 @@ export class Simulation implements SimContext {
    *  fresh Simulation, so no stale memo can survive a restore. */
   noiseMemo = new Map<number, boolean>();
   noiseMemoRev = -1;
+
+  /** Lazy commercial-demand-map memo, valid for one `(tower.revision, hour)`
+   *  key. Transient like {@link noiseMemo}: never serialized, and load/undo build
+   *  a fresh Simulation, so no stale memo survives a restore. */
+  demandMemo: DemandMap | null = null;
+  demandMemoKey = "";
+
+  /** The per-venue commercial demand fractions and per-origin venue coverage for
+   *  the current census and layout (memoized). The hourly income loop computes
+   *  the map directly; this accessor serves the inspector's per-hover reads. */
+  demandMap(): DemandMap { return demand.demandMap(this); }
 
   sampleElevatorUtil(): void { congestion.sampleElevatorUtil(this); }
 
