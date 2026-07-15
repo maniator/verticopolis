@@ -32,39 +32,38 @@
 import { SCENES } from "./screenshot-scenes.ts";
 
 // The partition: explicit scene-id groups, NOT a count/index split. Grouped by
-// capture cost so the shards finish together. Cost is dominated by each scene's
-// tower BUILD + settle, not by shot count, so the five feature scenes (each its
-// own 100-200 unit build, with the two most expensive settles in the gallery:
-// `overlays` re-rendering three full-tower heatmaps and `metro` stepping a
-// 6-second train settle) used to swamp one `features` shard at ~2.5x the others.
-// They are now split across TWO shards: `metro`, the single most expensive scene
-// (its 6-second train settle can't be split), gets its own shard, and the other
-// four feature scenes share the sibling, so the shards run closer to even (metro
-// alone is the practical floor). The remaining
-// light scenes (showcase's one build amortized over 13 shots, milestones, and the
-// small/route misc scenes) stay grouped. This is the ONLY place the split is
-// defined; correctness is enforced by `verify` against SCENES, so a rebalance here
-// is safe as long as `verify` still passes. The exact balance is an estimate from
-// per-scene structure; confirm it against a CI run and nudge a scene across if a
-// shard still lags.
+// capture cost so the shards finish together. Now that a settle skips its discarded
+// intermediate draws by default (only the few `drawSettle` shots draw every frame),
+// the old poles (metro's 6-second train settle, the crowd rush) render in seconds,
+// and the expensive scenes are the ones that still draw every frame. So `metro` no
+// longer needs its own shard (folded in), and the groups are balanced against
+// MEASURED per-scene render time from CI, not structure:
+//
+//   tablet 55s, engine 29s               (the draw-every-frame scenes)
+//   metro 28s, traffic 12s, lobby-awnings 9s, first-run 6s
+//   mobile/construction ~4.5s, crowd/fire ~3.7s
+//   first-run-mobile/sprite-gallery/preview-rooms ~2.5s
+//   features (overlays+stats+crash-screen+basement) ~43s, showcase+milestones ~54s
+//
+// The two draw-every-frame scenes (tablet, engine) are the anchors and sit in
+// DIFFERENT shards so no shard carries both; the light scenes fill each shard to
+// roughly even (~57-71s a shard, so the gate is bounded near ~70s of render instead
+// of the old 197s `misc`). This is the ONLY place the split is defined; correctness
+// is enforced by `verify` against SCENES, so a rebalance here is safe as long as
+// `verify` still passes. The per-scene numbers are wall time under CI's two-leg
+// contention; confirm against a run and nudge a scene across if a shard still lags.
+// To go below the ~55s tablet floor, the lever is the scene itself (tablet draws
+// many settle frames), not the split.
 export const SHARDS: Record<string, string[]> = {
-  features: ["overlays", "stats", "crash-screen", "basement"],
-  metro: ["metro"],
-  showcase: ["showcase", "milestones"],
-  misc: [
-    "mobile",
-    "first-run",
-    "first-run-mobile",
-    "construction",
-    "engine",
-    "crowd",
-    "fire",
-    "sprite-gallery",
-    "preview-rooms",
-    "traffic",
-    "lobby-awnings",
-    "tablet",
-  ],
+  // ~64s: feature panels + two light HUD scenes.
+  features: ["overlays", "stats", "crash-screen", "basement", "traffic", "lobby-awnings"],
+  // ~57s: the hero gallery + the star ladder + the sprite sheet.
+  showcase: ["showcase", "milestones", "sprite-gallery"],
+  // ~67s: the live-engine scene (draws every frame) + the now-cheap metro + onboarding.
+  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms"],
+  // ~71s: anchored by the tablet shots (the heaviest draw-every-frame scene) plus
+  // the small scenes.
+  misc: ["tablet", "mobile", "construction", "crowd", "fire"],
 };
 
 function allSceneIds(): string[] {
