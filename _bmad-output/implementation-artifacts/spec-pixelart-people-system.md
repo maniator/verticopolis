@@ -2,7 +2,8 @@
 title: 'Pixel-art people system: the person() family, two-scale figures, honest occupancy, and the elevator queue seam'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: '3deb0d1'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -116,14 +117,14 @@ Real functions and files, grouped by boundary. Pure-render ships first; the engi
 ## Tasks & Acceptance
 
 **Execution (dependency order: shared family first, then call sites, then the seam story):**
-- [ ] Redesign `person()` in `pixelSprites/common.ts` to the finalized builds, head detail, torso edge shading, and contact shadow; keep the exported signature call-compatible; add the `PersonBuild` selector, the `personWalker` / `personRider` / `personHiVis` wrappers, and `moodTint`.
-- [ ] Extract the person family into `pixelSprites/person.ts` if `common.ts` crosses 500 lines; re-export through the barrel so no import path changes.
-- [ ] Apply the two-scale builds at every call site in `residential.ts`, `food.ts`, `shop.ts`, `facilities.ts`, and the `drawCar` cab in `transport.ts`.
+- [x] Redesign `person()` in `pixelSprites/common.ts` to the finalized builds, head detail, torso edge shading, and contact shadow; keep the exported signature call-compatible; add the `PersonBuild` selector, the `personWalker` / `personRider` / `personHiVis` wrappers, and `moodTint`.
+- [x] Extract the person family into `pixelSprites/person.ts` if `common.ts` crosses 500 lines; re-export through the barrel so no import path changes.
+- [x] Apply the two-scale builds at every call site in `residential.ts`, `food.ts`, `shop.ts`, `facilities.ts`, and the `drawCar` cab in `transport.ts`.
 - [ ] Grow the `TowerEngine` walker bake canvases (`bakePerson`, `personGfxRed`) for the 24px walker; wire the amber impatient tier next to the existing content and fed-up states.
-- [ ] Retire or gate `scatterPeople` (party hall, metro platform); record any deferral in the backlog.
+- [x] Retire or gate `scatterPeople` (party hall, metro platform); record any deferral in the backlog.
 - [ ] Engine seam story: add the read-only `ElevatorQueueView` projection in `crowd/routing.ts` in the existing single `crowd.people` pass, memoized once per outer step; thread it through `DrawData` to `drawTransport`; draw the ordered, tier-tinted landing queue; reconcile car fill from `t.carLoad`.
-- [ ] Tests: person builds and mood in `sprites.test.ts`; the `pixelSpritesCommon` literal guard; the engine projection unit test; re-verify `fileSize.guard` and `barrelSurface`.
-- [ ] `package.json`: bump minor.
+- [x] Tests: person builds and mood in `sprites.test.ts`; the `pixelSpritesCommon` literal guard; the engine projection unit test; re-verify `fileSize.guard` and `barrelSurface`.
+- [x] `package.json`: bump minor.
 
 **Acceptance Criteria:**
 - Given the redesigned `person()`, when an existing call site invokes `person(ctx, x, footY, s, seed, true)`, then it renders the 15px seated build (head 5, torso 10, no legs, 6px wide) with the new head detail, torso edge shading, and contact shadow, at integer pixels, and no call site required a signature change.

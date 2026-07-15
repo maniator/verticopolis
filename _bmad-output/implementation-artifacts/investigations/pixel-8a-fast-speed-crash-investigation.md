@@ -18,7 +18,7 @@
 | ---------------- | --------------------------------------------------------------------------- |
 | Ticket           | N/A (player report with save files)                                         |
 | Date opened      | 2026-07-12                                                                  |
-| Status           | Active                                                                      |
+| Status           | Resolved (recovery shipped via `spec-pixel-8a-crash-fix.md`: PRs #189/#191 merged 2026-07-12, in-place context-loss recovery PR #208 merged 2026-07-13) |
 | System           | Pixel 8a (Tensor G3, Mali-G715 GPU, 8GB), Android TWA of verticopolis.com   |
 | Evidence sources | SIXSEVEN.TDT + sixseven_1.vctower uploads (decoded), source, headless soak  |
 

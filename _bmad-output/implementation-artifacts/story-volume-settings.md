@@ -4,7 +4,7 @@ baseline_commit: 3afeb401aed443cb655a0d26f11d2acd2a985863
 
 # Story: Persisted volume settings
 
-Status: review
+Status: done (merged 2026-07-12 via PR #187, merge ff0d23b)
 
 Grounds: direct owner request (2026-07-12): save the users' volume options, and
 allow the user to set volume levels. No epic; this is a standalone

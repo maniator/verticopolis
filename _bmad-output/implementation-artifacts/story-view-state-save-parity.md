@@ -4,7 +4,7 @@ baseline_commit: ff0d23bb04e50b4d994b24a4a0faa4854b4f7540
 
 # Story: View-state save parity (.vctower / slots / TDT)
 
-Status: review
+Status: done (merged 2026-07-12 via PR #194, merge f6149da)
 
 Grounds: direct owner request (2026-07-12): a save moved between devices must
 reopen with the UI looking the way it did at save time, matching what the 1994

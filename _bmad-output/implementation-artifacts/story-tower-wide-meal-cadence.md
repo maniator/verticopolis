@@ -4,7 +4,7 @@ baseline_commit: 50c41094eab2fe0b6a2a71d8a379c150c92dea85
 
 # Story: Tower-wide meal cadence
 
-Status: review
+Status: done (merged 2026-07-09 via PR #173, merge 9700f3f, v1.16.0)
 
 Grounds: `_bmad-output/planning-artifacts/design/gdd-tower-wide-meal-cadence-2026-07-09.md`, `_bmad-output/planning-artifacts/design/arch-tower-wide-meal-cadence-2026-07-09.md`. This story implements the single feature both docs describe.
 

@@ -2,7 +2,8 @@
 title: 'Pixel-art structure and transport: floor, lobbies, entrances, wedding hall, stairs, escalator, and the three elevators'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: 'e3993a8'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -133,16 +134,16 @@ Real functions and files, grouped by tile. All are pure Canvas 2D draws ported f
 ## Tasks & Acceptance
 
 **Execution (dependency order: the shared `person()` family first (E1, people-system spec), then these structural and transport tiles, then the overlay behind the E6 seam):**
-- [ ] Port `drawFloor` to the warm banded deck; keep `cache:true` and horizontal strips.
-- [ ] Enrich `drawLobbyTile` ground and sky art to the board; keep `LOBBY_VARIANTS`, `lobbyVariant`, the `u.floor === 1` ground key, and the four sentinels exactly; walkers via `personWalker`, no scatter.
-- [ ] Port the three entrances plus canopy: grand left / right / solo (keep the doorman `anim`), service (static), and the `drawAwning` marquee; sentinel integers unchanged.
-- [ ] Port `drawWeddingHall` to the two-floor grand composition; guests and the couple as seated occupants at the altar.
-- [ ] Port stairs and escalator to the single-flight-plus-landing board tiles; ~17px riders; keep the single-flight rule.
-- [ ] Enrich the elevator shaft and `drawCar` to the board; keep the express see-through glass, floor-number legibility, the FULL red bar, and the direction lantern; keep express skip-floor blanking.
-- [ ] Retire or gate `scatterPeople` (party hall, metro) per the people-system spec; no ambient lobby or platform crowd; record any deferral in the backlog.
-- [ ] Reference (do not redefine) the people-system queue and fill overlay plus the E6 seam for the landing queue and the car FILL.
-- [ ] Tests: extend `sprites.test.ts` (wedding two-floor, stairs and escalator landing, no-throw); keep `barrelSurface`, `fileSize.guard`, and `lobbyVariant` green; extract before enriching if a file crosses 500 lines.
-- [ ] `package.json`: bump minor (once for the set).
+- [x] Port `drawFloor` to the warm banded deck; keep `cache:true` and horizontal strips.
+- [x] Enrich `drawLobbyTile` ground and sky art to the board; keep `LOBBY_VARIANTS`, `lobbyVariant`, the `u.floor === 1` ground key, and the four sentinels exactly; walkers via `personWalker`, no scatter.
+- [x] Port the three entrances plus canopy: grand left / right / solo (keep the doorman `anim`), service (static), and the `drawAwning` marquee; sentinel integers unchanged.
+- [x] Port `drawWeddingHall` to the two-floor grand composition; guests and the couple as seated occupants at the altar.
+- [x] Port stairs and escalator to the single-flight-plus-landing board tiles; ~17px riders; keep the single-flight rule.
+- [x] Enrich the elevator shaft and `drawCar` to the board; keep the express see-through glass, floor-number legibility, the FULL red bar, and the direction lantern; keep express skip-floor blanking.
+- [x] Retire or gate `scatterPeople` (party hall, metro) per the people-system spec; no ambient lobby or platform crowd; record any deferral in the backlog.
+- [x] Reference (do not redefine) the people-system queue and fill overlay plus the E6 seam for the landing queue and the car FILL.
+- [x] Tests: extend `sprites.test.ts` (wedding two-floor, stairs and escalator landing, no-throw); keep `barrelSurface`, `fileSize.guard`, and `lobbyVariant` green; extract before enriching if a file crosses 500 lines.
+- [x] `package.json`: bump minor (once for the set).
 
 **Acceptance Criteria:**
 - Given `drawLobby` on a floor-1 unit, when it bakes, then each 11px slice renders warm marble, a gilded cornice, red carpet, and its variant decoration (column, chandelier, or sconce), and `lobbyVariant(u.x + t)` still returns 0..3 with adjacent tiles aligned; `LOBBY_VARIANTS` and the four entrance sentinel integers are unchanged.

@@ -2,7 +2,8 @@
 title: 'Pixel-art actors and events: the vehicle sprites and the thief and Santa event figures'
 type: 'feature'
 created: '2026-07-14'
-status: 'draft'
+status: 'done'
+updated: '2026-07-15'
 baseline_commit: 'e3993a8'
 context:
   - '{project-root}/_bmad-output/implementation-artifacts/spec-pixel-art-overhaul.md'
@@ -86,10 +87,10 @@ Both files stay under the 500-line ceiling after enrichment (`facilities.ts` ~37
 ## Tasks & Acceptance
 
 **Execution (dependency order: vehicle sprites, then event figures, then tests, then version):**
-- [ ] `src/render/sprites/facilities.ts`: enrich `drawGarbageTruck`, `drawMetroTrain`, and `drawStreetCar` to the board, keeping signatures and bake sizes; integer rects; two-tone wheels replacing the arcs.
-- [ ] `src/render/sprites/events.ts`: add module-private `drawThiefFigure` and `drawSantaFigure` (board ports); rewire `drawThief` and `drawSanta` to compose them, keeping signatures and the caught-guard and sky-sleigh behavior; apply the reserved-color fix to Santa's gift.
-- [ ] Tests: extend the vehicle no-throw assertions; update the `drawThief` `fillText` expectation and add the Santa-figure fill; add the reserved-literal guard.
-- [ ] `package.json`: bump minor. Record any caught-guard follow-up in the backlog.
+- [x] `src/render/sprites/facilities.ts`: enrich `drawGarbageTruck`, `drawMetroTrain`, and `drawStreetCar` to the board, keeping signatures and bake sizes; integer rects; two-tone wheels replacing the arcs.
+- [x] `src/render/sprites/events.ts`: add module-private `drawThiefFigure` and `drawSantaFigure` (board ports); rewire `drawThief` and `drawSanta` to compose them, keeping signatures and the caught-guard and sky-sleigh behavior; apply the reserved-color fix to Santa's gift.
+- [x] Tests: extend the vehicle no-throw assertions; update the `drawThief` `fillText` expectation and add the Santa-figure fill; add the reserved-literal guard.
+- [x] `package.json`: bump minor. Record any caught-guard follow-up in the backlog.
 
 **Acceptance Criteria:**
 - Given a recycling center at an operational plant, when the collection hour (`GARBAGE_COLLECT_HOUR`) arrives, then the enriched truck (ribbed green hopper, recycle badge, cab and window, loader mouth, two-tone wheels, bags) slides in, loads, and drives off, and at every other hour no truck is drawn.

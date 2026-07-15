@@ -42,6 +42,8 @@ A **pain to solve** (player-reported). A thief cosmetic can slink across the tow
 - Changing the thief cosmetic itself, the log cap size (paired at 300 here), or which log kinds surface as toasts.
 - Persisting the log or replaying toasts after a reload — the log is transient, so a reload starts clean by design.
 
+> Postscript 2026-07-15: the "log is transient" non-goal above is superseded. Later work (story-save-metadata-and-log-tail, PR #195/#196, merged 2026-07-12) serializes a bounded log tail (`LOG_SAVE_CAP`, raised from 100 to 300 by the log-cap party) so scrollback survives the game's own reloads. Toast replay after a reload remains a non-goal. Kept as written above for the record.
+
 ## Success signal
 
 In a long session (past the log cap's worth of logged events), a thief — or any `good`/`bad` event — still shows its toast and its event-log line, so no cosmetic ever plays unexplained. The freeze that silenced all notifications once the log filled is gone.
