@@ -125,7 +125,7 @@ export interface StarRequirement {
 }
 
 /** The "what is blocking my next star" read model. Read-only: it mirrors the
- *  gates in {@link evaluateStar} (and {@link checkVip} for the TOWER rung)
+ *  gates in {@link evaluateStar} (and `checkVip` in events.ts for the TOWER rung)
  *  EXACTLY, so the checklist can never claim a rung is ready that promotion
  *  would refuse. Keep this list in step with those two functions. */
 export interface NextStarProgress {

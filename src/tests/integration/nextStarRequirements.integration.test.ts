@@ -11,6 +11,15 @@ const C = Math.floor(W / 2);
 function layFull(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
   for (let x = C; x < W; x++) sim.tower.place(kind, floor, x);
   for (let x = C - 1; x >= 0; x--) sim.tower.place(kind, floor, x);
+  // Assert the fixture's own construction (AGENTS.md: "fixtures must assert
+  // their own construction"). Rather than check each place().ok (some tiles
+  // are legitimately already paved, for example newGame's ground lobby on
+  // floor 1), assert the topology claim directly: the whole row ends covered
+  // by the intended kind. A silently short build fails here instead of
+  // producing misleading downstream assertions.
+  for (let x = 0; x < W; x++) {
+    expect(sim.tower.unitAt(floor, x)?.kind, `row ${floor} tile ${x} should be ${kind}`).toBe(kind);
+  }
 }
 
 function fillOffices(sim: Simulation, floor: number, rightClear = 0): number {
