@@ -517,7 +517,7 @@ describe("confirmModal — lit template mount", () => {
   });
 });
 
-describe("aria-labelledby across the real dialogs — every modal names itself for a screen reader", () => {
+describe("aria-labelledby across the real dialogs: every modal names itself for a screen reader", () => {
   // Every show* method funnels through finishModal, so this pins the
   // contract end to end (not just the shared primitive) across dialogs with
   // very different wiring: a plain wireActions dialog, a caller-supplied
@@ -563,7 +563,7 @@ describe("aria-labelledby across the real dialogs — every modal names itself f
     click('[data-act="export"]');
     expect(titleFor().textContent).toContain("Export tower?");
     // Same shared id, but now only one element in the whole document carries
-    // it — the saves dialog's old title node is gone, not orphaned.
+    // it: the saves dialog's old title node is gone, not orphaned.
     expect(dialog().getAttribute("aria-labelledby")).toBe(labelId);
     expect(document.querySelectorAll(`#${labelId}`).length).toBe(1);
   });
