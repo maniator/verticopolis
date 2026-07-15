@@ -169,7 +169,10 @@ test.describe("tower scene (region-composition tripwire)", () => {
     }, hour);
     await page.waitForFunction((h: number) => {
       const e = (window as any).game.engine;
-      return e.lastSyncHour === h && !e.hourSyncPending;
+      // Queue-empty is part of the settle contract (region-design I4): the
+      // hour flip marks every live region dirty and the drain trickles at
+      // budget pace, so capturing before it empties would race the repaints.
+      return e.lastSyncHour === h && !e.hourSyncPending && e.regionDirty.size === 0;
     }, hour);
     await page.evaluate(() => {
       document.getElementById("toast-wrap")?.replaceChildren();

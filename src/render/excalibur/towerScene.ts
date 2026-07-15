@@ -12,6 +12,7 @@ import {
   LOBBY_VARIANTS,
 } from "../sprites";
 import { drawSanta } from "../sprites/events";
+import { disposeRegions } from "./towerRegions";
 import { SHIRTS } from "../pixelSprites";
 import { personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
@@ -318,7 +319,11 @@ export function skyColor(hour: number): string {
 
 export function disposeScene(engine: TowerEngine): void {
   for (const cell of engine.structTiles.values()) cell.clearGraphics();
-  for (const rec of engine.roomActors.values()) rec.actor.kill();
+  // Region canvases, their membership, the dirty queue and the dead-parking
+  // set all clear together, so no queued repaint can survive into (and paint
+  // against) a swapped-in tower.
+  disposeRegions(engine);
+  for (const a of engine.animatedRooms.values()) a.kill();
   for (const a of engine.transportActors.values()) a.kill();
   for (const rec of engine.escapeActors.values()) {
     rec.l.kill();
@@ -331,7 +336,7 @@ export function disposeScene(engine: TowerEngine): void {
     engine.craneGfx = null;
   }
   engine.structTiles.clear();
-  engine.roomActors.clear();
+  engine.animatedRooms.clear();
   engine.roomSig.clear();
   engine.transportActors.clear();
   engine.transportSig.clear();

@@ -4,8 +4,7 @@ import type { FacilityKind, SerializedView, Transport, Unit } from "../../engine
 import { PinchTracker } from "../pinchTracker";
 import type { DrawCtx } from "../sprites";
 
-// World-scale constants live in ../scale (a pure module unit tests can import
-// without pulling in Excalibur); re-exported here for the existing consumers.
+// World-scale constants live in ../scale (pure); re-exported for consumers.
 import { FLOOR, TILE } from "../scale";
 
 import * as scene from "./towerScene";
@@ -14,7 +13,7 @@ import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import * as overlayFx from "./towerOverlay";
 import { displayLit, drainSceneSync, runSceneSync } from "./towerSyncSchedule";
-import type { RoomRec } from "./towerReconcile";
+import { drainRegions, type RegionRec } from "./towerRegions";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
 
@@ -108,8 +107,7 @@ export class TowerEngine {
   /** Screen rects of the selected elevator's extend arrows, for hit-testing.
    *  @internal friend-module access (towerInputCamera / towerOverlay). */
   arrowHit: { up?: ScreenRect; down?: ScreenRect } = {};
-  /** Active extend-arrow drag (which end of the shaft is being dragged).
-   *  @internal friend-module access (towerInputCamera / towerScene). */
+  /** Active extend-arrow drag end. @internal (towerInputCamera/towerScene). */
   arrowDrag: { end: "up" | "down" } | null = null;
 
   // Excalibur pointer gesture state. Contacts are tracked by their NATIVE
@@ -127,16 +125,18 @@ export class TowerEngine {
   lastSy = 0;
 
   // Retained scene graph, reconciled by stable id.
-  /** Static floor/lobby tiles live in ONE TileMap entity, not per-tile actors:
-   *  a full late-game slab is ~9,000+ one-tile units, and paying Excalibur's
-   *  per-actor update/draw overhead for each of them dominated the frame on
-   *  phones (measured ~55% of a paused frame on a 10,344-unit save). The
-   *  TileMap culls to on-screen cells and costs one entity. Cells keep the
-   *  exact same shared baked canvases the actors used, so pixels don't change.
-   *  Keyed by unit id, mirroring the other reconcile maps. */
+  /** Static floor/lobby tiles live in ONE TileMap entity, not per-tile
+   *  actors: paying per-actor overhead for a ~9,000-tile slab dominated the
+   *  frame on phones. Cells keep the same shared baked canvases the old
+   *  actors used, so pixels don't change. Keyed by unit id. */
   structTileMap!: ex.TileMap;
   structTiles = new Map<number, ex.Tile>();
-  roomActors = new Map<number, RoomRec>();
+  // Settled rooms compose into region canvases (towerRegions, spec CAP-2).
+  regions = new Map<number, RegionRec>();
+  regionUnits = new Map<number, number[]>(); // unit id -> its region keys
+  regionDirty = new Set<number>();
+  deadParking = new Set<number>(); // unchained parking (red X), per sync
+  animatedRooms = new Map<number, ex.Actor>(); // fire/construction actors
   roomSig = new Map<number, string>();
   transportActors = new Map<number, ex.Actor>();
   transportSig = new Map<number, string>();
@@ -349,8 +349,8 @@ export class TowerEngine {
     this.syncEventFx(animating);
     this.d.hour = c.hour;
     this.d.lit = displayLit(c);
-    // Drain last frame's deferred reconcile BEFORE the crane lit check and
-    // the sim advance in onUpdate (re-stack rationale: drainSceneSync's doc).
+    // Deferred-reconcile drain: before the crane check and the sim advance
+    // in onUpdate (re-stack rationale: drainSceneSync's doc).
     drainSceneSync(this);
     // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
     // refreshed inside syncScene — the same moment the sprites that read them
@@ -371,10 +371,10 @@ export class TowerEngine {
     this.engine.backgroundColor = ex.Color.fromHex(scene.skyColor(c.hour));
     if (this.onUpdate) this.onUpdate(elapsedMs);
 
-    // Reconcile room/structure actors when the model, lighting, the hour, or a
-    // meal-overlay repaint trigger changes; hour-driven reconciles defer to
-    // the next frame's drain above (towerSyncSchedule, spec CAP-3).
+    // Scene reconcile scheduling lives in towerSyncSchedule (spec CAP-3):
+    // hour-driven repaints defer to the next frame's drain above.
     runSceneSync(this);
+    drainRegions(this); // budgeted region repaints (towerRegions, CAP-2)
     this.updateMotion();
     this.reconcileCrowd();
   }
@@ -385,10 +385,10 @@ export class TowerEngine {
     scene.setSim(this, sim, opts);
   }
 
-  // Frame-pump steps for fake-driven ticks (stub these three directly). The
-  // scene syncs route through towerSyncSchedule's module functions: whitebox
-  // tests observe those with module mocks on towerReconcile/towerCrowd (see
-  // towerEngineMealOverlay.test.ts); start() still uses the delegations below.
+  // Frame-pump steps for fake-driven ticks (stub these three directly);
+  // scene syncs route through towerSyncSchedule's module functions, observed
+  // with module mocks (towerEngineMealOverlay.test.ts). start() uses the
+  // sync delegations below.
   private syncEventFx(animating: boolean): void { overlayFx.syncEventFx(this, animating); }
   private syncScene(): void { reconcile.syncScene(this); }
   private syncFacade(): void { reconcile.syncFacade(this); }
