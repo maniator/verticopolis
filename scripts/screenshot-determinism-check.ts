@@ -50,12 +50,14 @@ const GENERATOR = resolve(ROOT, "scripts/screenshots.ts");
 // Per-leg isolation, under the OS temp dir so this works off Linux too; override
 // the base with SCREENSHOT_TMP. The workflow's upload step stages run-a from the
 // SAME base (it computes os.tmpdir() the same way), so the two stay aligned on any
-// platform. Ports differ so a lingering server from one leg can never be mistaken
-// for the other's.
+// platform. The two preview ports differ so a lingering server from one leg can
+// never be mistaken for the other's; both are overridable (SCREENSHOT_PORT_A /
+// SCREENSHOT_PORT_B) for a machine already using 4173/4174, or to run two copies
+// at once (give each its own SCREENSHOT_TMP and port pair). CI keeps the defaults.
 const TMP = process.env.SCREENSHOT_TMP || tmpdir();
 const LEGS = [
-  { tag: "a", dest: join(TMP, "run-a"), outDir: join(TMP, "dist-a"), port: 4173 },
-  { tag: "b", dest: join(TMP, "run-b"), outDir: join(TMP, "dist-b"), port: 4174 },
+  { tag: "a", dest: join(TMP, "run-a"), outDir: join(TMP, "dist-a"), port: Number(process.env.SCREENSHOT_PORT_A) || 4173 },
+  { tag: "b", dest: join(TMP, "run-b"), outDir: join(TMP, "dist-b"), port: Number(process.env.SCREENSHOT_PORT_B) || 4174 },
 ];
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
