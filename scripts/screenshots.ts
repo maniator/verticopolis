@@ -73,18 +73,18 @@ const READY_TIMEOUT_MS = 30_000;
  *  pages (gallery/preview) are frozen by the pinned performance.now set in
  *  runScene, and the composite setContent shots are static markup, so a wall
  *  wait can't shift either. */
-async function settle(page: Page, ms: number, noDraw = false): Promise<void> {
+async function settle(page: Page, ms: number, drawEveryFrame = false): Promise<void> {
   // ceil already yields >= 1 frame for any ms > 0, so no lower clamp is needed;
   // ms <= 0 yields <= 0, which the stepper treats as "no step" (returns false).
-  // Default: draw every frame (pgStep), the robust path. A shot opts into
-  // pgStepNoDraw only when its settle is a heavy live-crowd dwell (metro, crowd);
-  // there the intermediate frames are discarded, so skipping their software raster
-  // is a big CI win, and pgStepNoDraw's drawPos sync keeps the final frame
-  // byte-identical. Skipping draws is deliberately NOT the default: it is
-  // draw-coupled (Excalibur culls off-screen entities against the camera's
-  // draw-phase position), so unconfined it would drift shots that resize the
-  // viewport or animate in the draw path.
-  const step = noDraw ? pgStepNoDraw : pgStep;
+  // Default: skip the intermediate draws (pgStepNoDraw). A settle always draws its
+  // FINAL frame either way; the flag only decides whether the discarded frames
+  // BEFORE it also draw. Skipping them is wasted software raster, and pgStepNoDraw's
+  // drawPos sync keeps the final frame byte-identical, so it is safe gallery-wide
+  // EXCEPT a few draw-coupled shots (per-shot viewport resizes, draw-path animation):
+  // those pass drawEveryFrame=true (via the shot's drawSettle). Route scene-level
+  // settles also draw every frame (see runScene): a live-engine route page is
+  // draw-sensitive.
+  const step = drawEveryFrame ? pgStep : pgStepNoDraw;
   const stepped = await page.evaluate(step, Math.ceil(ms / FRAME_MS));
   if (!stepped) await page.waitForTimeout(Math.max(0, ms));
 }
@@ -125,7 +125,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
-    await settle(page, shot.wait ?? 500, shot.noDrawSettle ?? false);
+    await settle(page, shot.wait ?? 500, shot.drawSettle ?? false);
     // Repaint the throttled DOM chrome off the final sim state, then sweep
     // stray toasts / event dialogs the running sim may have popped during the
     // settle, unless this shot is deliberately showing a modal.
@@ -212,7 +212,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       if ((await page.evaluate(pgAdoptTestClock)) === "failed") {
         throw new Error("engine present but test-clock adoption failed");
       }
-      await settle(page, 800);
+      // Draw this route settle: a live-engine route page (excalibur.html) is
+      // draw-coupled, and the no-engine routes (gallery/preview) wall-wait here
+      // anyway (no clock), so drawing is the safe choice for both.
+      await settle(page, 800, true);
     } else {
       await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
       // From here on, frames advance only when settle()/pgStep drives them:
@@ -237,11 +240,21 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       }
     }
   } finally {
-    await page.close();
+    // page.close() is cleanup: never let it throw past the finally (that would fail
+    // a scene whose shots all captured) and never let it skip the timing row. Log a
+    // close failure and carry on; the browser is torn down in main's finally anyway.
+    try {
+      await page.close();
+    } catch (e) {
+      console.error(`  page.close failed for scene ${scene.id}: ${e instanceof Error ? e.message : String(e)}`);
+    }
     const sceneMs = Date.now() - sceneStart;
     sceneTimings.push({ id: scene.id, ms: sceneMs });
-    // The route-not-ready early return above also passes through this finally, so
-    // a skipped scene still gets a (near-zero) row, which is itself a useful signal.
+    // The route-not-ready early return above also passes through this finally, so a
+    // scene that failed to render still gets a timing row. That row reflects the
+    // wall time actually spent, which for a route that never signaled ready is the
+    // readiness wait (up to READY_TIMEOUT_MS), not zero; either way it is a useful
+    // signal that the scene did not capture normally.
     console.log(`◀ scene: ${scene.id} (${(sceneMs / 1000).toFixed(1)}s)`);
   }
 }
