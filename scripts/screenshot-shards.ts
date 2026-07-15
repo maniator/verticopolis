@@ -32,14 +32,22 @@
 import { SCENES } from "./screenshot-scenes.ts";
 
 // The partition: explicit scene-id groups, NOT a count/index split. Grouped by
-// MEASURED capture cost (from a CI run) so the shards finish together. `features`
-// is the heaviest and is isolated on its own shard; the remaining light scenes
-// (milestones ~2.9 min, showcase, mobile, and the small misc scenes) are merged
-// to fit under that floor. This is the ONLY place the split is defined;
-// correctness is enforced by `verify` against SCENES, so a rebalance here is safe
-// as long as `verify` still passes.
+// capture cost so the shards finish together. Cost is dominated by each scene's
+// tower BUILD + settle, not by shot count, so the five feature scenes (each its
+// own 100-200 unit build, with the two most expensive settles in the gallery:
+// `overlays` re-rendering three full-tower heatmaps and `metro` stepping a
+// 6-second train settle) used to swamp one `features` shard at ~2.5x the others.
+// They are now split across TWO shards with the two heaviest (overlays, metro)
+// deliberately separated, so the four shards run closer to even. The remaining
+// light scenes (showcase's one build amortized over 13 shots, milestones, and the
+// small/route misc scenes) stay grouped. This is the ONLY place the split is
+// defined; correctness is enforced by `verify` against SCENES, so a rebalance here
+// is safe as long as `verify` still passes. The exact balance is an estimate from
+// per-scene structure; confirm it against a CI run and nudge a scene across if a
+// shard still lags.
 export const SHARDS: Record<string, string[]> = {
-  features: ["overlays", "basement", "stats", "metro", "crash-screen"],
+  features: ["overlays", "stats", "crash-screen"],
+  "features-b": ["basement", "metro"],
   showcase: ["showcase", "milestones"],
   misc: [
     "mobile",
