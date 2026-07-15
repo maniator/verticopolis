@@ -97,4 +97,36 @@ describe("retailStatsLines (commercial-venue inspector card)", () => {
     const bar = frag.querySelector<HTMLElement>(".evalbar > span");
     expect(bar?.getAttribute("style")).toBe("width:50%");
   });
+
+  it("shows the venue's local demand share as its own line, leaving the verdict on the stable baseline", () => {
+    // The demand line reports the venue's share of local demand. The verdict keeps
+    // a STABLE full-appeal baseline (100 customers), so 38 of that reads red, and
+    // the demand line explains the red as thin local demand rather than the
+    // baseline shrinking to hide it (which would misgrade yesterday against
+    // today's demand).
+    const frag = render(retailStatsLines("shop", 38, 38, 3000, false, 0.4));
+    expect(frag.textContent).toContain("Local demand: 40% of capacity.");
+    expect(frag.querySelector('div[style*="var(--bad)"]')?.textContent).toBe("Very few customers.");
+  });
+
+  it("reads a fully-subscribed venue as 100% local demand", () => {
+    const frag = render(retailStatsLines("shop", 90, 90, 5000, false, 1));
+    expect(frag.textContent).toContain("Local demand: 100% of capacity.");
+  });
+
+  it("reports zero local demand for a reachable venue with no local population", () => {
+    // demandFraction 0 (in the map, but the pool is empty): the venue is present
+    // and trading nothing, so the line names the cause honestly.
+    const frag = render(retailStatsLines("shop", 0, 0, 0, false, 0));
+    expect(frag.textContent).toContain("Local demand: 0% of capacity.");
+  });
+
+  it("omits the local-demand line when the fraction is unknown (venue absent from the demand map)", () => {
+    // undefined (not 0): the venue is not in the current demand map (stranded, or
+    // not yet in this hour's memo). Omit the line rather than fabricate a false 0%,
+    // and leave the rest of the card (verdict from the stable baseline) intact.
+    const frag = render(retailStatsLines("shop", 40, 70, 3000, false, undefined));
+    expect(frag.textContent).not.toContain("Local demand:");
+    expect(frag.textContent).toContain("Business is average."); // 70 / 100 baseline = 0.7, neutral
+  });
 });

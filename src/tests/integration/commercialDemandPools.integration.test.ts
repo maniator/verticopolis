@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
+import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { ECON } from "../../engine/econConfig";
 import { GRID, FACILITIES } from "../../engine/facilities";
 import type { GameMode, Unit } from "../../engine/types";
+import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**
  * The commercial demand-pools model (gdd/arch-commercial-demand-pools-2026-07-15):
@@ -128,5 +131,15 @@ describe("commercial demand pools", () => {
     const modern = servedTower(1, "modern");
     const mShop = occupied(modern, "shop", 2, C + 20);
     expect(computeDemandMap(modern).fractionByUnit.get(mShop.id)).toBe(ECON.demandFloorModern);
+  });
+
+  it("surfaces the venue's real local-demand share in the rendered inspector card (Phase B)", () => {
+    const sim = servedTower();
+    for (let i = 0; i < 4; i++) occupied(sim, "office", 2, 20 + i * 12);
+    const shop = occupied(sim, "shop", 2, C + 20);
+    const pct = Math.round((sim.demandMap().fractionByUnit.get(shop.id) ?? 0) * 100);
+    expect(pct).toBeGreaterThan(0); // precondition: the offices give the shop real demand
+    const text = renderToFragment(html`<div>${facilityDiagnostics(sim, shop)}</div>`).textContent ?? "";
+    expect(text).toContain(`Local demand: ${pct}% of capacity.`);
   });
 });

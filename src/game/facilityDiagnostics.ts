@@ -74,18 +74,21 @@ export function retailStatsLines(
   patronageYest: number | undefined,
   profitYest: number | undefined,
   isRaining: boolean,
+  demandFraction?: number,
 ): TemplateResult[] {
   const spend = ECON.retailSpendPerCustomer[kind];
   const daily = ECON.dailyTrafficIncome[kind];
   if (spend === undefined || spend <= 0 || daily === undefined) return [];
-  // The reference is an "average good day": a venue at full appeal, well placed,
-  // on a dry day. `daily / spend` is the theoretical ceiling where every hourly
+  // The reference is an "average good day": a venue at full local demand, well
+  // placed, on a dry day. `daily / spend` is the raw ceiling where every hourly
   // multiplier is 1, but the foot-traffic factor averages TRAFFIC_FACTOR_MEAN
   // (0.8), never 1, so real patronage tops out around that fraction of the
-  // ceiling. Baking the mean into the baseline keeps the verdict measuring the
-  // levers a player controls (appeal, placement, weather) rather than the daily
-  // dice; otherwise the top band was unreachable and the green verdict was dead
-  // code.
+  // ceiling. This baseline is a STABLE reference (it does not fold in the live
+  // demand fraction) so the verdict stays internally consistent day to day:
+  // yesterday's patronage is scored against the same yardstick whether or not
+  // local demand shifted overnight. The demand-limitation itself is surfaced
+  // separately, and honestly, by the "Local demand" line below, so a low verdict
+  // reads as "thin local demand here" rather than a mystery.
   const baseline = (daily / spend) * TRAFFIC_FACTOR_MEAN;
   const today = Math.max(0, patronageToday ?? 0);
   // The "Today's patronage" number is the running count so far today; its bar
@@ -117,8 +120,22 @@ export function retailStatsLines(
   // matching the old string that appended none.
   const lines: TemplateResult[] = [
     html`<div>Today's patronage: ${custRounded.toLocaleString()} customer${custRounded === 1 ? "" : "s"} <span class="evalbar"><span style="width:${barWidth}%"></span></span></div>`,
-    html`<div style=${tier.color ? `color:${tier.color}` : nothing}>${tier.verdict}</div>`,
   ];
+  // The venue's share of local demand (commercial demand pools): what fraction of
+  // its capacity the reachable population fills. Surfaced so a low customer count
+  // reads as "thin local demand here" (add population, or spread venues out)
+  // rather than a mystery, and so a venue pinned at 100% reads as fully
+  // subscribed. Plain information, shown in both modes; the Modern under-served /
+  // over-built advice rides on top of this number in a later phase.
+  // Only shown when the fraction is KNOWN (the venue is in the current demand
+  // map: reachable and operational). An absent venue, e.g. one that just finished
+  // construction and is not yet in this hour's memo, passes `undefined` and omits
+  // the line rather than fabricating a misleading "0% of capacity".
+  if (demandFraction !== undefined) {
+    const demandPct = Math.round(Math.max(0, Math.min(1, demandFraction)) * 100);
+    lines.push(html`<div>Local demand: ${demandPct}% of capacity.</div>`);
+  }
+  lines.push(html`<div style=${tier.color ? `color:${tier.color}` : nothing}>${tier.verdict}</div>`);
   // Yesterday's line is skipped on day 1 (no rollover yet) so the card doesn't
   // read "$0" for a fresh tower. Once at least one rollover has fired the field
   // is defined (>= 0) and the line shows even when yesterday earned nothing.
@@ -285,7 +302,18 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     ECON.dailyTrafficIncome[u.kind] !== undefined &&
     ECON.retailSpendPerCustomer[u.kind] !== undefined
   ) {
-    lines.push(...retailStatsLines(u.kind, u.patronageToday, u.patronageYest, u.profitYest, sim.weather === "rain"));
+    lines.push(
+      ...retailStatsLines(
+        u.kind,
+        u.patronageToday,
+        u.patronageYest,
+        u.profitYest,
+        sim.weather === "rain",
+        // Undefined (not `?? 0`) when the venue is absent from the demand map, so
+        // the readout omits the "Local demand" line rather than fabricating 0%.
+        sim.demandMap().fractionByUnit.get(u.id),
+      ),
+    );
   }
   return lines;
 }
