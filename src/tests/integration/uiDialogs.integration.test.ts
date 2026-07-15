@@ -295,12 +295,12 @@ describe("openModalTemplate — the window grammar", () => {
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
     const titleSpan = document.getElementById(labelId!)!;
-    expect(titleSpan.tagName).toBe("SPAN"); // labelled at the title-text span, not the h2
+    expect(titleSpan.tagName).toBe("SPAN"); // labeled at the title-text span, not the h2
     expect(titleSpan.parentElement).toBe(title);
     expect(titleSpan.textContent).toContain("Window Title");
   });
 
-  it("excludes the ✕ button from the accessible name: the labelled span carries the title text alone", () => {
+  it("excludes the ✕ button from the accessible name: the labeled span carries the title text alone", () => {
     // Regression guard: finishModal used to label the h2 itself, and the ✕
     // is appended into that same h2, so a screen reader announced the title
     // plus the ✕'s own accessible name ("Close"), e.g. "Settings Close".
@@ -493,7 +493,7 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
     const titleSpan = document.getElementById(labelId!)!;
-    expect(titleSpan.tagName).toBe("SPAN"); // labelled at the span, not the h2 (same contract as openModal)
+    expect(titleSpan.tagName).toBe("SPAN"); // labeled at the span, not the h2 (same contract as openModal)
     expect(titleSpan.parentElement).toBe(title);
     expect(titleSpan.textContent).toContain("Set all offices");
   });
@@ -525,8 +525,8 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     const box = ui.openModalTemplate(html`<h2>Settings</h2><p>body</p>`);
     const dlg = dialog();
 
-    // Drive finishModal a second time over the SAME dialog/box DOM (no close,
-    // no innerHTML wipe) — the exact repeat-mount scenario the review flagged.
+    // Drive finishModal a second time over the SAME dialog/box DOM: no close,
+    // no innerHTML wipe, the exact repeat-mount scenario the review flagged.
     (ui as any).finishModal(dlg, box);
 
     const titleId = "verticopolis-modal-title"; // the shared MODAL_TITLE_ID (private to UI.ts)
@@ -542,6 +542,8 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     const labelId = dlg.getAttribute("aria-labelledby");
     expect(labelId).toBe(titleId);
     expect(document.getElementById(labelId!)).toBe(titleSpan);
+
+    expect(box.querySelectorAll(".modal-x").length).toBe(1); // no duplicate close button either
   });
 });
 
