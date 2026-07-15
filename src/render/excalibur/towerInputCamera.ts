@@ -46,7 +46,8 @@ export interface ViewFocus {
   weather: WeatherKind;
 }
 
-/** What the pointer is over, resolved by Excalibur's collider hit-testing. */
+/** What the pointer is over: transports by Excalibur collider hit-test,
+ *  every unit kind by the tower's grid lookup (see pickEntityAt). */
 export interface Picked {
   type: "unit" | "transport";
   id: number;

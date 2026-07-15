@@ -1828,3 +1828,24 @@ Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
   reconcile cadence back to every frame in deep catch-up, the exact cost
   the deferral halves. Current choice favors catch-up cost over one frame
   of repaint latency; revisit only if the owner perceives the lag.
+
+### Render-perf S2a: picking via grid lookup (2026-07-15, PR #301 + review-fix PR)
+
+The pointer-path story ahead of region composition. The three review
+layers confirmed no patch-mandatory defect in the merged diff; the
+follow-up PR carries their actionable notes (two stale collider-hit-test
+comments reworded, boundary/basement/out-of-grid/stale-transport/z-tie
+pins added to the pick tests, vestigial roomActors/getUnit fixture stubs
+swept). Consciously accepted, on the record:
+
+- **Boundary tie-break changed at exact pixel lines.** The old actor
+  ray-cast was right-edge-inclusive and left-edge-exclusive; the grid
+  cell owns its left edge and top line instead. Measure-zero lines a
+  float pointer essentially never hits, and the new mapping agrees with
+  the (tile, floor) arguments every consumer already receives, where the
+  old pick could disagree on those same pixels. A consistency fix, not a
+  regression; now pinned by exact-edge tests.
+- **The rush-probe-per-PR spec constraint was met with a reasoned waiver**
+  (pointer path runs on input events; an O(rooms) scan became O(1), so a
+  probe could only show improvement or noise). Precedent: waivers are
+  acceptable for PRs with no frame-loop surface, stated in the PR body.
