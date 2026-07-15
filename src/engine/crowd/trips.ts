@@ -87,6 +87,13 @@ export function insideX(crowd: Crowd, u: Unit, inset: number): number {
  *  x is stamped, since the platform story has no floor tiles for pickX. Does no
  *  rng draw, so a metro-less tower's spawn/motion stream is untouched. */
 export function metroStationForPlatform(tower: Tower, platformFloor: number): Unit | undefined {
+  // A metro platform is always a basement story (the station is a below-ground
+  // module, so its middle deck sits below floor 1). Ground-lobby returns pass
+  // platformFloor === 1, the common case; short-circuit them before the linear
+  // scan over every unit (which includes each structural tile). This changes
+  // nothing behaviorally: a floor >= 1 never matched a metro platform anyway,
+  // so it still falls through to pickX exactly as before.
+  if (platformFloor >= 1) return undefined;
   return tower.units.find((u) => u.kind === "metro" && isOperational(u) && u.floor + 1 === platformFloor);
 }
 
