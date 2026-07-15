@@ -1,12 +1,26 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
-import { TRANSPORT_FAR_TILES, VACATE_RESCIND } from "../engine/Simulation";
+import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
 import { subtypeListFor } from "../engine/retailSubtypes";
-import { isOperational, VACATE_REASON_TEXT } from "../engine/types";
-import type { FacilityKind, Transport, Unit } from "../engine/types";
+import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
+import type { FacilityKind, Transport, Unit, VacateReason } from "../engine/types";
+
+/**
+ * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
+ * the drains WITHOUT a dedicated diagnostic line above are named here: access
+ * ("not connected" / "too far") and the office long-walk (W1) already have their
+ * own actionable lines, and a relocation is a life event, so those causes map to
+ * nothing and the gripe line stays off (deferring to the dedicated line). Each
+ * string names the lever the player can pull.
+ */
+const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
+  congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
+  rent: "the rent is above the going rate. Lower it to keep them.",
+  noise: "a noisy neighbor. An office or shop sits too close; a lobby tile between them shields it.",
+};
 
 /**
  * The per-facility DIAGNOSTIC lines: access reachability, placement warnings,
@@ -208,6 +222,24 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // Recycling runs on demand: how full it is right now, and whether the
   // tower has outgrown its centers (the canon 4★ gate).
   if (u.kind === "recycling" && isOperational(u)) lines.push(...recyclingLines(sim));
+  // "Main gripe": before an eviction notice ever fires, name the dominant drain
+  // on an unhappy tenant (office / condo / hotel) that isn't already called out
+  // by a dedicated line above, so a dropping satisfaction number reads as an
+  // actionable cause instead of a mystery. Access and the office long-walk keep
+  // their own lines (GRIPE_TEXT skips those causes); this surfaces congestion,
+  // over-market rent, and noise, which were otherwise invisible until the notice.
+  // Gated at GRIPE_WARN (the noise annoyance ceiling) so a content tenant is left
+  // unbothered while a noise-capped one, which sits exactly at the ceiling, is caught.
+  if (
+    isPresent(u) &&
+    u.state !== "vacating" &&
+    u.satisfaction <= GRIPE_WARN &&
+    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind))
+  ) {
+    const gripe = sim.dominantGripe(u);
+    const text = gripe ? GRIPE_TEXT[gripe] : undefined;
+    if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
+  }
   // A tenant on notice: spell out that they're leaving, why, how long is left,
   // and the exact recovery bar they must clear, the "inform before you hurt
   // them" contract, so the eviction is never a surprise. The countdown and the
