@@ -1877,7 +1877,7 @@ Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
   income, congestion, or census coupling changed. The catalog's transit
   bonuses (+60 arrival capacity, congestion relief) stay statistical. A
   per-rider ridership model is a separate design question.
-- **Metro as an attendance-visit origin** (SHIPPED v1.36.0, GH #316): the
+- **Metro as an attendance-visit origin** (SHIPPED v1.39.0, GH #316): the
   visits flow's `outside` VisitOrigin now picks a second street door for
   ticketed venues (cinema, party hall). When an operational metro's platform
   is served by passenger transport (`tower.isFloorServed(u.floor + 1)`), a
@@ -1936,7 +1936,7 @@ ratified order, with rulings:
    "revisit with per-person round-trips" precondition has shipped.
 7. **[[tdt-import-population-seed]] (GH #311):** seed occupants on import (a real 1994
    tower reads ~96 against the 234 written in its own save).
-8. **Metro as visit origin** (SHIPPED v1.36.0, GH #316): outsiders ride the
+8. **Metro as visit origin** (SHIPPED v1.39.0, GH #316): outsiders ride the
    train in for a film or a party. Spawned through the visits flow (never a
    venue intent on a `lingerFor` person), gated on an operational,
    transport-served platform. See the shipped note under the metro defers
