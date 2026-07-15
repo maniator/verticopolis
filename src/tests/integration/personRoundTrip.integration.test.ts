@@ -236,14 +236,14 @@ describe("outbound arrival transitions to dwelling with in-range timer (arch §8
       seenDwelling = sim.crowd.people.find((p) => p.state === "dwelling") ?? null;
     }
     expect(seenDwelling).not.toBeNull();
-    const eat = seenDwelling?.dwellSecondsLeft ?? -1;
+    const dwellLeft = seenDwelling?.dwellSecondsLeft ?? -1;
     // The person may have already decremented dwellSecondsLeft by up to one crowd
     // step (sim.tick(1) advances the crowd by CROWD_SECONDS_PER_MINUTE = 2
     // crowd-seconds) by the time we sample, so allow a 2-second slack under the
     // 60-second minimum. This still fails a bug that sets the timer far below
-    // the intended floor (e.g. a 5-10 second eat).
-    expect(eat).toBeGreaterThanOrEqual(EAT_SECONDS_MIN - CROWD_SECONDS_PER_MINUTE);
-    expect(eat).toBeLessThanOrEqual(EAT_SECONDS_MAX);
+    // the intended floor (e.g. a 5-10 second dwell).
+    expect(dwellLeft).toBeGreaterThanOrEqual(EAT_SECONDS_MIN - CROWD_SECONDS_PER_MINUTE);
+    expect(dwellLeft).toBeLessThanOrEqual(EAT_SECONDS_MAX);
   });
 });
 
