@@ -3,7 +3,7 @@ import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause } from "../../engine/sim/satisfaction";
 import { GRID } from "../../engine/facilities";
-import type { Unit } from "../../engine/types";
+import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
@@ -16,8 +16,34 @@ import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 const C = Math.floor(GRID.width / 2);
 
+/** Assert a place/build/transport call actually succeeded, surfacing its
+ *  `reason` on failure so a fixture never silently builds a different tower
+ *  than the scenario describes (AGENTS.md fixture-construction rule). */
+function expectOk<T extends { ok: boolean; reason?: string }>(r: T): T {
+  expect(r.ok, r.reason).toBe(true);
+  return r;
+}
+
+/** Lay a full floor of `kind`, building outward from the center so every tile
+ *  is adjacent to an already-placed one (the connectivity order the tower
+ *  requires). Tiles the new-game seed already laid as this kind are skipped
+ *  (re-placing would fail "Structure already here"); every genuine placement
+ *  is asserted. */
 function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
-  for (let x = 0; x < GRID.width; x++) sim.tower.place(kind, floor, x);
+  const put = (x: number): void => {
+    if (sim.tower.structureKindAt(floor, x) === kind) return;
+    expectOk(sim.tower.place(kind, floor, x));
+  };
+  for (let x = C; x < GRID.width; x++) put(x);
+  for (let x = C - 1; x >= 0; x--) put(x);
+}
+
+/** Place a unit, assert its construction, and return the live Unit. */
+function placeUnit(sim: Simulation, kind: FacilityKind, floor: number, x: number): Unit {
+  const r = expectOk(sim.tower.place(kind, floor, x));
+  const unit = sim.tower.units.find((u) => u.id === r.unitId);
+  expect(unit, `no unit for placed ${kind} at floor ${floor}, x ${x}`).toBeDefined();
+  return unit!;
 }
 
 /** An occupied office on floor 2, served by an elevator and sitting near it
@@ -28,9 +54,8 @@ function servedOffice(sim: Simulation): Unit {
   sim.star = 1; // no random fire/bomb events to perturb the run
   lay(sim, "lobby", 1);
   lay(sim, "floor", 2);
-  sim.buildTransport("elevatorStandard", C, 1, 2);
-  const r = sim.tower.place("office", 2, C - 12);
-  const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+  expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+  const office = placeUnit(sim, "office", 2, C - 12);
   office.state = "occupied";
   office.satisfaction = 1;
   return office;
@@ -57,8 +82,7 @@ describe("dominantGripe (the pre-notice main gripe)", () => {
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
     // No transport built: floor 2 is not served.
-    const r = sim.tower.place("office", 2, C);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const office = placeUnit(sim, "office", 2, C);
     office.state = "occupied";
     expect(sim.tower.isFloorServed(2)).toBe(false);
     expect(sim.dominantGripe(office)).toBe("access");
@@ -90,12 +114,11 @@ describe("dominantGripe (the pre-notice main gripe)", () => {
     sim.star = 1;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    sim.buildTransport("elevatorStandard", C, 1, 2);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
     // An office and a condo a few tiles apart on the same served floor: the
     // office noise carries across the built floor into the condo's 21-tile band.
-    sim.tower.place("office", 2, C - 12);
-    const cr = sim.tower.place("condo", 2, C + 4);
-    const condo = sim.tower.units.find((u) => u.id === cr.unitId)!;
+    expectOk(sim.tower.place("office", 2, C - 12));
+    const condo = placeUnit(sim, "condo", 2, C + 4);
     condo.state = "occupied";
     condo.satisfaction = 0.5; // unhappy but not yet on notice
     expect(sim.noiseAfflicted(condo)).toBe(true);
@@ -131,9 +154,8 @@ describe("the Main gripe inspector line", () => {
     lay(sim, "floor", 2);
     // Shaft mid-lot, office at the far right: the floor is served but the
     // office's nearest shaft sits well past the walk tolerance (W1).
-    sim.buildTransport("elevatorStandard", C, 1, 2);
-    const r = sim.tower.place("office", 2, GRID.width - 12);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+    const office = placeUnit(sim, "office", 2, GRID.width - 12);
     office.state = "occupied";
     office.satisfaction = 0.5;
     expect(sim.dominantGripe(office)).toBe("transportFar");
@@ -149,8 +171,7 @@ describe("the Main gripe inspector line", () => {
     sim.star = 1;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    const r = sim.tower.place("office", 2, C);
-    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const office = placeUnit(sim, "office", 2, C);
     office.state = "occupied";
     office.satisfaction = 0.5;
     const text = diagText(sim, office);
