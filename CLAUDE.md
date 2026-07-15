@@ -65,9 +65,31 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   only when a real row exists. The full rule lives in the backlog's "How items
   flow"; `src/tests/backlogIssueMirror.test.ts` enforces the row half in CI.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
+- **Keep a branch's own history readable before it merges.** A tidy branch is
+  a handful of commits that each state a real step. When review nitpicks pile
+  up into a trail of "fix typo", "address review", and "oops" commits, reshape
+  the branch into that coherent set before merge. This tidies the branch only:
+  the integration into `main` stays a merge commit, never a squash-merge (see
+  above). Because `git rebase -i` and `git add -i` are unavailable here,
+  reshape with `git reset --soft <base>` and re-commit, or `git commit --amend`
+  for the tip, then push with `git push --force-with-lease`. Avoid force-pushing
+  in the middle of an active review round. Any push of new commits re-arms the
+  reviewer (Copilot reviews one snapshot at a time), and a force-push also
+  rewrites the history it is reading, so batch the fixes and reshape once,
+  ideally just before requesting review or just before merge.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT
   clear it, and unresolved threads block merge under branch protection.
+- **Enable auto-merge only after Copilot has signed off and CI is green, never
+  speculatively.** Signed off means Copilot has reviewed the PR and left no
+  blocking finding unresolved (an approval, or a review whose comments are all
+  addressed and marked resolved). CI green means every required check has
+  passed, the screenshot drift check included. Do not arm auto-merge before
+  both hold, and do not arm it early so it fires the moment the checks pass.
+  Once both hold, auto-merge using a merge commit (never a squash-merge, per
+  the merge-commits-only rule above) may be armed without asking again.
+  If Copilot raises a finding or a required check fails, hold the PR and fix it
+  rather than let it merge.
 
 ## Canon reference (don't re-derive from memory)
 
