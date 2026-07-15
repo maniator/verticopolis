@@ -168,7 +168,7 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
 
   // Meal-cadence overlay: add outbound `origin -> venue` options during the
   // active meal window. Round-trippers self-schedule their own return leg
-  // after an eating pause (PR A); no `venue -> origin` options are pushed
+  // after an eating pause (the `dwelling` state, PR A); no `venue -> origin` options are pushed
   // here. The existing branches above stay untouched; meal options fold into
   // the same weighted pool `rng.pick` fires from. `MAX_PEOPLE` at the top
   // of the method caps the whole thing so tuning meal weights alone bounds
@@ -194,7 +194,7 @@ export function pushMealOptions(
   const w = MEAL_WINDOWS[window];
   // Normalized position across the window, [0..1). At the start of the
   // window the outbound weight is 1 and only outbound trips spawn; returns
-  // are self-scheduled by round-trippers on eating-timer expiry (PR A), so
+  // are self-scheduled by round-trippers on dwell-timer expiry (PR A), so
   // no separate returnWeight is applied here. Include the sub-hour fraction
   // so the profile shifts within an hour, not in one-hour steps.
   const hourFrac = clock.minuteOfDay / 60 - w.start;
@@ -253,7 +253,7 @@ export function pushMealOptions(
 
   // Per-window contribution. Outbound spawns REAL round-trip persons who
   // handle their own return leg after an eating pause (see spawnMealOutbound,
-  // advance's `eating` case, and transitionToReturn). The aggregate return
+  // advance's `dwelling` case, and transitionToReturn). The aggregate return
   // branch that pushed `venue -> origin` options was retired in PR A.
   //
   // The base coefficient is 3 to preserve the shipped pool weight against
@@ -276,7 +276,7 @@ export function pushMealOptions(
  * kind whose `visibleOccupants > 0` (a worker still IN the room, not
  * already out). Increments the origin's `outForMeal` and stamps
  * `originUnitId` on the spawned person; the person self-transitions to
- * `eating` on arrival and to a return trip on eat-timer expiry.
+ * `dwelling` on arrival and to a return trip on dwell-timer expiry.
  *
  * If no candidate exists (all workers already out), the call is a no-op:
  * the caller's `rng.pick` fired but no person spawns. The `MAX_PEOPLE` cap

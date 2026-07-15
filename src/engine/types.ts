@@ -233,7 +233,7 @@ export interface Unit {
    *  (fastFood / restaurant / shop). Not persisted: the field is omitted from
    *  serialization, so after a reload it is `undefined` and census reads treat
    *  it as 0 via `?? 0`; meal round-trippers rebuild the count organically.
-   *  Incremented when a person enters the `eating` state at this venue;
+   *  Incremented when a person enters the `dwelling` state at this venue;
    *  decremented when they leave. Only meaningful for commercial kinds. See
    *  {@link isCommercialKind}. */
   customersIn?: number;

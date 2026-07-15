@@ -3,7 +3,7 @@ title: Venue People Routing (Party Hall, Cinema, Wedding Hall)
 game_type: simulation
 platforms: browser
 created: 2026-07-14
-updated: 2026-07-14
+updated: 2026-07-15
 ---
 
 # Verticopolis Venue People Routing - Game Design Document
@@ -168,9 +168,11 @@ gives.
 - Dwell times (in-game minutes, uniform draw, converted through
   `CROWD_SECONDS_PER_MINUTE` like meals): cinema 90-120 (a showing), party
   hall 60-120 (an event).
-- Blockbuster crowd: while a cinema is showing a blockbuster, its visit
-  option is pushed twice per spawn round instead of once (bigger crowd,
-  canon), still bounded by `MAX_PEOPLE` and the attendance cap.
+- Blockbuster crowd: while a cinema is showing a blockbuster, every
+  eligible origin's visit option is contributed twice per spawn round, with
+  the extra contribution aimed at the floors holding a blockbuster house
+  (bigger crowd, canon), still bounded by `MAX_PEOPLE` and the attendance
+  cap.
 - Cinema leaves the one-way ambient venue pool (`openVenues`) and moves to
   this round-trip flow; shop, restaurant, and fast food keep their existing
   one-way ambient trips plus meal round-trips. The late-night meal window
@@ -255,8 +257,8 @@ One epic, four stories. Summary here; detail in `epics.md`.
 | Story | Scope |
 |---|---|
 | E1-S1 | Attendance ledger: catalog caps, arrival/departure tally split, occupants mirror, load reset, census-neutrality guards |
-| E1-S2 | Entertainment visit flow: lobby-origin round-trips (no-origin return leg), cinema + party hall options, dwell times, blockbuster weighting, cinema out of the one-way pool |
-| E1-S3 | Party hall hotel-guest mingling (hotel-origin visits on the meal round-trip accounting) |
+| E1-S2 | Entertainment visit flow: outside-origin round-trips through the street door (no-origin return leg), cinema + party hall options, dwell times, blockbuster weighting, cinema out of the one-way pool |
+| E1-S3 | Room-origin visits on the meal round-trip accounting: hotel mingling (canon), condo residents, office matinees, per the visit-origin matrix |
 | E1-S4 | Weekend wedding visits |
 
 ## Success Metrics

@@ -45,8 +45,10 @@ export type VisitOrigin = "outside" | "condo" | "office" | "hotel";
 /** Per-venue origin mix. Everyone can arrive from outside; residents and
  *  hotel guests go out to the movies and to parties (canon calls out hotel
  *  guests mingling at the party hall); office workers catch a matinee while
- *  the office is staffed (presence self-gates: `staffedOffices` empties at
- *  18:00 and on weekends). Wedding guests are invited from outside only. */
+ *  the office is staffed (`staffedOffices` empties at 18:00 and on weekends,
+ *  with up to one outer step of lag at the boundary: spawning reads the
+ *  bins before the hourly presence pass, the same staleness every spawn bin
+ *  has). Wedding guests are invited from outside only. */
 const VISIT_ORIGINS: Record<"cinema" | "partyHall" | "weddingHall", VisitOrigin[]> = {
   cinema: ["outside", "condo", "office", "hotel"],
   partyHall: ["outside", "condo", "hotel"],
@@ -93,16 +95,16 @@ export function pushVenueVisitOptions(
   const cinemas = floors.venuesByKind.cinema;
   if (cinemas?.length) {
     pushVisits("cinema", cinemas);
-    // A blockbuster month draws a bigger crowd (canon): one extra option
-    // contribution, aimed at the FLOORS that hold a blockbuster house so the
-    // boost lands there and not uniformly across every cinema floor; the
-    // candidate doubling in spawnVenueVisit then settles ties on a floor
-    // holding both a blockbuster and a plain cinema.
+    // A blockbuster month draws a bigger crowd (canon): every eligible
+    // origin's visit option is contributed a second time, aimed at the
+    // FLOORS that hold a blockbuster house so the boost lands there and not
+    // uniformly across every cinema floor. The whole mix doubles (street
+    // visitors, residents, workers, guests alike); the candidate doubling in
+    // spawnVenueVisit then settles ties on a floor holding both a
+    // blockbuster and a plain cinema.
     if (crowd.blockbusters.size > 0) {
       const bbFloors = blockbusterCinemaFloors(crowd, floors, cinemas);
-      if (bbFloors.length) {
-        options.push(() => spawnVenueVisit(crowd, tower, "cinema", bbFloors, floors, hour, "outside"));
-      }
+      if (bbFloors.length) pushVisits("cinema", bbFloors);
     }
   }
   const halls = floors.venuesByKind.partyHall;
@@ -153,6 +155,11 @@ export function spawnVenueVisit(
   origin: VisitOrigin,
 ): void {
   if (!isOpenAt(kind, hour)) return;
+  // The matrix is the contract even for direct callers (tests, future
+  // spawners): an origin row a venue does not declare never spawns, so
+  // condo-origin wedding guests cannot exist through any entry point.
+  const rows = (VISIT_ORIGINS as Partial<Record<FacilityKind, VisitOrigin[]>>)[kind];
+  if (!rows?.includes(origin)) return;
   const venueFloor = crowd.rng.pick(venueFloors);
   const candidates = (floors.unitsByFloor.get(venueFloor) ?? []).filter(
     (u) =>

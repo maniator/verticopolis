@@ -96,7 +96,7 @@ export class Crowd {
 
   /**
    * Venue-associated meal-customer census: how many tower occupants are
-   * currently out on a meal round-trip (heading to a venue, `eating`, or
+   * currently out on a meal round-trip (heading to a venue, `dwelling`, or
    * returning). This is a separate venue-side census seam for meal traffic; it
    * does not change HUD population or star-rating population, which stay on the
    * canonical room census.

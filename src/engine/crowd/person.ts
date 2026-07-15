@@ -63,17 +63,18 @@ export interface Person {
   /** Unit id of the meal venue chosen at spawn for a round-trip meal person;
    *  `destX` points inside this unit's footprint. Distinct from `venueUnitId`:
    *  this records the intent (set on spawn), while `venueUnitId` records the
-   *  census count actually taken (set on eating entry), so a give-up before
+   *  census count actually taken (set on dwell entry), so a give-up before
    *  arrival never decrements a count that was never incremented. */
   mealVenueId?: number;
   /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
-   *  person is currently eating. Set when the person enters `eating` state;
+   *  person is currently attending. Set when the person enters the
+   *  `dwelling` state;
    *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
    *  all non-meal persons and for eaters at non-commercial destinations. */
   venueUnitId?: number;
   /** True when this counted eater came from a HOTEL origin, so finish() also
    *  decrements the venue's `hotelCustomersIn` (the 4-star-plus census
-   *  exclusion). Captured at eating entry, when the origin still exists. */
+   *  exclusion). Captured at dwell entry, when the origin still exists. */
   countedHotelGuest?: boolean;
   /** Unit id of the ORIGIN room for a round-trip meal person (an office,
    *  condo, or hotel room whose visible occupancy dropped by 1 when this

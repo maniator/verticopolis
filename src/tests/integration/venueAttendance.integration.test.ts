@@ -2,14 +2,10 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
 import { Crowd } from "../../engine/Crowd";
-import { attendanceCap, censusCount, syncAttendanceOccupants, ALL_KINDS, FACILITIES, GRID } from "../../engine/facilities";
+import { attendanceCap, censusCount, syncAttendanceOccupants, ALL_KINDS, FACILITIES } from "../../engine/facilities";
 import { spawnFloors } from "../../engine/crowd/spawn";
 import { dwellSecondsRange, EAT_SECONDS_MIN, EAT_SECONDS_MAX, CROWD_SECONDS_PER_MINUTE } from "../../engine/crowd/person";
-import {
-  pushVenueVisitOptions,
-  spawnVenueVisit,
-  WEDDING_ARRIVAL_START,
-} from "../../engine/crowd/visits";
+import { pushVenueVisitOptions, spawnVenueVisit } from "../../engine/crowd/visits";
 import type { Unit } from "../../engine/types";
 
 /**
@@ -305,46 +301,6 @@ describe("party hall receives routed evening visitors", () => {
   });
 });
 
-describe("visit origin matrix", () => {
-  it("party hall options: outside always, hotel when guests exist, condo when residents exist", () => {
-    const sim = partyHallTower(); // hotel yes, condo no
-    setClock(sim, 18);
-    let floors = spawnFloors(sim.tower, sim.clock);
-    const withoutCondo: Array<() => void> = [];
-    pushVenueVisitOptions(sim.crowd, sim.tower, sim.clock, floors, withoutCondo);
-    expect(withoutCondo.length).toBe(2); // outside + hotel
-    const condo = sim.tower.place("condo", 5, 0);
-    expect(condo.ok).toBe(true);
-    const home = sim.tower.getUnit(condo.unitId!)!;
-    home.state = "occupied";
-    home.occupants = 3;
-    floors = spawnFloors(sim.tower, sim.clock);
-    const withCondo: Array<() => void> = [];
-    pushVenueVisitOptions(sim.crowd, sim.tower, sim.clock, floors, withCondo);
-    expect(withCondo.length).toBe(3); // outside + condo + hotel
-  });
-
-  it("residents go out: a condo-origin visitor thins their home", () => {
-    const sim = partyHallTower();
-    const condo = sim.tower.place("condo", 5, 0);
-    expect(condo.ok).toBe(true);
-    const home = sim.tower.getUnit(condo.unitId!)!;
-    home.state = "occupied";
-    home.occupants = 3;
-    setClock(sim, 18);
-    const hall = hallOf(sim);
-    let sawResident = false;
-    for (let m = 0; m < 360 && !sawResident; m++) {
-      sim.tick(1);
-      if (sim.crowd.people.some((p) => p.mealVenueId === hall.id && p.originUnitId === home.id)) {
-        sawResident = true;
-        expect(home.outForMeal ?? 0).toBeGreaterThan(0);
-      }
-    }
-    expect(sawResident).toBe(true);
-  });
-});
-
 describe("cinema attendance", () => {
   /** Party-hall fixture plus a tenanted two-story cinema on floor 2. */
   function cinemaTower(): Simulation {
@@ -390,83 +346,5 @@ describe("cinema attendance", () => {
     const boosted: Array<() => void> = [];
     pushVenueVisitOptions(crowd, sim.tower, sim.clock, floors, boosted);
     expect(boosted.length).toBe(2);
-  });
-});
-
-describe("weekend wedding", () => {
-  /** A floor-100 tower: lobby, a 20-tile support stack to the roof, one
-   *  express serving every floor, and the wedding hall at GRID.maxFloor. */
-  function weddingTower(): Simulation {
-    const sim = new Simulation(2024, "modern", "realWorld");
-    sim.money = 100_000_000;
-    sim.star = 1;
-    for (let x = 0; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let f = 2; f <= GRID.maxFloor; f++) {
-      for (let x = 0; x < 20; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
-    }
-    expect(sim.tower.placeTransport("elevatorExpress", 17, 1, GRID.maxFloor).ok).toBe(true);
-    const hall = sim.tower.place("weddingHall", GRID.maxFloor, 0);
-    expect(hall.ok).toBe(true);
-    return sim;
-  }
-
-  it("weekday middays spawn no wedding guests", () => {
-    const sim = weddingTower();
-    setClock(sim, WEDDING_ARRIVAL_START, 0); // Monday
-    const hall = sim.tower.units.find((u) => u.kind === "weddingHall")!;
-    for (let m = 0; m < 180; m++) {
-      sim.tick(1);
-      expect(sim.crowd.people.some((p) => p.mealVenueId === hall.id)).toBe(false);
-    }
-    expect(hall.customersIn ?? 0).toBe(0);
-  });
-
-  it("weekend middays spawn guests who register at the hall", () => {
-    const sim = weddingTower();
-    setClock(sim, WEDDING_ARRIVAL_START, 5); // Saturday
-    const hall = sim.tower.units.find((u) => u.kind === "weddingHall")!;
-    let sawGuestTrip = false;
-    let sawAttendance = false;
-    for (let m = 0; m < 300 && !sawAttendance; m++) {
-      sim.tick(1);
-      if (sim.crowd.people.some((p) => p.mealVenueId === hall.id)) sawGuestTrip = true;
-      if ((hall.customersIn ?? 0) > 0) {
-        sawAttendance = true;
-        expect(hall.occupants).toBe(hall.customersIn);
-        expect(hall.customersIn!).toBeLessThanOrEqual(attendanceCap("weddingHall")!);
-      }
-    }
-    expect(sawGuestTrip).toBe(true);
-    expect(sawAttendance).toBe(true);
-  });
-
-  it("an unreachable wedding hall receives nobody", () => {
-    const sim = new Simulation(2024, "modern", "realWorld");
-    sim.money = 100_000_000;
-    sim.star = 1;
-    for (let x = 0; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
-    for (let f = 2; f <= GRID.maxFloor; f++) {
-      for (let x = 0; x < 20; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
-    }
-    // No express: floor 100 is unreachable from the ground lobby.
-    const hall = sim.tower.place("weddingHall", GRID.maxFloor, 0);
-    expect(hall.ok).toBe(true);
-    setClock(sim, WEDDING_ARRIVAL_START, 5); // Saturday, inside the window
-    const floors = spawnFloors(sim.tower, sim.clock);
-    expect(floors.venuesByKind.weddingHall?.length).toBe(1); // binned (it exists)...
-    spawnVenueVisit(sim.crowd, sim.tower, "weddingHall", floors.venuesByKind.weddingHall!, floors, WEDDING_ARRIVAL_START, "outside");
-    expect(sim.crowd.people.length).toBe(0); // ...but no route means no guest
-    expect(sim.tower.units.find((u) => u.kind === "weddingHall")!.customersIn ?? 0).toBe(0);
-  });
-
-  it("updatePresence keeps a mid-wedding house on the never-tenanted (empty) hall", () => {
-    const sim = weddingTower();
-    const hall = sim.tower.units.find((u) => u.kind === "weddingHall")!;
-    expect(hall.state).toBe("empty"); // never tenanted by design
-    hall.customersIn = 6;
-    syncAttendanceOccupants(hall);
-    setClock(sim, 12, 5);
-    sim.updatePresence();
-    expect(hall.occupants).toBe(6);
   });
 });

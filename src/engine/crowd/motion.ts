@@ -59,7 +59,7 @@ export function advance(crowd: Crowd, dtSec: number, tower: Tower): void {
     // the trip's ride distance so a legitimate long haul up a tall tower
     // isn't culled mid-ride.
     const patience = (p.staff ? STAFF_GIVE_UP : GIVE_UP) + tripFloors(p) * RIDE_SECONDS_PER_FLOOR;
-    // `eating` is a stationary meal pause at the venue (PR A); it is neither
+    // `dwelling` is a stationary venue stay (a meal or an attendance visit);
     // "travelling" nor a service the give-up valve should cull. Excluding it
     // here keeps a long-tail eater (up to EAT_SECONDS_MAX plus their outbound
     // trip's age accumulation) from being finished mid-eat and mis-flagged as
@@ -345,28 +345,28 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
   }
 }
 
-/** Mutate a dwelling (`eating`) person into their return leg. Silent despawn
+/** Mutate a `dwelling` person into their return leg. Silent despawn
  *  on any route failure or missing origin unit; the `finish` path will handle
  *  the `outForMeal` decrement (guarded so a bulldozed origin does not ghost-
  *  decrement a fresh unit built on the same floor after). */
 function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   const origin = originUnit(tower, p);
   if (!origin && p.originUnitId !== undefined) {
-    // Ghost origin: unit was bulldozed while the person was eating, so there
+    // Ghost origin: unit was bulldozed while the person was dwelling, so there
     // is no origin unit left to decrement. Just despawn.
     p.originUnitId = undefined;
     finish(crowd, p, tower);
     return;
   }
   const venueFloor = p.floor;
-  // A round-tripper with an origin room heads back to it; a lobby-origin
-  // attendance visitor (no origin unit was ever stamped) heads back to the
+  // A round-tripper with an origin room heads back to it; an outside
+  // visitor (no origin unit was ever stamped) heads back to the
   // floor they spawned on (`floors[0]` still holds the outbound route here)
   // and despawns there, leaving the tower the way they entered it.
   const originFloor = origin ? origin.floor : p.floors[0];
   const r = crowd.route(tower, venueFloor, originFloor);
   if (!r) {
-    // Return route unreachable (transport degraded while eating). The person
+    // Return route unreachable (transport degraded while dwelling). The person
     // "went home some other way"; the accounting must still balance, so
     // finish() decrements outForMeal via the ghost-guarded path below.
     p.returning = true;
@@ -426,7 +426,7 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
     }
   }
   // Meal round-tripper: decrement the origin's outForMeal on ANY despawn
-  // path (successful return arrival, mid-transit give-up, mid-eating
+  // path (successful return arrival, mid-transit give-up, mid-dwell
   // give-up, unreachable-return), so the accounting always balances for a
   // person whose spawn incremented outForMeal. `tower` is REQUIRED (not
   // optional) so a future call site cannot accidentally leak a decrement
@@ -441,7 +441,7 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
     tower.bumpMealOverlayRevision();
   }
   // Venue customer: decrement the destination's live customer count on any
-  // despawn path (successful return, mid-eating give-up, ghost origin).
+  // despawn path (successful return, mid-dwell give-up, ghost origin).
   // O(1): getUnit uses an internal Map. Guarded the same way as outForMeal.
   if (p.venueUnitId !== undefined) {
     const venue = tower.getUnit(p.venueUnitId);
@@ -450,7 +450,7 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
       // Attendance venues keep their occupants mirror in step with the tally
       // (a no-op for every other kind).
       syncAttendanceOccupants(venue);
-      // Mirror the hotel-origin split taken at eating entry (via the flag
+      // Mirror the hotel-origin split taken at dwell entry (via the flag
       // rather than a fresh origin lookup, so a mid-meal bulldoze cannot
       // unbalance it).
       if (p.countedHotelGuest && (venue.hotelCustomersIn ?? 0) > 0) {

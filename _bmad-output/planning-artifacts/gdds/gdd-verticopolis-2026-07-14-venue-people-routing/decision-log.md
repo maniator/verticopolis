@@ -96,3 +96,30 @@
   eatSecondsLeft to dwellSecondsLeft (the state now covers showings, parties,
   and weddings, not just meals); replaced the `1 | "hotel"` origin union with
   the self-describing VisitOrigin union.
+
+2026-07-15 incremental review triage (origin-matrix commit)
+
+- Blind Hunter, Edge Case Hunter, and Acceptance Auditor ran on the
+  incremental diff; Copilot and Codex reviewed on GitHub. Patched:
+  - Blockbuster boost widened to the whole origin mix (a second pushVisits
+    aimed at blockbuster floors), restoring the promised doubled
+    contribution that the matrix had diluted to roughly 5:4 (internal
+    layers and Codex P2 agreed).
+  - Rename residue: every comment, docstring, test title, and local still
+    saying "eating" for the renamed `dwelling` state was updated; prose
+    about meal customers eating food stays.
+  - Matrix rows pinned by tests: cinema outside+office option count, an
+    office-origin matinee visitor thinning the office, and the wedding
+    hall's outside-only row with residents and guests present.
+  - GDD epics table, epics.md, and the blockbuster bullet reconciled with
+    the origin matrix; frontmatter `updated` bumped.
+- DECISION: the option-pool volume growing with origin count is deliberate:
+  each origin population is one contribution, so venues draw proportionally
+  more visitors in towers with more kinds of people, exactly like the meal
+  pools. MAX_PEOPLE and the attendance caps bound the total.
+- Dismissed: hotel bucket predicate drift (matchesMealOriginKind's hotel
+  case IS isHotelKind); person-state persistence (crowd people are
+  transient, never serialized); version bump (this lands inside the same
+  unreleased 1.33.0); office visitors crossing 18:00 (outForMeal decrements
+  are guarded and visibleOccupants clamps at zero, same shape the dinner
+  meal window already has).

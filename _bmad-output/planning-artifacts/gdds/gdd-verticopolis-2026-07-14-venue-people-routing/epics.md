@@ -25,9 +25,9 @@ derive honest visible attendance from them. Review skill: `/gds-code-review`
 ## E1-S2: Entertainment visit flow (cinema + party hall)
 
 - New spawn contributor `pushVenueVisitOptions` (additive, like
-  `pushMealOptions`): lobby-origin round-trip visits to open, tenanted,
-  reachable cinema and party hall floors, binned once per outer step in
-  `spawnFloors`.
+  `pushMealOptions`): outside-origin round-trip visits (the street door,
+  floor 1 today; the metro platform later) to open, tenanted, reachable
+  cinema and party hall floors, binned once per outer step in `spawnFloors`.
 - No-origin return leg: a round-tripper without `originUnitId` returns to its
   outbound origin floor (`floors[0]`) after dwell instead of despawning at
   the venue; ghost-origin behavior (origin unit bulldozed) is unchanged.
@@ -43,13 +43,16 @@ derive honest visible attendance from them. Review skill: `/gds-code-review`
   attendance rises and drains across an evening; blockbuster doubles option
   contribution; return leg completes to floor 1.
 
-## E1-S3: Party hall hotel-guest mingling
+## E1-S3: Room-origin visits (the visit-origin matrix)
 
-- Hotel-floor origin option for party hall visits, reusing the meal
-  round-trip origin accounting (`originUnitId`, `outForMeal`,
-  `visibleOccupants` thinning, hotel-guest census split flag).
-- Tests: hotel room thins while its guest attends; accounting balances on
-  give-up; census neutrality holds for hotel-origin attendees.
+- Room-origin options reusing the meal round-trip origin accounting
+  (`originUnitId`, `outForMeal`, `visibleOccupants` thinning): hotel guests
+  mingle at the party hall (canon), condo residents attend the cinema and
+  the party hall, office workers catch a matinee while staffed. Staff kinds
+  are excluded (on shift).
+- Tests: hotel room, condo, and office thin while their person attends;
+  accounting balances on give-up; census neutrality holds for room-origin
+  attendees; per-venue option counts pin the matrix rows.
 
 ## E1-S4: Weekend wedding visits
 
