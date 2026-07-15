@@ -217,7 +217,11 @@ export function deserialize(raw: SerializedGame): Simulation {
         state,
         label: typeof u.label === "string" ? u.label : FACILITIES[u.kind].name,
         satisfaction: Math.max(0, Math.min(1, num(u.satisfaction, 1))),
-        occupants: Math.max(0, num(u.occupants, 0)),
+        // Attendance venues' occupants mirrors the transient customersIn
+        // tally (zeroed below), so it restores to 0 no matter what the save
+        // carries: a hand-edited or legacy save can't seed a phantom
+        // audience the live crowd would never drain.
+        occupants: FACILITIES[u.kind].attendance !== undefined ? 0 : Math.max(0, num(u.occupants, 0)),
         // Household size, only kept for a CURRENTLY-sold condo, and sanitized by
         // the rule-set (Classic strips it so its condos read the flat 3; Modern
         // clamps into the 2..5 generator band). A not-sold condo (legacy dead

@@ -1718,3 +1718,26 @@ departed while culled never flashes at a stale position). Standing defers:
   into a commit this story. Consider pointing its output at `test-results/`
   (or gating the write behind the screenshot workflow env) so a local e2e run
   can never dirty the committed gallery.
+
+### Deferred from: code review of venue-people-routing (`/gds-code-review`, 2026-07-14)
+
+- **Party hall carries roughly 2x the cinema's visit-option weight in hotel
+  towers (Blind, low).** `pushVenueVisitOptions` contributes one lobby option
+  plus one hotel-mingle option for the party hall, versus a single lobby
+  option for a plain cinema. This mirrors how the meal pools contribute one
+  option per origin population and reads as livelier halls in hotel towers,
+  which fits the canon "hotel guests mingle" flavor. Deliberate for now;
+  retune with explicit weights only if halls visibly starve cinemas.
+- **Hotel-mingle spawn picks a hotel floor before a room (Blind, low).** A
+  bad floor draw (no in-room guest) no-ops instead of retrying, so mingle
+  frequency scales with the fraction of hotel floors holding guests, not
+  guest count. This is the exact idiom `spawnMealOutbound` uses for meal
+  origins; keeping the two aligned beats optimizing one. Revisit both
+  together if origin sampling ever needs to be population-proportional.
+- **The attendance tally has exactly one decrement path, `finish()` (Blind,
+  med, defused).** Every current despawn route funnels through it (verified
+  by the Edge Case Hunter), and production never wholesale-clears
+  `crowd.people` while units persist (`Crowd.reset` has no engine caller;
+  loads rebuild the sim and strip the tally). The standing rule for future
+  work: any new despawn shortcut MUST route through `finish()`, or add a
+  reconciliation pass first. No repair pass exists by design today.

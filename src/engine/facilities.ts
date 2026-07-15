@@ -23,6 +23,7 @@ export {
   openHoursPerDay,
   isCommercialKind,
   hasBusinessHours,
+  attendanceCap,
   isElevatorKind,
   isStaffOnlyTransport,
   isStaffTransportKind,
@@ -40,6 +41,7 @@ export {
 export {
   residentCount,
   censusCount,
+  syncAttendanceOccupants,
   STAR_THRESHOLDS,
   TOWER_POPULATION,
   RECYCLING_POP_PER_CENTER,

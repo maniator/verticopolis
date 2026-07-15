@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { GRID } from "../../engine/facilities";
+import { GRID, attendanceCap } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { drawRoom, type RoomCtx } from "../../render/pixelSprites";
 import { buildTDT } from "../../storage/tdtExport";
@@ -90,11 +90,15 @@ describe("save round-trip paints identical pixels (.vctower serialize/deserializ
     for (const name of RESTAURANT_SUBTYPES) placeRetail("restaurant", name);
     for (const name of SHOP_SUBTYPES) placeRetail("shop", name);
     sim.tower.place("cinema", 13, 0);
-    // Occupy everything so the art draws its lived-in state.
+    // Occupy everything so the art draws its lived-in state. Attendance
+    // venues (the cinema here) are exempt from the occupants stamp: their
+    // occupants mirrors the transient live-attendance tally and restores to
+    // 0 on load by design, so a pinned nonzero value would (correctly) fail
+    // the round-trip. Their empty-house paint is still compared.
     for (const u of sim.tower.units) {
       if (u.kind === "floor" || u.kind === "lobby") continue;
       if (u.state === "empty" || u.state === "construction") u.state = "occupied";
-      if (u.occupants === 0) u.occupants = 3;
+      if (u.occupants === 0 && attendanceCap(u.kind) === undefined) u.occupants = 3;
     }
     return sim;
   }

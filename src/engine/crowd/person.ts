@@ -25,7 +25,7 @@ export type StaffKind = "security" | "medical" | "housekeeping" | "recycling";
  * steady, watchable pace regardless of the game-speed time compression.
  */
 
-export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "eating" | "done";
+export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "dwelling" | "done";
 
 export interface Person {
   id: number;
@@ -63,17 +63,18 @@ export interface Person {
   /** Unit id of the meal venue chosen at spawn for a round-trip meal person;
    *  `destX` points inside this unit's footprint. Distinct from `venueUnitId`:
    *  this records the intent (set on spawn), while `venueUnitId` records the
-   *  census count actually taken (set on eating entry), so a give-up before
+   *  census count actually taken (set on dwell entry), so a give-up before
    *  arrival never decrements a count that was never incremented. */
   mealVenueId?: number;
   /** Unit id of the commercial venue (fastFood / restaurant / shop) where this
-   *  person is currently eating. Set when the person enters `eating` state;
+   *  person is currently attending. Set when the person enters the
+   *  `dwelling` state;
    *  used to decrement `venueUnit.customersIn` when they leave. Undefined for
    *  all non-meal persons and for eaters at non-commercial destinations. */
   venueUnitId?: number;
   /** True when this counted eater came from a HOTEL origin, so finish() also
    *  decrements the venue's `hotelCustomersIn` (the 4-star-plus census
-   *  exclusion). Captured at eating entry, when the origin still exists. */
+   *  exclusion). Captured at dwell entry, when the origin still exists. */
   countedHotelGuest?: boolean;
   /** Unit id of the ORIGIN room for a round-trip meal person (an office,
    *  condo, or hotel room whose visible occupancy dropped by 1 when this
@@ -82,13 +83,14 @@ export interface Person {
    *  `originUnit.outForMeal`, guarded so a bulldozed origin cannot ghost-
    *  decrement a fresh unit built in the same slot after. */
   originUnitId?: number;
-  /** Remaining crowd-seconds in the `eating` state (a stationary sit at the
-   *  destination floor after the outbound trip's `toDest` completes). Only
-   *  set for round-trip meal persons; drained in the `advance` loop. */
-  eatSecondsLeft?: number;
+  /** Remaining crowd-seconds in the `dwelling` state (a stationary stay at
+   *  the destination floor after the outbound trip's `toDest` completes: a
+   *  meal, a showing, a party, a wedding). Only set for round-trippers;
+   *  drained in the `advance` loop. */
+  dwellSecondsLeft?: number;
   /** True once the outbound arrival has transitioned this person into their
    *  return trip (venue -> origin). Distinguishes the two `toDest` completions
-   *  a round-tripper has (outbound arrival triggers eating; return arrival
+   *  a round-tripper has (outbound arrival triggers the dwell; return arrival
    *  triggers the outForMeal decrement + despawn). */
   returning?: boolean;
 }
@@ -179,6 +181,26 @@ const EAT_MINUTES_MIN = 30;
 const EAT_MINUTES_MAX = 60;
 export const EAT_SECONDS_MIN = EAT_MINUTES_MIN * CROWD_SECONDS_PER_MINUTE;
 export const EAT_SECONDS_MAX = EAT_MINUTES_MAX * CROWD_SECONDS_PER_MINUTE;
+
+/** Attendance-visit dwell windows per entertainment venue, in in-game minutes:
+ *  a cinema visit spans a showing, a party runs longer, a wedding longer
+ *  still. Design tuning (not canon figures), sized so a visit fits inside the
+ *  venue's open hours with the crowd visibly overlapping into a full house. */
+const ATTEND_MINUTES: Partial<Record<FacilityKind, { min: number; max: number }>> = {
+  cinema: { min: 90, max: 120 },
+  partyHall: { min: 60, max: 120 },
+  weddingHall: { min: 120, max: 180 },
+};
+
+/** The stationary-dwell window (in crowd-seconds) for a round-tripper at a
+ *  venue of `kind`: the attendance window for entertainment venues, the meal
+ *  window for everything else (food venues, and the fallback when the venue
+ *  was bulldozed before arrival and its kind is unknown). */
+export function dwellSecondsRange(kind: FacilityKind | undefined): { min: number; max: number } {
+  const m = kind === undefined ? undefined : ATTEND_MINUTES[kind];
+  if (!m) return { min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX };
+  return { min: m.min * CROWD_SECONDS_PER_MINUTE, max: m.max * CROWD_SECONDS_PER_MINUTE };
+}
 
 /**
  * Visible occupant count for a room, as seen by the renderer and (PR B) the
