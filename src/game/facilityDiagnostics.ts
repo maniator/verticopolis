@@ -131,11 +131,12 @@ export function hasAccessDiagnostic(u: Unit): boolean {
 }
 
 /**
- * The concatenated diagnostic lines for a unit, in card order: access, hotel
- * star-count, parking ramp/demand, office long-walk, commercial lobby distance,
- * recycling capacity, the on-notice countdown, and the retail patronage block.
- * Any line that does not apply returns "", so the result is empty for a plain,
- * well-placed, non-retail unit with nothing to warn about.
+ * The diagnostic lines for a unit, in card order: access, hotel star-count,
+ * parking ramp/demand, office long-walk, commercial lobby distance, recycling
+ * capacity, the on-notice countdown, and the retail patronage block. Each line
+ * is a lit `TemplateResult`; a rule that does not apply pushes nothing, so the
+ * returned array is empty for a plain, well-placed, non-retail unit with nothing
+ * to warn about.
  */
 export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] {
   // Built in card order: access, hotel, parking, walk-far, commercial-lobby,
@@ -260,8 +261,8 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
 /**
  * The transport diagnostic line: how full a passenger elevator's cars run on
  * average, with a near-capacity nudge. Staff-only service elevators carry no
- * passenger load and stairs/escalators have none, so both return "". Shared by
- * the hover card and the mobile transport editor.
+ * passenger load and stairs/escalators have none, so both return an empty array.
+ * Shared by the hover card and the mobile transport editor.
  */
 export function transportDiagnostics(sim: Simulation, t: Transport): TemplateResult[] {
   const util = isElevatorKind(t.kind) ? sim.elevatorUtilization(t.id) : undefined;

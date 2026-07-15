@@ -163,9 +163,11 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // On mobile, fold the inspector card's diagnostics in as a live block between
   // the stats and the controls (one panel, no separate card). Desktop leaves
   // them to the hover card, so the block only exists on mobile.
-  const diag = facilityDiagnostics(sim, u);
-  const diagnostics =
-    mobile && diag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${diag}</div>` : nothing;
+  // Only the mobile fold-in shows the diagnostics, so only the mobile path pays
+  // for computing them (facilityDiagnostics can run a parking flood-fill etc.);
+  // desktop leaves the block to the hover card.
+  const diag = mobile ? facilityDiagnostics(sim, u) : [];
+  const diagnostics = diag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${diag}</div>` : nothing;
   // Canon retail variant titles the editor card too, matching the inspector.
   return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);
 }
@@ -226,8 +228,8 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
   }
   actions.push(edRow(html`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-  const tdiag = transportDiagnostics(sim, t);
-  const diagnostics =
-    mobile && tdiag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>` : nothing;
+  // Desktop leaves the diagnostics to the hover card, so skip the work off mobile.
+  const tdiag = mobile ? transportDiagnostics(sim, t) : [];
+  const diagnostics = tdiag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>` : nothing;
   return editorShell(`transport:${t.id}`, f.name, rows, actions, diagnostics);
 }

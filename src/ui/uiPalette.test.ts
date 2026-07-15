@@ -44,7 +44,7 @@ describe("buildPalette", () => {
     expect(office.getAttribute("aria-label")).toContain("$");
   });
 
-  it("activates a tool item on click and on Enter, dispatching selectTool", () => {
+  it("activates a facility build item on click and on Enter, dispatching selectTool", () => {
     const { ui, palette, selectTool } = stubUI();
     buildPalette(ui);
     const office = palette.querySelector<HTMLElement>('.pal-item[data-kind="office"]')!;
