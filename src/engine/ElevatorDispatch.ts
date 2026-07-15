@@ -179,6 +179,10 @@ export class ElevatorDispatch {
       if (v <= 0) this.waiting.delete(fl);
       else this.waiting.set(fl, v);
     }
+    // This runs every sim step, not just on boundaries, so one set read here
+    // (the set is revision-memoized in tower/routing.ts) trims the flat
+    // minute tick as well as the hourly sweep.
+    const servedSet = tower.servedFloors();
     for (const u of tower.units) {
       // Attendance venues (cinema / party hall / wedding hall): `occupants`
       // mirrors the individually-routed visitors, and those people already
@@ -187,7 +191,7 @@ export class ElevatorDispatch {
       // attendee (and keep phantom demand alive after closing while late
       // dwellers linger), so the mirror stays out of this loop.
       if (attendanceCap(u.kind) !== undefined) continue;
-      if (u.occupants <= 0 || !tower.isFloorServed(u.floor)) continue;
+      if (u.occupants <= 0 || !servedSet.has(u.floor)) continue;
       this.waiting.set(u.floor, Math.min(25, (this.waiting.get(u.floor) ?? 0) + u.occupants * rush * dt * 0.012));
     }
     const pop = tower.totalPopulation();

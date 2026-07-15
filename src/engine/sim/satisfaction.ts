@@ -83,9 +83,12 @@ export function updateSatisfaction(sim: Simulation): void {
   // New notices this tick are batched into one toast (like move-ins) so a
   // tower-wide problem raises a single alarm, not one per unit.
   const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
+  // One set read per sweep instead of a 4-deep delegation per unit: the set
+  // itself is already revision-memoized (tower/routing.ts servedFloors).
+  const servedSet = sim.tower.servedFloors();
   for (const u of sim.tower.units) {
     if (isDormant(u)) continue;
-    const served = sim.tower.isFloorServed(u.floor);
+    const served = servedSet.has(u.floor);
     const cong = congMap ? (congMap.get(u.floor) ?? 0) : globalCong;
     // A bigger Modern household leans harder on the tower: scale only the
     // NEGATIVE access/congestion pressures, never the recovery, so a well-served
@@ -203,7 +206,7 @@ export function updateSatisfaction(sim: Simulation): void {
       const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
       const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk;
       if (noiseCannotEvict && nonNoiseProblem) {
-        u.vacateReason = sim.vacateCause(u, served, cong);
+        u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy);
       }
       const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
       if (!isRelocation && (u.satisfaction >= VACATE_RESCIND || rescindNoise)) {
@@ -225,11 +228,11 @@ export function updateSatisfaction(sim: Simulation): void {
     } else if (leaseTenant && u.satisfaction <= 0) {
       // Give notice: enter the grace period with the attributed cause.
       u.state = "vacating";
-      u.vacateReason = sim.vacateCause(u, served, cong);
+      u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy);
       u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
       notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });
     } else if (u.satisfaction <= 0 && isHotelKind(u.kind)) {
-      sim.vacate(u, sim.vacateCause(u, served, cong));
+      sim.vacate(u, sim.vacateCause(u, served, cong, farWalk, noisy));
     }
   }
   sim.emitNotices(notices);
@@ -262,27 +265,32 @@ export function emitNotices(sim: Simulation, notices: { floor: number; kind: Fac
  * crowding, then an over-market office rent, and finally, for a served,
  * uncongested hotel/condo, sustained office-noise erosion. `access` remains
  * the catch-all for the rare emergency-driven bottom-out.
+ *
+ * `farWalk`/`noisy` accept the flags updateSatisfaction already computed this
+ * tick so the attribution never rescans; when absent (callers outside the
+ * sweep) they recompute through the same predicates.
  */
-export function vacateCause(sim: Simulation, u: Unit, served: boolean, cong: number): VacateReason {
+export function vacateCause(sim: Simulation, u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean): VacateReason {
   if (!served) return "access";
   if (u.floor !== 1 && cong > 1) return "congestion";
   if (u.kind === "office") {
     const cfg = rentConfig("office");
     if (cfg && rentOf(u) > cfg.default) return "rent";
     // A served, market-priced office that still bottomed out did so through the
-    // W1 walk penalty, its nearest shaft is beyond tolerance (ground-floor
-    // offices are exempt, so this only fires above floor 1).
-    if (u.floor !== 1 && sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES) {
+    // W1 walk penalty, its nearest shaft is beyond tolerance. The ground-floor
+    // exemption is an unconditional gate here (offices on floor 1 are never
+    // transport-far), so a precomputed farWalk flag can never override it.
+    if (u.floor !== 1 && (farWalk ?? sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES)) {
       return "transportFar";
     }
     // …or the W2 commercial-noise band next door.
-    if (sim.noiseAfflicted(u)) return "noise";
+    if (noisy ?? sim.noiseAfflicted(u)) return "noise";
     return "access";
   }
   // A served, uncongested hotel/condo that still bottomed out did so through
   // sustained noise erosion (office or commercial within its band), the only
   // remaining satisfaction sink.
-  if (sim.noiseAfflicted(u)) return "noise";
+  if (noisy ?? sim.noiseAfflicted(u)) return "noise";
   return "access";
 }
 
@@ -324,8 +332,29 @@ export function nearestKindWithin(sim: Simulation,
  *  bothered by an office OR commercial within 21. The commercial source set is
  *  the canon {@link isCommercialKind} four (shared with W3). The single
  *  noise-adjacency test, shared by the noise erosion and its cause attribution
- *  so the two can never disagree. */
+ *  so the two can never disagree. Memoized per unit for the lifetime of one
+ *  tower.revision: `noiseAfflictedFresh` is a pure function of layout, and the
+ *  memo clears strictly when tower.revision changes, so every hit equals a
+ *  fresh scan of the current layout no matter when the caller queries. Unit
+ *  STATE is deliberately not an input (a gutted or empty room still radiates
+ *  by kind); anyone adding a state gate here must also drop this memo, see the
+ *  functionalParkingSet precedent. */
 export function noiseAfflicted(sim: Simulation, u: Unit): boolean {
+  if (sim.noiseMemoRev !== sim.tower.revision) {
+    sim.noiseMemo.clear();
+    sim.noiseMemoRev = sim.tower.revision;
+  }
+  const hit = sim.noiseMemo.get(u.id);
+  if (hit !== undefined) return hit;
+  const fresh = noiseAfflictedFresh(sim, u);
+  sim.noiseMemo.set(u.id, fresh);
+  return fresh;
+}
+
+/** The cache-bypassed compute behind {@link noiseAfflicted}: the memo fills
+ *  through this, and the differential test pins memo === fresh across every
+ *  mutation kind, so the two paths cannot drift apart. */
+export function noiseAfflictedFresh(sim: Simulation, u: Unit): boolean {
   if (u.kind === "office") {
     return sim.nearestKindWithin(u, isCommercialKind, OFFICE_NOISE_TILES);
   }
