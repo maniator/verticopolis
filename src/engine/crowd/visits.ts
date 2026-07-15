@@ -14,7 +14,7 @@ import type { Crowd } from "../Crowd";
 import type { Person, SpawnFloors } from "./person";
 import { dwellSecondsRange, visibleOccupants } from "./person";
 import { matchesMealOriginKind } from "./meals";
-import { add, venueHasRoom } from "./trips";
+import { add, insideX, venueHasRoom } from "./trips";
 
 /**
  * Attendance visits: round-trip trips to the entertainment venues (cinema,
@@ -135,6 +135,49 @@ function blockbusterCinemaFloors(crowd: Crowd, floors: SpawnFloors, cinemaFloors
   return out;
 }
 
+/** How often an outside visitor to a ticketed venue rides the train in rather
+ *  than walking through the ground lobby, when a served metro platform is
+ *  available as a second street door. Design tuning (not a canon figure): a
+ *  visible share arrive by train without the platform swamping the ground
+ *  entrance. Only ever consulted for a tower that has an operational,
+ *  reachable metro. */
+const METRO_VISIT_SHARE = 0.5;
+
+/**
+ * Resolve the street door for an `outside` venue visitor: the ground lobby
+ * (floor 1) by default, or a served metro platform for some riders to a
+ * ticketed venue (a film at a cinema, a party at a party hall). Returns the
+ * origin floor and, when a platform is chosen, the station unit so the caller
+ * can stamp the origin x inside its footprint (the platform story carries no
+ * floor tiles for pickX). Every rng draw here is gated behind a present,
+ * operational, transport-served platform, so a tower without one draws nothing
+ * and its spawn stream is byte-identical to before this feature (the golden
+ * master fixture has no metro).
+ */
+function pickOutsideStreetDoor(
+  crowd: Crowd,
+  tower: Tower,
+  floors: SpawnFloors,
+  kind: FacilityKind,
+): { floor: number; station?: Unit } {
+  const GROUND_LOBBY = 1;
+  // Only the ticketed venues draw riders in by train; the wedding hall and the
+  // ambient venue pool keep the ground-lobby entrance.
+  if (kind !== "cinema" && kind !== "partyHall") return { floor: GROUND_LOBBY };
+  // metroStations already holds only operational stations (spawnFloors gates on
+  // isOperational). A platform is a usable street door only when passenger
+  // transport reaches it: the station's middle story, u.floor + 1, matching the
+  // metro commuter spawns. Gating on isFloorServed here (independent of the
+  // separate unroutable-metro spawn guard) keeps this from ever minting a
+  // null-routing visitor.
+  if (floors.metroStations.length === 0) return { floor: GROUND_LOBBY };
+  const served = floors.metroStations.filter((s) => tower.isFloorServed(s.floor + 1));
+  if (served.length === 0) return { floor: GROUND_LOBBY };
+  if (!crowd.rng.chance(METRO_VISIT_SHARE)) return { floor: GROUND_LOBBY };
+  const station = crowd.rng.pick(served);
+  return { floor: station.floor + 1, station };
+}
+
 /**
  * Fire a single attendance round-trip to a venue of `kind`: pick a floor from
  * the bin, a concrete open venue with a free seat on it, and an origin (the
@@ -177,14 +220,22 @@ export function spawnVenueVisit(
       ? candidates.flatMap((u) => (crowd.blockbusters.has(u.id) ? [u, u] : [u]))
       : candidates;
   const venue = crowd.rng.pick(pool);
-  // TODO(metro street door): `outside` resolves to the ground lobby (floor
-  // 1), the tower's only street entrance today. Once the metro platform
-  // lands as a second street door (PR #294), pick the entry point here
-  // (ground lobby or an operational platform) so venue visitors also arrive
-  // by train, matching the metro's "brings huge numbers of visitors" line.
+  // `outside` visitors normally enter at the ground lobby (floor 1). For a
+  // ticketed showing or party, some ride the train in instead: an operational
+  // metro whose platform is served by transport becomes a second street door,
+  // and the visitor routes up from the platform. This is a plain visits-flow
+  // round-tripper whose entry coordinate happens to be the platform; it never
+  // carries `lingerFor` or a metro-departure hold, so it cannot double-wait
+  // (platform hold AND venue dwell). The platform hold and the visit intent
+  // stay disjoint by construction.
   let originFloor = 1;
   let originRoom: Unit | undefined;
-  if (origin !== "outside") {
+  let originStation: Unit | undefined;
+  if (origin === "outside") {
+    const door = pickOutsideStreetDoor(crowd, tower, floors, kind);
+    originFloor = door.floor;
+    originStation = door.station;
+  } else {
     const originFloorBin = originFloorsFor(origin, floors);
     if (originFloorBin.length === 0) return;
     const roomFloor = crowd.rng.pick(originFloorBin);
@@ -202,6 +253,13 @@ export function spawnVenueVisit(
   if (!spawned) return;
   spawned.destX = crowd.rng.int(venue.x, venue.x + venue.width - 1);
   spawned.mealVenueId = venue.id;
+  if (originStation) {
+    // The platform story has no floor tiles for pickX, so stamp the origin x
+    // inside the station footprint (the same treatment the metro-arrival
+    // commuter gets). No `lingerFor` is set: this visitor waits only at the
+    // venue, through the `dwelling` state, not at the platform.
+    spawned.x = insideX(crowd, originStation, 2);
+  }
   if (originRoom) {
     // Room-origin visitors ride the meal round-trip origin accounting: the
     // room's visible occupancy thins while they are out, and every despawn
