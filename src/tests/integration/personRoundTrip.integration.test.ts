@@ -230,14 +230,14 @@ describe("outbound arrival transitions to eating with in-range timer (arch §8 t
     setHour(sim, 12);
     // Pump long enough for a spawn to complete outbound + reach the venue.
     // ~15 min is generous for a 3-floor trip.
-    let seenEating: { eatSecondsLeft?: number } | null = null;
+    let seenEating: { dwellSecondsLeft?: number } | null = null;
     for (let m = 0; m < 30 && !seenEating; m++) {
       sim.tick(1);
-      seenEating = sim.crowd.people.find((p) => p.state === "eating") ?? null;
+      seenEating = sim.crowd.people.find((p) => p.state === "dwelling") ?? null;
     }
     expect(seenEating).not.toBeNull();
-    const eat = seenEating?.eatSecondsLeft ?? -1;
-    // The person may have already decremented eatSecondsLeft by up to one crowd
+    const eat = seenEating?.dwellSecondsLeft ?? -1;
+    // The person may have already decremented dwellSecondsLeft by up to one crowd
     // step (sim.tick(1) advances the crowd by CROWD_SECONDS_PER_MINUTE = 2
     // crowd-seconds) by the time we sample, so allow a 2-second slack under the
     // 60-second minimum. This still fails a bug that sets the timer far below
@@ -248,14 +248,14 @@ describe("outbound arrival transitions to eating with in-range timer (arch §8 t
 });
 
 describe("return trip fires after eating expires (arch §8 test 3)", () => {
-  it("an eating person's route mutates to venue -> origin when eatSecondsLeft hits zero", () => {
+  it("an eating person's route mutates to venue -> origin when dwellSecondsLeft hits zero", () => {
     const sim = officeAndFastFood();
     setHour(sim, 12);
     // Find a person in `eating` state and remember their originUnitId.
     let originId = -1;
     for (let m = 0; m < 30; m++) {
       sim.tick(1);
-      const eater = sim.crowd.people.find((p) => p.state === "eating");
+      const eater = sim.crowd.people.find((p) => p.state === "dwelling");
       if (eater) {
         originId = eater.originUnitId!;
         break;
@@ -263,7 +263,7 @@ describe("return trip fires after eating expires (arch §8 test 3)", () => {
     }
     expect(originId).toBeGreaterThan(0);
     const office = sim.tower.units.find((u) => u.id === originId)!;
-    // Advance long enough for eatSecondsLeft to drain (max 120 crowd-seconds =
+    // Advance long enough for dwellSecondsLeft to drain (max 120 crowd-seconds =
     // ~60 in-game minutes, generously covered by 90 minutes).
     for (let m = 0; m < 90; m++) sim.tick(1);
     // The specific person is either mid-return-trip (state in toShaft/waiting/
@@ -272,7 +272,7 @@ describe("return trip fires after eating expires (arch §8 test 3)", () => {
     // behind, and if a return-trip person is in-flight their route starts at
     // the venue floor (5) and ends at the origin floor (2).
     const stillEatingHere = sim.crowd.people.filter(
-      (p) => p.state === "eating" && p.originUnitId === originId,
+      (p) => p.state === "dwelling" && p.originUnitId === originId,
     );
     expect(stillEatingHere.length).toBe(0);
     const inFlightReturn = sim.crowd.people.find(
@@ -366,7 +366,7 @@ describe("eating customers attach to the venue they were sent to (census attribu
     let sawCountedEater = false;
     for (let m = 0; m < 60; m++) {
       sim.tick(1);
-      const eaters = sim.crowd.people.filter((p) => p.state === "eating");
+      const eaters = sim.crowd.people.filter((p) => p.state === "dwelling");
       for (const p of eaters) {
         // The only census-counted venue in this tower is the fastFood, so every
         // eater must be counted there; a missed count (venueUnitId undefined)
@@ -436,7 +436,7 @@ describe("venue customer capacity: customersIn never exceeds the catalog populat
     let traveler;
     for (let m = 0; m < 30 && !traveler; m++) {
       sim.tick(1);
-      traveler = sim.crowd.people.find((p) => p.mealVenueId === ff.id && p.state !== "eating");
+      traveler = sim.crowd.people.find((p) => p.mealVenueId === ff.id && p.state !== "dwelling");
     }
     expect(traveler).toBeDefined();
     // The venue fills while they travel (stamp the count at capacity, standing
@@ -445,7 +445,7 @@ describe("venue customer capacity: customersIn never exceeds the catalog populat
     for (let m = 0; m < 90; m++) {
       sim.tick(1);
       expect(ff.customersIn).toBe(cap);
-      if (traveler!.state === "eating") break;
+      if (traveler!.state === "dwelling") break;
     }
     // Whether they made it to the table or gave up en route, they were never
     // counted: venueUnitId unset means finish() will not decrement either, so

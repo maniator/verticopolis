@@ -25,7 +25,7 @@ export type StaffKind = "security" | "medical" | "housekeeping" | "recycling";
  * steady, watchable pace regardless of the game-speed time compression.
  */
 
-export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "eating" | "done";
+export type PersonState = "toShaft" | "waiting" | "riding" | "climbing" | "toDest" | "dwelling" | "done";
 
 export interface Person {
   id: number;
@@ -82,13 +82,14 @@ export interface Person {
    *  `originUnit.outForMeal`, guarded so a bulldozed origin cannot ghost-
    *  decrement a fresh unit built in the same slot after. */
   originUnitId?: number;
-  /** Remaining crowd-seconds in the `eating` state (a stationary sit at the
-   *  destination floor after the outbound trip's `toDest` completes). Only
-   *  set for round-trip meal persons; drained in the `advance` loop. */
-  eatSecondsLeft?: number;
+  /** Remaining crowd-seconds in the `dwelling` state (a stationary stay at
+   *  the destination floor after the outbound trip's `toDest` completes: a
+   *  meal, a showing, a party, a wedding). Only set for round-trippers;
+   *  drained in the `advance` loop. */
+  dwellSecondsLeft?: number;
   /** True once the outbound arrival has transitioned this person into their
    *  return trip (venue -> origin). Distinguishes the two `toDest` completions
-   *  a round-tripper has (outbound arrival triggers eating; return arrival
+   *  a round-tripper has (outbound arrival triggers the dwell; return arrival
    *  triggers the outForMeal decrement + despawn). */
   returning?: boolean;
 }

@@ -145,13 +145,22 @@ gives.
   pushes round-trip visit options whenever an operational, tenanted,
   reachable entertainment venue is open (`isOpenAt`: cinema 12:00-24:00,
   party hall 17:00-24:00).
-- Origins:
-  - Ground lobby (floor 1): outside visitors, both kinds. These persons have
-    no origin unit; their return leg routes back to their spawn floor and
-    they despawn there.
-  - Hotel floors, party hall only (canon: "hotel guests mingle"): reuses the
-    meal round-trip origin accounting (`originUnitId` + `outForMeal`), so the
-    guest's room visibly thins while they are at the party.
+- Origins (the visit-origin matrix; staff kinds are deliberately excluded,
+  they are on shift and their sanctioned break is the meal system's job):
+  - Outside: street visitors, every venue. Today "outside" resolves to the
+    ground lobby (floor 1), the tower's only street door; when the metro
+    platform lands as a second street door, the entry point is picked at
+    spawn time (recorded as a TODO at the resolution site). These persons
+    have no origin unit; their return leg routes back to their spawn floor
+    and they despawn there.
+  - Condo residents: cinema and party hall. Reuses the meal round-trip
+    origin accounting (`originUnitId` + `outForMeal`), so the home visibly
+    thins while they are out.
+  - Office workers: cinema only, while the office is staffed (presence
+    self-gates: weekday working hours), a matinee crowd.
+  - Hotel guests: cinema and party hall (canon: "hotel guests mingle" at the
+    party hall). Same room accounting as condos.
+  - Wedding hall: outside only (invited guests arrive from the street).
 - Lifecycle: spawn, route (two-ride rule applies; null route means nobody
   comes), walk to a tile inside the venue footprint, register attendance,
   dwell, return, deregister. Give-ups and mid-dwell bulldozes balance the

@@ -76,3 +76,23 @@
   single-decrement-path rule for the tally.
 - Dismissed: TDT import phantom audience (import derives occupants from the
   catalog population, which is 0 for attendance kinds).
+
+2026-07-15 PR review follow-ups (Copilot + owner direction)
+
+- DECISION (owner): visit origins generalize beyond "lobby or hotel" into a
+  per-venue origin matrix: outside / condo / office / hotel, with staff kinds
+  deliberately excluded (on shift; meals are their sanctioned break). The
+  room-origin path reuses the meal spawn's bucket predicate
+  (matchesMealOriginKind) and outForMeal accounting, so the two flows cannot
+  drift. Census-neutral by construction: ratingPopulation sums censusCount
+  per room (origin rooms keep counting their residents while they are out)
+  and never reads outForMeal.
+- DECISION (owner): the outside origin is named "outside", not "lobby": the
+  ground lobby is where street visitors materialize today, not where they
+  are from. A TODO at the resolution site names the metro platform (PR #294)
+  as the future second street door so venue visitors can also arrive by
+  train.
+- Copilot review: renamed the person state "eating" to "dwelling" and
+  eatSecondsLeft to dwellSecondsLeft (the state now covers showings, parties,
+  and weddings, not just meals); replaced the `1 | "hotel"` origin union with
+  the self-describing VisitOrigin union.

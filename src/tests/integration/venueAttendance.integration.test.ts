@@ -282,7 +282,7 @@ describe("party hall receives routed evening visitors", () => {
     hall.customersIn = attendanceCap("partyHall")!;
     syncAttendanceOccupants(hall);
     const floors = spawnFloors(sim.tower, sim.clock);
-    spawnVenueVisit(sim.crowd, sim.tower, "partyHall", floors.venuesByKind.partyHall!, floors, 18, 1);
+    spawnVenueVisit(sim.crowd, sim.tower, "partyHall", floors.venuesByKind.partyHall!, floors, 18, "outside");
     expect(sim.crowd.people.length).toBe(0);
   });
 
@@ -299,9 +299,49 @@ describe("party hall receives routed evening visitors", () => {
     sim.tower.getUnit(hall.unitId!)!.state = "occupied";
     setClock(sim, 18);
     const floors = spawnFloors(sim.tower, sim.clock);
-    spawnVenueVisit(sim.crowd, sim.tower, "partyHall", floors.venuesByKind.partyHall!, floors, 18, 1);
+    spawnVenueVisit(sim.crowd, sim.tower, "partyHall", floors.venuesByKind.partyHall!, floors, 18, "outside");
     expect(sim.crowd.people.length).toBe(0); // route() is null: no person, no tally
     expect(hallOf(sim).customersIn ?? 0).toBe(0);
+  });
+});
+
+describe("visit origin matrix", () => {
+  it("party hall options: outside always, hotel when guests exist, condo when residents exist", () => {
+    const sim = partyHallTower(); // hotel yes, condo no
+    setClock(sim, 18);
+    let floors = spawnFloors(sim.tower, sim.clock);
+    const withoutCondo: Array<() => void> = [];
+    pushVenueVisitOptions(sim.crowd, sim.tower, sim.clock, floors, withoutCondo);
+    expect(withoutCondo.length).toBe(2); // outside + hotel
+    const condo = sim.tower.place("condo", 5, 0);
+    expect(condo.ok).toBe(true);
+    const home = sim.tower.getUnit(condo.unitId!)!;
+    home.state = "occupied";
+    home.occupants = 3;
+    floors = spawnFloors(sim.tower, sim.clock);
+    const withCondo: Array<() => void> = [];
+    pushVenueVisitOptions(sim.crowd, sim.tower, sim.clock, floors, withCondo);
+    expect(withCondo.length).toBe(3); // outside + condo + hotel
+  });
+
+  it("residents go out: a condo-origin visitor thins their home", () => {
+    const sim = partyHallTower();
+    const condo = sim.tower.place("condo", 5, 0);
+    expect(condo.ok).toBe(true);
+    const home = sim.tower.getUnit(condo.unitId!)!;
+    home.state = "occupied";
+    home.occupants = 3;
+    setClock(sim, 18);
+    const hall = hallOf(sim);
+    let sawResident = false;
+    for (let m = 0; m < 360 && !sawResident; m++) {
+      sim.tick(1);
+      if (sim.crowd.people.some((p) => p.mealVenueId === hall.id && p.originUnitId === home.id)) {
+        sawResident = true;
+        expect(home.outForMeal ?? 0).toBeGreaterThan(0);
+      }
+    }
+    expect(sawResident).toBe(true);
   });
 });
 
@@ -414,7 +454,7 @@ describe("weekend wedding", () => {
     setClock(sim, WEDDING_ARRIVAL_START, 5); // Saturday, inside the window
     const floors = spawnFloors(sim.tower, sim.clock);
     expect(floors.venuesByKind.weddingHall?.length).toBe(1); // binned (it exists)...
-    spawnVenueVisit(sim.crowd, sim.tower, "weddingHall", floors.venuesByKind.weddingHall!, floors, WEDDING_ARRIVAL_START, 1);
+    spawnVenueVisit(sim.crowd, sim.tower, "weddingHall", floors.venuesByKind.weddingHall!, floors, WEDDING_ARRIVAL_START, "outside");
     expect(sim.crowd.people.length).toBe(0); // ...but no route means no guest
     expect(sim.tower.units.find((u) => u.kind === "weddingHall")!.customersIn ?? 0).toBe(0);
   });

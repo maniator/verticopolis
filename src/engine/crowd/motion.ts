@@ -65,7 +65,7 @@ export function advance(crowd: Crowd, dtSec: number, tower: Tower): void {
     // trip's age accumulation) from being finished mid-eat and mis-flagged as
     // a frustrated commuter, which would pollute the crowd stress signal AND
     // skip the return leg the round-trip design promises. See review Edge #1.
-    if (p.age > patience && p.state !== "toDest" && p.state !== "eating" && p.state !== "done") {
+    if (p.age > patience && p.state !== "toDest" && p.state !== "dwelling" && p.state !== "done") {
       if (!p.staff) {
         frustrated++;
         travelling++;
@@ -330,13 +330,14 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       }
       break;
     }
-    case "eating": {
-      // Stationary sit at the venue floor. The person is still rendered at
-      // their destX from the outbound trip. When the timer expires, mutate
-      // into a return trip toward `originUnitId`'s floor (if it still exists)
-      // or despawn quietly (ghost origin from a bulldoze while eating).
-      p.eatSecondsLeft = (p.eatSecondsLeft ?? 0) - dt;
-      if (p.eatSecondsLeft <= 0) transitionToReturn(crowd, tower, p);
+    case "dwelling": {
+      // Stationary stay at the venue floor (a meal, a showing, a party). The
+      // person is still rendered at their destX from the outbound trip. When
+      // the timer expires, mutate into a return trip toward `originUnitId`'s
+      // floor (if it still exists), the spawn floor for outside visitors, or
+      // despawn quietly (ghost origin from a bulldoze while dwelling).
+      p.dwellSecondsLeft = (p.dwellSecondsLeft ?? 0) - dt;
+      if (p.dwellSecondsLeft <= 0) transitionToReturn(crowd, tower, p);
       break;
     }
     default:

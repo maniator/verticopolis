@@ -13,6 +13,7 @@ import {
 import type { Crowd } from "../Crowd";
 import type { Person, SpawnFloors } from "./person";
 import { dwellSecondsRange, visibleOccupants } from "./person";
+import { matchesMealOriginKind } from "./meals";
 import { add, venueHasRoom } from "./trips";
 
 /**
@@ -33,14 +34,45 @@ export const WEDDING_ARRIVAL_START = 11;
 export const WEDDING_ARRIVAL_END = 14;
 
 /**
- * Contribute entertainment attendance-visit options: round trips from the
- * ground lobby (and, for the party hall, from hotel floors: canon says hotel
- * guests mingle there) to an open cinema / party hall, and weekend-midday
- * wedding-guest trips to the wedding hall. Additive over the shipped branch
- * tree, exactly like the meal overlay; the shared options pool and
- * `MAX_PEOPLE` bound the whole thing. Venue floors were binned by
- * `spawnFloors` only while open (the wedding hall whenever built), so an
- * empty bin means "nothing to visit right now".
+ * The origin populations a venue visit can start from. `outside` is a street
+ * visitor; the room kinds ride the meal round-trip origin accounting (a
+ * specific room's visible occupancy thins while its person is out). Staff
+ * kinds are deliberately absent: they are on shift, and their sanctioned
+ * break is the meal system's job.
+ */
+export type VisitOrigin = "outside" | "condo" | "office" | "hotel";
+
+/** Per-venue origin mix. Everyone can arrive from outside; residents and
+ *  hotel guests go out to the movies and to parties (canon calls out hotel
+ *  guests mingling at the party hall); office workers catch a matinee while
+ *  the office is staffed (presence self-gates: `staffedOffices` empties at
+ *  18:00 and on weekends). Wedding guests are invited from outside only. */
+const VISIT_ORIGINS: Record<"cinema" | "partyHall" | "weddingHall", VisitOrigin[]> = {
+  cinema: ["outside", "condo", "office", "hotel"],
+  partyHall: ["outside", "condo", "hotel"],
+  weddingHall: ["outside"],
+};
+
+/** The spawn-floor bin a room-origin draws from (see {@link spawnVenueVisit}). */
+function originFloorsFor(origin: Exclude<VisitOrigin, "outside">, floors: SpawnFloors): number[] {
+  switch (origin) {
+    case "condo":
+      return floors.condoFloors;
+    case "office":
+      return floors.staffedOffices;
+    case "hotel":
+      return floors.hotelFloors;
+  }
+}
+
+/**
+ * Contribute entertainment attendance-visit options: round trips from each
+ * eligible origin population (see {@link VISIT_ORIGINS}) to an open cinema /
+ * party hall, and weekend-midday wedding-guest trips to the wedding hall.
+ * Additive over the shipped branch tree, exactly like the meal overlay; the
+ * shared options pool and `MAX_PEOPLE` bound the whole thing. Venue floors
+ * were binned by `spawnFloors` only while open (the wedding hall whenever
+ * built), so an empty bin means "nothing to visit right now".
  */
 export function pushVenueVisitOptions(
   crowd: Crowd,
@@ -50,9 +82,17 @@ export function pushVenueVisitOptions(
   options: Array<() => void>,
 ): void {
   const hour = clock.hour;
+  const pushVisits = (kind: keyof typeof VISIT_ORIGINS, venueFloors: number[]) => {
+    for (const origin of VISIT_ORIGINS[kind]) {
+      // Room-origin options only exist while that population has floors to
+      // draw from; `outside` always applies (the street never empties).
+      if (origin !== "outside" && originFloorsFor(origin, floors).length === 0) continue;
+      options.push(() => spawnVenueVisit(crowd, tower, kind, venueFloors, floors, hour, origin));
+    }
+  };
   const cinemas = floors.venuesByKind.cinema;
   if (cinemas?.length) {
-    options.push(() => spawnVenueVisit(crowd, tower, "cinema", cinemas, floors, hour, 1));
+    pushVisits("cinema", cinemas);
     // A blockbuster month draws a bigger crowd (canon): one extra option
     // contribution, aimed at the FLOORS that hold a blockbuster house so the
     // boost lands there and not uniformly across every cinema floor; the
@@ -61,19 +101,12 @@ export function pushVenueVisitOptions(
     if (crowd.blockbusters.size > 0) {
       const bbFloors = blockbusterCinemaFloors(crowd, floors, cinemas);
       if (bbFloors.length) {
-        options.push(() => spawnVenueVisit(crowd, tower, "cinema", bbFloors, floors, hour, 1));
+        options.push(() => spawnVenueVisit(crowd, tower, "cinema", bbFloors, floors, hour, "outside"));
       }
     }
   }
   const halls = floors.venuesByKind.partyHall;
-  if (halls?.length) {
-    options.push(() => spawnVenueVisit(crowd, tower, "partyHall", halls, floors, hour, 1));
-    // Hotel guests mingle at the party hall (canon). Their room accounting
-    // rides the meal round-trip machinery, so the room visibly thins.
-    if (floors.hotelFloors.length) {
-      options.push(() => spawnVenueVisit(crowd, tower, "partyHall", halls, floors, hour, "hotel"));
-    }
-  }
+  if (halls?.length) pushVisits("partyHall", halls);
   const weddings = floors.venuesByKind.weddingHall;
   if (
     weddings?.length &&
@@ -81,7 +114,7 @@ export function pushVenueVisitOptions(
     hour >= WEDDING_ARRIVAL_START &&
     hour < WEDDING_ARRIVAL_END
   ) {
-    options.push(() => spawnVenueVisit(crowd, tower, "weddingHall", weddings, floors, hour, 1));
+    pushVisits("weddingHall", weddings);
   }
 }
 
@@ -102,12 +135,13 @@ function blockbusterCinemaFloors(crowd: Crowd, floors: SpawnFloors, cinemaFloors
 
 /**
  * Fire a single attendance round-trip to a venue of `kind`: pick a floor from
- * the bin, a concrete open venue with a free seat on it, and an origin
- * (ground lobby, or an occupied hotel room for the party-hall mingle), then
- * spawn the round-tripper. Arrival registers attendance ({@link beginDwell}),
- * the dwell runs the kind's window, and the return leg walks the trip back.
- * Any missing piece (no candidate venue, no in-room hotel guest, no route)
- * makes the call a no-op, exactly like the meal outbound spawn.
+ * the bin, a concrete open venue with a free seat on it, and an origin (the
+ * street door for `outside`, or an occupied room of the origin population),
+ * then spawn the round-tripper. Arrival registers attendance
+ * ({@link beginDwell}), the dwell runs the kind's window, and the return leg
+ * walks the trip back. Any missing piece (no candidate venue, no in-room
+ * origin person, no route) makes the call a no-op, exactly like the meal
+ * outbound spawn.
  */
 export function spawnVenueVisit(
   crowd: Crowd,
@@ -116,7 +150,7 @@ export function spawnVenueVisit(
   venueFloors: number[],
   floors: SpawnFloors,
   hour: number,
-  origin: 1 | "hotel",
+  origin: VisitOrigin,
 ): void {
   if (!isOpenAt(kind, hour)) return;
   const venueFloor = crowd.rng.pick(venueFloors);
@@ -136,23 +170,33 @@ export function spawnVenueVisit(
       ? candidates.flatMap((u) => (crowd.blockbusters.has(u.id) ? [u, u] : [u]))
       : candidates;
   const venue = crowd.rng.pick(pool);
+  // TODO(metro street door): `outside` resolves to the ground lobby (floor
+  // 1), the tower's only street entrance today. Once the metro platform
+  // lands as a second street door (PR #294), pick the entry point here
+  // (ground lobby or an operational platform) so venue visitors also arrive
+  // by train, matching the metro's "brings huge numbers of visitors" line.
   let originFloor = 1;
   let originRoom: Unit | undefined;
-  if (origin === "hotel") {
-    const hotelFloor = crowd.rng.pick(floors.hotelFloors);
-    const rooms = (floors.unitsByFloor.get(hotelFloor) ?? []).filter(
-      (r) => isHotelKind(r.kind) && visibleOccupants(r) > 0,
+  if (origin !== "outside") {
+    const originFloorBin = originFloorsFor(origin, floors);
+    if (originFloorBin.length === 0) return;
+    const roomFloor = crowd.rng.pick(originFloorBin);
+    // A specific room of the origin population with someone still IN it,
+    // exactly the meal spawn's origin rule (same bucket predicate, so the
+    // two paths can never drift on what counts as "home").
+    const rooms = (floors.unitsByFloor.get(roomFloor) ?? []).filter(
+      (r) => matchesMealOriginKind(r, origin) && visibleOccupants(r) > 0,
     );
     if (rooms.length === 0) return;
     originRoom = crowd.rng.pick(rooms);
-    originFloor = hotelFloor;
+    originFloor = roomFloor;
   }
   const spawned = add(crowd, tower, originFloor, venueFloor);
   if (!spawned) return;
   spawned.destX = crowd.rng.int(venue.x, venue.x + venue.width - 1);
   spawned.mealVenueId = venue.id;
   if (originRoom) {
-    // Hotel-origin guests ride the meal round-trip origin accounting: the
+    // Room-origin visitors ride the meal round-trip origin accounting: the
     // room's visible occupancy thins while they are out, and every despawn
     // path balances the decrement through finish().
     spawned.originUnitId = originRoom.id;
@@ -163,13 +207,13 @@ export function spawnVenueVisit(
 
 /**
  * A round-tripper's outbound arrival: transition into the stationary dwell
- * (`eating` state) and register the person at their venue. Called from the
+ * (`dwelling` state) and register the person at their venue. Called from the
  * motion state machine when a `toDest` walk completes for a person carrying
  * an origin room or a venue intent; the return leg is self-scheduled when the
- * dwell timer expires (motion's `eating` case).
+ * dwell timer expires (motion's `dwelling` case).
  */
 export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
-  p.state = "eating";
+  p.state = "dwelling";
   p.linger = 0;
   // Reset the give-up age so the outbound trip's accumulated seconds do not
   // eat into the return-leg patience budget once the return transition
@@ -189,7 +233,7 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
   // draw as before the attendance flow existed, so meal-only towers keep a
   // byte-identical stream.
   const dwell = dwellSecondsRange(venueUnit?.kind);
-  p.eatSecondsLeft = crowd.rng.int(dwell.min, dwell.max);
+  p.dwellSecondsLeft = crowd.rng.int(dwell.min, dwell.max);
   // Census venues (commercial, population > 0) clamp at the catalog
   // population: that value is the venue's advertised customer capacity AND
   // its census contribution. The capacity clamp is the arrival-side half of
