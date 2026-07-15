@@ -118,7 +118,7 @@ Real functions and files. Pure render; no engine change.
 ## Tasks & Acceptance
 
 **Execution (dependency order: extract, then port static, then wire live inputs, then the ghost-crowd removal, then tests):**
-- [x] Extract the seven routines plus the three actors and `star` into `src/render/sprites/utilities.ts`; re-export through `sprites/facilities.ts`; re-verify `fileSize.guard` and `barrelSurface`.
+- [x] Extract the seven routines plus the three actors and `star` into `src/render/sprites/utilities.ts`; re-export through `sprites/facilities.ts`; re-verify `fileSize.guard` and `barrelSurface`. (Shipped 2026-07-13 via the earlier per-domain `src/render/sprites/facilities/` split in PR #253, which the `sprites/facilities.ts` barrel re-exports; the outcome landed, the destination file differs from this plan line.)
 - [x] Port `medical`, `security`, `housekeeping` from `page-01-utilities.build.js`; thread `d` into their dispatch cases for the `lit` glow.
 - [x] Port `parking` and `parkingRamp` from their reference scripts; keep the `parkingUse` / `parkingDead` gate exactly.
 - [x] Port `recycling`: enriched static plant plus the retained `recycleFill` pile and green/amber/red FULL gauge; substitute the reserved `#C24A3A` bale with a non-reserved color; use `personHiVis`.
