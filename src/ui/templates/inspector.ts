@@ -48,11 +48,14 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // that number (plus a closed marker), never a static "N/25" that reads as a
   // flat, always-full population. "(closed)" only for a tenanted venue outside
   // business hours; vacancy/construction already reads from the Status row.
+  // Attendance venues (cinema / party hall / wedding hall, catalog population
+  // 0) show the same live line from their routed attendance tally: a mid-show
+  // house must never inspect as empty while the audience is visibly seated.
   const closed = isTenanted(u) && !isOpenAt(u.kind, sim.clock.hour);
   return html`<h4 class="win-title">${title}</h4><div>${labelIsExtra ? html`${u.label}<br />` : nothing}${
     u.floor >= 1 ? `Floor ${u.floor}` : `B${1 - u.floor}`
   }</div><div>Status: ${statusText}</div>${
-    isCommercialKind(u.kind) && f.population > 0
+    (isCommercialKind(u.kind) && f.population > 0) || f.attendance !== undefined
       ? html`<div>Customers: ${u.customersIn ?? 0}${closed ? " (closed)" : ""}</div>`
       : f.population
         ? html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`

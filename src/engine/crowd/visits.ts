@@ -249,9 +249,14 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
   // capacity anyway. An over-capacity arrival dwells uncounted (venueUnitId
   // stays unset, so finish() will not decrement).
   const cap = venueUnit ? attendanceCap(venueUnit.kind) : undefined;
+  // The tenancy recheck covers the ride, mirroring the attendance branch's
+  // isOperational recheck below: a venue that vacated or burned after the
+  // spawn-side gate passed must not count a customer. The person simply
+  // dwells uncounted and leaves (review edge H4, closed 2026-07-15).
   if (
     venueUnit &&
     isCommercialKind(venueUnit.kind) &&
+    isTenanted(venueUnit) &&
     FACILITIES[venueUnit.kind].population > 0 &&
     (venueUnit.customersIn ?? 0) < FACILITIES[venueUnit.kind].population
   ) {
@@ -270,7 +275,7 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
   } else if (
     venueUnit &&
     cap !== undefined &&
-    isOperational(venueUnit) &&
+    (venueUnit.kind === "weddingHall" ? isOperational(venueUnit) : isTenanted(venueUnit)) &&
     (venueUnit.customersIn ?? 0) < cap
   ) {
     // Attendance venue (cinema / party hall / wedding hall): the tally
@@ -278,10 +283,11 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
     // interior art through the occupants mirror, and is census-inert
     // (population 0 keeps censusCount's gate closed), so there is no
     // hotel-origin split to track here. Over-cap arrivals attend uncounted,
-    // mirroring the census venues' clamp above. The isOperational recheck
-    // covers the ride: a venue that caught fire (or was gutted) after the
-    // spawn-side gate passed must not have an audience stamped onto the
-    // ruin; the visitor simply dwells uncounted and leaves.
+    // mirroring the census venues' clamp above. The arrival recheck repeats
+    // this branch's own spawn-side gate (spawnVenueVisit: the wedding hall
+    // is functional-when-built, the ticketed venues need a tenant), so a
+    // venue that vacated or burned after the spawn-side gate passed must
+    // not seat a counted audience; the visitor dwells uncounted and leaves.
     p.venueUnitId = venueUnit.id;
     venueUnit.customersIn = (venueUnit.customersIn ?? 0) + 1;
     syncAttendanceOccupants(venueUnit);
