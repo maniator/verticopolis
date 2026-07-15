@@ -288,6 +288,31 @@ describe("openModalTemplate — the window grammar", () => {
     expect(nested.querySelector("button")).toBeNull(); // and no ✕ either
   });
 
+  it("points the dialog's aria-labelledby at the title bar's id, so a screen reader announces which dialog opened", () => {
+    const { ui } = makeUI();
+    const box = open(ui, "<h2>Window Title</h2><p>body</p>");
+    const labelId = dialog().getAttribute("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    const title = box.querySelector(":scope > h2")!;
+    expect(title.id).toBe(labelId); // the reference resolves to the rendered title
+    expect(document.getElementById(labelId!)).toBe(title);
+    expect(title.textContent).toContain("Window Title");
+  });
+
+  it("never labels the dialog with a nested (non-title-bar) h2", () => {
+    const { ui } = makeUI();
+    open(ui, "<h2>Window Title</h2><div><h2>Section heading</h2></div>");
+    const labelId = dialog().getAttribute("aria-labelledby")!;
+    expect(document.getElementById(labelId)!.textContent).toContain("Window Title");
+    expect(document.getElementById(labelId)!.textContent).not.toContain("Section heading");
+  });
+
+  it("clears aria-labelledby rather than leaving it dangling when a modal renders no top-level h2", () => {
+    const { ui } = makeUI();
+    open(ui, "<p>no title here</p>");
+    expect(dialog().hasAttribute("aria-labelledby")).toBe(false);
+  });
+
   it("appends exactly one ✕, as the LAST child of the title bar (focus lands on the primary action, not ✕)", () => {
     const { ui } = makeUI();
     const box = open(ui, html`<h2>Title</h2><button class="btn primary" data-act="close">OK</button>`);
@@ -432,6 +457,32 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(dialog().querySelectorAll(".modal-x").length).toBe(1);
     expect(box2.querySelector(":scope > h2")!.textContent).toContain("Second");
   });
+
+  it("wires aria-labelledby to the title bar's id for the lit mount path too", () => {
+    const { ui } = makeUI();
+    const box = ui.openModalTemplate(html`<h2>Set all offices</h2><p>body</p>`);
+    const labelId = dialog().getAttribute("aria-labelledby");
+    expect(labelId).toBeTruthy();
+    const title = box.querySelector(":scope > h2")!;
+    expect(title.id).toBe(labelId);
+    expect(document.getElementById(labelId!)!.textContent).toContain("Set all offices");
+  });
+
+  it("relabels cleanly on close/reopen: same shared id, no dangling reference while closed, no duplicate ids", () => {
+    const { ui } = makeUI();
+    ui.openModalTemplate(html`<h2>First</h2>`);
+    const firstId = dialog().getAttribute("aria-labelledby");
+    expect(firstId).toBeTruthy();
+
+    ui.closeModal();
+    expect(dialog().hasAttribute("aria-labelledby")).toBe(false); // nothing visible to dangle a reference to
+
+    ui.openModalTemplate(html`<h2>Second</h2>`);
+    const secondId = dialog().getAttribute("aria-labelledby");
+    expect(secondId).toBe(firstId); // the shared id is reused, now naming the new title
+    expect(document.getElementById(secondId!)!.textContent).toContain("Second");
+    expect(document.querySelectorAll(`#${secondId}`).length).toBe(1); // never two elements sharing the id
+  });
 });
 
 describe("confirmModal — lit template mount", () => {
@@ -455,6 +506,58 @@ describe("confirmModal — lit template mount", () => {
     x.click();
     expect(dialog().open).toBe(false);
     expect(onYes).not.toHaveBeenCalled();
+  });
+});
+
+describe("aria-labelledby across the real dialogs — every modal names itself for a screen reader", () => {
+  // Every show* method funnels through finishModal, so this pins the
+  // contract end to end (not just the shared primitive) across dialogs with
+  // very different wiring: a plain wireActions dialog, a caller-supplied
+  // title, and the emergency dialog that overrides oncancel and renders no
+  // [data-act="close"] button at all.
+  const titleFor = (): Element => {
+    const id = dialog().getAttribute("aria-labelledby");
+    expect(id, "expected #modal to carry aria-labelledby").toBeTruthy();
+    const el = document.getElementById(id!);
+    expect(el, `expected an element with id="${id}" in the document`).not.toBeNull();
+    return el!;
+  };
+
+  it("showStats labels the dialog with the rendered title", () => {
+    const { ui } = makeUI();
+    ui.showStats(html`<p>numbers</p>`);
+    expect(titleFor().textContent).toContain("Tower Statistics");
+  });
+
+  it("showHelp labels the dialog with the rendered title", () => {
+    const { ui } = makeUI();
+    ui.showHelp();
+    expect(titleFor().textContent).toContain("How to play");
+  });
+
+  it("confirmModal labels the dialog with the caller-supplied title, not a generic string", () => {
+    const { ui } = makeUI();
+    ui.confirmModal("Start a new tower?", "This abandons your tower.", () => {});
+    expect(titleFor().textContent).toContain("Start a new tower?");
+  });
+
+  it("showEventChoice (custom oncancel, no [data-act=close]) still labels the dialog", () => {
+    const { ui } = makeUI();
+    ui.showEventChoice("A fire has broken out!", "$50,000", () => {});
+    expect(titleFor().textContent).toContain("Emergency");
+  });
+
+  it("swapping from one modal straight into another (saves → export confirm) relabels instead of stacking a stale id", () => {
+    const { ui } = makeUI();
+    ui.showSaves([]);
+    expect(titleFor().textContent).toContain("Saved Towers");
+    const labelId = dialog().getAttribute("aria-labelledby")!;
+    click('[data-act="export"]');
+    expect(titleFor().textContent).toContain("Export tower?");
+    // Same shared id, but now only one element in the whole document carries
+    // it — the saves dialog's old title node is gone, not orphaned.
+    expect(dialog().getAttribute("aria-labelledby")).toBe(labelId);
+    expect(document.querySelectorAll(`#${labelId}`).length).toBe(1);
   });
 });
 

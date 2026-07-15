@@ -22,6 +22,14 @@ import { buildPalette } from "./uiPalette";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
 
+/** Id stamped on the shared modal's title bar so `#modal` can point
+ *  `aria-labelledby` at it (see {@link UI.finishModal}). The dialog's DOM is
+ *  fully replaced on every open (`openModal`/`openModalTemplate` reset
+ *  `dialog.innerHTML`, and only one modal is ever live at a time, guarded by
+ *  {@link UI.isModalOpen}), so a single constant id never collides with a
+ *  second modal's title the way a page-scoped id normally could. */
+const MODAL_TITLE_ID = "modal-title";
+
 export interface UICallbacks {
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
@@ -235,8 +243,11 @@ export class UI {
 
   /** The shared window grammar {@link openModalTemplate} finishes with: skin the
    *  top-level h2 as the title bar (`:scope > h2` so a nested h2 is never
-   *  skinned), show the dialog,
-   *  then append the win-style ✕. The ✕ routes through the dialog's cancel path
+   *  skinned), point the dialog's `aria-labelledby` at it (stamping the shared
+   *  {@link MODAL_TITLE_ID} so a screen reader announces which dialog opened;
+   *  cleared when a modal renders no top-level h2, so the reference is never left
+   *  dangling), show the dialog, then append the win-style ✕. The ✕ routes
+   *  through the dialog's cancel path
    *  (same as Esc) rather than closeModal() directly, so modals that override
    *  oncancel to resolve a pending choice still resolve. It is appended AFTER
    *  showModal() so it is not the first focusable element (keyboard users land on
@@ -244,6 +255,12 @@ export class UI {
   private finishModal(dialog: HTMLDialogElement, box: HTMLElement): HTMLElement {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
+    if (h2) {
+      h2.id = MODAL_TITLE_ID;
+      dialog.setAttribute("aria-labelledby", MODAL_TITLE_ID);
+    } else {
+      dialog.removeAttribute("aria-labelledby");
+    }
     if (!dialog.open) dialog.showModal();
     if (h2) {
       h2.appendChild(
@@ -261,6 +278,10 @@ export class UI {
     const dialog = this.el.modal as HTMLDialogElement;
     if (dialog.open) dialog.close();
     dialog.innerHTML = "";
+    // The title h2 goes with the wiped content; drop the reference to it too,
+    // so aria-labelledby never dangles at a stale/missing id while the dialog
+    // is closed (finishModal re-sets it fresh on the next open).
+    dialog.removeAttribute("aria-labelledby");
   }
 
   /** Bind click handlers to a dialog's [data-act] buttons. Every lookup is loud
