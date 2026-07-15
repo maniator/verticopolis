@@ -2,7 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { MILESTONES } from "../milestones";
 
-import { FACILITIES, STAR_THRESHOLDS, censusCount, isCommercialKind, isHotelKind } from "../facilities";
+import { FACILITIES, STAR_THRESHOLDS, TOWER_POPULATION, censusCount, isCommercialKind, isHotelKind } from "../facilities";
 import type { FacilityKind } from "../types";
 
 import { isPresent } from "../types";
@@ -116,6 +116,74 @@ export function population(sim: Simulation): number {
 export function nextStarThreshold(sim: Simulation): number | null {
   if (sim.star >= 5) return null;
   return STAR_THRESHOLDS[sim.star + 1];
+}
+
+/** One requirement toward the next star: a human label and whether it is met. */
+export interface StarRequirement {
+  label: string;
+  met: boolean;
+}
+
+/** The "what is blocking my next star" read model. Read-only: it mirrors the
+ *  gates in {@link evaluateStar} (and {@link checkVip} for the TOWER rung)
+ *  EXACTLY, so the checklist can never claim a rung is ready that promotion
+ *  would refuse. Keep this list in step with those two functions. */
+export interface NextStarProgress {
+  /** The rung being worked toward: 2..5, or 6 for the final TOWER inspection. */
+  star: number;
+  /** True when the next rung is the TOWER rating. */
+  isTower: boolean;
+  /** Population on the census THIS rung is judged against. Hotels help up
+   *  through 4★, then 5★ and TOWER want real occupants, matching evaluateStar
+   *  and checkVip. */
+  popHave: number;
+  popNeed: number;
+  popMet: boolean;
+  /** Facility gates for this rung (empty for 2★, which is population-only). */
+  gates: StarRequirement[];
+  /** True when the population bar and every gate are satisfied. */
+  allMet: boolean;
+}
+
+/** Requirements for the tower's next star, for the stats readout. Returns null
+ *  once the tower is a TOWER (nothing above it). */
+export function nextStarRequirements(sim: Simulation): NextStarProgress | null {
+  if (sim.star >= 6) return null;
+  const star = sim.star + 1;
+  const isTower = star === 6;
+  const popHave = star >= 5 ? sim.occupantPopulation() : sim.tower.totalPopulation();
+  const popNeed = isTower ? TOWER_POPULATION : STAR_THRESHOLDS[star];
+  const popMet = popHave >= popNeed;
+  const gates: StarRequirement[] = [];
+  // A facility counts only once operational (hasOperational / countOperational).
+  if (isTower) {
+    // The TOWER inspection (checkVip) checks ONLY these, not the cumulative
+    // lower-rung amenity set: build the Wedding Hall on floor 100 to summon the
+    // VIP, keep the metro, and clear the 15,000 population bar.
+    gates.push({ label: "Wedding Hall (floor 100)", met: sim.hasOperational("weddingHall") });
+    gates.push({ label: "Metro station", met: sim.hasOperational("metro") });
+  } else {
+    // evaluateStar re-checks EVERY lower rung's facility gate on each tick, and
+    // the star never falls, so being at a rung does not guarantee that rung's
+    // facilities still stand. Reaching star N therefore needs the gates for all
+    // of rungs 3..N re-satisfied, not just rung N's own. List them cumulatively
+    // so the checklist matches promotion (for example recycling that outgrows
+    // its capacity, or a sold-off security office, blocks 5★ and shows here).
+    if (star >= 3) {
+      gates.push({ label: "Security office", met: sim.hasOperational("security") });
+    }
+    if (star >= 4) {
+      gates.push({ label: "Medical center", met: sim.hasOperational("medical") });
+      gates.push({ label: "Recycling meets demand", met: sim.recyclingDemandMet() });
+      gates.push({ label: "2+ hotel suites", met: sim.countOperational("hotelSuite") >= 2 });
+      gates.push({ label: "Favorable VIP review", met: sim.vipFavorable });
+    }
+    if (star >= 5) {
+      gates.push({ label: "Metro station", met: sim.hasOperational("metro") });
+    }
+  }
+  const allMet = popMet && gates.every((g) => g.met);
+  return { star, isTower, popHave, popNeed, popMet, gates, allMet };
 }
 
 /** Whether hotel guests currently count toward the star rating (they stop at 4★). */

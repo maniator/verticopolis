@@ -281,6 +281,10 @@ export class Simulation implements SimContext {
 
   milestoneProgress(): { achieved: number; total: number; list: { label: string; desc: string; done: boolean }[] } { return star.milestoneProgress(this); }
 
+  /** Requirements for the next star (population + facility gates), for the
+   *  stats "Next star" checklist. Null once the tower is a TOWER. */
+  nextStarRequirements(): star.NextStarProgress | null { return star.nextStarRequirements(this); }
+
   reportMoveIns(): void { churn.reportMoveIns(this); }
 
   // ---- Presence (who is physically in each unit right now) ---------------
