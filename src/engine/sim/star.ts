@@ -2,7 +2,7 @@ import type { Simulation } from "../Simulation";
 
 import { MILESTONES } from "../milestones";
 
-import { FACILITIES, STAR_THRESHOLDS, censusCount, isCommercialKind, isHotelKind } from "../facilities";
+import { FACILITIES, STAR_THRESHOLDS, TOWER_POPULATION, censusCount, isCommercialKind, isHotelKind } from "../facilities";
 import type { FacilityKind } from "../types";
 
 import { isPresent } from "../types";
@@ -28,27 +28,17 @@ export function evaluateStar(sim: Simulation): void {
       break;
     }
   }
-  // Extra gates beyond raw population, matching the original's ladder. A
-  // facility only counts once it is actually operational (not still under
-  // construction, not on fire).
-  if (target >= 3 && !sim.hasOperational("security")) target = Math.min(target, 2);
-  // 4★ wants the full amenity set: Medical, Recycling DEMAND MET (one center
-  // per ~2,500 population, see {@link recyclingDemandMet}), more than one
-  // Hotel Suite, and a favorable VIP review (see {@link maybeVipStay}), per canon.
-  if (
-    target >= 4 &&
-    !(
-      sim.hasOperational("medical") &&
-      sim.recyclingDemandMet() &&
-      sim.countOperational("hotelSuite") >= 2 &&
-      sim.vipFavorable
-    )
-  ) {
-    target = Math.min(target, 3);
+  // Cap to the highest rung whose cumulative facility gates are all met. The
+  // gates come from {@link cumulativeStarGates}, shared with
+  // {@link nextStarRequirements} so the "Next star" checklist can never
+  // disagree with actual promotion. The gates are cumulative (reaching a rung
+  // re-requires every lower rung's facility, matching the original's ladder:
+  // Security for 3★; Medical, Recycling demand met, two-plus Suites, and a
+  // favorable VIP review for 4★; Metro for 5★), and a facility counts only once
+  // operational. The TOWER rung is gated separately by `checkVip` in events.ts.
+  while (target >= 3 && cumulativeStarGates(sim, target).some((g) => !g.met)) {
+    target--;
   }
-  // 5★ needs a Metro Station (canon), it was previously only checked at the
-  // TOWER stage.
-  if (target >= 5 && !sim.hasOperational("metro")) target = Math.min(target, 4);
 
   if (target > sim.star) {
     sim.star = target;
@@ -116,6 +106,85 @@ export function population(sim: Simulation): number {
 export function nextStarThreshold(sim: Simulation): number | null {
   if (sim.star >= 5) return null;
   return STAR_THRESHOLDS[sim.star + 1];
+}
+
+/** One requirement toward the next star: a human label and whether it is met. */
+export interface StarRequirement {
+  label: string;
+  met: boolean;
+}
+
+/** The "what is blocking my next star" read model. Read-only: it mirrors the
+ *  gates in {@link evaluateStar} (and `checkVip` in events.ts for the TOWER rung)
+ *  EXACTLY, so the checklist can never claim a rung is ready that promotion
+ *  would refuse. Keep this list in step with those two functions. */
+export interface NextStarProgress {
+  /** The rung being worked toward: 2..5, or 6 for the final TOWER inspection. */
+  star: number;
+  /** True when the next rung is the TOWER rating. */
+  isTower: boolean;
+  /** Population on the census THIS rung is judged against. Hotels help up
+   *  through 4★, then 5★ and TOWER want real occupants, matching evaluateStar
+   *  and checkVip. */
+  popHave: number;
+  popNeed: number;
+  popMet: boolean;
+  /** Facility gates for this rung (empty for 2★, which is population-only). */
+  gates: StarRequirement[];
+  /** True when the population bar and every gate are satisfied. */
+  allMet: boolean;
+}
+
+/** The cumulative facility gates required to reach star `rung`, in ladder order:
+ *  Security from 3★; the amenity set (Medical, Recycling demand met, two-plus
+ *  Suites, favorable VIP) from 4★; Metro from 5★. Total over `number`: it
+ *  returns an empty list below 3★ (population-only rungs) and treats any rung
+ *  above 5 like 5★, so callers cannot pass an out-of-range value into a
+ *  half-defined state. evaluateStar re-checks these each hour and the star never
+ *  falls, so reaching rung N needs every gate for rungs 3..N, not just rung N's
+ *  own. Shared by {@link evaluateStar} (to cap promotion) and
+ *  {@link nextStarRequirements} (to show the checklist) so the two cannot drift.
+ *  The TOWER rung is gated separately by `checkVip` in events.ts (Wedding Hall,
+ *  metro, population), not here. A facility counts only once operational (not
+ *  under construction, not on fire). */
+export function cumulativeStarGates(sim: Simulation, rung: number): StarRequirement[] {
+  const gates: StarRequirement[] = [];
+  if (rung >= 3) {
+    gates.push({ label: "Security office", met: sim.hasOperational("security") });
+  }
+  if (rung >= 4) {
+    gates.push({ label: "Medical center", met: sim.hasOperational("medical") });
+    gates.push({ label: "Recycling meets demand", met: sim.recyclingDemandMet() });
+    gates.push({ label: "2+ hotel suites", met: sim.countOperational("hotelSuite") >= 2 });
+    gates.push({ label: "Favorable VIP review", met: sim.vipFavorable });
+  }
+  if (rung >= 5) {
+    gates.push({ label: "Metro station", met: sim.hasOperational("metro") });
+  }
+  return gates;
+}
+
+/** Requirements for the tower's next star, for the stats readout. Returns null
+ *  once the tower is a TOWER (nothing above it). */
+export function nextStarRequirements(sim: Simulation): NextStarProgress | null {
+  if (sim.star >= 6) return null;
+  const star = sim.star + 1;
+  const isTower = star === 6;
+  const popHave = star >= 5 ? sim.occupantPopulation() : sim.tower.totalPopulation();
+  const popNeed = isTower ? TOWER_POPULATION : STAR_THRESHOLDS[star];
+  const popMet = popHave >= popNeed;
+  // Non-TOWER rungs reuse evaluateStar's exact cumulative gate ladder, so the
+  // checklist cannot drift from promotion. The TOWER inspection (checkVip in
+  // events.ts) instead wants the Wedding Hall (placement-locked to floor 100,
+  // so the label's floor is always accurate), the metro, and the population bar.
+  const gates: StarRequirement[] = isTower
+    ? [
+        { label: "Wedding Hall (floor 100)", met: sim.hasOperational("weddingHall") },
+        { label: "Metro station", met: sim.hasOperational("metro") },
+      ]
+    : cumulativeStarGates(sim, star);
+  const allMet = popMet && gates.every((g) => g.met);
+  return { star, isTower, popHave, popNeed, popMet, gates, allMet };
 }
 
 /** Whether hotel guests currently count toward the star rating (they stop at 4★). */

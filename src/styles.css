@@ -988,17 +988,30 @@ dialog.crash-card::backdrop {
  * shows overall progress (same idiom as the facility evalbar). Rows read as
  * "· Label   description" at every width — natural-width label, left-aligned
  * description. */
-.stats-grid .col.ms {
+.stats-grid .col.ms,
+.stats-grid .col.nsr {
   grid-template-columns: auto 1fr;
 }
-.stats-grid .col.ms .v {
+.stats-grid .col.ms .v,
+.stats-grid .col.nsr .v {
   text-align: left;
   color: var(--muted);
 }
-.stats-grid .col.ms .k {
+.stats-grid .col.ms .k,
+.stats-grid .col.nsr .k {
   color: var(--muted);
 }
-.stats-grid .col.ms .k.ms-done {
+.stats-grid .col.ms .k.ms-done,
+.stats-grid .col.nsr .k.ms-done {
+  color: var(--good);
+}
+/* Next-star checklist: the value ("Ready" / the population count) also greens
+ * when its gate is met, so the row reads done without an inline color. */
+.stats-grid .col.nsr .v.ms-done {
+  color: var(--good);
+}
+/* The "· ready" flag in the Next-star section header (all gates met). */
+.stats-section .nsr-ready {
   color: var(--good);
 }
 .stats-section .evalbar {
@@ -1348,10 +1361,12 @@ dialog.crash-card::backdrop {
   .stats-grid {
     grid-template-columns: 1fr;
   }
-  .stats-grid .col.ms {
+  .stats-grid .col.ms,
+  .stats-grid .col.nsr {
     grid-template-columns: auto 1fr;
   }
-  .stats-grid .col.ms .v {
+  .stats-grid .col.ms .v,
+  .stats-grid .col.nsr .v {
     text-align: left;
   }
 

@@ -78,6 +78,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         <span class="k">Elevators</span><span class="v">${s.elevators}</span>
         <span class="k">All transports</span><span class="v">${s.transports}</span>
       </div>
+      ${nextStarSection(sim)}
       <div class="stats-section win-title sm">Tenancy</div>
       <div class="col kv">
         <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
@@ -208,6 +209,37 @@ function householdSection(sim: Simulation): TemplateResult {
     .map((sz) => `${sz}p × ${counts.get(sz)}`)
     .join(" · ");
   return html`${head}<div class="col kv"><span class="k">People housed</span><span class="v">${residents.toLocaleString()}</span><span class="k">Avg household</span><span class="v">${avg}</span></div><div class="col kv"><span class="k">Size mix</span><span class="v">${mix}</span></div>`;
+}
+
+/**
+ * The "what is blocking my next star" checklist: the population bar plus the
+ * facility gates for the next rung. Driven by the engine read model
+ * (`sim.nextStarRequirements()`), which mirrors the promotion gates, so the
+ * checklist can never disagree with an actual star-up. Hidden once the tower is
+ * a TOWER (nothing above it).
+ */
+export function nextStarSection(sim: Simulation): TemplateResult | typeof nothing {
+  const req = sim.nextStarRequirements();
+  if (!req) return nothing;
+  const fmt = (n: number) => n.toLocaleString();
+  const goal = req.isTower ? "TOWER" : `${req.star}★`;
+  const mark = (met: boolean) => (met ? "✓" : "·");
+  // Coloring rides the shared checklist `ms-done` class (green when met, the
+  // muted `.col.nsr .v/.k` default otherwise), so there are no inline color
+  // overrides to keep in sync with the theme.
+  const rows: TemplateResult[] = [
+    html`<span class="k${req.popMet ? " ms-done" : ""}">${mark(req.popMet)} Population</span><span class="v${req.popMet ? " ms-done" : ""}">${fmt(req.popHave)} / ${fmt(req.popNeed)}</span>`,
+    ...req.gates.map(
+      (g) =>
+        html`<span class="k${g.met ? " ms-done" : ""}">${mark(g.met)} ${g.label}</span><span class="v${g.met ? " ms-done" : ""}">${g.met ? "Ready" : "Needed"}</span>`,
+    ),
+  ];
+  const head = html`<div class="stats-section win-title sm">Next: ${goal}${
+    req.allMet ? html`<span class="nsr-ready"> · ready</span>` : nothing
+  }</div>`;
+  const half = Math.ceil(rows.length / 2);
+  const col = (items: TemplateResult[]) => html`<div class="col nsr kv">${items}</div>`;
+  return html`${head}${col(rows.slice(0, half))}${col(rows.slice(half))}`;
 }
 
 /** The optional-goals checklist, the lone renderer since the string builders retired. */
