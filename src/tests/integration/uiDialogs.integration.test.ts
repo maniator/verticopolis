@@ -288,15 +288,29 @@ describe("openModalTemplate — the window grammar", () => {
     expect(nested.querySelector("button")).toBeNull(); // and no ✕ either
   });
 
-  it("points the dialog's aria-labelledby at the title bar's id, so a screen reader announces which dialog opened", () => {
+  it("points the dialog's aria-labelledby at the title-text span, so a screen reader announces which dialog opened", () => {
     const { ui } = makeUI();
     const box = open(ui, "<h2>Window Title</h2><p>body</p>");
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
-    expect(title.id).toBe(labelId); // the reference resolves to the rendered title
-    expect(document.getElementById(labelId!)).toBe(title);
-    expect(title.textContent).toContain("Window Title");
+    const titleSpan = document.getElementById(labelId!)!;
+    expect(titleSpan.tagName).toBe("SPAN"); // labelled at the title-text span, not the h2
+    expect(titleSpan.parentElement).toBe(title);
+    expect(titleSpan.textContent).toContain("Window Title");
+  });
+
+  it("excludes the ✕ button from the accessible name: the labelled span carries the title text alone", () => {
+    // Regression guard: finishModal used to label the h2 itself, and the ✕
+    // is appended into that same h2, so a screen reader announced the title
+    // plus the ✕'s own accessible name ("Close"), e.g. "Settings Close".
+    const { ui } = makeUI();
+    open(ui, "<h2>Settings</h2><p>body</p>");
+    const labelId = dialog().getAttribute("aria-labelledby")!;
+    const titleSpan = document.getElementById(labelId)!;
+    expect(titleSpan.textContent).toContain("Settings");
+    expect(titleSpan.textContent).not.toContain("Close");
+    expect(titleSpan.querySelector("button")).toBeNull();
   });
 
   it("never labels the dialog with a nested (non-title-bar) h2", () => {
@@ -307,12 +321,18 @@ describe("openModalTemplate — the window grammar", () => {
     expect(document.getElementById(labelId)!.textContent).not.toContain("Section heading");
   });
 
-  it("keeps a title's own id instead of clobbering it, and points aria-labelledby there", () => {
+  it("leaves a caller-supplied h2 id untouched; aria-labelledby points at the title-text span, not the caller id", () => {
     const { ui } = makeUI();
     open(ui, '<h2 id="custom-title-id">Titled</h2><p>body</p>');
     const title = dialog().querySelector<HTMLElement>("h2.win-title")!;
-    expect(title.id).toBe("custom-title-id"); // caller id preserved, not overwritten
-    expect(dialog().getAttribute("aria-labelledby")).toBe("custom-title-id");
+    expect(title.id).toBe("custom-title-id"); // caller id preserved, never read or overwritten
+    const labelId = dialog().getAttribute("aria-labelledby");
+    expect(labelId).not.toBe("custom-title-id");
+    expect(labelId).toBe("modal-title"); // the shared MODAL_TITLE_ID, stamped on the span
+    const titleSpan = document.getElementById(labelId!)!;
+    expect(titleSpan.tagName).toBe("SPAN");
+    expect(titleSpan.parentElement).toBe(title); // nested inside the caller's own h2
+    expect(titleSpan.textContent).toContain("Titled");
   });
 
   it("clears aria-labelledby rather than leaving it dangling when a modal renders no top-level h2", () => {
@@ -466,14 +486,16 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(box2.querySelector(":scope > h2")!.textContent).toContain("Second");
   });
 
-  it("wires aria-labelledby to the title bar's id for the lit mount path too", () => {
+  it("wires aria-labelledby to the title-text span for the lit mount path too", () => {
     const { ui } = makeUI();
     const box = ui.openModalTemplate(html`<h2>Set all offices</h2><p>body</p>`);
     const labelId = dialog().getAttribute("aria-labelledby");
     expect(labelId).toBeTruthy();
     const title = box.querySelector(":scope > h2")!;
-    expect(title.id).toBe(labelId);
-    expect(document.getElementById(labelId!)!.textContent).toContain("Set all offices");
+    const titleSpan = document.getElementById(labelId!)!;
+    expect(titleSpan.tagName).toBe("SPAN"); // labelled at the span, not the h2 (same contract as openModal)
+    expect(titleSpan.parentElement).toBe(title);
+    expect(titleSpan.textContent).toContain("Set all offices");
   });
 
   it("relabels cleanly on close/reopen: same shared id, no dangling reference while closed, no duplicate ids", () => {
