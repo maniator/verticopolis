@@ -10,7 +10,7 @@ scope: Editor and dialog UX only. The engine rulings are ratified inputs and are
   (issue #370) because this spec redraws the editor panel anyway.
 inputs:
   - _bmad-output/planning-artifacts/design/gdd-classic-modern-pricing-roadmap-2026-07-08.md (§0-§2)
-  - _bmad-output/planning-artifacts/design/epics-classic-modern-roadmap-2026-07-08.md (Epic 1, FR1-FR8, NFR1-NFR3, UX-DR1/2/4)
+  - _bmad-output/planning-artifacts/design/epics-classic-modern-roadmap-2026-07-08.md (Epic 1, FR1-FR8, NFR1-NFR3, AR6, UX-DR1/2/4)
   - _bmad-output/party-mode/memories/installed/.memlog.md (epic-review party + elicitation-findings party, 2026-07-08)
   - docs/design-system.md (the dialog grammar this spec composes from)
   - _bmad-output/implementation-artifacts/spec-pixelart-unit-states.md (the reserved state-cue canon)
