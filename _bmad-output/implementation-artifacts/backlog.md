@@ -181,6 +181,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `gds-code-review` of commercial-demand-pools Phase B (#393) (adversarial, 2026-07-15)
+
+- **The inspector's "Local demand: N%" line can lag an occupancy change by up to an hour (Edge Case Hunter, low).** `facilityDiagnostics` reads the memoized `sim.demandMap()`, keyed on `(tower.revision, hour)`; a lease signed mid-hour does not bump `tower.revision`, so the surfaced percentage (and the income loop's fresh per-tick fraction) can differ until the hour rolls. Bounded, self-healing, and income is unaffected (the money loop calls `computeDemandMap` fresh). Phase B fixed the worst case (a venue ABSENT from the memo now omits the line rather than showing a false 0%). If the residual lag ever reads wrong to players, switch the inspector to a fresh `computeDemandMap` read (accepting the per-hover recompute) or key the memo on an occupancy epoch; fold into the render-perf memoization thread rather than a bespoke fix.
+
 ### Deferred from: `gds-code-review` of commercial-demand-pools Phase A (#393) (adversarial, 2026-07-15)
 
 - **Attendance venues (cinema/partyHall) distort the retail demand pool (Edge Case Hunter, medium; GDD-flagged revisit).** Promoted to a curated row: `attendance-venue-demand` (#424). A cinema/party hall enters the demand pool's `totalCap` as a capacity sink and can collapse retail income; fix is an attendance-fill fraction that drops them from the retail `totalCap`. Per-spec today (Acceptance Auditor), so a balance refinement. See the row for detail.
