@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
 import { GRID } from "../../engine/facilities";
+import { Tower } from "../../engine/Tower";
 import { FLOOR, TILE } from "../scale";
 import {
   MIN_ZOOM,
@@ -43,7 +44,6 @@ function eng(over: Record<string, any> = {}): any {
       weather: "clear",
     },
     transportActors: new Map(),
-    roomActors: new Map(),
     screenToWorld(sx: number, sy: number) {
       return ex.vec((sx - e.viewWidth / 2) / e.cam.zoom + e.cam.pos.x, (sy - e.viewHeight / 2) / e.cam.zoom + e.cam.pos.y);
     },
@@ -247,47 +247,97 @@ describe("focus resolves the dominant facility in the visible band", () => {
   });
 });
 
-describe("pickEntityAt resolves the top-most collider under a point", () => {
+describe("pickEntityAt: transports by collider, every unit by grid lookup", () => {
   const world = ex.vec(100, -100);
   const hit = (z: number) => ({ z, contains: () => true });
   const miss = (z: number) => ({ z, contains: () => false });
 
-  it("prefers a transport whose collider contains the point", () => {
+  it("prefers a transport whose collider contains the point over the unit beneath", () => {
     const e = eng({
       transportActors: new Map([[7, hit(1)]]),
-      roomActors: new Map([[3, { actor: hit(0) }]]),
-      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => ({ kind: "elevatorStandard" }), getUnit: () => ({ kind: "office" }), unitAt: () => undefined } },
+      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => ({ kind: "elevatorStandard" }), unitAt: () => ({ id: 3, kind: "office" }) } },
     });
     expect(pickEntityAt(e, world)).toEqual({ type: "transport", id: 7, kind: "elevatorStandard" });
   });
 
-  it("returns the higher-z of two overlapping room actors", () => {
-    const e = eng({
-      transportActors: new Map(),
-      roomActors: new Map([
-        [1, { actor: hit(0) }],
-        [2, { actor: hit(5) }],
-      ]),
-      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, getUnit: () => ({ kind: "office" }), unitAt: () => undefined } },
-    });
-    expect(pickEntityAt(e, world)!.id).toBe(2);
-  });
-
-  it("falls back to a floor/lobby tile via unitAt when no actor contains the point", () => {
+  it("resolves any unit kind by unitAt when no transport contains the point", () => {
     const e = eng({
       transportActors: new Map([[7, miss(1)]]),
-      roomActors: new Map([[3, { actor: miss(0) }]]),
-      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, getUnit: () => undefined, unitAt: () => ({ id: 99, kind: "lobby" }) } },
+      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, unitAt: () => ({ id: 3, kind: "office" }) } },
     });
-    expect(pickEntityAt(e, world)).toEqual({ type: "unit", id: 99, kind: "lobby" });
+    expect(pickEntityAt(e, world)).toEqual({ type: "unit", id: 3, kind: "office" });
   });
 
   it("returns null when nothing is under the point and the tile is empty", () => {
     const e = eng({
       transportActors: new Map(),
-      roomActors: new Map(),
-      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, getUnit: () => undefined, unitAt: () => undefined } },
+      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, unitAt: () => undefined } },
     });
     expect(pickEntityAt(e, ex.vec(1, -1))).toBeNull();
+  });
+
+  it("a stale transport actor falls through to the unit, and a z-tie keeps last-wins", () => {
+    // Stale: the collider still contains the point but the transport is gone
+    // from the sim; the guard must fall through to the grid lookup.
+    const stale = eng({
+      transportActors: new Map([[7, hit(1)]]),
+      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: () => undefined, unitAt: () => ({ id: 3, kind: "office" }) } },
+    });
+    expect(pickEntityAt(stale, world)).toEqual({ type: "unit", id: 3, kind: "office" });
+
+    // Two overlapping transports at the same z: the >= comparison keeps the
+    // later map entry, the same tie-break the actor scan always had.
+    const kinds = new Map([
+      [1, { kind: "elevatorStandard" }],
+      [2, { kind: "elevatorExpress" }],
+    ]);
+    const tie = eng({
+      transportActors: new Map([
+        [1, hit(1)],
+        [2, hit(1)],
+      ]),
+      sim: { tower: { highestFloor: 40, lowestFloor: 1, getTransport: (id: number) => kinds.get(id), unitAt: () => undefined } },
+    });
+    expect(pickEntityAt(tie, world)!.id).toBe(2);
+  });
+
+  it("resolves rooms on a REAL tower with zero render actors, including a multi-floor unit's upper story", () => {
+    // The regression the grid-lookup switch must pin: picking reads only the
+    // sim's footprint-complete tile index, never the room actor layer (which
+    // the region-composition story retires), and Tower.register claims every
+    // story of a multi-floor unit so its upper floors resolve too.
+    const tower = new Tower();
+    for (let x = 100; x < 150; x++) {
+      expect(tower.place("lobby", 1, x).ok).toBe(true);
+      expect(tower.place("floor", 2, x).ok).toBe(true);
+      expect(tower.place("floor", 3, x).ok).toBe(true);
+    }
+    const cinema = tower.place("cinema", 2, 100); // 31 tiles wide, 2 stories
+    expect(cinema.ok).toBe(true);
+    const office = tower.place("office", 2, 140);
+    expect(office.ok).toBe(true);
+    const e = eng({ transportActors: new Map(), sim: { tower } });
+
+    const at = (tile: number, floor: number) => pickEntityAt(e, ex.vec((tile + 0.5) * TILE, -(floor - 0.5) * FLOOR));
+    expect(at(141, 2)).toEqual({ type: "unit", id: office.unitId, kind: "office" });
+    expect(at(110, 2)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema" });
+    expect(at(110, 3)).toEqual({ type: "unit", id: cinema.unitId, kind: "cinema" }); // upper story
+    expect(at(141, 3)!.kind).toBe("floor"); // bare structure above the office
+    expect(at(141, 1)!.kind).toBe("lobby");
+    expect(at(50, 20)).toBeNull(); // open sky
+
+    // Exact pixel-boundary semantics (the deliberate tie-break recorded in
+    // the backlog): a cell owns its left pixel edge; the right edge and the
+    // line below belong to the neighbor. Basements and out-of-grid points
+    // resolve through the same total lookup, no clamping, no throw.
+    const atWorld = (x: number, y: number) => pickEntityAt(e, ex.vec(x, y));
+    const midFloor2 = -(2 - 0.5) * FLOOR;
+    expect(atWorld(140 * TILE, midFloor2)!.id).toBe(office.unitId); // left edge is the office's
+    expect(atWorld(149 * TILE, midFloor2)!.kind).toBe("floor"); // right edge is the neighbor's
+    expect(tower.place("floor", 0, 120).ok).toBe(true); // B1 under the lobby strip
+    expect(atWorld(120.5 * TILE, 0)!.kind).toBe("floor"); // the ground line maps to B1 (ceil(-0) keys as floor 0)
+    expect(atWorld(-5, midFloor2)).toBeNull(); // left of the lot
+    expect(atWorld(400 * TILE, midFloor2)).toBeNull(); // right of the lot
+    expect(atWorld(120.5 * TILE, -150 * FLOOR)).toBeNull(); // far above the build cap
   });
 });

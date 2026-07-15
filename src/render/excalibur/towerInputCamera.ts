@@ -46,7 +46,8 @@ export interface ViewFocus {
   weather: WeatherKind;
 }
 
-/** What the pointer is over, resolved by Excalibur's collider hit-testing. */
+/** What the pointer is over: transports by Excalibur collider hit-test,
+ *  every unit kind by the tower's grid lookup (see pickEntityAt). */
 export interface Picked {
   type: "unit" | "transport";
   id: number;
@@ -90,7 +91,8 @@ export function bindInput(engine: TowerEngine): void {
   });
 }
 
-/** Top-most unit/transport whose Excalibur collider contains the point. */
+/** Top-most unit/transport under the point: transports by their Excalibur
+ *  colliders (z 1, they overlay every unit), units by grid lookup. */
 export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | null {
   let best: Picked | null = null;
   let bestZ = -Infinity;
@@ -103,27 +105,17 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
       }
     }
   }
-  const considerUnit = (id: number, a: ex.Actor) => {
-    if (a.z >= bestZ && a.contains(world.x, world.y)) {
-      const u = engine.sim.tower.getUnit(id);
-      if (u) {
-        best = { type: "unit", id, kind: u.kind };
-        bestZ = a.z;
-      }
-    }
-  };
-  for (const [id, rec] of engine.roomActors) considerUnit(id, rec.actor);
-  // Floor/lobby tiles have no per-tile actors (they live in the struct
-  // TileMap), so resolve them by grid lookup instead of an actor scan. They
-  // sat at z -1, below every room (0) and transport (1), so they only ever
-  // won a pick when nothing else contained the point, which is exactly the
-  // "no actor matched" case here. O(1) versus the old scan of ~9,000 actors.
+  // Every unit kind resolves by grid lookup now, the way floor/lobby tiles
+  // (which never had per-tile actors) already did. The tower's tile index is
+  // footprint-complete (Tower.register claims every story of a multi-floor
+  // unit), units never overlap, and rooms always sat below transports, so
+  // one O(1) unitAt matches what the O(rooms) actor scan returned while
+  // freeing the pick from the render's actor model entirely, which the
+  // region-composition story (rooms stop owning per-unit actors) needs.
   if (!best) {
     const { tile, floor } = worldToCell(world);
     const u = engine.sim.tower.unitAt(floor, tile);
-    if (u && (u.kind === "floor" || u.kind === "lobby")) {
-      best = { type: "unit", id: u.id, kind: u.kind };
-    }
+    if (u) best = { type: "unit", id: u.id, kind: u.kind };
   }
   return best;
 }

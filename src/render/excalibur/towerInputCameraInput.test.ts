@@ -46,8 +46,7 @@ function inputEng(over: Record<string, unknown> = {}) {
     onExtendTo: vi.fn(),
     onExtendEnd: vi.fn(),
     transportActors: new Map(),
-    roomActors: new Map(),
-    sim: { tower: { getTransport: () => undefined, getUnit: () => undefined, unitAt: () => undefined } },
+    sim: { tower: { getTransport: () => undefined, unitAt: () => undefined } },
     engine: {
       input: {
         pointers: { on: (name: string, cb: (ev: unknown) => void) => (handlers[name] = cb) },
@@ -216,7 +215,7 @@ describe("pointer up routing", () => {
       selectedId: 5,
       onExtendTo: vi.fn(),
       onExtendEnd: vi.fn(),
-      sim: { tower: { getTransport: () => ({ top: 20, bottom: 4 }), getUnit: () => undefined, unitAt: () => undefined } },
+      sim: { tower: { getTransport: () => ({ top: 20, bottom: 4 }), unitAt: () => undefined } },
     });
     e.arrowDrag = { end: "up" };
     e.moved = 0;
