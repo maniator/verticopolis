@@ -5,8 +5,6 @@ a basement garage and a Recycling Center).
 
 | Screenshot | Shows |
 |---|---|
-| `parking-garage-day.png` | Weekday afternoon: office workers' cars fill the garage bays across both basement decks. |
-| `parking-garage-predawn.png` | Pre-dawn (04:30): the same decks nearly empty once the office cars have gone; only overnight suite-guest cars remain. |
 | `garbage-truck-collection.png` | The garbage truck loading at the Recycling Center during the 05:00 collection; the dead (unchained) parking space keeps its red X with no cars. |
 | `recycling-filling.png` | The Recycling Center late in the day: garbage bags piled up with the green→amber→red wall fill gauge. |
 | `inspector-recycling.png` | Hover inspector on the Recycling Center: live fill %, and the capacity/demand-met verdict. |
@@ -25,15 +23,17 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-satisfaction.png` | **Satisfaction** mode: green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
 | `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 
-## Condo rule-sets (Classic vs Modern)
+## Metro station (routed commuters + the train)
 
-Captured from the built app via the unified generator (`scripts/screenshots.ts`, `condo-modes` scene).
+Captured from the built app via the unified generator (`scripts/screenshots.ts`, `metro` scene) on the hero
+tower during the morning rush. The station is the high-platform composition: a
+double-height concourse over a one-story track trough, with the platform deck
+on the module's middle story, where the crowd engine stands routed commuters.
 
 | Screenshot | Shows |
 |---|---|
-| `condo-modes.png` | Both of the below stacked into one captioned figure (handy for embedding in a single image slot). |
-| `new-tower-modes.png` | The **Found a New Tower** rule-set picker: Classic (faithful 1994: flat family of 3, 2×–2.5× price, owner buy-back) vs Modern (variant 2–5 households), with the permanence notice. The choice is fixed for the tower's life. |
-| `stats-households-modern.png` | Tower Statistics on a Modern tower: the conditional **Households** section: people housed, average household, and the size mix across sold condos. (Classic towers don't show this section.) |
+| `metro-platform-waiting.png` | The platform mid-rush with the track empty: commuters who rode down (or just stepped off the last train) wait at the yellow edge among the benches, posters, and vending machines. |
+| `metro-station-train.png` | The consist pulled in: coupled cars with lit window bands and door pairs at the crowd, the red livery stripe running the platform's length. |
 
 ## Traffic congestion chip (peak-driven + hotspot floor)
 
@@ -44,19 +44,6 @@ tower (three office floors slammed onto one weak elevator, peak congestion 2.07)
 |---|---|
 | `traffic-chip.png` | **Gridlock · 11F**: the chip tiers on peak per-floor congestion (matching the overlay legend) and names the hotspot floor on one line, tier word bold and the floor a lighter footnote. |
 | `traffic-chip-mobile.png` | The same state at phone width: the HUD wraps its stats onto rows and the chip (glyph + tier + floor) reads cleanly there too. |
-
-## Build palette: unlock visibility (locked tiers hidden until earned)
-
-Captured from the built app via the unified generator (`scripts/screenshots.ts`, `palette-unlock` scene). Parity with the
-1994 original: locked facilities are hidden until their star tier is reached, so
-the palette grows as stars are earned rather than showing dimmed, unbuildable rows.
-
-| Screenshot | Shows |
-|---|---|
-| `palette-unlock.png` | The three below stacked into one captioned figure (handy for embedding in a single image slot). |
-| `palette-1star.png` | A fresh **1★** tower: only the 1★ tools, and the Leisure / Services / Special group headers are absent (nothing unlocked in them yet). |
-| `palette-3star.png` | **3★**: the Leisure and Services headers appear and the 2★/3★ rows (Single/Double/Suite, Restaurant, Retail Shop, Escalator/Service/Express, parking, medical, recycling) are revealed. Special is still hidden. |
-| `palette-5star.png` | **5★**: the full palette: the Special group (Metro Station, Wedding Hall) is now unlocked too. |
 
 ## Tablet responsive breakpoint
 
@@ -69,19 +56,6 @@ bottom-strip + drawer, and wraps the top bar so nothing clips.
 |---|---|
 | `tablet-portrait.png` | 834×1112 (portrait tablet): the tablet layout (Tools docked left, SELECTED/TOWER/BULLETIN/GAME docked right, stats on a tidy second row). |
 | `tablet-compact.png` | 1000×720 (compact band): the top bar wraps cleanly (brand on one line, all buttons visible) and the columns tighten so the canvas keeps room. |
-
-## SimTower-1994 segment-width parity + save migration (`towerone_6`)
-
-Captured from the built app via the unified generator (`scripts/screenshots.ts`, `migration` scene) on the real
-`towerone_6` save the initiative began with: loaded twice, once with the v1→v2
-reflow skipped ("before") and once applied ("after"), so the change is honest.
-
-| Screenshot | Shows |
-|---|---|
-| `parity-migration-before.png` | The whole 57-floor tower with the reflow **skipped**: rooms at their pre-canon widths. |
-| `parity-migration-after.png` | The same tower **migrated** to canon 1994 segment widths. Deliberately near-identical at full zoom: the reflow is minimum-disruption by design (rooms hold their anchors; only widths change). |
-| `parity-migration-parking-before.png` | Basement parking pre-migration: narrow 6-wide ramps (short diagonals) and 6-wide spaces. |
-| `parity-migration-parking-after.png` | Basement parking after canon widths: ramps widen 6→16 (the long diagonals now span each level) and spaces narrow 6→4, the whole basement reflowed. This is the clearest read on the change, and where the initiative started ("why does each parking spot only add one spot?"). |
 
 ## Crash screen (context-loss recovery with a crash report)
 

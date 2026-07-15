@@ -51,7 +51,9 @@ export function buildCanonTower(): void {
       s.tower.place("lobby", f, x);
     }
   }
-  s.tower.placeTransport("elevatorStandard", left + 2, 1, 15);
+  // The first bank is placed AFTER the basement dig below (it runs down to
+  // the metro platform, and validateTransport rejects a span through floors
+  // that do not exist yet; placing it here would silently lose the bank).
   s.tower.placeTransport("elevatorStandard", left + 8, 15, 30);
   s.tower.placeTransport("elevatorStandard", left + 14, 30, 40);
   s.tower.placeTransport("elevatorExpress", left + 20, 1, 30);
@@ -99,6 +101,15 @@ export function buildCanonTower(): void {
   for (let f = -1; f >= -4; f--) for (let x = 0; x < W; x++) s.tower.place("floor", f, x);
   const metro = s.tower.place("metro", -4, 0);
   if (metro.ok) s.tower.getUnit(metro.unitId).state = "occupied";
+  // The first elevator bank, held back from the transport block above: it
+  // serves the metro platform (B4, floor -3) through the lobby up to the
+  // 15F sky lobby, and can only be placed once the basement floors exist
+  // (review Edge #1: the earlier placement was silently rejected, orphaning
+  // the platform AND floors 3-14). Hard-assert the result: this call is
+  // order-sensitive and load-bearing for the metro scene, so a regression
+  // must fail the capture loudly, not ship an empty platform.
+  const platformBank = s.tower.placeTransport("elevatorStandard", left + 2, -3, 15);
+  if (!platformBank.ok) throw new Error(`hero platform bank failed: ${platformBank.reason}`);
   s.tower.place("parkingRamp", -1, left);
   for (let x = left + 16; x + 1 <= right; ) {
     const r = s.tower.place("parking", -1, x);

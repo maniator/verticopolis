@@ -1741,3 +1741,48 @@ departed while culled never flashes at a stale position). Standing defers:
   loads rebuild the sim and strip the tally). The standing rule for future
   work: any new despawn shortcut MUST route through `finish()`, or add a
   reconciliation pass first. No repair pass exists by design today.
+## Metro platform commuters + high-platform station (v1.34.0)
+
+The metro station became a real routed crowd destination (engine:
+`crowd/venueTrips.ts` spawners, the `spawnFloors` metro bin, the
+`Person.lingerFor` platform-wait hold), the train grew to the party-ratified 60px consist
+with warm-lit riders behind the windows, and `drawMetro` was redrawn as the
+high-platform composition (deck on the middle story's floor line, where the
+crowd stands routed commuters). A `metro` screenshot scene captures the
+platform with and without the train; the hero tower's first elevator bank
+now reaches the platform. Before/after comparison screenshot groups were
+removed at the owner's request (save-migration parity, parking day/predawn,
+condo Classic vs Modern, palette unlock).
+
+Integrated on top of the venue-attendance work (v1.33.0): the hall-routing
+half of the original branch was dropped in its favor (its counted round
+trips with the attendance ledger supersede the one-way hall guests this
+branch first shipped), the trip primitives come from its `crowd/trips.ts`,
+and `Person.lingerFor` stays metro-only (venue stays ride the `dwelling`
+state and its `dwellSecondsLeft`, so the two mechanisms cannot stack).
+
+Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
+
+- **Metro ridership economy**: commuters are visual-and-routing only; no
+  income, congestion, or census coupling changed. The catalog's transit
+  bonuses (+60 arrival capacity, congestion relief) stay statistical. A
+  per-rider ridership model is a separate design question.
+- **Metro as an attendance-visit origin**: commuters currently head to
+  offices, homes, and the ambient venue pool. Wiring the platform in as an
+  origin for the visits flow (riding in specifically for a film or a
+  party) would compound both features. The seam is the visits flow's
+  `outside` VisitOrigin (crowd/visits.ts): an outside visitor whose street
+  door is the platform instead of the ground lobby. Small seam, deliberate
+  follow-up (handoff-agreed with the venue-attendance effort).
+  Caution from the integration verify: `lingerFor` and the visit intent
+  (`mealVenueId`) are disjoint today by construction, and nothing clears
+  `lingerFor` on the venue paths, so that follow-up must spawn visit
+  people through the visits flow, never by adding a venue intent to a
+  `metroDeparture`-stamped person (they would double-wait).
+- **Unroutable-metro spawn no-ops (review Edge #4)**: a metro with no shaft
+  to its platform still contributes options to the spawn pool; picked
+  options route null and consume the spawn budget as no-ops. Consistent
+  with the pre-existing null-route behavior for unreachable floors, so
+  deferred; a spawn-side routability pre-check (or a bulletin hint, "your
+  metro platform has no elevator") would close it and double as player
+  guidance.

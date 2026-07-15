@@ -190,23 +190,6 @@ export function pgFillRow(kind: string, floor: number, x0: number, x1: number, s
   }
 }
 
-/** Set the tower's star rating and refresh the build palette to it, then expand
- *  the docked scroll so the whole (growing) tool list is in frame. isUnlocked()
- *  keys off star alone, so no built tower is needed to show the unlock set. */
-export function pgPaletteAtStar(star: number): void {
-  const g = (window as unknown as { game: any }).game;
-  g.sim.star = star;
-  g.ui.update(g.sim);
-  for (const id of ["palette", "palette-scroll"]) {
-    const el = document.getElementById(id);
-    if (el) {
-      el.style.height = "auto";
-      el.style.maxHeight = "none";
-      el.style.overflow = "visible";
-    }
-  }
-}
-
 /** Set the in-game clock to a whole hour without advancing days. */
 export function pgSetClock(hour: number): void {
   const c = (window as unknown as { game: any }).game.sim.clock;
