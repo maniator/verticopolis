@@ -34,7 +34,9 @@
  * regen diff means the UI actually changed.
  *
  * Env knobs: RUN_SERVER=1 spawns its own `vite preview`; ONLY=milestones,tablet
- * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets.
+ * re-shoots just those scene ids; BASE_URL / PORT / PW_CHROME override targets;
+ * SHOTS_DIR relocates the output gallery (used by the determinism guard to render
+ * two independent legs into separate roots concurrently).
  *
  * TypeScript runs natively on Node ≥ 22.18 (type-stripping): no build step, no
  * extra dep. Keep every module here ERASABLE (type annotations / interfaces /
@@ -51,6 +53,15 @@ import { SCENES } from "./screenshot-scenes.ts";
 // ---- Runner -----------------------------------------------------------------
 
 const FRAME_MS = 1000 / 60;
+
+// Wall-clock ceiling for a page to signal it finished booting (a route's ready
+// flag, or the game object). This is only a ceiling before the scene is declared
+// failed: the waits resolve the instant the page is ready, so a generous value
+// costs nothing on the happy path. Sized with headroom because the determinism
+// guard (screenshot-capture.yml) now renders its two legs CONCURRENTLY: the
+// doubled CPU contention on the runner can slow a heavy scene's boot, and a ceiling
+// tuned for one-leg-at-a-time load would flag that transient slowness as a failure.
+const READY_TIMEOUT_MS = 30_000;
 
 /** Deterministic settle: advance the page by `ms` of VIRTUAL time by stepping
  *  the adopted TestClock in whole frames, so identical runs replay identical
@@ -167,10 +178,10 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         await page.waitForFunction(() => {
           const w = window as any;
           return w.galleryReady === true || w.excaliburReady === true || w.previewReady === true;
-        }, null, { timeout: 12000 });
+        }, null, { timeout: READY_TIMEOUT_MS });
       } catch {
         for (const shot of scene.shots) {
-          failures.push(`${scene.id}/${shot.name}: route never signaled ready, skipped (kept existing image)`);
+          failures.push(`${scene.id}/${shot.name}: route never signaled ready, skipped (no new image written)`);
           console.error(`  ✗ ${shot.name}: route never ready, skipped`);
         }
         return;
@@ -185,7 +196,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       }
       await settle(page, 800);
     } else {
-      await page.waitForFunction(() => !!(window as any).game, null, { timeout: 15000 });
+      await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
       // From here on, frames advance only when settle()/pgStep drives them:
       // wall time (rAF jitter, CI load, staging latency) can no longer leak
       // into what the sim and the decorations look like at capture. A failed

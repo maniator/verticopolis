@@ -14,10 +14,18 @@ import { mkdirSync, existsSync } from "node:fs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(__dirname, "..");
+// Where the generated gallery is written. Defaults to the committed
+// docs/screenshots tree; SHOTS_DIR relocates the whole set (features/milestones
+// stay relative to it) so two renders can run CONCURRENTLY into separate roots
+// without clobbering each other's PNGs. The determinism guard (screenshot-
+// capture.yml) uses this to render its two independent legs in parallel: leg a
+// into <root-a>/docs/screenshots, leg b into <root-b>/docs/screenshots, then
+// byte-diffs the two trees.
+const SHOTS_DIR = process.env.SHOTS_DIR ? resolve(process.env.SHOTS_DIR) : resolve(ROOT, "docs/screenshots");
 export const DIRS = {
-  screenshots: resolve(ROOT, "docs/screenshots"),
-  features: resolve(ROOT, "docs/screenshots/features"),
-  milestones: resolve(ROOT, "docs/screenshots/milestones"),
+  screenshots: SHOTS_DIR,
+  features: resolve(SHOTS_DIR, "features"),
+  milestones: resolve(SHOTS_DIR, "milestones"),
 };
 export type OutDir = keyof typeof DIRS;
 // Browser: PW_CHROME wins (the CI container path sets it to the image's Chromium);
