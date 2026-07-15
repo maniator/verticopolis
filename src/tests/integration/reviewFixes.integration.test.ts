@@ -208,6 +208,7 @@ describe("F7 — commercial income never exceeds its headline daily figure", () 
     // the "at most its daily figure" ceiling is the assertion under test.
     for (const x of [20, 32, 44, 56]) {
       const o = sim.tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
       sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
     const before = sim.money;
@@ -233,6 +234,7 @@ describe("F14 — the Recycling Centre has a real effect", () => {
     // the recycling bonus, which lifts that pool, has something to act on.
     for (const x of [20, 30]) {
       const o = tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
       tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
     if (withRecycling) {

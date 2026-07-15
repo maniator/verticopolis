@@ -209,13 +209,14 @@ describe("Recycling lifts commercial demand (demand-pools model)", () => {
       sim.star = 3;
       lay(sim, "lobby", 1);
       lay(sim, "floor", 2);
-      sim.buildTransport("elevatorStandard", C, 1, 2);
+      expect(sim.buildTransport("elevatorStandard", C, 1, 2).ok).toBe(true);
       // A modest occupied office block, population well under the shop's demand
       // capacity, so the shop is not saturated and the recycling pool bonus is
       // visible in its income (a saturated venue capped at its daily figure would
       // hide it). Offices sit clear of the shop at x=0.
       for (let i = 0; i < 6; i++) {
         const r = sim.tower.place("office", 2, 20 + i * 10);
+        expect(r.ok, r.reason).toBe(true);
         sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
       }
       occupy(sim, "shop", 2, 0, "occupied");

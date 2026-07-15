@@ -33,6 +33,7 @@ function strandedShopTower(seed: number): Simulation {
   // the shafts (C, C+6, C+12) and the shop column (C+30).
   for (const x of [X0, C + 18]) {
     const o = sim.tower.place("office", 2, x);
+    expect(o.ok, o.reason).toBe(true);
     sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
   }
   const r = sim.tower.place("shop", 40, C + 30); // 3 rides up

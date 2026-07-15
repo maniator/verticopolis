@@ -45,8 +45,9 @@ function unit(sim: Simulation, id: number | undefined) {
  *  cancels and only the venue's own penalty (W3 distance, rain, ...) differs. */
 function addDemand(sim: Simulation, floor = 2, n = 4): void {
   for (let i = 0; i < n; i++) {
-    const o = unit(sim, sim.tower.place("office", floor, 100 + i * 12).unitId);
-    o.state = "occupied";
+    const r = sim.tower.place("office", floor, 100 + i * 12);
+    expect(r.ok, r.reason).toBe(true);
+    unit(sim, r.unitId).state = "occupied";
   }
 }
 

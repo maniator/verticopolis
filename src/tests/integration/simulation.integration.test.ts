@@ -1519,6 +1519,7 @@ describe("Commercial-venue inspector: patronage/profit accumulation, rollover, s
   function addOffices(sim: Simulation, x0: number): void {
     for (const x of [x0 + 20, x0 + 30]) {
       const r = sim.tower.place("office", 2, x);
+      expect(r.ok, r.reason).toBe(true);
       const o = sim.tower.units.find((u) => u.id === r.unitId);
       if (!o) throw new Error("office placement failed");
       o.state = "occupied";

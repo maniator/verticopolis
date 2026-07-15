@@ -276,6 +276,7 @@ describe("Events & amounts (FAQ Cluster B)", () => {
       // both weather runs, so only the rain multiplier differs.
       for (const x of [20, 32, 44]) {
         const o = sim.tower.place("office", 2, x);
+        expect(o.ok, o.reason).toBe(true);
         sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
       }
       sim.weather = weather; // stays fixed within the day (no day boundary crossed)

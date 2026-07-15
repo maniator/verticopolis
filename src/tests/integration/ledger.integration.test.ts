@@ -97,6 +97,7 @@ describe("Income breakdown integration", () => {
     // demand-driven), so the retail line takes real dollars.
     for (const x of [20, 32, 44]) {
       const o = sim.tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
       sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
     // Run a few days so the shop earns during its open hours and days roll over.
@@ -119,6 +120,7 @@ describe("Income breakdown integration", () => {
     // demand-driven), so the retail line takes real dollars.
     for (const x of [20, 32, 44]) {
       const o = sim.tower.place("office", 2, x);
+      expect(o.ok, o.reason).toBe(true);
       sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
     }
     for (let d = 0; d < 3; d++) sim.tick(60 * 24);
