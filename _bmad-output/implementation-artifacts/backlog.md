@@ -1822,3 +1822,9 @@ Deferred / follow-up notes (from `/gds-code-review`, 2026-07-14):
   deferred; a spawn-side routability pre-check (or a bulletin hint, "your
   metro platform has no elevator") would close it and double as player
   guidance.
+- **Cascade booking trade recorded (Codex round 3):** using the
+  live-vs-displayed hour mismatch to BOOK the hour sync in the crossing
+  frame itself would land repaints one frame sooner but double the
+  reconcile cadence back to every frame in deep catch-up, the exact cost
+  the deferral halves. Current choice favors catch-up cost over one frame
+  of repaint latency; revisit only if the owner perceives the lag.

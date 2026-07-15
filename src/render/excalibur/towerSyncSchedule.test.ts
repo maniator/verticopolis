@@ -166,6 +166,42 @@ describe("runSceneSync (engine wiring)", () => {
     expect(e.hourSyncPending).toBe(false);
     expect(e.lastSyncHour).toBe(9);
   });
+
+  it("hour cascade with the REAL tick ordering: syncs every other frame, coalescing to the newest hour, never losing one for good", () => {
+    // Deep catch-up: every frame's onUpdate crosses an hour. Model the true
+    // per-frame order: d.hour sampled at frame top, drain, sim advance, then
+    // the post-update evaluation. The reconcile cadence halves (the drain
+    // coalesces consecutive hours into one repaint from live state), which is
+    // the point at throttled catch-up; the newest hour always lands.
+    const e = eng(); // lastSyncHour 9
+    // Frame 1: top samples 10 (crossed last frame); onUpdate crosses to 11.
+    e.d.hour = 10;
+    e.sim.clock.hour = 10;
+    drainSceneSync(e as never);
+    e.sim.clock.hour = 11;
+    runSceneSync(e as never);
+    expect(syncScene).not.toHaveBeenCalled(); // booked, not synced
+    // Frame 2: drain repaints at hour 11 (hour 10's look coalesced away).
+    e.d.hour = 11;
+    drainSceneSync(e as never);
+    expect(syncScene).toHaveBeenCalledTimes(1);
+    expect(e.lastSyncHour).toBe(11);
+    e.sim.clock.hour = 12;
+    runSceneSync(e as never);
+    expect(e.hourSyncPending).toBe(false); // the 12 crossing is not visible yet
+    // Frame 3: quiet for the reconcile; the crossing books post-update.
+    e.d.hour = 12;
+    drainSceneSync(e as never);
+    expect(syncScene).toHaveBeenCalledTimes(1);
+    e.sim.clock.hour = 13;
+    runSceneSync(e as never);
+    expect(e.hourSyncPending).toBe(true);
+    // Frame 4: drain repaints at the newest hour.
+    e.d.hour = 13;
+    drainSceneSync(e as never);
+    expect(syncScene).toHaveBeenCalledTimes(2);
+    expect(e.lastSyncHour).toBe(13);
+  });
 });
 
 describe("drainSceneSync (frame-start drain, before the sim advances)", () => {
