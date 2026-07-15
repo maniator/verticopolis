@@ -1,3 +1,4 @@
+import { html, render } from "lit-html";
 import { ALL_KINDS, FACILITIES } from "../engine/facilities";
 import type { FacilityCategory, FacilityKind } from "../engine/types";
 import type { Tool, UI } from "./UI";
@@ -67,7 +68,10 @@ function toolButton(ui: UI, type: "inspect" | "bulldoze", label: string, color: 
   const item = document.createElement("div");
   item.className = "pal-item";
   item.dataset.tool = type;
-  item.innerHTML = `<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${label}</span>`;
+  // lit render for the inner swatch/label (built once at construction, from
+  // trusted catalog constants); the container's a11y wiring stays imperative in
+  // makeActivatable so a future re-render can't drop its listeners.
+  render(html`<span class="pal-swatch" style="background:${color}"></span><span class="pal-name">${label}</span>`, item);
   makeActivatable(item, label, () => ui.selectTool({ type } as Tool));
   return item;
 }
@@ -78,10 +82,10 @@ function facilityButton(ui: UI, kind: FacilityKind, group: string): HTMLElement 
   item.className = "pal-item";
   item.dataset.kind = kind;
   item.dataset.group = group;
-  item.innerHTML =
-    `<span class="pal-swatch" style="background:${f.color}"></span>` +
-    `<span class="pal-name">${f.name}</span>` +
-    `<span class="pal-cost">$${shortMoney(f.cost)}</span>`;
+  render(
+    html`<span class="pal-swatch" style="background:${f.color}"></span><span class="pal-name">${f.name}</span><span class="pal-cost">$${shortMoney(f.cost)}</span>`,
+    item,
+  );
   // Locked facilities are hidden from the palette entirely (parity with the
   // original), so a visible button is never locked, no locked toast path.
   // (A visible button may still be unaffordable; the engine build guard, not

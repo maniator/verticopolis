@@ -1,15 +1,69 @@
+import { html, nothing, render as litRender, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
  * checklist with device-aware hints. Pure DOM chrome: it READS the simulation to
  * detect real progress but never mutates it (no engine coupling, no new save
- * state), preserving the diegesis split. Once-only, skippable, re-openable from
- * Help. See the design docs under _bmad-output/planning-artifacts/design/.
+ * state), preserving the diegesis split. The splash and checklist bodies render
+ * through lit; the focus trap, backdrop/Esc dismissal, and the `data-splash` /
+ * `data-onboard` click delegation stay imperative on the container. Once-only,
+ * skippable, re-openable from Help. See the design docs under
+ * _bmad-output/planning-artifacts/design/.
  */
 
 const FLAG = "tt.onboarded";
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
+/** "Metropolis Dusk" title screen body: an art-deco skyline + setting sun under
+ *  an indigo->coral dusk sky, with the Verticopolis wordmark. The wordmark and
+ *  tagline are SVG `<text>` with `textLength` so they always fit any screen (no
+ *  clipping, no web-font download, offline-safe for the PWA). The skyline and
+ *  lighting layers are decorative (`aria-hidden`); the two lettering SVGs carry
+ *  `role="img"` + `aria-label` so a screen reader hears the name and tagline.
+ *
+ *  Whitespace note: this template's indentation adds inter-element whitespace
+ *  text nodes the old innerHTML string did not have. That is harmless only
+ *  because `#splash` and `.splash-actions` are flex (anonymous whitespace items
+ *  are not laid out) and the two lettering SVGs plus the premise are block. Keep
+ *  those display rules, or collapse the whitespace here, if either becomes
+ *  inline/inline-block. No whitespace is added inside any `<text>`/`<tspan>` (it
+ *  would shift the `textLength`-fitted glyphs). */
+function splashTemplate(hasSave: boolean, premise: string): TemplateResult {
+  return html`<div class="splash-stars" aria-hidden="true"></div>
+    <div class="splash-sun" aria-hidden="true"></div>
+    <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
+      <g fill="#201643" stroke="#0d0d10" stroke-width="1">
+        <path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z" />
+        <path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z" />
+        <path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z" />
+        <path d="M310 200 V92 h30 V68 h15 V92 h30 V200 z" />
+        <path d="M410 200 V60 h20 V36 h11 V60 h34 V200 z" />
+      </g>
+      <g fill="#ffdca0">
+        <rect x="8" y="130" width="3" height="4" /><rect x="8" y="146" width="3" height="4" />
+        <rect x="104" y="92" width="3" height="4" /><rect x="104" y="112" width="3" height="4" />
+        <rect x="214" y="66" width="3" height="4" /><rect x="214" y="90" width="3" height="4" />
+        <rect x="320" y="100" width="3" height="4" /><rect x="424" y="72" width="3" height="4" />
+      </g>
+    </svg>
+    <div class="splash-brand">
+      <svg class="splash-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis">
+        <text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text>
+      </svg>
+      <svg class="splash-tag" viewBox="0 0 360 20" role="img" aria-label="the vertical metropolis">
+        <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text>
+      </svg>
+      <p class="splash-premise">${premise}</p>
+    </div>
+    <div class="splash-actions">
+      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue">▶ Continue</button>` : nothing}
+      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new">＋ New Tower</button>
+      <button class="splash-btn ghost" data-splash="help">？ How to Play</button>
+    </div>
+    <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
+    <p class="splash-version">v${APP_VERSION}</p>`;
+}
 
 export function isOnboarded(): boolean {
   try {
@@ -159,45 +213,7 @@ export class OnboardingController {
     const premise = mobile
       ? "Raise a high-rise floor by floor and climb to the TOWER."
       : "Raise a living high-rise floor by floor: lease offices, open shops, run hotels, and thread the elevators that keep the city moving. Climb from 1★ to the legendary TOWER.";
-    const continueBtn = o.hasSave
-      ? `<button class="splash-btn primary" data-splash="continue">▶ Continue</button>`
-      : "";
-    // "Metropolis Dusk" title screen: an art-deco skyline + setting sun under an
-    // indigo→coral dusk sky, with the Verticopolis wordmark. The wordmark/tagline
-    // are SVG <text> with `textLength` so they always fit any screen (no clipping,
-    // no web-font download — offline-safe for the PWA).
-    el.innerHTML =
-      `<div class="splash-stars" aria-hidden="true"></div>` +
-      `<div class="splash-sun" aria-hidden="true"></div>` +
-      `<svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">` +
-      `<g fill="#201643" stroke="#0d0d10" stroke-width="1">` +
-      `<path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z"/>` +
-      `<path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z"/>` +
-      `<path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z"/>` +
-      `<path d="M310 200 V92 h30 V68 h15 V92 h30 V200 z"/>` +
-      `<path d="M410 200 V60 h20 V36 h11 V60 h34 V200 z"/>` +
-      `</g>` +
-      `<g fill="#ffdca0">` +
-      `<rect x="8" y="130" width="3" height="4"/><rect x="8" y="146" width="3" height="4"/>` +
-      `<rect x="104" y="92" width="3" height="4"/><rect x="104" y="112" width="3" height="4"/>` +
-      `<rect x="214" y="66" width="3" height="4"/><rect x="214" y="90" width="3" height="4"/>` +
-      `<rect x="320" y="100" width="3" height="4"/><rect x="424" y="72" width="3" height="4"/>` +
-      `</g></svg>` +
-      `<div class="splash-brand">` +
-      `<svg class="splash-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis">` +
-      `<text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs">` +
-      `<tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text></svg>` +
-      `<svg class="splash-tag" viewBox="0 0 360 20" role="img" aria-label="the vertical metropolis">` +
-      `<text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text></svg>` +
-      `<p class="splash-premise">${premise}</p>` +
-      `</div>` +
-      `<div class="splash-actions">` +
-      continueBtn +
-      `<button class="splash-btn ${o.hasSave ? "" : "primary"}" data-splash="new">＋ New Tower</button>` +
-      `<button class="splash-btn ghost" data-splash="help">？ How to Play</button>` +
-      `</div>` +
-      `<p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>` +
-      `<p class="splash-version">v${APP_VERSION}</p>`;
+    litRender(splashTemplate(o.hasSave, premise), el);
     document.body.appendChild(el);
     this.splashEl = el;
 
@@ -323,14 +339,14 @@ export class OnboardingController {
     const items = ONBOARD_STEPS.map((st, i) => {
       const state = i < this.step ? "done" : i === this.step ? "cur" : "todo";
       const mark = state === "done" ? "✓" : i === this.step ? "▸" : "·";
-      return (
-        `<li class="ob-step ob-${state}"><span class="ob-mark">${mark}</span>` +
-        `<span class="ob-text"><b>${st.title}</b>${i === this.step ? `<span class="ob-sub">${st.sub}</span>` : ""}</span></li>`
-      );
-    }).join("");
-    this.panelEl.innerHTML =
-      `<div class="win-title">Getting Started<button class="btn xs" data-onboard="skip">Skip</button></div>` +
-      `<ol class="ob-list">${items}</ol>`;
+      // The current step folds in its one-line sub; the win-title text stays
+      // adjacent to the Skip button so its title-bar layout is unchanged.
+      return html`<li class="ob-step ob-${state}"><span class="ob-mark">${mark}</span><span class="ob-text"><b>${st.title}</b>${i === this.step ? html`<span class="ob-sub">${st.sub}</span>` : nothing}</span></li>`;
+    });
+    litRender(
+      html`<div class="win-title">Getting Started<button class="btn xs" data-onboard="skip">Skip</button></div><ol class="ob-list">${items}</ol>`,
+      this.panelEl,
+    );
   }
 
   private applyHintAndPulse(): void {
@@ -347,7 +363,10 @@ export class OnboardingController {
     document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
     this.setDefaultHint();
     if (this.panelEl) {
-      this.panelEl.innerHTML = `<div class="win-title">Nice. You're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`;
+      litRender(
+        html`<div class="win-title">Nice. You're a landlord.</div><p class="ob-sendoff">The rest is in Help (？). Build up!</p>`,
+        this.panelEl,
+      );
       this.panelEl.addEventListener("click", () => this.clearSession(), { once: true });
     }
     if (this.sendOff) clearTimeout(this.sendOff);

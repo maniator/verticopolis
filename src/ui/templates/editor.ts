@@ -1,6 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { keyed } from "lit-html/directives/keyed.js";
-import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import type { Simulation } from "../../engine/Simulation";
 import type { Transport, Unit } from "../../engine/types";
 import { isOperational, isTenanted } from "../../engine/types";
@@ -30,9 +29,10 @@ import { floorTag } from "../format";
  * read them, and they document which cells carry live values.
  *
  * The mobile diagnostics block folds in `facilityDiagnostics` /
- * `transportDiagnostics`, which still emit trusted internal HTML strings
- * (shared with the desktop inspector card, migrating in E6-S2). `unsafeHTML`
- * bridges them for now; it re-parses only when the string actually changes.
+ * `transportDiagnostics` (shared with the desktop inspector card). They return
+ * lit `TemplateResult` lines, so the block interpolates them directly; the
+ * wrapper renders only when there is at least one line (an empty array leaves no
+ * `.ed-diagnostics` box, matching the old empty `:empty { display:none }` div).
  */
 
 /** The editor card's title bar, one template so the two editors can't drift. */
@@ -163,9 +163,11 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // On mobile, fold the inspector card's diagnostics in as a live block between
   // the stats and the controls (one panel, no separate card). Desktop leaves
   // them to the hover card, so the block only exists on mobile.
-  const diagnostics = mobile
-    ? html`<div class="ed-diagnostics" data-field="diagnostics">${unsafeHTML(facilityDiagnostics(sim, u))}</div>`
-    : nothing;
+  // Only the mobile fold-in shows the diagnostics, so only the mobile path pays
+  // for computing them (facilityDiagnostics can run a parking flood-fill etc.);
+  // desktop leaves the block to the hover card.
+  const diag = mobile ? facilityDiagnostics(sim, u) : [];
+  const diagnostics = diag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${diag}</div>` : nothing;
   // Canon retail variant titles the editor card too, matching the inspector.
   return editorShell(`unit:${u.id}`, u.subtype ?? f.name, rows, actions, diagnostics);
 }
@@ -226,8 +228,8 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
   }
   actions.push(edRow(html`<button class="btn danger" data-edit="sell">Sell / Bulldoze</button>`));
 
-  const diagnostics = mobile
-    ? html`<div class="ed-diagnostics" data-field="diagnostics">${unsafeHTML(transportDiagnostics(sim, t))}</div>`
-    : nothing;
+  // Desktop leaves the diagnostics to the hover card, so skip the work off mobile.
+  const tdiag = mobile ? transportDiagnostics(sim, t) : [];
+  const diagnostics = tdiag.length ? html`<div class="ed-diagnostics" data-field="diagnostics">${tdiag}</div>` : nothing;
   return editorShell(`transport:${t.id}`, f.name, rows, actions, diagnostics);
 }

@@ -1,5 +1,4 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { unsafeHTML } from "lit-html/directives/unsafe-html.js";
 import type { Simulation } from "../../engine/Simulation";
 import type { Transport, Unit } from "../../engine/types";
 import { isTenanted } from "../../engine/types";
@@ -15,10 +14,10 @@ import { floorTag } from "../format";
  * equivalence tests). The card re-renders on every hover pick; lit patches
  * the changed text in place. The title/label/subtype copy auto-escapes
  * through lit (the legacy code used escapeHtml; the subtype is additionally
- * whitelist-coerced on load). The diagnostics blocks are trusted internal
- * HTML strings shared with the mobile editor fold-in; `unsafeHTML` bridges
- * them, re-parsing only when the string changes, until the final sweep
- * decides their template form.
+ * whitelist-coerced on load). The diagnostics blocks (`facilityDiagnostics` /
+ * `transportDiagnostics`, shared with the mobile editor fold-in) return lit
+ * `TemplateResult` lines and are interpolated directly; an empty array renders
+ * nothing.
  *
  * The mobile-only ✕ is NOT part of these templates: `showInspector` appends
  * it from the one shared `titleBarClose` recipe after the h4's lit-managed
@@ -60,7 +59,7 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
       : f.population
         ? html`<div>Occupants: ${u.occupants}/${residentCount(u)}</div>`
         : nothing
-  }${unsafeHTML(facilityDiagnostics(sim, u))}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
+  }${facilityDiagnostics(sim, u)}<div>Satisfaction: ${Math.round(u.satisfaction * 100)}%</div>`;
 }
 
 export function transportInspectorTemplate(sim: Simulation, t: Transport): TemplateResult {
@@ -70,7 +69,7 @@ export function transportInspectorTemplate(sim: Simulation, t: Transport): Templ
   // with the mobile transport editor via transportDiagnostics.
   return html`<h4 class="win-title">${f.name}</h4><div>Serves floors ${floorTag(t.bottom)}–${floorTag(t.top)}</div>${
     isElevatorKind(t.kind) ? html`<div>Cars: ${t.cars}</div>` : nothing
-  }${unsafeHTML(transportDiagnostics(sim, t))}`;
+  }${transportDiagnostics(sim, t)}`;
 }
 
 /** The Modern build-refusal tooltip: the build-preview path borrows the

@@ -213,23 +213,15 @@ export class UI {
 
   // ---- Modal primitives (friend-modules build their dialogs on these) -----
 
-  /** @internal friend-module access (uiDialogs). */
-  openModal(html: string): HTMLElement {
-    const dialog = this.el.modal as HTMLDialogElement;
-    dialog.innerHTML = `<div class="modal-box win">${html}</div>`;
-    return this.finishModal(dialog, dialog.firstElementChild as HTMLElement);
-  }
-
-  /** Sibling of {@link openModal} for the lit-html migration: renders a lit
-   *  `TemplateResult` into the shared modal with the identical window grammar
-   *  (both paths finish through {@link finishModal}). The template renders into a
-   *  box that is FRESH per open and discarded by closeModal(), so lit's part-cache
-   *  never shares a container with the string path's `innerHTML` writes: one
-   *  container, one renderer. render() only ever touches this child box; innerHTML
-   *  is only ever set on the dialog itself. It renders once per open (no
-   *  re-render), so the ✕ that finishModal appends into the rendered h2 is safe;
-   *  any initial focus is the dialog controller's own explicit side effect, not
-   *  this mount's job.
+  /** Renders a lit `TemplateResult` into the shared modal with the window
+   *  grammar (see {@link finishModal}). The template renders into a box that is
+   *  FRESH per open and discarded by closeModal(), so lit's part-cache never
+   *  shares a container across opens: one container, one renderer. render() only
+   *  ever touches this child box; innerHTML is only ever set on the dialog itself
+   *  (cleared here and in closeModal). It renders once per open (no re-render), so
+   *  the ✕ that finishModal appends into the rendered h2 is safe; any initial
+   *  focus is the dialog controller's own explicit side effect, not this mount's
+   *  job.
    *  @internal friend-module access (uiDialogs). */
   openModalTemplate(result: TemplateResult): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
@@ -241,10 +233,9 @@ export class UI {
     return this.finishModal(dialog, box);
   }
 
-  /** The shared window grammar both mount paths finish with, kept in one place so
-   *  the string path ({@link openModal}) and the template path
-   *  ({@link openModalTemplate}) can never drift: skin the top-level h2 as the
-   *  title bar (`:scope > h2` so a nested h2 is never skinned), show the dialog,
+  /** The shared window grammar {@link openModalTemplate} finishes with: skin the
+   *  top-level h2 as the title bar (`:scope > h2` so a nested h2 is never
+   *  skinned), show the dialog,
    *  then append the win-style ✕. The ✕ routes through the dialog's cancel path
    *  (same as Esc) rather than closeModal() directly, so modals that override
    *  oncancel to resolve a pending choice still resolve. It is appended AFTER
