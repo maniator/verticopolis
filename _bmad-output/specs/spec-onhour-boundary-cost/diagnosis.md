@@ -78,3 +78,10 @@ arithmetic above), designer concurring (canon audit PASS with four guards:
 state-blind fence, congestion out, gutted-still-radiates preserved, golden
 master as machine proof; 8:00 stack ruled canon; slicing ruled a non-goal
 with its reopen gate).
+
+Full-party roundtable, same day (owner-delegated final word): the cache
+shape refined from an eager per-floor index module to a lazy revision-keyed
+memo computing through the existing `nearestKindWithin`, deleting the
+reimplementation-drift risk instead of testing around it; storage ruled a
+Simulation transient (`elevatorUtil` precedent); spec PR merges first,
+implementation follows as one PR.
