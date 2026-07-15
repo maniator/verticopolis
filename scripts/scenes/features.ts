@@ -14,6 +14,7 @@ import {
   buildTabletTower,
   pgSetOverlay,
   pgStep,
+  pgStepNoDraw,
 } from "../screenshot-builders.ts";
 
 export const FEATURE_SCENES: Scene[] = [
@@ -146,8 +147,11 @@ export const FEATURE_SCENES: Scene[] = [
         setup: async (page) => {
           // Let the morning rush route commuters down first (the crowd moves on
           // stepped frames), then park the train's ambient cycle just BEFORE it
-          // enters, so the platform reads with the track honestly empty.
-          await page.evaluate(pgStep, 330);
+          // enters, so the platform reads with the track honestly empty. These 330
+          // frames are only intermediate crowd-routing, discarded before the shot,
+          // so step them without drawing (pgStepNoDraw): same final sim state, far
+          // faster.
+          await page.evaluate(pgStepNoDraw, 330);
           await page.evaluate(() => {
             const g = (window as any).game;
             g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
@@ -164,7 +168,8 @@ export const FEATURE_SCENES: Scene[] = [
         setup: async (page) => {
           // A little more crowd, then re-base the cycle so the settle lands
           // mid-dwell: the consist parked at the platform, doors at the crowd.
-          await page.evaluate(pgStep, 60);
+          // Intermediate crowd frames, discarded before the shot, so no draw.
+          await page.evaluate(pgStepNoDraw, 60);
           await page.evaluate(() => {
             const g = (window as any).game;
             g.engine.setCamera(Math.floor(g.grid.width / 2), -3, 1.7);
@@ -172,6 +177,10 @@ export const FEATURE_SCENES: Scene[] = [
           });
         },
         wait: 6000, // anim 246: train parked; six more seconds of arrivals
+        // The 6s dwell is ~360 software-rastered frames of discarded intermediate
+        // crowd motion; skip their draws (only the final frame is captured). The
+        // pole scene: this is the single biggest CI-capture win. Byte-identical.
+        noDrawSettle: true,
       },
     ],
   },

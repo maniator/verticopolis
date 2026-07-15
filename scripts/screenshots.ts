@@ -47,7 +47,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep } from "./screenshot-builders.ts";
+import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -73,10 +73,19 @@ const READY_TIMEOUT_MS = 30_000;
  *  pages (gallery/preview) are frozen by the pinned performance.now set in
  *  runScene, and the composite setContent shots are static markup, so a wall
  *  wait can't shift either. */
-async function settle(page: Page, ms: number): Promise<void> {
+async function settle(page: Page, ms: number, noDraw = false): Promise<void> {
   // ceil already yields >= 1 frame for any ms > 0, so no lower clamp is needed;
-  // ms <= 0 yields <= 0, which pgStep treats as "no step" (returns false).
-  const stepped = await page.evaluate(pgStep, Math.ceil(ms / FRAME_MS));
+  // ms <= 0 yields <= 0, which the stepper treats as "no step" (returns false).
+  // Default: draw every frame (pgStep), the robust path. A shot opts into
+  // pgStepNoDraw only when its settle is a heavy live-crowd dwell (metro, crowd);
+  // there the intermediate frames are discarded, so skipping their software raster
+  // is a big CI win, and pgStepNoDraw's drawPos sync keeps the final frame
+  // byte-identical. Skipping draws is deliberately NOT the default: it is
+  // draw-coupled (Excalibur culls off-screen entities against the camera's
+  // draw-phase position), so unconfined it would drift shots that resize the
+  // viewport or animate in the draw path.
+  const step = noDraw ? pgStepNoDraw : pgStep;
+  const stepped = await page.evaluate(step, Math.ceil(ms / FRAME_MS));
   if (!stepped) await page.waitForTimeout(Math.max(0, ms));
 }
 
@@ -111,7 +120,7 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     if (shot.frame) {
       await page.evaluate(pgFrame, { tile: shot.frame.tile ?? null, floor: shot.frame.floor, zoom: shot.frame.zoom });
     }
-    await settle(page, shot.wait ?? 500);
+    await settle(page, shot.wait ?? 500, shot.noDrawSettle ?? false);
     // Repaint the throttled DOM chrome off the final sim state, then sweep
     // stray toasts / event dialogs the running sim may have popped during the
     // settle, unless this shot is deliberately showing a modal.

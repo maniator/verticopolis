@@ -151,6 +151,65 @@ export function pgStep(frames: number): boolean {
   return true;
 }
 
+/** Advance `frames` like pgStep, but SUPPRESS the engine's draw on every frame
+ *  except the last, so a long settle whose intermediate frames are discarded pays
+ *  for its software raster only once. The clock is still STEPPED every frame, so
+ *  performance.now() (shimmed onto clock.now() by pgAdoptTestClock), the throttled
+ *  chrome, any scheduled callbacks, and the whole UPDATE phase (sim tick, animClock,
+ *  crowd/car/train motion) advance byte-for-byte as pgStep would; only the
+ *  intermediate DRAW is skipped.
+ *
+ *  Use with care, and only via a shot's `noDrawSettle` opt-in for a heavy live-crowd
+ *  settle (metro's 6s train dwell, the crowd rush): skipping draws is NOT free of
+ *  pixel effects, because Excalibur's draw phase is not pure output. Its
+ *  OffscreenSystem (a DRAW-phase system) culls off-screen entities against the
+ *  camera's `drawPos`, and `drawPos` is synced to the logical `pos` ONLY inside
+ *  Camera.draw(). setCamera writes `pos` directly, so with the draws suppressed the
+ *  final (only) frame would cull the freshly framed region against the PREVIOUS
+ *  shot's camera position, dropping the platform/crowd/underground to the clear
+ *  color. We fix that by copying `pos` into `drawPos` right before the final draw,
+ *  which reproduces where a full-draw settle leaves drawPos by its last frame. That
+ *  covers the camera-cull coupling; it does NOT cover a per-shot viewport resize or
+ *  a draw-cumulative effect, which is why the DEFAULT settle draws every frame and
+ *  this is confined to the two poles (validated byte-identical in the pinned
+ *  container). Falls back to a plain full step if the private draw hook is not where
+ *  expected, so a future Excalibur rename degrades to slow-but-correct. Returns false
+ *  in the same no-clock cases as pgStep. Runs in the browser. */
+export function pgStepNoDraw(frames: number): boolean {
+  const w = window as unknown as { game?: any; engine?: any };
+  const eng = (w.game?.engine ?? w.engine)?.engine;
+  const clock = eng?.clock;
+  if (!clock || typeof clock.step !== "function") return false;
+  const n = Math.floor(frames);
+  if (!Number.isFinite(n) || n <= 0) return false;
+  const originalDraw = eng._draw;
+  if (typeof originalDraw !== "function") {
+    // Draw hook not where expected (Excalibur internals changed): step normally,
+    // drawing every frame. Slower, but always correct.
+    for (let i = 0; i < n; i++) clock.step(1000 / 60);
+    return true;
+  }
+  try {
+    eng._draw = () => {};
+    for (let i = 0; i < n - 1; i++) clock.step(1000 / 60);
+  } finally {
+    eng._draw = originalDraw;
+  }
+  // Sync the camera's draw-phase cull position (drawPos) to its logical position
+  // before the final, only, draw, so OffscreenSystem culls against the real camera
+  // rather than the position the previous shot's last draw left behind.
+  try {
+    const cam = eng.currentScene && eng.currentScene.camera;
+    if (cam && cam.pos && cam.drawPos && typeof cam.pos.clone === "function") {
+      cam.pos.clone(cam.drawPos); // Vector.clone(dest): copy pos into the existing drawPos
+    }
+  } catch {
+    /* Excalibur internals moved: the final draw still runs, degrading to prior behavior. */
+  }
+  clock.step(1000 / 60);
+  return true;
+}
+
 /** Repaint the throttled DOM chrome (topbar, traffic chip, open editor) off the
  *  final sim state. The per-frame update() only refreshes that DOM every ~160ms
  *  of WALL time, so under stepped frames the last refresh lands on an arbitrary

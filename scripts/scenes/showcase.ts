@@ -251,7 +251,10 @@ export const SHOWCASE_SCENES: Scene[] = [
     },
     build: buildCrowdTower,
     assertUnits: 40,
-    shots: [{ name: "14-crowd-routing", wait: 6000 }],
+    // The 6s live rush is ~360 software-rastered frames of discarded intermediate
+    // crowd motion; skip their draws (only the final frame is captured). One of the
+    // two capture poles, alongside metro. Byte-identical (validated in the container).
+    shots: [{ name: "14-crowd-routing", wait: 6000, noDrawSettle: true }],
   },
   // --- Fire emergency ---------------------------------------------------------
   {
