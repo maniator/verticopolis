@@ -47,7 +47,7 @@ import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
 import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
-import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep } from "./screenshot-builders.ts";
+import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep } from "./screenshot-builders.ts";
 import { SCENES } from "./screenshot-scenes.ts";
 
 // ---- Runner -----------------------------------------------------------------
@@ -118,6 +118,9 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
     await page.evaluate(pgRefreshUi);
     const keepDialogs = shot.keepDialogs ?? (!!shot.crop && shot.crop.includes("modal"));
     await page.evaluate(pgClearTransients, keepDialogs);
+    // Mask the app version to a fixed placeholder so a routine version bump does
+    // not churn the splash/help pixels (the shipped app still shows the real one).
+    await page.evaluate(pgMaskVersion);
     await page.waitForTimeout(80);
     // animations: "disabled" freezes CSS animation (the splash star twinkle,
     // the onboarding pulse) at a fixed phase so DOM chrome is byte-stable too.

@@ -32,6 +32,18 @@ export function pgClearTransients(keepDialogs: boolean): void {
   }
 }
 
+/** Mask the app version with a fixed placeholder just before a capture, wherever
+ *  it renders (the splash line `.splash-version` and the help "About" line
+ *  `.app-version`), so a routine package.json version bump never churns the
+ *  committed pixels. The shipped app still shows the real version; this only
+ *  rewrites the DOM at capture time. Idempotent, and a no-op on shots that show
+ *  neither element. Runs in the browser. */
+export function pgMaskVersion(): void {
+  document.querySelectorAll<HTMLElement>(".splash-version, .app-version").forEach((el) => {
+    el.textContent = "vX.Y.Z";
+  });
+}
+
 // ---- In-page helpers (serialized into the browser by page.evaluate) ---------
 // These run in the browser off window.game; they cannot reference Node scope.
 
