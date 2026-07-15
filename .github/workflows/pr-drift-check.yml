@@ -400,9 +400,17 @@ jobs:
   # commit-on-approval gate and never turns this required check red. Mark THIS job
   # (`drift-gate`) as the required status check in branch protection, not `capture`
   # or any path-gated job.
+  # `if: !cancelled()` (not `always()`): it runs on every non-cancelled outcome
+  # (success, failure, or skip) so it always reports on the LIVE run, but it is
+  # itself skipped when the run is cancelled. That matters because a superseding
+  # push cancels this run's `capture`; with `always()` the gate would then run,
+  # see `capture: cancelled`, and post a spurious red on the now-stale SHA. Branch
+  # protection gates on the newest SHA, whose own run reports normally, so skipping
+  # on cancellation avoids the false red without ever leaving the live head without
+  # a status.
   drift-gate:
     needs: [changes, guard, capture]
-    if: always()
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions: {}
     steps:
