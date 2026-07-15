@@ -195,14 +195,17 @@ jobs:
           # never break out. The script exits non-zero on any render failure or on
           # nondeterminism, which fails this step.
           node scripts/screenshot-determinism-check.ts "$SHARD"
-          # Stage the verified run-a set for upload. The .shard-complete marker is
+          # Stage the verified run-a set for upload. run-a lives under the same temp
+          # base the check uses (os.tmpdir(), overridable via SCREENSHOT_TMP), so read
+          # it from there rather than a hardcoded path. The .shard-complete marker is
           # the authoritative "this shard finished" signal (the consumers count it),
           # so a shard that legitimately renders nothing still uploads a marker and
           # is not mistaken for a missing artifact.
+          run_a="$(node -p 'process.env.SCREENSHOT_TMP || require("os").tmpdir()')/run-a"
           stage=/tmp/stage
           rm -rf "$stage"; mkdir -p "$stage/shots"
           touch "$stage/.shard-complete"
-          [ -d /tmp/run-a ] && cp -a /tmp/run-a/. "$stage/shots/"
+          [ -d "$run_a" ] && cp -a "$run_a/." "$stage/shots/"
 
       - name: Upload this shard's verified screenshots
         uses: actions/upload-artifact@v4

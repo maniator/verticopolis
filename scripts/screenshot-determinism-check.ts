@@ -38,6 +38,7 @@
  */
 import { spawn, execFileSync, type ChildProcess, type SpawnOptions } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -46,12 +47,15 @@ const VITE_BIN = resolve(ROOT, "node_modules/vite/bin/vite.js");
 const SHARDS = resolve(ROOT, "scripts/screenshot-shards.ts");
 const GENERATOR = resolve(ROOT, "scripts/screenshots.ts");
 
-// Per-leg isolation. The workflow's upload step stages /tmp/run-a, so keep that
-// default; everything else is a matching sibling. Ports differ so a lingering
-// server from one leg can never be mistaken for the other's.
+// Per-leg isolation, under the OS temp dir so this works off Linux too; override
+// the base with SCREENSHOT_TMP. The workflow's upload step stages run-a from the
+// SAME base (it computes os.tmpdir() the same way), so the two stay aligned on any
+// platform. Ports differ so a lingering server from one leg can never be mistaken
+// for the other's.
+const TMP = process.env.SCREENSHOT_TMP || tmpdir();
 const LEGS = [
-  { tag: "a", dest: "/tmp/run-a", outDir: "/tmp/dist-a", port: 4173 },
-  { tag: "b", dest: "/tmp/run-b", outDir: "/tmp/dist-b", port: 4174 },
+  { tag: "a", dest: join(TMP, "run-a"), outDir: join(TMP, "dist-a"), port: 4173 },
+  { tag: "b", dest: join(TMP, "run-b"), outDir: join(TMP, "dist-b"), port: 4174 },
 ];
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
@@ -112,15 +116,19 @@ function stopServer(server: ChildProcess): Promise<void> {
       return resolvePromise();
     }
     let done = false;
+    let backstop: ReturnType<typeof setTimeout> | undefined;
     const finish = (): void => {
       if (done) return;
       done = true;
+      // Cancel the SIGKILL backstop the moment the server exits, so it can't fire
+      // later against a since-reused PID.
+      if (backstop) clearTimeout(backstop);
       liveServers.delete(server);
       resolvePromise();
     };
-    server.on("close", finish);
+    server.once("close", finish);
     server.kill("SIGTERM");
-    const backstop = setTimeout(() => {
+    backstop = setTimeout(() => {
       try {
         server.kill("SIGKILL");
       } catch {
