@@ -13,6 +13,7 @@ import * as reconcile from "./towerReconcile";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import * as overlayFx from "./towerOverlay";
+import { runSceneSync } from "./towerSyncSchedule";
 import type { RoomRec } from "./towerReconcile";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
@@ -197,7 +198,9 @@ export class TowerEngine {
   mealOverlayRev = -1;
   /** @internal friend-module access (towerScene). */
   litState = false;
-  private lastSyncHour = -1;
+  /** @internal friend-module access (towerSyncSchedule). */
+  lastSyncHour = -1;
+  hourSyncPending = false; // an hour-driven reconcile booked for the next frame
   /** Set by the controller from the game speed: when paused, the decorative
    *  animation clock stops so on-screen people freeze with everything else. */
   paused = false;
@@ -310,7 +313,13 @@ export class TowerEngine {
     scene.makeOverlay(this);
     // A boot-loaded autosave restores its saved view; a fresh tower centers.
     this.adoptCamera(this.sim.view);
+    // Bake the boot scene against the real clock, not the d defaults: the
+    // hour-driven resync now defers a frame (towerSyncSchedule), so a stale
+    // boot bake would actually display instead of being fixed pre-draw.
+    this.d.hour = this.sim.clock.hour;
+    this.d.lit = this.sim.clock.isNight() || this.sim.clock.isEvening();
     this.litState = this.d.lit;
+    this.lastSyncHour = this.d.hour;
     this.syncScene();
     this.syncMotion();
     this.syncFacade();
@@ -359,24 +368,9 @@ export class TowerEngine {
     if (this.onUpdate) this.onUpdate(elapsedMs);
 
     // Reconcile room/structure actors when the model, lighting, the hour, or a
-    // meal-overlay repaint trigger changes. The overlay path keeps visible
-    // office/condo dips in sync even when someone leaves and returns inside one
-    // hour bucket.
-    const structuralChanged = this.sim.tower.revision !== this.builtRev;
-    const mealOverlayChanged = this.sim.tower.mealOverlayRevision !== this.mealOverlayRev;
-    if (structuralChanged || mealOverlayChanged || this.d.lit !== this.litState || this.d.hour !== this.lastSyncHour) {
-      this.litState = this.d.lit;
-      this.lastSyncHour = this.d.hour;
-      this.syncScene();
-      this.mealOverlayRev = this.sim.tower.mealOverlayRevision;
-    }
-    // Motion actors and the exterior facade (escape stairs, roof crane) only
-    // need reconciling when the layout itself changes.
-    if (structuralChanged) {
-      this.syncMotion();
-      this.syncFacade();
-      this.builtRev = this.sim.tower.revision;
-    }
+    // meal-overlay repaint trigger changes; hour-driven reconciles defer one
+    // frame off the engine's hourly scans (towerSyncSchedule, spec CAP-3).
+    runSceneSync(this);
     this.updateMotion();
     this.reconcileCrowd();
   }
