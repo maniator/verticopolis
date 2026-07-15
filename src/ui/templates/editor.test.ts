@@ -207,8 +207,24 @@ describe("transport editor row and action branches", () => {
 
   it("mobile folds the transport diagnostics block in", () => {
     const { sim, lift } = withLift("elevatorStandard", 4);
-    expect(renderToFragment(transportEditorTemplate(sim, lift, true)).querySelector(".ed-diagnostics")).not.toBeNull();
+    // A passenger elevator reports its average load once the sim has measured
+    // utilization; seed it so transportDiagnostics emits its "Avg load" line
+    // (an idle, never-ticked shaft has no measurement and no line, which the
+    // mobile editor renders as no fold-in block at all).
+    sim.elevatorUtil.set(lift.id, 0.5);
+    const mobile = renderToFragment(transportEditorTemplate(sim, lift, true));
+    expect(mobile.querySelector(".ed-diagnostics")).not.toBeNull();
+    expect(mobile.textContent).toContain("Avg load: 50% full");
+    // Desktop leaves the diagnostics to the hover card, so it carries no block.
     expect(renderToFragment(transportEditorTemplate(sim, lift)).querySelector(".ed-diagnostics")).toBeNull();
+  });
+
+  it("mobile omits the diagnostics block for an idle elevator with no measured load", () => {
+    // No utilization recorded yet: transportDiagnostics is empty, so the mobile
+    // editor renders no empty .ed-diagnostics box (parity with the old empty
+    // div's `:empty { display:none }`, now expressed as no box at all).
+    const { sim, lift } = withLift("elevatorStandard", 4);
+    expect(renderToFragment(transportEditorTemplate(sim, lift, true)).querySelector(".ed-diagnostics")).toBeNull();
   });
 
   it("express elevator surfaces a preserved skipped lobby honestly", () => {

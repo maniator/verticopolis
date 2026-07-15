@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { html } from "lit-html";
+import { html, type TemplateResult } from "lit-html";
 import { UI, type UICallbacks } from "../../ui/UI";
 import { Simulation } from "../../engine/Simulation";
 import type { Unit } from "../../engine/types";
@@ -19,7 +19,7 @@ import * as platformModule from "../../platform";
  *  - titleBarClose: every DOM-built ✕ comes from the one shared recipe —
  *    a real <button> with classes "btn xs", aria-label "Close", ✕ glyph — so
  *    the modal ✕ and the inspector ✕ can't drift apart again.
- *  - openModal: the window grammar (.modal-box.win box, top-level h2 becomes
+ *  - openModalTemplate: the window grammar (.modal-box.win box, top-level h2 becomes
  *    the .win-title bar, nested h2s are never skinned), the ✕ is appended
  *    AFTER showModal so it's the title bar's last child (keyboard focus lands
  *    on the primary action, not on ✕), and the ✕ routes through the dialog's
@@ -265,14 +265,14 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
   });
 });
 
-describe("openModal — the window grammar", () => {
-  // openModal is private but is THE window factory; its return value and
+describe("openModalTemplate — the window grammar", () => {
+  // openModalTemplate is private but is THE window factory; its return value and
   // skinning rules are the contract every show* method builds on.
-  const open = (ui: UI, html: string): HTMLElement => (ui as any).openModal(html);
+  const open = (ui: UI, content: TemplateResult): HTMLElement => (ui as any).openModalTemplate(content);
 
   it("wraps content in .modal-box.win and returns that box", () => {
     const { ui } = makeUI();
-    const box = open(ui, "<h2>Title</h2><p>body</p>");
+    const box = open(ui, html`<h2>Title</h2><p>body</p>`);
     expect(box).toBe(dialog().firstElementChild);
     expect(box.classList.contains("modal-box")).toBe(true);
     expect(box.classList.contains("win")).toBe(true);
@@ -281,7 +281,7 @@ describe("openModal — the window grammar", () => {
 
   it("skins only the TOP-LEVEL h2 as .win-title — an h2 nested in body content is untouched", () => {
     const { ui } = makeUI();
-    const box = open(ui, "<h2>Window Title</h2><div><h2>Section heading</h2></div>");
+    const box = open(ui, html`<h2>Window Title</h2><div><h2>Section heading</h2></div>`);
     const [title, nested] = [...box.querySelectorAll("h2")];
     expect(title.classList.contains("win-title")).toBe(true);
     expect(nested.classList.contains("win-title")).toBe(false);
@@ -290,7 +290,7 @@ describe("openModal — the window grammar", () => {
 
   it("appends exactly one ✕, as the LAST child of the title bar (focus lands on the primary action, not ✕)", () => {
     const { ui } = makeUI();
-    const box = open(ui, "<h2>Title</h2><button class='btn primary' data-act='close'>OK</button>");
+    const box = open(ui, html`<h2>Title</h2><button class="btn primary" data-act="close">OK</button>`);
     const title = box.querySelector(":scope > h2")!;
     const xs = box.querySelectorAll(".modal-x");
     expect(xs.length).toBe(1);
@@ -299,7 +299,7 @@ describe("openModal — the window grammar", () => {
 
   it("✕ routes through the dialog's cancel path (a cancelable cancel event), not closeModal directly", () => {
     const { ui } = makeUI();
-    open(ui, "<h2>Title</h2>");
+    open(ui, html`<h2>Title</h2>`);
     // Steal the cancel path the way showEventChoice does. If ✕ called
     // closeModal() directly, this handler would be bypassed and the dialog
     // would close anyway.
@@ -315,18 +315,18 @@ describe("openModal — the window grammar", () => {
 
   it("with the default cancel handler, ✕ and Esc (cancel) both close the modal", () => {
     const { ui } = makeUI();
-    open(ui, "<h2>Title</h2>");
+    open(ui, html`<h2>Title</h2>`);
     click(".modal-x");
     expect(dialog().open).toBe(false);
 
-    open(ui, "<h2>Title</h2>");
+    open(ui, html`<h2>Title</h2>`);
     dialog().dispatchEvent(new Event("cancel", { cancelable: true })); // what Esc produces
     expect(dialog().open).toBe(false);
   });
 
   it("a backdrop click (target === dialog) closes the modal", () => {
     const { ui } = makeUI();
-    open(ui, "<h2>Title</h2>");
+    open(ui, html`<h2>Title</h2>`);
     dialog().click();
     expect(dialog().open).toBe(false);
   });
@@ -1379,7 +1379,7 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     makeUI();
     document.getElementById("btn-settings")!.click();
     expect(dialog().open).toBe(true);
-    // openModal appends its ✕ affordance inside the heading; match the title.
+    // openModalTemplate appends its ✕ affordance inside the heading; match the title.
     expect(dialog().querySelector("h2")!.textContent).toContain("Settings");
   });
 

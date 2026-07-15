@@ -177,6 +177,20 @@ describe("Onboarding — splash / title screen", () => {
     expect(document.querySelector('[data-splash="continue"]')).toBeNull();
   });
 
+  it("keeps the lettering SVGs labeled and the decorative layers hidden from a screen reader", () => {
+    const { c } = makeSpyController();
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onNewTower: vi.fn() });
+    const splash = document.getElementById("splash")!;
+    // The wordmark and tagline are the accessible name of the title screen.
+    expect(splash.querySelector(".splash-word")!.getAttribute("aria-label")).toBe("Verticopolis");
+    expect(splash.querySelector(".splash-tag")!.getAttribute("aria-label")).toBe("the vertical metropolis");
+    // textLength is preserved so the lettering always fits (camelCase SVG attr).
+    expect(splash.querySelector(".splash-word text")!.getAttribute("textLength")).toBe("392");
+    // The skyline and lighting layers are purely decorative.
+    expect(splash.querySelector(".splash-skyline")!.getAttribute("aria-hidden")).toBe("true");
+    expect(splash.querySelector(".splash-stars")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("Continue tears down the splash, resumes the engine, and calls onContinue", () => {
     const { c, opts } = makeSpyController();
     const onContinue = vi.fn();

@@ -305,7 +305,7 @@ export function openImport(ui: UI): void {
 export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () => void }): void {
   // Never clobber a live dialog: the OS file picker isn't a modal, so a
   // blocking choice (emergency, update prompt) can open in the shared <dialog>
-  // before the file finishes reading. openModal would wipe its DOM and handlers.
+  // before the file finishes reading. openModalTemplate would wipe its DOM and handlers.
   if (ui.isModalOpen()) {
     ui.toast("Close the open dialog first, then import again.", "info");
     return;
