@@ -265,15 +265,19 @@ export class UI {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
     if (h2) {
-      // Move the title CONTENTS (every child node, including any markup a
-      // caller placed inside the h2) into their own span, and label the dialog at THAT
-      // span, not the h2 (see MODAL_TITLE_ID). A caller-supplied h2.id (deep-
-      // linking, styling, another ARIA relationship) is never touched; only
-      // the h2's child nodes move.
-      const titleSpan = document.createElement("span");
-      titleSpan.id = MODAL_TITLE_ID;
-      while (h2.firstChild) titleSpan.appendChild(h2.firstChild);
-      h2.appendChild(titleSpan);
+      // Move the title CONTENTS into their own span and label the dialog at
+      // THAT span, not the h2 (see MODAL_TITLE_ID); a caller-supplied h2.id is
+      // never touched. Idempotent: reuse an existing span rather than nesting
+      // a new one, and never sweep the ✕ (.modal-x) into it, so a repeat call
+      // can't nest spans or fold "Close" into the accessible name.
+      let titleSpan = h2.querySelector<HTMLSpanElement>(`#${MODAL_TITLE_ID}`);
+      if (!titleSpan) {
+        titleSpan = document.createElement("span");
+        titleSpan.id = MODAL_TITLE_ID;
+        const close = h2.querySelector(".modal-x");
+        while (h2.firstChild && h2.firstChild !== close) titleSpan.appendChild(h2.firstChild);
+        h2.appendChild(titleSpan);
+      }
       dialog.setAttribute("aria-labelledby", titleSpan.id);
     } else {
       dialog.removeAttribute("aria-labelledby");

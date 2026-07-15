@@ -513,6 +513,36 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
     expect(document.getElementById(secondId!)!.textContent).toContain("Second");
     expect(document.querySelectorAll(`#${secondId}`).length).toBe(1); // never two elements sharing the id
   });
+
+  it("stays idempotent if finishModal ever ran twice over the same rendered title bar, without wiping the DOM in between", () => {
+    // Regression guard (Copilot review on #405): finishModal's `while
+    // (h2.firstChild) …` used to move EVERY child of the h2, including a ✕
+    // appended by an earlier run, into a freshly nested span. A second call
+    // on the same title bar should reuse the existing span and leave the ✕
+    // where it is instead of nesting spans or folding "Close" into the
+    // accessible name.
+    const { ui } = makeUI();
+    const box = ui.openModalTemplate(html`<h2>Settings</h2><p>body</p>`);
+    const dlg = dialog();
+
+    // Drive finishModal a second time over the SAME dialog/box DOM (no close,
+    // no innerHTML wipe) — the exact repeat-mount scenario the review flagged.
+    (ui as any).finishModal(dlg, box);
+
+    const titleId = "verticopolis-modal-title"; // the shared MODAL_TITLE_ID (private to UI.ts)
+    const spans = box.querySelectorAll(`#${titleId}`);
+    expect(spans.length).toBe(1); // exactly one title span, never nested
+    const titleSpan = spans[0] as HTMLElement;
+    expect(titleSpan.querySelector(`#${titleId}`)).toBeNull(); // not nested inside itself
+
+    expect(titleSpan.textContent).not.toContain("Close");
+    expect(titleSpan.textContent).not.toContain("✕");
+    expect(titleSpan.textContent).toContain("Settings");
+
+    const labelId = dlg.getAttribute("aria-labelledby");
+    expect(labelId).toBe(titleId);
+    expect(document.getElementById(labelId!)).toBe(titleSpan);
+  });
 });
 
 describe("confirmModal — lit template mount", () => {
