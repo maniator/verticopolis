@@ -262,19 +262,27 @@ describe("drainSceneSync (frame-start drain, before the sim advances)", () => {
     expect(calmFlag).not.toHaveBeenCalled();
   });
 
-  it("a catch-up frame that crosses the NEXT hour never re-stacks: the drain repaints before the sim advances, the new hour books its own deferral", () => {
-    // Frame start: last frame's deferral drains against the pre-advance hour.
+  it("a catch-up frame that crosses the NEXT hour never re-stacks: the drain repaints first, the new hour syncs on a later drain", () => {
+    // Frame N start: last frame's deferral drains against the sampled hour.
     const e = eng();
     drainSceneSync(e as never);
     expect(syncScene).toHaveBeenCalledTimes(1);
-    // The sim then advances across ANOTHER hour inside onUpdate (its onHour
-    // scans run there); the post-update evaluation must book, not sync, so
-    // the two costs land on different frames.
+    // The sim then crosses ANOTHER hour inside onUpdate (its onHour scans run
+    // there). d.hour keeps the frame-top sample, exactly like the real tick,
+    // so the post-update evaluation sees only simCrossedHour and does NOT
+    // sync in the scan frame.
     e.sim.clock.hour = 11;
-    e.d.hour = 11;
     runSceneSync(e as never);
-    expect(syncScene).toHaveBeenCalledTimes(1); // still just the drain's sync
+    expect(syncScene).toHaveBeenCalledTimes(1); // nothing joins the scans
+    // Frame N+1: the top sample catches up, the crossing books post-update.
+    e.d.hour = 11;
+    drainSceneSync(e as never); // no-op, nothing pending yet
+    runSceneSync(e as never);
     expect(e.hourSyncPending).toBe(true);
+    // Frame N+2: the drain repaints at the new hour.
+    drainSceneSync(e as never);
+    expect(syncScene).toHaveBeenCalledTimes(2);
+    expect(e.lastSyncHour).toBe(11);
   });
 });
 
