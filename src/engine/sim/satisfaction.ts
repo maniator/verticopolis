@@ -258,40 +258,58 @@ export function emitNotices(sim: Simulation, notices: { floor: number; kind: Fac
 }
 
 /**
- * Attribute a tenant's departure to the dominant satisfaction drain at the
- * moment it bottomed out, so the toast/inspector names the real cause instead
- * of always blaming access. The order mirrors the drains in
+ * The dominant ACTIVE satisfaction drain on a tenant right now, or null when
+ * nothing is dragging it down. The order mirrors the drains in
  * {@link updateSatisfaction}: an unreachable floor is harshest, then elevator
- * crowding, then an over-market office rent, and finally, for a served,
- * uncongested hotel/condo, sustained office-noise erosion. `access` remains
- * the catch-all for the rare emergency-driven bottom-out.
+ * crowding, then an over-market office rent, then a far-walk office (W1), and
+ * finally, for a served, uncongested hotel/condo, office/commercial noise (W2).
+ * Where {@link vacateCause} falls back to "access" as the bottom-out catch-all,
+ * this returns null so the "Main gripe" inspector line can stay silent for a
+ * content tenant. Read-only.
  *
- * `farWalk`/`noisy` accept the flags updateSatisfaction already computed this
- * tick so the attribution never rescans; when absent (callers outside the
- * sweep) they recompute through the same predicates.
+ * `served`/`cong`/`farWalk`/`noisy` accept the flags updateSatisfaction already
+ * computed this tick so the attribution never rescans; when absent (the
+ * inspector, calling per hover) they recompute through the same predicates.
  */
-export function vacateCause(sim: Simulation, u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean): VacateReason {
-  if (!served) return "access";
-  if (u.floor !== 1 && cong > 1) return "congestion";
+export function dominantGripe(
+  sim: Simulation,
+  u: Unit,
+  served?: boolean,
+  cong?: number,
+  farWalk?: boolean,
+  noisy?: boolean,
+): VacateReason | null {
+  if (!(served ?? sim.tower.isFloorServed(u.floor))) return "access";
+  if (u.floor !== 1 && (cong ?? sim.congestionAt(u.floor)) > 1) return "congestion";
   if (u.kind === "office") {
     const cfg = rentConfig("office");
     if (cfg && rentOf(u) > cfg.default) return "rent";
-    // A served, market-priced office that still bottomed out did so through the
-    // W1 walk penalty, its nearest shaft is beyond tolerance. The ground-floor
-    // exemption is an unconditional gate here (offices on floor 1 are never
-    // transport-far), so a precomputed farWalk flag can never override it.
+    // The W1 walk penalty: its nearest shaft is beyond tolerance. The
+    // ground-floor exemption is an unconditional gate here (offices on floor 1
+    // are never transport-far), so a precomputed farWalk flag can't override it.
     if (u.floor !== 1 && (farWalk ?? sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES)) {
       return "transportFar";
     }
     // …or the W2 commercial-noise band next door.
     if (noisy ?? sim.noiseAfflicted(u)) return "noise";
-    return "access";
+    return null;
   }
-  // A served, uncongested hotel/condo that still bottomed out did so through
-  // sustained noise erosion (office or commercial within its band), the only
-  // remaining satisfaction sink.
+  // A served, uncongested hotel/condo is only drained by sustained noise
+  // (office or commercial within its band), the last remaining sink.
   if (noisy ?? sim.noiseAfflicted(u)) return "noise";
-  return "access";
+  return null;
+}
+
+/**
+ * Attribute a tenant's DEPARTURE to the dominant drain at the moment it bottomed
+ * out, so the toast/on-notice inspector line names the real cause instead of
+ * always blaming access. It is {@link dominantGripe} with "access" as the
+ * catch-all for the rare emergency-driven bottom-out (a served, uncongested,
+ * market-rent, near, un-noisy tenant that still cratered), so the departure line
+ * and the pre-notice "Main gripe" line can never disagree on which cause wins.
+ */
+export function vacateCause(sim: Simulation, u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean): VacateReason {
+  return dominantGripe(sim, u, served, cong, farWalk, noisy) ?? "access";
 }
 
 /** True when a noise SOURCE of one of `kinds` sits within `maxTiles` tiles

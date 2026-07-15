@@ -36,6 +36,7 @@ export type { LogEntry } from "./types";
 export {
   VACATE_RESCIND,
   TRANSPORT_FAR_TILES,
+  GRIPE_WARN,
   LOG_SAVE_CAP,
   CONGESTION_CHURN,
   CONGESTION_GRIDLOCK,
@@ -308,6 +309,10 @@ export class Simulation implements SimContext {
   emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void { satisfaction.emitNotices(this, notices); }
 
   vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean): VacateReason { return satisfaction.vacateCause(this, u, served, cong, farWalk, noisy); }
+
+  /** The dominant active satisfaction drain on a tenant right now (or null when
+   *  content), for the inspector's pre-notice "Main gripe" line. */
+  dominantGripe(u: Unit): VacateReason | null { return satisfaction.dominantGripe(this, u); }
 
   nearestKindWithin( u: Unit, isSource: (kind: FacilityKind) => boolean, maxTiles: number, ): boolean { return satisfaction.nearestKindWithin(this, u, isSource, maxTiles); }
 

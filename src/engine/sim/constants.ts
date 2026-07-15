@@ -19,6 +19,14 @@ export const VACATE_RESCIND = 0.4;
  *  neighbor is too noisy"). */
 export const NOISE_CAP = 0.6;
 
+/** At or below this satisfaction the inspector names a tenant's dominant gripe
+ *  (congestion / rent / noise) proactively, before an eviction notice at 0, so a
+ *  content tenant (which recovers above it) is left unbothered. Pinned to
+ *  {@link NOISE_CAP}: a noise-bothered tenant caps at exactly that ceiling, so
+ *  tying the bar to it guarantees the "noisy neighbor" gripe is caught for
+ *  precisely the tenants it describes. */
+export const GRIPE_WARN = NOISE_CAP;
+
 /** Per-hour erosion applied on top of the cap while the office neighbor stays.
  *  It slightly outpaces the +0.05/hr served recovery (net ≈ −0.02/hr), so an
  *  UNADDRESSED noisy neighbor wears the tenant down past the rescind bar and,
