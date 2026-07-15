@@ -181,6 +181,41 @@ describe("metro platform as an outside visit origin", () => {
     expect(p.destX).toBeLessThanOrEqual(station.x + station.width - 3);
   });
 
+  it("a return leg lands inside the footprint even if the metro broke mid-trip", () => {
+    // The station's deck still physically exists when it catches fire or is
+    // gutted, so a visitor who rode in and is now returning must still land on
+    // it, not the lot-edge pickX fallback. The return-leg lookup is state-
+    // agnostic on purpose (only the outbound origin gate is operational-only).
+    const { tower, venueId, venueFloor, platform } = venueTower("cinema", "served");
+    const station = tower.units.find((u) => u.kind === "metro")!;
+    station.state = "fire"; // broke while the visitor was dwelling at the cinema
+    const crowd = new Crowd(7);
+    const p: Person = {
+      id: 1,
+      seed: 24680,
+      state: "dwelling",
+      floor: venueFloor,
+      fy: venueFloor,
+      x: 5,
+      floors: [platform, venueFloor],
+      shafts: [],
+      leg: 0,
+      shaftId: null,
+      carIndex: null,
+      destX: 5,
+      wait: 0,
+      age: 0,
+      linger: 0,
+      mealVenueId: venueId,
+      dwellSecondsLeft: 0.1,
+    };
+    crowd.people.push(p);
+    crowd.advance(1, tower);
+    expect(p.returning).toBe(true);
+    expect(p.destX).toBeGreaterThanOrEqual(station.x + 2);
+    expect(p.destX).toBeLessThanOrEqual(station.x + station.width - 3);
+  });
+
   it("a wedding-hall outside guest stays at the ground lobby even with a served metro", () => {
     // The wedding hall admits the `outside` origin too, so the cinema/party
     // hall-only gate in pickOutsideStreetDoor is load-bearing: a wedding guest

@@ -1,6 +1,5 @@
 import type { Tower } from "../Tower";
 import type { Unit } from "../types";
-import { isOperational } from "../types";
 import { attendanceCap, FACILITIES } from "../facilities";
 import type { Crowd } from "../Crowd";
 import type { Person, Route } from "./person";
@@ -80,12 +79,17 @@ export function insideX(crowd: Crowd, u: Unit, inset: number): number {
   return crowd.rng.int(lo, hi);
 }
 
-/** The operational metro station whose platform story (`floor + 1`) is
- *  `platformFloor`, or undefined when none is. Metro is capped at one per
- *  tower, so at most one matches. Used to place a metro-origin visitor's
- *  return destX inside the station footprint, the same way the outbound origin
- *  x is stamped, since the platform story has no floor tiles for pickX. Does no
- *  rng draw, so a metro-less tower's spawn/motion stream is untouched. */
+/** The metro station whose platform story (`floor + 1`) is `platformFloor`, or
+ *  undefined when none is. Metro is capped at one per tower, so at most one
+ *  matches. Used to place a metro-origin visitor's return destX inside the
+ *  station footprint, the same way the outbound origin x is stamped, since the
+ *  platform story has no floor tiles for pickX. Deliberately NOT gated on
+ *  operational state: the station's footprint still physically exists when it
+ *  catches fire or is gutted, so a visitor who rode in and is returning to a
+ *  now-broken platform must still land on the deck, not the lot-edge fallback.
+ *  The outbound origin gate (pickOutsideStreetDoor) stays operational-only; a
+ *  visitor never originates from a broken metro. Does no rng draw, so a
+ *  metro-less tower's spawn/motion stream is untouched. */
 export function metroStationForPlatform(tower: Tower, platformFloor: number): Unit | undefined {
   // A metro platform is always a basement story (the station is a below-ground
   // module, so its middle deck sits below floor 1). Ground-lobby returns pass
@@ -94,7 +98,7 @@ export function metroStationForPlatform(tower: Tower, platformFloor: number): Un
   // nothing behaviorally: a floor >= 1 never matched a metro platform anyway,
   // so it still falls through to pickX exactly as before.
   if (platformFloor >= 1) return undefined;
-  return tower.units.find((u) => u.kind === "metro" && isOperational(u) && u.floor + 1 === platformFloor);
+  return tower.units.find((u) => u.kind === "metro" && u.floor + 1 === platformFloor);
 }
 
 /** Spawn-side venue fullness filter, the mirror of the arrival-side clamps in
