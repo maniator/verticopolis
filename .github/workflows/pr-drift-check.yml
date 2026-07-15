@@ -43,12 +43,15 @@ on:
     # scene reads a real save under fixtures), or a fixture-only PR could change
     # committed pixels with no check. The `!*.test.ts` exclude sits last so no
     # colocated test can slip back in through the fixtures re-include. Plus the
-    # generator, this workflow, and the reusable capture it calls. Also gate on the
-    # version/build inputs that reach the splash: vite.config.ts injects
-    # package.json's version into __APP_VERSION__, which the 00-splash shot renders,
-    # so a version-only bump changes committed pixels. (A Playwright/font bump via
-    # package-lock.json also can, but that is the [update-screenshots] marker's job;
-    # gating on the lockfile would regen on every dependency PR, so it is left out.)
+    # generator, this workflow, and the reusable capture it calls. The app version
+    # is deliberately NOT gated: the generator masks it to a fixed placeholder at
+    # capture time (pgMaskVersion), so a package.json version bump (and the
+    # vite.config.ts inject that carries it into __APP_VERSION__) no longer changes
+    # committed pixels. That is why neither is listed below: gating them would fire
+    # this check on every routine version-only PR for no pixel change, dulling the
+    # approval gate. (A Playwright/font bump via package-lock.json still can change
+    # pixels, but that is the [update-screenshots] marker's job; gating the lockfile
+    # would regen on every dependency PR, so it is left out.)
     # WARNING: do NOT make any job here a REQUIRED status check while this
     # top-level `paths:` filter is in place, or a PR touching none of these paths
     # hangs "pending" forever. To require it, drop this filter and gate internally
@@ -60,8 +63,6 @@ on:
       - "!src/**/*.test.ts"
       - "scripts/screenshots.ts"
       - "scripts/screenshot-*.ts"
-      - "package.json"
-      - "vite.config.ts"
       - ".github/workflows/pr-drift-check.yml"
       - ".github/workflows/screenshot-capture.yml"
 
