@@ -162,7 +162,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
    *  chrome that overlays the canvas rect: the star-4 build pops toasts that
    *  self-remove on timers mid-capture, which defeats the screenshot
    *  stability loop (the exact failure the first mint hit). */
-  const settleAt = async (page: any, hour: number) => {
+  const settleAt = async (page: import("@playwright/test").Page, hour: number) => {
     await page.evaluate((h: number) => {
       const g = (window as any).game;
       g.sim.clock.minutes = g.sim.clock.day * 24 * 60 + h * 60;
@@ -181,7 +181,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
     await settleAt(page, 10);
     await page.evaluate(() => {
       const g = (window as any).game;
-      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001); // clamps to MIN_ZOOM
+      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0); // 0 clamps to MIN_ZOOM
     });
     await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-day.png", { timeout: 30_000 });
   });
@@ -190,7 +190,7 @@ test.describe("tower scene (region-composition tripwire)", () => {
     await settleAt(page, 20);
     await page.evaluate(() => {
       const g = (window as any).game;
-      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0.0001);
+      g.engine.setCamera(Math.floor(g.grid.width / 2), 30, 0); // 0 clamps to MIN_ZOOM
     });
     await expect(page.locator("#view")).toHaveScreenshot("scene-min-zoom-night.png", { timeout: 30_000 });
   });
