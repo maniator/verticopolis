@@ -14,6 +14,11 @@ export const VACATE_NOTICE_MINUTES = 2 * 24 * 60;
  *  exact recovery target (the "inform before you hurt them" contract). */
 export const VACATE_RESCIND = 0.4;
 
+/** The metro-platform-cut-off advisory copy. Exported so the emit site and the
+ *  tests that match on it share one source and cannot drift. */
+export const METRO_PLATFORM_CUTOFF_MSG =
+  "Your metro platform is cut off. Build a passenger elevator, stairs, or an escalator down to the platform so commuters can reach the station.";
+
 /** The immediate annoyance ceiling for a hotel/condo sat right beside an office:
  *  moving in next to noise caps satisfaction here at once (canon "office
  *  neighbor is too noisy"). */

@@ -126,6 +126,29 @@ describe("metro commuter trips", () => {
     const people = churn(new Crowd(7), tower, clockAt(8));
     expect(people.filter((p) => p.floors.includes(-2))).toHaveLength(0);
   });
+
+  it("an unreachable metro contributes no commuter options (spawn stream matches a metro-less tower)", () => {
+    // The reachability guard filters an unreachable metro out of the commuter
+    // option pool entirely, so the tower spawns the exact same trips it would
+    // with no metro at all. Without the guard the null-routing metro options
+    // would still be picked and burn `rng.pick` draws, shifting every
+    // downstream trip; comparing to a metro-less tower under the same seed
+    // proves the guard removes them rather than just relying on null routing.
+    const bare = baseTower(true); // no metro at all
+    const dead = baseTower(true);
+    must(dead, "metro", -3, 0);
+    dead.units.find((u) => u.kind === "metro")!.state = "occupied"; // operational but no shaft to the platform
+
+    const bareTrips = churn(new Crowd(7), bare, clockAt(8)).map((p) => p.floors);
+    const deadTrips = churn(new Crowd(7), dead, clockAt(8)).map((p) => p.floors);
+    expect(deadTrips).toEqual(bareTrips);
+    // And a reachable metro DOES change the stream (guard is not a no-op): the
+    // served fixture adds real commuter trips the metro-less tower never makes.
+    const served = baseTower(true);
+    withMetro(served);
+    const servedTrips = churn(new Crowd(7), served, clockAt(8)).map((p) => p.floors);
+    expect(servedTrips).not.toEqual(bareTrips);
+  });
 });
 
 describe("the lingerFor hold", () => {
