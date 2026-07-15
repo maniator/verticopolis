@@ -86,7 +86,7 @@ describe("nextStarRequirements (what blocks the next star)", () => {
     expect(sim.star).toBe(3); // promotion granted, matching allMet === true
   });
 
-  it("lists lower-rung gates cumulatively (evaluateStar re-checks them every tick)", () => {
+  it("lists lower-rung gates cumulatively (evaluateStar re-checks them each hour)", () => {
     // evaluateStar re-requires security + the whole 4★ amenity set + metro to
     // promote to 5★, and the star never falls, so the checklist must list the
     // full ladder for the 5★ rung, not just metro. A regression here would let
