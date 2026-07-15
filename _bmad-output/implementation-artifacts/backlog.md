@@ -23,10 +23,16 @@ How items flow:
 3. `Type` legend: `review-deferral` (a real finding parked for scope),
    `perf` (a measured/suspected optimization), `feature-request` (unbuilt
    capability awaiting a spec), `bug` (a player-reported defect awaiting a
-   fix). `Status`: `open`, `in-progress`, `idea` (feature not yet specced),
-   `done`, plus the table's established refinements: `partial` (a named
-   remainder is still open), `parked` (deliberately shelved with a resurrection
-   condition), `next` (queued), `shipped-v1`, `resolved`, and `impl-review`.
+   fix), `design-decision` (a ruling recorded for the record, often parked
+   with its trigger), `task` (a scoped follow-up with a known method).
+   `Status`: `open`, `in-progress`, `idea` (feature not yet specced),
+   `done` (delivered in full), plus the table's established refinements:
+   `partial` (a named remainder is still open), `parked` (deliberately
+   shelved with a resurrection condition), `next` (queued), `shipped-v1`
+   (first version shipped; the row tracks refinements), `resolved`
+   (investigated or fixed and verified; kept for the record, unlike `done`
+   it usually closes a defect or a question rather than delivering a
+   feature), and `impl-review` (implemented, awaiting review/validation).
 4. `Priority` is the do-first order (impact × effort × risk, and whether the
    item is blocked), distinct from `Severity`, which is impact alone. **P1**:
    work next; real correctness/data-safety impact and ready to pick up. **P2**:
