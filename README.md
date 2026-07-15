@@ -48,7 +48,7 @@ knowing:
   "updating…" toast, then swaps to the new assets. You always end up on the
   current build and your tower survives the reload.
 - **Scoped to the game.** Only the main game registers the service worker; the
-  `gallery`/`preview`/`excalibur` tooling pages are excluded from its scope and
+  `gallery`/`preview` tooling pages are excluded from its scope and
   precache.
 - **Icons** live in `src/public/` and are generated from an in-code SVG (no
   external art), matching the game's "every sprite drawn in code" ethos. Regen

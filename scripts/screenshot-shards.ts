@@ -60,7 +60,6 @@ export const SHARDS: Record<string, string[]> = {
     "crowd",
     "fire",
     "sprite-gallery",
-    "excalibur-preview",
     "preview-rooms",
     "traffic",
     "lobby-awnings",

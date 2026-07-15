@@ -52,7 +52,7 @@ export default defineConfig({
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling
-    // pages (gallery/preview/excalibur) stay outside the app scope.
+    // pages (gallery/preview) stay outside the app scope.
     //
     // `registerType: "prompt"` means a freshly built service worker waits
     // instead of hijacking the tab. The game listens for that (src/pwa.ts):
@@ -87,9 +87,9 @@ export default defineConfig({
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
-        globIgnores: ["**/gallery*", "**/preview*", "**/excalibur*"],
+        globIgnores: ["**/gallery*", "**/preview*"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/gallery/, /preview/, /excalibur/],
+        navigateFallbackDenylist: [/gallery/, /preview/],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
@@ -115,20 +115,14 @@ export default defineConfig({
         main: resolve(__dirname, "src/index.html"),
         gallery: resolve(__dirname, "src/gallery.html"),
         preview: resolve(__dirname, "src/preview.html"),
-        excalibur: resolve(__dirname, "src/excalibur.html"),
       },
       output: {
         // Split the Excalibur engine into its own vendor chunk, separate from our
-        // TowerEngine app code. Both the game (main) and the tooling (excalibur)
-        // entry statically import it, so Rollup already hoisted it into one shared
-        // chunk — but sharing a hash with our own code meant every TowerEngine edit
-        // re-downloaded all ~550 kB of the pinned engine. Isolating it lets the
-        // browser (and the PWA precache) reuse the engine across app updates.
-        //
-        // The name deliberately does NOT start with "excalibur": Workbox's
-        // globIgnores excludes `**/excalibur*` from the game precache (to keep the
-        // excalibur.html tooling entry out of the install), and a chunk named
-        // `excalibur-*` would be wrongly dropped from the game's own precache.
+        // TowerEngine app code. Sharing a hash with our own code meant every
+        // TowerEngine edit re-downloaded all ~550 kB of the pinned engine.
+        // Isolating it lets the browser (and the PWA precache) reuse the engine
+        // across app updates. The name starts with "vendor", so it does not match
+        // Workbox's `**/gallery*` / `**/preview*` tooling-page globIgnores.
         manualChunks(id) {
           // Normalize separators before matching: Rollup normally emits POSIX
           // module ids, but be defensive so the split still holds if a build
@@ -200,7 +194,6 @@ export default defineConfig({
         "src/tests/**",
         "src/gallery.ts",
         "src/preview.ts",
-        "src/excalibur-main.ts",
         "src/pwa.ts",
         "src/main.ts",
         // The Excalibur/WebGL render layer was split into friend-modules; the

@@ -53,9 +53,8 @@ export function pgMaskVersion(): void {
  *  every capture becomes a pure function of the step count instead of wall
  *  time; that (plus seeded sims) is what makes CI regens byte-stable. Also
  *  zeroes the decorative animation clock, which accumulated a boot-dependent
- *  amount of time before adoption. Handles both page shapes: the game
- *  (window.game.engine is the TowerEngine) and the excalibur.html tooling page
- *  (window.engine is).
+ *  amount of time before adoption. Reads the game's engine off
+ *  window.game.engine (the TowerEngine).
  *
  *  Returns a status the runner MUST check, because a silent fall-through here
  *  would quietly hand the page back to wall-clock timing and void the whole
@@ -63,8 +62,8 @@ export function pgMaskVersion(): void {
  *  has no engine: gallery/preview), or "failed" (an engine exists but the
  *  clock could not be swapped, e.g. an Excalibur API change). */
 export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
-  const w = window as unknown as { game?: any; engine?: any };
-  const te = w.game?.engine ?? w.engine;
+  const w = window as unknown as { game?: any };
+  const te = w.game?.engine;
   const eng = te?.engine;
   if (!eng) return "none";
   // Install the manually stepped clock if it isn't already the active one.
@@ -99,8 +98,8 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
   // downstream shot would drift. Point performance.now() at the stepped clock
   // and clear the wall-time throttle + the sub-minute accumulator (which also
   // carried a boot-period value), so update() becomes a pure function of the
-  // seeded sim and the step count. No-op for the excalibur.html tooling page
-  // (no window.game), which has no such loop.
+  // seeded sim and the step count. No-op for the engine-less route pages
+  // (gallery/preview), which have no window.game and no such loop.
   const g = w.game;
   if (g) {
     try {
@@ -142,8 +141,8 @@ export function pgAdoptTestClock(): "adopted" | "none" | "failed" {
  *  invalid request: no stepping, returns false, so a bad caller can't mistake
  *  "did nothing" for "advanced time" and quietly void determinism. */
 export function pgStep(frames: number): boolean {
-  const w = window as unknown as { game?: any; engine?: any };
-  const clock = (w.game?.engine ?? w.engine)?.engine?.clock;
+  const w = window as unknown as { game?: any };
+  const clock = w.game?.engine?.engine?.clock;
   if (!clock || typeof clock.step !== "function") return false;
   const n = Math.floor(frames);
   if (!Number.isFinite(n) || n <= 0) return false;
@@ -176,8 +175,8 @@ export function pgStep(frames: number): boolean {
  *  expected, so a future Excalibur rename degrades to slow-but-correct. Returns false
  *  in the same no-clock cases as pgStep. Runs in the browser. */
 export function pgStepNoDraw(frames: number): boolean {
-  const w = window as unknown as { game?: any; engine?: any };
-  const eng = (w.game?.engine ?? w.engine)?.engine;
+  const w = window as unknown as { game?: any };
+  const eng = w.game?.engine?.engine;
   const clock = eng?.clock;
   if (!clock || typeof clock.step !== "function") return false;
   const n = Math.floor(frames);

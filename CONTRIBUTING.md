@@ -105,8 +105,8 @@ e2e specs (e.g. `e2e/integration.spec.ts` boots it in a real browser):
 - **`src/render/excalibur/**`**: the Excalibur/WebGL engine wrapper.
 
 Also excluded are non-product tooling entry points that are build/dev plumbing,
-not game logic: the gallery/preview/excalibur pages (`src/gallery.ts`,
-`src/preview.ts`, `src/excalibur-main.ts`) and the PWA bootstrap (`src/pwa.ts`),
+not game logic: the gallery/preview pages (`src/gallery.ts`,
+`src/preview.ts`) and the PWA bootstrap (`src/pwa.ts`),
 plus the usual non-code (`*.d.ts`, `*.config.*`) and the tests themselves.
 
 ### What you might assume is untestable but ISN'T

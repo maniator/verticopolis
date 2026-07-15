@@ -188,14 +188,14 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
     if (scene.initScript) await page.addInitScript(scene.initScript);
     await page.goto(scene.route ? `${BASE}/${scene.route}` : BASE, { waitUntil: "networkidle" });
     if (scene.route) {
-      // Route pages set their own ready flag (galleryReady / excaliburReady / previewReady).
+      // Route pages set their own ready flag (galleryReady / previewReady).
       // A missing flag means the page never finished rendering, so capturing now would
       // commit a blank/half-drawn PNG over a good one. Record the failure and SKIP the
       // scene's shots entirely, leaving the existing committed images untouched.
       try {
         await page.waitForFunction(() => {
           const w = window as any;
-          return w.galleryReady === true || w.excaliburReady === true || w.previewReady === true;
+          return w.galleryReady === true || w.previewReady === true;
         }, null, { timeout: READY_TIMEOUT_MS });
       } catch {
         for (const shot of scene.shots) {
@@ -204,17 +204,17 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         }
         return;
       }
-      // excalibur.html runs a live TowerEngine; take over its clock so the demo
-      // tower's frames replay identically. "none" is fine here (gallery/preview
-      // have no engine and are already frozen by the pinned performance.now
-      // above), but an engine whose clock can't be swapped must fail the scene
-      // rather than silently capture wall-clock pixels.
+      // The route pages (gallery/preview) have no engine, so "none" is expected
+      // here: they are already frozen by the pinned performance.now above. The
+      // guard stays defensive: if a route page ever did carry an engine whose
+      // clock could not be swapped, that must fail the scene rather than silently
+      // capture wall-clock pixels.
       if ((await page.evaluate(pgAdoptTestClock)) === "failed") {
         throw new Error("engine present but test-clock adoption failed");
       }
-      // Draw this route settle: a live-engine route page (excalibur.html) is
-      // draw-coupled, and the no-engine routes (gallery/preview) wall-wait here
-      // anyway (no clock), so drawing is the safe choice for both.
+      // The route pages (gallery/preview) have no engine clock, so this settle
+      // wall-waits regardless of the draw flag; passing true is harmless and
+      // keeps one code path for route settles.
       await settle(page, 800, true);
     } else {
       await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });

@@ -191,6 +191,35 @@ How items flow:
 - **Classic shows fix advice, but the GDD reserves advice for Modern (Acceptance Auditor, medium).** The `GRIPE_TEXT` strings in `src/game/facilityDiagnostics.ts` bake the fix into the line ("Add cars or a parallel shaft", "Lower it to keep them", "a lobby tile between them shields it"), shown in both modes, while `gdd-simtower-optimization-gaps-2026-07-15.md` says Classic shows information and only Modern adds advice. Not fixed in #400 because the fix is holistic: the existing inspector lines (Access "Add a sky-lobby transfer", W1 "Put a stairway...", W3 "Keep it within 2 floors...") ALL embed advice with no mode gate, so mode-gating only the new line would be inconsistent. The right move is one pass that routes all inspector advice through a `GameRules` gate (Classic = cause only, Modern = cause + fix). Scope it as its own story before touching it.
 - **`dominantGripe` rebuilds the spatial congestion map per inspector render in v2 (Edge Case Hunter, low/perf).** `sim.dominantGripe(u)` calls `sim.congestionAt(u.floor)`, which in the v2 model rebuilds the whole `spatialCongestionByFloor` map (unmemoized) to read one floor; the inspector card re-renders on pointer-move and to tick live countdowns, so an unhappy office/condo/hotel hover pays one full-tower scan per render. Bounded (hover only, unhappy tenants only, v2 only) and the stats overlay already does the same, so it is not new-in-kind. Fold into the render-perf memoization work (see the `congestion` memoization / on-hour amortization threads) rather than a bespoke fix.
 
+### Deferred from: code review of dropping the excalibur-preview screenshot scene (`/bmad-code-review` adversarial, 2026-07-15)
+
+Change: removed the redundant `excalibur-preview` screenshot scene (it captured the
+standalone `excalibur.html` dev page and rendered blank under the container's
+software GL) from `scripts/scenes/showcase.ts`, dropped its id from the shard
+partition in `scripts/screenshot-shards.ts`, and deleted the committed
+`docs/screenshots/excalibur-preview.png`. On the owner's call (party-ratified,
+2026-07-15) the change then grew to nuke the whole standalone Excalibur preview
+harness, an orphaned bring-up scaffold nothing in `src/` imports and no CI job
+hits: deleted `src/excalibur.html`, `src/excalibur-main.ts`, and the interim
+`e2e/excalibur.spec.ts` boot smoke; removed the `excalibur` vite build input, its
+Workbox `**/excalibur*` globIgnore/denylist, and its coverage-exclude line; and
+pruned the tooling-page branch from the screenshot scripts. The Excalibur *engine*
+(`src/render/excalibur/**`, the `excalibur` npm package) is untouched. Two review
+layers ran (Blind Hunter, Edge Case Hunter; no spec, so no Acceptance Auditor).
+One defer:
+
+- **`pr-drift-check.yml` render-path filter misses `scripts/scenes/*.ts`** (Edge
+  Case Hunter): the `changes` job classifies render-affecting edits with a
+  `scripts/screenshot-*.ts` glob, which does not match `scripts/scenes/*.ts`. A
+  future scene-only edit (adding or changing a shot without co-editing
+  `scripts/screenshot-shards.ts` or another `screenshot-*.ts` file) could skip the
+  screenshot drift capture and merge a stale gallery. This PR is unaffected because
+  it co-edits `screenshot-shards.ts`, which the glob matches. Fix for the
+  drift-workflow owner: widen the filter to include `scripts/scenes/**` (or
+  `scripts/screenshot*`/`scripts/scenes` together). Low severity, watch-only until
+  a scene-only PR actually lands.
+
+### Deferred from: code review of the Modern escalator/office rule gate (`gds-code-review` adversarial, 2026-07-14)
 
 Change: gated the Classic-canon "escalators link commercial floors only" placement
 refusal behind `GameRules.allowsEscalatorOnOfficeFloors` (Classic false, Modern

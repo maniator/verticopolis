@@ -370,13 +370,6 @@ export const SHOWCASE_SCENES: Scene[] = [
     shots: [{ name: "06-sprite-gallery", fullPage: true }],
   },
   {
-    id: "excalibur-preview",
-    outDir: "screenshots",
-    route: "excalibur.html",
-    // drawSettle: a live TowerEngine route page, draw-coupled like 11-game-tower.
-    shots: [{ name: "excalibur-preview", wait: 1500, drawSettle: true }],
-  },
-  {
     id: "preview-rooms",
     outDir: "screenshots",
     route: "preview.html",
