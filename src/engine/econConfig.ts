@@ -40,6 +40,27 @@ export const ECON = {
     hotel: 1.0,
     staff: 1.0,
   },
+  /**
+   * Commercial demand pools (gdd/arch-commercial-demand-pools-2026-07-15).
+   * Per-capita daily demand dollars a weighted resident/worker spends across the
+   * venues reachable to them. The tower's demand pool is this times the weighted,
+   * connected census (reusing {@link mealPopulationWeights}), and each reachable
+   * venue earns `min(1, pool / reachable-capacity)` of its headline daily figure
+   * in place of the old tower-wide appeal scalar. PROVISIONAL calibration: 30
+   * keeps a small, fully-connected tower close to the pre-change uniform appeal
+   * (`0.35 + pop/8000`), so the swap conserves income near that point; the value
+   * wants a playtest tuning pass before Classic parity is claimed.
+   */
+  demandPerCapita: 30,
+  /**
+   * Modern-only minimum per-venue demand fraction: a baseline of external,
+   * street-level walk-in trade that does not depend on the tower's own
+   * population, so a well-placed venue is not dead on arrival while the tower is
+   * still filling. Classic uses 0 (a thin Classic tower genuinely starves
+   * commercial, closer to 1994's placement pressure); Modern is more forgiving.
+   * Resolved through {@link GameRules.demandModel}. PROVISIONAL, wants tuning.
+   */
+  demandFloorModern: 0.25,
   /** Cost to add one elevator car to a shaft. */
   addCarCost: 40_000,
   /** Monthly film-booking cost per cinema (canon: 150k average / 300k

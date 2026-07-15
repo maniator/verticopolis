@@ -109,9 +109,11 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
 });
 
 /** sha256 of the stable-stringified serialize() output of the fixed scenario.
- *  Re-pinned intentionally when the VIP visit counter joined the save payload.
- *  This fixture never reaches 3★ (no suites, no wedding hall), so the payload
- *  differs only by the new always-written fields at their fresh-tower defaults
- *  (`vipVisits: 0`, `lastVipNagDay: -100`); the tower's behavior is otherwise
- *  unchanged. */
-const PINNED_STATE_HASH = "89d7e814686638b816d497018e804a4a12ba3eece71de2da39bf9b2c832d5326";
+ *  Re-pinned intentionally for commercial demand pools (#393): the fixture's two
+ *  fast-food venues now earn a demand-driven share of their daily figure (the
+ *  connected office census split across the reachable venues) instead of the old
+ *  tower-wide appeal scalar, so their accrued income (and the money/patronage
+ *  fields it touches) shifts. Behavior is otherwise unchanged; the fixture stays
+ *  a fully-connected Classic tower whose offices feed its venues, so commercial
+ *  income is conserved near this calibration point rather than zeroed. */
+const PINNED_STATE_HASH = "e1f9be18ace3421eb2faa923943934b473668f70ba3d2d1967370ad2c590a787";

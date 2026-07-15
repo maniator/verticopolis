@@ -3,10 +3,11 @@ import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { FACILITIES, RECYCLING_POP_PER_CENTER, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
+import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
+import { computeDemandMap } from "./sim/demand";
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
  *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). Exported so
@@ -110,7 +111,11 @@ export class EconomySystem {
 
   /** Hourly food/retail/entertainment takings, scaled by foot traffic. */
   collectTrafficIncome(): void {
-    const appeal = this.trafficAppeal();
+    // Per-venue demand fractions replace the old tower-wide appeal scalar: each
+    // reachable venue earns a share of its daily figure driven by the connected
+    // census split across the reachable venues (commercial demand pools). Pure
+    // and deterministic, so it adds no draw to the seeded economy stream.
+    const demandMap = computeDemandMap(this.sim);
     // Visitor income obeys the two-ride rule: a floor more than two rides from
     // the lobby draws no patrons (the same "no visitors will come" condition the
     // stranded-floor advisory reports), so its commercial rooms earn nothing —
@@ -170,6 +175,10 @@ export class EconomySystem {
       // same value updatePresence just did.
       if (attends) syncAttendanceOccupants(u);
       else u.occupants = FACILITIES[u.kind].population;
+      // This venue's demand share (0..1), the per-venue replacement for the old
+      // tower-wide appeal. A reachable, open venue always has an entry; the
+      // `?? 0` is a guard, not an expected path.
+      const frac = demandMap.fractionByUnit.get(u.id) ?? 0;
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       const rainMult =
@@ -199,7 +208,7 @@ export class EconomySystem {
       const openH = openHoursPerDay(u.kind);
       const hourly =
         (daily / openH) *
-        appeal *
+        frac *
         rainMult *
         filmMult *
         lobbyMult *
@@ -218,7 +227,7 @@ export class EconomySystem {
         const custPerHourAtBaseline = daily / (spend * openH);
         u.patronageToday =
           (u.patronageToday ?? 0) +
-          custPerHourAtBaseline * appeal * rainMult * lobbyMult * trafficFactor;
+          custPerHourAtBaseline * frac * rainMult * lobbyMult * trafficFactor;
       }
       if (u.pendingIncome >= 1) {
         const earned = Math.floor(u.pendingIncome);
@@ -233,31 +242,6 @@ export class EconomySystem {
         if (isRetail) u.profitToday = (u.profitToday ?? 0) + earned;
       }
     }
-  }
-
-  /**
-   * 0..1 demand-share: what fraction of a venue's headline daily take it
-   * actually earns, driven by foot traffic. It is a SHARE (capped at 1), not a
-   * population multiplier, so commercial income can never exceed its advertised
-   * daily figure. A metro pulls in outside visitors and a recycling center keeps
-   * the tower clean and attractive — both lift trade, the classic reasons to dig
-   * down to the subway / run recycling in the original.
-   */
-  private trafficAppeal(): number {
-    const pop = this.sim.tower.totalPopulation();
-    const metro = this.hasOperational("metro") ? 0.25 : 0;
-    // F14: a real effect for the center — scaled by how much of the tower's
-    // waste the centers can actually process (canon fill model): an
-    // overflowing recycling plant stops flattering the tower, so the bonus
-    // shrinks as population outgrows capacity until more centers go in.
-    let recycling = 0;
-    let centers = 0;
-    for (const u of this.sim.tower.units) if (u.kind === "recycling" && isOperational(u)) centers++;
-    if (centers > 0) {
-      const capacity = centers * RECYCLING_POP_PER_CENTER;
-      recycling = 0.1 * Math.min(1, capacity / Math.max(1, pop));
-    }
-    return Math.min(1, 0.35 + pop / 8000 + metro + recycling);
   }
 
   /** Morning hotel checkout: collect revenue and mark rooms dirty. Cleaning is

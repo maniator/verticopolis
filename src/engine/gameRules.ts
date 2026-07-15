@@ -122,6 +122,16 @@ export interface GameRules {
    * stays byte-identical (Classic never rolls). `residents` undefined is treated
    * as the mean household of 3. */
   condoRelocationChance(residents: number | undefined): number;
+  /**
+   * Commercial demand model magnitudes (gdd/arch-commercial-demand-pools). The
+   * split SHAPE is identical in both modes (otherwise Classic is not reproducing
+   * the classic game); only these differ. `perCapita` is the daily demand dollars
+   * per weighted resident/worker; `floor` is the minimum per-venue demand fraction
+   * (a small-tower assist). Classic is firmer (floor 0, a thin tower starves
+   * commercial); Modern keeps a gentle floor. Provisional magnitudes, pending a
+   * calibration pass.
+   */
+  demandModel(): { perCapita: number; floor: number };
 }
 
 export const CLASSIC_RULES: GameRules = {
@@ -156,6 +166,11 @@ export const CLASSIC_RULES: GameRules = {
   },
   condoRelocationChance() {
     return 0; // 1994 condos never turn over; a sold Classic condo is forever
+  },
+  demandModel() {
+    // Firm: no small-tower floor, so thin Classic towers genuinely starve
+    // commercial (closer to 1994's placement pressure).
+    return { perCapita: ECON.demandPerCapita, floor: 0 };
   },
 };
 
@@ -202,6 +217,11 @@ export const MODERN_RULES: GameRules = {
     // with no household reads as the mean 3, so the scale is exactly 1.
     const size = residents ?? CLASSIC_HOUSEHOLD;
     return ECON.condoRelocationChanceMonthly * (size / CLASSIC_HOUSEHOLD);
+  },
+  demandModel() {
+    // Gentle: a baseline of external street-level walk-in trade keeps a
+    // well-placed venue alive while the tower's own population is still thin.
+    return { perCapita: ECON.demandPerCapita, floor: ECON.demandFloorModern };
   },
 };
 

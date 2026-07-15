@@ -4,6 +4,7 @@ import { EconomySystem } from "../../engine/EconomySystem";
 import { Tower } from "../../engine/Tower";
 import { Clock } from "../../engine/Clock";
 import { RNG } from "../../engine/rng";
+import { CLASSIC_RULES } from "../../engine/gameRules";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import type { FacilityKind } from "../../engine/types";
 
@@ -202,6 +203,13 @@ describe("F7 — commercial income never exceeds its headline daily figure", () 
     sim.star = 3; // shops unlock at 3★ (canon)
     expect(sim.build("shop", 2, 0).ok).toBe(true);
     sim.tower.units.find((u) => u.kind === "shop")!.state = "occupied"; // skip construction
+    // Occupied offices give the shop a demand pool to serve (income is
+    // demand-driven). Enough to push the shop toward, but not past, its cap so
+    // the "at most its daily figure" ceiling is the assertion under test.
+    for (const x of [20, 32, 44, 56]) {
+      const o = sim.tower.place("office", 2, x);
+      sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+    }
     const before = sim.money;
     // Run from 07:00 to 23:00 — covers the shop's full 10:00–21:00 open span
     // without crossing midnight (which would add a maintenance charge and muddy
@@ -221,6 +229,12 @@ describe("F14 — the Recycling Centre has a real effect", () => {
     tower.placeTransport("elevatorStandard", 4, 1, 2); // floor 2 served
     tower.place("shop", 2, 0);
     tower.units.find((u) => u.kind === "shop")!.state = "occupied";
+    // Occupied offices give the shop a demand pool (income is demand-driven), so
+    // the recycling bonus, which lifts that pool, has something to act on.
+    for (const x of [20, 30]) {
+      const o = tower.place("office", 2, x);
+      tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
+    }
     if (withRecycling) {
       for (let x = 0; x < 40; x++) {
         tower.place("floor", 0, x);
@@ -236,6 +250,7 @@ describe("F14 — the Recycling Centre has a real effect", () => {
       get money() { return money; },
       set money(v: number) { money = v; },
       star: 5,
+      rules: CLASSIC_RULES, // floor 0, so the recycling pool lift is not masked by a baseline
       emit: () => {},
       hasAny: (k: FacilityKind) => tower.units.some((u) => u.kind === k),
       hasOperational: (k: FacilityKind) =>
