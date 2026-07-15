@@ -1005,6 +1005,11 @@ dialog.crash-card::backdrop {
 .stats-grid .col.nsr .k.ms-done {
   color: var(--good);
 }
+/* Next-star checklist: the value ("Ready" / the population count) also greens
+ * when its gate is met, so the row reads done without an inline color. */
+.stats-grid .col.nsr .v.ms-done {
+  color: var(--good);
+}
 .stats-section .evalbar {
   margin-left: auto;
   width: 84px;

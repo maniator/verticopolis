@@ -224,11 +224,14 @@ export function nextStarSection(sim: Simulation): TemplateResult | typeof nothin
   const fmt = (n: number) => n.toLocaleString();
   const goal = req.isTower ? "TOWER" : `${req.star}★`;
   const mark = (met: boolean) => (met ? "✓" : "·");
+  // Coloring rides the shared checklist `ms-done` class (green when met, the
+  // muted `.col.nsr .v/.k` default otherwise), so there are no inline color
+  // overrides to keep in sync with the theme.
   const rows: TemplateResult[] = [
-    html`<span class="k${req.popMet ? " ms-done" : ""}">${mark(req.popMet)} Population</span><span class="v" style="color:${req.popMet ? "var(--good)" : "var(--muted)"}">${fmt(req.popHave)} / ${fmt(req.popNeed)}</span>`,
+    html`<span class="k${req.popMet ? " ms-done" : ""}">${mark(req.popMet)} Population</span><span class="v${req.popMet ? " ms-done" : ""}">${fmt(req.popHave)} / ${fmt(req.popNeed)}</span>`,
     ...req.gates.map(
       (g) =>
-        html`<span class="k${g.met ? " ms-done" : ""}">${mark(g.met)} ${g.label}</span><span class="v" style="color:${g.met ? "var(--good)" : "var(--muted)"}">${g.met ? "Ready" : "Needed"}</span>`,
+        html`<span class="k${g.met ? " ms-done" : ""}">${mark(g.met)} ${g.label}</span><span class="v${g.met ? " ms-done" : ""}">${g.met ? "Ready" : "Needed"}</span>`,
     ),
   ];
   const head = html`<div class="stats-section win-title sm">Next: ${goal}${
