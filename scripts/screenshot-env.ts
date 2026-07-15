@@ -69,7 +69,7 @@ export interface Scene {
   id: string;
   outDir: OutDir;
   viewport?: Viewport; // desktop by default
-  route?: string; // navigate here instead of building a tower (gallery/excalibur/preview)
+  route?: string; // navigate here instead of building a tower (gallery/preview)
   keepSplash?: boolean; // firstRun scene captures splash states, so don't dismiss
   initScript?: () => void; // runs before page scripts, for per-scene localStorage/bootstrap tweaks
   build?: () => void; // stage the sim once for this scene (runs in-page)

@@ -196,11 +196,17 @@ How items flow:
 Change: removed the redundant `excalibur-preview` screenshot scene (it captured the
 standalone `excalibur.html` dev page and rendered blank under the container's
 software GL) from `scripts/scenes/showcase.ts`, dropped its id from the shard
-partition in `scripts/screenshot-shards.ts`, deleted the committed
-`docs/screenshots/excalibur-preview.png`, and added an `e2e/excalibur.spec.ts` boot
-smoke so `src/excalibur-main.ts` keeps its "integration-covered by the e2e tier"
-coverage claim honest. Two review layers ran (Blind Hunter, Edge Case Hunter; no
-spec, so no Acceptance Auditor). One defer:
+partition in `scripts/screenshot-shards.ts`, and deleted the committed
+`docs/screenshots/excalibur-preview.png`. On the owner's call (party-ratified,
+2026-07-15) the change then grew to nuke the whole standalone Excalibur preview
+harness, an orphaned bring-up scaffold nothing in `src/` imports and no CI job
+hits: deleted `src/excalibur.html`, `src/excalibur-main.ts`, and the interim
+`e2e/excalibur.spec.ts` boot smoke; removed the `excalibur` vite build input, its
+Workbox `**/excalibur*` globIgnore/denylist, and its coverage-exclude line; and
+pruned the tooling-page branch from the screenshot scripts. The Excalibur *engine*
+(`src/render/excalibur/**`, the `excalibur` npm package) is untouched. Two review
+layers ran (Blind Hunter, Edge Case Hunter; no spec, so no Acceptance Auditor).
+One defer:
 
 - **`pr-drift-check.yml` render-path filter misses `scripts/scenes/*.ts`** (Edge
   Case Hunter): the `changes` job classifies render-affecting edits with a
