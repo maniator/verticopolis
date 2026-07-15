@@ -207,7 +207,7 @@ export function elevatorCalls(crowd: Crowd, tower: Tower): ElevatorCalls {
  * from a landing into a car: the leftover line is the same individuals, now
  * shorter. This deliberately does NOT read the dispatch's statistical
  * `t.carLoad`, an aggregate-demand count unrelated to the drawn figures.
- * Reconciled in E6-S7 (GH #314); see the backlog note.
+ * Reconciled in E6-S7 (GH #314): both halves already count the drawn crowd.
  */
 export function elevatorQueueView(crowd: Crowd, tower: Tower): ElevatorQueueView {
   const landings = new Map<number, Map<number, QueueLanding>>();

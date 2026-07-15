@@ -43,8 +43,11 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
    *  verify the drawn per-car occupancy that queueView.boarded reads, rather
    *  than asserting against carRiders itself (the read's own source). */
   function countRidersInCar(crowd: Crowd, shaftId: number, carIndex: number): number {
-    return crowd.people.filter((p) => p.state === "riding" && p.shaftId === shaftId && p.carIndex === carIndex)
-      .length;
+    let count = 0;
+    for (const p of crowd.people) {
+      if (p.state === "riding" && p.shaftId === shaftId && p.carIndex === carIndex) count++;
+    }
+    return count;
   }
 
   /** A person parked in the `waiting` state at a shaft landing. */
