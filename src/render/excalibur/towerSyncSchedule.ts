@@ -63,6 +63,11 @@ export function planSceneSync(t: SyncTriggers): { syncNow: boolean; nextPending:
 /** The sync itself plus the bookkeeping that marks it done, shared by the
  *  frame-start drain and the post-update evaluation. */
 function applySceneSync(engine: TowerEngine): void {
+  // The crane's cached canvas draws d.lit live but re-rasterizes only when
+  // flagged. Flag it here, exactly when the adopted lighting changes, so the
+  // cab window flips once and in the same frame as the room repaint, even
+  // when the decorative animation clock is frozen (pause / reduced motion).
+  if (engine.craneGfx && engine.litState !== engine.d.lit) engine.craneGfx.flagDirty();
   engine.litState = engine.d.lit;
   engine.lastSyncHour = engine.d.hour;
   syncScene(engine);
@@ -77,6 +82,11 @@ function applySceneSync(engine: TowerEngine): void {
  *  exists to prevent. */
 export function drainSceneSync(engine: TowerEngine): void {
   if (!engine.hourSyncPending) return;
+  // A structural change is already waiting (a tower swap reset builtRev, or
+  // an edit landed since last frame): leave the deferral booked and let this
+  // frame's structural sync adopt the hour and lighting bits along with it,
+  // instead of running the full reconcile walk twice in one frame.
+  if (engine.sim.tower.revision !== engine.builtRev) return;
   engine.hourSyncPending = false;
   applySceneSync(engine);
 }

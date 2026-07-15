@@ -197,6 +197,35 @@ describe("drainSceneSync (frame-start drain, before the sim advances)", () => {
     expect(syncScene).not.toHaveBeenCalled();
   });
 
+  it("stands aside when a structural change is already waiting: one sync covers both", () => {
+    // A tower swap (builtRev reset) or an edit from last frame is visible at
+    // frame start; draining too would run the full reconcile twice.
+    const e = eng({ sim: { tower: { revision: 2, mealOverlayRevision: 0 }, clock: { hour: 10 } } });
+    drainSceneSync(e as never);
+    expect(syncScene).not.toHaveBeenCalled();
+    expect(e.hourSyncPending).toBe(true); // stays booked for the structural sync
+    runSceneSync(e as never);
+    expect(syncScene).toHaveBeenCalledTimes(1);
+    expect(syncMotion).toHaveBeenCalledTimes(1);
+    expect(e.hourSyncPending).toBe(false);
+    expect(e.lastSyncHour).toBe(10);
+  });
+
+  it("flags the crane's canvas when the adopted lighting changes, and only then", () => {
+    // The crane's cab window is lighting-dependent but its canvas re-rasters
+    // only when flagged; the sync application is its one lit-driven trigger,
+    // so a frozen decorative clock (pause / reduced motion) still flips it.
+    const flagDirty = vi.fn();
+    const e = eng({ craneGfx: { flagDirty } });
+    drainSceneSync(e as never); // d.lit true vs litState false: flip adopted
+    expect(flagDirty).toHaveBeenCalledTimes(1);
+
+    const calmFlag = vi.fn();
+    const calm = eng({ craneGfx: { flagDirty: calmFlag }, d: { lit: false, hour: 10 }, litState: false });
+    drainSceneSync(calm as never); // hour moved, lighting did not
+    expect(calmFlag).not.toHaveBeenCalled();
+  });
+
   it("a catch-up frame that crosses the NEXT hour never re-stacks: the drain repaints before the sim advances, the new hour books its own deferral", () => {
     // Frame start: last frame's deferral drains against the pre-advance hour.
     const e = eng();

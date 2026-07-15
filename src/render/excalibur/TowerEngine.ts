@@ -356,9 +356,10 @@ export class TowerEngine {
     // refreshed inside syncScene — the same moment the sprites that read them
     // re-bake — so they're never staler than the sprite, and the flood-fill /
     // scans stay off this per-frame path.
-    // The crane repaints while its inputs move: the decorative clock (trolley,
-    // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
-    if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
+    // The crane repaints while the decorative clock moves (trolley, hook,
+    // beacon); the lighting flip (cab window) rides the scene sync instead,
+    // so it lands once, aligned with the room repaint (towerSyncSchedule).
+    if (this.craneGfx && animating) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
     // Read-only queue + car-fill projection for the transport render path.
     // Memoized on the (step, revision) key in the engine, so this per-frame read
