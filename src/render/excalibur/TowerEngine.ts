@@ -13,6 +13,7 @@ import * as reconcile from "./towerReconcile";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
 import * as overlayFx from "./towerOverlay";
+import { displayLit, drainSceneSync, runSceneSync } from "./towerSyncSchedule";
 import type { RoomRec } from "./towerReconcile";
 import type { Walker } from "./towerCrowd";
 import type { ViewFocus, Picked, ScreenRect } from "./towerInputCamera";
@@ -197,7 +198,9 @@ export class TowerEngine {
   mealOverlayRev = -1;
   /** @internal friend-module access (towerScene). */
   litState = false;
-  private lastSyncHour = -1;
+  /** @internal friend-module access (towerSyncSchedule). */
+  lastSyncHour = -1;
+  hourSyncPending = false; // an hour-driven reconcile booked for the next frame
   /** Set by the controller from the game speed: when paused, the decorative
    *  animation clock stops so on-screen people freeze with everything else. */
   paused = false;
@@ -310,7 +313,13 @@ export class TowerEngine {
     scene.makeOverlay(this);
     // A boot-loaded autosave restores its saved view; a fresh tower centers.
     this.adoptCamera(this.sim.view);
+    // Bake the boot scene against the real clock instead of the d defaults:
+    // the hour-driven resync now defers a frame (towerSyncSchedule), so a
+    // stale boot bake would actually display instead of being fixed pre-draw.
+    this.d.hour = this.sim.clock.hour;
+    this.d.lit = displayLit(this.sim.clock);
     this.litState = this.d.lit;
+    this.lastSyncHour = this.d.hour;
     this.syncScene();
     this.syncMotion();
     this.syncFacade();
@@ -339,14 +348,18 @@ export class TowerEngine {
     this.d.anim = this.animClock;
     this.syncEventFx(animating);
     this.d.hour = c.hour;
-    this.d.lit = c.isNight() || c.isEvening();
+    this.d.lit = displayLit(c);
+    // Drain last frame's deferred reconcile BEFORE the crane lit check and
+    // the sim advance in onUpdate (re-stack rationale: drainSceneSync's doc).
+    drainSceneSync(this);
     // Garage/waste display fractions (this.d.parkingUse / recycleFill) are
     // refreshed inside syncScene — the same moment the sprites that read them
     // re-bake — so they're never staler than the sprite, and the flood-fill /
     // scans stay off this per-frame path.
-    // The crane repaints while its inputs move: the decorative clock (trolley,
-    // hook, beacon) or a lighting flip (cab window). Frozen clock → no repaint.
-    if (this.craneGfx && (animating || this.d.lit !== this.litState)) this.craneGfx.flagDirty();
+    // The crane repaints while the decorative clock moves (trolley, hook,
+    // beacon); the lighting flip (cab window) rides the scene sync instead,
+    // so it lands once, aligned with the room repaint (towerSyncSchedule).
+    if (this.craneGfx && animating) this.craneGfx.flagDirty();
     this.d.stress = Math.max(0, Math.min(1, this.sim.congestion() - 1));
     // Read-only queue + car-fill projection for the transport render path.
     // Memoized on the (step, revision) key in the engine, so this per-frame read
@@ -359,24 +372,9 @@ export class TowerEngine {
     if (this.onUpdate) this.onUpdate(elapsedMs);
 
     // Reconcile room/structure actors when the model, lighting, the hour, or a
-    // meal-overlay repaint trigger changes. The overlay path keeps visible
-    // office/condo dips in sync even when someone leaves and returns inside one
-    // hour bucket.
-    const structuralChanged = this.sim.tower.revision !== this.builtRev;
-    const mealOverlayChanged = this.sim.tower.mealOverlayRevision !== this.mealOverlayRev;
-    if (structuralChanged || mealOverlayChanged || this.d.lit !== this.litState || this.d.hour !== this.lastSyncHour) {
-      this.litState = this.d.lit;
-      this.lastSyncHour = this.d.hour;
-      this.syncScene();
-      this.mealOverlayRev = this.sim.tower.mealOverlayRevision;
-    }
-    // Motion actors and the exterior facade (escape stairs, roof crane) only
-    // need reconciling when the layout itself changes.
-    if (structuralChanged) {
-      this.syncMotion();
-      this.syncFacade();
-      this.builtRev = this.sim.tower.revision;
-    }
+    // meal-overlay repaint trigger changes; hour-driven reconciles defer to
+    // the next frame's drain above (towerSyncSchedule, spec CAP-3).
+    runSceneSync(this);
     this.updateMotion();
     this.reconcileCrowd();
   }
@@ -387,8 +385,10 @@ export class TowerEngine {
     scene.setSim(this, sim, opts);
   }
 
-  // Frame-pump steps. tick() dispatches through these so a controller can drive
-  // tick on a fake and observe the repaint-trigger contract by stubbing them.
+  // Frame-pump steps for fake-driven ticks (stub these three directly). The
+  // scene syncs route through towerSyncSchedule's module functions: whitebox
+  // tests observe those with module mocks on towerReconcile/towerCrowd (see
+  // towerEngineMealOverlay.test.ts); start() still uses the delegations below.
   private syncEventFx(animating: boolean): void { overlayFx.syncEventFx(this, animating); }
   private syncScene(): void { reconcile.syncScene(this); }
   private syncFacade(): void { reconcile.syncFacade(this); }
