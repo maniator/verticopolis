@@ -41,7 +41,10 @@ export function serializeUnit(u: Unit): SerializedUnit {
   if (!(width === 1 && FACILITIES[kind].width === 1 && (kind === "floor" || kind === "lobby"))) out.width = width;
   if (state !== "empty") out.state = state;
   if (satisfaction !== 1) out.satisfaction = satisfaction;
-  if (occupants !== 0) out.occupants = occupants;
+  // Attendance venues' occupants is a transient mirror of `customersIn` (the
+  // live routed crowd), so it is omitted exactly like the tally it mirrors:
+  // a save taken mid-show must not reload with a phantom audience.
+  if (occupants !== 0 && FACILITIES[kind].attendance === undefined) out.occupants = occupants;
   if (everOccupied) out.everOccupied = true;
   if (pendingIncome !== 0) out.pendingIncome = pendingIncome;
   // A default label picking up a future catalog rename on load is intended:

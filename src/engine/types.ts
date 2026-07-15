@@ -206,6 +206,13 @@ export interface Facility {
   staffOnly?: boolean;
   /** True if the facility may only be built underground (basement floors). */
   basement?: boolean;
+  /** Visible seat capacity for routed attendance visitors at population-0
+   *  entertainment venues (cinema / party hall / wedding hall). Live
+   *  attendance (`Unit.customersIn`) is clamped here and mirrored into
+   *  `occupants` for the occupancy-gated interior art; it never enters the
+   *  census (the kind's `population` stays 0, keeping `censusCount`'s
+   *  commercial gate closed). Design tuning, not a canon figure. */
+  attendance?: number;
   description: string;
 }
 
@@ -222,13 +229,17 @@ export interface Unit {
   satisfaction: number;
   /** Current number of occupants present right now. */
   occupants: number;
-  /** Transient count of meal customers currently eating at this commercial venue
-   *  (fastFood / restaurant / shop). Not persisted: the field is omitted from
-   *  serialization, so after a reload it is `undefined` and census reads treat
-   *  it as 0 via `?? 0`; meal round-trippers rebuild the count organically.
-   *  Incremented when a person enters the `eating` state at this venue;
-   *  decremented when they leave. Only meaningful for commercial kinds. See
-   *  {@link isCommercialKind}. */
+  /** Transient count of the people currently at this venue: meal customers
+   *  eating at a commercial venue (fastFood / restaurant / shop, where the
+   *  count clamps at the catalog population and feeds the census), or routed
+   *  attendance visitors at a population-0 entertainment venue (cinema /
+   *  partyHall / weddingHall, where it clamps at the catalog `attendance`
+   *  cap, mirrors into `occupants` for the interior art, and never enters
+   *  the census). Not persisted: the field is omitted from serialization, so
+   *  after a reload it is `undefined` and census reads treat it as 0 via
+   *  `?? 0`; round-trippers rebuild the count organically. Incremented when
+   *  a person enters the `dwelling` state at this venue; decremented when
+   *  they leave. See {@link isCommercialKind} and `attendanceCap`. */
   customersIn?: number;
   /** Transient subset of {@link customersIn}: how many of the current eaters
    *  came from a HOTEL origin. The 4-star-plus rating census excludes hotel

@@ -58,6 +58,10 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
   // or tower.units"). The memo makes this the sole build per step.
   sim.crowd.beginStep();
   sim.crowd.queueView(sim.tower);
+  // Prime the crowd's view of this month's blockbuster bookings (a live
+  // read-only reference, no copy) so the venue-visit spawn path can weight
+  // the bigger cinema crowd without the crowd ever touching the economy.
+  sim.crowd.blockbusters = sim.economy.blockbusterSet;
   // The crowd runs on its own seconds, a few per game-minute, capped so a
   // huge outer tick still can't teleport (or mass-spawn) everyone at once.
   sim.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), sim.tower, sim.clock);

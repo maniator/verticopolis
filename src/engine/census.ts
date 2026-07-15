@@ -1,4 +1,5 @@
 import type { Unit } from "./types";
+import { isOperational } from "./types";
 import { FACILITIES } from "./facilitiesData";
 import { isCommercialKind } from "./facilityPredicates";
 
@@ -35,6 +36,25 @@ export function censusCount(
 ): number {
   if (isCommercialKind(u.kind) && FACILITIES[u.kind].population > 0) return u.customersIn ?? 0;
   return residentCount(u);
+}
+
+/**
+ * Mirror a venue's live routed attendance (`customersIn`) into `occupants` so
+ * the occupancy-gated interior art fills honestly. Only population-0
+ * attendance venues (cinema / party hall / wedding hall, the kinds with a
+ * catalog `attendance` cap) mirror; every other kind keeps `occupants` owned
+ * by `updatePresence`. Called at every tally change (arrival/departure) AND
+ * from the hourly presence/traffic passes, so neither side can stamp the
+ * other out. Census-inert by construction: `censusCount` above never reads
+ * `occupants`, and these kinds' catalog population stays 0.
+ *
+ * A non-operational venue (mid-build, on fire, gutted) always mirrors 0: a
+ * lingering tally on a ruin (attendees despawning after a fire) must never
+ * re-stamp audience art onto the burned shell between presence passes.
+ */
+export function syncAttendanceOccupants(u: Unit): void {
+  if (FACILITIES[u.kind].attendance === undefined) return;
+  u.occupants = isOperational(u) ? (u.customersIn ?? 0) : 0;
 }
 
 /**
