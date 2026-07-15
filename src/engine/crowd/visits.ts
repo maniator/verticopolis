@@ -249,10 +249,11 @@ export function beginDwell(crowd: Crowd, tower: Tower, p: Person): void {
   // capacity anyway. An over-capacity arrival dwells uncounted (venueUnitId
   // stays unset, so finish() will not decrement).
   const cap = venueUnit ? attendanceCap(venueUnit.kind) : undefined;
-  // The tenancy recheck covers the ride, mirroring the attendance branch's
-  // isOperational recheck below: a venue that vacated or burned after the
-  // spawn-side gate passed must not count a customer. The person simply
-  // dwells uncounted and leaves (review edge H4, closed 2026-07-15).
+  // The tenancy recheck covers the ride, the same shape as the attendance
+  // branch's arrival recheck below (both repeat their own spawn-side gate):
+  // a venue that vacated or burned after the spawn-side gate passed must not
+  // count a customer. The person simply dwells uncounted and leaves (review
+  // edge H4, closed 2026-07-15).
   if (
     venueUnit &&
     isCommercialKind(venueUnit.kind) &&
