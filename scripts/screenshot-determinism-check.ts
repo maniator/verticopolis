@@ -174,6 +174,10 @@ async function runLeg(
     { cwd: ROOT, env: process.env, stdio: ["ignore", "pipe", "pipe"] },
   );
   liveServers.add(server);
+  // A spawn-level error (EMFILE, exec failure) on a ChildProcess with no "error"
+  // listener is re-thrown as an uncaughtException; log it and let the readiness
+  // poll below fail the leg cleanly instead.
+  server.on("error", (err) => process.stdout.write(`[${tag}] preview server error: ${err.message}\n`));
   pipeTagged(tag, server.stdout);
   pipeTagged(tag, server.stderr);
 
@@ -182,15 +186,24 @@ async function runLeg(
       process.stdout.write(`[${tag}] preview server did not come up on :${port}\n`);
       return 1;
     }
-    return await runTagged(tag, process.execPath, [GENERATOR], {
-      cwd: ROOT,
-      env: {
-        ...process.env,
-        SHOTS_DIR: join(dest, "docs/screenshots"),
-        BASE_URL: `http://localhost:${port}`,
-        ONLY: only,
-      },
-    });
+    // If our OWN server process already exited, the port was answered by a stale
+    // server from an earlier hard-killed run (--strictPort makes our vite exit
+    // rather than bind a busy port). Rendering against a stale build would be
+    // wrong, so fail loudly rather than trust the foreign 200.
+    if (server.exitCode !== null || server.signalCode !== null) {
+      process.stdout.write(`[${tag}] port :${port} is held by another (stale) preview server; refusing to render against it. Kill it and retry.\n`);
+      return 1;
+    }
+    // Never let the generator spawn its OWN preview: this leg already owns one at
+    // BASE_URL. Drop RUN_SERVER/PORT (which `npm run screenshots` sets) from the
+    // inherited environment so a local run cannot collide on this leg's port.
+    const childEnv = { ...process.env };
+    delete childEnv.RUN_SERVER;
+    delete childEnv.PORT;
+    childEnv.SHOTS_DIR = join(dest, "docs/screenshots");
+    childEnv.BASE_URL = `http://localhost:${port}`;
+    childEnv.ONLY = only;
+    return await runTagged(tag, process.execPath, [GENERATOR], { cwd: ROOT, env: childEnv });
   } finally {
     await stopServer(server);
   }
@@ -260,7 +273,16 @@ async function checkOnly(label: string, only: string): Promise<boolean> {
     process.stdout.write(`::error::screenshot check '${label}' is nondeterministic: ${reason}. A wall-clock/RNG read leaked into the build or a capture (likely a new time-driven decoration in the engine render path, or a build-time timestamp); fix it before screenshots can update.\n`);
     return false;
   }
-  process.stdout.write(`'${label}' is deterministic (${countPngs(LEGS[0].dest)} shot(s)).\n`);
+  // Two identical EMPTY roots also byte-match, so a run that rendered nothing (a
+  // mistyped scene id, a scene set that matched no real scene) would otherwise
+  // read as "deterministic". Nothing was actually compared, so treat it as a
+  // failure rather than a green pass.
+  const shots = countPngs(LEGS[0].dest);
+  if (shots === 0) {
+    process.stdout.write(`::error::screenshot check '${label}' rendered 0 files, so nothing was compared; check the shard or scene ids.\n`);
+    return false;
+  }
+  process.stdout.write(`'${label}' is deterministic (${shots} shot(s)).\n`);
   return true;
 }
 
