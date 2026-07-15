@@ -1693,3 +1693,28 @@ E7-S1 decision above. Triage defers: `shortMoney` still has no direct unit
 test (pre-existing; its 1M+ branch is uncovered, unchanged by the move), and
 `condoModes` was split (`condoStatsPanel.integration.test.ts`) after landing
 exactly on the 500-line ceiling.
+
+### Render-perf S1: zoom cull of the moving layer (2026-07-15)
+
+CAP-1 of the mobile render-perf spec
+(`_bmad-output/specs/spec-render-perf-mobile-zoom/`). Review triage patched
+everything the layers confirmed (reconcileCrowd running the idempotent
+hysteresis step itself; the accidental milestone-PNG clobber reverted; the
+loop-skip pinned at unit tier; the e2e crowd leg de-vacuumed with seeded
+people; re-show leaving routed people to reconcileCrowd so a figure that
+departed while culled never flashes at a stale position). Standing defers:
+
+- **Engine `onHour` amortization stays out of scope** (spec non-goal, party
+  verdict 2026-07-14). `updateSatisfaction` and `collectTrafficIncome` are
+  load-bearing for determinism and the golden master; splitting their scans
+  across frames needs a checkpoint-the-inputs design consult first. The
+  render-side share of the on-the-hour hitch is CAP-3's target instead.
+- **`TowerEngine.ts` sits at exactly the 500-line ceiling** after gaining the
+  one-line `crowdCulled` latch. The next line added there forces a split (it
+  is not in `fileSize.ratchet.txt`); plan the seam then rather than balancing
+  on the limit.
+- **`e2e/milestones.spec.ts` writes into `docs/screenshots/milestones/` as a
+  side effect of any local run**, which is how host-browser captures snuck
+  into a commit this story. Consider pointing its output at `test-results/`
+  (or gating the write behind the screenshot workflow env) so a local e2e run
+  can never dirty the committed gallery.

@@ -9,6 +9,7 @@ import { carIndicator, type CarIndicator } from "../carIndicator";
 import type { Person } from "../../engine/Crowd";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
+import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
 
 /**
  * Engine-driven crowd and motion for {@link TowerEngine}: the routed commuter
@@ -65,6 +66,14 @@ export interface Walker {
 /** Draw the engine-owned commuters: add/remove/position one actor per live
  * person, by stable id. Read-only, the engine advances the crowd in tick(). */
 export function reconcileCrowd(engine: TowerEngine): void {
+  // Zoom cull (CAP-1): while the moving layer is sub-legible, skip the whole
+  // add/remove/position pass. People who spawn or leave meanwhile are settled
+  // by the first reconcile after the camera zooms back in. Runs the same
+  // idempotent hysteresis step as updateMotion rather than reading the raw
+  // latch, so correctness never rests on which pass the frame loop calls
+  // first: whichever runs first this frame advances the latch, and an un-cull
+  // frame always reconciles (rider hiding, despawn reaping) before rendering.
+  if (applyCrowdCull(engine)) return;
   const seen = new Set<number>();
   for (const p of engine.sim.crowd.people) {
     seen.add(p.id);
@@ -229,6 +238,9 @@ export function syncMotion(engine: TowerEngine): void {
     engine.garageCars.push({ actor: a, floor, x0w, x1w, seed });
   }
   buildWalkers(engine);
+  // A structural rebuild recreates the moving layer visible; while the camera
+  // is culled-out, hide it again before it can flash for a frame.
+  reassertCrowdCull(engine);
 }
 
 function buildWalkers(engine: TowerEngine): void {
@@ -352,6 +364,10 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
 
 /** Repositions every moving actor each frame (the engine then draws them). */
 export function updateMotion(engine: TowerEngine): void {
+  // Zoom cull (CAP-1): owns the hysteresis step for the frame. While culled,
+  // every per-frame position/graphic loop below is skipped along with the
+  // sibling reconcileCrowd pass.
+  if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
   for (const c of engine.carActors) {
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -c.t.carPositions[c.i] * FLOOR);

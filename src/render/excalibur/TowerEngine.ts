@@ -160,6 +160,7 @@ export class TowerEngine {
    *  floor that carries parking, ping-ponging along that floor's parking run. */
   garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   walkers: Walker[] = [];
+  crowdCulled = false; // zoom-cull latch: crowd per-frame work skipped (crowdCull.ts)
   /** Active colored stats overlay (congestion / occupancy / satisfaction), or
    *  null for off. Set by the controller from a UI toggle; drawn over the tower
    *  as a semi-transparent per-floor heatmap with a legend. */

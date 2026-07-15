@@ -31,6 +31,10 @@ function eng(over: Record<string, any> = {}): any {
   const e: any = {
     engine: { add: vi.fn() },
     d: { anim: 0, stress: 0 },
+    // The zoom cull (crowdCull.ts) reads these at the top of every pass; a
+    // legible zoom keeps the moving layer live for the motion assertions.
+    cam: { zoom: 1 },
+    crowdCulled: false,
     crowdActors: new Map(),
     carActors: [],
     trainActors: [],
@@ -136,6 +140,59 @@ describe("clear paths kill every actor they own", () => {
     for (const s of spies) expect(s).toHaveBeenCalledTimes(1);
     expect(e.carActors).toEqual([]);
     expect(e.walkers).toEqual([]);
+  });
+});
+
+describe("zoom cull skips the per-frame loops (CAP-1's cost mechanism)", () => {
+  // The visibility flip alone is not the fix: the point of the cull is that
+  // updateMotion/reconcileCrowd do NO per-actor work while culled. These pin
+  // the early returns so a regression that kept the hiding but dropped the
+  // skip would fail here, not just on a phone.
+  it("updateMotion under the cull threshold flips the latch, hides the car, and never repositions it", () => {
+    const car = {
+      actor: actor(),
+      t: { x: 12, kind: "elevatorStandard", carPositions: [8], carLoad: [0], carDir: [0] },
+      i: 0, seed: 0, w: 4 * TILE, kind: "elevatorStandard",
+      gfx: new Map<string, ex.Graphic>(), shown: "0:x:e",
+    };
+    const e = eng({ carActors: [car], cam: { zoom: 0.06 } });
+    updateMotion(e);
+    expect(e.crowdCulled).toBe(true);
+    expect(car.actor.graphics.visible).toBe(false);
+    expect(car.actor.pos.x).toBeCloseTo(0, 6); // untouched: the loop never ran
+    expect(car.actor.pos.y).toBeCloseTo(0, 6);
+  });
+
+  it("reconcileCrowd under the cull threshold adds no actor for a live person", () => {
+    const e = eng({
+      cam: { zoom: 0.06 },
+      sim: { ...eng().sim, crowd: { people: [{ id: 1, seed: 0, staff: false, state: "walking", x: 10, fy: 5, wait: 0 }] } },
+    });
+    reconcileCrowd(e);
+    expect(e.crowdCulled).toBe(true);
+    expect(e.crowdActors.size).toBe(0);
+    expect(e.engine.add).not.toHaveBeenCalled();
+  });
+
+  it("on un-cull, a person who departed while culled is reaped hidden while a live one re-shows", () => {
+    const live = { id: 1, seed: 0, staff: false, state: "walking", x: 10, fy: 5, wait: 0 };
+    const gone = { id: 2, seed: 1, staff: false, state: "walking", x: 12, fy: 5, wait: 0 };
+    const e = eng({ sim: { ...eng().sim, crowd: { people: [live, gone] } } });
+    reconcileCrowd(e); // both drawn at a legible zoom
+    const goneActor = e.crowdActors.get(2).actor;
+
+    e.cam.zoom = 0.06;
+    reconcileCrowd(e); // cull: both hidden, reaping suspended
+    e.sim.crowd.people = [live]; // person 2 departs while culled
+    expect(goneActor.graphics.visible).toBe(false);
+
+    e.cam.zoom = 1;
+    reconcileCrowd(e); // un-cull: the flip leaves people hidden for this pass
+    // The stale actor was reaped without ever being made visible again, and
+    // the live person came back through positionPerson in the same pass.
+    expect(e.crowdActors.has(2)).toBe(false);
+    expect(goneActor.graphics.visible).toBe(false);
+    expect(e.crowdActors.get(1).actor.graphics.visible).toBe(true);
   });
 });
 
