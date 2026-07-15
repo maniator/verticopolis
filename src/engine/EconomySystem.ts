@@ -154,7 +154,7 @@ export class EconomySystem {
         continue;
       }
       if (!isOpenAt(u.kind, this.sim.clock.hour)) {
-        // Closed for the night — no patrons.
+        // Closed for the night: no patrons.
         if (u.state === "occupied") {
           if (attends) syncAttendanceOccupants(u);
           else u.occupants = 0;
