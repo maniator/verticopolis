@@ -384,10 +384,16 @@ jobs:
   #                                                whether a render change went
   #                                                unchecked, so do not pass it).
   #   - no render-affecting paths changed       -> green (nothing to check).
-  #   - capture ran and passed, OR was skipped
-  #     (the [update-screenshots] marker backstop) -> green.
-  #   - capture FAILED (nondeterminism: a shard's two independent renders differ)
-  #                                             -> RED.
+  #   - capture ran and passed                  -> green.
+  #   - capture was skipped AND guard succeeded -> green. capture skips by design
+  #     only for the [update-screenshots] marker backstop (guard detects the marker
+  #     and update-screenshots.yml runs the same determinism capture on the push
+  #     event). A `skipped` capture is trusted ONLY when guard itself succeeded; if
+  #     guard failed or was cancelled, `capture` (which `needs: guard`) cascades to
+  #     skipped, and treating that as green would pass an unchecked PR, so it fails
+  #     closed instead.
+  #   - anything else (capture failed: nondeterminism; or capture skipped because
+  #     guard did not succeed)                  -> RED.
   # Drift (freshly generated pixels differ from the committed gallery) is NOT a
   # failure here: turning every legitimate UI change red is the boy-who-cried-wolf
   # trap the whole design avoids, so drift stays the separate, human-approved
@@ -395,7 +401,7 @@ jobs:
   # (`drift-gate`) as the required status check in branch protection, not `capture`
   # or any path-gated job.
   drift-gate:
-    needs: [changes, capture]
+    needs: [changes, guard, capture]
     if: always()
     runs-on: ubuntu-latest
     permissions: {}
@@ -404,6 +410,7 @@ jobs:
         env:
           CHANGES: ${{ needs.changes.result }}
           RENDER: ${{ needs.changes.outputs.render }}
+          GUARD: ${{ needs.guard.result }}
           CAPTURE: ${{ needs.capture.result }}
         run: |
           if [ "$CHANGES" != "success" ]; then
@@ -414,13 +421,18 @@ jobs:
             echo "No render-affecting paths changed; the screenshot determinism check is not required for this PR. ✅"
             exit 0
           fi
-          case "$CAPTURE" in
-            success | skipped)
-              echo "Screenshot determinism check passed (capture: $CAPTURE). ✅"
-              exit 0
-              ;;
-            *)
-              echo "::error::the screenshot determinism guard did not pass (capture: $CAPTURE). This is the hard nondeterminism check (a shard's two independent renders differ), not the drift approval gate. Fix the nondeterminism before merging."
-              exit 1
-              ;;
-          esac
+          # Render paths changed, so the determinism capture was expected to run.
+          if [ "$CAPTURE" = "success" ]; then
+            echo "Screenshot determinism check passed. ✅"
+            exit 0
+          fi
+          if [ "$CAPTURE" = "skipped" ] && [ "$GUARD" = "success" ]; then
+            # Intentional skip: guard ran fine and detected an [update-screenshots]
+            # marker, so update-screenshots.yml runs the same capture on the push
+            # event. (A skip caused by guard failing is caught by the else below,
+            # because GUARD would not be "success".)
+            echo "Determinism capture intentionally skipped for an [update-screenshots] marker push; the marker workflow runs the same check. ✅"
+            exit 0
+          fi
+          echo "::error::the screenshot determinism guard did not pass (guard: $GUARD, capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
+          exit 1
