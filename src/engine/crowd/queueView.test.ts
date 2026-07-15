@@ -38,6 +38,15 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     return res.transportId;
   }
 
+  /** Riders drawn (crowd.people) currently aboard a specific car, keyed the
+   *  same way as crowd.carRiders (`shaftId:carIndex`). Used to independently
+   *  verify the drawn per-car occupancy that queueView.boarded reads, rather
+   *  than asserting against carRiders itself (the read's own source). */
+  function countRidersInCar(crowd: Crowd, shaftId: number, carIndex: number): number {
+    return crowd.people.filter((p) => p.state === "riding" && p.shaftId === shaftId && p.carIndex === carIndex)
+      .length;
+  }
+
   /** A person parked in the `waiting` state at a shaft landing. */
   function waiter(id: number, shaftId: number, floor: number, opts: Partial<Person> = {}): Person {
     return {
@@ -139,7 +148,7 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     // One crowd step boards riders in order up to capacity; the rest stay put.
     crowd.advance(0.5, tower);
 
-    const aboardCar0 = crowd.people.filter((p) => p.state === "riding" && p.carIndex === 0).length;
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
     expect(aboardCar0).toBe(CAR_CAPACITY); // min(queue = n, remaining capacity = CAR_CAPACITY)
     const leftover = crowd.people.filter((p) => p.state === "waiting").map((p) => p.id);
     expect(leftover).toEqual([CAR_CAPACITY + 1, CAR_CAPACITY + 2, CAR_CAPACITY + 3]);
@@ -165,7 +174,7 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
 
     crowd.advance(0.5, tower);
 
-    const aboardCar0 = crowd.people.filter((p) => p.state === "riding" && p.carIndex === 0).length;
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
     expect(aboardCar0).toBe(4); // min(queue = 4, remaining capacity = CAR_CAPACITY)
     expect(crowd.people.some((p) => p.state === "waiting")).toBe(false);
 
@@ -196,7 +205,7 @@ describe("Crowd.queueView: read-only elevator queue projection", () => {
     crowd.advance(0.5, tower); // real boarding: motion moves figures into car 0
 
     // The drawn truth: who is actually aboard car 0, and who is still queued.
-    const aboardCar0 = crowd.people.filter((p) => p.state === "riding" && p.carIndex === 0).length;
+    const aboardCar0 = countRidersInCar(crowd, s, 0);
     const stillWaiting = crowd.people.filter((p) => p.state === "waiting").length;
     expect(aboardCar0).toBe(CAR_CAPACITY);
     expect(stillWaiting).toBe(n - CAR_CAPACITY);
