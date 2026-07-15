@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
+import { dominantGripe, vacateCause } from "../../engine/sim/satisfaction";
 import { GRID } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
@@ -71,6 +72,38 @@ describe("dominantGripe (the pre-notice main gripe)", () => {
     expect(sim.dominantGripe(office)).toBe("rent");
     expect(sim.vacateCause(office, true, 0)).toBe("rent");
   });
+
+  it("returns congestion for a served tenant on a crowded floor (above rent/noise)", () => {
+    const sim = Simulation.newGame(1);
+    const office = servedOffice(sim);
+    office.rent = 20_000; // an over-market rent that congestion must outrank
+    // The engine passes the congestion ratio it already computed this tick; a
+    // ratio above 1.0 is the crowded-elevator drain, harsher than everything but
+    // an unreachable floor, so it wins over the over-market rent below it.
+    expect(dominantGripe(sim, office, true, 2)).toBe("congestion");
+    expect(vacateCause(sim, office, true, 2)).toBe("congestion");
+  });
+
+  it("returns noise for a served, uncongested condo beside an office", () => {
+    const sim = Simulation.newGame(1);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    // An office and a condo a few tiles apart on the same served floor: the
+    // office noise carries across the built floor into the condo's 21-tile band.
+    sim.tower.place("office", 2, C - 12);
+    const cr = sim.tower.place("condo", 2, C + 4);
+    const condo = sim.tower.units.find((u) => u.id === cr.unitId)!;
+    condo.state = "occupied";
+    condo.satisfaction = 0.5; // unhappy but not yet on notice
+    expect(sim.noiseAfflicted(condo)).toBe(true);
+    expect(sim.dominantGripe(condo)).toBe("noise");
+    const text = diagText(sim, condo);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("noisy neighbor");
+  });
 });
 
 describe("the Main gripe inspector line", () => {
@@ -88,6 +121,26 @@ describe("the Main gripe inspector line", () => {
     const sim = Simulation.newGame(1);
     const office = servedOffice(sim); // satisfaction 1, default rent
     expect(diagText(sim, office)).not.toContain("Main gripe:");
+  });
+
+  it("defers to the dedicated long-walk line for transportFar (no duplicate Main gripe)", () => {
+    const sim = Simulation.newGame(1);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    // Shaft mid-lot, office at the far right: the floor is served but the
+    // office's nearest shaft sits well past the walk tolerance (W1).
+    sim.buildTransport("elevatorStandard", C, 1, 2);
+    const r = sim.tower.place("office", 2, GRID.width - 12);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    office.satisfaction = 0.5;
+    expect(sim.dominantGripe(office)).toBe("transportFar");
+    const text = diagText(sim, office);
+    // The far walk has its own always-on line; the Main gripe line does not repeat it.
+    expect(text).toContain("Long walk to transport");
+    expect(text).not.toContain("Main gripe:");
   });
 
   it("defers to the dedicated line for access (no duplicate Main gripe)", () => {

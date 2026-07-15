@@ -19,7 +19,7 @@ import type { FacilityKind, Transport, Unit, VacateReason } from "../engine/type
 const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
   rent: "the rent is above the going rate. Lower it to keep them.",
-  noise: "a noisy neighbor. An office or shop sits too close; a lobby tile between them shields it.",
+  noise: "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.",
 };
 
 /**
