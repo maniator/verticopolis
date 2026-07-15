@@ -181,7 +181,7 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
         }, null, { timeout: READY_TIMEOUT_MS });
       } catch {
         for (const shot of scene.shots) {
-          failures.push(`${scene.id}/${shot.name}: route never signaled ready, skipped (kept existing image)`);
+          failures.push(`${scene.id}/${shot.name}: route never signaled ready, skipped (no new image written)`);
           console.error(`  ✗ ${shot.name}: route never ready, skipped`);
         }
         return;
