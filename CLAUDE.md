@@ -56,6 +56,14 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   browser (outside the pinned container) or any downloaded-browser capture, which
   render different pixels; those are **preview only**. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**.
+- **The backlog mirrors to GitHub issues (standing rule, 2026-07-15).** Every
+  unresolved curated row in `_bmad-output/implementation-artifacts/backlog.md`
+  carries its issue number in the `GH` column: create the matching issue when a
+  row lands (template title prefix, `[P1]`-`[P3]` tag in the title, row notes
+  as the body) and close the issue when the row finishes. Only unfinished work
+  keeps a live issue, and a doc may claim something is "tracked in the backlog"
+  only when a real row exists. The full rule lives in the backlog's "How items
+  flow"; `src/tests/backlogIssueMirror.test.ts` enforces the row half in CI.
 - **Merge commits only** to `main` (never squash). Commit/push only when asked.
 - **Resolve Copilot/Codex PR review threads** once addressed. Actually mark
   each thread **Resolved** (`resolve_review_thread`); a reply alone does NOT

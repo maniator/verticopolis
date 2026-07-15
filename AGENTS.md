@@ -79,6 +79,13 @@ resolving review threads). On top of that, in an agent session:
   `_bmad-output/implementation-artifacts/backlog.md`. This applies to **every**
   non-trivial change, including save/persistence and infra work where it's easy
   to assume "it's just plumbing."
+- **Keep the backlog-to-GitHub mirror true.** When triage folds a defer into a
+  curated backlog row, create its GitHub issue and record the number in the
+  row's `GH` column; when a row finishes, close its issue and clear the cell.
+  Never write "tracked in the backlog" into a spec or GDD without a real row.
+  The rule lives in the backlog's "How items flow" section and
+  `src/tests/backlogIssueMirror.test.ts` fails the suite when a row half
+  drifts.
 - **Bring in the agents relevant to the change** rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
