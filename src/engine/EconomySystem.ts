@@ -138,6 +138,11 @@ export class EconomySystem {
     // Whether a metro softens rain's hit to traffic is a tower-wide fact, so
     // resolve it once here rather than per unit inside the loop below.
     const rainMetroRelief = this.sim.weather === "rain" && this.hasOperational("metro");
+    // Weekday/weekend is a tower-wide, deterministic fact too (#398): resolve the
+    // rule-set and the calendar phase once, then read the per-kind multiplier per
+    // venue below. Draws no RNG, so the seeded economy stream is unperturbed.
+    const rules = this.sim.rules ?? MODERN_RULES;
+    const isWeekend = this.sim.clock.isWeekend;
     for (const u of this.sim.tower.units) {
       const daily = ECON.dailyTrafficIncome[u.kind];
       if (daily === undefined) continue;
@@ -226,6 +231,15 @@ export class EconomySystem {
       // Spread the headline DAILY take across the venue's actual open hours so a
       // full day earns ≈ `daily * appeal`, not a per-hour multiple of it. (Before,
       // dividing by a flat 8 while open 9–15 h/day inflated income 2–3x.)
+      // Weekday/weekend retail swing (#398): Classic matches the 1994 targets
+      // (retail busier on weekends), Modern reads a realistic rhythm (fast food
+      // quiets, restaurants and shops pick up). A weekday, or a non-retail kind,
+      // reads 1.0. Attendance venues (cinema, party hall) are excluded on purpose:
+      // their `frac` is the live-attendance fill, which the crowd already spawns
+      // with a weekday/weekend rhythm (#424), so a flat multiplier here would
+      // double-count the weekend.
+      const weekendMult =
+        attendanceCapV !== undefined ? 1 : rules.weekendMultiplier(u.kind, isWeekend);
       const trafficFactor = TRAFFIC_FACTOR_MIN + this.sim.rng.next() * TRAFFIC_FACTOR_SPAN;
       const openH = openHoursPerDay(u.kind);
       const hourly =
@@ -234,6 +248,7 @@ export class EconomySystem {
         rainMult *
         filmMult *
         lobbyMult *
+        weekendMult *
         trafficFactor;
       u.pendingIncome += hourly;
       // Retail-only "today's patronage" for the inspector card. The one RNG
@@ -249,7 +264,7 @@ export class EconomySystem {
         const custPerHourAtBaseline = daily / (spend * openH);
         u.patronageToday =
           (u.patronageToday ?? 0) +
-          custPerHourAtBaseline * frac * rainMult * lobbyMult * trafficFactor;
+          custPerHourAtBaseline * frac * rainMult * lobbyMult * weekendMult * trafficFactor;
       }
       if (u.pendingIncome >= 1) {
         const earned = Math.floor(u.pendingIncome);
