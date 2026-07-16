@@ -3,7 +3,7 @@ import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
-import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
+import { FACILITIES, attendanceCap, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
@@ -147,7 +147,12 @@ export class EconomySystem {
       // house drains through its visitors' departures, never a stamped 0
       // over people still inside, and the open-hour stamp must not write the
       // catalog population (0) over a mid-show mirror.
-      const attends = FACILITIES[u.kind].attendance !== undefined;
+      // `attendanceCap(kind)` IS `FACILITIES[kind].attendance`; using the named
+      // helper keeps this classification identical to the one `demand.ts` uses to
+      // drop attendance venues from the pool, so a venue can never be excluded from
+      // the pool on one side yet read a pool fraction on the other.
+      const attendanceCapV = attendanceCap(u.kind);
+      const attends = attendanceCapV !== undefined;
       if (!drawsVisitors(u.floor)) {
         // Unreachable within two rides (stranded, or not connected at all) → no
         // patrons. Clear any lingering occupancy so a newly-stranded venue reads
@@ -176,9 +181,26 @@ export class EconomySystem {
       if (attends) syncAttendanceOccupants(u);
       else u.occupants = FACILITIES[u.kind].population;
       // This venue's demand share (0..1), the per-venue replacement for the old
-      // tower-wide appeal. A reachable, open venue always has an entry; the
-      // `?? 0` is a guard, not an expected path.
-      const frac = demandMap.fractionByUnit.get(u.id) ?? 0;
+      // tower-wide appeal. Retail venues read the connected-census demand pool.
+      // Attendance venues (cinema / party hall) read their own live-attendance
+      // fill instead (#424): their take tracks how full the house is, clamped to
+      // [0, 1], rather than diluting, or being diluted by, the retail pool they are
+      // no longer part of. The clamp guards both ends: `max(0, ...)` so a forged
+      // negative counter cannot pay negative income, and `min(1, ...)` so an
+      // over-full house never beats a sold-out one. The `> 0` cap guard mirrors the
+      // retail `spend > 0` guard below, so a forged 0 cap cannot divide. A booked
+      // blockbuster raises this fill (its bigger drawn crowd) AND the `filmMult`
+      // below, so the premium compounds in an under-filled house, but the `min(1,
+      // ...)` cap holds a sold-out blockbuster to exactly `filmMult` times the
+      // advertised figure, so income can never run away. The retail `?? 0` is a
+      // guard, not an expected path (a reachable, open retail venue always has a
+      // map entry).
+      const frac =
+        attendanceCapV !== undefined
+          ? attendanceCapV > 0
+            ? Math.min(1, Math.max(0, u.customersIn ?? 0) / attendanceCapV)
+            : 0
+          : (demandMap.fractionByUnit.get(u.id) ?? 0);
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
       const rainMult =
