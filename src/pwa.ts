@@ -113,7 +113,12 @@ export function registerPWA(handlers: PwaHandlers): void {
   let lastSurfacedKey: string | undefined;
   let hasSurfaced = false;
   const surface = (info: UpdateInfo | undefined, activate: () => Promise<void>) => {
-    const key = info?.sha ?? info?.version;
+    // Prefer a real git sha as the identity, but treat the non-git placeholder
+    // "unknown" as no sha (matching isDifferentBuild) and fall back to the
+    // version, so builds that ship sha:"unknown" are told apart by version
+    // instead of all colliding on one key.
+    const sha = info?.sha && info.sha !== "unknown" ? info.sha : undefined;
+    const key = sha ?? info?.version;
     // Dedup so the two detectors (onNeedRefresh and the version.json backstop)
     // never double-prompt for one build. Once something has surfaced, skip a
     // repeat of the same key AND a keyless surface (a failed fetch carries no
