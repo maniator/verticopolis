@@ -2,17 +2,20 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { GameMode } from "../../engine/types";
 
-// A fresh game already lays a ground lobby spanning this x-range (40 tiles), so
-// the tower is built on top of it rather than re-placing floor 1.
-const LOBBY_X0 = 167;
-const LOBBY_X1 = 206;
+/** The x-span of the ground-lobby tiles a fresh game lays down on floor 1, read
+ *  from the actual Simulation rather than hardcoded, so the fixture stays valid
+ *  if the starter-lobby layout (GRID width, lobby width, centering) ever moves. */
+function lobbyBounds(sim: Simulation): { x0: number; x1: number } {
+  const xs = sim.tower.units.filter((u) => u.floor === 1 && u.kind === "lobby").map((u) => u.x);
+  return { x0: Math.min(...xs), x1: Math.max(...xs) };
+}
 
 /**
  * A small, fully reachable tower: a demand pool (four occupied offices on floor
- * 2) and one occupied commercial venue on floor 3, one ride from the lobby. Same
- * seed and identical structure across calls, so the venue's take on two different
- * calendar days is compared like-for-like, isolating the weekday/weekend
- * multiplier (#398).
+ * 2) and one occupied commercial venue on floor 3, one ride from the lobby, all
+ * built within the starter lobby's own footprint. Same seed and identical
+ * structure across calls, so the venue's take on two different calendar days is
+ * compared like-for-like, isolating the weekday/weekend multiplier (#398).
  */
 function venueTower(
   seed: number,
@@ -21,19 +24,20 @@ function venueTower(
 ): { sim: Simulation; venueId: number } {
   const sim = Simulation.newGame(seed, mode);
   sim.money = 1e9;
-  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
-  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) expect(sim.tower.place("floor", 3, x).ok).toBe(true);
+  const { x0, x1 } = lobbyBounds(sim);
+  for (let x = x0; x <= x1; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+  for (let x = x0; x <= x1; x++) expect(sim.tower.place("floor", 3, x).ok).toBe(true);
   // Elevator at the right edge (clear of every unit) so floors 2 and 3 are each
   // reachable within one ride of the lobby.
-  expect(sim.tower.placeTransport("elevatorStandard", LOBBY_X1, 1, 3).ok).toBe(true);
+  expect(sim.tower.placeTransport("elevatorStandard", x1, 1, 3).ok).toBe(true);
   // Occupied offices (width 9) on floor 2, spaced so none overlaps another or the
   // edge shaft, give the venue a real, reachable demand pool.
-  for (const x of [LOBBY_X0, LOBBY_X0 + 10, LOBBY_X0 + 20, LOBBY_X0 + 30]) {
+  for (const x of [x0, x0 + 10, x0 + 20, x0 + 30]) {
     const o = sim.tower.place("office", 2, x);
     expect(o.ok, o.reason).toBe(true);
     sim.tower.units.find((u) => u.id === o.unitId)!.state = "occupied";
   }
-  const v = sim.tower.place(venue, 3, LOBBY_X0);
+  const v = sim.tower.place(venue, 3, x0);
   expect(v.ok, v.reason).toBe(true);
   sim.tower.units.find((u) => u.id === v.unitId)!.state = "occupied";
   return { sim, venueId: v.unitId! };
