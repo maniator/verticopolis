@@ -21,8 +21,8 @@ function venueTower(
 ): { sim: Simulation; venueId: number } {
   const sim = Simulation.newGame(seed, mode);
   sim.money = 1e9;
-  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) sim.tower.place("floor", 2, x);
-  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) sim.tower.place("floor", 3, x);
+  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+  for (let x = LOBBY_X0; x <= LOBBY_X1; x++) expect(sim.tower.place("floor", 3, x).ok).toBe(true);
   // Elevator at the right edge (clear of every unit) so floors 2 and 3 are each
   // reachable within one ride of the lobby.
   expect(sim.tower.placeTransport("elevatorStandard", LOBBY_X1, 1, 3).ok).toBe(true);

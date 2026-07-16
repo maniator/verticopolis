@@ -180,7 +180,7 @@ export interface GameRules {
  *  weekday / 48 weekend and shops at 25 / 30 (all busier on weekends), so Classic
  *  reads those ratios. Attendance venues (cinema, party hall) are not listed: their
  *  weekend swing is emergent from live attendance (#424), not a flat scalar. */
-const CLASSIC_WEEKEND_MULT: Record<string, number> = {
+const CLASSIC_WEEKEND_MULT: Partial<Record<string, number>> = {
   fastFood: 48 / 35,
   restaurant: 48 / 35,
   shop: 30 / 25,

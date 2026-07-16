@@ -44,7 +44,7 @@ export const ECON = {
     fastFood: 0.7,
     restaurant: 1.35,
     shop: 1.2,
-  } as Record<string, number>,
+  } as Partial<Record<string, number>>,
   maintenancePerCarMonthly: 600,
   /**
    * Meal-cadence origin weights (arch-tower-wide-meal-cadence-2026-07-09 §3).
