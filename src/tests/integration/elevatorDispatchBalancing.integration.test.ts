@@ -87,6 +87,19 @@ describe("Elevator dispatch: shaft fairness across an equivalent bank", () => {
     expect(routed.rng.int(0, 1_000_000)).toBe(untouched.rng.int(0, 1_000_000));
   });
 
+  it("the reachability probe draws no rng even on a banked tower (pure structural query)", () => {
+    // `crowd.reachable` backs `floorReachable`, which runs on the editor's ~6 Hz
+    // repaint pump. It must stay pure so UI timing never perturbs the seeded
+    // crowd stream, even when a bank exists (where `route` WOULD draw). Two
+    // seed-equal crowds: one probes the bank, one does not; their next draw must
+    // match.
+    const { tower } = towerWithBank(2);
+    const probed = new Crowd(2024);
+    const untouched = new Crowd(2024);
+    expect(probed.reachable(tower, 1, 8)).toBe(true);
+    expect(probed.rng.int(0, 1_000_000)).toBe(untouched.rng.int(0, 1_000_000));
+  });
+
   it("mutation check: without balancing the raw BFS funnels every trip onto one shaft", () => {
     // The pre-fix behavior, reproduced by calling bfsRoute directly on the
     // adjacency graph: the edge-order tie-break names the SAME shaft every time,

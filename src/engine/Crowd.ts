@@ -159,6 +159,14 @@ export class Crowd {
     return routing.staffRoute(this, tower, from, to);
   }
 
+  /** Pure passenger reachability probe (no rng draw), for callers that only
+   *  need "is this floor routable in two rides?" and discard the route. Kept
+   *  separate from {@link route} so reachability checks never consume the
+   *  seeded crowd rng the shaft-balancing path draws from. See routing.reachable. */
+  reachable(tower: Tower, from: number, to: number): boolean {
+    return routing.reachable(this, tower, from, to);
+  }
+
   /** Spawn new trips for a span of time (delegated to the spawn module). Split
    *  from {@link update} because spawning scans the whole unit list: it must run
    *  once per outer sim step, not once per fine-grained sub-step. */

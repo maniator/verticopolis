@@ -144,6 +144,17 @@ function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
   return r;
 }
 
+/** Pure reachability probe: does a fewest-transfer passenger route exist at
+ *  all, without committing a rider to a shaft? Reachability is a structural
+ *  question, so unlike {@link route} it draws NO rng (route/staffRoute draw to
+ *  spread trips across an equivalent bank). floorReachable's memoized probe
+ *  runs on the editor's ~6 Hz repaint pump; routing there through the balancing
+ *  path would let UI timing perturb the seeded crowd stream on a banked tower,
+ *  so a probe that never rides must never draw. */
+export function reachable(crowd: Crowd, tower: Tower, from: number, to: number): boolean {
+  return bfsRoute(adjacency(crowd, tower), from, to, MAX_RIDES) !== null;
+}
+
 /** Route over the STAFF network (service elevators / stairs / escalators).
  *  Staff aren't bound by the two-ride comfort rule: the search is UNCAPPED
  *  (the BFS `seen` set terminates it), so it agrees with what
