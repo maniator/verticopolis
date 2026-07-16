@@ -325,14 +325,18 @@ export function nearestLobbyFloorDistance(tower: Tower, floor: number): number {
   return best;
 }
 
-/** The nearest sky-lobby slot that is legal, BUILDABLE (within the tower), still
- *  empty, and strictly nearer to `floor` than its current nearest lobby, or null
- *  when no such slot exists. This is the inspector's honesty gate for the
- *  lobby-distance advice (#394 recalibration): "build a sky lobby on floor N"
- *  may only ever name a floor the placement rules would actually accept, so the
- *  line goes neutral for the short block above the highest buildable slot
- *  (e.g. floors 91+ over a floor-90 lobby, where slot 105 exceeds maxFloor)
- *  instead of prescribing an impossible fix. O(lobby slots), a handful. */
+/** The nearest sky-lobby slot that is LEGAL (an every-interval floor at or under
+ *  `GRID.maxFloor`), does not already hold a lobby, and is strictly nearer to
+ *  `floor` than its current nearest lobby; null when no such slot exists. This
+ *  is the inspector's honesty gate for the lobby-distance advice (#394
+ *  recalibration): the advice may only ever name a slot the player can actually
+ *  reach, so the line goes neutral for the short block above the highest legal
+ *  slot (e.g. floors 91+ over a floor-90 lobby, where slot 105 exceeds
+ *  maxFloor) instead of prescribing an impossible fix. A returned slot may
+ *  still need work first, floors laid up to it or non-lobby content cleared
+ *  off it; callers read {@link floorHasNonLobbyContent} to phrase the clearing
+ *  step, keeping the advice a real project rather than a refusal loop.
+ *  O(lobby slots), a handful. */
 export function nearestBuildableLobbySlot(tower: Tower, floor: number): number | null {
   const current = nearestLobbyFloorDistance(tower, floor);
   let best: number | null = null;

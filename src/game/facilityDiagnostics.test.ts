@@ -122,6 +122,31 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
   });
 
+  it("names the clearing step when the buildable slot already carries non-lobby content", () => {
+    // Lobbies at 1 and 15; slot 30 was skipped and extended through with plain
+    // floor tiles instead. The office on floor 23 (distance 8 from the floor-15
+    // lobby) is capped; the fix is slot 30, but a lobby there is refused until
+    // the story is cleared, so the advice must name that step.
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 30; fl++) {
+      const kind = fl === 15 ? "lobby" : "floor";
+      for (let x = 10; x < 30; x++) expect(sim.tower.place(kind, fl, x).ok).toBe(true);
+    }
+    expect(sim.buildTransport("elevatorStandard", 10, 1, 30).ok).toBe(true);
+    const r = sim.tower.place("office", 23, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    expect(sim.tower.nearestBuildableLobbySlot(23)).toBe(30); // precondition: the blocked slot is the fix
+    expect(sim.tower.floorHasNonLobbyContent(30)).toBe(true);
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
+    expect(line?.textContent).toContain("A sky lobby on floor 30 would lift it (clear that floor first).");
+  });
+
   it("goes neutral and uncolored at the top of the tower, where no nearer slot can exist", () => {
     // Every legal slot (15..90) carries a lobby; the office sits on floor 98,
     // 8 floors above the highest buildable slot, so there is no legal fix. The

@@ -291,19 +291,29 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         lines.push(
           html`<div>Far from the nearest lobby${distNote}. Satisfaction settles a little below full here; no closer sky lobby slot exists this high in the tower.</div>`,
         );
-      } else if (drain.erosion > SERVED_RECOVERY) {
-        // The strong "sinks until notice" warning only when the distance erosion
-        // actually outpaces the served recovery, so the tenant really is sliding
-        // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
-        lines.push(
-          html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Build the sky lobby on floor ${slot} to lift these tenants.</div>`,
-        );
       } else {
-        // The ceiling holds satisfaction down without evicting; the gentler line
-        // describes that honestly and names the buildable fix.
-        lines.push(
-          html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it.</div>`,
-        );
+        // A slot that already carries floors or rooms is still the fix, but the
+        // build tool refuses a lobby until the story is cleared, so the advice
+        // names that step too (never a prescribe-then-refuse loop).
+        const clearFirst = sim.tower.floorHasNonLobbyContent(slot);
+        if (drain.erosion > SERVED_RECOVERY) {
+          // The strong "sinks until notice" warning only when the distance erosion
+          // actually outpaces the served recovery, so the tenant really is sliding
+          // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
+          lines.push(
+            clearFirst
+              ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Clear floor ${slot} and build the sky lobby there to lift these tenants.</div>`
+              : html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Build the sky lobby on floor ${slot} to lift these tenants.</div>`,
+          );
+        } else {
+          // The ceiling holds satisfaction down without evicting; the gentler line
+          // describes that honestly and names the buildable fix.
+          lines.push(
+            clearFirst
+              ? html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it (clear that floor first).</div>`
+              : html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it.</div>`,
+          );
+        }
       }
     }
   }

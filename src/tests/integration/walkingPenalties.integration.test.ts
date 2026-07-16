@@ -338,7 +338,7 @@ describe("W-new: graduated lobby-distance penalty (#394, edges derived from the 
     const sim = Simulation.newGame(7, "classic");
     servedTower(sim, 10);
     const near = unit(sim, sim.tower.place("office", 2, 40).unitId); // 1 floor from the ground lobby
-    const far = unit(sim, sim.tower.place("office", 9, 40).unitId); // 8 floors up: the far band (a skipped sky lobby)
+    const far = unit(sim, sim.tower.place("office", 9, 40).unitId); // 8 floors up: the far band (slot 15 not yet built)
     for (const u of [near, far]) {
       u.state = "occupied";
       u.satisfaction = 1;
@@ -448,7 +448,14 @@ describe("W-new: graduated lobby-distance penalty (#394, edges derived from the 
     sim.money = 1e12;
     sim.star = 5;
     const laySpan = (s: Simulation, kind: "floor" | "lobby", floor: number): void => {
-      for (let x = MID; x < MID + 40; x++) s.tower.place(kind, floor, x);
+      for (let x = MID; x < MID + 40; x++) {
+        // newGame seeds a starter ground lobby that overlaps this span; skip
+        // tiles it already covers and assert every genuine placement, so a
+        // placement-rule change can never silently degrade the fixture.
+        if (s.tower.hasStructure(floor, x)) continue;
+        const r = s.tower.place(kind, floor, x);
+        expect(r.ok, `lay ${kind} @ f${floor} x${x}: ${r.reason ?? ""}`).toBe(true);
+      }
     };
     laySpan(sim, "lobby", 1);
     for (let f = 2; f <= GRID.maxFloor; f++) {
