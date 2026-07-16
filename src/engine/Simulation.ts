@@ -23,6 +23,7 @@ import * as loop from "./sim/loop";
 import * as serialization from "./sim/serialization";
 import * as rent from "./sim/rent";
 import * as satisfaction from "./sim/satisfaction";
+import * as gripe from "./sim/gripe";
 import * as churn from "./sim/churn";
 import * as congestion from "./sim/congestion";
 import * as build from "./sim/build";
@@ -329,11 +330,11 @@ export class Simulation implements SimContext {
 
   emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void { satisfaction.emitNotices(this, notices); }
 
-  vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean, lobbyFar?: boolean): VacateReason { return satisfaction.vacateCause(this, u, served, cong, farWalk, noisy, lobbyFar); }
+  vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean, lobbyFar?: boolean, unmetDemand?: boolean): VacateReason { return gripe.vacateCause(this, u, served, cong, farWalk, noisy, lobbyFar, unmetDemand); }
 
   /** The dominant active satisfaction drain on a tenant right now (or null when
    *  content), for the inspector's pre-notice "Main gripe" line. */
-  dominantGripe(u: Unit): VacateReason | null { return satisfaction.dominantGripe(this, u); }
+  dominantGripe(u: Unit): VacateReason | null { return gripe.dominantGripe(this, u); }
 
   nearestKindWithin( u: Unit, isSource: (kind: FacilityKind) => boolean, maxTiles: number, ): boolean { return satisfaction.nearestKindWithin(this, u, isSource, maxTiles); }
 

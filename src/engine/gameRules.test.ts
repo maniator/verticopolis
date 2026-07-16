@@ -9,6 +9,10 @@ import {
   LOBBY_FAR_CAP,
   LOBBY_VERY_FAR_CAP,
   LOBBY_VERY_FAR_EROSION,
+  UNMET_DEMAND_FLOOR,
+  UNMET_DEMAND_CAP,
+  UNMET_DEMAND_EVICT_FLOOR,
+  SERVED_RECOVERY,
 } from "./sim/constants";
 
 /**
@@ -106,6 +110,16 @@ describe("CLASSIC_RULES", () => {
     }); // very far: lower ceiling and the evicting erosion
   });
 
+  it("caps but never evicts for unmet local demand (canon: too few amenities lowers renewal only)", () => {
+    // Full coverage (at or above the floor): the neutral drain, no penalty.
+    expect(CLASSIC_RULES.unmetDemandDrain(1)).toEqual({ cap: 1, erosion: 0 });
+    expect(CLASSIC_RULES.unmetDemandDrain(UNMET_DEMAND_FLOOR)).toEqual({ cap: 1, erosion: 0 });
+    // Below the floor: a flat ceiling, but erosion 0 in every case, so it can cap
+    // renewal yet never drive a tenant to a notice (like noise in Classic).
+    expect(CLASSIC_RULES.unmetDemandDrain(UNMET_DEMAND_FLOOR - 0.01)).toEqual({ cap: UNMET_DEMAND_CAP, erosion: 0 });
+    expect(CLASSIC_RULES.unmetDemandDrain(0)).toEqual({ cap: UNMET_DEMAND_CAP, erosion: 0 });
+  });
+
   it("lifts every demand-pool retail kind on weekends by the literal 1994 ratios", () => {
     // Weekday is always the flat 1.0 baseline.
     expect(CLASSIC_RULES.weekendMultiplier("fastFood", false)).toBe(1);
@@ -186,6 +200,30 @@ describe("MODERN_RULES", () => {
     expect(farther.cap).toBeLessThanOrEqual(near.cap);
     expect(farther.cap).toBeCloseTo(LOBBY_VERY_FAR_CAP, 6); // bottoms out at the same worst-case ceiling
     expect(farther.erosion).toBeCloseTo(LOBBY_VERY_FAR_EROSION, 6); // and the same evicting erosion
+  });
+
+  it("tightens the ceiling with the shortfall and erodes only past the evict floor for unmet demand", () => {
+    // At or above the floor: the neutral drain, no penalty.
+    expect(MODERN_RULES.unmetDemandDrain(1)).toEqual({ cap: 1, erosion: 0 });
+    expect(MODERN_RULES.unmetDemandDrain(UNMET_DEMAND_FLOOR)).toEqual({ cap: 1, erosion: 0 });
+    // Just below the floor: the ceiling begins to ease down (still above the
+    // Classic flat cap), and no erosion yet (above the evict floor).
+    const near = MODERN_RULES.unmetDemandDrain(UNMET_DEMAND_FLOOR - 0.05);
+    expect(near.cap).toBeLessThan(1);
+    expect(near.cap).toBeGreaterThan(UNMET_DEMAND_CAP);
+    expect(near.erosion).toBe(0);
+    // Monotonic: less coverage is at least as harsh, bottoming at the worst-case cap.
+    const worst = MODERN_RULES.unmetDemandDrain(0);
+    expect(worst.cap).toBeLessThanOrEqual(near.cap);
+    expect(worst.cap).toBeCloseTo(UNMET_DEMAND_CAP, 6);
+    // Erosion eases in below the evict floor (0 at the floor, rising toward the
+    // worst case), so just inside it there is a small positive drain...
+    expect(MODERN_RULES.unmetDemandDrain(UNMET_DEMAND_EVICT_FLOOR).erosion).toBe(0);
+    expect(MODERN_RULES.unmetDemandDrain(UNMET_DEMAND_EVICT_FLOOR - 0.01).erosion).toBeGreaterThan(0);
+    // ...and at coverage 0 (a tenant that can reach no retail at all) the erosion
+    // clears the served recovery, so a chronically stranded Modern tenant nets a
+    // negative drift and eventually gives notice.
+    expect(MODERN_RULES.unmetDemandDrain(0).erosion).toBeGreaterThan(SERVED_RECOVERY);
   });
 
   it("reads a realistic weekend rhythm: fast food quiets, restaurants and shops pick up", () => {

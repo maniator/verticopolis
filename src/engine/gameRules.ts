@@ -7,6 +7,9 @@ import {
   LOBBY_VERY_FAR_CAP,
   LOBBY_VERY_FAR_EROSION,
   LOBBY_NO_DRAIN,
+  UNMET_DEMAND_FLOOR,
+  UNMET_DEMAND_CAP,
+  UNMET_DEMAND_EVICT_FLOOR,
 } from "./sim/constants";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
@@ -161,6 +164,20 @@ export interface GameRules {
    */
   lobbyDistanceDrain(distanceFloors: number): { cap: number; erosion: number };
   /**
+   * Unmet local-demand satisfaction pressure (#395), keyed on a tenant's reachable
+   * retail demand-coverage in [0, 1] (1 = the reachable shops and eateries cover
+   * the tower's demand). Returns the satisfaction CEILING (`cap`, 1 = no penalty)
+   * and the per-hour `erosion` for the shared placement-erosion step, exactly like
+   * {@link lobbyDistanceDrain}. Above {@link UNMET_DEMAND_FLOOR} both modes return
+   * the neutral drain. Below it, Classic caps at {@link UNMET_DEMAND_CAP} but never
+   * erodes (canon: too few amenities lowers renewal, never evicts), while Modern
+   * tightens the ceiling with the shortfall and, past {@link UNMET_DEMAND_EVICT_FLOOR},
+   * erodes gently so a chronically under-served tenant eventually gives notice
+   * (cause `unmetDemand`). Applies to office/condo/hotel; the caller gates on
+   * `served` and kind. Pure and deterministic (no RNG).
+   */
+  unmetDemandDrain(coverage: number): { cap: number; erosion: number };
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food
@@ -236,6 +253,12 @@ export const CLASSIC_RULES: GameRules = {
     if (distanceFloors > LOBBY_FAR_FLOORS) return { cap: LOBBY_FAR_CAP, erosion: 0 };
     return LOBBY_NO_DRAIN;
   },
+  unmetDemandDrain(coverage) {
+    // Canon: too few reachable amenities caps satisfaction (lowers renewal) but
+    // never evicts, exactly like noise in Classic. A ceiling only, no erosion.
+    if (coverage >= UNMET_DEMAND_FLOOR) return LOBBY_NO_DRAIN;
+    return { cap: UNMET_DEMAND_CAP, erosion: 0 };
+  },
   weekendMultiplier(kind, isWeekend) {
     // Canon: every commercial kind is busier on the weekend (the literal 1994
     // visitor targets), quiet on weekdays.
@@ -309,6 +332,24 @@ export const MODERN_RULES: GameRules = {
     const cap = 1 - capT * (1 - LOBBY_VERY_FAR_CAP);
     const eroT = Math.max(0, Math.min(1, (distanceFloors - LOBBY_VERY_FAR_FLOORS) / 2));
     return { cap, erosion: eroT * LOBBY_VERY_FAR_EROSION };
+  },
+  unmetDemandDrain(coverage) {
+    // Modern smooths: the deeper the shortfall below the floor, the tighter the
+    // ceiling (from 1.0 at the floor down to UNMET_DEMAND_CAP at coverage 0), and
+    // past a lower evict floor a gentle erosion eases in. Adding a reachable shop
+    // or restaurant raises coverage and lets tenants recover. NOTE (PROVISIONAL):
+    // the erosion only *outpaces* the +0.05/hr served recovery near coverage 0, so
+    // in practice only a fully-stranded tenant (coverage ~0, reaches no retail)
+    // actually drifts to a notice; between the evict floor and there it caps but
+    // net-recovers. The evict floor and `unmetDemandErosion` want a calibration
+    // pass to widen the region that can genuinely shed tenants (see the backlog
+    // Deferral inbox); v1 is deliberately conservative so it cannot rage-evict a
+    // mid-fill tower before a playtest tuning pass.
+    if (coverage >= UNMET_DEMAND_FLOOR) return LOBBY_NO_DRAIN;
+    const capT = Math.min(1, (UNMET_DEMAND_FLOOR - coverage) / UNMET_DEMAND_FLOOR);
+    const cap = 1 - capT * (1 - UNMET_DEMAND_CAP);
+    const eroT = Math.max(0, Math.min(1, (UNMET_DEMAND_EVICT_FLOOR - coverage) / UNMET_DEMAND_EVICT_FLOOR));
+    return { cap, erosion: eroT * ECON.unmetDemandErosion };
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday
