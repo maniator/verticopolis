@@ -95,7 +95,10 @@ describe("editor card lit diffing — updates in place, element identity survive
   it("the Classic rung picker keeps element identity across a refresh and follows the engine value", () => {
     // Same invariant for the Classic card's select: a stat-tick refresh must
     // never recreate the picker (which would collapse an open dropdown), and a
-    // price change re-selects the right option through lit's .selected diff.
+    // price change re-selects the right option through syncRungSelects, the
+    // post-render pass that writes select.value from data-current (lit commits
+    // option bindings before the options attach, so the value write must come
+    // after render).
     const sim = new Simulation(); // Classic
     for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
