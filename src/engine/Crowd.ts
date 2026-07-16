@@ -1,5 +1,6 @@
 import type { Clock } from "./Clock";
 import type { Tower } from "./Tower";
+import type { WeatherKind } from "./types";
 import { RNG } from "./rng";
 import type { Person, Route, ElevatorCalls, ElevatorQueueView } from "./crowd/person";
 import * as routing from "./crowd/routing";
@@ -178,8 +179,8 @@ export class Crowd {
   /** Spawn new trips for a span of time (delegated to the spawn module). Split
    *  from {@link update} because spawning scans the whole unit list: it must run
    *  once per outer sim step, not once per fine-grained sub-step. */
-  spawn(dtSec: number, tower: Tower, clock: Clock): void {
-    crowdSpawn.spawnStep(this, dtSec, tower, clock);
+  spawn(dtSec: number, tower: Tower, clock: Clock, weather?: WeatherKind): void {
+    crowdSpawn.spawnStep(this, dtSec, tower, clock, weather);
   }
 
   /**

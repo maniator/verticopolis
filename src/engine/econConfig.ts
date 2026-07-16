@@ -45,6 +45,25 @@ export const ECON = {
     restaurant: 1.35,
     shop: 1.2,
   } as Partial<Record<string, number>>,
+  /**
+   * Rain crowd factor (weather-shapes-crowd, #430): the multiplier on the crowd
+   * spawn rate on a rainy day, so rain thins the people actually out and about
+   * rather than only firing a hidden income multiplier. A thinner crowd is what
+   * drops an attendance venue's live fill (`customersIn`), so a rainy cinema now
+   * earns less because fewer people show up, not because a bolt-on scalar fires
+   * (the `rainMult` in `collectTrafficIncome` is dropped for attendance venues to
+   * avoid double-counting; retail keeps it, since retail income is statistical and
+   * does not read the drawn crowd). Classic matches the canon shopper hit (0.5, the
+   * same magnitude as the retail `rainMult`); Modern softens (0.7). Non-rainy days
+   * read 1.0 at the call site. Applied to the spawn accumulator, which already
+   * scales by time-of-day and population and draws no RNG, so the seeded crowd
+   * stream is unperturbed and a clear-day tower is byte-identical. Resolved through
+   * {@link GameRules.rainCrowdFactor}. PROVISIONAL, wants a playtest tuning pass.
+   */
+  rainCrowdFactor: {
+    classic: 0.5,
+    modern: 0.7,
+  },
   maintenancePerCarMonthly: 600,
   /**
    * Meal-cadence origin weights (arch-tower-wide-meal-cadence-2026-07-09 §3).

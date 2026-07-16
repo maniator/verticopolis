@@ -1,6 +1,6 @@
 import type { Clock } from "../Clock";
 import type { Tower } from "../Tower";
-import type { FacilityKind, Unit } from "../types";
+import type { FacilityKind, Unit, WeatherKind } from "../types";
 import { isOperational, isTenanted } from "../types";
 import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
@@ -17,6 +17,7 @@ import {
   type MealOriginKind,
 } from "./meals";
 import { isMetroPlatformServed } from "../tower/routing";
+import { weatherFor } from "../sim/build";
 import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
 import { pushRoutineOptions } from "./routines";
@@ -430,13 +431,31 @@ export function takeStaffResults(crowd: Crowd): readonly { unitId: number; ok: b
   return out;
 }
 
-export function spawnStep(crowd: Crowd, dtSec: number, tower: Tower, clock: Clock): void {
+export function spawnStep(
+  crowd: Crowd,
+  dtSec: number,
+  tower: Tower,
+  clock: Clock,
+  weather?: WeatherKind,
+): void {
   // Spawn at a rate that scales with how busy the hour is AND how populated the
   // tower is (review F39): a 6-office tower and a 12,000-pop tower no longer
   // spawn identically. The MAX_PEOPLE cap in spawnTrips still bounds the total.
   const timeRate = clock.isNight() ? 0.3 : clock.isWeekend ? 1.2 : 2.2;
   const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
-  crowd.spawnAcc += dtSec * timeRate * popFactor;
+  // Rain thins the people out and about (weather-shapes-crowd, #430): fewer
+  // spawns on a rainy day, so the visible crowd empties and attendance houses
+  // fill less. Read the SAME authoritative `sim.weather` the economy's rain
+  // channel reads (the loop passes it in), so the crowd and the income loop can
+  // never disagree about whether it is raining within a tick; fall back to the
+  // pure per-day `weatherFor` hash (the value `sim.weather` is itself set from)
+  // for the crowd-only paths that have no Simulation to hand (motion.update and
+  // the crowd-driven tests). Either source is off the gameplay RNG, and it scales
+  // the accumulator like the time and population factors above, so it perturbs no
+  // seeded draw; a clear or cloudy sky multiplies by exactly 1.
+  const sky = weather ?? weatherFor(clock.day);
+  const weatherFactor = sky === "rain" ? tower.rules.rainCrowdFactor() : 1;
+  crowd.spawnAcc += dtSec * timeRate * popFactor * weatherFactor;
   if (crowd.spawnAcc < 1) return;
   // Categorize floors once per outer step: the drain loop below only adds
   // people (never units), so the four lists are stable across its iterations.

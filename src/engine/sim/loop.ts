@@ -64,7 +64,10 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
   sim.crowd.blockbusters = sim.economy.blockbusterSet;
   // The crowd runs on its own seconds, a few per game-minute, capped so a
   // huge outer tick still can't teleport (or mass-spawn) everyone at once.
-  sim.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), sim.tower, sim.clock);
+  // Pass the live `sim.weather` so the crowd's rain thinning reads the exact same
+  // value the economy's rain channel does (weather-shapes-crowd, #430): one source
+  // per tick, so the two layers can never disagree about whether it is raining.
+  sim.crowd.spawn(Math.min(CROWD_MAX_STEP, dtMinutes * CROWD_SECONDS_PER_MINUTE), sim.tower, sim.clock, sim.weather);
   // The movement loop honors the same cap IN TOTAL: a month-long catch-up
   // tick (legacy v1 model) advances cars/people by at most CROWD_MAX_STEP
   // crowd-seconds of motion, not a month of thousands of chunks.
