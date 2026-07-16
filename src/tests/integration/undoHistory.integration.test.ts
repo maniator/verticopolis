@@ -135,6 +135,22 @@ describe("towerStateSig", () => {
     expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
   });
 
+  it("changes when a unit's No Rate flag flips (taking it off the market is undoable)", () => {
+    // An Average unit keeps rent undefined, so the No Rate toggle can be the
+    // ONLY mutation of a gesture; without noRate in the signature, commitUndo
+    // would drop that edit as a no-op and Ctrl+Z could not restore the market
+    // state. Pin it, like the subtype reroll below.
+    const sim = Simulation.newGame(1, "classic");
+    const cx = Math.floor(GRID.width / 2);
+    for (let x = cx - 10; x <= cx + 10; x++) sim.tower.place("floor", 2, x);
+    expect(sim.build("office", 2, cx).ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.kind === "office")!;
+    expect(office.rent).toBeUndefined(); // precondition: Average, no stored override
+    const sig0 = towerStateSig(sim.tower, sim.money);
+    office.noRate = true;
+    expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
+  });
+
   it("changes when a retail unit's canon subtype rerolls (Change variety is undoable)", () => {
     // Without subtype in the signature, commitUndo would drop the reroll step
     // (see towerStateSig) so the player couldn't undo a Change variety. Pin it.

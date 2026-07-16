@@ -2,7 +2,7 @@ import type { Tower } from "./Tower";
 
 /**
  * A cheap fingerprint of the player-mutable state: structure, transport config,
- * labels, rents, cinema booking policy, retail subtype, and money. It
+ * labels, rents, the No Rate flag, cinema booking policy, retail subtype, and money. It
  * deliberately omits the clock/time fields, so the sub-second time delta
  * *within a single gesture* isn't mistaken for a change when {@link UndoHistory}
  * compares capture-vs-commit to drop no-op gestures. (Money IS included; over
@@ -11,7 +11,14 @@ import type { Tower } from "./Tower";
  */
 export function towerStateSig(tower: Tower, money: number): string {
   const u = tower.units
-    .map((x) => `${x.kind}@${x.floor},${x.x}:${x.label ?? ""}:${x.rent ?? ""}:${x.filmPolicy ?? ""}:${x.subtype ?? ""}`)
+    .map(
+      // noRate must be part of the signature: taking a unit off the market can
+      // be the ONLY mutation of a gesture (an Average unit keeps rent
+      // undefined), and a fingerprint blind to it would drop that edit as a
+      // no-op, making No Rate un-undoable.
+      (x) =>
+        `${x.kind}@${x.floor},${x.x}:${x.label ?? ""}:${x.rent ?? ""}:${x.noRate ? "N" : ""}:${x.filmPolicy ?? ""}:${x.subtype ?? ""}`,
+    )
     .join(";");
   const r = tower.transports
     .map((x) => `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}`)
