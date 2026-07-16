@@ -129,4 +129,42 @@ describe("retailStatsLines (commercial-venue inspector card)", () => {
     expect(frag.textContent).not.toContain("Local demand:");
     expect(frag.textContent).toContain("Business is average."); // 70 / 100 baseline = 0.7, neutral
   });
+
+  // Phase C: Modern-only under-served / over-built advice, keyed on the raw share.
+  it("Modern advice names an under-served tower when demand outstrips capacity", () => {
+    const frag = render(retailStatsLines("shop", 100, 90, 5000, false, 1, 1.5, true));
+    expect(frag.textContent).toContain("another venue would still sell");
+  });
+
+  it("Modern advice names an over-built tower when capacity outstrips demand", () => {
+    const frag = render(retailStatsLines("shop", 20, 20, 500, false, 0.3, 0.3, true));
+    expect(frag.textContent).toContain("hold off on new venues");
+  });
+
+  it("Modern advice stays silent in the healthy demand band", () => {
+    const frag = render(retailStatsLines("shop", 70, 70, 3000, false, 0.7, 0.7, true));
+    expect(frag.textContent).not.toContain("would still sell");
+    expect(frag.textContent).not.toContain("hold off on new venues");
+  });
+
+  it("advice keys on the raw share, not the displayed fraction (Modern over-built)", () => {
+    // Decouple the two arguments to pin the routing contract: pass a displayed
+    // fraction of 60% (which sits in the silent healthy band, so advice keyed on
+    // the fraction would stay quiet) alongside a raw share of 0.2 (over-built). The
+    // over-built line must still fire, proving the advice reads `share`, not the
+    // floored/displayed fraction. (Physically the floor is 0.25, below the 0.5
+    // over-built cut, so a real map never separates the two across this threshold;
+    // this guards the function's contract regardless, so a future floor change
+    // cannot silently reroute the advice onto the wrong number.)
+    const frag = render(retailStatsLines("shop", 60, 60, 1200, false, 0.6, 0.2, true));
+    expect(frag.textContent).toContain("Local demand: 60% of capacity.");
+    expect(frag.textContent).toContain("hold off on new venues");
+  });
+
+  it("Classic shows the demand number but no advice", () => {
+    const frag = render(retailStatsLines("shop", 20, 20, 500, false, 0.3, 0.3, false));
+    expect(frag.textContent).toContain("Local demand: 30% of capacity.");
+    expect(frag.textContent).not.toContain("hold off on new venues");
+    expect(frag.textContent).not.toContain("would still sell");
+  });
 });

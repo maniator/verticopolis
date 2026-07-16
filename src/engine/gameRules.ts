@@ -125,10 +125,16 @@ export interface GameRules {
   /**
    * Commercial demand model magnitudes (gdd/arch-commercial-demand-pools). The
    * split SHAPE is identical in both modes (otherwise Classic is not reproducing
-   * the classic game); only these differ. `perCapita` is the daily demand dollars
-   * per weighted resident/worker; `floor` is the minimum per-venue demand fraction
-   * (a small-tower assist). Classic is firmer (floor 0, a thin tower starves
-   * commercial); Modern keeps a gentle floor. Provisional magnitudes, pending a
+   * the classic game, and cross-venue cannibalization only holds when each venue
+   * earns the plain `min(1, share)` below the cap: any per-venue curve that lifts
+   * the fraction above the identity would let total delivered demand exceed the
+   * pool as venues are added, breaking conservation). Only these magnitudes differ.
+   * `perCapita` is the daily demand dollars per weighted resident/worker (shared by
+   * both modes today; a Modern retune for larger-tower viability is reserved for the
+   * calibration pass); `floor` is the minimum per-venue demand fraction (a
+   * small-tower assist) and is where the two modes actually diverge now: Classic is
+   * firmer (floor 0: a thin tower starves commercial), Modern keeps a gentle floor
+   * of external street-level walk-in trade. Provisional magnitudes, pending a
    * calibration pass.
    */
   demandModel(): { perCapita: number; floor: number };

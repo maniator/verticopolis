@@ -86,22 +86,41 @@ per in-game hour. Confirm against the `perf` Playwright lane before Phase A merg
 
 ## 5. GameRules seam
 
-One new method, following `noiseErosionScale()` / `operatingOverheadPerUnit()`:
+> **Superseded (Phase C review, 2026-07-15): the `smoothing` field was dropped.**
+> A per-venue "soft" curve that lifts a venue's earned fraction above the identity
+> `min(1, share)` below the cap makes total delivered demand exceed the pool as
+> venues are added, which inverts the model's core cannibalization property.
+> Conservation holds only when every venue earns exactly `min(1, share)` below the
+> cap, so a conservation-preserving soft shoulder does not exist. The shipped seam
+> is `{ perCapita; floor }`; the Modern-vs-Classic difference is the small-tower
+> `floor` today (a street-trade baseline), with per-capita magnitude shared by both
+> modes for now and reserved for the calibration pass, never a per-venue cap curve.
+> A future Modern demand assist must live outside the per-venue split (a larger
+> `floor`, or a pool multiplier) to stay conservative. See the backlog Deferral
+> inbox (Phase A note, RESOLVED). The original design below is kept for the record.
+
+One new method, following `noiseErosionScale()` / `operatingOverheadPerUnit()`.
+The snippet and bullets below are the ORIGINAL spec, retained for the record; the
+`smoothing` field and the `"soft"` Modern clause were dropped (see the note above).
+The shipped seam is `demandModel(): { perCapita: number; floor: number }`, and both
+modes earn the plain `min(1, share)` below the cap.
 
 ```
-// src/engine/gameRules.ts
+// src/engine/gameRules.ts  (ORIGINAL spec; `smoothing` since dropped)
 demandModel(): {
   perCapita: number;   // S_percapita: per-capita daily demand dollars
   floor: number;       // minimum per-venue fraction before demand (small-tower gate)
-  smoothing: "hard" | "soft";  // cap approach; hard = plain min(1, x)
+  smoothing: "hard" | "soft";  // cap approach; hard = plain min(1, x)  (DROPPED, not shipped)
 };
 ```
 
-- `CLASSIC_RULES.demandModel()` returns the 1994-calibrated `perCapita`, a firm
-  (low or zero) `floor`, and `"hard"` smoothing.
-- `MODERN_RULES.demandModel()` returns a retuned `perCapita` for larger towers, a
-  gentle non-zero `floor` so early commercial is not dead on arrival, and
-  optionally `"soft"`.
+- `CLASSIC_RULES.demandModel()` returns the 1994-calibrated `perCapita` and a firm
+  (low or zero) `floor`. (Originally also `"hard"` smoothing; smoothing was dropped,
+  and the shipped Classic is the plain `min(1, share)`.)
+- `MODERN_RULES.demandModel()` returns `perCapita` (shared with Classic today; a
+  larger-tower retune is reserved for calibration) and a gentle non-zero `floor` so
+  early commercial is not dead on arrival. (Originally also optionally `"soft"`;
+  that clause was dropped.)
 
 `computeDemandMap` reads `sim.rules.demandModel()`; it never branches on the mode
 string. The `floor` applies as `fraction_v = max(floor, min(1, D_v / cap_v))` when

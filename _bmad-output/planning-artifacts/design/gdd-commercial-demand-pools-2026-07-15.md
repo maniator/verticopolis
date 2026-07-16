@@ -207,14 +207,24 @@ deterministic (census plus layout), so it adds no RNG draw (section 6).
 
 ## 5. Classic versus Modern
 
+> **Superseded (Phase C review, 2026-07-15): the `smoothing` field was dropped.**
+> A per-venue "soft shoulder" that lifts a venue's earned fraction above the
+> identity `min(1, share)` below the cap makes total delivered demand exceed the
+> pool as venues are added, inverting the model's core cannibalization. The split
+> stays the plain `min(1, share)` in both modes; only `perCapita` and the
+> small-tower `floor` differ. See section 5's note in the arch doc and the backlog
+> Deferral inbox (Phase A note, RESOLVED). The original table below is kept for the
+> record.
+
 The split shape is identical in both modes (otherwise Classic is not reproducing
-the classic game). Only magnitudes and the smoothing differ, and they ride one
-`GameRules` method, following the `noiseErosionScale()` pattern:
+the classic game). Only the magnitudes differ (the `smoothing` field was dropped,
+see the note above), and they ride one `GameRules` method, following the
+`noiseErosionScale()` pattern:
 
 ```
 interface GameRules {
   // ... existing ...
-  demandModel(): { perCapita: number; floor: number; smoothing: "hard" | "soft" };
+  demandModel(): { perCapita: number; floor: number };  // `smoothing` dropped, see note above
 }
 ```
 
@@ -222,7 +232,7 @@ interface GameRules {
 | --- | --- | --- |
 | Per-capita spend `S` | Dedicated 1994 target at the calibration tower | Same shape, retuned so larger towers stay viable |
 | Small-tower floor | Firmer: a thin tower genuinely starves commercial | Gentle floor so early commercial is not dead on arrival |
-| Cap behavior | Hard `min(1, ...)` | Same cap, optionally a soft shoulder approaching it |
+| Cap behavior | Hard `min(1, ...)` | Same hard cap (a soft shoulder would break conservation; dropped) |
 | Distance | W3 halving stays as today | May compose the graduated lobby curve from #394 |
 
 Classic withholds advice, never information: both modes compute the same true

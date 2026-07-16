@@ -142,4 +142,43 @@ describe("commercial demand pools", () => {
     const text = renderToFragment(html`<div>${facilityDiagnostics(sim, shop)}</div>`).textContent ?? "";
     expect(text).toContain(`Local demand: ${pct}% of capacity.`);
   });
+
+  it("earns the plain min(1, share) below the cap in both modes, so the split stays conservative (Phase C)", () => {
+    // The per-venue fraction is the identity `min(1, share)` below the cap in
+    // BOTH modes (only the small-tower floor differs today, Classic 0 vs Modern
+    // demandFloorModern; per-capita is shared, a Modern retune is reserved for
+    // calibration). A curve that lifted the fraction above the identity would let
+    // total delivered demand exceed the pool as venues are added, breaking
+    // conservation and inverting the flagship cannibalization property; this pins
+    // that both modes stay on the conservative identity.
+    const build = (mode: GameMode) => {
+      const sim = servedTower(1, mode);
+      for (let i = 0; i < 7; i++) occupied(sim, "office", 2, 20 + i * 12);
+      const shop = occupied(sim, "shop", 2, C + 20);
+      return { map: computeDemandMap(sim), shopId: shop.id };
+    };
+    const classic = build("classic");
+    const modern = build("modern");
+    const share = classic.map.share;
+    // Precondition: pin the identity band `floor < share < 1`. Above the Modern
+    // floor (so `max(floor, ...)` is not what lifts Modern's fraction here, the
+    // test genuinely exercises `min(1, share)`) and below the cap (so the shape
+    // matters, not the clamp).
+    expect(share).toBeGreaterThan(ECON.demandFloorModern);
+    expect(share).toBeLessThan(1);
+    expect(modern.map.share).toBeCloseTo(share, 6); // share is mode-independent (pool and capacity are the same)
+    const cFrac = classic.map.fractionByUnit.get(classic.shopId)!;
+    const mFrac = modern.map.fractionByUnit.get(modern.shopId)!;
+    expect(cFrac).toBeCloseTo(Math.min(1, share), 6); // Classic: plain min(1, share)
+    expect(mFrac).toBeCloseTo(Math.min(1, share), 6); // Modern: same identity (its floor is far below this share)
+  });
+
+  it("exposes the raw uncapped share even when the earned fraction is capped at 1 (Phase C)", () => {
+    const sim = servedTower(1, "classic");
+    for (let i = 0; i < 20; i++) occupied(sim, "office", 2, i * 9); // over-demanded: pool exceeds the shop's capacity
+    const shop = occupied(sim, "shop", 2, C + 20);
+    const map = computeDemandMap(sim);
+    expect(map.fractionByUnit.get(shop.id)).toBe(1); // the fraction is capped
+    expect(map.share).toBeGreaterThan(1); // but the raw pressure (an under-served area) is still visible
+  });
 });
