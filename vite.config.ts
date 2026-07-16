@@ -4,8 +4,20 @@ import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { VitePWA } from "vite-plugin-pwa";
+import { notesForVersion } from "./src/changelog";
 
 const pkgVersion = JSON.parse(readFileSync(resolve(__dirname, "package.json"), "utf8")).version as string;
+
+/** Player-facing "What's new" lines for THIS build, read from the committed
+ *  CHANGELOG.md section matching the package version (empty for an internal
+ *  build with no player notes, or if the file is missing/unreadable). */
+function changelogNotes(): string[] {
+  try {
+    return notesForVersion(readFileSync(resolve(__dirname, "CHANGELOG.md"), "utf8"), pkgVersion);
+  } catch {
+    return [];
+  }
+}
 
 /** Short git SHA of the build, or "unknown" outside a checkout. */
 function gitShortSha(): string {
@@ -23,9 +35,9 @@ function gitShortSha(): string {
  * client fetches when a new worker is waiting, to learn what it's updating to
  * (see src/pwa.ts `fetchUpdateInfo`). It is deliberately a `.json`, which
  * Workbox's `globPatterns` does not match, so it is never precached and is
- * always fetched network-fresh. `notes` is empty today; the `Player-note:`
- * trailer harvest (see CONTRIBUTING.md → Versioning) will populate it once
- * player-facing features ship.
+ * always fetched network-fresh. `notes` is the player-facing "What's new" list,
+ * read from the CHANGELOG.md section matching this version (see `changelogNotes`
+ * and CONTRIBUTING.md → "Player notes").
  */
 function emitVersionJson(): Plugin {
   return {
@@ -35,7 +47,7 @@ function emitVersionJson(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "version.json",
-        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: [] as string[] }),
+        source: JSON.stringify({ version: pkgVersion, sha: gitShortSha(), notes: changelogNotes() }),
       });
     },
   };
