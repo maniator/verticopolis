@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { basename, dirname, resolve } from "node:path";
 import { Simulation } from "../../engine/Simulation";
 import { Clock } from "../../engine/Clock";
+import { FACILITIES } from "../../engine/facilities";
 import { beginDwell } from "../../engine/crowd/visits";
 import { add } from "../../engine/crowd/trips";
 import { finish } from "../../engine/crowd/motion";
@@ -26,6 +27,14 @@ import type { Unit } from "../../engine/types";
  * Also pins the state-at-arrival recheck (GH #360): a commercial venue that
  * vacated or burned between spawn and arrival takes no `customersIn++`,
  * mirroring the attendance branch's isOperational recheck.
+ *
+ * The "mid-visit teardown paths" block below walks the despawn-adjacent
+ * structural changes the issue names, each of which could strand or leak a
+ * tally if a future change routed around `finish()`: the venue bulldozed
+ * under counted visitors, the venue catching fire and gutting mid-show, and
+ * a save/load round-trip taken mid-visit (the one legitimate wholesale crowd
+ * teardown: the load rebuilds a fresh sim, so every transient tally must
+ * restore to zero, forged saves included).
  */
 
 const CROWD_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../engine/crowd");
@@ -258,5 +267,111 @@ describe("state-at-arrival recheck (census venues)", () => {
     beginDwell(sim.crowd, sim.tower, p);
     expect(venue.customersIn ?? 0).toBe(1);
     expect(p.venueUnitId).toBe(venue.id);
+  });
+});
+
+describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
+  /** Run the evening attendance window until the party hall holds counted
+   *  visitors who are still live people, then hand both back. Bounded and
+   *  deterministic (seeded rng); the bound covers the slowest counted
+   *  arrival the evening window produces in this fixture. */
+  function withCountedAttendees(): { sim: Simulation; hall: Unit } {
+    const sim = mixedTower();
+    setClock(sim, 18);
+    const hall = sim.tower.units.find((u) => u.kind === "partyHall" && u.floor === 2)!;
+    for (let m = 0; m < 480 && (hall.customersIn ?? 0) === 0; m++) sim.tick(1);
+    expect(hall.customersIn ?? 0).toBeGreaterThan(0);
+    expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(hall.customersIn ?? 0);
+    return { sim, hall };
+  }
+
+  it("bulldozing the venue mid-visit: the tally dies with the unit and a rebuilt unit takes no ghost decrement", () => {
+    const { sim, hall } = withCountedAttendees();
+    expect(sim.tower.removeUnit(hall.id)).toBeDefined();
+    // The surviving units stay balanced the instant the venue vanishes.
+    reconcile(sim);
+    // Rebuild on the same tiles. `Tower.nextId` is monotonic, so the ghost
+    // visitors' venue stamp can never resolve to the new unit; their wind-down
+    // through finish() must leave the rebuilt tally untouched (and never -1).
+    const rebuilt = sim.tower.place("fastFood", 2, 0);
+    expect(rebuilt.ok).toBe(true);
+    const fresh = sim.tower.units.find((u) => u.kind === "fastFood" && u.floor === 2)!;
+    expect(fresh.id).not.toBe(hall.id);
+    // Quiet night, before the 06:00 breakfast window: the ghost visitors
+    // drain through finish() (dwell expiry, return leg or give-up) with no
+    // venue left to decrement.
+    setClock(sim, 2, 1);
+    for (let m = 0; m < 220 && liveWith(sim, (p) => p.venueUnitId === hall.id) > 0; m++) sim.tick(1);
+    expect(liveWith(sim, (p) => p.venueUnitId === hall.id)).toBe(0);
+    expect(fresh.customersIn ?? 0).toBe(0);
+    expect(fresh.outForMeal ?? 0).toBe(0);
+    reconcile(sim);
+  });
+
+  it("a fire mid-visit guts the venue without stranding or leaking the tally", () => {
+    const { sim, hall } = withCountedAttendees();
+    const counted = hall.customersIn ?? 0;
+    // The ignition transition, exactly the mutation EventSystem.startFire
+    // performs on its picked unit (state + occupants zero; the tallies are
+    // deliberately untouched, which is the invariant under test). Mutating
+    // directly keeps the target deterministic instead of racing the event
+    // rng; precedent: metroVisitOrigin.test.ts sets a station ablaze the
+    // same way.
+    hall.state = "fire";
+    hall.occupants = 0;
+    for (let m = 0; m < 30; m++) sim.tick(1);
+    // Still balanced mid-blaze, and the attendance occupants mirror stays 0
+    // on a non-operational venue even while finish() drains the tally
+    // through syncAttendanceOccupants.
+    reconcile(sim);
+    expect(hall.customersIn ?? 0).toBeLessThanOrEqual(counted);
+    expect(hall.occupants).toBe(0);
+    // The blaze ends as a gutted shell (EventSystem.gut zeroes occupants and
+    // tenancy fields, never the tallies): the remaining visitors must drain
+    // to exactly zero through finish(), and the mirror must hold at 0.
+    hall.state = "gutted";
+    hall.occupants = 0;
+    setClock(sim, 2, 1);
+    for (let m = 0; m < 240 && (hall.customersIn ?? 0) > 0; m++) sim.tick(1);
+    expect(hall.customersIn ?? 0).toBe(0);
+    expect(hall.occupants).toBe(0);
+    reconcile(sim);
+  });
+
+  it("a save/load round-trip mid-visit restores every tally to zero, forged saves included", () => {
+    const { sim } = withCountedAttendees();
+    // Keep ticking until a meal round-tripper is out too, so the round trip
+    // covers all three counters at once (customersIn at the hall is already
+    // nonzero from the fixture).
+    for (let m = 0; m < 480 && !sim.tower.units.some((u) => (u.outForMeal ?? 0) > 0); m++) sim.tick(1);
+    expect(sim.tower.units.some((u) => (u.outForMeal ?? 0) > 0)).toBe(true);
+    const loaded = Simulation.deserialize(sim.serialize());
+    // The load rebuilds a fresh sim: the crowd is empty and every transient
+    // tally restores to zero, so nothing needs (or gets) a finish() call.
+    expect(loaded.crowd.people).toHaveLength(0);
+    for (const u of loaded.tower.units) {
+      expect(u.customersIn ?? 0, `customersIn survived a load on ${u.kind}#${u.id}`).toBe(0);
+      expect(u.hotelCustomersIn ?? 0, `hotelCustomersIn survived a load on ${u.kind}#${u.id}`).toBe(0);
+      expect(u.outForMeal ?? 0, `outForMeal survived a load on ${u.kind}#${u.id}`).toBe(0);
+      if (FACILITIES[u.kind].attendance !== undefined) {
+        expect(u.occupants, `attendance occupants mirror survived a load on ${u.kind}#${u.id}`).toBe(0);
+      }
+    }
+    reconcile(loaded);
+    // A hand-edited save cannot smuggle a tally past the strip: the load
+    // coerces the transient counters away no matter what the file carries.
+    const forged = sim.serialize();
+    const target = forged.units.find((u) => u.kind === "partyHall") as Record<string, unknown> | undefined;
+    expect(target).toBeDefined();
+    target!.customersIn = 999;
+    target!.hotelCustomersIn = 5;
+    target!.outForMeal = 7;
+    target!.occupants = 999;
+    const hardened = Simulation.deserialize(forged);
+    const hu = hardened.tower.units.find((u) => u.kind === "partyHall")!;
+    expect(hu.customersIn ?? 0).toBe(0);
+    expect(hu.hotelCustomersIn ?? 0).toBe(0);
+    expect(hu.outForMeal ?? 0).toBe(0);
+    expect(hu.occupants).toBe(0);
   });
 });
