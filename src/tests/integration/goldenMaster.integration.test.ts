@@ -157,16 +157,18 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * re-pins this constant IN THAT PR, with a comment explaining what shifted, so
  * the change is deliberate and reviewable, never an accident.
  *
- * Last re-pinned for the graduated lobby-distance penalty (#394): the fixture's
+ * Last re-pinned for the weekday/weekend retail multipliers (#398): the Classic
+ * fixture runs on the CANON calendar (a three-day week: two weekday slots and one
+ * weekend day), so its fixed three-day run reaches the weekend on day 2, where
+ * Classic applies the literal 1994 visitor lift (fast food at 48/35). The
+ * fixture's fast-food venue earns more on that weekend tick, so its accrued income
+ * and the money fields shift. The prior re-pin was for the graduated
+ * lobby-distance penalty (#394): the fixture's
  * upper rooms sit up to 5 floors above the ground lobby (its highest occupied
- * floor is 6, distance 5), which now falls in the "far" band, so those tenants
- * cap at LOBBY_FAR_CAP (0.7) instead of drifting toward 1.0. Their satisfaction
- * fields (and nothing else) shift. The fixture builds no sky lobby, so it exercises
- * the far ceiling only, not the very-far erosion. The prior re-pin was for
- * commercial demand pools (#393): the fixture's fast-food venues earn a
- * demand-driven share instead of the old tower-wide appeal scalar.
+ * floor is 6, distance 5), which falls in the "far" band, so those tenants
+ * cap at LOBBY_FAR_CAP (0.7) instead of drifting toward 1.0.
  */
-const PINNED_STATE_HASH = "4d3a93016a2d7431c8f1272c0a0418580231d80db10aa7ad882b2ee2033debb3";
+const PINNED_STATE_HASH = "543450331b58c13dd303a1ff67fa993a932abe2d1acbeb5a500e9d6630e61843";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run

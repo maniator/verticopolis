@@ -73,6 +73,33 @@ describe("CLASSIC_RULES", () => {
       erosion: LOBBY_VERY_FAR_EROSION,
     }); // very far: lower ceiling and the evicting erosion
   });
+
+  it("lifts every demand-pool retail kind on weekends by the literal 1994 ratios", () => {
+    // Weekday is always the flat 1.0 baseline.
+    expect(CLASSIC_RULES.weekendMultiplier("fastFood", false)).toBe(1);
+    expect(CLASSIC_RULES.weekendMultiplier("restaurant", false)).toBe(1);
+    // Weekend: the three retail kinds busier (the 1994 targets), fast food included.
+    expect(CLASSIC_RULES.weekendMultiplier("fastFood", true)).toBeCloseTo(48 / 35, 6);
+    expect(CLASSIC_RULES.weekendMultiplier("restaurant", true)).toBeCloseTo(48 / 35, 6);
+    expect(CLASSIC_RULES.weekendMultiplier("shop", true)).toBeCloseTo(30 / 25, 6);
+    // Every retail multiplier is a lift (> 1): no retail kind quiets in Classic.
+    expect(CLASSIC_RULES.weekendMultiplier("fastFood", true)).toBeGreaterThan(1);
+  });
+
+  it("leaves attendance venues (cinema, party hall) at 1.0: their weekend swing is emergent (#424)", () => {
+    // Cinema and party hall earn from the live-attendance fill, which the crowd
+    // already spawns with a weekday/weekend rhythm, so a flat multiplier here would
+    // double-count. They read 1.0 on both days.
+    expect(CLASSIC_RULES.weekendMultiplier("cinema", true)).toBe(1);
+    expect(CLASSIC_RULES.weekendMultiplier("cinema", false)).toBe(1);
+    expect(CLASSIC_RULES.weekendMultiplier("partyHall", true)).toBe(1);
+    expect(CLASSIC_RULES.weekendMultiplier("partyHall", false)).toBe(1);
+  });
+
+  it("reads 1.0 for a non-commercial kind on either day (no weekend swing)", () => {
+    expect(CLASSIC_RULES.weekendMultiplier("office", true)).toBe(1);
+    expect(CLASSIC_RULES.weekendMultiplier("office", false)).toBe(1);
+  });
 });
 
 describe("MODERN_RULES", () => {
@@ -127,6 +154,36 @@ describe("MODERN_RULES", () => {
     expect(farther.cap).toBeLessThanOrEqual(near.cap);
     expect(farther.cap).toBeCloseTo(LOBBY_VERY_FAR_CAP, 6); // bottoms out at the same worst-case ceiling
     expect(farther.erosion).toBeCloseTo(LOBBY_VERY_FAR_EROSION, 6); // and the same evicting erosion
+  });
+
+  it("reads a realistic weekend rhythm: fast food quiets, restaurants and shops pick up", () => {
+    // Weekday is the flat 1.0 baseline, same as Classic.
+    expect(MODERN_RULES.weekendMultiplier("fastFood", false)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("restaurant", false)).toBe(1);
+    // Weekend: fast food drops below 1 (no office-lunch crowd) while restaurants
+    // and shops rise above it. Magnitudes track the Modern tunable so this test
+    // does not fossilize a provisional constant.
+    expect(MODERN_RULES.weekendMultiplier("fastFood", true)).toBe(ECON.weekendTrafficMultiplier.fastFood);
+    expect(MODERN_RULES.weekendMultiplier("fastFood", true)).toBeLessThan(1);
+    expect(MODERN_RULES.weekendMultiplier("restaurant", true)).toBe(ECON.weekendTrafficMultiplier.restaurant);
+    expect(MODERN_RULES.weekendMultiplier("restaurant", true)).toBeGreaterThan(1);
+    expect(MODERN_RULES.weekendMultiplier("shop", true)).toBe(ECON.weekendTrafficMultiplier.shop);
+    expect(MODERN_RULES.weekendMultiplier("shop", true)).toBeGreaterThan(1);
+  });
+
+  it("leaves attendance venues (cinema, party hall) at 1.0: their weekend swing is emergent (#424)", () => {
+    expect(MODERN_RULES.weekendMultiplier("cinema", true)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("cinema", false)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("partyHall", true)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("partyHall", false)).toBe(1);
+  });
+
+  it("reads 1.0 for a non-commercial kind on either day (no weekend swing)", () => {
+    // Both days for both kinds: symmetric with the Classic non-commercial check.
+    expect(MODERN_RULES.weekendMultiplier("office", true)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("office", false)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("condo", true)).toBe(1);
+    expect(MODERN_RULES.weekendMultiplier("condo", false)).toBe(1);
   });
 
   it("keeps the variant-household distribution centered on the classic mean", () => {

@@ -160,7 +160,31 @@ export interface GameRules {
    * office/condo/hotel; the caller gates on `served` and kind.
    */
   lobbyDistanceDrain(distanceFloors: number): { cap: number; erosion: number };
+  /**
+   * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
+   * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
+   * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food
+   * quiets without the office-lunch crowd, restaurants and shops pick up), tuned
+   * by `ECON.weekendTrafficMultiplier`. Only the demand-pool retail kinds swing:
+   * attendance venues (cinema, party hall) read 1.0 here, because their income
+   * already tracks the live-attendance fill (#424), which the crowd spawns with
+   * its own weekday/weekend rhythm; a flat multiplier would double-count. A `kind`
+   * outside the retail set reads 1.0. Pure and deterministic (no RNG), so it never
+   * perturbs the seeded economy stream.
+   */
+  weekendMultiplier(kind: string, isWeekend: boolean): number;
 }
+
+/** Classic 1994 weekend traffic multipliers per demand-pool retail kind, relative
+ *  to the weekday baseline. The original settles fast food and restaurants at 35
+ *  weekday / 48 weekend and shops at 25 / 30 (all busier on weekends), so Classic
+ *  reads those ratios. Attendance venues (cinema, party hall) are not listed: their
+ *  weekend swing is emergent from live attendance (#424), not a flat scalar. */
+const CLASSIC_WEEKEND_MULT: Record<string, number> = {
+  fastFood: 48 / 35,
+  restaurant: 48 / 35,
+  shop: 30 / 25,
+};
 
 export const CLASSIC_RULES: GameRules = {
   mode: "classic",
@@ -209,6 +233,11 @@ export const CLASSIC_RULES: GameRules = {
     if (distanceFloors > LOBBY_VERY_FAR_FLOORS) return { cap: LOBBY_VERY_FAR_CAP, erosion: LOBBY_VERY_FAR_EROSION };
     if (distanceFloors > LOBBY_FAR_FLOORS) return { cap: LOBBY_FAR_CAP, erosion: 0 };
     return LOBBY_NO_DRAIN;
+  },
+  weekendMultiplier(kind, isWeekend) {
+    // Canon: every commercial kind is busier on the weekend (the literal 1994
+    // visitor targets), quiet on weekdays.
+    return isWeekend ? (CLASSIC_WEEKEND_MULT[kind] ?? 1) : 1;
   },
 };
 
@@ -277,6 +306,11 @@ export const MODERN_RULES: GameRules = {
     const cap = 1 - capT * (1 - LOBBY_VERY_FAR_CAP);
     const eroT = Math.max(0, Math.min(1, (distanceFloors - LOBBY_VERY_FAR_FLOORS) / 2));
     return { cap, erosion: eroT * LOBBY_VERY_FAR_EROSION };
+  },
+  weekendMultiplier(kind, isWeekend) {
+    // Realistic daily rhythm: fast food quiets on the weekend (its weekday
+    // office-lunch crowd is gone), while leisure venues pick up. Tuned via ECON.
+    return isWeekend ? (ECON.weekendTrafficMultiplier[kind] ?? 1) : 1;
   },
 };
 

@@ -26,6 +26,25 @@ export const ECON = {
     restaurant: 30,
     shop: 20,
   } as Partial<Record<string, number>>,
+  /**
+   * Modern "realistic" weekend traffic multipliers per demand-pool retail kind,
+   * relative to the weekday baseline of 1.0 (weekend-patronage-curve, #398).
+   * Modern reads the daily rhythm rather than the flat 1994 targets: a fast-food
+   * counter lives on the weekday office-lunch crowd, so it QUIETS on weekends,
+   * while restaurants and shops (leisure trade) pick up. Classic instead matches
+   * the literal 1994 visitor targets (all retail busier on weekends), resolved in
+   * `GameRules.weekendMultiplier`. Only the three demand-pool retail kinds appear
+   * here: attendance venues (cinema, party hall) are deliberately left out,
+   * because their take reads the live-attendance fill (#424), which the crowd
+   * already spawns with its own weekday/weekend rhythm, so a flat multiplier on
+   * top would double-count the weekend. PROVISIONAL magnitudes, pending a playtest
+   * tuning pass. A kind absent here reads 1.0 (no weekend swing).
+   */
+  weekendTrafficMultiplier: {
+    fastFood: 0.7,
+    restaurant: 1.35,
+    shop: 1.2,
+  } as Record<string, number>,
   maintenancePerCarMonthly: 600,
   /**
    * Meal-cadence origin weights (arch-tower-wide-meal-cadence-2026-07-09 §3).
