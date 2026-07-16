@@ -270,6 +270,11 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // low, and deep in the very-far band also erodes toward a move-out. Name the
   // structural fix (a sky lobby, not a local shaft). Always-on, like W1/W3. Modern
   // shows the live distance (advice-with-numbers); Classic names the band only.
+  // HONESTY GATE: the advice may only prescribe a lobby the placement rules
+  // would accept, so it names the exact buildable slot; when no legal nearer
+  // slot exists (the short block above the highest buildable slot, e.g. floors
+  // 91+ over a floor-90 lobby), the line goes neutral and uncolored instead of
+  // flagging unavoidable geometry as a player mistake.
   if (
     (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind)) &&
     sim.tower.isFloorServed(u.floor)
@@ -279,19 +284,71 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     if (drain.cap < 1) {
       // Modern shows the live distance; Classic names the situation without it.
       const distNote = sim.rules.mode === "modern" ? `: ${lobbyDist} floors` : "";
-      // The strong "sinks until notice" warning only when the distance erosion
-      // actually outpaces the served recovery, so the tenant really is sliding out
-      // (Classic very far, or Modern deep isolation). At shallower distances the
-      // ceiling just holds satisfaction down without evicting, which the gentler
-      // line describes honestly.
-      if (drain.erosion > SERVED_RECOVERY) {
+      const slot = sim.tower.nearestBuildableLobbySlot(u.floor);
+      if (slot === null) {
+        // No nearer lobby can legally exist (the short block above the highest
+        // legal slot). Plain information, no imperative. The eroding variant is
+        // unreachable at the current geometry (the invariant test pins the top
+        // block inside the capped band), but the branch handles it anyway so
+        // the neutral copy can never mask an actual slide toward a notice.
         lines.push(
-          html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Add a sky lobby (every 15th floor) within reach.</div>`,
+          drain.erosion > SERVED_RECOVERY
+            ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice, and no closer sky lobby slot exists this high in the tower.</div>`
+            : html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out; no closer sky lobby slot exists this high in the tower.</div>`,
         );
       } else {
-        lines.push(
-          html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A nearer sky lobby (every 15th floor) would lift it.</div>`,
-        );
+        // Name the WHOLE project the build rules will actually accept, never a
+        // prescribe-then-refuse loop: a slot above the built top needs floors
+        // laid up to it first; a slot carrying floors or rooms needs clearing;
+        // and a unit sitting on the empty slot itself must move (clearing the
+        // floor demolishes it, so "lift these tenants" would be false for it).
+        const onSlot = slot === u.floor;
+        // A slot one story above the built top rests on the top story and is
+        // directly placeable; only a slot higher than that needs floors first.
+        const needsSupport = slot > sim.tower.highestFloor + 1;
+        const clearFirst = !onSlot && !needsSupport && sim.tower.floorHasNonLobbyContent(slot);
+        // Clearing the slot is itself refused while stories rest on it, so the
+        // advice names the teardown too, whether the slot's own obstacle is
+        // other content or the advised unit itself; the in-place floor-to-lobby
+        // conversion that would spare it is the gated #317 engine change (backlog).
+        const aboveBlocked = !needsSupport && sim.tower.floorHasNonLobbyContent(slot + 1);
+        const blockedAbove = clearFirst && aboveBlocked;
+        if (drain.erosion > SERVED_RECOVERY) {
+          // The strong "sinks until notice" warning only when the distance erosion
+          // actually outpaces the served recovery, so the tenant really is sliding
+          // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
+          const fix = onSlot
+            ? aboveBlocked
+              ? `This unit sits on the empty sky lobby slot; take down the stories above floor ${slot}, move it, clear the story, and build the lobby there to anchor the block.`
+              : `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
+            : needsSupport
+              ? `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`
+              : blockedAbove
+                ? `Take down the stories above floor ${slot}, clear it, and build the sky lobby there to lift these tenants.`
+                : clearFirst
+                  ? `Clear floor ${slot} and build the sky lobby there to lift these tenants.`
+                  : `Build the sky lobby on floor ${slot} to lift these tenants.`;
+          lines.push(
+            html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. ${fix}</div>`,
+          );
+        } else {
+          // The ceiling holds satisfaction down without evicting; the gentler line
+          // describes that honestly and names the buildable fix.
+          const fix = onSlot
+            ? aboveBlocked
+              ? `This unit sits on the sky lobby slot itself; a lobby here, once the stories above come down, it moves, and the story is cleared, would lift the block.`
+              : `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
+            : needsSupport
+              ? `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`
+              : blockedAbove
+                ? `A sky lobby on floor ${slot} would lift it (the stories above it must come down before it can be cleared).`
+                : clearFirst
+                  ? `A sky lobby on floor ${slot} would lift it (clear that floor first).`
+                  : `A sky lobby on floor ${slot} would lift it.`;
+          lines.push(
+            html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. ${fix}</div>`,
+          );
+        }
       }
     }
   }

@@ -157,18 +157,16 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * re-pins this constant IN THAT PR, with a comment explaining what shifted, so
  * the change is deliberate and reviewable, never an accident.
  *
- * Last re-pinned for the weekday/weekend retail multipliers (#398): the Classic
- * fixture runs on the CANON calendar (a three-day week: two weekday slots and one
- * weekend day), so its fixed three-day run reaches the weekend on day 2, where
- * Classic applies the literal 1994 visitor lift (fast food at 48/35). The
- * fixture's fast-food venue earns more on that weekend tick, so its accrued income
- * and the money fields shift. The prior re-pin was for the graduated
- * lobby-distance penalty (#394): the fixture's
- * upper rooms sit up to 5 floors above the ground lobby (its highest occupied
- * floor is 6, distance 5), which falls in the "far" band, so those tenants
- * cap at LOBBY_FAR_CAP (0.7) instead of drifting toward 1.0.
+ * Last re-pinned for the lobby-distance band recalibration: LOBBY_FAR_FLOORS is
+ * now derived as floor(lobbyInterval / 2) = 7 (it was a hand-picked 4), so the
+ * fixture's upper rooms (highest occupied floor 6, distance 5) fall back inside
+ * the no-penalty band and their satisfaction drifts toward 1.0 instead of
+ * capping at LOBBY_FAR_CAP. The prior re-pin was for the weekday/weekend retail
+ * multipliers (#398): the Classic fixture runs on the CANON calendar (a
+ * three-day week), so its fixed three-day run reaches the weekend on day 2,
+ * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-const PINNED_STATE_HASH = "543450331b58c13dd303a1ff67fa993a932abe2d1acbeb5a500e9d6630e61843";
+const PINNED_STATE_HASH = "c3e33d77f73e3a71213fae2f6e93863626909d291e82de4454ade7c4cd1883ad";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
@@ -179,8 +177,9 @@ const PINNED_STATE_HASH = "543450331b58c13dd303a1ff67fa993a932abe2d1acbeb5a500e9
  * that legitimately changes Modern behavior, with intent, exactly like the Classic
  * hash above. First pinned alongside Phase C of commercial demand pools (#393),
  * which added no Modern income math itself (the value simply captures Modern's
- * demand-pools behavior, previously unpinned). Re-pinned for #394: the fixture's
- * upper rooms now feel the Modern far-band ceiling (a smoother continuous curve
- * over the same anchors), shifting their satisfaction fields.
+ * demand-pools behavior, previously unpinned). Re-pinned for the lobby-distance
+ * band recalibration: the Modern continuous ramp now starts at the derived
+ * mid-block edge (7, was 4), so the fixture's upper rooms (distance 5 at most)
+ * no longer feel any distance ceiling and their satisfaction fields shift.
  */
-const PINNED_MODERN_STATE_HASH = "faee6fd5ea7f3a75574fd98398ad3f1a3049bb0d83f2e92f5af5f7812611fd97";
+const PINNED_MODERN_STATE_HASH = "3d534086a370ec52d1008fd0295f74a2bc4697e30a8d5ab427627b709d1f857e";

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import { LOBBY_FAR_CAP, LOBBY_VERY_FAR_CAP } from "../../engine/sim/constants";
 
 /**
@@ -317,12 +318,27 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
   });
 });
 
-describe("W-new: graduated lobby-distance penalty (#394)", () => {
+describe("W-new: graduated lobby-distance penalty (#394, edges derived from the lobby ladder)", () => {
+  it("leaves the deepest mid-block floor of a complete lobby ladder penalty-free (Classic)", () => {
+    // Distance 7 (= floor(lobbyInterval / 2)) is the farthest any floor can sit
+    // from a lobby when every legal slot is built, so it MUST carry no penalty:
+    // correct play is fully rewarded, not merely spared eviction. (Seed picked
+    // so no random event interrupts the 40-hour run.)
+    const sim = Simulation.newGame(9, "classic");
+    servedTower(sim, 8);
+    const midBlock = unit(sim, sim.tower.place("office", 8, 40).unitId); // 7 floors from the ground lobby
+    midBlock.state = "occupied";
+    midBlock.satisfaction = 1;
+    for (let i = 0; i < 40; i++) sim.tick(60);
+    expect(midBlock.satisfaction).toBeGreaterThan(0.9); // no cap, no erosion
+    expect(midBlock.state).toBe("occupied");
+  });
+
   it("caps a far-from-lobby tenant at the far ceiling without evicting it, near tenant untouched (Classic)", () => {
     const sim = Simulation.newGame(7, "classic");
-    servedTower(sim, 8);
+    servedTower(sim, 10);
     const near = unit(sim, sim.tower.place("office", 2, 40).unitId); // 1 floor from the ground lobby
-    const far = unit(sim, sim.tower.place("office", 6, 40).unitId); // 5 floors up: the far band
+    const far = unit(sim, sim.tower.place("office", 9, 40).unitId); // 8 floors up: the far band (slot 15 not yet built)
     for (const u of [near, far]) {
       u.state = "occupied";
       u.satisfaction = 1;
@@ -337,8 +353,8 @@ describe("W-new: graduated lobby-distance penalty (#394)", () => {
 
   it("erodes a very-far office to a notice, attributed to lobbyFar (Classic)", () => {
     const sim = Simulation.newGame(8, "classic");
-    servedTower(sim, 10);
-    const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // 8 floors up: past the lobby-ladder reach
+    servedTower(sim, 14);
+    const office = unit(sim, sim.tower.place("office", 13, 40).unitId); // 12 floors up: past even a skipped-lobby cap
     office.state = "occupied";
     office.satisfaction = 0.1; // already near the floor; the gentle erosion carries it out
     for (let i = 0; i < 40; i++) sim.tick(60); // inside the notice window, so it stays "vacating"
@@ -348,8 +364,8 @@ describe("W-new: graduated lobby-distance penalty (#394)", () => {
 
   it("holds a very-far tenant below the very-far ceiling (Classic)", () => {
     const sim = Simulation.newGame(11, "classic");
-    servedTower(sim, 10);
-    const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // very far (distance 8)
+    servedTower(sim, 14);
+    const office = unit(sim, sim.tower.place("office", 13, 40).unitId); // very far (distance 12)
     office.state = "occupied";
     office.satisfaction = 1;
     for (let i = 0; i < 5; i++) sim.tick(60); // a few hours: snapped under the ceiling, still here
@@ -378,13 +394,14 @@ describe("W-new: graduated lobby-distance penalty (#394)", () => {
   });
 
   it("Modern is gentler than Classic at the same very-far distance", () => {
-    // Same floor (distance 8) and starting satisfaction in both modes: Classic
-    // erodes (heading out), Modern's continuous curve only caps at this distance
-    // (net-positive drift), so the Modern tenant recovers to a higher plateau.
+    // Same floor (distance 12) and starting satisfaction in both modes: Classic
+    // erodes (heading out), Modern's continuous curve barely erodes at this
+    // distance (net-positive drift), so the Modern tenant settles at a higher
+    // plateau while the Classic one keeps sliding.
     const run = (mode: "classic" | "modern") => {
       const sim = Simulation.newGame(13, mode);
-      servedTower(sim, 10);
-      const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // distance 8
+      servedTower(sim, 14);
+      const office = unit(sim, sim.tower.place("office", 13, 40).unitId); // distance 12
       office.state = "occupied";
       office.satisfaction = 1;
       for (let i = 0; i < 40; i++) sim.tick(60);
@@ -399,8 +416,8 @@ describe("W-new: graduated lobby-distance penalty (#394)", () => {
 
   it("applies to condos: a very-far condo gives notice, attributed to lobbyFar (Classic)", () => {
     const sim = Simulation.newGame(21, "classic");
-    servedTower(sim, 10);
-    const condo = unit(sim, sim.tower.place("condo", 9, 40).unitId); // distance 8: very far
+    servedTower(sim, 14);
+    const condo = unit(sim, sim.tower.place("condo", 13, 40).unitId); // distance 12: very far
     condo.state = "occupied";
     condo.satisfaction = 0.1;
     for (let i = 0; i < 40; i++) sim.tick(60);
@@ -410,13 +427,71 @@ describe("W-new: graduated lobby-distance penalty (#394)", () => {
 
   it("applies to hotels: a very-far hotel room is capped at the very-far ceiling (Classic)", () => {
     const sim = Simulation.newGame(22, "classic");
-    servedTower(sim, 10);
-    const hotel = unit(sim, sim.tower.place("hotelSingle", 9, 40).unitId); // distance 8: very far
+    servedTower(sim, 14);
+    const hotel = unit(sim, sim.tower.place("hotelSingle", 13, 40).unitId); // distance 12: very far
     hotel.state = "occupied";
     hotel.satisfaction = 1;
     for (let i = 0; i < 5; i++) sim.tick(60);
     // The distance ceiling applies to hotels too (they were previously untouched
     // by any lobby-distance pressure), snapping them under the very-far cap.
     expect(hotel.satisfaction).toBeLessThanOrEqual(LOBBY_VERY_FAR_CAP + 1e-9);
+  });
+
+  it("advice is always followable: every capped floor either has a buildable nearer slot or reads as top-block geometry", () => {
+    // The property behind the #394 recalibration: for EVERY floor the tower can
+    // hold, a firing lobby-distance drain must come with advice the placement
+    // rules can actually honor. With every legal slot built, no floor between
+    // two lobbies may feel any drain at all; only the short block above the
+    // highest buildable slot may cap, and there the slot lookup must return
+    // null (neutral copy) and the drain must never evict, in BOTH rule-sets.
+    const sim = Simulation.newGame(31, "classic");
+    sim.money = 1e12;
+    sim.star = 5;
+    const laySpan = (s: Simulation, kind: "floor" | "lobby", floor: number): void => {
+      for (let x = MID; x < MID + 40; x++) {
+        // newGame seeds a starter ground lobby that overlaps this span; skip
+        // tiles it already covers and assert every genuine placement, so a
+        // placement-rule change can never silently degrade the fixture.
+        if (s.tower.hasStructure(floor, x)) continue;
+        const r = s.tower.place(kind, floor, x);
+        expect(r.ok, `lay ${kind} @ f${floor} x${x}: ${r.reason ?? ""}`).toBe(true);
+      }
+    };
+    laySpan(sim, "lobby", 1);
+    for (let f = 2; f <= GRID.maxFloor; f++) {
+      laySpan(sim, f % GRID.lobbyInterval === 0 ? "lobby" : "floor", f);
+    }
+    const highestSlot = Math.floor(GRID.maxFloor / GRID.lobbyInterval) * GRID.lobbyInterval;
+    for (let f = 1; f <= GRID.maxFloor; f++) {
+      const dist = sim.tower.nearestLobbyFloorDistance(f);
+      const slot = sim.tower.nearestBuildableLobbySlot(f);
+      for (const rules of [CLASSIC_RULES, MODERN_RULES]) {
+        const drain = rules.lobbyDistanceDrain(dist);
+        if (drain.cap >= 1) continue; // no penalty, nothing to advise
+        // Every slot is built, so the only legal capped floors are the top block.
+        expect(f, `floor ${f} caps but sits between two built lobbies`).toBeGreaterThan(highestSlot);
+        expect(slot, `floor ${f}: advice would name a slot but none is buildable`).toBeNull();
+        expect(drain.erosion, `floor ${f}: top-block geometry must cap, never evict`).toBe(0);
+      }
+    }
+    // And with a genuinely skipped slot, every capped floor names that exact slot.
+    const gap = Simulation.newGame(32, "classic");
+    gap.money = 1e12;
+    gap.star = 5;
+    laySpan(gap, "lobby", 1);
+    for (let f = 2; f <= 45; f++) {
+      // Slot 30 is deliberately skipped; 15 and 45 are built.
+      laySpan(gap, f !== 30 && f % GRID.lobbyInterval === 0 ? "lobby" : "floor", f);
+    }
+    let cappedFloors = 0;
+    for (let f = 2; f <= 45; f++) {
+      for (const rules of [CLASSIC_RULES, MODERN_RULES]) {
+        const drain = rules.lobbyDistanceDrain(gap.tower.nearestLobbyFloorDistance(f));
+        if (drain.cap >= 1) continue;
+        cappedFloors++;
+        expect(gap.tower.nearestBuildableLobbySlot(f), `floor ${f} should name the skipped slot`).toBe(30);
+      }
+    }
+    expect(cappedFloors).toBeGreaterThan(0); // the skipped slot genuinely bites
   });
 });

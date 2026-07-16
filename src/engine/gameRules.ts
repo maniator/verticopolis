@@ -225,11 +225,13 @@ export const CLASSIC_RULES: GameRules = {
     return { perCapita: ECON.demandPerCapita, floor: 0 };
   },
   lobbyDistanceDrain(distanceFloors) {
-    // Two discrete canon bands, snapping at the edges: near (no penalty), far (a
-    // ceiling), very far (a lower ceiling plus the gentle erosion). The very-far
-    // edge sits just past the mid-block distance of a 15-floor lobby ladder, so a
-    // tower lobbied every 15 caps its mid-block floors but never force-evicts them;
-    // only a skipped sky lobby pushes floors into the evicting very-far band.
+    // Two discrete bands, snapping at the edges: near (no penalty), far (a
+    // ceiling), very far (a lower ceiling plus the gentle erosion). The near band
+    // covers the whole mid-block reach of a complete lobby ladder (the FAR edge is
+    // floor(lobbyInterval / 2), see sim/constants.ts), so a tower lobbied every 15
+    // feels no distance pressure anywhere between two lobbies; only a skipped sky
+    // lobby pushes floors into the capped far band and, deeper, the evicting
+    // very-far band.
     if (distanceFloors > LOBBY_VERY_FAR_FLOORS) return { cap: LOBBY_VERY_FAR_CAP, erosion: LOBBY_VERY_FAR_EROSION };
     if (distanceFloors > LOBBY_FAR_FLOORS) return { cap: LOBBY_FAR_CAP, erosion: 0 };
     return LOBBY_NO_DRAIN;
@@ -297,9 +299,10 @@ export const MODERN_RULES: GameRules = {
     // Classic band values a couple floors beyond the very-far edge. So each extra
     // floor of distance costs a little more (the inspector shows the live
     // distance), and a well-sky-lobbied Modern tower, whose mid-block floors sit at
-    // most `lobbyInterval / 2` from a lobby, only ever feels the gentle ceiling,
-    // never the evicting erosion; that stays reserved for genuine isolation (a tall
-    // tower with no sky lobby). Modern smooths and helps.
+    // most `lobbyInterval / 2` from a lobby, feels no distance pressure at all
+    // (the FAR edge is derived as exactly that mid-block reach); the ceiling and
+    // the evicting erosion stay reserved for genuinely under-lobbied towers.
+    // Modern smooths and helps.
     if (distanceFloors <= LOBBY_FAR_FLOORS) return LOBBY_NO_DRAIN;
     const capSpan = LOBBY_VERY_FAR_FLOORS + 2 - LOBBY_FAR_FLOORS;
     const capT = Math.min(1, (distanceFloors - LOBBY_FAR_FLOORS) / capSpan);

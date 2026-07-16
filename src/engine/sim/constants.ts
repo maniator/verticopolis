@@ -1,4 +1,5 @@
 import type { Unit } from "../types";
+import { GRID } from "../facilitiesData";
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving, a grace window the player can use
@@ -78,20 +79,32 @@ export const TRANSPORT_FAR_TILES = 79;
  *     just outpaces the +0.05/hr served recovery, so a genuinely isolated tenant
  *     eventually gives notice (attributed to the `lobbyFar` cause), a slow,
  *     telegraphed pressure like the noise fuse, not an instant eviction.
- * The very-far edge (7) is chosen against `GRID.lobbyInterval` (15): the most
- * central floor between two lobbies 15 apart sits 7 floors from the nearer one, so
- * a tower with sky lobbies placed every 15 floors (the in-game advice) keeps every
- * floor within the FAR band at worst, capped but never force-evicted. Only a tower
- * that SKIPS a sky lobby leaves floors past distance 7, which is where the evicting
- * very-far band bites: correct play is sufficient, and the pressure lands exactly
- * on the under-lobbied towers the mechanic means to push.
+ * The FAR edge is DERIVED from the placement rule, not tuned: lobbies are legal
+ * only on the ground floor and every `GRID.lobbyInterval`th floor, so the most
+ * central floor between two adjacent lobbies sits floor(lobbyInterval / 2) floors
+ * from the nearer one. That distance must be penalty-free, or a tower with every
+ * legal lobby built carries a permanent capped band it has no way to fix, and
+ * the inspector prescribes a lobby the placement rule refuses (the v1.44.0
+ * state: the edge was 4, mirroring the thread-reported 1994 mid-block bands,
+ * against an unavoidable mid-block 7). Owner ruling 2026-07-16 (agent panel +
+ * red team, PARITY.md "Known parity gaps"): feedback integrity wins over the
+ * mid-block tithe. Correct play is sufficient AND fully rewarded: build every
+ * sky lobby and no floor between two lobbies feels any distance pressure.
+ * The bands then land exactly on genuinely under-lobbied towers: one skipped
+ * sky lobby makes a 2x-interval block whose middle floors sit 8 to 15 from a
+ * lobby, capped in FAR and, past {@link LOBBY_VERY_FAR_FLOORS}, eroding out.
+ * One deliberate exception: the short block above the HIGHEST buildable lobby
+ * slot (floors 91..100 over the floor-90 lobby, up to 10 away) can enter FAR
+ * with no legal fix. It is kept inside the capped band, never the evicting one
+ * (see the invariant test in `gameRules.test.ts`), and the inspector shows
+ * neutral no-advice copy there instead of prescribing an unbuildable lobby.
  * Classic reads these as the two discrete bands; Modern reads a smoother
  * continuous curve over the same anchors (see {@link GameRules.lobbyDistanceDrain}).
- * PROVISIONAL magnitudes (there is no in-repo canon source for the exact band
- * edges), pending a playtest tuning pass.
+ * The caps and the very-far edge remain PROVISIONAL magnitudes (no in-repo canon
+ * source), flagged for a playtest pass; the FAR edge is geometry, not taste.
  */
-export const LOBBY_FAR_FLOORS = 4;
-export const LOBBY_VERY_FAR_FLOORS = 7;
+export const LOBBY_FAR_FLOORS = Math.floor(GRID.lobbyInterval / 2);
+export const LOBBY_VERY_FAR_FLOORS = 11;
 export const LOBBY_FAR_CAP = 0.7;
 export const LOBBY_VERY_FAR_CAP = 0.5;
 /** Very-far per-hour erosion. Strictly above the +0.05/hr served recovery so the
