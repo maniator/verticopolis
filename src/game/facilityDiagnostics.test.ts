@@ -127,6 +127,30 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
   });
 
+  it("names the teardown when stories rest on the blocked slot", () => {
+    // Slot 30 carries floor tiles AND supports built stories above (31-33), so
+    // bulldozing it is refused until those come down; the advice must say so
+    // rather than send the player into a clear-then-refuse loop.
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 33; fl++) {
+      const kind = fl === 15 ? "lobby" : "floor";
+      for (let x = 10; x < 30; x++) expect(sim.tower.place(kind, fl, x).ok).toBe(true);
+    }
+    expect(sim.buildTransport("elevatorStandard", 10, 1, 30).ok).toBe(true);
+    const r = sim.tower.place("office", 23, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
+    expect(line?.textContent).toContain(
+      "A sky lobby on floor 30 would lift it (the stories above it must come down before it can be cleared).",
+    );
+  });
+
   it("tells a tenant sitting on the empty slot floor to move, not to demolish itself", () => {
     // Rooms are legal on an unclaimed sky-lobby story, so an office can sit ON
     // the skipped slot. "Clear floor 30" would demolish the advised office, so

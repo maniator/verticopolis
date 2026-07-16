@@ -294,7 +294,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         lines.push(
           drain.erosion > SERVED_RECOVERY
             ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice, and no closer sky lobby slot exists this high in the tower.</div>`
-            : html`<div>Far from the nearest lobby${distNote}. Satisfaction settles a little below full here; no closer sky lobby slot exists this high in the tower.</div>`,
+            : html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out; no closer sky lobby slot exists this high in the tower.</div>`,
         );
       } else {
         // Name the WHOLE project the build rules will actually accept, never a
@@ -307,6 +307,10 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         // directly placeable; only a slot higher than that needs floors first.
         const needsSupport = slot > sim.tower.highestFloor + 1;
         const clearFirst = !onSlot && !needsSupport && sim.tower.floorHasNonLobbyContent(slot);
+        // Clearing the slot is itself refused while stories rest on it, so the
+        // advice names the teardown too; the in-place floor-to-lobby conversion
+        // that would spare it is the gated #317 engine change (backlog).
+        const blockedAbove = clearFirst && sim.tower.floorHasNonLobbyContent(slot + 1);
         if (drain.erosion > SERVED_RECOVERY) {
           // The strong "sinks until notice" warning only when the distance erosion
           // actually outpaces the served recovery, so the tenant really is sliding
@@ -315,9 +319,11 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
             ? `This unit sits on the empty sky lobby slot; move it and build the lobby on floor ${slot} to anchor the block.`
             : needsSupport
               ? `Build floors up to ${slot} and put the sky lobby there to lift these tenants.`
-              : clearFirst
-                ? `Clear floor ${slot} and build the sky lobby there to lift these tenants.`
-                : `Build the sky lobby on floor ${slot} to lift these tenants.`;
+              : blockedAbove
+                ? `Take down the stories above floor ${slot}, clear it, and build the sky lobby there to lift these tenants.`
+                : clearFirst
+                  ? `Clear floor ${slot} and build the sky lobby there to lift these tenants.`
+                  : `Build the sky lobby on floor ${slot} to lift these tenants.`;
           lines.push(
             html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. ${fix}</div>`,
           );
@@ -328,9 +334,11 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
             ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves, would lift the block.`
             : needsSupport
               ? `A sky lobby on floor ${slot} would lift it (build floors up to it first).`
-              : clearFirst
-                ? `A sky lobby on floor ${slot} would lift it (clear that floor first).`
-                : `A sky lobby on floor ${slot} would lift it.`;
+              : blockedAbove
+                ? `A sky lobby on floor ${slot} would lift it (the stories above it must come down before it can be cleared).`
+                : clearFirst
+                  ? `A sky lobby on floor ${slot} would lift it (clear that floor first).`
+                  : `A sky lobby on floor ${slot} would lift it.`;
           lines.push(
             html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. ${fix}</div>`,
           );

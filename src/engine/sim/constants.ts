@@ -1,5 +1,5 @@
 import type { Unit } from "../types";
-import { GRID } from "../facilities";
+import { GRID } from "../facilitiesData";
 
 /** How long (game minutes) an office/condo tenant stays "on notice" in the
  *  `vacating` state before actually leaving, a grace window the player can use
