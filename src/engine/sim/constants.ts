@@ -124,6 +124,23 @@ export const LOBBY_NO_DRAIN: { readonly cap: number; readonly erosion: number } 
  *  "capped but stable" tenant from one actually sliding toward a notice). */
 export const SERVED_RECOVERY = 0.05;
 
+/**
+ * Unmet local-demand thresholds (leave-tower-unmet-demand, #395). A tenant's
+ * retail demand-coverage sits in [0, 1] (1 = the reachable shops and eateries
+ * comfortably cover the tower's demand; 0 = nowhere to eat or shop within reach).
+ * When coverage drops below {@link UNMET_DEMAND_FLOOR}, satisfaction is capped at
+ * {@link UNMET_DEMAND_CAP} (lowers renewal, canon "not enough amenities"); Modern
+ * additionally erodes once coverage falls below {@link UNMET_DEMAND_EVICT_FLOOR},
+ * so a chronically under-served tenant eventually gives notice. Classic caps but
+ * never erodes (it returns {@link LOBBY_NO_DRAIN} above the floor and a
+ * ceiling-only drain below it). Provisional, shared by both rule-sets; the Modern
+ * erosion magnitude lives in `ECON.unmetDemandErosion`. Kept strictly below 1 so
+ * a fully-served tower (coverage 1) is a no-op and the golden master is unchanged.
+ */
+export const UNMET_DEMAND_FLOOR = 0.5;
+export const UNMET_DEMAND_CAP = 0.6;
+export const UNMET_DEMAND_EVICT_FLOOR = 0.25;
+
 /** Canon same-floor noise buffers, in tiles (the gap a source may sit within
  *  before it bothers the sensitive room). Only these two are documented numbers;
  *  everything else reuses the room's own band (see arch §2.2 / gdd §4.2). The

@@ -53,6 +53,15 @@ export interface DemandMap {
    *  while a low `share` means capacity outstrips demand (over-built). The Modern
    *  inspector advice reads this; 0 when there is no reachable capacity. */
   share: number;
+  /** Count of operational RETAIL venues (shop, fast food, restaurant) BUILT in
+   *  the tower, whether or not they are reachable. Distinct from `fractionByUnit`
+   *  (which counts only the REACHABLE venues that earn a fraction): a tower whose
+   *  retail is all on stranded floors has `retailVenueCount > 0` but an empty
+   *  `fractionByUnit`. The unmet-demand exemption (#395) keys on this so a tower
+   *  that HAS retail but leaves it all unreachable still penalizes its tenants
+   *  (coverage 0), while a tower with no retail at all stays the exempt baseline.
+   *  Attendance venues (cinema, party hall) are excluded, matching `fractionByUnit`. */
+  retailVenueCount: number;
 }
 
 /** The demand weight of an origin kind, reusing the meal-cadence origin weights
@@ -125,11 +134,13 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   // income loop instead, and so never appear in `fractionByUnit`/`deliveredByUnit`.
   const venues: { id: number; cap: number }[] = [];
   let totalCap = 0;
+  let retailVenueCount = 0;
   for (const u of sim.tower.units) {
     const cap = ECON.dailyTrafficIncome[u.kind];
     if (cap === undefined) continue; // not a traffic venue
     if (attendanceCap(u.kind) !== undefined) continue; // attendance venue: earns from live fill, not the retail pool (#424)
     if (!isOperational(u)) continue; // gutted / burning / under construction earns nothing
+    retailVenueCount++; // a built, operational retail venue (reachable or not): the #395 exemption reads this
     if (!draws(u.floor)) continue; // stranded: no patrons, contributes no capacity
     venues.push({ id: u.id, cap });
     totalCap += cap;
@@ -182,7 +193,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     fractionByUnit.set(v.id, frac);
     deliveredByUnit.set(v.id, frac * v.cap);
   }
-  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share };
+  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share, retailVenueCount };
 }
 
 /**

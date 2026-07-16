@@ -119,8 +119,11 @@ export function isUnitState(v: unknown): v is UnitState {
  *  the nearest (sky)lobby, worn down by the graduated distance penalty once it is
  *  deep in the very-far band (a tall tower that skipped a sky lobby, so a floor
  *  sits past the lobby-ladder reach). The fix is a sky lobby (a nearer stairway or
- *  elevator does not help). */
-export type VacateReason = "access" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "relocation";
+ *  elevator does not help). `unmetDemand` marks a served office/hotel/condo whose
+ *  reachable shops and eateries cannot cover the tower's demand (Modern evicts for
+ *  it; Classic caps only); the fix is more reachable retail. */
+export type VacateReason =
+  | "access" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
@@ -133,20 +136,15 @@ export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   noise: "a noisy neighbor nearby",
   transportFar: "too far from a stairway, escalator, or passenger elevator",
   lobbyFar: "too far from a lobby or sky lobby",
+  unmetDemand: "too few shops or restaurants within reach",
   relocation: "the household is relocating",
 };
 
-/** Guard for a persisted departure cause from an untrusted save. */
+/** Guard for a persisted departure cause from an untrusted save. Derived from
+ *  {@link VACATE_REASON_TEXT} so the two can never drift as causes are added. */
+const VACATE_REASONS: ReadonlySet<string> = new Set(Object.keys(VACATE_REASON_TEXT));
 export function isVacateReason(v: unknown): v is VacateReason {
-  return (
-    v === "access" ||
-    v === "congestion" ||
-    v === "rent" ||
-    v === "noise" ||
-    v === "transportFar" ||
-    v === "lobbyFar" ||
-    v === "relocation"
-  );
+  return typeof v === "string" && VACATE_REASONS.has(v);
 }
 
 /** A unit that is live: not under construction, ablaze, or a burned-out shell.

@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
-import { dominantGripe, vacateCause } from "../../engine/sim/satisfaction";
+import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/gripe";
+import type { DemandMap } from "../../engine/sim/demand";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
@@ -178,5 +179,70 @@ describe("the Main gripe inspector line", () => {
     // Access has its own actionable line; the Main gripe line does not repeat it.
     expect(text).toContain("Access:");
     expect(text).not.toContain("Main gripe:");
+  });
+});
+
+/** A minimal DemandMap for the pure coverage read. `unmetCoverage` reads the
+ *  per-origin reachable-venue count, `share`, and whether ANY retail is BUILT in
+ *  the tower (`retailVenueCount`, reachable or not). `venueCount` seeds the
+ *  REACHABLE venues in `fractionByUnit`; `retailVenueCount` defaults to it but can
+ *  be set higher to model retail that is built yet unreachable (all on stranded
+ *  floors), where `fractionByUnit` is empty but the tower still has shops. */
+function fakeDemand(
+  share: number,
+  entries: [number, number][],
+  venueCount = share > 0 ? 1 : 0,
+  retailVenueCount = venueCount,
+): DemandMap {
+  const fractionByUnit = new Map<number, number>();
+  for (let i = 0; i < venueCount; i++) fractionByUnit.set(1000 + i, Math.min(1, share));
+  return {
+    fractionByUnit,
+    deliveredByUnit: new Map(),
+    reachableVenuesByOrigin: new Map(entries),
+    share,
+    retailVenueCount,
+  };
+}
+
+describe("unmetCoverage (#395 retail-coverage read)", () => {
+  const u = { id: 1 } as unknown as Unit;
+
+  it("exempts a unit that is not a counted demand origin this tick", () => {
+    expect(unmetCoverage(fakeDemand(2, []), u)).toBeNull();
+  });
+
+  it("exempts a tower with no retail built at all (share 0), even for a counted origin", () => {
+    // An office building with no shops is the baseline, not an unmet-demand problem.
+    expect(unmetCoverage(fakeDemand(0, [[1, 0]]), u)).toBeNull();
+  });
+
+  it("reads 0 coverage when retail exists in the tower but this origin can reach none", () => {
+    expect(unmetCoverage(fakeDemand(1.5, [[1, 0]]), u)).toBe(0);
+  });
+
+  it("reads 0 (not exempt) for a stranded origin when retail exists but the demand pool is empty", () => {
+    // share is 0 here because the pool is empty (every origin stranded), NOT because
+    // there is no retail: the tower has one reachable venue, so a stranded tenant
+    // that can reach none is under-served (coverage 0), not exempt.
+    expect(unmetCoverage(fakeDemand(0, [[1, 0]], 1), u)).toBe(0);
+  });
+
+  it("reads 0 (not exempt) when the tower's retail is all unreachable (built but stranded)", () => {
+    // A tower that HAS shops but leaves them all on stranded floors: `fractionByUnit`
+    // is empty (no REACHABLE venue), yet `retailVenueCount` is 1, so a tenant that
+    // can reach none is under-served (coverage 0), not the no-retail baseline. Keying
+    // the exemption on the reachable count would have wrongly exempted this.
+    expect(unmetCoverage(fakeDemand(0, [[1, 0]], 0, 1), u)).toBe(0);
+  });
+
+  it("reads full coverage when reachable capacity meets or beats demand", () => {
+    expect(unmetCoverage(fakeDemand(0.4, [[1, 2]]), u)).toBe(1); // share < 1 → capped at 1
+    expect(unmetCoverage(fakeDemand(1, [[1, 2]]), u)).toBe(1);
+  });
+
+  it("reads the shortfall (1 / share) when demand outstrips reachable capacity", () => {
+    expect(unmetCoverage(fakeDemand(2, [[1, 3]]), u)).toBe(0.5);
+    expect(unmetCoverage(fakeDemand(4, [[1, 3]]), u)).toBe(0.25);
   });
 });

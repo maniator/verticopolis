@@ -9,6 +9,8 @@ import type { FacilityKind, Unit, VacateReason } from "../types";
 import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, GRIPE_WARN, NOISE_EROSION, CONDO_NOISE_EROSION, TRANSPORT_FAR_TILES, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES, LOBBY_NO_DRAIN, SERVED_RECOVERY } from "./constants";
+import { computeDemandMap, type DemandMap } from "./demand";
+import { unmetCoverage } from "./gripe";
 
 /** Presence, satisfaction, noise notices for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -86,6 +88,13 @@ export function updateSatisfaction(sim: Simulation): void {
   // One set read per sweep instead of a 4-deep delegation per unit: the set
   // itself is already revision-memoized (tower/routing.ts servedFloors).
   const servedSet = sim.tower.servedFloors();
+  // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
+  // income loop) rather than through the hour-memoized accessor, so an occupancy
+  // change is reflected the same tick and the inspector memo is not perturbed. It
+  // draws no RNG and mutates nothing, so it never touches the seeded stream. Built
+  // LAZILY on the first served office/condo/hotel that reads coverage, so a tower
+  // with no such tenant (all-commercial, still-empty, or early game) pays nothing.
+  let demandMap: DemandMap | null = null;
   for (const u of sim.tower.units) {
     if (isDormant(u)) continue;
     const served = servedSet.has(u.floor);
@@ -157,7 +166,20 @@ export function updateSatisfaction(sim: Simulation): void {
         ? sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(u.floor))
         : LOBBY_NO_DRAIN;
     const lobbyCapped = lobbyDrain.cap < 1;
-    if (farWalk || noisy || lobbyCapped) {
+    // W-new unmet local-demand pressure (#395): the same office/condo/hotel set,
+    // keyed on the tenant's reachable retail coverage. It joins THIS shared step
+    // too, so a tenant also hit by noise or lobby distance still erodes once per
+    // tick. Classic caps only (never evicts for it); Modern additionally erodes
+    // once coverage falls deep enough, so a chronically under-served tenant gives
+    // notice. A fully-covered tower (coverage 1) returns the neutral drain, so
+    // this is a no-op there. Couples venue mix to population and the star gates.
+    const coverage =
+      served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
+        ? unmetCoverage((demandMap ??= computeDemandMap(sim)), u)
+        : null;
+    const unmetDrain = coverage === null ? LOBBY_NO_DRAIN : sim.rules.unmetDemandDrain(coverage);
+    const unmetCapped = unmetDrain.cap < 1;
+    if (farWalk || noisy || lobbyCapped || unmetCapped) {
       // A *sold* condo (everOccupied) is an owner, not a nightly guest, so it
       // erodes at the gentler condo rate, sticky against a transient neighbor
       // the player removes in time, worn out only by sustained, unaddressed
@@ -177,11 +199,11 @@ export function updateSatisfaction(sim: Simulation): void {
       // One erosion step, steepest cause wins (max, never the sum), so a tenant
       // hit by several placement problems still lands on its cap at the telegraphed
       // pace instead of cratering N times as fast.
-      const erosion = Math.max(placementErosion, lobbyDrain.erosion);
-      // The ceiling is the tightest among the active afflictions (noise 0.6 and/or
-      // the lobby-distance cap). Erode THEN clamp so a freshly-exposed unit lands
-      // exactly on the cap.
-      const cap = Math.min(farWalk || noisy ? NOISE_CAP : 1, lobbyDrain.cap);
+      const erosion = Math.max(placementErosion, lobbyDrain.erosion, unmetDrain.erosion);
+      // The ceiling is the tightest among the active afflictions (noise 0.6, the
+      // lobby-distance cap, and/or the unmet-demand cap). Erode THEN clamp so a
+      // freshly-exposed unit lands exactly on the cap.
+      const cap = Math.min(farWalk || noisy ? NOISE_CAP : 1, lobbyDrain.cap, unmetDrain.cap);
       u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, cap));
     }
     // The very-far tier (ceiling at or below the gripe bar) is the tier that also
@@ -189,6 +211,12 @@ export function updateSatisfaction(sim: Simulation): void {
     // band (a higher ceiling, no erosion) never bottoms a tenant out on its own, so
     // it is deliberately not a nameable gripe.
     const lobbyFar = lobbyDrain.cap <= GRIPE_WARN;
+    // Unmet demand only NAMES the departure (and can evict) where it actually
+    // erodes: that is Modern past the evict floor. Classic caps but never erodes,
+    // so `unmetDrain.erosion > 0` is false there and unmet demand never becomes a
+    // Classic vacate cause, exactly like noise. The gentlest sink, so it sits last
+    // in the gripe ladder below.
+    const unmetDemand = unmetDrain.erosion > 0;
     // NOTE: the individually-routed crowd's frustration is exposed read-only via
     // {@link crowdStress} for the HUD, but is deliberately NOT written back into
     // satisfaction, its value depends on frame/step cadence, so feeding it into
@@ -232,7 +260,7 @@ export function updateSatisfaction(sim: Simulation): void {
       const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
       const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk || lobbyFar;
       if (noiseCannotEvict && nonNoiseProblem) {
-        u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar);
+        u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand);
       }
       const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
       if (!isRelocation && (u.satisfaction >= VACATE_RESCIND || rescindNoise)) {
@@ -254,11 +282,11 @@ export function updateSatisfaction(sim: Simulation): void {
     } else if (leaseTenant && u.satisfaction <= 0) {
       // Give notice: enter the grace period with the attributed cause.
       u.state = "vacating";
-      u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar);
+      u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand);
       u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
       notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });
     } else if (u.satisfaction <= 0 && isHotelKind(u.kind)) {
-      sim.vacate(u, sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar));
+      sim.vacate(u, sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand));
     }
   }
   sim.emitNotices(notices);
@@ -283,83 +311,6 @@ export function emitNotices(sim: Simulation, notices: { floor: number; kind: Fac
   sim.emit(`${notices.length} tenants gave notice: ${parts.join(", ")}. Fix the flagged units before they leave.`, "bad");
 }
 
-/**
- * The dominant ACTIVE satisfaction drain on a tenant right now, or null when
- * nothing is dragging it down. The order mirrors the drains in
- * {@link updateSatisfaction}: an unreachable floor is harshest, then elevator
- * crowding, then an over-market office rent, then a far-walk office (W1), and
- * finally, for a served, uncongested hotel/condo, office/commercial noise (W2).
- * Where {@link vacateCause} falls back to "access" as the bottom-out catch-all,
- * this returns null so the "Main gripe" inspector line can stay silent for a
- * content tenant. Read-only.
- *
- * `served`/`cong`/`farWalk`/`noisy`/`lobbyFar` accept the flags updateSatisfaction
- * already computed this tick so the attribution never rescans; when absent (the
- * inspector, calling per hover) they recompute through the same predicates.
- * `lobbyFar` ranks after the W1 far-walk and before noise: a very-far tenant
- * erodes in both modes (where Classic noise does not), so naming lobby distance
- * ahead of noise keeps the departure line honest.
- */
-export function dominantGripe(
-  sim: Simulation,
-  u: Unit,
-  served?: boolean,
-  cong?: number,
-  farWalk?: boolean,
-  noisy?: boolean,
-  lobbyFar?: boolean,
-): VacateReason | null {
-  const isServed = served ?? sim.tower.isFloorServed(u.floor);
-  if (!isServed) return "access";
-  if (u.floor !== 1 && (cong ?? sim.congestionAt(u.floor)) > 1) return "congestion";
-  // Very-far from the nearest (sky)lobby (the tier whose ceiling sits at or below
-  // the gripe bar). Recomputed through the same GameRules curve when the flag is
-  // absent. Only office/condo/hotel carry the distance penalty.
-  const veryFar =
-    lobbyFar ??
-    (isServed &&
-      (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo") &&
-      sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(u.floor)).cap <= GRIPE_WARN);
-  if (u.kind === "office") {
-    const cfg = rentConfig("office");
-    if (cfg && rentOf(u) > cfg.default) return "rent";
-    // The W1 walk penalty: its nearest shaft is beyond tolerance. The
-    // ground-floor exemption is an unconditional gate here (offices on floor 1
-    // are never transport-far), so a precomputed farWalk flag can't override it.
-    if (u.floor !== 1 && (farWalk ?? sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES)) {
-      return "transportFar";
-    }
-    if (veryFar) return "lobbyFar";
-    // …or the W2 commercial-noise band next door.
-    if (noisy ?? sim.noiseAfflicted(u)) return "noise";
-    return null;
-  }
-  // A served, uncongested hotel/condo is drained by lobby distance, then by
-  // sustained noise (office or commercial within its band), the last sink.
-  if (veryFar) return "lobbyFar";
-  if (noisy ?? sim.noiseAfflicted(u)) return "noise";
-  return null;
-}
-
-/**
- * Attribute a tenant's DEPARTURE to the dominant drain at the moment it bottomed
- * out, so the toast/on-notice inspector line names the real cause instead of
- * always blaming access. It is {@link dominantGripe} with "access" as the
- * catch-all for the rare emergency-driven bottom-out (a served, uncongested,
- * market-rent, near, un-noisy tenant that still cratered), so the departure line
- * and the pre-notice "Main gripe" line can never disagree on which cause wins.
- */
-export function vacateCause(
-  sim: Simulation,
-  u: Unit,
-  served: boolean,
-  cong: number,
-  farWalk?: boolean,
-  noisy?: boolean,
-  lobbyFar?: boolean,
-): VacateReason {
-  return dominantGripe(sim, u, served, cong, farWalk, noisy, lobbyFar) ?? "access";
-}
 
 /** True when a noise SOURCE of one of `kinds` sits within `maxTiles` tiles
  *  ("segments") of `u` on the same floor, scanning outward from each side of

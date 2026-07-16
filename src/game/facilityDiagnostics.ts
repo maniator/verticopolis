@@ -12,15 +12,18 @@ import type { FacilityKind, Transport, Unit, VacateReason } from "../engine/type
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
  * the drains WITHOUT a dedicated diagnostic line above are named here: access
- * ("not connected" / "too far") and the office long-walk (W1) already have their
- * own actionable lines, and a relocation is a life event, so those causes map to
- * nothing and the gripe line stays off (deferring to the dedicated line). Each
- * string names the lever the player can pull.
+ * ("not connected" / "too far"), the office long-walk (W1), and very-far lobby
+ * distance already have their own actionable lines, and a relocation is a life
+ * event, so those causes map to nothing and the gripe line stays off (deferring
+ * to the dedicated line). Congestion, over-market rent, noise, and unmet local
+ * retail demand (#395) have no such line, so they surface here. Each string
+ * names the lever the player can pull.
  */
 const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
   rent: "the rent is above the going rate. Lower it to keep them.",
   noise: "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.",
+  unmetDemand: "too few shops or restaurants within reach. Add or connect retail near this floor.",
 };
 
 /**
@@ -358,9 +361,10 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // "Main gripe": before an eviction notice ever fires, name the dominant drain
   // on an unhappy tenant (office / condo / hotel) that isn't already called out
   // by a dedicated line above, so a dropping satisfaction number reads as an
-  // actionable cause instead of a mystery. Access and the office long-walk keep
-  // their own lines (GRIPE_TEXT skips those causes); this surfaces congestion,
-  // over-market rent, and noise, which were otherwise invisible until the notice.
+  // actionable cause instead of a mystery. Access, the office long-walk, and
+  // very-far lobby distance keep their own lines (GRIPE_TEXT skips those causes);
+  // this surfaces congestion, over-market rent, noise, and unmet local retail
+  // demand, which were otherwise invisible until the notice.
   // Gated at GRIPE_WARN (the noise annoyance ceiling) so a content tenant is left
   // unbothered while a noise-capped one, which sits exactly at the ceiling, is caught.
   if (

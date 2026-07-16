@@ -80,6 +80,15 @@ export const ECON = {
    * Resolved through {@link GameRules.demandModel}. PROVISIONAL, wants tuning.
    */
   demandFloorModern: 0.25,
+  /**
+   * Modern-only per-hour satisfaction erosion for a tenant whose reachable retail
+   * coverage has fallen below `UNMET_DEMAND_EVICT_FLOOR` (leave-tower-unmet-demand,
+   * #395). Strictly above `SERVED_RECOVERY` (0.05) so a chronically under-served
+   * Modern tenant nets a slow negative drift and eventually gives notice, gentle
+   * enough that adding a shop or restaurant within reach lets them recover. Classic
+   * never erodes for unmet demand (it caps only). PROVISIONAL, wants a tuning pass.
+   */
+  unmetDemandErosion: 0.055,
   /** Cost to add one elevator car to a shaft. */
   addCarCost: 40_000,
   /** Monthly film-booking cost per cinema (canon: 150k average / 300k
