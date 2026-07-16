@@ -40,6 +40,12 @@ export class Crowd {
   /** @internal Cached STAFF stop-graph (service elevators / stairs / escalators). */
   staffAdj: Map<number, { f: number; shaft: number; express: boolean }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
+  /** @internal Cached equivalent-shaft banks, keyed "kind:from:to" → sorted
+   *  shaft ids, rebuilt when the tower changes. Lets the shaft-balancing pass
+   *  spread a routed leg across its bank in O(1) instead of rescanning every
+   *  transport per trip. See routing.shaftBanks. */
+  shaftBanks: Map<string, number[]> | null = null;
+  /** @internal */ shaftBanksRev = -1;
   /** @internal Cinema unit ids showing a blockbuster this month, primed once
    *  per outer step by the sim loop from the EconomySystem's bookings (the
    *  crowd never sees the economy directly). Read by the venue-visit spawn
@@ -80,6 +86,8 @@ export class Crowd {
     this.adjRev = -1;
     this.staffAdj = null;
     this.staffAdjRev = -1;
+    this.shaftBanks = null;
+    this.shaftBanksRev = -1;
     this.staffDone = [];
     this.staffCount = 0;
     this.blockbusters = new Set();

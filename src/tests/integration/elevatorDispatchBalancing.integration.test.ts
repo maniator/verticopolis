@@ -18,8 +18,12 @@ describe("Elevator dispatch: shaft fairness across an equivalent bank", () => {
    *  (identical span, distinct columns) forming a bank. */
   function towerWithBank(shafts: number): { tower: Tower; ids: number[] } {
     const tower = new Tower();
-    for (let x = 0; x < 40; x++) tower.place("lobby", 1, x);
-    for (let f = 2; f <= 10; f++) for (let x = 0; x < 40; x++) tower.place("floor", f, x);
+    // Assert every placement the bank depends on: a silent place() failure (a
+    // future placement-rule change) must not degrade the tower shape and make
+    // the fairness assertions pass for the wrong reason (AGENTS.md).
+    for (let x = 0; x < 40; x++) expect(tower.place("lobby", 1, x).ok).toBe(true);
+    for (let f = 2; f <= 10; f++)
+      for (let x = 0; x < 40; x++) expect(tower.place("floor", f, x).ok).toBe(true);
     const ids: number[] = [];
     for (let s = 0; s < shafts; s++) {
       const t = tower.placeTransport("elevatorStandard", 4 + s * 4, 1, 10);
