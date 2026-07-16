@@ -127,7 +127,12 @@ export function registerPWA(handlers: PwaHandlers): void {
     if (hasSurfaced && (key === undefined || key === lastSurfacedKey)) return;
     hasSurfaced = true;
     lastSurfacedKey = key;
-    handlers.onUpdateAvailable(activate, info);
+    // A same-version rebuild (an internal change with no version bump, new sha)
+    // carries the "What's new" notes of the version the player is already on, so
+    // don't replay them; show the build-id line only. A real version change keeps
+    // its notes.
+    const shown = info && info.version === __APP_VERSION__ ? { ...info, notes: [] } : info;
+    handlers.onUpdateAvailable(activate, shown);
   };
 
   const updateSW = registerSW({
