@@ -243,3 +243,46 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     expect(line?.getAttribute("style")).toBeNull(); // informational, not a fault
   });
 });
+
+describe("facilityDiagnostics: No Rate legibility (ux-pricing-split-editor §2.2)", () => {
+  it("a vacant No Rate unit reads the off-market line, uncolored (a chosen setting, not a fault)", () => {
+    const { sim, unit } = simWith("office");
+    unit.state = "empty";
+    unit.noRate = true;
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Off the market"));
+    expect(line?.textContent).toBe("Off the market: No Rate. No one moves in until you set a rate.");
+    expect(line?.getAttribute("style")).toBeNull(); // plain ink: neither --good nor --bad
+  });
+
+  it("an occupied No Rate unit states the census fact out loud", () => {
+    const { sim, unit } = simWith("office");
+    unit.noRate = true; // occupied via the fixture
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("No Rate"));
+    expect(line?.textContent).toBe("No Rate: the tenant stays, pays nothing, and still counts toward stars.");
+    expect(line?.getAttribute("style")).toBeNull();
+  });
+
+  it("sits after the access line and before the on-notice block, so both truths show together", () => {
+    const { sim, unit } = simWith("office");
+    unit.noRate = true;
+    unit.state = "vacating"; // notice given first, then rent zeroed: both show
+    unit.vacateReason = "rent";
+    unit.vacateAt = sim.clock.minutes + 3 * 60;
+    unit.satisfaction = 0.2;
+    const texts = [...render(facilityDiagnostics(sim, unit)).querySelectorAll("div")].map((d) => d.textContent ?? "");
+    const access = texts.findIndex((t) => t.startsWith("Access:"));
+    const noRate = texts.findIndex((t) => t.startsWith("No Rate") || t.startsWith("Off the market"));
+    const notice = texts.findIndex((t) => t.startsWith("Giving notice"));
+    expect(access).toBeGreaterThanOrEqual(0);
+    expect(noRate).toBeGreaterThan(access);
+    expect(notice).toBeGreaterThan(noRate);
+  });
+
+  it("an on-market unit emits no No Rate line", () => {
+    const { sim, unit } = simWith("office");
+    const texts = [...render(facilityDiagnostics(sim, unit)).querySelectorAll("div")].map((d) => d.textContent ?? "");
+    expect(texts.some((t) => t.includes("No Rate"))).toBe(false);
+  });
+});

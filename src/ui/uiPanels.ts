@@ -1,5 +1,6 @@
 import { render, nothing, type TemplateResult } from "lit-html";
 import type { UI } from "./UI";
+import { syncRungSelects } from "./templates/rungPicker";
 
 /**
  * Editor and inspector panel rendering and placement for {@link UI}, as friend
@@ -17,6 +18,10 @@ import type { UI } from "./UI";
  *  never write its innerHTML around lit's back. */
 export function renderEditor(ui: UI, tpl: TemplateResult): void {
   render(tpl, ui.el.editor);
+  // Selection on a native select must be written after the options attach
+  // (see rungPicker.ts); a no-op when the card has no picker or it already
+  // agrees with the engine.
+  syncRungSelects(ui.el.editor);
   ui.el.editor.classList.remove("hidden");
   // Re-measure after every render so per-frame anchoring keeps reading the
   // cache, never layout. This runs at the ~6 Hz editor pump, not per frame,
@@ -40,6 +45,13 @@ export function wireEditorActions(ui: UI): void {
     if (x && ui.el.editor.contains(x)) return hideEditor(ui);
     const b = target.closest<HTMLElement>("[data-edit]");
     if (b && ui.el.editor.contains(b)) ui.cb.onEditAction(b.dataset.edit!, ui.el.editor);
+  });
+  // Selects (the Classic rung picker) commit on `change`, not click; the same
+  // delegated pattern so lit re-renders never need rewiring. The handler reads
+  // the select's live value out of the card, exactly like the rename input.
+  ui.el.editor.addEventListener("change", (e) => {
+    const s = (e.target as Element).closest<HTMLSelectElement>("select[data-edit-select]");
+    if (s && ui.el.editor.contains(s)) ui.cb.onEditAction(s.dataset.editSelect!, ui.el.editor);
   });
 }
 

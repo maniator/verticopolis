@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES, isElevatorKind, maxCarsFor } from "../engine/facilities";
-import { ECON, rentConfig, carResaleRefund, extendBill } from "../engine/econConfig";
+import { FACILITIES, isElevatorKind, isHotelKind, maxCarsFor } from "../engine/facilities";
+import { ECON, carResaleRefund, extendBill } from "../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
@@ -117,12 +117,14 @@ export class EditorActions {
   }
 
   /** Open the batch-pricing dialog pre-scoped to `kind`, wired to the engine's
-   *  pure preview + mutating apply (what you preview is what commits). */
+   *  pure preview + mutating apply (what you preview is what commits). The
+   *  dialog renders a rung picker or the range editor off the SHAPE of the
+   *  mode's price options, never the mode string. */
   private openBatchPricing(kind: FacilityKind): void {
-    const band = rentConfig(kind);
-    if (!band) return;
+    const options = this.deps.getSim().rules.priceOptions(kind);
+    if (!options) return;
     this.deps.ui.showBatchPricingDialog(
-      { kind, kindLabel: FACILITIES[kind].name, band },
+      { kind, kindLabel: FACILITIES[kind].name, options },
       {
         preview: (target, opts) => this.deps.getSim().previewRentBatch(kind, target, opts)!,
         apply: (target, opts) => {
@@ -152,6 +154,7 @@ export class EditorActions {
       rename: "Rename",
       rentUp: "Rent change",
       rentDown: "Rent change",
+      rung: "Rent change",
       addcar: "Elevator cars",
       removecar: "Elevator cars",
       stops: "Elevator stops",
@@ -181,6 +184,30 @@ export class EditorActions {
         if (sim.adjustRent(u.id, action === "rentUp" ? 1 : -1) !== null) {
           this.deps.audio.sfx("click");
           this.deps.refreshEditor();
+        }
+      } else if (action === "rung") {
+        // The Classic rung picker commits on change: a rung applies through the
+        // engine's one price choke point; "noRate" takes the unit off the
+        // market (charges nothing, blocks move-ins, never evicts). Announced
+        // with the pinned strings (ux-pricing-split-editor §1.4 / §5).
+        const sel = root.querySelector<HTMLSelectElement>("#ed-rung");
+        const shape = sim.rules.priceOptions(u.kind);
+        if (sel && shape?.shape === "ladder") {
+          if (sel.value === "noRate") {
+            if (sim.setNoRate(u.id)) {
+              this.deps.audio.sfx("click");
+              this.deps.announce("No Rate: off the market. Charges nothing; no one moves in.");
+              this.deps.refreshEditor();
+            }
+          } else {
+            const rung = shape.rungs[Number(sel.value)];
+            if (rung && sim.priceUnit(u, rung.value) !== null) {
+              const what = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Rent";
+              this.deps.audio.sfx("click");
+              this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);
+              this.deps.refreshEditor();
+            }
+          }
         }
       } else if (action === "filmPolicy") {
         const order = ["auto", "feature", "blockbuster"] as const;

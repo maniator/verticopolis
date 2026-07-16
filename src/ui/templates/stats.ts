@@ -83,7 +83,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
       <div class="col kv">
         <span class="k">Offices</span><span class="v">${s.occupiedOffices}/${s.offices}</span>
         <span class="k">Condos sold</span><span class="v">${s.soldCondos}/${s.condos}</span>
-        <span class="k">Vacancies</span><span class="v">${s.vacant}</span>
+        <span class="k">Vacancies</span><span class="v">${s.vacant}${s.vacantNoRate ? ` (${s.vacantNoRate} off-market)` : ""}</span>
       </div>
       <div class="col kv">
         <span class="k">Hotel rooms in use</span><span class="v">${s.occupiedHotel}/${s.hotelRooms}</span>

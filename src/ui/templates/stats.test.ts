@@ -264,3 +264,26 @@ describe("incomeSection (income breakdown)", () => {
     expect(renderToFragment(statsTemplate(sim)).textContent).not.toContain("Income (avg / day");
   });
 });
+
+describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
+  it("plain vacancies read the bare number; off-market vacancies add the parenthetical", () => {
+    const sim = builtTower();
+    // Two more offices: one plain-vacant, one vacant AND off-market.
+    const a = sim.tower.place("office", 2, 12 + 9);
+    expect(a.ok).toBe(true);
+    const b = sim.tower.place("office", 2, 12 + 18);
+    expect(b.ok).toBe(false); // floor strip ends at 29; widen below
+    for (let x = 30; x < 45; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 30; x < 45; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const c = sim.tower.place("office", 2, 30);
+    expect(c.ok).toBe(true);
+    const vacantRow = () => {
+      const frag = renderToFragment(statsTemplate(sim));
+      const key = [...frag.querySelectorAll("span.k")].find((k) => k.textContent === "Vacancies");
+      return (key?.nextElementSibling as HTMLElement).textContent;
+    };
+    expect(vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
+    sim.tower.units.find((u) => u.id === c.unitId)!.noRate = true;
+    expect(vacantRow()).toBe("2 (1 off-market)"); // the honest split
+  });
+});

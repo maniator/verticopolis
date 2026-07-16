@@ -3,10 +3,16 @@ import {
   batchPricingTemplate,
   batchPriceText,
   batchPreviewMessage,
+  batchRungTemplate,
+  batchRungPreviewMessage,
   type BatchPricingCtx,
   type BatchPricingState,
   type BatchPricingHandlers,
+  type BatchRungCtx,
+  type BatchRungState,
+  type BatchRungHandlers,
 } from "./batchPricing";
+import { CLASSIC_RULES, type PriceRung } from "../../engine/gameRules";
 import type { BatchRentResult } from "../../engine/Simulation";
 import { renderToFragment, click, change, input } from "../testing/litTestUtils";
 
@@ -137,5 +143,74 @@ describe("batchPreviewMessage reproduces the honest count sentence", () => {
   it("appends the clamp clauses when the target leaves the band", () => {
     expect(batchPreviewMessage(CTX, 20000, baseResult({ clampedHigh: 1 }))).toContain("Clamped to the $20,000 max.");
     expect(batchPreviewMessage(CTX, 5000, baseResult({ clampedLow: 1 }))).toContain("Clamped to the $5,000 min.");
+  });
+});
+
+describe("batchRungTemplate (the Classic ladder variant, ux-pricing-split-editor §1.7)", () => {
+  const RUNGS = (CLASSIC_RULES.priceOptions("office") as { rungs: readonly PriceRung[] }).rungs;
+  const RCTX: BatchRungCtx = { noun: "offices", single: "office", rungs: RUNGS };
+  const rnoop: BatchRungHandlers = {
+    onChoiceChange: () => {},
+    onOnlyChange: () => {},
+    onApply: () => {},
+    onCancel: () => {},
+  };
+  const rstate = (over: Partial<BatchRungState> = {}): BatchRungState => ({
+    choice: 2,
+    only: false,
+    noRateArmed: false,
+    previewMsg: "",
+    applyDisabled: false,
+    ...over,
+  });
+
+  it("swaps the number machinery for the rung picker: no price field, no band hint, no mode radios", () => {
+    const frag = renderToFragment(batchRungTemplate(RCTX, rstate(), rnoop));
+    expect(frag.querySelector("#bp-rung")).not.toBeNull();
+    expect(frag.querySelector("#bp-price")).toBeNull();
+    expect(frag.querySelector(".bp-band")).toBeNull();
+    expect(frag.querySelector('input[type="radio"]')).toBeNull();
+    expect(frag.textContent).toContain("Set every office to");
+    // The filter survives, reworded to the ladder.
+    expect(frag.textContent).toContain("Only offices still on Average");
+    // The preview stays a polite live region; one primary plus Cancel.
+    expect(frag.querySelector("#bp-preview")!.getAttribute("aria-live")).toBe("polite");
+    expect(frag.querySelectorAll(".modal-actions .btn.primary")).toHaveLength(1);
+  });
+
+  it("relabels the primary to Confirm No Rate while armed", () => {
+    expect(
+      renderToFragment(batchRungTemplate(RCTX, rstate(), rnoop)).querySelector("#bp-apply")!.textContent,
+    ).toBe("Apply");
+    expect(
+      renderToFragment(batchRungTemplate(RCTX, rstate({ choice: "noRate", noRateArmed: true }), rnoop))
+        .querySelector("#bp-apply")!.textContent,
+    ).toBe("Confirm No Rate");
+  });
+
+  it("pins the preview sentences: rung, sold-skipped, and the No Rate warning", () => {
+    const r = (over: Partial<BatchRentResult> = {}): BatchRentResult => ({
+      matched: 12,
+      eligible: 9,
+      changed: 9,
+      skippedSold: 0,
+      skippedCustom: 0,
+      customOverwritten: 0,
+      clampedLow: 0,
+      clampedHigh: 0,
+      ...over,
+    });
+    expect(batchRungPreviewMessage(RCTX, 1, r())).toBe("Set 9 of 12 offices to Low ($5,000).");
+    const condoCtx: BatchRungCtx = {
+      noun: "condos",
+      single: "condo",
+      rungs: (CLASSIC_RULES.priceOptions("condo") as { rungs: readonly PriceRung[] }).rungs,
+    };
+    expect(batchRungPreviewMessage(condoCtx, 3, r({ matched: 6, changed: 4, skippedSold: 2 }))).toBe(
+      "Set 4 of 6 condos to High ($200,000). 2 sold skipped.",
+    );
+    expect(batchRungPreviewMessage(RCTX, "noRate", r({ matched: 14, changed: 12 }))).toBe(
+      "Take 12 of 14 offices off the market (No Rate). Occupied offices keep their tenants and charge nothing.",
+    );
   });
 });

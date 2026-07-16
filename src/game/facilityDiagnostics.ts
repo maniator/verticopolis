@@ -218,6 +218,19 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           : html`<div style="color:var(--bad)">Access: too far. 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`,
     );
   }
+  // No Rate (off-market) legibility: a chosen setting, so plain ink, neither
+  // --good nor --bad. The occupied line states the census fact out loud on
+  // purpose (free tenants still count is canon, the 1994 cheap-rent lever
+  // endpoint), so it never reads as a bug later. Sits after the access line
+  // and before the on-notice block, so a No Rate unit that is ALSO on notice
+  // shows both truthfully (ux-pricing-split-editor §2.2).
+  if (u.noRate) {
+    lines.push(
+      isPresent(u)
+        ? html`<div>No Rate: the tenant stays, pays nothing, and still counts toward stars.</div>`
+        : html`<div>Off the market: No Rate. No one moves in until you set a rate.</div>`,
+    );
+  }
   // Silent rule: hotel guests stop counting toward the star rating at 4★.
   if (isHotelKind(u.kind)) {
     lines.push(
