@@ -1,6 +1,7 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
+import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { ECON } from "../engine/econConfig";
@@ -264,6 +265,35 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     lines.push(
       html`<div style="color:var(--bad)">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`,
     );
+  }
+  // W-new (#394): a served office/condo/hotel far from the nearest (sky)lobby caps
+  // low, and deep in the very-far band also erodes toward a move-out. Name the
+  // structural fix (a sky lobby, not a local shaft). Always-on, like W1/W3. Modern
+  // shows the live distance (advice-with-numbers); Classic names the band only.
+  if (
+    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind)) &&
+    sim.tower.isFloorServed(u.floor)
+  ) {
+    const lobbyDist = sim.tower.nearestLobbyFloorDistance(u.floor);
+    const drain = sim.rules.lobbyDistanceDrain(lobbyDist);
+    if (drain.cap < 1) {
+      // Modern shows the live distance; Classic names the situation without it.
+      const distNote = sim.rules.mode === "modern" ? `: ${lobbyDist} floors` : "";
+      // The strong "sinks until notice" warning only when the distance erosion
+      // actually outpaces the served recovery, so the tenant really is sliding out
+      // (Classic very far, or Modern deep isolation). At shallower distances the
+      // ceiling just holds satisfaction down without evicting, which the gentler
+      // line describes honestly.
+      if (drain.erosion > SERVED_RECOVERY) {
+        lines.push(
+          html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Add a sky lobby (every 15th floor) within reach.</div>`,
+        );
+      } else {
+        lines.push(
+          html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A nearer sky lobby (every 15th floor) would lift it.</div>`,
+        );
+      }
+    }
   }
   // Recycling runs on demand: how full it is right now, and whether the
   // tower has outgrown its centers (the canon 4★ gate).

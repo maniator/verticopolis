@@ -80,7 +80,7 @@ elevators, commercial economy, tenant life, UI legibility).
 | Story | Area | Issue | Type / Prio | Summary |
 | --- | --- | --- | --- | --- |
 | `commercial-demand-pools` | Commercial | #393 | feature-request, P2 (epic, spec-first) | Replace the tower-wide `trafficAppeal` scalar with a per-origin demand budget split across reachable venues. Restores diminishing returns, cross-venue lift, and makes the "abandonment limit" emergent. Economy core, needs a golden calibration test. |
-| `graduated-lobby-distance-eval` | Tenant life / Traffic | #394 | feature-request, P2 | Extend the office-only W1 far penalty into a graduated far / very-far satisfaction drain keyed on floors from the nearest (sky)lobby, for office/condo/hotel, caps-not-kills, with a `lobbyFar` vacate cause. Motivates sky lobbies. |
+| `graduated-lobby-distance-eval` | Tenant life / Traffic | #394 | feature-request, P2 | Extend the office-only W1 far penalty into a graduated far / very-far satisfaction drain keyed on floors from the nearest (sky)lobby, for office/condo/hotel, with a `lobbyFar` vacate cause. FAR caps satisfaction (never evicts); VERY FAR (past the lobby-ladder reach, i.e. a skipped sky lobby) also erodes gently and can evict. Motivates sky lobbies: building them every 15 floors keeps every floor capped-at-worst, never force-evicted. |
 | `leave-tower-unmet-demand` | Tenant life / Commercial | #395 | feature-request, P2 (depends on #393) | A soft satisfaction drain when a tenant's reachable local-venue coverage falls below a floor, routed into the existing vacate path. Couples venue mix to population to star gates. Operates on the census, not the drawn crowd. |
 | `contiguous-skylobby-transfer` | Traffic | #396 | feature-request, P3 (Classic-gated) | Make express/standard transfers explicitly require a contiguous sky lobby, vs today's implicit shared-stop adjacency. Routing-admissibility change, gated via `gameRules.ts`. |
 | `condo-demographic-routines` | Tenant life | #397 | feature-request, P3 (Modern) | Add school-run and office sales-call outbound trips, faked statistically as spawn-mix and timing biases. Builds on the condo-departures GDD. Texture and rhythm. |
@@ -117,7 +117,7 @@ because otherwise Classic is not actually reproducing the classic game.
 | System | Classic (fidelity) | Modern (opt-in layer) |
 | --- | --- | --- |
 | Per-venue demand pools (#393) | Dedicated 1994 targets and the split denominator | Same shape, retuned magnitudes for larger towers |
-| Lobby-distance penalty (#394) | Graduated on the canon mid-block bands, caps not kills | Smoother continuous curve, distance shown in the inspector |
+| Lobby-distance penalty (#394) | Two discrete canon bands: FAR caps satisfaction only (never evicts), VERY FAR also erodes gently and can eventually evict (cause `lobbyFar`) | Smoother continuous curve over the same anchors, gentler at the same distance, live distance shown in the inspector |
 | Leave-if-no-venue (#395) | Firmer population consequence | Soft drain into the existing grace-period vacate |
 | Contiguous sky-lobby transfer (#396) | Enforced | May keep the current forgiving implicit routing |
 | Weekend patronage (#398) | Exact 1994 numbers | Tunable multipliers |

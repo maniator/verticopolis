@@ -157,15 +157,16 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * re-pins this constant IN THAT PR, with a comment explaining what shifted, so
  * the change is deliberate and reviewable, never an accident.
  *
- * Last re-pinned for commercial demand pools (#393): the fixture's two fast-food
- * venues now earn a demand-driven share of their daily figure (the connected
- * office census split across the reachable venues) instead of the old tower-wide
- * appeal scalar, so their accrued income (and the money/patronage fields it
- * touches) shifts. Behavior is otherwise unchanged; the fixture stays a
- * fully-connected Classic tower whose offices feed its venues, so commercial
- * income is conserved near this calibration point rather than zeroed.
+ * Last re-pinned for the graduated lobby-distance penalty (#394): the fixture's
+ * upper rooms sit up to 5 floors above the ground lobby (its highest occupied
+ * floor is 6, distance 5), which now falls in the "far" band, so those tenants
+ * cap at LOBBY_FAR_CAP (0.7) instead of drifting toward 1.0. Their satisfaction
+ * fields (and nothing else) shift. The fixture builds no sky lobby, so it exercises
+ * the far ceiling only, not the very-far erosion. The prior re-pin was for
+ * commercial demand pools (#393): the fixture's fast-food venues earn a
+ * demand-driven share instead of the old tower-wide appeal scalar.
  */
-const PINNED_STATE_HASH = "e1f9be18ace3421eb2faa923943934b473668f70ba3d2d1967370ad2c590a787";
+const PINNED_STATE_HASH = "4d3a93016a2d7431c8f1272c0a0418580231d80db10aa7ad882b2ee2033debb3";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
@@ -176,6 +177,8 @@ const PINNED_STATE_HASH = "e1f9be18ace3421eb2faa923943934b473668f70ba3d2d1967370
  * that legitimately changes Modern behavior, with intent, exactly like the Classic
  * hash above. First pinned alongside Phase C of commercial demand pools (#393),
  * which added no Modern income math itself (the value simply captures Modern's
- * demand-pools behavior, previously unpinned).
+ * demand-pools behavior, previously unpinned). Re-pinned for #394: the fixture's
+ * upper rooms now feel the Modern far-band ceiling (a smoother continuous curve
+ * over the same anchors), shifting their satisfaction fields.
  */
-const PINNED_MODERN_STATE_HASH = "3d534086a370ec52d1008fd0295f74a2bc4697e30a8d5ab427627b709d1f857e";
+const PINNED_MODERN_STATE_HASH = "faee6fd5ea7f3a75574fd98398ad3f1a3049bb0d83f2e92f5af5f7812611fd97";
