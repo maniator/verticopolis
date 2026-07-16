@@ -88,13 +88,60 @@ export function route(crowd: Crowd, tower: Tower, from: number, to: number): Rou
   // Classic gates express transfers to (sky) lobby floors (1994 canon, see
   // GameRules.expressTransferNeedsLobby); Modern keeps the plain BFS, byte-for-
   // byte the pre-gate behavior. The rule object decides, never the mode string.
-  if (!tower.rules.expressTransferNeedsLobby()) return bfsRoute(adj, from, to, MAX_RIDES);
   // v1 uses the FLOOR-LEVEL rule: the shared stop must be a lobby floor (has
   // lobby tiles, or is the ground floor 1, the tower's entrance lobby). This is
   // a deliberate simplification: the 1994 game's finer notion, a contiguous
   // lobby SPAN actually touching both shafts on that floor, is not modeled yet,
   // so a lobby tile anywhere on the floor admits the transfer tower-wide.
-  return bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor));
+  const r = tower.rules.expressTransferNeedsLobby()
+    ? bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor))
+    : bfsRoute(adj, from, to, MAX_RIDES);
+  // The chosen PATH (and thus the express-transfer decision above) is fixed;
+  // balanceShafts only re-picks WHICH physical shaft of an equivalent bank
+  // carries each leg, so the gate outcome is untouched.
+  return r && balanceShafts(crowd, tower, r);
+}
+
+/**
+ * Spread each ride leg across its bank of equivalent parallel shafts.
+ *
+ * {@link bfsRoute} finds the fewest-transfer PATH, but its edge-order tie-break
+ * names the SAME shaft every time a floor pair is served by several equivalent
+ * shafts, so identical trips funnel onto one shaft of a bank while its siblings
+ * sit idle (the landing queue there piles up and the drawn crowd makes it
+ * obvious). This keeps the path bfsRoute chose and only re-picks WHICH physical
+ * shaft of an equivalent bank carries each leg, drawing from the seeded crowd
+ * rng so the spread is deterministic and reproducible, never build-order
+ * biased. A leg with no sibling shaft draws nothing, so a tower without a bank
+ * keeps its exact rng stream (the zero-draw gate).
+ *
+ * "Equivalent" is the SAME transport kind stopping at both the leg's boarding
+ * and alighting floors. Matching on kind means this never swaps a rider's
+ * transport MODE: an elevator leg stays an elevator, a service-elevator leg
+ * stays a service elevator, a stair leg stays a stair. So the staff service-first
+ * routing preference bfsRoute expresses (service elevators win route ties over
+ * stairs) survives intact, and pool spans/caps are untouched: this only decides
+ * which shaft within a bank of equals answers the trip.
+ */
+function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
+  for (let i = 0; i < r.shafts.length; i++) {
+    const chosen = tower.getTransport(r.shafts[i]);
+    if (!chosen) continue;
+    const from = r.floors[i];
+    const to = r.floors[i + 1];
+    // Gather the bank in a STABLE order (ascending id) so a given rng draw maps
+    // to the same shaft run-to-run; the shaft bfsRoute chose is one of them.
+    const bank: number[] = [];
+    for (const t of tower.transports) {
+      if (t.kind !== chosen.kind) continue;
+      if (!tower.stopsAt(t, from) || !tower.stopsAt(t, to)) continue;
+      bank.push(t.id);
+    }
+    if (bank.length <= 1) continue; // no sibling: nothing to balance, no draw
+    bank.sort((a, b) => a - b);
+    r.shafts[i] = bank[crowd.rng.int(0, bank.length - 1)];
+  }
+  return r;
 }
 
 /** Route over the STAFF network (service elevators / stairs / escalators).
@@ -105,7 +152,8 @@ export function route(crowd: Crowd, tower: Tower, from: number, to: number): Rou
  *  ever drift, spawnStaff reports "no-route" so dispatch can surface it
  *  instead of retrying silently.) */
 export function staffRoute(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  return bfsRoute(staffAdjacency(crowd, tower), from, to, Infinity);
+  const r = bfsRoute(staffAdjacency(crowd, tower), from, to, Infinity);
+  return r && balanceShafts(crowd, tower, r);
 }
 
 /** NOTE: edge ORDER is a contract: within a BFS level the first-listed
