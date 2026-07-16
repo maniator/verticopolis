@@ -211,7 +211,19 @@ export function deserialize(raw: SerializedGame): Simulation {
       // pricing bulletin on every load. Ladder mode bounds to the ladder's
       // own extremes (the snap pass then lands it exactly on a rung); band
       // mode keeps the historical bounds.
-      let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
+      // In ladder mode a non-finite forged rent must REACH the snap pass as
+      // non-finite so snapToLadder's documented rule lands it on Average: the
+      // band defaults sit far below the hotel ladders, so coercing through
+      // them here would snap a forged NaN rent to Very Low instead.
+      const ladderPriced = sim.rules.priceOptions(u.kind)?.shape === "ladder";
+      let rent =
+        u.rent === undefined
+          ? undefined
+          : ladderPriced
+            ? typeof u.rent === "number"
+              ? u.rent
+              : Number.NaN
+            : num(u.rent, rentConfig(u.kind)?.default ?? 0);
       if (rent !== undefined && u.kind === "condo") {
         const condoOpts = sim.rules.priceOptions("condo");
         const ladderMode = condoOpts?.shape === "ladder";

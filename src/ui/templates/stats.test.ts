@@ -268,13 +268,14 @@ describe("incomeSection (income breakdown)", () => {
 describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
   it("plain vacancies read the bare number; off-market vacancies add the parenthetical", () => {
     const sim = builtTower();
-    // Two more offices: one plain-vacant, one vacant AND off-market.
-    const a = sim.tower.place("office", 2, 12 + 9);
-    expect(a.ok).toBe(true);
-    const b = sim.tower.place("office", 2, 12 + 18);
-    expect(b.ok).toBe(false); // floor strip ends at 29; widen below
+    // Widen the strip first so both extra offices place cleanly, then add
+    // them: one plain-vacant, one vacant AND off-market. Every placement is
+    // asserted successful, so a fixture-width change fails loudly here
+    // instead of silently testing a different tower.
     for (let x = 30; x < 45; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 30; x < 45; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const a = sim.tower.place("office", 2, 12 + 9);
+    expect(a.ok).toBe(true);
     const c = sim.tower.place("office", 2, 30);
     expect(c.ok).toBe(true);
     const vacantRow = () => {

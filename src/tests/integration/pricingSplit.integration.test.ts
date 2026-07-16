@@ -255,6 +255,22 @@ describe("snap-on-load: the golden pre-split migration fixture (NFR3)", () => {
     expect(loaded.money).toBe(moneyBefore - 100_000);
   });
 
+  it("a forged non-finite HOTEL rent lands on Average, never the band-anchored Very Low", () => {
+    // The office band default coincides with the office ladder's Average, so
+    // the forged-rents test above cannot see this; the hotel bands sit far
+    // below the canon ladders. A non-finite rent must reach the snap pass as
+    // non-finite so snapToLadder's documented rule lands it on Average,
+    // rather than being coerced through the tiny band default and snapping
+    // to Very Low.
+    const sim = strip("classic", 49);
+    const r = sim.tower.place("hotelSingle", 2, x0());
+    expect(r.ok).toBe(true);
+    const save = sim.serialize();
+    (save.units.find((u) => u.id === r.unitId) as { rent?: unknown }).rent = NaN;
+    const loaded = Simulation.deserialize(save);
+    expect(rentOf(loaded.tower.units.find((u) => u.kind === "hotelSingle")!)).toBe(2_000); // Average rung
+  });
+
   it("a legal $50,000 (Very Low) condo sale survives load untouched: no phantom snap, no re-posted bulletin", () => {
     // The Very Low rung sits BELOW the band-era SOLD_CONDO_MIN_PRICE, so the
     // sold-condo forged-value bound must be ladder-aware: lifting a legal $50k
