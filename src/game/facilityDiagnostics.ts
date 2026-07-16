@@ -133,8 +133,8 @@ export function retailStatsLines(
   // its capacity the reachable population fills. Surfaced so a low customer count
   // reads as "thin local demand here" (add population, or spread venues out)
   // rather than a mystery, and so a venue pinned at 100% reads as fully
-  // subscribed. Plain information, shown in both modes; the Modern under-served /
-  // over-built advice rides on top of this number in a later phase.
+  // subscribed. Plain information, shown in both modes; in Modern the under-served
+  // / over-built advice rides on top of this number (added just below).
   // Only shown when the fraction is KNOWN (the venue is in the current demand
   // map: reachable and operational). An absent venue, e.g. one that just finished
   // construction and is not yet in this hour's memo, passes `undefined` and omits
