@@ -1,4 +1,3 @@
-import { rentConfig } from "../engine/econConfig";
 import type { FacilityKind } from "../engine/types";
 import { TENANT_KIND, rentFromClass } from "./tdtTables";
 
@@ -39,30 +38,24 @@ export const PART_STACKS: Readonly<Partial<Record<FacilityKind, readonly number[
 
 /** Inverse of {@link rentFromClass}: a unit's rent maps to the nearest of the
  *  four 1994 rent-level classes (0 to 3), plus class 4 (No Rate) for kinds that
- *  charge no rent. A priced kind sitting on its default exports as 2 (Average),
- *  which the importer reads back as "keep the default"; an unpriced kind (no
- *  rent band) exports as 4 (No Rate), matching what real saves store. */
+ *  charge no rent. Since the pricing split, a Classic tower's rents ARE the
+ *  canon rung dollars, so this is lossless in practice (each rung is exactly
+ *  its class); the nearest-with-ties-up rule only fires on a forged in-memory
+ *  value and mirrors the engine's snap, so export and snap can never disagree.
+ *  A priced kind with no stored override sits on Average and exports as 2; an
+ *  unpriced kind (no rent band) exports as 4 (No Rate), matching what real
+ *  saves store (fast food, security, housekeeping, retail all carry class 4). */
 export function classFromRent(kind: FacilityKind, rent: number | undefined): number {
-  const band = rentConfig(kind);
-  // A kind with no rent band charges no tenant rent, which the 1994 game stores
-  // as class 4 (No Rate): confirmed against real saves (fast food, security,
-  // housekeeping, retail all carry class 4). A priced kind sitting on its
-  // default reads back as 2 (Average).
-  if (!band) return 4;
-  if (rent === undefined) return 2;
-  // Anchors come from the SAME function the importer applies on read-back, so
-  // "nearest class" is measured against what the class will actually become.
-  const values: [number, number][] = [
-    [0, rentFromClass(kind, 0) ?? band.min],
-    [1, rentFromClass(kind, 1) ?? band.min],
-    [2, band.default],
-    [3, rentFromClass(kind, 3) ?? band.max],
-  ];
+  const anchors = [0, 1, 2, 3].map((cls) => rentFromClass(kind, cls));
+  if (anchors[0] === undefined) return 4; // no ladder: an unpriced kind
+  if (rent === undefined) return 2; // no override: the Average default rung
   let best = 2;
   let bestDist = Infinity;
-  for (const [cls, value] of values) {
-    const d = Math.abs(rent - value);
-    if (d < bestDist) {
+  for (let cls = 0; cls < anchors.length; cls++) {
+    const d = Math.abs(rent - (anchors[cls] as number));
+    // `<=` so an exact tie prefers the higher class: ties round up, matching
+    // the engine's snapToLadder.
+    if (d <= bestDist) {
       bestDist = d;
       best = cls;
     }

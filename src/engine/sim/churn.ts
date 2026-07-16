@@ -4,7 +4,7 @@ import { REAL_WORLD } from "../calendar";
 
 import { rentOf, rentConfig } from "../econConfig";
 
-import { householdPrice } from "../gameRules";
+import { householdPrice, snapToLadder } from "../gameRules";
 
 import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isHotelKind } from "../facilities";
@@ -47,14 +47,20 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // elsewhere and keeps a re-sold condo drawing a fresh household.
   if (!isHotelKind(u.kind)) u.everOccupied = false;
   u.residents = undefined;
-  // A condo returning to market re-lists in the CURRENT band: clamp away any
+  // A condo returning to market re-lists at a CURRENTLY legal price: snapped
+  // onto the canon ladder in Classic, clamped into the band in Modern, so a
   // legacy/out-of-band asking price it carried while sold (e.g. a $240k
-  // old-max), so it can't re-sell above the current ceiling, or, in Modern,
-  // above it after household scaling. The buy-back charge above already used
-  // the pre-clamp price, so it still mirrors the historical sale.
+  // old-max) can't re-sell above the current ceiling, or, in Modern, above it
+  // after household scaling. The buy-back charge above already used the
+  // pre-normalized price, so it still mirrors the historical sale.
   if (u.kind === "condo" && u.rent !== undefined) {
-    const band = rentConfig("condo")!;
-    u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    const priceShape = sim.rules.priceOptions("condo")!;
+    if (priceShape.shape === "ladder") {
+      u.rent = snapToLadder(priceShape.rungs, u.rent);
+    } else {
+      const band = rentConfig("condo")!;
+      u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    }
   }
   u.label = FACILITIES[u.kind].name;
   u.vacateReason = undefined;

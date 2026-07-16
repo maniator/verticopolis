@@ -227,9 +227,13 @@ export function gatherTower(save: SerializedGame): GatheredTower {
     // rent-derived class, so it round-trips as "No Rate". Only priced kinds
     // carry the flag, matching the importer.
     const rentClass = u.noRate && rentConfig(u.kind) ? 4 : classFromRent(u.kind, u.rent);
-    if (u.rent !== undefined) {
-      // What the class reads back as on import: class 2 means "the default".
-      const back = rentClass === 2 ? rentConfig(u.kind)?.default : rentFromClass(u.kind, rentClass);
+    if (u.rent !== undefined && !u.noRate) {
+      // What the class reads back as on import (every class 0-3 now reads the
+      // exact rung dollars). Since the pricing split a Classic tower's rents
+      // already sit on the rungs, so this counter stays 0 in practice and the
+      // "rents snap" stays-behind line no longer appears; it still catches a
+      // forged in-memory value honestly.
+      const back = rentFromClass(u.kind, rentClass);
       if (back !== undefined && back !== u.rent) counts.rentsSnapped++;
     }
     if (u.label && u.label !== FACILITIES[u.kind].name) counts.namesDropped++;

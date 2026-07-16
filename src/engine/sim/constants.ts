@@ -279,8 +279,10 @@ export interface HeatCell {
   severity: number;
 }
 
-/** Batch-pricing target: an exact price, or "default" to clear the override. */
-export type BatchTarget = number | "default";
+/** Batch-pricing target: an exact price, "default" to return to the neutral
+ *  anchor (band default / Classic Average rung), or "noRate" to take the kind
+ *  off the market (ladder modes only; Modern never holds the No Rate state). */
+export type BatchTarget = number | "default" | "noRate";
 export interface BatchRentOptions {
   /** Only touch units still on the default price (skip hand-tuned ones). */
   onlyDefaultPriced?: boolean;

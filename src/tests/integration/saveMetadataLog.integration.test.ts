@@ -254,13 +254,22 @@ describe("bulletin-log persistence", () => {
     expect(flood[299].text).toBe("l99999");
   });
 
-  it("the pre-log fixture still loads with an empty bulletin", () => {
+  it("the pre-log fixture loads with only the one-time Classic pricing-snap bulletin", () => {
     const data = decodeVctower(towerFile);
     expect("log" in data).toBe(false);
     // The v5 -> v6 party-hall migration relocates this fixture's basement hall
-    // into a free two-story slot (it does not drop it), so no bulletin line is
-    // emitted and the pre-log save still loads with an empty log.
-    expect(Simulation.deserialize(data).log).toEqual([]);
+    // into a free two-story slot (it does not drop it), so it emits nothing.
+    // This pre-split Classic fixture's rents DO snap onto the canon ladder,
+    // though, so the load posts exactly the pinned snap bulletin (with the
+    // condo callout: the fixture holds condos), once: a second round-trip
+    // finds everything already on rungs and adds no new line.
+    const first = Simulation.deserialize(data);
+    expect(first.log.map((e) => e.text)).toEqual([
+      "Classic pricing: rents snapped to the four 1994 rate levels. Condos can now sell for as little as $50,000.",
+    ]);
+    expect(first.log[0].kind).toBe("info"); // bulletin-only, never a toast
+    const again = Simulation.deserialize(first.serialize());
+    expect(again.log.map((e) => e.text)).toEqual(first.log.map((e) => e.text));
   });
 });
 
