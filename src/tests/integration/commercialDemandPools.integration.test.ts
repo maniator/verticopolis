@@ -160,8 +160,12 @@ describe("commercial demand pools", () => {
     const classic = build("classic");
     const modern = build("modern");
     const share = classic.map.share;
-    expect(share).toBeGreaterThan(0);
-    expect(share).toBeLessThan(1); // precondition: below the cap, so the shape matters
+    // Precondition: pin the identity band `floor < share < 1`. Above the Modern
+    // floor (so `max(floor, ...)` is not what lifts Modern's fraction here, the
+    // test genuinely exercises `min(1, share)`) and below the cap (so the shape
+    // matters, not the clamp).
+    expect(share).toBeGreaterThan(ECON.demandFloorModern);
+    expect(share).toBeLessThan(1);
     expect(modern.map.share).toBeCloseTo(share, 6); // share is mode-independent (pool and capacity are the same)
     const cFrac = classic.map.fractionByUnit.get(classic.shopId)!;
     const mFrac = modern.map.fractionByUnit.get(modern.shopId)!;

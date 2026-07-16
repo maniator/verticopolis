@@ -62,18 +62,18 @@ function recyclingLines(sim: Simulation): TemplateResult[] {
   ];
 }
 
-/** The retail-only block: today's customer count, the tier verdict vs baseline,
- *  yesterday's profit, and a rain note when weather is dragging down traffic.
- *  Kept as a pure function so the HTML is exercised by unit tests without a DOM
- *  shell (see `inspectorRetailStats.test.ts`). The tier bands were tuned in the
- *  party consult (Samus, Cloud, Sally, 2026-07-09); see the spec's Player-Facing
- *  Copy section for the canonical strings. */
 /** Below this raw demand `share` (pool / reachable capacity) the tower reads as
  *  over-built for commerce: its shoppers fill less than half the reachable
  *  commercial capacity, so the Modern inspector advises adding residents or
  *  holding off on new venues. */
 const OVER_BUILT_SHARE = 0.5;
 
+/** The retail-only block: today's customer count, the tier verdict vs baseline,
+ *  yesterday's profit, and a rain note when weather is dragging down traffic.
+ *  Kept as a pure function so the HTML is exercised by unit tests without a DOM
+ *  shell (see `inspectorRetailStats.test.ts`). The tier bands were tuned in the
+ *  party consult (Samus, Cloud, Sally, 2026-07-09); see the spec's Player-Facing
+ *  Copy section for the canonical strings. */
 export function retailStatsLines(
   kind: FacilityKind,
   patronageToday: number | undefined,
