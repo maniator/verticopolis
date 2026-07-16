@@ -83,18 +83,126 @@ export function buildAdjacency(
   return adj;
 }
 
-export function route(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
+/**
+ * The chosen fewest-transfer passenger PATH, before any shaft balancing.
+ *
+ * Classic gates express transfers to (sky) lobby floors (1994 canon, see
+ * GameRules.expressTransferNeedsLobby); Modern keeps the plain BFS, byte-for-
+ * byte the pre-gate behavior. The rule object decides, never the mode string.
+ * v1 uses the FLOOR-LEVEL rule: the shared stop must be a lobby floor (has
+ * lobby tiles, or is the ground floor 1, the tower's entrance lobby). This is
+ * a deliberate simplification: the 1994 game's finer notion, a contiguous
+ * lobby SPAN actually touching both shafts on that floor, is not modeled yet,
+ * so a lobby tile anywhere on the floor admits the transfer tower-wide.
+ *
+ * Shared by {@link route} (which then balances the shaft, drawing rng) and
+ * {@link reachable} (which only asks whether a path exists, no rng), so the two
+ * can never diverge on whether the Classic gate applies.
+ */
+function passengerPath(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
   const adj = adjacency(crowd, tower);
-  // Classic gates express transfers to (sky) lobby floors (1994 canon, see
-  // GameRules.expressTransferNeedsLobby); Modern keeps the plain BFS, byte-for-
-  // byte the pre-gate behavior. The rule object decides, never the mode string.
-  if (!tower.rules.expressTransferNeedsLobby()) return bfsRoute(adj, from, to, MAX_RIDES);
-  // v1 uses the FLOOR-LEVEL rule: the shared stop must be a lobby floor (has
-  // lobby tiles, or is the ground floor 1, the tower's entrance lobby). This is
-  // a deliberate simplification: the 1994 game's finer notion, a contiguous
-  // lobby SPAN actually touching both shafts on that floor, is not modeled yet,
-  // so a lobby tile anywhere on the floor admits the transfer tower-wide.
-  return bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor));
+  return tower.rules.expressTransferNeedsLobby()
+    ? bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor))
+    : bfsRoute(adj, from, to, MAX_RIDES);
+}
+
+export function route(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
+  // The chosen PATH (and thus the express-transfer decision) is fixed;
+  // balanceShafts only re-picks WHICH physical shaft of an equivalent bank
+  // carries each leg, so the gate outcome is untouched.
+  const r = passengerPath(crowd, tower, from, to);
+  return r && balanceShafts(crowd, tower, r);
+}
+
+/**
+ * Spread each ride leg across its bank of equivalent parallel shafts.
+ *
+ * {@link bfsRoute} finds the fewest-transfer PATH, but its edge-order tie-break
+ * names the SAME shaft every time a floor pair is served by several equivalent
+ * shafts, so identical trips funnel onto one shaft of a bank while its siblings
+ * sit idle (the landing queue there piles up and the drawn crowd makes it
+ * obvious). This keeps the path bfsRoute chose and only re-picks WHICH physical
+ * shaft of an equivalent bank carries each leg, drawing from the seeded crowd
+ * rng so the spread is deterministic and reproducible, never build-order
+ * biased. A leg with no sibling shaft draws nothing, so a tower without a bank
+ * keeps its exact rng stream (the zero-draw gate).
+ *
+ * "Equivalent" is the SAME transport kind stopping at both the leg's boarding
+ * and alighting floors. Matching on kind means this never swaps a rider's
+ * transport MODE: an elevator leg stays an elevator, a service-elevator leg
+ * stays a service elevator, a stair leg stays a stair. So the staff service-first
+ * routing preference bfsRoute expresses (service elevators win route ties over
+ * stairs) survives intact, and pool spans/caps are untouched: this only decides
+ * which shaft within a bank of equals answers the trip.
+ *
+ * The banks are precomputed once per {@link Tower.revision} by {@link shaftBanks}
+ * and looked up in O(1) here, so a routed leg costs a Map lookup plus (only when
+ * a real bank exists) one rng draw, never a per-trip rescan of every transport.
+ */
+function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
+  const banks = shaftBanks(crowd, tower);
+  for (let i = 0; i < r.shafts.length; i++) {
+    const chosen = tower.getTransport(r.shafts[i]);
+    if (!chosen) continue;
+    const bank = banks.get(bankKey(chosen.kind, r.floors[i], r.floors[i + 1]));
+    // No bank, or a lone shaft: nothing to balance, so draw nothing and keep the
+    // exact rng stream. The chosen shaft is always a member when a bank exists.
+    if (!bank || bank.length <= 1) continue;
+    r.shafts[i] = bank[crowd.rng.int(0, bank.length - 1)];
+  }
+  return r;
+}
+
+/** The bank key for one directed leg: the transport kind plus the boarding and
+ *  alighting floors, so equivalent shafts (same kind, both floors) collide. */
+function bankKey(kind: Transport["kind"], from: number, to: number): string {
+  return `${kind}:${from}:${to}`;
+}
+
+/**
+ * The equivalent-shaft banks, keyed "kind:from:to" → shaft ids in STABLE
+ * ascending order (so a given rng draw maps to the same shaft run-to-run).
+ *
+ * Built once per {@link Tower.revision} and cached on the crowd, the way
+ * {@link adjacency} caches the stop-graph: it only changes when the tower's
+ * transports change. Every directed stop pair of every transport contributes
+ * its id to that pair's bank, so {@link balanceShafts} answers each leg with a
+ * single Map lookup. Keeping the key kind-partitioned means one shared cache
+ * serves both the passenger and the staff route paths without ever mixing a
+ * service elevator into a passenger bank (or a stair into an elevator one).
+ */
+export function shaftBanks(crowd: Crowd, tower: Tower): Map<string, number[]> {
+  if (crowd.shaftBanks && crowd.shaftBanksRev === tower.revision) return crowd.shaftBanks;
+  const banks = new Map<string, number[]>();
+  for (const t of tower.transports) {
+    const stops = tower.stopsOf(t);
+    for (const from of stops) {
+      for (const to of stops) {
+        if (to === from) continue;
+        const key = bankKey(t.kind, from, to);
+        let bank = banks.get(key);
+        if (!bank) banks.set(key, (bank = []));
+        bank.push(t.id);
+      }
+    }
+  }
+  for (const bank of banks.values()) bank.sort((a, b) => a - b);
+  crowd.shaftBanks = banks;
+  crowd.shaftBanksRev = tower.revision;
+  return banks;
+}
+
+/** Pure reachability probe: does a fewest-transfer passenger route exist at
+ *  all, without committing a rider to a shaft? Reachability is a structural
+ *  question, so unlike {@link route} it draws NO rng (route/staffRoute draw to
+ *  spread trips across an equivalent bank). floorReachable's memoized probe
+ *  runs on the editor's ~6 Hz repaint pump; routing there through the balancing
+ *  path would let UI timing perturb the seeded crowd stream on a banked tower,
+ *  so a probe that never rides must never draw. It runs the SAME
+ *  {@link passengerPath} route() does (Classic express-transfer gate included),
+ *  so a floor route() would refuse in Classic never reads as reachable here. */
+export function reachable(crowd: Crowd, tower: Tower, from: number, to: number): boolean {
+  return passengerPath(crowd, tower, from, to) !== null;
 }
 
 /** Route over the STAFF network (service elevators / stairs / escalators).
@@ -105,7 +213,8 @@ export function route(crowd: Crowd, tower: Tower, from: number, to: number): Rou
  *  ever drift, spawnStaff reports "no-route" so dispatch can surface it
  *  instead of retrying silently.) */
 export function staffRoute(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  return bfsRoute(staffAdjacency(crowd, tower), from, to, Infinity);
+  const r = bfsRoute(staffAdjacency(crowd, tower), from, to, Infinity);
+  return r && balanceShafts(crowd, tower, r);
 }
 
 /** NOTE: edge ORDER is a contract: within a BFS level the first-listed

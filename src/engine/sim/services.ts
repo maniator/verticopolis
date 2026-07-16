@@ -237,7 +237,12 @@ export function floorReachable(sim: Simulation, floor: number): boolean {
   }
   let hit = memo.verdicts.get(floor);
   if (hit === undefined) {
-    hit = sim.crowd.route(sim.tower, 1, floor) !== null;
+    // Pure reachability probe: this discards the route and only asks whether the
+    // floor is routable, so it must NOT draw the crowd rng that route()'s
+    // shaft-balancing consumes (this runs on the ~6 Hz editor repaint pump; a
+    // draw here would let UI timing perturb the seeded crowd stream on a banked
+    // tower).
+    hit = sim.crowd.reachable(sim.tower, 1, floor);
     memo.verdicts.set(floor, hit);
   }
   return hit;

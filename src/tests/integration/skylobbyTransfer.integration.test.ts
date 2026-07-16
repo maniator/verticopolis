@@ -205,6 +205,29 @@ describe("express transfers are lobby-gated in Classic (#396)", () => {
     }
   });
 
+  it("the pure reachability probe honors the SAME gate as route (no rng, no divergence)", () => {
+    // crowd.reachable backs floorReachable (the ~6 Hz editor probe) and must
+    // agree with route() on the Classic express-transfer gate: a floor route()
+    // refuses in Classic must not read as reachable, and Modern's forgiving
+    // routing must read reachable, exactly as route() would ride it.
+    const classic = nonLobbyHubTower("classic");
+    const cc = new Crowd();
+    expect(cc.route(classic.tower, 1, 25)).toBeNull(); // gated off
+    expect(cc.reachable(classic.tower, 1, 25)).toBe(false); // probe agrees
+
+    const modern = nonLobbyHubTower("modern");
+    const mc = new Crowd();
+    expect(mc.route(modern.tower, 1, 25)).not.toBeNull(); // forgiving
+    expect(mc.reachable(modern.tower, 1, 25)).toBe(true); // probe agrees
+
+    // A direct single-ride hop is reachable in Classic too (the gate never
+    // fires without a transfer), and the probe draws no rng doing it.
+    const probe = new Crowd(4242);
+    const untouched = new Crowd(4242);
+    expect(probe.reachable(classic.tower, 1, 20)).toBe(true);
+    expect(probe.rng.int(0, 1_000_000)).toBe(untouched.rng.int(0, 1_000_000));
+  });
+
   it("Classic: a sky lobby added later reopens the gated transfer (cache refreshes)", () => {
     // Same shape as the sky-lobby case, but the lobby lands AFTER a failed
     // route: placing it bumps the tower revision, the adjacency cache and the
