@@ -111,9 +111,16 @@ export function registerPWA(handlers: PwaHandlers): void {
   // version.json poll) never double-prompt for the same build, while a genuinely
   // newer deploy still re-arms the prompt.
   let lastSurfacedKey: string | undefined;
+  let hasSurfaced = false;
   const surface = (info: UpdateInfo | undefined, activate: () => Promise<void>) => {
     const key = info?.sha ?? info?.version;
-    if (key !== undefined && key === lastSurfacedKey) return;
+    // Dedup so the two detectors (onNeedRefresh and the version.json backstop)
+    // never double-prompt for one build. Once something has surfaced, skip a
+    // repeat of the same key AND a keyless surface (a failed fetch carries no
+    // identity to tell builds apart, so treat it as "already shown"); a genuinely
+    // different key still re-arms the prompt.
+    if (hasSurfaced && (key === undefined || key === lastSurfacedKey)) return;
+    hasSurfaced = true;
     lastSurfacedKey = key;
     handlers.onUpdateAvailable(activate, info);
   };

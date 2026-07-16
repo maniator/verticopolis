@@ -56,8 +56,10 @@ export function parseUpdateInfo(j: unknown): UpdateInfo | null {
  *
  * Compares the git sha first (it changes on every build, so it also catches an
  * internal-only rebuild that did not bump the version), then the version string.
- * A missing or empty field on either side is ignored, so absent data never
- * triggers a false "update available".
+ * A missing or empty field on either side is ignored, and the non-git placeholder
+ * `"unknown"` (what `gitShortSha()` emits outside a checkout) is treated the same
+ * as missing, matching how the update prompt drops it. So absent or placeholder
+ * data never triggers a false "update available".
  */
 export function isDifferentBuild(
   info: UpdateInfo | null,
@@ -65,7 +67,10 @@ export function isDifferentBuild(
   runningSha: string,
 ): boolean {
   if (!info) return false;
-  if (info.sha && runningSha && info.sha !== runningSha) return true;
+  const realSha = (s: string | undefined): string => (s && s !== "unknown" ? s : "");
+  const deployedSha = realSha(info.sha);
+  const localSha = realSha(runningSha);
+  if (deployedSha && localSha && deployedSha !== localSha) return true;
   if (info.version && runningVersion && info.version !== runningVersion) return true;
   return false;
 }

@@ -88,4 +88,16 @@ describe("isDifferentBuild — running vs deployed", () => {
     // A blank running sha (a non-git build) must not read every deploy as different.
     expect(isDifferentBuild({ version: "1.50.0", sha: "5f90fc2", notes: [] }, "1.50.0", "")).toBe(false);
   });
+
+  it('treats the non-git placeholder "unknown" sha as missing on either side', () => {
+    // Deployed sha is the "unknown" placeholder but the version matches: not different.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "unknown", notes: [] }, "1.50.0", "5f90fc2")).toBe(false);
+    // Running build has no git metadata ("unknown"); deployed has a real sha but
+    // the version matches: not different (do not compare "unknown" as a real sha).
+    expect(isDifferentBuild({ version: "1.50.0", sha: "5f90fc2", notes: [] }, "1.50.0", "unknown")).toBe(false);
+    // Both "unknown", same version: not different.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(false);
+    // "unknown" sha but a genuinely newer version still fires via the version fallback.
+    expect(isDifferentBuild({ version: "1.51.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(true);
+  });
 });
