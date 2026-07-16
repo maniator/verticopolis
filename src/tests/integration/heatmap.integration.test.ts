@@ -124,6 +124,53 @@ describe("floorHeatmap (stats overlay data)", () => {
     expect(cellOn(sim.floorHeatmap("occupancy"), 2)!.severity).toBe(1);
     expect(cellOn(sim.floorHeatmap("satisfaction"), 2)).toBeUndefined();
   });
+
+  it("cleanliness: tints hotel rooms by staff reach and dirty state, leaves non-hotel untinted", () => {
+    const sim = Simulation.newGame(57);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 6; f++) lay(sim, "floor", f);
+    // Passenger elevator serves the whole stack (guests reach every floor).
+    expect(sim.buildTransport("elevatorStandard", C, 1, 6).ok).toBe(true);
+    // Service elevator covers only floors 2..5, so floor 6 has no staff route.
+    expect(sim.tower.placeTransport("elevatorService", C + 8, 2, 5).ok).toBe(true);
+    // An operational housekeeping crew on floor 2, staff-connected to 2..5.
+    const hk = sim.tower.place("housekeeping", 2, C - 8);
+    expect(hk.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === hk.unitId)!.state = "occupied"; // in service, not construction
+    // One hotel room per floor so cells match by floor: reachable+clean (3),
+    // reachable+dirty (4), and unreachable (6, no staff transport).
+    const clean = sim.tower.place("hotelDouble", 3, C - 20);
+    expect(clean.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === clean.unitId)!.state = "asleep";
+    const dirty = sim.tower.place("hotelDouble", 4, C - 20);
+    expect(dirty.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === dirty.unitId)!.state = "dirty";
+    const unreached = sim.tower.place("hotelDouble", 6, C - 20);
+    expect(unreached.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === unreached.unitId)!.state = "asleep";
+    // An office on floor 5 must produce no cleanliness cell (non-hotel).
+    expect(sim.tower.place("office", 5, C - 20).ok).toBe(true);
+
+    const map = sim.floorHeatmap("cleanliness");
+    expect(cellOn(map, 3)!.severity).toBe(0); // reachable, clean → green
+    expect(cellOn(map, 4)!.severity).toBeCloseTo(0.6, 6); // reachable, dirty → amber
+    expect(cellOn(map, 6)!.severity).toBe(1); // no staff route → red (the "build another" nudge)
+    expect(cellOn(map, 5)).toBeUndefined(); // office only → no housekeeping signal
+  });
+
+  it("cleanliness: every hotel room reads unreached when there is no housekeeping crew", () => {
+    const sim = Simulation.newGame(58);
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 2).ok).toBe(true);
+    const r = sim.tower.place("hotelDouble", 2, C - 20);
+    expect(r.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
+    // No housekeeping unit exists, so no crew can reach any room: worst case.
+    expect(cellOn(sim.floorHeatmap("cleanliness"), 2)!.severity).toBe(1);
+  });
 });
 
 describe("congestionSeverity (overlay ramp, sim-anchored)", () => {

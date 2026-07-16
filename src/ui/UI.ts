@@ -75,7 +75,7 @@ export interface UICallbacks {
   onRenameTower(name: string): void;
   onShowStats(): void;
   /** Set the colored stats overlay to a mode by its select value ("congestion"
-   *  / "occupancy" / "satisfaction", or "" for off). */
+   *  / "occupancy" / "satisfaction" / "cleanliness", or "" for off). */
   onSetOverlay(mode: string): void;
   onShowSaves(): void;
   /** The inspector card's ✕ was clicked — dismiss it and latch it closed. */

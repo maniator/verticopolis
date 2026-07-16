@@ -60,7 +60,7 @@ import { SCENES } from "./screenshot-scenes.ts";
 // many settle frames), not the split.
 export const SHARDS: Record<string, string[]> = {
   // ~64s: feature panels + two light HUD scenes.
-  features: ["overlays", "stats", "crash-screen", "basement", "traffic", "lobby-awnings"],
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings"],
   // ~57s: the hero gallery + the star ladder + the sprite sheet.
   showcase: ["showcase", "milestones", "sprite-gallery"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro

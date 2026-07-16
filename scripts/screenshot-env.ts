@@ -46,7 +46,7 @@ export interface Shot {
   name: string; // file basename, no extension
   outDir?: OutDir; // defaults to the scene's outDir
   clock?: number; // set the in-game hour (0..23) before framing
-  overlay?: "" | "congestion" | "occupancy" | "satisfaction"; // map overlay via the real dropdown
+  overlay?: "" | "congestion" | "occupancy" | "satisfaction" | "cleanliness"; // map overlay via the real dropdown
   frame?: Frame; // camera: centre tile (default lot centre), floor, zoom
   crop?: string; // CSS selector to screenshot instead of the whole page
   fullPage?: boolean;
