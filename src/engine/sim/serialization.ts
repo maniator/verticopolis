@@ -202,14 +202,24 @@ export function deserialize(raw: SerializedGame): Simulation {
       // Very Low sits BELOW the band floor by design, so the band clamp must
       // not run first and pre-clamp $50k up to $80k). A SOLD condo keeps its
       // historical price so the buy-back mirrors what it sold for, but is
-      // still bounded to the widest-ever band so a forged `rent` can't drive
-      // an unbounded buy-back money drain (the ladder snap then lands it on a
-      // rung inside that range).
+      // still bounded so a forged `rent` can't drive an unbounded buy-back
+      // money drain. The bound must match the mode's own legal range: the
+      // Classic ladder's Very Low ($50,000) sits BELOW the band-era
+      // SOLD_CONDO_MIN_PRICE, so bounding a ladder-mode sale through the band
+      // floor would lift a legal $50k sale to $60k, the snap pass would pull
+      // it back down, and that phantom migration would re-post the one-time
+      // pricing bulletin on every load. Ladder mode bounds to the ladder's
+      // own extremes (the snap pass then lands it exactly on a rung); band
+      // mode keeps the historical bounds.
       let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
       if (rent !== undefined && u.kind === "condo") {
-        const ladderMode = sim.rules.priceOptions("condo")?.shape === "ladder";
+        const condoOpts = sim.rules.priceOptions("condo");
+        const ladderMode = condoOpts?.shape === "ladder";
         if (soldCondo) {
-          rent = Math.max(SOLD_CONDO_MIN_PRICE, Math.min(SOLD_CONDO_MAX_PRICE, rent));
+          rent =
+            condoOpts?.shape === "ladder"
+              ? Math.max(condoOpts.rungs[0].value, Math.min(condoOpts.rungs[condoOpts.rungs.length - 1].value, rent))
+              : Math.max(SOLD_CONDO_MIN_PRICE, Math.min(SOLD_CONDO_MAX_PRICE, rent));
         } else if (!ladderMode) {
           const band = rentConfig("condo")!;
           rent = Math.max(band.min, Math.min(band.max, rent));

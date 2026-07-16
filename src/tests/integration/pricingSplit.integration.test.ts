@@ -255,6 +255,29 @@ describe("snap-on-load: the golden pre-split migration fixture (NFR3)", () => {
     expect(loaded.money).toBe(moneyBefore - 100_000);
   });
 
+  it("a legal $50,000 (Very Low) condo sale survives load untouched: no phantom snap, no re-posted bulletin", () => {
+    // The Very Low rung sits BELOW the band-era SOLD_CONDO_MIN_PRICE, so the
+    // sold-condo forged-value bound must be ladder-aware: lifting a legal $50k
+    // sale to $60k first would make the snap pull it back down and count a
+    // migration on EVERY load, re-posting the one-time pricing bulletin.
+    const sim = strip("classic", 47);
+    const r = sim.tower.place("condo", 2, x0());
+    expect(r.ok).toBe(true);
+    const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
+    condo.rent = 50_000; // sold at the Very Low rung, a legal Classic sale
+    condo.everOccupied = true;
+    condo.state = "occupied";
+    const once = Simulation.deserialize(sim.serialize());
+    const rc = once.tower.units.find((u) => u.kind === "condo")!;
+    expect(rc.rent).toBe(50_000); // untouched, never lifted through $60k
+    const bulletins = (l: Simulation) =>
+      l.log.filter((e) => e.text.startsWith("Classic pricing: rents snapped")).length;
+    const firstLoad = bulletins(once);
+    const twice = Simulation.deserialize(once.serialize());
+    expect(twice.tower.units.find((u) => u.kind === "condo")!.rent).toBe(50_000);
+    expect(bulletins(twice)).toBe(firstLoad); // stable: no new bulletin on a re-load
+  });
+
   it("Modern saves are untouched: no snap, no bulletin", () => {
     const sim = strip("modern", 47);
     const X = x0();
