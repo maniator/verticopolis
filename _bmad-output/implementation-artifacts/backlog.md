@@ -544,22 +544,23 @@ quietly reintroduces the very blind spots PR #188 removed.
   - Do not conflate the two: a naive "differs from committed = fail" turns every
     legit sprite tweak red, people learn to ignore red, and the day a real
     nondeterminism leak lands it is the boy who cried wolf.
-- **Keep the `[update-screenshots]` marker; do NOT retire it in PR 2** (party
-  round-tabled 2026-07-13: Winston/Dana/Boundary/John/Grumbal). The marker/
-  `workflow_dispatch` and the PR drift-check are COMPLEMENTARY, not redundant: the
-  marker is imperative + unconditional (regen on any branch, with no open PR, a
-  force-refresh, or a pixel change that arrives via a non-gated path such as a
-  Playwright/font/dep bump), while the drift-check is PR-diff-reactive + path-
-  gated. The genuine duplication is the CAPTURE logic, which PR 2 (after the user
-  renegotiated the "do not edit update-screenshots.yml" constraint) extracted
-  into a shared reusable `workflow_call`, `screenshot-capture.yml`, that BOTH
-  `update-screenshots.yml` and `pr-drift-check.yml` call, so they can never drift
-  on how pixels are generated or how nondeterminism is caught. The commit logic
-  stays per-caller (marker-commit vs approval-gated commit), since the two differ.
-  Retirement of the marker is deferred, not denied: now that the shared capture
-  is collapsed into one place, reconsider dropping the marker once the drift-check
-  has real-PR mileage (keep `workflow_dispatch` regardless). That is a PR 3
-  candidate.
+- **[RESOLVED 2026-07-16] The `[update-screenshots]` marker was retired.** It was
+  kept through PR 2 (party round-tabled 2026-07-13: Winston/Dana/Boundary/John/
+  Grumbal) as a complement to the PR drift-check, with retirement flagged as a PR 3
+  candidate once the drift-check had real-PR mileage. That mileage arrived: drift is
+  now a hard gate on the PR (a stale committed gallery turns the required
+  `drift-gate` red), and the approval-gated `commit-on-approval` regenerates and
+  commits the gallery in the same run. That makes `update-screenshots.yml`
+  redundant, so it is deleted, and the marker-skip machinery it required in
+  `pr-drift-check.yml` (the `guard` job plus the capture/drift-gate skip branches)
+  is removed with it. This also drops the `workflow_dispatch` force-refresh lever
+  that the 2026-07-13 ruling had wanted kept: with every change landing via a PR
+  under branch protection, and the drift gate plus approval commit covering
+  staleness, a manual out-of-band regen no longer earns its keep. To force a
+  refresh (e.g. after a filter miss or a hand-edited gallery), open a PR touching a
+  render-affecting path so the gate flags it and the approval commit clears it.
+  Every gallery refresh now flows through a PR; the reusable
+  `screenshot-capture.yml` stays as the single capture.
 
 ### Deferred from: code review of spec-pr-drift-check (`/bmad-code-review`, 2026-07-13)
 
@@ -568,15 +569,12 @@ quietly reintroduces the very blind spots PR #188 removed.
 
 ### Deferred from: code review of pr-drift-check marker skip (`/bmad-code-review`, 2026-07-13)
 
-Change: `pr-drift-check.yml` now skips the Playwright capture when the PR head
-commit carries `[update-screenshots]`, since `update-screenshots.yml` runs the
-same capture on the push event (was 2x compute). Two review layers (Blind Hunter,
-Edge Case Hunter). Patched in-PR: case-insensitive marker match (to mirror
-`contains()`), and the skip is gated to same-repo, non-`main` heads so it only
-fires when the backstop workflow actually runs. Residuals parked here:
-
-- **A marker head reached via `opened`/`reopened` (no concurrent push), or after an `update-screenshots` run that hard-failed or committed nothing, has its PR drift check skipped with no regen in that same triggering.** The skip trusts that `update-screenshots.yml` ran and succeeded for this head. Determinism was already verified at the original push that carried the marker, and a hard-failed sibling run stays red on the same head SHA (its checks attach to the PR head commit), so the signal is visible, just not as this workflow's own job. Inherent to any "trust the sibling workflow" dedup and not cleanly detectable from within this run. Revisit only if a skipped-but-undrifted PR is observed in practice. (Low, Edge Case Hunter.)
-- **Substring collision: a head commit that merely mentions `[update-screenshots]` in prose (a revert, a workflow-editing commit quoting the marker) trips the skip.** Kept intentionally: the guard must match `update-screenshots.yml`'s substring `contains` exactly, or a stricter word-boundary match would re-introduce the 2x divergence on real marker pushes. For same-repo non-`main` heads both workflows fire together, so they stay consistent. If the marker convention is ever tightened, tighten it in both files at once. (Low, both hunters, intentional.)
+Both residuals here (a marker head reached via `opened`/`reopened` with no
+concurrent regen, and the `[update-screenshots]` substring collision) were
+properties of the marker-skip branch in `pr-drift-check.yml`. That branch and the
+`guard` job were removed when `update-screenshots.yml` was retired (2026-07-16, see
+the RESOLVED note under "Followups from: screenshot-determinism" above), so neither
+edge case can occur anymore. Nothing to action.
 
 ### Deferred from: code review of ToneAudioEngine split (`bmad-code-review` adversarial, 2026-07-14, Wave C-1)
 

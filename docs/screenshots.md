@@ -20,21 +20,30 @@ later regen re-renders every PNG, flooding the diff with noise. So the **canonic
 committed set is minted inside the pinned Playwright Docker image** (one Chromium
 build for the whole repo), never from a host browser. That image is what CI runs,
 and running the **same pinned image locally is equivalent** and may be committed
-(see [CONTRIBUTING.md](../CONTRIBUTING.md) → Screenshots). In CI, two marker-driven
-workflows produce it:
+(see [CONTRIBUTING.md](../CONTRIBUTING.md) → Screenshots). In CI, two workflows
+produce it, both in the image pinned to the **exact Playwright version locked in
+`package-lock.json`**:
 
-- [`update-screenshots.yml`](../.github/workflows/update-screenshots.yml)
-  regenerates `docs/screenshots/**` and commits it back.
+- [`pr-drift-check.yml`](../.github/workflows/pr-drift-check.yml) regenerates
+  `docs/screenshots/**`. On every render-affecting PR it renders the gallery and
+  compares it against the committed set; if they differ the required `drift-gate`
+  check is red until the gallery is refreshed. To refresh it, a maintainer
+  approves the run's `commit-on-approval` job (Actions tab -> the run -> Review
+  deployments -> approve `screenshot-approval`), which commits the regenerated
+  pixels straight to the PR branch. It calls the reusable capture in
+  [`screenshot-capture.yml`](../.github/workflows/screenshot-capture.yml).
 - [`update-visual-baselines.yml`](../.github/workflows/update-visual-baselines.yml)
   mints the `e2e/visual.spec.ts-snapshots` baselines the visual-regression gate
-  compares against.
+  compares against. A **marker push** triggers it: put `[update-baselines]` in the
+  head commit message and push.
 
-Both run in the image pinned to the **exact Playwright version locked in
-`package-lock.json`**. A **marker push** triggers them: put `[update-screenshots]`
-and/or `[update-baselines]` in the head commit message and push. The bot commits
-the refreshed images on the same branch; review that commit's image diff like
-code. (Because the bot pushes with `GITHUB_TOKEN`, its commit gets no CI run of
-its own, so push or rebase once more after pulling it to land a green check.)
+The bot commits the refreshed images on the same branch; review that commit's
+image diff like code. Because the bot pushes with `GITHUB_TOKEN`, that commit
+fires no workflow run of its own. For the visual baselines that just means the
+commit carries no CI run. For the docs gallery it also means the required
+`drift-gate` check does not re-run on the new head by itself, so re-trigger CI on
+that commit for the gate to re-evaluate the refreshed gallery and go green before
+merge.
 
 ### `npm run screenshots` (local preview only)
 

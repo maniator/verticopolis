@@ -44,13 +44,16 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   and anchors the update flow, so a missing bump misreports the build. See
   [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
 - **Screenshots come from the pinned Playwright Docker container, never a host
-  browser.** Regenerate `docs/screenshots/**` either via the
-  `update-screenshots.yml` workflow (marker push `[update-screenshots]`) OR
+  browser.** Regenerate `docs/screenshots/**` either by approving the
+  `commit-on-approval` job on the PR's `pr-drift-check` run (it renders in the
+  pinned image and commits the refreshed gallery straight to the PR branch) OR
   locally inside that **same pinned image** (the exact
   `mcr.microsoft.com/playwright:v<lockfile-playwright-version>-jammy` the workflow
   resolves), running `npm ci && npm run build && RUN_SERVER=1 node
   scripts/screenshots.ts` in it. Output from the pinned image is equivalent to
-  CI's and may be committed. Mint `e2e/visual.spec.ts-snapshots` only via
+  CI's and may be committed. There is no `[update-screenshots]` marker workflow
+  anymore (retired once drift became a hard gate on the PR); every gallery refresh
+  flows through a PR. Mint `e2e/visual.spec.ts-snapshots` only via
   `update-visual-baselines.yml` (`[update-baselines]`) or that same pinned image.
   What is **not** allowed as the final set: `npm run screenshots` on a HOST
   browser (outside the pinned container) or any downloaded-browser capture, which

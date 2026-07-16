@@ -1,27 +1,22 @@
 name: PR screenshot drift-check
 
 # Moves the screenshot determinism guard LEFT, onto the pull request, and turns a
-# pixel change into a one-click update instead of a separate marker push. It calls
-# the SHARED reusable capture (screenshot-capture.yml) that both this workflow and
-# update-screenshots.yml use, so the two never drift on how pixels are generated
-# or how nondeterminism is caught. Two deliberately separate signals:
+# pixel change into a one-click update in the same run. It calls the reusable
+# capture (screenshot-capture.yml) to render the gallery. This is the SOLE path
+# that regenerates the committed gallery: there is no separate marker-push
+# workflow anymore (update-screenshots.yml was retired once drift became a hard
+# gate here, so every gallery refresh flows through a PR). Two separate signals:
 #
 #   1. HARD FAIL: the reusable `capture` renders every shard TWICE and fails if the
 #      two renders differ (nondeterminism, the exact leak PR #188 chased). If it
 #      fails, this whole workflow is red and nothing below runs.
 #
-#   2. APPROVAL GATE (`commit-on-approval`), NOT a red X: when the freshly
-#      generated (pinned-container, canonical) pixels differ from the committed
-#      gallery, the run pauses at the `screenshot-approval` Environment. On the
-#      maintainer's one click it commits the regenerated gallery straight to the PR
-#      branch in the SAME run: no marker push, no second run. Drift alone never
-#      turns the PR red (that would be the boy-who-cried-wolf trap: every legit
-#      sprite tweak red, people learn to ignore red, a real leak lands unnoticed).
-#
-# COMPLEMENTARY to update-screenshots.yml's `[update-screenshots]` marker, not a
-# replacement: the marker is imperative + unconditional (any branch, no PR,
-# force-refresh, non-gated pixel changes); this check is PR-diff-reactive and
-# path-gated.
+#   2. DRIFT GATE: when the freshly generated (pinned-container, canonical) pixels
+#      differ from the committed gallery, `drift-gate` is RED on a same-repo PR (so
+#      a merge cannot leave the gallery stale on main). The author clears it by
+#      approving the `commit-on-approval` job, which regenerates and commits the
+#      gallery straight to the PR branch in the SAME run: no marker push, no second
+#      run. Fork PRs cannot run that job, so they are exempt from the drift gate.
 #
 # PREREQUISITE: the `screenshot-approval` Environment must exist with a required
 # reviewer (repo Settings -> Environments). Without a required reviewer the gate
@@ -40,8 +35,8 @@ on:
     types: [opened, synchronize, reopened]
 
 # One run per PR; a new push supersedes the previous run. This cancels THIS
-# workflow's own jobs (the guard, verify-drift, and a commit-on-approval still
-# waiting at the gate). It does NOT reliably cancel the jobs of the reusable
+# workflow's own jobs (verify-drift, and a commit-on-approval still waiting at the
+# gate). It does NOT reliably cancel the jobs of the reusable
 # `screenshot-capture.yml` this calls (a caller's cancel-in-progress does not
 # propagate into a called workflow's in-progress jobs, GitHub discussion #30708),
 # so that reusable workflow carries its OWN concurrency group to cancel its
@@ -109,9 +104,8 @@ jobs:
             case "$f" in .github/workflows/screenshot-capture.yml) sign=+ ;; esac
             # The pinned Playwright/browser + font versions come from the lockfile, and
             # a bump there can shift antialiasing across the WHOLE committed gallery.
-            # That pixel source was historically left to the [update-screenshots] marker
-            # (this filter used to exclude the lockfile to avoid a capture on every
-            # dependency PR). With drift now a hard gate, treat it as render-affecting so
+            # This filter used to exclude the lockfile to avoid a capture on every
+            # dependency PR. With drift now a hard gate, treat it as render-affecting so
             # a Playwright/font bump is caught and its screenshots refreshed in the PR
             # rather than silently drifting main. The cost is a capture on lockfile PRs,
             # which is the price of never missing a dependency-driven pixel change.
@@ -121,91 +115,14 @@ jobs:
           echo "render=$render" >> "$GITHUB_OUTPUT"
           echo "render-affecting paths changed: $render"
 
-  # Skip the whole check when the PR head commit carries the [update-screenshots]
-  # marker. That marker triggers update-screenshots.yml (on the push event), which
-  # runs this SAME reusable capture and commits the regenerated gallery. Without
-  # this guard a marker push to a PR branch fires BOTH the push event (regen) and
-  # this pull_request event (drift check), so the expensive Playwright capture runs
-  # twice for one push: 2x compute for no extra signal. Skipping here is safe: the
-  # twice-render determinism hard-fail is not lost, it still runs inside
-  # update-screenshots.yml's capture on the push event. The guard reads the marker
-  # defensively: on ANY error (a fork head SHA not resolvable in this repo, or a
-  # transient API failure) the step catches it and defaults head_is_marker=false, so
-  # the capture still RUNS. That is the safe default for an advisory, non-required
-  # check (see the WARNING on the paths filter above): the worst case is running the
-  # capture once more, never a silently skipped determinism check. A guard job that
-  # threw instead would fail `capture` through `needs: guard` and skip the check even
-  # for the fork and main-headed PRs the capture `if:` below means to keep running.
-  #
-  # The marker is read from the PR HEAD commit via the API (contents:read, no
-  # checkout, so no PR-head code executes here). This must stay the SAME commit
-  # update-screenshots.yml gates on: it keys off `github.event.head_commit.message`
-  # (the head commit of the push), and on a pull_request synchronize the PR head sha
-  # IS that commit, so the two workflows agree on what a "marker push" is. Match its
-  # detection EXACTLY (keep the literal in sync, and match case-insensitively): the
-  # GitHub Actions `contains()` update-screenshots.yml uses is case-insensitive, so
-  # `[Update-Screenshots]` triggers the regen there; if this guard missed it, the
-  # capture would run in both workflows, the exact 2x this change removes.
-  guard:
+  # Shared, sharded, self-verifying capture (renders each shard twice and hard-
+  # fails on nondeterminism). Read-only; runs PR-head code, so no write token. Runs
+  # whenever render-affecting paths changed. There is no marker-skip anymore: with
+  # update-screenshots.yml retired, no push-event workflow renders the gallery in
+  # parallel, so there is no double-capture to dedup, and this is the only capture.
+  capture:
     needs: changes
     if: needs.changes.outputs.render == 'true'
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    outputs:
-      head_is_marker: ${{ steps.check.outputs.head_is_marker }}
-    steps:
-      - id: check
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // Fail SAFE toward running the capture: any failure to read the commit
-            // (fork head SHA not in this repo, transient API error) leaves isMarker
-            // false, so the capture runs rather than the guard job throwing and
-            // skipping it via `needs`.
-            let isMarker = false;
-            try {
-              const { data: commit } = await github.rest.repos.getCommit({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                ref: context.payload.pull_request.head.sha,
-              });
-              const message = commit.commit.message || '';
-              // Case-insensitive to match update-screenshots.yml's `contains()`.
-              isMarker = message.toLowerCase().includes('[update-screenshots]');
-            } catch (err) {
-              core.warning(
-                `Could not read the PR head commit message (${err.message}); ` +
-                  'defaulting head_is_marker=false so the capture runs.',
-              );
-            }
-            core.setOutput('head_is_marker', isMarker ? 'true' : 'false');
-            core.info(
-              isMarker
-                ? 'PR head commit carries [update-screenshots]; update-screenshots.yml regenerates the gallery on the push event, so this drift-check capture is skipped to avoid running the Playwright capture twice.'
-                : 'No [update-screenshots] marker on the PR head commit; running the drift check.',
-            );
-
-  # Shared, sharded, self-verifying capture (renders each shard twice and hard-
-  # fails on nondeterminism). Read-only; runs PR-head code, so no write token.
-  # Skipped on a marker push (see the guard job); its dependents cascade-skip.
-  #
-  # Skip ONLY when update-screenshots.yml actually runs as the backstop for THIS
-  # push, i.e. its `push: branches-ignore: [main]` trigger fires: a same-repo branch
-  # that is not `main`. A fork PR pushes to the fork, so no push event reaches this
-  # repo and no regen runs here; a `main`-headed PR is ignored by that trigger. In
-  # both cases there is no backstop, so keep running the capture (worst case is the
-  # 2x we accept, never a silently skipped determinism check). The asymmetry is
-  # deliberate: failing to skip only costs compute, but skipping without a backstop
-  # would drop the determinism/drift signal. Mirror update-screenshots.yml's trigger
-  # here if it ever changes.
-  capture:
-    needs: [changes, guard]
-    if: >-
-      needs.changes.outputs.render == 'true' &&
-      ( needs.guard.outputs.head_is_marker != 'true' ||
-        github.event.pull_request.head.repo.full_name != github.repository ||
-        github.event.pull_request.head.ref == 'main' )
     uses: ./.github/workflows/screenshot-capture.yml
     with:
       ref: ${{ github.event.pull_request.head.sha }}
@@ -287,7 +204,7 @@ jobs:
             const hasDrift = '${{ steps.drift.outputs.has_drift }}' === 'true';
             const count = '${{ steps.drift.outputs.drift_count }}';
             const body = hasDrift
-              ? `${marker}\n### 📸 Screenshot drift detected\nThis PR would change **${count}** committed screenshot(s). The generator is deterministic (the hard check passed), so this is the expected result of a UI change, not a bug.\n\nTo refresh the committed gallery **without a marker push**: a maintainer approves the \`commit-on-approval\` job for this run (Actions tab → this run → **Review deployments** → approve **screenshot-approval**). The regenerated, pinned-container pixels are then committed to this branch in the same run.`
+              ? `${marker}\n### 📸 Screenshot drift detected\nThis PR would change **${count}** committed screenshot(s). The generator is deterministic (the hard check passed), so this is the expected result of a UI change, not a bug.\n\nTo refresh the committed gallery: a maintainer approves the \`commit-on-approval\` job for this run (Actions tab → this run → **Review deployments** → approve **screenshot-approval**). The regenerated, pinned-container pixels are then committed to this branch in the same run.`
               : `${marker}\n### 📸 Screenshot drift check\nNo drift: the committed screenshots already match a fresh deterministic generation. ✅`;
             // Paginate: on a busy PR the marker comment can be past the first 30,
             // and a first-page-only search would post a duplicate sticky each run.
@@ -392,21 +309,15 @@ jobs:
   # check would. It gates on TWO things: the hard determinism guard, then drift.
   #
   # Determinism gate:
-  #   - changes-detection itself failed        -> RED (fail closed: we cannot tell
-  #                                                whether a render change went
-  #                                                unchecked, so do not pass it).
-  #   - no render-affecting paths changed       -> green (nothing to check).
-  #   - capture ran and passed                  -> determinism OK, fall through to
-  #                                                the drift gate below.
-  #   - capture was skipped AND guard succeeded -> green. capture skips by design
-  #     only for the [update-screenshots] marker backstop (guard detects the marker
-  #     and update-screenshots.yml runs the same determinism capture on the push
-  #     event). A `skipped` capture is trusted ONLY when guard itself succeeded; if
-  #     guard failed or was cancelled, `capture` (which `needs: guard`) cascades to
-  #     skipped, and treating that as green would pass an unchecked PR, so it fails
-  #     closed instead.
-  #   - anything else (capture failed: nondeterminism; or capture skipped because
-  #     guard did not succeed)                  -> RED.
+  #   - changes-detection itself failed   -> RED (fail closed: we cannot tell
+  #                                          whether a render change went unchecked,
+  #                                          so do not pass it).
+  #   - no render-affecting paths changed  -> green (nothing to check).
+  #   - capture ran and passed             -> determinism OK, fall through to the
+  #                                          drift gate below.
+  #   - capture failed or did not run      -> RED (a shard's two independent renders
+  #                                          differ (nondeterminism), or an upstream
+  #                                          job did not succeed; fail closed).
   #
   # Drift gate (same-repo PRs only): once determinism passes, a drifting committed
   # gallery is RED. A merge can no longer land committed screenshots that a fresh
@@ -429,7 +340,7 @@ jobs:
   # on cancellation avoids the false red without ever leaving the live head without
   # a status.
   drift-gate:
-    needs: [changes, guard, capture, verify-drift]
+    needs: [changes, capture, verify-drift]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     permissions: {}
@@ -438,7 +349,6 @@ jobs:
         env:
           CHANGES: ${{ needs.changes.result }}
           RENDER: ${{ needs.changes.outputs.render }}
-          GUARD: ${{ needs.guard.result }}
           CAPTURE: ${{ needs.capture.result }}
           VERIFY_DRIFT: ${{ needs.verify-drift.result }}
           HAS_DRIFT: ${{ needs.verify-drift.outputs.has_drift }}
@@ -454,17 +364,8 @@ jobs:
             exit 0
           fi
           # Render paths changed, so the determinism capture was expected to run.
-          if [ "$CAPTURE" = "skipped" ] && [ "$GUARD" = "success" ]; then
-            # Intentional skip: guard ran fine and detected an [update-screenshots]
-            # marker, so update-screenshots.yml runs the same capture on the push
-            # event. (A skip caused by guard failing is caught by the else below,
-            # because GUARD would not be "success".) No local gallery was rebuilt,
-            # so there is nothing to drift-check here; the marker workflow owns it.
-            echo "Determinism capture intentionally skipped for an [update-screenshots] marker push; the marker workflow runs the same check. ✅"
-            exit 0
-          fi
           if [ "$CAPTURE" != "success" ]; then
-            echo "::error::the screenshot determinism guard did not pass (guard: $GUARD, capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
+            echo "::error::the screenshot determinism guard did not pass (capture: $CAPTURE). Either a shard's two independent renders differ (nondeterminism), or the capture did not run because an upstream job did not succeed. This is the hard check, not the drift approval gate; fix it before merging."
             exit 1
           fi
           echo "Screenshot determinism check passed. ✅"
@@ -475,7 +376,7 @@ jobs:
           # so blocking it would strand it with no way to go green.
           if [ "$SAME_REPO" != "true" ]; then
             if [ "$HAS_DRIFT" = "true" ]; then
-              echo "Drift detected ($DRIFT_COUNT screenshot(s)) on a fork PR, which cannot clear it from here; not blocking. A maintainer refreshes the gallery via the marker workflow before merge. ✅"
+              echo "Drift detected ($DRIFT_COUNT screenshot(s)) on a fork PR, which cannot clear it from here; not blocking. A maintainer refreshes the gallery before merge (for example by taking the change onto a same-repo branch, where the approval gate can commit the regenerated pixels). ✅"
             fi
             exit 0
           fi

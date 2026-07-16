@@ -8,8 +8,9 @@ on:
 
 # The default job (lint/typecheck/tests/build) needs no browser, and the e2e job
 # runs inside the pinned Playwright image whose Chromium is already bundled, so
-# skip Playwright's browser download during `npm ci` workflow-wide. Regenerating
-# the docs gallery is handled by update-screenshots.yml, not here.
+# skip Playwright's browser download during `npm ci` workflow-wide. The docs
+# gallery is regenerated on a PR by pr-drift-check.yml (its approval-gated commit),
+# not here.
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
 
@@ -61,8 +62,8 @@ jobs:
   # Tier-2 end-to-end smoke: drive the BUILT app in a real browser and prove the
   # TOWER win surfaces (the congratulations modal), plus the visual.spec.ts pixel
   # baselines. Runs INSIDE the pinned Playwright image, the same Chromium build
-  # the update-visual-baselines and update-screenshots workflows use, so the
-  # baselines it compares against are minted against the identical renderer. Kept
+  # update-visual-baselines and the screenshot capture (screenshot-capture.yml) use,
+  # so the baselines it compares against are minted against the identical renderer. Kept
   # in its own job so the container pull never slows the fast lint/test lane.
   e2e:
     needs: resolve-image

@@ -1,6 +1,7 @@
 /**
  * Shard partition for the screenshot generator's CI capture: the SINGLE source
- * of truth for how update-screenshots.yml splits the work across parallel jobs.
+ * of truth for how screenshot-capture.yml (the reusable capture that
+ * pr-drift-check.yml calls) splits the work across parallel jobs.
  *
  * The gallery is ~70 shots rendered with no GPU (software raster) in the pinned
  * container, and the determinism guard renders the whole set twice, so a serial
