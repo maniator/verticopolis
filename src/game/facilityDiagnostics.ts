@@ -286,32 +286,53 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
       const distNote = sim.rules.mode === "modern" ? `: ${lobbyDist} floors` : "";
       const slot = sim.tower.nearestBuildableLobbySlot(u.floor);
       if (slot === null) {
-        // No nearer lobby can legally exist. Plain information, no fault color,
-        // no imperative: tenants here settle a little below full and hold.
+        // No nearer lobby can legally exist (the short block above the highest
+        // legal slot). Plain information, no imperative. The eroding variant is
+        // unreachable at the current geometry (the invariant test pins the top
+        // block inside the capped band), but the branch handles it anyway so
+        // the neutral copy can never mask an actual slide toward a notice.
         lines.push(
-          html`<div>Far from the nearest lobby${distNote}. Satisfaction settles a little below full here; no closer sky lobby slot exists this high in the tower.</div>`,
+          drain.erosion > SERVED_RECOVERY
+            ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice, and no closer sky lobby slot exists this high in the tower.</div>`
+            : html`<div>Far from the nearest lobby${distNote}. Satisfaction settles a little below full here; no closer sky lobby slot exists this high in the tower.</div>`,
         );
       } else {
-        // A slot that already carries floors or rooms is still the fix, but the
-        // build tool refuses a lobby until the story is cleared, so the advice
-        // names that step too (never a prescribe-then-refuse loop).
-        const clearFirst = sim.tower.floorHasNonLobbyContent(slot);
+        // Name the WHOLE project the build rules will actually accept, never a
+        // prescribe-then-refuse loop: a slot above the built top needs floors
+        // laid up to it first; a slot carrying floors or rooms needs clearing;
+        // and a unit sitting on the empty slot itself must move (clearing the
+        // floor demolishes it, so "lift these tenants" would be false for it).
+        const onSlot = slot === u.floor;
+        // A slot one story above the built top rests on the top story and is
+        // directly placeable; only a slot higher than that needs floors first.
+        const needsSupport = slot > sim.tower.highestFloor + 1;
+        const clearFirst = !onSlot && !needsSupport && sim.tower.floorHasNonLobbyContent(slot);
         if (drain.erosion > SERVED_RECOVERY) {
           // The strong "sinks until notice" warning only when the distance erosion
           // actually outpaces the served recovery, so the tenant really is sliding
           // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
+          const fix = onSlot
+            ? `This unit sits on the empty sky lobby slot; move it and build the lobby on floor ${slot} to anchor the block.`
+            : needsSupport
+              ? `Build floors up to ${slot} and put the sky lobby there to lift these tenants.`
+              : clearFirst
+                ? `Clear floor ${slot} and build the sky lobby there to lift these tenants.`
+                : `Build the sky lobby on floor ${slot} to lift these tenants.`;
           lines.push(
-            clearFirst
-              ? html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Clear floor ${slot} and build the sky lobby there to lift these tenants.</div>`
-              : html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Build the sky lobby on floor ${slot} to lift these tenants.</div>`,
+            html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. ${fix}</div>`,
           );
         } else {
           // The ceiling holds satisfaction down without evicting; the gentler line
           // describes that honestly and names the buildable fix.
+          const fix = onSlot
+            ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves, would lift the block.`
+            : needsSupport
+              ? `A sky lobby on floor ${slot} would lift it (build floors up to it first).`
+              : clearFirst
+                ? `A sky lobby on floor ${slot} would lift it (clear that floor first).`
+                : `A sky lobby on floor ${slot} would lift it.`;
           lines.push(
-            clearFirst
-              ? html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it (clear that floor first).</div>`
-              : html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it.</div>`,
+            html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. ${fix}</div>`,
           );
         }
       }

@@ -43,6 +43,11 @@ describe("lobby-distance band geometry (both rule-sets)", () => {
     expect(LOBBY_FAR_FLOORS).toBeGreaterThanOrEqual(midBlock);
     expect(CLASSIC_RULES.lobbyDistanceDrain(midBlock)).toEqual({ cap: 1, erosion: 0 });
     expect(MODERN_RULES.lobbyDistanceDrain(midBlock)).toEqual({ cap: 1, erosion: 0 });
+    // The far band must be non-empty: FAR strictly below VERY_FAR, or a future
+    // lobbyInterval retune (the FAR edge tracks it; VERY_FAR is hand-tuned)
+    // would jump straight from no-penalty to the evicting band and collapse
+    // Modern's ramp span.
+    expect(LOBBY_FAR_FLOORS).toBeLessThan(LOBBY_VERY_FAR_FLOORS);
   });
 
   it("keeps the block above the highest buildable lobby capped at worst, never evicting", () => {

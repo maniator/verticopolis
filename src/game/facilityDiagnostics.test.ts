@@ -104,22 +104,51 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     return { sim, unit };
   }
 
-  it("names the exact buildable slot for a capped (far-band) office", () => {
-    const { sim, unit } = tallSim(10, 9); // distance 8: far band, slot 15 empty
+  it("names the slot AND the build-up step when the slot sits above the built top", () => {
+    // A young 10-story tower: slot 15 is the fix, but floors 11-14 do not exist
+    // yet, so bare "build on floor 15" would be refused (no floating overhangs).
+    // The advice names the whole project.
+    const { sim, unit } = tallSim(10, 9); // distance 8: far band, slot 15 above the top
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
     expect(line?.textContent).toContain("Satisfaction is capped here");
-    expect(line?.textContent).toContain("A sky lobby on floor 15 would lift it.");
+    expect(line?.textContent).toContain("A sky lobby on floor 15 would lift it (build floors up to it first).");
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
   });
 
-  it("names the exact buildable slot for an eroding (very-far) office", () => {
-    const { sim, unit } = tallSim(14, 13); // distance 12: very far, slot 15 empty
+  it("names the plain imperative when the slot rests directly on the built top", () => {
+    // A 14-story tower: slot 15 sits one story above the top, so a lobby there
+    // rests on floor 14 and is directly placeable. No extra step to name.
+    const { sim, unit } = tallSim(14, 13); // distance 12: very far, slot 15 directly placeable
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
     expect(line?.textContent).toContain("Satisfaction sinks until tenants give notice.");
     expect(line?.textContent).toContain("Build the sky lobby on floor 15 to lift these tenants.");
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
+  });
+
+  it("tells a tenant sitting on the empty slot floor to move, not to demolish itself", () => {
+    // Rooms are legal on an unclaimed sky-lobby story, so an office can sit ON
+    // the skipped slot. "Clear floor 30" would demolish the advised office, so
+    // the copy must acknowledge the unit itself has to move.
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 30; fl++) {
+      const kind = fl === 15 ? "lobby" : "floor";
+      for (let x = 10; x < 30; x++) expect(sim.tower.place(kind, fl, x).ok).toBe(true);
+    }
+    expect(sim.buildTransport("elevatorStandard", 10, 1, 30).ok).toBe(true);
+    const r = sim.tower.place("office", 30, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    expect(sim.tower.nearestBuildableLobbySlot(30)).toBe(30); // precondition: it sits on the slot
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
+    expect(line?.textContent).toContain("This unit sits on the empty sky lobby slot; move it and build the lobby on floor 30 to anchor the block.");
+    expect(line?.textContent).not.toContain("Clear floor 30");
   });
 
   it("names the clearing step when the buildable slot already carries non-lobby content", () => {
