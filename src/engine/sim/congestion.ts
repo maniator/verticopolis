@@ -223,7 +223,21 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
     // given a place to point. A reachable but dirty room is amber (it is waiting
     // its turn), and a reachable clean room is green. Only hotel rooms carry a
     // housekeeping signal, so non-hotel floors stay untinted.
-    const crews = sim.tower.units.filter((u) => u.kind === "housekeeping" && isOperational(u));
+    // Precompute crew reach once, so the per-room test is O(1) instead of
+    // O(rooms x crews). A room is reachable iff some operational crew is on its
+    // floor, or shares its staff-network component. `staffConnected(a, b)` is
+    // exactly "a === b, or both floors carry the same component id", so collect
+    // the crew floors and the component ids those floors belong to, then a room
+    // matches on either. The component map is revision-memoized (routing.ts).
+    const comps = sim.tower.staffComponents();
+    const crewFloors = new Set<number>();
+    const crewComps = new Set<number>();
+    for (const u of sim.tower.units) {
+      if (u.kind !== "housekeeping" || !isOperational(u)) continue;
+      crewFloors.add(u.floor);
+      const c = comps.get(u.floor);
+      if (c !== undefined) crewComps.add(c);
+    }
     const out: HeatCell[] = [];
     for (const u of sim.tower.units) {
       // Only live hotel rooms carry a housekeeping signal: a room still under
@@ -231,7 +245,8 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
       // report, so skip it (matching the satisfaction/occupancy branches, which
       // likewise ignore units with nothing to say).
       if (!isHotelKind(u.kind) || !isOperational(u)) continue;
-      const reachable = crews.some((c) => sim.tower.staffConnected(c.floor, u.floor));
+      const roomComp = comps.get(u.floor);
+      const reachable = crewFloors.has(u.floor) || (roomComp !== undefined && crewComps.has(roomComp));
       const severity = !reachable ? 1 : u.state === "dirty" ? 0.6 : 0;
       out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity });
     }
