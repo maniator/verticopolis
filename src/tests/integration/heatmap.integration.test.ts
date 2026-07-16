@@ -131,7 +131,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 6; f++) lay(sim, "floor", f);
     // Passenger elevator serves the whole stack (guests reach every floor).
-    sim.buildTransport("elevatorStandard", C, 1, 6);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 6).ok).toBe(true);
     // Service elevator covers only floors 2..5, so floor 6 has no staff route.
     expect(sim.tower.placeTransport("elevatorService", C + 8, 2, 5).ok).toBe(true);
     // An operational housekeeping crew on floor 2, staff-connected to 2..5.
@@ -141,10 +141,13 @@ describe("floorHeatmap (stats overlay data)", () => {
     // One hotel room per floor so cells match by floor: reachable+clean (3),
     // reachable+dirty (4), and unreachable (6, no staff transport).
     const clean = sim.tower.place("hotelDouble", 3, C - 20);
+    expect(clean.ok).toBe(true);
     sim.tower.units.find((u) => u.id === clean.unitId)!.state = "asleep";
     const dirty = sim.tower.place("hotelDouble", 4, C - 20);
+    expect(dirty.ok).toBe(true);
     sim.tower.units.find((u) => u.id === dirty.unitId)!.state = "dirty";
     const unreached = sim.tower.place("hotelDouble", 6, C - 20);
+    expect(unreached.ok).toBe(true);
     sim.tower.units.find((u) => u.id === unreached.unitId)!.state = "asleep";
     // An office on floor 5 must produce no cleanliness cell (non-hotel).
     expect(sim.tower.place("office", 5, C - 20).ok).toBe(true);
@@ -161,8 +164,9 @@ describe("floorHeatmap (stats overlay data)", () => {
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
-    sim.buildTransport("elevatorStandard", C, 1, 2);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 2).ok).toBe(true);
     const r = sim.tower.place("hotelDouble", 2, C - 20);
+    expect(r.ok).toBe(true);
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "asleep";
     // No housekeeping unit exists, so no crew can reach any room: worst case.
     expect(cellOn(sim.floorHeatmap("cleanliness"), 2)!.severity).toBe(1);
