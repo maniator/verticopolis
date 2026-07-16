@@ -171,7 +171,9 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     expect(sim.tower.nearestBuildableLobbySlot(30)).toBe(30); // precondition: it sits on the slot
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
-    expect(line?.textContent).toContain("This unit sits on the empty sky lobby slot; move it and build the lobby on floor 30 to anchor the block.");
+    expect(line?.textContent).toContain(
+      "This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor 30 to anchor the block.",
+    );
     expect(line?.textContent).not.toContain("Clear floor 30");
   });
 

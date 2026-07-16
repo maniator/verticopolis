@@ -316,7 +316,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           // actually outpaces the served recovery, so the tenant really is sliding
           // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
           const fix = onSlot
-            ? `This unit sits on the empty sky lobby slot; move it and build the lobby on floor ${slot} to anchor the block.`
+            ? `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
             : needsSupport
               ? `Build floors up to ${slot} and put the sky lobby there to lift these tenants.`
               : blockedAbove
@@ -331,7 +331,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           // The ceiling holds satisfaction down without evicting; the gentler line
           // describes that honestly and names the buildable fix.
           const fix = onSlot
-            ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves, would lift the block.`
+            ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
             : needsSupport
               ? `A sky lobby on floor ${slot} would lift it (build floors up to it first).`
               : blockedAbove
