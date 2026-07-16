@@ -278,7 +278,7 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
    *  visitors who are still live people, then hand both back. Bounded and
    *  deterministic (seeded rng). The bound stops at 450 so a caller may
    *  tick up to 30 more minutes and still land at or before 02:00 day 1,
-   *  which keeps setClock(sim, 2, 1) a strictly forward jump. */
+   *  which means setClock(sim, 2, 1) never moves the clock backward. */
   function withCountedAttendees(): { sim: Simulation; hall: Unit } {
     const sim = mixedTower();
     setClock(sim, 18);
