@@ -347,7 +347,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         // (so absent venues get neither the demand line nor the advice).
         demandFraction === undefined ? undefined : demandMap.share,
         // Modern-only advice: Classic shows the demand number without a verdict on it.
-        sim.rules?.mode === "modern",
+        sim.rules.mode === "modern",
       ),
     );
   }

@@ -217,8 +217,9 @@ deterministic (census plus layout), so it adds no RNG draw (section 6).
 > record.
 
 The split shape is identical in both modes (otherwise Classic is not reproducing
-the classic game). Only magnitudes and the smoothing differ, and they ride one
-`GameRules` method, following the `noiseErosionScale()` pattern:
+the classic game). Only the magnitudes differ (the `smoothing` field was dropped,
+see the note above), and they ride one `GameRules` method, following the
+`noiseErosionScale()` pattern:
 
 ```
 interface GameRules {
