@@ -53,11 +53,8 @@ export class Tower {
   /** Room occupying a tile, else the structural tile, else undefined. */
   unitAt(floor: number, x: number): Unit | undefined {
     const k = this.key(floor, x);
-    const rid = this.rooms.get(k);
-    if (rid !== undefined) return this.byId.get(rid);
-    const sid = this.structure.get(k);
-    if (sid !== undefined) return this.byId.get(sid);
-    return undefined;
+    const id = this.rooms.get(k) ?? this.structure.get(k);
+    return id === undefined ? undefined : this.byId.get(id);
   }
 
   /** The room (non-structural) at a tile, if any. */
@@ -71,9 +68,7 @@ export class Tower {
   }
 
   occupiedFloors(): number[] {
-    const set = new Set<number>();
-    for (const u of this.units) set.add(u.floor);
-    return [...set].sort((a, b) => a - b);
+    return [...new Set(this.units.map((u) => u.floor))].sort((a, b) => a - b);
   }
 
   /** Cached built-floor bounds, keyed by {@link revision} so the min/max scan
@@ -370,6 +365,10 @@ export class Tower {
 
   nearestLobbyFloorDistance(floor: number): number {
     return transport.nearestLobbyFloorDistance(this, floor);
+  }
+
+  nearestBuildableLobbySlot(floor: number): number | null {
+    return transport.nearestBuildableLobbySlot(this, floor);
   }
 
   setStop(id: number, floor: number, stop: boolean): boolean {

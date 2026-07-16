@@ -325,6 +325,26 @@ export function nearestLobbyFloorDistance(tower: Tower, floor: number): number {
   return best;
 }
 
+/** The nearest sky-lobby slot that is legal, BUILDABLE (within the tower), still
+ *  empty, and strictly nearer to `floor` than its current nearest lobby, or null
+ *  when no such slot exists. This is the inspector's honesty gate for the
+ *  lobby-distance advice (#394 recalibration): "build a sky lobby on floor N"
+ *  may only ever name a floor the placement rules would actually accept, so the
+ *  line goes neutral for the short block above the highest buildable slot
+ *  (e.g. floors 91+ over a floor-90 lobby, where slot 105 exceeds maxFloor)
+ *  instead of prescribing an impossible fix. O(lobby slots), a handful. */
+export function nearestBuildableLobbySlot(tower: Tower, floor: number): number | null {
+  const current = nearestLobbyFloorDistance(tower, floor);
+  let best: number | null = null;
+  for (let slot = GRID.lobbyInterval; slot <= GRID.maxFloor; slot += GRID.lobbyInterval) {
+    if (!isSkyLobbyFloor(slot) || floorHasLobby(tower, slot)) continue;
+    const d = Math.abs(floor - slot);
+    if (d >= current) continue; // must actually improve on the nearest lobby
+    if (best === null || d < Math.abs(floor - best)) best = slot;
+  }
+  return best;
+}
+
 /**
  * Toggle whether a transport stops at a floor (express configuration).
  * Endpoints are always stops, a shaft's bottom and top can't be skipped, or

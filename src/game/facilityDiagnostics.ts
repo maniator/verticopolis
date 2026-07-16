@@ -270,6 +270,11 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // low, and deep in the very-far band also erodes toward a move-out. Name the
   // structural fix (a sky lobby, not a local shaft). Always-on, like W1/W3. Modern
   // shows the live distance (advice-with-numbers); Classic names the band only.
+  // HONESTY GATE: the advice may only prescribe a lobby the placement rules
+  // would accept, so it names the exact buildable slot; when no legal nearer
+  // slot exists (the short block above the highest buildable slot, e.g. floors
+  // 91+ over a floor-90 lobby), the line goes neutral and uncolored instead of
+  // flagging unavoidable geometry as a player mistake.
   if (
     (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind)) &&
     sim.tower.isFloorServed(u.floor)
@@ -279,18 +284,25 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     if (drain.cap < 1) {
       // Modern shows the live distance; Classic names the situation without it.
       const distNote = sim.rules.mode === "modern" ? `: ${lobbyDist} floors` : "";
-      // The strong "sinks until notice" warning only when the distance erosion
-      // actually outpaces the served recovery, so the tenant really is sliding out
-      // (Classic very far, or Modern deep isolation). At shallower distances the
-      // ceiling just holds satisfaction down without evicting, which the gentler
-      // line describes honestly.
-      if (drain.erosion > SERVED_RECOVERY) {
+      const slot = sim.tower.nearestBuildableLobbySlot(u.floor);
+      if (slot === null) {
+        // No nearer lobby can legally exist. Plain information, no fault color,
+        // no imperative: tenants here settle a little below full and hold.
         lines.push(
-          html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Add a sky lobby (every 15th floor) within reach.</div>`,
+          html`<div>Far from the nearest lobby${distNote}. Satisfaction settles a little below full here; no closer sky lobby slot exists this high in the tower.</div>`,
+        );
+      } else if (drain.erosion > SERVED_RECOVERY) {
+        // The strong "sinks until notice" warning only when the distance erosion
+        // actually outpaces the served recovery, so the tenant really is sliding
+        // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
+        lines.push(
+          html`<div style="color:var(--bad)">Too far from any lobby${distNote}. Satisfaction sinks until tenants give notice. Build the sky lobby on floor ${slot} to lift these tenants.</div>`,
         );
       } else {
+        // The ceiling holds satisfaction down without evicting; the gentler line
+        // describes that honestly and names the buildable fix.
         lines.push(
-          html`<div>Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A nearer sky lobby (every 15th floor) would lift it.</div>`,
+          html`<div style="color:var(--bad)">Far from the nearest lobby${distNote}. Satisfaction is capped here, so it never tops out. A sky lobby on floor ${slot} would lift it.</div>`,
         );
       }
     }

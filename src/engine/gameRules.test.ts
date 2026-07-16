@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "./gameRules";
-import { FACILITIES } from "./facilities";
+import { FACILITIES, GRID } from "./facilities";
 import { ECON } from "./econConfig";
 import { RNG } from "./rng";
 import {
@@ -28,6 +28,33 @@ describe("makeRules", () => {
   it("gates the escalator office-floor rule by mode", () => {
     expect(CLASSIC_RULES.allowsEscalatorOnOfficeFloors).toBe(false); // 1994 canon
     expect(MODERN_RULES.allowsEscalatorOnOfficeFloors).toBe(true);
+  });
+});
+
+describe("lobby-distance band geometry (both rule-sets)", () => {
+  it("derives the far edge from the lobby ladder: correct play is penalty-free", () => {
+    // Lobbies are legal only on the ground and every lobbyInterval-th floor, so
+    // the deepest mid-block floor of a complete ladder sits floor(interval / 2)
+    // from a lobby. That distance must carry no drain in either mode, or a tower
+    // with every legal lobby built would be penalized with no legal fix (the
+    // v1.44.0 shipping bug). This inequality is geometry, not tuning: if it
+    // fails, someone re-tuned LOBBY_FAR_FLOORS below the lobby ladder's reach.
+    const midBlock = Math.floor(GRID.lobbyInterval / 2);
+    expect(LOBBY_FAR_FLOORS).toBeGreaterThanOrEqual(midBlock);
+    expect(CLASSIC_RULES.lobbyDistanceDrain(midBlock)).toEqual({ cap: 1, erosion: 0 });
+    expect(MODERN_RULES.lobbyDistanceDrain(midBlock)).toEqual({ cap: 1, erosion: 0 });
+  });
+
+  it("keeps the block above the highest buildable lobby capped at worst, never evicting", () => {
+    // The top of the tower has no legal nearer slot (the next every-15 floor
+    // exceeds maxFloor), so its worst distance may cap satisfaction but must
+    // never carry an evicting erosion: unavoidable geometry informs, it does
+    // not punish. Both modes.
+    const highestSlot = Math.floor(GRID.maxFloor / GRID.lobbyInterval) * GRID.lobbyInterval;
+    const worstTopDistance = GRID.maxFloor - highestSlot;
+    expect(worstTopDistance).toBeLessThanOrEqual(LOBBY_VERY_FAR_FLOORS);
+    expect(CLASSIC_RULES.lobbyDistanceDrain(worstTopDistance).erosion).toBe(0);
+    expect(MODERN_RULES.lobbyDistanceDrain(worstTopDistance).erosion).toBe(0);
   });
 });
 

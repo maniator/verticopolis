@@ -83,3 +83,70 @@ describe("facilityDiagnostics", () => {
     expect(frag.textContent).not.toContain("Fix the cause");
   });
 });
+
+describe("facilityDiagnostics: lobby-distance advice names only buildable slots", () => {
+  /** A 20-tile-wide tower with lobby floor 1, plain floors 2..`top`, one
+   *  standard elevator serving the whole span, and an occupied office on
+   *  `floor`. No sky lobby is built, so slot 15 (and up) stays empty. */
+  function tallSim(top: number, floor: number): { sim: Simulation; unit: Unit } {
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= top; fl++) {
+      for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+    }
+    expect(sim.buildTransport("elevatorStandard", 10, 1, top).ok).toBe(true);
+    const r = sim.tower.place("office", floor, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    return { sim, unit };
+  }
+
+  it("names the exact buildable slot for a capped (far-band) office", () => {
+    const { sim, unit } = tallSim(10, 9); // distance 8: far band, slot 15 empty
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
+    expect(line?.textContent).toContain("Satisfaction is capped here");
+    expect(line?.textContent).toContain("A sky lobby on floor 15 would lift it.");
+    expect(line?.getAttribute("style")).toBe("color:var(--bad)");
+  });
+
+  it("names the exact buildable slot for an eroding (very-far) office", () => {
+    const { sim, unit } = tallSim(14, 13); // distance 12: very far, slot 15 empty
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
+    expect(line?.textContent).toContain("Satisfaction sinks until tenants give notice.");
+    expect(line?.textContent).toContain("Build the sky lobby on floor 15 to lift these tenants.");
+    expect(line?.getAttribute("style")).toBe("color:var(--bad)");
+  });
+
+  it("goes neutral and uncolored at the top of the tower, where no nearer slot can exist", () => {
+    // Every legal slot (15..90) carries a lobby; the office sits on floor 98,
+    // 8 floors above the highest buildable slot, so there is no legal fix. The
+    // line must inform without color, imperative, or a named floor.
+    const sim = new Simulation();
+    sim.money = 1e12;
+    sim.star = 5;
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let fl = 2; fl <= 98; fl++) {
+      const kind = fl % 15 === 0 ? "lobby" : "floor";
+      for (let x = 10; x < 30; x++) expect(sim.tower.place(kind, fl, x).ok).toBe(true);
+    }
+    // An express elevator reaches the top: it stops at every lobby floor and at
+    // its own endpoints, so floor 98 is served.
+    expect(sim.buildTransport("elevatorExpress", 10, 1, 98).ok).toBe(true);
+    const r = sim.tower.place("office", 98, 15);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "occupied";
+    expect(sim.tower.nearestBuildableLobbySlot(98)).toBeNull(); // precondition: no legal fix
+    const frag = render(facilityDiagnostics(sim, unit));
+    const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
+    expect(line?.textContent).toContain("no closer sky lobby slot exists this high in the tower");
+    expect(line?.textContent).not.toContain("would lift it");
+    expect(line?.textContent).not.toMatch(/floor \d/); // never names an unbuildable floor
+    expect(line?.getAttribute("style")).toBeNull(); // informational, not a fault
+  });
+});
