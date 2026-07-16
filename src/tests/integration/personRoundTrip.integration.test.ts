@@ -129,7 +129,16 @@ describe("same-floor meal round-trip (walk-only route)", () => {
   it("outForMeal drains fully after a same-floor round-trip completes", () => {
     const sim = officeAndFastFoodSameFloor();
     setHour(sim, 11);
-    for (let m = 0; m < 240; m++) sim.tick(1);
+    // Run 11:00 -> 16:55: past the lunch window's stragglers AND the Modern
+    // sales-call window (10-15, #397), whose office round-trippers share the
+    // outForMeal accounting. The margin assumes THIS uncongested two-shaft
+    // fixture: a 14:59 caller travels in minutes, dwells at most 60, and is
+    // back around 16:10. It is not a worst-case bound (a congested tower's
+    // give-up budget plus a max dwell could legally run past 16:55), so if
+    // this fixture ever grows congestion, widen the margin rather than doubt
+    // the accounting. Stop short of 17:00 so the dinner window can't start a
+    // fresh meal trip right before the drain assertion.
+    for (let m = 0; m < 355; m++) sim.tick(1);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
     expect(office.outForMeal ?? 0).toBe(0);
   });
@@ -137,13 +146,18 @@ describe("same-floor meal round-trip (walk-only route)", () => {
 
 describe("round trip completes and re-increments visible occupancy", () => {
   it("outForMeal drains fully by the time all stragglers finish their return leg", () => {
-    // The last outbound spawn fires around t=0.6 (12:48 for lunch). With max
-    // eat time (60 game minutes) + return trip (~5-10 min) the last straggler
-    // is back around 14:00. Run PAST the window's end to guarantee full drain.
+    // The last outbound MEAL spawn fires around t=0.6 (12:48 for lunch). With
+    // max eat time (60 game minutes) + return trip (~5-10 min) the last meal
+    // straggler is back around 14:00. The Modern sales-call window (10-15,
+    // #397) shares the outForMeal accounting and its last caller departs by
+    // 14:59, back by ~16:15 ON THIS UNCONGESTED FIXTURE (not a worst-case
+    // bound; congestion could stretch a max-dwell caller past 16:55, so widen
+    // the margin if this fixture ever grows congestion). Run 11:00 -> 16:55:
+    // past both mechanisms' stragglers but short of the 17:00 dinner window,
+    // which would start a fresh meal trip right before the drain assertion.
     const sim = officeAndFastFood();
     setHour(sim, 11);
-    // 4 hours: 3-hour lunch window + 1 hour of straggler wind-down.
-    for (let m = 0; m < 240; m++) sim.tick(1);
+    for (let m = 0; m < 355; m++) sim.tick(1);
     const office = sim.tower.units.find((u) => u.kind === "office")!;
     expect(office.outForMeal ?? 0).toBe(0);
   });
@@ -251,11 +265,16 @@ describe("return trip fires after the dwell expires (arch §8 test 3)", () => {
   it("a dwelling person's route mutates to venue -> origin when dwellSecondsLeft hits zero", () => {
     const sim = officeAndFastFood();
     setHour(sim, 12);
-    // Find a person in `dwelling` state and remember their originUnitId.
+    // Find a MEAL person in `dwelling` state (mealVenueId set) and remember
+    // their originUnitId. The office also emits Modern sales-call
+    // round-trippers (#397) that dwell at the lobby with no venue intent;
+    // this test is about the MEAL return leg, so every filter below scopes on
+    // mealVenueId to keep a freshly-spawned sales caller from the same office
+    // out of the sample.
     let originId = -1;
     for (let m = 0; m < 30; m++) {
       sim.tick(1);
-      const dweller = sim.crowd.people.find((p) => p.state === "dwelling");
+      const dweller = sim.crowd.people.find((p) => p.state === "dwelling" && p.mealVenueId !== undefined);
       if (dweller) {
         originId = dweller.originUnitId!;
         break;
@@ -268,15 +287,19 @@ describe("return trip fires after the dwell expires (arch §8 test 3)", () => {
     for (let m = 0; m < 90; m++) sim.tick(1);
     // The specific person is either mid-return-trip (state in toShaft/waiting/
     // riding/climbing/toDest with returning=true) or already back (state=done).
-    // Either way, no one still `dwelling` who originated at that office is left
-    // behind, and if a return-trip person is in-flight their route starts at
-    // the venue floor (5) and ends at the origin floor (2).
+    // Either way, no MEAL dweller who originated at that office is left
+    // behind, and if a meal return-trip person is in-flight their route starts
+    // at the venue floor (5) and ends at the origin floor (2).
     const stillDwellingHere = sim.crowd.people.filter(
-      (p) => p.state === "dwelling" && p.originUnitId === originId,
+      (p) => p.state === "dwelling" && p.originUnitId === originId && p.mealVenueId !== undefined,
     );
     expect(stillDwellingHere.length).toBe(0);
     const inFlightReturn = sim.crowd.people.find(
-      (p) => p.originUnitId === originId && p.returning === true && p.state !== "done",
+      (p) =>
+        p.originUnitId === originId &&
+        p.mealVenueId !== undefined &&
+        p.returning === true &&
+        p.state !== "done",
     );
     if (inFlightReturn) {
       expect(inFlightReturn.floors[0]).toBe(5);

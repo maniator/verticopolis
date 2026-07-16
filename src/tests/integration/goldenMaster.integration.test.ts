@@ -177,9 +177,16 @@ const PINNED_STATE_HASH = "c3e33d77f73e3a71213fae2f6e93863626909d291e82de4454ade
  * that legitimately changes Modern behavior, with intent, exactly like the Classic
  * hash above. First pinned alongside Phase C of commercial demand pools (#393),
  * which added no Modern income math itself (the value simply captures Modern's
- * demand-pools behavior, previously unpinned). Re-pinned for the lobby-distance
- * band recalibration: the Modern continuous ramp now starts at the derived
- * mid-block edge (7, was 4), so the fixture's upper rooms (distance 5 at most)
- * no longer feel any distance ceiling and their satisfaction fields shift.
+ * demand-pools behavior, previously unpinned). Previously re-pinned for the
+ * lobby-distance band recalibration: the Modern continuous ramp now starts at
+ * the derived mid-block edge (7, was 4), so the fixture's upper rooms (distance
+ * 5 at most) no longer feel any distance ceiling and their satisfaction fields
+ * shift. Re-pinned for demographic routines (#397): Modern's staffed offices now
+ * emit midday sales-call round trips (and the sales-call weight gate draws from
+ * the shared crowd rng each spawn pass inside the 10-15 window), so the seeded
+ * crowd stream and the fields it feeds shift under the identical footprint.
+ * Classic draws nothing new (its routine weights are 0 and the overlay returns
+ * before any rng use), which is why the Classic hash above is UNCHANGED in that
+ * PR: the unchanged value is the proof of the zero-draw gate.
  */
-const PINNED_MODERN_STATE_HASH = "3d534086a370ec52d1008fd0295f74a2bc4697e30a8d5ab427627b709d1f857e";
+const PINNED_MODERN_STATE_HASH = "0b03540a0f305750e9e1d16a75f7d62139d83b2ba0bf07dce9be3b11de337272";

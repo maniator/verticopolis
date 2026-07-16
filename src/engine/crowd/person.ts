@@ -93,6 +93,12 @@ export interface Person {
    *  a round-tripper has (outbound arrival triggers the dwell; return arrival
    *  triggers the outForMeal decrement + despawn). */
   returning?: boolean;
+  /** Which demographic routine (condo-demographic-routines, #397) spawned this
+   *  person: a condo school-run leg or an office sales call. A transient tag
+   *  for attribution (tests, future overlays); the waves are purely
+   *  statistical, so it names the routine, never an identity, and like every
+   *  Person field it is in-memory only (nothing persists who is a child). */
+  routine?: "schoolRun" | "salesCall";
   /** Extended arrival linger (crowd-seconds): how long to hold the arrived
    *  pose before despawning. A metro commuter waiting on the platform for
    *  their train. Unset for ordinary trips, which keep the default 2-second
