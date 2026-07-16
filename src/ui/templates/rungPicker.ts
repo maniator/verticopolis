@@ -69,14 +69,19 @@ export function rungPickerTemplate(opts: {
 /**
  * Point every rung picker under `root` at its engine truth (`data-current`),
  * written AFTER render so the options are attached and the value write sticks.
- * The write is skipped when the DOM already agrees, so a pump re-render never
- * disturbs a select the player is mid-interaction with; when the engine value
- * genuinely moved underneath (a batch reprice, an undo), the picker follows.
+ * Two guards keep the ~6 Hz editor pump from fighting the player: the write is
+ * skipped when the DOM already agrees, AND a focused select is left alone
+ * entirely (some platforms move `value` while the player arrows through the
+ * open list, before `change` commits, so a pump write mid-interaction would
+ * cancel the pick). Engine truth still lands: the change handler's own refresh
+ * and the first pump after blur both reconcile, and a value that genuinely
+ * moved underneath (a batch reprice, an undo) follows then.
  * Call after every render that may contain a rung picker (the editor pump and
  * the batch dialog both do).
  */
 export function syncRungSelects(root: ParentNode): void {
   for (const s of root.querySelectorAll<HTMLSelectElement>("select[data-current]")) {
+    if (s.ownerDocument.activeElement === s) continue;
     const v = s.dataset.current!;
     if (s.value !== v) s.value = v;
   }

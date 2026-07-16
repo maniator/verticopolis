@@ -126,6 +126,40 @@ describe("editor card lit diffing — updates in place, element identity survive
     expect(select.value).toBe("3");
   });
 
+  it("a FOCUSED rung picker is never overwritten by the pump sync (the in-progress pick survives)", () => {
+    // Some platforms move a select's value while the player arrows through the
+    // open list, before change commits; the ~6 Hz editor pump must not write
+    // engine truth over that in-progress pick. After blur, the next sync
+    // reconciles normally.
+    const sim = new Simulation(); // Classic
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    const card = document.createElement("div");
+    document.body.appendChild(card); // focus needs a connected element
+    try {
+      const paint = () => {
+        render(unitEditorTemplate(sim, office), card);
+        syncRungSelects(card);
+      };
+      paint();
+      const select = card.querySelector<HTMLSelectElement>("#ed-rung")!;
+      select.focus();
+      expect(document.activeElement).toBe(select);
+      select.value = "3"; // mid-pick: the player moved the value, change not yet committed
+      syncRungSelects(card); // a pump tick lands mid-interaction
+      expect(select.value).toBe("3"); // the pick survives
+      select.blur();
+      syncRungSelects(card); // first sync after blur reconciles to engine truth
+      expect(select.value).toBe("2");
+    } finally {
+      card.remove();
+    }
+  });
+
   it("a shape change (gutted) restructures rows while the action buttons keep identity", () => {
     const { sim, office } = fixture();
     const card = document.createElement("div");
