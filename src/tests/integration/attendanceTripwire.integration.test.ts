@@ -276,9 +276,9 @@ describe("state-at-arrival recheck (census venues)", () => {
 describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
   /** Run the evening attendance window until the party hall holds counted
    *  visitors who are still live people, then hand both back. Bounded and
-   *  deterministic (seeded rng). The bound is 450, not 480, so a caller may
+   *  deterministic (seeded rng). The bound stops at 450 so a caller may
    *  tick up to 30 more minutes and still land at or before 02:00 day 1,
-   *  where setClock(sim, 2, 1) is a forward jump, never a rewind. */
+   *  which keeps setClock(sim, 2, 1) a strictly forward jump. */
   function withCountedAttendees(): { sim: Simulation; hall: Unit } {
     const sim = mixedTower();
     setClock(sim, 18);
