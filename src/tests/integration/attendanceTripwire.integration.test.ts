@@ -336,8 +336,8 @@ describe("mid-visit teardown paths (issue #302 scenario walk)", () => {
     const { sim, hall } = withCountedAttendees();
     // Ignite through the engine's own mid-fire re-arm path (the exact shape
     // deserialize uses to restore a save taken during a blaze): the unit
-    // burns AND the EventSystem's active set knows it, so a day rollover
-    // runs the real processFires against it.
+    // burns AND the EventSystem's active set knows it, which is what lets the
+    // paid-rescue extinguishAll below find and gut it through the real path.
     hall.state = "fire";
     sim.events.restore([hall.id]);
     for (let m = 0; m < 30; m++) sim.tick(1);
