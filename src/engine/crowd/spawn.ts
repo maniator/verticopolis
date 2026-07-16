@@ -19,6 +19,7 @@ import {
 import { isMetroPlatformServed } from "../tower/routing";
 import { add, makePerson, venueHasRoom } from "./trips";
 import { pushVenueVisitOptions } from "./visits";
+import { pushRoutineOptions } from "./routines";
 import { metroArrival, metroDeparture } from "./venueTrips";
 
 // Re-exported so existing importers (motion.ts, tests) keep their historical
@@ -227,6 +228,10 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   // saturation.
   pushMealOptions(crowd, tower, clock, floors, options);
   pushVenueVisitOptions(crowd, tower, clock, floors, options);
+  // Demographic routines (#397): school-run and sales-call options, Modern-only
+  // through the GameRules seam. Classic reads zero weights and the call returns
+  // before any rng draw, so its pool and stream are exactly what they were.
+  pushRoutineOptions(crowd, tower, clock, floors, options);
 
   if (options.length) crowd.rng.pick(options)();
 }

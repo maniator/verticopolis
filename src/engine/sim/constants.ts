@@ -166,6 +166,29 @@ export const SOLD_CONDO_MAX_PRICE = 240_000;
  * lives in Crowd.ts so crowd-side constants can be derived from it). */
 export const CROWD_MAX_STEP = 60;
 
+/**
+ * Demographic-routine hour windows (condo-demographic-routines, #397), each
+ * `[start, end)` like the meal windows in `crowd/meals.ts`. These are
+ * STRUCTURAL: any mode that enables a routine uses the same hours (a school
+ * day is a school day), so they live here as named constants; only the
+ * per-routine spawn weights are Modern tunables (`ECON.demographicRoutineWeights`,
+ * resolved through `GameRules.demographicRoutines`). The SimTower optimization
+ * thread describes condo children leaving for school in the morning and
+ * returning in the early afternoon, and office workers making midday
+ * sales-call round trips; the crowd layer reads these windows to bias its
+ * spawn mix in those hours. Weekday-only gates (school days, staffed offices)
+ * live at the spawn site, not here.
+ */
+export const SCHOOL_RUN_DEPART_START = 7;
+export const SCHOOL_RUN_DEPART_END = 8;
+export const SCHOOL_RUN_RETURN_START = 15;
+export const SCHOOL_RUN_RETURN_END = 16;
+/** Sales-call departures span the office midday; each caller is back within an
+ *  hour or two (the shared round-trip dwell is 30-60 game minutes plus travel),
+ *  so a 14:xx departure still returns comfortably inside the staffed day. */
+export const SALES_CALL_START = 10;
+export const SALES_CALL_END = 15;
+
 /** Clamp a target price into its kind's band. */
 export function clampRent(cfg: { min: number; max: number }, target: number): number {
   return Math.max(cfg.min, Math.min(cfg.max, target));

@@ -190,7 +190,33 @@ export interface GameRules {
    * perturbs the seeded economy stream.
    */
   weekendMultiplier(kind: string, isWeekend: boolean): number;
+  /**
+   * Statistical demographic-routine spawn weights for the crowd layer
+   * (condo-demographic-routines, #397): `schoolRun` is the condo morning
+   * school-departure wave and its early-afternoon return wave, `salesCall` the
+   * occasional office midday round trip. Each weight is the per-spawn-pass
+   * probability that the routine contributes a trip option while its hour
+   * window is active; the windows themselves are structural constants
+   * (`SCHOOL_RUN_*` / `SALES_CALL_*` in `sim/constants`), shared by any mode
+   * that enables a routine. A weight of 0 disables that routine, and callers
+   * MUST return before drawing from the RNG when every weight is 0, so a
+   * Classic tower's seeded crowd stream stays byte-identical (Classic returns
+   * all zeros; Modern reads `ECON.demographicRoutineWeights`). Texture only:
+   * the trips ride the existing crowd machinery and add no income or
+   * satisfaction mechanics.
+   */
+  demographicRoutines(): DemographicRoutines;
 }
+
+/** Per-routine spawn weights, see {@link GameRules.demographicRoutines}. */
+export interface DemographicRoutines {
+  readonly schoolRun: number;
+  readonly salesCall: number;
+}
+
+/** The disabled routine set Classic returns: both weights 0, frozen and shared
+ *  so the every-spawn-pass read allocates nothing. */
+const NO_DEMOGRAPHIC_ROUTINES: DemographicRoutines = Object.freeze({ schoolRun: 0, salesCall: 0 });
 
 /** Classic 1994 weekend traffic multipliers per demand-pool retail kind, relative
  *  to the weekday baseline. The original settles fast food and restaurants at 35
@@ -263,6 +289,12 @@ export const CLASSIC_RULES: GameRules = {
     // Canon: every commercial kind is busier on the weekend (the literal 1994
     // visitor targets), quiet on weekdays.
     return isWeekend ? (CLASSIC_WEEKEND_MULT[kind] ?? 1) : 1;
+  },
+  demographicRoutines() {
+    // 1994 crowds carry no school-run or sales-call rhythm; both weights are 0
+    // and the spawn overlay returns before its first RNG draw, so a Classic
+    // tower's seeded crowd stream is byte-identical to before the feature.
+    return NO_DEMOGRAPHIC_ROUTINES;
   },
 };
 
@@ -355,6 +387,13 @@ export const MODERN_RULES: GameRules = {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday
     // office-lunch crowd is gone), while leisure venues pick up. Tuned via ECON.
     return isWeekend ? (ECON.weekendTrafficMultiplier[kind] ?? 1) : 1;
+  },
+  demographicRoutines() {
+    // Modern towers carry the daily rhythm the optimization thread describes:
+    // condo kids leave for school each weekday morning and return in the early
+    // afternoon, office workers head out on midday sales calls. Weights are
+    // tuned in ECON; the hour windows are structural (sim/constants).
+    return ECON.demographicRoutineWeights;
   },
 };
 

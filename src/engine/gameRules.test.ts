@@ -271,3 +271,25 @@ describe("MODERN_RULES", () => {
     expect(sum / N).toBeCloseTo(CLASSIC_3, 1); // mean ≈ 3.0
   });
 });
+
+describe("demographicRoutines (condo-demographic-routines, #397)", () => {
+  it("Classic disables both routines: zero weights, so the spawn overlay never draws RNG", () => {
+    const routines = CLASSIC_RULES.demographicRoutines();
+    expect(routines.schoolRun).toBe(0);
+    expect(routines.salesCall).toBe(0);
+  });
+
+  it("Classic returns the same frozen object every call (no per-pass allocation, tamper-proof)", () => {
+    const a = CLASSIC_RULES.demographicRoutines();
+    expect(CLASSIC_RULES.demographicRoutines()).toBe(a);
+    expect(Object.isFrozen(a)).toBe(true);
+  });
+
+  it("Modern enables both routines at the ECON weights", () => {
+    const routines = MODERN_RULES.demographicRoutines();
+    expect(routines.schoolRun).toBe(ECON.demographicRoutineWeights.schoolRun);
+    expect(routines.salesCall).toBe(ECON.demographicRoutineWeights.salesCall);
+    expect(routines.schoolRun).toBeGreaterThan(0);
+    expect(routines.salesCall).toBeGreaterThan(0);
+  });
+});

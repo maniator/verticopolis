@@ -60,6 +60,24 @@ export const ECON = {
     staff: 1.0,
   },
   /**
+   * Demographic-routine spawn weights (condo-demographic-routines, #397),
+   * Modern-only via {@link GameRules.demographicRoutines} (Classic reads all
+   * zeros and its crowd stream is untouched). Each weight is the probability
+   * that the routine contributes one trip option to the weighted spawn pool
+   * per spawn pass while its hour window is active (windows are the
+   * SCHOOL_RUN_* / SALES_CALL_* constants in `sim/constants.ts`); a weight of
+   * 1 or more contributes without an RNG draw, mirroring
+   * {@link mealPopulationWeights}. `schoolRun` drives the condo morning
+   * departure wave and its early-afternoon return wave; `salesCall` drives
+   * occasional office midday round trips. Texture only: no income or
+   * satisfaction hangs off these. PROVISIONAL magnitudes, pending a playtest
+   * tuning pass.
+   */
+  demographicRoutineWeights: {
+    schoolRun: 1.0,
+    salesCall: 0.35,
+  },
+  /**
    * Commercial demand pools (gdd/arch-commercial-demand-pools-2026-07-15).
    * Per-capita daily demand dollars a weighted resident/worker spends across the
    * venues reachable to them. The tower's demand pool is this times the weighted,
