@@ -361,7 +361,10 @@ describe("Save hardening at the trust boundary", () => {
     const reloaded = Simulation.deserialize(raw);
     expect(reloaded.mode).toBe("classic"); // invalid mode resolves to classic …
     const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
-    expect(rentOf(rc)).toBe(120_000); // … and migration treats it as legacy, not the new $160k
+    // … migration treats it as legacy (the old $120k default, not the new
+    // $160k), and the Classic snap-on-load then lands that on the nearest
+    // canon rung ($100,000), the ratified uniform migration (NFR3).
+    expect(rentOf(rc)).toBe(100_000);
   });
 
   it("clears a stale household on a not-sold condo on load", () => {
@@ -402,7 +405,10 @@ describe("Save hardening at the trust boundary", () => {
     for (const u of raw.units) if (u.kind === "condo") delete (u as { rent?: unknown }).rent;
     const reloaded = Simulation.deserialize(raw);
     const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
-    expect(rentOf(rc)).toBe(120_000);
+    // The backfill lands on the old $120k default; the Classic snap-on-load
+    // then takes it to the nearest canon rung (ties round up; $100,000). The
+    // one-time buy-back shift is the accepted NFR3 migration cost.
+    expect(rentOf(rc)).toBe(100_000);
   });
 
   it("bounds a forged sold-condo price so buy-back can't drain money without limit", () => {
@@ -413,10 +419,12 @@ describe("Save hardening at the trust boundary", () => {
     for (const u of raw.units) if (u.kind === "condo") u.rent = 1e9; // absurd forged price
     const reloaded = Simulation.deserialize(raw);
     const rc = reloaded.tower.units.find((u) => u.kind === "condo" && u.everOccupied)!;
-    expect(rentOf(rc)).toBe(240_000); // clamped to the widest-ever ceiling, not 1e9
+    // Clamped to the widest-ever ceiling ($240k) first, then snapped onto the
+    // Classic ladder: nothing off-ladder (let alone 1e9) survives a load.
+    expect(rentOf(rc)).toBe(200_000);
   });
 
-  it("clamps an unsold condo's legacy out-of-band price, leaving sold condos untouched", () => {
+  it("snaps a Classic condo's legacy out-of-band price onto the ladder, sold or not", () => {
     const sim = Simulation.newGame(3, "classic");
     const a = servedCondo(sim);
     const b = sim.tower.place("condo", 2, C + 24);
@@ -432,7 +440,31 @@ describe("Save hardening at the trust boundary", () => {
     const reloaded = Simulation.deserialize(sim.serialize());
     const ra = reloaded.tower.units.find((u) => u.id === a.id)!;
     const rsold = reloaded.tower.units.find((u) => u.id === sold.id)!;
-    expect(rentOf(ra)).toBe(200_000); // unsold clamped down to the new max
+    // Classic snap-on-load is uniform (NFR3, no intent-guessing): the unsold
+    // AND the sold price land on the nearest canon rung. The sold condo's
+    // buy-back now mirrors the snapped rung, the accepted one-time shift.
+    expect(rentOf(ra)).toBe(200_000);
+    expect(rentOf(rsold)).toBe(200_000);
+  });
+
+  it("Modern load clamps an unsold condo into the band and keeps a sold price untouched", () => {
+    const sim = Simulation.newGame(3, "modern");
+    const a = servedCondo(sim);
+    const b = sim.tower.place("condo", 2, C + 24);
+    const sold = sim.tower.units.find((u) => u.id === b.unitId)!;
+    // a: unsold, priced at the OLD max ($240k, above the new $200k ceiling).
+    a.rent = 240_000;
+    a.everOccupied = false;
+    // sold: an owned condo carrying a historical out-of-band price, kept so
+    // its buy-back mirrors what it actually sold for (Modern is untouched by
+    // the Classic snap).
+    sold.rent = 240_000;
+    sold.everOccupied = true;
+    sold.state = "occupied";
+    const reloaded = Simulation.deserialize(sim.serialize());
+    const ra = reloaded.tower.units.find((u) => u.id === a.id)!;
+    const rsold = reloaded.tower.units.find((u) => u.id === sold.id)!;
+    expect(rentOf(ra)).toBe(200_000); // unsold clamped down to the band max
     expect(rentOf(rsold)).toBe(240_000); // sold left untouched
   });
 });

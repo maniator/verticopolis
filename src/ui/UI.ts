@@ -10,6 +10,7 @@ import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import type { FacilityKind, GameMode } from "../engine/types";
+import type { PriceOptions } from "../engine/gameRules";
 import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
@@ -429,7 +430,7 @@ export class UI {
   }
 
   showBatchPricingDialog(
-    ctx: { kind: FacilityKind; kindLabel: string; band: { default: number; min: number; max: number; step: number } },
+    ctx: { kind: FacilityKind; kindLabel: string; options: PriceOptions },
     cb: {
       preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
       apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;

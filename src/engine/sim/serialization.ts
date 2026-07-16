@@ -4,6 +4,7 @@ import { Clock } from "../Clock";
 import { coerceCalendarKind, type CalendarKind } from "../calendar";
 
 import { rentConfig } from "../econConfig";
+import { snapToLadder } from "../gameRules";
 
 import { Ledger } from "../Ledger";
 
@@ -193,19 +194,39 @@ export function deserialize(raw: SerializedGame): Simulation {
       const notOwned = state === "empty" || state === "construction" || state === "gutted";
       const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
       const soldCondo = u.kind === "condo" && everOccupied;
-      // Player-set price, coerced to a finite number, then bounded for condos.
-      // An UNSOLD condo re-enters the current band ($80k–$200k) so a legacy save
-      // priced at the old min/max ($60k/$240k) can't sell below build cost or
-      // above the new ceiling (or render past the slider ends). A SOLD condo
-      // keeps its historical price so the buy-back mirrors what it sold for, but
-      // is still bounded to the widest-ever band so a forged `rent` can't drive
-      // an unbounded buy-back money drain.
-      let rent = u.rent === undefined ? undefined : num(u.rent, rentConfig(u.kind)?.default ?? 0);
+      // Player-set price. Ladder-priced kinds pass through raw (non-finite
+      // included): the snap pass below owns their normalization, and both of
+      // its rules would otherwise be broken here, since the ladder's Very Low
+      // rungs sit below the band floors (a band clamp would lift a legal $50k
+      // condo sale to $60k, and the snap pulling it back would re-post the
+      // one-time bulletin as a phantom migration on every load) and the band
+      // DEFAULTS sit below the hotel ladders (coercing a forged NaN through
+      // one would snap to Very Low instead of snapToLadder's Average rule).
+      // Band mode keeps the historical behavior: an unsold condo re-enters
+      // the legal band, and a SOLD condo keeps its historical price for the
+      // buy-back mirror, bounded so a forged rent cannot drive an unbounded
+      // buy-back drain (ladder mode bounds that sale to the ladder extremes).
+      const ladderPriced = sim.rules.priceOptions(u.kind)?.shape === "ladder";
+      let rent =
+        u.rent === undefined
+          ? undefined
+          : ladderPriced
+            ? typeof u.rent === "number"
+              ? u.rent
+              : Number.NaN
+            : num(u.rent, rentConfig(u.kind)?.default ?? 0);
       if (rent !== undefined && u.kind === "condo") {
-        const band = rentConfig("condo")!;
-        const lo = soldCondo ? SOLD_CONDO_MIN_PRICE : band.min;
-        const hi = soldCondo ? SOLD_CONDO_MAX_PRICE : band.max;
-        rent = Math.max(lo, Math.min(hi, rent));
+        const condoOpts = sim.rules.priceOptions("condo");
+        const ladderMode = condoOpts?.shape === "ladder";
+        if (soldCondo) {
+          rent =
+            condoOpts?.shape === "ladder"
+              ? Math.max(condoOpts.rungs[0].value, Math.min(condoOpts.rungs[condoOpts.rungs.length - 1].value, rent))
+              : Math.max(SOLD_CONDO_MIN_PRICE, Math.min(SOLD_CONDO_MAX_PRICE, rent));
+        } else if (!ladderMode) {
+          const band = rentConfig("condo")!;
+          rent = Math.max(band.min, Math.min(band.max, rent));
+        }
       }
       return {
         ...u,
@@ -273,6 +294,50 @@ export function deserialize(raw: SerializedGame): Simulation {
         outForMeal: undefined,
       };
     });
+  // Snap-on-load (pricing split, NFR3): in a ladder-priced mode (Classic),
+  // every stored rent snaps once onto the canon rungs, nearest rung with ties
+  // rounding UP, uniformly for every kind with no intent-guessing (the labeled
+  // "grandfather" row was rejected on the record). Non-finite and out-of-band
+  // values were already coerced above, and the snap itself bounds anything
+  // left, so nothing off-ladder survives into a ladder tower: the dropdown
+  // never lies. Idempotent, so a post-split save re-snaps to itself and only a
+  // genuinely pre-split (or forged) save ever reports a change; Modern saves
+  // read the band shape and are untouched. Runs on the restored units, before
+  // any log emit below, so the bulletin lands after the restored tail.
+  let rentsSnapped = 0;
+  let snappedTowerHasCondo = false;
+  for (const u of sim.tower.units) {
+    if (u.kind === "condo") snappedTowerHasCondo = true;
+    const priceShape = sim.rules.priceOptions(u.kind);
+    if (!priceShape || priceShape.shape !== "ladder") continue;
+    const cfg = rentConfig(u.kind)!;
+    const effective = u.rent ?? cfg.default; // what rentOf would charge (No Rate aside)
+    // A stored value snaps to its nearest rung; an ABSENT override is not a
+    // stored rent at all, it means "on the default", and the ladder's default
+    // rung is Average (AR6), so it lands there directly. Snapping the band
+    // default's dollars instead would drop a never-priced hotel onto Very Low
+    // (the band defaults sit an order of magnitude under the canon ladder)
+    // while an identical new build starts on Average: same untouched unit,
+    // two prices. Offices and condos read identically either way.
+    const snapped = u.rent === undefined ? priceShape.rungs[2].value : snapToLadder(priceShape.rungs, u.rent);
+    // Count only visible price changes: an off-market (No Rate) unit charges
+    // $0 either way, so normalizing its latent stored value is silent.
+    if (!u.noRate && snapped !== effective) rentsSnapped++;
+    // Same storage rule as every rung write: strip the override only when the
+    // rung coincides with the band default (so `rentOf`'s fallback still reads
+    // the same rung and sparse saves stay sparse for offices on Average).
+    u.rent = snapped === cfg.default ? undefined : snapped;
+  }
+  if (rentsSnapped > 0) {
+    // One bulletin line, once per save (idempotence above means a later load
+    // finds nothing to change): durable in the log, no modal and no toast
+    // ("info" entries are bulletin-only). The condo callout turns the removed
+    // $80k floor into the feature it is (ux-pricing-split-editor §3).
+    sim.emit(
+      `Classic pricing: rents snapped to the four 1994 rate levels.${snappedTowerHasCondo ? " Condos can now sell for as little as $50,000." : ""}`,
+      "info",
+    );
+  }
   const keptTransports: Transport[] = [];
   sim.tower.transports = (Array.isArray(data.transports) ? data.transports : [])
     // Same null/non-object guard as units: never read `.kind` off a `null`

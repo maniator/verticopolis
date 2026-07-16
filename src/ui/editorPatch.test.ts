@@ -4,6 +4,7 @@ import { render } from "lit-html";
 import { Simulation } from "../engine/Simulation";
 import type { Transport, Unit } from "../engine/types";
 import { unitEditorTemplate, transportEditorTemplate } from "./templates/editor";
+import { syncRungSelects } from "./templates/rungPicker";
 
 /**
  * The editor card's update-in-place invariant, rewritten for lit (E6-S1).
@@ -15,11 +16,13 @@ import { unitEditorTemplate, transportEditorTemplate } from "./templates/editor"
  * editorBusy, hide/close) is pinned by the renderEditor integration block.
  */
 
-/** A small built tower with an occupied office (rename + rent adjuster) and a
- *  standard elevator. Placements are asserted so a silent fixture failure can't
- *  make the identity assertions pass vacuously. */
+/** A small built MODERN tower with an occupied office (rename + the '+ rent'
+ *  stepper these identity tests pin; Classic renders the rung picker, which
+ *  has its own identity test below) and a standard elevator. Placements are
+ *  asserted so a silent fixture failure can't make the identity assertions
+ *  pass vacuously. */
 function fixture(): { sim: Simulation; office: Unit; lift: Transport } {
-  const sim = new Simulation();
+  const sim = new Simulation(12345, "modern");
   for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
   for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
   const r = sim.tower.place("office", 2, 12);
@@ -87,6 +90,74 @@ describe("editor card lit diffing — updates in place, element identity survive
     btn.click();
     expect(onClick).toHaveBeenCalledOnce();
     expect(card.contains(btn)).toBe(true);
+  });
+
+  it("the Classic rung picker keeps element identity across a refresh and follows the engine value", () => {
+    // Same invariant for the Classic card's select: a stat-tick refresh must
+    // never recreate the picker (which would collapse an open dropdown), and a
+    // price change re-selects the right option through syncRungSelects, the
+    // post-render pass that writes select.value from data-current (lit commits
+    // option bindings before the options attach, so the value write must come
+    // after render).
+    const sim = new Simulation(); // Classic
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    const card = document.createElement("div");
+    // Mirror renderEditor: selection is written post-render by syncRungSelects
+    // (a select's options must be attached before its value can be set).
+    const paint = () => {
+      render(unitEditorTemplate(sim, office), card);
+      syncRungSelects(card);
+    };
+    paint();
+    const select = card.querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(select).not.toBeNull();
+    expect(select.value).toBe("2"); // Average, the default rung
+    office.satisfaction = 0.4; // a stat tick lands mid-interaction
+    paint();
+    expect(card.querySelector("#ed-rung")).toBe(select);
+    sim.priceUnit(office, 15_000); // High
+    paint();
+    expect(card.querySelector("#ed-rung")).toBe(select);
+    expect(select.value).toBe("3");
+  });
+
+  it("a FOCUSED rung picker is never overwritten by the pump sync (the in-progress pick survives)", () => {
+    // Some platforms move a select's value while the player arrows through the
+    // open list, before change commits; the ~6 Hz editor pump must not write
+    // engine truth over that in-progress pick. After blur, the next sync
+    // reconciles normally.
+    const sim = new Simulation(); // Classic
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    const card = document.createElement("div");
+    document.body.appendChild(card); // focus needs a connected element
+    try {
+      const paint = () => {
+        render(unitEditorTemplate(sim, office), card);
+        syncRungSelects(card);
+      };
+      paint();
+      const select = card.querySelector<HTMLSelectElement>("#ed-rung")!;
+      select.focus();
+      expect(document.activeElement).toBe(select);
+      select.value = "3"; // mid-pick: the player moved the value, change not yet committed
+      syncRungSelects(card); // a pump tick lands mid-interaction
+      expect(select.value).toBe("3"); // the pick survives
+      select.blur();
+      syncRungSelects(card); // first sync after blur reconciles to engine truth
+      expect(select.value).toBe("2");
+    } finally {
+      card.remove();
+    }
   });
 
   it("a shape change (gutted) restructures rows while the action buttons keep identity", () => {

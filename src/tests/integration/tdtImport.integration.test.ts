@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
-import { ECON } from "../../engine/econConfig";
 import { FACILITIES, GRID, maxCarsFor, maxSpanFor } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { SAVE_VERSION } from "../../engine/saveMigration";
@@ -633,23 +632,26 @@ describe("parseTDT: golden mappings", () => {
     expect(report.couldNotBring.join(" ")).toMatch(/asleep past checkout/);
   });
 
-  it("rent classes map onto our price bands (min / low / default / max / no-rate)", () => {
-    const band = ECON.rent.office;
-    expect(rentFromClass("office", 0)).toBe(band.min);
-    const low = rentFromClass("office", 1)!;
-    expect(low).toBeGreaterThan(band.min);
-    expect(low).toBeLessThan(band.default);
-    expect((low - band.min) % band.step).toBe(0); // snapped to the band's grid
-    expect(rentFromClass("office", 2)).toBeUndefined(); // Average = the default
-    expect(rentFromClass("office", 3)).toBe(band.max);
-    expect(rentFromClass("office", 4)).toBeUndefined(); // No Rate
+  it("rent classes map onto the Classic canon rungs (very low / low / average / high / no-rate)", () => {
+    // TDT towers are Classic, so classes 0-3 are exactly the canon ladder
+    // dollars (pricing split, FR8): office 2k/5k/10k/15k quarterly.
+    expect(rentFromClass("office", 0)).toBe(2_000);
+    expect(rentFromClass("office", 1)).toBe(5_000);
+    expect(rentFromClass("office", 2)).toBe(10_000); // Average, the default rung
+    expect(rentFromClass("office", 3)).toBe(15_000);
+    expect(rentFromClass("office", 4)).toBeUndefined(); // No Rate carries no dollar value
     expect(rentFromClass("office", 99)).toBeUndefined(); // garbage
     expect(rentFromClass("shop", 3)).toBeUndefined(); // unpriced kind
+    // Condo and hotel ladders map the same way (spot-check the ends).
+    expect(rentFromClass("condo", 0)).toBe(50_000);
+    expect(rentFromClass("condo", 3)).toBe(200_000);
+    expect(rentFromClass("hotelSingle", 0)).toBe(500);
+    expect(rentFromClass("hotelSuite", 3)).toBe(9_000);
 
     const highOffice = rooms({
       floors: [{ index: 20, tenants: [{ left: 100, right: 109, type: 7, rentRate: 3 }] }],
     })[0];
-    expect(highOffice.rent).toBe(band.max);
+    expect(highOffice.rent).toBe(15_000);
   });
 
   it("rent class 4 (No Rate) flags a priced unit off-market and leaves rent at default", () => {
@@ -1022,8 +1024,8 @@ describe("end-to-end: import → deserialize → live simulation", () => {
     expect(sim.tower.transports.some((t) => t.kind === "stairs")).toBe(true);
     expect(sim.tower.units.some((u) => u.state === "asleep")).toBe(true);
     expect(sim.tower.units.some((u) => u.state === "dirty")).toBe(true);
-    // An imported High rent survived onto the unit.
-    expect(sim.tower.units.some((u) => u.kind === "office" && u.rent === ECON.rent.office.max)).toBe(true);
+    // An imported High rent survived onto the unit (class 3 = the $15k rung).
+    expect(sim.tower.units.some((u) => u.kind === "office" && u.rent === 15_000)).toBe(true);
     // Six game-hours, minute ticks; crosses the morning rush and lunch.
     for (let i = 0; i < 6 * 60; i++) sim.tick(1);
     expect(Number.isFinite(sim.money)).toBe(true);

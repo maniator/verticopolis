@@ -2,7 +2,8 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
 import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
-import { ECON, rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
+import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
+import type { PriceOptions } from "../../engine/gameRules";
 import type { Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
@@ -307,7 +308,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     onToggle: (floor: number, stop: boolean) => void;
   } | null;
   let batchDlg: {
-    ctx: { kind: string; kindLabel: string; band: { default: number; min: number; max: number; step: number } };
+    ctx: { kind: string; kindLabel: string; options: PriceOptions };
     cb: {
       preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
       apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
@@ -436,23 +437,68 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(f.sfx).toEqual(["click", "click", "click"]);
   });
 
+  it("the rung action applies the picked rung through the choke point and announces the pinned string", () => {
+    sel = { type: "unit", id: office.id };
+    render(unitEditorTemplate(sim, office), root);
+    const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(select).not.toBeNull();
+    select.value = "1"; // Low
+    editor.handleEditAction("rung", root);
+    expect(rentOf(office)).toBe(5_000);
+    expect(last(announced)).toBe("Rent set to Low ($5,000).");
+    expect(last(f.sfx)).toBe("click");
+    expect(undo.captures).toContain("Rent change");
+    expect(refreshed).toBeGreaterThan(0);
+  });
+
+  it("the rung action's No Rate entry takes the unit off the market and announces the off-market string", () => {
+    sel = { type: "unit", id: office.id };
+    render(unitEditorTemplate(sim, office), root);
+    const select = root.querySelector<HTMLSelectElement>("#ed-rung")!;
+    select.value = "noRate";
+    editor.handleEditAction("rung", root);
+    expect(office.noRate).toBe(true);
+    expect(office.state).toBe("occupied"); // never evicts
+    expect(rentOf(office)).toBe(0);
+    expect(last(announced)).toBe("No Rate: off the market. Charges nothing; no one moves in.");
+    // Picking a rung afterwards returns it to the market.
+    render(unitEditorTemplate(sim, office), root);
+    root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "3";
+    editor.handleEditAction("rung", root);
+    expect(office.noRate).toBeUndefined();
+    expect(rentOf(office)).toBe(15_000);
+    expect(last(announced)).toBe("Rent set to High ($15,000).");
+  });
+
+  it("the rung action announces condo and hotel phrasing per the copy inventory", () => {
+    sel = { type: "unit", id: condo.id };
+    render(unitEditorTemplate(sim, condo), root);
+    root.querySelector<HTMLSelectElement>("#ed-rung")!.value = "0";
+    editor.handleEditAction("rung", root);
+    expect(rentOf(condo)).toBe(50_000); // the canon firesale floor, below build cost
+    expect(last(announced)).toBe("Sale price set to Very Low ($50,000).");
+  });
+
   it("batchKind opens the batch-pricing dialog wired to the engine's preview/apply, with undo around apply", () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
     editor.handleEditAction("batchKind", root);
     expect(batchDlg).not.toBeNull();
-    const band = rentConfig("office")!;
-    expect(batchDlg!.ctx).toEqual({ kind: "office", kindLabel: FACILITIES.office.name, band });
+    // A default Simulation is Classic, so the dialog is handed the ladder shape.
+    const options = sim.rules.priceOptions("office")!;
+    expect(batchDlg!.ctx).toEqual({ kind: "office", kindLabel: FACILITIES.office.name, options });
+    expect(options.shape).toBe("ladder");
+    const high = 15_000; // the Classic High rung
     // Preview is pure: it reports without touching the tower.
     const before = rentOf(office);
-    const p = batchDlg!.cb.preview(band.max, {});
+    const p = batchDlg!.cb.preview(high, {});
     expect(p.matched).toBe(1);
     expect(rentOf(office)).toBe(before);
     // Apply commits exactly what preview showed, inside its own undo step.
     undo = { captures: [], commits: 0 };
-    const a = batchDlg!.cb.apply(band.max, {});
+    const a = batchDlg!.cb.apply(high, {});
     expect(a.changed).toBe(1);
-    expect(rentOf(office)).toBe(band.max);
+    expect(rentOf(office)).toBe(high);
     expect(undo.captures).toEqual(["Set prices"]);
     expect(undo.commits).toBe(1);
     // onApplied fans out to sfx, toast, announcer, and the editor refresh.

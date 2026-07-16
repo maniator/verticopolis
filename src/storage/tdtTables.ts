@@ -1,4 +1,4 @@
-import { rentConfig } from "../engine/econConfig";
+import { CLASSIC_RULES } from "../engine/gameRules";
 import { FACILITIES, GRID, facilityFloors, isHotelKind } from "../engine/facilities";
 import type { FacilityKind } from "../engine/types";
 
@@ -123,25 +123,16 @@ export function misplacedOnFloor(kind: FacilityKind, floor: number): boolean {
 }
 
 /** Map the unit record's rent/lease byte (doc §4: 0 Very Low, 1 Low,
- *  2 Average, 3 High, 4 No Rate) onto our per-kind price band. Average and
- *  No Rate (and garbage) leave the unit on the default via `undefined`. */
+ *  2 Average, 3 High, 4 No Rate) onto the Classic canon rent ladder: TDT
+ *  towers are Classic by definition (the exporter refuses Modern), so classes
+ *  0-3 ARE the ladder's rung levels and map to the exact rung dollars,
+ *  losslessly both ways (pricing split, FR8). No Rate (4) carries no dollar
+ *  value (the importer sets `noRate` instead), and garbage classes read as
+ *  `undefined` here; the importer maps a garbage class on a priced kind to
+ *  the Average rung itself (see tdtParse), never the band default. */
 export function rentFromClass(kind: FacilityKind, rentClass: number): number | undefined {
-  const band = rentConfig(kind);
-  if (!band) return undefined;
-  switch (rentClass) {
-    case 0:
-      return band.min;
-    case 1: {
-      // Halfway between minimum and default, snapped to the band's step grid
-      // (the same grid the in-game price editor uses). Guard the divisor: a
-      // misconfigured zero step must not mint a NaN rent.
-      const step = band.step > 0 ? band.step : 1;
-      const mid = (band.min + band.default) / 2;
-      return Math.round((mid - band.min) / step) * step + band.min;
-    }
-    case 3:
-      return band.max;
-    default:
-      return undefined;
-  }
+  const opts = CLASSIC_RULES.priceOptions(kind);
+  if (!opts || opts.shape !== "ladder") return undefined;
+  if (Number.isInteger(rentClass) && rentClass >= 0 && rentClass <= 3) return opts.rungs[rentClass].value;
+  return undefined;
 }

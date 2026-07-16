@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
+import { rentOf } from "../../engine/econConfig";
 import { ElevatorDispatch } from "../../engine/ElevatorDispatch";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import type { FacilityKind, SerializedUnit, Unit } from "../../engine/types";
@@ -7,8 +8,9 @@ import { isOperational } from "../../engine/types";
 import { SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 
 describe("Rent / price controls", () => {
-  it("steps and clamps a unit's price within its band", () => {
-    const sim = Simulation.newGame(1);
+  it("steps and clamps a unit's price within its band (Modern) and its ladder (Classic)", () => {
+    // Modern keeps the continuous band: one step per nudge, clamped at the ends.
+    const sim = Simulation.newGame(1, "modern");
     const x0 = Math.floor(GRID.width / 2);
     for (let i = 0; i < 12; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -20,6 +22,15 @@ describe("Rent / price controls", () => {
     expect(sim.tower.units.find((u) => u.id === id)!.rent).toBe(ECON.rent.office.max);
     for (let i = 0; i < 50; i++) sim.adjustRent(id, -1);
     expect(sim.tower.units.find((u) => u.id === id)!.rent).toBe(ECON.rent.office.min);
+    // Classic steps whole canon rungs and clamps at the ladder ends.
+    const classic = Simulation.newGame(1);
+    for (let i = 0; i < 12; i++) classic.tower.place("floor", 2, x0 + i);
+    classic.buildTransport("elevatorStandard", x0, 1, 2);
+    const cid = classic.tower.place("office", 2, x0 + 1).unitId!;
+    for (let i = 0; i < 50; i++) classic.adjustRent(cid, 1);
+    expect(rentOf(classic.tower.units.find((u) => u.id === cid)!)).toBe(15_000); // High
+    for (let i = 0; i < 50; i++) classic.adjustRent(cid, -1);
+    expect(rentOf(classic.tower.units.find((u) => u.id === cid)!)).toBe(2_000); // Very Low
   });
 
   it("won't change a condo's price once it has sold", () => {
@@ -162,7 +173,9 @@ describe("Simulation economy", () => {
     // Force the resident in.
     const condo = sim.tower.units.find((u) => u.kind === "condo")!;
     (sim as any).moveIn(condo);
-    expect(sim.money).toBe(before + ECON.rent.condo.default);
+    // A Classic build lists on the Average rung ($150,000), so that is the
+    // lump sum the sale fetches (not the Modern band default).
+    expect(sim.money).toBe(before + 150_000);
     expect(condo.everOccupied).toBe(true);
     // A second move-in does not re-sell.
     const mid = sim.money;

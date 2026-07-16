@@ -390,6 +390,8 @@ export class Simulation implements SimContext {
 
   priceUnit(u: Unit, target: number): number | null { return rent.priceUnit(this, u, target); }
 
+  setNoRate(id: number): boolean { return rent.setNoRate(this, id); }
+
   adjustRent(id: number, dir: 1 | -1): number | null { return rent.adjustRent(this, id, dir); }
 
   previewRentBatch(kind: FacilityKind, target: BatchTarget, opts: BatchRentOptions = {}): BatchRentResult | null { return rent.previewRentBatch(this, kind, target, opts); }

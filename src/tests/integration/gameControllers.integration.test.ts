@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
-import { ECON, rentConfig, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
+import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
@@ -243,14 +243,15 @@ describe("EditorActions (editor-card money paths)", () => {
     expect(renderedCard(unitEditorTemplate(sim, shop, false)).textContent).not.toContain("patronage");
   });
 
-  it("rentUp/rentDown clamp a real office to the engine's rent band", () => {
+  it("rentUp/rentDown clamp a real office to the ends of the Classic ladder", () => {
     sel = { type: "unit", id: office.id };
     render(unitEditorTemplate(sim, office), root);
-    const band = rentConfig("office")!;
+    // A default Simulation is Classic: nudges step whole rungs and clamp at
+    // the ladder ends (High $15,000 / Very Low $2,000), never the Modern band.
     for (let i = 0; i < 100; i++) editor.handleEditAction("rentUp", root);
-    expect(rentOf(office)).toBe(band.max);
+    expect(rentOf(office)).toBe(15_000);
     for (let i = 0; i < 200; i++) editor.handleEditAction("rentDown", root);
-    expect(rentOf(office)).toBe(band.min);
+    expect(rentOf(office)).toBe(2_000);
   });
 
   it("addcar charges and removecar refunds the half-back car resale", () => {

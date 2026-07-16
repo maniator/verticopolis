@@ -318,8 +318,17 @@ export function parseTDT(buffer: ArrayBuffer, filename: string): ParsedLegacyTow
         state = "occupied";
         everOccupied = true;
       }
-      // Rent class (unit byte 16) → our price band, for priced kinds.
-      const rent = rentFromClass(kind, t.rentRate);
+      // Rent class (unit byte 16) → the Classic canon rung dollars, for
+      // priced kinds. A GARBAGE class (outside 0-4, corrupt/hand-built file)
+      // on a priced kind reads as class 2 (Average): leaving it undefined
+      // would make rentOf fall back to the band default, which for hotels is
+      // an order of magnitude below the ladder, so snap-on-load would land it
+      // on Very Low and post the pre-split migration bulletin on a fresh
+      // import. Class 4 (No Rate) stays undefined on purpose: the flag below
+      // carries the state and the price is genuinely unset.
+      const rent =
+        rentFromClass(kind, t.rentRate) ??
+        (t.rentRate !== 4 && rentConfig(kind) !== null ? rentFromClass(kind, 2) : undefined);
       if (rent !== undefined) counts.rentsApplied++;
       // Rent class 4 ("No Rate") on a priced kind: the unit is deliberately off
       // the market, charging nothing. Leave `rent` at default and flag it, so

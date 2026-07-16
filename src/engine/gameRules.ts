@@ -11,8 +11,14 @@ import {
   UNMET_DEMAND_CAP,
   UNMET_DEMAND_EVICT_FLOOR,
 } from "./sim/constants";
+import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS, type PriceOptions } from "./pricing";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
+
+// The pricing SHAPE layer (canon ladders, PriceOptions, snap helpers) lives in
+// ./pricing; re-exported here so consumers keep one import path for the seam.
+export { priceNeutral, snapToLadder, ladderRungFor } from "./pricing";
+export type { PriceRung, PriceOptions } from "./pricing";
 
 /**
  * Rule-set strategy: the ONE place Classic and Modern behavior diverge.
@@ -50,6 +56,7 @@ const HOUSEHOLD_WEIGHTS = [4, 6, 2, 1] as const; // mean = (2·4+3·6+4·2+5·1)
 const HOUSEHOLD_CHURN_PER_PERSON = 0.06;
 
 const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
 
 /**
  * A condo's price for a given household — the asking `base` scaled by household
@@ -105,6 +112,15 @@ export interface GameRules {
    * uniform); Modern sharpens for big families and softens slightly for small.
    */
   churnMultiplier(residents: number | undefined): number;
+  /**
+   * How this mode prices a rentable kind, or null for a kind whose price is not
+   * player-set. Classic returns the discrete canon 4-rung ladder plus the
+   * No Rate off-market sentinel (the 1994 dropdown); Modern returns today's
+   * continuous `{min, default, max, step}` band. Consumers switch on the SHAPE
+   * of the return, never on the mode string. Returns frozen singletons, so
+   * per-unit reads allocate nothing.
+   */
+  priceOptions(kind: string): PriceOptions | null;
 
   // ---- The Modern "deeper economy" layer -------------------------------------
   // Three mechanics the 1994 original never had, added (gdd-economy-depth,
@@ -249,6 +265,11 @@ export const CLASSIC_RULES: GameRules = {
   churnMultiplier() {
     return 1;
   },
+  priceOptions(kind) {
+    // The 1994 four-rung dropdown plus No Rate, at the full canon dollar
+    // tables (see CLASSIC_RENT_LADDERS for the provenance notes).
+    return CLASSIC_PRICE_OPTIONS[kind] ?? null;
+  },
   // Classic is pixel-faithful: none of the Modern economy sinks apply.
   operatingOverheadPerUnit() {
     return 0;
@@ -322,6 +343,10 @@ export const MODERN_RULES: GameRules = {
     // Clamped positive so it can only ever soften or sharpen the drain, never
     // flip its sign (dead for the legal 2–5 band; a guard if the band widens).
     return Math.max(0.5, 1 + HOUSEHOLD_CHURN_PER_PERSON * (residents - CLASSIC_HOUSEHOLD));
+  },
+  priceOptions(kind) {
+    // Today's tuned continuous ranges, unchanged; Modern never offers No Rate.
+    return MODERN_PRICE_OPTIONS[kind] ?? null;
   },
   // Modern runs the deeper-economy sinks at their tuned values.
   operatingOverheadPerUnit() {

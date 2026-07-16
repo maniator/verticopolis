@@ -37,6 +37,21 @@ function simWith(kind: Parameters<Simulation["tower"]["place"]>[0], floors = 2):
   return { sim, unit };
 }
 
+/** The same fixture founded as a MODERN tower, for the band-shape branches
+ *  (price stepper, hidden sold-condo row). */
+function simWithModern(kind: Parameters<Simulation["tower"]["place"]>[0], floors = 2): { sim: Simulation; unit: Unit } {
+  const sim = new Simulation(12345, "modern");
+  for (let x = 0; x < GRID.width; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+  for (let fl = 2; fl <= floors; fl++) {
+    for (let x = 0; x < GRID.width; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+  }
+  const r = sim.tower.place(kind, 2, 40);
+  expect(r.ok).toBe(true);
+  const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+  unit.state = "occupied";
+  return { sim, unit };
+}
+
 function withLift(
   kind: "elevatorStandard" | "elevatorService" | "elevatorExpress" | "stairs" | "escalator",
   top = 2,
@@ -142,18 +157,45 @@ describe("unit editor row and action branches", () => {
     expect(offMarket.querySelector('[data-field="rent"]')!.textContent).toBe("No Rate");
   });
 
-  it("condo: unsold offers the price adjuster and batch action; sold drops them", () => {
+  it("condo (Classic): unsold offers the rung picker and batch action; sold locks the picker", () => {
     const unsold = simWith("condo");
-    unsold.unit.state = "empty"; // built, never sold: the adjuster stays offered
+    unsold.unit.state = "empty"; // built, never sold: the picker stays live
+    const uFrag = renderToFragment(unitEditorTemplate(unsold.sim, unsold.unit));
+    expect(uFrag.textContent).toContain("Sale price");
+    const picker = uFrag.querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(picker).not.toBeNull();
+    expect(picker.disabled).toBe(false);
+    expect(uFrag.querySelector('[data-edit="rentUp"]')).toBeNull(); // no Modern stepper in Classic
+    expect(uFrag.querySelector('[data-edit="batchKind"]')).not.toBeNull();
+    // Very Low $50,000 is offered (canon firesale, below build cost, FR7).
+    expect(picker.textContent).toContain("Very Low  $50,000");
+    const sold = simWith("condo");
+    sold.unit.everOccupied = true;
+    sold.unit.rent = 150_000;
+    const sFrag = renderToFragment(unitEditorTemplate(sold.sim, sold.unit));
+    // Sold: price-locked, so the picker renders DISABLED at the locked rung
+    // (showing why it cannot be pressed), and the batch action drops.
+    const lockedPicker = sFrag.querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(lockedPicker).not.toBeNull();
+    expect(lockedPicker.disabled).toBe(true);
+    expect(lockedPicker.dataset.current).toBe("2"); // Average, the locked rung
+    expect(sFrag.querySelector('[data-edit="batchKind"]')).toBeNull();
+  });
+
+  it("condo (Modern): unsold offers the price stepper; sold drops the price row", () => {
+    const unsold = simWithModern("condo");
+    unsold.unit.state = "empty";
     const uFrag = renderToFragment(unitEditorTemplate(unsold.sim, unsold.unit));
     expect(uFrag.textContent).toContain("Sale price");
     expect(uFrag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
+    expect(uFrag.querySelector("#ed-rung")).toBeNull(); // no rung picker in Modern
     expect(uFrag.querySelector('[data-edit="batchKind"]')).not.toBeNull();
-    const sold = simWith("condo");
+    const sold = simWithModern("condo");
     sold.unit.everOccupied = true;
     sold.unit.residents = 4;
     const sFrag = renderToFragment(unitEditorTemplate(sold.sim, sold.unit));
     expect(sFrag.querySelector('[data-edit="rentUp"]')).toBeNull();
+    expect(sFrag.querySelector("#ed-rung")).toBeNull(); // Modern keeps the hidden-row behavior
     expect(sFrag.querySelector('[data-edit="batchKind"]')).toBeNull();
   });
 
@@ -250,5 +292,102 @@ describe("transport editor row and action branches", () => {
     expect(eFrag.querySelector('[data-field="cars"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="extendUp"]')).toBeNull();
     expect(eFrag.querySelector('[data-edit="sell"]')).not.toBeNull();
+  });
+});
+
+describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
+  it("renders the four canon rungs, the divider, and No Rate, labels verbatim from the engine table", () => {
+    const { sim, unit } = simWith("office");
+    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const picker = frag.querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(picker).not.toBeNull();
+    expect(picker.classList.contains("field")).toBe(true);
+    expect(picker.dataset.editSelect).toBe("rung"); // routes through the delegated change listener
+    const options = [...picker.querySelectorAll("option")];
+    expect(options.map((o) => o.textContent)).toEqual([
+      "Very Low  $2,000",
+      "Low  $5,000",
+      "Average  $10,000",
+      "High  $15,000",
+      "──────",
+      "No Rate",
+    ]);
+    expect(options[4].disabled).toBe(true); // the divider is not a choice
+    expect(options.map((o) => o.value).slice(0, 4)).toEqual(["0", "1", "2", "3"]);
+    expect(options[5].value).toBe("noRate");
+    // Engine truth rides data-current for the post-render selection sync.
+    expect(picker.dataset.current).toBe("2"); // Average, the default rung
+    // No Modern stepper row exists beside it.
+    expect(frag.querySelector('[data-edit="rentUp"]')).toBeNull();
+    expect(frag.querySelector('[data-edit="rentDown"]')).toBeNull();
+  });
+
+  it("the chip carries the rung color slot, is decorative, and hollows out for No Rate", () => {
+    const { sim, unit } = simWith("office");
+    const priced = renderToFragment(unitEditorTemplate(sim, unit));
+    const chip = priced.querySelector<HTMLElement>(".rung-chip")!;
+    expect(chip).not.toBeNull();
+    expect(chip.getAttribute("aria-hidden")).toBe("true"); // color never carries the state alone
+    expect(chip.dataset.rung).toBe("2");
+    sim.priceUnit(unit, 15_000);
+    expect(renderToFragment(unitEditorTemplate(sim, unit)).querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("3");
+    unit.noRate = true;
+    const off = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(off.querySelector<HTMLElement>(".rung-chip")!.dataset.rung).toBe("none");
+    expect(off.querySelector<HTMLSelectElement>("#ed-rung")!.dataset.current).toBe("noRate");
+  });
+
+  it("hotel kinds get the picker with their own canon ladder", () => {
+    const { sim, unit } = simWith("hotelSuite");
+    const picker = renderToFragment(unitEditorTemplate(sim, unit)).querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect([...picker.querySelectorAll("option")].map((o) => o.textContent)).toEqual([
+      "Very Low  $1,500",
+      "Low  $4,000",
+      "Average  $6,000",
+      "High  $9,000",
+      "──────",
+      "No Rate",
+    ]);
+  });
+
+  it("Modern offices keep the stepper and never see a picker or a No Rate option", () => {
+    const { sim, unit } = simWithModern("office");
+    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    expect(frag.querySelector("#ed-rung")).toBeNull();
+    expect(frag.querySelector('[data-edit="rentUp"]')).not.toBeNull();
+    expect(frag.textContent).not.toContain("No Rate");
+  });
+});
+
+describe("the editor access row's third state (#370)", () => {
+  it("a served but 3+ rides floor reads 'Too far (3+ rides)' in the bad color for commuter kinds", () => {
+    const { sim, unit } = simWith("office");
+    expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
+    // Force the two-ride verdict: the template must read sim.floorReachable.
+    sim.floorReachable = () => false;
+    const frag = renderToFragment(unitEditorTemplate(sim, unit));
+    const cell = frag.querySelector('[data-field="served"]')!;
+    expect(cell.textContent).toBe("Too far (3+ rides)");
+    expect(cell.innerHTML).toContain("var(--bad)");
+  });
+
+  it("served and reachable reads Yes in the good color; unserved reads No", () => {
+    const { sim, unit } = simWith("office");
+    expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
+    const yes = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    expect(yes.textContent).toBe("Yes");
+    expect(yes.innerHTML).toContain("var(--good)");
+    sim.tower.isFloorServed = () => false;
+    const no = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    expect(no.textContent).toBe("No");
+    expect(no.innerHTML).toContain("var(--bad)");
+  });
+
+  it("a zero-population service kind keeps plain Yes/No (the two-ride rule is about passenger trips)", () => {
+    const { sim, unit } = simWith("security");
+    expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
+    sim.floorReachable = () => false; // must be ignored for service kinds
+    const cell = renderToFragment(unitEditorTemplate(sim, unit)).querySelector('[data-field="served"]')!;
+    expect(cell.textContent).toBe("Yes");
   });
 });

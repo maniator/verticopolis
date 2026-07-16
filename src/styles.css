@@ -52,6 +52,15 @@
     inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
   /* Floating windows cast one hard shadow. */
   --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
+  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
+     Chosen to read on gray chrome and to stay clear of every reserved sprite
+     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
+     the pixel-art party's ratification. No Rate has no token: absence of a
+     price is absence of a fill (the chip renders hollow). */
+  --rung-vlow: #2048b0;
+  --rung-low: #1e7a2e;
+  --rung-avg: #c8a000;
+  --rung-high: #b02020;
 }
 
 /* ---- 2. BASE --------------------------------------------------------- */
@@ -1101,6 +1110,26 @@ dialog.crash-card::backdrop {
 .bp-band { margin-left: 22px; color: var(--muted); font-size: 0.85em; }
 .bp-only { display: flex; align-items: center; gap: 6px; margin: 6px 0; }
 .bp-preview { min-height: 2.4em; color: var(--r-title); font-weight: 600; }
+/* Classic (ladder) batch variant: the rung picker row replaces the number
+   machinery; same chip + select recipe as the editor card. */
+.bp-rung { display: flex; align-items: center; gap: 6px; margin: 6px 0 8px; }
+.bp-rung .field { flex: 1; }
+.bp-rung-lead { margin: 6px 0 0; }
+/* The rent-rung chip: a 12px swatch in a pressed ring, decorative
+   reinforcement beside the rung's NAME in the select (color never carries the
+   state alone). data-rung="none" (No Rate) stays hollow: chrome face, no fill. */
+.rung-chip {
+  flex: none;
+  align-self: center;
+  width: 12px;
+  height: 12px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+.rung-chip[data-rung="0"] { background: var(--rung-vlow); }
+.rung-chip[data-rung="1"] { background: var(--rung-low); }
+.rung-chip[data-rung="2"] { background: var(--rung-avg); }
+.rung-chip[data-rung="3"] { background: var(--rung-high); }
 
 /* ---- Help dialog: keyboard-play key hints ---- */
 .help-keys { line-height: 1.9; }
@@ -1529,7 +1558,11 @@ dialog.crash-card::backdrop {
 @media (pointer: coarse) {
   .modal-actions .btn,
   .modal-box .btn:not(.xs),
-  #editor .ed-row .btn {
+  #editor .ed-row .btn,
+  /* The rung picker's select is a tap target too (editor card and the batch
+     dialog variant); the rename text input keeps its natural height. */
+  #editor .ed-row select.field,
+  .bp-rung select.field {
     min-height: 36px;
   }
   /* Title-bar ✕s keep their exact desktop look — stretching them reads

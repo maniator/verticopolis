@@ -12,9 +12,10 @@ import {
   maxCarsFor,
   residentCount,
 } from "../../engine/facilities";
-import { householdPrice } from "../../engine/gameRules";
+import { householdPrice, ladderRungFor } from "../../engine/gameRules";
 import { rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
 import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
+import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
 
 /**
@@ -87,10 +88,19 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // whose diagnostics emit NO access line, so its connectivity still shows.
   if (!mobile || !hasAccessDiagnostic(u)) {
     const served = sim.tower.isFloorServed(u.floor);
+    // The third state (#370): a floor can be connected yet sit 3+ rides from
+    // the lobby, where no commuter ever comes, so "Yes" would lie. Only kinds
+    // that draw commuters/visitors read it (hasAccessDiagnostic, the same
+    // predicate the diagnostics line uses); zero-population service kinds keep
+    // plain Yes/No, because the two-ride rule is about passenger trips they do
+    // not make. "(3+ rides)" deliberately echoes the inspector sentence and
+    // the stats footnote, one phrase for one concept.
+    const tooFar = served && hasAccessDiagnostic(u) && !sim.floorReachable(u.floor);
+    const text = !served ? "No" : tooFar ? "Too far (3+ rides)" : "Yes";
     rows.push(
       kv(
         "Elevator access",
-        html`<span style="color:${served ? "var(--good)" : "var(--bad)"}">${served ? "Yes" : "No"}</span>`,
+        html`<span style="color:${served && !tooFar ? "var(--good)" : "var(--bad)"}">${text}</span>`,
         "served",
       ),
     );
@@ -133,8 +143,35 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
       ),
     );
   }
-  // Price adjuster: offices/hotels any time, condos only while still unsold.
-  if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
+  // Price control, chosen off the SHAPE of priceOptions(), never the mode
+  // string: a ladder renders the 1994 rung picker; a band keeps the existing
+  // nudge steppers. A SOLD condo is price-locked: the ladder shows the picker
+  // DISABLED at the locked rung (the design system's "show why a thing cannot
+  // be pressed"); the band keeps today's hidden-row behavior.
+  const priceShape = sim.rules.priceOptions(u.kind);
+  if (priceShape?.shape === "ladder") {
+    const locked = u.kind === "condo" && u.everOccupied;
+    const current: RungChoice = u.noRate ? "noRate" : ladderRungFor(priceShape.rungs, rentOf(u)).level;
+    const ariaLabel = u.kind === "condo" ? "Sale price level" : isHotelKind(u.kind) ? "Room rate level" : "Rent level";
+    actions.push(
+      edRow(
+        rungPickerTemplate({
+          id: "ed-rung",
+          rungs: priceShape.rungs,
+          current,
+          ariaLabel,
+          disabled: locked,
+          dataEditSelect: "rung",
+        }),
+      ),
+    );
+    // Batch-price every unit of this kind at once (no per-room grind); a sold
+    // condo keeps only its locked picker.
+    if (!locked) {
+      actions.push(edRow(html`<button class="btn" data-edit="batchKind">Set all ${f.name.toLowerCase()}s…</button>`));
+    }
+  } else if (rcfg && !(u.kind === "condo" && u.everOccupied)) {
+    // Price adjuster: offices/hotels any time, condos only while still unsold.
     const what = u.kind === "condo" ? "price" : "rent";
     actions.push(
       edRow(

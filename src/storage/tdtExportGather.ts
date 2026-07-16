@@ -227,10 +227,20 @@ export function gatherTower(save: SerializedGame): GatheredTower {
     // rent-derived class, so it round-trips as "No Rate". Only priced kinds
     // carry the flag, matching the importer.
     const rentClass = u.noRate && rentConfig(u.kind) ? 4 : classFromRent(u.kind, u.rent);
-    if (u.rent !== undefined) {
-      // What the class reads back as on import: class 2 means "the default".
-      const back = rentClass === 2 ? rentConfig(u.kind)?.default : rentFromClass(u.kind, rentClass);
-      if (back !== undefined && back !== u.rent) counts.rentsSnapped++;
+    const priceBand = rentConfig(u.kind);
+    if (priceBand && !u.noRate) {
+      // Fidelity: compare what the class reads back as on import (every class
+      // 0-3 now reads the exact rung dollars) against the unit's EFFECTIVE
+      // price, through the same fallback rentOf applies: an unset override
+      // reads the band default, which for condos/hotels is NOT the Average
+      // rung, so an unset unit exporting as class 2 is a real (if tiny) price
+      // shift and counts. Since the pricing split a Classic tower's rents
+      // already sit on explicit rungs (build stamps, snap-on-load stamps), so
+      // this stays 0 in practice and the "rents snap" stays-behind line no
+      // longer appears; it still catches in-memory off-rung values honestly.
+      const effective = u.rent ?? priceBand.default;
+      const back = rentFromClass(u.kind, rentClass);
+      if (back !== undefined && back !== effective) counts.rentsSnapped++;
     }
     if (u.label && u.label !== FACILITIES[u.kind].name) counts.namesDropped++;
     if (u.kind === "parking") counts.parkingStalls++;

@@ -451,6 +451,58 @@ describe("buildTDT: No-Rate rent class + lastQuarterMoney header", () => {
     expect(tenant?.rentRate).toBe(4); // and re-export still emits class 4
   });
 
+  it("Classic rung values round-trip losslessly: every rung of every kind maps to its class and back exactly (FR8)", () => {
+    // One unit per rung per rentable kind, plus a No Rate office; the rung
+    // dollar values ARE the class anchors post-split, so nothing snaps.
+    const ladders: [FacilityKind, number, number[]][] = [
+      ["office", 9, [2_000, 5_000, 10_000, 15_000]],
+      ["condo", 16, [50_000, 100_000, 150_000, 200_000]],
+      ["hotelSingle", 4, [500, 1_500, 2_000, 3_000]],
+      ["hotelDouble", 6, [800, 2_000, 3_000, 4_500]],
+      ["hotelSuite", 10, [1_500, 4_000, 6_000, 9_000]],
+    ];
+    const units: Unit[] = [];
+    let id = 1;
+    ladders.forEach(([kind, width, values], row) => {
+      values.forEach((rent, i) => {
+        units.push(unit({ id: id++, kind, floor: 5 + row, x: 20 + i * 40, width, rent }));
+      });
+    });
+    units.push(unit({ id: id++, kind: "office", floor: 12, x: 200, width: 9, noRate: true }));
+    const save = tower(units);
+    const first = buildTDT(save);
+    // Byte level: each unit's rent class is exactly its rung level (0-3), and
+    // the No Rate office carries class 4 (doc §4 tenant type IDs).
+    const TYPE: Record<string, number> = { office: 7, condo: 9, hotelSingle: 3, hotelDouble: 4, hotelSuite: 5 };
+    const tdt = parseTdtBinary(first.bytes);
+    const tenants = tdt.floors.flatMap((f) => f.tenants);
+    for (const [kind] of ladders) {
+      const rates = tenants
+        .filter((t) => Math.abs(t.type) === TYPE[kind])
+        .sort((a, b) => a.left - b.left)
+        .map((t) => t.rentRate);
+      // The office row carries the extra class-4 (No Rate) unit at the far right.
+      expect(rates, kind).toEqual(kind === "office" ? [0, 1, 2, 3, 4] : [0, 1, 2, 3]);
+    }
+    // Round trip: the exact rung dollars come back on import (class 2 included:
+    // Average is a real value now, not "keep the default").
+    const back = parseTDT(first.bytes.buffer as ArrayBuffer, "R.TDT").save;
+    for (const [kind, , values] of ladders) {
+      const rents = back.units
+        .filter((u) => u.kind === kind && !u.noRate)
+        .sort((a, b) => a.x - b.x)
+        .map((u) => u.rent);
+      expect(rents, kind).toEqual(values);
+    }
+    expect(back.units.some((u) => u.kind === "office" && u.noRate === true)).toBe(true);
+    // Zero importer warnings, and re-export is byte-identical (NFR9).
+    expect(parseTdtBinary(first.bytes).warnings).toEqual([]);
+    expect(buildTDT(back).bytes).toEqual(first.bytes);
+    // The reverse fidelity report's "rents snap" line no longer applies: a
+    // post-split Classic tower's rents are already the four classes.
+    expect(first.report.staysBehind.some((s) => s.includes("snap to 1994's four lease classes"))).toBe(false);
+  });
+
   it("writes lastQuarterMoney at header 0x10 (÷100), and 0 when unset", () => {
     const withSnapshot = buildTDT(tower([], { lastQuarterMoney: 1_500_000 })).bytes;
     expect(i32(withSnapshot, 0x10)).toBe(15_000); // 1,500,000 / 100

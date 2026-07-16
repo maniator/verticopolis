@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { UI, type UICallbacks } from "../../ui/UI";
 import { Simulation } from "../../engine/Simulation";
+import { CLASSIC_RULES } from "../../engine/gameRules";
 import type { Unit } from "../../engine/types";
 import { unitEditorTemplate } from "../../ui/templates/editor";
 import * as platformModule from "../../platform";
@@ -627,9 +628,11 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
   const editorEl = (): HTMLElement => document.getElementById("editor")!;
 
   /** A small built tower with an occupied office, so the card carries the
-   *  rename input, the rent adjuster, and live stat cells. */
+   *  rename input, the rent adjuster, and live stat cells. Modern, so the
+   *  card carries the '+ rent' stepper this identity regression pins (the
+   *  Classic card renders the rung picker instead; see editor.test.ts). */
   function officeSim(): { sim: Simulation; office: Unit } {
-    const sim = new Simulation();
+    const sim = new Simulation(12345, "modern");
     for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
     for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
     const r = sim.tower.place("office", 2, 12);
@@ -685,6 +688,27 @@ describe("renderEditor — lit diff patches in place; delegated actions dispatch
     ui.renderEditor(unitEditorTemplate(sim, office));
     editorEl().querySelector<HTMLElement>('[data-edit="sell"]')!.click();
     expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("sell", editorEl());
+  });
+
+  it("the Classic rung picker's change event dispatches through the delegated listener, and renderEditor syncs its selection", () => {
+    const { ui, cb } = makeUI();
+    const sim = new Simulation(); // Classic: the card renders the rung picker
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("office", 2, 12);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.units.find((u) => u.id === r.unitId)!;
+    office.state = "occupied";
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    const select = editorEl().querySelector<HTMLSelectElement>("#ed-rung")!;
+    expect(select.value).toBe("2"); // renderEditor synced the Average selection post-render
+    select.value = "3";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(cb.onEditAction).toHaveBeenCalledExactlyOnceWith("rung", editorEl());
+    // An engine-side change re-syncs the picker on the next pump render.
+    sim.priceUnit(office, 2_000);
+    ui.renderEditor(unitEditorTemplate(sim, office));
+    expect(editorEl().querySelector<HTMLSelectElement>("#ed-rung")!.value).toBe("0");
   });
 
   it("hideEditor clears the card through lit and a later render reopens it", () => {
@@ -1974,7 +1998,10 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     const preview = vi.fn(() => ({ ...result }));
     const apply = vi.fn(() => ({ ...result }));
     const onApplied = vi.fn();
-    ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", band }, { preview, apply, onApplied });
+    ui.showBatchPricingDialog(
+      { kind: "office", kindLabel: "Office", options: { shape: "band", band } },
+      { preview, apply, onApplied },
+    );
     return { preview, apply, onApplied };
   }
 
@@ -2048,6 +2075,85 @@ describe("showBatchPricingDialog — set-all rent/price with a reset confirm", (
     expect(dialog().querySelector<HTMLInputElement>("#bp-price")!.value).toBe("12345");
     price.dispatchEvent(new Event("change", { bubbles: true })); // commit: snaps to the $1,000 grid
     expect(dialog().querySelector<HTMLInputElement>("#bp-price")!.value).toBe("12000");
+  });
+});
+
+describe("showBatchPricingDialog — the Classic ladder variant (rung picker + armed No Rate)", () => {
+  const result = { matched: 12, eligible: 9, changed: 9, skippedSold: 0, skippedCustom: 0, customOverwritten: 0, clampedLow: 0, clampedHigh: 0 };
+  function openLadder() {
+    const { ui } = makeUI();
+    const options = CLASSIC_RULES.priceOptions("office")!;
+    const preview = vi.fn(() => ({ ...result }));
+    const apply = vi.fn(() => ({ ...result }));
+    const onApplied = vi.fn();
+    ui.showBatchPricingDialog({ kind: "office", kindLabel: "Office", options }, { preview, apply, onApplied });
+    return { preview, apply, onApplied };
+  }
+  const rung = () => dialog().querySelector<HTMLSelectElement>("#bp-rung")!;
+  const applyBtn = () => dialog().querySelector<HTMLButtonElement>("#bp-apply")!;
+  const pick = (value: string) => {
+    rung().value = value;
+    rung().dispatchEvent(new Event("change", { bubbles: true }));
+  };
+
+  it("opens on Average (the default rung) with a live rung preview and no number machinery", () => {
+    const { preview } = openLadder();
+    expect(rung().value).toBe("2");
+    expect(dialog().querySelector("#bp-price")).toBeNull();
+    expect(preview).toHaveBeenCalledWith(10_000, { onlyDefaultPriced: false });
+    expect(dialog().querySelector("#bp-preview")!.textContent).toBe("Set 9 of 12 offices to Average ($10,000).");
+  });
+
+  it("picking a rung re-previews with the rung's exact dollars", () => {
+    const { preview } = openLadder();
+    pick("1");
+    expect(preview).toHaveBeenLastCalledWith(5_000, { onlyDefaultPriced: false });
+    expect(dialog().querySelector("#bp-preview")!.textContent).toBe("Set 9 of 12 offices to Low ($5,000).");
+  });
+
+  it("Apply on a rung commits once and reports the pinned summary", () => {
+    const { apply, onApplied } = openLadder();
+    pick("3");
+    applyBtn().click();
+    expect(apply).toHaveBeenCalledWith(15_000, { onlyDefaultPriced: false });
+    expect(onApplied).toHaveBeenCalledWith("Set 9 offices to High ($15,000).");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("batch No Rate is armed: first click relabels to Confirm No Rate, second applies", () => {
+    const { apply, onApplied } = openLadder();
+    pick("noRate");
+    expect(dialog().querySelector("#bp-preview")!.textContent).toBe(
+      "Take 9 of 12 offices off the market (No Rate). Occupied offices keep their tenants and charge nothing.",
+    );
+    applyBtn().click(); // arms
+    expect(applyBtn().textContent).toBe("Confirm No Rate");
+    expect(apply).not.toHaveBeenCalled();
+    applyBtn().click(); // confirms
+    expect(apply).toHaveBeenCalledWith("noRate", { onlyDefaultPriced: false });
+    expect(onApplied).toHaveBeenCalledWith("Took 9 offices off the market (No Rate).");
+  });
+
+  it("any other change disarms a pending No Rate confirm", () => {
+    const { apply } = openLadder();
+    pick("noRate");
+    applyBtn().click(); // arm
+    expect(applyBtn().textContent).toBe("Confirm No Rate");
+    const only = dialog().querySelector<HTMLInputElement>("#bp-only")!;
+    only.checked = true;
+    only.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(applyBtn().textContent).toBe("Apply"); // disarmed
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("the only-on-Average filter rides every preview and apply", () => {
+    const { preview, apply } = openLadder();
+    const only = dialog().querySelector<HTMLInputElement>("#bp-only")!;
+    only.checked = true;
+    only.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(preview).toHaveBeenLastCalledWith(10_000, { onlyDefaultPriced: true });
+    applyBtn().click();
+    expect(apply).toHaveBeenCalledWith(10_000, { onlyDefaultPriced: true });
   });
 });
 

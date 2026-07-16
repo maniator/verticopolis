@@ -19,7 +19,7 @@ abstraction · ⬜ not present.
 
 ## Facilities (all original tenant/room types)
 - ✅ Office (quarterly rent; staffed 8–18 on weekdays)
-- ✅ Condominium: one-time sale, residents live in permanently. Priced on the original's construction-cost scale (default ~2× build cost, up to a ~2.5× ceiling; a higher asking price sells slower), and losing an owner to sustained neglect triggers a full-price **buy-back**
+- ✅ Condominium: one-time sale, residents live in permanently. Classic lists on the canon 4-level ladder ($50k/$100k/$150k/$200k, and MAY firesale below build cost, exactly as in 1994); Modern keeps the construction-cost band (default ~2× build cost, up to a ~2.5× ceiling, floor at break-even; a higher asking price sells slower). Losing an owner to sustained neglect triggers a full-price **buy-back**
 - ✅ Hotel: Single / Double / Suite (nightly revenue, guests check in/out)
 - ✅ Fast Food, Restaurant, Retail Shop (daily traffic income, business hours)
 - ✅ Cinema and Party Hall, both two-story rooms (guests enter on the lower floor); evening crowds
@@ -39,7 +39,8 @@ abstraction · ⬜ not present.
 
 ## Economy
 - ✅ Start with $2,000,000
-- ✅ Office rent (quarterly), condo sale (once, at ~2×–2.5× build cost with an owner buy-back on loss), hotel nightly revenue
+- ✅ Office rent (quarterly), condo sale (once, with an owner buy-back on loss), hotel nightly revenue
+- ✅ **Classic prices exactly like 1994** (v1.50.0, #299): offices, condos, and all three hotel room kinds use the original's discrete 4-level rate dropdown (Very Low / Low / Average / High) at the researched canon dollar tables (office 2k/5k/10k/15k quarterly; condo 50k/100k/150k/200k one-time; hotel single 500/1,500/2,000/3,000, double 800/2,000/3,000/4,500, suite 1,500/4,000/6,000/9,000 nightly), plus the **No Rate** off-market state (charges nothing AND blocks move-ins; an occupied unit keeps its free tenant, who still counts toward stars). Pre-split Classic saves snap once onto the ladder at load. Modern keeps the tuned continuous ranges. The dollar tables are single-source (Relentless Optimizer) pending a manual cross-check; canon hotel rates run ~10x our old band, an accepted faithful consequence (money trivializes late, as in 1994)
 - ◑ Food / retail / cinema / party-hall traffic income, scaled by foot traffic + open hours (an aggregate foot-traffic model; per-venue dedicated patronage and cross-venue lift are a tracked gap, see Known parity gaps)
 - ✅ Per-car and per-service monthly maintenance
 - ✅ Buried treasure when excavating basement rooms
@@ -86,7 +87,7 @@ abstraction · ⬜ not present.
 ## Save / platform
 - ✅ Autosave + multiple save slots, `.vctower` tower-file export/import (`localStorage`)
 - ✅ Import of original 1994 SimTower saves (**`.TDT`**, per `docs/canon/tdt-format.md`): funds, star rating, clock, floors, rooms, rent classes, hotel room states, and the save's own elevators and stairways (with their per-floor stop settings) come over, with a fidelity report shown before anything is adopted and an auto-save to a free slot. A truncated or corrupt transport block falls back to a synthesized elevator layout, and the report says which path ran; tenant names, retail subtypes and finance history are queued follow-ups (backlog `tdt-importer`)
-- ✅ Export back to original 1994 SimTower saves (**`.TDT`**): rooms with occupancy and hotel states, transports with per-floor stop settings, funds, star, and the clock make the trip; a reverse fidelity modal shows what stays behind (exact rents snap to the four 1994 lease classes, funds round to $100, names and the ledger drop) before anything downloads, and Modern-rule towers are refused. Every exported file must re-import through our own parser with zero warnings; validation against the real game is a recorded follow-up (backlog `tdt-exporter`)
+- ✅ Export back to original 1994 SimTower saves (**`.TDT`**): rooms with occupancy and hotel states, transports with per-floor stop settings, funds, star, and the clock make the trip; a reverse fidelity modal shows what stays behind (funds round to $100, names and the ledger drop; since the v1.50.0 pricing split Classic rents already ARE the four 1994 lease classes, so they round-trip losslessly and the old "rents snap" line no longer applies) before anything downloads, and Modern-rule towers are refused. Every exported file must re-import through our own parser with zero warnings; validation against the real game is a recorded follow-up (backlog `tdt-exporter`)
 - ✅ Mobile: responsive layout, touch pan/pinch, drawer panels
 
 ## Deliberate divergences

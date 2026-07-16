@@ -23,12 +23,18 @@ export function stats(sim: Simulation) {
     shops = 0,
     restaurants = 0,
     vacant = 0,
+    vacantNoRate = 0,
     parkingSpaces = 0;
   for (const u of sim.tower.units) {
     if (u.kind === "office") {
       offices++;
       if (isTenanted(u)) occupiedOffices++; // a lame-duck on notice still holds the space
-      if (u.state === "empty") vacant++;
+      if (u.state === "empty") {
+        vacant++;
+        // Off-market (No Rate) vacancies are split out so the headline count
+        // stays honest: these will never fill at the current setting.
+        if (u.noRate) vacantNoRate++;
+      }
     } else if (u.kind === "condo") {
       condos++;
       if (u.everOccupied) soldCondos++;
@@ -59,6 +65,7 @@ export function stats(sim: Simulation) {
     shops,
     restaurants,
     vacant,
+    vacantNoRate,
     floors: sim.tower.highestFloor,
     basements: Math.max(0, 1 - sim.tower.lowestFloor),
     elevators: sim.tower.transports.filter((t) => isElevatorKind(t.kind)).length,

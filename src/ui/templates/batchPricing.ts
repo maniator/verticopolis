@@ -1,6 +1,8 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import type { BatchTarget, BatchRentResult } from "../../engine/Simulation";
+import type { PriceRung } from "../../engine/gameRules";
+import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 
 /**
  * The batch-pricing dialog (E4, the interactive stateful dialog). This is a pure
@@ -71,6 +73,73 @@ export function batchPreviewMessage(ctx: BatchPricingCtx, target: BatchTarget, r
   if (r.clampedHigh) msg += ` Clamped to the ${money(ctx.band.max)} max.`;
   if (r.clampedLow) msg += ` Clamped to the ${money(ctx.band.min)} min.`;
   return msg;
+}
+
+// ---- The Classic (ladder) variant (ux-pricing-split-editor §1.7) -------------
+// Same modal window; the body swaps the number machinery for the rung picker.
+// The two Modern mode radios collapse into the one select (Average IS the
+// default rung, so a separate reset mode would be the same choice twice), the
+// range helper line disappears (a ladder needs no band hint), and a rung can
+// never clamp, so the preview never emits clamp sentences.
+
+export interface BatchRungCtx {
+  /** Plural noun for the kind ("offices"). */
+  noun: string;
+  /** Singular ("office"), for the lead-in sentence. */
+  single: string;
+  rungs: readonly PriceRung[];
+}
+
+export interface BatchRungState {
+  choice: RungChoice;
+  only: boolean;
+  /** Batch No Rate is armed, two clicks: the first activation relabels the
+   *  primary to `Confirm No Rate`, the second applies. Any other change disarms. */
+  noRateArmed: boolean;
+  previewMsg: string;
+  applyDisabled: boolean;
+}
+
+export interface BatchRungHandlers {
+  onChoiceChange: (e: Event) => void;
+  onOnlyChange: (e: Event) => void;
+  onApply: () => void;
+  onCancel: () => void;
+}
+
+/** The honest preview sentence for a ladder batch, pinned strings from the UX
+ *  spec's copy inventory (§5). A pure function so it lives with the view. */
+export function batchRungPreviewMessage(ctx: BatchRungCtx, choice: RungChoice, r: BatchRentResult): string {
+  if (choice === "noRate") {
+    return `Take ${r.changed} of ${r.matched} ${ctx.noun} off the market (No Rate). Occupied ${ctx.noun} keep their tenants and charge nothing.`;
+  }
+  const rung = ctx.rungs[choice];
+  let msg = `Set ${r.changed} of ${r.matched} ${ctx.noun} to ${rung.label} (${money(rung.value)}).`;
+  if (r.skippedSold) msg += ` ${r.skippedSold} sold skipped.`;
+  return msg;
+}
+
+export function batchRungTemplate(
+  ctx: BatchRungCtx,
+  state: BatchRungState,
+  h: BatchRungHandlers,
+): TemplateResult {
+  return html`
+      <h2>Set all ${ctx.noun}</h2>
+      <p class="bp-rung-lead">Set every ${ctx.single} to</p>
+      <div class="bp-rung">${rungPickerTemplate({
+        id: "bp-rung",
+        rungs: ctx.rungs,
+        current: state.choice,
+        ariaLabel: `Set every ${ctx.single} to`,
+        onChange: h.onChoiceChange,
+      })}</div>
+      <label class="bp-only"><input id="bp-only" type="checkbox" ?checked=${state.only} @change=${h.onOnlyChange} /> Only ${ctx.noun} still on Average</label>
+      <p id="bp-preview" class="bp-preview" aria-live="polite">${state.previewMsg || nothing}</p>
+      <div class="modal-actions">
+        <button class="btn primary" id="bp-apply" data-act="apply" ?disabled=${state.applyDisabled} @click=${h.onApply}>${state.noRateArmed ? "Confirm No Rate" : "Apply"}</button>
+        <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
+      </div>`;
 }
 
 export function batchPricingTemplate(

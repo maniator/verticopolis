@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "./gameRules";
+import {
+  CLASSIC_RULES,
+  MODERN_RULES,
+  makeRules,
+  householdPrice,
+  priceNeutral,
+  snapToLadder,
+  ladderRungFor,
+  type PriceRung,
+} from "./gameRules";
 import { FACILITIES, GRID } from "./facilities";
-import { ECON } from "./econConfig";
+import { ECON, PRICED_KINDS } from "./econConfig";
 import { RNG } from "./rng";
 import {
   LOBBY_FAR_FLOORS,
@@ -291,5 +300,98 @@ describe("demographicRoutines (condo-demographic-routines, #397)", () => {
     expect(routines.salesCall).toBe(ECON.demographicRoutineWeights.salesCall);
     expect(routines.schoolRun).toBeGreaterThan(0);
     expect(routines.salesCall).toBeGreaterThan(0);
+  });
+});
+
+describe("priceOptions (the Classic/Modern pricing split, #299)", () => {
+  /** The canon rung tables, pinned verbatim (GDD §0/§2, user call 2026-07-08).
+   *  Dollar tables are the Relentless Optimizer reference (single-source);
+   *  the rent-class structure is TDT byte 0-4. */
+  const CANON: Record<string, [number, number, number, number]> = {
+    office: [2_000, 5_000, 10_000, 15_000], // quarterly
+    condo: [50_000, 100_000, 150_000, 200_000], // one-time sale
+    hotelSingle: [500, 1_500, 2_000, 3_000], // nightly
+    hotelDouble: [800, 2_000, 3_000, 4_500], // nightly
+    hotelSuite: [1_500, 4_000, 6_000, 9_000], // nightly
+  };
+
+  it("Classic returns the discrete 4-rung canon ladder plus the No Rate sentinel for every priced kind", () => {
+    for (const kind of PRICED_KINDS) {
+      const opts = CLASSIC_RULES.priceOptions(kind);
+      expect(opts).not.toBeNull();
+      if (opts?.shape !== "ladder") throw new Error(`expected a ladder for ${kind}`);
+      expect(opts.noRate).toBe(true);
+      expect(opts.rungs.map((r) => r.value)).toEqual(CANON[kind]);
+      expect(opts.rungs.map((r) => r.label)).toEqual(["Very Low", "Low", "Average", "High"]);
+      // Rung levels double as the TDT rent-class bytes 0-3.
+      expect(opts.rungs.map((r) => r.level)).toEqual([0, 1, 2, 3]);
+    }
+  });
+
+  it("Modern returns today's continuous band unchanged (the live ECON entry)", () => {
+    for (const kind of PRICED_KINDS) {
+      const opts = MODERN_RULES.priceOptions(kind);
+      if (opts?.shape !== "band") throw new Error(`expected a band for ${kind}`);
+      expect(opts.band).toBe(ECON.rent[kind]); // identity: a retune can never desync
+    }
+  });
+
+  it("returns null for a kind whose price is not player-set, in both modes", () => {
+    expect(CLASSIC_RULES.priceOptions("shop")).toBeNull();
+    expect(CLASSIC_RULES.priceOptions("lobby")).toBeNull();
+    expect(MODERN_RULES.priceOptions("fastFood")).toBeNull();
+  });
+
+  it("returns frozen singletons, so per-unit reads allocate nothing and nobody can mutate the canon", () => {
+    const a = CLASSIC_RULES.priceOptions("office");
+    expect(CLASSIC_RULES.priceOptions("office")).toBe(a);
+    expect(Object.isFrozen(a)).toBe(true);
+    if (a?.shape === "ladder") {
+      expect(Object.isFrozen(a.rungs)).toBe(true);
+      expect(Object.isFrozen(a.rungs[0])).toBe(true);
+    }
+    expect(MODERN_RULES.priceOptions("condo")).toBe(MODERN_RULES.priceOptions("condo"));
+  });
+
+  it("the neutral anchor is the Average rung (Classic) or the band default (Modern)", () => {
+    expect(priceNeutral(CLASSIC_RULES.priceOptions("condo")!)).toBe(150_000);
+    expect(priceNeutral(CLASSIC_RULES.priceOptions("hotelSingle")!)).toBe(2_000);
+    expect(priceNeutral(MODERN_RULES.priceOptions("condo")!)).toBe(ECON.rent.condo.default);
+  });
+
+  it("Classic office Average coincides with the band default, which the satisfaction rent-gripe anchors on", () => {
+    // sim/satisfaction.ts keys its office rent-over-market reads off
+    // rentConfig("office").default; that is only correct in Classic because
+    // the canon Average rung IS $10,000. If a retune ever moves the band
+    // default off the Average rung, those reads must switch to priceNeutral.
+    expect(priceNeutral(CLASSIC_RULES.priceOptions("office")!)).toBe(ECON.rent.office.default);
+  });
+});
+
+describe("snapToLadder / ladderRungFor (the NFR3 snap rule)", () => {
+  const rungs = (CLASSIC_RULES.priceOptions("office") as { rungs: readonly PriceRung[] }).rungs;
+
+  it("snaps to the nearest rung, ties rounding UP", () => {
+    expect(snapToLadder(rungs, 10_000)).toBe(10_000); // exact rung is itself
+    expect(snapToLadder(rungs, 6_000)).toBe(5_000);
+    expect(snapToLadder(rungs, 7_500)).toBe(10_000); // exact tie rounds up
+    expect(snapToLadder(rungs, 3_500)).toBe(5_000); // tie 2k/5k rounds up
+    expect(snapToLadder(rungs, 12_500)).toBe(15_000); // tie 10k/15k rounds up
+  });
+
+  it("bounds out-of-band and repairs non-finite values (clamp then snap)", () => {
+    expect(snapToLadder(rungs, 20_000)).toBe(15_000); // the old band max lands on High
+    expect(snapToLadder(rungs, -5)).toBe(2_000);
+    expect(snapToLadder(rungs, 1e12)).toBe(15_000);
+    // Non-finite input (NaN, ±Infinity) lands on Average, the neutral rung.
+    expect(snapToLadder(rungs, NaN)).toBe(10_000);
+    expect(snapToLadder(rungs, Infinity)).toBe(10_000);
+    expect(snapToLadder(rungs, -Infinity)).toBe(10_000);
+  });
+
+  it("names the rung a value sits on", () => {
+    expect(ladderRungFor(rungs, 15_000).label).toBe("High");
+    expect(ladderRungFor(rungs, 0).label).toBe("Very Low");
+    expect(ladderRungFor(rungs, 7_500).label).toBe("Average"); // tie up
   });
 });

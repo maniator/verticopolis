@@ -3,9 +3,12 @@ import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
 
-/** A served floor-2 tower with `n` offices (all still on the default price). */
+/** A served floor-2 MODERN tower with `n` offices (all still on the default
+ *  price). Modern keeps the continuous band, so these band-mechanics tests
+ *  (exact targets, clamping, band steps) run against the shape that still has
+ *  them; the Classic ladder semantics get their own describe below. */
 function officeTower(seed = 1, n = 4) {
-  const sim = Simulation.newGame(seed);
+  const sim = Simulation.newGame(seed, "modern");
   const x0 = Math.floor(GRID.width / 2) - 20;
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
   sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -57,7 +60,7 @@ describe("Batch pricing", () => {
   });
 
   it("never reprices a sold condo (counted as skippedSold)", () => {
-    const sim = Simulation.newGame(2);
+    const sim = Simulation.newGame(2, "modern");
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -162,7 +165,7 @@ describe("No-Rate units earn nothing until repriced", () => {
   });
 
   it("a batch reprice clears No-Rate only on repriced units; a skipped sold condo keeps it", () => {
-    const sim = Simulation.newGame(2);
+    const sim = Simulation.newGame(2, "modern");
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -178,5 +181,95 @@ describe("No-Rate units earn nothing until repriced", () => {
     expect(condos[0].noRate).toBe(true); // skipped unit KEEPS its flag
     expect(condos[1].noRate).toBeUndefined(); // repriced unit cleared it
     expect(rentOf(condos[1])).toBe(200_000);
+  });
+});
+
+/** A served floor-2 CLASSIC tower with `n` offices (all on the Average rung). */
+function classicOfficeTower(seed = 1, n = 4) {
+  const sim = Simulation.newGame(seed);
+  const x0 = Math.floor(GRID.width / 2) - 20;
+  for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
+  sim.buildTransport("elevatorStandard", x0, 1, 2);
+  sim.money = 1e9;
+  for (let i = 0; i < n; i++) expect(sim.build("office", 2, x0 + i * 9).ok).toBe(true);
+  const offices = sim.tower.units.filter((u) => u.kind === "office");
+  return { sim, offices, x0 };
+}
+
+describe("Batch pricing on the Classic ladder", () => {
+  it("a rung target applies exactly and an off-ladder target snaps (never clamps)", () => {
+    const { sim, offices } = classicOfficeTower(1, 3);
+    const res = sim.applyRentBatch("office", 5_000)!; // the Low rung
+    expect(res.changed).toBe(3);
+    expect(res.clampedLow + res.clampedHigh).toBe(0);
+    expect(offices.every((u) => rentOf(u) === 5_000)).toBe(true);
+    // A forged off-ladder target snaps to the nearest rung, ties up.
+    const snapped = sim.applyRentBatch("office", 7_500)!;
+    expect(snapped.clampedLow + snapped.clampedHigh).toBe(0);
+    expect(offices.every((u) => rentOf(u) === 10_000)).toBe(true);
+  });
+
+  it("'noRate' takes every eligible unit off the market without touching tenants", () => {
+    const { sim, offices } = classicOfficeTower(2, 3);
+    offices[0].state = "occupied";
+    offices[0].everOccupied = true;
+    offices[0].occupants = 6;
+    const preview = sim.previewRentBatch("office", "noRate")!;
+    expect(preview.changed).toBe(3);
+    expect(offices.every((u) => u.noRate === undefined)).toBe(true); // preview is pure
+    const res = sim.applyRentBatch("office", "noRate")!;
+    expect(res).toEqual(preview);
+    expect(offices.every((u) => u.noRate === true)).toBe(true);
+    // The occupied unit keeps its tenant (no eviction wave) and charges nothing.
+    expect(offices[0].state).toBe("occupied");
+    expect(offices[0].occupants).toBe(6);
+    expect(rentOf(offices[0])).toBe(0);
+    // A second pass changes nothing (already off-market).
+    expect(sim.previewRentBatch("office", "noRate")!.changed).toBe(0);
+  });
+
+  it("'noRate' skips sold condos (price-locked) and is refused by Modern (seam law)", () => {
+    const sim = Simulation.newGame(3);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
+    sim.buildTransport("elevatorStandard", x0, 1, 2);
+    sim.money = 1e9;
+    expect(sim.build("condo", 2, x0).ok).toBe(true);
+    expect(sim.build("condo", 2, x0 + 16).ok).toBe(true);
+    const condos = sim.tower.units.filter((u) => u.kind === "condo");
+    condos[0].everOccupied = true; // sold
+    const res = sim.applyRentBatch("condo", "noRate")!;
+    expect(res.skippedSold).toBe(1);
+    expect(res.changed).toBe(1);
+    expect(condos[0].noRate).toBeUndefined();
+    expect(condos[1].noRate).toBe(true);
+    // Modern's engine never holds the state: a "noRate" batch is refused whole.
+    const modern = Simulation.newGame(3, "modern");
+    expect(modern.previewRentBatch("office", "noRate")).toBeNull();
+    expect(modern.applyRentBatch("office", "noRate")).toBeNull();
+  });
+
+  it("onlyDefaultPriced means 'still on Average', and a No Rate unit is not", () => {
+    const { sim, offices } = classicOfficeTower(4, 3);
+    sim.priceUnit(offices[0], 15_000); // High
+    offices[1].noRate = true;
+    const res = sim.applyRentBatch("office", 5_000, { onlyDefaultPriced: true })!;
+    expect(res.skippedCustom).toBe(2); // the High unit and the off-market unit
+    expect(res.changed).toBe(1);
+    expect(rentOf(offices[0])).toBe(15_000);
+    expect(offices[1].noRate).toBe(true); // filter never drags a No Rate unit back on-market
+    expect(rentOf(offices[2])).toBe(5_000);
+  });
+
+  it("adjustRent steps whole rungs in Classic and clamps at the ladder ends", () => {
+    const { sim, offices } = classicOfficeTower(5, 1);
+    const id = offices[0].id;
+    expect(rentOf(offices[0])).toBe(10_000); // new builds start on Average (AR6)
+    expect(sim.adjustRent(id, 1)).toBe(15_000);
+    expect(sim.adjustRent(id, 1)).toBe(15_000); // clamped at High
+    expect(sim.adjustRent(id, -1)).toBe(10_000);
+    expect(sim.adjustRent(id, -1)).toBe(5_000);
+    expect(sim.adjustRent(id, -1)).toBe(2_000);
+    expect(sim.adjustRent(id, -1)).toBe(2_000); // clamped at Very Low
   });
 });

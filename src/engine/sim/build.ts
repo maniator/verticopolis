@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 
-import { resaleRefund } from "../econConfig";
+import { rentConfig, resaleRefund } from "../econConfig";
+import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
 import type { FacilityKind, WeatherKind } from "../types";
@@ -108,6 +109,17 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
     if (name !== undefined) {
       const u = sim.tower.getUnit(res.unitId);
       if (u) u.subtype = name;
+    }
+    // A new build in a ladder-priced mode starts on the Average rung (epics
+    // AR6). Stored explicitly whenever Average differs from the band default
+    // (Classic condos/hotels), so `rentOf` reads a real rung, never an
+    // off-ladder band default; where they coincide (offices) the override is
+    // stripped, exactly like every other neutral-priced write.
+    const priceShape = sim.rules.priceOptions(kind);
+    if (priceShape?.shape === "ladder") {
+      const u = sim.tower.getUnit(res.unitId);
+      const cfg = rentConfig(kind);
+      if (u && cfg) storeRent(u, cfg, priceShape.rungs[2].value);
     }
   }
   // Rooms spend time under construction before they can be used.

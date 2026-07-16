@@ -4,7 +4,7 @@ import { REAL_WORLD } from "../calendar";
 
 import { rentOf, rentConfig } from "../econConfig";
 
-import { householdPrice } from "../gameRules";
+import { householdPrice, snapToLadder } from "../gameRules";
 
 import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isHotelKind } from "../facilities";
@@ -31,7 +31,13 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // condo (offices, never-sold condos: they cost nothing back).
   let buyback = 0;
   if (u.kind === "condo" && u.everOccupied) {
-    buyback = householdPrice(rentOf(u), u.residents);
+    // The buy-back mirrors the historical SALE price, which No Rate does not
+    // rewrite: rentOf reads $0 for an off-market unit (an imported class-4
+    // occupied condo), but losing that owner still costs the repurchase at
+    // what the unit sold for (the stored price; the kind default when a
+    // legacy record carries none), never a free walk-away.
+    const salePrice = u.rent ?? rentConfig("condo")!.default;
+    buyback = householdPrice(salePrice, u.residents);
     sim.money -= buyback;
     sim.recordMoney("condos", -buyback);
   }
@@ -47,14 +53,20 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // elsewhere and keeps a re-sold condo drawing a fresh household.
   if (!isHotelKind(u.kind)) u.everOccupied = false;
   u.residents = undefined;
-  // A condo returning to market re-lists in the CURRENT band: clamp away any
+  // A condo returning to market re-lists at a CURRENTLY legal price: snapped
+  // onto the canon ladder in Classic, clamped into the band in Modern, so a
   // legacy/out-of-band asking price it carried while sold (e.g. a $240k
-  // old-max), so it can't re-sell above the current ceiling, or, in Modern,
-  // above it after household scaling. The buy-back charge above already used
-  // the pre-clamp price, so it still mirrors the historical sale.
+  // old-max) can't re-sell above the current ceiling, or, in Modern, above it
+  // after household scaling. The buy-back charge above already used the
+  // pre-normalized price, so it still mirrors the historical sale.
   if (u.kind === "condo" && u.rent !== undefined) {
-    const band = rentConfig("condo")!;
-    u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    const priceShape = sim.rules.priceOptions("condo")!;
+    if (priceShape.shape === "ladder") {
+      u.rent = snapToLadder(priceShape.rungs, u.rent);
+    } else {
+      const band = rentConfig("condo")!;
+      u.rent = Math.max(band.min, Math.min(band.max, u.rent));
+    }
   }
   u.label = FACILITIES[u.kind].name;
   u.vacateReason = undefined;
