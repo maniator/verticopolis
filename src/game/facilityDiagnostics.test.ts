@@ -112,7 +112,9 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
     const frag = render(facilityDiagnostics(sim, unit));
     const line = [...frag.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Far from"));
     expect(line?.textContent).toContain("Satisfaction is capped here");
-    expect(line?.textContent).toContain("A sky lobby on floor 15 would lift it (build floors up to it first).");
+    expect(line?.textContent).toContain(
+      "A sky lobby on floor 15 would lift it (build floors up to 14 first; the slot story itself stays clear for the lobby).",
+    );
     expect(line?.getAttribute("style")).toBe("color:var(--bad)");
   });
 

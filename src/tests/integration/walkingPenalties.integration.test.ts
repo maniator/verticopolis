@@ -485,10 +485,12 @@ describe("W-new: graduated lobby-distance penalty (#394, edges derived from the 
     }
     let cappedFloors = 0;
     for (let f = 2; f <= 45; f++) {
-      const drain = gap.rules.lobbyDistanceDrain(gap.tower.nearestLobbyFloorDistance(f));
-      if (drain.cap >= 1) continue;
-      cappedFloors++;
-      expect(gap.tower.nearestBuildableLobbySlot(f), `floor ${f} should name the skipped slot`).toBe(30);
+      for (const rules of [CLASSIC_RULES, MODERN_RULES]) {
+        const drain = rules.lobbyDistanceDrain(gap.tower.nearestLobbyFloorDistance(f));
+        if (drain.cap >= 1) continue;
+        cappedFloors++;
+        expect(gap.tower.nearestBuildableLobbySlot(f), `floor ${f} should name the skipped slot`).toBe(30);
+      }
     }
     expect(cappedFloors).toBeGreaterThan(0); // the skipped slot genuinely bites
   });

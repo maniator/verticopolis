@@ -318,7 +318,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           const fix = onSlot
             ? `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
             : needsSupport
-              ? `Build floors up to ${slot} and put the sky lobby there to lift these tenants.`
+              ? `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`
               : blockedAbove
                 ? `Take down the stories above floor ${slot}, clear it, and build the sky lobby there to lift these tenants.`
                 : clearFirst
@@ -333,7 +333,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           const fix = onSlot
             ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
             : needsSupport
-              ? `A sky lobby on floor ${slot} would lift it (build floors up to it first).`
+              ? `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`
               : blockedAbove
                 ? `A sky lobby on floor ${slot} would lift it (the stories above it must come down before it can be cleared).`
                 : clearFirst
