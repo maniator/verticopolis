@@ -57,8 +57,9 @@ async function fetchUpdateInfo(): Promise<UpdateInfo | null> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 4000);
   try {
-    // Resolve against the page (base is "./", so the site lives at a Pages
-    // subpath) and cache-bust so a CDN edge can't hand back a stale copy.
+    // Resolve against the page (Vite base is "./", so URLs stay relative to
+    // wherever the site is served from) and cache-bust so a CDN edge can't hand
+    // back a stale copy.
     const url = new URL("version.json", document.baseURI);
     url.searchParams.set("t", String(Date.now()));
     const res = await fetch(url.href, { cache: "no-store", signal: controller.signal });
