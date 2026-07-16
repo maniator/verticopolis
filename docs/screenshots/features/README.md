@@ -24,6 +24,26 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-cleanliness.png` | **Housekeeping** mode: hotel rooms tinted by service coverage: green where a housekeeping crew can reach them, amber for dirty rooms waiting, red for floors with no service-elevator route (the "build another housekeeping station" nudge). |
 | `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 
+## Mode-forked pricing surfaces (Classic vs Modern)
+
+The pricing split (v1.50.0, PR #440) made these surfaces diverge by rule-set,
+so each renders one variant per mode, suffixed `-classic` / `-modern` (the
+convention is documented in [`docs/screenshots.md`](../../screenshots.md)).
+Classic variants come from the classic stats/showcase towers; Modern variants
+from the compact modern-rules tower shared by the `pricing-modern` and
+`pricing-modern-batch` scenes.
+
+| Screenshot | Shows |
+|---|---|
+| `editor-pricing-classic.png` | The editor card on a Classic office: the 1994 rung picker (with its No Rate option) where the price control sits. |
+| `editor-pricing-modern.png` | The same card on a Modern office: the free +/- rent steppers instead of the ladder. |
+| `stats-tenancy-classic.png` | Tower Statistics, Tenancy block, Classic: the Vacancies row splitting out off-market (No Rate) units. |
+| `stats-tenancy-modern.png` | The same block on a Modern tower: plain vacancies (Modern never holds the No-Rate state) plus the Modern-only Households readout (the 2–5 person family distribution). |
+
+The batch-pricing pair (`10-batch-pricing-classic.png` / `-modern.png`) lives
+with the showcase set in `docs/screenshots/`, as does the new-game dialog pair
+(`00b-onboarding-classic.png` / `-modern.png`).
+
 ## Metro station (routed commuters + the train)
 
 Captured from the built app via the unified generator (`scripts/screenshots.ts`, `metro` scene) on the hero

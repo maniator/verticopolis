@@ -22,7 +22,13 @@ export const SHOWCASE_SCENES: Scene[] = [
     shots: [
       { name: "00-splash", wait: 400 },
       {
-        name: "00b-onboarding",
+        // MODE FORK (issue #443): the rule-set picker is founding-time UI whose
+        // whole point is the Classic/Modern choice, so it renders one variant
+        // per mode: this one with the default Classic card selected, the
+        // -modern sibling below with the Modern card picked (its calendar
+        // sub-picker stays on the real-world default, the actual founding
+        // default). Same dialog, same framing; only the checked radio differs.
+        name: "00b-onboarding-classic",
         // The onboarding subject is the rule-set picker ("Found a New Tower").
         // Open it directly and KEEP it: the per-shot transient sweep would
         // otherwise close the modal and leave only the splash behind.
@@ -31,6 +37,24 @@ export const SHOWCASE_SCENES: Scene[] = [
           await page.evaluate(() => (window as any).game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
           // Fail the shot (keep the committed image) if the picker never mounts.
           await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
+        },
+        frame: { floor: 4, zoom: 1.0 },
+      },
+      {
+        name: "00b-onboarding-modern",
+        keepDialogs: true,
+        setup: async (page) => {
+          // Re-open rather than assume the previous shot's dialog survived, so
+          // this shot stands on its own; openModalTemplate replaces the body.
+          await page.evaluate(() => (window as any).game.ui.newTowerModal({ hasSave: false, onFound: () => {} }));
+          await page.waitForSelector("#modal[open], dialog[open]", { timeout: 4000 });
+          // Pick the Modern card through its real radio (a DOM click checks it
+          // and fires change, which is what highlights the card via :checked).
+          await page.evaluate(() => {
+            const radio = document.querySelector('input[name="nt-mode"][value="modern"]') as HTMLInputElement | null;
+            if (!radio) throw new Error("the new-game dialog has no Modern rule-set radio");
+            radio.click();
+          });
         },
         frame: { floor: 4, zoom: 1.0 },
       },
@@ -127,7 +151,16 @@ export const SHOWCASE_SCENES: Scene[] = [
         wait: 300,
       },
       {
-        name: "10-batch-pricing",
+        // MODE FORK (issue #443): the batch dialog body swaps by rule-set
+        // since the pricing split (PR #440); this classic tower gets the
+        // rung-picker variant, the -modern sibling (pricing-modern-batch
+        // scene) keeps the number-input band editor. The Classic editor-card
+        // crop deliberately does NOT live here: this scene renders at
+        // deviceScaleFactor 1 (outDir "screenshots", see runScene), and a
+        // features-bound crop shot minted here would land at half the
+        // resolution of its -modern sibling; it lives in the stats scene
+        // (features, DSF 2) instead.
+        name: "10-batch-pricing-classic",
         keepDialogs: true,
         setup: async (page) => {
           await page.evaluate(() => {
@@ -138,14 +171,10 @@ export const SHOWCASE_SCENES: Scene[] = [
           });
           await page.waitForTimeout(150);
           await page.evaluate(() => (document.querySelector('#editor [data-edit="batchKind"]') as HTMLElement | null)?.click());
-          await page.waitForTimeout(200);
-          await page.evaluate(() => {
-            const el = document.querySelector("#bp-price") as HTMLInputElement | null;
-            if (el) {
-              el.value = "12000";
-              el.dispatchEvent(new Event("input", { bubbles: true }));
-            }
-          });
+          // The Classic dialog is the rung-picker variant (no #bp-price number
+          // input exists here); capture it at its defaults, live preview line
+          // included.
+          await page.waitForSelector("#modal #bp-rung", { timeout: 4000 });
         },
         wait: 250,
       },
@@ -154,8 +183,9 @@ export const SHOWCASE_SCENES: Scene[] = [
         setup: async (page) => {
           await page.evaluate(() => {
             const g = (window as any).game;
-            // Clear the office selection carried over from 17-select / 10-batch-pricing
-            // so the inspector editor panel isn't floating over the crowd shot.
+            // Clear the office selection carried over from 17-select and the
+            // editor/batch pricing shots, so the inspector editor panel isn't
+            // floating over the crowd shot.
             // Mirror Game.clearSelection: null the selection AND hide the editor
             // panel. refreshEditor() alone no-ops when selected is null (it early-
             // returns), so the panel would keep floating; ui.hideEditor() removes it.

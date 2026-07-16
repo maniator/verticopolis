@@ -12,7 +12,7 @@
  *   - `screenshot-page-ops.ts`: the `pg*` in-page primitives (clock adoption,
  *     stepping, chrome sweeps, palette/overlay/clock nudges, camera framing).
  *   - `screenshot-tower-builders.ts`: `buildCanonTower`, `buildBasement`,
- *     `pgGrowToStar`.
+ *     `buildModernPricingTower`, `pgGrowToStar`.
  *   - `screenshot-scene-builders.ts`: the engine/crowd/fire/condo/stats/hotspot/
  *     overlay/tablet builders folded in from the old shot-*.mjs generators.
  *
