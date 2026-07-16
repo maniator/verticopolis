@@ -60,7 +60,7 @@ import { SCENES } from "./screenshot-scenes.ts";
 // many settle frames), not the split.
 export const SHARDS: Record<string, string[]> = {
   // ~64s: feature panels + two light HUD scenes.
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings"],
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork),
   // placed here because this was the lightest shard, keeping the gate bounded

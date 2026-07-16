@@ -38,11 +38,13 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   emphatic-restatement pattern and AI marketing vocabulary (leverage, seamless,
   robust, comprehensive, elevate, streamline, and the like). Keep copy plain,
   human, and grammatically correct.
-- **Bump `package.json` `version` on any player-facing change** (minor for a new
-  player-facing capability, patch for a player-noticeable fix/behavior change;
-  internal-only work needs none). It's injected as `__APP_VERSION__` on the splash
-  and anchors the update flow, so a missing bump misreports the build. See
-  [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
+- **Bump `package.json` `version` on any player-facing change**, keyed to "would a
+  player notice anything different?": **major** for a save/compat break or a
+  headline milestone, **minor** as the default for anything a player notices,
+  **patch** for a fix-only re-deploy; internal-only work needs none. Bump the
+  lockfile in lockstep (use `npm version`; a CI guard enforces it). It's injected
+  as `__APP_VERSION__` on the splash and anchors the update flow, so a missing bump
+  misreports the build. See [CONTRIBUTING.md](./CONTRIBUTING.md) → **Versioning**.
 - **Screenshots come from the pinned Playwright Docker container, never a host
   browser.** Regenerate `docs/screenshots/**` either by approving the
   `commit-on-approval` job on the PR's `pr-drift-check` run (it renders in the

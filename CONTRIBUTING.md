@@ -189,20 +189,28 @@ Bump it with `npm version <patch|minor> --no-git-tag-version`, not by hand-editi
 lockstep (a stale lockfile breaks `npm ci` and misreports the build). A CI guard,
 `src/tests/versionLockSync.test.ts`, fails the moment the two drift.
 
-**Bump `version` in the same PR as any player-facing change**, semver by player
-impact:
+**Bump `version` in the same PR as any player-facing change.** The tier is keyed
+to one question: would a player notice anything different?
 
-- **minor** (`x.Y.0`): a new player-facing capability (e.g. a Modern-mode
-  feature, a new facility, a new screen).
-- **patch** (`x.y.Z`): a player-noticeable bug fix or behavior/balance change
-  (economy tuning, an evict rule, a visible UI fix).
-- **no bump**: internal-only work with no player-visible effect (pure refactor,
-  perf with identical behavior, tests, docs, tooling, CI).
+- **major** (`X.0.0`): the save format or compatibility breaks (an old tower
+  would no longer load), or a deliberate headline/milestone release. Rare and
+  intentional, never incidental.
+- **minor** (`x.Y.0`): the default player-facing bump. A player would notice
+  something new or changed: a feature, a balance shift, or a visible fix.
+- **patch** (`x.y.Z`): a fix-only follow-up or a re-deploy with no new
+  player-facing capability (a hotfix to an already-shipped release).
+- **no bump**: internal-only work with no player-observable effect at all (pure
+  refactor, identical-behavior perf, tests, docs, tooling, CI).
 
-A player-facing change that ships **without** a version bump is a review finding:
-the splash (and the update prompt's build-id line) would otherwise misreport the
-build as unchanged. When two open PRs both bump, whoever merges second rebases and
-re-bumps. (Bump once per PR, not per commit.)
+The old "minor for a capability, patch for a fix" split is retired; it sorted
+changes by how they were built rather than by what a player feels, so the
+minor/patch line kept coming down to a judgment call. Sort by player impact
+instead, and the question answers itself.
+
+A player-facing change that ships **without** a bump is a review finding: the
+splash (and the update prompt's build-id line) would otherwise misreport the build
+as unchanged. Bump once per PR, not per commit. When two open PRs both bump,
+whoever merges second rebases and re-bumps.
 
 ### Player notes (what the update prompt shows players)
 
@@ -216,10 +224,20 @@ the `· <sha>` half is dropped when the sha is `unknown`), plus a short
 `notes` is read at build time from **`CHANGELOG.md`**: the `## <version>` section
 whose version matches `package.json` `version` (see `changelogNotes` in
 `vite.config.ts`, backed by the pure, unit-tested `notesForVersion` in
-`src/changelog.ts`). A committed file is used rather than git commit trailers
-because releases land on `main` as **merge commits**, and a merge commit's message
-carries none of the branch commits' trailers, so a trailer harvest would silently
-drop the note. The file is always present at the exact commit the deploy builds.
+`src/changelog.ts`). It parses the file with CommonMark (`marked`, a build-time
+devDependency, so nothing ships to the browser) and returns the section's bullets
+as **plain text**: markdown is flattened (`**bold**` becomes `bold`, a link keeps
+its label and drops the URL), so no markup reaches the update modal and that
+reload-critical surface keeps lit's auto-escaping with no HTML-injection lane. A
+committed file is used rather than git commit trailers because releases land on
+`main` as **merge commits**, and a merge commit's message carries none of the
+branch commits' trailers, so a trailer harvest would silently drop the note. The
+file is always present at the exact commit the deploy builds.
+
+Cadence: one curated block **per player-noticeable release** (per PR, not per
+commit). Fewer lines beat more, and a release that is a patch or internal-only
+gets none, just the build-id line. Curation is the point: the modal is a "here's
+what's new, get back in" moment, not a patch-note viewer.
 
 When you bump the version for a player-facing change, add a section at the top of
 `CHANGELOG.md`:
