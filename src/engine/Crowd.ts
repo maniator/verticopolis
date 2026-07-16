@@ -35,10 +35,10 @@ export class Crowd {
   /** @internal Rolling fraction of recent travellers who waited too long (0..1). */
   frustration = 0;
   /** @internal Cached passenger stop-graph, rebuilt when the tower changes. */
-  adj: Map<number, { f: number; shaft: number }[]> | null = null;
+  adj: Map<number, { f: number; shaft: number; express: boolean }[]> | null = null;
   /** @internal */ adjRev = -1;
   /** @internal Cached STAFF stop-graph (service elevators / stairs / escalators). */
-  staffAdj: Map<number, { f: number; shaft: number }[]> | null = null;
+  staffAdj: Map<number, { f: number; shaft: number; express: boolean }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
   /** @internal Cinema unit ids showing a blockbuster this month, primed once
    *  per outer step by the sim loop from the EconomySystem's bookings (the

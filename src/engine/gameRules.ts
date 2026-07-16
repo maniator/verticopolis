@@ -88,6 +88,22 @@ export interface GameRules {
    *  Modern drops the restriction and lets escalators serve office floors. */
   readonly allowsEscalatorOnOfficeFloors: boolean;
   /**
+   * True when a passenger transfer involving an EXPRESS elevator is admissible
+   * only at a (sky) lobby floor, the ground lobby included. "Involving" means
+   * EITHER leg: express to or from a standard elevator, stairs, or escalator,
+   * and also express to express (two express shafts can only share a plain
+   * floor at their endpoints, and switching spines belongs at a lobby just the
+   * same). The 1994 game routes riders
+   * from the express spine onto local banks only through a sky lobby, which is
+   * what forces the layered-tower architecture (express spine, sky lobbies
+   * every 15 floors, local banks between them). Classic enforces it; Modern
+   * keeps the forgiving any-shared-stop routing. Transfers between two
+   * non-express transports are untouched in both modes, and the two-ride trip
+   * cap is unchanged. Read by the crowd routing BFS only; it never changes
+   * what the builder accepts.
+   */
+  expressTransferNeedsLobby(): boolean;
+  /**
    * Decide a condo's household and sale price the moment it sells. Classic sells
    * to the flat family of 3 at the asking price (no household stored); Modern
    * draws a 2–5 person family from `rng` and scales the price by its size.
@@ -250,6 +266,9 @@ export const CLASSIC_RULES: GameRules = {
   hasVariantHouseholds: false,
   showsPreviewReason: false, // canon-faithful pedagogy: click-to-refuse, learn by doing
   allowsEscalatorOnOfficeFloors: false, // canon: escalators link commercial floors only
+  expressTransferNeedsLobby() {
+    return true; // canon: express riders switch to local transports only at a (sky) lobby
+  },
   sellCondo(base) {
     // Flat family of 3, sold at the asking price — no household stored, so the
     // census reads the catalog 3. Never touches the RNG, so a Classic tower's
@@ -324,6 +343,9 @@ export const MODERN_RULES: GameRules = {
   hasVariantHouseholds: true,
   showsPreviewReason: true, // Modern surfaces refusal reasons on the invalid preview
   allowsEscalatorOnOfficeFloors: true, // Modern lifts the commercial-only escalator rule
+  expressTransferNeedsLobby() {
+    return false; // Modern keeps the forgiving transfer-at-any-shared-stop routing
+  },
   sellCondo(base, rng) {
     const residents = rollHousehold(rng);
     return { price: householdPrice(base, residents), residents };

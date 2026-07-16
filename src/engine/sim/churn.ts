@@ -111,9 +111,11 @@ export function attemptMoveIns(sim: Simulation): void {
     const f = FACILITIES[u.kind];
     if (f.population === 0 && !isHotelKind(u.kind)) continue; // non-tenant facility
     if (!servedSet.has(u.floor)) continue; // nobody moves to an unreachable floor
-    // Two-ride rule: a served floor 3+ rides from the lobby draws no
-    // commuters (Crowd.MAX_RIDES), so nobody can arrive to buy, lease, or
-    // check in. Same gate for every tenant kind; commercial visitor income
+    // Two-ride rule: a served floor with no admissible two-ride route from
+    // the lobby (3+ rides out, or a Classic express transfer at a plain
+    // floor) draws no commuters (Crowd.MAX_RIDES plus the Classic lobby
+    // transfer gate), so nobody can arrive to buy, lease, or check in. Same
+    // gate for every tenant kind; commercial visitor income
     // already honors it (EconomySystem.collectTrafficIncome), this makes
     // move-ins agree. (Quarterly office rent still gates on isFloorServed
     // only, a deliberate grandfather for tenants already in place.)
