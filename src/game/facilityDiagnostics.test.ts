@@ -177,6 +177,17 @@ describe("facilityDiagnostics: lobby-distance advice names only buildable slots"
       "This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor 30 to anchor the block.",
     );
     expect(line?.textContent).not.toContain("Clear floor 30");
+
+    // The same tenant inside a built-through tower: stories above the slot must
+    // come down before its story can be cleared, and the advice says so.
+    for (let fl = 31; fl <= 33; fl++) {
+      for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", fl, x).ok).toBe(true);
+    }
+    const tall = render(facilityDiagnostics(sim, unit));
+    const tallLine = [...tall.querySelectorAll("div")].find((d) => d.textContent?.startsWith("Too far"));
+    expect(tallLine?.textContent).toContain(
+      "This unit sits on the empty sky lobby slot; take down the stories above floor 30, move it, clear the story, and build the lobby there to anchor the block.",
+    );
   });
 
   it("names the clearing step when the buildable slot already carries non-lobby content", () => {

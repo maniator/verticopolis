@@ -308,15 +308,19 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         const needsSupport = slot > sim.tower.highestFloor + 1;
         const clearFirst = !onSlot && !needsSupport && sim.tower.floorHasNonLobbyContent(slot);
         // Clearing the slot is itself refused while stories rest on it, so the
-        // advice names the teardown too; the in-place floor-to-lobby conversion
-        // that would spare it is the gated #317 engine change (backlog).
-        const blockedAbove = clearFirst && sim.tower.floorHasNonLobbyContent(slot + 1);
+        // advice names the teardown too, whether the slot's own obstacle is
+        // other content or the advised unit itself; the in-place floor-to-lobby
+        // conversion that would spare it is the gated #317 engine change (backlog).
+        const aboveBlocked = !needsSupport && sim.tower.floorHasNonLobbyContent(slot + 1);
+        const blockedAbove = clearFirst && aboveBlocked;
         if (drain.erosion > SERVED_RECOVERY) {
           // The strong "sinks until notice" warning only when the distance erosion
           // actually outpaces the served recovery, so the tenant really is sliding
           // out (a genuinely skipped sky lobby). Name the exact slot that fixes it.
           const fix = onSlot
-            ? `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
+            ? aboveBlocked
+              ? `This unit sits on the empty sky lobby slot; take down the stories above floor ${slot}, move it, clear the story, and build the lobby there to anchor the block.`
+              : `This unit sits on the empty sky lobby slot; move it, clear the story, and build the lobby on floor ${slot} to anchor the block.`
             : needsSupport
               ? `Build floors up to ${slot - 1}, then put the sky lobby on floor ${slot} to lift these tenants.`
               : blockedAbove
@@ -331,7 +335,9 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
           // The ceiling holds satisfaction down without evicting; the gentler line
           // describes that honestly and names the buildable fix.
           const fix = onSlot
-            ? `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
+            ? aboveBlocked
+              ? `This unit sits on the sky lobby slot itself; a lobby here, once the stories above come down, it moves, and the story is cleared, would lift the block.`
+              : `This unit sits on the sky lobby slot itself; a lobby here, once it moves and the story is cleared, would lift the block.`
             : needsSupport
               ? `A sky lobby on floor ${slot} would lift it (build floors up to ${slot - 1} first; the slot story itself stays clear for the lobby).`
               : blockedAbove
