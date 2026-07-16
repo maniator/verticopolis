@@ -1,4 +1,5 @@
-import type { LogEntry, SerializedUnit, SerializedView, Unit } from "../types";
+import type { LogEntry, SerializedUnit, SerializedView, Transport, Unit } from "../types";
+import { cloneSchedule, scheduleIsEmpty } from "../elevatorSchedule";
 
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../types";
 import { LOG_RING_CAP, LOG_TEXT_CAP } from "./constants";
@@ -70,6 +71,25 @@ export function serializeUnit(u: Unit): SerializedUnit {
   }
   if (completeAt !== undefined) out.completeAt = completeAt;
   return out;
+}
+
+/**
+ * Serialize one transport for a save snapshot. Deep-copies every per-car / array
+ * field so a retained save object can't be mutated later by an in-place update
+ * (the car arrays are written each tick), and clones the authored schedule (#305)
+ * for the same reason. An empty schedule (nothing authored) is not written, so the
+ * write side matches the load side, which drops an empty schedule to `undefined`;
+ * an absent schedule stays absent (sparse save).
+ */
+export function serializeTransport(t: Transport): Transport {
+  return {
+    ...t,
+    carPositions: [...t.carPositions],
+    carDir: [...t.carDir],
+    carLoad: t.carLoad ? [...t.carLoad] : undefined,
+    skipFloors: t.skipFloors ? [...t.skipFloors] : undefined,
+    schedule: t.schedule && !scheduleIsEmpty(t.schedule) ? cloneSchedule(t.schedule) : undefined,
+  };
 }
 
 /** The four LogEntry kinds, for restore-time coercion (an unknown kind reads

@@ -166,7 +166,13 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * three-day week), so its fixed three-day run reaches the weekend on day 2,
  * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-const PINNED_STATE_HASH = "c3e33d77f73e3a71213fae2f6e93863626909d291e82de4454ade7c4cd1883ad";
+// Re-pinned for the elevator-schedule save bump (#305 Phase 1): SAVE_VERSION
+// bumped 6 -> 7 for the additive optional Transport.schedule field, so the
+// serialized `version` field changes 6 -> 7. That is the ONLY difference: the
+// fixture authors no schedule, and a serialized `schedule: undefined` is omitted
+// by JSON.stringify, so nothing else in the state moves. The deterministic and
+// round-trip golden tests (unchanged) prove no other drift.
+const PINNED_STATE_HASH = "5f5a8056eaf296f2f3a31e941321ab1e907bcc1890faa00c0d50790533943f07";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
@@ -189,4 +195,7 @@ const PINNED_STATE_HASH = "c3e33d77f73e3a71213fae2f6e93863626909d291e82de4454ade
  * before any rng use), which is why the Classic hash above is UNCHANGED in that
  * PR: the unchanged value is the proof of the zero-draw gate.
  */
-const PINNED_MODERN_STATE_HASH = "0b03540a0f305750e9e1d16a75f7d62139d83b2ba0bf07dce9be3b11de337272";
+// Re-pinned for the same #305 Phase 1 SAVE_VERSION 6 -> 7 bump as the Classic
+// hash above; the only serialized difference is the `version` field (no schedule
+// authored in the fixture, `schedule: undefined` omitted by JSON).
+const PINNED_MODERN_STATE_HASH = "d7505db3b195d52a1e817416224bd00a5214cbea27484ea3310451310c6b5bd1";

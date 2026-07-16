@@ -14,7 +14,7 @@ import { Clock } from "../../engine/Clock";
  *   - ratingPopulation keeps the canon hotel exclusion via the room-side hotel
  *     gate at 4★+.
  *   - Ghost guard: an origin bulldozed mid-meal does not corrupt the census.
- *   - SAVE_VERSION is 5 and a v3 save migrates cleanly.
+ *   - SAVE_VERSION is 7 and a v3 save migrates cleanly.
  */
 
 /** A fixture with one served office (6 workers) + a fastFood venue. Star gate
@@ -315,10 +315,10 @@ describe("commercial venues (fastFood/restaurant/shop) count toward totalPopulat
 });
 
 
-describe("save version is 6 and a v3 save migrates cleanly", () => {
-  it("SAVE_VERSION is 6 and serialize stamps it", () => {
+describe("save version is 7 and a v3 save migrates cleanly", () => {
+  it("SAVE_VERSION is 7 and serialize stamps it", () => {
     const sim = officeAndFastFood();
-    expect(SAVE_VERSION).toBe(6);
+    expect(SAVE_VERSION).toBe(7);
     expect(sim.serialize().version).toBe(SAVE_VERSION);
   });
 

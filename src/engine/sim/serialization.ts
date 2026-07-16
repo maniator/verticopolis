@@ -14,6 +14,7 @@ import { FACILITIES, GRID, POOLED_CAPS, facilityFloors, isElevatorKind, isFacili
 import type { FacilityKind, GameMode, SerializedGame, Transport } from "../types";
 
 import { isGameMode, isUnitState, isVacateReason } from "../types";
+import { coerceSchedule } from "../elevatorSchedule";
 import { SAVE_VERSION, migrateSave } from "../saveMigration";
 
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE, LOG_SAVE_CAP } from "./constants";
@@ -38,15 +39,7 @@ export function serialize(sim: Simulation): SerializedGame {
     modernCalendar: sim.modernCalendar,
     lastQuarterMoney: sim.lastQuarterMoney,
     units: sim.tower.units.map(serializeUnit),
-    transports: sim.tower.transports.map((t) => ({
-      ...t,
-      // Deep-copy every per-car/array field so a retained snapshot can't be
-      // mutated later by in-place updates (carLoad is written each tick).
-      carPositions: [...t.carPositions],
-      carDir: [...t.carDir],
-      carLoad: t.carLoad ? [...t.carLoad] : undefined,
-      skipFloors: t.skipFloors ? [...t.skipFloors] : undefined,
-    })),
+    transports: sim.tower.transports.map(serializeTransport),
     nextId: sim.tower.getNextId(),
     towerName: sim.tower.towerName,
     builtWeddingHall: sim.tower.builtWeddingHall,
@@ -390,6 +383,11 @@ export function deserialize(raw: SerializedGame): Simulation {
         skipFloors: Array.isArray(t.skipFloors)
           ? t.skipFloors.filter((n) => typeof n === "number" && Number.isFinite(n))
           : undefined,
+        // Harden the authored schedule (#305) at the load boundary: clamp its
+        // active-car counts to [0, cars], its response tunables to sane ranges,
+        // and its home floors onto the shaft, so a forged save cannot drive the
+        // dispatcher out of range. A garbage or empty value loads as no schedule.
+        schedule: coerceSchedule(t.schedule, cars, bottom, top),
       };
     })
     // Bound the list before the quadratic overlap pass below: a legit tower
@@ -497,4 +495,4 @@ export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar
   return sim;
 }
 
-import { serializeUnit, coerceLog, coerceView } from "./coerce";
+import { serializeUnit, serializeTransport, coerceLog, coerceView } from "./coerce";
