@@ -81,23 +81,26 @@ export function deserialize(raw: SerializedGame): Simulation {
     isGameMode(data.mode) ? data.mode : "classic",
     coerceCalendarKind(data.modernCalendar),
   );
-  sim.money = data.money;
+  // Coerce money to a finite number (untrusted save): a forged NaN/Infinity or
+  // non-number poisons the ledger; a broken value keeps the start balance, not NaN.
+  sim.money = typeof data.money === "number" && Number.isFinite(data.money) ? data.money : sim.money;
   // Clamp the star to the real ladder (1..6, TOWER included): a forged NaN or
   // out-of-range value would otherwise poison every star compare downstream,
   // e.g. reading parking demand while the build gate refuses to sell parking.
   sim.star = Math.max(1, Math.min(6, Math.floor(typeof data.star === "number" && Number.isFinite(data.star) ? data.star : 1)));
   // Reuse the calendar the constructor already resolved from mode + choice, so
   // the restored clock reads the same week/quarter/year as a fresh tower would.
-  sim.clock = new Clock(data.minutes, sim.clock.calendar);
+  // Clamp minutes to a non-negative finite number (untrusted save): a forged
+  // NaN/negative would poison every clock.minutes consumer. Not floored, so a valid fractional (sub-minute) save round-trips.
+  sim.clock = new Clock(Math.max(0, typeof data.minutes === "number" && Number.isFinite(data.minutes) ? data.minutes : 0), sim.clock.calendar);
   sim.evaluatedTower = data.evaluatedTower;
   // Restore the pending VIP inspection so saving during the post-Wedding-Hall
   // window doesn't permanently cancel the TOWER evaluation.
   sim.vipVisitDay = data.vipVisitDay ?? -1;
   sim.vipFavorable = data.vipFavorable ?? false;
-  // Clamp to a bounded non-negative integer (untrusted save): a forged
-  // negative, fractional, or absurd count would render nonsense in the stats
-  // dialog forever, and past 2^53 the ++ would stop incrementing (same
-  // precision trap ID_CAP guards below).
+  // Clamp to a bounded non-negative integer (untrusted save): a forged negative,
+  // fractional, or absurd count would render nonsense in the stats dialog, and
+  // past 2^53 the ++ would stop incrementing (same precision trap as ID_CAP).
   sim.vipVisits = Math.max(
     0,
     Math.min(
@@ -106,19 +109,16 @@ export function deserialize(raw: SerializedGame): Simulation {
     ),
   );
   // Saves written before the counter (and TDT imports, which synthesize
-  // vipFavorable from the star) carry no visits at all, yet a favorable review
-  // proves a VIP stayed at least once, and a won tower adds the winning TOWER
-  // inspection on top; adopt those so the stats row can't contradict the
-  // recorded flags. Only when the FIELD IS ABSENT: an explicit 0 (however it
-  // arose) round-trips unchanged, keeping serialize/deserialize idempotent.
+  // vipFavorable from the star) carry no visits: a favorable review proves one,
+  // a won tower two (its winning TOWER inspection). Adopt those so the stats row
+  // can't contradict the flags. Only when ABSENT, so an explicit 0 round-trips.
   if (data.vipVisits === undefined && (sim.vipFavorable || sim.evaluatedTower)) {
     sim.vipVisits = sim.evaluatedTower ? 2 : 1;
   }
   // Restore the unfavorable-VIP nag day so a reload can't reopen the 5-day
   // window early (that would both re-nag and inflate the persisted vipVisits).
   // Clamped to the save's own day so a forged future value can't mute the VIP
-  // for years; missing (legacy) restores the fresh-tower default, at worst
-  // re-nagging once after load.
+  // for years; missing (legacy) restores the fresh-tower default.
   sim.lastVipNagDay = Math.min(
     sim.clock.day,
     typeof data.lastVipNagDay === "number" && Number.isFinite(data.lastVipNagDay) ? Math.floor(data.lastVipNagDay) : -100,
