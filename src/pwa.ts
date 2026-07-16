@@ -18,7 +18,7 @@
  * UI, or reloads on a timer.
  */
 import { registerSW } from "virtual:pwa-register";
-import { parseUpdateInfo, type UpdateInfo } from "./pwaUpdateInfo";
+import { parseUpdateInfo, isDifferentBuild, type UpdateInfo } from "./pwaUpdateInfo";
 
 /**
  * High-level facts about the INCOMING build, read at prompt time from the
@@ -106,23 +106,56 @@ export function registerPWA(handlers: PwaHandlers): void {
     return;
   }
 
+  // Surface an incoming build to the app at most once, keyed by its identity, so
+  // the two detectors below (the service worker's onNeedRefresh and the
+  // version.json poll) never double-prompt for the same build, while a genuinely
+  // newer deploy still re-arms the prompt.
+  let lastSurfacedKey: string | undefined;
+  const surface = (info: UpdateInfo | undefined, activate: () => Promise<void>) => {
+    const key = info?.sha ?? info?.version;
+    if (key !== undefined && key === lastSurfacedKey) return;
+    lastSurfacedKey = key;
+    handlers.onUpdateAvailable(activate, info);
+  };
+
   const updateSW = registerSW({
     immediate: true,
     onRegisteredSW(_swUrl, registration) {
       // The browser's built-in update check only runs on navigation, so for an
-      // installed PWA left open across a release it effectively never fires.
-      // Drive `registration.update()` ourselves on two triggers the navigation
-      // check misses (mirrors maniator/blipit-legends' service-worker hook):
-      //   • an hourly poll, so a session left running still picks up a release;
-      //   • a re-check whenever the tab returns to the foreground, so reopening
-      //     a backgrounded PWA notices a new version right away.
-      // A found update surfaces as a waiting worker → onNeedRefresh below. The
-      // update() call is best-effort (offline / transient network) — swallow it.
+      // installed PWA left open across a release it effectively never fires. On
+      // an hourly poll AND whenever the tab returns to the foreground:
+      //   1. registration.update() re-fetches sw.js; a found update installs a
+      //      waiting worker, which surfaces through onNeedRefresh (the normal
+      //      path). This is what the stale-served sw.js used to block, and what
+      //      the deploy's no-cache header on sw.js now restores.
+      //   2. Backstop: a worker can reach "waiting" before the app attached its
+      //      onNeedRefresh handler, so that event is occasionally missed. If one
+      //      is waiting, confirm against the network-fresh version.json (never
+      //      precached) and surface the prompt. Gating on an actual waiting
+      //      worker keeps the activate honest: updateSW(true) always has a real
+      //      worker to skip, so the prompt can never reload into the same build.
+      // Both network calls are best-effort (offline / transient failure), and a
+      // simple in-flight guard stops the interval and a visibilitychange that
+      // land together from running two overlapping checks.
       if (!registration) return;
-      const check = () => void registration.update().catch(() => {});
-      window.setInterval(check, UPDATE_POLL_MS);
+      let checking = false;
+      const check = async () => {
+        if (checking) return;
+        checking = true;
+        try {
+          await registration.update().catch(() => {});
+          if (!registration.waiting) return;
+          const info = await fetchUpdateInfo();
+          if (isDifferentBuild(info, __APP_VERSION__, __APP_SHA__)) {
+            surface(info ?? undefined, () => updateSW(true));
+          }
+        } finally {
+          checking = false;
+        }
+      };
+      window.setInterval(() => void check(), UPDATE_POLL_MS);
       document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible") check();
+        if (document.visibilityState === "visible") void check();
       });
     },
     onNeedRefresh() {
@@ -134,7 +167,7 @@ export function registerPWA(handlers: PwaHandlers): void {
       // force-reloaded out from under a live game.
       void (async () => {
         const info = await fetchUpdateInfo();
-        handlers.onUpdateAvailable(() => updateSW(true), info ?? undefined);
+        surface(info ?? undefined, () => updateSW(true));
       })().catch(() => {
         // onUpdateAvailable only stores state + shows the chip, but guard anyway
         // so a throw here can't surface as an unhandled rejection.
