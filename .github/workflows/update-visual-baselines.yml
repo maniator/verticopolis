@@ -20,11 +20,12 @@ on:
     branches-ignore: [main]
   workflow_dispatch:
 
-# SHARED with update-screenshots.yml: the two bot workflows both commit to this
-# branch, so they must never run at the same time or they'd race on push. One
-# group + cancel-in-progress:false serializes them (the second queues behind the
-# first); the second then checks out the first's commit (ref below) and
-# fast-forwards. cancel-in-progress is false so a queued mint is never dropped.
+# Serialize this workflow's own runs on a ref: a bot commit to the branch must
+# never race another. One group + cancel-in-progress:false serializes them (the
+# second queues behind the first); the second then checks out the first's commit
+# (ref below) and fast-forwards. cancel-in-progress is false so a queued mint is
+# never dropped. (This group was historically shared with update-screenshots.yml,
+# which also committed here; that workflow has been retired.)
 concurrency:
   group: regen-ci-artifacts-${{ github.ref }}
   cancel-in-progress: false

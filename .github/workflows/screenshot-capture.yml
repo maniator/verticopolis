@@ -1,11 +1,11 @@
 name: Screenshot capture (reusable)
 
-# The SHARED, sharded, self-verifying screenshot capture. Called (workflow_call)
-# by both update-screenshots.yml (the marker/dispatch regen) and pr-drift-check.yml
-# (the per-PR check), so the two never drift on HOW pixels are generated or how
-# nondeterminism is caught. The caller supplies the git ref to render and, after
-# this returns, does its own thing with the artifacts (commit on a marker, or
-# detect drift + commit on approval).
+# The sharded, self-verifying screenshot capture. Called (workflow_call) by
+# pr-drift-check.yml (the per-PR drift check), its only caller. Kept as a separate
+# reusable workflow so the capture logic (render + twice-render determinism guard)
+# lives in one place. The caller supplies the git ref to render and, after this
+# returns, does its own thing with the artifacts (detect drift + commit on
+# approval).
 #
 # For each shard (scripts/screenshot-shards.ts partitions SCENES; the `verify`
 # coverage gate here fails the run if any scene is in no shard or two), ONE job:
@@ -63,23 +63,22 @@ on:
 # NEVER `github.workflow` (which resolves to the CALLER's workflow name and would
 # collide with the caller's own group, deadlocking or self-cancelling the run,
 # discussion #30708). The prefix keeps this group distinct from every caller's own
-# top-level group (`pr-drift-*`, `regen-ci-artifacts-*`), so a reusable run never
-# contends with its caller's group: no caller/callee deadlock. Cancel ONLY for
-# `pull_request` runs (the PR drift-check, where a new push means new pixels
-# anyway). The push/dispatch caller `update-screenshots.yml` deliberately
-# serializes with `cancel-in-progress: false` to avoid racing on the branch it
-# pushes to, so its capture must never be cancelled: the expression below keeps
-# that path non-cancelling.
+# top-level group (`pr-drift-*`), so a reusable run never contends with its
+# caller's group: no caller/callee deadlock. Cancel ONLY for `pull_request` runs
+# (the PR drift-check, where a new push means new pixels anyway). Today the only
+# caller is pr-drift-check.yml on `pull_request`, so the expression below cancels
+# every run; the event guard is kept so a future non-`pull_request` caller that
+# should NOT be cancelled (e.g. a serialized push/dispatch regen) stays safe
+# without editing this key.
 #
 # INVARIANTS this key relies on (nothing enforces them, so honor them when adding
 # a caller): the group distinguishes runs by event + PR/branch, NOT by caller, so
 # there must be at most ONE caller per (event_name, ref); today that holds (only
-# `update-screenshots.yml` triggers on push/dispatch, only `pr-drift-check.yml` on
-# pull_request). A second push-event caller on the same branch would share
-# `screenshot-capture-push-<ref>` and serialize against an unrelated run. And a
-# new caller on any event where a fresh push SHOULD supersede the capture would
-# get no cancellation here (only `pull_request` cancels); extend the expression if
-# you add one.
+# `pr-drift-check.yml` calls this, on pull_request). A second caller on the same
+# event and branch would share the group and serialize against an unrelated run.
+# And a new caller on any event where a fresh push SHOULD supersede the capture
+# would get no cancellation here (only `pull_request` cancels); extend the
+# expression if you add one.
 concurrency:
   group: screenshot-capture-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}

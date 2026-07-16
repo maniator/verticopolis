@@ -293,9 +293,10 @@ alone.
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
   and embed them. Regenerate `docs/screenshots/**` only through CI, in the pinned
-  Playwright Docker image: push with `[update-screenshots]` in the head commit to
-  trigger the `update-screenshots.yml` workflow, and `[update-baselines]` for the
-  `e2e/visual.spec.ts-snapshots` baselines (`update-visual-baselines.yml`). The
+  Playwright Docker image: open a PR and approve its `pr-drift-check` run's
+  `commit-on-approval` job, which renders the gallery and commits the refreshed
+  pixels to the PR branch. For the `e2e/visual.spec.ts-snapshots` baselines, push
+  with `[update-baselines]` in the head commit (`update-visual-baselines.yml`). The
   local `npm run screenshots` is a host-Chromium preview whose antialiasing
   differs, so its output must not be committed as the final set.
 - **Merge to `main` with a merge commit. Never squash-merge.** A standard
