@@ -206,20 +206,36 @@ export function isStrandedCandidate(_sim: Simulation, u: Unit, scope: "leased" |
   return u.floor >= 2 && isOperational(u) && (FACILITIES[u.kind].population > 0 || isHotelKind(u.kind));
 }
 
+/** Per-sim reachability verdict cache for {@link floorReachable}, keyed by
+ *  `tower.revision` (the same key Crowd's adjacency graph and Tower.stopsOf
+ *  memoize on: every structural/stop change bumps it, and the ≤2-ride verdict
+ *  is a pure function of that structure). A WeakMap so a discarded sim never
+ *  pins its cache. */
+const reachMemos = new WeakMap<Simulation, { revision: number; verdicts: Map<number, boolean> }>();
+
 /**
  * True when a commuter can actually reach `floor` from the ground lobby in ≤2
  * transport rides (the {@link Crowd.route} cap). A floor can be
  * {@link Tower.isFloorServed} yet return false here, connected, but 3+ rides
- * out, so no commuter ever spawns for it. Runs a fresh bounded (≤2-ride) BFS
- * each call, only Crowd's ADJACENCY graph is cached by `tower.revision`, not
- * the route result. Keep it off the per-FRAME/HUD path. The hourly economy
- * (`collectTrafficIncome`, gating commercial visitor income) does call it, but
- * dedupes per distinct floor within the call, so it's one small bounded BFS
- * per commercial floor per game-hour, not per unit, an acceptable tick cost.
+ * out, so no commuter ever spawns for it. The bounded (≤2-ride) BFS runs at
+ * most once per floor per `tower.revision`: the verdict is memoized (like
+ * Tower.stopsOf) because the editor card's access row now reads it on the
+ * ~6 Hz editor pump, which must never pay a fresh routing BFS per repaint.
+ * Callers with their own per-pass memo (attemptMoveIns) simply hit this one.
  */
 export function floorReachable(sim: Simulation, floor: number): boolean {
   if (floor === 1) return true;
-  return sim.crowd.route(sim.tower, 1, floor) !== null;
+  let memo = reachMemos.get(sim);
+  if (!memo || memo.revision !== sim.tower.revision) {
+    memo = { revision: sim.tower.revision, verdicts: new Map() };
+    reachMemos.set(sim, memo);
+  }
+  let hit = memo.verdicts.get(floor);
+  if (hit === undefined) {
+    hit = sim.crowd.route(sim.tower, 1, floor) !== null;
+    memo.verdicts.set(floor, hit);
+  }
+  return hit;
 }
 
 /** Like {@link hasAny} but only counts a facility that is finished and intact

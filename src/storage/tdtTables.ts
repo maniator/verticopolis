@@ -128,8 +128,8 @@ export function misplacedOnFloor(kind: FacilityKind, floor: number): boolean {
  *  0-3 ARE the ladder's rung levels and map to the exact rung dollars,
  *  losslessly both ways (pricing split, FR8). No Rate (4) carries no dollar
  *  value (the importer sets `noRate` instead), and garbage classes read as
- *  `undefined` (the unit stays on its default, which snap-on-load then lands
- *  on Average). */
+ *  `undefined` here; the importer maps a garbage class on a priced kind to
+ *  the Average rung itself (see tdtParse), never the band default. */
 export function rentFromClass(kind: FacilityKind, rentClass: number): number | undefined {
   const opts = CLASSIC_RULES.priceOptions(kind);
   if (!opts || opts.shape !== "ladder") return undefined;

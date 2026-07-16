@@ -197,7 +197,6 @@ export class EditorActions {
             if (sim.setNoRate(u.id)) {
               this.deps.audio.sfx("click");
               this.deps.announce("No Rate: off the market. Charges nothing; no one moves in.");
-              this.deps.refreshEditor();
             }
           } else {
             const rung = shape.rungs[Number(sel.value)];
@@ -205,9 +204,13 @@ export class EditorActions {
               const what = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Rent";
               this.deps.audio.sfx("click");
               this.deps.announce(`${what} set to ${rung.label} ($${rung.value.toLocaleString()}).`);
-              this.deps.refreshEditor();
             }
           }
+          // Refresh on the refusal paths too (e.g. a condo that sold between
+          // the last pump render and this change event): the re-render's
+          // selection sync snaps the picker back to engine truth immediately,
+          // so a refused choice never sits on the select until the next pump.
+          this.deps.refreshEditor();
         }
       } else if (action === "filmPolicy") {
         const order = ["auto", "feature", "blockbuster"] as const;

@@ -132,11 +132,13 @@ export function computeBatch(sim: Simulation,
       r.skippedSold++;
       continue;
     }
-    // "Still on the default" means the effective price IS the neutral anchor:
-    // an absent override (which reads the band default) or an explicit value
-    // equal to it (a legacy save or older adjustRent that stored it), and not
-    // off-market (a No Rate unit charges nothing, so it is not on the anchor).
-    const neutralPriced = !u.noRate && (u.rent === undefined || u.rent === neutral);
+    // "Still on the default" means the EFFECTIVE price IS the neutral anchor.
+    // Compare through the same fallback rentOf applies (an absent override
+    // reads the band default), so a ladder kind whose Average differs from
+    // the band default (Classic condos/hotels) never counts an unset,
+    // off-ladder unit as "on Average"; and never off-market (a No Rate unit
+    // charges nothing, so it is not on the anchor).
+    const neutralPriced = !u.noRate && (u.rent ?? cfg.default) === neutral;
     if (onlyDefault && !neutralPriced) {
       r.skippedCustom++;
       continue;
@@ -144,8 +146,9 @@ export function computeBatch(sim: Simulation,
     r.eligible++;
     if (target === "noRate") {
       // Off the market: occupied units keep their tenants (pay nothing, still
-      // counted); vacant ones stop accepting move-ins. The stored rent stays
-      // as the latent value a later reprice starts from.
+      // counted); vacant ones stop accepting move-ins. The stored rent is left
+      // in place but nothing reads it while off-market (rentOf charges $0, and
+      // a later reprice applies its caller's explicit target, not this value).
       if (!u.noRate) r.changed++;
       if (mutate) u.noRate = true;
       continue;

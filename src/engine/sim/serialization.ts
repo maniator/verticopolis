@@ -299,7 +299,14 @@ export function deserialize(raw: SerializedGame): Simulation {
     if (!priceShape || priceShape.shape !== "ladder") continue;
     const cfg = rentConfig(u.kind)!;
     const effective = u.rent ?? cfg.default; // what rentOf would charge (No Rate aside)
-    const snapped = snapToLadder(priceShape.rungs, effective);
+    // A stored value snaps to its nearest rung; an ABSENT override is not a
+    // stored rent at all, it means "on the default", and the ladder's default
+    // rung is Average (AR6), so it lands there directly. Snapping the band
+    // default's dollars instead would drop a never-priced hotel onto Very Low
+    // (the band defaults sit an order of magnitude under the canon ladder)
+    // while an identical new build starts on Average: same untouched unit,
+    // two prices. Offices and condos read identically either way.
+    const snapped = u.rent === undefined ? priceShape.rungs[2].value : snapToLadder(priceShape.rungs, u.rent);
     // Count only visible price changes: an off-market (No Rate) unit charges
     // $0 either way, so normalizing its latent stored value is silent.
     if (!u.noRate && snapped !== effective) rentsSnapped++;

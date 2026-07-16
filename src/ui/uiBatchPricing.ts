@@ -180,7 +180,20 @@ function showBatchRungDialog(
   const handlers: BatchRungHandlers = {
     onChoiceChange: (e: Event) => {
       const v = (e.target as HTMLSelectElement).value;
-      state.choice = v === "noRate" ? "noRate" : (Number(v) as 0 | 1 | 2 | 3);
+      if (v === "noRate") {
+        state.choice = "noRate";
+      } else {
+        // Bounds-guard like the editor's rung handler: a nonconforming picker
+        // that commits the disabled divider (or junk) must not store NaN and
+        // blow up targetOf's rung lookup. Keep the held choice and re-render,
+        // whose selection sync snaps the select back onto it.
+        const idx = Number(v);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= rungs.length) {
+          rerender();
+          return;
+        }
+        state.choice = idx as 0 | 1 | 2 | 3;
+      }
       afterInput();
     },
     onOnlyChange: (e: Event) => {

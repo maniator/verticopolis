@@ -284,3 +284,36 @@ describe("a Classic condo returning to market re-lists on the ladder", () => {
     expect(condo.rent).toBe(200_000); // re-listed on the High rung
   });
 });
+
+describe("review regressions: unset defaults and the No Rate buy-back", () => {
+  it("a pre-split hotel with NO stored rent lands on Average, not the nearest rung to the old band default", () => {
+    // An absent override is not a stored rent: it means "on the default", and
+    // the ladder's default rung is Average (AR6). Snapping the old $90 band
+    // default's dollars would land Very Low and price a migrated untouched
+    // room differently from an identical new build.
+    const sim = strip("classic", 59);
+    const r = sim.tower.place("hotelSingle", 2, x0());
+    expect(r.ok).toBe(true);
+    const loaded = Simulation.deserialize(sim.serialize());
+    const room = loaded.tower.units.find((u) => u.kind === "hotelSingle")!;
+    expect(rentOf(room)).toBe(2_000); // Average, matching a fresh build
+    // The jump from the $90 effective default is a visible change: bulletined.
+    expect(loaded.log.some((e) => e.text.startsWith("Classic pricing:"))).toBe(true);
+  });
+
+  it("an imported occupied No Rate condo still costs the full buy-back when its owner leaves", () => {
+    // rentOf reads $0 for an off-market unit, but the buy-back mirrors the
+    // SALE price: a class-4 import must not let the owner walk away free.
+    const sim = strip("classic", 61);
+    const r = sim.tower.place("condo", 2, x0());
+    expect(r.ok).toBe(true);
+    const condo = sim.tower.units.find((u) => u.id === r.unitId)!;
+    condo.everOccupied = true;
+    condo.state = "occupied";
+    condo.rent = 150_000;
+    condo.noRate = true; // the importer's class-4 state on an occupied condo
+    const before = sim.money;
+    (sim as unknown as { vacate(u: Unit, reason: string): void }).vacate(condo, "access");
+    expect(sim.money).toBe(before - 150_000); // never a $0 walk-away
+  });
+});

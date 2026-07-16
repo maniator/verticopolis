@@ -31,7 +31,13 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // condo (offices, never-sold condos: they cost nothing back).
   let buyback = 0;
   if (u.kind === "condo" && u.everOccupied) {
-    buyback = householdPrice(rentOf(u), u.residents);
+    // The buy-back mirrors the historical SALE price, which No Rate does not
+    // rewrite: rentOf reads $0 for an off-market unit (an imported class-4
+    // occupied condo), but losing that owner still costs the repurchase at
+    // what the unit sold for (the stored price; the kind default when a
+    // legacy record carries none), never a free walk-away.
+    const salePrice = u.rent ?? rentConfig("condo")!.default;
+    buyback = householdPrice(salePrice, u.residents);
     sim.money -= buyback;
     sim.recordMoney("condos", -buyback);
   }
