@@ -184,6 +184,11 @@ time as `__APP_VERSION__` (see `vite.config.ts`). It's shown on the splash and
 is the anchor the PWA update flow reports against. It is **not** auto-derived, so
 it only moves if a change moves it.
 
+Bump it with `npm version <patch|minor> --no-git-tag-version`, not by hand-editing
+`package.json` alone: that also updates **`package-lock.json`**, which must move in
+lockstep (a stale lockfile breaks `npm ci` and misreports the build). A CI guard,
+`src/tests/versionLockSync.test.ts`, fails the moment the two drift.
+
 **Bump `version` in the same PR as any player-facing change**, semver by player
 impact:
 
