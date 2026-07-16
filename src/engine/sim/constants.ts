@@ -62,6 +62,55 @@ export const CONDO_NOISE_EROSION = 0.054;
  *  inspector's always-on "long walk" line reads the exact same threshold. */
 export const TRANSPORT_FAR_TILES = 79;
 
+/**
+ * Graduated "far from a (sky)lobby" satisfaction pressure (#394). Keyed on floors
+ * from the nearest lobby (ground floor 1 always anchors; sky lobbies sit every
+ * `GRID.lobbyInterval` floors), it motivates the sky lobby, the central mid-game
+ * structural decision: a tall tower with no sky lobby leaves its upper floors far
+ * from any lobby, so their tenants cap low until the player adds one. Two bands,
+ * applied to office/condo/hotel inside the SHARED placement-erosion step (never a
+ * second compounding drain):
+ *   - FAR (nearest-lobby distance beyond {@link LOBBY_FAR_FLOORS}): an annoyance
+ *     CEILING at {@link LOBBY_FAR_CAP}, no erosion, so it lowers renewal but never
+ *     evicts (caps, does not kill).
+ *   - VERY FAR (beyond {@link LOBBY_VERY_FAR_FLOORS}): a lower ceiling
+ *     {@link LOBBY_VERY_FAR_CAP} AND a gentle {@link LOBBY_VERY_FAR_EROSION} that
+ *     just outpaces the +0.05/hr served recovery, so a genuinely isolated tenant
+ *     eventually gives notice (attributed to the `lobbyFar` cause), a slow,
+ *     telegraphed pressure like the noise fuse, not an instant eviction.
+ * The very-far edge (7) is chosen against `GRID.lobbyInterval` (15): the most
+ * central floor between two lobbies 15 apart sits 7 floors from the nearer one, so
+ * a tower with sky lobbies placed every 15 floors (the in-game advice) keeps every
+ * floor within the FAR band at worst, capped but never force-evicted. Only a tower
+ * that SKIPS a sky lobby leaves floors past distance 7, which is where the evicting
+ * very-far band bites: correct play is sufficient, and the pressure lands exactly
+ * on the under-lobbied towers the mechanic means to push.
+ * Classic reads these as the two discrete bands; Modern reads a smoother
+ * continuous curve over the same anchors (see {@link GameRules.lobbyDistanceDrain}).
+ * PROVISIONAL magnitudes (there is no in-repo canon source for the exact band
+ * edges), pending a playtest tuning pass.
+ */
+export const LOBBY_FAR_FLOORS = 4;
+export const LOBBY_VERY_FAR_FLOORS = 7;
+export const LOBBY_FAR_CAP = 0.7;
+export const LOBBY_VERY_FAR_CAP = 0.5;
+/** Very-far per-hour erosion. Strictly above the +0.05/hr served recovery so the
+ *  net drift is negative (about -0.005/hr, roughly 4 days from the very-far cap to
+ *  a notice, then the 2-day notice window), gentle enough that a tenant near a
+ *  second lobby or one the player reconnects recovers, harsh enough that true
+ *  isolation eventually costs the tenant. Keep it > 0.05 or very-far would cap but never
+ *  evict, and the `lobbyFar` vacate cause could never honestly fire. */
+export const LOBBY_VERY_FAR_EROSION = 0.055;
+/** The neutral lobby-distance drain (no ceiling, no erosion), a single shared
+ *  frozen value both rule-sets return for the near-a-lobby case and the satisfaction
+ *  loop uses for units the penalty does not apply to, so the common no-penalty path
+ *  allocates nothing per unit per tick. */
+export const LOBBY_NO_DRAIN: { readonly cap: number; readonly erosion: number } = Object.freeze({ cap: 1, erosion: 0 });
+/** Per-hour satisfaction a served, uncongested tenant recovers. A distance or
+ *  noise erosion evicts only when it exceeds this (so the inspector can tell a
+ *  "capped but stable" tenant from one actually sliding toward a notice). */
+export const SERVED_RECOVERY = 0.05;
+
 /** Canon same-floor noise buffers, in tiles (the gap a source may sit within
  *  before it bothers the sensitive room). Only these two are documented numbers;
  *  everything else reuses the room's own band (see arch §2.2 / gdd §4.2). The

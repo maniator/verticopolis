@@ -1,5 +1,13 @@
 import { FACILITIES } from "./facilities";
 import { ECON } from "./econConfig";
+import {
+  LOBBY_FAR_FLOORS,
+  LOBBY_VERY_FAR_FLOORS,
+  LOBBY_FAR_CAP,
+  LOBBY_VERY_FAR_CAP,
+  LOBBY_VERY_FAR_EROSION,
+  LOBBY_NO_DRAIN,
+} from "./sim/constants";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
 
@@ -138,6 +146,20 @@ export interface GameRules {
    * calibration pass.
    */
   demandModel(): { perCapita: number; floor: number };
+  /**
+   * Graduated "far from a (sky)lobby" satisfaction pressure (#394), keyed on the
+   * tenant's floor-distance to the nearest lobby. Returns the satisfaction CEILING
+   * (`cap`, 1 = no penalty) and the per-hour `erosion` to apply in the shared
+   * placement-erosion step. Both modes use the same anchors and band values
+   * (`LOBBY_*` in `sim/constants`); they differ only in SHAPE: Classic snaps to
+   * the two discrete bands (near / far / very-far), Modern eases the ceiling and
+   * the erosion in continuously with each floor of distance (and shows the live
+   * distance in the inspector). `cap < 1` means the tenant is capped; the
+   * very-far tier (`cap <= GRIPE_WARN`) is the one that also erodes and can
+   * eventually evict, attributed to the `lobbyFar` cause. Applies to
+   * office/condo/hotel; the caller gates on `served` and kind.
+   */
+  lobbyDistanceDrain(distanceFloors: number): { cap: number; erosion: number };
 }
 
 export const CLASSIC_RULES: GameRules = {
@@ -177,6 +199,16 @@ export const CLASSIC_RULES: GameRules = {
     // Firm: no small-tower floor, so thin Classic towers genuinely starve
     // commercial (closer to 1994's placement pressure).
     return { perCapita: ECON.demandPerCapita, floor: 0 };
+  },
+  lobbyDistanceDrain(distanceFloors) {
+    // Two discrete canon bands, snapping at the edges: near (no penalty), far (a
+    // ceiling), very far (a lower ceiling plus the gentle erosion). The very-far
+    // edge sits just past the mid-block distance of a 15-floor lobby ladder, so a
+    // tower lobbied every 15 caps its mid-block floors but never force-evicts them;
+    // only a skipped sky lobby pushes floors into the evicting very-far band.
+    if (distanceFloors > LOBBY_VERY_FAR_FLOORS) return { cap: LOBBY_VERY_FAR_CAP, erosion: LOBBY_VERY_FAR_EROSION };
+    if (distanceFloors > LOBBY_FAR_FLOORS) return { cap: LOBBY_FAR_CAP, erosion: 0 };
+    return LOBBY_NO_DRAIN;
   },
 };
 
@@ -228,6 +260,23 @@ export const MODERN_RULES: GameRules = {
     // Gentle: a baseline of external street-level walk-in trade keeps a
     // well-placed venue alive while the tower's own population is still thin.
     return { perCapita: ECON.demandPerCapita, floor: ECON.demandFloorModern };
+  },
+  lobbyDistanceDrain(distanceFloors) {
+    // A smooth continuous ramp over the same anchors instead of two snapping
+    // bands: the ceiling eases from 1.0 at the far threshold down to the very-far
+    // cap, and the erosion eases in past the very-far threshold, both reaching the
+    // Classic band values a couple floors beyond the very-far edge. So each extra
+    // floor of distance costs a little more (the inspector shows the live
+    // distance), and a well-sky-lobbied Modern tower, whose mid-block floors sit at
+    // most `lobbyInterval / 2` from a lobby, only ever feels the gentle ceiling,
+    // never the evicting erosion; that stays reserved for genuine isolation (a tall
+    // tower with no sky lobby). Modern smooths and helps.
+    if (distanceFloors <= LOBBY_FAR_FLOORS) return LOBBY_NO_DRAIN;
+    const capSpan = LOBBY_VERY_FAR_FLOORS + 2 - LOBBY_FAR_FLOORS;
+    const capT = Math.min(1, (distanceFloors - LOBBY_FAR_FLOORS) / capSpan);
+    const cap = 1 - capT * (1 - LOBBY_VERY_FAR_CAP);
+    const eroT = Math.max(0, Math.min(1, (distanceFloors - LOBBY_VERY_FAR_FLOORS) / 2));
+    return { cap, erosion: eroT * LOBBY_VERY_FAR_EROSION };
   },
 };
 

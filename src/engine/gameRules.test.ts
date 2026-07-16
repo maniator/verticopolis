@@ -3,6 +3,13 @@ import { CLASSIC_RULES, MODERN_RULES, makeRules, householdPrice } from "./gameRu
 import { FACILITIES } from "./facilities";
 import { ECON } from "./econConfig";
 import { RNG } from "./rng";
+import {
+  LOBBY_FAR_FLOORS,
+  LOBBY_VERY_FAR_FLOORS,
+  LOBBY_FAR_CAP,
+  LOBBY_VERY_FAR_CAP,
+  LOBBY_VERY_FAR_EROSION,
+} from "./sim/constants";
 
 /**
  * The rule-set strategy object in isolation — the one place Classic and Modern
@@ -57,6 +64,15 @@ describe("CLASSIC_RULES", () => {
     expect(CLASSIC_RULES.condoHoldTaxRate()).toBe(0);
     expect(CLASSIC_RULES.noiseErosionScale()).toBe(0);
   });
+
+  it("reads lobby distance as two discrete bands: near, far (cap only), very far (cap + erosion)", () => {
+    expect(CLASSIC_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS)).toEqual({ cap: 1, erosion: 0 }); // at the edge: still near
+    expect(CLASSIC_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS + 1)).toEqual({ cap: LOBBY_FAR_CAP, erosion: 0 }); // far: ceiling only
+    expect(CLASSIC_RULES.lobbyDistanceDrain(LOBBY_VERY_FAR_FLOORS + 1)).toEqual({
+      cap: LOBBY_VERY_FAR_CAP,
+      erosion: LOBBY_VERY_FAR_EROSION,
+    }); // very far: lower ceiling and the evicting erosion
+  });
 });
 
 describe("MODERN_RULES", () => {
@@ -95,6 +111,22 @@ describe("MODERN_RULES", () => {
     expect(MODERN_RULES.operatingOverheadPerUnit()).toBe(ECON.overheadPerLeasableUnitMonthly);
     expect(MODERN_RULES.condoHoldTaxRate()).toBe(ECON.condoMonthlyTaxRate);
     expect(MODERN_RULES.noiseErosionScale()).toBe(1);
+  });
+
+  it("eases lobby distance in as a smooth continuous curve, gentler than Classic at the same distance", () => {
+    // No penalty up to the far edge, exactly like Classic.
+    expect(MODERN_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS)).toEqual({ cap: 1, erosion: 0 });
+    // Just into the far band: the ceiling has only begun to ease down (still above
+    // the Classic band's flat 0.7), and no erosion yet.
+    const near = MODERN_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS + 1);
+    expect(near.cap).toBeLessThan(1);
+    expect(near.cap).toBeGreaterThan(LOBBY_FAR_CAP); // gentler than Classic's discrete far cap
+    expect(near.erosion).toBe(0);
+    // The curve is monotonic: farther is always at least as harsh.
+    const farther = MODERN_RULES.lobbyDistanceDrain(LOBBY_VERY_FAR_FLOORS + 2);
+    expect(farther.cap).toBeLessThanOrEqual(near.cap);
+    expect(farther.cap).toBeCloseTo(LOBBY_VERY_FAR_CAP, 6); // bottoms out at the same worst-case ceiling
+    expect(farther.erosion).toBeCloseTo(LOBBY_VERY_FAR_EROSION, 6); // and the same evicting erosion
   });
 
   it("keeps the variant-household distribution centered on the classic mean", () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
+import { LOBBY_FAR_CAP, LOBBY_VERY_FAR_CAP } from "../../engine/sim/constants";
 
 /**
  * SimTower-parity pedestrian penalties (initiative epics E2):
@@ -313,5 +314,109 @@ describe("W3 — commercial must be near a lobby (2 floors)", () => {
       return sim.money - before;
     };
     expect(earn(true)).toBeGreaterThan(earn(false));
+  });
+});
+
+describe("W-new: graduated lobby-distance penalty (#394)", () => {
+  it("caps a far-from-lobby tenant at the far ceiling without evicting it, near tenant untouched (Classic)", () => {
+    const sim = Simulation.newGame(7, "classic");
+    servedTower(sim, 8);
+    const near = unit(sim, sim.tower.place("office", 2, 40).unitId); // 1 floor from the ground lobby
+    const far = unit(sim, sim.tower.place("office", 6, 40).unitId); // 5 floors up: the far band
+    for (const u of [near, far]) {
+      u.state = "occupied";
+      u.satisfaction = 1;
+    }
+    for (let i = 0; i < 40; i++) sim.tick(60);
+    // The far office settles at the far ceiling and never leaves; the near one is untouched.
+    expect(far.satisfaction).toBeLessThanOrEqual(LOBBY_FAR_CAP + 1e-9);
+    expect(far.satisfaction).toBeGreaterThan(LOBBY_FAR_CAP - 0.05); // recovers up to the cap, no erosion
+    expect(far.state).toBe("occupied"); // caps, does not kill
+    expect(near.satisfaction).toBeGreaterThan(0.9);
+  });
+
+  it("erodes a very-far office to a notice, attributed to lobbyFar (Classic)", () => {
+    const sim = Simulation.newGame(8, "classic");
+    servedTower(sim, 10);
+    const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // 8 floors up: past the lobby-ladder reach
+    office.state = "occupied";
+    office.satisfaction = 0.1; // already near the floor; the gentle erosion carries it out
+    for (let i = 0; i < 40; i++) sim.tick(60); // inside the notice window, so it stays "vacating"
+    expect(office.state).toBe("vacating");
+    expect(office.vacateReason).toBe("lobbyFar");
+  });
+
+  it("holds a very-far tenant below the very-far ceiling (Classic)", () => {
+    const sim = Simulation.newGame(11, "classic");
+    servedTower(sim, 10);
+    const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // very far (distance 8)
+    office.state = "occupied";
+    office.satisfaction = 1;
+    for (let i = 0; i < 5; i++) sim.tick(60); // a few hours: snapped under the ceiling, still here
+    expect(office.satisfaction).toBeLessThanOrEqual(LOBBY_VERY_FAR_CAP + 1e-9);
+    expect(office.state).toBe("occupied");
+  });
+
+  it("a sky lobby beside the floor cancels the penalty", () => {
+    // Build the tower with floor 15 laid as a sky LOBBY (not a plain floor), the
+    // way the player founds one, so it registers as a lobby anchor.
+    const withSky = Simulation.newGame(12, "classic");
+    withSky.money = 1e12;
+    withSky.star = 5;
+    lay(withSky, "lobby", 1);
+    for (let f = 2; f <= 20; f++) lay(withSky, f === 15 ? "lobby" : "floor", f);
+    withSky.buildTransport("elevatorStandard", 3, 1, 20);
+    // Floor 16 sits 1 floor from the sky lobby (and 15 from the ground): the sky
+    // lobby is the nearer anchor, so the distance penalty never fires.
+    const nearSky = unit(withSky, withSky.tower.place("office", 16, 40).unitId);
+    expect(withSky.tower.nearestLobbyFloorDistance(16)).toBe(1); // precondition: the sky lobby anchors it
+    nearSky.state = "occupied";
+    nearSky.satisfaction = 1;
+    for (let i = 0; i < 20; i++) withSky.tick(60);
+    expect(nearSky.satisfaction).toBeGreaterThan(0.9); // no lobby-distance penalty at all
+    expect(nearSky.state).toBe("occupied");
+  });
+
+  it("Modern is gentler than Classic at the same very-far distance", () => {
+    // Same floor (distance 8) and starting satisfaction in both modes: Classic
+    // erodes (heading out), Modern's continuous curve only caps at this distance
+    // (net-positive drift), so the Modern tenant recovers to a higher plateau.
+    const run = (mode: "classic" | "modern") => {
+      const sim = Simulation.newGame(13, mode);
+      servedTower(sim, 10);
+      const office = unit(sim, sim.tower.place("office", 9, 40).unitId); // distance 8
+      office.state = "occupied";
+      office.satisfaction = 1;
+      for (let i = 0; i < 40; i++) sim.tick(60);
+      return office;
+    };
+    const classic = run("classic");
+    const modern = run("modern");
+    expect(modern.satisfaction).toBeGreaterThan(classic.satisfaction); // Modern is gentler
+    expect(modern.satisfaction).toBeLessThan(1); // but still capped, not fully content
+    expect(modern.state).toBe("occupied"); // and not evicting at this distance
+  });
+
+  it("applies to condos: a very-far condo gives notice, attributed to lobbyFar (Classic)", () => {
+    const sim = Simulation.newGame(21, "classic");
+    servedTower(sim, 10);
+    const condo = unit(sim, sim.tower.place("condo", 9, 40).unitId); // distance 8: very far
+    condo.state = "occupied";
+    condo.satisfaction = 0.1;
+    for (let i = 0; i < 40; i++) sim.tick(60);
+    expect(condo.state).toBe("vacating");
+    expect(condo.vacateReason).toBe("lobbyFar");
+  });
+
+  it("applies to hotels: a very-far hotel room is capped at the very-far ceiling (Classic)", () => {
+    const sim = Simulation.newGame(22, "classic");
+    servedTower(sim, 10);
+    const hotel = unit(sim, sim.tower.place("hotelSingle", 9, 40).unitId); // distance 8: very far
+    hotel.state = "occupied";
+    hotel.satisfaction = 1;
+    for (let i = 0; i < 5; i++) sim.tick(60);
+    // The distance ceiling applies to hotels too (they were previously untouched
+    // by any lobby-distance pressure), snapping them under the very-far cap.
+    expect(hotel.satisfaction).toBeLessThanOrEqual(LOBBY_VERY_FAR_CAP + 1e-9);
   });
 });
