@@ -394,4 +394,62 @@ export const FEATURE_SCENES: Scene[] = [
       { name: "tablet-compact", viewport: { width: 1000, height: 720 }, wait: 500, drawSettle: true },
     ],
   },
+  // --- Update prompt ("What's new" changelog notes, and the no-notes variant) --
+  {
+    id: "update-prompt",
+    outDir: "features",
+    build: buildStatsTower,
+    assertUnits: 100,
+    shots: [
+      // The update modal for a build whose changelog carried player notes. The
+      // notes arrive as PLAIN TEXT (the build strips inline markdown), so this
+      // documents the three-line "What's new" list plus the muted build-id line.
+      // Version/sha are fixed in the passed info (not read from __APP_VERSION__),
+      // so the shot is deterministic without the version mask.
+      {
+        name: "update-prompt-notes",
+        crop: "#modal .modal-box",
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            g.speed = 0;
+            g.engine.paused = true;
+            (document.getElementById("modal") as HTMLDialogElement | null)?.close();
+            g.ui.showUpdatePrompt(
+              () => {},
+              () => {},
+              {
+                version: "1.52.0",
+                sha: "a1b2c3d",
+                notes: [
+                  "Shops and restaurants draw different crowds on weekdays and weekends.",
+                  "Tenants get restless when nearby shops cannot keep up.",
+                  "A new overlay shows housekeeping coverage across the tower.",
+                ],
+              },
+            );
+          });
+          await page.waitForSelector("#modal .modal-box .whatsnew li", { timeout: 4000 });
+        },
+      },
+      // The same modal for an internal build with no player notes: the "What's
+      // new" block is absent and only the muted build-id line remains.
+      {
+        name: "update-prompt-plain",
+        crop: "#modal .modal-box",
+        setup: async (page) => {
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            (document.getElementById("modal") as HTMLDialogElement | null)?.close();
+            g.ui.showUpdatePrompt(
+              () => {},
+              () => {},
+              { version: "1.52.0", sha: "a1b2c3d", notes: [] },
+            );
+          });
+          await page.waitForSelector("#modal .modal-box .build-id", { timeout: 4000 });
+        },
+      },
+    ],
+  },
 ];

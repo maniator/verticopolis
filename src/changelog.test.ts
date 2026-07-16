@@ -74,4 +74,30 @@ describe("notesForVersion", () => {
     const long = "x".repeat(MAX_NOTE_LEN + 50);
     expect(notesForVersion(`## 1.0.0\n- ${long}\n`, "1.0.0")[0]).toHaveLength(MAX_NOTE_LEN);
   });
+
+  it("flattens inline markdown to plain text (emphasis markers dropped)", () => {
+    expect(notesForVersion("## 1.0.0\n- **Weekends** change who _shops_.\n", "1.0.0")).toEqual([
+      "Weekends change who shops.",
+    ]);
+  });
+
+  it("keeps a link's label and drops its URL (no href reaches the prompt)", () => {
+    expect(notesForVersion("## 1.0.0\n- See the [new overlay](https://example.com/x).\n", "1.0.0")).toEqual([
+      "See the new overlay.",
+    ]);
+  });
+
+  it("keeps apostrophes and ampersands literal (no HTML-entity escaping)", () => {
+    // Guards against a markdown library whose token text is HTML-escaped: the
+    // note must read "Don't" and "shops & food", not "Don&#39;t" / "shops &amp; food".
+    expect(notesForVersion("## 1.0.0\n- Don't crowd shops & food on reload.\n", "1.0.0")).toEqual([
+      "Don't crowd shops & food on reload.",
+    ]);
+  });
+
+  it("drops raw inline HTML rather than passing it through as literal text", () => {
+    expect(notesForVersion("## 1.0.0\n- Faster <span>reopen</span> loads.\n", "1.0.0")).toEqual([
+      "Faster reopen loads.",
+    ]);
+  });
 });
