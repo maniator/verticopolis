@@ -145,11 +145,12 @@ describe("commercial demand pools", () => {
 
   it("earns the plain min(1, share) below the cap in both modes, so the split stays conservative (Phase C)", () => {
     // The per-venue fraction is the identity `min(1, share)` below the cap in
-    // BOTH modes (only the Modern floor and per-capita magnitude differ). A curve
-    // that lifted the fraction above the identity would let total delivered demand
-    // exceed the pool as venues are added, breaking conservation and inverting the
-    // flagship cannibalization property; this pins that both modes stay on the
-    // conservative identity.
+    // BOTH modes (only the small-tower floor differs today, Classic 0 vs Modern
+    // demandFloorModern; per-capita is shared, a Modern retune is reserved for
+    // calibration). A curve that lifted the fraction above the identity would let
+    // total delivered demand exceed the pool as venues are added, breaking
+    // conservation and inverting the flagship cannibalization property; this pins
+    // that both modes stay on the conservative identity.
     const build = (mode: GameMode) => {
       const sim = servedTower(1, mode);
       for (let i = 0; i < 7; i++) occupied(sim, "office", 2, 20 + i * 12);
