@@ -13,6 +13,7 @@ import {
   buildOverlayTower,
   buildStatsTower,
   buildTabletTower,
+  pgClearTransients,
   pgSetOverlay,
   pgStep,
   pgStepNoDraw,
@@ -142,6 +143,91 @@ export const FEATURE_SCENES: Scene[] = [
             const box = document.querySelector("#modal .modal-box") as HTMLElement;
             const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Income/.test(h.textContent || "")) as HTMLElement | undefined;
             if (sec) box.scrollTop = sec.offsetTop - box.offsetTop - 8;
+          });
+        },
+        wait: 300,
+      },
+      {
+        // MODE FORK (issue #443): the editor card's price control diverges by
+        // rule-set since the pricing split (PR #440): Classic renders the 1994
+        // rung picker, Modern the free +/- steppers. This classic tower is the
+        // Classic half; the -modern sibling renders off the pricing-modern
+        // scene. It lives HERE (not in the showcase scene) so both halves of
+        // the features pair mint at the same deviceScaleFactor: the runner
+        // keys DSF on the SCENE's outDir (screenshots 1x, everything else 2x),
+        // and a features-bound crop taken inside the 1x showcase scene would
+        // land at half its sibling's resolution.
+        name: "editor-pricing-classic",
+        crop: "#editor",
+        setup: async (page) => {
+          // Close the dialog the previous shot left open so it cannot overlap
+          // the editor crop, then select an occupied office (the 90-day warmup
+          // can vacate a few, and a vacant card would not represent the
+          // priced-office ladder this shot documents).
+          await page.evaluate(pgClearTransients, false);
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            const office = g.sim.tower.units.find((u: any) => u.kind === "office" && u.state === "occupied");
+            if (!office) throw new Error("stats tower has no occupied office to select for the editor crop");
+            g.selected = { type: "unit", id: office.id };
+            g.engine.selectedId = office.id;
+            g.refreshEditor();
+          });
+          // Fail loudly if the Classic rung picker never renders in the card.
+          await page.waitForSelector("#editor #ed-rung", { timeout: 4000 });
+        },
+        wait: 300,
+      },
+      {
+        // MODE FORK (issue #443): the Tenancy block's Vacancies row splits out
+        // off-market (No Rate) units since the pricing split (PR #440). This
+        // classic tower shows the split alone; the -modern sibling (in the
+        // pricing-modern scene) adds the Modern-only Households readout right
+        // under the same block. LAST in the scene on purpose: it stages
+        // vacancies into the tower (and freezes the sim), and the shots above
+        // must keep their exact committed state.
+        name: "stats-tenancy-classic",
+        crop: "#modal .modal-box",
+        setup: async (page) => {
+          // Freeze the sim first: buildStatsTower leaves it running (speed 1),
+          // and a random event popping during the settle would ride over the
+          // stats dialog (the modal-crop default keeps dialogs, so the sweep
+          // would not clear it). Then close the dialog the previous shot left
+          // open and stage the split: five offices go vacant, the first two
+          // off-market. Staged here (not in buildStatsTower) so the earlier
+          // stats shots stay untouched.
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            g.speed = 0;
+            g.engine.paused = true;
+          });
+          await page.evaluate(pgClearTransients, false);
+          await page.evaluate(() => {
+            const g = (window as any).game;
+            const offices = g.sim.tower.units
+              .filter((u: any) => u.kind === "office")
+              .sort((a: any, b: any) => a.floor - b.floor || a.x - b.x);
+            if (offices.length < 5) throw new Error(`stats tower staged only ${offices.length} offices (need 5 for the vacancy split)`);
+            for (let i = 0; i < 5; i++) {
+              const u = offices[i];
+              u.state = "empty";
+              u.everOccupied = false;
+              u.occupants = 0;
+              if (i < 2) u.noRate = true;
+            }
+          });
+          await page.evaluate(() => document.getElementById("btn-stats")?.click());
+          await page.waitForSelector("#modal .stats-grid", { timeout: 4000 });
+          // Frame the Tenancy block and assert the very divergence this shot
+          // exists to document (the off-market split) actually rendered, so a
+          // template rename or a broken staging fails the shot instead of
+          // committing a picture of the wrong thing.
+          await page.evaluate(() => {
+            const box = document.querySelector("#modal .modal-box") as HTMLElement;
+            const sec = [...box.querySelectorAll(".stats-section")].find((h) => /Tenancy/.test(h.textContent || "")) as HTMLElement | undefined;
+            if (!sec) throw new Error("stats dialog has no Tenancy section to frame");
+            if (!/off-market/.test(box.textContent || "")) throw new Error("the staged off-market Vacancies split did not render");
+            box.scrollTop = sec.offsetTop - box.offsetTop - 8;
           });
         },
         wait: 300,

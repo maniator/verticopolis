@@ -61,8 +61,11 @@ import { SCENES } from "./screenshot-scenes.ts";
 export const SHARDS: Record<string, string[]> = {
   // ~64s: feature panels + two light HUD scenes.
   features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings"],
-  // ~57s: the hero gallery + the star ladder + the sprite sheet.
-  showcase: ["showcase", "milestones", "sprite-gallery"],
+  // ~57s + the two light pricing-modern scenes (one small frozen tower built
+  // twice, four DOM panel/dialog shots total; issue #443's Modern fork),
+  // placed here because this was the lightest shard, keeping the gate bounded
+  // by the same ~71s pole.
+  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding.
   engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms"],

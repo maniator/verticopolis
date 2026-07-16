@@ -179,6 +179,95 @@ export function buildBasement(): void {
   g.engine.paused = true;
 }
 
+/**
+ * A compact MODERN-rules tower for the mode-forked pricing shots (issue #443).
+ * The pricing split (PR #440) made Classic and Modern diverge on player-visible
+ * surfaces: Classic prices through the 1994 rung picker while Modern keeps the
+ * free number steppers, and the stats Tenancy block adds the Modern-only
+ * Households readout. The Classic halves of those shot pairs render off the
+ * existing classic towers (the showcase hero and the stats tower); this builder
+ * stages their Modern sibling, small on purpose, for the two light pricing
+ * scenes (pricing-modern at features resolution, pricing-modern-batch at the
+ * showcase gallery's resolution):
+ *   - offices for the editor steppers + the batch band dialog, with a few
+ *     plain vacancies (Modern never holds the No-Rate state, so unlike the
+ *     Classic tenancy shot there is no off-market split to stage here);
+ *   - sold condos with 2-5 person households so the Households readout has a
+ *     real distribution to draw.
+ */
+export function buildModernPricingTower(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  // The mode is founded at newGame and permanent for the tower's life; this is
+  // the one place the gallery builds a Modern sim (everything else stays on the
+  // classic default).
+  g.sim = Sim.newGame(4400, "modern");
+  const s = g.sim;
+  s.money = 50_000_000;
+  s.star = 3;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  const left = cx - 30;
+  const right = cx + 30;
+  // Ground lobby grows outward from the seeded center strip (a ground tile only
+  // connects by touching the tower); upper floors rest on the story below.
+  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 8; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  s.tower.placeTransport("elevatorStandard", left + 4, 1, 8);
+  // Offices on 2..5, leased, reading each placed unit's canon width to advance.
+  for (let f = 2; f <= 5; f++) {
+    for (let x = left + 8; x + 1 <= right; ) {
+      const r = s.tower.place("office", f, x);
+      if (r.ok) {
+        const u = s.tower.getUnit(r.unitId);
+        u.state = "occupied";
+        u.everOccupied = true;
+        u.occupants = 6;
+        x += u.width;
+      } else x += 1;
+    }
+  }
+  // Condos on 6..8, SOLD with a deterministic 2-5 household cycle so the
+  // Modern-only Households readout shows the full size spread.
+  const sizes = [2, 3, 4, 5];
+  let ci = 0;
+  for (let f = 6; f <= 8; f++) {
+    for (let x = left + 8; x + 1 <= right; ) {
+      const r = s.tower.place("condo", f, x);
+      if (r.ok) {
+        const u = s.tower.getUnit(r.unitId);
+        u.state = "occupied";
+        u.everOccupied = true;
+        u.residents = sizes[ci % sizes.length];
+        u.occupants = u.residents;
+        ci++;
+        x += u.width;
+      } else x += 1;
+    }
+  }
+  // Stage plain vacancies on floor 5 so the Vacancies row reads nonzero. NO
+  // No-Rate here on purpose: Modern never holds the No-Rate state
+  // (GameRules.coerceNoRate strips it), so an off-market split in this shot
+  // would document a state the mode cannot reach; the Classic tenancy shot is
+  // the one that shows the split.
+  const f5 = s.tower.units.filter((u: any) => u.kind === "office" && u.floor === 5).sort((a: any, b: any) => a.x - b.x);
+  if (f5.length < 5) throw new Error(`pricing-modern tower staged only ${f5.length} floor-5 offices (need 5 for the vacancy row)`);
+  for (let i = 0; i < 5; i++) {
+    const u = f5[i];
+    u.state = "empty";
+    u.everOccupied = false;
+    u.occupants = 0;
+  }
+  s.evaluateStar();
+  g.engine.setSim(s);
+  g.engine.setCamera(cx, 4, 0.9);
+  // Freeze: every shot here is a DOM panel/dialog over a static backdrop, and a
+  // running sim would churn the frame between regens.
+  g.speed = 0;
+  g.engine.paused = true;
+}
+
 /** Build deterministically to a target star rating and return the star the
  *  sim's OWN evaluateStar() awards, so the milestone is honest, not forced.
  *

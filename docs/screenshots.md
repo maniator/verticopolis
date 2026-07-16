@@ -73,6 +73,35 @@ which would overlap and gap a floor), and a pre-capture sweep clears stray toast
 continues; the tail prints a per-directory count and a non-zero exit on any
 failure.
 
+### Mode-forked shots: the `-classic` / `-modern` suffix
+
+Most of the game renders identically under the Classic and Modern rule-sets, so
+the gallery captures almost every scene **once**, in one mode, and adding a
+second mode there would double render time for identical pixels. But the
+pricing split (v1.50.0, PR #440) made a handful of surfaces genuinely diverge,
+and those shots now render **one variant per mode**, suffixed `-classic` /
+`-modern`:
+
+- **The new-game dialog** (`00b-onboarding-*`): the rule-set picker with the
+  Classic card selected vs the Modern card (and its calendar sub-picker).
+- **The editor card's price control** (`features/editor-pricing-*`): the 1994
+  rung picker (Classic) vs the free +/- steppers (Modern).
+- **The batch pricing dialog** (`10-batch-pricing-*`): the rung-picker dialog
+  body (Classic) vs the number-band editor (Modern).
+- **The stats Tenancy block** (`features/stats-tenancy-*`): Classic shows the
+  Vacancies row's off-market (No Rate) split; Modern (which never holds the
+  No-Rate state) shows plain vacancies plus the Modern-only Households readout.
+
+The Classic halves render off the existing classic scene towers; the Modern
+halves share one compact modern-rules tower builder across two light scenes
+(`pricing-modern` for the features-resolution shots, `pricing-modern-batch`
+for the showcase-resolution batch dialog, since a scene's outDir decides its
+device scale factor and each half of a pair must mint at its sibling's scale).
+Every non-diverging scene stays single-mode. When a future change makes
+another surface diverge, fork **only that surface's shot** the same way
+(suffix both variants, matching resolution; never fork a whole scene that
+renders the same in both modes).
+
 ## Committing
 
 Commit the PNGs; don't leave them as throwaway files:
