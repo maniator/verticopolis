@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { deflateSync } from "fflate";
-import { SAVE_VERSION, Simulation } from "../../engine/Simulation";
+import { SAVE_VERSION, Simulation, ECON } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { FACILITIES, GRID } from "../../engine/facilities";
 
@@ -71,6 +71,73 @@ describe("SaveGame", () => {
     expect(u.satisfaction).toBeGreaterThanOrEqual(0);
     expect(u.satisfaction).toBeLessThanOrEqual(1);
     expect(Number.isFinite(u.occupants)).toBe(true);
+  });
+
+  it("coerces forged top-level scalars (star, money, clock) from a tampered save to sane bounded values", () => {
+    const sim = sampleGame();
+    sim.star = 3;
+    sim.money = 1_234_567;
+    const goodMinutes = sim.clock.minutes;
+    // A valid save round-trips these scalars untouched (coercion is a no-op on
+    // legal values, so idempotence and the golden master stay intact).
+    const clean = Simulation.deserialize(sim.serialize());
+    expect(clean.star).toBe(3);
+    expect(clean.money).toBe(1_234_567);
+    expect(clean.clock.minutes).toBe(goodMinutes);
+
+    // star: a forged NaN / out-of-range value clamps to the real ladder (1..6).
+    for (const [bad, want] of [
+      [NaN, 1],
+      [0, 1],
+      [99, 6],
+      [-4, 1],
+      ["5" as unknown as number, 1],
+    ] as const) {
+      const data = sim.serialize();
+      (data as { star: unknown }).star = bad;
+      const loaded = Simulation.deserialize(data);
+      expect(Number.isFinite(loaded.star)).toBe(true);
+      expect(loaded.star).toBe(want);
+    }
+
+    // money: a forged non-finite / non-number never poisons the bank with NaN;
+    // it falls back to the constructor's starting balance (pins the fallback so
+    // a mutation to `: 0` is caught, not just "finite"). The expected value is
+    // the live constructor default (ECON.startingMoney), so a retune of the
+    // starting balance can never leave a stale literal passing for the wrong
+    // reason.
+    for (const bad of [NaN, Infinity, -Infinity, "1000" as unknown as number, undefined as unknown as number]) {
+      const data = sim.serialize();
+      (data as { money: unknown }).money = bad;
+      const loaded = Simulation.deserialize(data);
+      expect(Number.isFinite(loaded.money)).toBe(true);
+      expect(loaded.money).toBe(ECON.startingMoney); // constructor default
+    }
+    {
+      const data = sim.serialize();
+      (data as { money: unknown }).money = -50_000; // legal debt (the sign) round-trips intact
+      expect(Simulation.deserialize(data).money).toBe(-50_000);
+    }
+
+    // clock: a forged NaN / negative / Infinity / non-number falls back to 0,
+    // which the Clock ctor maps to the 07:00 founding time (pins the fallback).
+    for (const bad of [NaN, -100, Infinity, -Infinity, "600" as unknown as number, undefined as unknown as number]) {
+      const data = sim.serialize();
+      (data as { minutes: unknown }).minutes = bad;
+      const loaded = Simulation.deserialize(data);
+      expect(Number.isFinite(loaded.clock.minutes)).toBe(true);
+      expect(loaded.clock.minutes).toBeGreaterThanOrEqual(0);
+      expect(loaded.clock.minutes).toBe(7 * 60); // fallback 0 -> 07:00 founding
+      // A ticked-forward load must not throw on any clock consumer.
+      expect(() => loaded.tick(60)).not.toThrow();
+    }
+    // A legitimate fractional minute count round-trips exactly: real play
+    // accumulates sub-minute steps, so the coercion must not floor a valid save.
+    {
+      const data = sim.serialize();
+      (data as { minutes: unknown }).minutes = 420.5;
+      expect(Simulation.deserialize(data).clock.minutes).toBe(420.5);
+    }
   });
 
   it("drops null/malformed unit and transport entries from a corrupt save without throwing", () => {
