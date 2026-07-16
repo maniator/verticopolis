@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "1.50.0",
+  "version": "1.50.1",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -47,6 +47,8 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
+    "@vercel/speed-insights": "^2.0.0",
     "excalibur": "^0.32.0",
     "fflate": "^0.8.3",
     "lit-html": "^3.3.3",

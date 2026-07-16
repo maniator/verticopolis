@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseUpdateInfo, MAX_NOTE_LEN, MAX_NOTES } from "./pwaUpdateInfo";
+import { parseUpdateInfo, isDifferentBuild, MAX_NOTE_LEN, MAX_NOTES } from "./pwaUpdateInfo";
 
 /**
  * The pure sanitizer that bounds an incoming version.json payload before it
@@ -44,5 +44,60 @@ describe("parseUpdateInfo — payload sanitization", () => {
   it("defaults notes to [] when the field is absent or not an array", () => {
     expect(parseUpdateInfo({})?.notes).toEqual([]);
     expect(parseUpdateInfo({ notes: "not-an-array" })?.notes).toEqual([]);
+  });
+});
+
+/**
+ * The pure build-comparison used by the version.json poll to catch a new deploy
+ * even when the service-worker update check is missed (a stale-served sw.js).
+ */
+describe("isDifferentBuild — running vs deployed", () => {
+  const running = { version: "1.50.0", sha: "5f90fc2" };
+
+  it("is false for a null payload (fetch failed / offline)", () => {
+    expect(isDifferentBuild(null, running.version, running.sha)).toBe(false);
+  });
+
+  it("is false when sha and version both match the running build", () => {
+    expect(isDifferentBuild({ version: "1.50.0", sha: "5f90fc2", notes: [] }, running.version, running.sha)).toBe(
+      false,
+    );
+  });
+
+  it("detects a different sha even when the version string is unchanged", () => {
+    // An internal-only rebuild bumps the sha but not the version.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(
+      true,
+    );
+  });
+
+  it("detects a newer version string", () => {
+    expect(isDifferentBuild({ version: "1.51.0", sha: "abcdef0", notes: [] }, running.version, running.sha)).toBe(
+      true,
+    );
+  });
+
+  it("ignores an absent sha on the payload and falls back to the version", () => {
+    expect(isDifferentBuild({ version: "1.51.0", notes: [] }, running.version, running.sha)).toBe(true);
+    expect(isDifferentBuild({ version: "1.50.0", notes: [] }, running.version, running.sha)).toBe(false);
+  });
+
+  it("never fires on absent data (both fields missing or blank)", () => {
+    expect(isDifferentBuild({ notes: [] }, running.version, running.sha)).toBe(false);
+    expect(isDifferentBuild({ version: "", sha: "", notes: [] }, running.version, running.sha)).toBe(false);
+    // A blank running sha (a non-git build) must not read every deploy as different.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "5f90fc2", notes: [] }, "1.50.0", "")).toBe(false);
+  });
+
+  it('treats the non-git placeholder "unknown" sha as missing on either side', () => {
+    // Deployed sha is the "unknown" placeholder but the version matches: not different.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "unknown", notes: [] }, "1.50.0", "5f90fc2")).toBe(false);
+    // Running build has no git metadata ("unknown"); deployed has a real sha but
+    // the version matches: not different (do not compare "unknown" as a real sha).
+    expect(isDifferentBuild({ version: "1.50.0", sha: "5f90fc2", notes: [] }, "1.50.0", "unknown")).toBe(false);
+    // Both "unknown", same version: not different.
+    expect(isDifferentBuild({ version: "1.50.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(false);
+    // "unknown" sha but a genuinely newer version still fires via the version fallback.
+    expect(isDifferentBuild({ version: "1.51.0", sha: "unknown", notes: [] }, "1.50.0", "unknown")).toBe(true);
   });
 });

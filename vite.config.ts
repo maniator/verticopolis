@@ -46,7 +46,14 @@ export default defineConfig({
   base: "./",
   // Compile-time app version, shown on the splash. (package.json isn't importable
   // in the browser bundle.)
-  define: { __APP_VERSION__: JSON.stringify(pkgVersion) },
+  // Compile-time build identity. `__APP_VERSION__` shows on the splash;
+  // `__APP_SHA__` lets the running client compare itself against the deployed
+  // `version.json` (see src/pwa.ts) so it can detect a newer build even if the
+  // service-worker update check is missed.
+  define: {
+    __APP_VERSION__: JSON.stringify(pkgVersion),
+    __APP_SHA__: JSON.stringify(gitShortSha()),
+  },
   plugins: [
     emitVersionJson(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
@@ -89,7 +96,11 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
         globIgnores: ["**/gallery*", "**/preview*"],
         navigateFallback: "index.html",
-        navigateFallbackDenylist: [/gallery/, /preview/],
+        // Keep the tooling pages out of the app shell fallback, and let
+        // `version.json` fall through to the network: it is a real file (the
+        // update-check payload), not an app route, so a navigation straight to
+        // it must return the JSON rather than the game shell.
+        navigateFallbackDenylist: [/gallery/, /preview/, /version\.json$/],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,

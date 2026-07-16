@@ -25,6 +25,8 @@ import { InspectorController } from "./game/inspector";
 import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
 import { KeyboardPlay } from "./game/keyboardPlay";
 import { registerPWA, type UpdateInfo } from "./pwa";
+import { injectSpeedInsights } from "@vercel/speed-insights";
+import { inject as injectWebAnalytics } from "@vercel/analytics";
 import { resolveBootScreen } from "./bootScreen";
 import { CRASH_SCREEN_ID, showCrashScreen } from "./ui/crashScreen";
 import type { FrameErrorEntry } from "./game/crashReport";
@@ -1558,6 +1560,24 @@ function showBootMessage(msg: string, withReload = false): void {
 // Bootstrap once the DOM is ready.
 if (typeof document !== "undefined") {
   const boot = () => {
+    // Vercel Speed Insights + Web Analytics: report Core Web Vitals and page
+    // views, but only where the Vercel endpoints (/_vercel/speed-insights/* and
+    // /_vercel/insights/*) actually exist: the production domain and Vercel
+    // preview deployments. Gating on the host keeps the injected scripts' 404s
+    // (and the console errors they raise) out of localhost, the `vite preview`
+    // server the e2e console-error guards run against, and the native Capacitor
+    // shell (whose origin is not on this list, mirroring the service-worker
+    // registration's native gate). Wrapped so a telemetry hiccup can never throw
+    // past this line and suppress the WebGL fallback below.
+    const host = window.location.hostname;
+    if (host === "verticopolis.com" || host.endsWith(".vercel.app")) {
+      try {
+        injectSpeedInsights();
+        injectWebAnalytics();
+      } catch {
+        /* best-effort telemetry; never block boot on it */
+      }
+    }
     if (!hasWebGL()) {
       showBootMessage(
         "This viewer can't run WebGL, which Verticopolis needs to draw the tower.<br><br>Open this page in <b>Safari</b>, <b>Chrome</b>, or another full web browser to play.",
