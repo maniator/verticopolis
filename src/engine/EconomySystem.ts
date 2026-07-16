@@ -120,8 +120,9 @@ export class EconomySystem {
     // the lobby draws no patrons (the same "no visitors will come" condition the
     // stranded-floor advisory reports), so its commercial rooms earn nothing —
     // the transport puzzle has real economic teeth, not just a warning. This is
-    // stricter than mere connectivity (`isFloorServed`): a floor connected only
-    // via 3+ rides is served but unreachable to visitors, and now earns $0.
+    // stricter than mere connectivity (`isFloorServed`): a floor with no
+    // admissible two-ride route (3+ rides, or a Classic express transfer away
+    // from any lobby) is served but unreachable to visitors, and earns $0.
     // Memoized per call since the route BFS isn't free and rooms share floors.
     const reachCache = new Map<number, boolean>();
     const drawsVisitors = (floor: number): boolean => {

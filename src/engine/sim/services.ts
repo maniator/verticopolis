@@ -131,19 +131,22 @@ export function nudgeServiceShortfalls(sim: Simulation): void {
   sim.suiteParkingNudged = suiteShort;
 }
 
-/** Once-per-day, edge-triggered log nudge when a floor with tenant space is
- *  3+ rides from the lobby (invisible otherwise). Uses the wide `rentable`
- *  scope: empty units on such a floor can never move in (see the two-ride
- *  gate in {@link attemptMoveIns}), and with no tenant there is no other
- *  symptom, so the advisory is the only tell. Log-only (never a toast);
- *  de-duped by a latch so it can't repeat while the condition persists. */
+/** Once-per-day, edge-triggered log nudge when a floor with tenant space has
+ *  no route from the lobby within two rides (invisible otherwise). That covers
+ *  both a floor needing 3+ rides and, in Classic, a floor whose only two-ride
+ *  path leans on an express transfer at a plain floor (inadmissible under the
+ *  lobby-transfer rule, so no route forms). Uses the wide `rentable` scope:
+ *  empty units on such a floor can never move in (see the two-ride gate in
+ *  {@link attemptMoveIns}), and with no tenant there is no other symptom, so
+ *  the advisory is the only tell. Log-only (never a toast); de-duped by a
+ *  latch so it can't repeat while the condition persists. */
 export function nudgeStranded(sim: Simulation): void {
   const stranded = sim.strandedFloors("rentable").length > 0;
   if (stranded && !sim.strandedNudged) {
     // "info", not "bad": the UI toasts every good/bad log entry, and this
     // advisory is meant to be log-only (a quiet bulletin line, not a toast).
     sim.emit(
-      "A floor with tenant space is 3+ elevator rides from the lobby. Nobody will move in or visit. Check it in the inspector.",
+      "A floor with tenant space has no route from the lobby within two rides. Nobody will move in or visit. Check it in the inspector.",
       "info",
     );
   }
@@ -215,13 +218,15 @@ const reachMemos = new WeakMap<Simulation, { revision: number; verdicts: Map<num
 
 /**
  * True when a commuter can actually reach `floor` from the ground lobby in ≤2
- * transport rides (the {@link Crowd.route} cap). A floor can be
- * {@link Tower.isFloorServed} yet return false here, connected, but 3+ rides
- * out, so no commuter ever spawns for it. The bounded (≤2-ride) BFS runs at
- * most once per floor per `tower.revision`: the verdict is memoized (like
- * Tower.stopsOf) because the editor card's access row now reads it on the
- * ~6 Hz editor pump, which must never pay a fresh routing BFS per repaint.
- * Callers with their own per-pass memo (attemptMoveIns) simply hit this one.
+ * transport rides (the {@link Crowd.route} cap, which in Classic also refuses
+ * an express transfer away from a lobby floor). A floor can be
+ * {@link Tower.isFloorServed} yet return false here, connected, but with no
+ * admissible two-ride route, so no commuter ever spawns for it. The bounded
+ * (≤2-ride) BFS runs at most once per floor per `tower.revision`: the verdict
+ * is memoized (like Tower.stopsOf) because the editor card's access row now
+ * reads it on the ~6 Hz editor pump, which must never pay a fresh routing BFS
+ * per repaint. Callers with their own per-pass memo (attemptMoveIns) simply
+ * hit this one.
  */
 export function floorReachable(sim: Simulation, floor: number): boolean {
   if (floor === 1) return true;

@@ -13,13 +13,15 @@ import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./pe
  * `route` / `staffRoute` / `elevatorCalls` methods that delegate here.
  */
 
-type AdjGraph = Map<number, { f: number; shaft: number }[]>;
+type AdjGraph = Map<number, { f: number; shaft: number; express: boolean }[]>;
 
 /**
  * BFS over the transport network for the fewest-transfer route. Each edge is
  * one transport ride, and, per the original ("Sims will only take two methods
  * of transportation to their destination"), a trip is capped at TWO rides
- * (i.e. one sky-lobby transfer). A destination needing 3+ rides returns null,
+ * (i.e. one transfer). A destination with no admissible route within the cap
+ * returns null (3+ rides in either mode; in Classic, also a two-ride path
+ * whose express transfer sits away from any lobby floor, see {@link route}),
  * so a badly-zoned tower's commuters give up rather than teleporting there.
  */
 const MAX_RIDES = 2;
@@ -68,17 +70,31 @@ export function buildAdjacency(
     // hops travel on foot and BFS still prefers a single long elevator ride
     // (one transfer) over many stair flights for tall trips.
     const stops = tower.stopsOf(t);
+    // Each edge carries whether its shaft is an express elevator, so the
+    // Classic transfer gate (see {@link route}) can tell an express leg from a
+    // local one without a per-hop transport lookup.
+    const express = t.kind === "elevatorExpress";
     for (const a of stops) {
       let list = adj.get(a);
       if (!list) adj.set(a, (list = []));
-      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id });
+      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, express });
     }
   }
   return adj;
 }
 
 export function route(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  return bfsRoute(adjacency(crowd, tower), from, to, MAX_RIDES);
+  const adj = adjacency(crowd, tower);
+  // Classic gates express transfers to (sky) lobby floors (1994 canon, see
+  // GameRules.expressTransferNeedsLobby); Modern keeps the plain BFS, byte-for-
+  // byte the pre-gate behavior. The rule object decides, never the mode string.
+  if (!tower.rules.expressTransferNeedsLobby()) return bfsRoute(adj, from, to, MAX_RIDES);
+  // v1 uses the FLOOR-LEVEL rule: the shared stop must be a lobby floor (has
+  // lobby tiles, or is the ground floor 1, the tower's entrance lobby). This is
+  // a deliberate simplification: the 1994 game's finer notion, a contiguous
+  // lobby SPAN actually touching both shafts on that floor, is not modeled yet,
+  // so a lobby tile anywhere on the floor admits the transfer tower-wide.
+  return bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor));
 }
 
 /** Route over the STAFF network (service elevators / stairs / escalators).
@@ -132,6 +148,81 @@ export function bfsRoute(
           return { floors, shafts };
         }
         next.push(edge.f);
+      }
+    }
+    frontier = next;
+  }
+  return null;
+}
+
+/**
+ * {@link bfsRoute} with the Classic express-transfer gate: switching transports
+ * at a shared stop is a TRANSFER, and a transfer involving an express elevator
+ * on either leg (express to or from a standard elevator, stairs, or escalator,
+ * and express to express alike) is admissible only where `isTransferFloor`
+ * says so (the (sky) lobby floors). Transfers between two non-express legs are
+ * untouched, and the ride cap works exactly as in {@link bfsRoute}. Boarding
+ * the SAME shaft again also counts as a gated transfer; that loses nothing,
+ * because {@link buildAdjacency} emits a complete stop-pair clique per shaft,
+ * so any same-shaft continuation is already covered by a direct one-ride edge.
+ *
+ * The search state is (floor, arrived-by-express), not the bare floor: the same
+ * floor reached by an express leg and by a local leg admits DIFFERENT onward
+ * transfers, so each arrival class is tracked (and `seen`-marked) separately. A
+ * single per-floor seen set would let an express arrival enumerated first
+ * shadow a local arrival to the same floor and strand a destination the local
+ * path legally reaches in two rides. In a tower with no express shaft every
+ * arrival is the local class, keys stay unique per floor, and the search
+ * matches {@link bfsRoute} edge for edge, tie-breaks included. Pure graph
+ * admissibility: no RNG, deterministic for a given tower.
+ */
+export function bfsRouteExpressGated(
+  adj: AdjGraph,
+  from: number,
+  to: number,
+  maxRides: number,
+  isTransferFloor: (floor: number) => boolean,
+): Route | null {
+  if (from === to) return { floors: [from], shafts: [] };
+  // State key: floor doubled plus the arrival-class bit (works for basement
+  // floors too, doubling keeps negative floors collision-free).
+  const stateKey = (floor: number, express: boolean) => floor * 2 + (express ? 1 : 0);
+  const originKey = stateKey(from, false);
+  const prev = new Map<number, { key: number; floor: number; shaft: number }>();
+  const seen = new Set<number>([originKey]);
+  let frontier: { floor: number; express: boolean }[] = [{ floor: from, express: false }];
+  let rides = 0;
+  while (frontier.length && rides < maxRides) {
+    rides++;
+    const next: typeof frontier = [];
+    for (const s of frontier) {
+      for (const edge of adj.get(s.floor) ?? []) {
+        // Past the first ride, boarding `edge` at s.floor is a transfer off the
+        // leg that brought us here. Gate it when either leg is express. (The
+        // origin only ever sits in the rides === 1 frontier, so a trip's first
+        // boarding is never gated.)
+        if (rides > 1 && (s.express || edge.express) && !isTransferFloor(s.floor)) continue;
+        const k = stateKey(edge.f, edge.express);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        prev.set(k, { key: stateKey(s.floor, s.express), floor: s.floor, shaft: edge.shaft });
+        if (edge.f === to) {
+          // Reconstruct along the state chain (floors can repeat across
+          // classes; states cannot).
+          const floors = [to];
+          const shafts: number[] = [];
+          let cur = k;
+          while (cur !== originKey) {
+            const p = prev.get(cur)!;
+            floors.push(p.floor);
+            shafts.push(p.shaft);
+            cur = p.key;
+          }
+          floors.reverse();
+          shafts.reverse();
+          return { floors, shafts };
+        }
+        next.push({ floor: edge.f, express: edge.express });
       }
     }
     frontier = next;

@@ -42,6 +42,14 @@ describe("makeRules", () => {
     expect(CLASSIC_RULES.allowsEscalatorOnOfficeFloors).toBe(false); // 1994 canon
     expect(MODERN_RULES.allowsEscalatorOnOfficeFloors).toBe(true);
   });
+
+  it("gates the express-transfer-at-lobby rule by mode (#396)", () => {
+    // Canon: express riders switch to a local transport only at a (sky) lobby,
+    // which forces the layered-tower architecture. Modern keeps the forgiving
+    // transfer-at-any-shared-stop routing.
+    expect(CLASSIC_RULES.expressTransferNeedsLobby()).toBe(true);
+    expect(MODERN_RULES.expressTransferNeedsLobby()).toBe(false);
+  });
 });
 
 describe("lobby-distance band geometry (both rule-sets)", () => {

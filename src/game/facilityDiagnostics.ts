@@ -208,14 +208,16 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // the array is empty for a plain, well-placed unit with nothing to warn about.
   const lines: TemplateResult[] = [];
   // Access is the whole truth, not just "served": a floor can be connected yet
-  // sit 3+ rides from the lobby, in which case no commuter ever comes.
+  // have no admissible two-ride route from the lobby (3+ rides out, or, in
+  // Classic, its only path leans on an express transfer at a plain floor), in
+  // which case no commuter ever comes.
   if (hasAccessDiagnostic(u)) {
     lines.push(
       !sim.tower.isFloorServed(u.floor)
         ? html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`
         : sim.floorReachable(u.floor)
           ? html`<div style="color:var(--good)">Access: reachable (≤2 rides from the lobby).</div>`
-          : html`<div style="color:var(--bad)">Access: too far. 3+ rides from the lobby, so no one travels here. Add a sky-lobby transfer.</div>`,
+          : html`<div style="color:var(--bad)">Access: too far. No route from the lobby within two rides, so no one travels here. Add a sky-lobby transfer.</div>`,
     );
   }
   // No Rate (off-market) legibility: a chosen setting, so plain ink, neither
