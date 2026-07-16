@@ -209,8 +209,35 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
  * - `congestion`: how jammed the floor's transport is (per-floor congestion).
  * - `occupancy`:  the floor's vacant share (red = empty, green = fully leased).
  * - `satisfaction`: per-unit tenant unhappiness (red = a tenant near leaving).
+ * - `cleanliness`: per-hotel-room housekeeping coverage (red = no service-elevator
+ *   crew can reach it, amber = dirty and waiting, green = clean and covered).
  */
 export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
+  if (mode === "cleanliness") {
+    // Per hotel room, the units housekeeping serves: tint by whether a crew can
+    // reach it and whether it is dirty right now. Staff travel the service
+    // network (service elevators, stairs, escalators), never passenger
+    // elevators, so a room with no operational housekeeping crew in its staff
+    // component can never be cleaned: that is the worst case (red), the
+    // "build another housekeeping station or extend the service elevator" nudge
+    // given a place to point. A reachable but dirty room is amber (it is waiting
+    // its turn), and a reachable clean room is green. Only hotel rooms carry a
+    // housekeeping signal, so non-hotel floors stay untinted.
+    const crews = sim.tower.units.filter((u) => u.kind === "housekeeping" && isOperational(u));
+    const out: HeatCell[] = [];
+    for (const u of sim.tower.units) {
+      // Only live hotel rooms carry a housekeeping signal: a room still under
+      // construction, ablaze, or a burned-out shell has no coverage state to
+      // report, so skip it (matching the satisfaction/occupancy branches, which
+      // likewise ignore units with nothing to say).
+      if (!isHotelKind(u.kind) || !isOperational(u)) continue;
+      const reachable = crews.some((c) => sim.tower.staffConnected(c.floor, u.floor));
+      const severity = !reachable ? 1 : u.state === "dirty" ? 0.6 : 0;
+      out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity });
+    }
+    return out;
+  }
+
   if (mode === "satisfaction") {
     // Per-unit, not per-floor: tint each present tenant's own footprint by its
     // unhappiness. Averaging a floor would let one miserable suite (near

@@ -33,10 +33,11 @@ export const HEATMAP_LABELS: Record<HeatmapMode, { title: string; good: string; 
   congestion: { title: "Congestion", good: "clear", bad: "jammed" },
   occupancy: { title: "Occupancy", good: "full", bad: "vacant" },
   satisfaction: { title: "Satisfaction", good: "happy", bad: "unhappy" },
+  cleanliness: { title: "Housekeeping", good: "covered", bad: "unreached" },
 };
 
 /** The overlay modes in cycle order (a UI toggle steps Off → each → Off). */
-export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction"];
+export const HEATMAP_MODES: HeatmapMode[] = ["congestion", "occupancy", "satisfaction", "cleanliness"];
 
 /** Heatmap ramp stops (green → chartreuse → amber → red). The chartreuse
  *  waypoint gives the green→amber leg real resolution, so the lived-in low end

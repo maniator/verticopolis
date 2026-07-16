@@ -8,6 +8,7 @@ import { type Scene, PHONE } from "../screenshot-env.ts";
 import {
   buildBasement,
   buildCanonTower,
+  buildCleanlinessTower,
   buildHotspotTower,
   buildOverlayTower,
   buildStatsTower,
@@ -36,6 +37,19 @@ export const FEATURE_SCENES: Scene[] = [
       // uniform to read), written into docs/screenshots/.
       { name: "15-congestion", outDir: "screenshots", overlay: "congestion", frame: { floor: 15, zoom: 0.4 } },
       { name: "23-occupancy", outDir: "screenshots", overlay: "occupancy", frame: { floor: 15, zoom: 0.4 } },
+    ],
+  },
+  // --- Housekeeping-coverage overlay (#401) -----------------------------------
+  {
+    id: "cleanliness-overlay",
+    outDir: "features",
+    build: buildCleanlinessTower,
+    assertUnits: 100,
+    shots: [
+      // The service elevator (right) reaches floors 1..8; the upper hotel floors
+      // are guest-reachable but have no staff route, so they read red. A few dirty
+      // rooms in the covered zone read amber.
+      { name: "overlay-cleanliness", overlay: "cleanliness", frame: { floor: 7, zoom: 0.45 } },
     ],
   },
   // --- Basement: parking garage, recycling, garbage truck, inspector ----------

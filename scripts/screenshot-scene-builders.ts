@@ -322,6 +322,67 @@ export function buildOverlayTower(): void {
   g.engine.paused = true;
 }
 
+/**
+ * A hotel tower staged for the HOUSEKEEPING-coverage overlay: a lower zone the
+ * service elevator (and its housekeeping crew) can reach, with a few rooms left
+ * dirty, and an upper zone reachable by GUESTS (passenger elevator) but with no
+ * service route, so housekeeping can never reach it. The overlay then shows the
+ * full range: covered-clean (green), covered-dirty (amber), unreached (red).
+ */
+export function buildCleanlinessTower(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(4041);
+  const s = g.sim;
+  s.money = 1e12;
+  s.star = 5;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  const left = cx - 30;
+  const right = cx + 30;
+  // Ground lobby grows outward from the seeded center; floors 2..12.
+  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 12; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  // Passenger elevator serves the whole stack (guests reach every hotel floor).
+  s.tower.placeTransport("elevatorStandard", left + 4, 1, 12);
+  // Service elevator + housekeeping cover the LOWER zone (1..8) only; the upper
+  // floors (9..12) get no staff route.
+  s.tower.placeTransport("elevatorService", right - 4, 1, 8);
+  const hk = s.tower.place("housekeeping", 2, left + 12);
+  if (hk.ok) s.tower.getUnit(hk.unitId).state = "occupied"; // in service now, skip construction
+  // Fill every floor with hotel rooms, guests asleep.
+  for (let f = 2; f <= 12; f++) {
+    for (let x = left + 22; x + 1 <= right; ) {
+      const r = s.tower.place("hotelDouble", f, x);
+      if (r.ok) {
+        const u = s.tower.getUnit(r.unitId);
+        u.state = "asleep";
+        u.everOccupied = true;
+        x += u.width;
+      } else x += 1;
+    }
+  }
+  // Stage a few DIRTY rooms on EACH of floors 4..6 (the covered zone) so the
+  // overlay reads amber there, between the green covered-clean rooms and the red
+  // unreached upper zone. Cap per floor so the dirty rooms spread across all three
+  // rather than all landing on the first floor scanned.
+  const dirtiedByFloor: Record<number, number> = {};
+  for (const u of s.tower.units) {
+    if (u.kind !== "hotelDouble" || u.floor < 4 || u.floor > 6) continue;
+    const n = dirtiedByFloor[u.floor] ?? 0;
+    if (n >= 2) continue;
+    u.state = "dirty";
+    u.occupants = 0;
+    dirtiedByFloor[u.floor] = n + 1;
+  }
+  s.evaluateStar();
+  g.engine.setSim(s);
+  g.engine.setCamera(cx, 7, 0.5);
+  g.speed = 0;
+  g.engine.paused = true;
+}
+
 /** A modest mixed tower for the responsive-layout (tablet) shots. */
 export function buildTabletTower(): void {
   const g = (window as unknown as { game: any }).game;

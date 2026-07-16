@@ -21,6 +21,7 @@ hotel rooms, a cinema, shops, food, 5 elevators) after warming up a quarter.
 | `overlay-congestion.png` | The colored stats overlay in **Congestion** mode: floors tinted green (clear) → red (jammed) with a legend. |
 | `overlay-occupancy.png` | **Occupancy** mode: green where fully leased (offices/condos), red/amber on the hotel floors that sit empty at midday. |
 | `overlay-satisfaction.png` | **Satisfaction** mode: green for happy tenants; floors with no one present are left untinted (no happiness to judge). |
+| `overlay-cleanliness.png` | **Housekeeping** mode: hotel rooms tinted by service coverage: green where a housekeeping crew can reach them, amber for dirty rooms waiting, red for floors with no service-elevator route (the "build another housekeeping station" nudge). |
 | `overlay-picker-ui.png` | The **🗺️ Map overlay** dropdown in the Tower panel (below Full Statistics); every mode is directly selectable. |
 
 ## Metro station (routed commuters + the train)

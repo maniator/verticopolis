@@ -170,7 +170,7 @@ export const LOG_SAVE_CAP = LOG_RING_CAP;
 export const LOG_TEXT_CAP = 400;
 
 /** The metric the colored stats overlay tints floors by. */
-export type HeatmapMode = "congestion" | "occupancy" | "satisfaction";
+export type HeatmapMode = "congestion" | "occupancy" | "satisfaction" | "cleanliness";
 
 /** Congestion ratio at which tenants begin leaving (see {@link Simulation.updateSatisfaction},
  *  `cong > 1`), the overlay paints this AMBER so the color never contradicts the sim. */
