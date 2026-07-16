@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
-import type { FacilityKind } from "../../engine/types";
+import type { FacilityKind, GameMode } from "../../engine/types";
 
 /**
  * Golden-master determinism net for the large-file split refactor.
@@ -77,8 +77,8 @@ function stableStringify(value: unknown): string {
   });
 }
 
-function runFixedScenario(): Simulation {
-  const sim = Simulation.newGame(20260713, "classic");
+function runFixedScenario(mode: GameMode = "classic"): Simulation {
+  const sim = Simulation.newGame(20260713, mode);
   buildFixedTower(sim);
   // Drive three full in-game days in hourly steps. `tick` takes MINUTES, so 60
   // is one hour and 24*3 iterations is three days: exercises onHour/onDay,
@@ -108,6 +108,39 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
   });
 });
 
+// The same build-and-run scenario founded as a MODERN tower. Modern diverges from
+// Classic under an identical footprint (the deeper-economy sinks: operating
+// overhead per held unit, and the commercial demand floor that keeps a thin
+// tower's venues trading), so its serialized state settles to a different
+// fingerprint. Pinning it locks Modern's determinism the same way, so a
+// behavior-preserving refactor that only means to move code cannot silently drift
+// Modern-mode math either. (The scenario lays no condo, so the variant-household
+// RNG path is exercised by its own unit tests, not this fixture.)
+describe("golden master (modern): Simulation serialize() is byte-stable across refactors", () => {
+  it("is deterministic run-to-run", () => {
+    const a = stableStringify(runFixedScenario("modern").serialize());
+    const b = stableStringify(runFixedScenario("modern").serialize());
+    expect(a).toEqual(b);
+  });
+
+  it("round-trips through deserialize without drift", () => {
+    const once = runFixedScenario("modern").serialize();
+    const twice = Simulation.deserialize(once).serialize();
+    expect(stableStringify(twice)).toEqual(stableStringify(once));
+  });
+
+  it("differs from the Classic fingerprint (the mode divergence is real)", () => {
+    const classicHash = createHash("sha256").update(stableStringify(runFixedScenario("classic").serialize())).digest("hex");
+    const modernHash = createHash("sha256").update(stableStringify(runFixedScenario("modern").serialize())).digest("hex");
+    expect(modernHash).not.toEqual(classicHash);
+  });
+
+  it("matches the pinned Modern state hash (a pure refactor must not change it)", () => {
+    const hash = createHash("sha256").update(stableStringify(runFixedScenario("modern").serialize())).digest("hex");
+    expect(hash).toEqual(PINNED_MODERN_STATE_HASH);
+  });
+});
+
 /**
  * The golden-master fingerprint: a sha256 of the stable-stringified `serialize()`
  * output of the fixed build-and-run scenario above. Because the scenario is fully
@@ -133,3 +166,16 @@ describe("golden master: Simulation serialize() is byte-stable across refactors"
  * income is conserved near this calibration point rather than zeroed.
  */
 const PINNED_STATE_HASH = "e1f9be18ace3421eb2faa923943934b473668f70ba3d2d1967370ad2c590a787";
+
+/**
+ * The Modern-mode golden-master fingerprint: the same fixed build-and-run
+ * scenario founded as a Modern tower. Distinct from the Classic hash because
+ * Modern applies the deeper-economy sinks (operating overhead per held unit) and
+ * the commercial demand floor, so money, accrued income, and the fields they
+ * touch settle differently under the identical footprint. Re-pin this IN THE PR
+ * that legitimately changes Modern behavior, with intent, exactly like the Classic
+ * hash above. First pinned alongside Phase C of commercial demand pools (#393),
+ * which added no Modern income math itself (the value simply captures Modern's
+ * demand-pools behavior, previously unpinned).
+ */
+const PINNED_MODERN_STATE_HASH = "3d534086a370ec52d1008fd0295f74a2bc4697e30a8d5ab427627b709d1f857e";

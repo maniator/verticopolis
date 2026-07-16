@@ -86,6 +86,19 @@ per in-game hour. Confirm against the `perf` Playwright lane before Phase A merg
 
 ## 5. GameRules seam
 
+> **Superseded (Phase C review, 2026-07-15): the `smoothing` field was dropped.**
+> A per-venue "soft" curve that lifts a venue's earned fraction above the identity
+> `min(1, share)` below the cap makes total delivered demand exceed the pool as
+> venues are added, which inverts the model's core cannibalization property.
+> Conservation holds only when every venue earns exactly `min(1, share)` below the
+> cap, so a conservation-preserving soft shoulder does not exist. The shipped seam
+> is `{ perCapita; floor }`; the Modern-vs-Classic difference is the small-tower
+> `floor` today (a street-trade baseline), with per-capita magnitude shared by both
+> modes for now and reserved for the calibration pass, never a per-venue cap curve.
+> A future Modern demand assist must live outside the per-venue split (a larger
+> `floor`, or a pool multiplier) to stay conservative. See the backlog Deferral
+> inbox (Phase A note, RESOLVED). The original design below is kept for the record.
+
 One new method, following `noiseErosionScale()` / `operatingOverheadPerUnit()`:
 
 ```
@@ -93,7 +106,7 @@ One new method, following `noiseErosionScale()` / `operatingOverheadPerUnit()`:
 demandModel(): {
   perCapita: number;   // S_percapita: per-capita daily demand dollars
   floor: number;       // minimum per-venue fraction before demand (small-tower gate)
-  smoothing: "hard" | "soft";  // cap approach; hard = plain min(1, x)
+  smoothing: "hard" | "soft";  // cap approach; hard = plain min(1, x)  (DROPPED, see note above)
 };
 ```
 

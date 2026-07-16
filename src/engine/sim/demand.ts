@@ -38,6 +38,13 @@ export interface DemandMap {
    *  floor is stranded), the coverage signal `leave-tower-unmet-demand` (#395)
    *  will read. */
   reachableVenuesByOrigin: Map<number, number>;
+  /** The raw, UNCAPPED demand pressure `pool / reachableCapacity`, tower-uniform
+   *  under the lobby-anchored model. Distinct from `fractionByUnit` (which is
+   *  capped at 1 and floored): `share >= 1` means demand meets or outstrips the
+   *  reachable commercial capacity (the area is under-served, room to build more),
+   *  while a low `share` means capacity outstrips demand (over-built). The Modern
+   *  inspector advice reads this; 0 when there is no reachable capacity. */
+  share: number;
 }
 
 /** The demand weight of an origin kind, reusing the meal-cadence origin weights
@@ -139,16 +146,28 @@ export function computeDemandMap(sim: SimContext): DemandMap {
 
   // Capacity-proportional distribution reduces to a uniform share under
   // lobby-anchored reachability (see the module note): D_v = pool * cap_v /
-  // totalCap, so D_v / cap_v = pool / totalCap for every reachable venue. The
-  // Modern floor sets a minimum; the min(1, ...) is the appeal-cap contract
-  // (income can never exceed the advertised daily figure).
+  // totalCap, so D_v / cap_v = pool / totalCap for every reachable venue.
   const share = totalCap > 0 ? pool / totalCap : 0;
+  // Each reachable venue earns the plain `min(1, share)`, floored by the mode's
+  // small-tower assist. The identity-below-cap shape is what conserves the pool:
+  // while `floor <= share < 1` every venue earns exactly `share`, so total
+  // delivered = sum(frac * cap_v) = share * totalCap = pool, and adding a venue
+  // dilutes every venue's share (cross-venue cannibalization) without inflating
+  // the total. Two documented departures from that identity, both intended: above
+  // the cap (`share >= 1`) a venue earns 1, holding income to the advertised daily
+  // figure (the appeal cap); and below the floor (`share < floor`, the Modern
+  // street-trade case) every venue earns `floor`, a deliberate small-tower subsidy
+  // that pays out ABOVE the pool. A per-venue curve that lifted the fraction above
+  // the identity BETWEEN floor and cap, by contrast, would inflate the total as
+  // venues are added and break cannibalization: that is why the soft shoulder was
+  // dropped. Both modes share this shape; only `perCapita` and `floor` differ (see
+  // GameRules.demandModel).
   const frac = Math.max(floor, Math.min(1, share));
   for (const v of venues) {
     fractionByUnit.set(v.id, frac);
     deliveredByUnit.set(v.id, frac * v.cap);
   }
-  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin };
+  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share };
 }
 
 /**

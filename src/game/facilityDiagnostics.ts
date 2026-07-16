@@ -68,6 +68,12 @@ function recyclingLines(sim: Simulation): TemplateResult[] {
  *  shell (see `inspectorRetailStats.test.ts`). The tier bands were tuned in the
  *  party consult (Samus, Cloud, Sally, 2026-07-09); see the spec's Player-Facing
  *  Copy section for the canonical strings. */
+/** Below this raw demand `share` (pool / reachable capacity) the tower reads as
+ *  over-built for commerce: its shoppers fill less than half the reachable
+ *  commercial capacity, so the Modern inspector advises adding residents or
+ *  holding off on new venues. */
+const OVER_BUILT_SHARE = 0.5;
+
 export function retailStatsLines(
   kind: FacilityKind,
   patronageToday: number | undefined,
@@ -75,6 +81,8 @@ export function retailStatsLines(
   profitYest: number | undefined,
   isRaining: boolean,
   demandFraction?: number,
+  demandShare?: number,
+  advice = false,
 ): TemplateResult[] {
   const spend = ECON.retailSpendPerCustomer[kind];
   const daily = ECON.dailyTrafficIncome[kind];
@@ -134,6 +142,27 @@ export function retailStatsLines(
   if (demandFraction !== undefined) {
     const demandPct = Math.round(Math.max(0, Math.min(1, demandFraction)) * 100);
     lines.push(html`<div>Local demand: ${demandPct}% of capacity.</div>`);
+    // Modern-only advice on top of the demand number: name whether the TOWER is
+    // under-served for commerce (its shoppers meet or outstrip the reachable
+    // commercial capacity, so more venues would still sell) or over-built (that
+    // capacity outstrips the shoppers, so every venue splits a thin pool). The
+    // demand model is tower-uniform under lobby-anchored reachability, so the copy
+    // speaks about the tower, not "here": naming a local area would overpromise a
+    // locality the share does not carry. Classic shows the number only (it
+    // withholds advice, never information). Keyed on the raw uncapped `share`, so
+    // the Modern floor never masks a genuinely thin tower.
+    if (advice && demandShare !== undefined) {
+      if (demandShare >= 1) {
+        lines.push(html`<div>The tower's shoppers outstrip its retail space; another venue would still sell.</div>`);
+      } else if (demandShare < OVER_BUILT_SHARE) {
+        // Phrased to hold for a one-venue tower and a zero-pool tower too: "add
+        // homes" always lifts the pool, and "hold off on new venues" is the
+        // build-side lever. Avoid telling a player to "thin" a single venue,
+        // which would mean bulldozing their only shop (and could not lift a pool
+        // that is already zero).
+        lines.push(html`<div>The tower has more retail than its shoppers fill; add homes, or hold off on new venues, to lift every venue.</div>`);
+      }
+    }
   }
   lines.push(html`<div style=${tier.color ? `color:${tier.color}` : nothing}>${tier.verdict}</div>`);
   // Yesterday's line is skipped on day 1 (no rollover yet) so the card doesn't
@@ -302,6 +331,8 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     ECON.dailyTrafficIncome[u.kind] !== undefined &&
     ECON.retailSpendPerCustomer[u.kind] !== undefined
   ) {
+    const demandMap = sim.demandMap();
+    const demandFraction = demandMap.fractionByUnit.get(u.id);
     lines.push(
       ...retailStatsLines(
         u.kind,
@@ -311,7 +342,12 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         sim.weather === "rain",
         // Undefined (not `?? 0`) when the venue is absent from the demand map, so
         // the readout omits the "Local demand" line rather than fabricating 0%.
-        sim.demandMap().fractionByUnit.get(u.id),
+        demandFraction,
+        // The tower-wide raw demand pressure, only when this venue is in the map
+        // (so absent venues get neither the demand line nor the advice).
+        demandFraction === undefined ? undefined : demandMap.share,
+        // Modern-only advice: Classic shows the demand number without a verdict on it.
+        sim.rules?.mode === "modern",
       ),
     );
   }
