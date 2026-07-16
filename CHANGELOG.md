@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.52.0
+
+- On rainy days fewer people are out and about, so cinemas and other venues draw smaller crowds.
+
 ## 1.51.2
 
 - Elevators in a bank now share waiting riders instead of crowding one shaft.

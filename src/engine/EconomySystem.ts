@@ -209,8 +209,18 @@ export class EconomySystem {
           : (demandMap.fractionByUnit.get(u.id) ?? 0);
       // Rain keeps shoppers away (canon) — it bites fast food hardest; a metro
       // (underground visitors) softens the blow. Cosmetic-only on non-rainy days.
+      // Any venue with an attendance cap (`attendanceCapV !== undefined`) is
+      // excluded (#430): those are the live-fill kinds (cinema and party hall
+      // today), whose income reads the live-attendance `frac` above, and rain now
+      // thins that crowd at the spawn layer (GameRules.rainCrowdFactor), so a flat
+      // multiplier here would double-count the weather. Rain reaches an attendance
+      // house through its emptier seats, the one source of truth. Keying on the cap
+      // (not a kind list) also covers any future attendance kind, and wedding hall,
+      // which has a cap but no `dailyTrafficIncome` and so returns above before it
+      // ever reaches this line. Retail income is statistical (it does not read the
+      // drawn crowd), so retail keeps rainMult as its only rain channel.
       const rainMult =
-        this.sim.weather === "rain"
+        this.sim.weather === "rain" && attendanceCapV === undefined
           ? (rainMetroRelief ? 0.7 : 0.5) * (u.kind === "fastFood" ? 0.6 : 1)
           : 1;
       // A cinema showing a blockbuster this month draws a much bigger crowd — it

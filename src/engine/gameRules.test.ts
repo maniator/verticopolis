@@ -163,6 +163,13 @@ describe("CLASSIC_RULES", () => {
     expect(CLASSIC_RULES.weekendMultiplier("office", true)).toBe(1);
     expect(CLASSIC_RULES.weekendMultiplier("office", false)).toBe(1);
   });
+
+  it("thins the rainy crowd at the canon shopper magnitude (#430)", () => {
+    // Classic matches the 0.5 the retail rainMult already uses, so a rainy tower
+    // visibly empties and its attendance houses fill less.
+    expect(CLASSIC_RULES.rainCrowdFactor()).toBe(ECON.rainCrowdFactor.classic);
+    expect(CLASSIC_RULES.rainCrowdFactor()).toBe(0.5);
+  });
 });
 
 describe("MODERN_RULES", () => {
@@ -201,6 +208,14 @@ describe("MODERN_RULES", () => {
     expect(MODERN_RULES.operatingOverheadPerUnit()).toBe(ECON.overheadPerLeasableUnitMonthly);
     expect(MODERN_RULES.condoHoldTaxRate()).toBe(ECON.condoMonthlyTaxRate);
     expect(MODERN_RULES.noiseErosionScale()).toBe(1);
+  });
+
+  it("softens the rainy crowd thinning relative to Classic (#430)", () => {
+    // Modern smooths: rain still thins the crowd, but less sharply, so a rainy day
+    // reads as a slower tower rather than a near-empty one.
+    expect(MODERN_RULES.rainCrowdFactor()).toBe(ECON.rainCrowdFactor.modern);
+    expect(MODERN_RULES.rainCrowdFactor()).toBe(0.7);
+    expect(MODERN_RULES.rainCrowdFactor()).toBeGreaterThan(CLASSIC_RULES.rainCrowdFactor());
   });
 
   it("eases lobby distance in as a smooth continuous curve, gentler than Classic at the same distance", () => {

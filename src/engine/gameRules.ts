@@ -238,6 +238,20 @@ export interface GameRules {
    * satisfaction mechanics.
    */
   demographicRoutines(): DemographicRoutines;
+  /**
+   * Crowd spawn-rate multiplier on a rainy day (weather-shapes-crowd, #430), so
+   * rain thins the people actually out and about instead of only firing a hidden
+   * income multiplier. The caller gates on `weather === "rain"` and reads 1.0 on
+   * any other sky, exactly like the retail `rainMult`. Classic matches the canon
+   * shopper hit (`ECON.rainCrowdFactor.classic`, the same 0.5 magnitude as the
+   * retail multiplier); Modern softens (`ECON.rainCrowdFactor.modern`). Applied to
+   * the spawn accumulator, which already scales by time-of-day and population and
+   * draws no RNG, so a rainy day thins the drawn crowd without perturbing the
+   * seeded stream and a clear-day tower stays byte-identical. A thinner crowd is
+   * what lowers an attendance venue's live fill; retail income is statistical and
+   * unaffected here (it keeps its own `rainMult`).
+   */
+  rainCrowdFactor(): number;
 }
 
 /** Per-routine spawn weights, see {@link GameRules.demographicRoutines}. */
@@ -335,6 +349,12 @@ export const CLASSIC_RULES: GameRules = {
     // and the spawn overlay returns before its first RNG draw, so a Classic
     // tower's seeded crowd stream is byte-identical to before the feature.
     return NO_DEMOGRAPHIC_ROUTINES;
+  },
+  rainCrowdFactor() {
+    // Canon: rain keeps half the ambient crowd home (the same 0.5 the retail
+    // rainMult uses), so a rainy tower visibly empties and its attendance houses
+    // fill less.
+    return ECON.rainCrowdFactor.classic;
   },
 };
 
@@ -441,6 +461,11 @@ export const MODERN_RULES: GameRules = {
     // afternoon, office workers head out on midday sales calls. Weights are
     // tuned in ECON; the hour windows are structural (sim/constants).
     return ECON.demographicRoutineWeights;
+  },
+  rainCrowdFactor() {
+    // Modern smooths: rain thins the crowd, but less sharply than the canon hit,
+    // so a rainy day reads as a slower tower rather than a near-empty one.
+    return ECON.rainCrowdFactor.modern;
   },
 };
 
