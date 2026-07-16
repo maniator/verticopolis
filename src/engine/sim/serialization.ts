@@ -194,27 +194,18 @@ export function deserialize(raw: SerializedGame): Simulation {
       const notOwned = state === "empty" || state === "construction" || state === "gutted";
       const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
       const soldCondo = u.kind === "condo" && everOccupied;
-      // Player-set price, coerced to a finite number, then bounded for condos.
-      // An UNSOLD condo re-enters the currently legal range so a legacy save
-      // priced at an old min/max can't sell off-range (or render past the
-      // editor's ends): the Modern band clamps here; a ladder mode instead
-      // snaps every priced rent onto the canon rungs in the pass below (whose
-      // Very Low sits BELOW the band floor by design, so the band clamp must
-      // not run first and pre-clamp $50k up to $80k). A SOLD condo keeps its
-      // historical price so the buy-back mirrors what it sold for, but is
-      // still bounded so a forged `rent` can't drive an unbounded buy-back
-      // money drain. The bound must match the mode's own legal range: the
-      // Classic ladder's Very Low ($50,000) sits BELOW the band-era
-      // SOLD_CONDO_MIN_PRICE, so bounding a ladder-mode sale through the band
-      // floor would lift a legal $50k sale to $60k, the snap pass would pull
-      // it back down, and that phantom migration would re-post the one-time
-      // pricing bulletin on every load. Ladder mode bounds to the ladder's
-      // own extremes (the snap pass then lands it exactly on a rung); band
-      // mode keeps the historical bounds.
-      // In ladder mode a non-finite forged rent must REACH the snap pass as
-      // non-finite so snapToLadder's documented rule lands it on Average: the
-      // band defaults sit far below the hotel ladders, so coercing through
-      // them here would snap a forged NaN rent to Very Low instead.
+      // Player-set price. Ladder-priced kinds pass through raw (non-finite
+      // included): the snap pass below owns their normalization, and both of
+      // its rules would otherwise be broken here, since the ladder's Very Low
+      // rungs sit below the band floors (a band clamp would lift a legal $50k
+      // condo sale to $60k, and the snap pulling it back would re-post the
+      // one-time bulletin as a phantom migration on every load) and the band
+      // DEFAULTS sit below the hotel ladders (coercing a forged NaN through
+      // one would snap to Very Low instead of snapToLadder's Average rule).
+      // Band mode keeps the historical behavior: an unsold condo re-enters
+      // the legal band, and a SOLD condo keeps its historical price for the
+      // buy-back mirror, bounded so a forged rent cannot drive an unbounded
+      // buy-back drain (ladder mode bounds that sale to the ladder extremes).
       const ladderPriced = sim.rules.priceOptions(u.kind)?.shape === "ladder";
       let rent =
         u.rent === undefined
