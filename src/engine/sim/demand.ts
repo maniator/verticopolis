@@ -3,7 +3,7 @@ import type { Simulation } from "../Simulation";
 import { MODERN_RULES } from "../gameRules";
 import { ECON } from "../econConfig";
 import { RECYCLING_POP_PER_CENTER } from "../facilities";
-import { isHotelKind } from "../facilities";
+import { isHotelKind, attendanceCap } from "../facilities";
 import { residentCount } from "../census";
 import { isOperational, isTenanted } from "../types";
 
@@ -13,9 +13,13 @@ import { isOperational, isTenanted } from "../types";
  * Replaces the old tower-wide `trafficAppeal` scalar with a demand POOL built
  * from the connected census: each occupied office/condo/hotel contributes a
  * per-capita budget (weighted by kind, reusing the meal-cadence weights), and
- * that pool is distributed across the reachable commercial venues in proportion
- * to their headline daily capacity. A venue then earns `min(1, D_v / cap_v)` of
- * its daily figure, exactly where `appeal` used to sit.
+ * that pool is distributed across the reachable RETAIL venues (shop, fast food,
+ * restaurant) in proportion to their headline daily capacity. A venue then earns
+ * `min(1, D_v / cap_v)` of its daily figure, exactly where `appeal` used to sit.
+ * Attendance venues (cinema, party hall) sit OUTSIDE this pool (#424): they draw
+ * on a separate live-attendance fill, not the office/condo/hotel demand budget,
+ * so they neither dilute the retail share nor consume it. The income loop sources
+ * their fraction from `customersIn / attendanceCap` directly.
  *
  * Because the engine's reachability is lobby-anchored (a floor either draws
  * visitors within the two-ride rule or it does not, the same gate the income
@@ -34,9 +38,13 @@ export interface DemandMap {
   /** Venue unit id to delivered demand dollars (fraction times capacity), for
    *  the inspector readout and the conservation test. */
   deliveredByUnit: Map<number, number>;
-  /** Origin unit id to the count of venues it can reach (0 when the origin's own
-   *  floor is stranded), the coverage signal `leave-tower-unmet-demand` (#395)
-   *  will read. */
+  /** Origin unit id to the count of reachable RETAIL venues (0 when the origin's
+   *  own floor is stranded), the coverage signal `leave-tower-unmet-demand` (#395)
+   *  will read. Attendance venues (cinema, party hall) are NOT counted here (#424):
+   *  they sit outside the retail demand pool, so a tower whose only reachable venue
+   *  is a cinema reads 0 retail coverage. A future #395 consumer that treats 0 as
+   *  "nowhere to go" should fold in attendance coverage separately if it means to
+   *  count the cinema as somewhere residents can spend time. */
   reachableVenuesByOrigin: Map<number, number>;
   /** The raw, UNCAPPED demand pressure `pool / reachableCapacity`, tower-uniform
    *  under the lobby-anchored model. Distinct from `fractionByUnit` (which is
@@ -108,12 +116,19 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     return hit;
   };
 
-  // Reachable venues and their headline capacity.
+  // Reachable RETAIL venues and their headline capacity. Attendance venues
+  // (cinema, party hall) are deliberately excluded from the pool (#424): their
+  // trade is driven by the live-attendance fill (`customersIn / attendanceCap`),
+  // not the office/condo/hotel demand budget, so counting their large daily
+  // figures here as capacity sinks would dilute the retail share and let a single
+  // cinema starve genuine shops. They earn their own fill-derived fraction in the
+  // income loop instead, and so never appear in `fractionByUnit`/`deliveredByUnit`.
   const venues: { id: number; cap: number }[] = [];
   let totalCap = 0;
   for (const u of sim.tower.units) {
     const cap = ECON.dailyTrafficIncome[u.kind];
     if (cap === undefined) continue; // not a traffic venue
+    if (attendanceCap(u.kind) !== undefined) continue; // attendance venue: earns from live fill, not the retail pool (#424)
     if (!isOperational(u)) continue; // gutted / burning / under construction earns nothing
     if (!draws(u.floor)) continue; // stranded: no patrons, contributes no capacity
     venues.push({ id: u.id, cap });

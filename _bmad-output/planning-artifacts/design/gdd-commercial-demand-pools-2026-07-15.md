@@ -186,6 +186,27 @@ venue starves the old ones instead of minting free money.
 
 ### 4.5 Attendance venues
 
+> **Superseded (#424, 2026-07-16): attendance venues no longer join the demand
+> pool.** The Phase A design below folded cinema and partyHall into `totalCap` as
+> capacity sinks. Adversarial review confirmed that distorts a modest tower: a
+> single cinema (daily 8000) collapses `share = pool / totalCap` and can zero
+> genuine shop/food income, even though its own trade runs on the separate
+> live-attendance system, not the office lunch crowd. So attendance venues are now
+> excluded from `totalCap`, and their income fraction comes from their live fill,
+> `min(1, customersIn / attendanceCap)`, computed in the income loop. They never
+> dilute the retail share nor draw the office/condo/hotel budget. The blockbuster
+> `filmMult` still multiplies on top of that fill fraction. Note the two blockbuster
+> channels now compose: a blockbuster draws a bigger crowd (a higher `customersIn`,
+> so a higher fill fraction) AND applies the `filmMult`, so its premium is more than
+> a flat 2.2x in an under-filled house. This is deliberate and bounded: the
+> `min(1, ...)` cap holds a sold-out blockbuster to exactly `filmMult` times the
+> advertised figure, so income can never run away, and a quiet tower's thin crowd
+> keeps the absolute take low (still a gamble against the doubled booking fee),
+> preserving the "a blockbuster can never pay back its doubled fee purely through
+> appeal" balance from `gdd-economy-depth`. The `economyDepth` and
+> `commercialDemandPools` tests pin the sold-out 2.2x premium and the empty-house
+> zero. The original Phase A text is kept below for the record.
+
 Cinema and partyHall carry a `dailyTrafficIncome` but have zero catalog population
 and no retail subtype, and they skip the `patronageToday` seam
 (`EconomySystem.ts:211-216`). They participate in the demand pool as capacity
@@ -251,9 +272,18 @@ wrong even if it typechecks.
    `trafficFactor` at `EconomySystem.ts:198`. The demand map is deterministic. The
    `economyDepth` "overhead consumes no RNG / shared stream untouched" assertion
    and the golden-master hash both pin byte-identical stream position.
-3. **Census, not crowd draw.** Budgets read `totalPopulation` /
-   `occupantPopulation` / catalog `population` / condo `residents`, never
-   `customersIn` or the roughly 140-person crowd.
+3. **Census, not crowd draw.** The RETAIL demand pool's budgets read
+   `totalPopulation` / `occupantPopulation` / catalog `population` / condo
+   `residents`, never `customersIn` or the roughly 140-person crowd, so a large
+   tower's saturating crowd cannot cap the pool. Attendance venues (cinema, party
+   hall) are a deliberate exception (#424): they never joined the census pool, and
+   their income reads their own live `customersIn` fill, which is exactly their
+   long-standing live-attendance model. The exception is safe because it is
+   local to each attendance venue (it does not feed the shared retail pool) and
+   bounded by its own small `attendanceCap`. Its known consequence is that on a
+   very large tower the thin crowd may keep a cinema below its cap; that is the
+   attendance system's existing behavior, and tuning attendance draw at scale is a
+   calibration concern, not a demand-pool one.
 4. **`retailSpendPerCustomer` stays cosmetic** (`econConfig.ts:16`). The money loop
    still does not divide by it. If a later phase makes visitors load-bearing, that
    is a separate, deliberate decision with its own review.
@@ -330,10 +360,12 @@ four quality gates, and a version bump when player-facing.
 - **Reachability cost on maxed towers.** Bounded by per-floor caching on
   `tower.revision`, but confirm with a perf check on a full tower before Phase A
   merges (the `perf` Playwright lane).
-- **Attendance venue weighting.** Cinema's $8,000 capacity dominates a mixed
-  floor's proportional split. Confirm the resulting cinema economics against the
-  blockbuster tests during Phase A; adjust attendance capacity weighting if a
-  single cinema distorts a small tower.
+- **Attendance venue weighting.** RESOLVED (#424, 2026-07-16). Cinema's $8,000
+  capacity dominated a mixed floor's proportional split and could zero a modest
+  tower's genuine retail, so attendance venues (cinema, party hall) were pulled out
+  of the demand pool entirely (see §4.5): they now earn from their own live
+  attendance fill, not the office/condo/hotel budget. The blockbuster economics
+  stay pinned by the `economyDepth` tests.
 
 ## 11. Source links
 
