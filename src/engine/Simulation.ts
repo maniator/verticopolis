@@ -269,6 +269,19 @@ export class Simulation implements SimContext {
    *  transient (warms up after load, not serialized). */
   elevatorUtil = new Map<number, number>();
 
+  /** Per-shaft measured demand by hour-of-day: a 24-slot ring of EMA'd load
+   *  fractions (0..1), one array per elevator shaft id (elevator-scheduling #305
+   *  Phase 3). Sampled hourly alongside {@link elevatorUtil} and read by the
+   *  schedule dialog for Auto-tune and the measured-demand ghost series. Transient:
+   *  never serialized, warms up over a day or two after a load, so a scheduler
+   *  opened on a fresh save reads empty and offers the "needs measured traffic"
+   *  path rather than a fabricated curve. */
+  elevatorHourly = new Map<number, number[]>();
+
+  /** This shaft's measured hourly demand curve (24 EMA'd load fractions 0..1), or
+   *  undefined for a shaft not yet sampled. Read-only view for the schedule UI. */
+  elevatorHourlyLoad(id: number): number[] | undefined { return this.elevatorHourly.get(id); }
+
   /** Lazy noise-adjacency memo by unit id, valid for exactly one
    *  tower.revision (strict equality; -1 forces the first fill). Noise is a
    *  pure function of layout and every layout mutation bumps revision, so a

@@ -11,6 +11,7 @@ import {
   UNMET_DEMAND_EVICT_FLOOR,
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS, type PriceOptions } from "./pricing";
+import type { ElevatorScheduleUX } from "./elevatorSchedule";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
 
@@ -91,6 +92,10 @@ export interface GameRules {
    * what the builder accepts.
    */
   expressTransferNeedsLobby(): boolean;
+  /** The Classic/Modern authoring-affordance split for the per-shaft schedule
+   *  dialog (#305 Phase 3). UI-only; the sim never reads it. The flag semantics
+   *  live on {@link ElevatorScheduleUX} in `elevatorSchedule.ts`. */
+  elevatorScheduleUX(): ElevatorScheduleUX;
   /**
    * Decide a condo's household and sale price the moment it sells. Classic sells
    * to the flat family of 3 at the asking price (no household stored); Modern
@@ -286,6 +291,11 @@ export const CLASSIC_RULES: GameRules = {
   expressTransferNeedsLobby() {
     return true; // canon: express riders switch to local transports only at a (sky) lobby
   },
+  elevatorScheduleUX() {
+    // 1994 fidelity: the raw manual grid, no presets/auto-tune/advice. Classic
+    // withholds advice, never information.
+    return { presets: false, autoTune: false, rawGridDefault: true, advice: false };
+  },
   sellCondo(base) {
     // Flat family of 3, sold at the asking price — no household stored, so the
     // census reads the catalog 3. Never touches the RNG, so a Classic tower's
@@ -378,6 +388,11 @@ export const MODERN_RULES: GameRules = {
   allowsEscalatorOnOfficeFloors: true, // Modern lifts the commercial-only escalator rule
   expressTransferNeedsLobby() {
     return false; // Modern keeps the forgiving transfer-at-any-shared-stop routing
+  },
+  elevatorScheduleUX() {
+    // Modern assistance: intent presets and auto-tune, with the raw grid tucked
+    // behind an Advanced toggle and an honest advice line.
+    return { presets: true, autoTune: true, rawGridDefault: false, advice: true };
   },
   sellCondo(base, rng) {
     const residents = rollHousehold(rng);

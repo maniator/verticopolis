@@ -359,6 +359,12 @@ export class Tower {
     return transport.setCars(this, id, cars);
   }
 
+  /** Write an authored per-shaft elevator schedule, hardened against the shaft's
+   *  live cars and span (elevator-scheduling #305 Phase 3). Bumps `revision`. */
+  setSchedule(id: number, raw: unknown): boolean {
+    return transport.setSchedule(this, id, raw);
+  }
+
   lobbyFloors(): number[] {
     return transport.lobbyFloors(this);
   }

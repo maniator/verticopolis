@@ -2,6 +2,7 @@ import type { Tower } from "../Tower";
 import { FACILITIES, GRID, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, maxCarsFor } from "../facilities";
 import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
+import { coerceSchedule } from "../elevatorSchedule";
 
 /** Transport CRUD, stops, and resize for the Tower, as friend functions taking
  * the {@link Tower} instance. Extracted from `Tower.ts`. */
@@ -278,6 +279,10 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
     }
     t.skipFloors = [...skip].sort((a, b) => a - b);
   }
+  // Re-harden an authored schedule against the new span (elevator-scheduling #305):
+  // a shrink must pull the per-car home floors back onto the shaft, the same reason
+  // carPositions were just clamped. Dispatch also clamps home floors on read.
+  if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   tower.revision++;
   return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
 }
@@ -298,6 +303,27 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carDir.length = cars;
   }
   t.cars = cars;
+  // Re-harden an authored schedule against the new car count (elevator-scheduling
+  // #305, the Phase 1 defer): shrinking the fleet must clamp active-car rows and
+  // truncate the per-car home floors so the stored schedule never references a car
+  // that no longer exists. Dispatch also clamps on read, so this is belt-and-braces.
+  if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
+  tower.revision++;
+  return true;
+}
+
+/**
+ * Write an authored per-shaft schedule (elevator-scheduling #305 Phase 3). The raw
+ * value (a working copy from the dialog, or any untrusted input) is hardened through
+ * `coerceSchedule` against the shaft's live cars and span, so a schedule can never
+ * carry an active count above the current fleet or a home floor off the shaft, and a
+ * schedule on a car-less transport is dropped. Bumps `revision` so the routing and
+ * stop caches invalidate (arch §3). Returns false for a non-elevator id.
+ */
+export function setSchedule(tower: Tower, id: number, raw: unknown): boolean {
+  const t = tower.transportById(id);
+  if (!t || !isElevatorKind(t.kind)) return false;
+  t.schedule = coerceSchedule(raw, t.cars, t.bottom, t.top);
   tower.revision++;
   return true;
 }

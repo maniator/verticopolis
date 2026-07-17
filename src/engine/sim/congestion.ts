@@ -348,18 +348,34 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
 /** Fold this hour's car occupancy into each passenger elevator's running
  *  utilization average, and forget shafts that have been removed. */
 export function sampleElevatorUtil(sim: Simulation): void {
-  const alive = new Set<number>();
+  const aliveUtil = new Set<number>();
+  const aliveHourly = new Set<number>();
+  const hour = ((Math.floor(sim.clock.hour) % 24) + 24) % 24;
   for (const t of sim.tower.transports) {
-    if (!isElevatorKind(t.kind) || isStaffOnlyTransport(t.kind)) continue;
-    alive.add(t.id);
+    if (!isElevatorKind(t.kind)) continue;
     const cap = t.cars * transportCarCapacity(t.kind);
     const load = (t.carLoad ?? []).reduce((sum, n) => sum + n, 0);
     const frac = cap > 0 ? Math.min(1, load / cap) : 0;
+    // Per-shaft demand-by-hour curve (elevator-scheduling #305): EMA this hour's
+    // load into slot [hour] of a transient 24-ring the schedule dialog reads. All
+    // elevator kinds (service and express included) are recorded, since all three
+    // are schedulable, unlike the passenger-only utilization EMA below.
+    aliveHourly.add(t.id);
+    let hourly = sim.elevatorHourly.get(t.id);
+    if (!hourly || hourly.length !== 24) {
+      hourly = new Array(24).fill(0);
+      sim.elevatorHourly.set(t.id, hourly);
+    }
+    hourly[hour] = 0.3 * frac + 0.7 * hourly[hour];
+    // Passenger utilization EMA (staff-only shafts excluded, as before).
+    if (isStaffOnlyTransport(t.kind)) continue;
+    aliveUtil.add(t.id);
     const prev = sim.elevatorUtil.get(t.id);
     // Slow EMA so the figure reflects a typical day, not the current instant.
     sim.elevatorUtil.set(t.id, prev === undefined ? frac : 0.15 * frac + 0.85 * prev);
   }
-  for (const id of [...sim.elevatorUtil.keys()]) if (!alive.has(id)) sim.elevatorUtil.delete(id);
+  for (const id of [...sim.elevatorUtil.keys()]) if (!aliveUtil.has(id)) sim.elevatorUtil.delete(id);
+  for (const id of [...sim.elevatorHourly.keys()]) if (!aliveHourly.has(id)) sim.elevatorHourly.delete(id);
 }
 
 /** Average utilization (0..1) of a passenger elevator, or undefined for a
