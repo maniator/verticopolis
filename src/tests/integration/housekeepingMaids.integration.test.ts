@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { HK_CLEAN_MINUTES, HK_MAIDS_PER_UNIT } from "../../engine/economy/housekeeping";
+import { maxStaffFor } from "../../engine/crowd/spawn";
 import { CROWD_SECONDS_PER_MINUTE } from "../../engine/Crowd";
 import type { GameMode } from "../../engine/types";
 
@@ -125,6 +126,36 @@ describe("the maid pool", () => {
     sim.tick(60);
     expect(a.state).toBe("empty");
     expect(b.state).toBe("empty");
+  });
+});
+
+describe("the staff pool scales with built crews (canon: no tower-wide staff cap)", () => {
+  it("maxStaffFor is exactly the operational crews' worth of maids", () => {
+    const sim = baseTower(39);
+    expect(maxStaffFor(sim.tower)).toBe(0); // no crews: nothing to field
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
+    expect(sim.tower.place("housekeeping", 2, X0 + 16).ok).toBe(true);
+    expect(maxStaffFor(sim.tower)).toBe(2 * HK_MAIDS_PER_UNIT);
+    // A burning crew has no staff to send, so it drops out of the ceiling.
+    sim.tower.units.find((u) => u.kind === "housekeeping")!.state = "fire";
+    expect(maxStaffFor(sim.tower)).toBe(HK_MAIDS_PER_UNIT);
+  });
+
+  it("an 11th crew's maids are admitted: the old fixed 64-maid gate is gone", () => {
+    // 11 crews can field 66 maids, one more crew's worth than the retired
+    // MAX_STAFF = 64 constant admitted. Probe the spawn gate directly at the
+    // old constant's exact value (walking 64 live maids through the crowd
+    // end-to-end would need a skyscraper fixture; the gate is the unit under
+    // test, and the per-crew ledgers are covered above).
+    const sim = baseTower(40);
+    for (let f = 3; f <= 12; f++) placeSlab(sim, f);
+    for (let f = 2; f <= 12; f++) expect(sim.tower.place("housekeeping", f, X0 + 8).ok).toBe(true);
+    expect(maxStaffFor(sim.tower)).toBe(11 * HK_MAIDS_PER_UNIT);
+    const room = dirtyRoom(sim, 2, X0);
+    sim.crowd.staffCount = 64; // the retired pool's ceiling: no longer "full"
+    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("sent");
+    sim.crowd.staffCount = 11 * HK_MAIDS_PER_UNIT; // built capacity: the honest ceiling
+    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("full");
   });
 });
 

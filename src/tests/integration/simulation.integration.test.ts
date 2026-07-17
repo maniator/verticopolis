@@ -437,6 +437,9 @@ describe("Hotel housekeeping", () => {
     expect(sim.tower.placeTransport("elevatorService", x0 + 6, 1, 5).ok).toBe(true);
     expect(sim.tower.placeTransport("elevatorService", x0 + 12, 1, 5).ok).toBe(true);
     const shafts = sim.tower.transports.filter((t) => t.kind === "elevatorService");
+    // A crew to field her: the staff spawn ceiling is what the built
+    // housekeeping units can staff, so a crewless tower spawns none.
+    expect(sim.tower.place("housekeeping", 3, x0 + 8).ok).toBe(true);
     // One housekeeper, routed over exactly one shaft, standing at floor 3
     // waiting for its car.
     expect(sim.crowd.spawnStaff(sim.tower, 3, 5, x0 + 2, 12345, 8)).toBe("sent");

@@ -6,7 +6,8 @@ import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
 import type { Crowd } from "../Crowd";
 import type { SpawnFloors, StaffKind } from "./person";
-import { MAX_PEOPLE, MAX_STAFF, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
+import { MAX_PEOPLE, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
+import { HK_MAIDS_PER_UNIT } from "../economy/housekeeping";
 import {
   MEAL_WINDOWS,
   mealWindowFor,
@@ -418,7 +419,7 @@ export function spawnStaff(
   cleanMinutes: number,
   fromX?: number,
 ): "sent" | "full" | "no-route" {
-  if (crowd.staffCount >= MAX_STAFF) return "full";
+  if (crowd.staffCount >= maxStaffFor(tower)) return "full";
   const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
   if (!r) return "no-route";
   const p = makePerson(crowd, tower, r, destX);
@@ -431,6 +432,23 @@ export function spawnStaff(
   p.lingerFor = cleanMinutes * CROWD_SECONDS_PER_MINUTE;
   crowd.staffCount++;
   return "sent";
+}
+
+/** The staff-actor spawn ceiling: exactly what the built housekeeping units can
+ *  field (operational crews x {@link HK_MAIDS_PER_UNIT}). Canon has NO
+ *  tower-wide staff pool (each 1994 housekeeping room staffs its own 6 maids,
+ *  and documented near-max towers run 12-16 units per hotel section with every
+ *  maid working), so a fixed global cap here silently throttled big hotels
+ *  below their built capacity. The per-crew ledgers in
+ *  `economy/housekeeping.ts` (6 out per crew, one per floor) are the real
+ *  constraint; this gate only backstops them, and screen load stays bounded
+ *  because fielding more maids costs building more crews. */
+export function maxStaffFor(tower: Tower): number {
+  let crews = 0;
+  for (const u of tower.units) {
+    if (u.kind === "housekeeping" && isOperational(u)) crews++;
+  }
+  return crews * HK_MAIDS_PER_UNIT;
 }
 
 /** Drain the staff jobs that ended since the last call (arrived or failed). */
