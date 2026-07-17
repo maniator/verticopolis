@@ -1216,6 +1216,8 @@ dialog.crash-card::backdrop {
 /* The derived base marker and the lobby tag on the floor label. */
 .es-base { color: var(--accent); }
 .es-lobby-mark { color: var(--accent); font-size: 9px; font-weight: 700; }
+/* Measured demand hotspot (#465): where riders board at the busiest hour. */
+.es-origin { color: var(--bad); font-size: 8px; margin-left: 2px; }
 /* A car chip: a numbered mini button, hollow on other rows, pressed navy on its
    home row. Color never carries it alone: aria-pressed and the bevel do. */
 .es-chip {

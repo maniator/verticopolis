@@ -148,6 +148,65 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(rings.weekday[9]).toBe(0);
   });
 
+  it("tallies boarding origins in dispatch and folds them into the hour they happened in (#465)", () => {
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    // Occupants on floor 5 generate statistical trips; cars board them there
+    // (and at the lobby, which draws from the tower population).
+    const r = sim.tower.place("office", 5, 2);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.getUnit(r.unitId!)!;
+    office.state = "occupied";
+    office.occupants = 8;
+    sim.clock.minutes = 8 * 60; // day 0 (weekday), 08:00
+    for (let i = 0; i < 240; i++) sim.elevators.update(sim.tower, 1, 3);
+    // The hourly sampler fires at the top of the NEXT hour; the tally covers
+    // the hour that ended, so the boardings belong to the 08:00 slot.
+    sim.clock.minutes = 9 * 60;
+    sim.sampleElevatorUtil();
+    const rings = sim.elevatorOriginLoad(shaft.id)!;
+    const slot = rings.weekday[8];
+    expect(slot.size).toBeGreaterThan(0); // attributed to the ended hour, not 09:00
+    expect(rings.weekday[9].size).toBe(0);
+    expect(rings.weekend[8].size).toBe(0); // and nowhere near the weekend
+    expect(slot.get(5) ?? 0).toBeGreaterThan(0); // a real non-lobby origin, not just the lobby
+    for (const floor of slot.keys()) {
+      expect(floor).toBeGreaterThanOrEqual(shaft.bottom);
+      expect(floor).toBeLessThanOrEqual(shaft.top);
+    }
+    // The drain cleared the tally: sampling again without new boardings only
+    // decays the slot, it never re-adds the drained hour.
+    const mass = [...slot.values()].reduce((a, b) => a + b, 0);
+    sim.clock.minutes = 10 * 60;
+    sim.sampleElevatorUtil();
+    sim.clock.minutes = 9 * 60; // back to re-sample the 08:00 slot's own fold hour
+    sim.sampleElevatorUtil();
+    const after = [...rings.weekday[8].values()].reduce((a, b) => a + b, 0);
+    expect(after).toBeLessThan(mass);
+  });
+
+  it("attributes a midnight drain to yesterday's last hour and day type (#465)", () => {
+    // Boardings during Sunday 23:00 drain at Monday 00:00: they belong to the
+    // WEEKEND 23:00 slot, not the weekday ring the clock is in at sample time.
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    const r = sim.tower.place("office", 5, 2);
+    expect(r.ok).toBe(true);
+    const office = sim.tower.getUnit(r.unitId!)!;
+    office.state = "occupied";
+    office.occupants = 8;
+    sim.clock.minutes = 6 * 1440 + 23 * 60; // day 6 (Sunday), 23:00
+    expect(sim.clock.isWeekend).toBe(true);
+    for (let i = 0; i < 60; i++) sim.elevators.update(sim.tower, 1, 3);
+    sim.clock.minutes = 7 * 1440; // Monday 00:00 (a weekday)
+    expect(sim.clock.isWeekend).toBe(false);
+    sim.sampleElevatorUtil();
+    const rings = sim.elevatorOriginLoad(shaft.id)!;
+    expect(rings.weekend[23].size).toBeGreaterThan(0);
+    expect(rings.weekday[23].size).toBe(0);
+    expect(rings.weekday[0].size).toBe(0);
+  });
+
   it("snaps against fresh stops even when the stopsOf cache is warm (#467)", () => {
     // Dispatch reads tower.stopsOf every tick, so in a live game the
     // per-revision stops cache is always warm when a stop edit lands. The edit

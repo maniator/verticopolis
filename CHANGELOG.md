@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.61.0
+
+- The Schedule dialog now shows where your riders actually come from: red hotspot markers flag the floors where most boarding happens at the busiest hour, the Simulate line names them, and Auto-tune stages the upper half of the fleet at the busiest measured boarding floor instead of guessing the top lobby.
+
 ## 1.60.0
 
 - New music: the start screen has its own warm, hummable theme, and in the tower a calm, slowly drifting bed plays that shifts gently over a couple of minutes instead of looping the same short tune. The two glide into each other when you start a tower rather than cutting.

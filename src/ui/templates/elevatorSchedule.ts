@@ -2,6 +2,11 @@ import { html, nothing, type TemplateResult } from "lit-html";
 import { live } from "lit-html/directives/live.js";
 import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
 import type { SchedulePreset } from "../../engine/scheduleAuthoring";
+// floorLabel is a DOM-free pure helper in its own module (so the schedule
+// formatter can reuse it without pulling in lit-html); re-exported here so
+// existing importers and tests keep their `./elevatorSchedule` path.
+import { floorLabel } from "../floorLabel";
+export { floorLabel };
 
 /**
  * The per-shaft elevator Schedule dialog (elevator-scheduling #305 Phase 3, floors
@@ -70,6 +75,9 @@ export interface SchedState {
    *  Simulate staging readout. */
   adviceMsg: string;
   simMsg: string;
+  /** Measured demand-hotspot floors for the visible day's busiest hour (#465):
+   *  marked in the grid; empty when origins are cold. */
+  originFloors: number[];
 }
 
 export interface SchedHandlers {
@@ -110,12 +118,6 @@ function span(state: SchedState): [number, number] {
 }
 
 const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
-
-/** Floor label with the basement grammar the retired stops dialog pinned: B1,
- *  B2... below ground, plain numbers above. */
-export function floorLabel(floor: number): string {
-  return floor < 1 ? `B${1 - floor}` : String(floor);
-}
 
 /** Press-and-hold auto-repeat for a stepper button: fires the handler once per
  *  ~150ms after a 400ms hold, so 8 presses of − collapse into one hold. Attached
@@ -291,7 +293,7 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
           const isBase = f.floor === state.base;
           return html`
           <div class="es-grid-row${f.served ? "" : " es-skipped"}">
-            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}</span>
+            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}${state.originFloors.includes(f.floor) ? html`<span class="es-origin" role="img" aria-label="Demand hotspot: many riders board here at the busiest ${state.day} hour" title="Demand hotspot: many riders board here at the busiest ${state.day} hour">▲</span>` : nothing}</span>
             ${ctx.isExpress
               ? nothing
               : f.endpoint

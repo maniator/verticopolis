@@ -2450,6 +2450,78 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().textContent).toContain("No measured weekend traffic yet; Auto-tune adjusts only measured days.");
   });
 
+  it("marks measured boarding hotspots in the grid and names them in Simulate (#465)", async () => {
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    // Weekday demand peaks at 08:00; origins say that hour's riders board on
+    // floors 7 (mostly) and 1.
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 30],
+      [1, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins });
+    const marks = Array.from(dialog().querySelectorAll(".es-origin"));
+    expect(marks).toHaveLength(2);
+    // The marker carries an accessible label, not just a title tooltip.
+    expect(marks[0].getAttribute("role")).toBe("img");
+    expect(marks[0].getAttribute("aria-label")).toContain("Demand hotspot");
+    expect(simText()).toContain("Most riders board on floors 1, 7.");
+    // The markers are day-scoped like the ghost: a cold weekend shows none.
+    dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click();
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(0);
+    expect(simText()).not.toContain("Most riders board");
+  });
+
+  it("origins never outrun the demand gate: warm origins on a cold day show nothing (#465)", async () => {
+    // The inverse of the cold-origins case: the weekend ORIGIN map carries mass
+    // but the weekend demand curve never warmed. Deleting the dayWarmed() gate
+    // in dayOriginsAt would light these markers; pin that they stay dark.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const origins = emptyOriginRings();
+    origins.weekend[12] = new Map([[7, 30]]);
+    const hourly = Array(24).fill(0.5);
+    open({ hourly: { weekday: hourly }, origins, initialWeekend: true }); // the cold weekend tab
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(0);
+    expect(simText()).not.toContain("Most riders board");
+  });
+
+  it("drops the hotspot mark and the named floor once the floor is skipped (#465)", async () => {
+    // EMA'd origin history outlives a stop edit; the readouts must not claim
+    // boardings on a floor the shaft no longer serves.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 30],
+      [1, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins, stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 5, 6, 8, 9, 10]) });
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(1); // floor 7 is skipped: only floor 1 marks
+    expect(simText()).toContain("Most riders board at Floor 1.");
+  });
+
+  it("a skipped floor's stale mass does not suppress the served-floor marker (#465)", async () => {
+    // The share threshold must apply to the SERVED set: floor 7 carries most of
+    // the slot's historical mass but is skipped, so filtering it out AFTER the
+    // ranking would leave floor 3 below threshold and blank all markers. With
+    // the slot filtered to served floors first, floor 3 still marks.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 90], // skipped, but dominates the raw slot total
+      [3, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins, stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 5, 6, 8, 9, 10]) });
+    const marks = Array.from(dialog().querySelectorAll(".es-origin"));
+    expect(marks).toHaveLength(1); // floor 3 still marks despite floor 7's larger mass
+    expect(simText()).toContain("Most riders board at Floor 3.");
+  });
+
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
     const { apply } = open({
       stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 8, 9, 10]),

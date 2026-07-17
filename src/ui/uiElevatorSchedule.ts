@@ -9,6 +9,8 @@ import {
   type SchedHandlers,
 } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
+import { ORIGIN_HOURS, dayOriginTotals, peakOriginFloor, topOriginFloors, type OriginRings } from "../engine/scheduleOrigins";
+import { hh, fmtHours, originClause } from "./scheduleFormat";
 import {
   presetSchedule,
   autoTuneSchedule,
@@ -58,6 +60,9 @@ export interface ScheduleDialogCtx {
   /** Measured 24-hour demand curves (0..1) split by day type (#466), or undefined
    *  if the shaft has never been sampled. Either day may still be cold. */
   hourly?: { weekday?: readonly number[]; weekend?: readonly number[] };
+  /** Per-floor boarding-origin rings (#465), day-split like `hourly`; feeds the
+   *  grid's hotspot markers, the Simulate origin clause, and Auto-tune's aim. */
+  origins?: OriginRings;
   /** The shaft's current authored schedule (the working copy is seeded from it). */
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
@@ -102,6 +107,31 @@ export function showElevatorScheduleDialog(
     floors.filter((f) => f.served && f.lobby).map((f) => f.floor).sort((x, y) => x - y);
   const baseOf = (floors: FloorRow[]): number => servedLobbiesAsc(floors)[0] ?? ctx.bottom;
 
+  /** The visible day's origin map at hour `h`, gated on that day's warm demand
+   *  curve so origins never outrun the demand gate (#465). */
+  const dayOriginsAt = (h: number): ReadonlyMap<number, number> | undefined => {
+    if (!ctx.origins || !dayWarmed()) return undefined;
+    const ring = state.day === "weekend" ? ctx.origins.weekend : ctx.origins.weekday;
+    return ring[((h % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
+  };
+  /** Auto-tune's staging aim (#465): the busiest boarding floor across the
+   *  WHOLE day's origin rings (a single peak-hour slot is the wrong basis:
+   *  the demand peak is often the lobby-dominated up-rush, and one slot can
+   *  be empty at the sampled instant). Prefers the VISIBLE day when warm so
+   *  a Weekend-tab Auto-tune aims at weekend geography, else the other warm
+   *  day. Filtered to floors the shaft still serves; undefined with no
+   *  origin data, which falls back to the plain split seed. */
+  const originAim = (floors: FloorRow[]): number | undefined => {
+    if (!ctx.origins) return undefined;
+    const dayIsWe = state.day === "weekend";
+    const useWe = dayIsWe ? warmedWe() || !warmedWd() : warmedWe() && !warmedWd();
+    if (!(useWe ? warmedWe() : warmedWd())) return undefined;
+    const totals = dayOriginTotals(useWe ? ctx.origins.weekend : ctx.origins.weekday);
+    const served = new Set(servedFloorsAsc(floors));
+    for (const floor of [...totals.keys()]) if (!served.has(floor)) totals.delete(floor);
+    return peakOriginFloor(totals);
+  };
+
   /** The authoring-model view of the shaft, rebuilt from the LIVE rows so preset
    *  staging and the Simulate readout follow stop edits made inside the dialog. */
   const shaftNow = (floors: FloorRow[]): ShaftContext => ({
@@ -110,6 +140,7 @@ export function showElevatorScheduleDialog(
     top: ctx.top,
     servedLobbies: servedLobbiesAsc(floors),
     hourly: measured(),
+    peakOriginFloor: originAim(floors),
   });
 
   // A stored home floor may sit on a stop the shaft no longer serves: snap it to
@@ -156,6 +187,7 @@ export function showElevatorScheduleDialog(
     },
     adviceMsg: "",
     simMsg: "",
+    originFloors: [],
   };
   // Whether the player (now, or in the stored schedule) has authored staging by hand;
   // presets keep their hands off hand-set homes, and Auto-tune seeds staging only
@@ -185,20 +217,6 @@ export function showElevatorScheduleDialog(
   };
 
   const announce = (msg: string): void => ctx.announce?.(msg);
-  // Compress an ascending hour list into ranges ("07:00–10:00, 13:00") so a
-  // long advice stretch reads as one span, not a two-line comma flood (§11).
-  const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
-  const fmtHours = (hs: number[]): string => {
-    const parts: string[] = [];
-    for (let i = 0; i < hs.length; ) {
-      let j = i;
-      while (j + 1 < hs.length && hs[j + 1] === hs[j] + 1) j++;
-      parts.push(j > i ? `${hh(hs[i])}–${hh(hs[j])}` : hh(hs[i]));
-      i = j + 1;
-    }
-    return parts.join(", ");
-  };
-
   // Whether the last recompute produced CRITICAL advice, straight from the
   // model (never parsed back out of the rendered copy, which a copy tweak
   // would silently break): the auto-unfold keys on this.
@@ -231,9 +249,19 @@ export function showElevatorScheduleDialog(
     const peakClause = sctx.hasMeasured
       ? `Busiest ${state.day} hour ${hh(sum.peakHour)}`
       : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
+    // Origin readouts (#465): hotspot markers for the visible day's peak hour,
+    // and a trailing boarding clause. Both empty until origins warm.
+    // Filter the slot to served floors BEFORE ranking: topOriginFloors takes its
+    // share threshold against the slot total, so a skipped floor's stale EMA mass
+    // would otherwise push every served floor below threshold and blank the markers.
+    const servedNow = new Set(servedFloorsAsc(state.floors));
+    const peakSlot = dayOriginsAt(sum.peakHour);
+    const servedSlot = peakSlot && new Map([...peakSlot].filter(([f]) => servedNow.has(f)));
+    state.originFloors = topOriginFloors(servedSlot || undefined);
     state.simMsg =
       `${peakClause}: ${sum.upTowerCars} staged up-tower, ` +
-      `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.`;
+      `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.` +
+      originClause(state.originFloors);
   };
 
   function rerender(): void {
@@ -408,7 +436,12 @@ export function showElevatorScheduleDialog(
           weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...(state.schedule.activeCars?.weekday ?? fullRow())],
           weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...(state.schedule.activeCars?.weekend ?? fullRow())],
         };
-        if (tuned.homeFloors) state.schedule.homeFloors = [...tuned.homeFloors];
+        // Snap the tuned homes onto the served set (#465): the aim is filtered
+        // to served floors, but a stale schedule row or a race with a live stop
+        // edit could still hand back a floor with no chip row, and the grid
+        // must never stage a car where it cannot show it.
+        const servedNow = servedFloorsAsc(state.floors);
+        if (tuned.homeFloors) state.schedule.homeFloors = tuned.homeFloors.map((f) => snapToServed(f, servedNow));
       }
       // Name the days that were actually tuned: on a cold Weekend tab a blanket
       // "auto-tuned" would claim a change the visible row never shows (#466).

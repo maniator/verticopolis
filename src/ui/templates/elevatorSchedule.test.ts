@@ -71,6 +71,7 @@ const state = (over: Partial<SchedState> = {}): SchedState => ({
   },
   adviceMsg: "",
   simMsg: "Busiest weekday hour 17:00: 4 of 4 cars, 0 staged up-tower, 4 at the lobby.",
+  originFloors: [],
   ...over,
 });
 

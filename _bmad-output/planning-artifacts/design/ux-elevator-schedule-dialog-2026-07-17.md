@@ -471,7 +471,9 @@ the 12+12 wrap (breaks the noon-straddling rush window).
 | Announce, auto-tune | `Auto-tuned cars and staging to this shaft's measured demand.` |
 | Auto-tune disabled note | `Auto-tune needs a day or two of measured traffic first.` |
 | Advice line | `This shaft is over-staffed <span> and short at <hour span> on <day type>s.` / `Measured demand and your schedule line up.` (hour spans compress: `09:00–16:00`) |
-| Simulate readout (§6, re-pinned §16/§17) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (a non-ground base reads `<l> at Floor <n> (the base)`; staging clause leads; origin-floor variants deferred behind #465) |
+| Simulate readout (§6, re-pinned §16/§17) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (a non-ground base reads `<l> at Floor <n> (the base)` with B-n grammar below ground; staging clause leads; an unmeasured day leads with `No measured <day type> peak yet; at the 17:00 down-rush` instead of `Busiest`) |
+| Simulate origin clause (§6 as-built, #465) | Trailing, only once origins warm for the visible day: ` Most riders board at Floor <n>.` / ` Most riders board on floors <a>–<b>.` (contiguous band) / ` Most riders board on floors <a>, <b>, <c>.` (scattered) |
+| Hotspot marker title (#465) | `Demand hotspot: many riders board here at the busiest <day type> hour` on the red ▲ beside the floor label; markers and clause show only floors the shaft still serves |
 | Floors list heads (fold-in increment, §16) | `Floor` / `Serve` / `Home car(s)` |
 | Floors quick-actions (fold-in increment, §16) | `Express (lobbies)` / `All stops` |
 | Express floors caption (fold-in increment, §16) | `Serves all lobbies and sky lobbies` |
@@ -779,7 +781,8 @@ so the spec and the build cannot drift silently:
   the strip one fold away. The party may overrule at review. Shipped instead: the touch flow
   hint ("Tap an hour, then set its cars with − and +. A second tap spans hours."), second-tap
   span extension on coarse pointers, press-and-hold auto-repeat on every stepper, and the
-  sticky day toggle. Peak-origin markers still wait on the per-floor accumulator (#465).
+  sticky day toggle. Peak-origin markers landed with the per-floor accumulator (#465),
+  one increment later; see the origin bullet below.
 - **Copy re-pins**: the Simulate base clause and the home-all quick action name the base floor
   when it is not the ground lobby (`8 at Floor 30 (the base)` / `Home all cars at Floor 30`),
   Samus's sky-lobby honesty flag from the containment review. New pinned strings: the stops
@@ -789,8 +792,24 @@ so the spec and the build cannot drift silently:
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
 - **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
-  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The per-floor
-  accumulator (#465) refines the sampling story; revisit the distinction there.
+  yet sampled", so an unsampled hour draws no dash rather than a zero dash. Tracked as
+  `schedule-ring-sampled-mask` (#474).
+- **Origin accumulator (#465, v1.61.0)**: the dispatcher tallies boardings by origin floor
+  at its board site (only at stops with a live call, so a homecoming car cannot credit its
+  own home floor and feed the staging aim back into itself); `sampleElevatorUtil` drains the
+  tally hourly into day-split per-hour origin maps (transient, never serialized). The drain
+  attributes to the hour that ENDED and to that hour's day type, so a midnight day-boundary
+  drain files under yesterday's ring. Three specced surfaces land on it: red hotspot markers
+  in the floors grid for the visible day's busiest hour, the Simulate trailing clause ("Most
+  riders board on floors 5–7."), and Auto-tune's staging seed aiming the upper half at the
+  busiest boarding floor across the WHOLE day's rings (a single peak-hour slot is often the
+  lobby-dominated up-rush), preferring the visible day when warm. Presets keep the plain
+  lobby split: they are intents, not measurements. Origins are gated on the day's warm demand
+  curve, and both the markers and the aim are filtered to floors the shaft still serves, so
+  EMA'd history can never mark or stage a skipped floor. Known limits, tracked: attendance
+  venue riders (cinema, party hall) place real crowd calls and never enter the statistical
+  boarding tally, so their floors cannot become hotspots; the dialog's origin snapshot goes
+  stale across undo/adoptSim (#475).
 - **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
   day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
   Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and
