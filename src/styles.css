@@ -1754,6 +1754,32 @@ dialog.crash-card::backdrop {
   .es-strip-axis {
     display: none;
   }
+  /* Touch breathing room (owner's phone feedback): the 36px controls need more
+     air between sections than the desktop's 8px, the quick actions must not
+     crowd the car list, and the docked stepper and Simulate line want space
+     before the actions row. Coarse-only, so desktop pixels stay untouched. */
+  .es-body {
+    gap: 12px;
+  }
+  .es-homes {
+    gap: 10px 12px;
+  }
+  .es-home-row {
+    gap: 8px;
+  }
+  .es-home-row > span {
+    flex: none;
+  }
+  .es-quick {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .es-strip-step {
+    margin-top: 6px;
+  }
+  .es-sim {
+    margin-top: 4px;
+  }
   /* Title-bar ✕s keep their exact desktop look — stretching them reads
      wrong in the bar — and instead grow an invisible tap halo, so the
      effective target is ~34px without a pixel of visual change. */
