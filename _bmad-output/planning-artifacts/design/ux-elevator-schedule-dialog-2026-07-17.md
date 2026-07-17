@@ -196,7 +196,7 @@ the SAME data the current `Configure stops…` dialog edits; per the owner call 
 REPLACES that dialog (§7), so it is the one place a shaft's stops are set. For an EXPRESS
 shaft the floors are not a free list (it stops at lobbies/sky lobbies by construction), so
 instead of a disabled-looking checkbox column it renders as a static one-line caption,
-`Serves all lobbies and sky lobbies`, never a greyed picker (a greyed editable-looking
+`Serves all lobbies and sky lobbies`, never a grayed picker (a grayed editable-looking
 control reads as a bug; a caption reads as a fact).
 
 ### 4.2 Base / starting floor
