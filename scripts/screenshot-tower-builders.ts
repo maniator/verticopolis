@@ -311,6 +311,8 @@ export function buildScheduleTowerModern(): void {
   }
   // A measured day: commuter peaks at 08:00 and 17:00, a lunch shoulder, quiet
   // nights. Seeded directly (the EMA would need days of sim time to warm up).
+  // Day-split shape (#466): the scene opens on the weekday tab; the weekend ring
+  // gets a quieter curve so the tabs read differently in the gallery.
   const hourly = Array.from({ length: 24 }, (_, h) => {
     if (h === 8 || h === 17) return 0.85;
     if (h === 7 || h === 9 || h === 16 || h === 18) return 0.6;
@@ -319,7 +321,10 @@ export function buildScheduleTowerModern(): void {
     if (h >= 19 && h <= 21) return 0.25;
     return 0.08;
   });
-  s.elevatorHourly.set(std.id, hourly);
+  s.elevatorHourly.set(std.id, {
+    weekday: hourly,
+    weekend: hourly.map((v) => Math.max(0.05, Math.round(v * 40) / 100)),
+  });
   // Authored schedule: thin overnight, but a single car at the 08:00 peak, so
   // the Modern advice line has a real shortfall to report (the honesty
   // threshold in scheduleAdvice needs a 2-car gap before it nags).
