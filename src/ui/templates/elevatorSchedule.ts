@@ -35,11 +35,15 @@ export interface SchedCtx {
   ux: ElevatorScheduleUX;
   isExpress: boolean;
   cars: number;
-  /** Whether the shaft has warmed up a measured curve (enables Auto-tune / advice,
-   *  and the ghost series in both modes). */
+  /** Whether the CURRENT DAY TAB has a warmed measured curve (#466): drives the
+   *  ghost legend and the advice fallback; the controller updates it on day switch. */
   hasMeasured: boolean;
-  /** The warmed measured curve for DISPLAY (the ghost series), or undefined. */
+  /** The current day's warmed curve for DISPLAY (the ghost series), or undefined
+   *  while that day is unmeasured; day-scoped like {@link hasMeasured}. */
   hourly?: readonly number[];
+  /** Whether EITHER day has warmed up (arms the Auto-tune button, which tunes
+   *  every measured day at once). */
+  canTune: boolean;
   recommended: SchedulePreset;
 }
 
@@ -317,10 +321,10 @@ function presetsTemplate(ctx: SchedCtx, h: SchedHandlers): TemplateResult {
         <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" @click=${() => h.onPreset(p)}
           title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`)}
       ${ctx.ux.autoTune
-        ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.hasMeasured} @click=${h.onAutoTune}>Auto-tune</button>`
+        ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
         : nothing}
     </div>
-    ${ctx.ux.autoTune && !ctx.hasMeasured ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}`;
+    ${ctx.ux.autoTune && !ctx.canTune ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}`;
 }
 
 export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {

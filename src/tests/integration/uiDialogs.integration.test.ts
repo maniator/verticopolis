@@ -2363,7 +2363,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     hourly[8] = 0.9;
     const { ui } = makeUI();
     const current = { activeCars: { weekday: Array(24).fill(1) } };
-    ui.showElevatorScheduleDialog(baseCtx({ hourly, current }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current }), { apply: vi.fn() });
     const advice = dialog().querySelector(".es-advice");
     expect(advice).not.toBeNull();
     expect(advice!.textContent).toBe("This shaft is short at 08:00 on weekdays.");
@@ -2376,14 +2376,14 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     // which must read as one 00:00-23:00 span, not 24 comma'd stamps.
     const hourly = Array(24).fill(0.9);
     const { ui } = makeUI();
-    ui.showElevatorScheduleDialog(baseCtx({ hourly, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn() });
+    ui.showElevatorScheduleDialog(baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn() });
     expect(dialog().querySelector(".es-advice")!.textContent).toBe("This shaft is short at 00:00–23:00 on weekdays.");
   });
 
   it("hands Auto-tune the measured curve and the tuned counts land on OK", () => {
     const hourly = Array(24).fill(0.1);
     hourly[8] = 1;
-    const { apply } = open({ hourly });
+    const { apply } = open({ hourly: { weekday: hourly } });
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
     const row = apply.mock.calls[0][0].activeCars.weekday;
@@ -2393,7 +2393,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("Auto-tune seeds split staging on an untouched shaft", () => {
     const hourly = Array(24).fill(0.5);
-    const { apply } = open({ hourly }); // no stored schedule, staging never edited
+    const { apply } = open({ hourly: { weekday: hourly } }); // no stored schedule, staging never edited
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 8, 8]); // the split
@@ -2401,7 +2401,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("Auto-tune never overwrites hand-set homes", () => {
     const hourly = Array(24).fill(0.5);
-    const { apply } = open({ hourly });
+    const { apply } = open({ hourly: { weekday: hourly } });
     chipAt(5, 1).click(); // hand-home car 1 at floor 5
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
@@ -2421,9 +2421,29 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("keeps Auto-tune disabled until the curve has a real spread of sampled hours", () => {
     const hourly = Array(24).fill(0);
     hourly[8] = 0.9; // one busy hour is not a measured day
-    open({ hourly });
+    open({ hourly: { weekday: hourly } });
     expect(dialog().querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(true);
     expect(dialog().querySelector(".es-advice")).toBeNull(); // no advice off a cold ring
+  });
+
+  it("day-scopes the ghost and advice: a warm weekday never stands in for a cold weekend (#466)", () => {
+    // Only the weekday ring is measured; the weekday tab shows the ghost and its
+    // day-named advice, and flipping to Weekend must drop BOTH (no phantom rush),
+    // while Auto-tune stays armed (it can still tune the measured weekday).
+    const hourly = Array(24).fill(0.05);
+    hourly[8] = 0.9;
+    const { ui } = makeUI();
+    ui.showElevatorScheduleDialog(
+      baseCtx({ hourly: { weekday: hourly }, current: { activeCars: { weekday: Array(24).fill(1), weekend: Array(24).fill(1) } } }),
+      { apply: vi.fn() },
+    );
+    expect(dialog().querySelector(".es-legend")).not.toBeNull();
+    expect(dialog().querySelector(".es-advice")!.textContent).toContain("on weekdays");
+    dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click(); // Weekend
+    expect(dialog().querySelector(".es-legend")).toBeNull(); // no ghost off a cold ring
+    expect(dialog().querySelector(".es-bar-demand")).toBeNull();
+    expect(dialog().querySelector(".es-advice")).toBeNull(); // no weekend advice invented
+    expect(dialog().querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(false);
   });
 
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
@@ -2578,7 +2598,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("emits the pinned announce strings on stepper commits, presets, and Auto-tune", () => {
     const announce = vi.fn();
     const hourly = Array(24).fill(0.5);
-    open({ hourly, announce });
+    open({ hourly: { weekday: hourly }, announce });
     const steppers = dialog().querySelectorAll(".es-spread .es-stepper");
     steppers[0].querySelector<HTMLButtonElement>('[aria-label="raise"]')!.click();
     expect(announce).toHaveBeenLastCalledWith("Waiting Car Response set to 1. Higher holds idle cars in place longer.");

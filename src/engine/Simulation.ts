@@ -32,6 +32,7 @@ import * as services from "./sim/services";
 import * as events from "./sim/events";
 import * as demand from "./sim/demand";
 import type { DemandMap } from "./sim/demand";
+import type { HourlyByDay } from "./elevatorSchedule";
 import * as stats from "./sim/stats";
 
 import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
@@ -260,14 +261,14 @@ export class Simulation implements SimContext {
    *  transient (warms up after load, not serialized). */
   elevatorUtil = new Map<number, number>();
 
-  /** Per-shaft measured demand by hour-of-day: a 24-slot ring of EMA'd load
-   *  fractions (0..1) per shaft id, sampled hourly alongside {@link elevatorUtil}
-   *  and read by the schedule dialog (#305 Phase 3). Transient like it: a fresh
-   *  load reads empty ("needs measured traffic"), never a fabricated curve. */
-  elevatorHourly = new Map<number, number[]>();
+  /** Per-shaft measured demand by hour-of-day, split by day type (#466): two
+   *  24-slot rings of EMA'd load fractions (0..1) per shaft id, sampled hourly
+   *  alongside {@link elevatorUtil} for the schedule dialog (#305 Phase 3).
+   *  Transient like it: a fresh load reads empty, never a fabricated curve. */
+  elevatorHourly = new Map<number, HourlyByDay>();
 
-  /** This shaft's measured hourly curve, or undefined before it warms up. */
-  elevatorHourlyLoad(id: number): number[] | undefined { return this.elevatorHourly.get(id); }
+  /** This shaft's measured day-split curves, or undefined before any sample. */
+  elevatorHourlyLoad(id: number): HourlyByDay | undefined { return this.elevatorHourly.get(id); }
 
   /** Lazy noise-adjacency memo by unit id, valid for exactly one
    *  tower.revision (strict equality; -1 forces the first fill). Noise is a

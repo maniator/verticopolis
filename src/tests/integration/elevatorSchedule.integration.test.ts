@@ -108,6 +108,23 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(shaft.schedule!.homeFloors).toEqual([3, 1]);
   });
 
+  it("samples each day type into its own demand ring (#466)", () => {
+    // The real-world calendar's weekend is the trailing 2 of 7 days, so day 0
+    // is a weekday and day 5 a Saturday. A loaded weekday sample must land in
+    // the weekday ring ONLY; the same hour on Saturday fills the weekend ring.
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    shaft.carLoad = [5, 5];
+    sim.clock.minutes = 8 * 60; // day 0 (weekday), 08:00
+    sim.sampleElevatorUtil();
+    const rings = sim.elevatorHourlyLoad(shaft.id)!;
+    expect(rings.weekday[8]).toBeGreaterThan(0);
+    expect(rings.weekend[8]).toBe(0); // never bleeds across day types
+    sim.clock.minutes = 5 * 1440 + 8 * 60; // day 5 (Saturday), 08:00
+    sim.sampleElevatorUtil();
+    expect(rings.weekend[8]).toBeGreaterThan(0);
+  });
+
   it("snaps against fresh stops even when the stopsOf cache is warm (#467)", () => {
     // Dispatch reads tower.stopsOf every tick, so in a live game the
     // per-revision stops cache is always warm when a stop edit lands. The edit

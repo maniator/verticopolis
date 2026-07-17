@@ -45,6 +45,7 @@ const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
   isExpress: false,
   cars: 4,
   hasMeasured: true,
+  canTune: true,
   recommended: "rush",
   ...over,
 });
@@ -101,7 +102,9 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
   });
 
   it("marks the recommended preset and disables Auto-tune before the shaft warms up", () => {
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ hasMeasured: false, recommended: "feeder" }), state(), noop));
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx({ hasMeasured: false, canTune: false, recommended: "feeder" }), state(), noop),
+    );
     const rec = frag.querySelector(".es-presets .es-rec")!;
     expect(rec.textContent).toBe("Feeder");
     expect(frag.querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(true);

@@ -55,8 +55,9 @@ export interface ScheduleDialogCtx {
   top: number;
   /** The live stops port (the folded-in `Configure stops…` model). */
   stops: ScheduleStopsPort;
-  /** Measured 24-hour demand curve (0..1), or undefined if the shaft has not warmed up. */
-  hourly?: readonly number[];
+  /** Measured 24-hour demand curves (0..1) split by day type (#466), or undefined
+   *  if the shaft has never been sampled. Either day may still be cold. */
+  hourly?: { weekday?: readonly number[]; weekend?: readonly number[] };
   /** The shaft's current authored schedule (the working copy is seeded from it). */
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
@@ -77,10 +78,20 @@ export function showElevatorScheduleDialog(
   ctx: ScheduleDialogCtx,
   cb: { apply: (schedule: ElevatorSchedule) => void },
 ): void {
-  // The measured curve arms the assists only once genuinely warmed; a cold curve is
-  // withheld from the authoring model entirely, so advice and Auto-tune cannot read
-  // a mostly-empty ring as a day of traffic.
-  const warmed = !!ctx.hourly && ctx.hourly.filter((v) => v > 0).length >= WARMED_MIN_HOURS;
+  // Each day's measured curve arms the assists only once genuinely warmed (#466);
+  // a cold curve is withheld from the authoring model entirely, so advice and
+  // Auto-tune cannot read a mostly-empty ring as a day of traffic, and a warmed
+  // weekday never stands in for an unmeasured weekend.
+  const warm = (c?: readonly number[]): boolean => !!c && c.filter((v) => v > 0).length >= WARMED_MIN_HOURS;
+  const warmedWd = warm(ctx.hourly?.weekday);
+  const warmedWe = warm(ctx.hourly?.weekend);
+  const measured =
+    warmedWd || warmedWe
+      ? {
+          ...(warmedWd ? { weekday: ctx.hourly!.weekday } : {}),
+          ...(warmedWe ? { weekend: ctx.hourly!.weekend } : {}),
+        }
+      : undefined;
 
   const readFloors = (): FloorRow[] => ctx.stops.read();
   const servedFloorsAsc = (floors: FloorRow[]): number[] =>
@@ -96,7 +107,7 @@ export function showElevatorScheduleDialog(
     bottom: ctx.bottom,
     top: ctx.top,
     servedLobbies: servedLobbiesAsc(floors),
-    hourly: warmed ? ctx.hourly : undefined,
+    hourly: measured,
   });
 
   // A stored home floor may sit on a stop the shaft no longer serves: snap it to
@@ -153,13 +164,21 @@ export function showElevatorScheduleDialog(
   // take them back (each has its own undo step instead).
   let dirty = false;
 
+  // The template's `hourly`/`hasMeasured` are DAY-SCOPED (#466): the ghost and
+  // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
+  // ghost even while the weekday curve is warm. `recompute` keeps them current.
+  const dayWarmed = (): boolean => (state.day === "weekend" ? warmedWe : warmedWd);
+  const dayCurve = (): readonly number[] | undefined =>
+    state.day === "weekend" ? (warmedWe ? ctx.hourly?.weekend : undefined) : (warmedWd ? ctx.hourly?.weekday : undefined);
+
   const sctx: SchedCtx = {
     title: ctx.title,
     ux: ctx.ux,
     isExpress: ctx.isExpress,
     cars: ctx.cars,
-    hasMeasured: warmed,
-    hourly: warmed ? ctx.hourly : undefined,
+    hasMeasured: dayWarmed(),
+    hourly: dayCurve(),
+    canTune: warmedWd || warmedWe,
     recommended: recommendedPreset(ctx.isExpress),
   };
 
@@ -184,6 +203,8 @@ export function showElevatorScheduleDialog(
   let adviceCritical = false;
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";
+    sctx.hasMeasured = dayWarmed();
+    sctx.hourly = dayCurve();
     const shaft = shaftNow(state.floors);
     const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
     adviceCritical = adv !== null;
@@ -371,9 +392,11 @@ export function showElevatorScheduleDialog(
       const probe: ElevatorSchedule = { ...state.schedule, homeFloors: homesDirty ? state.schedule.homeFloors : undefined };
       const tuned = autoTuneSchedule(probe, shaftNow(state.floors));
       if (tuned) {
+        // A day the model left untuned (its ring unmeasured, #466) keeps ITS OWN
+        // working row; falling back to curRow() would copy the visible day across.
         state.schedule.activeCars = {
-          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...curRow()],
-          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...curRow()],
+          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...state.schedule.activeCars.weekday!],
+          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...state.schedule.activeCars.weekend!],
         };
         if (tuned.homeFloors) state.schedule.homeFloors = [...tuned.homeFloors];
       }

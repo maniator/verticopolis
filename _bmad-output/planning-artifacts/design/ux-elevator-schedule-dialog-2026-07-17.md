@@ -788,6 +788,11 @@ so the spec and the build cannot drift silently:
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
 - **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
-  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The day-split
-  rings (#466) and the per-floor accumulator (#465) refine the sampling story; revisit the
-  distinction there.
+  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The per-floor
+  accumulator (#465) refines the sampling story; revisit the distinction there.
+- **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
+  day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
+  Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and
+  no advice even while the weekday curve is warm, and Auto-tune tunes each day only from its
+  own ring (an unmeasured day keeps its authored row). The Auto-tune button arms when either
+  day is warm; the warm-up gate (6 sampled hours) applies per ring.
