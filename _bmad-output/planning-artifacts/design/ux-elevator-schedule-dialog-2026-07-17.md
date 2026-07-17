@@ -274,7 +274,8 @@ proportional to that hour's load. It writes the working-copy rows at author time
 waiting estimate, and `Simulation` samples an hourly AVERAGE elevator utilization
 (`elevatorUtil`), neither of which is a per-shaft 24-hour demand curve. So Auto-tune and the
 ghost series (§14.2) require Phase 3 to ADD a small per-shaft, per-hour demand accumulator: a
-transient 24-slot ring per shaft, filled from the demand the dispatch already computes, keyed
+transient 24-slot ring per shaft (since v1.59.0 one ring per day type; see the §17 day-split
+bullet, #466), filled from the demand the dispatch already computes, keyed
 like `carDwell` so it is NOT serialized (rebuilt as the sim runs) and adds no golden-master
 state and no RNG. Until a shaft has accumulated a day or two, Auto-tune and the ghost series
 read empty (the disabled-note path below). This is engine-adjacent plumbing the Phase 3 PR
@@ -788,6 +789,17 @@ so the spec and the build cannot drift silently:
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
 - **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
-  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The day-split
-  rings (#466) and the per-floor accumulator (#465) refine the sampling story; revisit the
-  distinction there.
+  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The per-floor
+  accumulator (#465) refines the sampling story; revisit the distinction there.
+- **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
+  day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
+  Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and
+  no advice even while the weekday curve is warm, and Auto-tune tunes each day only from its
+  own ring (an unmeasured day keeps its authored row), announcing exactly which days it
+  tuned. The Auto-tune button arms when either day is warm, with a hint naming the cold
+  visible day; the warm-up gate (6 sampled hours) applies per ring and is re-checked on
+  every recompute, so a day that warms while the dialog sits open is picked up. On a cold
+  day the Simulate sentence does not claim a measured peak: it reads "No measured
+  <day> peak yet; at the 17:00 down-rush: ...". The zero-vs-unsampled conflation is now
+  per-day load-bearing (a genuinely dead weekend can never warm its ring); tracked as its
+  own backlog row.

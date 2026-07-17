@@ -68,25 +68,39 @@ describe("recommendedPreset", () => {
 });
 
 describe("autoTuneSchedule", () => {
-  it("sets counts proportional to measured load, floored at 1, both day rows", () => {
-    const s = autoTuneSchedule(undefined, { ...CTX, hourly: rushCurve() })!;
+  it("sets counts proportional to measured load, floored at 1, per measured day (#466)", () => {
+    const s = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve() } })!;
     expect(s.activeCars?.weekday?.[8]).toBe(6); // load 1.0 * 6
     expect(s.activeCars?.weekday?.[12]).toBe(3); // load 0.5 * 6
     expect(s.activeCars?.weekday?.[3]).toBe(1); // load 0.1 * 6 -> round 0.6 -> 1, never 0
-    expect(s.activeCars?.weekend).toEqual(s.activeCars?.weekday);
+    // The unmeasured weekend is NOT tuned from the weekday rush: with no authored
+    // row it stays absent ("all cars run"), never a phantom copy of the weekday.
+    expect(s.activeCars?.weekend).toBeUndefined();
+  });
+
+  it("tunes each day from its own curve and keeps an unmeasured day's authored row (#466)", () => {
+    const quiet = Array(SCHEDULE_HOURS).fill(0.2);
+    const both = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve(), weekend: quiet } })!;
+    expect(both.activeCars?.weekday?.[8]).toBe(6); // weekday rush
+    expect(both.activeCars?.weekend?.[8]).toBe(1); // weekend quiet: 0.2 * 6 -> 1
+    // Only the weekend measured: the authored weekday row survives untouched.
+    const cur = { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(2) } };
+    const weOnly = autoTuneSchedule(cur, { ...CTX, hourly: { weekend: quiet } })!;
+    expect(weOnly.activeCars?.weekday).toEqual(Array(SCHEDULE_HOURS).fill(2));
+    expect(weOnly.activeCars?.weekend?.[8]).toBe(1);
   });
 
   it("seeds split staging when homes are unset, but never overwrites a hand-set staging", () => {
-    const seeded = autoTuneSchedule(undefined, { ...CTX, hourly: rushCurve() })!;
+    const seeded = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve() } })!;
     expect(seeded.homeFloors).toEqual([1, 1, 1, 30, 30, 30]); // seeded split
-    const authored = autoTuneSchedule({ homeFloors: [15, 15, 15, 15, 15, 15] }, { ...CTX, hourly: rushCurve() })!;
+    const authored = autoTuneSchedule({ homeFloors: [15, 15, 15, 15, 15, 15] }, { ...CTX, hourly: { weekday: rushCurve() } })!;
     expect(authored.homeFloors).toEqual([15, 15, 15, 15, 15, 15]); // preserved
   });
 
   it("returns the current schedule unchanged when there is no measured history", () => {
     const cur = { waitingCarResponse: 3 };
     expect(autoTuneSchedule(cur, { ...CTX, hourly: undefined })).toBe(cur);
-    expect(autoTuneSchedule(cur, { ...CTX, hourly: Array(24).fill(0) })).toBe(cur);
+    expect(autoTuneSchedule(cur, { ...CTX, hourly: { weekday: Array(24).fill(0) } })).toBe(cur);
   });
 });
 
@@ -94,30 +108,39 @@ describe("scheduleAdvice", () => {
   it("flags an over-staffed lull and a short peak, and returns null when in line", () => {
     // Author a flat 3 cars all day against a curve that wants 6 at 17:00 and 1 overnight.
     const flat = { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(3) } };
-    const adv = scheduleAdvice(flat, { ...CTX, hourly: rushCurve() }, false)!;
+    const adv = scheduleAdvice(flat, { ...CTX, hourly: { weekday: rushCurve() } }, false)!;
     expect(adv.short).toContain(17); // wants 6, runs 3
     expect(adv.over).toContain(3); // wants 1, runs 3
     // A schedule that matches the curve advises nothing.
-    const tuned = autoTuneSchedule(undefined, { ...CTX, hourly: rushCurve() });
-    expect(scheduleAdvice(tuned, { ...CTX, hourly: rushCurve() }, false)).toBeNull();
+    const tuned = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve() } });
+    expect(scheduleAdvice(tuned, { ...CTX, hourly: { weekday: rushCurve() } }, false)).toBeNull();
   });
 
   it("never nags 'short' on an hour already running the full fleet", () => {
     // Full fleet all day; a curve that wants more than the fleet cannot be satisfied.
     const full = { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(6) } };
-    const adv = scheduleAdvice(full, { ...CTX, hourly: Array(SCHEDULE_HOURS).fill(1) }, false);
+    const adv = scheduleAdvice(full, { ...CTX, hourly: { weekday: Array(SCHEDULE_HOURS).fill(1) } }, false);
     expect(adv?.short ?? []).not.toContain(8); // 6 of 6 already, no nag
   });
 
   it("returns null with no measured history", () => {
     expect(scheduleAdvice({ activeCars: { weekday: Array(24).fill(1) } }, { ...CTX, hourly: undefined }, false)).toBeNull();
   });
+
+  it("stays silent on a day whose own ring is unmeasured, even with the other day warm (#466)", () => {
+    // The original defect: a weekday-only curve produced "short at 08:00 on
+    // weekends" advice. The weekend read must see no data and say nothing.
+    const flat = { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(1), weekend: Array(SCHEDULE_HOURS).fill(1) } };
+    const ctx = { ...CTX, hourly: { weekday: rushCurve() } };
+    expect(scheduleAdvice(flat, ctx, false)).not.toBeNull(); // weekday: measured, short
+    expect(scheduleAdvice(flat, ctx, true)).toBeNull(); // weekend: no ring, no advice
+  });
 });
 
 describe("stagingSummary", () => {
   it("reads the measured peak hour and splits cars up-tower vs lobby from the homes", () => {
     const s = { activeCars: { weekday: Array(SCHEDULE_HOURS).fill(6) }, homeFloors: [1, 1, 1, 30, 30, 30] };
-    const sum = stagingSummary(s, { ...CTX, hourly: rushCurve() }, false);
+    const sum = stagingSummary(s, { ...CTX, hourly: { weekday: rushCurve() } }, false);
     expect(sum.peakHour).toBe(8); // rushCurve peaks first at 08:00
     expect(sum.activeAtPeak).toBe(6);
     expect(sum.upTowerCars).toBe(3);
@@ -129,6 +152,17 @@ describe("stagingSummary", () => {
     expect(sum.peakHour).toBe(17);
     expect(sum.upTowerCars).toBe(0); // no homes authored: all fall back to the base lobby
     expect(sum.lobbyCars).toBe(6);
+  });
+
+  it("reads each day's peak from its own ring; an unmeasured day falls back to 17:00 (#466)", () => {
+    const weekend = Array(SCHEDULE_HOURS).fill(0.1);
+    weekend[11] = 1; // the weekend rush sits at 11:00, not the weekday 08:00
+    const ctx = { ...CTX, hourly: { weekday: rushCurve(), weekend } };
+    expect(stagingSummary(undefined, ctx, false).peakHour).toBe(8);
+    expect(stagingSummary(undefined, ctx, true).peakHour).toBe(11);
+    // The weekday ring alone must not name a weekend peak.
+    const wdOnly = { ...CTX, hourly: { weekday: rushCurve() } };
+    expect(stagingSummary(undefined, wdOnly, true).peakHour).toBe(17);
   });
 
   it("counts any car homed above the base lobby as up-tower, whatever the lobby layout", () => {

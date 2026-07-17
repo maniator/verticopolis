@@ -23,6 +23,19 @@ export interface ElevatorSchedule {
 }
 
 /**
+ * A shaft's measured hourly demand, split by day type (#466): one 24-slot ring
+ * per day of EMA'd load fractions (0..1), so weekend samples never blend into
+ * the weekday curve. A slot of 0 means "no positive sample yet": a genuinely
+ * zero-load hour also reads 0, so consumers cannot tell the two apart (the
+ * conflation is tracked as #474). Transient (never serialized): a fresh load
+ * reads empty, never a fabricated curve.
+ */
+export interface HourlyByDay {
+  weekday: number[];
+  weekend: number[];
+}
+
+/**
  * Which authoring affordances the schedule dialog shows (Phase 3). Returned by
  * the `GameRules.elevatorScheduleUX()` seam: Classic all-false except
  * `rawGridDefault` (1994 fidelity, advice withheld, information not); Modern

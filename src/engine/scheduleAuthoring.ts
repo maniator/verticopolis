@@ -14,15 +14,27 @@ import { SCHEDULE_HOURS, coerceSchedule } from "./elevatorSchedule";
 
 /** The shaft facts the authoring helpers read. `servedLobbies` is the subset of
  *  served floors that carry a (sky) lobby, sorted ascending; it is the express home
- *  set and the staging target for every preset. `hourly` is the measured 24-hour
- *  demand curve (0..1 per hour-of-day) from `Simulation.elevatorHourlyLoad`, or
- *  undefined when the shaft has not warmed up yet. */
+ *  set and the staging target for every preset. `hourly` carries the measured
+ *  24-hour demand curves (0..1 per hour-of-day) from `Simulation.elevatorHourlyLoad`,
+ *  split by day type (#466); an absent day (or an all-zero curve) means that day
+ *  has not warmed up yet, and an absent `hourly` means neither has. */
 export interface ShaftContext {
   cars: number;
   bottom: number;
   top: number;
   servedLobbies: number[];
-  hourly?: readonly number[];
+  hourly?: { weekday?: readonly number[]; weekend?: readonly number[] };
+}
+
+/** The measured curve for one day type, or undefined when that day has no
+ *  positive sample yet (#466): consumers must never treat the other day's
+ *  rush as this day's demand. NOTE: this accepts a single positive sample;
+ *  the dialog additionally gates on WARMED_MIN_HOURS before passing a curve
+ *  in, so callers that skip the dialog should apply their own warm-up gate. */
+function measuredDay(ctx: ShaftContext, isWeekend: boolean): readonly number[] | undefined {
+  const curve = isWeekend ? ctx.hourly?.weekend : ctx.hourly?.weekday;
+  if (!curve || curve.length === 0 || curve.every((v) => v <= 0)) return undefined;
+  return curve;
 }
 
 export type SchedulePreset = "rush" | "balanced" | "feeder";
@@ -125,25 +137,31 @@ export function recommendedPreset(isExpress: boolean): SchedulePreset {
 
 /**
  * Auto-tune (spec §5.2): set each hour's active count proportional to the measured
- * load, floored at 1 (never fully off the air), for both day-type rows from the one
- * measured curve. Also SEED staging (the split: lower half at base, upper half
- * up-tower) WHEN the caller marks the home floors as untouched by passing them
- * absent; it never overwrites a hand-set staging. The accumulator is per-hour only,
- * so the seed cannot yet aim at a measured demand origin; a per-floor accumulator
- * (backlogged) would sharpen it. Returns the current schedule unchanged when there
- * is no measured history yet (the caller shows the "needs measured traffic" note).
+ * load, floored at 1 (never fully off the air). Each day-type row tunes from ITS
+ * OWN measured curve (#466); a day with no history keeps the authored row rather
+ * than inheriting the other day's rush. Also SEED staging (the split: lower half
+ * at base, upper half up-tower) WHEN the caller marks the home floors as untouched
+ * by passing them absent; it never overwrites a hand-set staging. The accumulator
+ * is per-hour only, so the seed cannot yet aim at a measured demand origin; a
+ * per-floor accumulator (backlogged) would sharpen it. Returns the current schedule
+ * unchanged when neither day has measured history yet (the caller shows the "needs
+ * measured traffic" note).
  */
 export function autoTuneSchedule(current: ElevatorSchedule | undefined, ctx: ShaftContext): ElevatorSchedule | undefined {
-  const hourly = ctx.hourly;
-  if (!hourly || hourly.length === 0 || hourly.every((v) => v <= 0)) return current;
-  const row = Array.from({ length: SCHEDULE_HOURS }, (_, h) => {
-    const frac = hourly[h] ?? 0;
-    return Math.max(1, Math.min(ctx.cars, Math.round(frac * ctx.cars)));
-  });
+  const wd = measuredDay(ctx, false);
+  const we = measuredDay(ctx, true);
+  if (!wd && !we) return current;
+  const rowFrom = (curve: readonly number[]): number[] =>
+    Array.from({ length: SCHEDULE_HOURS }, (_, h) => Math.max(1, Math.min(ctx.cars, Math.round((curve[h] ?? 0) * ctx.cars))));
+  const activeCars: NonNullable<ElevatorSchedule["activeCars"]> = {};
+  if (wd) activeCars.weekday = rowFrom(wd);
+  else if (current?.activeCars?.weekday) activeCars.weekday = [...current.activeCars.weekday];
+  if (we) activeCars.weekend = rowFrom(we);
+  else if (current?.activeCars?.weekend) activeCars.weekend = [...current.activeCars.weekend];
   const homesAuthored = !!current?.homeFloors && current.homeFloors.length > 0;
   const next: ElevatorSchedule = {
     ...current,
-    activeCars: { weekday: [...row], weekend: [...row] },
+    activeCars,
     homeFloors: homesAuthored ? current!.homeFloors : splitStaging(ctx),
   };
   return coerceSchedule(next, ctx.cars, ctx.bottom, ctx.top);
@@ -151,18 +169,20 @@ export function autoTuneSchedule(current: ElevatorSchedule | undefined, ctx: Sha
 
 /**
  * The advice comparison (spec §5.3, §14.3): name hours where the authored count is
- * well below or well above the measured demand for the live day type. Suppresses the
- * "short at H" call whenever that hour already runs the full fleet (you cannot add a
- * car you do not have). Returns null when nothing is notably off, or when there is no
- * measured history. Data only; the UI formats the sentence.
+ * well below or well above the measured demand for the live day type, read from
+ * THAT day's ring (#466) so the sentence's day name is always true to the data.
+ * Suppresses the "short at H" call whenever that hour already runs the full fleet
+ * (you cannot add a car you do not have). Returns null when nothing is notably off,
+ * or when the named day has no measured history. Data only; the UI formats the
+ * sentence.
  */
 export function scheduleAdvice(
   schedule: ElevatorSchedule | undefined,
   ctx: ShaftContext,
   isWeekend: boolean,
 ): { over: number[]; short: number[] } | null {
-  const hourly = ctx.hourly;
-  if (!hourly || hourly.length === 0 || hourly.every((v) => v <= 0)) return null;
+  const hourly = measuredDay(ctx, isWeekend);
+  if (!hourly) return null;
   const row = (isWeekend ? schedule?.activeCars?.weekend : schedule?.activeCars?.weekday) ?? undefined;
   const over: number[] = [];
   const short: number[] = [];
@@ -178,17 +198,18 @@ export function scheduleAdvice(
 
 /**
  * The Simulate staging summary (spec §6, §14.2): score POSITIONING, not counts. Reports
- * the shaft's busiest measured hour (or, with no history, the evening down-rush hour as
- * a sane default), the active count then, and how the fleet is staged (how many cars
- * wait up-tower vs at the base lobby). Data only; the UI turns it into the pinned
- * sentence. Never promises a routed wait time (§6 constraint).
+ * the shaft's busiest measured hour on the named day's own ring (#466), or, with no
+ * history for that day, the evening down-rush hour as a sane default, the active
+ * count then, and how the fleet is staged (how many cars wait up-tower vs at the
+ * base lobby). Data only; the UI turns it into the pinned sentence. Never promises
+ * a routed wait time (§6 constraint).
  */
 export function stagingSummary(
   schedule: ElevatorSchedule | undefined,
   ctx: ShaftContext,
   isWeekend: boolean,
 ): { peakHour: number; activeAtPeak: number; upTowerCars: number; lobbyCars: number; topLobby: number; baseLobby: number } {
-  const hourly = ctx.hourly;
+  const hourly = measuredDay(ctx, isWeekend);
   let peakHour = 17; // the evening down-rush, the default when there is no measured curve
   if (hourly && hourly.length === SCHEDULE_HOURS) {
     let best = -1;
