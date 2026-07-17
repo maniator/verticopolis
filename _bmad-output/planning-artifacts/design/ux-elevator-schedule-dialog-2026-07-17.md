@@ -177,7 +177,7 @@ row), value in a `.field`-styled read-only cell, 36px targets on coarse pointers
   without touching anything writes a schedule that dispatches identically.
 - **Announce on commit** (single-throat announce path), pinned as templates (`<n>` is the
   committed value; see the copy inventory §11):
-  - `Waiting Car Response: <n> floors. Idle cars hold for calls more than <n> floors off.`
+  - `Waiting Car Response set to <n>. Higher holds idle cars in place longer.`
   - `Waiting Car Response: 0. Idle cars answer the nearest call.` (the floor-0 read, the default)
   - `Standard Floor Departure: <n> seconds.`
 - The `– ` disables at the floor, `+` at the cap; both borrow the existing disabled-nudge
@@ -266,10 +266,19 @@ one undo (Cancel) or one other preset away, so it needs no confirm.
 
 ### 5.2 Auto-tune (Modern)
 
-`Auto-tune` reads the shaft's own measured hourly load (the existing statistical demand the
-dispatcher already accumulates, exposed read-only to the UI) and sets each hour's active
-count proportional to that hour's load. It writes the working-copy rows at author time only
-(no sim-tick effect, no RNG; arch §6), then re-renders. The model permits `0..cars` per hour,
+`Auto-tune` reads the shaft's measured hourly load and sets each hour's active count
+proportional to that hour's load. It writes the working-copy rows at author time only
+(no sim-tick effect, no RNG; arch §6), then re-renders.
+
+**Build note (the signal does not exist yet).** The dispatcher today keeps only a per-floor
+waiting estimate, and `Simulation` samples an hourly AVERAGE elevator utilization
+(`elevatorUtil`), neither of which is a per-shaft 24-hour demand curve. So Auto-tune and the
+ghost series (§14.2) require Phase 3 to ADD a small per-shaft, per-hour demand accumulator: a
+transient 24-slot ring per shaft, filled from the demand the dispatch already computes, keyed
+like `carDwell` so it is NOT serialized (rebuilt as the sim runs) and adds no golden-master
+state and no RNG. Until a shaft has accumulated a day or two, Auto-tune and the ghost series
+read empty (the disabled-note path below). This is engine-adjacent plumbing the Phase 3 PR
+carries; it does not change dispatch behavior. The model permits `0..cars` per hour,
 but Auto-tune deliberately floors its output at `1` (never 0): a measured-demand tune should
 thin a quiet hour, never take the shaft fully off the air, so a lull cannot silently strand a
 floor for an hour. A player who wants a true 0-car hour still sets it by hand on the strip.
@@ -409,7 +418,7 @@ fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
 | Dialog title | `Schedule: <Shaft name> (floors <bottom>-<top>)` |
 | Day-type toggle | `Weekday` / `Weekend` |
 | Strip heading | `Cars on shift by hour` + `<n> of <cars>` |
-| Announce, WCR set | `Waiting Car Response: <n> floors. Idle cars hold for calls more than <n> floors off.` |
+| Announce, WCR set | `Waiting Car Response set to <n>. Higher holds idle cars in place longer.` |
 | Announce, WCR zero | `Waiting Car Response: 0. Idle cars answer the nearest call.` |
 | Announce, SFD set | `Standard Floor Departure: <n> seconds.` |
 | Preset buttons | `Rush` / `Balanced` / `Feeder` |
@@ -521,13 +530,17 @@ real skill. Owner call 2026-07-17: research Classic, party for Modern.
 ### 14.2 The positioning-first re-layout (Modern; three engine-free moves)
 
 Option A is not just "rearrange"; it makes positioning the legibly-scored lever via three
-deterministic, author-time moves (no tick effect, no RNG, unscheduled towers byte-identical):
+deterministic moves. The authoring itself is author-time (no tick effect); the one tick-time
+addition is the transient, read-only per-shaft per-hour demand accumulator that feeds moves 1
+and the Auto-tune of move 2 (§5.2 build note), which aggregates demand the dispatch already
+computes, adds no serialized state and no RNG, and so leaves unscheduled towers byte-identical:
 
 1. **Measured-demand ghost series behind the strip.** Render the shaft's measured hourly load
-   as a second series behind the authored bars, and gray any authored bar segment ABOVE the
-   demand line as "idle anyway, no effect." Maxing counts becomes a VISIBLE redundancy rather
-   than a hidden non-choice, and Classic finally shows the true measured load it always
-   promised (§5.3) instead of leaving Classic blind. This also restores the strip's count
+   (from the new per-shaft per-hour accumulator, §5.2 build note) as a second series behind the
+   authored bars, and gray any authored bar segment ABOVE the demand line as "idle anyway, no
+   effect." Maxing counts becomes a VISIBLE redundancy rather than a hidden non-choice, and
+   Classic finally shows the true measured load it always promised (§5.3) instead of leaving
+   Classic blind. This also restores the strip's count
    gridlines (0/2/4/.../cars) the first mockup dropped, so a bar's value reads without a
    tooltip.
 2. **Auto-tune owns the Modern count rows by default; the manual strip moves behind Advanced.**
@@ -575,7 +588,7 @@ SHOULD-CONSIDER (folded as refinements):
 - **Mark the recommended preset per shaft (§5.1, §5.4).** Highlight Feeder on express and Rush
   on a busy local, so the presets teach the mechanic instead of a flat three-button menu.
 - **Live legibility sentence under each stepper (§3).** Show the announce sentence on-screen
-  live (`Idle cars hold for calls more than 4 floors off.`; a dwell tradeoff line for SFD), so
+  live (`Higher holds idle cars in place longer.`; a dwell tradeoff line for SFD), so
   the two tunables read as choices, not opaque knobs. Add press-and-hold auto-repeat and wire
   the disabled-at-floor/cap state.
 - **Home floors: numbered car chips, not anonymous dots (§4.3).** Render `(5)(6)` chips rather
