@@ -37,8 +37,10 @@ export class ElevatorDispatch {
    *  computes; never serialized, never read back into behavior. */
   private boardTally = new Map<number, Map<number, number>>();
 
-  /** Hand over and clear the boarding tally (the hourly origin sampler's feed). */
-  drainBoardings(): Map<number, Map<number, number>> {
+  /** Hand over and clear the boarding tally (the hourly origin sampler's feed).
+   *  Returned read-only so a consumer can drain and read but never mutate the
+   *  sampled history (the contract is drain-only). */
+  drainBoardings(): ReadonlyMap<number, ReadonlyMap<number, number>> {
     const out = this.boardTally;
     this.boardTally = new Map();
     return out;
