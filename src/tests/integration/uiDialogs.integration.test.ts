@@ -2460,6 +2460,48 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(row[9]).toBe(3);
   });
 
+  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", () => {
+    const stops = fakeStops();
+    const { apply } = open({ stops, current: { homeFloors: [5, 1, 1, 1] } });
+    // Uncheck floor 5: the port mutates, the grid refreshes, car 1's home snaps off it.
+    const rows = () => dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)");
+    const serve5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!
+      .querySelector<HTMLInputElement>("input[type=checkbox]")!;
+    serve5.checked = false;
+    serve5.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(stops.setServe).toHaveBeenCalledWith(5, false);
+    const row5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!;
+    expect(row5.classList.contains("es-skipped")).toBe(true);
+    expect(row5.querySelectorAll(".es-chip")).toHaveLength(0);
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors[0]).not.toBe(5); // snapped off the skipped floor
+  });
+
+  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", () => {
+    open();
+    const serve = dialog().querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]")[1];
+    serve.checked = false;
+    serve.dispatchEvent(new Event("change", { bubbles: true }));
+    dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
+    expect(dialog().open).toBe(false); // closed at once: no schedule edit pending
+  });
+
+  it("the bulk stop quick actions ride the port and announce", () => {
+    const announce = vi.fn();
+    const stops = fakeStops();
+    open({ stops, announce });
+    const quick = dialog().querySelectorAll<HTMLButtonElement>(".es-quick .btn");
+    quick[0].click(); // Express (lobbies)
+    expect(stops.expressStops).toHaveBeenCalledOnce();
+    expect(announce).toHaveBeenLastCalledWith("Stops set to lobbies only.");
+    // The grid follows: non-lobby floors read skipped now.
+    expect(dialog().querySelectorAll(".es-grid-row.es-skipped").length).toBeGreaterThan(0);
+    quick[1].click(); // All stops
+    expect(stops.allStops).toHaveBeenCalledOnce();
+    expect(announce).toHaveBeenLastCalledWith("Stopping at every floor.");
+    expect(dialog().querySelectorAll(".es-grid-row.es-skipped")).toHaveLength(0);
+  });
+
   it("emits the pinned announce strings on stepper commits, presets, and Auto-tune", () => {
     const announce = vi.fn();
     const hourly = Array(24).fill(0.5);

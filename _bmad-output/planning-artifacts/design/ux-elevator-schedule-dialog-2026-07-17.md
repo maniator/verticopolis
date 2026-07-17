@@ -744,3 +744,41 @@ above the base; stored home floors snap to the nearest served stop; the measured
 first sample at full value and the assists arm only after six sampled hours; the strip gained
 keyboard editing (arrows adjust and move), shift-click span fill, and count gridlines; the pinned
 announce strings ride the live region; touch gets 36px scrollable bars and the dirty-discard guard.
+
+## 17. The floors fold-in as built (#464, 2026-07-17)
+
+The fold-in increment shipped the one-surface dialog. Deltas against §4/§8/§15, recorded here
+so the spec and the build cannot drift silently:
+
+- **The floors grid is primary in BOTH modes** (staging-first, §14): span floors descending,
+  Serve toggles (live-applied, per-toggle undo steps, exactly the retired dialog's semantics),
+  the derived base marker, lobby tags, and one numbered chip per car on every served row. A
+  chip press homes that car on that row: the radio-grid reading of §4.3's "focus a row and
+  press its car number", chosen over focus-then-type (undiscoverable on touch) and drag
+  (rejected in §15). The retired surfaces are gone: `Configure stops…`, its dialog, and the
+  card's `Express (lobbies)` / `All stops` rows, which now live in the grid's quick row.
+- **The base floor is DERIVED ONLY** (lowest served lobby, else the shaft bottom), marked with
+  `◎` but not settable: the merged schedule model carries no base field, and adding one is a
+  save-format conversation this increment does not open. §4.2's `Set as base` affordance is
+  parked until an authored-base field earns a format bump; the marker plus the snap rules keep
+  the derived base legible meanwhile.
+- **The ghost series shipped in both modes** (§14.2 move 1, the §16 2-1 ruling): a dashed
+  measured-demand mark per bar with the authored fill above it rendered pale as spare
+  capacity, plus a one-line legend. The count gridlines and the in-scroller hour axis (ticks
+  anchored to the bar track, so they scroll together; replaces the v1.57.1 static-axis hide)
+  ride the same strip rebuild.
+- **Mobile: the §15 read-only sparkline is superseded**, not built: with the strip scrolling
+  inside its own well, the ghost carrying the read half, and Modern auto-opening Advanced
+  whenever the advice line critiques strip numbers, a second demand rendering would duplicate
+  the strip one fold away. The party may overrule at review. Shipped instead: the touch flow
+  hint ("Tap an hour, then set its cars with − and +. A second tap spans hours."), second-tap
+  span extension on coarse pointers, press-and-hold auto-repeat on every stepper, and the
+  sticky day toggle. Peak-origin markers still wait on the per-floor accumulator (#465).
+- **Copy re-pins**: the Simulate base clause and the home-all quick action name the base floor
+  when it is not the ground lobby (`8 at Floor 30 (the base)` / `Home all cars at Floor 30`),
+  Samus's sky-lobby honesty flag from the containment review. New pinned strings: the stops
+  announces (`Floor <n> served.` / `Floor <n> skipped.` / `Stops set to lobbies only.` /
+  `Stopping at every floor.`), the grid heading `Serviced floors and home cars`, and the touch
+  hint above.
+- **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
+  Cancel could not honestly take them back; the guard covers only the schedule working copy.

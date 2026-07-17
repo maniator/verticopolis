@@ -4,8 +4,7 @@ import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
 import { coerceSchedule, snapHomesToStops } from "../elevatorSchedule";
 
-/** Transport CRUD, stops, and resize for the Tower, as friend functions taking
- * the {@link Tower} instance. Extracted from `Tower.ts`. */
+/** Transport CRUD, stops, and resize (friend functions of {@link Tower}). */
 
 /** Validate a transport placement without mutating anything. */
 export function validateTransport(tower: Tower, kind: FacilityKind, x: number, bottom: number, top: number): PlaceResult {
@@ -161,8 +160,7 @@ export function removeUnit(tower: Tower, id: number): Unit | undefined {
  *  {@link ensureFloorUnder}). Returns the ids laid, or `null` if some tile can
  *  never be supported, after rolling the whole batch back so the caller can
  *  refuse without leaving an orphan floor. Used by the elevator-extend
- *  auto-floor: extending a shaft past the built structure brings its floor
- *  with it (the `auto-floor-build` backlog item's elevator-extend behavior). */
+ *  auto-floor: extending past built structure brings the floor along. */
 export function layShaftFloors(tower: Tower, floors: number[], x: number, width: number): number[] | null {
   const tiles: { fl: number; x: number }[] = [];
   for (const fl of floors) {
@@ -272,10 +270,9 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
     }
     t.skipFloors = [...skip].sort((a, b) => a - b);
   }
-  // Re-harden an authored schedule against the new span (#305): a shrink must
-  // pull home floors back onto the shaft, same as the carPositions clamp above.
-  // Then snap homes onto the live stop set (#467): the express skip resync just
-  // above may have skipped a floor a car homes at.
+  // Re-harden an authored schedule against the new span (#305) and snap homes
+  // onto the live stop set (#467): the express skip resync just above may have
+  // skipped a floor a car homes at.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   tower.revision++;
@@ -298,19 +295,17 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carDir.length = cars;
   }
   t.cars = cars;
-  // Re-harden an authored schedule against the new car count (#305, the Phase 1
-  // defer): a fleet shrink clamps active-car rows and truncates home floors so
-  // the stored schedule never references a car that no longer exists.
+  // Re-harden an authored schedule against the new car count (#305): a fleet
+  // shrink clamps rows and truncates homes past the last remaining car.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   tower.revision++;
   return true;
 }
 
-/** Write an authored per-shaft schedule (#305 Phase 3). The raw value (dialog
- *  working copy or any untrusted input) is hardened through `coerceSchedule`
- *  against the shaft's live cars and span, so it can never carry an active count
- *  above the fleet or a home floor off the shaft. Bumps `revision` so routing
- *  and stop caches invalidate (arch §3). Returns false for a non-elevator id. */
+/** Write an authored per-shaft schedule (#305 Phase 3), hardened through
+ *  `coerceSchedule` against the live cars and span so it can never carry a count
+ *  above the fleet or a home off the shaft. Bumps `revision` so routing and stop
+ *  caches invalidate (arch §3). Returns false for a non-elevator id. */
 export function setSchedule(tower: Tower, id: number, raw: unknown): boolean {
   const t = tower.transportById(id);
   if (!t || !isElevatorKind(t.kind)) return false;
@@ -386,8 +381,7 @@ export function setStop(tower: Tower, id: number, floor: number, stop: boolean):
   if (stop) skip.delete(floor);
   else skip.add(floor);
   t.skipFloors = [...skip].sort((a, b) => a - b);
-  // A skipped floor may orphan a car's home there (#467): snap homes onto the
-  // live stop set, so a car never parks at a floor it cannot stop at.
+  // A skipped floor may orphan a car's home there (#467): snap homes to stops.
   if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   tower.revision++;
   return true;
@@ -414,8 +408,7 @@ export function clearStops(tower: Tower, id: number): boolean {
   const t = tower.transportById(id);
   if (!t) return false;
   if (t.kind === "elevatorExpress") return tower.setExpressStops(id);
-  t.skipFloors = [];
-  // Every floor stops again, so any span-clamped home is a valid stop; no snap needed.
+  t.skipFloors = []; // every floor stops again: no home snap needed
   tower.revision++;
   return true;
 }

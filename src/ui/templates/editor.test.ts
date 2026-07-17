@@ -286,7 +286,9 @@ describe("transport editor row and action branches", () => {
     const service = withLift("elevatorService");
     const sFrag = renderToFragment(transportEditorTemplate(service.sim, service.lift));
     expect(sFrag.querySelector('[data-field="cars"]')).not.toBeNull();
-    expect(sFrag.querySelector('[data-edit="stops"]')).not.toBeNull(); // staff-only still configures stops
+    // Stops config folded into the Schedule dialog (#464): no card button remains.
+    expect(sFrag.querySelector('[data-edit="stops"]')).toBeNull();
+    expect(sFrag.querySelector('[data-edit="schedule"]')).not.toBeNull();
     const esc = withLift("escalator", 2, "shop");
     const eFrag = renderToFragment(transportEditorTemplate(esc.sim, esc.lift));
     expect(eFrag.querySelector('[data-field="cars"]')).toBeNull();
