@@ -1821,9 +1821,7 @@ dialog.crash-card::backdrop {
   /* The rung picker's select is a tap target too (editor card and the batch
      dialog variant); the rename text input keeps its natural height. */
   #editor .ed-row select.field,
-  .bp-rung select.field,
-  /* The schedule dialog's per-car home-floor pickers. */
-  .es-home-sel {
+  .bp-rung select.field {
     min-height: 36px;
   }
   /* The count strip on touch: every bar grows to the 36px target and the strip
@@ -1858,14 +1856,20 @@ dialog.crash-card::backdrop {
   .es-body {
     gap: 12px;
   }
-  .es-homes {
-    gap: 10px 12px;
+  /* The car chips and Serve checkboxes are the grid's primary touch targets:
+     every one clears ~36px (spec section 8's MUST; the chips are the reason the
+     per-car selects retired). */
+  .es-chip {
+    min-width: 34px;
+    height: 34px;
+    font-size: 12px;
   }
-  .es-home-row {
-    gap: 8px;
+  .es-cell-serve input {
+    width: 22px;
+    height: 22px;
   }
-  .es-home-row > span {
-    flex: none;
+  .es-grid-row {
+    min-height: 40px;
   }
   .es-quick {
     gap: 8px;

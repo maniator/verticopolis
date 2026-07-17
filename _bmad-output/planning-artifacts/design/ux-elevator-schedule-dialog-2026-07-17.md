@@ -470,12 +470,17 @@ the 12+12 wrap (breaks the noon-straddling rush window).
 | Announce, auto-tune | `Auto-tuned cars and staging to this shaft's measured demand.` |
 | Auto-tune disabled note | `Auto-tune needs a day or two of measured traffic first.` |
 | Advice line | `This shaft is over-staffed <span> and short at <hour span> on <day type>s.` / `Measured demand and your schedule line up.` (hour spans compress: `09:00–16:00`) |
-| Simulate readout (§6, re-pinned §16) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (staging clause leads; the origin-floor variants are deferred behind a per-floor accumulator, §16) |
+| Simulate readout (§6, re-pinned §16/§17) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (a non-ground base reads `<l> at Floor <n> (the base)`; staging clause leads; origin-floor variants deferred behind #465) |
 | Floors list heads (fold-in increment, §16) | `Floor` / `Serve` / `Home car(s)` |
 | Floors quick-actions (fold-in increment, §16) | `Express (lobbies)` / `All stops` |
 | Express floors caption (fold-in increment, §16) | `Serves all lobbies and sky lobbies` |
-| Home quick-actions | `Home all cars at the lobby` / `Stage upper half up-tower` |
+| Home quick-actions | `Home all cars at the lobby` (non-ground base: `Home all cars at Floor <n>`) / `Stage upper half up-tower` |
 | Dirty Cancel arm | `Discard changes?` |
+| Grid heading (§17) | `Serviced floors and home cars` |
+| Announce, stops (§17) | `Floor <n> served.` / `Floor <n> skipped.` / `Floor <n> must stay a stop.` / `Stops set to lobbies only.` / `Stopping at every floor.` |
+| Touch flow hint (§17) | `Tap an hour, then set its cars with − and +. A second tap spans hours.` |
+| Ghost legend (§17) | `Dashes mark measured demand; the pale bar top is spare capacity.` |
+| Endpoint Serve mark title (§17) | `The top and bottom stay connected: endpoints always stop` |
 | Advanced disclosure (Modern) | `Cars on shift by hour (Advanced)` |
 | Save announce | `Elevator schedule saved.` / gone-shaft refusal `That elevator is gone.` |
 

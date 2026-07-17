@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.58.0
+
+- The elevator Schedule dialog is now the one place you configure a shaft: serviced floors, per-car home staging, and hourly scheduling live in a single floors-by-cars grid, just like the 1994 Elevator window. The separate Configure stops dialog is gone.
+- The cars-on-shift strip shows your measured demand as a dashed line, with any spare capacity above it drawn pale, and on phones the whole dialog got friendlier: bigger targets, a tap-then-stepper hint, and hold-to-repeat steppers.
+
 ## 1.57.2
 
 - The "too few shops or restaurants" gripe now says which problem you actually have: not enough retail for the tower's crowds (build more, on any connected floor) or retail that no shopper can reach (reconnect it). It no longer tells you to build "near this floor", which never mattered.

@@ -2146,6 +2146,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
           floor,
           served: served.has(floor),
           lobby: lobbySet.has(floor),
+          endpoint: floor === 1 || floor === top,
         })),
       setServe: vi.fn((floor: number, serve: boolean) => {
         if (floor === 1 || floor === top) return; // endpoints always stop
@@ -2500,6 +2501,78 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(stops.allStops).toHaveBeenCalledOnce();
     expect(announce).toHaveBeenLastCalledWith("Stopping at every floor.");
     expect(dialog().querySelectorAll(".es-grid-row.es-skipped")).toHaveLength(0);
+  });
+
+  it("on touch, the FIRST tap selects (never spans); the second extends; a third resets (F1)", () => {
+    const orig = window.matchMedia;
+    window.matchMedia = ((q: string) =>
+      ({ matches: q === "(pointer: coarse)", media: q, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
+      bars()[6].click(); // FIRST tap: selects, must not span from the seeded 17
+      expect(dialog().textContent).toContain("Hour 06:00");
+      expect(dialog().textContent).not.toContain("Hours ");
+      bars()[9].click(); // second tap extends
+      expect(dialog().textContent).toContain("Hours 06:00–09:00");
+      bars()[3].click(); // third tap resets to the tapped bar
+      expect(dialog().textContent).toContain("Hour 03:00");
+      dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!.click();
+      okBtn().click();
+      const row = apply.mock.calls[0][0].activeCars.weekday;
+      expect(row[3]).toBe(3); // only the reset single hour stepped
+      expect(row[6]).toBe(4);
+    } finally {
+      window.matchMedia = orig;
+    }
+  });
+
+  it("a held stepper auto-repeats and stops when the button detaches (F3)", () => {
+    vi.useFakeTimers();
+    try {
+      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const minus = () => dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!;
+      minus().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      vi.advanceTimersByTime(400 + 150 * 3 + 10); // hold: ~3 repeats
+      const btn = minus();
+      btn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      okBtn().click();
+      const held = apply.mock.calls[0][0].activeCars.weekday[17];
+      expect(held).toBeLessThanOrEqual(1); // 4 - 3 repeats
+      expect(held).toBeGreaterThanOrEqual(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a runaway hold dies with the dialog: no repeats fire after dismissal (F3)", () => {
+    vi.useFakeTimers();
+    try {
+      const announce = vi.fn();
+      open({ ux: CLASSIC_RULES.elevatorScheduleUX(), announce });
+      const steppers = dialog().querySelectorAll(".es-spread .es-stepper");
+      const up = steppers[0].querySelector<HTMLButtonElement>('[aria-label="raise"]')!;
+      up.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      vi.advanceTimersByTime(400 + 150 * 2 + 10); // repeats begin
+      const fired = announce.mock.calls.length;
+      expect(fired).toBeGreaterThan(0);
+      dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click(); // pristine? no: WCR edits armed... use Esc-free: the guard arms
+      dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click(); // second press discards
+      expect(dialog().open).toBe(false);
+      vi.advanceTimersByTime(150 * 10); // the interval must self-stop on the detached button
+      expect(announce.mock.calls.length).toBe(fired);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("endpoints render a fixed serve mark, never a toggle, and basements read B-n (F2/V5)", () => {
+    open({ stops: fakeStops(10, [1, 8]) });
+    const rows = dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)");
+    expect(rows[0].querySelector("input[type=checkbox]")).toBeNull(); // top endpoint
+    expect(rows[0].querySelector(".es-always")).not.toBeNull();
+    expect(rows[rows.length - 1].querySelector("input[type=checkbox]")).toBeNull(); // bottom endpoint
+    expect(rows[1].querySelector("input[type=checkbox]")).not.toBeNull(); // interior floors toggle
   });
 
   it("emits the pinned announce strings on stepper commits, presets, and Auto-tune", () => {

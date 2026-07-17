@@ -74,15 +74,24 @@ export class EditorActions {
         const at = liveShaft();
         if (!at) return [];
         const lobbies = new Set(at.sim.tower.lobbyFloors());
-        const rows: { floor: number; served: boolean; lobby: boolean }[] = [];
+        const rows: { floor: number; served: boolean; lobby: boolean; endpoint: boolean }[] = [];
         for (let fl = at.shaft.top; fl >= at.shaft.bottom; fl--) {
-          rows.push({ floor: fl, served: at.sim.tower.stopsAt(at.shaft, fl), lobby: lobbies.has(fl) });
+          rows.push({
+            floor: fl,
+            served: at.sim.tower.stopsAt(at.shaft, fl),
+            lobby: lobbies.has(fl),
+            endpoint: fl === at.shaft.bottom || fl === at.shaft.top,
+          });
         }
         return rows;
       },
       setServe: (floor: number, serve: boolean) => {
         const at = liveShaft();
         if (!at) return;
+        // Refusals the engine would silently absorb must not burn an undo step:
+        // endpoints always stop, and an express serves only lobby floors.
+        if (floor === at.shaft.bottom || floor === at.shaft.top) return;
+        if (serve && at.shaft.kind === "elevatorExpress" && !at.sim.tower.floorHasLobby(floor)) return;
         this.deps.captureUndo("Elevator stops");
         at.sim.tower.setStop(id, floor, serve);
         this.deps.commitUndo();

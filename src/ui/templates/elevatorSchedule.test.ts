@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   elevatorScheduleTemplate,
+  floorLabel,
   type SchedCtx,
   type SchedState,
   type SchedHandlers,
@@ -176,6 +177,15 @@ describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
     expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Floor");
     expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Serve");
     expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Home car(s)");
+  });
+});
+
+describe("floorLabel", () => {
+  it("keeps the retired stops dialog's basement grammar: B1 below ground, plain above", () => {
+    expect(floorLabel(5)).toBe("5");
+    expect(floorLabel(1)).toBe("1");
+    expect(floorLabel(0)).toBe("B1");
+    expect(floorLabel(-2)).toBe("B3");
   });
 });
 

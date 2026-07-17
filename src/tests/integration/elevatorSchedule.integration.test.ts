@@ -94,6 +94,20 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(shaft.schedule!.waitingCarResponse).toBe(3);
   });
 
+  it("snaps homes on the express lobby-only lock and on a resize skip resync (#467)", () => {
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    // Author a home mid-shaft, then lock to lobbies: home snaps to a stop.
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [5, 1] })).toBe(true);
+    expect(sim.tower.setExpressStops(shaft.id)).toBe(true); // lobby (1) + endpoints (1, 8) stop
+    expect(shaft.schedule!.homeFloors).toEqual([8, 1]); // 5 snaps to the nearer endpoint 8
+    // Tie-break: equidistant stops resolve toward the LOWER floor.
+    expect(sim.tower.clearStops(shaft.id)).toBe(true);
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [4, 1] })).toBe(true);
+    expect(sim.tower.setStop(shaft.id, 4, false)).toBe(true); // 3 and 5 both one away
+    expect(shaft.schedule!.homeFloors).toEqual([3, 1]);
+  });
+
   it("leaves a shaft with no schedule absent (sparse save, today's behavior)", () => {
     const sim = towerWithElevator();
     expect(sim.tower.transports[0].schedule).toBeUndefined();

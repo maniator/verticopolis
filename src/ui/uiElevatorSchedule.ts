@@ -203,11 +203,19 @@ export function showElevatorScheduleDialog(
   function rerender(): void {
     render(elevatorScheduleTemplate(sctx, state, handlers), box);
   }
+  /** Advice about strip numbers must not critique a hidden strip: whenever the
+   *  sentence turns critical while the Modern fold is shut, open it. */
+  const unfoldOnAdvice = (): void => {
+    if (!ctx.ux.rawGridDefault && ctx.ux.advice && !state.advancedOpen && state.adviceMsg.startsWith("This shaft is")) {
+      state.advancedOpen = true;
+    }
+  };
   /** A schedule edit landed: mark dirty, disarm a pending discard, recompute, repaint. */
   const after = (): void => {
     dirty = true;
     state.cancelArmed = false;
     recompute();
+    unfoldOnAdvice();
     rerender();
   };
   /** A stop edit landed (applied live): refresh rows, re-derive the base, re-snap
@@ -232,24 +240,29 @@ export function showElevatorScheduleDialog(
     box.querySelectorAll<HTMLButtonElement>(".es-bar")[h]?.focus();
   };
   // On touch, a second tap on another bar EXTENDS the selection to a span (spec
-  // §8: shift is not a phone key); a third tap resets to the tapped bar. On fine
-  // pointers a plain click always re-selects and shift-click extends.
+  // §8: shift is not a phone key); a third tap resets to the tapped bar. Only a
+  // bar the player explicitly tapped anchors a span: the seeded default
+  // selection never does, or the FIRST tap would span instead of select. On
+  // fine pointers a plain click always re-selects and shift-click extends.
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  let anchored = false;
 
   const handlers: SchedHandlers = {
     onDay: (day) => {
       state.day = day;
       state.rangeEnd = null;
+      anchored = false; // a fresh day view starts unanchored, like open
       state.cancelArmed = false;
       recompute();
       rerender();
     },
     onSelectHour: (h, extend) => {
-      const tapExtend = coarse && state.rangeEnd === null && h !== state.selectedHour;
+      const tapExtend = coarse && anchored && state.rangeEnd === null && h !== state.selectedHour;
       if (extend || tapExtend) state.rangeEnd = h;
       else {
         state.selectedHour = h;
         state.rangeEnd = null;
+        anchored = true;
       }
       rerender();
     },
@@ -292,8 +305,12 @@ export function showElevatorScheduleDialog(
     },
     onServe: (floor, serve) => {
       ctx.stops.setServe(floor, serve);
-      announce(serve ? `Floor ${floor} served.` : `Floor ${floor} skipped.`);
       afterStops();
+      // Announce what actually happened: the engine can refuse (endpoints,
+      // the express lobby lock), and the re-read rows are the truth.
+      const now = state.floors.find((f) => f.floor === floor)?.served;
+      if (now === serve) announce(serve ? `Floor ${floor} served.` : `Floor ${floor} skipped.`);
+      else announce(`Floor ${floor} must stay a stop.`);
     },
     onExpressStops: () => {
       ctx.stops.expressStops();
@@ -377,11 +394,7 @@ export function showElevatorScheduleDialog(
   };
 
   recompute();
-  // Advice about strip numbers should not critique a hidden strip: when the dialog
-  // opens with a real advice sentence, the Advanced fold starts open (party flag).
-  if (!ctx.ux.rawGridDefault && ctx.ux.advice && state.adviceMsg && state.adviceMsg.startsWith("This shaft is")) {
-    state.advancedOpen = true;
-  }
+  unfoldOnAdvice(); // an already-critical shaft opens with the fold unfolded
   const box = ui.openModalTemplate(elevatorScheduleTemplate(sctx, state, handlers));
   // The dirty guard must cover EVERY dismissal, not just the Cancel button: Esc and
   // the title-bar ✕ arrive as the dialog's cancelable "cancel" event, a backdrop

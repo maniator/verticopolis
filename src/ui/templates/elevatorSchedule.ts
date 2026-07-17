@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { live } from "lit-html/directives/live.js";
 import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
 import type { SchedulePreset } from "../../engine/scheduleAuthoring";
 
@@ -24,6 +25,9 @@ export interface FloorRow {
   floor: number;
   served: boolean;
   lobby: boolean;
+  /** A span endpoint: always a stop (the shaft cannot disconnect from itself),
+   *  so the grid renders a fixed mark there, never a toggle. */
+  endpoint?: boolean;
 }
 
 export interface SchedCtx {
@@ -103,6 +107,12 @@ function span(state: SchedState): [number, number] {
 
 const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
 
+/** Floor label with the basement grammar the retired stops dialog pinned: B1,
+ *  B2... below ground, plain numbers above. */
+export function floorLabel(floor: number): string {
+  return floor < 1 ? `B${1 - floor}` : String(floor);
+}
+
 /** Press-and-hold auto-repeat for a stepper button: fires the handler once per
  *  ~150ms after a 400ms hold, so 8 presses of − collapse into one hold. Attached
  *  via @pointerdown; the plain @click still fires the single step on release of a
@@ -115,7 +125,9 @@ function holdRepeat(fire: () => void): (e: PointerEvent) => void {
     let interval: ReturnType<typeof setInterval> | undefined;
     const start = setTimeout(() => {
       interval = setInterval(() => {
-        if (btn.disabled) return stop();
+        // A dismissed dialog detaches the button with no pointerup to stop us:
+        // the connectivity check is the teardown of last resort.
+        if (btn.disabled || !btn.isConnected) return stop();
         repeated = true;
         fire();
       }, 150);
@@ -274,17 +286,19 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
           const isBase = f.floor === state.base;
           return html`
           <div class="es-grid-row${f.served ? "" : " es-skipped"}">
-            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${f.floor}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}</span>
+            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}</span>
             ${ctx.isExpress
               ? nothing
-              : html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${f.floor}"
-                  .checked=${f.served} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`}
+              : f.endpoint
+                ? html`<span class="es-cell-serve es-always" title="The top and bottom stay connected: endpoints always stop">✓</span>`
+                : html`<span class="es-cell-serve"><input type="checkbox" aria-label="Serve floor ${floorLabel(f.floor)}"
+                    .checked=${live(f.served)} @change=${(e: Event) => h.onServe(f.floor, (e.target as HTMLInputElement).checked)} /></span>`}
             <span class="es-cell-cars">
               ${f.served
                 ? Array.from({ length: ctx.cars }, (_, car) => {
                     const here = homes[car] === f.floor;
                     return html`<button type="button" class="es-chip${here ? " on" : ""}"
-                      aria-label="Home car ${car + 1} at floor ${f.floor}" aria-pressed=${here}
+                      aria-label="Home car ${car + 1} at floor ${floorLabel(f.floor)}" aria-pressed=${here}
                       @click=${() => h.onHomeSet(car, f.floor)}>${car + 1}</button>`;
                   })
                 : nothing}
