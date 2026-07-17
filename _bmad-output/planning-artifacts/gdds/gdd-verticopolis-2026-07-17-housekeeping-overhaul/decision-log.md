@@ -2,13 +2,13 @@
 
 Game: Verticopolis (SimTower-like browser tower-management sim)
 Created: 2026-07-17
-State: draft (discovery complete via live play-test session; awaiting 3 design-call ratifications)
+State: draft (discovery complete via live playtest session; design calls ratified 2026-07-17)
 
 ## Origin
 
-Surfaced from a long play-test on a real 91-floor save (`sixseven_12/13`, appVersion
+Surfaced from a long playtest on a real 91-floor save (`sixseven_12/13`, appVersion
 1.53.0, Classic) plus SimTower canon research. The shipped cockroach-infestation
-feature (`gdd-cockroach-infestation-2026-07-16.md`) works, but play-testing exposed
+feature (`gdd-cockroach-infestation-2026-07-16.md`) works, but playtesting exposed
 that our housekeeping model diverges from the 1994 original and hides its own
 failure from the player.
 

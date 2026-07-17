@@ -14,7 +14,7 @@ state: draft
 ## Executive Summary
 
 Verticopolis already models hotel-room cleanliness, a 3-day dirty-to-infested
-lifecycle, and a Classic/Modern recovery split (shipped v1.53.0). Live play-testing
+lifecycle, and a Classic/Modern recovery split (shipped v1.53.0). Live playtesting
 on a real 91-floor tower exposed that the housekeeping engine underneath it
 diverges from the 1994 original and, worse, hides its own failure from the player:
 the tower drowned in cockroaches while every readout said "enough housekeeping."
@@ -172,7 +172,7 @@ canon anchor (~19 rooms per maid on a compact, well-connected hotel).
 
 ### Agent model
 
-Maids are first-class staff actors with states: `idle-at-unit`, `travelling`
+Maids are first-class staff actors with states: `idle-at-unit`, `traveling`
 (over the staff graph), `cleaning` (dwelling in a room), `returning`. A maid holds
 at most one room assignment at a time; assignment is released on completion or
 give-up. Determinism: all selection and tiebreaks are ordered and seed-free; no
