@@ -259,7 +259,10 @@ export class Housekeeping {
       }
     }
     if (spread > 0) {
-      this.sim.emit(`🪳 Cockroaches spread from infested rooms into ${spread} more. Clear the infested source.`, "bad");
+      this.sim.emit(
+        `🪳 Cockroaches spread from infested rooms into ${spread} more room${spread > 1 ? "s" : ""}. Clear the infested source.`,
+        "bad",
+      );
     }
   }
 }
