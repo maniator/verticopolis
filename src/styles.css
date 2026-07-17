@@ -826,6 +826,17 @@ a.btn {
   color: var(--muted);
   font-size: 12px;
 }
+/* Read-only build echo at the foot of Settings: muted, small, centered, and set
+   apart by a hairline so it never reads as a control. Sourced from the same
+   __APP_VERSION__ as the splash and Help's About line. */
+.set-version {
+  margin: 10px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line, #7a7a7a);
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
 
 /* ---- Crash screen ----
    The card shown when the GPU drops the WebGL context (see
@@ -858,6 +869,32 @@ dialog.crash-card::backdrop {
   flex-direction: column;
   gap: 10px;
   margin: 12px 0;
+}
+/* The Modern-only reveal: the "Modern adds" label and the calendar pace picker.
+   Shown by default and HIDDEN under Classic via `:has()`. Written this way round
+   deliberately: a browser without `:has()` support simply keeps the block visible
+   in both modes (the old always-rendered calendar), so a Modern player can always
+   reach the calendar choice. With `:has()` (all current targets) Classic collapses
+   it, which also drops the calendar radios out of the tab order, correct because
+   the calendar only applies to Modern. */
+.nt-modern-only {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.nt-choice:has(input[name="nt-mode"][value="classic"]:checked) .nt-modern-only {
+  display: none;
+}
+.nt-adds {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.nt-more {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin-top: 2px;
 }
 .nt-mode {
   display: flex;
@@ -894,13 +931,13 @@ dialog.crash-card::backdrop {
   padding-left: 8px;
   border-left: 3px solid var(--accent);
 }
-/* Modern-only calendar sub-picker: same card idiom as the mode cards, a step
-   lighter so it reads as a secondary choice under the two rule-sets. */
+/* Calendar pace picker: same card idiom as the mode cards, a step lighter so it
+   reads as a secondary choice. It lives inside the Modern-only reveal, so the
+   parent's flex gap handles spacing (no bottom margin of its own). */
 .nt-calendar {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  margin: 0 0 12px;
   padding: 10px 12px;
   border: 2px solid var(--line, #b8b2a0);
   border-radius: 6px;
@@ -1151,6 +1188,30 @@ dialog.crash-card::backdrop {
   border-bottom-width: 2px;
   border-radius: 3px;
 }
+/* Collapsible Help sections (The basics, Going further, Classic vs Modern,
+   Keyboard play, About). Each summary reads like the dialog's other <h3> section
+   headings (bold, same size), with a caret that swaps on open (no motion, so it
+   respects reduced-motion). The body keeps a real heading inside the summary for
+   screen-reader heading navigation. All but "The basics" are collapsed, so Help
+   opens short; the New Tower dialog points at the Classic vs Modern section. */
+.help-modes > summary {
+  cursor: pointer;
+  font-size: 1.17em; /* match the default <h3> the other Help sections use */
+  font-weight: 700;
+  margin: 16px 0 8px;
+  list-style: none; /* drop the native marker; we draw our own caret */
+}
+.help-modes > summary::-webkit-details-marker {
+  display: none;
+}
+.help-modes > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.help-modes[open] > summary::before {
+  content: "▾ ";
+}
+
 /* Help "Report an issue" row — a plain flex row so the link keeps its natural
    button width and would sit beside any future sibling link. */
 .help-report {

@@ -261,7 +261,10 @@ export function showHelp(ui: UI): void {
 
 /** The Settings dialog: sound levels plus the presentation toggles. */
 export function showSettings(ui: UI): void {
-  const box = ui.openModalTemplate(settingsTemplate());
+  // Same build constant the splash and Help's About line show; masked to a fixed
+  // placeholder in screenshots (see pgMaskVersion, which keys on `.app-version`).
+  const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+  const box = ui.openModalTemplate(settingsTemplate(version));
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.

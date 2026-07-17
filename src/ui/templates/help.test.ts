@@ -13,6 +13,13 @@ import { renderToFragment, click } from "../testing/litTestUtils";
 
 const noop = { onReplay: () => {} };
 
+/** Find a collapsible Help section by its <summary> text. */
+function sectionBySummary(frag: DocumentFragment, summary: string): HTMLDetailsElement | undefined {
+  return [...frag.querySelectorAll<HTMLDetailsElement>("details.help-modes")].find(
+    (d) => d.querySelector("summary")?.textContent?.trim() === summary,
+  );
+}
+
 describe("helpTemplate structure and a11y", () => {
   it("renders the heading and the primary Got it with autofocus", () => {
     const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
@@ -35,6 +42,41 @@ describe("helpTemplate structure and a11y", () => {
   it("interpolates the app version into the About line", () => {
     const frag = renderToFragment(helpTemplate(false, "9.9.9", noop));
     expect(frag.textContent).toContain("Verticopolis v9.9.9");
+  });
+
+  it("opens on the essentials and collapses the reference sections", () => {
+    // Cloud's IA rule: essentials open, reference-or-optional collapsed. "The
+    // basics" is the only section open on first paint; Going further, Keyboard
+    // play, Classic vs Modern, and About are all collapsed so Help opens short.
+    const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
+    expect(sectionBySummary(frag, "The basics")?.hasAttribute("open")).toBe(true);
+    for (const collapsed of ["Going further", "Keyboard play", "Classic vs Modern", "About"]) {
+      const sec = sectionBySummary(frag, collapsed);
+      expect(sec, collapsed).not.toBeUndefined();
+      expect(sec!.hasAttribute("open"), collapsed).toBe(false);
+    }
+  });
+
+  it("covers every Modern divergence from gameRules, not just the headline three", () => {
+    // Guards against Help drifting out of date as Modern gains behaviors. Each
+    // phrase maps to a divergence in src/engine/gameRules.ts.
+    const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
+    const text = sectionBySummary(frag, "Classic vs Modern")!.textContent ?? "";
+    for (const phrase of [
+      "Variant households", // hasVariantHouseholds / sellCondo
+      "move out on its own", // condoRelocationChance
+      "deeper economy", // overhead / tax / noise erosion / unmet demand
+      "Continuous pricing", // priceOptions (continuous vs 4-rung + No Rate)
+      "Escalators can serve office floors", // allowsEscalatorOnOfficeFloors
+      "switch elevators at any shared stop", // expressTransferNeedsLobby
+      "paid exterminator", // infestationRecovery
+      "Hovering an invalid spot", // showsPreviewReason
+      "school", // demographicRoutines
+      "Calendar pace", // calendar choice
+      "pixel-faithful to 1994", // the Classic-fidelity report call-out
+    ]) {
+      expect(text).toContain(phrase);
+    }
   });
 });
 

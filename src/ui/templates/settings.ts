@@ -12,8 +12,14 @@ import { html, type TemplateResult } from "lit-html";
  * button carries `autofocus` (the dialog renders once, so it is honored on
  * showModal). There is a real Close button here (the `data-act="close"` action the
  * controller wires), not a title-bar-only dismissal.
+ *
+ * The muted version line at the foot is a read-only echo of the splash and Help's
+ * About block: some players look in Settings first for "what build am I on." It is
+ * the interpolated app `version` (auto-escaped by lit), a read-only label rather
+ * than a control, sourced from the same `__APP_VERSION__` the About line uses;
+ * never make it look editable or read it from anywhere else.
  */
-export function settingsTemplate(): TemplateResult {
+export function settingsTemplate(version: string): TemplateResult {
   return html`
       <h2>Settings</h2>
       <h3>Sound</h3>
@@ -30,5 +36,6 @@ export function settingsTemplate(): TemplateResult {
         <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
       </div>
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
+      <p class="set-version">Verticopolis <span class="app-version">v${version}</span></p>
     `;
 }
