@@ -54,6 +54,11 @@ export interface InfestationRecovery { calloutFee: number; perRoomFee: number }
  *  the wing stops taking fresh work. `cutoff` is a fractional hour (16.5 = 16:30). */
 export interface HousekeepingShift { start: number; end: number; cutoff: number }
 
+/** Modern's smart-dispatch triage weights: a dirty room scores
+ *  `dirtyDays * perDirtyDay - nearestCrewFloorDistance * perFloor` and maids
+ *  take the highest score first (rescue about-to-infest, mind the commute). */
+export interface HousekeepingTriage { perDirtyDay: number; perFloor: number }
+
 export interface GameRules {
   /** The mode this rule-set implements (mirrors {@link GameMode}). */
   readonly mode: GameMode;
@@ -148,6 +153,10 @@ export interface GameRules {
    *  tail. Hotel checkout stays a morning event in both modes, independent of
    *  this window; only when the maids work differs by mode. */
   housekeepingShift(): HousekeepingShift;
+  /** Dispatch order for dirty rooms: Classic `null` (opportunistic tower
+   *  order, the original's automatic behavior), Modern the smart triage
+   *  weights (deterministic, fixed tiebreaks; NOT a neural net, per the GDD). */
+  housekeepingTriage(): HousekeepingTriage | null;
   /**
    * Monthly probability that a SOLD condo's household relocates on its own (a
    * life event unrelated to how well the tower serves it), scaled UP with family
@@ -267,6 +276,8 @@ const CLASSIC_WEEKEND_MULT: Partial<Record<string, number>> = {
   shop: 30 / 25,
 };
 
+const MODERN_HK_TRIAGE: HousekeepingTriage = Object.freeze({ perDirtyDay: 10, perFloor: 1 });
+
 export const CLASSIC_RULES: GameRules = {
   mode: "classic",
   hasVariantHouseholds: false,
@@ -311,6 +322,9 @@ export const CLASSIC_RULES: GameRules = {
   housekeepingShift() {
     // Canon: maids work noon to 5, starting no new room after 4:30.
     return { start: 12, end: 17, cutoff: 16.5 };
+  },
+  housekeepingTriage() {
+    return null; // canon: opportunistic tower-order dispatch, no priority engine
   },
   condoRelocationChance() {
     return 0; // 1994 condos never turn over; a sold Classic condo is forever
@@ -405,6 +419,10 @@ export const MODERN_RULES: GameRules = {
   housekeepingShift() {
     // Modern's longer staffed day: 08:00-19:00, same 30-minute no-new-room tail.
     return { start: 8, end: 19, cutoff: 18.5 };
+  },
+  housekeepingTriage() {
+    // A day of dirt outweighs ten floors of travel (PROVISIONAL, playtest pass).
+    return MODERN_HK_TRIAGE;
   },
   condoRelocationChance(residents) {
     // Scale the base monthly chance by family size relative to the classic 3, so

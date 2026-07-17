@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.56.0
+
+- Modern towers gain smart housekeeping dispatch: maids now rescue the rooms closest to infestation first, weighing how long a room has waited against how far the crew must travel. Classic keeps the original's simple order.
+
 ## 1.55.0
 
 - The housekeeping picture stops hiding trouble: infestation alerts now name the floors, infested rooms get their own violet shade on the Housekeeping overlay (condos read as not-applicable gray), and the stats verdict turns red when rooms go unserved or any room is infested.
