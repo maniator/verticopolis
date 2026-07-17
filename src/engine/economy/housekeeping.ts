@@ -92,9 +92,10 @@ export class Housekeeping {
   private hkNudgedDay = -1;
 
   /** Yesterday's observed shift result, or null before the first checkout
-   *  (fresh game or fresh load). See {@link hkYesterday}. */
-  report(): Readonly<{ cleaned: number; leftover: number }> | null {
-    return this.hkYesterday;
+   *  (fresh game or fresh load). Returns a copy, so no consumer can mutate
+   *  the shared latch. See {@link hkYesterday}. */
+  report(): { cleaned: number; leftover: number } | null {
+    return this.hkYesterday ? { ...this.hkYesterday } : null;
   }
 
   /** Emit yesterday's shift report and breed overnight cockroaches, before this

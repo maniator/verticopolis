@@ -33,10 +33,11 @@ export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[
 /** The housekeeping-station coverage block, the housekeeping analog of the
  *  parking demand line: the maids a unit fields, the tower's crews vs its hotel
  *  rooms, and a red verdict keyed on the OBSERVED shortfall (rooms that
- *  survived yesterday's whole shift dirty), never a nominal best case: the
- *  maids-times-anchor estimate can read fine while a distant wing rots. The
- *  nominal comparison remains only as the fallback before the first checkout,
- *  and an active infestation always shows red (it is at-risk, not "adequate"). */
+ *  survived yesterday's whole shift dirty), never a nominal best case alone:
+ *  the maids-times-anchor estimate can read fine while a distant wing rots.
+ *  The nominal comparison stays on as a gross-under-provision floor (it also
+ *  covers a big build-out before the next morning's latched report), and an
+ *  active infestation always shows red (it is at-risk, not "adequate"). */
 export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   const c = sim.housekeepingCoverage();
   const report = sim.economy.housekeepingReport();

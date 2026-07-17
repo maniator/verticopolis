@@ -15,7 +15,7 @@
 export const HEAT_STOPS: readonly (readonly [number, number, number])[] = [
   [63, 184, 90], // green (good)
   [163, 199, 71], // chartreuse
-  [224, 169, 78], // amber — the congestion overlay pins churn here (see below)
+  [224, 169, 78], // amber: the congestion overlay pins churn here (see heatColor)
   [214, 52, 47], // red (bad)
 ];
 export const HEAT_SEGS = HEAT_STOPS.length - 1;
