@@ -146,6 +146,12 @@ canon anchor (~19 rooms per maid on a compact, well-connected hotel).
   before checkout, or only after.
 - Spread stays **horizontal** (same floor); vertical spread is out of scope here
   (fire already climbs; roaches do not, matching canon).
+- **Supersedes the prior doc's spread line.** The doc this builds on,
+  `gdd-cockroach-infestation-2026-07-16.md`, described the spread source as a
+  "dirty-or-infested" room; canon research (see the decision log) corrected that
+  to infested-only. This GDD is the source of truth for the spread rule, and the
+  prior doc's Spread line is superseded (the canon fix that ships this change adds
+  a matching SUPERSEDED note there).
 
 ### 5. Recovery (unchanged; mode-gated via GameRules)
 
