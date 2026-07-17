@@ -55,8 +55,8 @@ export interface Person {
   /** Idle timer once arrived, before despawning. */
   linger: number;
   /** True for tower staff (housekeepers): they route over the STAFF network
-   *  (service elevators / stairs / escalators), never count toward tenant
-   *  stress, and render in a work uniform. */
+   *  (service elevators / stairs), never count toward tenant stress, and
+   *  render in a work uniform. */
   staff?: boolean;
   /** Unit id this staffer is dispatched to service (a dirty hotel room). */
   cleanUnitId?: number;
@@ -245,8 +245,11 @@ export function visibleOccupants(u: { occupants: number; outForMeal?: number }):
 }
 
 /** Staff travel outside the tenant cap (they must be able to work even in a
- *  packed tower) but stay bounded so dispatch can't flood the screen. */
-export const MAX_STAFF = 32;
+ *  packed tower) but stay bounded so dispatch can't flood the screen. Sized
+ *  for the time-simulated maid model: each housekeeping unit fields 6 maids
+ *  (HK_MAIDS_PER_UNIT), so this admits ~10 units' worth before the pool caps
+ *  a big tower's throughput below its built capacity. */
+export const MAX_STAFF = 64;
 export const STRESS_WAIT = 25; // seconds of waiting that counts as "fed up"
 /**
  * A commuter who hasn't reached their floor within this many real seconds gives

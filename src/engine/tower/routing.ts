@@ -69,7 +69,7 @@ export function servedFloorSet(tower: Tower): ReadonlySet<number> {
 
 /**
  * Label every floor touched by a staff-capable transport (service elevators,
- * stairs, escalators, never passenger elevators) with a connected-component id.
+ * stairs, never escalators or passenger elevators) with a connected-component id.
  * Housekeepers travel this network to reach dirty rooms, exactly as in the
  * original where staff ride the service elevator while guests take the
  * passenger ones. Floors with no staff transport get no label: staff there
@@ -103,7 +103,7 @@ export function staffComponents(tower: Tower): Map<number, number> {
 }
 
 /** True if staff stationed on floor `a` can reach floor `b` (same floor, or
- *  connected through service elevators / stairs / escalators). */
+ *  connected through service elevators / stairs). */
 export function staffConnected(tower: Tower, a: number, b: number): boolean {
   if (a === b) return true;
   const comp = tower.staffComponents();

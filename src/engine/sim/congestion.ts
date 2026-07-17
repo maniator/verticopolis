@@ -216,7 +216,7 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
   if (mode === "cleanliness") {
     // Per hotel room, the units housekeeping serves: tint by whether a crew can
     // reach it and whether it is dirty right now. Staff travel the service
-    // network (service elevators, stairs, escalators), never passenger
+    // network (service elevators, stairs), never passenger
     // elevators, so a room with no operational housekeeping crew in its staff
     // component can never be cleaned: that is the worst case (red), the
     // "build another housekeeping station or extend the service elevator" nudge

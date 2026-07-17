@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { HK_ROOMS_PER_CREW, INFEST_DAYS } from "../../engine/economy/housekeeping";
+import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../../engine/economy/housekeeping";
 import type { FacilityKind, GameMode, Unit } from "../../engine/types";
 
 /**
@@ -217,7 +217,8 @@ describe("Cockroach persistence and legibility", () => {
     const cov = sim.housekeepingCoverage();
     expect(cov.rooms).toBe(2);
     expect(cov.crews).toBe(1);
-    expect(cov.dailyCapacity).toBe(HK_ROOMS_PER_CREW);
+    expect(cov.maids).toBe(HK_MAIDS_PER_UNIT);
+    expect(cov.dailyCapacity).toBe(HK_MAIDS_PER_UNIT * HK_NOMINAL_ROOMS_PER_MAID);
     expect(cov.outOfReach).toBe(0); // crew shares the rooms' floor
     expect(cov.dirty).toBe(1);
     expect(cov.infested).toBe(0);

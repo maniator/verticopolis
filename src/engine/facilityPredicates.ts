@@ -93,10 +93,12 @@ export function isStaffOnlyTransport(kind: FacilityKind): boolean {
   return FACILITIES[kind]?.staffOnly === true;
 }
 
-/** True for transports STAFF travel on: the staff-only elevators plus everything
- *  walkable (stairs, escalators). The single source of truth for the staff
- *  network, shared by Tower.staffConnected and Crowd's staff routing so the
- *  two can never disagree about reachability. */
+/** True for transports STAFF travel on: the staff-only elevators plus stairs.
+ *  The single source of truth for the staff network, shared by
+ *  Tower.staffConnected and Crowd's staff routing so the two can never disagree
+ *  about reachability. Canon (SimTower): housekeeping travels by service
+ *  elevator or stairs only, never escalators (escalators move too slowly for a
+ *  working maid and were not part of the original staff network). */
 export function isStaffTransportKind(kind: FacilityKind): boolean {
-  return isStaffOnlyTransport(kind) || kind === "stairs" || kind === "escalator";
+  return isStaffOnlyTransport(kind) || kind === "stairs";
 }

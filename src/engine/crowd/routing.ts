@@ -205,7 +205,7 @@ export function reachable(crowd: Crowd, tower: Tower, from: number, to: number):
   return passengerPath(crowd, tower, from, to) !== null;
 }
 
-/** Route over the STAFF network (service elevators / stairs / escalators).
+/** Route over the STAFF network (service elevators / stairs).
  *  Staff aren't bound by the two-ride comfort rule: the search is UNCAPPED
  *  (the BFS `seen` set terminates it), so it agrees with what
  *  Tower.staffConnected calls reachable: both walk the same

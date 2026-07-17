@@ -1,4 +1,3 @@
-import { FACILITIES } from "./facilities";
 import { ECON } from "./econConfig";
 import {
   LOBBY_FAR_FLOORS,
@@ -38,41 +37,22 @@ export type { PriceRung, PriceOptions } from "./pricing";
  * decisions that differ by mode, just reads of data the rules produced.
  */
 
-/** The flat household the 1994 game (and Classic mode) gives every condo. */
-const CLASSIC_HOUSEHOLD = FACILITIES.condo.population; // 3
-
-/**
- * Modern "variant households": the family sizes a condo can sell to and their
- * weights. Centered so the mean is EXACTLY the classic 3 — a Modern tower's
- * condo population matches a Classic one's on average, only varying unit to unit
- * — with 3 the clear mode. INVARIANT: keep the implied mean at 3 so Modern never
- * silently inflates or deflates the star-rating ladder relative to Classic.
- */
-const HOUSEHOLD_SIZES = [2, 3, 4, 5] as const;
-const HOUSEHOLD_WEIGHTS = [4, 6, 2, 1] as const; // mean = (2·4+3·6+4·2+5·1)/13 = 39/13 = 3.0
-
-/** A bigger family leans harder on the tower — access/congestion/noise bite a
- *  5-person household more than a 2-person one. Per person away from the classic 3. */
-const HOUSEHOLD_CHURN_PER_PERSON = 0.06;
+// The condo HOUSEHOLD layer (sizes, weighted Modern draw, household-scaled
+// price) lives in ./households, split out like the pricing shape layer;
+// re-exported here so consumers keep one import path for the seam.
+import { CLASSIC_HOUSEHOLD, HOUSEHOLD_SIZES, HOUSEHOLD_CHURN_PER_PERSON, householdPrice, rollHousehold } from "./households";
+export { householdPrice } from "./households";
 
 const isFiniteNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
 
-
-/**
- * A condo's price for a given household — the asking `base` scaled by household
- * size relative to the classic 3. A condo with no household (Classic, or any
- * unsold unit) is exactly the base. Shared by the sale AND the buy-back so the
- * repurchase always mirrors what the unit sold for. Pure and mode-agnostic: it
- * reads the household off the data, so both rule-sets and the buy-back path can
- * call it without knowing the mode.
- */
-export function householdPrice(base: number, residents: number | undefined): number {
-  if (residents === undefined) return base;
-  return Math.round((base * residents) / CLASSIC_HOUSEHOLD);
-}
-
 /** Modern's paid-exterminator fees: a flat `calloutFee` plus `perRoomFee` per infested room. */
 export interface InfestationRecovery { calloutFee: number; perRoomFee: number }
+
+/** The housekeeping day shift, in whole-hour clock terms. Maids dispatch only
+ *  while `start <= hour < end`, and start no NEW room at or after `cutoff` (the
+ *  canon "no new room" tail before end of shift), so in-flight maids finish but
+ *  the wing stops taking fresh work. `cutoff` is a fractional hour (16.5 = 16:30). */
+export interface HousekeepingShift { start: number; end: number; cutoff: number }
 
 export interface GameRules {
   /** The mode this rule-set implements (mirrors {@link GameMode}). */
@@ -162,6 +142,12 @@ export interface GameRules {
   /** How a cockroach-`infested` hotel room recovers short of the bulldozer:
    *  Classic `null` (PERMANENT, 1994 parity), Modern the paid-exterminator fees. */
   infestationRecovery(): InfestationRecovery | null;
+  /** The housekeeping day-shift window. Classic is the canon noon-to-5 shift
+   *  (12:00-17:00) with a 16:30 "no new room" cutoff; Modern works a longer
+   *  08:00-19:00 day (framed as the payoff of modern staffing), same 30-minute
+   *  tail. Hotel checkout stays a morning event in both modes, independent of
+   *  this window; only when the maids work differs by mode. */
+  housekeepingShift(): HousekeepingShift;
   /**
    * Monthly probability that a SOLD condo's household relocates on its own (a
    * life event unrelated to how well the tower serves it), scaled UP with family
@@ -322,6 +308,10 @@ export const CLASSIC_RULES: GameRules = {
   infestationRecovery() {
     return null; // 1994 parity: infested is permanent, bulldoze-only
   },
+  housekeepingShift() {
+    // Canon: maids work noon to 5, starting no new room after 4:30.
+    return { start: 12, end: 17, cutoff: 16.5 };
+  },
   condoRelocationChance() {
     return 0; // 1994 condos never turn over; a sold Classic condo is forever
   },
@@ -412,6 +402,10 @@ export const MODERN_RULES: GameRules = {
   infestationRecovery() {
     return { calloutFee: ECON.exterminatorCalloutFee, perRoomFee: ECON.exterminatorPerRoomFee };
   },
+  housekeepingShift() {
+    // Modern's longer staffed day: 08:00-19:00, same 30-minute no-new-room tail.
+    return { start: 8, end: 19, cutoff: 18.5 };
+  },
   condoRelocationChance(residents) {
     // Scale the base monthly chance by family size relative to the classic 3, so
     // a 5-person family is a clearly bigger flight risk than a 2-person one (and
@@ -480,18 +474,6 @@ export const MODERN_RULES: GameRules = {
     return ECON.rainCrowdFactor.modern;
   },
 };
-
-/** Draw a Modern condo's household size (2–5, weighted toward 3) from the
- *  gameplay RNG, so it's deterministic and reproduces across save/reload. */
-function rollHousehold(rng: RNG): number {
-  const total = HOUSEHOLD_WEIGHTS.reduce((a, b) => a + b, 0);
-  let roll = rng.int(1, total);
-  for (let i = 0; i < HOUSEHOLD_SIZES.length; i++) {
-    roll -= HOUSEHOLD_WEIGHTS[i];
-    if (roll <= 0) return HOUSEHOLD_SIZES[i];
-  }
-  return CLASSIC_HOUSEHOLD; // unreachable; the classic 3 as a safety net
-}
 
 /** The rule-set for a mode. Both are stateless singletons (pure behavior), so a
  *  tower just holds a reference; nothing per-sim to construct. */

@@ -113,11 +113,11 @@ describe("facilityDiagnostics: housekeeping and cockroaches", () => {
     expect(render(facilityDiagnostics(sim, unit)).textContent).toMatch(/exterminator/i);
   });
 
-  it("a housekeeping station shows its ~20/day capacity and the tower's coverage", () => {
+  it("a housekeeping station shows its maid staffing and the tower's coverage", () => {
     const { sim, unit } = simWith("housekeeping");
     expect(sim.tower.place("hotelSingle", 2, 24).ok).toBe(true);
     const frag = render(facilityDiagnostics(sim, unit));
-    expect(frag.textContent).toContain("Cleans ~20 rooms a day");
+    expect(frag.textContent).toContain("Fields 6 maids");
     expect(frag.textContent).toMatch(/hotel room/);
   });
 });

@@ -30,9 +30,15 @@ export const TRAFFIC_FACTOR_SPAN = 0.4;
  *  here, so it is the reference the inspector scores against. */
 export const TRAFFIC_FACTOR_MEAN = TRAFFIC_FACTOR_MIN + TRAFFIC_FACTOR_SPAN / 2;
 
-/** The housekeeping day shift: guests check out at its start and dispatch
- *  keeps sending crews each hour through its end. The two hours are coupled
- *  (checkout must open the shift), so they live side by side here. */
+/** The hour hotel guests check out each morning, in BOTH modes: checkout is a
+ *  hotel event, not a housekeeping one, so it stays fixed while the maid shift
+ *  window is mode-specific ({@link GameRules.housekeepingShift}: Classic works
+ *  the canon 12:00-17:00, Modern the longer 08:00-19:00). */
+export const HK_CHECKOUT_HOUR = 8;
+/** The legacy (and Modern) housekeeping day shift, kept as the no-rule-set
+ *  fallback window (see `staffOnShift` in crowd/meals.ts and the housekeeping
+ *  module's FALLBACK_SHIFT). The live dispatch window comes from
+ *  {@link GameRules.housekeepingShift}, not these. */
 export const HK_SHIFT_START = 8;
 export const HK_SHIFT_END = 19;
 

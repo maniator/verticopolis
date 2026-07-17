@@ -118,7 +118,10 @@ canon anchor (~19 rooms per maid on a compact, well-connected hotel).
 ### 2. Shift window
 
 - **Classic:** maids work **12:00-17:00**, and **start no new room after 16:30**
-  (canon). Rooms not cleaned by 17:00 stay dirty until tomorrow.
+  (canon). Rooms nobody started on by the cutoff stay dirty until tomorrow; a
+  maid already in a room finishes it, even if her dwell runs a little past
+  17:00 (ratified in epic 2: in-flight work completes, the wing just stops
+  taking fresh rooms).
 - **Modern:** longer **08:00-19:00** working day, framed as the payoff of modern
   staffing management. Same 30-minute "no new room" tail before end of shift.
 - Mode-specific windows resolve through `GameRules`, not an engine-body branch.
@@ -299,8 +302,16 @@ non-negotiables. Balance constants tuned in-epic and recorded back here.
 
 ## Open Items
 
-- `[NOTE FOR DESIGNER]` exact per-room dwell constant (tune to ~19/maid on a
-  compact hotel).
+- ~~`[NOTE FOR DESIGNER]` exact per-room dwell constant (tune to ~19/maid on a
+  compact hotel).~~ **Pinned in epic 2 (v1.54.0): `HK_CLEAN_MINUTES = 8`**
+  game-minutes of pure in-room dwell; readout anchor
+  `HK_NOMINAL_ROOMS_PER_MAID = 19`. Measured in review (1-minute ticks,
+  saturated wing): same-floor work ~28 rooms/shift, a compact all-elevator
+  hotel ~15/maid, short stair hops ~20, so the ~19 anchor holds for mixed
+  compact layouts while pure elevator commutes land under it (car speed
+  dominates the cycle). Deliberately left at 8 pending a playtest pass; shave
+  toward ~6 if the elevator-served case must hit the anchor. Tunable in
+  `src/engine/economy/housekeeping.ts`.
 - `[NOTE FOR DESIGNER]` Modern dispatch urgency-vs-travel weight (pin + test).
 - `[NOTE FOR DESIGNER]` whether a spread-marked occupied room shows an early roach
   cue before checkout.

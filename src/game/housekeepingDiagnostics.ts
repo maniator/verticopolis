@@ -1,7 +1,7 @@
 import { html, type TemplateResult } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import type { Unit } from "../engine/types";
-import { HK_ROOMS_PER_CREW, INFEST_DAYS } from "../engine/economy/housekeeping";
+import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../engine/economy/housekeeping";
 
 /**
  * Housekeeping / cockroach inspector lines, split out of `facilityDiagnostics`
@@ -17,7 +17,7 @@ import { HK_ROOMS_PER_CREW, INFEST_DAYS } from "../engine/economy/housekeeping";
 export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[] {
   if (u.state === "dirty") {
     return [
-      html`<div style="color:var(--bad)">Dirty: the guest checked out, so it can't be re-let until a housekeeper cleans it. Left dirty for ${INFEST_DAYS} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator, stairs, or escalator.</div>`,
+      html`<div style="color:var(--bad)">Dirty: the guest checked out, so it can't be re-let until a maid cleans it. Left dirty for ${INFEST_DAYS} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator or stairs.</div>`,
     ];
   }
   if (u.state === "infested") {
@@ -31,13 +31,13 @@ export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[
 }
 
 /** The housekeeping-station coverage block, the housekeeping analog of the
- *  parking demand line: how many rooms a crew turns over, the tower's crews vs
- *  its hotel rooms, and a red verdict when the tower is short on capacity or has
+ *  parking demand line: the maids a unit fields, the tower's crews vs its hotel
+ *  rooms, and a red verdict when the tower is short on nominal capacity or has
  *  rooms no crew can reach over the staff network. */
 export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   const c = sim.housekeepingCoverage();
   const out: TemplateResult[] = [
-    html`<div>Cleans ~${HK_ROOMS_PER_CREW} rooms a day. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (~${c.dailyCapacity}/day) for ${c.rooms} hotel room(s).</div>`,
+    html`<div>Fields ${HK_MAIDS_PER_UNIT} maids, each cleaning up to ~${HK_NOMINAL_ROOMS_PER_MAID} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maids, ~${c.dailyCapacity}/day at best) for ${c.rooms} hotel room(s).</div>`,
   ];
   if (c.dailyCapacity < c.rooms - c.infested) {
     // Infested rooms are uncleanable, so they are not part of the daily workload.
@@ -45,7 +45,7 @@ export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   }
   if (c.outOfReach > 0) {
     out.push(
-      html`<div style="color:var(--bad)">${c.outOfReach} room(s) are out of staff reach and can never be cleaned. Extend a service elevator, stairs, or escalator to their floors.</div>`,
+      html`<div style="color:var(--bad)">${c.outOfReach} room(s) are out of staff reach and can never be cleaned. Extend a service elevator or stairs to their floors.</div>`,
     );
   }
   return out;
