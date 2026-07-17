@@ -4,6 +4,7 @@ import { cloneSchedule, scheduleIsEmpty } from "../elevatorSchedule";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../types";
 import { LOG_RING_CAP, LOG_TEXT_CAP } from "./constants";
 import { FACILITIES, GRID, isHotelKind } from "../facilities";
+import { INFEST_DAYS } from "../economy/housekeeping";
 import { subtypeListFor } from "../retailSubtypes";
 
 /**
@@ -80,12 +81,16 @@ export function serializeUnit(u: Unit): SerializedUnit {
 
 /** Trust-boundary coercion for a hotel room's dirty-day escalation clock. Kept
  *  only on a room that reloads `dirty` (the one state it means anything in) and
- *  coerced to a non-negative integer, so the 3-day timer survives a reload but a
- *  forged value can't drive a nonsense count. Any other state or a non-hotel
- *  kind drops it to undefined. */
+ *  clamped to [0, INFEST_DAYS - 1], so the 3-day timer survives a reload but a
+ *  forged value can't drive a nonsense count: a legal room can never carry more
+ *  than INFEST_DAYS - 1 (the escalator infests it at the boundary and clears
+ *  the field), and the ceiling also keeps a forged magnitude out of Modern's
+ *  triage score (a MAX_VALUE clock would ride distance-blind priority). Any
+ *  other state or a non-hotel kind drops it to undefined. */
 export function coerceDirtyDays(state: UnitState, kind: FacilityKind, raw: unknown): number | undefined {
   if (state !== "dirty" || !isHotelKind(kind) || raw === undefined) return undefined;
-  return typeof raw === "number" && Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+  const n = typeof raw === "number" && Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+  return Math.min(INFEST_DAYS - 1, n);
 }
 
 /** Trust-boundary coercion for a booked exterminator's landing day. Only a

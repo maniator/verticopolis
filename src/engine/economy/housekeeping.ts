@@ -241,26 +241,49 @@ export class Housekeeping {
     );
     let crewsFor = (_room: Unit): Unit[] => crews;
     if (triage) {
-      const nearestDist = (room: Unit): number => {
-        let best = Infinity;
+      // Distance and crew order depend only on the room's FLOOR, so both memo
+      // by floor: a hotel floor packed with dirty rooms costs one scan and one
+      // sort, not one per room (review: dispatch also reruns per drained maid
+      // batch, so the per-room work should stay flat).
+      const distByFloor = new Map<number, number>();
+      const nearestDist = (floor: number): number => {
+        let best = distByFloor.get(floor);
+        if (best !== undefined) return best;
+        best = Infinity;
         for (const crew of crews) {
-          if (!tower.staffConnected(crew.floor, room.floor)) continue;
-          const d = Math.abs(crew.floor - room.floor);
+          if (!tower.staffConnected(crew.floor, floor)) continue;
+          const d = Math.abs(crew.floor - floor);
           if (d < best) best = d;
         }
+        distByFloor.set(floor, best);
         return best;
       };
       const score = (room: Unit): number => {
-        const d = nearestDist(room);
+        const d = nearestDist(room.floor);
         if (d === Infinity) return -Infinity; // unreachable: sorted last, still reported below
         return (room.dirtyDays ?? 0) * triage.perDirtyDay - d * triage.perFloor;
       };
       const scores = new Map(candidates.map((r) => [r.id, score(r)]));
-      candidates = [...candidates].sort((a, b) => scores.get(b.id)! - scores.get(a.id)! || a.id - b.id);
-      crewsFor = (room) =>
-        [...crews].sort(
-          (c1, c2) => Math.abs(c1.floor - room.floor) - Math.abs(c2.floor - room.floor) || c1.id - c2.id,
-        );
+      // COMPARE the scores, never subtract them: two unreachable rooms both
+      // score -Infinity and a subtraction would hand the sort NaN, leaving
+      // determinism to NaN falsiness instead of the explicit id tiebreak
+      // (review finding; a test pins the two-unreachable ordering).
+      candidates = [...candidates].sort((a, b) => {
+        const sa = scores.get(a.id)!;
+        const sb = scores.get(b.id)!;
+        return sa === sb ? a.id - b.id : sb > sa ? 1 : -1;
+      });
+      const crewOrderByFloor = new Map<number, Unit[]>();
+      crewsFor = (room) => {
+        let order = crewOrderByFloor.get(room.floor);
+        if (!order) {
+          order = [...crews].sort(
+            (c1, c2) => Math.abs(c1.floor - room.floor) - Math.abs(c2.floor - room.floor) || c1.id - c2.id,
+          );
+          crewOrderByFloor.set(room.floor, order);
+        }
+        return order;
+      };
     }
     let unreachable = 0;
     for (const room of candidates) {

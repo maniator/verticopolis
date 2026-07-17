@@ -421,7 +421,7 @@ export const MODERN_RULES: GameRules = {
     return { start: 8, end: 19, cutoff: 18.5 };
   },
   housekeepingTriage() {
-    // A day of dirt outweighs ten floors of travel (PROVISIONAL, playtest pass).
+    // A day of dirt beats anything under ten floors, tying at ten (PROVISIONAL).
     return MODERN_HK_TRIAGE;
   },
   condoRelocationChance(residents) {

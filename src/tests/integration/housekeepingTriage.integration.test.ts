@@ -35,9 +35,11 @@ function dirtyRoom(sim: Simulation, floor: number, x: number, dirtyDays?: number
   return room;
 }
 
-/** The unit ids maids were dispatched to, in spawn (= dispatch) order. */
+/** The unit ids maids were dispatched to, in spawn (= dispatch) order. Keyed
+ *  on `cleanUnitId` (not just `p.staff`) so any future staff spawned without a
+ *  cleaning job can't pollute the observed order. */
 function dispatchOrder(sim: Simulation): number[] {
-  return sim.crowd.people.filter((p) => p.staff).map((p) => p.cleanUnitId!);
+  return sim.crowd.people.filter((p) => p.staff && p.cleanUnitId !== undefined).map((p) => p.cleanUnitId!);
 }
 
 describe("Modern smart dispatch (GameRules triage)", () => {
@@ -63,7 +65,7 @@ describe("Modern smart dispatch (GameRules triage)", () => {
     const build = () => {
       const { sim } = triageTower(63, "modern");
       dirtyRoom(sim, 3, X0, 1);
-      dirtyRoom(sim, 5, X0, 1); // equal urgency and differing distance + id tiebreaks
+      dirtyRoom(sim, 5, X0, 1); // equal urgency at differing distances (distinct scores)
       dirtyRoom(sim, 4, X0, 2);
       sim.clock.minutes = 13 * 60;
       sim.economy.dispatchHousekeepers();
@@ -72,6 +74,68 @@ describe("Modern smart dispatch (GameRules triage)", () => {
     const a = build();
     expect(a.length).toBe(3);
     expect(build()).toEqual(a);
+  });
+});
+
+describe("triage tiebreaks and edges", () => {
+  it("equal scores fall to the unit-id tiebreak (two identical rooms on one distant floor)", () => {
+    const { sim } = triageTower(65, "modern");
+    // Same floor, same dirtyDays: identical scores, so placement (id) order
+    // decides. One maid per floor serializes them; the FIRST assignment is the
+    // observable tiebreak winner.
+    const a = dirtyRoom(sim, 5, X0, 1);
+    const b = dirtyRoom(sim, 5, X0 + 4, 1);
+    expect(a.id).toBeLessThan(b.id);
+    sim.clock.minutes = 13 * 60;
+    sim.economy.dispatchHousekeepers();
+    expect(dispatchOrder(sim)).toEqual([a.id]); // one-per-floor: only the tiebreak winner goes
+  });
+
+  it("unreachable rooms sort last, stay deterministic together, and still raise the can't-reach nudge", () => {
+    const { sim } = triageTower(66, "modern");
+    // Floors 9-10 exist beyond every staff transport: two unreachable dirty
+    // rooms (the -Infinity pair whose ordering must come from the id tiebreak,
+    // never from NaN comparator luck) plus one reachable fresh room.
+    for (let f = 9; f <= 10; f++)
+      for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", f, X0 + i).ok).toBe(true);
+    const reachable = dirtyRoom(sim, 3, X0);
+    dirtyRoom(sim, 9, X0, 2);
+    dirtyRoom(sim, 10, X0, 2);
+    sim.clock.minutes = 13 * 60;
+    sim.economy.dispatchHousekeepers();
+    // Only the reachable room gets a maid; the unreachable pair is reported.
+    expect(dispatchOrder(sim)).toEqual([reachable.id]);
+    expect(sim.log.some((l) => l.text.includes("Housekeeping can't reach 2 dirty room(s)"))).toBe(true);
+  });
+
+  it("locks the ratified 10:1 weight at its boundary (a day of dirt beats 9 floors, loses to 11)", () => {
+    const wins = (() => {
+      const { sim } = triageTower(67, "modern");
+      for (let f = 9; f <= 11; f++)
+        for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", f, X0 + i).ok).toBe(true);
+      expect(sim.tower.placeTransport("stairs", X0, 8, 9).ok).toBe(true);
+      expect(sim.tower.placeTransport("stairs", X0 + 8, 9, 10).ok).toBe(true);
+      expect(sim.tower.placeTransport("stairs", X0, 10, 11).ok).toBe(true);
+      const near = dirtyRoom(sim, 2, X0); // fresh at distance 0: score 0
+      const nine = dirtyRoom(sim, 11, X0 + 24, 1); // 1 day at distance 9: 10 - 9 = 1 > 0
+      sim.clock.minutes = 13 * 60;
+      sim.economy.dispatchHousekeepers();
+      return dispatchOrder(sim).slice(0, 2).join(",") === `${nine.id},${near.id}`;
+    })();
+    expect(wins).toBe(true); // 9 floors: the day of dirt wins
+    const loses = (() => {
+      const { sim } = triageTower(68, "modern");
+      for (let f = 9; f <= 13; f++)
+        for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", f, X0 + i).ok).toBe(true);
+      for (let f = 8; f <= 12; f++)
+        expect(sim.tower.placeTransport("stairs", X0 + (f % 2) * 8, f, f + 1).ok).toBe(true);
+      const near = dirtyRoom(sim, 2, X0); // fresh at distance 0: score 0
+      const eleven = dirtyRoom(sim, 13, X0 + 24, 1); // 1 day at distance 11: 10 - 11 = -1 < 0
+      sim.clock.minutes = 13 * 60;
+      sim.economy.dispatchHousekeepers();
+      return dispatchOrder(sim).slice(0, 2).join(",") === `${near.id},${eleven.id}`;
+    })();
+    expect(loses).toBe(true); // 11 floors: the commute wins
   });
 });
 

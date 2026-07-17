@@ -189,6 +189,11 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `gds-code-review` of Modern smart dispatch (housekeeping-overhaul epic 4, PR #463) (adversarial, 2026-07-17)
+
+- **The triage travel proxy is blind to transport quality and crew saturation (Blind Hunter + Acceptance Auditor, low; refinement with the playtest weight pass).** The score's travel term is floor distance to the NEAREST staff-connected crew: a six-floor stairs-only climb scores like a six-floor service-elevator ride, and when the nearest crew's six maids are all out, a much farther crew is the one that actually travels while the score still reads "close". Documented as an accepted v1 proxy in the GDD's pinned-weight note; revisit alongside the `MODERN_HK_TRIAGE` weight tuning if playtest shows Modern towers mis-prioritizing (fix shapes: distance to the nearest crew WITH a free maid, or a transport-aware cost off the staff route length).
+- **`gameRules.ts` sits at exactly the 500-line file-size ceiling (Edge Case Hunter, informational).** The next added line trips `fileSize.guard.test.ts` mid-feature. Plan the next cohesive split (candidates: the Modern deeper-economy layer, or the two rule-set literals) BEFORE the next GameRules seam lands, mirroring the `households.ts`/`pricing.ts` precedents, rather than splitting under pressure inside an unrelated PR.
+
 ### Deferred from: `gds-code-review` of housekeeping legibility layer (housekeeping-overhaul epic 3, PR #462) (adversarial, 2026-07-17)
 
 - **Maids never visibly leave a cleaned room: no return leg (Acceptance Auditor, low; player-noticeable polish).** After the cleaning dwell expires, a staff person hits the non-round-tripper branch in `crowd/motion.ts` and despawns inside the room; the GDD's "walk in, dwell, and leave a room clean" (and the agent model's `returning` state) is under-delivered by the vanish. Spawn is now pinned to the unit footprint (epic 3), so the remaining gap is only the exit. Fix shape: reuse the meal round-trip machinery (a `returning` staff leg back to the crew floor that despawns at the unit), taking care the job RESULT still fires at dwell end (cleaning must not wait for the walk home) and the maid ledger frees at result time, not despawn time, or throughput regresses.

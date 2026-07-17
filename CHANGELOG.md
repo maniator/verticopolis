@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.56.0
 
-- Modern towers gain smart housekeeping dispatch: maids now rescue the rooms closest to infestation first, weighing how long a room has waited against how far the crew must travel. Classic keeps the original's simple order.
+- Modern towers gain smart housekeeping dispatch: maids now rescue the rooms closest to infestation first, weighing how long a room has waited against how far away the nearest crew is. Classic keeps the original's simple order.
 
 ## 1.55.0
 
