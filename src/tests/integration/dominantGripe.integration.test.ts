@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/gripe";
-import type { DemandMap } from "../../engine/sim/demand";
+import { computeDemandMap, type DemandMap } from "../../engine/sim/demand";
+import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
@@ -165,6 +166,64 @@ describe("the Main gripe inspector line", () => {
     expect(text).toContain("Long walk to transport");
     expect(text).not.toContain("Main gripe:");
   });
+
+  it("names the capacity shortfall for a tenant whose reachable retail is oversubscribed", () => {
+    // A full-width floor of occupied offices sharing one fast food venue: every
+    // office reaches it, but the pool dwarfs its capacity (share > 2, coverage
+    // below the 0.5 floor), so the gripe must prescribe MORE venues anywhere
+    // connected, never "near this floor" (the demand model is tower-uniform).
+    const sim = Simulation.newGame(1);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    // Parallel shafts every 40 tiles so no office is transport-far or congested.
+    for (let sx = 10; sx < GRID.width - 10; sx += 40) {
+      expectOk(sim.buildTransport("elevatorStandard", sx, 1, 2));
+    }
+    const food = placeUnit(sim, "fastFood", 2, GRID.width - 30);
+    food.state = "occupied";
+    let sample: Unit | undefined;
+    for (let x = 14; x + 9 <= GRID.width - 40; x += 11) {
+      const r = sim.tower.place("office", 2, x);
+      if (!r.ok) continue; // tiles under a shaft column: skip, the rest suffice
+      const o = sim.tower.units.find((u) => u.id === r.unitId)!;
+      o.state = "occupied";
+      // The sample must sit outside the venue's noise band so unmet demand,
+      // the last sink, is the dominant gripe under test.
+      if (!sample && x < GRID.width - 120) sample = o;
+    }
+    expect(sample, "fixture placed no sample office").toBeDefined();
+    const coverage = unmetCoverage(computeDemandMap(sim), sample!);
+    expect(coverage).not.toBeNull();
+    expect(coverage!).toBeGreaterThan(0); // reaches the venue...
+    expect(coverage!).toBeLessThan(UNMET_DEMAND_FLOOR); // ...which is oversubscribed
+    sample!.satisfaction = 0.5;
+    const text = diagText(sim, sample!);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("Add venues on any connected floor");
+    expect(text).not.toContain("reachable from here");
+  }, 30000);
+
+  it("names the broken connection for a tenant whose retail is all stranded", () => {
+    // The tower HAS retail, but it sits on an unserved floor: the office reaches
+    // none of it (coverage 0), so the gripe must prescribe reconnecting the
+    // retail, not building more.
+    const sim = Simulation.newGame(1);
+    const office = servedOffice(sim);
+    lay(sim, "floor", 3);
+    // No transport reaches floor 3: the venue is built and operational but
+    // stranded, so it counts as existing retail that no shopper can reach.
+    const food = placeUnit(sim, "fastFood", 3, C + 40);
+    food.state = "occupied";
+    expect(sim.tower.isFloorServed(3)).toBe(false);
+    expect(unmetCoverage(computeDemandMap(sim), office)).toBe(0);
+    office.satisfaction = 0.5;
+    const text = diagText(sim, office);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("none of them are reachable from here");
+    expect(text).not.toContain("Add venues on any connected floor");
+  }, 30000);
 
   it("defers to the dedicated line for access (no duplicate Main gripe)", () => {
     const sim = Simulation.newGame(1);
