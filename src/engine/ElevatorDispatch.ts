@@ -1,6 +1,15 @@
 import type { Tower } from "./Tower";
 import type { ElevatorCalls } from "./Crowd";
 import { attendanceCap, isElevatorKind, isStaffOnlyTransport, transportCarCapacity } from "./facilities";
+import { activeCarCount, dwellMinutesFor, homeFloorFor, waitingResponseFor } from "./elevatorSchedule";
+
+/** The clock signal dispatch needs to read a per-shaft schedule: which day-type
+ *  row is live and which of its 24 hours applies. A shaft with no schedule ignores
+ *  it entirely, so an unscheduled tower dispatches the same whatever the clock says. */
+export interface DispatchClock {
+  hour: number;
+  isWeekend: boolean;
+}
 
 /** Car travel speed in floors per game-minute. Exported so the crowd's
  *  patience budget can be derived from it and never drift (see Crowd's
@@ -51,9 +60,9 @@ export class ElevatorDispatch {
    * are per-car forced stops — a rider can only alight from their own car, so
    * these are served by that car regardless of what the other cars claim.
    */
-  update(tower: Tower, dt: number, rush: number, crowdCalls?: ElevatorCalls): void {
+  update(tower: Tower, dt: number, rush: number, crowdCalls?: ElevatorCalls, clock?: DispatchClock): void {
     this.accumulate(tower, dt, rush);
-    this.moveCars(tower, dt, crowdCalls);
+    this.moveCars(tower, dt, crowdCalls, clock);
   }
 
   /** Advance the statistical demand model by a span of time. Split out from
@@ -64,8 +73,11 @@ export class ElevatorDispatch {
     this.accumulateWaiting(tower, dt, rush);
   }
 
-  /** Move the cars by a (short) time slice against the current demand. */
-  moveCars(tower: Tower, dt: number, crowdCalls?: ElevatorCalls): void {
+  /** Move the cars by a (short) time slice against the current demand. `clock`
+   *  (day-type + hour) is read only for shafts that carry a `schedule`; without it,
+   *  or for a shaft with no schedule, every car is on shift and idles at the derived
+   *  lobby exactly as before (elevator-scheduling #305 Phase 2). */
+  moveCars(tower: Tower, dt: number, crowdCalls?: ElevatorCalls, clock?: DispatchClock): void {
     const demand = this.waiting;
     // Idle cars rest at the lowest LOBBY the shaft serves (the ground/sky lobby),
     // not merely its lowest stop — review F27.
@@ -81,6 +93,20 @@ export class ElevatorDispatch {
       const stops = tower.stopsOf(t);
       if (stops.length === 0) continue;
       const idleFloor = stops.find((s) => lobbySet.has(s)) ?? stops[0];
+
+      // Per-shaft schedule reads (#305 Phase 2). All of them are gated behind the
+      // clock: the schedule is a function of the day-type and hour, so with no clock
+      // the shaft reads as unscheduled (pre-schedule behavior across the board, not
+      // just for active-car gating). The live loop always passes `sim.clock`; a
+      // caller that omits it (a test, future tooling) gets today's behavior. Each
+      // read then also falls back to the global default for a shaft with no schedule,
+      // so an unscheduled shaft is byte-identical: activeCount is every car, the dwell
+      // is the global default, and response gating is off.
+      const sched = clock ? t.schedule : undefined;
+      const activeCount = clock ? activeCarCount(sched, clock.isWeekend, clock.hour, t.cars) : t.cars;
+      const shaftDwell = dwellMinutesFor(sched, DWELL_MINUTES);
+      const response = waitingResponseFor(sched);
+      const span = t.top - t.bottom;
 
       let dwell = this.carDwell.get(t.id);
       if (!dwell || dwell.length !== t.cars) {
@@ -103,6 +129,31 @@ export class ElevatorDispatch {
       // (review F17).
       const claimed = new Set<number>();
       for (let i = 0; i < t.cars; i++) {
+        // Where this car idles: its authored home floor, or the derived lobby when
+        // unscheduled (then carHome === idleFloor, so nothing changes). Clamp to the
+        // shaft span defensively, mirroring activeCarCount: a resize (Tower.setBounds)
+        // clamps carPositions but not the stored schedule, so a stale home floor could
+        // otherwise sit off the shaft and pin a car at the boundary, never parking.
+        const carHome = Math.max(t.bottom, Math.min(t.top, homeFloorFor(sched, i, idleFloor)));
+        // Off shift this hour (a scheduled active-car count below the fleet size):
+        // the car carries nobody, answers nothing, and drifts home to park. It is
+        // skipped before the call scan, so it claims no floor and accrues no load.
+        if (i >= activeCount) {
+          t.carLoad[i] = 0;
+          dwell[i] = 0;
+          const cur = t.carPositions[i];
+          if (Math.abs(cur - carHome) < 0.05) {
+            t.carPositions[i] = carHome;
+            t.carDir[i] = 0;
+          } else {
+            const step = dt * CAR_FLOORS_PER_MINUTE;
+            const dir = carHome > cur ? 1 : -1;
+            const np = Math.abs(carHome - cur) <= step ? carHome : cur + dir * step;
+            t.carPositions[i] = Math.max(t.bottom, Math.min(t.top, np));
+            t.carDir[i] = np === carHome ? 0 : dir;
+          }
+          continue;
+        }
         // Serve out any remaining dwell first; if it expires mid-step the car
         // moves for the remainder, so throughput doesn't depend on how the
         // outer step happens to be chunked.
@@ -120,21 +171,37 @@ export class ElevatorDispatch {
         }
         const v = carDt * CAR_FLOORS_PER_MINUTE; // floors traveled this step
         let pos = t.carPositions[i];
+        // A car that parked last tick sits at dir 0; it is "waiting" for the
+        // purposes of Waiting Car Response below.
+        const wasParked = t.carDir[i] === 0;
         let dir = t.carDir[i] || 1;
 
         // This car's own riders' destinations. They are NOT subject to
         // `claimed`: another car "handling" the floor can serve its hall call
         // but can never deliver THIS car's passengers.
         const cab = cabs?.get(i);
+        // Waiting Car Response: a parked car holds for a hall call farther than the
+        // threshold allows, so a scheduled shaft can keep cars staged instead of
+        // launching them at every distant call. Higher response -> smaller reach ->
+        // stays put longer. The gate is applied to the nearest call in EACH scan
+        // direction, so a far call ahead does not mask a within-reach call behind: a
+        // held ahead-call falls through to the turnaround exactly like an absent one.
+        // A car's own cab stops are never gated (it must deliver its riders); reach is
+        // Infinity for a moving car or an unscheduled shaft, so the gate is inert and
+        // an unscheduled shaft answers exactly as before.
+        const reach = wasParked && response !== undefined ? Math.max(0, span - response) : Infinity;
         let target = this.nextDemandStop(stops, pos, dir, calls, claimed, cab);
+        if (target !== null && !cab?.has(target) && Math.abs(target - pos) > reach) target = null;
         if (target === null) {
-          dir = -dir; // nothing ahead — turn around
+          dir = -dir; // nothing ahead (or a far call held per response), so turn around
           target = this.nextDemandStop(stops, pos, dir, calls, claimed, cab);
+          if (target !== null && !cab?.has(target) && Math.abs(target - pos) > reach) target = null;
         }
         if (target !== null) claimed.add(target); // reserve this call for this car
         if (target === null) {
-          // Nobody waiting: return to the lobby and stop dead rather than pacing.
-          target = idleFloor;
+          // Nobody waiting (or a parked car holding per response): return to the
+          // home floor and stop dead rather than pacing.
+          target = carHome;
           if (Math.abs(pos - target) < 0.05) {
             t.carDir[i] = 0;
             t.carLoad[i] = 0; // everyone's stepped off
@@ -144,7 +211,7 @@ export class ElevatorDispatch {
 
         if (Math.abs(target - pos) <= v) {
           pos = target;
-          dwell[i] = DWELL_MINUTES; // pause to load / unload
+          dwell[i] = shaftDwell; // pause to load / unload (per-shaft when scheduled)
           // Some riders alight, then waiting passengers board up to capacity.
           // Staff shafts carry only their real callers (the hall count) — the
           // statistical tenant queue never boards a service car.

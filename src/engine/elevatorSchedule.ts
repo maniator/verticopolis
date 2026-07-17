@@ -25,12 +25,13 @@ export interface ElevatorSchedule {
 /**
  * Pure helpers for the per-shaft elevator schedule (elevator-scheduling, #305).
  *
- * Phase 1 scope: the load-boundary coercion (`coerceSchedule`) that hardens an
- * untrusted saved schedule, plus the `scheduleIsEmpty` guard the serializer uses
- * to avoid persisting a schedule with nothing in it. The dispatch read accessors
- * (active-car count, home floor, dwell, response) land with Phase 2 when the
- * dispatcher first reads a schedule; keeping them out of Phase 1 avoids shipping
- * code nothing calls yet.
+ * Two groups: the load-boundary coercion (`coerceSchedule`) that hardens an
+ * untrusted saved schedule plus the `scheduleIsEmpty` guard the serializer uses
+ * (Phase 1); and the dispatch read accessors (`activeCarCount`, `homeFloorFor`,
+ * `dwellMinutesFor`, `waitingResponseFor`) that `ElevatorDispatch` calls each tick
+ * (Phase 2). Every accessor short-circuits to today's automatic behavior for an
+ * absent schedule or an absent field, so an unscheduled shaft dispatches exactly
+ * as it did before this epic (the golden-master invariant, GDD §6.1).
  *
  * No DOM, no RNG, no Simulation import: this is an engine leaf so both the sim and
  * (later) the TDT codec can share one definition of the schedule's meaning.
@@ -38,6 +39,20 @@ export interface ElevatorSchedule {
 
 /** Hours in a schedule row (a full day). */
 export const SCHEDULE_HOURS = 24;
+
+/** Game-seconds in one game-minute, the unit `standardFloorDeparture` (stored in
+ *  game-seconds) is divided by to recover the dispatcher's game-minute dwell. */
+const SECONDS_PER_GAME_MINUTE = 60;
+
+/**
+ * The second-denominated equivalent of the dispatcher's default dwell (0.8
+ * game-minutes = 48 game-seconds), exposed so the Phase 3 stepper can center its
+ * range on today's behavior. PROVISIONAL, like the two `*_MAX` bounds: the exact
+ * stepper range settles in the Phase 3 dialog PR. Dispatch never reads this; it is
+ * a documentation anchor for the UI. An absent `standardFloorDeparture` uses the
+ * global default directly (see `dwellMinutesFor`), so nothing changes until set.
+ */
+export const DWELL_DEFAULT_SECONDS = 48;
 
 /**
  * Clamp bounds for the two response tunables. PROVISIONAL (the UI stepper ranges
@@ -143,6 +158,79 @@ export function coerceSchedule(
   }
 
   return scheduleIsEmpty(out) ? undefined : out;
+}
+
+/**
+ * How many of a shaft's `cars` are on shift in a given hour (Phase 2 dispatch
+ * read). The lowest-indexed `activeCarCount` cars run; the rest park at home and
+ * answer nothing. An absent schedule, an absent day-type row, or a non-finite hour
+ * entry all mean "all cars run", so an unscheduled shaft keeps every car on shift.
+ * Re-clamps to `[0, cars]` defensively (a UI-built schedule may hold a value the
+ * load coercion never re-checked, e.g. after the player removed a car).
+ */
+export function activeCarCount(
+  s: ElevatorSchedule | undefined,
+  isWeekend: boolean,
+  hour: number,
+  cars: number,
+): number {
+  const rows = s?.activeCars;
+  if (!rows) return cars;
+  const row = isWeekend ? rows.weekend : rows.weekday;
+  if (!row || row.length === 0) return cars;
+  const h = ((Math.floor(hour) % SCHEDULE_HOURS) + SCHEDULE_HOURS) % SCHEDULE_HOURS;
+  const v = row[h];
+  if (typeof v !== "number" || !Number.isFinite(v)) return cars;
+  return clamp(Math.floor(v), 0, cars);
+}
+
+/**
+ * The floor idle car `carIndex` returns to and waits on (Phase 2 dispatch read).
+ * An absent schedule, an absent `homeFloors` array, or a missing/short entry all
+ * fall back to `fallback` (the dispatcher's derived lowest-lobby idle floor), so an
+ * unscheduled shaft and any car past the authored home list idle exactly as today.
+ * The value is rounded to a whole floor: load coercion already rounds, but an
+ * in-memory schedule (a future authoring path) could hold a fractional value, and
+ * dispatch must park on a discrete floor, never between two.
+ */
+export function homeFloorFor(s: ElevatorSchedule | undefined, carIndex: number, fallback: number): number {
+  const hf = s?.homeFloors;
+  if (!hf) return fallback;
+  const v = hf[carIndex];
+  return typeof v === "number" && Number.isFinite(v) ? Math.round(v) : fallback;
+}
+
+/**
+ * The per-shaft dwell in game-minutes (Phase 2 dispatch read), overriding the
+ * dispatcher's global default when `standardFloorDeparture` is set. The stored
+ * value is in game-seconds; 60 game-seconds is one game-minute, so the 0.8-minute
+ * default corresponds to `DWELL_DEFAULT_SECONDS` (48). An absent value returns the
+ * passed default unchanged, so an unscheduled shaft holds exactly as long as today.
+ * The seconds are clamped to `[0, STANDARD_FLOOR_DEPARTURE_MAX]` defensively (load
+ * coercion already clamps): an in-memory schedule that skipped coercion cannot then
+ * freeze a shaft with a huge hold.
+ */
+export function dwellMinutesFor(s: ElevatorSchedule | undefined, defaultMinutes: number): number {
+  const sd = s?.standardFloorDeparture;
+  if (typeof sd !== "number" || !Number.isFinite(sd)) return defaultMinutes;
+  return clamp(sd, 0, STANDARD_FLOOR_DEPARTURE_MAX) / SECONDS_PER_GAME_MINUTE;
+}
+
+/**
+ * The Waiting Car Response threshold in floors (Phase 2 dispatch read), or
+ * `undefined` when unset so the dispatcher keeps its current, un-gated call
+ * response for an unscheduled shaft. A set value makes a parked (idle-at-home) car
+ * hold for a call farther than the threshold allows, so the higher the value the
+ * longer a staged car stays put; the dispatcher owns the exact geometry. Provisional
+ * mapping onto our SCAN model: canon does not document the 1994 term at byte level,
+ * so this preserves the stepper's direction (higher = stays put) and its no-op
+ * default rather than claiming byte fidelity. The value is rounded and clamped to
+ * `[0, WAITING_CAR_RESPONSE_MAX]` defensively (mirroring load coercion), so an
+ * in-memory schedule that skipped coercion cannot collapse the reach past the bound.
+ */
+export function waitingResponseFor(s: ElevatorSchedule | undefined): number | undefined {
+  const r = s?.waitingCarResponse;
+  return typeof r === "number" && Number.isFinite(r) ? clamp(Math.round(r), 0, WAITING_CAR_RESPONSE_MAX) : undefined;
 }
 
 /** Deep-copy a schedule for a serialization snapshot, so a retained save object

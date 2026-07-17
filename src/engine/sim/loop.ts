@@ -74,7 +74,10 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
   const moveMinutes = Math.min(dtMinutes, CROWD_MAX_STEP / CROWD_SECONDS_PER_MINUTE);
   for (let left = moveMinutes; left > 0; ) {
     const chunk = Math.min(left, 2.5);
-    sim.elevators.moveCars(sim.tower, chunk, sim.crowd.elevatorCalls(sim.tower));
+    // Pass the clock so a shaft with an authored schedule reads its live day-type
+    // row and hour (active-car count, home floors, dwell, response). An unscheduled
+    // shaft ignores it, so this changes nothing until a schedule exists (#305 Phase 2).
+    sim.elevators.moveCars(sim.tower, chunk, sim.crowd.elevatorCalls(sim.tower), sim.clock);
     sim.crowd.advance(chunk * CROWD_SECONDS_PER_MINUTE, sim.tower);
     left -= chunk;
   }
