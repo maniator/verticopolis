@@ -247,7 +247,11 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
       if (!isHotelKind(u.kind) || !isOperational(u)) continue;
       const roomComp = comps.get(u.floor);
       const reachable = crewFloors.has(u.floor) || (roomComp !== undefined && crewComps.has(roomComp));
-      const severity = !reachable ? 1 : u.state === "dirty" ? 0.6 : 0;
+      // Unreachable is the worst (red): no crew can ever service it. A full
+      // cockroach infestation is next (housekeeping can no longer clean it, so
+      // it reads hotter than a merely dirty room waiting its turn). A reachable
+      // dirty room is amber, a clean covered room green.
+      const severity = !reachable ? 1 : u.state === "infested" ? 0.85 : u.state === "dirty" ? 0.6 : 0;
       out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity });
     }
     return out;

@@ -4,6 +4,7 @@ import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simul
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
+import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
 import { ECON } from "../engine/econConfig";
 import { subtypeListFor } from "../engine/retailSubtypes";
 import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
@@ -240,6 +241,13 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
         ? html`<div style="color:var(--good)">Counts toward stars: yes.</div>`
         : html`<div style="color:var(--bad)">Counts toward stars: no. Hotel guests stop counting at 4★ (they still earn income).</div>`,
     );
+    lines.push(...hotelInfestationLines(sim, u));
+  }
+  // Housekeeping station: the coverage readout (crews vs rooms, out-of-reach),
+  // the housekeeping analog of the parking demand line. Skip while it's still
+  // building or on fire; "Status" covers that.
+  if (u.kind === "housekeeping" && isOperational(u)) {
+    lines.push(...housekeepingCoverageLines(sim));
   }
   // Silent rule: a parking space only works when it chains to a ramp. Skip
   // the verdict while it's still building (or on fire); "Status" covers that.

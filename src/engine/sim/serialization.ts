@@ -49,6 +49,7 @@ export function serialize(sim: Simulation): SerializedGame {
     vipVisits: sim.vipVisits,
     lastVipNagDay: sim.lastVipNagDay,
     treasuresFound: sim.treasuresFound,
+    exterminationDueDay: sim.exterminationDueDay,
     events: sim.events.saveState(),
     excavated: [...sim.excavated],
     blockbusters: sim.economy.blockbusterIds,
@@ -116,12 +117,12 @@ export function deserialize(raw: SerializedGame): Simulation {
     sim.clock.day,
     typeof data.lastVipNagDay === "number" && Number.isFinite(data.lastVipNagDay) ? Math.floor(data.lastVipNagDay) : -100,
   );
-  // Clamp ≥0 (untrusted save): a negative value would keep `treasuresFound < 3`
-  // true forever and re-open the treasure farm.
+  // Clamp ≥0 (untrusted): a negative keeps `treasuresFound < 3` true and re-opens the treasure farm.
   sim.treasuresFound = Math.max(
     0,
     typeof data.treasuresFound === "number" && Number.isFinite(data.treasuresFound) ? data.treasuresFound : 0,
   );
+  sim.exterminationDueDay = coerceExterminationDueDay(sim.rules.infestationRecovery() !== null, sim.clock.day, data.exterminationDueDay);
   // Restore excavation history so buried treasure stays one-time per tile across
   // a save/reload (otherwise the build/bulldoze exploit reopens on load).
   if (Array.isArray(data.excavated)) {
@@ -173,17 +174,15 @@ export function deserialize(raw: SerializedGame): Simulation {
       // innerHTML and state-machine compares); the sold/leased flag below reads it.
       const state = isUnitState(u.state) ? u.state : "empty";
       // Harden the "currently sold/leased" flag at the trust boundary: only a
-      // literal `true` counts (a forged "yes" must not mark a condo sold), AND,
-      // for a LEASE/SALE unit (office, condo), whose everOccupied means "currently
-      // leased/sold", a shell state (empty, construction, gutted) is definitionally
-      // NOT currently owned, so the flag is normalized to false even if the save
-      // left it true. That rescues a LEGACY "dead" condo whose owner left back when
-      // `vacate()` kept `everOccupied` set (else it reloads sold-but-empty and, since
-      // sales require `!everOccupied`, sits off-market forever) and blocks a forged
-      // shell from doing the same. (A sold unit that's on fire IS still owned, so
-      // `fire` is not cleared.) HOTELS are exempt: their everOccupied means "ever
-      // booked" and legitimately stays true while the room sits `empty` between
-      // guests (turnover runs through `state`, not this flag).
+      // literal `true` counts, AND for a LEASE/SALE unit (office, condo) a shell
+      // state (empty, construction, gutted) is definitionally NOT owned, so the
+      // flag normalizes to false even if the save left it true. That rescues a
+      // LEGACY "dead" condo whose owner left back when `vacate()` kept
+      // `everOccupied` set (else it reloads sold-but-empty and, since sales
+      // require `!everOccupied`, sits off-market forever), and blocks a forged
+      // shell doing the same. (A sold unit on fire IS still owned, so `fire` is
+      // not cleared.) HOTELS are exempt: everOccupied means "ever booked" and
+      // stays true while a room sits `empty` between guests (turnover is `state`).
       const notOwned = state === "empty" || state === "construction" || state === "gutted";
       const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
       const soldCondo = u.kind === "condo" && everOccupied;
@@ -269,6 +268,7 @@ export function deserialize(raw: SerializedGame): Simulation {
         // deadline from a forged save must not reach the toast / state machine.
         vacateReason: isVacateReason(u.vacateReason) ? u.vacateReason : undefined,
         vacateAt: u.vacateAt === undefined ? undefined : num(u.vacateAt, 0),
+        dirtyDays: coerceDirtyDays(state, u.kind as FacilityKind, u.dirtyDays),
         // Off-market flag, sanitized through the rule-set seam (like
         // `coerceResidents`): Classic keeps a literal-true flag and hardens a
         // forged non-boolean away; Modern never holds the state, so it coerces
@@ -495,4 +495,4 @@ export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar
   return sim;
 }
 
-import { serializeUnit, serializeTransport, coerceLog, coerceView } from "./coerce";
+import { serializeUnit, serializeTransport, coerceLog, coerceView, coerceDirtyDays, coerceExterminationDueDay } from "./coerce";

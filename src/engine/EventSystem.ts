@@ -174,6 +174,8 @@ export class EventSystem {
     u.patronageYest = undefined;
     u.profitToday = undefined;
     u.profitYest = undefined;
+    // A burned hotel room carries no dirty-day clock into its gutted shell.
+    u.dirtyDays = undefined;
     u.label = FACILITIES[u.kind].name;
   }
 
@@ -272,6 +274,33 @@ export class EventSystem {
     return this.sim.tower.roomAt(u.floor, u.x - 1) ?? this.sim.tower.roomAt(u.floor, u.x + u.width);
   }
 
+  /** The room directly above a unit. Canon fire climbs UPWARD (never down), so a
+   *  blaze reaches the story above as well as its same-floor neighbors; that
+   *  vertical spread is what turns an unfought fire into a tower-gutting
+   *  emergency. `roomAt` reads only the room layer, so a structural floor/lobby
+   *  tile above is never a target. */
+  private roomAbove(u: Unit): Unit | undefined {
+    return this.sim.tower.roomAt(u.floor + 1, u.x);
+  }
+
+  /** Spread an uncontained blaze into one candidate room. Honors the small-tower
+   *  safety valve (never consume the LAST operational room of its kind, so one
+   *  blaze can't wipe a starter tower to zero of something) and skips anything
+   *  not operational (already ablaze, gutted, or under construction). */
+  private spreadFireTo(target: Unit | undefined): void {
+    if (!target || !isOperational(target)) return;
+    // Count with an early exit (no per-spread array allocation).
+    let opsOfKind = 0;
+    for (const x of this.sim.tower.units) {
+      if (x.kind === target.kind && isOperational(x) && ++opsOfKind > 1) break;
+    }
+    if (opsOfKind <= 1) return; // last of its kind: spare it
+    target.state = "fire";
+    target.occupants = 0;
+    this.active.add(target.id);
+    this.sim.emit(`The fire spread to ${FACILITIES[target.kind].name} on ${this.sim.floorLabel(target.floor)}!`, "bad");
+  }
+
   /**
    * Resolve active fires. Security and especially a medical center speed the
    * emergency response; without them a blaze is more likely to spread to the
@@ -298,25 +327,12 @@ export class EventSystem {
           "bad",
         );
       } else {
-        const next = this.adjacentRoom(u);
-        // Small-tower safety valve: never consume the LAST operational room of its
-        // kind, so one blaze can't wipe a starter tower to zero of something.
-        // Count with an early exit (no per-spread array allocation).
-        let opsOfKind = 0;
-        if (next) {
-          for (const x of this.sim.tower.units) {
-            if (x.kind === next.kind && isOperational(x) && ++opsOfKind > 1) break;
-          }
-        }
-        const lastOfKind = !!next && opsOfKind <= 1;
-        // adjacentRoom() returns only room-layer units (never floor/lobby) and
-        // isOperational() already excludes fire — so the guard is just these two.
-        if (next && !lastOfKind && isOperational(next)) {
-          next.state = "fire";
-          next.occupants = 0;
-          this.active.add(next.id);
-          this.sim.emit(`The fire spread to ${FACILITIES[next.kind].name} on ${this.sim.floorLabel(next.floor)}!`, "bad");
-        }
+        // Uncontained: the blaze both widens along its floor and climbs to the
+        // story above (canon fire spreads sideways and UP, never down). Each
+        // direction is an independent spread attempt through the same safety
+        // valve; the same-floor attempt keeps the original left-then-right rule.
+        this.spreadFireTo(this.adjacentRoom(u));
+        this.spreadFireTo(this.roomAbove(u));
       }
     }
     // An active emergency rattles everyone still in the building.

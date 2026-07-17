@@ -974,6 +974,11 @@ dialog.crash-card::backdrop {
   font-size: 13px;
   padding: 0 2px;
 }
+/* The exterminator action row is a direct child of the two-column grid; span it
+   full width so the button never sits in a single column and breaks the flow. */
+.stats-grid .modal-actions {
+  grid-column: 1 / -1;
+}
 /* Layout only — type/casing/padding come from .win-title.sm in the markup. */
 .stats-section {
   grid-column: 1 / -1;

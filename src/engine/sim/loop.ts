@@ -104,7 +104,13 @@ export function onHour(sim: Simulation): void {
   sim.updatePresence();
   // Guests check out in the morning (not at midnight), so overnight hotel
   // population is still present at the midnight TOWER/VIP evaluation.
-  if (sim.clock.hour === HK_SHIFT_START) sim.economy.hotelCheckout();
+  if (sim.clock.hour === HK_SHIFT_START) {
+    sim.economy.hotelCheckout();
+    // A booked exterminator lands AFTER this morning's checkout (so infested
+    // rooms spread one last time while the crew was en route), clearing rooms
+    // back to rentable.
+    sim.resolveExtermination();
+  }
   // Housekeeping works a day shift: dispatch keeps sending crews to dirty
   // rooms through the day (retrying jobs that failed or were over capacity).
   if (sim.clock.hour >= HK_SHIFT_START && sim.clock.hour <= HK_SHIFT_END) {

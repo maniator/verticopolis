@@ -27,6 +27,19 @@ export function statsModalTemplate(body: TemplateResult): TemplateResult {
       <div class="modal-actions"><button class="btn primary" data-act="close">Close</button></div>`;
 }
 
+/** True when the stats modal should offer the "Call exterminator" action:
+ *  Modern (an exterminator exists), at least one infested room, and no dispatch
+ *  already en route. Shared by the template (to render the button) and `main`
+ *  (to wire its handler) so the two can never disagree, which matters because
+ *  `wireActions` throws if it binds a handler to a button that was not rendered. */
+export function canCallExterminator(sim: Simulation): boolean {
+  return (
+    sim.rules.infestationRecovery() !== null &&
+    sim.exterminationDueDay === undefined &&
+    sim.housekeepingCoverage().infested > 0
+  );
+}
+
 export function statsTemplate(sim: Simulation): TemplateResult {
   const s = sim.stats();
   const c = sim.clock;
@@ -37,6 +50,13 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   const ratingPop = sim.ratingPopulation();
   const parkingWorking = sim.tower.functionalParkingSet().size;
   const parkingDemand = sim.parkingDemand();
+  const hk = sim.housekeepingCoverage();
+  // Compare capacity against CLEANABLE rooms: infested rooms can't be cleaned,
+  // so counting them as workload would over-report an under-provisioning.
+  const hkShort = hk.rooms > 0 && (hk.dailyCapacity < hk.rooms - hk.infested || hk.outOfReach > 0);
+  const extermRecovery = sim.rules.infestationRecovery();
+  const extermPending = sim.exterminationDueDay !== undefined;
+  const extermCost = extermRecovery ? extermRecovery.calloutFee + extermRecovery.perRoomFee * hk.infested : 0;
   const recyclingCap = sim.recyclingCapacity();
   const recyclingShort = !sim.recyclingDemandMet();
   const stranded = sim.strandedFloors().length; // BFS-bearing
@@ -87,10 +107,27 @@ export function statsTemplate(sim: Simulation): TemplateResult {
       </div>
       <div class="col kv">
         <span class="k">Hotel rooms in use</span><span class="v">${s.occupiedHotel}/${s.hotelRooms}</span>
-        <span class="k">Rooms to clean</span><span class="v">${s.dirty}</span>
+        <span class="k">Rooms to clean</span><span class="v" style="color:${s.dirty ? "var(--bad)" : "var(--good)"}">${s.dirty}</span>
+        ${
+          hk.rooms > 0
+            ? html`<span class="k">Housekeeping</span><span class="v" style="color:${hkShort ? "var(--bad)" : "var(--good)"}">${fmt(hk.crews)} crew${hk.crews === 1 ? "" : "s"}, ~${fmt(hk.dailyCapacity)}/day for ${fmt(hk.rooms)} room(s)${hk.outOfReach > 0 ? `, ${fmt(hk.outOfReach)} out of reach` : ""}</span>`
+            : nothing
+        }
+        ${
+          hk.infested > 0
+            ? html`<span class="k">Infested</span><span class="v" style="color:var(--bad)">${fmt(hk.infested)} (${sim.rules.infestationRecovery() ? "exterminate or bulldoze" : "bulldoze to clear"})</span>`
+            : nothing
+        }
         <span class="k">Shops / Food</span><span class="v">${s.shops} / ${s.restaurants}</span>
         <span class="k">On fire</span><span class="v" style="color:${s.fires ? "var(--bad)" : "var(--good)"}">${s.fires || "None"}</span>
       </div>
+      ${
+        extermPending
+          ? html`<div class="col kv"><span class="k">Exterminator</span><span class="v" style="color:var(--muted)">en route: the booked rooms clear tomorrow</span></div>`
+          : canCallExterminator(sim)
+            ? html`<div class="modal-actions"><button type="button" class="btn" data-act="exterminate">Call exterminator: $${fmt(extermCost)} for ${fmt(hk.infested)} room(s)</button></div>`
+            : nothing
+      }
       ${sim.rules.hasVariantHouseholds ? householdSection(sim) : nothing}
       <div class="stats-section win-title sm">Transport &amp; access</div>
       <div class="col kv">

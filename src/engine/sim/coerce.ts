@@ -1,9 +1,9 @@
-import type { LogEntry, SerializedUnit, SerializedView, Transport, Unit } from "../types";
+import type { FacilityKind, LogEntry, SerializedUnit, SerializedView, Transport, Unit, UnitState } from "../types";
 import { cloneSchedule, scheduleIsEmpty } from "../elevatorSchedule";
 
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../types";
 import { LOG_RING_CAP, LOG_TEXT_CAP } from "./constants";
-import { FACILITIES, GRID } from "../facilities";
+import { FACILITIES, GRID, isHotelKind } from "../facilities";
 import { subtypeListFor } from "../retailSubtypes";
 
 /**
@@ -28,7 +28,7 @@ export function serializeUnit(u: Unit): SerializedUnit {
   // future field is added to Unit, `unhandled` stops satisfying
   // Record<string, never> and this fails to compile, forcing the new field
   // into the omit table below instead of silently vanishing from saves.
-  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, patronageToday, patronageYest, profitToday, profitYest, completeAt, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
+  const { id, kind, floor, x, width, state, satisfaction, occupants, everOccupied, pendingIncome, label, residents, rent, noRate, vacateReason, vacateAt, filmPolicy, subtype, patronageToday, patronageYest, profitToday, profitYest, completeAt, dirtyDays, outForMeal: _outForMeal, customersIn: _customersIn, hotelCustomersIn: _hotelCustomersIn, ...unhandled } = u;
   void _outForMeal; // Transient: not persisted; a save/reload resets it to 0.
   void _customersIn; // Transient: not persisted; rebuilt from meal round-trips.
   void _hotelCustomersIn; // Transient: the hotel-origin subset of customersIn.
@@ -70,7 +70,35 @@ export function serializeUnit(u: Unit): SerializedUnit {
     if (profitYest !== undefined) out.profitYest = profitYest;
   }
   if (completeAt !== undefined) out.completeAt = completeAt;
+  // The dirty-day clock persists only while it is actually ticking (a room
+  // currently `dirty` with at least one full day banked); 0/undefined and a
+  // freshly dirtied room omit it, so a save stays sparse and the loader treats
+  // absence as 0. Written for `dirty` rooms only, mirroring the deserialize gate.
+  if (dirtyDays && state === "dirty") out.dirtyDays = dirtyDays;
   return out;
+}
+
+/** Trust-boundary coercion for a hotel room's dirty-day escalation clock. Kept
+ *  only on a room that reloads `dirty` (the one state it means anything in) and
+ *  coerced to a non-negative integer, so the 3-day timer survives a reload but a
+ *  forged value can't drive a nonsense count. Any other state or a non-hotel
+ *  kind drops it to undefined. */
+export function coerceDirtyDays(state: UnitState, kind: FacilityKind, raw: unknown): number | undefined {
+  if (state !== "dirty" || !isHotelKind(kind) || raw === undefined) return undefined;
+  return typeof raw === "number" && Number.isFinite(raw) ? Math.max(0, Math.floor(raw)) : 0;
+}
+
+/** Trust-boundary coercion for a booked exterminator's landing day. Only a
+ *  Modern tower (`hasRecovery`) can hold one; a forged value floors at the
+ *  current day so a past date still resolves at the next checkout instead of
+ *  stranding the flag, and a Classic save's forgery drops away entirely. */
+export function coerceExterminationDueDay(hasRecovery: boolean, clockDay: number, raw: unknown): number | undefined {
+  if (!hasRecovery || typeof raw !== "number" || !Number.isFinite(raw)) return undefined;
+  // A real booking always schedules resolution for the next day, so a valid due
+  // day is at most clockDay + 1. Clamp into [clockDay, clockDay + 1] so a
+  // hand-edited save can't strand the tower in a permanent "exterminator en
+  // route" state (which would block new bookings and never resolve).
+  return Math.min(clockDay + 1, Math.max(clockDay, Math.floor(raw)));
 }
 
 /**

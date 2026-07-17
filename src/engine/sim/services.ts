@@ -8,6 +8,7 @@ import { FACILITIES, GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_
 import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
+import { HK_ROOMS_PER_CREW } from "../economy/housekeeping";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -60,6 +61,129 @@ export function parkingDemand(sim: Simulation): { officePop: number; offices: nu
   }
   const offices = Math.ceil(officePop / PARKING_WORKERS_PER_SPACE);
   return { officePop, offices, suites, total: offices + suites };
+}
+
+/** Housekeeping supply vs. demand, the legibility figure behind the stats row
+ *  and the per-station inspector line (the housekeeping analog of
+ *  {@link parkingDemand}). `outOfReach` reuses the same staff-network reach test
+ *  as the cleanliness overlay: a hotel room is reachable when a crew stands on
+ *  its floor or shares its staff-network component (service elevators, stairs,
+ *  escalators, never passenger elevators). */
+export interface HousekeepingCoverage {
+  /** Total operational hotel rooms in service (the readout denominator). This
+   *  counts infested rooms too; they are not cleanable, so the serviceable
+   *  workload is `rooms - infested`, and callers that compare against capacity
+   *  net out `infested` themselves. */
+  rooms: number;
+  /** Operational housekeeping crews. */
+  crews: number;
+  /** Rooms the crews can turn over in a day: `crews * HK_ROOMS_PER_CREW`. */
+  dailyCapacity: number;
+  /** Hotel rooms no crew can reach over the staff network (never cleanable
+   *  until the service network extends to them). */
+  outOfReach: number;
+  /** Rooms waiting on housekeeping right now. */
+  dirty: number;
+  /** Rooms lost to cockroaches (housekeeping can no longer help these). */
+  infested: number;
+}
+
+export function housekeepingCoverage(sim: Simulation): HousekeepingCoverage {
+  // Crew reach, computed once (same shape as sim/congestion.ts cleanliness map).
+  const comps = sim.tower.staffComponents();
+  const crewFloors = new Set<number>();
+  const crewComps = new Set<number>();
+  let crews = 0;
+  for (const u of sim.tower.units) {
+    if (u.kind !== "housekeeping" || !isOperational(u)) continue;
+    crews++;
+    crewFloors.add(u.floor);
+    const c = comps.get(u.floor);
+    if (c !== undefined) crewComps.add(c);
+  }
+  let rooms = 0;
+  let outOfReach = 0;
+  let dirty = 0;
+  let infested = 0;
+  for (const u of sim.tower.units) {
+    if (!isHotelKind(u.kind) || !isOperational(u)) continue;
+    rooms++;
+    if (u.state === "dirty") dirty++;
+    else if (u.state === "infested") infested++;
+    const c = comps.get(u.floor);
+    const reachable = crewFloors.has(u.floor) || (c !== undefined && crewComps.has(c));
+    if (!reachable) outOfReach++;
+  }
+  return { rooms, crews, dailyCapacity: crews * HK_ROOMS_PER_CREW, outOfReach, dirty, infested };
+}
+
+/** Outcome of a {@link callExterminator} attempt, for the UI to surface. `ok`
+ *  false carries a `reason`: `unavailable` (Classic has no exterminator),
+ *  `pending` (a dispatch is already en route), `none` (no infested rooms), or
+ *  `funds` (can't afford it; `cost`/`rooms` still populated so the UI can say
+ *  how much it would be). */
+export interface ExterminatorResult {
+  ok: boolean;
+  reason?: "unavailable" | "pending" | "none" | "funds";
+  cost?: number;
+  rooms?: number;
+}
+
+/** Dispatch a paid exterminator (Modern only) to clear cockroach infestations
+ *  tower-wide. Charges `calloutFee + perRoomFee * infestedRooms` up front and
+ *  schedules the treatment for the next day, so the rooms keep earning nothing
+ *  and spread one more morning while the crew is en route (the "waiting still
+ *  hurts" design). Classic returns `unavailable`: its infested rooms are
+ *  bulldoze-only (1994 parity). */
+export function callExterminator(sim: Simulation): ExterminatorResult {
+  const recovery = sim.rules.infestationRecovery();
+  if (!recovery) return { ok: false, reason: "unavailable" };
+  if (sim.exterminationDueDay !== undefined) return { ok: false, reason: "pending" };
+  const ids: number[] = [];
+  for (const u of sim.tower.units) if (isHotelKind(u.kind) && u.state === "infested") ids.push(u.id);
+  const rooms = ids.length;
+  if (rooms === 0) return { ok: false, reason: "none" };
+  const cost = recovery.calloutFee + recovery.perRoomFee * rooms;
+  if (sim.money < cost) return { ok: false, reason: "funds", cost, rooms };
+  sim.money -= cost;
+  sim.recordMoney("upkeep", -cost);
+  sim.exterminationDueDay = sim.clock.day + 1;
+  // Remember exactly which rooms were billed, so an overnight-escalated wing is
+  // NOT swept up for the price of today's smaller count. Transient by design: a
+  // save taken mid-booking loses this and resolution falls back to clearing all
+  // infested rooms (the dueDay itself persists, so the treatment still lands).
+  sim.exterminationRoomIds = ids;
+  sim.emit(
+    `🧹 Exterminator booked for ${rooms} infested room(s): $${cost.toLocaleString()} charged. The rooms clear tomorrow.`,
+    "money",
+  );
+  return { ok: true, cost, rooms };
+}
+
+/** Land a booked exterminator's treatment once its day arrives, clearing the
+ *  rooms it was billed for (those still `infested`) back to a rentable `empty`.
+ *  A room bulldozed or burned before resolution is simply not found (no refund).
+ *  After a mid-booking save the billed set is gone, so it clears every infested
+ *  room. No-op when nothing is en route. */
+export function resolveExtermination(sim: Simulation): void {
+  if (sim.exterminationDueDay === undefined || sim.clock.day < sim.exterminationDueDay) return;
+  sim.exterminationDueDay = undefined;
+  const billed = sim.exterminationRoomIds;
+  sim.exterminationRoomIds = undefined;
+  const billedSet = billed ? new Set(billed) : null;
+  let cleared = 0;
+  for (const u of sim.tower.units) {
+    if (!isHotelKind(u.kind) || u.state !== "infested") continue;
+    if (billedSet && !billedSet.has(u.id)) continue; // escalated after booking: not paid for
+    u.state = "empty";
+    u.satisfaction = 1;
+    u.occupants = 0;
+    u.dirtyDays = undefined;
+    cleared++;
+  }
+  if (cleared > 0) {
+    sim.emit(`🧹 The exterminator cleared ${cleared} infested room(s). They can be rented again.`, "good");
+  }
 }
 
 /** True when there aren't enough working spaces for one-per-suite (the VIP

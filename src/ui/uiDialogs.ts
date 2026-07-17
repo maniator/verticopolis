@@ -32,9 +32,9 @@ import { routeExternalInWrapper } from "./externalLink";
 // `dialogs.showBatchPricingDialog` callers (UI.ts) are unchanged.
 export { showBatchPricingDialog } from "./uiBatchPricing";
 
-export function showStats(ui: UI, body: TemplateResult): void {
+export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
   const box = ui.openModalTemplate(statsModalTemplate(body));
-  ui.wireActions(box);
+  ui.wireActions(box, handlers);
 }
 
 /** Saves manager: auto-save + numbered slots, plus export/import. */

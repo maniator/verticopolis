@@ -56,7 +56,7 @@ abstraction · ⬜ not present.
 - ✅ **TOWER** rating: 5★ + Wedding Hall + metro + VIP inspection (8,000 pop, scaled to our model)
 
 ## Events & disasters
-- ✅ Fire: spreads to the neighbor unless Security/Medical contain it; burned rooms are destroyed (gutted shells you must bulldoze and rebuild), never auto-repaired
+- ✅ Fire: spreads to the same-floor neighbor AND climbs to the room above (canon: fire spreads sideways and upward, never down) unless Security/Medical contain it; burned rooms are destroyed (gutted shells you must bulldoze and rebuild), never auto-repaired
 - ✅ Bomb threat (4★+): Security defuses it; otherwise damage + fine, with an explosion flash at the blast epicenter
 - ✅ VIP inspection → TOWER win/lose: the VIP's limousine pulls up to the lobby for the review
 - ✅ Treasure discovery (a gold sparkle rises from the dig site); flavorful headlines
@@ -96,6 +96,7 @@ abstraction · ⬜ not present.
 - The population census counts **occupants**: office workers + condo residents (hotel guests count up through 4★, then drop out); retail/food/visitors never do. The **TOWER** goal is the canonical **15,000**, kept reachable by the canon **375-tile** buildable lot width (the 1994 map is 375 segments wide; a well-zoned 100-floor tower measures well over 15,000 occupants).
 - Optional **rule-set** chosen when a tower is founded and fixed for its life: **Classic** is the pixel-faithful 1994 game; **Modern** adds what the original couldn't; today that means *variant households* (a condo sells to a 2–5 person family, weighted to a mean of 3 so the star ladder is unchanged, that scales its price and how demanding it is) and a *calendar choice* (the compressed 1994 calendar or a real-world-length one). Classic always runs the canon calendar. Saves with no mode load as Classic, and a Modern save with no calendar choice loads real-world-length.
 - **Housekeeping is modeled on rooms-per-crew with staff-network routing and cockroach spread**, not the 1994 "six housekeepers, one floor each, and a service elevator over exactly six floors" geometry. That geometry optimized around a pathfinding quirk (seven-plus floors degraded), which we deliberately do not reproduce.
+- **Cockroaches are visible and have a full lifecycle** (as of 1.53). A hotel room left dirty for 3 straight days breeds a roach **infestation** (a distinct sprite and room state) that housekeeping can no longer clean, exactly as in 1994. **Classic** recovers only by bulldozing and rebuilding (canon). **Modern** adds an owner-ratified paid **exterminator** (a call-out fee plus a per-room fee, landing the next day) as an alternative to the bulldozer; this is a new mechanic, gated through the rule-set, and the only divergence here. Roaches spread along the hotel floor (never between floors), matching canon.
 - **Commercial patronage is modeled from reachable nearby population** rather than the original's opaque per-venue patron counters (which expert players suspect hide a cap). The transparent per-origin demand-pool refinement that restores the classic diminishing-returns and cross-venue behavior is tracked (#393); the opaque counter itself is not reproduced.
 
 ## Known parity gaps (tracked, 2026-07-15)

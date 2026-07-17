@@ -71,6 +71,9 @@ export function householdPrice(base: number, residents: number | undefined): num
   return Math.round((base * residents) / CLASSIC_HOUSEHOLD);
 }
 
+/** Modern's paid-exterminator fees: a flat `calloutFee` plus `perRoomFee` per infested room. */
+export interface InfestationRecovery { calloutFee: number; perRoomFee: number }
+
 export interface GameRules {
   /** The mode this rule-set implements (mirrors {@link GameMode}). */
   readonly mode: GameMode;
@@ -156,6 +159,9 @@ export interface GameRules {
    *  the ceiling and never erodes below it (canon "office noise caps but never
    *  evicts"). */
   noiseErosionScale(): number;
+  /** How a cockroach-`infested` hotel room recovers short of the bulldozer:
+   *  Classic `null` (PERMANENT, 1994 parity), Modern the paid-exterminator fees. */
+  infestationRecovery(): InfestationRecovery | null;
   /**
    * Monthly probability that a SOLD condo's household relocates on its own (a
    * life event unrelated to how well the tower serves it), scaled UP with family
@@ -313,6 +319,9 @@ export const CLASSIC_RULES: GameRules = {
   noiseErosionScale() {
     return 0; // noise caps satisfaction but never erodes/evicts (canon)
   },
+  infestationRecovery() {
+    return null; // 1994 parity: infested is permanent, bulldoze-only
+  },
   condoRelocationChance() {
     return 0; // 1994 condos never turn over; a sold Classic condo is forever
   },
@@ -399,6 +408,9 @@ export const MODERN_RULES: GameRules = {
   },
   noiseErosionScale() {
     return 1;
+  },
+  infestationRecovery() {
+    return { calloutFee: ECON.exterminatorCalloutFee, perRoomFee: ECON.exterminatorPerRoomFee };
   },
   condoRelocationChance(residents) {
     // Scale the base monthly chance by family size relative to the classic 3, so

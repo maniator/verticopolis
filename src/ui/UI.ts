@@ -413,8 +413,8 @@ export class UI {
     panels.showInspector(this, tpl);
   }
 
-  showStats(body: TemplateResult): void {
-    dialogs.showStats(this, body);
+  showStats(body: TemplateResult, handlers: Record<string, () => void> = {}): void {
+    dialogs.showStats(this, body, handlers);
   }
 
   showSaves(slots: SlotInfo[]): void {
