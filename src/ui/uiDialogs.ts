@@ -32,6 +32,9 @@ import { routeExternalInWrapper } from "./externalLink";
 // `dialogs.showBatchPricingDialog` callers (UI.ts) are unchanged.
 export { showBatchPricingDialog } from "./uiBatchPricing";
 
+// The elevator Schedule dialog controller likewise lives in its own module.
+export { showElevatorScheduleDialog, type ScheduleDialogCtx } from "./uiElevatorSchedule";
+
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
   const box = ui.openModalTemplate(statsModalTemplate(body));
   ui.wireActions(box, handlers);

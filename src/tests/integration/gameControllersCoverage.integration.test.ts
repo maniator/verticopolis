@@ -4,6 +4,8 @@ import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engin
 import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
 import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
 import type { PriceOptions } from "../../engine/gameRules";
+import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
+import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
 import type { Transport, Unit } from "../../engine/types";
 import type { Picked, TowerEngine } from "../../render/excalibur/TowerEngine";
 import type { Tool } from "../../ui/UI";
@@ -315,6 +317,10 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
       onApplied: (summary: string) => void;
     };
   } | null;
+  let scheduleDlg: {
+    ctx: ScheduleDialogCtx;
+    cb: { apply: (schedule: ElevatorSchedule) => void };
+  } | null;
 
   /** A richer strip than fixture(): three room floors so the cinema (2 floors,
    *  31 wide — canon), an office, a condo, and elevator/stairs all fit without
@@ -347,6 +353,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     announced = [];
     stopsDlg = null;
     batchDlg = null;
+    scheduleDlg = null;
     root = document.createElement("div");
     const build = new BuildActions({
       getSim: () => sim,
@@ -361,6 +368,7 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
         toast: f.ui.toast,
         showStopsDialog: (title, floors, onToggle) => (stopsDlg = { title, floors, onToggle }),
         showBatchPricingDialog: (ctx, cb) => (batchDlg = { ctx, cb }),
+        showElevatorScheduleDialog: (ctx, cb) => (scheduleDlg = { ctx, cb }),
       },
       audio: f.audio,
       build,
@@ -514,6 +522,42 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     render(unitEditorTemplate(sim, cinema), root);
     editor.handleEditAction("batchKind", root);
     expect(batchDlg).toBeNull();
+  });
+
+  it("schedule opens the elevator-schedule dialog wired to setSchedule, with undo around apply", () => {
+    lift.cars = 4;
+    sel = { type: "transport", id: lift.id };
+    render(transportEditorTemplate(sim, lift), root);
+    editor.handleEditAction("schedule", root);
+    expect(scheduleDlg).not.toBeNull();
+    // The dialog is handed the shaft's live geometry and the mode UX flags.
+    expect(scheduleDlg!.ctx.cars).toBe(4);
+    expect(scheduleDlg!.ctx.isExpress).toBe(false);
+    expect(scheduleDlg!.ctx.ux).toEqual(sim.rules.elevatorScheduleUX());
+    expect(lift.schedule).toBeUndefined();
+    // Apply writes the authored schedule through one undoable setSchedule.
+    undo = { captures: [], commits: 0 };
+    scheduleDlg!.cb.apply({
+      activeCars: { weekday: Array(24).fill(2), weekend: Array(24).fill(1) },
+      waitingCarResponse: 6,
+      standardFloorDeparture: 40,
+      homeFloors: [1, 1, 2, 2],
+    });
+    expect(lift.schedule).toBeDefined();
+    expect(lift.schedule!.activeCars?.weekday?.[9]).toBe(2);
+    expect(lift.schedule!.waitingCarResponse).toBe(6);
+    expect(undo.captures).toEqual(["Set elevator schedule"]);
+    expect(undo.commits).toBe(1);
+    expect(last(f.sfx)).toBe("build");
+    expect(last(announced)).toBe("Elevator schedule saved.");
+    expect(refreshed).toBeGreaterThan(0);
+  });
+
+  it("schedule on a non-elevator transport (stairs) does nothing", () => {
+    sel = { type: "transport", id: stairs.id };
+    render(transportEditorTemplate(sim, stairs), root);
+    editor.handleEditAction("schedule", root);
+    expect(scheduleDlg).toBeNull();
   });
 
   it("addcar refuses at the car cap (before any money talk) and when broke", () => {

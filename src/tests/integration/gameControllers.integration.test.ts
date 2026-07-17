@@ -162,6 +162,7 @@ describe("EditorActions (editor-card money paths)", () => {
         toast: f.ui.toast,
         showStopsDialog: () => {},
         showBatchPricingDialog: () => {},
+        showElevatorScheduleDialog: () => {},
       },
       audio: f.audio,
       build,
