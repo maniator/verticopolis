@@ -299,8 +299,12 @@ non-negotiables. Balance constants tuned in-epic and recorded back here.
 
 ## Open Items
 
-- `[NOTE FOR DESIGNER]` exact per-room dwell constant (tune to ~19/maid on a
-  compact hotel).
+- ~~`[NOTE FOR DESIGNER]` exact per-room dwell constant (tune to ~19/maid on a
+  compact hotel).~~ **Pinned in epic 2 (v1.54.0): `HK_CLEAN_MINUTES = 8`**
+  game-minutes of pure in-room dwell; with typical service-elevator travel the
+  full cycle lands near the ~15-minute canon derivation, and the readout anchor
+  is `HK_NOMINAL_ROOMS_PER_MAID = 19`. Tunable in
+  `src/engine/economy/housekeeping.ts` if playtest shows drift.
 - `[NOTE FOR DESIGNER]` Modern dispatch urgency-vs-travel weight (pin + test).
 - `[NOTE FOR DESIGNER]` whether a spread-marked occupied room shows an early roach
   cue before checkout.

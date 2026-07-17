@@ -300,7 +300,7 @@ describe("Hotel housekeeping", () => {
     expect(room.state).not.toBe("dirty");
   });
 
-  it("rooms stay dirty until a housekeeper actually arrives — cleaning is never instant", () => {
+  it("rooms stay dirty until a maid arrives and finishes the cleaning dwell — never instant", () => {
     const sim = hotelTower(12);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -308,12 +308,14 @@ describe("Hotel housekeeping", () => {
     sim.tower.place("housekeeping", 2, x0 + 8); // same floor: no ride needed
     const room = sim.tower.units.find((u) => u.id === r.unitId)!;
     room.state = "dirty";
-    // One tick reaches the 8:00 shift start (the clock opens at 7:00): dispatch
-    // sends a housekeeper, but the room is still dirty — nobody's arrived yet.
-    sim.tick(60);
+    // Ticks reach the Classic canon 12:00 shift start (the clock opens at
+    // 7:00): dispatch sends a maid, but the room is still dirty — she has not
+    // arrived, let alone finished the in-room cleaning dwell.
+    for (let i = 0; i < 5; i++) sim.tick(60);
     expect(room.state).toBe("dirty");
     expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
-    // The next hour of simulation walks them to the room; arrival cleans it.
+    // The next hour of simulation walks her over and drains the dwell; only
+    // then does the room turn over.
     sim.tick(60);
     expect(room.state).toBe("empty");
   });
@@ -339,12 +341,13 @@ describe("Hotel housekeeping", () => {
     const r = sim.tower.place("hotelDouble", 2, x0);
     const room = sim.tower.units.find((u) => u.id === r.unitId)!;
     room.state = "dirty";
-    // Past the shift start with no crew anywhere: nothing can clean.
+    // Past the checkout with no crew anywhere: nothing can clean.
     for (let i = 0; i < 3; i++) sim.tick(60); // 7:00 → 10:00
     expect(room.state).toBe("dirty");
-    // Build housekeeping mid-shift; the next hourly dispatch picks it up.
+    // Build housekeeping mid-morning; the first noon dispatch (Classic canon
+    // shift) picks it up the same day.
     sim.tower.place("housekeeping", 2, x0 + 8);
-    for (let i = 0; i < 3; i++) sim.tick(60);
+    for (let i = 0; i < 3; i++) sim.tick(60); // 10:00 → 13:00, through 12:00
     expect(room.state).toBe("empty");
   });
 
@@ -400,12 +403,15 @@ describe("Hotel housekeeping", () => {
     expect(route?.shafts[0]).toBe(service.id); // rides, not climbs
   });
 
-  it("warns once a day when housekeeping is over capacity", () => {
+  it("reports rooms that survived a whole shift unserved at the next checkout", () => {
     const sim = hotelTower(42);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Widen the ground outward, then floor 2 above it, and fill floor 2 with
-    // more singles than one crew's daily 20.
+    // far more singles than one maid can cycle through a shift: canon fields 6
+    // maids per unit but at most one of a unit's maids works a floor at a time,
+    // so a single-floor wing this wide is throughput-bound by one maid's
+    // travel + per-room cleaning dwell and MUST leave a backlog.
     for (let i = x0 + 40; i < x0 + 60; i++) sim.tower.place("lobby", 1, i);
     for (let i = x0 - 1; i >= x0 - 60; i--) sim.tower.place("lobby", 1, i);
     for (let i = -60; i < 60; i++) sim.tower.place("floor", 2, x0 + i);
@@ -416,8 +422,10 @@ describe("Hotel housekeeping", () => {
     }
     expect(placed).toBe(24);
     for (const u of sim.tower.units) if (u.kind === "hotelSingle") u.state = "dirty";
-    for (let i = 0; i < 12; i++) sim.tick(60); // through the day shift
-    expect(sim.log.some((l) => l.text.includes("Housekeeping is at capacity"))).toBe(true);
+    // Through the whole shift and past the NEXT morning checkout (7:00 + 25h),
+    // where the previous day's shift report calls out the unserved backlog.
+    for (let i = 0; i < 25; i++) sim.tick(60);
+    expect(sim.log.some((l) => l.text.includes("went unserved"))).toBe(true);
   });
 
   it("staff calls are shaft-scoped — only the shaft the staffer uses responds", () => {
@@ -431,7 +439,7 @@ describe("Hotel housekeeping", () => {
     const shafts = sim.tower.transports.filter((t) => t.kind === "elevatorService");
     // One housekeeper, routed over exactly one shaft, standing at floor 3
     // waiting for its car.
-    expect(sim.crowd.spawnStaff(sim.tower, 3, 5, x0 + 2, 12345)).toBe("sent");
+    expect(sim.crowd.spawnStaff(sim.tower, 3, 5, x0 + 2, 12345, 8)).toBe("sent");
     const p = sim.crowd.people.find((q) => q.staff)!;
     p.state = "waiting";
     const calls = sim.crowd.elevatorCalls(sim.tower);

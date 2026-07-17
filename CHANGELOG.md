@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.54.0
+
+- Housekeeping now fields six real maids per unit who walk the tower, spend time cleaning each room, and work the classic noon-to-five shift in Classic towers, so how many rooms get cleaned depends on your service elevators and stairs.
+- Housekeeping staff no longer ride escalators, matching the original: give your crews a service elevator or stairs to reach their floors.
+
 ## 1.53.1
 
 - Cockroaches now spread only from fully infested rooms, never from a room that is merely waiting to be cleaned, so a tidy tower stops raising false roach alarms.

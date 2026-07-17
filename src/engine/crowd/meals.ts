@@ -36,12 +36,15 @@ export function mealWindowFor(hour: number): MealWindow | null {
 }
 
 /** Whether a staff kind is eligible to make meal trips at this hour. Only
- *  housekeeping has a modeled shift window today ([HK_SHIFT_START, HK_SHIFT_END)
- *  in `EconomySystem`); security, medical, and recycling are always eligible
+ *  housekeeping has a modeled shift window today; pass the mode's window
+ *  (`GameRules.housekeepingShift()`: Classic the canon 12:00-17:00, Modern
+ *  08:00-19:00) so the meal texture follows the maids' real hours. Callers
+ *  without a rule-set fall back to the legacy [HK_SHIFT_START, HK_SHIFT_END)
+ *  in `EconomySystem`. Security, medical, and recycling are always eligible
  *  while their facility is operational. If a future kind gains a shift, add
  *  its case here alongside the new constants, so the gate stays single-source. */
-export function staffOnShift(kind: StaffKind, hour: number): boolean {
-  if (kind === "housekeeping") return hour >= HK_SHIFT_START && hour < HK_SHIFT_END;
+export function staffOnShift(kind: StaffKind, hour: number, shift?: { start: number; end: number }): boolean {
+  if (kind === "housekeeping") return hour >= (shift?.start ?? HK_SHIFT_START) && hour < (shift?.end ?? HK_SHIFT_END);
   return true;
 }
 

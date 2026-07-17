@@ -38,7 +38,7 @@ export class Crowd {
   /** @internal Cached passenger stop-graph, rebuilt when the tower changes. */
   adj: Map<number, { f: number; shaft: number; express: boolean }[]> | null = null;
   /** @internal */ adjRev = -1;
-  /** @internal Cached STAFF stop-graph (service elevators / stairs / escalators). */
+  /** @internal Cached STAFF stop-graph (service elevators / stairs). */
   staffAdj: Map<number, { f: number; shaft: number; express: boolean }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
   /** @internal Cached equivalent-shaft banks, keyed "kind:from:to" → sorted
@@ -163,7 +163,7 @@ export class Crowd {
     return routing.route(this, tower, from, to);
   }
 
-  /** Uncapped staff-network route (service elevators / stairs / escalators). */
+  /** Uncapped staff-network route (service elevators / stairs). */
   staffRoute(tower: Tower, from: number, to: number): Route | null {
     return routing.staffRoute(this, tower, from, to);
   }
@@ -186,10 +186,11 @@ export class Crowd {
   /**
    * Dispatch a staff member (housekeeper) over the STAFF network (delegated to
    * the spawn module). Returns "sent", "full" (pool at cap, retry), or
-   * "no-route" (the network can't get there, surface it).
+   * "no-route" (the network can't get there, surface it). `cleanMinutes` is
+   * the in-room cleaning dwell in game-minutes (see spawn.spawnStaff).
    */
-  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number): "sent" | "full" | "no-route" {
-    return crowdSpawn.spawnStaff(this, tower, from, to, destX, cleanUnitId);
+  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route" {
+    return crowdSpawn.spawnStaff(this, tower, from, to, destX, cleanUnitId, cleanMinutes);
   }
 
   /** Drain the staff jobs that ended since the last call (arrived or failed). */

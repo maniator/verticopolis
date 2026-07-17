@@ -6,7 +6,7 @@ import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
 import type { Crowd } from "../Crowd";
 import type { SpawnFloors, StaffKind } from "./person";
-import { MAX_PEOPLE, MAX_STAFF, visibleOccupants } from "./person";
+import { MAX_PEOPLE, MAX_STAFF, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
 import {
   MEAL_WINDOWS,
   mealWindowFor,
@@ -300,7 +300,7 @@ export function pushMealOptions(
         break;
       case "staff": {
         const onShift = floors.staffFloors
-          .filter((s) => staffOnShift(s.kind, clock.hour))
+          .filter((s) => staffOnShift(s.kind, clock.hour, tower.rules.housekeepingShift()))
           .map((s) => s.floor);
         push("staff", onShift, staff);
         break;
@@ -360,7 +360,7 @@ export function spawnMealOutbound(
   const candidates = floorUnits.filter(
     (u) =>
       matchesMealOriginKind(u, pool.originKind) &&
-      (pool.originKind !== "staff" || staffOnShift(u.kind as StaffKind, hour)) &&
+      (pool.originKind !== "staff" || staffOnShift(u.kind as StaffKind, hour, tower.rules.housekeepingShift())) &&
       visibleOccupants(u) > 0,
   );
   if (candidates.length === 0) return;
@@ -403,7 +403,10 @@ export function spawnMealOutbound(
  * network, walking to `destX` (the room being serviced). The two failure
  * modes are distinct so the caller reacts correctly: "full" (staff pool at
  * cap, retry later) vs "no-route" (the network can't get there, surface
- * it, don't retry silently).
+ * it, don't retry silently). `cleanMinutes` is the per-room cleaning dwell in
+ * game-minutes: the maid holds in the room (the arrived `toDest` pose, via
+ * `lingerFor`) for that long before the job reports done, so cleaning is
+ * watchable work over time, never instant on arrival.
  */
 export function spawnStaff(
   crowd: Crowd,
@@ -412,6 +415,7 @@ export function spawnStaff(
   to: number,
   destX: number,
   cleanUnitId: number,
+  cleanMinutes: number,
 ): "sent" | "full" | "no-route" {
   if (crowd.staffCount >= MAX_STAFF) return "full";
   const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
@@ -419,6 +423,7 @@ export function spawnStaff(
   const p = makePerson(crowd, tower, r, destX);
   p.staff = true;
   p.cleanUnitId = cleanUnitId;
+  p.lingerFor = cleanMinutes * CROWD_SECONDS_PER_MINUTE;
   crowd.staffCount++;
   return "sent";
 }

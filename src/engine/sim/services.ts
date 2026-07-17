@@ -8,7 +8,7 @@ import { FACILITIES, GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_
 import type { FacilityKind, Unit } from "../types";
 
 import { isOperational, isTenanted } from "../types";
-import { HK_ROOMS_PER_CREW } from "../economy/housekeeping";
+import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID } from "../economy/housekeeping";
 
 /** Recycling / parking / staff / stranded advisories for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -67,8 +67,8 @@ export function parkingDemand(sim: Simulation): { officePop: number; offices: nu
  *  and the per-station inspector line (the housekeeping analog of
  *  {@link parkingDemand}). `outOfReach` reuses the same staff-network reach test
  *  as the cleanliness overlay: a hotel room is reachable when a crew stands on
- *  its floor or shares its staff-network component (service elevators, stairs,
- *  escalators, never passenger elevators). */
+ *  its floor or shares its staff-network component (service elevators and
+ *  stairs, never escalators or passenger elevators). */
 export interface HousekeepingCoverage {
   /** Total operational hotel rooms in service (the readout denominator). This
    *  counts infested rooms too; they are not cleanable, so the serviceable
@@ -77,7 +77,13 @@ export interface HousekeepingCoverage {
   rooms: number;
   /** Operational housekeeping crews. */
   crews: number;
-  /** Rooms the crews can turn over in a day: `crews * HK_ROOMS_PER_CREW`. */
+  /** Maids the crews field: `crews * HK_MAIDS_PER_UNIT`. */
+  maids: number;
+  /** Rooms the maids NOMINALLY turn over in a day, per the canon anchor
+   *  (`maids * HK_NOMINAL_ROOMS_PER_MAID`). An estimate for readouts: real
+   *  throughput is emergent from travel time over the staff network plus the
+   *  per-room cleaning dwell, so a spread-out, stair-only tower does far less
+   *  than this figure while a compact one approaches it. */
   dailyCapacity: number;
   /** Hotel rooms no crew can reach over the staff network (never cleanable
    *  until the service network extends to them). */
@@ -114,7 +120,8 @@ export function housekeepingCoverage(sim: Simulation): HousekeepingCoverage {
     const reachable = crewFloors.has(u.floor) || (c !== undefined && crewComps.has(c));
     if (!reachable) outOfReach++;
   }
-  return { rooms, crews, dailyCapacity: crews * HK_ROOMS_PER_CREW, outOfReach, dirty, infested };
+  const maids = crews * HK_MAIDS_PER_UNIT;
+  return { rooms, crews, maids, dailyCapacity: maids * HK_NOMINAL_ROOMS_PER_MAID, outOfReach, dirty, infested };
 }
 
 /** Outcome of a {@link callExterminator} attempt, for the UI to surface. `ok`
@@ -390,6 +397,6 @@ export function countOperational(sim: Simulation, kind: FacilityKind): number {
 /** Send a staff member (housekeeper) over the staff network, see
  *  {@link Crowd.spawnStaff}. Exposed on the context so the economy subsystem
  *  can dispatch crews without owning the crowd. */
-export function spawnStaffTrip(sim: Simulation, from: number, to: number, destX: number, cleanUnitId: number): "sent" | "full" | "no-route" {
-  return sim.crowd.spawnStaff(sim.tower, from, to, destX, cleanUnitId);
+export function spawnStaffTrip(sim: Simulation, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route" {
+  return sim.crowd.spawnStaff(sim.tower, from, to, destX, cleanUnitId, cleanMinutes);
 }
