@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.55.0
 
-- The housekeeping picture stops hiding trouble: infestation alerts now name the floors, infested rooms get their own violet shade on the Housekeeping overlay (condos read as not-applicable gray), and the stats verdict turns red the moment rooms go unserved or any room is infested.
+- The housekeeping picture stops hiding trouble: infestation alerts now name the floors, infested rooms get their own violet shade on the Housekeeping overlay (condos read as not-applicable gray), and the stats verdict turns red when rooms go unserved or any room is infested.
 
 ## 1.54.0
 

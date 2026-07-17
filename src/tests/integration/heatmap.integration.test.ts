@@ -125,7 +125,7 @@ describe("floorHeatmap (stats overlay data)", () => {
     expect(cellOn(sim.floorHeatmap("satisfaction"), 2)).toBeUndefined();
   });
 
-  it("cleanliness: tints hotel rooms by staff reach and dirty state, leaves non-hotel untinted", () => {
+  it("cleanliness: tints hotel rooms by staff reach and dirty state; offices emit nothing, condos read n/a", () => {
     const sim = Simulation.newGame(57);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
@@ -156,12 +156,28 @@ describe("floorHeatmap (stats overlay data)", () => {
     sim.tower.units.find((u) => u.id === unreached.unitId)!.state = "asleep";
     // A non-hotel (office) must produce no cleanliness cell; put it out of the way.
     expect(sim.tower.place("office", 2, C - 20).ok).toBe(true);
+    // An OPERATIONAL condo reads n/a (it never takes housekeeping, so a blank
+    // must not be mistaken for an uncovered hotel room); one still under
+    // construction has nothing to say and emits no cell at all.
+    const condo = sim.tower.place("condo", 6, C - 40); // 16 wide: clear of the floor-6 hotel room
+    expect(condo.ok).toBe(true);
+    const building = sim.tower.place("condo", 6, C + 12);
+    expect(building.ok).toBe(true);
+    const buildingUnit = sim.tower.units.find((u) => u.id === building.unitId)!;
+    buildingUnit.state = "construction";
 
     const map = sim.floorHeatmap("cleanliness");
     expect(cellOn(map, 3)!.severity).toBe(0); // reachable, clean → green
     expect(cellOn(map, 4)!.severity).toBeCloseTo(0.6, 6); // reachable, dirty → amber
-    expect(cellOn(map, 5)!.severity).toBeCloseTo(0.85, 6); // reachable, infested → hotter than dirty
-    expect(cellOn(map, 6)!.severity).toBe(1); // no staff route → red (the "build another" nudge)
+    const infestedCell = map.find((h) => h.floor === 5)!;
+    expect(infestedCell.severity).toBeCloseTo(0.85, 6); // reachable, infested → hotter than dirty
+    expect(infestedCell.tint).toBe("infested"); // and semantically distinct from unreached
+    const unreachedCell = map.find((h) => h.floor === 6 && h.tint === undefined)!;
+    expect(unreachedCell.severity).toBe(1); // no staff route → red (the "build another" nudge)
+    const condoUnit = sim.tower.units.find((u) => u.id === condo.unitId)!;
+    const condoCell = map.find((h) => h.floor === 6 && h.minX === condoUnit.x)!;
+    expect(condoCell.tint).toBe("na");
+    expect(map.some((h) => h.minX === buildingUnit.x && h.floor === 6)).toBe(false); // under construction: no cell
     // The floor-2 office contributes no cleanliness cell (the housekeeping crew
     // is the only other floor-2 unit, and it carries no hotel signal either).
     expect(cellsOn(map, 2).length).toBe(0);

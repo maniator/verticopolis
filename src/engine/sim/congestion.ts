@@ -225,8 +225,9 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
     // component can never be cleaned: that is the worst case (red), the
     // "build another housekeeping station or extend the service elevator" nudge
     // given a place to point. A reachable but dirty room is amber (it is waiting
-    // its turn), and a reachable clean room is green. Only hotel rooms carry a
-    // housekeeping signal, so non-hotel floors stay untinted.
+    // its turn), and a reachable clean room is green. Hotel rooms carry the
+    // coverage signal; condos get an explicit n/a tint (below) and every
+    // other kind stays untinted.
     // Precompute crew reach once, so the per-room test is O(1) instead of
     // O(rooms x crews). A room is reachable iff some operational crew is on its
     // floor, or shares its staff-network component. `staffConnected(a, b)` is

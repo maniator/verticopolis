@@ -32,7 +32,10 @@ const FALLBACK_SHIFT: HousekeepingShift = { start: 8, end: 19, cutoff: 18.5 };
 
 /** Compact floor list for alert copy: sorted, deduped, consecutive runs
  *  folded to ranges ("12, 14–16"), so an infestation alert names WHERE instead
- *  of a bare count. En-dash in the numeric range per house style. */
+ *  of a bare count. En-dash in the numeric range per house style. Raw floor
+ *  numbers are safe here: hotel kinds and condos can never be built in the
+ *  basement (NO_BASEMENT_KINDS), so every floor is >= 1 and reads exactly as
+ *  the player-facing "floor N" convention. */
 export function formatFloors(floors: Iterable<number>): string {
   const sorted = [...new Set(floors)].sort((a, b) => a - b);
   const parts: string[] = [];
@@ -90,7 +93,7 @@ export class Housekeeping {
 
   /** Yesterday's observed shift result, or null before the first checkout
    *  (fresh game or fresh load). See {@link hkYesterday}. */
-  report(): { cleaned: number; leftover: number } | null {
+  report(): Readonly<{ cleaned: number; leftover: number }> | null {
     return this.hkYesterday;
   }
 

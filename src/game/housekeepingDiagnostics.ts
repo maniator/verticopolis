@@ -41,15 +41,16 @@ export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   const c = sim.housekeepingCoverage();
   const report = sim.economy.housekeepingReport();
   const out: TemplateResult[] = [
-    html`<div>Fields ${HK_MAIDS_PER_UNIT} maids, each cleaning up to ~${HK_NOMINAL_ROOMS_PER_MAID} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maids) for ${c.rooms} hotel room(s).</div>`,
+    html`<div>Fields ${HK_MAIDS_PER_UNIT} maids, each cleaning up to ~${HK_NOMINAL_ROOMS_PER_MAID} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maid${c.maids === 1 ? "" : "s"}) for ${c.rooms} hotel room(s).</div>`,
   ];
-  if (report && report.leftover > 0) {
+  if (report && report.leftover > 0 && c.rooms > 0) {
     out.push(
       html`<div style="color:var(--bad)">Falling behind: ${report.leftover} room(s) went unserved yesterday (${report.cleaned} cleaned). Add another Housekeeping unit or improve staff transport.</div>`,
     );
-  } else if (!report && c.dailyCapacity < c.rooms) {
-    // No observed shift yet (fresh game or load): the nominal best case is the
-    // only signal available, so use it without discounting anything out.
+  } else if (c.dailyCapacity < c.rooms) {
+    // Gross under-provision by the nominal best case: fires immediately (a big
+    // hotel build-out should not wait for the next morning's latched report to
+    // read red), and it is the only signal before the first observed shift.
     out.push(html`<div style="color:var(--bad)">Likely under capacity: rooms may pile up dirty. Add another Housekeeping unit.</div>`);
   }
   if (c.infested > 0) {

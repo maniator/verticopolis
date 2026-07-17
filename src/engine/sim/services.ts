@@ -70,10 +70,11 @@ export function parkingDemand(sim: Simulation): { officePop: number; offices: nu
  *  its floor or shares its staff-network component (service elevators and
  *  stairs, never escalators or passenger elevators). */
 export interface HousekeepingCoverage {
-  /** Total operational hotel rooms in service (the readout denominator). This
-   *  counts infested rooms too; they are not cleanable, so the serviceable
-   *  workload is `rooms - infested`, and callers that compare against capacity
-   *  net out `infested` themselves. */
+  /** Total operational hotel rooms in service (the readout denominator),
+   *  infested rooms included. Callers must NOT net `infested` out of the
+   *  workload when judging adequacy: that discount is how the old verdict
+   *  read "enough" while a wing rotted (an active infestation is an at-risk
+   *  state, not a workload reduction). */
   rooms: number;
   /** Operational housekeeping crews. */
   crews: number;

@@ -278,7 +278,10 @@ export function congestionSeverity(cong: number): number {
  *  picks the pixels): `infested` marks a hotel room housekeeping can no longer
  *  clean (terminal, distinct from "unreached"), `na` marks a unit the overlay's
  *  metric does not apply to (a condo on the housekeeping map), so a blank never
- *  reads as an uncovered room. Cells without a tint read the severity ramp. */
+ *  reads as an uncovered room. Cells without a tint read the severity ramp.
+ *  Numeric consumers aggregating `severity` must SKIP `na` cells (their 0
+ *  means "not applicable", never "perfectly covered"); `infested` cells keep
+ *  an honest hot severity for anything reading the number alone. */
 export interface HeatCell {
   floor: number;
   minX: number;
