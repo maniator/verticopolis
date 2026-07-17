@@ -28,7 +28,9 @@ export interface ShaftContext {
 
 /** The measured curve for one day type, or undefined when that day has no
  *  positive sample yet (#466): consumers must never treat the other day's
- *  rush as this day's demand. */
+ *  rush as this day's demand. NOTE: this accepts a single positive sample;
+ *  the dialog additionally gates on WARMED_MIN_HOURS before passing a curve
+ *  in, so callers that skip the dialog should apply their own warm-up gate. */
 function measuredDay(ctx: ShaftContext, isWeekend: boolean): readonly number[] | undefined {
   const curve = isWeekend ? ctx.hourly?.weekend : ctx.hourly?.weekday;
   if (!curve || curve.length === 0 || curve.every((v) => v <= 0)) return undefined;

@@ -108,21 +108,44 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(shaft.schedule!.homeFloors).toEqual([3, 1]);
   });
 
-  it("samples each day type into its own demand ring (#466)", () => {
+  it("samples each day type into its own demand ring, in both directions (#466)", () => {
     // The real-world calendar's weekend is the trailing 2 of 7 days, so day 0
     // is a weekday and day 5 a Saturday. A loaded weekday sample must land in
-    // the weekday ring ONLY; the same hour on Saturday fills the weekend ring.
+    // the weekday ring ONLY, and the weekend sample must not touch the weekday
+    // ring either (an implementation writing both rings would pass a one-way check).
     const sim = towerWithElevator();
     const shaft = sim.tower.transports[0];
     shaft.carLoad = [5, 5];
     sim.clock.minutes = 8 * 60; // day 0 (weekday), 08:00
     sim.sampleElevatorUtil();
     const rings = sim.elevatorHourlyLoad(shaft.id)!;
-    expect(rings.weekday[8]).toBeGreaterThan(0);
+    const wd8 = rings.weekday[8];
+    expect(wd8).toBeGreaterThan(0);
     expect(rings.weekend[8]).toBe(0); // never bleeds across day types
+    shaft.carLoad = [1, 1]; // a different weekend load so a bleed would be visible
     sim.clock.minutes = 5 * 1440 + 8 * 60; // day 5 (Saturday), 08:00
     sim.sampleElevatorUtil();
     expect(rings.weekend[8]).toBeGreaterThan(0);
+    expect(rings.weekday[8]).toBe(wd8); // the Saturday sample left the weekday ring alone
+  });
+
+  it("splits by day on the canon 3-day calendar too (#466)", () => {
+    // Canon week: 2 weekdays + 1 weekend day (dayOfWeek 2). The split keys on
+    // clock.isWeekend, not on any 7-day assumption.
+    const sim = new Simulation(2024, "classic", "canon");
+    sim.money = 10_000_000;
+    for (let x = 0; x < 24; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 0; x < 24; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const ev = sim.tower.placeTransport("elevatorStandard", 0, 1, 2);
+    expect(ev.ok, ev.reason).toBe(true);
+    const shaft = sim.tower.transports[0];
+    shaft.carLoad = [4, 4];
+    sim.clock.minutes = 2 * 1440 + 9 * 60; // day 2: the canon weekend day, 09:00
+    expect(sim.clock.isWeekend).toBe(true);
+    sim.sampleElevatorUtil();
+    const rings = sim.elevatorHourlyLoad(shaft.id)!;
+    expect(rings.weekend[9]).toBeGreaterThan(0);
+    expect(rings.weekday[9]).toBe(0);
   });
 
   it("snaps against fresh stops even when the stopsOf cache is warm (#467)", () => {

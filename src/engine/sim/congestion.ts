@@ -365,7 +365,9 @@ export function sampleElevatorUtil(sim: Simulation): void {
     // all three are schedulable, unlike the passenger-only utilization EMA below.
     aliveHourly.add(t.id);
     let rings = sim.elevatorHourly.get(t.id);
-    if (!rings) {
+    // Shape self-heal (kept from the single-ring version): a malformed entry is
+    // replaced, never EMA'd into or crashed on.
+    if (!rings || rings.weekday?.length !== 24 || rings.weekend?.length !== 24) {
       rings = { weekday: new Array(24).fill(0), weekend: new Array(24).fill(0) };
       sim.elevatorHourly.set(t.id, rings);
     }

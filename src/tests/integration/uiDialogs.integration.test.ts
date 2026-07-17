@@ -2444,6 +2444,10 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().querySelector(".es-bar-demand")).toBeNull();
     expect(dialog().querySelector(".es-advice")).toBeNull(); // no weekend advice invented
     expect(dialog().querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(false);
+    // The Simulate sentence never claims a measured peak for the cold day, and a
+    // hint explains why Auto-tune will not move the visible row.
+    expect(simText()).toContain("No measured weekend peak yet; at the 17:00 down-rush");
+    expect(dialog().textContent).toContain("No measured weekend traffic yet; Auto-tune adjusts only measured days.");
   });
 
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
@@ -2609,7 +2613,8 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Balanced")!.click();
     expect(announce).toHaveBeenLastCalledWith("Applied the Balanced schedule.");
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
-    expect(announce).toHaveBeenLastCalledWith("Auto-tuned cars and staging to this shaft's measured demand.");
+    // The announce names the days actually tuned (#466): only the weekday is warm here.
+    expect(announce).toHaveBeenLastCalledWith("Auto-tuned the weekday schedule and staging to measured demand.");
   });
 });
 

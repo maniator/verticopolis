@@ -314,7 +314,7 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
     </div>`;
 }
 
-function presetsTemplate(ctx: SchedCtx, h: SchedHandlers): TemplateResult {
+function presetsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   return html`
     <div class="es-row es-presets">
       ${(["rush", "balanced", "feeder"] as SchedulePreset[]).map((p) => html`
@@ -324,7 +324,10 @@ function presetsTemplate(ctx: SchedCtx, h: SchedHandlers): TemplateResult {
         ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.canTune} @click=${h.onAutoTune}>Auto-tune</button>`
         : nothing}
     </div>
-    ${ctx.ux.autoTune && !ctx.canTune ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}`;
+    ${ctx.ux.autoTune && !ctx.canTune ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}
+    ${ctx.ux.autoTune && ctx.canTune && !ctx.hasMeasured
+      ? html`<p class="es-hint">No measured ${state.day} traffic yet; Auto-tune adjusts only measured days.</p>`
+      : nothing}`;
 }
 
 export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
@@ -339,7 +342,7 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
           <button type="button" class="btn${state.day === "weekend" ? " es-on" : ""}" aria-pressed=${state.day === "weekend"} @click=${() => h.onDay("weekend")}>Weekend</button>
         </div>
 
-        ${ctx.ux.presets ? presetsTemplate(ctx, h) : nothing}
+        ${ctx.ux.presets ? presetsTemplate(ctx, state, h) : nothing}
 
         <!-- Positioning-first: the floors grid (staging + the folded-in stops) leads. -->
         ${floorsTemplate(ctx, state, h)}

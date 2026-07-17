@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.59.0
 
-- Elevator demand is now measured separately for weekdays and weekends. The Schedule dialog's demand dashes, its advice, and Auto-tune all follow the day tab you are on, so an office tower that sleeps on weekends no longer gets weekday-rush advice for its Weekend schedule.
+- Elevator demand is now measured separately for weekdays and weekends. The Schedule dialog's demand dashes and advice follow the day tab you are on, and Auto-tune adjusts each day only from its own measurements, so an office tower that sleeps on weekends no longer gets weekday-rush advice for its Weekend schedule.
 
 ## 1.58.0
 

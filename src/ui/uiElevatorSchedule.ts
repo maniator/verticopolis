@@ -81,15 +81,17 @@ export function showElevatorScheduleDialog(
   // Each day's measured curve arms the assists only once genuinely warmed (#466);
   // a cold curve is withheld from the authoring model entirely, so advice and
   // Auto-tune cannot read a mostly-empty ring as a day of traffic, and a warmed
-  // weekday never stands in for an unmeasured weekend.
+  // weekday never stands in for an unmeasured weekend. Computed LIVE (not once at
+  // open): ctx.hourly holds the sim's own rings, so a day that warms while the
+  // dialog sits open is picked up by the next recompute.
   const warm = (c?: readonly number[]): boolean => !!c && c.filter((v) => v > 0).length >= WARMED_MIN_HOURS;
-  const warmedWd = warm(ctx.hourly?.weekday);
-  const warmedWe = warm(ctx.hourly?.weekend);
-  const measured =
-    warmedWd || warmedWe
+  const warmedWd = (): boolean => warm(ctx.hourly?.weekday);
+  const warmedWe = (): boolean => warm(ctx.hourly?.weekend);
+  const measured = (): { weekday?: readonly number[]; weekend?: readonly number[] } | undefined =>
+    warmedWd() || warmedWe()
       ? {
-          ...(warmedWd ? { weekday: ctx.hourly!.weekday } : {}),
-          ...(warmedWe ? { weekend: ctx.hourly!.weekend } : {}),
+          ...(warmedWd() ? { weekday: ctx.hourly!.weekday } : {}),
+          ...(warmedWe() ? { weekend: ctx.hourly!.weekend } : {}),
         }
       : undefined;
 
@@ -107,7 +109,7 @@ export function showElevatorScheduleDialog(
     bottom: ctx.bottom,
     top: ctx.top,
     servedLobbies: servedLobbiesAsc(floors),
-    hourly: measured,
+    hourly: measured(),
   });
 
   // A stored home floor may sit on a stop the shaft no longer serves: snap it to
@@ -167,9 +169,9 @@ export function showElevatorScheduleDialog(
   // The template's `hourly`/`hasMeasured` are DAY-SCOPED (#466): the ghost and
   // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
   // ghost even while the weekday curve is warm. `recompute` keeps them current.
-  const dayWarmed = (): boolean => (state.day === "weekend" ? warmedWe : warmedWd);
+  const dayWarmed = (): boolean => (state.day === "weekend" ? warmedWe() : warmedWd());
   const dayCurve = (): readonly number[] | undefined =>
-    state.day === "weekend" ? (warmedWe ? ctx.hourly?.weekend : undefined) : (warmedWd ? ctx.hourly?.weekday : undefined);
+    state.day === "weekend" ? (warmedWe() ? ctx.hourly?.weekend : undefined) : (warmedWd() ? ctx.hourly?.weekday : undefined);
 
   const sctx: SchedCtx = {
     title: ctx.title,
@@ -178,7 +180,7 @@ export function showElevatorScheduleDialog(
     cars: ctx.cars,
     hasMeasured: dayWarmed(),
     hourly: dayCurve(),
-    canTune: warmedWd || warmedWe,
+    canTune: warmedWd() || warmedWe(),
     recommended: recommendedPreset(ctx.isExpress),
   };
 
@@ -205,6 +207,7 @@ export function showElevatorScheduleDialog(
     const isWeekend = state.day === "weekend";
     sctx.hasMeasured = dayWarmed();
     sctx.hourly = dayCurve();
+    sctx.canTune = warmedWd() || warmedWe();
     const shaft = shaftNow(state.floors);
     const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
     adviceCritical = adv !== null;
@@ -219,12 +222,17 @@ export function showElevatorScheduleDialog(
     // The Simulate sentence leads with the staging clause, the axis that responds
     // to skill; the on-shift count trails. The base clause names its floor when
     // the base is not the ground lobby (a sky-lobby shaft's "at the lobby" would
-    // read as a place it never touches; party ruling, spec §16).
+    // read as a place it never touches; party ruling, spec §16). A day with no
+    // measured ring must not claim a measured peak (#466): its sentence names
+    // the assumed 17:00 down-rush instead of "Busiest".
     const sum = stagingSummary(state.schedule, shaft, isWeekend);
     // floorLabel keeps the pinned B-n basement grammar for below-ground bases.
     const baseClause = state.base === 1 ? "at the lobby" : `at Floor ${floorLabel(state.base)} (the base)`;
+    const peakClause = sctx.hasMeasured
+      ? `Busiest ${state.day} hour ${hh(sum.peakHour)}`
+      : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
     state.simMsg =
-      `Busiest ${state.day} hour ${hh(sum.peakHour)}: ${sum.upTowerCars} staged up-tower, ` +
+      `${peakClause}: ${sum.upTowerCars} staged up-tower, ` +
       `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.`;
   };
 
@@ -394,13 +402,18 @@ export function showElevatorScheduleDialog(
       if (tuned) {
         // A day the model left untuned (its ring unmeasured, #466) keeps ITS OWN
         // working row; falling back to curRow() would copy the visible day across.
+        // (The working copy always seeds both rows, so the fallbacks are belt-and-
+        // suspenders; fullRow keeps them total if that seeding ever changes.)
         state.schedule.activeCars = {
-          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...state.schedule.activeCars.weekday!],
-          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...state.schedule.activeCars.weekend!],
+          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...(state.schedule.activeCars?.weekday ?? fullRow())],
+          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...(state.schedule.activeCars?.weekend ?? fullRow())],
         };
         if (tuned.homeFloors) state.schedule.homeFloors = [...tuned.homeFloors];
       }
-      announce("Auto-tuned cars and staging to this shaft's measured demand.");
+      // Name the days that were actually tuned: on a cold Weekend tab a blanket
+      // "auto-tuned" would claim a change the visible row never shows (#466).
+      const tunedDays = [warmedWd() ? "weekday" : null, warmedWe() ? "weekend" : null].filter(Boolean).join(" and ");
+      announce(`Auto-tuned the ${tunedDays} schedule and staging to measured demand.`);
       after();
     },
     onToggleAdvanced: () => {
