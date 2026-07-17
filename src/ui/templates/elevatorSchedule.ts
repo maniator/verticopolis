@@ -264,7 +264,7 @@ function steppersTemplate(state: SchedState, h: SchedHandlers): TemplateResult {
  *  control reads as a bug). */
 function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   const homes = state.schedule.homeFloors;
-  const baseLabel = state.base === 1 ? "Home all cars at the lobby" : `Home all cars at Floor ${state.base}`;
+  const baseLabel = state.base === 1 ? "Home all cars at the lobby" : `Home all cars at Floor ${floorLabel(state.base)}`;
   return html`
     <div class="es-floors">
       <div class="es-row es-heading-row"><span class="es-heading">Serviced floors and home cars</span></div>

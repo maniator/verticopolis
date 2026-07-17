@@ -2,6 +2,7 @@ import type { UI } from "./UI";
 import { render } from "lit-html";
 import {
   elevatorScheduleTemplate,
+  floorLabel,
   type FloorRow,
   type SchedCtx,
   type SchedState,
@@ -194,7 +195,8 @@ export function showElevatorScheduleDialog(
     // the base is not the ground lobby (a sky-lobby shaft's "at the lobby" would
     // read as a place it never touches; party ruling, spec §16).
     const sum = stagingSummary(state.schedule, shaft, isWeekend);
-    const baseClause = state.base === 1 ? "at the lobby" : `at Floor ${state.base} (the base)`;
+    // floorLabel keeps the pinned B-n basement grammar for below-ground bases.
+    const baseClause = state.base === 1 ? "at the lobby" : `at Floor ${floorLabel(state.base)} (the base)`;
     state.simMsg =
       `Busiest ${state.day} hour ${hh(sum.peakHour)}: ${sum.upTowerCars} staged up-tower, ` +
       `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.`;
@@ -227,6 +229,10 @@ export function showElevatorScheduleDialog(
     state.schedule.homeFloors = state.schedule.homeFloors.map((f) => snapToServed(f, served));
     state.cancelArmed = false;
     recompute();
+    // A stop edit reshapes the shaft context the advice reads, so it can turn
+    // the sentence critical too: unfold the Modern strip the same as a schedule
+    // edit would (advice must not critique a hidden strip).
+    unfoldOnAdvice();
     rerender();
   };
   const curRow = (): number[] => (state.day === "weekend" ? state.schedule.activeCars.weekend! : state.schedule.activeCars.weekday!);
