@@ -84,14 +84,14 @@ export function maybeAccent(
   time: number,
 ): void {
   if (def.accent === "none") return;
-  // Fire sparingly (and only well zoomed in) so accents feel like occasional
-  // life in the room, not a stream of random noises.
+  // Fire rarely (and only well zoomed in) so accents feel like an occasional
+  // close-up detail behind the music, not a stream of random beeps.
   const g = pseudo(tick * 2246822519 + 101);
-  if (g > 0.05 * detail) return;
+  if (g > 0.015 * detail) return;
   accentHit(nodes, def.accent, time);
 }
 
-export function accentHit(nodes: AccentNodes, accent: Accent, time: number): void {
+export function accentHit(nodes: AccentNodes, accent: Exclude<Accent, "none">, time: number): void {
   const { accentSynth, membrane, noiseAccent, accentFilter } = nodes;
   switch (accent) {
     case "ding": // elevator arrival chime
