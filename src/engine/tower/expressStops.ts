@@ -1,4 +1,5 @@
 import type { Tower } from "../Tower";
+import { snapHomesToStops } from "../elevatorSchedule";
 
 /**
  * Express-elevator stop management for the Tower, as friend functions taking the
@@ -38,6 +39,8 @@ export function setExpressStops(tower: Tower, id: number): boolean {
     if (!lobbies.has(fl)) skip.push(fl);
   }
   t.skipFloors = skip;
+  // The lobby-only lock may have skipped a floor a car homes at (#467).
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, tower.stopsOf(t));
   tower.revision++;
   return true;
 }

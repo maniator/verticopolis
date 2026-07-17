@@ -2,7 +2,7 @@ import type { Tower } from "../Tower";
 import { FACILITIES, GRID, isElevatorKind, isFixedSpanTransport, isStaffOnlyTransport, maxCarsFor } from "../facilities";
 import type { FacilityKind, PlaceResult, Transport, Unit } from "../types";
 import { isStructural, isSkyLobbyFloor, NEEDS_FLOORS, SHAFT_OVERLAP } from "./towerTopology";
-import { coerceSchedule } from "../elevatorSchedule";
+import { coerceSchedule, snapHomesToStops } from "../elevatorSchedule";
 
 /** Transport CRUD, stops, and resize for the Tower, as friend functions taking
  * the {@link Tower} instance. Extracted from `Tower.ts`. */
@@ -274,7 +274,10 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
   }
   // Re-harden an authored schedule against the new span (#305): a shrink must
   // pull home floors back onto the shaft, same as the carPositions clamp above.
+  // Then snap homes onto the live stop set (#467): the express skip resync just
+  // above may have skipped a floor a car homes at.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   tower.revision++;
   return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
 }
@@ -383,6 +386,9 @@ export function setStop(tower: Tower, id: number, floor: number, stop: boolean):
   if (stop) skip.delete(floor);
   else skip.add(floor);
   t.skipFloors = [...skip].sort((a, b) => a - b);
+  // A skipped floor may orphan a car's home there (#467): snap homes onto the
+  // live stop set, so a car never parks at a floor it cannot stop at.
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   tower.revision++;
   return true;
 }
@@ -409,6 +415,7 @@ export function clearStops(tower: Tower, id: number): boolean {
   if (!t) return false;
   if (t.kind === "elevatorExpress") return tower.setExpressStops(id);
   t.skipFloors = [];
+  // Every floor stops again, so any span-clamped home is a valid stop; no snap needed.
   tower.revision++;
   return true;
 }

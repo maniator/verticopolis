@@ -268,3 +268,31 @@ export function cloneSchedule(s: ElevatorSchedule): ElevatorSchedule {
     homeFloors: s.homeFloors ? [...s.homeFloors] : undefined,
   };
 }
+
+/**
+ * Snap a schedule's per-car home floors onto the shaft's live stop set (#467):
+ * a stop edit can orphan a home on a floor the car no longer stops at, and
+ * dispatch clamps to the span only, so the car would park at a skipped floor.
+ * Ties break toward the lower floor (ascending scan). Returns the schedule
+ * unchanged (same reference) when nothing needs to move, so callers can write
+ * conditionally without churning `revision`-adjacent state.
+ */
+export function snapHomesToStops(s: ElevatorSchedule, stops: readonly number[]): ElevatorSchedule {
+  if (!s.homeFloors || s.homeFloors.length === 0 || stops.length === 0) return s;
+  let moved = false;
+  const snapped = s.homeFloors.map((home) => {
+    if (!Number.isFinite(home) || stops.includes(home)) return home;
+    let best = stops[0];
+    let bestDist = Infinity;
+    for (const f of stops) {
+      const d = Math.abs(f - home);
+      if (d < bestDist) { bestDist = d; best = f; }
+    }
+    moved = true;
+    return best;
+  });
+  if (!moved) return s;
+  const out = cloneSchedule(s);
+  out.homeFloors = snapped;
+  return out;
+}
