@@ -367,22 +367,65 @@ floors section as two quick-actions above the list (`Express (lobbies)` / `All s
 no stop-editing affordance is lost in the retirement. The `Configure stops…` entry point
 (`data-edit="stops"`) and its `uiStops` surface are removed.
 
-## 8. Mobile
+## 8. Mobile (staging-first, revised by the 2026-07-17 mobile party)
 
-The dialog is the same modal at `min(<dialog-width>, 92vw)`, reusing the editor's
-fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
+The dialog is the same modal at `min(<dialog-width>, 92vw)`, `max-height: 82vh`, ONE vertical
+scroll axis (no nested scroll anywhere), sticky navy `.win-title` with the `.btn.xs` ✕ and its
+invisible tap halo, reusing the editor's diagnostics fold-in (§4.5, arch §8). A UX + game party
+(Sally + Samus, 2026-07-17) reworked this section, because the pre-§14 draft was strip-first and
+the strip is the axis with NO agency (§14). The rule: **on a phone, cut the count strip to the
+bone and protect the per-car staging list**, which is the real skill and the most phone-native
+shape (a vertical list of tappable rows). Recorded in §15.
 
-- **The strip** is the one piece that must adapt: 24 bars do not fit a phone width at 36px
-  targets. It becomes a horizontally scrollable strip (a day is naturally a scroll) with
-  snap stops every 6 hours, or, if scroll-in-a-modal tests poorly, a two-row 12+12 wrap.
-  Either way each bar keeps a 36px hit target and a numeric label, so the touch edit does
-  not depend on hitting a thin bar precisely.
-- The steppers, presets, and floors list stack vertically and inherit the coarse-pointer
-  36px minimum already in the editor's mobile block (it must extend to the strip cells and
-  the stepper triples, mirroring how the pricing spec grew that block to cover selects).
-- The Simulate readout and the advice line sit where the mobile editor already folds
-  diagnostics in, so the phone player reads the consequence in the same panel that owns the
-  controls.
+**Modern phone surface (the default).** Because §14.2 already demotes the manual count grid
+behind Advanced and lets Auto-tune own counts, the painful thing on a phone (24-bar editing) is
+not on the Modern default surface at all. The primary column, top to bottom:
+1. A sticky **Weekday/Weekend** segmented toggle (it re-scopes what is below, so it must not
+   scroll away).
+2. A **read-only demand sparkline** (full 24 hours, non-interactive: measured demand behind,
+   authored count bars, over-supply grayed). Glanceable, needs no precision, fits the width
+   because it is not a touch target. This carries the "read" half of the loop on mobile.
+3. The **staging block, primary (not behind Advanced):** the `Home all cars here` and
+   `Stage upper half up-tower` full-width quick-actions, then the key served floors as full-width
+   36px rows carrying **numbered car chips** (`(5)(6)`) and a **peak-origin marker** on the rows
+   the down-rush comes from, so staging is read and authored on one surface. Per-car assignment
+   is tapping a chip onto a row. Numbered chips (not the desktop dots, never drag) are a mobile
+   MUST (§14.3 promoted): anonymous dots are not separately tappable at 36px, and per-car split
+   staging is the skill ceiling.
+4. The three **preset** rows (recommended one marked) and the full-width **Auto-tune** row.
+5. The two **steppers** as full-width `[ – ] value [ + ]` rows (label on its own line,
+   press-and-hold auto-repeat, disabled-at-cap, the live legibility sentence under each).
+6. **Simulate + advice** in the diagnostics fold directly under the sparkline/staging they
+   describe (co-located, so author and see-result share a viewport).
+
+The full serviced-floors list (every floor's Serve toggle and the base-floor setter) and the
+editable 24-hour count grid live behind the **Advanced** disclosure: stops config and per-hour
+counts are the low-agency, once-per-shaft parts, safe one fold away. If a tall (30-floor) shaft's
+Advanced list buries OK, promote it to its own full-height sub-sheet reached by an
+`Edit homes and stops…` row (each sheet keeps one scroll axis); ship inline first.
+
+**Classic phone surface.** Classic keeps the manual count strip primary (fidelity), so it needs a
+real touch editor. The strip is horizontally scrollable with a 6-hour snap (optionally labeled as
+the 1994 time-frame bands, §12 Q4), each hour a 36px bar with its value printed ON the bar. You do
+NOT set height by dragging: **tap a bar to select it, tap a second to extend a span** (a rush
+window), and a **docked `[ – ] N cars [ + ]` stepper pinned under the strip** sets the whole
+selection at once. Tap-select-span plus a big stepper is a reliable two-tap that maps to "a rush
+window is 2-3 equal hours" and never depends on hitting a thin bar; it also gives the value a home
+with no hover. Horizontal scroll beats a 12+12 wrap (a wrap breaks a rush window that straddles
+hour 12).
+
+**Coarse-pointer sizing.** Extend the `@media (pointer: coarse)` block to the strip cells, the
+`[data-step]` nudges, the car chips, and the preset/quick-action rows, so every one clears 36px
+(mirroring how the pricing spec grew that block to cover selects).
+
+**Cancel.** ✕ / Esc / backdrop / hardware-back all cancel; when the working copy is dirty a
+`Discard changes?` confirm guards them (on a phone an accidental edge-swipe or back is far likelier
+to nuke a fully authored schedule than a stray desktop Esc, so mobile tips §14.3's judgment call to
+yes).
+
+**Rejected:** a pure morning/midday/evening/night time-band editor (it would coarsen the ratified
+24-slot model; the tap-select-span gesture gets the band ergonomics while writing 24 slots), and
+the 12+12 wrap (breaks the noon-straddling rush window).
 
 ## 9. Accessibility
 
@@ -633,3 +676,24 @@ scaling with active cars:
 The Modern Option A ruling rests on the 2026-07-17 game (Samus) and systems (Cloud) party,
 whose reasoning (money-cost rejected; congestion-penalty inverts the `congestion.ts` monotonic
 invariant; positioning-first re-layout) is summarized in §14.1 and §14.2.
+
+## 15. Mobile design review (UX + game party, 2026-07-17)
+
+A phone-focused roundtable (Sally, UX; Samus, game) reworked §8 after the desktop party, on the
+owner's call to make the dialog work well on mobile. Both seats converged:
+
+- **Cut the count strip, protect the staging list.** The strip is the low-agency axis (§14); on a
+  phone it belongs behind Advanced in Modern (Auto-tune owns counts) and gets a tap-select-span
+  editor in Classic. Per-car home-floor staging is the skill AND the most phone-native shape (a
+  tappable row list), so it stays first-class, never folded away.
+- **Numbered car chips are a mobile MUST** (promoted from the §14.3 SHOULD): anonymous dots are not
+  separately tappable at 36px and drag-between-rows is unusable on glass. The single-stepper
+  fallback (§12 Q3) is rejected on mobile because it buries the split-staging skill two folds deep.
+- **One modal, one scroll axis;** a read-only demand sparkline carries the read half; the Simulate
+  staging sentence is co-located with the staging control; a per-row peak-origin marker replaces the
+  desktop ghost as the demand target; a dirty-discard guard is warranted on touch.
+- **Same depth on the positioning axis, deliberately shallower on the count axis** (Samus's line): a
+  phone player can author any home-floor staging a desktop player can, but may lean on Auto-tune and
+  presets for counts, the axis with no ceiling to lock them out of.
+
+The full mobile treatment is folded into §8; this section records the review and its rationale.
