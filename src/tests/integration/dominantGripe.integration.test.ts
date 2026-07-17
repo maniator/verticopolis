@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/gripe";
-import { computeDemandMap, type DemandMap } from "../../engine/sim/demand";
+import type { DemandMap } from "../../engine/sim/demand";
 import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
@@ -194,7 +194,10 @@ describe("the Main gripe inspector line", () => {
       if (!sample && x < GRID.width - 120) sample = o;
     }
     expect(sample, "fixture placed no sample office").toBeDefined();
-    const coverage = unmetCoverage(computeDemandMap(sim), sample!);
+    // Assert the precondition through the SAME hour-memoized map the render
+    // reads (review finding: a locally built map could pass while the render's
+    // memo fell back to the other phrasing).
+    const coverage = unmetCoverage(sim.demandMap(), sample!);
     expect(coverage).not.toBeNull();
     expect(coverage!).toBeGreaterThan(0); // reaches the venue...
     expect(coverage!).toBeLessThan(UNMET_DEMAND_FLOOR); // ...which is oversubscribed
@@ -217,7 +220,7 @@ describe("the Main gripe inspector line", () => {
     const food = placeUnit(sim, "fastFood", 3, C + 40);
     food.state = "occupied";
     expect(sim.tower.isFloorServed(3)).toBe(false);
-    expect(unmetCoverage(computeDemandMap(sim), office)).toBe(0);
+    expect(unmetCoverage(sim.demandMap(), office)).toBe(0); // via the render's own memo
     office.satisfaction = 0.5;
     const text = diagText(sim, office);
     expect(text).toContain("Main gripe:");
