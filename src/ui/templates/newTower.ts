@@ -9,14 +9,18 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * "Modern adds" label and the calendar pace picker) lives inside `.nt-choice` and
  * is shown by default, then HIDDEN under Classic with
  * `.nt-choice:has(input[name="nt-mode"][value="classic"]:checked) .nt-modern-only { display:none }`.
- * Written that way round so a browser without `:has()` support keeps the block
+ * Written that way round so a browser WITHOUT `:has()` support keeps the block
  * visible in both modes (the old always-rendered calendar) rather than trapping a
- * Modern player with no calendar choice. When Classic is selected on a supporting
- * browser the block is `display:none`, so its calendar radios also drop out of the
- * tab order, which is correct: the calendar only applies to Modern. Do NOT
- * reintroduce a calendar that is always visible in BOTH modes; the Modern-only
- * reveal is the whole point of this layout. The full Classic-vs-Modern comparison
- * lives on the Help screen, so this dialog stays a commitment rather than a spec sheet.
+ * Modern player with no calendar choice. That always-visible behavior is the
+ * intentional legacy fallback for engines without `:has()`, and must stay. On a
+ * `:has()`-CAPABLE browser (all current targets) Classic instead hides the block
+ * via `display:none`, so its calendar radios also drop out of the tab order, which
+ * is correct: the calendar only applies to Modern. Do NOT drop the `:has()` rule
+ * or otherwise let the block stay visible under Classic on a capable browser; the
+ * Modern-only reveal is the whole point of this layout. (Always-visible in both
+ * modes is fine ONLY as the no-`:has()` fallback above.) The full Classic-vs-Modern
+ * comparison lives on the Help screen, so this dialog stays a commitment rather
+ * than a spec sheet.
  *
  * The radios keep their sane defaults even while hidden: `nt-cal`'s `realWorld`
  * stays `checked` so founding Modern without touching the picker still gets the
