@@ -160,7 +160,6 @@ describe("EditorActions (editor-card money paths)", () => {
       getSim: () => sim,
       ui: {
         toast: f.ui.toast,
-        showStopsDialog: () => {},
         showBatchPricingDialog: () => {},
         showElevatorScheduleDialog: () => {},
       },

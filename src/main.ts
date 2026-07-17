@@ -232,7 +232,6 @@ class GameApp implements GameAppPorts {
       getSim: () => this.sim,
       ui: {
         toast: (text, kind) => this.ui.toast(text, kind),
-        showStopsDialog: (title, floors, onToggle) => this.ui.showStopsDialog(title, floors, onToggle),
         showBatchPricingDialog: (ctx, cb) => this.ui.showBatchPricingDialog(ctx, cb),
         showElevatorScheduleDialog: (ctx, cb) => this.ui.showElevatorScheduleDialog(ctx, cb),
       },

@@ -1,4 +1,5 @@
 import type { Tower } from "../Tower";
+import { snapHomesToStops } from "../elevatorSchedule";
 
 /**
  * Express-elevator stop management for the Tower, as friend functions taking the
@@ -38,7 +39,10 @@ export function setExpressStops(tower: Tower, id: number): boolean {
     if (!lobbies.has(fl)) skip.push(fl);
   }
   t.skipFloors = skip;
+  // Revision bumps FIRST: stopsOf caches by revision (dispatch keeps it warm),
+  // so the snap must read the post-lock list, not the cache (#467).
   tower.revision++;
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, tower.stopsOf(t));
   return true;
 }
 

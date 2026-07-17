@@ -751,7 +751,9 @@ a.btn {
 .modal-box > .win-title {
   position: sticky;
   top: calc(-1 * var(--pad-y));
-  z-index: 1;
+  /* Above any in-body sticky bar (the schedule dialog's day toggle), so the
+     two stuck strips layer cleanly instead of slitting. */
+  z-index: 2;
 }
 .modal-box p,
 .modal-box li {
@@ -1123,31 +1125,7 @@ dialog.crash-card::backdrop {
   padding: 5px 8px;
 }
 
-/* ---- Stops config dialog ---- */
-.stop-list {
-  max-height: 320px;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 2px 10px;
-  margin: 8px 0;
-  padding: 6px;
-}
-.stop-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 2px 4px;
-  cursor: pointer;
-}
-.stop-row input {
-  cursor: pointer;
-}
-.stop-lobby {
-  color: var(--accent);
-  font-size: 10px;
-}
+
 
 /* ---- Batch-pricing dialog ---- */
 .batch-modes { display: grid; gap: 8px; margin: 10px 0; }
@@ -1198,11 +1176,65 @@ dialog.crash-card::backdrop {
 /* Presets row (Modern): the recommended preset carries the primary ring. */
 .es-presets .btn.es-rec { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out); font-weight: 700; }
 .es-presets .btn.es-rec:active { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in); }
-/* Home-floor staging: two columns when they fit, one on narrow screens. */
-.es-homes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 4px 12px; }
-.es-home-row { display: flex; align-items: center; gap: 6px; }
-.es-home-row > span { min-width: 44px; }
-.es-home-sel { flex: 1; min-width: 0; }
+/* The floors grid (#464): one row per span floor descending, in a pressed well.
+   Columns: floor label, the Serve stop toggle, then the car chips. The canon
+   floors-by-cars shape: floors down the left, one chip per car. */
+.es-floors { display: grid; gap: 6px; }
+.es-grid {
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 2px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+.es-grid-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 4px;
+  min-height: 24px;
+}
+.es-grid-head {
+  font-weight: 700;
+  position: sticky;
+  top: 0;
+  background: var(--r-face);
+  z-index: 1;
+}
+.es-cell-floor {
+  min-width: 52px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.es-cell-serve { min-width: 40px; text-align: center; }
+.es-cell-serve input { cursor: pointer; }
+.es-cell-cars { display: flex; flex-wrap: wrap; gap: 3px; flex: 1; min-width: 0; }
+/* A skipped floor's row dims (its chips are gone; Serve re-lights it). */
+.es-skipped .es-cell-floor { color: var(--r-shadow); }
+/* The derived base marker and the lobby tag on the floor label. */
+.es-base { color: var(--accent); }
+.es-lobby-mark { color: var(--accent); font-size: 9px; font-weight: 700; }
+/* A car chip: a numbered mini button, hollow on other rows, pressed navy on its
+   home row. Color never carries it alone: aria-pressed and the bevel do. */
+.es-chip {
+  min-width: 22px;
+  height: 20px;
+  padding: 0 2px;
+  border: 0;
+  font-family: var(--r-font);
+  font-size: 10px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  cursor: pointer;
+}
+.es-chip.on {
+  background: var(--accent);
+  color: var(--r-title-fg);
+  font-weight: 700;
+  box-shadow: var(--bevel-in);
+}
 /* Steppers: square − / + around a fixed-width readout so the row never
    shifts as the number changes. */
 .es-stepper { display: inline-flex; align-items: center; gap: 4px; }
@@ -1213,22 +1245,30 @@ dialog.crash-card::backdrop {
 .es-strip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .es-fleet { color: var(--muted); font-size: 0.85em; }
 .es-strip {
+  overflow-x: auto;
+  padding: 2px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+/* The inner track carries the bars AND the hour axis, so the axis labels scroll
+   with the bars they describe (the v1.57.1 hotfix hid a static axis for exactly
+   this lie; this is the real fix). max-content so 24 touch-sized bars can run
+   wider than the well and scroll inside it. */
+.es-strip-inner { min-width: 100%; width: max-content; }
+.es-strip-bars {
   position: relative;
   display: flex;
   align-items: stretch;
   gap: 1px;
   height: 64px;
-  padding: 2px;
-  background: var(--r-face);
-  box-shadow: var(--bevel-in);
+  min-width: 100%;
 }
 /* Count gridlines: one faint rule per car level so a bar's height reads as a
-   number without counting pixels (spec 14.2's gridline half; the measured-demand
-   ghost series ships with the fold-in increment). */
+   number without counting pixels. */
 .es-gridline {
   position: absolute;
-  left: 2px;
-  right: 2px;
+  left: 0;
+  right: 0;
   height: 1px;
   background: var(--r-shadow);
   opacity: 0.45;
@@ -1237,7 +1277,7 @@ dialog.crash-card::backdrop {
 .es-bar {
   position: relative;
   flex: 1;
-  min-width: 8px;
+  min-width: 10px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -1250,6 +1290,24 @@ dialog.crash-card::backdrop {
   right: 1px;
   bottom: 0;
   background: var(--accent);
+  pointer-events: none;
+}
+/* The ghost series (#464): a dash marks the measured demand level, and the
+   authored fill ABOVE it renders pale, visible spare capacity. Information in
+   both modes; only advice is Modern-gated. */
+.es-bar-over {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  background: color-mix(in srgb, var(--accent) 35%, var(--r-face));
+  pointer-events: none;
+}
+.es-bar-demand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  border-top: 2px dashed var(--r-dark);
   pointer-events: none;
 }
 .es-bar.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
@@ -1265,7 +1323,18 @@ dialog.crash-card::backdrop {
   text-shadow: 0 0 1px var(--r-face), 0 0 2px var(--r-face), 0 0 3px var(--r-face);
   pointer-events: none;
 }
-.es-strip-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8em; padding: 0 2px; }
+/* The hour axis rides INSIDE the scrolling track, each tick anchored to its
+   hour's fraction of the full 24-bar width. */
+.es-strip-axis {
+  position: relative;
+  height: 13px;
+  color: var(--muted);
+  font-size: 0.8em;
+}
+.es-axis-tick { position: absolute; top: 0; }
+/* The touch flow hint renders only for coarse pointers (below); the ghost
+   legend shows whenever the ghost does. */
+.es-touch-hint { display: none; }
 .es-strip-step { justify-content: space-between; }
 /* Advanced disclosure (Modern's fold for the raw grid). */
 .es-adv summary { cursor: pointer; font-size: 13px; }
@@ -1730,9 +1799,7 @@ dialog.crash-card::backdrop {
   /* The rung picker's select is a tap target too (editor card and the batch
      dialog variant); the rename text input keeps its natural height. */
   #editor .ed-row select.field,
-  .bp-rung select.field,
-  /* The schedule dialog's per-car home-floor pickers. */
-  .es-home-sel {
+  .bp-rung select.field {
     min-height: 36px;
   }
   /* The count strip on touch: every bar grows to the 36px target and the strip
@@ -1747,12 +1814,18 @@ dialog.crash-card::backdrop {
   .es-sq {
     min-width: 36px;
   }
-  /* The static 0/6/12/18/23 axis row lies once the strip scrolls (its labels
-     spread across the WRAPPER, not the bars sliding under them), so it hides on
-     touch; the docked stepper still names the selected hour. The fold-in
-     increment moves the axis inside the scroller instead. */
-  .es-strip-axis {
-    display: none;
+  /* The tap-then-stepper flow is invisible without a hint (owner report); one
+     line names it, coarse pointers only. */
+  .es-touch-hint {
+    display: block;
+  }
+  /* The day toggle stays reachable while the tall dialog scrolls. */
+  .es-day {
+    position: sticky;
+    top: 24px;
+    z-index: 1;
+    background: var(--r-face);
+    padding: 2px 0;
   }
   /* Touch breathing room (owner's phone feedback): the 36px controls need more
      air between sections than the desktop's 8px, the quick actions must not
@@ -1761,14 +1834,20 @@ dialog.crash-card::backdrop {
   .es-body {
     gap: 12px;
   }
-  .es-homes {
-    gap: 10px 12px;
+  /* The car chips and Serve checkboxes are the grid's primary touch targets:
+     every one clears ~36px (spec section 8's MUST; the chips are the reason the
+     per-car selects retired). */
+  .es-chip {
+    min-width: 34px;
+    height: 34px;
+    font-size: 12px;
   }
-  .es-home-row {
-    gap: 8px;
+  .es-cell-serve input {
+    width: 22px;
+    height: 22px;
   }
-  .es-home-row > span {
-    flex: none;
+  .es-grid-row {
+    min-height: 40px;
   }
   .es-quick {
     gap: 8px;

@@ -77,6 +77,50 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(back.schedule!.homeFloors).toEqual([1, 1, 8, 8]);
   });
 
+  it("snaps an orphaned home floor to the nearest stop when a stop is edited away (#467)", () => {
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    expect(shaft.cars).toBe(2); // the fixture default; homes below are per-car
+    expect(
+      sim.tower.setSchedule(shaft.id, { homeFloors: [5, 1], waitingCarResponse: 3 }),
+    ).toBe(true);
+    // Skip floor 5: car 1's home is orphaned and must snap to the nearest stop (4).
+    expect(sim.tower.setStop(shaft.id, 5, false)).toBe(true);
+    expect(shaft.schedule!.homeFloors).toEqual([4, 1]);
+    // Re-serving the floor does not move homes back (the snap is one-way, authored state).
+    expect(sim.tower.setStop(shaft.id, 5, true)).toBe(true);
+    expect(shaft.schedule!.homeFloors).toEqual([4, 1]);
+    // The rest of the schedule is untouched by the snap.
+    expect(shaft.schedule!.waitingCarResponse).toBe(3);
+  });
+
+  it("snaps homes on the express lobby-only lock and on a resize skip resync (#467)", () => {
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    // Author a home mid-shaft, then lock to lobbies: home snaps to a stop.
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [5, 1] })).toBe(true);
+    expect(sim.tower.setExpressStops(shaft.id)).toBe(true); // lobby (1) + endpoints (1, 8) stop
+    expect(shaft.schedule!.homeFloors).toEqual([8, 1]); // 5 snaps to the nearer endpoint 8
+    // Tie-break: equidistant stops resolve toward the LOWER floor.
+    expect(sim.tower.clearStops(shaft.id)).toBe(true);
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [4, 1] })).toBe(true);
+    expect(sim.tower.setStop(shaft.id, 4, false)).toBe(true); // 3 and 5 both one away
+    expect(shaft.schedule!.homeFloors).toEqual([3, 1]);
+  });
+
+  it("snaps against fresh stops even when the stopsOf cache is warm (#467)", () => {
+    // Dispatch reads tower.stopsOf every tick, so in a live game the
+    // per-revision stops cache is always warm when a stop edit lands. The edit
+    // must bump the revision BEFORE snapping homes, or the snap reads the
+    // stale cached list and leaves the orphaned home in place.
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [5, 1] })).toBe(true);
+    expect(sim.tower.stopsOf(shaft)).toContain(5); // warm the cache at the current revision
+    expect(sim.tower.setStop(shaft.id, 5, false)).toBe(true);
+    expect(shaft.schedule!.homeFloors).toEqual([4, 1]); // snapped against the fresh list
+  });
+
   it("leaves a shaft with no schedule absent (sparse save, today's behavior)", () => {
     const sim = towerWithElevator();
     expect(sim.tower.transports[0].schedule).toBeUndefined();

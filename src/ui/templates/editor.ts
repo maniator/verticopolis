@@ -244,20 +244,11 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
         html`<button class="btn" data-edit="removecar" ?disabled=${t.cars <= 1}>– Car</button><button class="btn" data-edit="addcar" ?disabled=${t.cars >= maxCars}>+ Car</button>`,
       ),
     );
-    // Standard/service keep the free per-floor stop config and All stops
-    // (real-game feature). An express is locked to (sky) lobbies, so it offers
-    // no stop-config buttons, just the fixed policy in the Stops row above.
-    if (t.kind !== "elevatorExpress") {
-      actions.push(edRow(html`<button class="btn" data-edit="stops">Configure stops…</button>`));
-      actions.push(
-        edRow(
-          html`<button class="btn" data-edit="express">Express (lobbies)</button><button class="btn" data-edit="allstops">All stops</button>`,
-        ),
-      );
-    }
-    // Per-shaft scheduling (elevator-scheduling #305 Phase 3): author how many cars
-    // run each hour, where idle cars home, and the two response tunables. Available
-    // on every elevator kind (standard, service, express).
+    // Per-shaft configuration (elevator-scheduling #305, floors fold-in #464):
+    // ONE surface for stops, staging, and scheduling. The old Configure stops…
+    // dialog and the Express (lobbies) / All stops card rows retired into the
+    // Schedule dialog's floors grid, matching the 1994 one-window layout.
+    // Available on every elevator kind (standard, service, express).
     actions.push(edRow(html`<button class="btn" data-edit="schedule">Schedule…</button>`));
     // Extend arrows are an elevator affordance: stairs/escalators are a
     // fixed two-floor flight by rule and never reach this branch.

@@ -5,7 +5,6 @@ import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
 import { savesTemplate } from "./templates/saves";
-import { stopsTemplate } from "./templates/stops";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
 import { statsModalTemplate } from "./templates/stats";
@@ -75,19 +74,6 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
       openImport(ui);
     },
   });
-}
-
-/** Per-floor stop configuration for an elevator (express service). */
-export function showStopsDialog(
-  ui: UI,
-  title: string,
-  floors: { floor: number; stop: boolean; lobby: boolean }[],
-  onToggle: (floor: number, stop: boolean) => void,
-): void {
-  // Each checkbox binds its @change inline (the floor comes from the row's
-  // closure), so the controller only wires the Done action now.
-  const box = ui.openModalTemplate(stopsTemplate(title, floors, onToggle));
-  ui.wireActions(box);
 }
 
 export function confirmModal(

@@ -1793,32 +1793,6 @@ describe("showSaves — the save-slot manager", () => {
   });
 });
 
-describe("showStopsDialog — per-floor elevator stop toggles", () => {
-  it("renders a labeled row per floor (basements as B-n) and reports toggles", () => {
-    const { ui } = makeUI();
-    const toggles: Array<[number, boolean]> = [];
-    ui.showStopsDialog(
-      "Express",
-      [
-        { floor: 5, stop: true, lobby: false },
-        { floor: 1, stop: true, lobby: true },
-        { floor: -2, stop: false, lobby: false },
-      ],
-      (floor, stop) => toggles.push([floor, stop]),
-    );
-    const boxes = dialog().querySelectorAll<HTMLInputElement>("input[data-floor]");
-    expect(boxes).toHaveLength(3);
-    expect(dialog().textContent).toContain("Floor 5");
-    expect(dialog().textContent).toContain("B2"); // basement label
-    expect(dialog().querySelector(".stop-lobby")).not.toBeNull(); // lobby tag
-    // Untick floor 5.
-    const f5 = dialog().querySelector<HTMLInputElement>('input[data-floor="5"]')!;
-    f5.checked = false;
-    f5.dispatchEvent(new Event("change"));
-    expect(toggles).toContainEqual([5, false]);
-  });
-});
-
 describe("showStats / congratsTower / showUpdateChip — small dialogs & chrome", () => {
   it("showStats opens a modal with the supplied body and a working Close", () => {
     const { ui } = makeUI();
@@ -2160,6 +2134,34 @@ describe("showBatchPricingDialog — the Classic ladder variant (rung picker + a
 
 describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   /** A 4-car standard shaft over floors 1..10, lobby at 1, sky lobby at 8. */
+  /** A fake in-memory stops port over floors 1..10 with lobbies at 1 and 8:
+   *  read() mirrors a live tower's descending rows and the toggles mutate it,
+   *  so the dialog's folded-in stops flow is exercised end to end. */
+  function fakeStops(top = 10, lobbies: number[] = [1, 8], servedInit?: number[]) {
+    const lobbySet = new Set(lobbies);
+    let served = new Set(servedInit ?? Array.from({ length: top }, (_, i) => i + 1));
+    const port = {
+      read: () =>
+        Array.from({ length: top }, (_, i) => top - i).map((floor) => ({
+          floor,
+          served: served.has(floor),
+          lobby: lobbySet.has(floor),
+          endpoint: floor === 1 || floor === top,
+        })),
+      setServe: vi.fn((floor: number, serve: boolean) => {
+        if (floor === 1 || floor === top) return; // endpoints always stop
+        if (serve) served.add(floor);
+        else served.delete(floor);
+      }),
+      expressStops: vi.fn(() => {
+        served = new Set([1, top, ...lobbies]);
+      }),
+      allStops: vi.fn(() => {
+        served = new Set(Array.from({ length: top }, (_, i) => i + 1));
+      }),
+    };
+    return port;
+  }
   function baseCtx(over: Partial<ScheduleDialogCtx> = {}): ScheduleDialogCtx {
     return {
       title: "Schedule: Standard elevator (floors 1-10)",
@@ -2168,8 +2170,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
       cars: 4,
       bottom: 1,
       top: 10,
-      servedLobbies: [1, 8],
-      servedFloors: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+      stops: fakeStops(),
       initialWeekend: false,
       ...over,
     };
@@ -2180,6 +2181,12 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     ui.showElevatorScheduleDialog(baseCtx(over), { apply });
     return { ui, apply };
   }
+  /** The car chip for `car` (1-based) on the grid row for `floor`. */
+  const chipAt = (floor: number, car: number) => {
+    const row = Array.from(dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)"))
+      .find((r) => r.querySelector(".es-cell-floor")!.textContent!.replace(/[^0-9-]/g, "") === String(floor))!;
+    return row.querySelectorAll<HTMLButtonElement>(".es-chip")[car - 1];
+  };
   const okBtn = () => dialog().querySelector<HTMLButtonElement>('[data-act="apply"]')!;
   const simText = () => dialog().querySelector(".es-sim")!.textContent!;
 
@@ -2261,7 +2268,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("an edit after arming disarms the discard confirm", () => {
     open();
     dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click(); // weekend: view change, stays clean
-    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:first-child")!.click(); // dirty
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage up-tower: dirty
     const cancel = () => dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!;
     cancel().click(); // arms
     expect(cancel().textContent).toBe("Discard changes?");
@@ -2274,17 +2281,17 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(simText()).toContain("4 at the lobby");
     dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage upper half up-tower
     expect(simText()).toContain("2 staged up-tower");
-    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:first-child")!.click(); // home all cars here
+    // The quick row leads with the folded-in stops actions; home-all is third.
+    dialog().querySelectorAll<HTMLButtonElement>(".es-quick .btn")[2].click(); // Home all cars at the lobby
     expect(simText()).toContain("4 at the lobby");
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 1]);
   });
 
-  it("a per-car home pick lands in the applied schedule", () => {
+  it("a per-car chip press lands in the applied schedule", () => {
     const { apply } = open();
-    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[3];
-    sel.value = "8";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    chipAt(8, 4).click(); // home car 4 at the sky lobby
+    expect(chipAt(8, 4).classList.contains("on")).toBe(true);
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 8]);
   });
@@ -2395,9 +2402,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
   it("Auto-tune never overwrites hand-set homes", () => {
     const hourly = Array(24).fill(0.5);
     const { apply } = open({ hourly });
-    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[0];
-    sel.value = "5";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    chipAt(5, 1).click(); // hand-home car 1 at floor 5
     dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors).toEqual([5, 1, 1, 1]);
@@ -2405,9 +2410,7 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("a preset keeps its hands off hand-set homes (counts only)", () => {
     const { apply } = open();
-    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[3];
-    sel.value = "9";
-    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    chipAt(9, 4).click(); // hand-home car 4 at floor 9
     const rush = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Rush")!;
     rush.click();
     okBtn().click();
@@ -2425,11 +2428,10 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
 
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
     const { apply } = open({
-      servedFloors: [1, 2, 3, 4, 8, 9, 10],
+      stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 8, 9, 10]),
       current: { homeFloors: [7, 1, 1, 1] }, // floor 7 no longer served
     });
-    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[0];
-    expect(sel.value).toBe("8"); // nearest served floor to 7 with a real option
+    expect(chipAt(8, 1).classList.contains("on")).toBe(true); // snapped to the nearest served floor
     okBtn().click();
     expect(apply.mock.calls[0][0].homeFloors[0]).toBe(8);
   });
@@ -2457,6 +2459,120 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     okBtn().click();
     const row = apply.mock.calls[0][0].activeCars.weekday;
     expect(row[9]).toBe(3);
+  });
+
+  it("a Serve toggle applies live, refreshes the rows, and re-snaps the working homes", () => {
+    const stops = fakeStops();
+    const { apply } = open({ stops, current: { homeFloors: [5, 1, 1, 1] } });
+    // Uncheck floor 5: the port mutates, the grid refreshes, car 1's home snaps off it.
+    const rows = () => dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)");
+    const serve5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!
+      .querySelector<HTMLInputElement>("input[type=checkbox]")!;
+    serve5.checked = false;
+    serve5.dispatchEvent(new Event("change", { bubbles: true }));
+    expect(stops.setServe).toHaveBeenCalledWith(5, false);
+    const row5 = Array.from(rows()).find((r) => r.querySelector(".es-cell-floor")!.textContent!.includes("5"))!;
+    expect(row5.classList.contains("es-skipped")).toBe(true);
+    expect(row5.querySelectorAll(".es-chip")).toHaveLength(0);
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors[0]).not.toBe(5); // snapped off the skipped floor
+  });
+
+  it("stop edits do not arm the discard guard (they applied live; Cancel cannot take them back)", () => {
+    open();
+    const serve = dialog().querySelectorAll<HTMLInputElement>(".es-grid input[type=checkbox]")[1];
+    serve.checked = false;
+    serve.dispatchEvent(new Event("change", { bubbles: true }));
+    dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
+    expect(dialog().open).toBe(false); // closed at once: no schedule edit pending
+  });
+
+  it("the bulk stop quick actions ride the port and announce", () => {
+    const announce = vi.fn();
+    const stops = fakeStops();
+    open({ stops, announce });
+    const quick = dialog().querySelectorAll<HTMLButtonElement>(".es-quick .btn");
+    quick[0].click(); // Express (lobbies)
+    expect(stops.expressStops).toHaveBeenCalledOnce();
+    expect(announce).toHaveBeenLastCalledWith("Stops set to lobbies only.");
+    // The grid follows: non-lobby floors read skipped now.
+    expect(dialog().querySelectorAll(".es-grid-row.es-skipped").length).toBeGreaterThan(0);
+    quick[1].click(); // All stops
+    expect(stops.allStops).toHaveBeenCalledOnce();
+    expect(announce).toHaveBeenLastCalledWith("Stopping at every floor.");
+    expect(dialog().querySelectorAll(".es-grid-row.es-skipped")).toHaveLength(0);
+  });
+
+  it("on touch, the FIRST tap selects (never spans); the second extends; a third resets (F1)", () => {
+    const orig = window.matchMedia;
+    window.matchMedia = ((q: string) =>
+      ({ matches: q === "(pointer: coarse)", media: q, addEventListener: () => {}, removeEventListener: () => {} }) as unknown as MediaQueryList) as typeof window.matchMedia;
+    try {
+      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
+      bars()[6].click(); // FIRST tap: selects, must not span from the seeded 17
+      expect(dialog().textContent).toContain("Hour 06:00");
+      expect(dialog().textContent).not.toContain("Hours ");
+      bars()[9].click(); // second tap extends
+      expect(dialog().textContent).toContain("Hours 06:00–09:00");
+      bars()[3].click(); // third tap resets to the tapped bar
+      expect(dialog().textContent).toContain("Hour 03:00");
+      dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!.click();
+      okBtn().click();
+      const row = apply.mock.calls[0][0].activeCars.weekday;
+      expect(row[3]).toBe(3); // only the reset single hour stepped
+      expect(row[6]).toBe(4);
+    } finally {
+      window.matchMedia = orig;
+    }
+  });
+
+  it("a held stepper auto-repeats and stops when the button detaches (F3)", () => {
+    vi.useFakeTimers();
+    try {
+      const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+      const minus = () => dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!;
+      minus().dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      vi.advanceTimersByTime(400 + 150 * 3 + 10); // hold: ~3 repeats
+      const btn = minus();
+      btn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
+      okBtn().click();
+      const held = apply.mock.calls[0][0].activeCars.weekday[17];
+      expect(held).toBeLessThanOrEqual(1); // 4 - 3 repeats
+      expect(held).toBeGreaterThanOrEqual(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("a runaway hold dies with the dialog: no repeats fire after dismissal (F3)", () => {
+    vi.useFakeTimers();
+    try {
+      const announce = vi.fn();
+      open({ ux: CLASSIC_RULES.elevatorScheduleUX(), announce });
+      const steppers = dialog().querySelectorAll(".es-spread .es-stepper");
+      const up = steppers[0].querySelector<HTMLButtonElement>('[aria-label="raise"]')!;
+      up.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+      vi.advanceTimersByTime(400 + 150 * 2 + 10); // repeats begin
+      const fired = announce.mock.calls.length;
+      expect(fired).toBeGreaterThan(0);
+      dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click(); // pristine? no: WCR edits armed... use Esc-free: the guard arms
+      dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click(); // second press discards
+      expect(dialog().open).toBe(false);
+      vi.advanceTimersByTime(150 * 10); // the interval must self-stop on the detached button
+      expect(announce.mock.calls.length).toBe(fired);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("endpoints render a fixed serve mark, never a toggle, and basements read B-n (F2/V5)", () => {
+    open({ stops: fakeStops(10, [1, 8]) });
+    const rows = dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)");
+    expect(rows[0].querySelector("input[type=checkbox]")).toBeNull(); // top endpoint
+    expect(rows[0].querySelector(".es-always")).not.toBeNull();
+    expect(rows[rows.length - 1].querySelector("input[type=checkbox]")).toBeNull(); // bottom endpoint
+    expect(rows[1].querySelector("input[type=checkbox]")).not.toBeNull(); // interior floors toggle
   });
 
   it("emits the pinned announce strings on stepper commits, presets, and Auto-tune", () => {

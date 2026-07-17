@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import {
   elevatorScheduleTemplate,
+  floorLabel,
   type SchedCtx,
   type SchedState,
   type SchedHandlers,
@@ -25,6 +26,9 @@ const noop: SchedHandlers = {
   onHourStep: () => {},
   onWcrStep: () => {},
   onSfdStep: () => {},
+  onServe: () => {},
+  onExpressStops: () => {},
+  onAllStops: () => {},
   onHomeSet: () => {},
   onHomeAllBase: () => {},
   onStageUpTower: () => {},
@@ -40,11 +44,8 @@ const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
   ux: MODERN_RULES.elevatorScheduleUX(),
   isExpress: false,
   cars: 4,
-  servedLobbies: [1],
-  servedFloors: [1, 2, 3, 4],
   hasMeasured: true,
   recommended: "rush",
-  baseLobby: 1,
   ...over,
 });
 
@@ -54,6 +55,13 @@ const state = (over: Partial<SchedState> = {}): SchedState => ({
   rangeEnd: null,
   advancedOpen: false,
   cancelArmed: false,
+  floors: [
+    { floor: 4, served: true, lobby: false },
+    { floor: 3, served: true, lobby: false },
+    { floor: 2, served: false, lobby: false },
+    { floor: 1, served: true, lobby: true },
+  ],
+  base: 1,
   schedule: {
     activeCars: { weekday: Array(24).fill(4), weekend: Array(24).fill(4) },
     homeFloors: [1, 1, 1, 1],
@@ -101,31 +109,101 @@ describe("elevatorScheduleTemplate: Classic vs Modern shape", () => {
   });
 });
 
-describe("elevatorScheduleTemplate: staging list", () => {
-  it("renders one home-floor row per car, selection riding data-current", () => {
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state({ schedule: { ...state().schedule, homeFloors: [1, 2, 3, 4] } }), noop));
-    const sels = frag.querySelectorAll<HTMLSelectElement>(".es-home-sel");
-    expect(sels).toHaveLength(4);
-    expect(Array.from(sels).map((s) => s.dataset.current)).toEqual(["1", "2", "3", "4"]);
-    expect(sels[0].querySelectorAll("option")).toHaveLength(4); // one per served floor
-    expect(frag.textContent).toContain("Car 1");
-    expect(frag.textContent).toContain("Car 4");
+describe("elevatorScheduleTemplate: floors grid (the fold-in surface)", () => {
+  it("renders one row per span floor descending, with Serve toggles and the base marker", () => {
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state(), noop));
+    const rows = frag.querySelectorAll(".es-grid-row:not(.es-grid-head)");
+    expect(rows).toHaveLength(4);
+    expect(rows[0].textContent).toContain("4"); // descending: top floor first
+    expect(rows[3].querySelector(".es-base")).not.toBeNull(); // base marker on floor 1
+    expect(rows[3].querySelector(".es-lobby-mark")).not.toBeNull();
+    const serve = rows[2].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+    expect(serve.checked).toBe(false); // floor 2 is skipped
+    expect(rows[2].classList.contains("es-skipped")).toBe(true);
+    expect(rows[2].querySelectorAll(".es-chip")).toHaveLength(0); // no chips on a skipped row
   });
 
-  it("wires the quick staging actions and the per-car change", () => {
-    const onHomeAllBase = vi.fn();
-    const onStageUpTower = vi.fn();
+  it("marks each car's home with a pressed numbered chip and wires chip presses", () => {
     const onHomeSet = vi.fn();
-    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state(), { ...noop, onHomeAllBase, onStageUpTower, onHomeSet }));
-    const quick = frag.querySelectorAll(".es-quick .btn");
+    const frag = renderToFragment(
+      elevatorScheduleTemplate(ctx(), state({ schedule: { ...state().schedule, homeFloors: [1, 1, 4, 4] } }), { ...noop, onHomeSet }),
+    );
+    const rows = frag.querySelectorAll(".es-grid-row:not(.es-grid-head)");
+    const topChips = rows[0].querySelectorAll<HTMLButtonElement>(".es-chip");
+    expect(topChips).toHaveLength(4); // every served row offers every car
+    expect(topChips[2].classList.contains("on")).toBe(true); // car 3 homes at 4
+    expect(topChips[0].classList.contains("on")).toBe(false);
+    click(rows[1].querySelectorAll(".es-chip")[1]); // press car 2's chip on floor 3
+    expect(onHomeSet).toHaveBeenCalledWith(1, 3);
+  });
+
+  it("wires the folded-in Serve toggle and bulk stop actions", () => {
+    const onServe = vi.fn();
+    const onExpressStops = vi.fn();
+    const onAllStops = vi.fn();
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state(), { ...noop, onServe, onExpressStops, onAllStops }));
+    const serve = frag.querySelectorAll(".es-grid-row:not(.es-grid-head)")[0].querySelector<HTMLInputElement>("input[type=checkbox]")!;
+    serve.checked = false;
+    change(serve);
+    expect(onServe).toHaveBeenCalledWith(4, false);
+    const quick = frag.querySelectorAll<HTMLButtonElement>(".es-quick .btn");
+    expect(quick[0].textContent).toBe("Express (lobbies)");
+    expect(quick[1].textContent).toBe("All stops");
     click(quick[0]);
     click(quick[1]);
-    expect(onHomeAllBase).toHaveBeenCalledOnce();
-    expect(onStageUpTower).toHaveBeenCalledOnce();
-    const sel = frag.querySelectorAll<HTMLSelectElement>(".es-home-sel")[2];
-    sel.value = "3";
-    change(sel);
-    expect(onHomeSet).toHaveBeenCalledWith(2, 3);
+    expect(onExpressStops).toHaveBeenCalledOnce();
+    expect(onAllStops).toHaveBeenCalledOnce();
+  });
+
+  it("names the base floor in the home-all quick action when it is not the ground lobby", () => {
+    const s = state({ base: 15 });
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), s, noop));
+    expect(frag.textContent).toContain("Home all cars at Floor 15");
+  });
+
+  it("express renders the caption and no Serve column or bulk stop buttons", () => {
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ isExpress: true }), state(), noop));
+    expect(frag.textContent).toContain("Serves all lobbies and sky lobbies");
+    expect(frag.querySelector(".es-grid input[type=checkbox]")).toBeNull();
+    const quick = Array.from(frag.querySelectorAll<HTMLButtonElement>(".es-quick .btn")).map((b) => b.textContent);
+    expect(quick).not.toContain("Express (lobbies)");
+    expect(quick).not.toContain("All stops");
+  });
+
+  it("the editor card retirement is total: no Configure stops surface remains", () => {
+    // The dialog is now the one stops surface; the grid must carry the pinned
+    // column heads from the copy inventory.
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state(), noop));
+    expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Floor");
+    expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Serve");
+    expect(frag.querySelector(".es-grid-head")!.textContent).toContain("Home car(s)");
+  });
+});
+
+describe("floorLabel", () => {
+  it("keeps the retired stops dialog's basement grammar: B1 below ground, plain above", () => {
+    expect(floorLabel(5)).toBe("5");
+    expect(floorLabel(1)).toBe("1");
+    expect(floorLabel(0)).toBe("B1");
+    expect(floorLabel(-2)).toBe("B3");
+  });
+});
+
+describe("elevatorScheduleTemplate: ghost series", () => {
+  it("draws a demand tick per hour and grays the authored fill above the measured line", () => {
+    const hourly = Array(24).fill(0.5);
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ hourly }), state({ advancedOpen: true }), noop));
+    const bars = frag.querySelectorAll(".es-bar");
+    expect(bars[9].querySelector(".es-bar-demand")).not.toBeNull();
+    // Authored 4 of 4 (100%) against measured 50%: the top half grays as spare.
+    expect(bars[9].querySelector(".es-bar-over")).not.toBeNull();
+    expect(frag.textContent).toContain("Dashes mark measured demand");
+  });
+
+  it("renders no ghost machinery before the shaft warms up", () => {
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx({ hourly: undefined }), state({ advancedOpen: true }), noop));
+    expect(frag.querySelector(".es-bar-demand")).toBeNull();
+    expect(frag.querySelector(".es-bar-over")).toBeNull();
   });
 });
 
