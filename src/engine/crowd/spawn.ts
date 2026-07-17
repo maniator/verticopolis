@@ -434,21 +434,25 @@ export function spawnStaff(
   return "sent";
 }
 
-/** The staff-actor spawn ceiling: exactly what the built housekeeping units can
- *  field (operational crews x {@link HK_MAIDS_PER_UNIT}). Canon has NO
- *  tower-wide staff pool (each 1994 housekeeping room staffs its own 6 maids,
- *  and documented near-max towers run 12-16 units per hotel section with every
- *  maid working), so a fixed global cap here silently throttled big hotels
- *  below their built capacity. The per-crew ledgers in
- *  `economy/housekeeping.ts` (6 out per crew, one per floor) are the real
- *  constraint; this gate only backstops them, and screen load stays bounded
- *  because fielding more maids costs building more crews. */
+/** The staff-actor spawn ceiling: built housekeeping units x
+ *  {@link HK_MAIDS_PER_UNIT}. Canon has no tower-wide staff pool (each 1994
+ *  unit staffs its own 6 maids), so a fixed cap here silently throttled big
+ *  hotels; the per-crew ledgers in `economy/housekeeping.ts` are the real
+ *  constraint and this gate only backstops them. Counted by KIND alone (a
+ *  burning crew keeps its share, so orphaned in-flight maids never pinch
+ *  healthy crews; dispatch's operational filter stops a burned crew fielding
+ *  new maids) and memoized per {@link Tower.revision}, which the kind count
+ *  tracks exactly (the gate runs in dispatch's per-room loop; a fresh
+ *  O(units) scan per call is out). A crewless tower reads "full" to any staff actor. */
+const staffCeiling = new WeakMap<Tower, { rev: number; cap: number }>();
 export function maxStaffFor(tower: Tower): number {
+  const hit = staffCeiling.get(tower);
+  if (hit && hit.rev === tower.revision) return hit.cap;
   let crews = 0;
-  for (const u of tower.units) {
-    if (u.kind === "housekeeping" && isOperational(u)) crews++;
-  }
-  return crews * HK_MAIDS_PER_UNIT;
+  for (const u of tower.units) if (u.kind === "housekeeping") crews++;
+  const entry = { rev: tower.revision, cap: crews * HK_MAIDS_PER_UNIT };
+  staffCeiling.set(tower, entry);
+  return entry.cap;
 }
 
 /** Drain the staff jobs that ended since the last call (arrived or failed). */

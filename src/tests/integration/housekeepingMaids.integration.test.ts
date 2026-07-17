@@ -130,14 +130,23 @@ describe("the maid pool", () => {
 });
 
 describe("the staff pool scales with built crews (canon: no tower-wide staff cap)", () => {
-  it("maxStaffFor is exactly the operational crews' worth of maids", () => {
+  it("maxStaffFor is the built crews' worth of maids, held while a crew burns", () => {
     const sim = baseTower(39);
     expect(maxStaffFor(sim.tower)).toBe(0); // no crews: nothing to field
     expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     expect(sim.tower.place("housekeeping", 2, X0 + 16).ok).toBe(true);
     expect(maxStaffFor(sim.tower)).toBe(2 * HK_MAIDS_PER_UNIT);
-    // A burning crew has no staff to send, so it drops out of the ceiling.
-    sim.tower.units.find((u) => u.kind === "housekeeping")!.state = "fire";
+    // A burning crew keeps its share of the ceiling on purpose: its in-flight
+    // maids still count against the pool, and shrinking the ceiling under
+    // them would starve the HEALTHY crews' ledger headroom until the orphans
+    // despawn (review finding). Dispatch's operational filter is what stops a
+    // burned crew fielding new maids.
+    const crew = sim.tower.units.find((u) => u.kind === "housekeeping")!;
+    crew.state = "fire";
+    expect(maxStaffFor(sim.tower)).toBe(2 * HK_MAIDS_PER_UNIT);
+    // Bulldozing is what shrinks it (removal bumps the revision the memo
+    // keys on, so the recount is exact).
+    expect(sim.tower.removeUnit(crew.id)).toBeDefined();
     expect(maxStaffFor(sim.tower)).toBe(HK_MAIDS_PER_UNIT);
   });
 
@@ -153,9 +162,10 @@ describe("the staff pool scales with built crews (canon: no tower-wide staff cap
     expect(maxStaffFor(sim.tower)).toBe(11 * HK_MAIDS_PER_UNIT);
     const room = dirtyRoom(sim, 2, X0);
     sim.crowd.staffCount = 64; // the retired pool's ceiling: no longer "full"
-    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("sent");
-    sim.crowd.staffCount = 11 * HK_MAIDS_PER_UNIT; // built capacity: the honest ceiling
-    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("full");
+    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("sent"); // 64 -> 65
+    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("sent"); // 65 -> 66: the last admitted maid
+    expect(sim.crowd.staffCount).toBe(11 * HK_MAIDS_PER_UNIT);
+    expect(sim.spawnStaffTrip(2, 2, room.x, room.id, HK_CLEAN_MINUTES)).toBe("full"); // built capacity: the honest ceiling
   });
 });
 
