@@ -52,10 +52,14 @@ empty --booked(evening)--> asleep --checkout(morning)--> dirty
   morning's fresh checkouts. The day the room went dirty is tracked per room so
   the clock survives save/reload (no reset-by-reload exploit).
 - **Infested rooms:** housekeeping can no longer clean them (dispatch only ever
-  targets `dirty`). They earn no rent and remain a cockroach **spread source**,
-  same as `dirty`, so an untreated infestation keeps eating the wing.
-- **Spread:** unchanged from today. A dirty-or-infested room soils an adjacent
-  clean/empty hotel room (turning it `dirty`) each morning.
+  targets `dirty`). They earn no rent and are the cockroach **spread source**, so
+  an untreated infestation keeps eating the wing.
+- **Spread:** an `infested` room soils an adjacent hotel room (turning it `dirty`)
+  each morning. **[SUPERSEDED 2026-07-17, v1.53.1]** This section originally said
+  "unchanged from today: a dirty-or-infested room soils a neighbor." Canon
+  research (SimTower wiki/FAQ) later confirmed only *infested* rooms spread, not
+  merely dirty ones, so the source was narrowed to `infested` only. See
+  `gdds/gdd-verticopolis-2026-07-17-housekeeping-overhaul/`.
 
 ### Mode divergence (through GameRules only)
 
