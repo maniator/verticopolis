@@ -59,8 +59,9 @@ import { SCENES } from "./screenshot-scenes.ts";
 // To go below the ~55s tablet floor, the lever is the scene itself (its shots draw
 // many settle frames), not the split.
 export const SHARDS: Record<string, string[]> = {
-  // ~64s: feature panels + two light HUD scenes.
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt"],
+  // ~64s: feature panels + two light HUD scenes + the three schedule-dialog
+  // scenes (#305 Phase 3: small frozen towers, DOM dialog shots, cheap).
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork),
   // placed here because this was the lightest shard, keeping the gate bounded

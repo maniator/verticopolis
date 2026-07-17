@@ -1173,6 +1173,96 @@ dialog.crash-card::backdrop {
 .rung-chip[data-rung="2"] { background: var(--rung-avg); }
 .rung-chip[data-rung="3"] { background: var(--rung-high); }
 
+/* ---- Elevator Schedule dialog (elevator-scheduling #305 Phase 3) ----
+   Same chrome grammar as the rest of the shell: gray face, bevels, navy
+   accents. Staging leads, the count strip is a pressed well of 24 bar
+   buttons, and every stepper reuses .btn. */
+.es-body { display: grid; gap: 8px; }
+.es-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.es-spread { justify-content: space-between; }
+.es-heading { font-weight: 700; }
+/* Day toggle: the pressed day sits in its bevel like #speed .btn.active. */
+.es-day .btn.es-on { font-weight: 700; box-shadow: var(--bevel-in); }
+/* Presets row (Modern): the recommended preset carries the primary ring. */
+.es-presets .btn.es-rec { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out); font-weight: 700; }
+.es-presets .btn.es-rec:active { box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in); }
+/* Home-floor staging: two columns when they fit, one on narrow screens. */
+.es-homes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 4px 12px; }
+.es-home-row { display: flex; align-items: center; gap: 6px; }
+.es-home-row > span { min-width: 44px; }
+.es-home-sel { flex: 1; min-width: 0; }
+/* Steppers: square − / + around a fixed-width readout so the row never
+   shifts as the number changes. */
+.es-stepper { display: inline-flex; align-items: center; gap: 4px; }
+.es-sq { min-width: 26px; text-align: center; }
+.es-val { min-width: 56px; text-align: center; font-variant-numeric: tabular-nums; }
+.es-hint { color: var(--muted); font-size: 0.85em; margin: 0; }
+/* The 24-hour count strip: a pressed well of one bar button per hour. */
+.es-strip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.es-fleet { color: var(--muted); font-size: 0.85em; }
+.es-strip {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 1px;
+  height: 64px;
+  padding: 2px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+/* Count gridlines: one faint rule per car level so a bar's height reads as a
+   number without counting pixels (spec 14.2's gridline half; the measured-demand
+   ghost series ships with the fold-in increment). */
+.es-gridline {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+  background: var(--r-shadow);
+  opacity: 0.45;
+  pointer-events: none;
+}
+.es-bar {
+  position: relative;
+  flex: 1;
+  min-width: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-family: var(--r-font);
+}
+.es-bar-fill {
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  bottom: 0;
+  background: var(--accent);
+  pointer-events: none;
+}
+.es-bar.sel { outline: 2px solid var(--accent); outline-offset: -1px; }
+.es-bar-n {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 1px;
+  font-size: 9px;
+  color: var(--r-ink);
+  /* A face-gray halo keeps the count readable when a full bar's navy fill
+     reaches up behind it. */
+  text-shadow: 0 0 1px var(--r-face), 0 0 2px var(--r-face), 0 0 3px var(--r-face);
+  pointer-events: none;
+}
+.es-strip-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8em; padding: 0 2px; }
+.es-strip-step { justify-content: space-between; }
+/* Advanced disclosure (Modern's fold for the raw grid). */
+.es-adv summary { cursor: pointer; font-size: 13px; }
+.es-adv[open] summary { margin-bottom: 6px; }
+/* Advice and the Simulate readout: advice is a plain sentence, the readout
+   carries the navy emphasis (same weight as .bp-preview). */
+.es-advice { margin: 0; font-size: 13px; }
+.es-sim { min-height: 1.4em; color: var(--r-title); font-weight: 600; font-size: 13px; }
+
 /* ---- Help dialog: keyboard-play key hints ---- */
 .help-keys { line-height: 1.9; }
 .help-keys kbd {
@@ -1628,8 +1718,22 @@ dialog.crash-card::backdrop {
   /* The rung picker's select is a tap target too (editor card and the batch
      dialog variant); the rename text input keeps its natural height. */
   #editor .ed-row select.field,
-  .bp-rung select.field {
+  .bp-rung select.field,
+  /* The schedule dialog's per-car home-floor pickers. */
+  .es-home-sel {
     min-height: 36px;
+  }
+  /* The count strip on touch: every bar grows to the 36px target and the strip
+     scrolls horizontally inside its own well (spec section 8), so the page never
+     pans sideways. The docked stepper below stays the precise editing path. */
+  .es-strip {
+    overflow-x: auto;
+  }
+  .es-bar {
+    min-width: 36px;
+  }
+  .es-sq {
+    min-width: 36px;
   }
   /* Title-bar ✕s keep their exact desktop look — stretching them reads
      wrong in the bar — and instead grow an invisible tap halo, so the

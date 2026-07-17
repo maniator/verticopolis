@@ -11,6 +11,7 @@ import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { PriceOptions } from "../engine/gameRules";
+import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
 import { getPlatform } from "../platform";
@@ -438,6 +439,13 @@ export class UI {
     },
   ): void {
     dialogs.showBatchPricingDialog(this, ctx, cb);
+  }
+
+  showElevatorScheduleDialog(
+    ctx: dialogs.ScheduleDialogCtx,
+    cb: { apply: (schedule: ElevatorSchedule) => void },
+  ): void {
+    dialogs.showElevatorScheduleDialog(this, ctx, cb);
   }
 
   confirmModal(title: string, body: string, onYes: () => void, yesLabel = "Confirm"): void {

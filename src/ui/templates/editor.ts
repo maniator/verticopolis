@@ -255,6 +255,10 @@ export function transportEditorTemplate(sim: Simulation, t: Transport, mobile = 
         ),
       );
     }
+    // Per-shaft scheduling (elevator-scheduling #305 Phase 3): author how many cars
+    // run each hour, where idle cars home, and the two response tunables. Available
+    // on every elevator kind (standard, service, express).
+    actions.push(edRow(html`<button class="btn" data-edit="schedule">Schedule…</button>`));
     // Extend arrows are an elevator affordance: stairs/escalators are a
     // fixed two-floor flight by rule and never reach this branch.
     actions.push(

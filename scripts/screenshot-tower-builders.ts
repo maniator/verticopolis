@@ -268,6 +268,131 @@ export function buildModernPricingTower(): void {
   g.engine.paused = true;
 }
 
+/**
+ * The elevator Schedule dialog's staging tower (elevator-scheduling #305 Phase 3),
+ * shared shape for both modes: floors 1..15 with a sky lobby at 15, a 4-car
+ * standard shaft over 1..10 and an express over 1..15, offices leased so the
+ * tower reads inhabited. The standard shaft carries an authored schedule that
+ * deliberately under-staffs the morning against a seeded measured demand curve
+ * (peaks at 08:00 and 17:00), so the Modern shot shows a real advice line and
+ * a warmed Auto-tune, and the Classic strip reads varied rather than flat.
+ * Two thin builders below found the mode (page-injected code cannot share a
+ * helper; the body is duplicated per the self-containment contract).
+ */
+export function buildScheduleTowerModern(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(4500, "modern");
+  const s = g.sim;
+  s.money = 50_000_000;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  const left = cx - 30;
+  const right = cx + 30;
+  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 15; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  for (let x = left; x <= right; x++) s.tower.place("lobby", 15, x); // sky lobby
+  s.tower.placeTransport("elevatorStandard", left + 4, 1, 10);
+  s.tower.placeTransport("elevatorExpress", right - 8, 1, 15);
+  const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
+  s.tower.setCars(std.id, 4);
+  for (let f = 2; f <= 9; f++) {
+    for (let x = left + 10; x + 1 <= right - 10; ) {
+      const r = s.tower.place("office", f, x);
+      if (r.ok) {
+        const u = s.tower.getUnit(r.unitId);
+        u.state = "occupied";
+        u.everOccupied = true;
+        u.occupants = 6;
+        x += u.width;
+      } else x += 1;
+    }
+  }
+  // A measured day: commuter peaks at 08:00 and 17:00, a lunch shoulder, quiet
+  // nights. Seeded directly (the EMA would need days of sim time to warm up).
+  const hourly = Array.from({ length: 24 }, (_, h) => {
+    if (h === 8 || h === 17) return 0.85;
+    if (h === 7 || h === 9 || h === 16 || h === 18) return 0.6;
+    if (h >= 11 && h <= 13) return 0.5;
+    if (h >= 10 && h <= 15) return 0.35;
+    if (h >= 19 && h <= 21) return 0.25;
+    return 0.08;
+  });
+  s.elevatorHourly.set(std.id, hourly);
+  // Authored schedule: thin overnight, but a single car at the 08:00 peak, so
+  // the Modern advice line has a real shortfall to report (the honesty
+  // threshold in scheduleAdvice needs a 2-car gap before it nags).
+  const weekday = hourly.map((v, h) => (h === 8 ? 1 : v >= 0.5 ? 4 : v >= 0.25 ? 3 : 1));
+  s.tower.setSchedule(std.id, {
+    activeCars: { weekday, weekend: weekday.map((v: number) => Math.max(1, v - 1)) },
+    waitingCarResponse: 4,
+    standardFloorDeparture: 40,
+    homeFloors: [1, 1, 8, 8],
+  });
+  s.evaluateStar();
+  g.engine.setSim(s);
+  g.engine.setCamera(cx, 6, 0.7);
+  // Freeze: the shots are a dialog over a static backdrop.
+  g.speed = 0;
+  g.engine.paused = true;
+}
+
+/** The Classic twin of {@link buildScheduleTowerModern} (same tower, classic
+ *  rules) for the raw-grid variant of the dialog. Body duplicated: injected
+ *  page code must be self-contained. */
+export function buildScheduleTowerClassic(): void {
+  const g = (window as unknown as { game: any }).game;
+  const Sim = g.sim.constructor;
+  g.sim = Sim.newGame(4500, "classic");
+  const s = g.sim;
+  s.money = 50_000_000;
+  const W = g.grid.width;
+  const cx = Math.floor(W / 2);
+  const left = cx - 30;
+  const right = cx + 30;
+  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  for (let f = 2; f <= 15; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
+  for (let x = left; x <= right; x++) s.tower.place("lobby", 15, x); // sky lobby
+  s.tower.placeTransport("elevatorStandard", left + 4, 1, 10);
+  s.tower.placeTransport("elevatorExpress", right - 8, 1, 15);
+  const std = s.tower.transports.find((t: any) => t.kind === "elevatorStandard");
+  s.tower.setCars(std.id, 4);
+  for (let f = 2; f <= 9; f++) {
+    for (let x = left + 10; x + 1 <= right - 10; ) {
+      const r = s.tower.place("office", f, x);
+      if (r.ok) {
+        const u = s.tower.getUnit(r.unitId);
+        u.state = "occupied";
+        u.everOccupied = true;
+        u.occupants = 6;
+        x += u.width;
+      } else x += 1;
+    }
+  }
+  // Same varied authored counts as the Modern twin so the primary raw strip
+  // reads staged rather than a flat wall of fours. No measured curve: Classic
+  // shows no advice, and the strip is the whole surface.
+  const weekday = Array.from({ length: 24 }, (_, h) => {
+    if (h === 8 || h === 17) return 4;
+    if (h >= 7 && h <= 18) return 3;
+    if (h >= 19 && h <= 21) return 2;
+    return 1;
+  });
+  s.tower.setSchedule(std.id, {
+    activeCars: { weekday, weekend: weekday.map((v: number) => Math.max(1, v - 1)) },
+    waitingCarResponse: 4,
+    standardFloorDeparture: 40,
+    homeFloors: [1, 1, 8, 8],
+  });
+  s.evaluateStar();
+  g.engine.setSim(s);
+  g.engine.setCamera(cx, 6, 0.7);
+  g.speed = 0;
+  g.engine.paused = true;
+}
+
 /** Build deterministically to a target star rating and return the star the
  *  sim's OWN evaluateStar() awards, so the milestone is honest, not forced.
  *

@@ -21,7 +21,7 @@ import type { BuildActions } from "./buildActions";
 export interface EditorActionsDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
-  ui: Pick<UI, "toast" | "showStopsDialog" | "showBatchPricingDialog">;
+  ui: Pick<UI, "toast" | "showStopsDialog" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
   audio: Pick<AudioEngine, "sfx">;
   /** Sell/refund/charge guards shared with the bulldozer. */
   build: Pick<BuildActions, "tryRemoveUnit" | "removeTransportWithRefund" | "canAfford">;
@@ -68,6 +68,59 @@ export class EditorActions {
       this.deps.commitUndo();
       this.deps.refreshEditor();
     });
+  }
+
+  /** Open the per-shaft elevator Schedule dialog for the selected elevator
+   *  (elevator-scheduling #305 Phase 3). Reads the Classic/Modern affordance flags
+   *  and the measured hourly demand, and writes the authored schedule back through
+   *  one `Tower.setSchedule` (hardened, undoable). */
+  openSchedule(): void {
+    const selected = this.deps.selected();
+    if (!selected || selected.type !== "transport") return;
+    const t = this.deps.selectedTransport();
+    if (!t || !isElevatorKind(t.kind)) return;
+    const sim = this.deps.getSim();
+    const lobbySet = new Set(sim.tower.lobbyFloors());
+    const servedFloors = sim.tower.stopsOf(t); // ascending served floors
+    const servedLobbies = servedFloors.filter((f) => lobbySet.has(f));
+    this.deps.ui.showElevatorScheduleDialog(
+      {
+        title: `Schedule: ${FACILITIES[t.kind].name} (floors ${t.bottom}-${t.top})`,
+        ux: sim.rules.elevatorScheduleUX(),
+        isExpress: t.kind === "elevatorExpress",
+        cars: t.cars,
+        bottom: t.bottom,
+        top: t.top,
+        servedLobbies: servedLobbies.length ? servedLobbies : [t.bottom],
+        servedFloors: servedFloors.length ? servedFloors : [t.bottom],
+        hourly: sim.elevatorHourlyLoad(t.id),
+        current: t.schedule,
+        initialWeekend: sim.clock.isWeekend,
+        announce: (msg) => this.deps.announce(msg),
+      },
+      {
+        apply: (schedule) => {
+          // Re-read the LIVE sim here, never the open-time capture: undo/redo
+          // stays live while the dialog is open (main.ts runs it ahead of the
+          // modal guard) and adoptSim swaps the instance underneath us. The id
+          // survives serialization, so the shaft resolves on the restored tower.
+          const live = this.deps.getSim();
+          const shaft = live.tower.getTransport(t.id);
+          if (!shaft || !isElevatorKind(shaft.kind)) {
+            // The shaft no longer exists (undone past its construction, or
+            // demolished). Nothing to write; say so instead of "saved".
+            this.deps.ui.toast("That elevator is gone.", "bad");
+            return;
+          }
+          this.deps.captureUndo("Set elevator schedule");
+          live.tower.setSchedule(shaft.id, schedule);
+          this.deps.commitUndo();
+          this.deps.audio.sfx("build");
+          this.deps.announce("Elevator schedule saved.");
+          this.deps.refreshEditor();
+        },
+      },
+    );
   }
 
   /** Drag-extend the selected shaft so `end` reaches `targetFloor`. Charges
@@ -258,6 +311,8 @@ export class EditorActions {
         // action too (the engine's setStop lock would refuse a non-lobby stop
         // regardless, but never even open the dialog for an express).
         if (t.kind !== "elevatorExpress") this.openStopsDialog();
+      } else if (action === "schedule") {
+        this.openSchedule();
       } else if (action === "express") {
         sim.tower.setExpressStops(t.id);
         this.deps.audio.sfx("click");

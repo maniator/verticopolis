@@ -23,6 +23,26 @@ export interface ElevatorSchedule {
 }
 
 /**
+ * Which authoring affordances the schedule dialog shows (Phase 3). Returned by
+ * the `GameRules.elevatorScheduleUX()` seam: Classic all-false except
+ * `rawGridDefault` (1994 fidelity, advice withheld, information not); Modern
+ * presets/autoTune/advice true with the raw grid behind Advanced. UI-only:
+ * the schedule object and its dispatch effect are identical in both modes.
+ * Defined here, the schedule's leaf module, so the UI and the rules seam share
+ * one definition without growing `gameRules.ts`.
+ */
+export interface ElevatorScheduleUX {
+  /** Modern only: the Rush/Balanced/Feeder intent-preset buttons. */
+  presets: boolean;
+  /** Modern only: the per-shaft auto-tune-from-measured-load action. */
+  autoTune: boolean;
+  /** Classic true: the raw manual grid is shown outright; Modern false: behind Advanced. */
+  rawGridDefault: boolean;
+  /** Modern only: the honest "over-staffed 09-11, short at 17" advice line. */
+  advice: boolean;
+}
+
+/**
  * Pure helpers for the per-shaft elevator schedule (elevator-scheduling, #305).
  *
  * Two groups: the load-boundary coercion (`coerceSchedule`) that hardens an

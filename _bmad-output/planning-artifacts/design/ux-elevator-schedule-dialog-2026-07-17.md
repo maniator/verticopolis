@@ -367,22 +367,65 @@ floors section as two quick-actions above the list (`Express (lobbies)` / `All s
 no stop-editing affordance is lost in the retirement. The `Configure stops…` entry point
 (`data-edit="stops"`) and its `uiStops` surface are removed.
 
-## 8. Mobile
+## 8. Mobile (staging-first, revised by the 2026-07-17 mobile party)
 
-The dialog is the same modal at `min(<dialog-width>, 92vw)`, reusing the editor's
-fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
+The dialog is the same modal at `min(<dialog-width>, 92vw)`, `max-height: 82vh`, ONE vertical
+scroll axis (no nested scroll anywhere), sticky navy `.win-title` with the `.btn.xs` ✕ and its
+invisible tap halo, reusing the editor's diagnostics fold-in (§4.5, arch §8). A UX + game party
+(Sally + Samus, 2026-07-17) reworked this section, because the pre-§14 draft was strip-first and
+the strip is the axis with NO agency (§14). The rule: **on a phone, cut the count strip to the
+bone and protect the per-car staging list**, which is the real skill and the most phone-native
+shape (a vertical list of tappable rows). Recorded in §15.
 
-- **The strip** is the one piece that must adapt: 24 bars do not fit a phone width at 36px
-  targets. It becomes a horizontally scrollable strip (a day is naturally a scroll) with
-  snap stops every 6 hours, or, if scroll-in-a-modal tests poorly, a two-row 12+12 wrap.
-  Either way each bar keeps a 36px hit target and a numeric label, so the touch edit does
-  not depend on hitting a thin bar precisely.
-- The steppers, presets, and floors list stack vertically and inherit the coarse-pointer
-  36px minimum already in the editor's mobile block (it must extend to the strip cells and
-  the stepper triples, mirroring how the pricing spec grew that block to cover selects).
-- The Simulate readout and the advice line sit where the mobile editor already folds
-  diagnostics in, so the phone player reads the consequence in the same panel that owns the
-  controls.
+**Modern phone surface (the default).** Because §14.2 already demotes the manual count grid
+behind Advanced and lets Auto-tune own counts, the painful thing on a phone (24-bar editing) is
+not on the Modern default surface at all. The primary column, top to bottom:
+1. A sticky **Weekday/Weekend** segmented toggle (it re-scopes what is below, so it must not
+   scroll away).
+2. A **read-only demand sparkline** (full 24 hours, non-interactive: measured demand behind,
+   authored count bars, over-supply grayed). Glanceable, needs no precision, fits the width
+   because it is not a touch target. This carries the "read" half of the loop on mobile.
+3. The **staging block, primary (not behind Advanced):** the `Home all cars here` and
+   `Stage upper half up-tower` full-width quick-actions, then the key served floors as full-width
+   36px rows carrying **numbered car chips** (`(5)(6)`) and a **peak-origin marker** on the rows
+   the down-rush comes from, so staging is read and authored on one surface. Per-car assignment
+   is tapping a chip onto a row. Numbered chips (not the desktop dots, never drag) are a mobile
+   MUST (§14.3 promoted): anonymous dots are not separately tappable at 36px, and per-car split
+   staging is the skill ceiling.
+4. The three **preset** rows (recommended one marked) and the full-width **Auto-tune** row.
+5. The two **steppers** as full-width `[ – ] value [ + ]` rows (label on its own line,
+   press-and-hold auto-repeat, disabled-at-cap, the live legibility sentence under each).
+6. **Simulate + advice** in the diagnostics fold directly under the sparkline/staging they
+   describe (co-located, so author and see-result share a viewport).
+
+The full serviced-floors list (every floor's Serve toggle and the base-floor setter) and the
+editable 24-hour count grid live behind the **Advanced** disclosure: stops config and per-hour
+counts are the low-agency, once-per-shaft parts, safe one fold away. If a tall (30-floor) shaft's
+Advanced list buries OK, promote it to its own full-height sub-sheet reached by an
+`Edit homes and stops…` row (each sheet keeps one scroll axis); ship inline first.
+
+**Classic phone surface.** Classic keeps the manual count strip primary (fidelity), so it needs a
+real touch editor. The strip is horizontally scrollable with a 6-hour snap (optionally labeled as
+the 1994 time-frame bands, §12 Q4), each hour a 36px bar with its value printed ON the bar. You do
+NOT set height by dragging: **tap a bar to select it, tap a second to extend a span** (a rush
+window), and a **docked `[ – ] N cars [ + ]` stepper pinned under the strip** sets the whole
+selection at once. Tap-select-span plus a big stepper is a reliable two-tap that maps to "a rush
+window is 2-3 equal hours" and never depends on hitting a thin bar; it also gives the value a home
+with no hover. Horizontal scroll beats a 12+12 wrap (a wrap breaks a rush window that straddles
+hour 12).
+
+**Coarse-pointer sizing.** Extend the `@media (pointer: coarse)` block to the strip cells, the
+`[data-step]` nudges, the car chips, and the preset/quick-action rows, so every one clears 36px
+(mirroring how the pricing spec grew that block to cover selects).
+
+**Cancel.** ✕ / Esc / backdrop / hardware-back all cancel; when the working copy is dirty a
+`Discard changes?` confirm guards them (on a phone an accidental edge-swipe or back is far likelier
+to nuke a fully authored schedule than a stray desktop Esc, so mobile tips §14.3's judgment call to
+yes).
+
+**Rejected:** a pure morning/midday/evening/night time-band editor (it would coarsen the ratified
+24-slot model; the tap-select-span gesture gets the band ergonomics while writing 24 slots), and
+the 12+12 wrap (breaks the noon-straddling rush window).
 
 ## 9. Accessibility
 
@@ -426,15 +469,15 @@ fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
 | Auto-tune button | `Auto-tune` |
 | Announce, auto-tune | `Auto-tuned cars and staging to this shaft's measured demand.` |
 | Auto-tune disabled note | `Auto-tune needs a day or two of measured traffic first.` |
-| Advice line | `This shaft is over-staffed <span> and short at <hour> on <day type>.` / `Measured demand and your schedule line up.` |
-| Simulate, down-rush staging (§6) | `<HH:00> down-rush originates on floors <lo>-<hi>; <n> cars staged there, <m> in lobby.` |
-| Simulate, up-rush staging (§6) | `<day type> peak <HH:00> up-rush: cars staged at the lobby, ready.` |
-| Simulate, overnight | `Overnight <HH:00>-<HH:00>: <n> cars on shift, homed <where>.` |
-| Floors list heads | `Floor` / `Serve` / `Home car(s)` |
-| Floors quick-actions (folded in from stops) | `Express (lobbies)` / `All stops` |
-| Express floors caption | `Serves all lobbies and sky lobbies` |
-| Home quick-action | `Home all cars here` |
-| Advanced disclosure | `Home floors and serviced floors` |
+| Advice line | `This shaft is over-staffed <span> and short at <hour span> on <day type>s.` / `Measured demand and your schedule line up.` (hour spans compress: `09:00–16:00`) |
+| Simulate readout (§6, re-pinned §16) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (staging clause leads; the origin-floor variants are deferred behind a per-floor accumulator, §16) |
+| Floors list heads (fold-in increment, §16) | `Floor` / `Serve` / `Home car(s)` |
+| Floors quick-actions (fold-in increment, §16) | `Express (lobbies)` / `All stops` |
+| Express floors caption (fold-in increment, §16) | `Serves all lobbies and sky lobbies` |
+| Home quick-actions | `Home all cars at the lobby` / `Stage upper half up-tower` |
+| Dirty Cancel arm | `Discard changes?` |
+| Advanced disclosure (Modern) | `Cars on shift by hour (Advanced)` |
+| Save announce | `Elevator schedule saved.` / gone-shaft refusal `That elevator is gone.` |
 
 ## 12. Decisions and remaining open questions
 
@@ -633,3 +676,71 @@ scaling with active cars:
 The Modern Option A ruling rests on the 2026-07-17 game (Samus) and systems (Cloud) party,
 whose reasoning (money-cost rejected; congestion-penalty inverts the `congestion.ts` monotonic
 invariant; positioning-first re-layout) is summarized in §14.1 and §14.2.
+
+## 15. Mobile design review (UX + game party, 2026-07-17)
+
+A phone-focused roundtable (Sally, UX; Samus, game) reworked §8 after the desktop party, on the
+owner's call to make the dialog work well on mobile. Both seats converged:
+
+- **Cut the count strip, protect the staging list.** The strip is the low-agency axis (§14); on a
+  phone it belongs behind Advanced in Modern (Auto-tune owns counts) and gets a tap-select-span
+  editor in Classic. Per-car home-floor staging is the skill AND the most phone-native shape (a
+  tappable row list), so it stays first-class, never folded away.
+- **Numbered car chips are a mobile MUST** (promoted from the §14.3 SHOULD): anonymous dots are not
+  separately tappable at 36px and drag-between-rows is unusable on glass. The single-stepper
+  fallback (§12 Q3) is rejected on mobile because it buries the split-staging skill two folds deep.
+- **One modal, one scroll axis;** a read-only demand sparkline carries the read half; the Simulate
+  staging sentence is co-located with the staging control; a per-row peak-origin marker replaces the
+  desktop ghost as the demand target; a dirty-discard guard is warranted on touch.
+- **Same depth on the positioning axis, deliberately shallower on the count axis** (Samus's line): a
+  phone player can author any home-floor staging a desktop player can, but may lean on Auto-tune and
+  presets for counts, the axis with no ceiling to lock them out of.
+
+The full mobile treatment is folded into §8; this section records the review and its rationale.
+
+## 16. Build triage rulings (game + UX + architect party, 2026-07-17)
+
+The Phase 3 build's adversarial review escalated three scope decisions; on the owner's call the
+party (Samus, game; Sally, UX; Cloud, architect) ruled on each after fresh canon research into the
+1994 Elevator window (manual OCR via archive.org, Sim Tower Wiki, dfloer/tower-docs TDT byte spec).
+Canon facts the rulings rest on: the original was ONE window per shaft (a WD/WE toggle over a
+6-time-frame clock strip, WCR and SFD panels, then a floors-by-cars grid showing serviced levels,
+per-car home floors, and live car symbols); home floors were stored one per car; the dialog showed
+no aggregate traffic statistics; express carried the same window with a restricted floor list.
+
+- **Serviced floors and the `Configure stops…` fold-in (§4.1, §4.2, §7): deferred to the immediate
+  next increment, unanimous.** The build ships as the scheduling surface only, and the standalone
+  stops dialog stays alive until the fold-in lands. Grafting the floors section onto a
+  review-hardened diff would re-arm the whole review over a doubled surface, and the interim state
+  cannot diverge data-wise (both surfaces edit the same engine-owned fields). The canon one-window
+  end state stands. The deferral is a live backlog row with its GitHub issue, and the fold-in
+  increment must also retire `uiStops` and rewrite the suites pinning the stops button.
+- **Staging list shape (§4.3): the shipped per-car selects are ratified as the INTERIM surface,
+  unanimous.** They match the canon per-car data shape exactly, but they answer the staging
+  question car-first when it is a floors-first question. The end state is the canon floors-by-cars
+  grid, hosted by the serviced-floors rows the fold-in increment builds anyway (car chips on floor
+  rows, §14.3/§15); the selects retire when it lands. One authoring surface, never both.
+- **Simulate copy (§6, §11): re-pinned to the shipped staging-scored sentence, unanimous.** The
+  original pinned strings named the rush's origin floors, data the per-hour accumulator does not
+  hold; a readout must never claim what the sim cannot back. The sentence leads with the staging
+  clause (the axis that responds to skill) and trails the on-shift count. The origin-floor variants
+  are deferred behind a per-floor origin accumulator (backlog row; that accumulator would also
+  sharpen the Auto-tune staging seed and feed the §15 peak-origin markers, and it must stay
+  transient or it becomes a save-format conversation).
+- **The measured-demand ghost series (§5.3, §14.2 move 1): deferred to the fold-in increment;
+  both-modes commitment retained on a 2-1 vote.** Sally and Cloud hold the line that the GameRules
+  seam differentiates affordances, never information access, and that Classic's strip is already a
+  ratified non-1994 surface (24 slots against the original's 6 frames), so withholding the curve
+  would leave Classic's manual-primary strip authoring blind. Samus's dissent (reading demand from
+  the crowds IS the Classic skill loop; the 1994 dialog showed no stats) is recorded for the owner
+  to overrule at the fold-in review if desired. The strip's count gridlines, pure presentation,
+  shipped now in both modes.
+
+Review patches folded into the build alongside these rulings: the apply path re-reads the live sim
+(undo can swap it mid-dialog) and refuses a vanished shaft; presets no longer overwrite hand-set
+homes and Auto-tune's staging seed is reachable on an untouched shaft; the up-tower staging target
+falls back to the top served floor on a single-lobby shaft and the Simulate count follows any home
+above the base; stored home floors snap to the nearest served stop; the measured ring seeds its
+first sample at full value and the assists arm only after six sampled hours; the strip gained
+keyboard editing (arrows adjust and move), shift-click span fill, and count gridlines; the pinned
+announce strings ride the live region; touch gets 36px scrollable bars and the dirty-discard guard.

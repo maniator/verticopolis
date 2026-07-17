@@ -39,9 +39,8 @@ export class Tower {
    *  is O(1). Used to keep express-elevator stops synced with sky lobbies as they
    *  are built or removed, regardless of the order relative to the elevator. */
   lobbyTiles = new Map<number, number>();
-  /** floor → number of NON-lobby tiles on it: plain floor tiles plus every
-   *  tile a room's footprint covers on this story (a multi-story facility
-   *  contributes to each of its stories). Mirror of `lobbyTiles`, kept live by
+  /** floor → number of NON-lobby tiles on it: plain floor plus every tile a
+   *  room's footprint covers on this story. Mirror of `lobbyTiles`, kept live by
    *  register/unregister/reindex so `floorHasNonLobbyContent` is O(1) on every
    *  hover-preview frame. */
   nonLobbyTiles = new Map<number, number>();
@@ -359,9 +358,11 @@ export class Tower {
     return transport.setCars(this, id, cars);
   }
 
-  lobbyFloors(): number[] {
-    return transport.lobbyFloors(this);
-  }
+  /** Write an authored per-shaft elevator schedule, hardened against the shaft's
+   *  live cars and span (elevator-scheduling #305 Phase 3). Bumps `revision`. */
+  setSchedule(id: number, raw: unknown): boolean { return transport.setSchedule(this, id, raw); }
+
+  lobbyFloors(): number[] { return transport.lobbyFloors(this); }
 
   nearestLobbyFloorDistance(floor: number): number {
     return transport.nearestLobbyFloorDistance(this, floor);
@@ -421,11 +422,10 @@ export class Tower {
     return transport.stopsOf(this, t);
   }
 
-  /** Per-floor list of transport-column spans `[x0, x1)` for shafts that STOP at
-   *  the floor AND make it reachable from the lobby, a dead-ended shaft the
-   *  crowd can't actually use never counts as "an elevator nearby". Memoized by
-   *  {@link revision}, the same signal `servedFloors` invalidates on, so the
-   *  W1 per-office scan below is O(offices × shaftsOnFloor) with no re-walk. */
+  /** Per-floor list of transport-column spans `[x0, x1)` for shafts that STOP
+   *  at the floor AND make it reachable from the lobby (a dead-ended shaft never
+   *  counts as "an elevator nearby"). Memoized by {@link revision}, so the W1
+   *  per-office scan below is O(offices × shaftsOnFloor) with no re-walk. */
   transportColsRev = -1;
   transportColsByFloor = new Map<number, Array<[number, number]>>();
   transportColumns(floor: number): Array<[number, number]> {
