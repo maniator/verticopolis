@@ -30,17 +30,6 @@ export type Scene =
 /** The four basic oscillator timbres our scenes use (never "custom"). */
 export type BasicWave = "sine" | "square" | "sawtooth" | "triangle";
 
-/** Close-up flavor scheduled only when the camera is zoomed in on a scene. */
-export type Accent =
-  | "none"
-  | "ding"
-  | "clatter"
-  | "keys"
-  | "rumble"
-  | "boom"
-  | "register"
-  | "chatter";
-
 export interface SceneDef {
   /** Semitone offsets of the scale, relative to root. */
   scale: number[];
@@ -60,8 +49,6 @@ export interface SceneDef {
   bass: number;
   /** Ambient room-tone bed, shaped by a bandpass/lowpass on looping noise. */
   amb: { type: BiquadFilterType; freq: number; q: number; gain: number };
-  /** Detail sound heard up close (see {@link Accent}). */
-  accent: Accent;
 }
 
 export const SCENES: Record<Scene, SceneDef> = {
@@ -76,7 +63,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.6,
     bass: 0.5,
     amb: { type: "lowpass", freq: 240, q: 0.7, gain: 0.22 },
-    accent: "none",
   },
   outside: {
     scale: [0, 2, 4, 7, 9],
@@ -88,7 +74,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.5,
     bass: 0.3,
     amb: { type: "bandpass", freq: 320, q: 0.5, gain: 0.26 },
-    accent: "none",
   },
   lobby: {
     scale: [0, 2, 4, 5, 7, 9, 11],
@@ -100,7 +85,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.6,
     bass: 0.35,
     amb: { type: "bandpass", freq: 520, q: 0.8, gain: 0.24 },
-    accent: "ding",
   },
   office: {
     scale: [0, 2, 3, 5, 7, 9, 10],
@@ -112,7 +96,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.45,
     bass: 0.4,
     amb: { type: "bandpass", freq: 220, q: 1.2, gain: 0.2 },
-    accent: "keys",
   },
   residential: {
     scale: [0, 2, 4, 7, 9],
@@ -124,7 +107,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.55,
     bass: 0.3,
     amb: { type: "bandpass", freq: 360, q: 0.7, gain: 0.14 },
-    accent: "chatter",
   },
   hotel: {
     scale: [0, 2, 3, 5, 7, 8, 10],
@@ -136,7 +118,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.5,
     bass: 0.35,
     amb: { type: "bandpass", freq: 260, q: 0.9, gain: 0.12 },
-    accent: "ding",
   },
   food: {
     scale: [0, 2, 4, 5, 7, 9, 11],
@@ -148,7 +129,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.55,
     bass: 0.4,
     amb: { type: "bandpass", freq: 900, q: 0.6, gain: 0.26 },
-    accent: "clatter",
   },
   retail: {
     scale: [0, 2, 4, 7, 9, 11],
@@ -160,7 +140,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.55,
     bass: 0.35,
     amb: { type: "bandpass", freq: 700, q: 0.7, gain: 0.24 },
-    accent: "register",
   },
   cinema: {
     scale: [0, 2, 3, 5, 7, 8, 11],
@@ -172,7 +151,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.5,
     bass: 0.5,
     amb: { type: "lowpass", freq: 110, q: 0.8, gain: 0.28 },
-    accent: "boom",
   },
   service: {
     scale: [0, 2, 4, 5, 7],
@@ -184,7 +162,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.4,
     bass: 0.3,
     amb: { type: "bandpass", freq: 180, q: 1.5, gain: 0.18 },
-    accent: "none",
   },
   metro: {
     scale: [0, 3, 5, 7, 10],
@@ -196,7 +173,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.5,
     bass: 0.55,
     amb: { type: "lowpass", freq: 90, q: 0.8, gain: 0.32 },
-    accent: "rumble",
   },
   quiet: {
     scale: [0, 4, 7],
@@ -208,7 +184,6 @@ export const SCENES: Record<Scene, SceneDef> = {
     gain: 0.35,
     bass: 0.2,
     amb: { type: "bandpass", freq: 400, q: 0.6, gain: 0.09 },
-    accent: "none",
   },
 };
 

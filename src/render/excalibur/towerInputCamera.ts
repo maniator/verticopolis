@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
 import { GRID } from "../../engine/facilities";
+import { FACILITIES } from "../../engine/facilitiesData";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { clampCameraY, fitZoom } from "../cameraBounds";
@@ -44,6 +45,14 @@ export interface ViewFocus {
   zoom: number;
   /** Today's sky weather; drives an outdoor rain layer in the ambient bed. */
   weather: WeatherKind;
+  /** Sim clock hour as a float in [0, 24); the ambience layer's workday and
+   *  evening gates read it (offices type at 10:00, sleep at 03:00). */
+  hour: number;
+  /** 0..1 live fill of the dominant kind's units in view (occupants against
+   *  capacity), falling back to visible crowd density where the kind tracks no
+   *  occupants (lobbies, the street). Drives honest ambience loudness: an
+   *  empty venue is near-silent, a packed one murmurs. */
+  crowd: number;
 }
 
 /** What the pointer is over: transports by Excalibur collider hit-test,
@@ -378,10 +387,21 @@ export function focus(engine: TowerEngine): ViewFocus {
   const f0 = engine.screenToFloor(engine.viewHeight * 0.7);
   const f1 = engine.screenToFloor(engine.viewHeight * 0.3);
   const tally = new Map<FacilityKind, number>();
+  // One walk collects both the dominant-kind tally and, per kind, the live
+  // occupancy against capacity (the ambience layer's honest "how full is what
+  // I'm looking at" signal). Same single pass the tally always did.
+  const occ = new Map<FacilityKind, number>();
+  const cap = new Map<FacilityKind, number>();
   for (const u of engine.sim.tower.units) {
     if (u.floor < f0 || u.floor > f1) continue;
     if (u.x + u.width < t0 || u.x > t1) continue;
     tally.set(u.kind, (tally.get(u.kind) ?? 0) + u.width);
+    const def = FACILITIES[u.kind];
+    const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
+    if (unitCap > 0) {
+      occ.set(u.kind, (occ.get(u.kind) ?? 0) + u.occupants);
+      cap.set(u.kind, (cap.get(u.kind) ?? 0) + unitCap);
+    }
   }
   let dominant: ViewFocus["dominant"] = "empty";
   let best = 0;
@@ -393,5 +413,28 @@ export function focus(engine: TowerEngine): ViewFocus {
     }
   }
   if (dominant === "empty" && centerFloor <= 0) dominant = "outside";
-  return { centerFloor, dominant, night, zoom: engine.cam.zoom, weather: engine.sim.weather };
+  // Fill of the dominant kind; kinds that track no occupants (lobby, street)
+  // fall back to the visible drawn-crowd density so a busy ground floor still
+  // reads busy. 24 people in frame counts as a full house for that fallback.
+  let crowd = 0;
+  const kindCap = cap.get(dominant as FacilityKind) ?? 0;
+  if (kindCap > 0) {
+    crowd = Math.min(1, (occ.get(dominant as FacilityKind) ?? 0) / kindCap);
+  } else {
+    let visible = 0;
+    for (const p of engine.sim.crowd.people) {
+      if (p.floor >= f0 && p.floor <= f1) visible++;
+    }
+    crowd = Math.min(1, visible / 24);
+  }
+  const hour = engine.sim.clock.minuteOfDay / 60;
+  return {
+    centerFloor,
+    dominant,
+    night,
+    zoom: engine.cam.zoom,
+    weather: engine.sim.weather,
+    hour,
+    crowd,
+  };
 }

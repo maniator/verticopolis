@@ -83,6 +83,8 @@ vi.mock("tone", () => {
     MembraneSynth: ctorFor("MembraneSynth"),
     Part: ctorFor("Part"),
     LFO: ctorFor("LFO"),
+    ToneAudioBuffer: ctorFor("ToneAudioBuffer"),
+    ToneBufferSource: ctorFor("ToneBufferSource"),
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
       scheduleRepeat: (cb: (t: number) => void) => ((beat.step = cb), 1),
@@ -160,16 +162,24 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     expect(() => eng.setMuted(false)).not.toThrow();
   });
 
-  it("the scheduled beat callback fires zoom-reactive accents (and stops when muted)", () => {
+  it("builds the crowd ambience layer into the graph (its steep filters exist)", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    expect(beat.step).toBeTypeOf("function"); // Transport handed us the per-beat step
-    eng.update(focus({ zoom: 2.2, dominant: "office" })); // zoom in → detail high → accents fire
-    for (let i = 0; i < 40; i++) expect(() => beat.step!(i * 0.25)).not.toThrow(); // several 16-step bars
-    eng.update(focus({ zoom: 2.2, dominant: "hotelSuite" })); // switch scene mid-sequence
-    for (let i = 0; i < 20; i++) beat.step!(i * 0.25);
-    eng.setMuted(true);
-    expect(() => beat.step!(99)).not.toThrow(); // muted → the step is a no-op
+    // The crowd layer's murmur and noise filters carry the steep -48 rolloff
+    // (the audition rule that keeps voices warm and noise dark).
+    const steep = graph.nodes.filter(
+      (n) => n.kind === "Filter" && ((n.args[0] ?? {}) as { rolloff?: number }).rolloff === -48,
+    );
+    expect(steep.length).toBeGreaterThanOrEqual(2);
+    // Driving updates across scenes (with occupancy and clock present) never throws.
+    const path: ViewFocus[] = [
+      focus({ zoom: 2.2, dominant: "office", hour: 10, crowd: 0.8 }),
+      focus({ zoom: 2.2, dominant: "restaurant", hour: 13, crowd: 0.5 }),
+      focus({ zoom: 2.2, dominant: "partyHall", hour: 20, crowd: 0.6 }),
+      focus({ zoom: 2.2, dominant: "empty", centerFloor: -3, hour: 9, crowd: 0.2 }),
+      focus({ zoom: 0.3, dominant: "empty", centerFloor: 30 }),
+    ];
+    for (const f of path) expect(() => eng.update(f)).not.toThrow();
   });
 
   it("builds a looping music Part that plays finite notes through the music voices", () => {

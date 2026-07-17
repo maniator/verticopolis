@@ -105,7 +105,7 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
         globIgnores: ["**/gallery*", "**/preview*"],
         navigateFallback: "index.html",
         // Keep the tooling pages out of the app shell fallback, and let
