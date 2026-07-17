@@ -6,8 +6,7 @@ import {
   type SchedState,
   type SchedHandlers,
 } from "./templates/elevatorSchedule";
-import type { ElevatorSchedule } from "../engine/elevatorSchedule";
-import { SCHEDULE_HOURS } from "../engine/elevatorSchedule";
+import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
 import {
   presetSchedule,
   autoTuneSchedule,
@@ -17,7 +16,6 @@ import {
   type ShaftContext,
   type SchedulePreset,
 } from "../engine/scheduleAuthoring";
-import type { ElevatorScheduleUX } from "../engine/gameRules";
 import { syncRungSelects } from "./templates/rungPicker";
 
 /**

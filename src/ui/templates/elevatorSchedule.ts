@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
-import type { ElevatorScheduleUX } from "../../engine/gameRules";
+import type { ElevatorScheduleUX } from "../../engine/elevatorSchedule";
 import type { SchedulePreset } from "../../engine/scheduleAuthoring";
 
 /**

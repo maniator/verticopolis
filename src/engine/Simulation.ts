@@ -64,24 +64,18 @@ export class Simulation implements SimContext {
   /** 1..5 stars, 6 == TOWER. */
   star = 1;
   evaluatedTower = false;
-  /**
-   * Where the player was looking when the save was written: inert UI cargo
-   * (see {@link SerializedView}). The engine NEVER reads it: the UI layer
-   * stamps it right before a save/export and the renderer restores it after a
-   * load. Null for fresh towers and pre-view saves (the renderer then centers
-   * as it always has).
-   */
+  /** Where the player was looking when the save was written: inert UI cargo
+   *  (see {@link SerializedView}). The engine NEVER reads it; the UI stamps it
+   *  before a save and the renderer restores it after a load. Null for fresh
+   *  towers and pre-view saves (the renderer then centers as it always has). */
   view: SerializedView | null = null;
 
-  /**
-   * Rule-set this tower was founded under, {@link GameMode}. Set once at
-   * construction and never reassigned (the field is `readonly`), so the whole
-   * engine can branch on it without ever guarding against a mid-game flip. Old
-   * saves with no persisted mode deserialize as `classic`, so their condos stay
-   * flat 3s and the population census is unchanged. The UI stamps the player's
-   * choice at tower creation. This is the persisted IDENTITY; the BEHAVIOR that
-   * hangs off it lives in {@link rules}.
-   */
+  /** Rule-set this tower was founded under, {@link GameMode}. Set once at
+   *  construction, `readonly`, so the engine never guards against a mid-game
+   *  flip. Old saves with no persisted mode deserialize as `classic` (condos
+   *  stay flat 3s, census unchanged). The UI stamps the player's choice at
+   *  tower creation. This is the persisted IDENTITY; the BEHAVIOR that hangs
+   *  off it lives in {@link rules}. */
   readonly mode: GameMode;
 
   /**
@@ -102,16 +96,13 @@ export class Simulation implements SimContext {
    */
   readonly rules: GameRules;
 
-  /**
-   * Simulation model selector (Phase 2, review F4). `v1` is the shipped behavior:
-   * a single `tick(dt)` samples the clock once, firing `onHour`/`onDay` at most
-   * once per call and handing the full `dt` to every integrator. `v2` decomposes
-   * each `tick(dt)` into ≤30-minute sub-steps aligned to hour boundaries, so the
-   * headless engine integrates exactly like the browser (which pre-chunks). Kept
-   * behind a flag so the suite could grow incrementally; now that the spatial
-   * model is in, **v2 is the default** (the real, browser-matching game). v1 is
-   * retained for the handful of tests that pin the old sampled/global behavior.
-   */
+  /** Simulation model selector (Phase 2, review F4). `v1` (legacy): one
+   *  `tick(dt)` samples the clock once, firing `onHour`/`onDay` at most once and
+   *  handing the full `dt` to every integrator. `v2` (the default, the real
+   *  browser-matching game) decomposes each tick into ≤30-minute sub-steps
+   *  aligned to hour boundaries, so the headless engine integrates exactly like
+   *  the browser (which pre-chunks). v1 is retained for the handful of tests
+   *  that pin the old sampled/global behavior. */
   simModel: "v1" | "v2" = "v2";
 
   /** Number of times {@link onHour} has run this session (test/diagnostic hook). */
@@ -270,16 +261,12 @@ export class Simulation implements SimContext {
   elevatorUtil = new Map<number, number>();
 
   /** Per-shaft measured demand by hour-of-day: a 24-slot ring of EMA'd load
-   *  fractions (0..1), one array per elevator shaft id (elevator-scheduling #305
-   *  Phase 3). Sampled hourly alongside {@link elevatorUtil} and read by the
-   *  schedule dialog for Auto-tune and the measured-demand ghost series. Transient:
-   *  never serialized, warms up over a day or two after a load, so a scheduler
-   *  opened on a fresh save reads empty and offers the "needs measured traffic"
-   *  path rather than a fabricated curve. */
+   *  fractions (0..1) per shaft id, sampled hourly alongside {@link elevatorUtil}
+   *  and read by the schedule dialog (#305 Phase 3). Transient like it: a fresh
+   *  load reads empty ("needs measured traffic"), never a fabricated curve. */
   elevatorHourly = new Map<number, number[]>();
 
-  /** This shaft's measured hourly demand curve (24 EMA'd load fractions 0..1), or
-   *  undefined for a shaft not yet sampled. Read-only view for the schedule UI. */
+  /** This shaft's measured hourly curve, or undefined before it warms up. */
   elevatorHourlyLoad(id: number): number[] | undefined { return this.elevatorHourly.get(id); }
 
   /** Lazy noise-adjacency memo by unit id, valid for exactly one

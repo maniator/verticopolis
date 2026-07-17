@@ -12,13 +12,22 @@ import {
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS, type PriceOptions } from "./pricing";
 import type { ElevatorScheduleUX } from "./elevatorSchedule";
+import {
+  CLASSIC_HOUSEHOLD,
+  HOUSEHOLD_SIZES,
+  HOUSEHOLD_CHURN_PER_PERSON,
+  householdPrice,
+  rollHousehold,
+} from "./households";
 import type { RNG } from "./rng";
 import type { GameMode } from "./types";
 
 // The pricing SHAPE layer (canon ladders, PriceOptions, snap helpers) lives in
 // ./pricing; re-exported here so consumers keep one import path for the seam.
+// Household sizing likewise lives in ./households.
 export { priceNeutral, snapToLadder, ladderRungFor } from "./pricing";
 export type { PriceRung, PriceOptions } from "./pricing";
+export { householdPrice } from "./households";
 
 /**
  * Rule-set strategy: the ONE place Classic and Modern behavior diverge.
@@ -292,8 +301,7 @@ export const CLASSIC_RULES: GameRules = {
     return true; // canon: express riders switch to local transports only at a (sky) lobby
   },
   elevatorScheduleUX() {
-    // 1994 fidelity: the raw manual grid, no presets/auto-tune/advice. Classic
-    // withholds advice, never information.
+    // 1994 fidelity: raw grid only. Classic withholds advice, never information.
     return { presets: false, autoTune: false, rawGridDefault: true, advice: false };
   },
   sellCondo(base) {
@@ -390,8 +398,7 @@ export const MODERN_RULES: GameRules = {
     return false; // Modern keeps the forgiving transfer-at-any-shared-stop routing
   },
   elevatorScheduleUX() {
-    // Modern assistance: intent presets and auto-tune, with the raw grid tucked
-    // behind an Advanced toggle and an honest advice line.
+    // Modern assistance: presets, auto-tune, advice; the raw grid behind Advanced.
     return { presets: true, autoTune: true, rawGridDefault: false, advice: true };
   },
   sellCondo(base, rng) {

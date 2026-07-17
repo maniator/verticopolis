@@ -156,17 +156,13 @@ export function removeUnit(tower: Tower, id: number): Unit | undefined {
   return u;
 }
 
-/**
- * Lay plain floor across `[x, x + width)` on each floor in `floors` that
- * lacks it, in support order: a retry loop drains an upward run bottom-up
- * (each floor rests on the one below) and a basement run top-down (each hangs
- * off the one above), exactly like {@link ensureFloorUnder}. Returns the ids
- * laid, or `null` if some tile can never be supported (an above-ground gap
- * with nothing below it), after rolling the whole batch back so the caller
- * can refuse without leaving an orphan floor. Used by the elevator-extend
- * auto-floor: extending a shaft past the built structure brings its floor
- * with it (the `auto-floor-build` backlog item's elevator-extend behavior).
- */
+/** Lay plain floor across `[x, x + width)` on each floor in `floors` that lacks
+ *  it, in support order (upward runs bottom-up, basements top-down, exactly like
+ *  {@link ensureFloorUnder}). Returns the ids laid, or `null` if some tile can
+ *  never be supported, after rolling the whole batch back so the caller can
+ *  refuse without leaving an orphan floor. Used by the elevator-extend
+ *  auto-floor: extending a shaft past the built structure brings its floor
+ *  with it (the `auto-floor-build` backlog item's elevator-extend behavior). */
 export function layShaftFloors(tower: Tower, floors: number[], x: number, width: number): number[] | null {
   const tiles: { fl: number; x: number }[] = [];
   for (const fl of floors) {
@@ -183,16 +179,13 @@ export function layShaftFloors(tower: Tower, floors: number[], x: number, width:
   return placed;
 }
 
-/**
- * Grow or shrink a transport's served range. Returns the number of floors
- * added (negative if removed) on success, or a failure reason. Newly served
- * floors are validated against other shafts; a newly-served floor with no
- * structure under the shaft auto-lays plain floor behind it (the 1994
- * behavior where extending a lift past the built structure creates the floor),
- * rather than refusing. `floorTilesCreated` counts the individual width-1
- * floor units laid (a 4-wide shaft that grows one story lays 4 of them), not
- * the number of stories, so the caller can size any structure charge exactly.
- */
+/** Grow or shrink a transport's served range. Returns the floors added
+ *  (negative if removed) on success, or a failure reason. Newly served floors
+ *  are validated against other shafts; one with no structure under the shaft
+ *  auto-lays plain floor behind it (the 1994 extend-past-structure behavior)
+ *  rather than refusing. `floorTilesCreated` counts the width-1 floor units
+ *  laid (a 4-wide shaft growing one story lays 4), not stories, so the caller
+ *  can size any structure charge exactly. */
 export function resizeTransport(tower: Tower, id: number, newBottom: number, newTop: number): PlaceResult & { added?: number; floorTilesCreated?: number } {
   const t = tower.transportById(id);
   if (!t) return { ok: false, reason: "No such transport." };
@@ -279,9 +272,8 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
     }
     t.skipFloors = [...skip].sort((a, b) => a - b);
   }
-  // Re-harden an authored schedule against the new span (elevator-scheduling #305):
-  // a shrink must pull the per-car home floors back onto the shaft, the same reason
-  // carPositions were just clamped. Dispatch also clamps home floors on read.
+  // Re-harden an authored schedule against the new span (#305): a shrink must
+  // pull home floors back onto the shaft, same as the carPositions clamp above.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   tower.revision++;
   return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
@@ -303,23 +295,19 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
     t.carDir.length = cars;
   }
   t.cars = cars;
-  // Re-harden an authored schedule against the new car count (elevator-scheduling
-  // #305, the Phase 1 defer): shrinking the fleet must clamp active-car rows and
-  // truncate the per-car home floors so the stored schedule never references a car
-  // that no longer exists. Dispatch also clamps on read, so this is belt-and-braces.
+  // Re-harden an authored schedule against the new car count (#305, the Phase 1
+  // defer): a fleet shrink clamps active-car rows and truncates home floors so
+  // the stored schedule never references a car that no longer exists.
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   tower.revision++;
   return true;
 }
 
-/**
- * Write an authored per-shaft schedule (elevator-scheduling #305 Phase 3). The raw
- * value (a working copy from the dialog, or any untrusted input) is hardened through
- * `coerceSchedule` against the shaft's live cars and span, so a schedule can never
- * carry an active count above the current fleet or a home floor off the shaft, and a
- * schedule on a car-less transport is dropped. Bumps `revision` so the routing and
- * stop caches invalidate (arch §3). Returns false for a non-elevator id.
- */
+/** Write an authored per-shaft schedule (#305 Phase 3). The raw value (dialog
+ *  working copy or any untrusted input) is hardened through `coerceSchedule`
+ *  against the shaft's live cars and span, so it can never carry an active count
+ *  above the fleet or a home floor off the shaft. Bumps `revision` so routing
+ *  and stop caches invalidate (arch §3). Returns false for a non-elevator id. */
 export function setSchedule(tower: Tower, id: number, raw: unknown): boolean {
   const t = tower.transportById(id);
   if (!t || !isElevatorKind(t.kind)) return false;
@@ -353,16 +341,13 @@ export function nearestLobbyFloorDistance(tower: Tower, floor: number): number {
 
 /** The nearest sky-lobby slot that is LEGAL (an every-interval floor at or under
  *  `GRID.maxFloor`), does not already hold a lobby, and is strictly nearer to
- *  `floor` than its current nearest lobby; null when no such slot exists. This
- *  is the inspector's honesty gate for the lobby-distance advice (#394
- *  recalibration): the advice may only ever name a slot the player can actually
- *  reach, so the line goes neutral for the short block above the highest legal
- *  slot (e.g. floors 91+ over a floor-90 lobby, where slot 105 exceeds
- *  maxFloor) instead of prescribing an impossible fix. A returned slot may
- *  still need work first, floors laid up to it or non-lobby content cleared
- *  off it; callers read {@link floorHasNonLobbyContent} to phrase the clearing
- *  step, keeping the advice a real project rather than a refusal loop.
- *  O(lobby slots), a handful. */
+ *  `floor` than its current nearest lobby; null when no such slot exists. The
+ *  inspector's honesty gate for the lobby-distance advice (#394): it may only
+ *  name a slot the player can actually reach, so the line goes neutral for the
+ *  short block above the highest legal slot instead of prescribing an
+ *  impossible fix. A returned slot may still need work first (floors laid,
+ *  non-lobby content cleared; callers read {@link floorHasNonLobbyContent} to
+ *  phrase that step). O(lobby slots), a handful. */
 export function nearestBuildableLobbySlot(tower: Tower, floor: number): number | null {
   const current = nearestLobbyFloorDistance(tower, floor);
   let best: number | null = null;
