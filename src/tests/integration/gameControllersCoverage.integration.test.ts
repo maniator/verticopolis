@@ -304,11 +304,6 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
   let refreshed: number;
   let announced: string[];
   let root: HTMLElement;
-  let stopsDlg: {
-    title: string;
-    floors: { floor: number; stop: boolean; lobby: boolean }[];
-    onToggle: (floor: number, stop: boolean) => void;
-  } | null;
   let batchDlg: {
     ctx: { kind: string; kindLabel: string; options: PriceOptions };
     cb: {
@@ -351,7 +346,6 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     undo = { captures: [], commits: 0 };
     refreshed = 0;
     announced = [];
-    stopsDlg = null;
     batchDlg = null;
     scheduleDlg = null;
     root = document.createElement("div");
@@ -366,7 +360,6 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
       getSim: () => sim,
       ui: {
         toast: f.ui.toast,
-        showStopsDialog: (title, floors, onToggle) => (stopsDlg = { title, floors, onToggle }),
         showBatchPricingDialog: (ctx, cb) => (batchDlg = { ctx, cb }),
         showElevatorScheduleDialog: (ctx, cb) => (scheduleDlg = { ctx, cb }),
       },
@@ -576,20 +569,18 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(f.toasts).toEqual([{ text: "Not enough money.", kind: "bad" }]);
   });
 
-  it("stops/express/allstops: express skips non-lobby middles, allstops restores them", () => {
+  it("the folded-in bulk stop actions: express skips non-lobby middles, allstops restores them (#464)", () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
-    render(transportEditorTemplate(sim, lift), root);
-    editor.handleEditAction("express", root);
+    editor.openSchedule();
+    const stops = scheduleDlg!.ctx.stops;
+    stops.expressStops();
     expect(lift.skipFloors).toEqual([2, 3]); // endpoints always stop; 2–3 aren't lobbies
     expect(sim.tower.stopsAt(lift, 2)).toBe(false);
-    editor.handleEditAction("allstops", root);
+    stops.allStops();
     expect(lift.skipFloors).toEqual([]);
     expect(sim.tower.stopsAt(lift, 2)).toBe(true);
-    // "stops" opens the per-floor dialog.
-    editor.handleEditAction("stops", root);
-    expect(stopsDlg).not.toBeNull();
-    expect(undo.commits).toBe(3);
+    expect(undo.commits).toBe(2);
   });
 
   it("an express is locked to lobbies: the engine refuses a non-lobby stop and clearStops stays lobby-only", () => {
@@ -633,17 +624,19 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(ex.skipFloors).toEqual([2, 3]);
   });
 
-  it("the express inspector hides stop-config buttons and reads a fixed lobby policy; standard keeps both", () => {
+  it("no card carries stop-config buttons anymore: Schedule… is the one config surface (#464)", () => {
     const r = sim.tower.placeTransport("elevatorExpress", 10, 1, 4);
     expect(r.ok).toBe(true);
     const ex = sim.tower.transports.find((t) => t.id === r.transportId)!;
-    const card = renderedCard(transportEditorTemplate(sim, ex));
-    expect(card.querySelector('[data-edit="allstops"]')).toBeNull();
-    expect(card.querySelector('[data-edit="stops"]')).toBeNull();
-    expect(card.textContent).toContain("lobbies and sky lobbies");
-    const std = renderedCard(transportEditorTemplate(sim, lift));
-    expect(std.querySelector('[data-edit="allstops"]')).not.toBeNull();
-    expect(std.querySelector('[data-edit="stops"]')).not.toBeNull();
+    for (const t of [ex, lift]) {
+      const card = renderedCard(transportEditorTemplate(sim, t));
+      expect(card.querySelector('[data-edit="stops"]')).toBeNull();
+      expect(card.querySelector('[data-edit="express"]')).toBeNull();
+      expect(card.querySelector('[data-edit="allstops"]')).toBeNull();
+      expect(card.querySelector('[data-edit="schedule"]')).not.toBeNull();
+    }
+    // The express card's fixed policy caption survives on its Stops row.
+    expect(renderedCard(transportEditorTemplate(sim, ex)).textContent).toContain("lobbies and sky lobbies");
   });
 
   it("the express Stops readout reports a deliberately skipped (sky) lobby honestly", () => {
@@ -664,31 +657,41 @@ describe("EditorActions (dialogs, extend billing, per-kind buttons)", () => {
     expect(renderedCard(transportEditorTemplate(s, ex)).textContent).toContain("lobbies and sky lobbies (1 skipped)");
   });
 
-  it("openStopsDialog lists floors top-down and each toggle is its own undo-bracketed setStop", () => {
+  it("the schedule dialog's stops port lists floors top-down and each toggle is its own undo-bracketed setStop (#464)", () => {
     expect(sim.tower.resizeTransport(lift.id, 1, 4).ok).toBe(true);
     sel = { type: "transport", id: lift.id };
-    editor.openStopsDialog();
-    expect(stopsDlg!.title).toBe(FACILITIES.elevatorStandard.name);
-    expect(stopsDlg!.floors.map((fl) => fl.floor)).toEqual([4, 3, 2, 1]);
-    expect(stopsDlg!.floors.every((fl) => fl.stop)).toBe(true);
-    expect(stopsDlg!.floors.find((fl) => fl.floor === 1)!.lobby).toBe(true);
-    stopsDlg!.onToggle(3, false);
+    editor.openSchedule();
+    const stops = scheduleDlg!.ctx.stops;
+    expect(stops.read().map((fl) => fl.floor)).toEqual([4, 3, 2, 1]);
+    expect(stops.read().every((fl) => fl.served)).toBe(true);
+    expect(stops.read().find((fl) => fl.floor === 1)!.lobby).toBe(true);
+    stops.setServe(3, false);
     expect(sim.tower.stopsAt(lift, 3)).toBe(false);
+    expect(stops.read().find((fl) => fl.floor === 3)!.served).toBe(false);
     expect(undo.captures).toEqual(["Elevator stops"]);
     expect(undo.commits).toBe(1);
-    expect(refreshed).toBe(1);
-    stopsDlg!.onToggle(3, true);
+    expect(refreshed).toBeGreaterThan(0);
+    stops.setServe(3, true);
     expect(sim.tower.stopsAt(lift, 3)).toBe(true);
+    // The folded-in bulk actions ride the same undo bracket.
+    stops.expressStops();
+    expect(sim.tower.stopsAt(lift, 3)).toBe(false); // 3 is no lobby
+    stops.allStops();
+    expect(sim.tower.stopsAt(lift, 3)).toBe(true);
+    expect(undo.captures.every((c) => c === "Elevator stops")).toBe(true);
   });
 
-  it("openStopsDialog guards: no selection, a unit selection, and a stale shaft all bail", () => {
-    editor.openStopsDialog();
-    sel = { type: "unit", id: office.id };
-    editor.openStopsDialog();
-    sim.tower.removeTransport(lift.id);
+  it("the stops port goes inert when the shaft vanishes mid-dialog (undo past its construction)", () => {
     sel = { type: "transport", id: lift.id };
-    editor.openStopsDialog();
-    expect(stopsDlg).toBeNull();
+    editor.openSchedule();
+    const stops = scheduleDlg!.ctx.stops;
+    sim.tower.removeTransport(lift.id);
+    expect(stops.read()).toEqual([]);
+    const before = undo.captures.length;
+    stops.setServe(1, false); // silent no-op: no undo step, no crash
+    stops.expressStops();
+    stops.allStops();
+    expect(undo.captures.length).toBe(before);
   });
 
   it("extendUp bills a floor when it fits and auto-lays the floor behind it in open sky", () => {

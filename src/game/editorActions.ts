@@ -21,7 +21,7 @@ import type { BuildActions } from "./buildActions";
 export interface EditorActionsDeps {
   /** The live simulation (never cached — adoptSim swaps the instance). */
   getSim(): Simulation;
-  ui: Pick<UI, "toast" | "showStopsDialog" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
+  ui: Pick<UI, "toast" | "showBatchPricingDialog" | "showElevatorScheduleDialog">;
   audio: Pick<AudioEngine, "sfx">;
   /** Sell/refund/charge guards shared with the bulldozer. */
   build: Pick<BuildActions, "tryRemoveUnit" | "removeTransportWithRefund" | "canAfford">;
@@ -48,41 +48,65 @@ export class EditorActions {
     this.extendHwm = null;
   }
 
-  /** Open the per-floor stop-configuration dialog for the selected elevator. */
-  openStopsDialog(): void {
-    const selected = this.deps.selected();
-    if (!selected || selected.type !== "transport") return;
-    const t = this.deps.selectedTransport();
-    if (!t) return;
-    const sim = this.deps.getSim();
-    const lobbies = new Set(sim.tower.lobbyFloors());
-    const floors: { floor: number; stop: boolean; lobby: boolean }[] = [];
-    for (let fl = t.top; fl >= t.bottom; fl--) {
-      floors.push({ floor: fl, stop: sim.tower.stopsAt(t, fl), lobby: lobbies.has(fl) });
-    }
-    this.deps.ui.showStopsDialog(FACILITIES[t.kind].name, floors, (floor, stop) => {
-      // Each toggle is its own undo step (the surrounding handleEditAction
-      // commit already fired before the dialog mutated anything).
-      this.deps.captureUndo("Elevator stops");
-      this.deps.getSim().tower.setStop(t.id, floor, stop);
-      this.deps.commitUndo();
-      this.deps.refreshEditor();
-    });
-  }
-
   /** Open the per-shaft elevator Schedule dialog for the selected elevator
-   *  (elevator-scheduling #305 Phase 3). Reads the Classic/Modern affordance flags
-   *  and the measured hourly demand, and writes the authored schedule back through
-   *  one `Tower.setSchedule` (hardened, undoable). */
+   *  (elevator-scheduling #305 Phase 3, floors fold-in #464): the ONE per-shaft
+   *  config surface. The stops port applies Serve toggles and the bulk stop
+   *  actions LIVE against the current sim (each its own undo step, the retired
+   *  stops dialog's semantics); the schedule working copy writes once through
+   *  `Tower.setSchedule` on OK (hardened, undoable). */
   openSchedule(): void {
     const selected = this.deps.selected();
     if (!selected || selected.type !== "transport") return;
     const t = this.deps.selectedTransport();
     if (!t || !isElevatorKind(t.kind)) return;
     const sim = this.deps.getSim();
-    const lobbySet = new Set(sim.tower.lobbyFloors());
-    const servedFloors = sim.tower.stopsOf(t); // ascending served floors
-    const servedLobbies = servedFloors.filter((f) => lobbySet.has(f));
+    const id = t.id;
+    // Every stops-port method re-reads the LIVE sim: undo/redo stays live while
+    // the dialog is open and adoptSim swaps the instance underneath us.
+    const live = () => this.deps.getSim();
+    const liveShaft = () => {
+      const cur = live();
+      const shaft = cur.tower.getTransport(id);
+      return shaft && isElevatorKind(shaft.kind) ? { sim: cur, shaft } : undefined;
+    };
+    const stops = {
+      read: () => {
+        const at = liveShaft();
+        if (!at) return [];
+        const lobbies = new Set(at.sim.tower.lobbyFloors());
+        const rows: { floor: number; served: boolean; lobby: boolean }[] = [];
+        for (let fl = at.shaft.top; fl >= at.shaft.bottom; fl--) {
+          rows.push({ floor: fl, served: at.sim.tower.stopsAt(at.shaft, fl), lobby: lobbies.has(fl) });
+        }
+        return rows;
+      },
+      setServe: (floor: number, serve: boolean) => {
+        const at = liveShaft();
+        if (!at) return;
+        this.deps.captureUndo("Elevator stops");
+        at.sim.tower.setStop(id, floor, serve);
+        this.deps.commitUndo();
+        this.deps.refreshEditor();
+      },
+      expressStops: () => {
+        const at = liveShaft();
+        if (!at) return;
+        this.deps.captureUndo("Elevator stops");
+        at.sim.tower.setExpressStops(id);
+        this.deps.commitUndo();
+        this.deps.audio.sfx("click");
+        this.deps.refreshEditor();
+      },
+      allStops: () => {
+        const at = liveShaft();
+        if (!at) return;
+        this.deps.captureUndo("Elevator stops");
+        at.sim.tower.clearStops(id);
+        this.deps.commitUndo();
+        this.deps.audio.sfx("click");
+        this.deps.refreshEditor();
+      },
+    };
     this.deps.ui.showElevatorScheduleDialog(
       {
         title: `Schedule: ${FACILITIES[t.kind].name} (floors ${t.bottom}-${t.top})`,
@@ -91,9 +115,8 @@ export class EditorActions {
         cars: t.cars,
         bottom: t.bottom,
         top: t.top,
-        servedLobbies: servedLobbies.length ? servedLobbies : [t.bottom],
-        servedFloors: servedFloors.length ? servedFloors : [t.bottom],
-        hourly: sim.elevatorHourlyLoad(t.id),
+        stops,
+        hourly: sim.elevatorHourlyLoad(id),
         current: t.schedule,
         initialWeekend: sim.clock.isWeekend,
         announce: (msg) => this.deps.announce(msg),
@@ -305,22 +328,10 @@ export class EditorActions {
         if (sim.tower.setCars(t.id, t.cars - 1)) sim.money += carResaleRefund();
         this.deps.audio.sfx("click");
         this.deps.refreshEditor();
-      } else if (action === "stops") {
-        // The free per-floor stop dialog is a standard/service feature only; an
-        // express is locked to (sky) lobbies and hides this button, so guard the
-        // action too (the engine's setStop lock would refuse a non-lobby stop
-        // regardless, but never even open the dialog for an express).
-        if (t.kind !== "elevatorExpress") this.openStopsDialog();
       } else if (action === "schedule") {
+        // Stops, staging, and scheduling share ONE surface (#464): the old
+        // stops/express/allstops card actions live inside this dialog now.
         this.openSchedule();
-      } else if (action === "express") {
-        sim.tower.setExpressStops(t.id);
-        this.deps.audio.sfx("click");
-        this.deps.refreshEditor();
-      } else if (action === "allstops") {
-        sim.tower.clearStops(t.id);
-        this.deps.audio.sfx("click");
-        this.deps.refreshEditor();
       } else if (action === "extendUp" || action === "extendDown") {
         const nb = action === "extendDown" ? t.bottom - 1 : t.bottom;
         const nt = action === "extendUp" ? t.top + 1 : t.top;

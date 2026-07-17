@@ -422,14 +422,6 @@ export class UI {
     dialogs.showSaves(this, slots);
   }
 
-  showStopsDialog(
-    title: string,
-    floors: { floor: number; stop: boolean; lobby: boolean }[],
-    onToggle: (floor: number, stop: boolean) => void,
-  ): void {
-    dialogs.showStopsDialog(this, title, floors, onToggle);
-  }
-
   showBatchPricingDialog(
     ctx: { kind: FacilityKind; kindLabel: string; options: PriceOptions },
     cb: {
