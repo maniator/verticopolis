@@ -251,11 +251,13 @@ export function showElevatorScheduleDialog(
       : `No measured ${state.day} peak yet; at the ${hh(sum.peakHour)} down-rush`;
     // Origin readouts (#465): hotspot markers for the visible day's peak hour,
     // and a trailing boarding clause. Both empty until origins warm.
-    // Filtered to floors the shaft still serves: EMA'd history outlives a stop
-    // edit, and a hotspot mark (or a named floor) on a skipped row would claim
-    // boardings the shaft can no longer take.
+    // Filter the slot to served floors BEFORE ranking: topOriginFloors takes its
+    // share threshold against the slot total, so a skipped floor's stale EMA mass
+    // would otherwise push every served floor below threshold and blank the markers.
     const servedNow = new Set(servedFloorsAsc(state.floors));
-    state.originFloors = topOriginFloors(dayOriginsAt(sum.peakHour)).filter((f) => servedNow.has(f));
+    const peakSlot = dayOriginsAt(sum.peakHour);
+    const servedSlot = peakSlot && new Map([...peakSlot].filter(([f]) => servedNow.has(f)));
+    state.originFloors = topOriginFloors(servedSlot || undefined);
     state.simMsg =
       `${peakClause}: ${sum.upTowerCars} staged up-tower, ` +
       `${sum.lobbyCars} ${baseClause}, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.` +

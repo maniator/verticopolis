@@ -2503,6 +2503,25 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(simText()).toContain("Most riders board at Floor 1.");
   });
 
+  it("a skipped floor's stale mass does not suppress the served-floor marker (#465)", async () => {
+    // The share threshold must apply to the SERVED set: floor 7 carries most of
+    // the slot's historical mass but is skipped, so filtering it out AFTER the
+    // ranking would leave floor 3 below threshold and blank all markers. With
+    // the slot filtered to served floors first, floor 3 still marks.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 90], // skipped, but dominates the raw slot total
+      [3, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins, stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 5, 6, 8, 9, 10]) });
+    const marks = Array.from(dialog().querySelectorAll(".es-origin"));
+    expect(marks).toHaveLength(1); // floor 3 still marks despite floor 7's larger mass
+    expect(simText()).toContain("Most riders board at Floor 3.");
+  });
+
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
     const { apply } = open({
       stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 8, 9, 10]),
