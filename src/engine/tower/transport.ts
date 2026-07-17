@@ -29,7 +29,6 @@ export function validateTransport(tower: Tower, kind: FacilityKind, x: number, b
     }
   }
 
-
   // Transports may NOT overlap other shafts, and every floor they serve
   // must exist as built structure at the shaft, so elevators can never
   // float outside the tower. Rooms are deliberately NOT a collision: a
@@ -271,11 +270,10 @@ export function resizeTransport(tower: Tower, id: number, newBottom: number, new
     t.skipFloors = [...skip].sort((a, b) => a - b);
   }
   // Re-harden an authored schedule against the new span (#305) and snap homes
-  // onto the live stop set (#467): the express skip resync just above may have
-  // skipped a floor a car homes at.
+  // onto the live stop set (#467); revision bumps first so stopsOf recomputes.
+  tower.revision++;
   if (t.schedule) t.schedule = coerceSchedule(t.schedule, t.cars, t.bottom, t.top);
   if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
-  tower.revision++;
   return { ok: true, added: newTop - newBottom + 1 - before, floorTilesCreated: createdFloors.length };
 }
 
@@ -309,8 +307,11 @@ export function setCars(tower: Tower, id: number, cars: number): boolean {
 export function setSchedule(tower: Tower, id: number, raw: unknown): boolean {
   const t = tower.transportById(id);
   if (!t || !isElevatorKind(t.kind)) return false;
+  tower.revision++; // before the snap: stopsOf caches by revision
   t.schedule = coerceSchedule(raw, t.cars, t.bottom, t.top);
-  tower.revision++;
+  // Backstop (#467): coerce clamps to the SPAN only; a mid-dialog stop edit
+  // (undo/redo) can still hand us a home on a skipped floor.
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   return true;
 }
 
@@ -367,23 +368,22 @@ export function nearestBuildableLobbySlot(tower: Tower, floor: number): number |
 export function setStop(tower: Tower, id: number, floor: number, stop: boolean): boolean {
   const t = tower.transportById(id);
   if (!t || floor < t.bottom || floor > t.top) return false;
-  // Endpoints are always stops (a shaft can't disconnect from itself). Report
-  // success, the request was valid and the endpoint is already stopping,
-  // regardless of the requested `stop` value.
+  // Endpoints are always stops (a shaft can't disconnect from itself); the
+  // request was valid and the endpoint is already stopping, so report success.
   if (floor === t.bottom || floor === t.top) return true;
   // Express elevators are locked to (sky) lobbies and endpoints (1994 parity):
-  // a floor may become a stop only if it hosts a lobby tile. Reject a request
-  // to stop at any other floor (leave it skipped), so the invariant holds
-  // against every caller. syncExpressStopsForFloor only ever passes stop=true
-  // for a floor that has a lobby, so this never blocks a legitimate resync.
+  // a floor may become a stop only if it hosts a lobby tile. Reject any other
+  // request (leave it skipped) so the invariant holds against every caller;
+  // syncExpressStopsForFloor only passes stop=true for a lobby floor.
   if (t.kind === "elevatorExpress" && stop && !tower.floorHasLobby(floor)) return false;
   const skip = new Set(t.skipFloors ?? []);
   if (stop) skip.delete(floor);
   else skip.add(floor);
   t.skipFloors = [...skip].sort((a, b) => a - b);
-  // A skipped floor may orphan a car's home there (#467): snap homes to stops.
-  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
+  // Bump revision BEFORE the snap: stopsOf caches by revision and dispatch keeps
+  // it warm every tick; snapping first would read the pre-edit stops (#467).
   tower.revision++;
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, stopsOf(tower, t));
   return true;
 }
 

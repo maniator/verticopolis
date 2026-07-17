@@ -21,7 +21,13 @@ export function towerStateSig(tower: Tower, money: number): string {
     )
     .join(";");
   const r = tower.transports
-    .map((x) => `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}`)
+    // The schedule must be part of the signature: setting it can be the only
+    // mutation of a gesture (the Schedule dialog's OK), and a fingerprint blind
+    // to it would drop that edit as a no-op, making the apply un-undoable.
+    .map(
+      (x) =>
+        `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}:${x.schedule ? JSON.stringify(x.schedule) : ""}`,
+    )
     .join(";");
   return `${money}|${u}|${r}`;
 }

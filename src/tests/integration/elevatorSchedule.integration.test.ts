@@ -108,6 +108,19 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(shaft.schedule!.homeFloors).toEqual([3, 1]);
   });
 
+  it("snaps against fresh stops even when the stopsOf cache is warm (#467)", () => {
+    // Dispatch reads tower.stopsOf every tick, so in a live game the
+    // per-revision stops cache is always warm when a stop edit lands. The edit
+    // must bump the revision BEFORE snapping homes, or the snap reads the
+    // stale cached list and leaves the orphaned home in place.
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    expect(sim.tower.setSchedule(shaft.id, { homeFloors: [5, 1] })).toBe(true);
+    expect(sim.tower.stopsOf(shaft)).toContain(5); // warm the cache at the current revision
+    expect(sim.tower.setStop(shaft.id, 5, false)).toBe(true);
+    expect(shaft.schedule!.homeFloors).toEqual([4, 1]); // snapped against the fresh list
+  });
+
   it("leaves a shaft with no schedule absent (sparse save, today's behavior)", () => {
     const sim = towerWithElevator();
     expect(sim.tower.transports[0].schedule).toBeUndefined();

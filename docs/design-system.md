@@ -77,7 +77,7 @@ panel scale (10px, uppercase), a deliberate size step-down rather than a diverge
 
 ### `.well`: sunken white data area
 `--r-hi` + `--bevel-in`. The File Manager idiom: the Bulletin log, the saves
-slot list, the stops checklist, dialog textareas all sit on wells.
+slot list, the Schedule dialog's floors grid, dialog textareas all sit on wells.
 
 ### `.field`: a text input
 A well you type into (same recipe + `font: inherit`).

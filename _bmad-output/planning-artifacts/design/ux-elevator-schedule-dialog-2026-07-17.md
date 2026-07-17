@@ -787,3 +787,7 @@ so the spec and the build cannot drift silently:
   hint above.
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
+- **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
+  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The day-split
+  rings (#466) and the per-floor accumulator (#465) refine the sampling story; revisit the
+  distinction there.

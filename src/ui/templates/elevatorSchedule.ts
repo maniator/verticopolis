@@ -120,6 +120,7 @@ export function floorLabel(floor: number): string {
  *  hold delay, and a repeat run suppresses the trailing click). */
 function holdRepeat(fire: () => void): (e: PointerEvent) => void {
   return (e: PointerEvent) => {
+    if (e.button !== 0) return; // primary button/touch only: no right-hold repeats
     const btn = e.currentTarget as HTMLButtonElement;
     let repeated = false;
     let interval: ReturnType<typeof setInterval> | undefined;

@@ -39,9 +39,10 @@ export function setExpressStops(tower: Tower, id: number): boolean {
     if (!lobbies.has(fl)) skip.push(fl);
   }
   t.skipFloors = skip;
-  // The lobby-only lock may have skipped a floor a car homes at (#467).
-  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, tower.stopsOf(t));
+  // Revision bumps FIRST: stopsOf caches by revision (dispatch keeps it warm),
+  // so the snap must read the post-lock list, not the cache (#467).
   tower.revision++;
+  if (t.schedule) t.schedule = snapHomesToStops(t.schedule, tower.stopsOf(t));
   return true;
 }
 

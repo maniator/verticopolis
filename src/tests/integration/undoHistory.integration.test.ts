@@ -151,6 +151,21 @@ describe("towerStateSig", () => {
     expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
   });
 
+  it("changes when a shaft's schedule is set (the Schedule dialog's OK is undoable)", () => {
+    // Setting the schedule can be the ONLY mutation of a gesture (the dialog's
+    // apply writes nothing else), so a signature blind to it would drop the
+    // "Set elevator schedule" undo step as a no-op. Pin it, like noRate above.
+    const sim = Simulation.newGame(1);
+    sim.money = 1e12;
+    const cx = Math.floor(GRID.width / 2);
+    for (let x = cx - 10; x <= cx + 10; x++) sim.tower.place("floor", 2, x);
+    expect(sim.buildTransport("elevatorStandard", cx, 1, 2).ok).toBe(true);
+    const shaft = sim.tower.transports.find((t) => t.kind === "elevatorStandard")!;
+    const sig0 = towerStateSig(sim.tower, sim.money);
+    expect(sim.tower.setSchedule(shaft.id, { waitingCarResponse: 5 })).toBe(true);
+    expect(towerStateSig(sim.tower, sim.money)).not.toBe(sig0);
+  });
+
   it("changes when a retail unit's canon subtype rerolls (Change variety is undoable)", () => {
     // Without subtype in the signature, commitUndo would drop the reroll step
     // (see towerStateSig) so the player couldn't undo a Change variety. Pin it.

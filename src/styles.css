@@ -751,7 +751,9 @@ a.btn {
 .modal-box > .win-title {
   position: sticky;
   top: calc(-1 * var(--pad-y));
-  z-index: 1;
+  /* Above any in-body sticky bar (the schedule dialog's day toggle), so the
+     two stuck strips layer cleanly instead of slitting. */
+  z-index: 2;
 }
 .modal-box p,
 .modal-box li {
@@ -1123,31 +1125,7 @@ dialog.crash-card::backdrop {
   padding: 5px 8px;
 }
 
-/* ---- Stops config dialog ---- */
-.stop-list {
-  max-height: 320px;
-  overflow-y: auto;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 2px 10px;
-  margin: 8px 0;
-  padding: 6px;
-}
-.stop-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  padding: 2px 4px;
-  cursor: pointer;
-}
-.stop-row input {
-  cursor: pointer;
-}
-.stop-lobby {
-  color: var(--accent);
-  font-size: 10px;
-}
+
 
 /* ---- Batch-pricing dialog ---- */
 .batch-modes { display: grid; gap: 8px; margin: 10px 0; }
