@@ -33,8 +33,9 @@ export function emptyOriginRings(): OriginRings {
   };
 }
 
-/** Floors whose EMA'd share decays below this are dropped from the slot map,
- *  so a floor that stopped generating trips fades out instead of lingering. */
+/** Floors whose EMA'd boarding count (absolute mass, not a normalized share)
+ *  decays below this are dropped from the slot map, so a floor that stopped
+ *  generating trips fades out instead of lingering. */
 const PRUNE_BELOW = 0.05;
 
 /**

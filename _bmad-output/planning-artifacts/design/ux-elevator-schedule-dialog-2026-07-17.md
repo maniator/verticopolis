@@ -794,7 +794,7 @@ so the spec and the build cannot drift silently:
 - **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
   yet sampled", so an unsampled hour draws no dash rather than a zero dash. Tracked as
   `schedule-ring-sampled-mask` (#474).
-- **Origin accumulator (#465, v1.60.0)**: the dispatcher tallies boardings by origin floor
+- **Origin accumulator (#465, v1.61.0)**: the dispatcher tallies boardings by origin floor
   at its board site (only at stops with a live call, so a homecoming car cannot credit its
   own home floor and feed the staging aim back into itself); `sampleElevatorUtil` drains the
   tally hourly into day-split per-hour origin maps (transient, never serialized). The drain
