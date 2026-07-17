@@ -300,7 +300,7 @@ describe("Hotel housekeeping", () => {
     expect(room.state).not.toBe("dirty");
   });
 
-  it("rooms stay dirty until a maid arrives and finishes the cleaning dwell — never instant", () => {
+  it("rooms stay dirty until a maid arrives and finishes the cleaning dwell, never instant", () => {
     const sim = hotelTower(12);
     sim.star = 2;
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -309,7 +309,7 @@ describe("Hotel housekeeping", () => {
     const room = sim.tower.units.find((u) => u.id === r.unitId)!;
     room.state = "dirty";
     // Ticks reach the Classic canon 12:00 shift start (the clock opens at
-    // 7:00): dispatch sends a maid, but the room is still dirty — she has not
+    // 7:00): dispatch sends a maid, but the room is still dirty; she has not
     // arrived, let alone finished the in-room cleaning dwell.
     for (let i = 0; i < 5; i++) sim.tick(60);
     expect(room.state).toBe("dirty");

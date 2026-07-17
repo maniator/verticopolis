@@ -73,9 +73,11 @@ export class Housekeeping {
     // dirty NOW survived the whole previous shift, so the leftover count is the
     // honest "your housekeeping is losing" figure (the fix is more crews or
     // better staff transport, and the escalation message below covers the
-    // terminal case).
+    // terminal case). The report fires whenever there IS a leftover, even on a
+    // zero-clean day (no crews, a burned crew, every trip gave up): total
+    // collapse is the day the player most needs the number, never a silent one.
     const leftover = this.sim.tower.units.filter((u) => isHotelKind(u.kind) && u.state === "dirty").length;
-    if (this.hkCleanedToday > 0) {
+    if (this.hkCleanedToday > 0 || leftover > 0) {
       const behind = leftover > 0 ? ` ${leftover} room(s) went unserved; add crews or improve staff transport.` : "";
       this.sim.emit(`Housekeeping cleaned ${this.hkCleanedToday} hotel room(s).${behind}`, leftover > 0 ? "bad" : "info");
     }
@@ -242,12 +244,14 @@ export class Housekeeping {
    * A dispatched maid finished. A completed cleaning dwell turns the room
    * over; a failed trip (gave up, shaft bulldozed mid-ride) or a wasted one
    * (the room burned down or was sold while she rode) just frees her. Either
-   * way the maid and her floor slot are released, and dispatch runs again so
-   * she moves straight on to the next dirty room (event-driven cycling: this
-   * is what makes throughput travel-plus-dwell-limited instead of quota-bound).
+   * way the maid and her floor slot are released. The sim loop re-runs
+   * dispatch once per drained batch of results (see sim/loop.ts), so freed
+   * maids cycle straight onto the next dirty room between hourly ticks
+   * (event-driven cycling: this is what makes throughput
+   * travel-plus-dwell-limited instead of quota-bound).
    */
   onResult(roomId: number, ok: boolean): void {
-    const had = this.releaseAssignment(roomId);
+    this.releaseAssignment(roomId);
     const room = this.sim.tower.getUnit(roomId);
     if (ok && room?.state === "dirty") {
       room.state = "empty";
@@ -255,9 +259,6 @@ export class Housekeeping {
       room.dirtyDays = undefined; // clock reset: a re-dirtied room starts fresh
       this.hkCleanedToday++;
     }
-    // Cycle the freed maid onto her next room (no-op outside the shift or past
-    // the no-new-room cutoff; the hourly dispatch already covers fresh hours).
-    if (had) this.dispatch();
   }
 
   /** A full cockroach infestation creeps into the adjacent room along the hotel

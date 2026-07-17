@@ -14,20 +14,20 @@ export const CLASSIC_HOUSEHOLD = FACILITIES.condo.population; // 3
 
 /**
  * Modern "variant households": the family sizes a condo can sell to and their
- * weights. Centered so the mean is EXACTLY the classic 3 — a Modern tower's
- * condo population matches a Classic one's on average, only varying unit to unit
- * — with 3 the clear mode. INVARIANT: keep the implied mean at 3 so Modern never
+ * weights. Centered so the mean is EXACTLY the classic 3 (a Modern tower's
+ * condo population matches a Classic one's on average, only varying unit to
+ * unit), with 3 the clear mode. INVARIANT: keep the implied mean at 3 so Modern never
  * silently inflates or deflates the star-rating ladder relative to Classic.
  */
 export const HOUSEHOLD_SIZES = [2, 3, 4, 5] as const;
 const HOUSEHOLD_WEIGHTS = [4, 6, 2, 1] as const; // mean = (2·4+3·6+4·2+5·1)/13 = 39/13 = 3.0
 
-/** A bigger family leans harder on the tower — access/congestion/noise bite a
+/** A bigger family leans harder on the tower: access/congestion/noise bite a
  *  5-person household more than a 2-person one. Per person away from the classic 3. */
 export const HOUSEHOLD_CHURN_PER_PERSON = 0.06;
 
 /**
- * A condo's price for a given household — the asking `base` scaled by household
+ * A condo's price for a given household: the asking `base` scaled by household
  * size relative to the classic 3. A condo with no household (Classic, or any
  * unsold unit) is exactly the base. Shared by the sale AND the buy-back so the
  * repurchase always mirrors what the unit sold for. Pure and mode-agnostic: it

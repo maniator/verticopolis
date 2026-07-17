@@ -81,11 +81,18 @@ export function advanceStep(sim: Simulation, dtMinutes: number): void {
     sim.crowd.advance(chunk * CROWD_SECONDS_PER_MINUTE, sim.tower);
     left -= chunk;
   }
-  // Housekeepers who reached (or abandoned) their room since the last step:
-  // the room is cleaned on ARRIVAL, never instantly, you can watch them go.
-  for (const job of sim.crowd.takeStaffResults()) {
+  // Maids who finished (or abandoned) their room since the last step: the room
+  // turns over only when the in-room cleaning dwell completes, never instantly,
+  // you can watch them work. Freed maids cycle onto their next room with ONE
+  // batched dispatch after the whole drain (not one full dispatch scan per
+  // result), so cycling stays event-driven between the hourly ticks without
+  // rescanning the tower per maid; dispatch itself self-gates on the shift's
+  // no-new-room cutoff.
+  const staffJobs = sim.crowd.takeStaffResults();
+  for (const job of staffJobs) {
     sim.economy.onHousekeeperResult(job.unitId, job.ok);
   }
+  if (staffJobs.length > 0) sim.economy.dispatchHousekeepers();
   sim.finishConstruction();
 
   const hour = sim.clock.hour;
@@ -121,7 +128,7 @@ export function onHour(sim: Simulation): void {
   // cutoff, and freed maids re-dispatch event-driven between these hourly
   // ticks; see Housekeeping.onResult).
   const hkShift = sim.rules.housekeepingShift();
-  if (sim.clock.hour >= hkShift.start && sim.clock.hour <= hkShift.end) {
+  if (sim.clock.hour >= hkShift.start && sim.clock.hour < hkShift.end) {
     sim.resolveExtermination();
     sim.economy.dispatchHousekeepers();
   }

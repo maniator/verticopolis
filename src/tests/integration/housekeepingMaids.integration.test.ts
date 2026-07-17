@@ -15,13 +15,19 @@ import type { GameMode } from "../../engine/types";
 
 const X0 = Math.floor(GRID.width / 2) - 20;
 
-/** A 2★ tower with a passenger elevator and a floor-2 slab, opening at 7:00. */
+/** A 2★ tower with a passenger elevator and a floor-2 slab, opening at 7:00.
+ *  Every placement is asserted so a silent refusal can't make a scenario lie. */
 function baseTower(seed: number, mode: GameMode = "classic"): Simulation {
   const sim = Simulation.newGame(seed, mode);
   sim.star = 2;
-  for (let i = 0; i < 30; i++) sim.tower.place("floor", 2, X0 + i);
-  sim.buildTransport("elevatorStandard", X0 + 26, 1, 2);
+  placeSlab(sim, 2);
+  expect(sim.buildTransport("elevatorStandard", X0 + 26, 1, 2).ok).toBe(true);
   return sim;
+}
+
+/** Lay a 30-tile floor slab, asserting each tile landed. */
+function placeSlab(sim: Simulation, floor: number) {
+  for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", floor, X0 + i).ok).toBe(true);
 }
 
 function dirtyRoom(sim: Simulation, floor: number, x: number) {
@@ -36,7 +42,7 @@ describe("shift windows via GameRules", () => {
   it("Classic maids start at noon, not at the 8:00 checkout", () => {
     const sim = baseTower(31);
     const room = dirtyRoom(sim, 2, X0);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     // 7:00 -> 11:00: checkout hour passed, but the canon shift has not opened.
     for (let i = 0; i < 4; i++) sim.tick(60);
     expect(room.state).toBe("dirty");
@@ -51,7 +57,7 @@ describe("shift windows via GameRules", () => {
   it("Classic dispatch starts no new room at or after the 16:30 cutoff", () => {
     const sim = baseTower(32);
     dirtyRoom(sim, 2, X0);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     sim.clock.minutes = 16 * 60 + 45; // 16:45, inside the shift but past 16:30
     sim.economy.dispatchHousekeepers();
     expect(sim.crowd.people.some((p) => p.staff)).toBe(false);
@@ -63,7 +69,7 @@ describe("shift windows via GameRules", () => {
   it("Modern keeps the longer 08:00 staffed day", () => {
     const sim = baseTower(33, "modern");
     const room = dirtyRoom(sim, 2, X0);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     // 7:00 -> 8:00 opens the Modern shift; the next hour cleans.
     sim.tick(60);
     expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
@@ -75,9 +81,9 @@ describe("shift windows via GameRules", () => {
 describe("staff network: service elevator or stairs only (canon)", () => {
   it("an escalator no longer carries staff; stairs do", () => {
     const sim = baseTower(34);
-    for (let i = 0; i < 30; i++) sim.tower.place("floor", 3, X0 + i);
+    placeSlab(sim, 3);
     const room = dirtyRoom(sim, 3, X0);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     expect(sim.tower.placeTransport("escalator", X0 + 18, 2, 3).ok).toBe(true);
     expect(sim.tower.staffConnected(2, 3)).toBe(false); // canon: not a staff transport
     for (let i = 0; i < 7; i++) sim.tick(60); // 7:00 -> 14:00, through the shift
@@ -95,10 +101,10 @@ describe("the maid pool", () => {
   it("a unit fields at most 6 maids at once, one per floor at a time", () => {
     const sim = baseTower(35);
     // Eight hotel floors, one dirty single each, all linked by a service shaft.
-    for (let f = 3; f <= 9; f++) for (let i = 0; i < 30; i++) sim.tower.place("floor", f, X0 + i);
+    for (let f = 3; f <= 9; f++) placeSlab(sim, f);
     expect(sim.tower.placeTransport("elevatorService", X0 + 18, 1, 9).ok).toBe(true);
     for (let f = 2; f <= 8; f++) dirtyRoom(sim, f, X0);
-    sim.tower.place("housekeeping", 9, X0 + 8);
+    expect(sim.tower.place("housekeeping", 9, X0 + 8).ok).toBe(true);
     sim.clock.minutes = 13 * 60; // mid-shift
     sim.economy.dispatchHousekeepers();
     // Seven reachable dirty rooms on seven floors, but only 6 maids go out.
@@ -109,7 +115,7 @@ describe("the maid pool", () => {
     const sim = baseTower(36);
     const a = dirtyRoom(sim, 2, X0);
     const b = dirtyRoom(sim, 2, X0 + 4);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     sim.clock.minutes = 13 * 60;
     sim.economy.dispatchHousekeepers();
     expect(sim.crowd.people.filter((p) => p.staff).length).toBe(1); // one maid per floor per unit
@@ -126,10 +132,28 @@ describe("the cleaning dwell", () => {
   it("a dispatched maid carries the per-room cleaning hold, so rooms are never cleaned on arrival", () => {
     const sim = baseTower(37);
     dirtyRoom(sim, 2, X0);
-    sim.tower.place("housekeeping", 2, X0 + 8);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
     sim.clock.minutes = 13 * 60;
     sim.economy.dispatchHousekeepers();
     const maid = sim.crowd.people.find((p) => p.staff)!;
     expect(maid.lingerFor).toBe(HK_CLEAN_MINUTES * CROWD_SECONDS_PER_MINUTE);
+  });
+
+  it("the room stays dirty while the maid is in it and turns over only when the dwell completes", () => {
+    const sim = baseTower(38);
+    const room = dirtyRoom(sim, 2, X0);
+    expect(sim.tower.place("housekeeping", 2, X0 + 8).ok).toBe(true);
+    sim.clock.minutes = 13 * 60;
+    sim.economy.dispatchHousekeepers();
+    expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
+    // Three game-minutes (6 crowd-seconds) covers the same-floor walk but is
+    // far short of the 16-crowd-second dwell: she is in the room, still
+    // scrubbing, and the room has NOT turned over (arrival cleans nothing).
+    sim.tick(3);
+    expect(sim.crowd.people.some((p) => p.staff)).toBe(true);
+    expect(room.state).toBe("dirty");
+    // Let the dwell drain (with margin): only now does the room turn over.
+    for (let i = 0; i < 5; i++) sim.tick(3);
+    expect(room.state).toBe("empty");
   });
 });
