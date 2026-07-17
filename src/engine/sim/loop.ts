@@ -106,14 +106,16 @@ export function onHour(sim: Simulation): void {
   // population is still present at the midnight TOWER/VIP evaluation.
   if (sim.clock.hour === HK_SHIFT_START) {
     sim.economy.hotelCheckout();
-    // A booked exterminator lands AFTER this morning's checkout (so infested
-    // rooms spread one last time while the crew was en route), clearing rooms
-    // back to rentable.
-    sim.resolveExtermination();
   }
-  // Housekeeping works a day shift: dispatch keeps sending crews to dirty
-  // rooms through the day (retrying jobs that failed or were over capacity).
+  // Housekeeping works a day shift. A booked exterminator lands AFTER this
+  // morning's checkout (so infested rooms spread one last time while the crew
+  // was en route). `resolveExtermination` is idempotent and self-guards on the
+  // due day, so it runs across the whole shift window, not just the exact
+  // HK_SHIFT_START tick: a save reloaded later on the due day still clears its
+  // rooms that day instead of stranding them en route until tomorrow. Dispatch
+  // then keeps sending crews to dirty rooms (retrying over-capacity jobs).
   if (sim.clock.hour >= HK_SHIFT_START && sim.clock.hour <= HK_SHIFT_END) {
+    sim.resolveExtermination();
     sim.economy.dispatchHousekeepers();
   }
   sim.updateSatisfaction();

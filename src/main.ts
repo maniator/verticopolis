@@ -556,7 +556,15 @@ class GameApp implements GameAppPorts {
   private confirmExterminate(): void {
     const cov = this.sim.housekeepingCoverage();
     const recovery = this.sim.rules.infestationRecovery();
-    if (!recovery || cov.infested === 0) return;
+    if (!recovery || cov.infested === 0) {
+      // The tower can change between rendering the stats modal and clicking the
+      // button (a fire or bulldoze clears the last infested room, or the mode
+      // rule-set no longer offers an exterminator), so say why nothing happens
+      // instead of a silent no-op.
+      this.sim.emit(recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.", "bad");
+      this.showStats();
+      return;
+    }
     const cost = recovery.calloutFee + recovery.perRoomFee * cov.infested;
     this.ui.confirmModal(
       "Call the exterminator?",

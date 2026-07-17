@@ -17,7 +17,7 @@ import { HK_ROOMS_PER_CREW, INFEST_DAYS } from "../engine/economy/housekeeping";
 export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[] {
   if (u.state === "dirty") {
     return [
-      html`<div style="color:var(--bad)">Dirty: the guest checked out, so it can't be re-let until a housekeeper cleans it. Left dirty for ${INFEST_DAYS} days, it breeds cockroaches. Staff reach rooms by service elevator, stairs, or escalator.</div>`,
+      html`<div style="color:var(--bad)">Dirty: the guest checked out, so it can't be re-let until a housekeeper cleans it. Left dirty for ${INFEST_DAYS} days, it turns infested: cockroaches housekeeping can no longer clear. Staff reach rooms by service elevator, stairs, or escalator.</div>`,
     ];
   }
   if (u.state === "infested") {
