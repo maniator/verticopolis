@@ -1,7 +1,9 @@
 import type { ViewFocus } from "../render/excalibur/TowerEngine";
 import type { SfxName } from "./ToneAudioEngine";
+import type { ProgramKind } from "./toneTracks";
 
 export type { SfxName };
+export type { ProgramKind };
 
 /** The subset of the Tone engine the facade constructs and drives. Declared
  *  structurally (rather than importing the concrete class) so the loader is a
@@ -12,6 +14,7 @@ interface AudioEngineImpl {
   start(): void;
   setMuted(m: boolean): void;
   setVolumes(music: number, sfx: number): void;
+  setProgram(program: ProgramKind): void;
   update(focus: ViewFocus): void;
   sfx(name: SfxName): void;
   dispose(): void;
@@ -45,6 +48,9 @@ export class AudioEngine {
    *  the real engine on load. Independent of `muted`. */
   musicVolume = 1;
   sfxVolume = 1;
+  /** Which composed track should play. Stored here (start screen vs. tower) so
+   *  a pre-load switch lands on the engine the moment it builds. */
+  program: ProgramKind = "game";
   /** True once the real engine has loaded and started. */
   started = false;
 
@@ -97,6 +103,7 @@ export class AudioEngine {
         this.impl = impl;
         impl.setMuted(this.muted);
         impl.setVolumes(this.musicVolume, this.sfxVolume);
+        impl.setProgram(this.program);
         impl.start();
         this.started = impl.started;
         if (this.lastFocus) impl.update(this.lastFocus);
@@ -111,6 +118,14 @@ export class AudioEngine {
   setMuted(m: boolean): void {
     this.muted = m;
     this.impl?.setMuted(m);
+  }
+
+  /** Choose the composed track: `"splash"` on the start screen, `"game"` in
+   *  the tower. Stored synchronously and forwarded to the engine (now if it's
+   *  loaded, otherwise when it builds). */
+  setProgram(program: ProgramKind): void {
+    this.program = program;
+    this.impl?.setProgram(program);
   }
 
   /** Set the player volume levels (0..1 each). Inputs are clamped, and a

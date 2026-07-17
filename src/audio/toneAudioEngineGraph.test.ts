@@ -81,6 +81,7 @@ vi.mock("tone", () => {
     Reverb: ctorFor("Reverb"),
     NoiseSynth: ctorFor("NoiseSynth"),
     MembraneSynth: ctorFor("MembraneSynth"),
+    Part: ctorFor("Part"),
     LFO: ctorFor("LFO"),
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
@@ -159,7 +160,7 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     expect(() => eng.setMuted(false)).not.toThrow();
   });
 
-  it("the scheduled beat callback generates music per scene (and stops when muted)", () => {
+  it("the scheduled beat callback fires zoom-reactive accents (and stops when muted)", () => {
     const eng = new ToneAudioEngine();
     eng.start();
     expect(beat.step).toBeTypeOf("function"); // Transport handed us the per-beat step
@@ -169,6 +170,54 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     for (let i = 0; i < 20; i++) beat.step!(i * 0.25);
     eng.setMuted(true);
     expect(() => beat.step!(99)).not.toThrow(); // muted → the step is a no-op
+  });
+
+  it("builds a looping music Part that plays finite notes through the music voices", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const part = graph.nodes.find((n) => n.kind === "Part");
+    expect(part, "music Part missing").toBeTruthy();
+    // The engine passes its per-note callback as the Part's first ctor arg.
+    const cb = part!.args[0] as (t: number, ev: unknown) => void;
+    expect(cb).toBeTypeOf("function");
+    // Drive one event of each voice; every frequency handed to a synth is finite.
+    const evs = [
+      { t: 0, midi: 62, dur: 0.5, vel: 0.5, voice: "arp" },
+      { t: 0, midi: 45, dur: 1, vel: 0.6, voice: "bass" },
+      { t: 0, midi: 69, dur: 0.5, vel: 0.7, voice: "hook" },
+    ];
+    for (const ev of evs) expect(() => cb(0, ev)).not.toThrow();
+    const synths = graph.nodes.filter((n) => n.kind === "PolySynth" || n.kind === "Synth");
+    const freqs = synths
+      .flatMap((s) => s.triggers)
+      .map((t) => t[0])
+      .filter((x): x is number => typeof x === "number");
+    expect(freqs.length).toBeGreaterThan(0);
+    for (const f of freqs) expect(Number.isFinite(f)).toBe(true);
+    // Muted: the callback must schedule nothing.
+    eng.setMuted(true);
+    const before = synths.reduce((n, s) => n + s.triggers.length, 0);
+    cb(0, { t: 0, midi: 62, dur: 0.5, vel: 0.5, voice: "arp" });
+    expect(synths.reduce((n, s) => n + s.triggers.length, 0)).toBe(before);
+  });
+
+  it("setProgram crossfades to the other track (rebuilds the Part after a fade) only when it changes", () => {
+    vi.useFakeTimers();
+    try {
+      const eng = new ToneAudioEngine();
+      eng.start();
+      const parts = () => graph.nodes.filter((n) => n.kind === "Part").length;
+      const built = parts();
+      eng.setProgram("game"); // same as the default → no-op, no crossfade timer
+      vi.advanceTimersByTime(2000);
+      expect(parts()).toBe(built);
+      eng.setProgram("splash"); // change → dip first...
+      expect(parts()).toBe(built); // ...part not swapped until the dip bottoms out
+      vi.advanceTimersByTime(2000);
+      expect(parts()).toBe(built + 1); // swapped in after the fade-out
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("setVolumes clamps and holds its values before and after start()", () => {
@@ -212,35 +261,6 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     expect(lfo!.args[0]).toEqual({ frequency: 0.3, min: 0.7, max: 1 });
     expect(lfo!.started).toBe(true);
     expect(lfo!.connects).toContain(swell);
-  });
-
-  it("REGRESSION: the overview melody is doubled two octaves up; other scenes are not", () => {
-    // +24 semitones is exactly a 4x frequency ratio, so a same-step trigger
-    // pair at ratio 4 IS the doubling (the close-up sparkle is +12 = 2x).
-    const pairsAtRatio4 = (eng: ToneAudioEngine, f: ViewFocus): number => {
-      eng.update(f);
-      const synths = graph.nodes.filter((n) => n.kind === "PolySynth");
-      let found = 0;
-      for (let i = 0; i < 200; i++) {
-        const before = synths.map((s) => s.triggers.length);
-        beat.step!(i * 0.25);
-        const stepFreqs = synths
-          .flatMap((s, si) => s.triggers.slice(before[si]))
-          .map((t) => t[0])
-          .filter((x): x is number => typeof x === "number");
-        for (const a of stepFreqs)
-          for (const b of stepFreqs) if (Math.abs(b / a - 4) < 0.001) found++;
-      }
-      return found;
-    };
-    const over = new ToneAudioEngine();
-    over.start();
-    expect(pairsAtRatio4(over, focus({ zoom: 0.3, dominant: "empty", centerFloor: 30 }))).toBeGreaterThan(0);
-    over.dispose();
-    graph.nodes.length = 0;
-    const office = new ToneAudioEngine();
-    office.start();
-    expect(pairsAtRatio4(office, focus({ zoom: 2.2, dominant: "office" }))).toBe(0);
   });
 
   it("rain weather adds an outdoor layer when the sky is visible", () => {

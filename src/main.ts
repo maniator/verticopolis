@@ -344,6 +344,13 @@ class GameApp implements GameAppPorts {
       showHelp: () => this.ui.showHelp(),
       pauseForSplash: (paused) => this.setSpeed(paused ? 0 : 1),
       chime: () => this.audio.sfx("promote"),
+      // Splash theme on the start screen, calm bed in the tower. Audio is
+      // autoplay-gated (it only sounds after a gesture), so the splash theme is
+      // heard on the New Tower path, where the splash stays up through the
+      // rule-set modal while the audio chunk loads and then crossfades to the
+      // bed. An instant Continue dismiss has no pre-dismiss gesture to sound
+      // under, so it lands straight on the bed (tracked in the backlog).
+      setMusicProgram: (onSplash) => this.audio.setProgram(onSplash ? "splash" : "game"),
     });
     // The title screen loads on every boot, so its branding, the attribution
     // line, and the Continue-vs-New-Tower (rule-set) choice greet the player each
