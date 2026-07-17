@@ -13,7 +13,7 @@ import { renderToFragment } from "../testing/litTestUtils";
 
 describe("settingsTemplate structure and a11y", () => {
   it("renders the two volume sliders (0..100 range) with labels and aria-hidden readouts", () => {
-    const frag = renderToFragment(settingsTemplate());
+    const frag = renderToFragment(settingsTemplate("1.2.3"));
     for (const [id, label] of [
       ["vol-music", "Music"],
       ["vol-sfx", "Effects"],
@@ -30,7 +30,7 @@ describe("settingsTemplate structure and a11y", () => {
   });
 
   it("renders both presentation toggles as role=switch with aria-describedby to their note", () => {
-    const frag = renderToFragment(settingsTemplate());
+    const frag = renderToFragment(settingsTemplate("1.2.3"));
     for (const [id, note] of [
       ["set-reduce-motion", "note-reduce-motion"],
       ["set-steady-clock", "note-steady-clock"],
@@ -44,10 +44,29 @@ describe("settingsTemplate structure and a11y", () => {
   });
 
   it("renders the primary Close action with autofocus", () => {
-    const frag = renderToFragment(settingsTemplate());
+    const frag = renderToFragment(settingsTemplate("1.2.3"));
     const close = frag.querySelector<HTMLButtonElement>('[data-act="close"]')!;
     expect(close.textContent).toBe("Close");
     expect([...close.classList].sort()).toEqual(["btn", "primary"]); // full set, not just primary
     expect(close.hasAttribute("autofocus")).toBe(true);
+  });
+
+  it("echoes the app version behind the .app-version class so screenshots mask it", () => {
+    // The version is a read-only echo of the splash and Help's About line. It must
+    // carry `.app-version` so pgMaskVersion rewrites it to a fixed placeholder in
+    // captures (a routine version bump must not churn the committed gallery).
+    const frag = renderToFragment(settingsTemplate("9.9.9"));
+    const ver = frag.querySelector<HTMLElement>(".set-version .app-version")!;
+    expect(ver).not.toBeNull();
+    expect(ver.textContent).toBe("v9.9.9");
+  });
+});
+
+describe("settingsTemplate escapes the interpolated version as text", () => {
+  it("renders a hostile version string as literal text, injecting no element", () => {
+    const hostile = `<img src=x onerror="alert(1)">`;
+    const frag = renderToFragment(settingsTemplate(hostile));
+    expect(frag.querySelector("img")).toBeNull();
+    expect(frag.textContent).toContain(`Verticopolis v${hostile}`);
   });
 });
