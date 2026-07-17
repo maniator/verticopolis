@@ -308,8 +308,7 @@ export function showElevatorScheduleDialog(
     },
     onCancel: () => {
       // A dirty working copy takes two presses: the first arms "Discard changes?",
-      // any edit disarms (spec §8). Esc and the title-bar close stay instant, matching
-      // every other dialog's dismiss grammar.
+      // any edit disarms (spec §8). Every dismissal path funnels here (see below).
       if (dirty && !state.cancelArmed) {
         state.cancelArmed = true;
         rerender();
@@ -322,4 +321,19 @@ export function showElevatorScheduleDialog(
   recompute();
   const box = ui.openModalTemplate(elevatorScheduleTemplate(sctx, state, handlers));
   syncRungSelects(box); // initial selection, post-attach (see rungPicker.ts)
+  // The dirty guard must cover EVERY dismissal, not just the Cancel button: Esc and
+  // the title-bar ✕ arrive as the dialog's cancelable "cancel" event, a backdrop
+  // click as a click on the dialog element itself. finishModal re-sets both
+  // handlers fresh on every open, so overriding them here cannot leak into other
+  // dialogs; preventDefault holds the native Esc close while the confirm arms.
+  const dlg = box.closest("dialog");
+  if (dlg instanceof HTMLDialogElement) {
+    dlg.oncancel = (e) => {
+      if (dirty && !state.cancelArmed) e.preventDefault();
+      handlers.onCancel();
+    };
+    dlg.onclick = (e) => {
+      if (e.target === dlg) handlers.onCancel();
+    };
+  }
 }

@@ -2233,6 +2233,31 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().open).toBe(false);
   });
 
+  it("Esc and the title-bar close honor the dirty guard too (arm first, close second)", () => {
+    const { apply } = open();
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // dirty
+    // Esc and the ✕ both arrive as the dialog's cancelable "cancel" event.
+    const esc = () => {
+      const e = new Event("cancel", { cancelable: true });
+      dialog().dispatchEvent(e);
+      return e;
+    };
+    expect(esc().defaultPrevented).toBe(true); // held open, arming instead
+    expect(dialog().open).toBe(true);
+    expect(dialog().querySelector('[data-act="close"]')!.textContent).toBe("Discard changes?");
+    expect(esc().defaultPrevented).toBe(false); // second press discards
+    expect(dialog().open).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("a pristine Esc closes at once (no guard without edits)", () => {
+    open();
+    const e = new Event("cancel", { cancelable: true });
+    dialog().dispatchEvent(e);
+    expect(e.defaultPrevented).toBe(false);
+    expect(dialog().open).toBe(false);
+  });
+
   it("an edit after arming disarms the discard confirm", () => {
     open();
     dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click(); // weekend: view change, stays clean
