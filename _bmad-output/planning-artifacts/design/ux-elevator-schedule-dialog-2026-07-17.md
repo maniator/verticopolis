@@ -143,7 +143,7 @@ Desktop, Modern, a standard shaft with 6 cars (raw grid folded behind Advanced):
 |                                                            |
 |  [ Rush ]  [ Balanced ]  [ Feeder ]        [ Auto-tune ]   |  Modern presets (§5)
 |                                                            |
-|  Waiting Car Response   [ – ]  4 floors   [ + ]           |  stepper (§3)
+|  Waiting Car Response   [ – ]  0 floors   [ + ]           |  stepper (§3, default 0)
 |  Standard Floor Departure [ – ]  48 sec   [ + ]           |  stepper (§3)
 |                                                            |
 |  ▸ Home floors and serviced floors (Advanced)             |  disclosure (§4)
@@ -175,10 +175,11 @@ row), value in a `.field`-styled read-only cell, 36px targets on coarse pointers
   The Standard Floor Departure default (48) sits on the step-2 grid and equals
   `DWELL_DEFAULT_SECONDS`, so opening the dialog on an unscheduled shaft and pressing OK
   without touching anything writes a schedule that dispatches identically.
-- **Announce on commit** (single-throat announce path), pinned:
-  - `Waiting Car Response: 4 floors. Idle cars hold for calls more than 4 floors off.`
-  - `Waiting Car Response: 0. Idle cars answer the nearest call.` (the floor-0 read)
-  - `Standard Floor Departure: 48 seconds.`
+- **Announce on commit** (single-throat announce path), pinned as templates (`<n>` is the
+  committed value; see the copy inventory §11):
+  - `Waiting Car Response: <n> floors. Idle cars hold for calls more than <n> floors off.`
+  - `Waiting Car Response: 0. Idle cars answer the nearest call.` (the floor-0 read, the default)
+  - `Standard Floor Departure: <n> seconds.`
 - The `– ` disables at the floor, `+` at the cap; both borrow the existing disabled-nudge
   styling so a player sees why the press does nothing.
 
@@ -464,7 +465,7 @@ settled):**
 The Classic ruling in §1 (the 1994 Express Elevator carried the full scheduling dialog with
 Waiting Car Response and Standard Floor Departure) rests on:
 
-- Sim Tower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
+- SimTower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
 - GameSurge SimTower strategy guide: https://www.gamesurge.com/strategies/strategyindex/simtower.shtml
 - ZealGames SimTower tips (per-time-frame Express-to-top/bottom clock settings, "Waiting
   Car Response 1 / Standard Floor Departure 30" advice): https://www.angelfire.com/games2/zealgames/simtower/towertips.html
@@ -604,7 +605,7 @@ The Classic "no count cost" ruling (§14.1) rests on GDD O2 (canon: no per-hour 
 plus a research pass that found only a flat per-shaft construction/maintenance cost, nothing
 scaling with active cars:
 
-- Sim Tower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
+- SimTower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
 - Relentless Optimizer, SimTower Reference: https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/
 
 The Modern Option A ruling rests on the 2026-07-17 game (Samus) and systems (Cloud) party,
