@@ -10,7 +10,9 @@ status: "Draft for owner review. This is the Phase 3 (UI, #352) design the
   finally lets a player author one."
 scope: "Dialog and editor-card UX only. The engine model, the dispatch effect, and
   the GameRules split are ratified inputs (Phases 1-2, gdd/arch), cited and never
-  re-argued. Closes the Phase 1 stepper-range defer by ratifying concrete ranges."
+  re-argued. Closes the Phase 1 stepper-range defer by ratifying concrete ranges.
+  Owner calls of 2026-07-17 fold in the stops dialog (Q1) and put the schedule
+  dialog on express in both modes (Q4, Classic by 1994 research, Modern by party)."
 inputs:
   - _bmad-output/planning-artifacts/design/gdd-elevator-scheduling-2026-07-16.md (§4 the model, §4.5 the dialog, §5 Classic vs Modern)
   - _bmad-output/planning-artifacts/design/arch-elevator-scheduling-2026-07-16.md (§2 module boundaries, §5 the GameRules seam, §8 UI/inspector, §11 A4 Simulate)
@@ -80,15 +82,33 @@ below. Nothing else on the card moves.
 +--------------------------------------------+
 ```
 
-- **Availability.** The row appears only for elevator kinds that carry cars
-  (`isElevatorKind`): standard, service, and express. Stairs and escalators have no
-  cars and no schedule (`coerceSchedule` drops a schedule on a car-less transport), so
-  they never show the row. A service (staff-only) shaft shows it: canon schedules service
-  elevators too, and the dispatch effect is identical.
-- **Express note.** An express shaft's serviced-floors list (§4) is its lobby set, not a
-  free per-floor list, so its floor section renders read-only (the schedule still governs
-  its cars, home floors, and timing). This is the one shape difference between express and
-  standard in the dialog.
+- **Availability (decided: all elevator kinds, both modes).** The row appears for every
+  elevator kind that carries cars (`isElevatorKind`): standard, service, AND express.
+  Stairs and escalators have no cars and no schedule (`coerceSchedule` drops a schedule on
+  a car-less transport), so they never show the row. A service (staff-only) shaft shows it:
+  canon schedules service elevators too, and the dispatch effect is identical.
+- **Express gets the dialog in BOTH modes.** This was open question Q4; it is now settled
+  two ways that agree (owner call 2026-07-17):
+  - *Classic (fidelity, researched):* the 1994 Express Elevator carried the SAME scheduling
+    dialog as the standard elevator (WD/WE time frames, Waiting Car Response, Standard Floor
+    Departure, plus the Express-to-top/bottom clock settings). Period guides even give
+    express-specific advice ("Waiting Car Response can be left at default because express
+    only stops every 15 levels"). Withholding it in Classic would be a fidelity regression.
+    Sources in §13.
+  - *Modern (assistance, party-decided):* a game/systems/UX roundtable was unanimous that
+    express should show the dialog, not hide it. The decisive point (systems seat): the
+    engine already honors an express `schedule` from a TDT import or save, so hiding the
+    authoring UI would manufacture invisible, uneditable live state (an express shaft
+    behaves differently and the player has no surface to see or reset it). Express is also
+    the marquee staging case: a whole-tower trunk idling at the wrong lobby is a long
+    dead-head before the down-rush, so WHERE its cars wait is a sharper choice than on a
+    short local.
+- **Express shape adaptations** (§4.1, §4.3, §5.4): its serviced floors render as a static
+  caption, not an editable list (it stops at lobbies/sky lobbies by construction); its
+  home-floor picker is limited to that lobby/sky-lobby stop set (the meaningful express
+  control, staging cars at the ground lobby vs a mid sky lobby to feed transfers); and its
+  Modern presets resolve their staging to those lobby stops. Everything else (the strip, the
+  Weekday/Weekend toggle, both steppers) is identical to a standard shaft.
 
 ## 2. The dialog: anatomy and pattern
 
@@ -172,9 +192,12 @@ floor, newest engine truth (`tower.stopsOf`) driving the rows.
 
 The `Serve` checkbox is the existing `skipFloors` toggle in list form: unchecking a floor
 adds it to `skipFloors` (the car no longer stops there), rechecking removes it. This is
-the SAME data the current `Configure stops…` dialog edits. See §7 for the structural
-decision on whether this list replaces that dialog or coexists with it. Express shafts
-render this column read-only (their stop set is the lobby graph, not a free list).
+the SAME data the current `Configure stops…` dialog edits; per the owner call this list
+REPLACES that dialog (§7), so it is the one place a shaft's stops are set. For an EXPRESS
+shaft the floors are not a free list (it stops at lobbies/sky lobbies by construction), so
+instead of a disabled-looking checkbox column it renders as a static one-line caption,
+`Serves all lobbies and sky lobbies`, never a greyed picker (a greyed editable-looking
+control reads as a bug; a caption reads as a fact).
 
 ### 4.2 Base / starting floor
 
@@ -193,7 +216,10 @@ on a focused row assigns the whole fleet in one press (the common case), and the
 dots are the fine control for split staging (lower half lobby, upper half up-tower, the
 down-rush play the whole feature exists for). An unassigned car falls back to the base
 floor (§4.2), i.e. today's idle. Home floors are clamped to the shaft span on read
-(Phase 2), so a value can never sit off the shaft.
+(Phase 2), so a value can never sit off the shaft. For an EXPRESS shaft the home rows are
+its lobby/sky-lobby stops only (the caption's floors), so staging a bank at the top sky
+lobby for the down-rush is one assignment; the per-car dots still allow splitting cars
+across lobbies to feed different transfer points.
 
 ## 5. Classic versus Modern (the GameRules seam)
 
@@ -253,6 +279,28 @@ measured load with no hint). Pinned patterns:
 The measured-vs-authored comparison is a pure read on open and after each edit; it never
 runs on the sim tick.
 
+### 5.4 Presets and auto-tune on an express shaft
+
+The party raised a real concern: Rush/Balanced/Feeder are named for up-tower-versus-lobby
+staging on a multi-stop shaft, so on a lobby-only trunk their vocabulary risks meaning
+something subtly different. The resolution keeps the presets (button parity, and the same
+assistance the mode promises) but binds their staging to the express stop set, so the
+names stay honest:
+
+- **Rush** on express: full fleet at the peaks, and the up-tower home resolves to the
+  HIGHEST served sky lobby (the down-rush transfer point), not an arbitrary floor.
+- **Feeder** on express: steady `ceil(cars/2)`, every car homed at the highest served
+  lobby. This is the natural express default and Modern should suggest it first.
+- **Balanced** on express: the daytime hump, all cars homed at the base (ground) lobby.
+- **Auto-tune** works unchanged (it reads measured load and sets counts); on express it
+  additionally biases home floors toward the busiest served lobby.
+
+Because every home target an express preset writes is already one of its lobby stops, the
+preset output is well-defined for express rather than an arbitrary floor the shaft cannot
+reach. Waiting Car Response defaults matter less on express (it stops sparsely, so an idle
+car is rarely the deciding factor); the dialog still exposes it for parity but Modern's
+advice never nags about it on an express shaft.
+
 ## 6. Simulate: the honest readout
 
 Per arch §11 A4, Simulate is a cheap ANALYTIC projection computed on the UI thread from
@@ -270,25 +318,21 @@ sim will actually do. No projected wait-time number is promised here (that would
 routing simulation); the readout states supply and positioning, which is exactly what the
 schedule controls.
 
-## 7. The structural decision: fold in `Configure stops…`?
+## 7. Folding in `Configure stops…` (decided: yes)
 
 The serviced-floors list (§4.1) edits the same `skipFloors` data as the existing
-`Configure stops…` dialog. Two paths to the same field is the kind of duplication the
-design system warns against. Options, for the owner (§9 Q1):
+`Configure stops…` dialog, and two edit paths to one field is the duplication the design
+system warns against. Owner call 2026-07-17: **fold in.** The `Schedule…` dialog becomes
+the one per-shaft config surface; its floors list carries the Serve toggles and the base
+setter, and the standalone `Configure stops…` button and its dialog retire. One place for
+cars, timing, home floors, and stops, matching how the pricing spec folded the access-state
+IOU into the one editor redraw rather than spreading it.
 
-- **A (recommended): fold in.** The `Schedule…` dialog becomes the one per-shaft config
-  surface; its floors list carries Serve toggles and the base setter, and the separate
-  `Configure stops…` button retires. One place for cars, timing, home floors, and stops.
-  Cost: the schedule dialog is now the only way to toggle a single stop, one more click for
-  a player who only wants to skip a floor.
-- **B: coexist.** Keep `Configure stops…` for quick stop edits; the schedule dialog shows
-  the floors list READ-ONLY for context (Serve state visible, edited elsewhere) and owns
-  only the home-floor and base assignment. Cost: the Serve column is a decoration in one
-  dialog and a control in another, and the gdd §4.5 explicitly puts editable Show toggles
-  in the schedule dialog.
-
-Recommendation A: one shaft, one config dialog, matching how the pricing spec folded the
-access-state IOU into the one editor redraw rather than spreading it.
+Build consequence: the `express` / `allstops` quick presets that lived beside
+`Configure stops…` (`data-edit="express"` / `"allstops"`) move onto the schedule dialog's
+floors section as two quick-actions above the list (`Express (lobbies)` / `All stops`), so
+no stop-editing affordance is lost in the retirement. The `Configure stops…` entry point
+(`data-edit="stops"`) and its `uiStops` surface are removed.
 
 ## 8. Mobile
 
@@ -353,29 +397,55 @@ fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
 | Simulate, peak | `Busiest <day type> hour <HH:00>: <n> of <cars> cars, homed <where>.` |
 | Simulate, overnight | `Overnight (00:00-05:00): <n> of <cars> cars on shift.` |
 | Floors list heads | `Floor` / `Serve` / `Home car(s)` |
+| Floors quick-actions (folded in from stops) | `Express (lobbies)` / `All stops` |
+| Express floors caption | `Serves all lobbies and sky lobbies` |
 | Home quick-action | `Home all cars here` |
 | Advanced disclosure | `Home floors and serviced floors` |
 
-## 12. Open questions (owner / party; the engine and split are settled)
+## 12. Decisions and remaining open questions
 
-1. **Fold in `Configure stops…`? (owner, structural; §7).** Recommendation A: the schedule
-   dialog becomes the one per-shaft config surface and the standalone stops dialog retires.
-   Default if unanswered: A, since two edit paths to `skipFloors` is the duplication the
-   design system warns against.
-2. **Preset shapes (owner / playtest; §5.1).** Rush/Balanced/Feeder are defined concretely
-   above, but the exact peak windows and the half-fleet split are tuning that wants a
-   playtest pass. Ship the shapes as written and revisit magnitudes with the same tuning
-   pass as the other provisional weights.
-3. **The strip interaction on mobile (§8).** Horizontal scroll versus a 12+12 wrap is a
+**Decided by the owner (2026-07-17), folded into the spec above:**
+
+- **Q1 fold in `Configure stops…`: YES** (§7). The schedule dialog is the one per-shaft
+  config surface; the standalone stops dialog retires, its `express`/`allstops` presets
+  move onto the floors section.
+- **Q4 express gets the dialog: YES, both modes** (§1). Classic because the 1994 Express
+  Elevator carried the same scheduling dialog (researched, §13); Modern because a
+  game/systems/UX party was unanimous, chiefly to avoid invisible uneditable state from an
+  imported express schedule. Express adapts with a caption floor list (§4.1),
+  lobby-limited home floors (§4.3), and lobby-staged presets (§5.4).
+
+**Still open (owner / playtest; the engine, the split, and the two decisions above are
+settled):**
+
+1. **Preset shapes (playtest; §5.1, §5.4).** Rush/Balanced/Feeder are defined concretely,
+   but the exact peak windows and the half-fleet split are tuning that wants a playtest
+   pass. Ship the shapes as written and revisit magnitudes with the same tuning pass as the
+   other provisional weights.
+2. **The strip interaction on mobile (§8).** Horizontal scroll versus a 12+12 wrap is a
    phone-ergonomics call best made against a real device test; the spec commits to a 36px
    target and a numeric label either way. Default: try scroll first, fall back to wrap if
    it tests poorly.
-4. **Do express shafts get the dialog at all? (owner, small; §1).** Express carries cars
-   and a schedule field, so scheduling its fleet is coherent, but an express shaft is
-   usually run flat-out as a trunk. Offer the dialog (with the read-only floor list) for
-   parity, or hide it for express and keep express always-all-cars? Default: offer it;
-   hiding it would be a mode-of-shaft special case the model does not otherwise have.
-5. **Home-floor UI density (§4.3).** The per-car dots plus `Home all cars here` cover both
+3. **Home-floor UI density (§4.3).** The per-car dots plus `Home all cars here` cover both
    the common (bank-together) and the fine (split-staging) cases. If playtest finds the
    dots fiddly on a 6-8 car shaft, a fallback is a single `Home floor` for the shaft with
    per-car split behind Advanced. Default: dots + quick-action as specced.
+4. **1994 used 6 daily time frames; our model is 24 hourly slots (minor, Classic-fidelity
+   nod).** The merged engine model is `activeCars[dayType][0..23]`, a Modern refinement over
+   the original's coarser 6-frame day. Not a blocker (the strip authors the 24-slot model
+   directly), but Classic could optionally GROUP the strip into the historical bands as a
+   fidelity gesture. Deferred as polish; the 24-slot model stays the source of truth.
+
+## 13. Sources (Classic express-scheduling research, 2026-07-17)
+
+The Classic ruling in §1 (the 1994 Express Elevator carried the full scheduling dialog with
+Waiting Car Response and Standard Floor Departure) rests on:
+
+- Sim Tower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
+- GameSurge SimTower strategy guide: https://www.gamesurge.com/strategies/strategyindex/simtower.shtml
+- ZealGames SimTower tips (per-time-frame Express-to-top/bottom clock settings, "Waiting
+  Car Response 1 / Standard Floor Departure 30" advice): https://www.angelfire.com/games2/zealgames/simtower/towertips.html
+
+The Modern ruling rests on the 2026-07-17 game/systems/UX roundtable summarized in §1 and
+§5.4 (offer the dialog; adapt the floor list to a caption, the home floors to lobby stops,
+and the presets to lobby staging).
