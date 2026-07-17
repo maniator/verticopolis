@@ -232,10 +232,17 @@ export class ElevatorDispatch {
           if (board > 0) {
             t.carLoad[i] += board;
             if (!staffOnly) demand.set(target, Math.max(0, w - board));
-            // Origin tally (#465): count where riders board, per shaft.
-            let tally = this.boardTally.get(t.id);
-            if (!tally) this.boardTally.set(t.id, (tally = new Map()));
-            tally.set(target, (tally.get(target) ?? 0) + board);
+            // Origin tally (#465): count where riders board, per shaft, but only
+            // at stops with a LIVE call this tick. A homecoming car soaking up
+            // sub-call residue would otherwise credit its own home floor and
+            // feed the very staging aim that parked it there. Service shafts
+            // tally too (they are schedulable; their staging needs origins).
+            // The cap bounds the EMA spike if sampling ever pauses.
+            if (calls.has(target)) {
+              let tally = this.boardTally.get(t.id);
+              if (!tally) this.boardTally.set(t.id, (tally = new Map()));
+              tally.set(target, Math.min(5000, (tally.get(target) ?? 0) + board));
+            }
           }
           if (pos >= t.top) dir = -1;
           else if (pos <= t.bottom) dir = 1;

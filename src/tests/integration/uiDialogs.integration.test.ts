@@ -2471,6 +2471,35 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(simText()).not.toContain("Most riders board");
   });
 
+  it("origins never outrun the demand gate: warm origins on a cold day show nothing (#465)", async () => {
+    // The inverse of the cold-origins case: the weekend ORIGIN map carries mass
+    // but the weekend demand curve never warmed. Deleting the dayWarmed() gate
+    // in dayOriginsAt would light these markers; pin that they stay dark.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const origins = emptyOriginRings();
+    origins.weekend[12] = new Map([[7, 30]]);
+    const hourly = Array(24).fill(0.5);
+    open({ hourly: { weekday: hourly }, origins, initialWeekend: true }); // the cold weekend tab
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(0);
+    expect(simText()).not.toContain("Most riders board");
+  });
+
+  it("drops the hotspot mark and the named floor once the floor is skipped (#465)", async () => {
+    // EMA'd origin history outlives a stop edit; the readouts must not claim
+    // boardings on a floor the shaft no longer serves.
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 30],
+      [1, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins, stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 5, 6, 8, 9, 10]) });
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(1); // floor 7 is skipped: only floor 1 marks
+    expect(simText()).toContain("Most riders board at Floor 1.");
+  });
+
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
     const { apply } = open({
       stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 8, 9, 10]),

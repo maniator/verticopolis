@@ -354,8 +354,17 @@ export function sampleElevatorUtil(sim: Simulation): void {
   const hour = ((Math.floor(sim.clock.hour) % 24) + 24) % 24;
   const day = sim.clock.isWeekend ? "weekend" : "weekday";
   // The dispatcher's boarding tally since the last hourly sample: the feed for
-  // the per-floor origin rings (#465). Drained exactly once per sample.
+  // the per-floor origin rings (#465). Drained exactly once per sample. Unlike
+  // the demand ring's frac (an instantaneous snapshot), the tally covers the
+  // hour that just ENDED, so it attributes to the previous hour and to THAT
+  // hour's day type (at 00:00 that is yesterday's 23:00, which flips the day
+  // ring at every weekday/weekend boundary).
   const boardings = sim.elevators.drainBoardings();
+  const prevMinutes = sim.clock.minutes - 60;
+  const originHour = ((Math.floor(prevMinutes / 60) % 24) + 24) % 24;
+  const cal = sim.clock.calendar;
+  const prevDow = Math.max(0, Math.floor(prevMinutes / 1440)) % cal.weekDays;
+  const originWeekend = prevDow >= cal.weekDays - cal.weekendDays;
   for (const t of sim.tower.transports) {
     if (!isElevatorKind(t.kind)) continue;
     const cap = t.cars * transportCarCapacity(t.kind);
@@ -382,11 +391,11 @@ export function sampleElevatorUtil(sim: Simulation): void {
     // zero-load hour also reads 0 (the slot is only written when frac > 0), so a
     // dead day can never warm; that conflation is tracked as #474.
     ring[hour] = ring[hour] === 0 && frac > 0 ? frac : 0.3 * frac + 0.7 * ring[hour];
-    // Origin rings (#465): fold this hour's boardings-by-floor with the same
-    // day-split and EMA rules, so origins warm and decay in step with demand.
+    // Origin rings (#465): fold the ended hour's boardings-by-floor with the
+    // same day-split and EMA rules, attributed to the hour they happened in.
     let origins = sim.elevatorOrigins.get(t.id);
     if (!origins) sim.elevatorOrigins.set(t.id, (origins = emptyOriginRings()));
-    foldOrigins(origins, sim.clock.isWeekend, hour, boardings.get(t.id));
+    foldOrigins(origins, originWeekend, originHour, boardings.get(t.id));
     // Passenger utilization EMA (staff-only shafts excluded, as before).
     if (isStaffOnlyTransport(t.kind)) continue;
     aliveUtil.add(t.id);

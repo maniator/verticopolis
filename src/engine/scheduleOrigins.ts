@@ -8,9 +8,13 @@
  *
  * Shape mirrors the day-split demand rings (#466): one 24-slot ring per day
  * type, each slot an origin-floor map EMA'd hourly with the same 0.3/0.7
- * blend and first-sample seeding, so the two accumulators warm and decay in
- * step. Pure helpers only; `Simulation` owns the per-shaft store and the
- * hourly fold site lives beside `sampleElevatorUtil`.
+ * blend. Two deliberate differences from the demand ring: the tally covers a
+ * whole hour, so the fold site attributes it to the hour that ENDED (the
+ * demand frac is instantaneous and stays on the current hour), and the
+ * full-value first-sample seed applies only to an EMPTY slot, so a floor that
+ * decays out and returns blends back in instead of snapping to full weight.
+ * Pure helpers only; `Simulation` owns the per-shaft store and the hourly
+ * fold site lives beside `sampleElevatorUtil`.
  */
 
 export const ORIGIN_HOURS = 24;
@@ -35,12 +39,15 @@ const PRUNE_BELOW = 0.05;
 
 /**
  * Fold one hour's boarding counts into the slot for `(day, hour)`. The same
- * EMA rule as the demand ring: a floor's first positive sample lands at full
- * value; after that `0.3 * new + 0.7 * old`. Floors absent this hour decay by
- * the same blend and are pruned once negligible.
+ * EMA rule as the demand ring: `0.3 * new + 0.7 * old`, with floors absent
+ * this hour decaying by the same blend and pruned once negligible. The
+ * full-value first-sample seed applies only when the WHOLE slot is empty:
+ * a previously pruned floor re-entering an active slot blends in at sample
+ * weight, so an intermittent floor cannot oscillate between full and gone.
  */
 export function foldOrigins(rings: OriginRings, isWeekend: boolean, hour: number, counts: ReadonlyMap<number, number> | undefined): void {
   const slot = (isWeekend ? rings.weekend : rings.weekday)[((hour % ORIGIN_HOURS) + ORIGIN_HOURS) % ORIGIN_HOURS];
+  const firstSample = slot.size === 0;
   for (const [floor, prev] of slot) {
     const sampled = counts?.get(floor) ?? 0;
     const next = 0.3 * sampled + 0.7 * prev;
@@ -50,9 +57,23 @@ export function foldOrigins(rings: OriginRings, isWeekend: boolean, hour: number
   if (counts) {
     for (const [floor, n] of counts) {
       if (n <= 0 || slot.has(floor)) continue; // existing floors were blended above
-      slot.set(floor, n); // first positive sample lands at full value
+      const seeded = firstSample ? n : 0.3 * n;
+      if (seeded >= PRUNE_BELOW) slot.set(floor, seeded);
     }
   }
+}
+
+/** The day's origin mass summed across all 24 slots, floor by floor: the
+ *  staging-aim input (#465). A single peak-hour slot is the wrong basis for
+ *  staging (the demand peak is often the lobby-dominated up-rush, and a slot
+ *  can be empty at the exact sampled instant), so the aim reads the whole
+ *  day's boarding geography instead. */
+export function dayOriginTotals(ring: ReadonlyArray<ReadonlyMap<number, number>>): Map<number, number> {
+  const totals = new Map<number, number>();
+  for (const slot of ring) {
+    for (const [floor, n] of slot) totals.set(floor, (totals.get(floor) ?? 0) + n);
+  }
+  return totals;
 }
 
 /**
