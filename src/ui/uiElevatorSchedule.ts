@@ -178,10 +178,15 @@ export function showElevatorScheduleDialog(
     return parts.join(", ");
   };
 
+  // Whether the last recompute produced CRITICAL advice, straight from the
+  // model (never parsed back out of the rendered copy, which a copy tweak
+  // would silently break): the auto-unfold keys on this.
+  let adviceCritical = false;
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";
     const shaft = shaftNow(state.floors);
     const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
+    adviceCritical = adv !== null;
     if (!ctx.ux.advice) state.adviceMsg = "";
     else if (!adv) state.adviceMsg = sctx.hasMeasured ? "Measured demand and your schedule line up." : "";
     else {
@@ -208,7 +213,7 @@ export function showElevatorScheduleDialog(
   /** Advice about strip numbers must not critique a hidden strip: whenever the
    *  sentence turns critical while the Modern fold is shut, open it. */
   const unfoldOnAdvice = (): void => {
-    if (!ctx.ux.rawGridDefault && ctx.ux.advice && !state.advancedOpen && state.adviceMsg.startsWith("This shaft is")) {
+    if (!ctx.ux.rawGridDefault && ctx.ux.advice && !state.advancedOpen && adviceCritical) {
       state.advancedOpen = true;
     }
   };
@@ -330,6 +335,9 @@ export function showElevatorScheduleDialog(
       afterStops();
     },
     onHomeSet: (car, floor) => {
+      // Re-pressing a car's own home chip changes nothing: do not mark the
+      // working copy dirty (which would arm the discard guard) for a no-op.
+      if (state.schedule.homeFloors[car] === floor) return;
       state.schedule.homeFloors[car] = floor;
       homesDirty = true;
       after();
