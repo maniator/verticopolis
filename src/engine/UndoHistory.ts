@@ -1,4 +1,13 @@
 import type { Tower } from "./Tower";
+import type { ElevatorSchedule } from "./elevatorSchedule";
+
+/** Deterministic compact signature of an authored schedule: joins exactly the
+ *  four player-set fields, so it stays cheap (no JSON of 24-slot arrays'
+ *  property structure) and independent of object-property order. */
+function schedSig(s: ElevatorSchedule | undefined): string {
+  if (!s) return "";
+  return `${(s.activeCars?.weekday ?? []).join(",")}/${(s.activeCars?.weekend ?? []).join(",")}~${s.waitingCarResponse ?? ""}~${s.standardFloorDeparture ?? ""}~${(s.homeFloors ?? []).join(",")}`;
+}
 
 /**
  * A cheap fingerprint of the player-mutable state: structure, transport config,
@@ -26,7 +35,7 @@ export function towerStateSig(tower: Tower, money: number): string {
     // to it would drop that edit as a no-op, making the apply un-undoable.
     .map(
       (x) =>
-        `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}:${x.schedule ? JSON.stringify(x.schedule) : ""}`,
+        `${x.kind}@${x.x}:${x.bottom}-${x.top}:${x.cars}:${(x.skipFloors ?? []).join(".")}:${schedSig(x.schedule)}`,
     )
     .join(";");
   return `${money}|${u}|${r}`;

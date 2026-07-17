@@ -315,8 +315,9 @@ export function showElevatorScheduleDialog(
       // Announce what actually happened: the engine can refuse (endpoints,
       // the express lobby lock), and the re-read rows are the truth.
       const now = state.floors.find((f) => f.floor === floor)?.served;
-      if (now === serve) announce(serve ? `Floor ${floor} served.` : `Floor ${floor} skipped.`);
-      else announce(`Floor ${floor} must stay a stop.`);
+      const fl = floorLabel(floor); // B-n grammar below ground, matching the grid
+      if (now === serve) announce(serve ? `Floor ${fl} served.` : `Floor ${fl} skipped.`);
+      else announce(`Floor ${fl} must stay a stop.`);
     },
     onExpressStops: () => {
       ctx.stops.expressStops();
