@@ -737,6 +737,12 @@ a.btn {
   padding: var(--pad-y) var(--pad-x);
   max-height: 82vh;
   overflow-y: auto;
+  /* Dialog grammar invariant: a window never pans sideways. overflow-y alone
+     computes overflow-x to auto, so a child's min-content leak (the schedule
+     strip's 36px touch bars were the first) would silently turn the WHOLE
+     dialog into a horizontal scroller on phones. Wide content scrolls inside
+     its own well or not at all. */
+  overflow-x: hidden;
 }
 /* The dialog title bar is additionally sticky, so the ✕ stays reachable when
    a long dialog (help, export) scrolls. Full-bleed comes from .win > .win-title.
@@ -1178,6 +1184,12 @@ dialog.crash-card::backdrop {
    accents. Staging leads, the count strip is a pressed well of 24 bar
    buttons, and every stepper reuses .btn. */
 .es-body { display: grid; gap: 8px; }
+/* Grid items keep the default min-width auto, so a wide child (the 24-bar strip
+   at its 36px touch minimum is ~890px of min-content) would propagate its width
+   up through the grid and blow the modal past the viewport instead of scrolling
+   inside .es-strip's own well. Seen on a real phone (v1.57.0); the mobile
+   design party's containment ruling. */
+.es-body > * { min-width: 0; }
 .es-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .es-spread { justify-content: space-between; }
 .es-heading { font-weight: 700; }
@@ -1734,6 +1746,39 @@ dialog.crash-card::backdrop {
   }
   .es-sq {
     min-width: 36px;
+  }
+  /* The static 0/6/12/18/23 axis row lies once the strip scrolls (its labels
+     spread across the WRAPPER, not the bars sliding under them), so it hides on
+     touch; the docked stepper still names the selected hour. The fold-in
+     increment moves the axis inside the scroller instead. */
+  .es-strip-axis {
+    display: none;
+  }
+  /* Touch breathing room (owner's phone feedback): the 36px controls need more
+     air between sections than the desktop's 8px, the quick actions must not
+     crowd the car list, and the docked stepper and Simulate line want space
+     before the actions row. Coarse-only, so desktop pixels stay untouched. */
+  .es-body {
+    gap: 12px;
+  }
+  .es-homes {
+    gap: 10px 12px;
+  }
+  .es-home-row {
+    gap: 8px;
+  }
+  .es-home-row > span {
+    flex: none;
+  }
+  .es-quick {
+    gap: 8px;
+    margin-bottom: 4px;
+  }
+  .es-strip-step {
+    margin-top: 6px;
+  }
+  .es-sim {
+    margin-top: 4px;
   }
   /* Title-bar ✕s keep their exact desktop look — stretching them reads
      wrong in the bar — and instead grow an invisible tap halo, so the
