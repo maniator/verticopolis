@@ -3,9 +3,11 @@ import { html } from "lit-html";
 import { Simulation } from "../../engine/Simulation";
 import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/gripe";
 import type { DemandMap } from "../../engine/sim/demand";
+import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { gripeLineText } from "../../game/gripeCopy";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**
@@ -165,6 +167,102 @@ describe("the Main gripe inspector line", () => {
     expect(text).toContain("Long walk to transport");
     expect(text).not.toContain("Main gripe:");
   });
+
+  it("names the capacity shortfall for a tenant whose reachable retail is oversubscribed", () => {
+    // A full-width floor of occupied offices sharing one fast food venue: every
+    // office reaches it, but the pool dwarfs its capacity (share > 2, coverage
+    // below the 0.5 floor), so the gripe prescribes more venues anywhere
+    // connected (the demand model is tower-uniform, so nearness carries
+    // nothing and "near this floor" would be a false promise).
+    const sim = Simulation.newGame(1);
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    // Parallel shafts every 40 tiles so no office is transport-far or congested.
+    for (let sx = 10; sx < GRID.width - 10; sx += 40) {
+      expectOk(sim.buildTransport("elevatorStandard", sx, 1, 2));
+    }
+    const food = placeUnit(sim, "fastFood", 2, GRID.width - 30);
+    food.state = "occupied";
+    let sample: Unit | undefined;
+    for (let x = 14; x + 9 <= GRID.width - 40; x += 11) {
+      const r = sim.tower.place("office", 2, x);
+      if (!r.ok) continue; // tiles under a shaft column: skip, the rest suffice
+      const o = sim.tower.units.find((u) => u.id === r.unitId)!;
+      o.state = "occupied";
+      // The sample must sit outside the venue's noise band so unmet demand,
+      // the last sink, is the dominant gripe under test.
+      if (!sample && x < GRID.width - 120) sample = o;
+    }
+    expect(sample, "fixture placed no sample office").toBeDefined();
+    // Assert the precondition through the SAME hour-memoized map the render
+    // reads (review finding: a locally built map could pass while the render's
+    // memo fell back to the other phrasing).
+    const coverage = unmetCoverage(sim.demandMap(), sample!);
+    expect(coverage).not.toBeNull();
+    expect(coverage!).toBeGreaterThan(0); // reaches the venue...
+    expect(coverage!).toBeLessThan(UNMET_DEMAND_FLOOR); // ...which is oversubscribed
+    sample!.satisfaction = 0.5;
+    const text = diagText(sim, sample!);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("Add venues on any connected floor");
+    expect(text).not.toContain("reachable from here");
+  }, 30000);
+
+  it("names the broken connection for a tenant whose retail is all stranded", () => {
+    // The tower HAS retail, but it sits on an unserved floor: the office
+    // reaches none of it (coverage 0), so the fix is a connection and the
+    // gripe prescribes reconnecting the retail.
+    const sim = Simulation.newGame(1);
+    const office = servedOffice(sim);
+    lay(sim, "floor", 3);
+    // No transport reaches floor 3: the venue is built and operational but
+    // stranded, so it counts as existing retail that no shopper can reach.
+    const food = placeUnit(sim, "fastFood", 3, C + 40);
+    food.state = "occupied";
+    expect(sim.tower.isFloorServed(3)).toBe(false);
+    expect(unmetCoverage(sim.demandMap(), office)).toBe(0); // via the render's own memo
+    office.satisfaction = 0.5;
+    const text = diagText(sim, office);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("none of them are reachable from here");
+    expect(text).not.toContain("Add venues on any connected floor");
+  }, 30000);
+
+  it("stays silent when coverage 0 comes from the tenant's own far floor (access owns it)", () => {
+    // The tower's retail is perfectly connected; what fails is the TENANT's
+    // floor, served but beyond two rides (three chained shafts). Coverage
+    // reads 0 for it, and the gripe copy defers to the dedicated red
+    // "Access: too far" line rather than blaming retail that is not broken
+    // (review finding: the reconnect copy would misprescribe here).
+    const sim = Simulation.newGame(21);
+    sim.money = 1e9;
+    sim.star = 5;
+    const X0 = C - 15;
+    const X1 = C + 45;
+    const put = (kind: "floor" | "lobby", f: number, x: number): void => {
+      if (sim.tower.structureKindAt(f, x) === kind) return;
+      expectOk(sim.tower.place(kind, f, x));
+    };
+    for (let x = X0; x <= X1; x++) put("lobby", 1, x);
+    for (let f = 2; f <= 40; f++) for (let x = X0; x <= X1; x++) put("floor", f, x);
+    expectOk(sim.tower.placeTransport("elevatorStandard", C, 1, 15));
+    expectOk(sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30));
+    expectOk(sim.tower.placeTransport("elevatorStandard", C + 12, 30, 40));
+    placeUnit(sim, "office", 2, X0).state = "occupied";
+    placeUnit(sim, "fastFood", 2, C + 30).state = "occupied";
+    const far = placeUnit(sim, "office", 40, C + 30);
+    far.state = "occupied";
+    expect(sim.tower.isFloorServed(40)).toBe(true); // served (no access "not connected")...
+    expect(sim.floorReachable(40)).toBe(false); // ...but beyond two rides
+    expect(unmetCoverage(sim.demandMap(), far)).toBe(0);
+    expect(gripeLineText(sim, far, "unmetDemand")).toBeUndefined();
+    // The reachable ground-floor office still reads the honest capacity copy
+    // through the same entry point (its coverage is nonzero).
+    const near = sim.tower.units.find((u) => u.kind === "office" && u.floor === 2)!;
+    expect(gripeLineText(sim, near, "unmetDemand")).toContain("Add venues on any connected floor");
+  }, 30000);
 
   it("defers to the dedicated line for access (no duplicate Main gripe)", () => {
     const sim = Simulation.newGame(1);

@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.57.2
+
+- The "too few shops or restaurants" gripe now says which problem you actually have: not enough retail for the tower's crowds (build more, on any connected floor) or retail that no shopper can reach (reconnect it). It no longer tells you to build "near this floor", which never mattered.
+
 ## 1.57.0
 
 - Big hotels can finally staff up: every housekeeping unit now fields its full six maids no matter how many units you build. A hidden 64-maid tower-wide limit used to starve large hotels below their built capacity; the original game has no such pool, and now neither do we.
