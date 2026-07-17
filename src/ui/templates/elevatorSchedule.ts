@@ -70,6 +70,9 @@ export interface SchedState {
    *  Simulate staging readout. */
   adviceMsg: string;
   simMsg: string;
+  /** Measured demand-hotspot floors for the visible day's busiest hour (#465):
+   *  marked in the grid; empty when origins are cold. */
+  originFloors: number[];
 }
 
 export interface SchedHandlers {
@@ -291,7 +294,7 @@ function floorsTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Tem
           const isBase = f.floor === state.base;
           return html`
           <div class="es-grid-row${f.served ? "" : " es-skipped"}">
-            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}</span>
+            <span class="es-cell-floor">${isBase ? html`<span class="es-base" title="Base floor: unhomed cars wait here">◎</span>` : nothing}${floorLabel(f.floor)}${f.lobby ? html`<span class="es-lobby-mark" title="Lobby floor">L</span>` : nothing}${state.originFloors.includes(f.floor) ? html`<span class="es-origin" title="Demand hotspot: many riders board here at the busiest ${state.day} hour">▲</span>` : nothing}</span>
             ${ctx.isExpress
               ? nothing
               : f.endpoint

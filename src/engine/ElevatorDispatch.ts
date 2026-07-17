@@ -32,6 +32,17 @@ export class ElevatorDispatch {
   private carDwell = new Map<number, number[]>();
   /** Waiting passengers per floor — builds up over time, cleared as cars call. */
   private waiting = new Map<number, number>();
+  /** Transient boarding tally since the last drain (#465): shaft id to origin
+   *  floor to boarded count. Pure counting of boardings the SCAN loop already
+   *  computes; never serialized, never read back into behavior. */
+  private boardTally = new Map<number, Map<number, number>>();
+
+  /** Hand over and clear the boarding tally (the hourly origin sampler's feed). */
+  drainBoardings(): Map<number, Map<number, number>> {
+    const out = this.boardTally;
+    this.boardTally = new Map();
+    return out;
+  }
 
   /** Current waiting estimate at a floor (for inspection / tests). */
   waitingAt(floor: number): number {
@@ -221,6 +232,10 @@ export class ElevatorDispatch {
           if (board > 0) {
             t.carLoad[i] += board;
             if (!staffOnly) demand.set(target, Math.max(0, w - board));
+            // Origin tally (#465): count where riders board, per shaft.
+            let tally = this.boardTally.get(t.id);
+            if (!tally) this.boardTally.set(t.id, (tally = new Map()));
+            tally.set(target, (tally.get(target) ?? 0) + board);
           }
           if (pos >= t.top) dir = -1;
           else if (pos <= t.bottom) dir = 1;

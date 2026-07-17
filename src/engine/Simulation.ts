@@ -33,6 +33,7 @@ import * as events from "./sim/events";
 import * as demand from "./sim/demand";
 import type { DemandMap } from "./sim/demand";
 import type { HourlyByDay } from "./elevatorSchedule";
+import type { OriginRings } from "./scheduleOrigins";
 import * as stats from "./sim/stats";
 
 import type { HeatmapMode, HeatCell, BatchTarget, BatchRentOptions, BatchRentResult } from "./sim/constants";
@@ -263,26 +264,25 @@ export class Simulation implements SimContext {
 
   /** Per-shaft measured demand by hour-of-day, split by day type (#466): two
    *  24-slot rings of EMA'd load fractions (0..1) per shaft id, sampled hourly
-   *  alongside {@link elevatorUtil} for the schedule dialog (#305 Phase 3).
-   *  Transient like it: a fresh load reads empty, never a fabricated curve. */
+   *  alongside {@link elevatorUtil} for the schedule dialog. Transient like it. */
   elevatorHourly = new Map<number, HourlyByDay>();
-
-  /** This shaft's measured day-split curves, or undefined before any sample. */
   elevatorHourlyLoad(id: number): HourlyByDay | undefined { return this.elevatorHourly.get(id); }
 
-  /** Lazy noise-adjacency memo by unit id, valid for exactly one
-   *  tower.revision (strict equality; -1 forces the first fill). Noise is a
-   *  pure function of layout and every layout mutation bumps revision, so a
-   *  hit is exact; unit STATE (fire, gut, occupancy) is deliberately not an
-   *  input, see the functionalParkingSet precedent in tower/routing.ts.
-   *  Transient like elevatorUtil: never serialized, and load/undo build a
-   *  fresh Simulation, so no stale memo can survive a restore. */
+  /** Per-shaft boarding-origin rings (#465), day-split per-hour origin-floor maps folded hourly from the dispatch boarding tally. Transient; never serialized. */
+  elevatorOrigins = new Map<number, OriginRings>();
+  elevatorOriginLoad(id: number): OriginRings | undefined { return this.elevatorOrigins.get(id); }
+
+  /** Lazy noise-adjacency memo by unit id, valid for exactly one tower.revision
+   *  (strict equality; -1 forces the first fill). Noise is a pure function of
+   *  layout and every layout mutation bumps revision, so a hit is exact; unit
+   *  STATE (fire, gut, occupancy) is deliberately not an input, see the
+   *  functionalParkingSet precedent in tower/routing.ts. Transient like
+   *  elevatorUtil: load/undo build a fresh Simulation, no stale memo survives. */
   noiseMemo = new Map<number, boolean>();
   noiseMemoRev = -1;
 
   /** Lazy commercial-demand-map memo, valid for one `(tower.revision, hour)`
-   *  key. Transient like {@link noiseMemo}: never serialized, and load/undo build
-   *  a fresh Simulation, so no stale memo survives a restore. */
+   *  key. Transient like {@link noiseMemo}. */
   demandMemo: DemandMap | null = null;
   demandMemoKey = "";
 

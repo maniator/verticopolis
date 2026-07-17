@@ -102,6 +102,21 @@ describe("autoTuneSchedule", () => {
     expect(autoTuneSchedule(cur, { ...CTX, hourly: undefined })).toBe(cur);
     expect(autoTuneSchedule(cur, { ...CTX, hourly: { weekday: Array(24).fill(0) } })).toBe(cur);
   });
+
+  it("aims the staging seed at the measured busiest boarding floor (#465)", () => {
+    // With an origin aim above the base, the upper half homes there instead of
+    // the top lobby; without one (or aimed at/below the base) the plain split
+    // stands, and a hand-set staging is never overwritten by the aim.
+    const aimed = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve() }, peakOriginFloor: 22 })!;
+    expect(aimed.homeFloors).toEqual([1, 1, 1, 22, 22, 22]);
+    const baseAim = autoTuneSchedule(undefined, { ...CTX, hourly: { weekday: rushCurve() }, peakOriginFloor: 1 })!;
+    expect(baseAim.homeFloors).toEqual([1, 1, 1, 30, 30, 30]); // the lobby aim falls back to the split
+    const authored = autoTuneSchedule(
+      { homeFloors: [15, 15, 15, 15, 15, 15] },
+      { ...CTX, hourly: { weekday: rushCurve() }, peakOriginFloor: 22 },
+    )!;
+    expect(authored.homeFloors).toEqual([15, 15, 15, 15, 15, 15]);
+  });
 });
 
 describe("scheduleAdvice", () => {

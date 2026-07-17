@@ -2450,6 +2450,27 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().textContent).toContain("No measured weekend traffic yet; Auto-tune adjusts only measured days.");
   });
 
+  it("marks measured boarding hotspots in the grid and names them in Simulate (#465)", async () => {
+    const { emptyOriginRings } = await import("../../engine/scheduleOrigins");
+    // Weekday demand peaks at 08:00; origins say that hour's riders board on
+    // floors 7 (mostly) and 1.
+    const hourly = Array(24).fill(0.2);
+    hourly[8] = 0.9;
+    const origins = emptyOriginRings();
+    origins.weekday[8] = new Map([
+      [7, 30],
+      [1, 10],
+    ]);
+    open({ hourly: { weekday: hourly }, origins });
+    const marks = Array.from(dialog().querySelectorAll(".es-origin"));
+    expect(marks).toHaveLength(2);
+    expect(simText()).toContain("Most riders board on floors 1, 7.");
+    // The markers are day-scoped like the ghost: a cold weekend shows none.
+    dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click();
+    expect(dialog().querySelectorAll(".es-origin")).toHaveLength(0);
+    expect(simText()).not.toContain("Most riders board");
+  });
+
   it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
     const { apply } = open({
       stops: fakeStops(10, [1, 8], [1, 2, 3, 4, 8, 9, 10]),

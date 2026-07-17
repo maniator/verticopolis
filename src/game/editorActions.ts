@@ -126,6 +126,7 @@ export class EditorActions {
         top: t.top,
         stops,
         hourly: sim.elevatorHourlyLoad(id),
+        origins: sim.elevatorOriginLoad(id),
         current: t.schedule,
         initialWeekend: sim.clock.isWeekend,
         announce: (msg) => this.deps.announce(msg),

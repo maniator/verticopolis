@@ -789,8 +789,17 @@ so the spec and the build cannot drift silently:
 - **Stop edits do not arm the discard guard**: they apply live with their own undo steps, so
   Cancel could not honestly take them back; the guard covers only the schedule working copy.
 - **Known ghost limit**: the demand accumulator cannot tell "measured zero" from "hour not
-  yet sampled", so an unsampled hour draws no dash rather than a zero dash. The per-floor
-  accumulator (#465) refines the sampling story; revisit the distinction there.
+  yet sampled", so an unsampled hour draws no dash rather than a zero dash. Tracked as
+  `schedule-ring-sampled-mask` (#474).
+- **Origin accumulator (#465, v1.60.0)**: the dispatcher tallies boardings by origin floor
+  at its board site; `sampleElevatorUtil` drains the tally hourly into day-split per-hour
+  origin maps (same EMA, first-sample, and warm-in-step rules as the demand rings; transient,
+  never serialized). Three specced surfaces land on it: red hotspot markers in the floors
+  grid for the visible day's busiest hour, the Simulate trailing clause ("Most riders board
+  on floors 5–7."), and Auto-tune's staging seed aiming the upper half at the busiest
+  measured boarding floor (presets keep the plain lobby split: they are intents, not
+  measurements). Origins are gated on the day's warm demand curve, so they never outrun the
+  ghost/advice gate.
 - **Day-split rings (#466, v1.59.0)**: the measured accumulator keeps one 24-slot ring per
   day type, keyed on `clock.isWeekend` at sample time. The ghost, the advice sentence, the
   Simulate peak, and Auto-tune are all day-scoped: an unmeasured weekend shows no ghost and

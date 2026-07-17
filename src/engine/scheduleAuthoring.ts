@@ -24,6 +24,9 @@ export interface ShaftContext {
   top: number;
   servedLobbies: number[];
   hourly?: { weekday?: readonly number[]; weekend?: readonly number[] };
+  /** The busiest measured boarding floor for the primary measured day (#465),
+   *  when the caller has origin data; Auto-tune aims its staging seed here. */
+  peakOriginFloor?: number;
 }
 
 /** The measured curve for one day type, or undefined when that day has no
@@ -74,6 +77,19 @@ function upTowerTarget(ctx: ShaftContext): number {
 function splitStaging(ctx: ShaftContext): number[] {
   const base = baseLobby(ctx);
   const up = upTowerTarget(ctx);
+  const lower = Math.floor(ctx.cars / 2);
+  return Array.from({ length: ctx.cars }, (_, i) => (i < lower ? base : up));
+}
+
+/** Auto-tune's staging seed (#465): the split, but with the up-tower half AIMED
+ *  at the measured busiest boarding floor when the caller supplies one above the
+ *  base (clamped to the span). Presets keep the plain lobby-targeted split: they
+ *  are fixed intents, not measurements. */
+function aimedStaging(ctx: ShaftContext): number[] {
+  const aim = ctx.peakOriginFloor;
+  if (aim === undefined || aim <= baseLobby(ctx)) return splitStaging(ctx);
+  const base = baseLobby(ctx);
+  const up = Math.max(ctx.bottom, Math.min(ctx.top, aim));
   const lower = Math.floor(ctx.cars / 2);
   return Array.from({ length: ctx.cars }, (_, i) => (i < lower ? base : up));
 }
@@ -162,7 +178,7 @@ export function autoTuneSchedule(current: ElevatorSchedule | undefined, ctx: Sha
   const next: ElevatorSchedule = {
     ...current,
     activeCars,
-    homeFloors: homesAuthored ? current!.homeFloors : splitStaging(ctx),
+    homeFloors: homesAuthored ? current!.homeFloors : aimedStaging(ctx),
   };
   return coerceSchedule(next, ctx.cars, ctx.bottom, ctx.top);
 }
