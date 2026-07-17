@@ -60,7 +60,7 @@ export interface SimContext {
    * network, walking to `destX` to service unit `cleanUnitId`, then holding in
    * the room for `cleanMinutes` game-minutes of visible cleaning before the job
    * reports done. "full" means the staff pool is at cap (retry later);
-   * "no-route" means the staff network can't get there (surface it — don't
+   * "no-route" means the staff network can't get there (surface it, don't
    * retry silently). Optional so hand-rolled test contexts without a crowd can
    * omit it. */
   spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route";
