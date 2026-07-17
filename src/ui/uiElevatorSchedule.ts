@@ -412,8 +412,10 @@ export function showElevatorScheduleDialog(
       }
       // Name the days that were actually tuned: on a cold Weekend tab a blanket
       // "auto-tuned" would claim a change the visible row never shows (#466).
-      const tunedDays = [warmedWd() ? "weekday" : null, warmedWe() ? "weekend" : null].filter(Boolean).join(" and ");
-      announce(`Auto-tuned the ${tunedDays} schedule and staging to measured demand.`);
+      const tunedDays = [warmedWd() ? "weekday" : null, warmedWe() ? "weekend" : null].filter(Boolean);
+      announce(
+        `Auto-tuned the ${tunedDays.join(" and ")} ${tunedDays.length > 1 ? "schedules" : "schedule"} and staging to measured demand.`,
+      );
       after();
     },
     onToggleAdvanced: () => {

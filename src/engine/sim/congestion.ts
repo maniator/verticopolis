@@ -373,8 +373,10 @@ export function sampleElevatorUtil(sim: Simulation): void {
     }
     const ring = rings[day];
     // First real sample lands at full value (same seeding rule as the util EMA
-    // below): a zero slot means "not yet sampled", and blending the first sample
-    // toward that zero would under-report the hour for days.
+    // below): a zero slot usually means "not yet sampled", and blending the first
+    // sample toward that zero would under-report the hour for days. A genuinely
+    // zero-load hour also reads 0 (the slot is only written when frac > 0), so a
+    // dead day can never warm; that conflation is tracked as #474.
     ring[hour] = ring[hour] === 0 && frac > 0 ? frac : 0.3 * frac + 0.7 * ring[hour];
     // Passenger utilization EMA (staff-only shafts excluded, as before).
     if (isStaffOnlyTransport(t.kind)) continue;
