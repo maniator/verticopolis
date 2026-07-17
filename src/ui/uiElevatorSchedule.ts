@@ -101,7 +101,19 @@ export function showElevatorScheduleDialog(
     recommended: recommendedPreset(ctx.isExpress),
   };
 
-  const fmtHours = (hs: number[]): string => hs.map((h) => `${String(h).padStart(2, "0")}:00`).join(", ");
+  // Compress an ascending hour list into ranges ("07:00–10:00, 13:00") so a
+  // long advice stretch reads as one span, not a two-line comma flood (§11).
+  const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
+  const fmtHours = (hs: number[]): string => {
+    const parts: string[] = [];
+    for (let i = 0; i < hs.length; ) {
+      let j = i;
+      while (j + 1 < hs.length && hs[j + 1] === hs[j] + 1) j++;
+      parts.push(j > i ? `${hh(hs[i])}–${hh(hs[j])}` : hh(hs[i]));
+      i = j + 1;
+    }
+    return parts.join(", ");
+  };
 
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";

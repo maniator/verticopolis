@@ -2312,7 +2312,18 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     ui.showElevatorScheduleDialog(baseCtx({ hourly, current }), { apply: vi.fn() });
     const advice = dialog().querySelector(".es-advice");
     expect(advice).not.toBeNull();
+    expect(advice!.textContent).toBe("This shaft is short at 08:00 on weekdays.");
     expect(dialog().querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(false);
+  });
+
+  it("compresses consecutive advice hours into one range", () => {
+    // Half the fleet parked all day against a flat busy curve: over-staffed
+    // never fires; a full-fleet demand with 1 active car is short EVERY hour,
+    // which must read as one 00:00-23:00 span, not 24 comma'd stamps.
+    const hourly = Array(24).fill(0.9);
+    const { ui } = makeUI();
+    ui.showElevatorScheduleDialog(baseCtx({ hourly, current: { activeCars: { weekday: Array(24).fill(1) } } }), { apply: vi.fn() });
+    expect(dialog().querySelector(".es-advice")!.textContent).toBe("This shaft is short at 00:00–23:00 on weekdays.");
   });
 
   it("hands Auto-tune the measured curve and the tuned counts land on OK", () => {

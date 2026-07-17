@@ -56,6 +56,27 @@ describe("elevator schedule persistence (#305 Phase 1)", () => {
     expect(back.schedule).toEqual(schedule);
   });
 
+  it("round-trips a schedule authored through Tower.setSchedule (the dialog's write path, Phase 3)", () => {
+    const sim = towerWithElevator();
+    const shaft = sim.tower.transports[0];
+    expect(sim.tower.setCars(shaft.id, 4)).toBe(true);
+    const before = sim.tower.revision;
+    // The dialog hands a fully-populated working copy; setSchedule hardens it.
+    expect(
+      sim.tower.setSchedule(shaft.id, {
+        activeCars: { weekday: Array(SCHEDULE_HOURS).fill(2), weekend: Array(SCHEDULE_HOURS).fill(1) },
+        waitingCarResponse: 6,
+        standardFloorDeparture: 40,
+        homeFloors: [1, 1, 8, 8],
+      }),
+    ).toBe(true);
+    expect(sim.tower.revision).toBeGreaterThan(before); // routing/stop caches invalidate
+    const back = roundTrip(sim).tower.transports[0];
+    expect(back.schedule).toEqual(shaft.schedule);
+    expect(back.schedule!.waitingCarResponse).toBe(6);
+    expect(back.schedule!.homeFloors).toEqual([1, 1, 8, 8]);
+  });
+
   it("leaves a shaft with no schedule absent (sparse save, today's behavior)", () => {
     const sim = towerWithElevator();
     expect(sim.tower.transports[0].schedule).toBeUndefined();

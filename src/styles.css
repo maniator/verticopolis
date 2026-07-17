@@ -1234,7 +1234,10 @@ dialog.crash-card::backdrop {
   right: 0;
   top: 1px;
   font-size: 9px;
-  color: var(--muted);
+  color: var(--r-ink);
+  /* A face-gray halo keeps the count readable when a full bar's navy fill
+     reaches up behind it. */
+  text-shadow: 0 0 1px var(--r-face), 0 0 2px var(--r-face), 0 0 3px var(--r-face);
   pointer-events: none;
 }
 .es-strip-axis { display: flex; justify-content: space-between; color: var(--muted); font-size: 0.8em; padding: 0 2px; }
