@@ -164,6 +164,10 @@ export interface OnboardingOpts {
   pauseForSplash: (paused: boolean) => void;
   /** A small chime on step advance (optional flourish). */
   chime: () => void;
+  /** Switch the music: `true` for the splash theme while the start screen is up,
+   *  `false` for the in-game bed once the player enters the tower. Optional so
+   *  tests can omit it. */
+  setMusicProgram?: (onSplash: boolean) => void;
 }
 
 export class OnboardingController {
@@ -201,6 +205,8 @@ export class OnboardingController {
 
   showSplash(o: { hasSave: boolean; onContinue: () => void; onNewTower: (dismiss: () => void) => void }): void {
     this.opts.pauseForSplash(true);
+    // The start screen has its own looping theme; the tower gets the calm bed.
+    this.opts.setMusicProgram?.(true);
     const mobile = this.opts.mq.matches;
     const el = document.createElement("div");
     el.id = "splash";
@@ -283,6 +289,8 @@ export class OnboardingController {
     this.splashEl?.remove();
     this.splashEl = null;
     this.opts.pauseForSplash(false);
+    // Entering the tower: hand off from the splash theme to the in-game bed.
+    this.opts.setMusicProgram?.(false);
   }
 
   // ---- Checklist / onboarding --------------------------------------------

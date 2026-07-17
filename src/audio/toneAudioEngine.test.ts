@@ -104,6 +104,8 @@ describe("inert-without-AudioContext contract", () => {
     for (const n of names) expect(() => eng.sfx(n)).not.toThrow();
     expect(() => eng.setMuted(true)).not.toThrow();
     expect(() => eng.setVolumes(0.5, 0.5)).not.toThrow();
+    expect(() => eng.setProgram("splash")).not.toThrow();
+    expect(() => eng.setProgram("game")).not.toThrow();
   });
 
   it("dispose tears down safely even when nothing was ever built", () => {

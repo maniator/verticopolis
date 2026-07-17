@@ -19,6 +19,7 @@ class StubEngine {
   disposed = false;
   music = 1;
   sfxVol = 1;
+  program = "game";
   lastFocus: unknown = null;
   constructor() {
     built.push(this);
@@ -32,6 +33,9 @@ class StubEngine {
   setVolumes(music: number, sfx: number): void {
     this.music = music;
     this.sfxVol = sfx;
+  }
+  setProgram(program: string): void {
+    this.program = program;
   }
   update(focus: unknown): void {
     this.lastFocus = focus;
@@ -126,6 +130,17 @@ describe("AudioEngine facade lazy loading", () => {
     audio.setVolumes(0.7, Infinity);
     expect(audio.musicVolume).toBe(0.7);
     expect(audio.sfxVolume).toBe(0.5);
+  });
+
+  it("forwards the pre-load program to the engine on load, then live after", async () => {
+    const audio = new AudioEngine(loader);
+    audio.setProgram("splash"); // chosen before any load
+    expect(audio.program).toBe("splash");
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect(built[0].program).toBe("splash"); // landed on the engine at build time
+    audio.setProgram("game"); // live switch forwards immediately
+    expect(built[0].program).toBe("game");
   });
 
   it("loads the chunk only once across repeated start() calls", async () => {
