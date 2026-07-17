@@ -5,7 +5,7 @@ game_type: simulation-management
 platforms: [web]
 created: 2026-07-17
 updated: 2026-07-17
-builds_on: gdd-cockroach-infestation-2026-07-16.md
+builds_on: ../../design/gdd-cockroach-infestation-2026-07-16.md
 state: draft
 ---
 
@@ -57,7 +57,7 @@ rejected; see Out of Scope).
 - Housekeepers you can **watch work** the floors, at a normal pace, cleaning rooms
   over real time instead of teleporting them clean.
 - **Canon-faithful Classic** housekeeping (6 maids per unit, one per floor, service
-  elevator or stairs, noon-5 shift) versus a **Modern "smart management"** upgrade
+  elevator or stairs, 12:00-17:00 shift) versus a **Modern "smart management"** upgrade
   that triages the rooms about to be lost.
 
 ## Core Gameplay
@@ -250,7 +250,7 @@ Detailed breakdown in `epics.md` (to be authored via
    evict a live guest. Kills the false-alarm spam and the eviction feel-bad first.
 2. **Time-simulated maids (Classic core):** 6 maids/unit, one-per-floor, walk
    service/stairs (drop escalators), per-room dwell, clean-after-dwell; remove the
-   `HK_ROOMS_PER_CREW` cap; Classic noon-5 window + 4:30 cutoff.
+   `HK_ROOMS_PER_CREW` cap; Classic 12:00-17:00 window + 16:30 cutoff.
 3. **Legibility layer:** staff-read-as-staff, infested terminal copy, "enough"
    verdict fix, infested overlay color, infested alert location, condo n/a shade.
 4. **Modern smart dispatch:** days-dirty-weighted-by-travel triage via GameRules;

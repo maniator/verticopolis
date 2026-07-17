@@ -21,7 +21,7 @@ failure from the player.
 - **CONFIRMED (code):** staff network includes escalators
   (`isStaffTransportKind` = service + stairs + escalator); canon is service-or-stairs.
 - **CONFIRMED (code):** our shift is 08:00-19:00 (`HK_SHIFT_START/END`); canon is
-  noon-5PM with a 4:30 "no new room" cutoff.
+  12:00-17:00 with a 16:30 "no new room" cutoff.
 - **CONFIRMED (code):** cockroach spread soils `asleep` (occupied) rooms and zeroes
   occupants, evicting sleeping guests; our own prior GDD said "clean/empty", canon
   says roaches spread "regardless if clean or not."
@@ -57,7 +57,7 @@ Additional canon found this session (SimTower wiki + FAQs):
   automatically); no canon order to honor.
 
 Ratifications:
-1. **Shift window (owner):** Classic = canon noon-5PM + 4:30 "no new room" cutoff;
+1. **Shift window (owner):** Classic = canon 12:00-17:00 + 16:30 "no new room" cutoff;
    Modern = keep the longer 08-19 day as part of its "better management" fantasy.
    Dwell tuned so ~19 rooms/maid emerges on a compact hotel; throughput emerges
    from simulated walk + dwell, not a hard 20/day cap.
