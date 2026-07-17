@@ -24,7 +24,7 @@ failure from the player.
   12:00-17:00 with a 16:30 "no new room" cutoff.
 - **CONFIRMED (code):** cockroach spread soils `asleep` (occupied) rooms and zeroes
   occupants, evicting sleeping guests; our own prior GDD said "clean/empty", canon
-  says roaches spread "regardless if clean or not."
+  says roaches spread regardless of whether the room is clean.
 - **CONFIRMED (code):** dispatch iterates rooms in tower order with no `dirtyDays`
   triage, so about-to-infest rooms get no priority.
 - **CONFIRMED (code + save):** the stats "enough housekeeping" verdict subtracts

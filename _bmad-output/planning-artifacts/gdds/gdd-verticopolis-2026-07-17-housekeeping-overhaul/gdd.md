@@ -1,8 +1,8 @@
 ---
 title: Housekeeping & Cockroach Overhaul
 game: Verticopolis
-game_type: simulation-management
-platforms: [web]
+game_type: simulation
+platforms: browser
 created: 2026-07-17
 updated: 2026-07-17
 builds_on: ../../design/gdd-cockroach-infestation-2026-07-16.md
