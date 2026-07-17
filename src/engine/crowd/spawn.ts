@@ -6,7 +6,8 @@ import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
 import type { Crowd } from "../Crowd";
 import type { SpawnFloors, StaffKind } from "./person";
-import { MAX_PEOPLE, MAX_STAFF, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
+import { MAX_PEOPLE, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
+import { HK_MAIDS_PER_UNIT } from "../economy/housekeeping";
 import {
   MEAL_WINDOWS,
   mealWindowFor,
@@ -418,7 +419,7 @@ export function spawnStaff(
   cleanMinutes: number,
   fromX?: number,
 ): "sent" | "full" | "no-route" {
-  if (crowd.staffCount >= MAX_STAFF) return "full";
+  if (crowd.staffCount >= maxStaffFor(tower)) return "full";
   const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
   if (!r) return "no-route";
   const p = makePerson(crowd, tower, r, destX);
@@ -431,6 +432,27 @@ export function spawnStaff(
   p.lingerFor = cleanMinutes * CROWD_SECONDS_PER_MINUTE;
   crowd.staffCount++;
   return "sent";
+}
+
+/** The staff-actor spawn ceiling: built housekeeping units x
+ *  {@link HK_MAIDS_PER_UNIT}. Canon has no tower-wide staff pool (each 1994
+ *  unit staffs its own 6 maids), so a fixed cap here silently throttled big
+ *  hotels; the per-crew ledgers in `economy/housekeeping.ts` are the real
+ *  constraint and this gate only backstops them. Counted by KIND alone (a
+ *  burning crew keeps its share, so orphaned in-flight maids never pinch
+ *  healthy crews; dispatch's operational filter stops a burned crew fielding
+ *  new maids) and memoized per {@link Tower.revision}, which the kind count
+ *  tracks exactly (the gate runs in dispatch's per-room loop; a fresh
+ *  O(units) scan per call is out). A crewless tower reads "full" to any staff actor. */
+const staffCeiling = new WeakMap<Tower, { rev: number; cap: number }>();
+export function maxStaffFor(tower: Tower): number {
+  const hit = staffCeiling.get(tower);
+  if (hit && hit.rev === tower.revision) return hit.cap;
+  let crews = 0;
+  for (const u of tower.units) if (u.kind === "housekeeping") crews++;
+  const entry = { rev: tower.revision, cap: crews * HK_MAIDS_PER_UNIT };
+  staffCeiling.set(tower, entry);
+  return entry.cap;
 }
 
 /** Drain the staff jobs that ended since the last call (arrived or failed). */
