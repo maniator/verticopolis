@@ -400,8 +400,16 @@ describe("Deep-review regressions (must not come back)", () => {
     const r1 = sim.tower.units.find((u) => u.id === a.unitId)!;
     const r2 = sim.tower.units.find((u) => u.id === b.unitId)!;
     r1.state = "dirty"; // no housekeeping anywhere
-    for (let i = 0; i < 24; i++) sim.tick(60);
-    expect(r2.state).toBe("dirty"); // infestation spread from r1 → r2
+    // Canon: a merely dirty room does not spread. With zero housekeeping r1 sits
+    // dirty for INFEST_DAYS and turns infested; only THEN is it a spread source.
+    for (let i = 0; i < 24 * 4; i++) sim.tick(60);
+    expect(r1.state).toBe("infested"); // dirty room escalated with no crew to clean it
+    // Present a clean adjacent room and run one checkout: the infested r1 spreads
+    // into it. (r2 cycles through its own bookings over the days, so pin it empty
+    // to isolate the spread from its own guest turnover.)
+    r2.state = "empty";
+    sim.economy.hotelCheckout();
+    expect(r2.state).toBe("dirty"); // infestation spread from the infested r1 -> r2
   });
 
   it("D25: a condo next to an office is worn down by noise and eventually gives notice + moves out", () => {

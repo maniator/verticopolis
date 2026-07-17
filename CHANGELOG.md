@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.53.1
+
+- Cockroaches now spread only from fully infested rooms, never from a room that is merely waiting to be cleaned, so a tidy tower stops raising false roach alarms.
+
 ## 1.53.0
 
 - Neglected hotel rooms now crawl with cockroaches, and a room left dirty too long becomes infested until you clear it: bulldoze it in Classic, or call a paid exterminator in Modern towers.

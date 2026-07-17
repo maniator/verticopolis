@@ -228,16 +228,20 @@ export class Housekeeping {
     }
   }
 
-  /** Rooms left dirty breed cockroaches that creep into the adjacent room along
-   * the hotel run (canon): under-provision housekeeping and the infestation
-   * spreads, soiling clean/occupied neighbors until you scale up cleaning. Both
-   * `dirty` and full `infested` rooms are spread sources, so an untreated
-   * infestation keeps eating the wing until it is cleaned, exterminated, or
-   * bulldozed. */
+  /** A full cockroach infestation creeps into the adjacent room along the hotel
+   * run (canon). Canon rule matched here: only an `infested` room is a spread
+   * source. A merely `dirty` room does NOT spread (leaving one dirty overnight is
+   * a housekeeping backlog, not an outbreak, so a tower with zero infested rooms
+   * never raises this alarm). An infested source soils an adjacent occupied or
+   * empty neighbor (turning it `dirty`), so an untreated infestation keeps eating
+   * the wing until the source is cleared (bulldoze, or Modern's exterminator).
+   *
+   * NOTE: softening the occupied-neighbor case so spread never robs a completed
+   * stay of its revenue is deferred (a naive "empty-only" target breaks
+   * propagation, since spread runs each morning while last night's guests are
+   * still `asleep`). Tracked in the housekeeping-overhaul GDD. */
   private spreadCockroaches(): void {
-    const sources = this.sim.tower.units.filter(
-      (u) => isHotelKind(u.kind) && (u.state === "dirty" || u.state === "infested"),
-    );
+    const sources = this.sim.tower.units.filter((u) => isHotelKind(u.kind) && u.state === "infested");
     if (sources.length === 0) return;
     let spread = 0;
     for (const u of sources) {
@@ -255,7 +259,10 @@ export class Housekeeping {
       }
     }
     if (spread > 0) {
-      this.sim.emit(`🪳 Cockroaches spread from unserviced rooms into ${spread} more. Add housekeeping!`, "bad");
+      this.sim.emit(
+        `🪳 Cockroaches spread from infested rooms into ${spread} more room${spread > 1 ? "s" : ""}. Clear the infested source.`,
+        "bad",
+      );
     }
   }
 }

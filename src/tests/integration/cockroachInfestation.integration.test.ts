@@ -80,6 +80,17 @@ describe("Cockroach infestation lifecycle", () => {
     expect(b.state).toBe("dirty");
   });
 
+  it("a merely dirty room does not spread cockroaches (only infested rooms do)", () => {
+    const sim = hotelTower(16);
+    const a = placeHotel(sim, X0);
+    const b = placeHotel(sim, X0 + a.width); // directly adjacent
+    a.state = "dirty"; // dirty, NOT infested
+    b.state = "empty";
+    sim.economy.hotelCheckout();
+    expect(b.state).toBe("empty"); // canon: a dirty room breeds no spread
+  });
+
+
   it("an infested room on an unserved floor stays infested (never self-clears for free)", () => {
     const sim = hotelTower(14);
     // A floor no elevator reaches: an unserved floor, where a non-dormant room's

@@ -60,8 +60,9 @@ RECOVERY of an infested room diverges by mode.
    at the daily checkout boundary (`beforeCheckout`, before the morning's fresh
    checkouts). The 3-day clock survives a save/load round trip (no reset
    exploit).
-3. Housekeeping never cleans an `infested` room. `infested` rooms remain a
-   spread SOURCE (like `dirty`).
+3. Housekeeping never cleans an `infested` room. `infested` rooms are the
+   spread SOURCE. (SUPERSEDED 2026-07-17, v1.53.1: originally "like `dirty`";
+   canon narrowed the source to `infested` only.)
 4. Classic: an `infested` room cannot be recovered except by bulldoze. No
    exterminator is offered. Bulldozing an infested room works and is not blocked
    by any new logic.
@@ -106,8 +107,9 @@ RECOVERY of an infested room diverges by mode.
   - [ ] In `Housekeeping.beforeCheckout`, BEFORE `spreadCockroaches`, escalate any
         room `dirty` for `>= INFEST_DAYS` (3) to `infested`. New constant near
         `HK_ROOMS_PER_CREW`.
-  - [ ] Make `spreadCockroaches` treat `infested` as a spread source too (source =
-        `dirty || infested`; neighbors still go `dirty`).
+  - [ ] Make `spreadCockroaches` spread from `infested` rooms; neighbors still go
+        `dirty`. (Updated 2026-07-17, v1.53.1: source is `infested` only, not
+        `dirty || infested`, per SimTower canon.)
 - [ ] **Engine: gameRules recovery seam + Modern exterminator** (AC: 4, 5)
   - [ ] Add `GameRules.infestationRecovery(): { calloutFee: number; perRoomFee: number } | null`.
         Classic returns `null` (permanent); Modern returns the fee model. Constants

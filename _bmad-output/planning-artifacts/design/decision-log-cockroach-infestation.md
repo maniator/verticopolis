@@ -19,6 +19,8 @@ Companion to `gdd-cockroach-infestation-2026-07-16.md`.
      to pay for exterminator." → party landed the design → owner: "Yes, build
      this" + "Scaling + call-out.")
   3. Escalation timer = 3 dirty days, identical in both modes; spread unchanged.
+     (SUPERSEDED 2026-07-17, v1.53.1: canon research narrowed the spread source to
+     `infested` only, not `dirty || infested`. See the housekeeping-overhaul GDD.)
   4. Visibility (both modes): roach sprite on dirty/infested, inspector "why",
      housekeeping overlay tints dirty/infested/out-of-reach (#401).
   5. Ship everything in one PR (owner: "Everything in one PR").
