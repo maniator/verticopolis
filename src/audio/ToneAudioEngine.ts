@@ -172,9 +172,9 @@ export class ToneAudioEngine {
       }).connect(this.musicGain);
       this.hook.volume.value = -6;
 
-      // Close-up accents (dry, held below the music so they read as background
-      // detail rather than sharp blips).
-      this.accentGain = new Tone.Gain(0.3).connect(this.musicBus);
+      // Close-up accents (dry, held well below the music so they read as faint
+      // background detail, never sharp blips competing with the composed track).
+      this.accentGain = new Tone.Gain(0.1).connect(this.musicBus);
       this.accentSynth = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "sine" },
         envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.4 },
@@ -394,9 +394,9 @@ export class ToneAudioEngine {
     if (this.muted) return;
     try {
       const def = SCENES[this.scene];
-      // Skip the accent path for scenes with no accent, so a zoomed-in quiet
-      // scene doesn't resolve/discard the voice nodes every step.
-      if (this.detail > 0.5 && def.accent !== "none") {
+      // Only well zoomed in, so accents stay a rare close-up detail behind the
+      // music (and a no-accent scene never resolves/discards the voice nodes).
+      if (this.detail > 0.62 && def.accent !== "none") {
         const nodes = this.accentNodes();
         if (nodes) maybeAccent(nodes, def, this.tick, this.detail, time);
       }

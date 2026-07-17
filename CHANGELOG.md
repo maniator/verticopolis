@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.61.1
+
+- The occasional close-up sounds when you zoom into a floor (elevator dings, register beeps, and the like) are quieter and rarer now, so they sit behind the new music instead of competing with it.
+
 ## 1.61.0
 
 - The Schedule dialog now shows where your riders actually come from: red hotspot markers flag the floors where most boarding happens at the busiest hour, the Simulate line names them, and Auto-tune stages the upper half of the fleet at the busiest measured boarding floor instead of guessing the top lobby.

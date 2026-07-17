@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
-import { scheduleStep } from "./toneVoices";
-import type { SceneDef } from "./toneScenes";
+import { scheduleStep, maybeAccent, accentHit, type AccentNodes } from "./toneVoices";
+import type { Accent, SceneDef } from "./toneScenes";
 
 /**
  * scheduleStep is an exported synthesis helper (extracted from the engine's
@@ -46,5 +46,54 @@ describe("scheduleStep", () => {
     // indexes an empty array; the guard must short-circuit instead.
     scheduleStep(lead as never, { ...BASE, scale: [], pad: [] }, "office", 1, 1, 0.6, 0);
     expect(lead.triggerAttackRelease).not.toHaveBeenCalled();
+  });
+});
+
+/** Recording stand-ins for the accent nodes (three sound voices: synth,
+ *  membrane, noise; plus their shared filter). The synth/membrane voices take a
+ *  frequency as their first trigger arg; the noise voice takes a duration
+ *  string, so only the tonal voices are checked for finite pitch. */
+function fakeAccentNodes() {
+  const calls = { synth: [] as unknown[][], membrane: [] as unknown[][], noise: [] as unknown[][] };
+  const nodes: AccentNodes = {
+    accentSynth: { triggerAttackRelease: (...a: unknown[]) => calls.synth.push(a) },
+    membrane: { triggerAttackRelease: (...a: unknown[]) => calls.membrane.push(a) },
+    noiseAccent: { triggerAttackRelease: (...a: unknown[]) => calls.noise.push(a) },
+    accentFilter: { type: "bandpass", frequency: { value: 0 }, Q: { value: 0 } },
+  } as unknown as AccentNodes;
+  const total = () => calls.synth.length + calls.membrane.length + calls.noise.length;
+  return { nodes, calls, total };
+}
+
+describe("accentHit", () => {
+  const accents: Exclude<Accent, "none">[] = ["ding", "clatter", "keys", "rumble", "boom", "register", "chatter"];
+
+  it("dispatches every accent to a voice with finite pitches and never throws", () => {
+    for (const a of accents) {
+      const { nodes, calls, total } = fakeAccentNodes();
+      expect(() => accentHit(nodes, a, 0)).not.toThrow();
+      expect(total(), `accent ${a} triggered nothing`).toBeGreaterThan(0);
+      for (const c of [...calls.synth, ...calls.membrane]) {
+        expect(Number.isFinite(c[0] as number)).toBe(true);
+      }
+    }
+  });
+});
+
+describe("maybeAccent", () => {
+  const withAccent = (accent: Accent): SceneDef => ({ ...BASE, accent });
+
+  it("never fires for a no-accent scene", () => {
+    const { nodes, total } = fakeAccentNodes();
+    for (let t = 0; t < 100; t++) maybeAccent(nodes, withAccent("none"), t, 1, 0);
+    expect(total()).toBe(0);
+  });
+
+  it("fires occasionally when zoomed in (drives the dispatch)", () => {
+    const { nodes, total } = fakeAccentNodes();
+    // Over many ticks at full detail some pass the rarity gate, so at least one
+    // accent lands (the exact count is deterministic but not asserted).
+    for (let t = 0; t < 3000; t++) maybeAccent(nodes, withAccent("ding"), t, 1, 0);
+    expect(total()).toBeGreaterThan(0);
   });
 });
