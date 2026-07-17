@@ -8,6 +8,7 @@
 // Type-only import (erased at compile) for the persisted calendar choice; its
 // home is calendar.ts, which imports GameMode back from here.
 import type { CalendarKind } from "./calendar";
+import type { ElevatorSchedule } from "./elevatorSchedule";
 
 /** Cosmetic sky weather, derived deterministically from the day. */
 export type WeatherKind = "clear" | "cloudy" | "rain";
@@ -345,6 +346,8 @@ export interface Transport {
   load: number;
   /** Floors this transport is configured NOT to stop at (express service). */
   skipFloors?: number[];
+  /** Optional per-shaft manual schedule (elevator-scheduling, #305); absent means today's automatic dispatch. Type and helpers live in the `elevatorSchedule` leaf. */
+  schedule?: ElevatorSchedule;
 }
 
 /**
