@@ -126,6 +126,23 @@ describe("Fire event", () => {
     expect(ctx.tower.units.some((u) => u.state === "fire")).toBe(true);
   });
 
+  it("an uncontained blaze climbs to the room directly above (canon: fire spreads upward)", () => {
+    // officeTower stacks one office per floor at x=0 (floors 3–6), so a floor-3
+    // blaze has no same-floor neighbor: the only spread target is the office
+    // directly above on floor 4 (and floors 5–6 keep the count above one, so the
+    // last-of-kind safety valve doesn't spare it). Roll 0 ignites; pick 0 selects
+    // the lowest office; a 0.9 containment draw fails (control 0.5) so it spreads.
+    const ctx = makeCtx(officeTower(), 2, new ScriptedRNG([0, 0, 0.9]));
+    const events = new EventSystem(ctx, 7);
+    events.maybeRandomEvent();
+    const lit = ctx.tower.units.find((u) => u.state === "fire")!;
+    expect(lit.floor).toBe(3); // pick 0 landed on the bottom office
+    const above = ctx.tower.units.find((u) => u.kind === "office" && u.floor === lit.floor + 1)!;
+    expect(above.state).not.toBe("fire");
+    events.maybeRandomEvent(); // processFires: containment fails, so the fire climbs
+    expect(above.state).toBe("fire");
+  });
+
   it("an unanswered choice auto-declines on the next roll — the game never stalls", () => {
     // First roll ignites + leaves the rescue pending; the second roll's
     // processFires draw (0.9) fails containment so the fire is still burning,

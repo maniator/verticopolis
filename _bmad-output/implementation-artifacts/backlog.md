@@ -98,8 +98,9 @@ How items flow:
 | 2026-07-15 | a11y-shaft-congestion-overlay | #373 | accessibility | feature-request | P3 | — | — | idea | **From gdd-accessibility-2026-07-01 (deferred to phase 2; the settings override in the GDD already promises to force this overlay on when it ships).** A congested-band hatch drawn on the shaft plus a small tier badge answers which shaft is choking without color reliance. Distinct from the `congestion-overlay` row (a perf memoization of `congestion()`), despite the similar name. Needs a small UX pass first. |
 | 2026-07-15 | star-falling | #374 | Classic/Modern split | design-decision | P3 | — | — | parked | **PARKED epic, spec-first; row created 2026-07-15 because gdd-classic-modern-pricing-roadmap claims it exists.** Modern-only: star ratings can fall within bounds (grace window, only un-earned stars, never TOWER). Epic-sized, needs its own gdd-/arch- docs; the room's standing caution is that it opens the should-rating-fall can (evaluateStar only ratchets up today). Resurrect via a party, not a rider. |
 | 2026-07-15 | post-tower-prestige | #375 | Classic/Modern split | design-decision | P3 | — | — | parked | **PARKED until player demand; row created 2026-07-15 because gdd-classic-modern-pricing-roadmap claims it exists.** A post-TOWER prestige progression for maxed towers. No design beyond the shortlist mention; record preserves the parking ruling and its resurrection condition (demand). |
-| 2026-07-15 | hotel-sticky-states | #376 | SimTower parity | feature-request | P3 | — | — | idea | **Gated: needs art, a save field, and a small spec. Tier 2.5 of the pricing roadmap (own row promised, created 2026-07-15).** The 1994 game has an infested hotel state (TDT status flag bits 64/32 decode in our importer) and escalating dirty texture. CAVEAT recorded from tdt-hotel-status-fidelity: TDT byte 17 is NOT a persisted days-dirty counter, so the roadmap's save-field premise is partly stale; the gameplay feature (infestation state + escalation) is still unbuilt and this row owns it. |
-| 2026-07-15 | pixelart-interior-animations | #377 | pixel-art | feature-request | P3 | — | — | idea | **From gdd-pixel-art-overhaul-2026-07-14 (deferred follow-up design pass; the GDD claimed it was tracked here, record made true 2026-07-15).** Subtle per-unit interior motion (desk fans, TV flicker, diners eating). Hard constraint from the bake architecture: only fire/construction redraw per frame today; any animated room must join the animated set deliberately or the texture cache churns. Design pass first, party-ratified. |
+| 2026-07-16 | fire-upward-spread | — | SimTower parity | bug | P2 | low | — | done | **DONE (v1.53.0).** Canon fire spreads along its floor AND climbs to the room directly above (never down); `EventSystem` previously only spread to a same-floor neighbor, so fires never crossed floors. Added `roomAbove` plus a shared `spreadFireTo` (keeps the same last-of-kind safety valve and the original left-then-right same-floor rule), each direction an independent per-day attempt. Verified online against the canon FAQ and strategy guides. Folded into the cockroach-visibility PR with owner sign-off. Guarded by `gameEvents.integration.test.ts`. |
+| 2026-07-15 | hotel-sticky-states | — | SimTower parity | feature-request | P3 | — | — | done | **DONE (v1.53.0). Design in `gdd-cockroach-infestation-2026-07-16.md`; closes #376.** New `infested` UnitState: a hotel room dirty 3 straight days (per-room `dirtyDays` counter, serialized so a reload can't reset the clock) breeds cockroaches. Housekeeping can no longer clean an infested room and it stays a spread source. Classic recovers only by bulldozing (full 1994 parity, reversing the old will-not-build); Modern adds a paid exterminator (call-out plus per-room fee, lands next day) via `GameRules.infestationRecovery()`. Visible: roach sprites on dirty (light) and infested (heavy) rooms, an inspector why-plus-fix line, the cleanliness overlay gains an infested tier, and a housekeeping-coverage readout (crews vs rooms vs out-of-reach). Did NOT rely on the stale TDT byte-17 premise. `/gds-code-review` ran. Guarded by `cockroachInfestation.integration.test.ts`, `heatmap.integration.test.ts`, `residential.test.ts`. |
+| 2026-07-15 | pixelart-interior-animations | #377 | pixel-art | feature-request | P3 | — | — | idea | **From gdd-pixel-art-overhaul-2026-07-14 (deferred follow-up design pass; the GDD claimed it was tracked here, record made true 2026-07-15).** Subtle per-unit interior motion (desk fans, TV flicker, diners eating). Hard constraint from the bake architecture: only fire/construction redraw per frame today; any animated room must join the animated set deliberately or the texture cache churns. Design pass first, party-ratified. **Includes the owner-requested cockroach leg-wiggle (2026-07-17): the redesigned roach decals are drawn into the cached hotel sprite, so a wiggle needs the same animated-set opt-in as everything else here (a 2-3 frame leg cycle on a moving actor layer, not the static room bake). Deferred as a fast-follow from the cockroach-visibility PR.** |
 | 2026-07-15 | modal-aria-labelledby | — | accessibility | task | P3 | low | — | done | **DONE 2026-07-15 (issue #378 closes with the PR).** `UI.finishModal` (`src/ui/UI.ts`) now wraps the shared modal's top-level `.win-title` title contents in a span carrying a stable id and points `aria-labelledby` on `#modal` at that span (so the close button appended to the title bar never leaks into the accessible name), for the lit (`openModalTemplate`) mount path; `closeModal` clears the attribute so it never dangles while the dialog is closed/empty. Covered in `src/tests/integration/uiDialogs.integration.test.ts`. ORIGINAL: **Ready, one-line a11y win. Lit-migration deferred item (a) (design/ui-rendering-engine 30-epics-and-stories.md; promised to the backlog, record made true 2026-07-15).** The #modal dialog should reference its `.win-title` with `aria-labelledby` so screen readers announce which dialog opened. |
 | 2026-07-15 | ui-update-decouple-mitigation | #379 | ui-rendering-engine | design-decision | P3 | — | — | parked | **Gated: fires only if the perf gate's profile B regresses. Lit-migration deferred item (c) (promised to the backlog, record made true 2026-07-15).** The structural mitigation decouples `ui.update` cadence from `engine.onUpdate` if lit template re-renders ever show up in the frame budget. Trigger recorded so it is not lost; no action while the perf gate stays green. |
 | 2026-07-15 | hotel-twin-naming | #380 | SimTower parity | feature-request | P3 | — | — | idea | **Ready, cosmetic canon naming (tier 3 of the pricing roadmap; the only tier-3 item without a row until 2026-07-15).** The 1994 game calls our hotelDouble a Twin (TDT canon doc unit table; the Finance Window line reads Twin). Rename player-facing copy where canon (build palette, inspector, stats); the engine kind id stays hotelDouble (save compatibility). |
@@ -1937,6 +1938,49 @@ departed while culled never flashes at a stale position). Standing defers:
   into a commit this story. Consider pointing its output at `test-results/`
   (or gating the write behind the screenshot workflow env) so a local e2e run
   can never dirty the committed gallery.
+
+### Deferred from: `/gds-code-review` of cockroach-infestation lifecycle (2026-07-16)
+
+Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
+Auditor). One HIGH finding (infested rooms self-clearing to `empty` because
+`isDormant` omitted the new state) and the MED exterminator "clears more than it
+billed" finding were both PATCHED in the same PR (`isDormant` now includes
+`infested`; the exterminator remembers the exact rooms it billed). Deferrals:
+
+- **A multi-tile burning room only climbs upward through its left column
+  (Edge, low).** `roomAbove(u)` checks `roomAt(u.floor + 1, u.x)`, the left edge
+  only, so a wide suite on fire ignites just the room above its left tile. This
+  mirrors the existing same-floor simplification (`adjacentRoom` checks only
+  `x-1` / `x+width`), so it is consistent with prior fire behavior, not a
+  regression. Revisit only if fire spread ever moves to a full-footprint model.
+- **Billing then bulldozing/burning an infested room wastes the exterminator fee
+  (Edge/Blind, low).** The fee is charged at booking; a room destroyed before the
+  next-morning treatment is simply not treated, with no refund. Player-controlled
+  and documented in `resolveExtermination`; a refund path is not worth the state.
+- **A hand-edited save can reset a room's `dirtyDays` to 0 (Blind, low).** The
+  coercion clamps to a non-negative int but has no lower anchor, so a self-editing
+  player could delay infestation. Self-cheating only (they could also set
+  `state:"empty"` directly); the persisted-clock guarantee holds for normal reloads.
+
+### Deferred from: `/gds-code-review` of cockroach sprite redesign (2026-07-17)
+
+Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
+Auditor) of the redesigned roach decals (`drawRoach`/`roachOval`/`roachLine` and
+the infested/dirty placement in `residential.ts`). One robustness gap was PATCHED
+in the same PR: `roachOval` now floors both radii to 1 so a future tiny-`L` roach
+can never divide by zero into a NaN rect (both adversarial layers flagged the
+`ry`-guard asymmetry, though no current caller reaches it). No live correctness,
+determinism, or caching defect was found. The owner-requested leg-wiggle is
+tracked under #377 above. Non-actionable notes (dismissed):
+
+- **Roach decals draw outside `maybeMirrored`, so absolute positions don't flip
+  with the room (Edge, cosmetic).** A satellite can land on a bed in the
+  unflipped layout and on wallpaper in the flipped one. The infestation cue is
+  pixel-identical regardless of flip (the stated intent and what `residential.test.ts`
+  asserts), so this is variety noise, not a bug.
+- **`seam`/`collar` verticals use `cx`/`cy` rather than the `X()`/`Y()` flip
+  helpers (Edge, cosmetic).** On upside-down (`fy=-1`) satellites the seam runs
+  the "wrong" way, but stays inside the symmetric body silhouette.
 
 ### Deferred from: code review of venue-people-routing (`/gds-code-review`, 2026-07-14)
 

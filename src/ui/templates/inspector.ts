@@ -29,12 +29,20 @@ export function unitInspectorTemplate(sim: Simulation, u: Unit): TemplateResult 
   // A relocation is a life event (Modern condos), not a complaint, so the
   // status line reads differently; the diagnostics block explains the rest.
   const isRelocation = u.state === "vacating" && u.vacateReason === "relocation";
+  // Hotel lifecycle states read as bare enums otherwise ("dirty", "asleep"); give
+  // them plain-language phrasing (the diagnostics block adds the why + the fix).
   const statusText =
     u.state === "vacating"
       ? isRelocation
         ? "on notice (household relocating)"
         : "on notice (tenant leaving)"
-      : u.state;
+      : u.state === "dirty"
+        ? "dirty (awaiting housekeeping)"
+        : u.state === "infested"
+          ? "cockroach infested"
+          : u.state === "asleep"
+            ? "occupied (guest asleep)"
+            : u.state;
   // Canon retail variant (§7): a shop / fastFood / restaurant with a subtype
   // titles as its specific name ("Chinese Cafe"), not the generic kind name.
   const title = u.subtype ?? f.name;

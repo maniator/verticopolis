@@ -2,10 +2,17 @@ import type { SimContext } from "../SimContext";
 import { isOperational } from "../types";
 import { isHotelKind } from "../facilities";
 
-/** Rooms one housekeeping crew can turn over per day. */
-const HK_ROOMS_PER_CREW = 20;
+/** Rooms one housekeeping crew can turn over per day. Exported so the coverage
+ *  readout (`sim/services.ts`) can size demand against it instead of duplicating
+ *  the number. */
+export const HK_ROOMS_PER_CREW = 20;
 /** Housekeepers a single crew keeps in transit at once (jobs queue behind). */
 const HK_MAX_IN_FLIGHT = 4;
+/** Consecutive days a hotel room may sit `dirty` before cockroaches take hold.
+ *  Mirrors the 1994 "left dirty more than 3 days" rule. On the INFEST_DAYS-th
+ *  daily checkout still dirty, the room turns `infested` and can no longer be
+ *  cleaned. */
+export const INFEST_DAYS = 3;
 
 /**
  * Hotel housekeeping dispatch, pulled out of {@link EconomySystem} into a friend
@@ -44,11 +51,47 @@ export class Housekeeping {
       this.sim.emit(`Housekeeping cleaned ${this.hkCleanedToday} hotel room(s).`, "info");
     }
     this.hkCleanedToday = 0;
+    // Age the dirty-day clock and turn rooms neglected past the limit into full
+    // infestations FIRST, so a freshly-infested room is a spread source this same
+    // morning (it can no longer be cleaned, only exterminated or bulldozed).
+    this.escalateInfestations();
     // Cockroaches breed in rooms left dirty overnight; spread BEFORE this
     // morning's checkouts go dirty, so a hotel whose housekeeping kept up
     // yesterday never seeds an infestation (and a tower with NO housekeeping
     // is the worst case, not immune).
     this.spreadCockroaches();
+  }
+
+  /** Advance the per-room dirty-day clock at the daily boundary. A hotel room
+   *  still `dirty` after {@link INFEST_DAYS} running days becomes `infested`:
+   *  housekeeping's dispatch only ever targets `dirty`, so an infested room is
+   *  automatically out of its reach from here on. Recovery is mode-specific and
+   *  handled elsewhere (Classic bulldoze-only; Modern paid exterminator). */
+  private escalateInfestations(): void {
+    let infested = 0;
+    for (const u of this.sim.tower.units) {
+      if (u.state !== "dirty" || !isHotelKind(u.kind)) continue;
+      const days = (u.dirtyDays ?? 0) + 1;
+      if (days >= INFEST_DAYS) {
+        u.state = "infested";
+        u.occupants = 0;
+        u.dirtyDays = undefined; // the clock's job is done; the room is now terminal-dirty
+        infested++;
+      } else {
+        u.dirtyDays = days;
+      }
+    }
+    if (infested > 0) {
+      // Point at the mode-correct fix so the toast is actionable: Modern towers
+      // can call an exterminator, Classic towers can only bulldoze and rebuild.
+      const fix = this.sim.rules?.infestationRecovery()
+        ? "Call an exterminator, or bulldoze and rebuild."
+        : "Bulldoze and rebuild to clear them.";
+      this.sim.emit(
+        `🪳 ${infested} neglected room(s) became cockroach-infested and can no longer be cleaned. ${fix}`,
+        "bad",
+      );
+    }
   }
 
   /** Fresh shift: yesterday's ledger is dropped (its travelers have long since
@@ -178,6 +221,7 @@ export class Housekeeping {
     if (ok && room?.state === "dirty") {
       room.state = "empty";
       room.satisfaction = 1;
+      room.dirtyDays = undefined; // clock reset: a re-dirtied room starts fresh
       this.hkCleanedToday++;
     } else if (crewId !== undefined) {
       this.hkCapacity.set(crewId, (this.hkCapacity.get(crewId) ?? 0) + 1);
@@ -186,12 +230,17 @@ export class Housekeeping {
 
   /** Rooms left dirty breed cockroaches that creep into the adjacent room along
    * the hotel run (canon): under-provision housekeeping and the infestation
-   * spreads, soiling clean/occupied neighbors until you scale up cleaning. */
+   * spreads, soiling clean/occupied neighbors until you scale up cleaning. Both
+   * `dirty` and full `infested` rooms are spread sources, so an untreated
+   * infestation keeps eating the wing until it is cleaned, exterminated, or
+   * bulldozed. */
   private spreadCockroaches(): void {
-    const dirty = this.sim.tower.units.filter((u) => isHotelKind(u.kind) && u.state === "dirty");
-    if (dirty.length === 0) return;
+    const sources = this.sim.tower.units.filter(
+      (u) => isHotelKind(u.kind) && (u.state === "dirty" || u.state === "infested"),
+    );
+    if (sources.length === 0) return;
     let spread = 0;
-    for (const u of dirty) {
+    for (const u of sources) {
       // Check BOTH neighbors; a non-hotel room on one side shouldn't block
       // infestation of a hotel room on the other.
       for (const neighbor of [

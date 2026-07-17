@@ -14,7 +14,7 @@ import { classifyGesture, isPaintKind } from "./game/gesture";
 import { unitEditorTemplate, transportEditorTemplate } from "./ui/templates/editor";
 import { buildRefusalTemplate } from "./ui/templates/inspector";
 import { brushTiles, snapX, type PlaceOutcome } from "./ui/placement";
-import { statsTemplate } from "./ui/templates/stats";
+import { canCallExterminator, statsTemplate } from "./ui/templates/stats";
 import { OnboardingController } from "./ui/Onboarding";
 import { BuildActions } from "./game/buildActions";
 import { EditorActions } from "./game/editorActions";
@@ -539,7 +539,57 @@ class GameApp implements GameAppPorts {
   }
 
   showStats(): void {
-    this.ui.showStats(statsTemplate(this.sim));
+    // The "Call exterminator" button only exists in the modal when it's offerable
+    // (Modern, infested rooms, none already en route). Gate the handler on the
+    // same predicate the template uses, since wireActions throws if it binds to a
+    // button that was not rendered.
+    const handlers: Record<string, () => void> = canCallExterminator(this.sim)
+      ? { exterminate: () => this.confirmExterminate() }
+      : {};
+    this.ui.showStats(statsTemplate(this.sim), handlers);
+  }
+
+  /** Confirm and pay for a tower-wide exterminator dispatch (Modern), then reopen
+   *  the stats modal so the player sees the "en route" state. The engine charges
+   *  and logs the booking; here we only confirm the spend and surface a refusal
+   *  the gate above should already have prevented. */
+  private confirmExterminate(): void {
+    const cov = this.sim.housekeepingCoverage();
+    const recovery = this.sim.rules.infestationRecovery();
+    if (!recovery || cov.infested === 0) {
+      // The tower can change between rendering the stats modal and clicking the
+      // button (a fire or bulldoze clears the last infested room, or the mode
+      // rule-set no longer offers an exterminator), so say why nothing happens
+      // instead of a silent no-op.
+      this.sim.emit(recovery ? "No infested rooms left to treat." : "The exterminator is unavailable.", "bad");
+      this.showStats();
+      return;
+    }
+    const cost = recovery.calloutFee + recovery.perRoomFee * cov.infested;
+    this.ui.confirmModal(
+      "Call the exterminator?",
+      `Clear ${cov.infested} infested room(s) for $${cost.toLocaleString()}? The crew arrives tomorrow.`,
+      () => {
+        const res = this.sim.callExterminator();
+        // Surface every refusal, not just funds: the tower can change between
+        // rendering the stats modal and confirming (rooms cleared, or another
+        // dispatch already booked), so a silent no-op would leave the player
+        // wondering why nothing happened.
+        if (!res.ok) {
+          const why =
+            res.reason === "funds"
+              ? `Not enough funds to book the exterminator ($${(res.cost ?? cost).toLocaleString()}).`
+              : res.reason === "pending"
+                ? "An exterminator is already on the way."
+                : res.reason === "none"
+                  ? "No infested rooms left to treat."
+                  : "The exterminator is unavailable.";
+          this.sim.emit(why, "bad");
+        }
+        this.showStats();
+      },
+      "Call exterminator",
+    );
   }
 
   showSaves(): void {

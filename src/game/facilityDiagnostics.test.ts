@@ -84,6 +84,44 @@ describe("facilityDiagnostics", () => {
   });
 });
 
+describe("facilityDiagnostics: housekeeping and cockroaches", () => {
+  it("a dirty hotel room names the 3-day cockroach risk", () => {
+    const { sim, unit } = simWith("hotelSingle");
+    unit.state = "dirty";
+    const frag = render(facilityDiagnostics(sim, unit));
+    expect(frag.textContent).toContain("Dirty:");
+    expect(frag.textContent).toMatch(/cockroaches/i);
+  });
+
+  it("an infested room names the mode-correct fix: Classic bulldoze, no exterminator", () => {
+    const { sim, unit } = simWith("hotelSingle");
+    unit.state = "infested";
+    const frag = render(facilityDiagnostics(sim, unit));
+    expect(frag.textContent).toContain("Cockroach infested");
+    expect(frag.textContent).toMatch(/[Bb]ulldoze/);
+    expect(frag.textContent).not.toMatch(/exterminator/i);
+  });
+
+  it("a Modern infested room offers the paid exterminator", () => {
+    const sim = new Simulation(1, "modern");
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 10; x < 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);
+    const r = sim.tower.place("hotelSingle", 2, 12);
+    expect(r.ok).toBe(true);
+    const unit = sim.tower.units.find((u) => u.id === r.unitId)!;
+    unit.state = "infested";
+    expect(render(facilityDiagnostics(sim, unit)).textContent).toMatch(/exterminator/i);
+  });
+
+  it("a housekeeping station shows its ~20/day capacity and the tower's coverage", () => {
+    const { sim, unit } = simWith("housekeeping");
+    expect(sim.tower.place("hotelSingle", 2, 24).ok).toBe(true);
+    const frag = render(facilityDiagnostics(sim, unit));
+    expect(frag.textContent).toContain("Cleans ~20 rooms a day");
+    expect(frag.textContent).toMatch(/hotel room/);
+  });
+});
+
 describe("facilityDiagnostics: lobby-distance advice names only buildable slots", () => {
   /** A 20-tile-wide tower with lobby floor 1, plain floors 2..`top`, one
    *  standard elevator serving the whole span, and an occupied office on

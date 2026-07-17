@@ -205,6 +205,11 @@ export class Simulation implements SimContext {
   /** Buried-treasure finds so far. Capped so a basement dug full of cheap parking
    * can't be farmed into tens of millions (the find stays a bounded windfall). */
   treasuresFound = 0;
+  /** Modern only: the day a booked exterminator's treatment lands (persisted),
+   *  and the infested room ids it was billed for (transient; a mid-booking save
+   *  loses them and resolution then clears every infested room instead). */
+  exterminationDueDay?: number;
+  exterminationRoomIds?: number[];
 
   constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld") {
     this.rng = new RNG(seed);
@@ -383,6 +388,11 @@ export class Simulation implements SimContext {
   officeParkingShort(): boolean { return services.officeParkingShort(this); }
 
   parkingUsage(spots: number = this.tower.functionalParkingSpots()): number { return services.parkingUsage(this, spots); }
+
+  // Housekeeping coverage + the Modern paid exterminator (see sim/services.ts).
+  housekeepingCoverage(): services.HousekeepingCoverage { return services.housekeepingCoverage(this); }
+  callExterminator(): services.ExterminatorResult { return services.callExterminator(this); }
+  resolveExtermination(): void { services.resolveExtermination(this); }
 
   attemptMoveIns(): void { churn.attemptMoveIns(this); }
 

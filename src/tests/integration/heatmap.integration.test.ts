@@ -146,17 +146,25 @@ describe("floorHeatmap (stats overlay data)", () => {
     const dirty = sim.tower.place("hotelDouble", 4, C - 20);
     expect(dirty.ok).toBe(true);
     sim.tower.units.find((u) => u.id === dirty.unitId)!.state = "dirty";
+    // Reachable but INFESTED (floor 5): housekeeping can't clean it, so it reads
+    // hotter than a merely dirty room but cooler than a truly unreachable one.
+    const infested = sim.tower.place("hotelDouble", 5, C - 20);
+    expect(infested.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === infested.unitId)!.state = "infested";
     const unreached = sim.tower.place("hotelDouble", 6, C - 20);
     expect(unreached.ok).toBe(true);
     sim.tower.units.find((u) => u.id === unreached.unitId)!.state = "asleep";
-    // An office on floor 5 must produce no cleanliness cell (non-hotel).
-    expect(sim.tower.place("office", 5, C - 20).ok).toBe(true);
+    // A non-hotel (office) must produce no cleanliness cell; put it out of the way.
+    expect(sim.tower.place("office", 2, C - 20).ok).toBe(true);
 
     const map = sim.floorHeatmap("cleanliness");
     expect(cellOn(map, 3)!.severity).toBe(0); // reachable, clean → green
     expect(cellOn(map, 4)!.severity).toBeCloseTo(0.6, 6); // reachable, dirty → amber
+    expect(cellOn(map, 5)!.severity).toBeCloseTo(0.85, 6); // reachable, infested → hotter than dirty
     expect(cellOn(map, 6)!.severity).toBe(1); // no staff route → red (the "build another" nudge)
-    expect(cellOn(map, 5)).toBeUndefined(); // office only → no housekeeping signal
+    // The floor-2 office contributes no cleanliness cell (the housekeeping crew
+    // is the only other floor-2 unit, and it carries no hotel signal either).
+    expect(cellsOn(map, 2).length).toBe(0);
   });
 
   it("cleanliness: every hotel room reads unreached when there is no housekeeping crew", () => {

@@ -13,6 +13,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.53.0
+
+- Neglected hotel rooms now crawl with cockroaches, and a room left dirty too long becomes infested until you clear it: bulldoze it in Classic, or call a paid exterminator in Modern towers.
+- Fires can now spread up to the floor above, not just along their own floor.
+- The stats panel shows how many rooms your housekeeping crews actually reach.
+
 ## 1.52.0
 
 - On rainy days fewer people are out and about, so cinemas and other venues draw smaller crowds.

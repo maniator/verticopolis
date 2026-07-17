@@ -86,6 +86,7 @@ export type UnitState =
   | "vacating" // tenant leaving due to dissatisfaction
   | "asleep" // hotel room with sleeping guest (night)
   | "dirty" // hotel room awaiting housekeeping after checkout
+  | "infested" // hotel room dirty too long: cockroaches. No longer cleanable (Classic: bulldoze; Modern: exterminator). Earns nothing, still spreads.
   | "fire" // unit ablaze during a fire emergency
   | "gutted"; // burned-out shell — no income, no tenants; must be bulldozed & rebuilt
 
@@ -97,6 +98,7 @@ const UNIT_STATES: ReadonlySet<string> = new Set([
   "vacating",
   "asleep",
   "dirty",
+  "infested",
   "fire",
   "gutted",
 ] satisfies UnitState[]);
@@ -107,22 +109,15 @@ export function isUnitState(v: unknown): v is UnitState {
   return typeof v === "string" && UNIT_STATES.has(v);
 }
 
-/** Why a dissatisfied tenant is leaving — attributed from the dominant
- *  satisfaction drain at the moment it bottoms out, so the notice/departure
- *  toast names the real cause instead of always blaming "poor access". `noise`
- *  marks a noise-sensitive room (office, hotel, or condo) worn down by a same-floor
- *  neighbor — an office bothered by nearby commercial, or a hotel/condo by a nearby
- *  office or commercial venue — over sustained, unaddressed exposure (the W2 noise
- *  erosion in updateSatisfaction). `transportFar` marks an office whose nearest
- *  reachable stairs/elevator sits beyond the canon walking tolerance (79 tiles) on
- *  its own floor — the tenant is served but hates the hike (the W1 penalty).
- *  `lobbyFar` marks a tenant (office, hotel, or condo) whose floor sits far from
- *  the nearest (sky)lobby, worn down by the graduated distance penalty once it is
- *  deep in the very-far band (a tall tower that skipped a sky lobby, so a floor
- *  sits past the lobby-ladder reach). The fix is a sky lobby (a nearer stairway or
- *  elevator does not help). `unmetDemand` marks a served office/hotel/condo whose
- *  reachable shops and eateries cannot cover the tower's demand (Modern evicts for
- *  it; Classic caps only); the fix is more reachable retail. */
+/** Why a dissatisfied tenant is leaving, attributed from the dominant
+ *  satisfaction drain when it bottoms out, so the toast names the real cause
+ *  rather than always blaming "poor access". `noise`: a noise-sensitive room
+ *  (office, hotel, condo) worn down by a same-floor neighbor over sustained
+ *  exposure (W2 erosion). `transportFar`: an office whose nearest stairs/elevator
+ *  sits past the walking tolerance (79 tiles) on its floor (W1). `lobbyFar`: a
+ *  tenant deep in the very-far band from the nearest (sky)lobby (fix: a sky
+ *  lobby, not a nearer stair/elevator). `unmetDemand`: a served office/hotel/condo
+ *  whose reachable shops/eateries can't cover demand (Modern evicts, Classic caps). */
 export type VacateReason =
   | "access" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation";
 
@@ -181,11 +176,11 @@ export function isTenanted(u: { state: UnitState }): boolean {
   return u.state === "occupied" || u.state === "vacating";
 }
 
-/** Nobody home and nothing to simulate — the per-tick presence/satisfaction
- *  loops skip these. NOT the inverse of {@link isOperational}: an operational
- *  `empty` room is still dormant, and fire has its own loop elsewhere. */
+/** Nobody home and nothing to simulate: the per-tick loops skip these (NOT the
+ *  inverse of {@link isOperational}; an operational `empty` is dormant). `infested` is here so a roach-ruined room isn't dragged through the satisfaction loop and self-vacated to a free `empty`, bypassing its bulldoze/exterminator recovery. */
 export function isDormant(u: { state: UnitState }): boolean {
-  return u.state === "empty" || u.state === "construction" || u.state === "fire" || u.state === "gutted";
+  const s = u.state;
+  return s === "empty" || s === "construction" || s === "fire" || s === "gutted" || s === "infested";
 }
 
 export interface Facility {
@@ -322,6 +317,9 @@ export interface Unit {
   profitYest?: number;
   /** Game-clock minute at which construction finishes (for the build phase). */
   completeAt?: number;
+  /** Hotel-only: consecutive DAYS `dirty` (counted at checkout); at `INFEST_DAYS`
+   *  it escalates to `infested`. Absent = 0; persisted so a reload can't reset it. */
+  dirtyDays?: number;
 }
 
 /** A vertical transport instance (elevator shaft / stairs / escalator). */
@@ -460,6 +458,8 @@ export interface SerializedGame {
   };
   /** Buried-treasure finds so far (capped), persisted so reload can't reset it. */
   treasuresFound?: number;
+  /** Modern only: the day a booked exterminator's treatment lands (persisted). */
+  exterminationDueDay?: number;
   /** Basement tiles already excavated ("floor:x"), so buried treasure stays a
    * one-time find per tile across save/reload. Optional for older saves. */
   excavated?: string[];

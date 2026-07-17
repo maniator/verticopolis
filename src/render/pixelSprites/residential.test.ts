@@ -83,6 +83,8 @@ describe("residential rooms draw at representative states without throwing", () 
     ["condo empty (sale)", { kind: "condo", width: 16, state: "empty", occupants: 0 }, {}],
     ["hotel single ready", { kind: "hotelSingle", width: 4, occupants: 1 }, { lit: true }],
     ["hotel double dirty", { kind: "hotelDouble", width: 6, state: "dirty", occupants: 0 }, {}],
+    ["hotel single infested", { kind: "hotelSingle", width: 4, state: "infested", occupants: 0 }, {}],
+    ["hotel suite infested", { kind: "hotelSuite", width: 10, state: "infested", occupants: 0 }, {}],
     ["hotel suite asleep", { kind: "hotelSuite", width: 10, state: "asleep", occupants: 2 }, { hour: 2 }],
   ];
   for (const [label, uo, ro] of cases) {
@@ -167,6 +169,25 @@ describe("hotel state cues render outside the mirror", () => {
       expect(lampAt, "ready lamp painted").toBeGreaterThanOrEqual(0);
       expect(lampAt, "ready lamp is outside the mirror").toBeGreaterThan(ready.log.lastIndexOf("restore:[]"));
     }
+  });
+
+  it("roaches paint outside the mirror, and an infested room swarms more than a dirty one", () => {
+    // Each roach draws one body oval in its palette's `dark` tone: chestnut
+    // (#2A1A0E) for an infested room, warmer amber (#4A331A) for the single
+    // dirty-room warning. Count those body fills (a dirty room shows one, an
+    // infested room a heavier swarm) and check they land after the mirror
+    // wrapper closes so a flipped room reads the same.
+    const CHESTNUT = "fillStyle=#2A1A0E";
+    const AMBER = "fillStyle=#4A331A";
+    const roachBodies = (log: string[]): number => log.filter((l) => l === CHESTNUT || l === AMBER).length;
+    const dirty = spyCtx();
+    drawRoom(room(dirty.ctx, { hour: 10 }), { ...hotelAt(false), state: "dirty", occupants: 0 }, 0, 0, 66, 44);
+    const infested = spyCtx();
+    drawRoom(room(infested.ctx, { hour: 10 }), { ...hotelAt(false), state: "infested", occupants: 0 }, 0, 0, 66, 44);
+    expect(roachBodies(dirty.log), "dirty room has a warning roach").toBeGreaterThan(0);
+    expect(roachBodies(infested.log), "infested room swarms harder").toBeGreaterThan(roachBodies(dirty.log));
+    const firstRoach = infested.log.findIndex((l) => l === CHESTNUT);
+    expect(firstRoach, "roaches draw outside the mirror").toBeGreaterThan(infested.log.lastIndexOf("restore:[]"));
   });
 
   it("the asleep z is text drawn outside the mirror, and only when occupied", () => {

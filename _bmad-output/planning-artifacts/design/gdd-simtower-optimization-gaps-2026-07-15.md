@@ -7,6 +7,16 @@ will-not-build, and records the Classic-parity vs Modern split and a priority
 order. Each net-new item has a backlog row and a GitHub issue; each ships later
 as its own spec plus PR with the correct review skill.
 
+> **Update 2026-07-16:** the hotel infested/sticky state (**#376**) shipped as
+> the cockroach visibility + infestation lifecycle feature, building on the
+> housekeeping-coverage overlay (**#401**, already shipped in v1.46.0, which this
+> feature extends with an `infested` tint tier). The design moved to its own
+> spec, `gdd-cockroach-infestation-2026-07-16.md`, now authoritative for the
+> mechanic. The `#376` "will-not-build" note below (permanent infestation kept
+> out for Classic) was reversed there with owner sign-off (Classic now ships full
+> 1994 parity; Modern adds a paid exterminator). The "6-floor pathfinding quirk"
+> will-not-build still stands.
+
 ## Why this exists
 
 A player shared a long, careful optimization thread (a min-maxer filling all 110

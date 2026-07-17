@@ -54,6 +54,24 @@ describe("unit inspector card branches", () => {
     expect(frag.textContent).toContain("Satisfaction: 73%");
   });
 
+  it("hotel lifecycle states read in plain language (dirty / asleep / infested)", () => {
+    const dirty = simWith("hotelSingle");
+    dirty.unit.state = "dirty";
+    expect(renderToFragment(unitInspectorTemplate(dirty.sim, dirty.unit)).textContent).toContain(
+      "Status: dirty (awaiting housekeeping)",
+    );
+    const asleep = simWith("hotelSingle");
+    asleep.unit.state = "asleep";
+    expect(renderToFragment(unitInspectorTemplate(asleep.sim, asleep.unit)).textContent).toContain(
+      "Status: occupied (guest asleep)",
+    );
+    const infested = simWith("hotelSingle");
+    infested.unit.state = "infested";
+    expect(renderToFragment(unitInspectorTemplate(infested.sim, infested.unit)).textContent).toContain(
+      "Status: cockroach infested",
+    );
+  });
+
   it("rename subheading: shown for a real rename, suppressed when it matches the title", () => {
     const renamed = simWith("office");
     renamed.unit.label = "Acme Corp";

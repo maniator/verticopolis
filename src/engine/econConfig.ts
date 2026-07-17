@@ -145,6 +145,16 @@ export const ECON = {
    *  soft transport-puzzle penalty the design review asked for — while a well-run
    *  tower stays hugely profitable (~a 20% haircut, self-scaling, never punitive). */
   overheadPerLeasableUnitMonthly: 700,
+  /** Modern only. Flat call-out fee for a tower-wide exterminator dispatch that
+   *  clears cockroach infestations. Charged once per dispatch on top of the
+   *  per-room fee below, so treating a single room is never free. */
+  exterminatorCalloutFee: 5000,
+  /** Modern only. Exterminator fee per infested room, charged at dispatch time.
+   *  Tuned so a small outbreak is cheaper to exterminate (and keeps the room
+   *  earning) while a big neglected wing tilts toward bulldozing: the crossover
+   *  is the decision. Classic has no exterminator (infestation is bulldoze-only,
+   *  1994 parity). */
+  exterminatorPerRoomFee: 2000,
   /** Modern only. Base monthly probability that a sold condo's household
    *  relocates (a life event: a job move, an upsize or downsize), for a mean
    *  household of 3; `GameRules.condoRelocationChance` scales it UP with family
