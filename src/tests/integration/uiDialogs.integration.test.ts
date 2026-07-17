@@ -2464,6 +2464,9 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     open({ hourly: { weekday: hourly }, origins });
     const marks = Array.from(dialog().querySelectorAll(".es-origin"));
     expect(marks).toHaveLength(2);
+    // The marker carries an accessible label, not just a title tooltip.
+    expect(marks[0].getAttribute("role")).toBe("img");
+    expect(marks[0].getAttribute("aria-label")).toContain("Demand hotspot");
     expect(simText()).toContain("Most riders board on floors 1, 7.");
     // The markers are day-scoped like the ghost: a cold weekend shows none.
     dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click();

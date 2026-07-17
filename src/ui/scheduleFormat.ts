@@ -1,4 +1,4 @@
-import { floorLabel } from "./templates/elevatorSchedule";
+import { floorLabel } from "./floorLabel";
 
 /**
  * Pure string formatters for the Schedule dialog's derived sentences (#305).
