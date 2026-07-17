@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { focus } from "./towerInputCamera";
 import { FACILITIES } from "../../engine/facilitiesData";
 import type { TowerEngine } from "./TowerEngine";
@@ -21,7 +21,7 @@ interface StubUnit {
 
 function stubEngine(opts: {
   units: StubUnit[];
-  people?: Array<{ floor: number }>;
+  people?: Array<{ floor: number; x: number }>;
   minuteOfDay?: number;
 }): TowerEngine {
   return {
@@ -81,21 +81,61 @@ describe("focus() crowd and hour plumbing", () => {
     const f = focus(
       stubEngine({
         units: [{ kind: "lobby", floor: 5, x: 4, width: 6, occupants: 0 }],
-        people: Array.from({ length: 12 }, () => ({ floor: 5 })),
+        people: Array.from({ length: 12 }, () => ({ floor: 5, x: 5 })),
       }),
     );
     expect(f.dominant).toBe("lobby");
     expect(f.crowd).toBeCloseTo(0.5); // 12 of the 24-person full house
   });
 
-  it("ignores drawn people outside the viewed floors in the fallback", () => {
+  it("ignores drawn people outside the viewed floors or tiles in the fallback", () => {
     const f = focus(
       stubEngine({
         units: [{ kind: "lobby", floor: 5, x: 4, width: 6, occupants: 0 }],
-        people: Array.from({ length: 30 }, () => ({ floor: 40 })),
+        people: [
+          ...Array.from({ length: 30 }, () => ({ floor: 40, x: 5 })), // above the view
+          ...Array.from({ length: 30 }, () => ({ floor: 5, x: 40 })), // off to the side
+        ],
       }),
     );
     expect(f.crowd).toBe(0);
+  });
+
+  it("refreshes the occupancy census at most once per second", () => {
+    const cap = FACILITIES.office.population;
+    const unit = { kind: "office", floor: 5, x: 4, width: 4, occupants: cap };
+    const engine = stubEngine({ units: [unit] });
+    let clock = 10_000;
+    const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    try {
+      expect(focus(engine).crowd).toBeCloseTo(1);
+      unit.occupants = 0; // the office empties...
+      clock += 500; // ...but the census is half a second old
+      expect(focus(engine).crowd).toBeCloseTo(1); // cached value holds
+      clock += 600; // past the 1 s refresh window
+      expect(focus(engine).crowd).toBeCloseTo(0); // fresh walk sees the truth
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
+  it("re-walks the census immediately when the dominant kind changes", () => {
+    const cap = FACILITIES.office.population;
+    const office = { kind: "office", floor: 5, x: 4, width: 2, occupants: cap };
+    const shop = { kind: "shop", floor: 5, x: 6, width: 1, occupants: 0 };
+    const engine = stubEngine({ units: [office, shop] });
+    let clock = 20_000;
+    const nowSpy = vi.spyOn(performance, "now").mockImplementation(() => clock);
+    try {
+      expect(focus(engine).dominant).toBe("office");
+      office.width = 0; // the pan story: the shop becomes dominant next call
+      clock += 100; // well inside the cache window
+      const f = focus(engine);
+      expect(f.dominant).toBe("shop");
+      expect(f.crowd).toBe(0); // not the office's stale cached fill
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   it("carries the sim clock as a fractional hour", () => {

@@ -20,7 +20,9 @@ type NodeRec = {
   args: unknown[];
   connects: NodeRec[];
   started: boolean;
+  disposed: boolean;
   triggers: unknown[][];
+  ramps: unknown[][];
 };
 
 // Shared holders, hoisted so the vi.mock factory can reach them: the per-beat
@@ -35,7 +37,7 @@ const graph = vi.hoisted(() => ({ nodes: [] as NodeRec[] }));
  *  (sub-property accesses like `.gain` yield the same proxy, so an edge into a
  *  node's param records as an edge into that node). */
 function node(kind = "anon", args: unknown[] = []): unknown {
-  const rec: NodeRec = { kind, args, connects: [], started: false, triggers: [] };
+  const rec: NodeRec = { kind, args, connects: [], started: false, disposed: false, triggers: [], ramps: [] };
   graph.nodes.push(rec);
   const p: any = new Proxy(function () {} as unknown as object, {
     get: (_t, prop) => {
@@ -55,6 +57,16 @@ function node(kind = "anon", args: unknown[] = []): unknown {
       if (prop === "triggerAttackRelease")
         return (...a: unknown[]) => {
           rec.triggers.push(a);
+          return p;
+        };
+      if (prop === "rampTo")
+        return (...a: unknown[]) => {
+          rec.ramps.push(a);
+          return p;
+        };
+      if (prop === "dispose")
+        return () => {
+          rec.disposed = true;
           return p;
         };
       return p;
@@ -85,6 +97,9 @@ vi.mock("tone", () => {
     LFO: ctorFor("LFO"),
     ToneAudioBuffer: ctorFor("ToneAudioBuffer"),
     ToneBufferSource: ctorFor("ToneBufferSource"),
+    Oscillator: ctorFor("Oscillator"),
+    Context: ctorFor("Context"),
+    setContext: () => {},
     getTransport: () => ({
       bpm: node(), // chainable: supports both `bpm.value = …` and `bpm.rampTo(…)`
       scheduleRepeat: (cb: (t: number) => void) => ((beat.step = cb), 1),
@@ -266,7 +281,11 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     // ...into the swell gain, which a started 0.3 Hz LFO (0.7..1) breathes.
     const swell = rainTone!.connects[0];
     expect(swell?.kind).toBe("Gain");
-    const lfo = graph.nodes.find((n) => n.kind === "LFO");
+    // More than one LFO lives in the graph now (the street hum breathes on its
+    // own); find the rain gust by its exact signature.
+    const lfo = graph.nodes.find(
+      (n) => n.kind === "LFO" && (n.args[0] as { frequency?: number })?.frequency === 0.3,
+    );
     expect(lfo, "gust LFO missing").toBeTruthy();
     expect(lfo!.args[0]).toEqual({ frequency: 0.3, min: 0.7, max: 1 });
     expect(lfo!.started).toBe(true);
@@ -279,6 +298,97 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     expect(() => eng.update(focus({ zoom: 0.3, dominant: "empty", centerFloor: 30, weather: "rain" }))).not.toThrow();
     expect(() => eng.update(focus({ zoom: 1.6, dominant: "outside", weather: "rain" }))).not.toThrow();
     expect(() => eng.update(focus({ zoom: 2.2, dominant: "office", weather: "rain" }))).not.toThrow(); // indoors → no rain
+  });
+
+
+  it("honest rooms: a near-empty attendance venue schedules no crowd sounds", () => {
+    vi.useFakeTimers();
+    try {
+      const eng = new ToneAudioEngine();
+      eng.start();
+      const settle = (f: ViewFocus) => {
+        eng.update(f); // the scene key must win two consecutive updates
+        eng.update(f);
+      };
+      const triggerCount = () => graph.nodes.reduce((n, r) => n + r.triggers.length, 0);
+      // 4 percent full: below the GDD's 0.05 silence line -> nothing fires.
+      settle(focus({ zoom: 2.4, dominant: "restaurant", hour: 13, crowd: 0.04 }));
+      const before = triggerCount();
+      vi.advanceTimersByTime(15_000);
+      expect(triggerCount()).toBe(before);
+      // A busy restaurant clinks within the same window.
+      settle(focus({ zoom: 2.4, dominant: "restaurant", hour: 13, crowd: 0.8 }));
+      vi.advanceTimersByTime(15_000);
+      expect(triggerCount()).toBeGreaterThan(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("venue programs start only with live attendance and stop on scene exit", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const parts = () => graph.nodes.filter((n) => n.kind === "Part");
+    const baseline = parts().length; // the music part
+    const settle = (f: ViewFocus) => {
+      eng.update(f);
+      eng.update(f);
+    };
+    // An empty party hall on screen builds no band.
+    settle(focus({ zoom: 2.4, dominant: "partyHall", hour: 20, crowd: 0.01 }));
+    expect(parts().length).toBe(baseline);
+    // A live party starts the band's looping part...
+    settle(focus({ zoom: 2.4, dominant: "partyHall", hour: 20, crowd: 0.7 }));
+    expect(parts().length).toBe(baseline + 1);
+    const bandPart = parts()[parts().length - 1];
+    expect(bandPart.started).toBe(true);
+    // ...and leaving the scene tears it down.
+    settle(focus({ zoom: 2.4, dominant: "office", hour: 10, crowd: 0.6 }));
+    expect(bandPart.disposed).toBe(true);
+  });
+
+  it("REGRESSION: every crowd noise source sits behind a steep rolloff -48 filter", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const steepInto = (rec: NodeRec) =>
+      rec.connects.some(
+        (t) => t.kind === "Filter" && ((t.args[0] ?? {}) as { rolloff?: number }).rolloff === -48,
+      );
+    // The crowd layer's NoiseSynth (venue bursts) and the metro's brown rumble
+    // must both pass the audition's no-static rule. The legacy pink beds (room
+    // tone, rain) keep their own band-shaping and are exempt by design.
+    const noiseSynths = graph.nodes.filter((n) => n.kind === "NoiseSynth");
+    expect(noiseSynths.length).toBeGreaterThan(0);
+    for (const n of noiseSynths) expect(steepInto(n)).toBe(true);
+    const rumble = graph.nodes.find(
+      (n) => n.kind === "Noise" && String(n.args[0]) === "brown",
+    );
+    expect(rumble, "metro rumble missing").toBeTruthy();
+    expect(steepInto(rumble!)).toBe(true);
+  });
+
+  it("applies each scene's murmur level (the hotel whispers)", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    const settle = (f: ViewFocus) => {
+      eng.update(f);
+      eng.update(f);
+    };
+    settle(focus({ zoom: 2.4, dominant: "hotelSuite", hour: 12, crowd: 0.6 }));
+    // Some gain ramped to the hotel's 0.24 murmur level from the spec table.
+    const rampedToHotel = graph.nodes.some(
+      (n) => n.kind === "Gain" && n.ramps.some((r) => r[0] === 0.24),
+    );
+    expect(rampedToHotel).toBe(true);
+  });
+
+  it("volume sliders land perceptually: zero is zero, half is a quarter gain", () => {
+    const eng = new ToneAudioEngine();
+    eng.start();
+    eng.setVolumes(0, 0.5);
+    const ramps = graph.nodes.filter((n) => n.kind === "Gain").flatMap((n) => n.ramps);
+    expect(ramps.some((r) => r[0] === 0)).toBe(true); // music slider at zero silences its bus
+    expect(ramps.some((r) => r[0] === 0.25)).toBe(true); // sfx at half ramps to 0.5^2
   });
 
   it("dispose tears the built graph down", () => {

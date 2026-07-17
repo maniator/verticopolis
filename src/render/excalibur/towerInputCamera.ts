@@ -379,6 +379,47 @@ export function setCamera(engine: TowerEngine, tileX: number, floor: number, zoo
 
 // ---- Audio focus --------------------------------------------------------
 
+/** Census cache per engine: the occupancy tally refreshes at most once per
+ *  second (the GDD's cap), while the cheap dominant/zoom/clock reads stay per
+ *  call. Keyed weakly so a torn-down engine drops its entry. */
+const censusCache = new WeakMap<TowerEngine, { at: number; dominant: string; crowd: number }>();
+const CENSUS_REFRESH_MS = 1000;
+
+/** The occupancy walk behind {@link ViewFocus.crowd}: fill of the dominant
+ *  kind's units in view, with a drawn-crowd fallback for kinds that track no
+ *  occupants (lobbies, the street). 24 visible people count as a full house
+ *  for the fallback. */
+function censusCrowd(
+  engine: TowerEngine,
+  dominant: ViewFocus["dominant"],
+  bounds: { t0: number; t1: number; f0: number; f1: number },
+): number {
+  let occ = 0;
+  let cap = 0;
+  if (dominant !== "empty" && dominant !== "outside") {
+    for (const u of engine.sim.tower.units) {
+      if (u.kind !== dominant) continue;
+      if (u.floor < bounds.f0 || u.floor > bounds.f1) continue;
+      if (u.x + u.width < bounds.t0 || u.x > bounds.t1) continue;
+      const def = FACILITIES[u.kind];
+      if (!def) continue; // a kind the catalog no longer knows: skip, never throw
+      const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
+      if (unitCap > 0) {
+        occ += u.occupants ?? 0;
+        cap += unitCap;
+      }
+    }
+  }
+  if (cap > 0) return Math.min(1, Math.max(0, occ / cap));
+  let visible = 0;
+  for (const p of engine.sim.crowd.people) {
+    if (p.floor < bounds.f0 || p.floor > bounds.f1) continue;
+    if (p.x < bounds.t0 || p.x > bounds.t1) continue;
+    visible++;
+  }
+  return Math.min(1, visible / 24);
+}
+
 export function focus(engine: TowerEngine): ViewFocus {
   const centerFloor = engine.screenToFloor(engine.viewHeight / 2);
   const night = engine.sim.clock.isNight();
@@ -387,21 +428,10 @@ export function focus(engine: TowerEngine): ViewFocus {
   const f0 = engine.screenToFloor(engine.viewHeight * 0.7);
   const f1 = engine.screenToFloor(engine.viewHeight * 0.3);
   const tally = new Map<FacilityKind, number>();
-  // One walk collects both the dominant-kind tally and, per kind, the live
-  // occupancy against capacity (the ambience layer's honest "how full is what
-  // I'm looking at" signal). Same single pass the tally always did.
-  const occ = new Map<FacilityKind, number>();
-  const cap = new Map<FacilityKind, number>();
   for (const u of engine.sim.tower.units) {
     if (u.floor < f0 || u.floor > f1) continue;
     if (u.x + u.width < t0 || u.x > t1) continue;
     tally.set(u.kind, (tally.get(u.kind) ?? 0) + u.width);
-    const def = FACILITIES[u.kind];
-    const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
-    if (unitCap > 0) {
-      occ.set(u.kind, (occ.get(u.kind) ?? 0) + u.occupants);
-      cap.set(u.kind, (cap.get(u.kind) ?? 0) + unitCap);
-    }
   }
   let dominant: ViewFocus["dominant"] = "empty";
   let best = 0;
@@ -413,19 +443,17 @@ export function focus(engine: TowerEngine): ViewFocus {
     }
   }
   if (dominant === "empty" && centerFloor <= 0) dominant = "outside";
-  // Fill of the dominant kind; kinds that track no occupants (lobby, street)
-  // fall back to the visible drawn-crowd density so a busy ground floor still
-  // reads busy. 24 people in frame counts as a full house for that fallback.
-  let crowd = 0;
-  const kindCap = cap.get(dominant as FacilityKind) ?? 0;
-  if (kindCap > 0) {
-    crowd = Math.min(1, (occ.get(dominant as FacilityKind) ?? 0) / kindCap);
+  // The occupancy walk refreshes at most once per second (or when the
+  // dominant kind changes, so a pan onto a new venue reads it immediately);
+  // ambience level changes are slow ramps, so a 1 s census is plenty.
+  const now = typeof performance !== "undefined" ? performance.now() : 0;
+  const cached = censusCache.get(engine);
+  let crowd: number;
+  if (cached && cached.dominant === dominant && now - cached.at < CENSUS_REFRESH_MS) {
+    crowd = cached.crowd;
   } else {
-    let visible = 0;
-    for (const p of engine.sim.crowd.people) {
-      if (p.floor >= f0 && p.floor <= f1) visible++;
-    }
-    crowd = Math.min(1, visible / 24);
+    crowd = censusCrowd(engine, dominant, { t0, t1, f0, f1 });
+    censusCache.set(engine, { at: now, dominant, crowd });
   }
   const hour = engine.sim.clock.minuteOfDay / 60;
   return {

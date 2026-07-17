@@ -30,8 +30,13 @@ const LAUGH_GAP_S = { min: 18, varS: 22 };
 const WHOOP_GAP_S = { min: 22, varS: 24 };
 /** Layer master at full detail; the whole layer sits under the music bed. */
 const LAYER_LEVEL = 0.5;
-/** Crowd factors below this read as "nobody there": the scene stays silent. */
-const EMPTY_CROWD = 0.03;
+/** Crowd factors below this read as "nobody there": the scene stays silent
+ *  (the GDD's occupancy rule). */
+const EMPTY_CROWD = 0.05;
+/** A scene key must win this many consecutive updates before the layer
+ *  switches, so a mixed floor (cinema beside a party hall) cannot churn the
+ *  programs while the camera pans. Mute bypasses it. */
+const KEY_SETTLE_UPDATES = 2;
 
 interface TalkerSlot {
   gain: Tone.Gain;
@@ -43,11 +48,18 @@ interface TalkerSlot {
 export class CrowdLayer {
   private master: Tone.Gain | null = null;
   private murmurFilter: Tone.Filter | null = null;
+  /** Applies each scene's murmur level (the hotel whispers, the lobby talks). */
+  private murmurGain: Tone.Gain | null = null;
   private toneGain: Tone.Gain | null = null;
   private pingSynth: Tone.PolySynth | null = null;
   private thudSynth: Tone.PolySynth | null = null;
   private noiseSynth: Tone.NoiseSynth | null = null;
   private noiseFilter: Tone.Filter | null = null;
+  /** The street's 65/98 Hz city hum, breathing on its own slow swell. */
+  private humGain: Tone.Gain | null = null;
+  private humLow: Tone.Oscillator | null = null;
+  private humHigh: Tone.Oscillator | null = null;
+  private humLfo: Tone.LFO | null = null;
   private voices: CrowdVoices | null = null;
   private party: PartyBand | null = null;
   private cinema: CinemaProgram | null = null;
@@ -56,6 +68,9 @@ export class CrowdLayer {
   private slots: TalkerSlot[] = [];
   private elementTimers = new Set<ReturnType<typeof setTimeout>>();
   private scene: CrowdSceneKey | null = null;
+  private pendingKey: CrowdSceneKey | null = null;
+  private pendingCount = 0;
+  private programOn = false;
   private activity = 0;
   private tick = 1;
   private disposed = false;
@@ -63,10 +78,12 @@ export class CrowdLayer {
   constructor(dest: Tone.InputNode, seedBaseUrl: string) {
     try {
       this.master = new Tone.Gain(0).connect(dest);
-      // Every voiced and one-shot sound passes a steep filter (the audition
-      // rule: nothing bright survives; noise never reads as static).
+      // Every voiced sound passes a steep filter (the audition rule: nothing
+      // bright survives; noise never reads as static), then the per-scene
+      // murmur level.
+      this.murmurGain = new Tone.Gain(0.4).connect(this.master);
       this.murmurFilter = new Tone.Filter({ type: "lowpass", frequency: 900, rolloff: -48 }).connect(
-        this.master,
+        this.murmurGain,
       );
       this.toneGain = new Tone.Gain(0.8).connect(this.master);
       this.pingSynth = new Tone.PolySynth(Tone.Synth, {
@@ -74,12 +91,14 @@ export class CrowdLayer {
         envelope: { attack: 0.004, decay: 0.12, sustain: 0, release: 0.08 },
       }).connect(this.toneGain);
       this.pingSynth.volume.value = -10;
+      this.pingSynth.maxPolyphony = 8;
       this.thudSynth = new Tone.PolySynth(Tone.Synth, {
         oscillator: { type: "sine" },
         envelope: { attack: 0.006, decay: 0.09, sustain: 0, release: 0.08 },
       }).connect(this.toneGain);
       this.thudSynth.volume.value = -8;
-      this.noiseFilter = new Tone.Filter({ type: "lowpass", frequency: 1400, rolloff: -48 }).connect(
+      this.thudSynth.maxPolyphony = 8;
+      this.noiseFilter = new Tone.Filter({ type: "lowpass", frequency: 900, rolloff: -48 }).connect(
         this.toneGain,
       );
       this.noiseSynth = new Tone.NoiseSynth({
@@ -87,6 +106,16 @@ export class CrowdLayer {
         envelope: { attack: 0.004, decay: 0.1, sustain: 0 },
       }).connect(this.noiseFilter);
       this.noiseSynth.volume.value = -16;
+      // The street hum: two well-separated sines breathing on a slow swell.
+      this.humGain = new Tone.Gain(0).connect(this.master);
+      this.humLfo = new Tone.LFO({ frequency: 0.08, min: 0.55, max: 1 });
+      const humSwell = new Tone.Gain(1).connect(this.humGain);
+      this.humLfo.connect(humSwell.gain);
+      this.humLfo.start();
+      this.humLow = new Tone.Oscillator({ frequency: 65, type: "sine", volume: -18 }).connect(humSwell);
+      this.humHigh = new Tone.Oscillator({ frequency: 98, type: "sine", volume: -24 }).connect(humSwell);
+      this.humLow.start();
+      this.humHigh.start();
       for (let i = 0; i < 6; i++) {
         const gain = new Tone.Gain(0.5).connect(this.murmurFilter);
         this.slots.push({ gain, semi: PITCH_MAX_SEMI, timer: null, active: false });
@@ -102,12 +131,27 @@ export class CrowdLayer {
   }
 
   /** Drive the layer from the engine's update: resolve the ambience scene,
-   *  swap generators on a change, and retune levels every call. */
+   *  swap generators on a (settled) change, and retune levels every call. */
   update(scene: Scene, focus: ViewFocus, detail: number, muted: boolean): void {
     if (this.disposed || !this.master) return;
     try {
-      const key = muted ? null : resolveCrowdScene(scene, focus.dominant);
-      if (key !== this.scene) this.switchScene(key);
+      const rawKey = muted ? null : resolveCrowdScene(scene, focus.dominant);
+      // Settle the key across a couple of updates so a mixed floor can't
+      // churn programs while panning; mute switches immediately.
+      if (rawKey !== this.scene) {
+        if (muted || rawKey === null) {
+          this.switchScene(rawKey);
+        } else if (rawKey === this.pendingKey) {
+          if (++this.pendingCount >= KEY_SETTLE_UPDATES) this.switchScene(rawKey);
+        } else {
+          this.pendingKey = rawKey;
+          this.pendingCount = 1;
+        }
+      } else {
+        this.pendingKey = null;
+        this.pendingCount = 0;
+      }
+      const key = this.scene;
       if (!key) {
         this.master.gain.rampTo(0, 0.5);
         this.activity = 0;
@@ -123,14 +167,34 @@ export class CrowdLayer {
             : rawCrowd
           : Math.max(rawCrowd, spec.crowdFloor ?? 0);
       this.activity = hourActivity(spec.gate, hour) * (crowd < EMPTY_CROWD ? 0 : crowd);
+      // Honest loudness: the layer level scales with activity (clock times
+      // occupancy) as well as zoom, so a near-empty room is near-silent.
       this.master.gain.rampTo(
-        this.activity <= 0 ? 0 : LAYER_LEVEL * (0.38 + 0.62 * detail),
+        this.activity <= 0 ? 0 : LAYER_LEVEL * (0.38 + 0.62 * detail) * Math.min(1, this.activity),
         0.5,
       );
+      this.humGain?.gain.rampTo(key === "outside" && this.activity > 0 ? 0.5 : 0, 1.2);
       if (spec.murmur) {
         this.murmurFilter?.frequency.rampTo(spec.murmur.muffleHz, 0.4);
-        const want = this.activity <= 0 ? 0 : Math.max(1, Math.round(spec.murmur.maxTalkers * Math.min(1, this.activity)));
-        for (let i = 0; i < this.slots.length; i++) this.setSlotActive(i, this.activity > 0 && i < want, key);
+        this.murmurGain?.gain.rampTo(spec.murmur.gain, 0.4);
+        // The GDD formula: talkers = round(maxTalkers * crowd). It can
+        // legitimately round to zero (a nearly empty room has nobody talking).
+        const want =
+          this.activity <= 0 ? 0 : Math.round(spec.murmur.maxTalkers * Math.min(1, crowd));
+        for (let i = 0; i < this.slots.length; i++) {
+          this.setSlotActive(i, this.activity > 0 && i < want, key);
+        }
+      }
+      // Venue programs run only while the venue is actually live (a show or
+      // party in progress), not merely while the empty hall is on screen.
+      if (spec.program) {
+        const shouldRun = this.activity > 0;
+        if (shouldRun !== this.programOn) {
+          this.programOn = shouldRun;
+          const program = this.programFor(spec.program);
+          if (shouldRun) program?.start();
+          else program?.stop();
+        }
       }
     } catch {
       /* transient audio error: recover on the next update */
@@ -139,15 +203,16 @@ export class CrowdLayer {
 
   /** Tear down the old scene's generators and start the new one's. */
   private switchScene(key: CrowdSceneKey | null): void {
+    this.pendingKey = null;
+    this.pendingCount = 0;
     for (const t of this.elementTimers) clearTimeout(t);
     this.elementTimers.clear();
     for (let i = 0; i < this.slots.length; i++) this.setSlotActive(i, false, key ?? "lobby");
     const oldProgram = this.scene ? CROWD_SCENES[this.scene].program : undefined;
-    const newProgram = key ? CROWD_SCENES[key].program : undefined;
-    if (oldProgram && oldProgram !== newProgram) this.programFor(oldProgram)?.stop();
+    if (oldProgram && this.programOn) this.programFor(oldProgram)?.stop();
+    this.programOn = false;
     this.scene = key;
     if (!key) return;
-    if (newProgram && newProgram !== oldProgram) this.programFor(newProgram)?.start();
     for (const el of CROWD_SCENES[key].elements) this.scheduleElement(key, el);
     if (key === "partyHall") this.schedulePartyVoices(key);
   }
@@ -159,45 +224,73 @@ export class CrowdLayer {
   /** Start or stop one talker slot's phrase loop. */
   private setSlotActive(i: number, active: boolean, key: CrowdSceneKey): void {
     const slot = this.slots[i];
-    if (slot.active === active) return;
+    if (slot.active === active) {
+      // A loop that bailed out (activity dipped to zero mid-phrase) marks
+      // itself inactive; nothing to do here unless the timer also died while
+      // the flag stayed set, which the bail-out paths prevent.
+      return;
+    }
     slot.active = active;
     if (!active) {
       if (slot.timer !== null) clearTimeout(slot.timer);
       slot.timer = null;
       return;
     }
+    const spec = CROWD_SCENES[key].murmur;
     slot.semi =
+      spec?.semi ??
       PITCH_MAX_SEMI + (PITCH_MIN_SEMI - PITCH_MAX_SEMI) * pseudo(this.tick++ * 40503 + i * 13);
     const loop = (): void => {
       slot.timer = null;
-      if (this.disposed || !slot.active || this.scene !== key || this.activity <= 0) return;
-      const spec = CROWD_SCENES[key].murmur;
-      if (!spec) return;
+      // Every bail-out clears the active flag so update() can restart the
+      // loop cleanly when the scene comes back to life.
+      if (this.disposed || !slot.active || this.scene !== key || this.activity <= 0) {
+        slot.active = false;
+        return;
+      }
+      const murmur = CROWD_SCENES[key].murmur;
+      if (!murmur) {
+        slot.active = false;
+        return;
+      }
       const wall = this.voices?.phrase(slot.gain, slot.semi, this.tick++) ?? null;
-      const pause = spec.pauseMin + spec.pauseVar * pseudo(this.tick++ * 22695477 + i);
+      const pause = murmur.pauseMin + murmur.pauseVar * pseudo(this.tick++ * 22695477 + i);
       slot.timer = setTimeout(loop, ((wall ?? 0.8) + pause) * 1000);
     };
     slot.timer = setTimeout(loop, pseudo(this.tick++ * 19349663 + i) * 1500);
   }
 
-  /** Run one element spec's irregular firing loop (with typing clusters and
-   *  paired notes where the spec asks). */
+  /** Run one element spec's irregular firing loop: typing-style clusters,
+   *  paired notes, and gaps stretched by low activity (a 20 percent full
+   *  restaurant clinks a fifth as often, per the GDD's linear scaling). */
   private scheduleElement(key: CrowdSceneKey, el: ElementSpec): void {
     let clusterLeft = 0;
+    const draw = (min: number, varS: number, salt: number): number =>
+      min + varS * pseudo(this.tick++ * 2654435761 + salt);
     const loop = (): void => {
       if (this.disposed || this.scene !== key) return;
+      let gap: number;
       if (this.activity > 0) {
-        this.fireElement(el);
-        if (el.cluster) {
-          clusterLeft = clusterLeft > 0 ? clusterLeft - 1 : el.cluster.min + Math.floor(pseudo(this.tick++ * 40503) * (el.cluster.max - el.cluster.min));
+        if (el.cluster && clusterLeft <= 0) {
+          clusterLeft =
+            el.cluster.min +
+            Math.floor(pseudo(this.tick++ * 40503) * (el.cluster.max - el.cluster.min + 1));
         }
+        this.fireElement(el);
+        if (el.cluster) clusterLeft--;
+        const inCluster = el.cluster !== undefined && clusterLeft > 0;
+        const base = inCluster
+          ? draw(el.rateMin, el.rateVar, 1)
+          : el.cluster
+            ? draw(el.cluster.pauseMin, el.cluster.pauseVar, 3)
+            : draw(el.rateMin, el.rateVar, 1);
+        gap = base / Math.max(0.2, Math.min(1, this.activity));
+      } else {
+        // Gated-off scene in view (an office at night): idle slowly instead of
+        // polling at keystroke rate, and let any cluster finish later.
+        clusterLeft = 0;
+        gap = Math.max(2, el.cluster ? draw(el.cluster.pauseMin, el.cluster.pauseVar, 3) : draw(el.rateMin, el.rateVar, 1));
       }
-      const inCluster = el.cluster && clusterLeft > 0;
-      const gap = inCluster
-        ? el.rateMin + el.rateVar * pseudo(this.tick++ * 2654435761)
-        : el.cluster
-          ? el.cluster.pauseMin + el.cluster.pauseVar * pseudo(this.tick++ * 2246822519)
-          : el.rateMin + el.rateVar * pseudo(this.tick++ * 2654435761);
       const timer = setTimeout(() => {
         this.elementTimers.delete(timer);
         loop();
@@ -216,12 +309,17 @@ export class CrowdLayer {
       const freq = el.freqMin + (el.freqMax - el.freqMin) * pseudo(this.tick++ * 40503 + 5);
       const gain = el.gainMin + (el.gainMax - el.gainMin) * pseudo(this.tick++ * 22695477 + 9);
       const now = Tone.now();
+      const attack = el.attack ?? 0.004;
       if (el.kind === "burst") {
-        if (this.noiseFilter) this.noiseFilter.frequency.value = freq;
-        this.noiseSynth?.triggerAttackRelease(el.dur, now, gain * 4);
+        // Envelope follows the spec so a page turn is a swish, not a click,
+        // and the filter glides (a snap under a live tail crackles).
+        this.noiseSynth?.set({ envelope: { attack, decay: Math.max(0.05, el.dur - attack), sustain: 0 } });
+        this.noiseFilter?.frequency.rampTo(freq, 0.02);
+        this.noiseSynth?.triggerAttackRelease(el.dur, now + 0.02, gain * 4);
         return;
       }
       const synth = el.kind === "ping" ? this.pingSynth : this.thudSynth;
+      synth?.set({ envelope: { attack, decay: Math.max(0.06, el.dur - attack), sustain: 0 } });
       synth?.triggerAttackRelease(freq, el.dur, now, gain * 3);
       if (el.pair) {
         synth?.triggerAttackRelease(freq * el.pair.ratio, el.dur, now + el.pair.delayS, gain * 3 * el.pair.gainScale);
@@ -270,7 +368,12 @@ export class CrowdLayer {
     this.party?.dispose();
     this.cinema?.dispose();
     this.metro?.dispose();
-    for (const n of [this.pingSynth, this.thudSynth, this.noiseSynth, this.noiseFilter, this.toneGain, this.murmurFilter, this.master]) {
+    const nodes = [
+      this.pingSynth, this.thudSynth, this.noiseSynth, this.noiseFilter,
+      this.humLow, this.humHigh, this.humLfo, this.humGain,
+      this.toneGain, this.murmurFilter, this.murmurGain, this.master,
+    ];
+    for (const n of nodes) {
       try {
         n?.dispose();
       } catch {
@@ -284,6 +387,9 @@ export class CrowdLayer {
     this.pingSynth = this.thudSynth = null;
     this.noiseSynth = null;
     this.noiseFilter = this.murmurFilter = null;
-    this.toneGain = this.master = null;
+    this.humLow = this.humHigh = null;
+    this.humLfo = null;
+    this.humGain = null;
+    this.toneGain = this.murmurGain = this.master = null;
   }
 }

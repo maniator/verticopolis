@@ -77,7 +77,9 @@ export class CrowdVoices {
       }
     }
     if (start < 0) return null;
-    this.emit(this.talk, gainNode, { rate, offset: start, srcDur: srcLen, fade: PHRASE_RAMP_S });
+    // ToneBufferSource.start's duration is wall-clock: the phrase plays for
+    // wallLen seconds, consuming srcLen seconds of (rate-shifted) source.
+    this.emit(this.talk, gainNode, { rate, offset: start, wallDur: wallLen, fade: PHRASE_RAMP_S });
     return wallLen;
   }
 
@@ -85,7 +87,7 @@ export class CrowdVoices {
   laugh(gainNode: Tone.Gain, tick: number): void {
     if (!this.laughs || !this.laughs.loaded) return;
     const [a, b] = LAUGH_REGIONS[Math.floor(pseudo(tick * 19349663) * LAUGH_REGIONS.length)];
-    this.emit(this.laughs, gainNode, { rate: 1, offset: a, srcDur: b - a, fade: 0.03 });
+    this.emit(this.laughs, gainNode, { rate: 1, offset: a, wallDur: b - a, fade: 0.03 });
   }
 
   /** A whoop: a calm talk chunk whose playback rate accelerates upward. */
@@ -114,9 +116,9 @@ export class CrowdVoices {
       src.playbackRate.setValueAtTime(whoopRate(0), now);
       src.playbackRate.linearRampToValueAtTime(whoopRate(0.5), now + wallLen * 0.5);
       src.playbackRate.linearRampToValueAtTime(whoopRate(1), now + wallLen);
+      src.start(now, start, wallLen + 0.1);
+      src.stop(now + wallLen + 0.06); // past the fadeOut so the tail never clicks
       this.track(src);
-      src.start(now, start, wallLen * 1.6);
-      src.stop(now + wallLen);
     } catch {
       /* voice glitch: skip this whoop */
     }
@@ -126,20 +128,27 @@ export class CrowdVoices {
   private emit(
     buffer: Tone.ToneAudioBuffer,
     gainNode: Tone.Gain,
-    opts: { rate: number; offset: number; srcDur: number; fade: number },
+    opts: { rate: number; offset: number; wallDur: number; fade: number },
   ): void {
+    let src: Tone.ToneBufferSource | null = null;
     try {
-      const src = new Tone.ToneBufferSource({
+      src = new Tone.ToneBufferSource({
         url: buffer,
         playbackRate: opts.rate,
         fadeIn: opts.fade,
         fadeOut: opts.fade,
       });
       src.connect(gainNode);
-      this.track(src);
-      src.start(Tone.now(), opts.offset, opts.srcDur);
+      src.start(Tone.now(), opts.offset, opts.wallDur);
+      this.track(src); // only a started source can reach onended
     } catch {
-      /* voice glitch: skip this phrase */
+      // A source that failed to connect or start never fires onended: reap it
+      // here rather than stranding it in the live set.
+      try {
+        src?.dispose();
+      } catch {
+        /* already gone */
+      }
     }
   }
 

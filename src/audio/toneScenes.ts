@@ -221,6 +221,7 @@ export function sceneFor(focus: ViewFocus, overview: boolean): Scene {
       return "retail";
     case "cinema":
     case "partyHall":
+    case "weddingHall":
       return "cinema";
     case "security":
     case "medical":

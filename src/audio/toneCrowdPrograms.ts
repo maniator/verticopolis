@@ -90,7 +90,11 @@ export class PartyBand implements Program {
       if (n % 2 === 1) events.push({ t, voice: "thud", midi: 55, dur: 0.12 });
       const root = PARTY_BASS_ROOTS[bar];
       events.push({ t: t + beat * 0.5, voice: "bass", midi: root + (n % 2 ? 12 : 0), dur: beat * 0.45 });
-      if (n % 2 === 0) events.push({ t: t + beat * 0.5, voice: "stab", midi: root + 26, dur: beat * 0.4 });
+      if (n % 2 === 0) {
+        // A two-note chord stab (root and fifth above), not a lone note.
+        events.push({ t: t + beat * 0.5, voice: "stab", midi: root + 26, dur: beat * 0.4 });
+        events.push({ t: t + beat * 0.5, voice: "stab", midi: root + 33, dur: beat * 0.4 });
+      }
     }
     for (const h of partyHookEvents()) events.push({ t: h.t, voice: "hook", midi: h.midi, dur: h.dur });
     return events;
@@ -118,12 +122,10 @@ export class PartyBand implements Program {
   }
 
   stop(): void {
-    safe(() => {
-      this.gain.gain.rampTo(0, 0.8);
-      this.part?.stop();
-      this.part?.dispose();
-      this.part = null;
-    });
+    safe(() => this.gain.gain.rampTo(0, 0.8));
+    safe(() => this.part?.stop());
+    safe(() => this.part?.dispose());
+    this.part = null;
   }
 
   dispose(): void {
@@ -202,14 +204,12 @@ export class CinemaProgram implements Program {
   }
 
   stop(): void {
-    safe(() => {
-      if (this.dramaTimer !== null) clearTimeout(this.dramaTimer);
-      this.dramaTimer = null;
-      this.gain.gain.rampTo(0, 0.8);
-      this.part?.stop();
-      this.part?.dispose();
-      this.part = null;
-    });
+    if (this.dramaTimer !== null) clearTimeout(this.dramaTimer);
+    this.dramaTimer = null;
+    safe(() => this.gain.gain.rampTo(0, 0.8));
+    safe(() => this.part?.stop());
+    safe(() => this.part?.dispose());
+    this.part = null;
   }
 
   dispose(): void {
@@ -275,6 +275,7 @@ export class MetroProgram implements Program {
 
   /** Play the whole scripted event via short timers off the event start. */
   private runEvent(): void {
+    let doorNum = 0;
     for (const step of trainEvent()) {
       const timer = setTimeout(() => {
         this.timers.delete(timer);
@@ -298,7 +299,8 @@ export class MetroProgram implements Program {
             this.brake.frequency.linearRampToValueAtTime(120, now + 1);
             this.brake.triggerAttackRelease(180, 1, now, step.gain);
           } else {
-            this.thumps.triggerAttackRelease(95, 0.3, now, step.gain);
+            // The two door thunks land at 95 then 88 Hz, per the spec.
+            this.thumps.triggerAttackRelease(doorNum++ % 2 === 0 ? 95 : 88, 0.3, now, step.gain);
           }
         });
       }, step.at * 1000);
@@ -307,13 +309,11 @@ export class MetroProgram implements Program {
   }
 
   stop(): void {
-    safe(() => {
-      for (const t of this.timers) clearTimeout(t);
-      this.timers.clear();
-      this.gain.gain.rampTo(0, 0.8);
-      this.rumbleGain.gain.rampTo(0, 0.4);
-      this.rumble.stop();
-    });
+    for (const t of this.timers) clearTimeout(t);
+    this.timers.clear();
+    safe(() => this.gain.gain.rampTo(0, 0.8));
+    safe(() => this.rumbleGain.gain.rampTo(0, 0.4));
+    safe(() => this.rumble.stop());
   }
 
   dispose(): void {

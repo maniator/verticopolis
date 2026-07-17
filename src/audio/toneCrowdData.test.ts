@@ -139,6 +139,15 @@ describe("whoopRate", () => {
 });
 
 describe("party remix", () => {
+  it("runs at the approved 124 BPM and the hook fits inside the 4-bar loop", () => {
+    expect(PARTY_BPM).toBe(124);
+    const loopEnd = 16 * (60 / PARTY_BPM);
+    for (const e of partyHookEvents()) {
+      expect(e.t).toBeGreaterThanOrEqual(0);
+      expect(e.t).toBeLessThan(loopEnd); // an event past loopEnd never plays
+    }
+  });
+
   it("plays the game's own splash hook, re-timed to the party tempo", () => {
     const party = partyHookEvents();
     const hook = splashProgram().events.filter((e) => e.voice === "hook");

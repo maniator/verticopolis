@@ -117,6 +117,14 @@ export class ToneAudioEngine {
       typeof (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext !== "undefined";
     if (!hasWebAudio) return; // no WebAudio (tests / unsupported)
     try {
+      // Prefer larger audio buffers over low latency: this is a sim, not an
+      // instrument, and the default interactive hint underruns on phones
+      // (heard as random crackles). Must happen before any node is built.
+      try {
+        Tone.setContext(new Tone.Context({ latencyHint: "playback" }));
+      } catch {
+        /* keep the default context */
+      }
       // Inside a user gesture, so resuming is allowed. Swallow rejections
       // (autoplay/permission) so a blocked context can't surface as unhandled.
       Tone.start().catch(() => {});
@@ -126,8 +134,8 @@ export class ToneAudioEngine {
       // Player volume buses between content and master: music & ambience on one,
       // action jingles on the other. Master keeps its fixed 0.35 (and the mute
       // ramp); these two only scale within it.
-      this.musicBus = new Tone.Gain(this.musicVolume).connect(this.master);
-      this.sfxBus = new Tone.Gain(this.sfxVolume).connect(this.master);
+      this.musicBus = new Tone.Gain(this.musicVolume * this.musicVolume).connect(this.master);
+      this.sfxBus = new Tone.Gain(this.sfxVolume * this.sfxVolume).connect(this.master);
 
       // Shared reverb so the music and ambient life feel like rooms, not dry
       // oscillators.
@@ -151,6 +159,7 @@ export class ToneAudioEngine {
         envelope: { attack: 0.03, decay: 0.5, sustain: 0.05, release: 0.8 },
       }).connect(this.musicGain);
       this.arp.volume.value = -9;
+      this.arp.maxPolyphony = 12; // runaway voices are mobile CPU (crackle)
 
       // Soft triangle bass root under each bar.
       this.bassVoice = new Tone.Synth({
@@ -165,6 +174,7 @@ export class ToneAudioEngine {
         envelope: { attack: 0.025, decay: 0.3, sustain: 0.2, release: 0.3 },
       }).connect(this.musicGain);
       this.hook.volume.value = -6;
+      this.hook.maxPolyphony = 12;
 
       // The crowd/venue ambience layer rides the distance-filtered bed so
       // zoom muffles and opens it with everything else. Its two voice seeds
@@ -206,6 +216,7 @@ export class ToneAudioEngine {
       this.sfxSynth = new Tone.PolySynth(Tone.Synth, {
         envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
       }).connect(this.sfxBus);
+      this.sfxSynth.maxPolyphony = 12;
 
       // Kick off the Transport (the looping music part and the venue programs
       // schedule on it).
@@ -234,8 +245,10 @@ export class ToneAudioEngine {
   setVolumes(music: number, sfx: number): void {
     if (Number.isFinite(music)) this.musicVolume = clamp(music, 0, 1);
     if (Number.isFinite(sfx)) this.sfxVolume = clamp(sfx, 0, 1);
-    this.musicBus?.gain.rampTo(this.musicVolume, 0.08);
-    this.sfxBus?.gain.rampTo(this.sfxVolume, 0.08);
+    // Loudness is logarithmic: a linear gain slider feels dead over most of
+    // its travel. Squaring the stored 0..1 makes half-slider audibly half.
+    this.musicBus?.gain.rampTo(this.musicVolume * this.musicVolume, 0.08);
+    this.sfxBus?.gain.rampTo(this.sfxVolume * this.sfxVolume, 0.08);
   }
 
   /** Choose which composed track plays: `"splash"` on the start screen,
@@ -382,15 +395,15 @@ export class ToneAudioEngine {
   }
 
   dispose(): void {
-    // Stop the global Transport so no scheduled part keeps ticking after
-    // teardown, and tear the crowd layer down first (it owns its own timers).
+    // Tear the crowd layer down first (it owns its own timers), then stop the
+    // global Transport so no scheduled part keeps ticking after teardown.
+    this.crowd?.dispose();
+    this.crowd = null;
     try {
       Tone.getTransport().stop();
     } catch {
       /* transport already gone */
     }
-    this.crowd?.dispose();
-    this.crowd = null;
     if (this.swapTimer !== null) clearTimeout(this.swapTimer);
     this.swapTimer = null;
     try {

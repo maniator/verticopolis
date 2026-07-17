@@ -128,8 +128,12 @@ phrases are per-scene (dense murmur: 0.3 to 1.7 s; occasional conversation:
 
 **Occupancy scaling.** Each scene defines a maximum talker count (and element
 rates). The live crowd factor (0 to 1, see Technical Specifications) scales
-them: `activeTalkers = round(maxTalkers * crowd)`, element firing rates scale
-linearly, and below 0.05 the layer is silent (room tone only).
+them: `activeTalkers = round(maxTalkers * crowd)` (which legitimately rounds
+to zero in a near-empty room), element gaps stretch by `1 / activity` (with a
+0.2 floor), the layer master scales by activity as well as zoom, and below
+0.05 the layer is silent (room tone only). One deliberate exception: the
+street keeps a small crowd floor (0.35), because the city has pedestrians no
+matter what the tower tracks; no indoor scene has a floor.
 
 **Zoom response.** The crowd layer routes through the existing distance
 lowpass (`bedFilter`, 650 to 7500 Hz across the detail ramp), so zooming in
@@ -173,8 +177,8 @@ the composed music bed.
 | Food: fast food | Busy cousin: 5 talkers, pauses 0.4-1.4 s, muffle 1050 Hz; frequent counter clatter (50-100 ms dark bursts at 1800 Hz source cutoff plus 1000-1900 Hz pings) every 0.5-1.6 s. |
 | Retail (shop) | Browse murmur: 2 talkers, pauses 1.2-3.6 s, muffle 950 Hz; occasional soft rustle (0.3-0.55 s dark swish, 1100 Hz) every 2.2-5 s. |
 | Cinema (dominant cinema) | Show-gated. Sparse plucked minor arpeggio (D4/F4/A4/D5 triangles, about 0.7 s decay, staggered, never sustained together); muffled dialogue (1 talker at -5.5 st, 650 Hz muffle); occasional riser (180 to 420 Hz over about 1 s) into a boom (55-60 Hz fundamental plus 110 and 225 Hz partials so small speakers render it). No sustained low swells, ever (they beat into a drone). |
-| Cinema (dominant partyHall) | Event-gated. Upbeat remix of the game's own splash hook at 124 BPM: kick 54-56 Hz each beat, backbeat thud 210 Hz, bouncing root/octave triangle bass, chord stabs, hook melody on top, the whole band muffled about 1150 Hz (through the wall). Up to 2 talkers with long pauses; the owner's real laughs (the laugh seed) roughly twice a minute; voice whoops (a calm seed chunk pitch-bent upward, rate 0.9 to 1.9 accelerating over 0.4-0.55 s) at a similar rate. |
-| Metro | Standing platform crowd: 4 talkers, muffle 900 Hz, extra room echo. Train event (fires while in view, roughly once a minute): wheel da-dum pairs (58 + 64 Hz thumps with a 130 Hz partial) rolling in over a swelling dark rumble (140 Hz cutoff), brakes easing (descending 180 Hz), two door thunks (95 and 88 Hz), then da-dums accelerating away (gap 0.7 s shrinking toward 0.32 s) as the rumble recedes. |
+| Cinema (dominant partyHall or weddingHall; weddings are parties) | Event-gated. Upbeat remix of the game's own splash hook at 124 BPM: kick 54-56 Hz each beat, backbeat thud 210 Hz, bouncing root/octave triangle bass, chord stabs, hook melody on top, the whole band muffled about 1150 Hz (through the wall). Up to 2 talkers with long pauses; the owner's real laughs (the laugh seed) roughly twice a minute; voice whoops (a calm seed chunk pitch-bent upward, rate 0.9 to 1.9 accelerating over 0.4-0.55 s) at a similar rate. |
+| Metro | Standing platform crowd: 4 talkers, muffle 900 Hz (the shared bed reverb supplies the hall's echo). Train event (fires while in view, roughly once a minute): wheel da-dum pairs (58 + 64 Hz thumps with a 130 Hz partial) rolling in over a swelling dark rumble (140 Hz cutoff), brakes easing (descending 180 Hz), two door thunks (95 and 88 Hz), then da-dums accelerating away (gap 0.7 s shrinking toward 0.32 s) as the rumble recedes. |
 | Outside | Noise-free street: city hum (65 Hz swells offset against quieter 98 Hz swells, never beating), sidewalk pedestrians (2 talkers, heavy 520 Hz muffle, pauses 1.6-4.4 s), sparse warm bird chirps (two-note pairs, 1300-1550 Hz, under 0.1 s), a distant car horn (370 + 466 Hz dual tone, about 0.35 s) rarely. Rain remains the existing weather layer, unchanged. |
 | Overview / quiet / service | No crowd layer. Music and the existing room-tone bed carry these; the service floors keep their current sound deliberately. |
 
@@ -254,7 +258,15 @@ attacks and irregular timing.
   by the removed accent path.
 - **Performance.** Same budget discipline as the music: a handful of synth
   voices and one or two buffer sources per scene; scheduling on the Transport
-  or short timers; zero allocations in the per-frame update path.
+  or short timers; zero allocations in the per-frame update path. The audio
+  context runs with the `playback` latency hint (larger buffers; the default
+  interactive hint underruns on phones and reads as random crackles), synth
+  polyphony is capped, venue programs run only while their venue is live, and
+  the ambience scene key must win two consecutive updates before a switch so
+  a mixed floor cannot churn programs while panning.
+- **Volume.** The player sliders are perceptual: the stored 0..1 is squared
+  at the bus, so half slider is audibly half (a linear gain slider reads as
+  doing nothing across most of its travel).
 - **Determinism.** Ambience shares the music's non-determinism budget: it
   reads sim state but never writes it and draws no simulation RNG. Golden
   masters are untouched by construction.
@@ -295,6 +307,10 @@ One epic, delivered as a single PR. Detail in `epics.md`.
 - Stereo placement or per-person spatial audio.
 - Additional recordings (restaurant/party/cinema real-room beds); the voice
   seeds carry v1.
+- Three fine-texture details from the audition prototypes, deferred at review
+  triage and tracked in the backlog: the condo vacuum pass and TV melody
+  notes, and the hotel cart's dark noise bed (its wheel-bump roll rhythm
+  shipped).
 - Any simulation-side behavior change whatsoever.
 
 ## Assumptions and Dependencies

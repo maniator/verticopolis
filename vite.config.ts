@@ -258,7 +258,6 @@ export default defineConfig({
         // toneVoices.ts, which keeps the lower synth floor (the mocked-Tone graph
         // test drives it end to end, but units can't reach every voice branch).
         "src/audio/ToneAudioEngine.ts": { functions: 80, branches: 72 },
-        "src/audio/toneVoices.ts": { statements: 68, lines: 68, branches: 72 },
         "src/render/sprites/**": { branches: 72 },
         "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
         // towerCrowd.ts is MEASURED, but roughly half of it (syncMotion,

@@ -42,6 +42,10 @@ export interface MurmurSpec {
   muffleHz: number;
   /** Murmur bus gain at full activity. */
   gain: number;
+  /** Fixed talker pitch shift, semitones (single-voice scenes: the office
+   *  phone call, the condo TV, the cinema dialogue). Omitted: each talker
+   *  draws its own voice from the down-only range. */
+  semi?: number;
 }
 
 /** A scheduled non-voiced detail sound. `ping` and `thud` are pitched tones;
@@ -59,6 +63,8 @@ export interface ElementSpec {
   /** Gap to the next firing: min plus a 0..1 draw times var, seconds. */
   rateMin: number;
   rateVar: number;
+  /** Envelope attack, seconds (default 0.004: a tick; longer = a swish). */
+  attack?: number;
   /** Fire in clusters (typing): `min..max` hits at the rate gap, then a
    *  thinking pause of `pauseMin` plus a draw times `pauseVar` seconds. */
   cluster?: { min: number; max: number; pauseMin: number; pauseVar: number };
@@ -75,8 +81,9 @@ export interface CrowdSceneSpec {
   murmur?: MurmurSpec;
   elements: ElementSpec[];
   gate: CrowdGate;
-  /** Streets have people regardless of what the tower tracks: floor for the
-   *  crowd factor so the scene never falls fully silent while gated on. */
+  /** Deliberate exception for the street only: the city has people no matter
+   *  what the tower tracks, so outside never falls fully silent. Indoor
+   *  scenes never set this (honest rooms: empty means silent). */
   crowdFloor?: number;
   /** Scene runs a composed program (party band, cinema score, metro train)
    *  built by the programs module rather than murmur alone. */
@@ -90,21 +97,21 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     murmur: { maxTalkers: 6, pauseMin: 0.3, pauseVar: 1.4, muffleHz: 950, gain: 0.5 },
     elements: [],
     gate: "always",
-    crowdFloor: 0.15,
   },
   office: {
-    murmur: { maxTalkers: 1, pauseMin: 1.6, pauseVar: 2.6, muffleHz: 850, gain: 0.33 },
+    murmur: { maxTalkers: 1, pauseMin: 1.6, pauseVar: 2.6, muffleHz: 850, gain: 0.33, semi: -3.5 },
     elements: [
-      // Typing patter: dark 12 ms ticks in bursts; the schedule below is the
-      // per-keystroke gap, and the layer inserts thinking pauses itself.
-      { kind: "burst", freqMin: 1300, freqMax: 1500, dur: 0.012, gainMin: 0.03, gainMax: 0.06, rateMin: 0.08, rateVar: 0.1, cluster: { min: 4, max: 12, pauseMin: 1.2, pauseVar: 3.0 } },
-      // Page turns: soft dark swishes.
-      { kind: "burst", freqMin: 650, freqMax: 750, dur: 0.35, gainMin: 0.04, gainMax: 0.06, rateMin: 4, rateVar: 4 },
+      // Two typists: dark 12 ms ticks in bursts at the spec's 900 Hz seat; the
+      // rate is the per-keystroke gap and the cluster adds thinking pauses.
+      { kind: "burst", freqMin: 750, freqMax: 900, dur: 0.012, gainMin: 0.02, gainMax: 0.04, rateMin: 0.08, rateVar: 0.1, cluster: { min: 4, max: 12, pauseMin: 1.2, pauseVar: 3.0 } },
+      { kind: "burst", freqMin: 750, freqMax: 900, dur: 0.012, gainMin: 0.02, gainMax: 0.04, rateMin: 0.09, rateVar: 0.09, cluster: { min: 4, max: 12, pauseMin: 1.8, pauseVar: 3.4 } },
+      // Page turns: soft dark swishes, not ticks.
+      { kind: "burst", freqMin: 650, freqMax: 750, dur: 0.35, gainMin: 0.03, gainMax: 0.05, rateMin: 4, rateVar: 4, attack: 0.08 },
     ],
     gate: "workday",
   },
   condo: {
-    murmur: { maxTalkers: 3, pauseMin: 0.9, pauseVar: 1.8, muffleHz: 480, gain: 0.3 },
+    murmur: { maxTalkers: 3, pauseMin: 0.9, pauseVar: 1.8, muffleHz: 480, gain: 0.3, semi: -2.5 },
     elements: [
       // Domestic one-shots: a dish clink and a cupboard thud, both rare.
       { kind: "ping", freqMin: 1150, freqMax: 1350, dur: 0.18, gainMin: 0.05, gainMax: 0.08, rateMin: 5, rateVar: 6 },
@@ -113,14 +120,15 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     gate: "condoDay",
   },
   hotel: {
-    murmur: { maxTalkers: 1, pauseMin: 2.2, pauseVar: 3.0, muffleHz: 420, gain: 0.24 },
+    murmur: { maxTalkers: 1, pauseMin: 2.2, pauseVar: 3.0, muffleHz: 420, gain: 0.24, semi: -4 },
     elements: [
-      // Cart wheel bumps in a slow roll, and a door thud down the hall.
-      { kind: "thud", freqMin: 64, freqMax: 76, dur: 0.12, gainMin: 0.05, gainMax: 0.09, rateMin: 3, rateVar: 4 },
-      { kind: "thud", freqMin: 105, freqMax: 115, dur: 0.35, gainMin: 0.14, gainMax: 0.2, rateMin: 9, rateVar: 9 },
+      // Cart wheel bumps rolling by in a cluster, then a long quiet hall.
+      { kind: "thud", freqMin: 64, freqMax: 76, dur: 0.12, gainMin: 0.05, gainMax: 0.09, rateMin: 0.35, rateVar: 0.25, cluster: { min: 5, max: 9, pauseMin: 9, pauseVar: 10 } },
+      // A door thud down the hall (110 Hz body with its 70 Hz floor). 0.636 is
+      // the 70/110 interval.
+      { kind: "thud", freqMin: 105, freqMax: 115, dur: 0.35, gainMin: 0.14, gainMax: 0.2, rateMin: 9, rateVar: 9, pair: { ratio: 0.636, delayS: 0.02, gainScale: 0.8 } },
     ],
     gate: "always",
-    crowdFloor: 0.1,
   },
   restaurant: {
     murmur: { maxTalkers: 3, pauseMin: 1.5, pauseVar: 3.5, muffleHz: 800, gain: 0.34 },
@@ -134,7 +142,7 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     murmur: { maxTalkers: 5, pauseMin: 0.4, pauseVar: 1.0, muffleHz: 1050, gain: 0.46 },
     elements: [
       // Counter clatter: dark tray bursts plus brighter pings, frequent.
-      { kind: "burst", freqMin: 1700, freqMax: 1800, dur: 0.07, gainMin: 0.08, gainMax: 0.13, rateMin: 0.5, rateVar: 1.1 },
+      { kind: "burst", freqMin: 1400, freqMax: 1700, dur: 0.07, gainMin: 0.06, gainMax: 0.1, rateMin: 0.5, rateVar: 1.1, attack: 0.015 },
       { kind: "ping", freqMin: 1000, freqMax: 1900, dur: 0.16, gainMin: 0.05, gainMax: 0.08, rateMin: 0.8, rateVar: 1.4 },
     ],
     gate: "attendance",
@@ -143,12 +151,12 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     murmur: { maxTalkers: 2, pauseMin: 1.2, pauseVar: 2.4, muffleHz: 950, gain: 0.3 },
     elements: [
       // Occasional soft browse rustle.
-      { kind: "burst", freqMin: 1050, freqMax: 1150, dur: 0.42, gainMin: 0.04, gainMax: 0.07, rateMin: 2.2, rateVar: 2.8 },
+      { kind: "burst", freqMin: 1050, freqMax: 1150, dur: 0.42, gainMin: 0.04, gainMax: 0.07, rateMin: 2.2, rateVar: 2.8, attack: 0.1 },
     ],
     gate: "attendance",
   },
   cinema: {
-    murmur: { maxTalkers: 1, pauseMin: 1.0, pauseVar: 2.2, muffleHz: 650, gain: 0.3 },
+    murmur: { maxTalkers: 1, pauseMin: 1.0, pauseVar: 2.2, muffleHz: 650, gain: 0.3, semi: -5.5 },
     elements: [],
     gate: "attendance",
     program: "cinema",
@@ -163,7 +171,6 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     murmur: { maxTalkers: 4, pauseMin: 0.6, pauseVar: 1.6, muffleHz: 900, gain: 0.42 },
     elements: [],
     gate: "always",
-    crowdFloor: 0.2,
     program: "metro",
   },
   outside: {
@@ -199,7 +206,8 @@ export function resolveCrowdScene(
     case "retail":
       return "shop";
     case "cinema":
-      return dominant === "partyHall" ? "partyHall" : "cinema";
+      // Weddings are parties (the same attendance-venue family).
+      return dominant === "partyHall" || dominant === "weddingHall" ? "partyHall" : "cinema";
     case "metro":
       return "metro";
     case "outside":

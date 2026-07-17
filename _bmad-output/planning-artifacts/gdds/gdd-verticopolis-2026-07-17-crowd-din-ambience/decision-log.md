@@ -23,6 +23,10 @@ the GDD carries the resulting specs.
 | 15 | Metro trains are events with a wheel rhythm, not a noise loop | Da-dum arrival/departure approved in the de-static round. |
 | 16 | Restaurant is quiet-ambient with occasional conversation | "More ambient and quieter, occasional conversation" versus the constant-murmur draft. |
 | 17 | Spec then implement in one PR, `/gds-code-review`, preview for sign-off | Owner instruction closing the audition phase. |
+| 18 | Review triage (same session): `/gds-code-review` ran its three layers over the implementation; every mechanics deviation was patched back to spec (silence threshold, talker formula, per-scene murmur gains and voices, element rate scaling, cluster math, program gating, census throttle) and three fine-texture prototype details were deferred to the backlog rather than silently dropped. | Findings summarized in the PR; defers in the backlog inbox. |
+| 19 | Phone crackle ruling: the audio context runs with the `playback` latency hint and capped polyphony. | Owner reported random static crackles on phone only (both prod and preview): buffer underruns, not synthesis. |
+| 20 | Volume sliders became perceptual (stored value squared at the bus). | Owner reported the music slider "doesn't seem to change the volume": linear gain reads as flat across most of the travel. |
 
 Finalization: GDD and epics drafted 2026-07-17 from the audition record;
-validation pass run before implementation began in the same session.
+validation pass run before implementation began in the same session; review
+triage deltas (rows 18-20) folded back into the GDD the same day.
