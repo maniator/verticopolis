@@ -12,7 +12,9 @@ scope: "Dialog and editor-card UX only. The engine model, the dispatch effect, a
   the GameRules split are ratified inputs (Phases 1-2, gdd/arch), cited and never
   re-argued. Closes the Phase 1 stepper-range defer by ratifying concrete ranges.
   Owner calls of 2026-07-17 fold in the stops dialog (Q1) and put the schedule
-  dialog on express in both modes (Q4, Classic by 1994 research, Modern by party)."
+  dialog on express in both modes (Q4, Classic by 1994 research, Modern by party).
+  A UX + game design party then reviewed every interaction and ruled on the
+  count-axis fork (Q5): positioning leads, no count cost ships in Phase 3 (§14)."
 inputs:
   - _bmad-output/planning-artifacts/design/gdd-elevator-scheduling-2026-07-16.md (§4 the model, §4.5 the dialog, §5 Classic vs Modern)
   - _bmad-output/planning-artifacts/design/arch-elevator-scheduling-2026-07-16.md (§2 module boundaries, §5 the GameRules seam, §8 UI/inspector, §11 A4 Simulate)
@@ -112,6 +114,12 @@ below. Nothing else on the card moves.
 
 ## 2. The dialog: anatomy and pattern
 
+> **Revised by the 2026-07-17 design party (see §14).** The anatomy below stands, but Modern
+> re-weights it toward POSITIONING: the manual count strip is demoted behind Advanced and owned
+> by Auto-tune, a measured-demand ghost series backs the strip, and Simulate scores staging. The
+> ASCII here shows the pre-revision layout; §14.2 is authoritative for the Modern surface order.
+> Classic keeps the manual strip primary.
+
 A modal opened through `ui.openModalTemplate`, stateful in the `uiBatchPricing` mold: a
 single `state` object, a `recompute()` that derives the Simulate readout and the
 OK-disabled flag, and a `rerender()` that lit-patches the whole body from `state` into the
@@ -157,7 +165,7 @@ row), value in a `.field`-styled read-only cell, 36px targets on coarse pointers
 
 | Control | Unit | Range | Step | Default | Maps to |
 |---|---|---|---|---|---|
-| Waiting Car Response | floors | 0-30 | 1 | 0 | `waitingCarResponse`; reach = span - value, so 0 = answers everything (today), higher = a staged car holds for farther calls |
+| Waiting Car Response | floors | 0-30 | 1 | 0 | `waitingCarResponse`; 0 = answers the nearest call (today's behavior), higher = a staged car holds for farther calls. The exact reach geometry is the dispatcher's and is provisional in the engine, so the stepper commits only to the direction, never to a formula |
 | Standard Floor Departure | seconds | 0-60 | 2 | 48 | `standardFloorDeparture`; 48 game-seconds is the 0.8 game-minute default dwell (`DWELL_DEFAULT_SECONDS`), so the default reproduces today's hold |
 
 - **These ranges ratify the Phase 1 provisional bounds.** `WAITING_CAR_RESPONSE_MAX`
@@ -259,9 +267,12 @@ one undo (Cancel) or one other preset away, so it needs no confirm.
 
 `Auto-tune` reads the shaft's own measured hourly load (the existing statistical demand the
 dispatcher already accumulates, exposed read-only to the UI) and sets each hour's active
-count proportional to that hour's load, clamped `1..cars`. It writes the working-copy rows
-at author time only (no sim-tick effect, no RNG; arch §6), then re-renders. It never
-touches home floors or the steppers, so it composes with a hand-set staging. Announce:
+count proportional to that hour's load. It writes the working-copy rows at author time only
+(no sim-tick effect, no RNG; arch §6), then re-renders. The model permits `0..cars` per hour,
+but Auto-tune deliberately floors its output at `1` (never 0): a measured-demand tune should
+thin a quiet hour, never take the shaft fully off the air, so a lull cannot silently strand a
+floor for an hour. A player who wants a true 0-car hour still sets it by hand on the strip.
+Auto-tune never touches home floors or the steppers, so it composes with a hand-set staging. Announce:
 `Auto-tuned cars to this shaft's measured demand.` If the shaft has no measured history yet
 (a fresh save), the button is disabled with the house why-disabled styling and a folded
 note: `Auto-tune needs a day or two of measured traffic first.`
@@ -306,17 +317,23 @@ advice never nags about it on an express shaft.
 Per arch §11 A4, Simulate is a cheap ANALYTIC projection computed on the UI thread from
 the working copy, never a second headless sim instance. It is a live readout under the
 strip (no separate Simulate button and no modal-within-modal): every edit recomputes it,
-so the player always sees the consequence of the current draft. Pinned patterns:
+so the player always sees the consequence of the current draft.
 
-- `Busiest weekday hour 17:00: 6 of 6 cars, homed lobby+22.`
-- `Overnight (00:00-05:00): 2 of 6 cars on shift.`
-- `Weekend never runs more than 3 of 6 cars.`
+**It scores POSITIONING, not counts** (party revision §14.2). A count-only readout ("6 of 6
+cars") cannot tell good staging from bad, so it never moves on the one axis the dialog is for.
+Instead the readout compares the authored home floors against the measured demand at the peak
+hour, so staging a bank up-tower against the down-rush visibly changes the line while shuffling
+counts above the demand curve does not. Pinned patterns:
 
-The heading count (`6 of 6`) and the readout derive from the same `activeCarCount` /
-`homeFloorFor` accessors the dispatcher reads, so the preview can never drift from what the
-sim will actually do. No projected wait-time number is promised here (that would imply a
-routing simulation); the readout states supply and positioning, which is exactly what the
-schedule controls.
+- `17:00 down-rush originates on floors 20-30; 2 cars staged there, 4 in lobby.`
+- `Weekday peak 08:00 up-rush: cars staged at the lobby, ready.`
+- `Overnight 00:00-05:00: 2 cars on shift, homed lobby.`
+
+The readout derives from the same `activeCarCount` / `homeFloorFor` accessors the dispatcher
+reads, so it can never drift from what the sim will do. No projected wait-time number is
+promised (that would imply a routing simulation); the readout scores supply DIRECTION against
+demand DIRECTION, which is exactly what the schedule controls and stays within the
+no-routing-sim constraint.
 
 ## 7. Folding in `Configure stops…` (decided: yes)
 
@@ -414,6 +431,12 @@ fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
   game/systems/UX party was unanimous, chiefly to avoid invisible uneditable state from an
   imported express schedule. Express adapts with a caption floor list (§4.1),
   lobby-limited home floors (§4.3), and lobby-staged presets (§5.4).
+- **Q5 the count axis (no running cost) does not lead the dialog** (§14). Classic keeps the
+  manual count strip primary and cost-free (canon O2 + research, §14.5); Modern re-weights
+  toward positioning via three engine-free moves (§14.2) after a unanimous game/systems party.
+  No count cost or bunching penalty ships in Phase 3: money-cost reopens canon and churns the
+  golden master; a congestion penalty would invert the `congestion.ts` monotonic invariant.
+  Both are deferred (the penalty only as a telemetry-gated post-Phase-3 experiment).
 
 **Still open (owner / playtest; the engine, the split, and the two decisions above are
 settled):**
@@ -449,3 +472,141 @@ Waiting Car Response and Standard Floor Departure) rests on:
 The Modern ruling rests on the 2026-07-17 game/systems/UX roundtable summarized in §1 and
 §5.4 (offer the dialog; adapt the floor list to a caption, the home floors to lobby stops,
 and the presets to lobby staging).
+
+## 14. Design review revisions (UX + game party, 2026-07-17)
+
+After the first mockup, a UX seat (Sally) and a game seat (Samus) reviewed the dialog and
+every interaction, and a follow-up game/systems party (Samus + Cloud) ruled on one
+structural fork. This section records the outcomes and amends the sections above; where §2 to
+§6 and §14 differ, §14 governs.
+
+### 14.1 The count axis has no agency, so positioning leads (the fork, decided)
+
+The review's headline finding: because there is no per-car running cost (GDD open question
+O2), setting an hour BELOW the fleet size saves nothing and is strictly worse service, so a
+rational player maxes every hour. The 24-hour "cars on shift" strip is therefore the
+LOWEST-agency control, while POSITIONING (home-floor staging for the down-rush) carries the
+real skill. Owner call 2026-07-17: research Classic, party for Modern.
+
+- **Classic (researched + canon):** no count cost. Canon O2 already confirms 1994 charged no
+  per-hour running cost; the research pass found only a flat per-shaft construction and
+  maintenance cost, nothing that scales with active cars (sources §14.5). So in Classic the
+  count strip is a manual positioning and service tool at 1994 semantics, unchanged and
+  primary; withholding or demoting it would break fidelity.
+- **Modern (party, unanimous Option A, NO engine change):** keep counts costless but stop
+  presenting them as the hero. Both seats rejected giving counts weight for Phase 3:
+  - A *money cost* is rejected outright: it reopens canon O2, perturbs the economy stream and
+    the golden-master hash, and turns 24 hourly slots into a spreadsheet chore, the least
+    SimTower-flavored option on the table.
+  - A *bunching/congestion penalty* is rejected for Phase 3 and as an epic on a hard technical
+    ground the systems seat found: `src/engine/sim/congestion.ts` rests on a MONOTONIC
+    invariant (adding any parallel shaft strictly increases capacity and reduces congestion),
+    which the #303 bank balancer and the two-ride routing BFS both assume. A penalty that made
+    surplus cars RAISE congestion would invert that invariant and destabilize merged Phase 2
+    plus the fairness work. Only a far-future dispatch rewrite (per-floor occupancy so bunching
+    emerges, not a flat penalty term) could do it cleanly, and even then it likely reads as a
+    chore. Deferred as a post-Phase-3, telemetry-gated experiment (build only if shipped
+    telemetry shows players pin every count at max, i.e. the axis is provably dead), never a
+    Phase 3 blocker, never money. A backlog row and issue are opened only if that telemetry
+    trigger fires; until then it is captured here in the spec, not as tracked work.
+
+### 14.2 The positioning-first re-layout (Modern; three engine-free moves)
+
+Option A is not just "rearrange"; it makes positioning the legibly-scored lever via three
+deterministic, author-time moves (no tick effect, no RNG, unscheduled towers byte-identical):
+
+1. **Measured-demand ghost series behind the strip.** Render the shaft's measured hourly load
+   as a second series behind the authored bars, and gray any authored bar segment ABOVE the
+   demand line as "idle anyway, no effect." Maxing counts becomes a VISIBLE redundancy rather
+   than a hidden non-choice, and Classic finally shows the true measured load it always
+   promised (§5.3) instead of leaving Classic blind. This also restores the strip's count
+   gridlines (0/2/4/.../cars) the first mockup dropped, so a bar's value reads without a
+   tooltip.
+2. **Auto-tune owns the Modern count rows by default; the manual strip moves behind Advanced.**
+   In Modern (`rawGridDefault: false`), the primary surface is home-floor staging, the two
+   response steppers, the demand-backed strip as a READOUT, and Simulate; the manual per-hour
+   count grid sits behind the Advanced disclosure beside the raw floors list. The player
+   inherits a sane Auto-tune count curve and never needs to touch counts to be optimal, which
+   removes the max-and-ignore incentive. Classic keeps the manual strip primary (fidelity).
+3. **Simulate scores staging, not counts** (§6). The readout responds to home-floor placement
+   against the down-rush and stays flat above the demand line, so attention follows the number
+   that actually moves. Pinned form: `17:00 down-rush originates on floors 20-30; 2 cars staged
+   there, 4 in lobby.` Pure analytic read (same accessors), still no promised routed wait
+   (§6 constraint intact).
+
+### 14.3 Interaction findings folded in
+
+MUST-FIX (each amends the section noted):
+
+- **The strip needs a real edit gesture (§2, §9).** Click/tap-to-height plus arrow keys are
+  the PRIMARY gesture (arrow up/down nudges an hour's count, left/right moves hours); vertical
+  drag is an accelerator, never the only path. Each hour is a `role="slider"` cell with a
+  visible focus ring and a spoken value.
+- **Paint across hours (§2).** A rush window is 2-3 consecutive equal hours; support
+  horizontal drag-to-paint the focused value across a span (and/or shift-click range fill), so
+  the strip is a schedule editor, not 24 unrelated sliders.
+- **Express keeps a home-floor picker (§4.3).** The caption replaces only the Serve COLUMN;
+  the lobby/sky-lobby rows still render with their home-car marks so `Home all cars here` and
+  per-car staging exist. The first mockup wrongly hid the whole list, dropping the one
+  interaction express is justified on. The spec text (§4.3) already required this; it is now
+  unmistakable.
+- **Waiting Car Response defaults to 0 (§3).** Pin the untouched value to 0 (a true no-op that
+  matches today), not 4; an untouched OK must not silently change dispatch, matching the
+  SFD-48 story beside it.
+- **Coarse-pointer sizing reaches the strip cells and stepper triples (§8, §9).** Extend the
+  `pointer: coarse` block to `.strip` cells and the `[data-step]` nudges, and adopt the §8
+  mobile strip (6-hour-snap scroll or 12+12 wrap) so a touch edit never depends on hitting a
+  thin bar.
+
+SHOULD-CONSIDER (folded as refinements):
+
+- **Presets do not silently overwrite hand-set home floors (§5.1).** Scope a preset to the
+  COUNT rows (and only set homes when the player has not authored any), or offer a lightweight
+  in-dialog Undo for the last preset/Auto-tune; a whole-dialog Cancel is too blunt an undo for
+  a one-button action.
+- **Mark the recommended preset per shaft (§5.1, §5.4).** Highlight Feeder on express and Rush
+  on a busy local, so the presets teach the mechanic instead of a flat three-button menu.
+- **Live legibility sentence under each stepper (§3).** Show the announce sentence on-screen
+  live (`Idle cars hold for calls more than 4 floors off.`; a dwell tradeoff line for SFD), so
+  the two tunables read as choices, not opaque knobs. Add press-and-hold auto-repeat and wire
+  the disabled-at-floor/cap state.
+- **Home floors: numbered car chips, not anonymous dots (§4.3).** Render `(5)(6)` chips rather
+  than identical red dots, keep `Home all cars here` and a one-press "stage upper half
+  up-tower" as the discoverable default, and drop the drag-between-rows gesture; the per-car
+  chips are the split-staging tail.
+- **Surface the base-floor and per-car assign as real WRITE affordances (§4.2, §4.3).** The
+  mockup showed home marks and the `◎` base as read-only; give a focused row a visible
+  `Set as base` control and a visible assign control, and differentiate the base glyph from a
+  home mark (a `BASE` tag, not a near-identical ring).
+- **Advice sits directly under the strip and never nags a maxed hour (§5.3).** Move the advice
+  line under the strip it describes, and suppress the "short at H" clause whenever that hour
+  already runs the full fleet (you cannot add a car you do not have); point at the `+ Car`
+  action instead, or say nothing.
+- **The day toggle scopes only the strip (§2).** Move Weekday/Weekend into the strip's header
+  (`Cars on shift by hour: Weekday | Weekend`) so it visibly governs the per-day counts alone;
+  the steppers, base, and home floors are shaft-wide and read that way.
+- **Consider a dirty-only discard guard (§9).** This dialog holds a lot of authored state; a
+  stray Esc dropping all of it silently is harsh. House grammar discards silently, so this is a
+  judgment call, but a "Discard changes?" guard when the working copy is dirty is worth it.
+
+### 14.4 Confirmed good (kept as specced)
+
+Live-readout Simulate (no button), the Classic-open / Modern-folded split via the
+`elevatorScheduleUX()` seam, no-confirm presets, folding in `Configure stops…` (§7), and
+Auto-tune setting counts only (so it cannot "win the dialog"). Auto-tune's real assist is
+positioning: extend it to bias home floors toward the busiest served lobby on standard shafts
+too (§5.4 already grants this on express), so the one-button assist helps the axis that
+matters.
+
+### 14.5 Sources (count-cost research, 2026-07-17)
+
+The Classic "no count cost" ruling (§14.1) rests on GDD O2 (canon: no per-hour running cost)
+plus a research pass that found only a flat per-shaft construction/maintenance cost, nothing
+scaling with active cars:
+
+- Sim Tower Wiki, Elevators: https://simtower.fandom.com/wiki/Elevators
+- Relentless Optimizer, SimTower Reference: https://relentlessoptimizer.com/gaming/2021/03/13/simtower-reference/
+
+The Modern Option A ruling rests on the 2026-07-17 game (Samus) and systems (Cloud) party,
+whose reasoning (money-cost rejected; congestion-penalty inverts the `congestion.ts` monotonic
+invariant; positioning-first re-layout) is summarized in §14.1 and §14.2.
