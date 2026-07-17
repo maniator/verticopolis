@@ -273,8 +273,13 @@ count proportional to that hour's load. It writes the working-copy rows at autho
 but Auto-tune deliberately floors its output at `1` (never 0): a measured-demand tune should
 thin a quiet hour, never take the shaft fully off the air, so a lull cannot silently strand a
 floor for an hour. A player who wants a true 0-car hour still sets it by hand on the strip.
-Auto-tune never touches home floors or the steppers, so it composes with a hand-set staging. Announce:
-`Auto-tuned cars to this shaft's measured demand.` If the shaft has no measured history yet
+Auto-tune also SEEDS positioning: when the player has not authored any home floors, it stages
+the fleet toward the shaft's busiest served lobby (its measured-demand origin), so the
+one-button assist helps the axis that matters (§14.4), not just the costless count axis. It
+never overwrites a hand-set staging, and it never touches the steppers, so it composes with
+manual positioning rather than clobbering it (the presets/Auto-tune no-clobber rule, §14.3).
+Announce: `Auto-tuned cars and staging to this shaft's measured demand.` If the shaft has no
+measured history yet
 (a fresh save), the button is disabled with the house why-disabled styling and a folded
 note: `Auto-tune needs a day or two of measured traffic first.`
 
@@ -304,8 +309,9 @@ names stay honest:
 - **Feeder** on express: steady `ceil(cars/2)`, every car homed at the highest served
   lobby. This is the natural express default and Modern should suggest it first.
 - **Balanced** on express: the daytime hump, all cars homed at the base (ground) lobby.
-- **Auto-tune** works unchanged (it reads measured load and sets counts); on express it
-  additionally biases home floors toward the busiest served lobby.
+- **Auto-tune** on express follows the same rule as everywhere (§5.2): it sets counts from
+  measured load and, when homes are unset, seeds staging toward the busiest served lobby,
+  which on a lobby-only trunk is the highest served sky lobby (the transfer feeder point).
 
 Because every home target an express preset writes is already one of its lobby stops, the
 preset output is well-defined for express rather than an arbitrary floor the shaft cannot
@@ -409,11 +415,12 @@ fold-in and the shared `titleBarClose` (arch §8, gdd §4.5).
 | Preset buttons | `Rush` / `Balanced` / `Feeder` |
 | Announce, preset | `Applied the <Preset> schedule.` |
 | Auto-tune button | `Auto-tune` |
-| Announce, auto-tune | `Auto-tuned cars to this shaft's measured demand.` |
+| Announce, auto-tune | `Auto-tuned cars and staging to this shaft's measured demand.` |
 | Auto-tune disabled note | `Auto-tune needs a day or two of measured traffic first.` |
 | Advice line | `This shaft is over-staffed <span> and short at <hour> on <day type>.` / `Measured demand and your schedule line up.` |
-| Simulate, peak | `Busiest <day type> hour <HH:00>: <n> of <cars> cars, homed <where>.` |
-| Simulate, overnight | `Overnight (00:00-05:00): <n> of <cars> cars on shift.` |
+| Simulate, down-rush staging (§6) | `<HH:00> down-rush originates on floors <lo>-<hi>; <n> cars staged there, <m> in lobby.` |
+| Simulate, up-rush staging (§6) | `<day type> peak <HH:00> up-rush: cars staged at the lobby, ready.` |
+| Simulate, overnight | `Overnight <HH:00>-<HH:00>: <n> cars on shift, homed <where>.` |
 | Floors list heads | `Floor` / `Serve` / `Home car(s)` |
 | Floors quick-actions (folded in from stops) | `Express (lobbies)` / `All stops` |
 | Express floors caption | `Serves all lobbies and sky lobbies` |
@@ -593,11 +600,13 @@ SHOULD-CONSIDER (folded as refinements):
 ### 14.4 Confirmed good (kept as specced)
 
 Live-readout Simulate (no button), the Classic-open / Modern-folded split via the
-`elevatorScheduleUX()` seam, no-confirm presets, folding in `Configure stops…` (§7), and
-Auto-tune setting counts only (so it cannot "win the dialog"). Auto-tune's real assist is
-positioning: extend it to bias home floors toward the busiest served lobby on standard shafts
-too (§5.4 already grants this on express), so the one-button assist helps the axis that
-matters.
+`elevatorScheduleUX()` seam, no-confirm presets, and folding in `Configure stops…` (§7).
+Auto-tune still cannot "win the dialog": it never overwrites a hand-set staging, so a player's
+authored positioning always survives. Its one behavior change from the first draft is the party
+recommendation now committed in §5.2: besides setting counts, it SEEDS staging toward the
+busiest served lobby WHEN homes are unset, so the one-button assist helps positioning (the axis
+that matters) instead of only the costless count axis. That seed rule is uniform across standard
+and express (§5.4).
 
 ### 14.5 Sources (count-cost research, 2026-07-17)
 
