@@ -469,15 +469,15 @@ the 12+12 wrap (breaks the noon-straddling rush window).
 | Auto-tune button | `Auto-tune` |
 | Announce, auto-tune | `Auto-tuned cars and staging to this shaft's measured demand.` |
 | Auto-tune disabled note | `Auto-tune needs a day or two of measured traffic first.` |
-| Advice line | `This shaft is over-staffed <span> and short at <hour> on <day type>.` / `Measured demand and your schedule line up.` |
-| Simulate, down-rush staging (§6) | `<HH:00> down-rush originates on floors <lo>-<hi>; <n> cars staged there, <m> in lobby.` |
-| Simulate, up-rush staging (§6) | `<day type> peak <HH:00> up-rush: cars staged at the lobby, ready.` |
-| Simulate, overnight | `Overnight <HH:00>-<HH:00>: <n> cars on shift, homed <where>.` |
-| Floors list heads | `Floor` / `Serve` / `Home car(s)` |
-| Floors quick-actions (folded in from stops) | `Express (lobbies)` / `All stops` |
-| Express floors caption | `Serves all lobbies and sky lobbies` |
-| Home quick-action | `Home all cars here` |
-| Advanced disclosure | `Home floors and serviced floors` |
+| Advice line | `This shaft is over-staffed <span> and short at <hour span> on <day type>s.` / `Measured demand and your schedule line up.` (hour spans compress: `09:00–16:00`) |
+| Simulate readout (§6, re-pinned §16) | `Busiest <day type> hour <HH:00>: <u> staged up-tower, <l> at the lobby, <n> of <cars> cars on shift.` (staging clause leads; the origin-floor variants are deferred behind a per-floor accumulator, §16) |
+| Floors list heads (fold-in increment, §16) | `Floor` / `Serve` / `Home car(s)` |
+| Floors quick-actions (fold-in increment, §16) | `Express (lobbies)` / `All stops` |
+| Express floors caption (fold-in increment, §16) | `Serves all lobbies and sky lobbies` |
+| Home quick-actions | `Home all cars at the lobby` / `Stage upper half up-tower` |
+| Dirty Cancel arm | `Discard changes?` |
+| Advanced disclosure (Modern) | `Cars on shift by hour (Advanced)` |
+| Save announce | `Elevator schedule saved.` / gone-shaft refusal `That elevator is gone.` |
 
 ## 12. Decisions and remaining open questions
 
@@ -697,3 +697,50 @@ owner's call to make the dialog work well on mobile. Both seats converged:
   presets for counts, the axis with no ceiling to lock them out of.
 
 The full mobile treatment is folded into §8; this section records the review and its rationale.
+
+## 16. Build triage rulings (game + UX + architect party, 2026-07-17)
+
+The Phase 3 build's adversarial review escalated three scope decisions; on the owner's call the
+party (Samus, game; Sally, UX; Cloud, architect) ruled on each after fresh canon research into the
+1994 Elevator window (manual OCR via archive.org, Sim Tower Wiki, dfloer/tower-docs TDT byte spec).
+Canon facts the rulings rest on: the original was ONE window per shaft (a WD/WE toggle over a
+6-time-frame clock strip, WCR and SFD panels, then a floors-by-cars grid showing serviced levels,
+per-car home floors, and live car symbols); home floors were stored one per car; the dialog showed
+no aggregate traffic statistics; express carried the same window with a restricted floor list.
+
+- **Serviced floors and the `Configure stops…` fold-in (§4.1, §4.2, §7): deferred to the immediate
+  next increment, unanimous.** The build ships as the scheduling surface only, and the standalone
+  stops dialog stays alive until the fold-in lands. Grafting the floors section onto a
+  review-hardened diff would re-arm the whole review over a doubled surface, and the interim state
+  cannot diverge data-wise (both surfaces edit the same engine-owned fields). The canon one-window
+  end state stands. The deferral is a live backlog row with its GitHub issue, and the fold-in
+  increment must also retire `uiStops` and rewrite the suites pinning the stops button.
+- **Staging list shape (§4.3): the shipped per-car selects are ratified as the INTERIM surface,
+  unanimous.** They match the canon per-car data shape exactly, but they answer the staging
+  question car-first when it is a floors-first question. The end state is the canon floors-by-cars
+  grid, hosted by the serviced-floors rows the fold-in increment builds anyway (car chips on floor
+  rows, §14.3/§15); the selects retire when it lands. One authoring surface, never both.
+- **Simulate copy (§6, §11): re-pinned to the shipped staging-scored sentence, unanimous.** The
+  original pinned strings named the rush's origin floors, data the per-hour accumulator does not
+  hold; a readout must never claim what the sim cannot back. The sentence leads with the staging
+  clause (the axis that responds to skill) and trails the on-shift count. The origin-floor variants
+  are deferred behind a per-floor origin accumulator (backlog row; that accumulator would also
+  sharpen the Auto-tune staging seed and feed the §15 peak-origin markers, and it must stay
+  transient or it becomes a save-format conversation).
+- **The measured-demand ghost series (§5.3, §14.2 move 1): deferred to the fold-in increment;
+  both-modes commitment retained on a 2-1 vote.** Sally and Cloud hold the line that the GameRules
+  seam differentiates affordances, never information access, and that Classic's strip is already a
+  ratified non-1994 surface (24 slots against the original's 6 frames), so withholding the curve
+  would leave Classic's manual-primary strip authoring blind. Samus's dissent (reading demand from
+  the crowds IS the Classic skill loop; the 1994 dialog showed no stats) is recorded for the owner
+  to overrule at the fold-in review if desired. The strip's count gridlines, pure presentation,
+  shipped now in both modes.
+
+Review patches folded into the build alongside these rulings: the apply path re-reads the live sim
+(undo can swap it mid-dialog) and refuses a vanished shaft; presets no longer overwrite hand-set
+homes and Auto-tune's staging seed is reachable on an untouched shaft; the up-tower staging target
+falls back to the top served floor on a single-lobby shaft and the Simulate count follows any home
+above the base; stored home floors snap to the nearest served stop; the measured ring seeds its
+first sample at full value and the assists arm only after six sampled hours; the strip gained
+keyboard editing (arrows adjust and move), shift-click span fill, and count gridlines; the pinned
+announce strings ride the live region; touch gets 36px scrollable bars and the dirty-discard guard.

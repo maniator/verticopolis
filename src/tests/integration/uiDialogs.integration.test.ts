@@ -2214,12 +2214,34 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(s.standardFloorDeparture).toBe(30);
   });
 
-  it("Cancel discards every edit without calling apply", () => {
+  it("a pristine Cancel closes at once", () => {
     const { apply } = open();
-    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage up-tower
     dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!.click();
     expect(apply).not.toHaveBeenCalled();
     expect(dialog().open).toBe(false);
+  });
+
+  it("a dirty Cancel arms Discard changes? and the second press discards", () => {
+    const { apply } = open();
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage up-tower
+    const cancel = () => dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!;
+    cancel().click(); // arms
+    expect(dialog().open).toBe(true);
+    expect(cancel().textContent).toBe("Discard changes?");
+    cancel().click(); // confirms
+    expect(apply).not.toHaveBeenCalled();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("an edit after arming disarms the discard confirm", () => {
+    open();
+    dialog().querySelectorAll<HTMLButtonElement>(".es-day .btn")[1].click(); // weekend: view change, stays clean
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:first-child")!.click(); // dirty
+    const cancel = () => dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!;
+    cancel().click(); // arms
+    expect(cancel().textContent).toBe("Discard changes?");
+    dialog().querySelector<HTMLButtonElement>('.es-spread [aria-label="raise"]')!.click(); // edit disarms
+    expect(cancel().textContent).toBe("Cancel");
   });
 
   it("the staging quick actions rewrite the homes and the Simulate readout follows", () => {
@@ -2335,6 +2357,98 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     const row = apply.mock.calls[0][0].activeCars.weekday;
     expect(row[8]).toBe(4); // the peak keeps the fleet
     expect(Math.min(...row)).toBeGreaterThanOrEqual(1); // quiet hours floor at 1, never 0
+  });
+
+  it("Auto-tune seeds split staging on an untouched shaft", () => {
+    const hourly = Array(24).fill(0.5);
+    const { apply } = open({ hourly }); // no stored schedule, staging never edited
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 8, 8]); // the split
+  });
+
+  it("Auto-tune never overwrites hand-set homes", () => {
+    const hourly = Array(24).fill(0.5);
+    const { apply } = open({ hourly });
+    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[0];
+    sel.value = "5";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([5, 1, 1, 1]);
+  });
+
+  it("a preset keeps its hands off hand-set homes (counts only)", () => {
+    const { apply } = open();
+    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[3];
+    sel.value = "9";
+    sel.dispatchEvent(new Event("change", { bubbles: true }));
+    const rush = Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Rush")!;
+    rush.click();
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors).toEqual([1, 1, 1, 9]); // staging untouched
+    expect(apply.mock.calls[0][0].activeCars.weekday[8]).toBe(4); // counts repainted
+  });
+
+  it("keeps Auto-tune disabled until the curve has a real spread of sampled hours", () => {
+    const hourly = Array(24).fill(0);
+    hourly[8] = 0.9; // one busy hour is not a measured day
+    open({ hourly });
+    expect(dialog().querySelector<HTMLButtonElement>(".es-autotune")!.disabled).toBe(true);
+    expect(dialog().querySelector(".es-advice")).toBeNull(); // no advice off a cold ring
+  });
+
+  it("snaps a stored home floor on a no-longer-served stop to the nearest served floor", () => {
+    const { apply } = open({
+      servedFloors: [1, 2, 3, 4, 8, 9, 10],
+      current: { homeFloors: [7, 1, 1, 1] }, // floor 7 no longer served
+    });
+    const sel = dialog().querySelectorAll<HTMLSelectElement>(".es-home-sel")[0];
+    expect(sel.value).toBe("8"); // nearest served floor to 7 with a real option
+    okBtn().click();
+    expect(apply.mock.calls[0][0].homeFloors[0]).toBe(8);
+  });
+
+  it("shift-click extends the selection and the docked stepper edits the whole span", () => {
+    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+    const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
+    bars()[6].click();
+    bars()[9].dispatchEvent(new MouseEvent("click", { bubbles: true, shiftKey: true }));
+    expect(dialog().textContent).toContain("Hours 06:00–09:00");
+    dialog().querySelector<HTMLButtonElement>('.es-strip-step [aria-label="fewer cars"]')!.click();
+    okBtn().click();
+    const row = apply.mock.calls[0][0].activeCars.weekday;
+    expect(row.slice(6, 10)).toEqual([3, 3, 3, 3]);
+    expect(row[5]).toBe(4);
+    expect(row[10]).toBe(4);
+  });
+
+  it("arrow keys adjust a bar's count and move between hours", () => {
+    const { apply } = open({ ux: CLASSIC_RULES.elevatorScheduleUX() });
+    const bars = () => dialog().querySelectorAll<HTMLButtonElement>(".es-bar");
+    bars()[9].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true }));
+    bars()[9].dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true, cancelable: true }));
+    expect(dialog().textContent).toContain("Hour 10:00"); // selection moved
+    okBtn().click();
+    const row = apply.mock.calls[0][0].activeCars.weekday;
+    expect(row[9]).toBe(3);
+  });
+
+  it("emits the pinned announce strings on stepper commits, presets, and Auto-tune", () => {
+    const announce = vi.fn();
+    const hourly = Array(24).fill(0.5);
+    open({ hourly, announce });
+    const steppers = dialog().querySelectorAll(".es-spread .es-stepper");
+    steppers[0].querySelector<HTMLButtonElement>('[aria-label="raise"]')!.click();
+    expect(announce).toHaveBeenLastCalledWith("Waiting Car Response set to 1. Higher holds idle cars in place longer.");
+    steppers[0].querySelector<HTMLButtonElement>('[aria-label="lower"]')!.click();
+    expect(announce).toHaveBeenLastCalledWith("Waiting Car Response: 0. Idle cars answer the nearest call.");
+    steppers[1].querySelector<HTMLButtonElement>('[aria-label="lower"]')!.click();
+    expect(announce).toHaveBeenLastCalledWith("Standard Floor Departure: 46 seconds.");
+    Array.from(dialog().querySelectorAll<HTMLButtonElement>(".es-presets .btn")).find((b) => b.textContent === "Balanced")!.click();
+    expect(announce).toHaveBeenLastCalledWith("Applied the Balanced schedule.");
+    dialog().querySelector<HTMLButtonElement>(".es-autotune")!.click();
+    expect(announce).toHaveBeenLastCalledWith("Auto-tuned cars and staging to this shaft's measured demand.");
   });
 });
 

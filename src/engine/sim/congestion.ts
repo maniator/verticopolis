@@ -366,7 +366,10 @@ export function sampleElevatorUtil(sim: Simulation): void {
       hourly = new Array(24).fill(0);
       sim.elevatorHourly.set(t.id, hourly);
     }
-    hourly[hour] = 0.3 * frac + 0.7 * hourly[hour];
+    // First real sample lands at full value (same seeding rule as the util EMA
+    // below): a zero slot means "not yet sampled", and blending the first sample
+    // toward that zero would under-report the hour for days.
+    hourly[hour] = hourly[hour] === 0 && frac > 0 ? frac : 0.3 * frac + 0.7 * hourly[hour];
     // Passenger utilization EMA (staff-only shafts excluded, as before).
     if (isStaffOnlyTransport(t.kind)) continue;
     aliveUtil.add(t.id);

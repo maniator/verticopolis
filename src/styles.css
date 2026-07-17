@@ -1201,6 +1201,7 @@ dialog.crash-card::backdrop {
 .es-strip-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .es-fleet { color: var(--muted); font-size: 0.85em; }
 .es-strip {
+  position: relative;
   display: flex;
   align-items: stretch;
   gap: 1px;
@@ -1208,6 +1209,18 @@ dialog.crash-card::backdrop {
   padding: 2px;
   background: var(--r-face);
   box-shadow: var(--bevel-in);
+}
+/* Count gridlines: one faint rule per car level so a bar's height reads as a
+   number without counting pixels (spec 14.2's gridline half; the measured-demand
+   ghost series ships with the fold-in increment). */
+.es-gridline {
+  position: absolute;
+  left: 2px;
+  right: 2px;
+  height: 1px;
+  background: var(--r-shadow);
+  opacity: 0.45;
+  pointer-events: none;
 }
 .es-bar {
   position: relative;
@@ -1706,10 +1719,21 @@ dialog.crash-card::backdrop {
      dialog variant); the rename text input keeps its natural height. */
   #editor .ed-row select.field,
   .bp-rung select.field,
-  /* The schedule dialog's per-car home-floor pickers (its bars stay compact;
-     precise hour edits ride the docked stepper, which grows here). */
+  /* The schedule dialog's per-car home-floor pickers. */
   .es-home-sel {
     min-height: 36px;
+  }
+  /* The count strip on touch: every bar grows to the 36px target and the strip
+     scrolls horizontally inside its own well (spec section 8), so the page never
+     pans sideways. The docked stepper below stays the precise editing path. */
+  .es-strip {
+    overflow-x: auto;
+  }
+  .es-bar {
+    min-width: 36px;
+  }
+  .es-sq {
+    min-width: 36px;
   }
   /* Title-bar ✕s keep their exact desktop look — stretching them reads
      wrong in the bar — and instead grow an invisible tap halo, so the

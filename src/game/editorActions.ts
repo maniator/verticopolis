@@ -96,11 +96,24 @@ export class EditorActions {
         hourly: sim.elevatorHourlyLoad(t.id),
         current: t.schedule,
         initialWeekend: sim.clock.isWeekend,
+        announce: (msg) => this.deps.announce(msg),
       },
       {
         apply: (schedule) => {
+          // Re-read the LIVE sim here, never the open-time capture: undo/redo
+          // stays live while the dialog is open (main.ts runs it ahead of the
+          // modal guard) and adoptSim swaps the instance underneath us. The id
+          // survives serialization, so the shaft resolves on the restored tower.
+          const live = this.deps.getSim();
+          const shaft = live.tower.getTransport(t.id);
+          if (!shaft || !isElevatorKind(shaft.kind)) {
+            // The shaft no longer exists (undone past its construction, or
+            // demolished). Nothing to write; say so instead of "saved".
+            this.deps.ui.toast("That elevator is gone.", "bad");
+            return;
+          }
           this.deps.captureUndo("Set elevator schedule");
-          sim.tower.setSchedule(t.id, schedule);
+          live.tower.setSchedule(shaft.id, schedule);
           this.deps.commitUndo();
           this.deps.audio.sfx("build");
           this.deps.announce("Elevator schedule saved.");

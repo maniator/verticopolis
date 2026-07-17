@@ -7,6 +7,7 @@ import {
   type SchedHandlers,
 } from "./templates/elevatorSchedule";
 import { SCHEDULE_HOURS, type ElevatorSchedule, type ElevatorScheduleUX } from "../engine/elevatorSchedule";
+import { syncRungSelects } from "./templates/rungPicker";
 import {
   presetSchedule,
   autoTuneSchedule,
@@ -16,14 +17,14 @@ import {
   type ShaftContext,
   type SchedulePreset,
 } from "../engine/scheduleAuthoring";
-import { syncRungSelects } from "./templates/rungPicker";
 
 /**
  * The per-shaft elevator Schedule dialog controller (elevator-scheduling #305 Phase 3),
  * in the `showBatchPricingDialog` mold: a local `state` working copy, a `recompute` that
  * derives the advice and Simulate readouts from the pure authoring model, and a
  * `rerender` that lit-patches the whole body. OK writes the working copy through the
- * supplied `apply` (a single `Tower.setSchedule`); Cancel discards it.
+ * supplied `apply` (a single `Tower.setSchedule`); Cancel discards it, behind a
+ * two-press "Discard changes?" arm once the copy is dirty (spec §8).
  *
  * Positioning-first (spec §14): the readouts score staging, and Auto-tune / presets seed
  * positioning, not thrift. The dialog is mode-agnostic; only the affordances differ, via
@@ -47,21 +48,32 @@ export interface ScheduleDialogCtx {
   current?: ElevatorSchedule;
   /** The live day type, so the dialog opens on the day the player is in. */
   initialWeekend: boolean;
+  /** The a11y live-region channel for the pinned announce strings (spec §9). */
+  announce?: (msg: string) => void;
 }
 
 const DEFAULT_SFD = 48; // the second-equivalent of the 0.8 game-minute dwell (DWELL_DEFAULT_SECONDS)
+
+/** Sampled hours (nonzero slots) before the curve counts as measured. One busy hour
+ *  must not arm Auto-tune and advice against 23 empty slots; the on-screen note
+ *  promises "a day or two", so the gate waits for a real spread of the day. */
+const WARMED_MIN_HOURS = 6;
 
 export function showElevatorScheduleDialog(
   ui: UI,
   ctx: ScheduleDialogCtx,
   cb: { apply: (schedule: ElevatorSchedule) => void },
 ): void {
+  // The measured curve arms the assists only once genuinely warmed; a cold curve is
+  // withheld from the authoring model entirely, so advice and Auto-tune cannot read
+  // a mostly-empty ring as a day of traffic.
+  const warmed = !!ctx.hourly && ctx.hourly.filter((v) => v > 0).length >= WARMED_MIN_HOURS;
   const shaft: ShaftContext = {
     cars: ctx.cars,
     bottom: ctx.bottom,
     top: ctx.top,
     servedLobbies: ctx.servedLobbies,
-    hourly: ctx.hourly,
+    hourly: warmed ? ctx.hourly : undefined,
   };
   const base = ctx.servedLobbies[0] ?? ctx.bottom;
   const fullRow = (): number[] => Array(SCHEDULE_HOURS).fill(ctx.cars);
@@ -70,16 +82,30 @@ export function showElevatorScheduleDialog(
     if (r) for (let h = 0; h < SCHEDULE_HOURS; h++) if (Number.isFinite(r[h])) out[h] = Math.max(0, Math.min(ctx.cars, Math.floor(r[h])));
     return out;
   };
+  // A stored home floor may sit on a stop the shaft no longer serves (stops edited
+  // after authoring): snap it to the nearest served floor so the select never renders
+  // blank and OK re-commits a floor the car can actually wait at.
+  const snapToServed = (floor: number): number => {
+    let bestFloor = ctx.servedFloors[0] ?? ctx.bottom;
+    let bestDist = Infinity;
+    for (const f of ctx.servedFloors) {
+      const d = Math.abs(f - floor);
+      if (d < bestDist) { bestDist = d; bestFloor = f; }
+    }
+    return bestFloor;
+  };
   const seedHomes = (): number[] =>
     Array.from({ length: ctx.cars }, (_, i) => {
       const v = ctx.current?.homeFloors?.[i];
-      return typeof v === "number" && Number.isFinite(v) ? v : base;
+      return typeof v === "number" && Number.isFinite(v) ? snapToServed(v) : base;
     });
 
   const state: SchedState = {
     day: ctx.initialWeekend ? "weekend" : "weekday",
     selectedHour: ctx.initialWeekend ? 12 : Math.min(17, SCHEDULE_HOURS - 1),
+    rangeEnd: null,
     advancedOpen: false,
+    cancelArmed: false,
     schedule: {
       activeCars: { weekday: seedRow(ctx.current?.activeCars?.weekday), weekend: seedRow(ctx.current?.activeCars?.weekend) },
       homeFloors: seedHomes(),
@@ -89,6 +115,12 @@ export function showElevatorScheduleDialog(
     adviceMsg: "",
     simMsg: "",
   };
+  // Whether the player (now, or in the stored schedule) has authored staging by hand;
+  // presets keep their hands off hand-set homes, and Auto-tune seeds staging only
+  // while this is false (spec §5.2/§14.3).
+  let homesDirty = !!ctx.current?.homeFloors && ctx.current.homeFloors.length > 0;
+  // Whether ANY edit has landed since open: arms the Cancel discard guard.
+  let dirty = false;
 
   const sctx: SchedCtx = {
     title: ctx.title,
@@ -97,10 +129,12 @@ export function showElevatorScheduleDialog(
     cars: ctx.cars,
     servedLobbies: ctx.servedLobbies,
     servedFloors: ctx.servedFloors,
-    hasMeasured: !!ctx.hourly && ctx.hourly.some((v) => v > 0),
+    hasMeasured: warmed,
     recommended: recommendedPreset(ctx.isExpress),
+    baseLobby: base,
   };
 
+  const announce = (msg: string): void => ctx.announce?.(msg);
   // Compress an ascending hour list into ranges ("07:00–10:00, 13:00") so a
   // long advice stretch reads as one span, not a two-line comma flood (§11).
   const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
@@ -118,18 +152,20 @@ export function showElevatorScheduleDialog(
   const recompute = (): void => {
     const isWeekend = state.day === "weekend";
     const adv = ctx.ux.advice ? scheduleAdvice(state.schedule, shaft, isWeekend) : null;
-    if (!adv) state.adviceMsg = sctx.hasMeasured ? "Measured demand and your schedule line up." : "";
+    if (!ctx.ux.advice) state.adviceMsg = "";
+    else if (!adv) state.adviceMsg = sctx.hasMeasured ? "Measured demand and your schedule line up." : "";
     else {
       const parts: string[] = [];
       if (adv.over.length) parts.push(`over-staffed ${fmtHours(adv.over)}`);
       if (adv.short.length) parts.push(`short at ${fmtHours(adv.short)}`);
       state.adviceMsg = `This shaft is ${parts.join(" and ")} on ${state.day}s.`;
     }
+    // The Simulate sentence leads with the staging clause, the axis that responds to
+    // skill; the on-shift count trails (spec §11 as amended, party ruling).
     const sum = stagingSummary(state.schedule, shaft, isWeekend);
-    const hh = `${String(sum.peakHour).padStart(2, "0")}:00`;
     state.simMsg =
-      `Busiest ${state.day} hour ${hh}: ${sum.activeAtPeak} of ${ctx.cars} cars, ` +
-      `${sum.upTowerCars} staged up-tower, ${sum.lobbyCars} at the lobby.`;
+      `Busiest ${state.day} hour ${hh(sum.peakHour)}: ${sum.upTowerCars} staged up-tower, ` +
+      `${sum.lobbyCars} at the lobby, ${sum.activeAtPeak} of ${ctx.cars} cars on shift.`;
   };
 
   function rerender(): void {
@@ -138,45 +174,93 @@ export function showElevatorScheduleDialog(
     // options must be attached before a select's value can be set reliably).
     syncRungSelects(box);
   }
+  /** An edit landed: mark dirty, disarm a pending discard, recompute, repaint. */
   const after = (): void => {
+    dirty = true;
+    state.cancelArmed = false;
     recompute();
     rerender();
   };
   const curRow = (): number[] => (state.day === "weekend" ? state.schedule.activeCars.weekend! : state.schedule.activeCars.weekday!);
+  /** The ascending inclusive hour span the docked stepper edits. */
+  const span = (): [number, number] => {
+    const a = state.selectedHour;
+    const b = state.rangeEnd ?? a;
+    return a <= b ? [a, b] : [b, a];
+  };
+  const focusBar = (h: number): void => {
+    box.querySelectorAll<HTMLButtonElement>(".es-bar")[h]?.focus();
+  };
 
   const handlers: SchedHandlers = {
     onDay: (day) => {
       state.day = day;
-      after();
-    },
-    onSelectHour: (h) => {
-      state.selectedHour = h;
+      state.rangeEnd = null;
+      state.cancelArmed = false;
+      recompute();
       rerender();
+    },
+    onSelectHour: (h, extend) => {
+      // A plain pick moves the selection; shift-pick extends it to a span the docked
+      // stepper then edits at once (spec §14.3 range fill).
+      if (extend) state.rangeEnd = h;
+      else {
+        state.selectedHour = h;
+        state.rangeEnd = null;
+      }
+      rerender();
+    },
+    onBarKey: (h, key) => {
+      // The slider contract the bars announce (role="slider"): arrows adjust and
+      // navigate from the keyboard (spec §9, §14.3).
+      if (key === "ArrowUp" || key === "ArrowDown") {
+        state.selectedHour = h;
+        state.rangeEnd = null;
+        const r = curRow();
+        const dir = key === "ArrowUp" ? 1 : -1;
+        r[h] = Math.max(0, Math.min(ctx.cars, (r[h] ?? ctx.cars) + dir));
+        after();
+        focusBar(h);
+      } else if (key === "ArrowLeft" || key === "ArrowRight") {
+        const nh = Math.max(0, Math.min(SCHEDULE_HOURS - 1, h + (key === "ArrowRight" ? 1 : -1)));
+        state.selectedHour = nh;
+        state.rangeEnd = null;
+        rerender();
+        focusBar(nh);
+      }
     },
     onHourStep: (dir) => {
       const r = curRow();
-      r[state.selectedHour] = Math.max(0, Math.min(ctx.cars, (r[state.selectedHour] ?? ctx.cars) + dir));
+      const [a, b] = span();
+      for (let h = a; h <= b; h++) r[h] = Math.max(0, Math.min(ctx.cars, (r[h] ?? ctx.cars) + dir));
       after();
     },
     onWcrStep: (dir) => {
-      state.schedule.waitingCarResponse = Math.max(0, Math.min(30, state.schedule.waitingCarResponse + dir));
+      const wcr = Math.max(0, Math.min(30, state.schedule.waitingCarResponse + dir));
+      state.schedule.waitingCarResponse = wcr;
+      announce(wcr === 0 ? "Waiting Car Response: 0. Idle cars answer the nearest call." : `Waiting Car Response set to ${wcr}. Higher holds idle cars in place longer.`);
       after();
     },
     onSfdStep: (dir) => {
-      state.schedule.standardFloorDeparture = Math.max(0, Math.min(60, state.schedule.standardFloorDeparture + dir * 2));
+      const sfd = Math.max(0, Math.min(60, state.schedule.standardFloorDeparture + dir * 2));
+      state.schedule.standardFloorDeparture = sfd;
+      announce(`Standard Floor Departure: ${sfd} seconds.`);
       after();
     },
     onHomeSet: (car, floor) => {
       state.schedule.homeFloors[car] = floor;
+      homesDirty = true;
       after();
     },
     onHomeAllBase: () => {
       state.schedule.homeFloors = state.schedule.homeFloors.map(() => base);
+      homesDirty = true;
       after();
     },
     onStageUpTower: () => {
       const preset = presetSchedule("rush", shaft); // its split staging is the one-press play
       if (preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      homesDirty = true;
       after();
     },
     onPreset: (p: SchedulePreset) => {
@@ -185,18 +269,25 @@ export function showElevatorScheduleDialog(
         weekday: preset.activeCars?.weekday ? [...preset.activeCars.weekday] : fullRow(),
         weekend: preset.activeCars?.weekend ? [...preset.activeCars.weekend] : fullRow(),
       };
-      if (preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      // A preset re-stages only staging the player has not hand-set (spec §14.3):
+      // counts are its business, a hand-placed fleet is not.
+      if (!homesDirty && preset.homeFloors) state.schedule.homeFloors = [...preset.homeFloors];
+      announce(`Applied the ${p === "rush" ? "Rush" : p === "balanced" ? "Balanced" : "Feeder"} schedule.`);
       after();
     },
     onAutoTune: () => {
-      const tuned = autoTuneSchedule(state.schedule, shaft);
+      // Hand the model an "unauthored homes" copy while the player has not touched
+      // staging, so the documented seed branch is reachable from the dialog.
+      const probe: ElevatorSchedule = { ...state.schedule, homeFloors: homesDirty ? state.schedule.homeFloors : undefined };
+      const tuned = autoTuneSchedule(probe, shaft);
       if (tuned) {
         state.schedule.activeCars = {
-          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : curRow(),
-          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : curRow(),
+          weekday: tuned.activeCars?.weekday ? [...tuned.activeCars.weekday] : [...curRow()],
+          weekend: tuned.activeCars?.weekend ? [...tuned.activeCars.weekend] : [...curRow()],
         };
         if (tuned.homeFloors) state.schedule.homeFloors = [...tuned.homeFloors];
       }
+      announce("Auto-tuned cars and staging to this shaft's measured demand.");
       after();
     },
     onToggleAdvanced: () => {
@@ -215,7 +306,17 @@ export function showElevatorScheduleDialog(
       });
       ui.closeModal();
     },
-    onCancel: () => ui.closeModal(),
+    onCancel: () => {
+      // A dirty working copy takes two presses: the first arms "Discard changes?",
+      // any edit disarms (spec §8). Esc and the title-bar close stay instant, matching
+      // every other dialog's dismiss grammar.
+      if (dirty && !state.cancelArmed) {
+        state.cancelArmed = true;
+        rerender();
+        return;
+      }
+      ui.closeModal();
+    },
   };
 
   recompute();

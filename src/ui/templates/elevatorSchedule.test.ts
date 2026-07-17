@@ -21,6 +21,7 @@ import { renderToFragment, click, change } from "../testing/litTestUtils";
 const noop: SchedHandlers = {
   onDay: () => {},
   onSelectHour: () => {},
+  onBarKey: () => {},
   onHourStep: () => {},
   onWcrStep: () => {},
   onSfdStep: () => {},
@@ -43,13 +44,16 @@ const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
   servedFloors: [1, 2, 3, 4],
   hasMeasured: true,
   recommended: "rush",
+  baseLobby: 1,
   ...over,
 });
 
 const state = (over: Partial<SchedState> = {}): SchedState => ({
   day: "weekday",
   selectedHour: 17,
+  rangeEnd: null,
   advancedOpen: false,
+  cancelArmed: false,
   schedule: {
     activeCars: { weekday: Array(24).fill(4), weekend: Array(24).fill(4) },
     homeFloors: [1, 1, 1, 1],
@@ -159,7 +163,28 @@ describe("elevatorScheduleTemplate: steppers and strip", () => {
     expect(bars[9].getAttribute("aria-valuenow")).toBe("2");
     expect(bars[9].textContent).toContain("2");
     click(bars[9]);
-    expect(onSelectHour).toHaveBeenCalledWith(9);
+    expect(onSelectHour).toHaveBeenCalledWith(9, false);
+  });
+
+  it("routes arrow keys through onBarKey and shift-click extends the span", () => {
+    const onBarKey = vi.fn();
+    const onSelectHour = vi.fn();
+    const s = state({ advancedOpen: true, selectedHour: 8, rangeEnd: 11 });
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), s, { ...noop, onBarKey, onSelectHour }));
+    const bars = frag.querySelectorAll<HTMLButtonElement>(".es-bar");
+    // The whole 08:00-11:00 span wears the selection outline.
+    for (let h = 8; h <= 11; h++) expect(bars[h].classList.contains("sel")).toBe(true);
+    expect(bars[7].classList.contains("sel")).toBe(false);
+    expect(frag.textContent).toContain("Hours 08:00–11:00");
+    const key = new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true, cancelable: true });
+    bars[9].dispatchEvent(key);
+    expect(onBarKey).toHaveBeenCalledWith(9, "ArrowUp");
+    expect(key.defaultPrevented).toBe(true);
+  });
+
+  it("draws one count gridline per car level behind the bars", () => {
+    const frag = renderToFragment(elevatorScheduleTemplate(ctx(), state({ advancedOpen: true }), noop));
+    expect(frag.querySelectorAll(".es-gridline")).toHaveLength(3); // cars 4: lines at 1..3
   });
 
   it("the docked hour stepper edits the selected hour and clamps at 0 and the fleet", () => {

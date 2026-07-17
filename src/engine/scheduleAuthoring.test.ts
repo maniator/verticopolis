@@ -130,4 +130,26 @@ describe("stagingSummary", () => {
     expect(sum.upTowerCars).toBe(0); // no homes authored: all fall back to the base lobby
     expect(sum.lobbyCars).toBe(6);
   });
+
+  it("counts any car homed above the base lobby as up-tower, whatever the lobby layout", () => {
+    // A ground-lobby-only local (the most common shaft): cars hand-homed at floor 9
+    // must read as staged up-tower, never "at the lobby".
+    const single: ShaftContext = { cars: 4, bottom: 1, top: 10, servedLobbies: [1] };
+    const s = { homeFloors: [1, 1, 9, 9] };
+    const sum = stagingSummary(s, single, false);
+    expect(sum.upTowerCars).toBe(2);
+    expect(sum.lobbyCars).toBe(2);
+  });
+});
+
+describe("single-lobby staging fallback", () => {
+  it("stages the upper half at the top served floor when the only lobby is the base", () => {
+    // Without the fallback, "stage upper half up-tower" on a ground-lobby local
+    // collapses onto floor 1 and the quick action is a silent no-op.
+    const single: ShaftContext = { cars: 4, bottom: 1, top: 10, servedLobbies: [1] };
+    const rush = presetSchedule("rush", single);
+    expect(rush.homeFloors).toEqual([1, 1, 10, 10]);
+    const feeder = presetSchedule("feeder", single);
+    expect(feeder.homeFloors).toEqual([10, 10, 10, 10]);
+  });
 });

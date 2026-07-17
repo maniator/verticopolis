@@ -47,18 +47,21 @@ function baseLobby(ctx: ShaftContext): number {
   return ctx.servedLobbies.length > 0 ? ctx.servedLobbies[0] : ctx.bottom;
 }
 
-/** The highest served lobby (a sky lobby if one exists): the up-tower staging target
- *  for the down-rush, and the express feeder home. */
-function topLobby(ctx: ShaftContext): number {
-  return ctx.servedLobbies.length > 0 ? ctx.servedLobbies[ctx.servedLobbies.length - 1] : ctx.top;
+/** The up-tower staging target: the highest served lobby when one sits ABOVE the
+ *  base, else the shaft's top served floor. The fallback matters on the most common
+ *  shaft of all, a ground-lobby-only local, where "stage up-tower" would otherwise
+ *  collapse onto the base and the quick action would be a silent no-op. */
+function upTowerTarget(ctx: ShaftContext): number {
+  const top = ctx.servedLobbies.length > 0 ? ctx.servedLobbies[ctx.servedLobbies.length - 1] : ctx.top;
+  return top > baseLobby(ctx) ? top : ctx.top;
 }
 
 /** Split the fleet: the lower half homes at the base lobby, the upper half up-tower
- *  (the top lobby), staged for the evening down-rush. The one-press "stage upper half
- *  up-tower" play, as a preset seed. */
+ *  (see {@link upTowerTarget}), staged for the evening down-rush. The one-press
+ *  "stage upper half up-tower" play, as a preset seed. */
 function splitStaging(ctx: ShaftContext): number[] {
   const base = baseLobby(ctx);
-  const up = topLobby(ctx);
+  const up = upTowerTarget(ctx);
   const lower = Math.floor(ctx.cars / 2);
   return Array.from({ length: ctx.cars }, (_, i) => (i < lower ? base : up));
 }
@@ -104,11 +107,11 @@ export function presetSchedule(preset: SchedulePreset, ctx: ShaftContext): Eleva
     weekend = [...weekday];
     homeFloors = uniformStaging(ctx, baseLobby(ctx));
   } else {
-    // Feeder: steady half-fleet all day and night, every car homed at the highest
-    // served lobby to feed an express transfer. The natural express default.
+    // Feeder: steady half-fleet all day and night, every car homed at the up-tower
+    // target (the top lobby) to feed an express transfer. The natural express default.
     weekday = fullRow(half(cars));
     weekend = [...weekday];
-    homeFloors = uniformStaging(ctx, topLobby(ctx));
+    homeFloors = uniformStaging(ctx, upTowerTarget(ctx));
   }
   // Coerce so the preset is guaranteed in range for this exact shaft.
   return coerceSchedule({ activeCars: { weekday, weekend }, homeFloors }, cars, ctx.bottom, ctx.top) ?? {};
@@ -123,10 +126,12 @@ export function recommendedPreset(isExpress: boolean): SchedulePreset {
 /**
  * Auto-tune (spec §5.2): set each hour's active count proportional to the measured
  * load, floored at 1 (never fully off the air), for both day-type rows from the one
- * measured curve. Also SEED staging toward the busiest served lobby WHEN the player
- * has not authored home floors, so the assist helps positioning too; it never
- * overwrites a hand-set staging. Returns the current schedule unchanged when there is
- * no measured history yet (the caller shows the "needs measured traffic" note).
+ * measured curve. Also SEED staging (the split: lower half at base, upper half
+ * up-tower) WHEN the caller marks the home floors as untouched by passing them
+ * absent; it never overwrites a hand-set staging. The accumulator is per-hour only,
+ * so the seed cannot yet aim at a measured demand origin; a per-floor accumulator
+ * (backlogged) would sharpen it. Returns the current schedule unchanged when there
+ * is no measured history yet (the caller shows the "needs measured traffic" note).
  */
 export function autoTuneSchedule(current: ElevatorSchedule | undefined, ctx: ShaftContext): ElevatorSchedule | undefined {
   const hourly = ctx.hourly;
@@ -139,16 +144,9 @@ export function autoTuneSchedule(current: ElevatorSchedule | undefined, ctx: Sha
   const next: ElevatorSchedule = {
     ...current,
     activeCars: { weekday: [...row], weekend: [...row] },
-    homeFloors: homesAuthored ? current!.homeFloors : busiestLobbyStaging(ctx, hourly),
+    homeFloors: homesAuthored ? current!.homeFloors : splitStaging(ctx),
   };
   return coerceSchedule(next, ctx.cars, ctx.bottom, ctx.top);
-}
-
-/** Seed staging toward the busiest served lobby: without per-floor demand history we
- *  stage the upper half up-tower for the evening down-rush (the split), which is the
- *  measured-demand-agnostic best default and matches the one-press play. */
-function busiestLobbyStaging(ctx: ShaftContext, _hourly: readonly number[]): number[] {
-  return splitStaging(ctx);
 }
 
 /**
@@ -198,16 +196,17 @@ export function stagingSummary(
   }
   const row = (isWeekend ? schedule?.activeCars?.weekend : schedule?.activeCars?.weekday) ?? undefined;
   const activeAtPeak = row && Number.isFinite(row[peakHour]) ? Math.max(0, Math.min(ctx.cars, Math.floor(row[peakHour]))) : ctx.cars;
-  const up = topLobby(ctx);
+  const up = upTowerTarget(ctx);
   const base = baseLobby(ctx);
   const homes = schedule?.homeFloors;
-  // A car counts as "staged up-tower" when its home is above the midpoint between the
-  // base and top lobby; unassigned cars fall back to the base (dispatch's idle floor).
-  const mid = (base + up) / 2;
+  // A car counts as "staged up-tower" the moment its home sits ABOVE the base lobby:
+  // the readout must follow the staging list honestly (a car hand-homed at floor 9 of
+  // a ground-lobby local is up-tower, whatever the lobby layout). Unassigned cars
+  // fall back to the base (dispatch's idle floor).
   let upTowerCars = 0;
   for (let i = 0; i < activeAtPeak; i++) {
     const home = homes && Number.isFinite(homes[i]) ? homes[i] : base;
-    if (home > mid && up > base) upTowerCars++;
+    if (home > base) upTowerCars++;
   }
   return { peakHour, activeAtPeak, upTowerCars, lobbyCars: activeAtPeak - upTowerCars, topLobby: up, baseLobby: base };
 }

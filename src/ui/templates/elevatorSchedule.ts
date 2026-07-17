@@ -1,6 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import type { ElevatorSchedule } from "../../engine/elevatorSchedule";
-import type { ElevatorScheduleUX } from "../../engine/elevatorSchedule";
+import type { ElevatorSchedule, ElevatorScheduleUX } from "../../engine/elevatorSchedule";
 import type { SchedulePreset } from "../../engine/scheduleAuthoring";
 
 /**
@@ -27,14 +26,20 @@ export interface SchedCtx {
   /** Whether the shaft has warmed up a measured curve (enables Auto-tune / advice). */
   hasMeasured: boolean;
   recommended: SchedulePreset;
+  /** The base (ground) lobby the "Home all cars at the lobby" quick action targets. */
+  baseLobby: number;
 }
 
 export interface SchedState {
   day: "weekday" | "weekend";
-  /** The hour the strip stepper is editing (0..23). */
+  /** The hour the strip stepper is editing (0..23), the anchor of any span. */
   selectedHour: number;
+  /** Shift-pick span end (inclusive), or null when a single hour is selected. */
+  rangeEnd: number | null;
   /** Modern only: the raw count grid is folded behind Advanced until opened. */
   advancedOpen: boolean;
+  /** Dirty-cancel arm: the Cancel button reads "Discard changes?" until re-pressed. */
+  cancelArmed: boolean;
   /** The live working copy (fully populated: both day rows length 24, homeFloors
    *  length cars, both tunables set). */
   schedule: Required<Pick<ElevatorSchedule, "activeCars" | "homeFloors" | "waitingCarResponse" | "standardFloorDeparture">>;
@@ -46,7 +51,8 @@ export interface SchedState {
 
 export interface SchedHandlers {
   onDay: (day: "weekday" | "weekend") => void;
-  onSelectHour: (h: number) => void;
+  onSelectHour: (h: number, extend: boolean) => void;
+  onBarKey: (h: number, key: string) => void;
   onHourStep: (dir: 1 | -1) => void;
   onWcrStep: (dir: 1 | -1) => void;
   onSfdStep: (dir: 1 | -1) => void;
@@ -67,30 +73,49 @@ function row(state: SchedState): number[] {
   return (state.day === "weekend" ? state.schedule.activeCars.weekend : state.schedule.activeCars.weekday) ?? [];
 }
 
+/** The ascending inclusive [start, end] hour span of the selection. */
+function span(state: SchedState): [number, number] {
+  const a = state.selectedHour;
+  const b = state.rangeEnd ?? a;
+  return a <= b ? [a, b] : [b, a];
+}
+
+const hh = (h: number): string => `${String(h).padStart(2, "0")}:00`;
+
 /** The 24-hour count strip: each hour a bar whose fill height is its active count,
- *  the selected hour outlined, the count printed on the bar (no hover needed). Click
- *  selects; the docked stepper below sets the selected hour. */
+ *  the selected span outlined, the count printed on the bar (no hover needed), count
+ *  gridlines behind. Click selects, shift-click extends the span, arrows adjust
+ *  (up/down) and move (left/right); the docked stepper edits the whole span. */
 function stripTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   const r = row(state);
-  const sel = state.selectedHour;
-  const n = r[sel] ?? ctx.cars;
+  const [a, b] = span(state);
+  const n = r[state.selectedHour] ?? ctx.cars;
+  const spanLabel = a === b ? `Hour ${hh(a)}` : `Hours ${hh(a)}–${hh(b)}`;
   return html`
     <div class="es-strip-wrap">
       <div class="es-strip-head"><span class="es-heading">Cars on shift by hour</span>
-        <span class="es-fleet">Fleet: ${ctx.cars} cars</span></div>
+        <span class="es-fleet">${n} of ${ctx.cars}</span></div>
       <div class="es-strip" role="group" aria-label="Cars on shift by hour, ${state.day}">
+        ${Array.from({ length: Math.max(0, ctx.cars - 1) }, (_, i) => html`<span
+          class="es-gridline" style="bottom:${((i + 1) / ctx.cars) * 100}%"></span>`)}
         ${r.map((v, hr) => html`
-          <button type="button" class="es-bar${hr === sel ? " sel" : ""}" role="slider"
-            aria-label="${state.day} ${String(hr).padStart(2, "0")}:00, ${v} of ${ctx.cars} cars"
+          <button type="button" class="es-bar${hr >= a && hr <= b ? " sel" : ""}" role="slider"
+            aria-label="${state.day} ${hh(hr)}, ${v} of ${ctx.cars} cars"
             aria-valuemin="0" aria-valuemax=${ctx.cars} aria-valuenow=${v}
-            @click=${() => h.onSelectHour(hr)}>
+            @click=${(e: MouseEvent) => h.onSelectHour(hr, !!e.shiftKey)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === "ArrowUp" || e.key === "ArrowDown" || e.key === "ArrowLeft" || e.key === "ArrowRight") {
+                e.preventDefault();
+                h.onBarKey(hr, e.key);
+              }
+            }}>
             <span class="es-bar-fill" style="height:${ctx.cars > 0 ? (v / ctx.cars) * 100 : 0}%"></span>
             <span class="es-bar-n">${v}</span>
           </button>`)}
       </div>
       <div class="es-strip-axis"><span>0</span><span>6</span><span>12</span><span>18</span><span>23</span></div>
       <div class="es-row es-strip-step">
-        <span>Hour ${String(sel).padStart(2, "0")}:00</span>
+        <span>${spanLabel}</span>
         <span class="es-stepper">
           <button type="button" class="btn es-sq" aria-label="fewer cars" ?disabled=${n <= 0} @click=${() => h.onHourStep(-1)}>–</button>
           <span class="es-val">${n} car${n === 1 ? "" : "s"}</span>
@@ -126,7 +151,9 @@ function steppersTemplate(state: SchedState, h: SchedHandlers): TemplateResult {
 }
 
 /** The home-floor staging list: the primary skill surface (spec §14.2). Per-car home
- *  floor picked from the served lobbies, plus the two one-press staging quick-actions. */
+ *  floor picked from the served floors, plus the two one-press staging quick-actions.
+ *  Interim shape (spec §12 amendment): per-car selects match the canon per-car data;
+ *  the canon floors-by-cars grid arrives with the serviced-floors fold-in increment. */
 function stagingTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
   const homes = state.schedule.homeFloors;
   const floors = ctx.servedFloors.length > 0 ? ctx.servedFloors : ctx.servedLobbies;
@@ -134,7 +161,7 @@ function stagingTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): Te
     <div class="es-stage">
       <div class="es-row es-heading-row"><span class="es-heading">Home floors (staging)</span></div>
       <div class="es-row es-quick">
-        <button type="button" class="btn" @click=${h.onHomeAllBase}>Home all cars here</button>
+        <button type="button" class="btn" @click=${h.onHomeAllBase}>Home all cars at the lobby</button>
         <button type="button" class="btn" @click=${h.onStageUpTower}>Stage upper half up-tower</button>
       </div>
       <div class="es-homes" role="group" aria-label="Per-car home floors">
@@ -159,13 +186,14 @@ function presetsTemplate(ctx: SchedCtx, h: SchedHandlers): TemplateResult {
       ${(["rush", "balanced", "feeder"] as SchedulePreset[]).map((p) => html`
         <button type="button" class="btn${p === ctx.recommended ? " es-rec" : ""}" @click=${() => h.onPreset(p)}
           title=${p === ctx.recommended ? "Recommended for this shaft" : ""}>${PRESET_LABEL[p]}</button>`)}
-      <button type="button" class="btn es-autotune" ?disabled=${!ctx.hasMeasured} @click=${h.onAutoTune}>Auto-tune</button>
+      ${ctx.ux.autoTune
+        ? html`<button type="button" class="btn es-autotune" ?disabled=${!ctx.hasMeasured} @click=${h.onAutoTune}>Auto-tune</button>`
+        : nothing}
     </div>
-    ${ctx.hasMeasured ? nothing : html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>`}`;
+    ${ctx.ux.autoTune && !ctx.hasMeasured ? html`<p class="es-hint">Auto-tune needs a day or two of measured traffic first.</p>` : nothing}`;
 }
 
 export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: SchedHandlers): TemplateResult {
-  const modern = ctx.ux.presets; // Modern shows presets/auto-tune/advice
   const strip = stripTemplate(ctx, state, h);
   // No .modal-box wrapper here: openModalTemplate supplies it, and finishModal
   // skins only a DIRECT-child h2 as the title bar (same grammar as batchPricing).
@@ -177,7 +205,7 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
           <button type="button" class="btn${state.day === "weekend" ? " es-on" : ""}" aria-pressed=${state.day === "weekend"} @click=${() => h.onDay("weekend")}>Weekend</button>
         </div>
 
-        ${modern ? presetsTemplate(ctx, h) : nothing}
+        ${ctx.ux.presets ? presetsTemplate(ctx, h) : nothing}
 
         <!-- Positioning-first: staging leads. -->
         ${stagingTemplate(ctx, state, h)}
@@ -192,11 +220,11 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
               ${state.advancedOpen ? strip : nothing}
             </details>`}
 
-        ${modern && state.adviceMsg ? html`<p class="es-advice" aria-live="polite">${state.adviceMsg}</p>` : nothing}
+        ${ctx.ux.advice && state.adviceMsg ? html`<p class="es-advice" aria-live="polite">${state.adviceMsg}</p>` : nothing}
         <div class="es-sim" aria-live="polite">${state.simMsg}</div>
       </div>
       <div class="modal-actions">
         <button class="btn primary" data-act="apply" @click=${h.onOk}>OK</button>
-        <button class="btn" data-act="close" @click=${h.onCancel}>Cancel</button>
+        <button class="btn" data-act="close" @click=${h.onCancel}>${state.cancelArmed ? "Discard changes?" : "Cancel"}</button>
       </div>`;
 }
