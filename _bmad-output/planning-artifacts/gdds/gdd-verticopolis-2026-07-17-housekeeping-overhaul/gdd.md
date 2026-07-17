@@ -312,6 +312,16 @@ non-negotiables. Balance constants tuned in-epic and recorded back here.
   dominates the cycle). Deliberately left at 8 pending a playtest pass; shave
   toward ~6 if the elevator-served case must hit the anchor. Tunable in
   `src/engine/economy/housekeeping.ts`.
-- `[NOTE FOR DESIGNER]` Modern dispatch urgency-vs-travel weight (pin + test).
+- ~~`[NOTE FOR DESIGNER]` Modern dispatch urgency-vs-travel weight (pin +
+  test).~~ **Pinned in epic 4 (v1.56.0): `perDirtyDay = 10, perFloor = 1`**
+  (one day of dirt outweighs anything under ten floors of travel, tying at
+  exactly ten; floor distance to the nearest staff-connected crew is the
+  deterministic travel proxy). Known proxy blind spots, accepted for v1: it
+  cannot see transport QUALITY (a six-floor stairs-only climb scores the same
+  as a six-floor service-elevator ride) or whether the nearest crew's maids
+  are all busy (a farther crew may be the one that actually travels).
+  Provisional pending the playtest tuning pass; lives in `MODERN_HK_TRIAGE`
+  (`src/engine/gameRules.ts`), boundary-locked in
+  `housekeepingTriage.integration.test.ts`.
 - `[NOTE FOR DESIGNER]` whether a spread-marked occupied room shows an early roach
   cue before checkout.

@@ -1,5 +1,5 @@
 import type { SimContext } from "../SimContext";
-import { isOperational } from "../types";
+import { isOperational, type Unit } from "../types";
 import { isHotelKind } from "../facilities";
 import type { HousekeepingShift } from "../gameRules";
 
@@ -227,14 +227,70 @@ export class Housekeeping {
     // housekeeping room has no staff to send.
     const crews = tower.units.filter((u) => u.kind === "housekeeping" && isOperational(u));
     if (crews.length === 0) return;
+    // The dispatch ORDER is the one place the modes differ (GameRules seam):
+    // Classic takes dirty rooms in plain tower order and tries crews in tower
+    // order (the original's opportunistic, unglamorous behavior); Modern's
+    // smart triage scores each room by days-dirty urgency against travel cost
+    // (floor distance to its nearest staff-connected crew) and takes the
+    // highest score first, trying the NEAREST eligible crew first. Both
+    // orderings are fully deterministic: scores tie-break on unit id, crews on
+    // floor distance then id, and no RNG is drawn anywhere on this path.
+    const triage = this.sim.rules?.housekeepingTriage() ?? null;
+    let candidates = tower.units.filter(
+      (u) => isHotelKind(u.kind) && u.state === "dirty" && !this.hkAssignedRoom.has(u.id),
+    );
+    let crewsFor = (_room: Unit): Unit[] => crews;
+    if (triage) {
+      // Distance and crew order depend only on the room's FLOOR, so both memo
+      // by floor: a hotel floor packed with dirty rooms costs one scan and one
+      // sort, not one per room (review: dispatch also reruns per drained maid
+      // batch, so the per-room work should stay flat).
+      const distByFloor = new Map<number, number>();
+      const nearestDist = (floor: number): number => {
+        let best = distByFloor.get(floor);
+        if (best !== undefined) return best;
+        best = Infinity;
+        for (const crew of crews) {
+          if (!tower.staffConnected(crew.floor, floor)) continue;
+          const d = Math.abs(crew.floor - floor);
+          if (d < best) best = d;
+        }
+        distByFloor.set(floor, best);
+        return best;
+      };
+      const score = (room: Unit): number => {
+        const d = nearestDist(room.floor);
+        if (d === Infinity) return -Infinity; // unreachable: sorted last, still reported below
+        return (room.dirtyDays ?? 0) * triage.perDirtyDay - d * triage.perFloor;
+      };
+      const scores = new Map(candidates.map((r) => [r.id, score(r)]));
+      // COMPARE the scores, never subtract them: two unreachable rooms both
+      // score -Infinity and a subtraction would hand the sort NaN, leaving
+      // determinism to NaN falsiness instead of the explicit id tiebreak
+      // (review finding; a test pins the two-unreachable ordering).
+      candidates = [...candidates].sort((a, b) => {
+        const sa = scores.get(a.id)!;
+        const sb = scores.get(b.id)!;
+        return sa === sb ? a.id - b.id : sb > sa ? 1 : -1;
+      });
+      const crewOrderByFloor = new Map<number, Unit[]>();
+      crewsFor = (room) => {
+        let order = crewOrderByFloor.get(room.floor);
+        if (!order) {
+          order = [...crews].sort(
+            (c1, c2) => Math.abs(c1.floor - room.floor) - Math.abs(c2.floor - room.floor) || c1.id - c2.id,
+          );
+          crewOrderByFloor.set(room.floor, order);
+        }
+        return order;
+      };
+    }
     let unreachable = 0;
-    for (const room of tower.units) {
-      if (!isHotelKind(room.kind) || room.state !== "dirty") continue;
-      if (this.hkAssignedRoom.has(room.id)) continue; // a maid is already on it
+    for (const room of candidates) {
       let reachable = false;
       let transient = false; // busy maids / pool limits: retries will get there
       let noRoute = false;
-      for (const crew of crews) {
+      for (const crew of crewsFor(room)) {
         if (!tower.staffConnected(crew.floor, room.floor)) continue;
         reachable = true;
         if ((this.hkMaidsOut.get(crew.id) ?? 0) >= HK_MAIDS_PER_UNIT) {
