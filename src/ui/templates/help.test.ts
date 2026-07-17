@@ -16,7 +16,7 @@ const noop = { onReplay: () => {} };
 /** Find a collapsible Help section by its <summary> text. */
 function sectionBySummary(frag: DocumentFragment, summary: string): HTMLDetailsElement | undefined {
   return [...frag.querySelectorAll<HTMLDetailsElement>("details.help-modes")].find(
-    (d) => d.querySelector("summary")?.textContent === summary,
+    (d) => d.querySelector("summary")?.textContent?.trim() === summary,
   );
 }
 
