@@ -32,16 +32,30 @@ export function hotelInfestationLines(sim: Simulation, u: Unit): TemplateResult[
 
 /** The housekeeping-station coverage block, the housekeeping analog of the
  *  parking demand line: the maids a unit fields, the tower's crews vs its hotel
- *  rooms, and a red verdict when the tower is short on nominal capacity or has
- *  rooms no crew can reach over the staff network. */
+ *  rooms, and a red verdict keyed on the OBSERVED shortfall (rooms that
+ *  survived yesterday's whole shift dirty), never a nominal best case: the
+ *  maids-times-anchor estimate can read fine while a distant wing rots. The
+ *  nominal comparison remains only as the fallback before the first checkout,
+ *  and an active infestation always shows red (it is at-risk, not "adequate"). */
 export function housekeepingCoverageLines(sim: Simulation): TemplateResult[] {
   const c = sim.housekeepingCoverage();
+  const report = sim.economy.housekeepingReport();
   const out: TemplateResult[] = [
-    html`<div>Fields ${HK_MAIDS_PER_UNIT} maids, each cleaning up to ~${HK_NOMINAL_ROOMS_PER_MAID} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maids, ~${c.dailyCapacity}/day at best) for ${c.rooms} hotel room(s).</div>`,
+    html`<div>Fields ${HK_MAIDS_PER_UNIT} maids, each cleaning up to ~${HK_NOMINAL_ROOMS_PER_MAID} rooms a day when travel is short. Tower: ${c.crews} crew${c.crews === 1 ? "" : "s"} (${c.maids} maids) for ${c.rooms} hotel room(s).</div>`,
   ];
-  if (c.dailyCapacity < c.rooms - c.infested) {
-    // Infested rooms are uncleanable, so they are not part of the daily workload.
-    out.push(html`<div style="color:var(--bad)">Under capacity: rooms will pile up dirty. Add another Housekeeping unit.</div>`);
+  if (report && report.leftover > 0) {
+    out.push(
+      html`<div style="color:var(--bad)">Falling behind: ${report.leftover} room(s) went unserved yesterday (${report.cleaned} cleaned). Add another Housekeeping unit or improve staff transport.</div>`,
+    );
+  } else if (!report && c.dailyCapacity < c.rooms) {
+    // No observed shift yet (fresh game or load): the nominal best case is the
+    // only signal available, so use it without discounting anything out.
+    out.push(html`<div style="color:var(--bad)">Likely under capacity: rooms may pile up dirty. Add another Housekeeping unit.</div>`);
+  }
+  if (c.infested > 0) {
+    out.push(
+      html`<div style="color:var(--bad)">${c.infested} room(s) are infested; cleaning can't recover them. ${sim.rules.infestationRecovery() ? "Call an exterminator, or bulldoze and rebuild." : "Bulldoze and rebuild to clear them."}</div>`,
+    );
   }
   if (c.outOfReach > 0) {
     out.push(

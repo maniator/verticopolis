@@ -337,6 +337,15 @@ export class EconomySystem {
     this.housekeeping.onResult(roomId, ok);
   }
 
+  /** Yesterday's observed housekeeping result (rooms cleaned / rooms that
+   *  survived the whole shift dirty), or null before the first checkout after
+   *  a fresh game or load. The coverage verdicts key on this instead of a
+   *  nominal capacity, so "enough housekeeping" reflects what actually
+   *  happened (delegated to the housekeeping module). */
+  housekeepingReport(): { cleaned: number; leftover: number } | null {
+    return this.housekeeping.report();
+  }
+
   /** Monthly upkeep for elevator cars and staffed service facilities. */
   payMaintenance(): void {
     let cost = 0;

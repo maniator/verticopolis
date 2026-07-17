@@ -416,11 +416,16 @@ export function spawnStaff(
   destX: number,
   cleanUnitId: number,
   cleanMinutes: number,
+  fromX?: number,
 ): "sent" | "full" | "no-route" {
   if (crowd.staffCount >= MAX_STAFF) return "full";
   const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
   if (!r) return "no-route";
   const p = makePerson(crowd, tower, r, destX);
+  // Staff step out of their own station, not a random corridor tile: pin the
+  // spawn x to the dispatching unit's footprint when the caller names one
+  // (overhaul GDD legibility; makePerson's seeded pickX stays the fallback).
+  if (fromX !== undefined) p.x = fromX;
   p.staff = true;
   p.cleanUnitId = cleanUnitId;
   p.lingerFor = cleanMinutes * CROWD_SECONDS_PER_MINUTE;

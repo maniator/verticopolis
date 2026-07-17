@@ -189,8 +189,8 @@ export class Crowd {
    * "no-route" (the network can't get there, surface it). `cleanMinutes` is
    * the in-room cleaning dwell in game-minutes (see spawn.spawnStaff).
    */
-  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route" {
-    return crowdSpawn.spawnStaff(this, tower, from, to, destX, cleanUnitId, cleanMinutes);
+  spawnStaff(tower: Tower, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number, fromX?: number): "sent" | "full" | "no-route" {
+    return crowdSpawn.spawnStaff(this, tower, from, to, destX, cleanUnitId, cleanMinutes, fromX);
   }
 
   /** Drain the staff jobs that ended since the last call (arrived or failed). */

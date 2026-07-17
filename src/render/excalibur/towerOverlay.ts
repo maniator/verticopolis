@@ -64,6 +64,16 @@ const HEAT_SEGS = HEAT_STOPS.length - 1;
  *  amber stop, which holds only while the palette keeps amber at position
  *  ⅔, i.e. a 4-stop ramp. A test asserts that so a palette edit can't silently
  *  break the anchor. */
+/** Colors for the semantic {@link HeatCell.tint} categories, outside the
+ *  good-to-bad ramp: `infested` is a violet no ramp position can produce
+ *  (terminal "housekeeping can never clean this", distinct from the red
+ *  "no crew can reach this"), `na` a faint neutral gray ("this unit does not
+ *  take housekeeping", so a blank condo never reads as an uncovered room). */
+export const TINT_COLORS: Record<"infested" | "na", string> = {
+  infested: "rgba(154,64,214,0.5)",
+  na: "rgba(128,134,148,0.18)",
+};
+
 export function heatColor(severity: number): string {
   // Clamp to [0,1]; the `> 0` form also folds NaN to 0 so a poisoned severity
   // can never index past the palette and throw on the draw path.
@@ -274,20 +284,24 @@ function drawStatsMap(engine: TowerEngine, ctx: CanvasRenderingContext2D): void 
     // Exact per-cell cull for horizontal extent (and any residual vertical
     // slop past the floor-band margin) so partial-edge tints still draw right.
     if (sy + sh < 0 || sy > engine.viewHeight || sx + sw < 0 || sx > engine.viewWidth) continue;
-    ctx.fillStyle = heatColor(cell.severity);
+    ctx.fillStyle = cell.tint ? TINT_COLORS[cell.tint] : heatColor(cell.severity);
     ctx.fillRect(sx, sy, sw, sh);
   }
   drawHeatLegend(engine, ctx);
 }
 
-/** A compact legend for the active overlay: its name and a good→bad gradient. */
+/** A compact legend for the active overlay: its name and a good→bad gradient.
+ *  The Housekeeping map carries two states the ramp cannot express, so it adds
+ *  a swatch row: violet = infested (terminal, cleaning can't fix it) and gray =
+ *  n/a (condos never take housekeeping). */
 function drawHeatLegend(engine: TowerEngine, ctx: CanvasRenderingContext2D): void {
   const label = HEATMAP_LABELS[engine.overlayMode ?? "congestion"];
+  const swatches = engine.overlayMode === "cleanliness";
   const pad = 10;
   const x = 12;
   const y = 12;
   const w = 150;
-  const h = 46;
+  const h = swatches ? 62 : 46;
   ctx.fillStyle = "rgba(16,20,28,0.8)";
   ctx.fillRect(x, y, w, h);
   ctx.strokeStyle = "rgba(255,255,255,0.18)";
@@ -320,6 +334,19 @@ function drawHeatLegend(engine: TowerEngine, ctx: CanvasRenderingContext2D): voi
   ctx.textAlign = "right";
   ctx.fillText(label.bad, bx + bw, by + 18);
   ctx.textAlign = "left";
+  if (swatches) {
+    // The two out-of-ramp categories, side by side under the gradient row.
+    const sy = by + 24;
+    ctx.fillStyle = TINT_COLORS.infested;
+    ctx.fillRect(bx, sy, 7, 7);
+    ctx.fillStyle = "#9aa6bd";
+    ctx.fillText("infested", bx + 11, sy + 7);
+    const nx = bx + Math.floor(bw / 2);
+    ctx.fillStyle = TINT_COLORS.na;
+    ctx.fillRect(nx, sy, 7, 7);
+    ctx.fillStyle = "#9aa6bd";
+    ctx.fillText("n/a (condo)", nx + 11, sy + 7);
+  }
 }
 
 /** Rain falls in front of the tower on rainy days (overlay layer). */

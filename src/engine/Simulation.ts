@@ -431,7 +431,7 @@ export class Simulation implements SimContext {
 
   hasAny(kind: FacilityKind): boolean { return star.hasAny(this, kind); }
 
-  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route" { return services.spawnStaffTrip(this, from, to, destX, cleanUnitId, cleanMinutes); }
+  spawnStaffTrip(from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number, fromX?: number): "sent" | "full" | "no-route" { return services.spawnStaffTrip(this, from, to, destX, cleanUnitId, cleanMinutes, fromX); }
 
   hotelsCountTowardRating(): boolean { return star.hotelsCountTowardRating(this); }
 

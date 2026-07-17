@@ -30,6 +30,21 @@ export const INFEST_DAYS = 3;
  *  with the 16:30 cutoff). */
 const FALLBACK_SHIFT: HousekeepingShift = { start: 8, end: 19, cutoff: 18.5 };
 
+/** Compact floor list for alert copy: sorted, deduped, consecutive runs
+ *  folded to ranges ("12, 14–16"), so an infestation alert names WHERE instead
+ *  of a bare count. En-dash in the numeric range per house style. */
+export function formatFloors(floors: Iterable<number>): string {
+  const sorted = [...new Set(floors)].sort((a, b) => a - b);
+  const parts: string[] = [];
+  for (let i = 0; i < sorted.length; ) {
+    let j = i;
+    while (j + 1 < sorted.length && sorted[j + 1] === sorted[j] + 1) j++;
+    parts.push(j > i ? `${sorted[i]}–${sorted[j]}` : `${sorted[i]}`);
+    i = j + 1;
+  }
+  return parts.join(", ");
+}
+
 /**
  * Hotel housekeeping dispatch, pulled out of {@link EconomySystem} into a friend
  * module that owns the transient shift ledger. All of this state is transient by
@@ -62,8 +77,22 @@ export class Housekeeping {
   private hkFloorsBusy = new Map<number, Set<number>>();
   /** Rooms turned over so far today (reported at the next checkout). */
   private hkCleanedToday = 0;
+  /** Yesterday's shift result, latched at the morning checkout: rooms cleaned
+   *  and rooms that survived the whole shift dirty. The OBSERVED throughput
+   *  figures the "enough housekeeping" verdicts key on (a nominal
+   *  maids-times-anchor capacity can read green while a distant wing rots;
+   *  what actually went unserved cannot lie). Transient: a fresh load reads
+   *  null (unknown) until the first checkout, and consumers fall back to the
+   *  nominal estimate for that first morning. */
+  private hkYesterday: { cleaned: number; leftover: number } | null = null;
   /** Day the "can't reach" nudge last fired, so it warns once per day. */
   private hkNudgedDay = -1;
+
+  /** Yesterday's observed shift result, or null before the first checkout
+   *  (fresh game or fresh load). See {@link hkYesterday}. */
+  report(): { cleaned: number; leftover: number } | null {
+    return this.hkYesterday;
+  }
 
   /** Emit yesterday's shift report and breed overnight cockroaches, before this
    *  morning's checkouts mark their rooms dirty (so a hotel whose housekeeping
@@ -81,6 +110,9 @@ export class Housekeeping {
       const behind = leftover > 0 ? ` ${leftover} room(s) went unserved; add crews or improve staff transport.` : "";
       this.sim.emit(`Housekeeping cleaned ${this.hkCleanedToday} hotel room(s).${behind}`, leftover > 0 ? "bad" : "info");
     }
+    // Latch the observed figures for the coverage verdicts before the ledger
+    // resets (see report()).
+    this.hkYesterday = { cleaned: this.hkCleanedToday, leftover };
     this.hkCleanedToday = 0;
     // Age the dirty-day clock and turn rooms neglected past the limit into full
     // infestations FIRST, so a freshly-infested room is a spread source this same
@@ -99,7 +131,7 @@ export class Housekeeping {
    *  automatically out of its reach from here on. Recovery is mode-specific and
    *  handled elsewhere (Classic bulldoze-only; Modern paid exterminator). */
   private escalateInfestations(): void {
-    let infested = 0;
+    const floors: number[] = [];
     for (const u of this.sim.tower.units) {
       if (u.state !== "dirty" || !isHotelKind(u.kind)) continue;
       const days = (u.dirtyDays ?? 0) + 1;
@@ -107,19 +139,21 @@ export class Housekeeping {
         u.state = "infested";
         u.occupants = 0;
         u.dirtyDays = undefined; // the clock's job is done; the room is now terminal-dirty
-        infested++;
+        floors.push(u.floor);
       } else {
         u.dirtyDays = days;
       }
     }
-    if (infested > 0) {
+    if (floors.length > 0) {
       // Point at the mode-correct fix so the toast is actionable: Modern towers
       // can call an exterminator, Classic towers can only bulldoze and rebuild.
+      // Naming the floors makes the alert locatable instead of a bare count
+      // (overhaul GDD, legibility: alerts carry location).
       const fix = this.sim.rules?.infestationRecovery()
         ? "Call an exterminator, or bulldoze and rebuild."
         : "Bulldoze and rebuild to clear them.";
       this.sim.emit(
-        `🪳 ${infested} neglected room(s) became cockroach-infested and can no longer be cleaned. ${fix}`,
+        `🪳 ${floors.length} neglected room(s) on floor(s) ${formatFloors(floors)} became cockroach-infested and can no longer be cleaned. ${fix}`,
         "bad",
       );
     }
@@ -211,8 +245,14 @@ export class Housekeeping {
         // condition, not a broken staff network: never report it as
         // unreachable.
         const sent =
-          this.sim.spawnStaffTrip?.(crew.floor, room.floor, room.x + room.width / 2, room.id, HK_CLEAN_MINUTES) ??
-          "full";
+          this.sim.spawnStaffTrip?.(
+            crew.floor,
+            room.floor,
+            room.x + room.width / 2,
+            room.id,
+            HK_CLEAN_MINUTES,
+            crew.x + crew.width / 2, // she steps out of her own station
+          ) ?? "full";
         if (sent === "full") {
           transient = true; // staff pool at cap: retry when a maid frees up
           break;
@@ -276,7 +316,7 @@ export class Housekeeping {
   private spreadCockroaches(): void {
     const sources = this.sim.tower.units.filter((u) => isHotelKind(u.kind) && u.state === "infested");
     if (sources.length === 0) return;
-    let spread = 0;
+    const floors: number[] = [];
     for (const u of sources) {
       // Check BOTH neighbors; a non-hotel room on one side shouldn't block
       // infestation of a hotel room on the other.
@@ -287,13 +327,13 @@ export class Housekeeping {
         if (neighbor && isHotelKind(neighbor.kind) && (neighbor.state === "asleep" || neighbor.state === "empty")) {
           neighbor.state = "dirty";
           neighbor.occupants = 0;
-          spread++;
+          floors.push(neighbor.floor);
         }
       }
     }
-    if (spread > 0) {
+    if (floors.length > 0) {
       this.sim.emit(
-        `🪳 Cockroaches spread from infested rooms into ${spread} more room${spread > 1 ? "s" : ""}. Clear the infested source.`,
+        `🪳 Cockroaches spread from infested rooms into ${floors.length} more room${floors.length > 1 ? "s" : ""} on floor(s) ${formatFloors(floors)}. Clear the infested source.`,
         "bad",
       );
     }

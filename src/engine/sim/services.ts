@@ -397,6 +397,6 @@ export function countOperational(sim: Simulation, kind: FacilityKind): number {
 /** Send a staff member (housekeeper) over the staff network, see
  *  {@link Crowd.spawnStaff}. Exposed on the context so the economy subsystem
  *  can dispatch crews without owning the crowd. */
-export function spawnStaffTrip(sim: Simulation, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route" {
-  return sim.crowd.spawnStaff(sim.tower, from, to, destX, cleanUnitId, cleanMinutes);
+export function spawnStaffTrip(sim: Simulation, from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number, fromX?: number): "sent" | "full" | "no-route" {
+  return sim.crowd.spawnStaff(sim.tower, from, to, destX, cleanUnitId, cleanMinutes, fromX);
 }
