@@ -5,42 +5,15 @@ import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
-import { unmetCoverage } from "../engine/sim/gripe";
+import { gripeLineText } from "./gripeCopy";
 import { ECON } from "../engine/econConfig";
 import { subtypeListFor } from "../engine/retailSubtypes";
 import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
-import type { FacilityKind, Transport, Unit, VacateReason } from "../engine/types";
+import type { FacilityKind, Transport, Unit } from "../engine/types";
 
-/**
- * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
- * the drains WITHOUT a dedicated diagnostic line above are named here: access
- * ("not connected" / "too far"), the office long-walk (W1), and very-far lobby
- * distance already have their own actionable lines, and a relocation is a life
- * event, so those causes map to nothing and the gripe line stays off (deferring
- * to the dedicated line). Congestion, over-market rent, noise, and unmet local
- * retail demand (#395) have no such line, so they surface here. Each string
- * names the lever the player can pull.
- */
-const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
-  congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
-  rent: "the rent is above the going rate. Lower it to keep them.",
-  noise: "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.",
-};
-
-/** The unmet-demand gripe (#395) names which of its two causes actually holds,
- *  because the demand model is lobby-anchored and tower-uniform: a tenant that
- *  reaches NO retail while the tower has some needs a connection, while a
- *  tenant that reaches plenty of oversubscribed retail needs more venues built
- *  on any connected floor (a shop on floor 5 helps floor 82 exactly as much as
- *  one next door; the old single string prescribed "near this floor", a
- *  locality the model does not carry). Coverage 0 is the stranded case; any
- *  other value, including a just-cleared null recompute at an hour boundary,
- *  reads the capacity phrasing (more retail always helps a griping tower). */
-function unmetDemandGripeText(sim: Simulation, u: Unit): string {
-  return unmetCoverage(sim.demandMap(), u) === 0
-    ? "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues within two rides of the lobby."
-    : "too few shops and restaurants for the tower's crowds. Add venues on any connected floor: retail is shared tower-wide.";
-}
+// The "Main gripe" phrasing lives in gripeCopy.ts (its own leaf: the
+// unmet-demand copy branches on live coverage, and this file sits against the
+// size guard).
 
 /**
  * The per-facility DIAGNOSTIC lines: access reachability, placement warnings,
@@ -412,8 +385,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind))
   ) {
     const gripe = sim.dominantGripe(u);
-    const text =
-      gripe === "unmetDemand" ? unmetDemandGripeText(sim, u) : gripe ? GRIPE_TEXT[gripe] : undefined;
+    const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
     if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
   }
   // A tenant on notice: spell out that they're leaving, why, how long is left,

@@ -7,6 +7,7 @@ import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { gripeLineText } from "../../game/gripeCopy";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**
@@ -170,8 +171,9 @@ describe("the Main gripe inspector line", () => {
   it("names the capacity shortfall for a tenant whose reachable retail is oversubscribed", () => {
     // A full-width floor of occupied offices sharing one fast food venue: every
     // office reaches it, but the pool dwarfs its capacity (share > 2, coverage
-    // below the 0.5 floor), so the gripe must prescribe MORE venues anywhere
-    // connected, never "near this floor" (the demand model is tower-uniform).
+    // below the 0.5 floor), so the gripe prescribes more venues anywhere
+    // connected (the demand model is tower-uniform, so nearness carries
+    // nothing and "near this floor" would be a false promise).
     const sim = Simulation.newGame(1);
     sim.money = 1e9;
     sim.star = 1;
@@ -209,9 +211,9 @@ describe("the Main gripe inspector line", () => {
   }, 30000);
 
   it("names the broken connection for a tenant whose retail is all stranded", () => {
-    // The tower HAS retail, but it sits on an unserved floor: the office reaches
-    // none of it (coverage 0), so the gripe must prescribe reconnecting the
-    // retail, not building more.
+    // The tower HAS retail, but it sits on an unserved floor: the office
+    // reaches none of it (coverage 0), so the fix is a connection and the
+    // gripe prescribes reconnecting the retail.
     const sim = Simulation.newGame(1);
     const office = servedOffice(sim);
     lay(sim, "floor", 3);
@@ -226,6 +228,40 @@ describe("the Main gripe inspector line", () => {
     expect(text).toContain("Main gripe:");
     expect(text).toContain("none of them are reachable from here");
     expect(text).not.toContain("Add venues on any connected floor");
+  }, 30000);
+
+  it("stays silent when coverage 0 comes from the tenant's own far floor (access owns it)", () => {
+    // The tower's retail is perfectly connected; what fails is the TENANT's
+    // floor, served but beyond two rides (three chained shafts). Coverage
+    // reads 0 for it, and the gripe copy defers to the dedicated red
+    // "Access: too far" line rather than blaming retail that is not broken
+    // (review finding: the reconnect copy would misprescribe here).
+    const sim = Simulation.newGame(21);
+    sim.money = 1e9;
+    sim.star = 5;
+    const X0 = C - 15;
+    const X1 = C + 45;
+    const put = (kind: "floor" | "lobby", f: number, x: number): void => {
+      if (sim.tower.structureKindAt(f, x) === kind) return;
+      expectOk(sim.tower.place(kind, f, x));
+    };
+    for (let x = X0; x <= X1; x++) put("lobby", 1, x);
+    for (let f = 2; f <= 40; f++) for (let x = X0; x <= X1; x++) put("floor", f, x);
+    expectOk(sim.tower.placeTransport("elevatorStandard", C, 1, 15));
+    expectOk(sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30));
+    expectOk(sim.tower.placeTransport("elevatorStandard", C + 12, 30, 40));
+    placeUnit(sim, "office", 2, X0).state = "occupied";
+    placeUnit(sim, "fastFood", 2, C + 30).state = "occupied";
+    const far = placeUnit(sim, "office", 40, C + 30);
+    far.state = "occupied";
+    expect(sim.tower.isFloorServed(40)).toBe(true); // served (no access "not connected")...
+    expect(sim.floorReachable(40)).toBe(false); // ...but beyond two rides
+    expect(unmetCoverage(sim.demandMap(), far)).toBe(0);
+    expect(gripeLineText(sim, far, "unmetDemand")).toBeUndefined();
+    // The reachable ground-floor office still reads the honest capacity copy
+    // through the same entry point (its coverage is nonzero).
+    const near = sim.tower.units.find((u) => u.kind === "office" && u.floor === 2)!;
+    expect(gripeLineText(sim, near, "unmetDemand")).toContain("Add venues on any connected floor");
   }, 30000);
 
   it("defers to the dedicated line for access (no duplicate Main gripe)", () => {
