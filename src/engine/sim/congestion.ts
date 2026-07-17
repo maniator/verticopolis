@@ -210,7 +210,11 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
  * - `occupancy`:  the floor's vacant share (red = empty, green = fully leased).
  * - `satisfaction`: per-unit tenant unhappiness (red = a tenant near leaving).
  * - `cleanliness`: per-hotel-room housekeeping coverage (red = no service-elevator
- *   crew can reach it, amber = dirty and waiting, green = clean and covered).
+ *   crew can reach it, amber = dirty and waiting, green = clean and covered),
+ *   plus two out-of-ramp categories via {@link HeatCell.tint}: `infested`
+ *   (terminal, cleaning can't fix it, rendered distinctly from unreached) and
+ *   `na` on condos (they never take housekeeping, so a blank can't be misread
+ *   as an uncovered room).
  */
 export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
   if (mode === "cleanliness") {
@@ -221,8 +225,9 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
     // component can never be cleaned: that is the worst case (red), the
     // "build another housekeeping station or extend the service elevator" nudge
     // given a place to point. A reachable but dirty room is amber (it is waiting
-    // its turn), and a reachable clean room is green. Only hotel rooms carry a
-    // housekeeping signal, so non-hotel floors stay untinted.
+    // its turn), and a reachable clean room is green. Hotel rooms carry the
+    // coverage signal; condos get an explicit n/a tint (below) and every
+    // other kind stays untinted.
     // Precompute crew reach once, so the per-room test is O(1) instead of
     // O(rooms x crews). A room is reachable iff some operational crew is on its
     // floor, or shares its staff-network component. `staffConnected(a, b)` is
@@ -240,18 +245,34 @@ export function floorHeatmap(sim: Simulation, mode: HeatmapMode): HeatCell[] {
     }
     const out: HeatCell[] = [];
     for (const u of sim.tower.units) {
+      // Condos never need housekeeping, but on this map a blank condo reads
+      // exactly like an uncovered hotel room, so give it an explicit neutral
+      // "not applicable" cell instead of nothing (overhaul GDD, legibility).
+      if (u.kind === "condo" && isOperational(u)) {
+        out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity: 0, tint: "na" });
+        continue;
+      }
       // Only live hotel rooms carry a housekeeping signal: a room still under
       // construction, ablaze, or a burned-out shell has no coverage state to
       // report, so skip it (matching the satisfaction/occupancy branches, which
       // likewise ignore units with nothing to say).
       if (!isHotelKind(u.kind) || !isOperational(u)) continue;
+      // A full cockroach infestation is TERMINAL, not a coverage failure:
+      // housekeeping can never clean it whatever the network looks like, so it
+      // carries its own semantic tint, distinct from the red "no crew can
+      // reach this" end of the ramp ("reached but terminal" must never read
+      // as "no coverage"). Severity still reads hot for anything consuming
+      // the number alone.
+      if (u.state === "infested") {
+        out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity: 0.85, tint: "infested" });
+        continue;
+      }
       const roomComp = comps.get(u.floor);
       const reachable = crewFloors.has(u.floor) || (roomComp !== undefined && crewComps.has(roomComp));
-      // Unreachable is the worst (red): no crew can ever service it. A full
-      // cockroach infestation is next (housekeeping can no longer clean it, so
-      // it reads hotter than a merely dirty room waiting its turn). A reachable
-      // dirty room is amber, a clean covered room green.
-      const severity = !reachable ? 1 : u.state === "infested" ? 0.85 : u.state === "dirty" ? 0.6 : 0;
+      // Unreachable is the worst (red): no crew can ever service it. A
+      // reachable dirty room is amber (waiting its turn), a clean covered
+      // room green.
+      const severity = !reachable ? 1 : u.state === "dirty" ? 0.6 : 0;
       out.push({ floor: u.floor, minX: u.x, maxX: u.x + u.width - 1, severity });
     }
     return out;

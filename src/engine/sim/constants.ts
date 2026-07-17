@@ -271,12 +271,23 @@ export function congestionSeverity(cong: number): number {
  *  bad it reads (0 = green/good … 1 = red/bad). Congestion and occupancy emit
  *  one cell per floor (they're floor-level metrics); satisfaction emits one cell
  *  per present tenant unit so a single unhappy suite reddens on its own instead
- *  of being averaged away by content neighbors sharing the floor. */
+ *  of being averaged away by content neighbors sharing the floor.
+ *
+ *  `tint` is an optional SEMANTIC category for cells whose meaning the plain
+ *  good-to-bad ramp cannot carry (the engine names the state; the renderer
+ *  picks the pixels): `infested` marks a hotel room housekeeping can no longer
+ *  clean (terminal, distinct from "unreached"), `na` marks a unit the overlay's
+ *  metric does not apply to (a condo on the housekeeping map), so a blank never
+ *  reads as an uncovered room. Cells without a tint read the severity ramp.
+ *  Numeric consumers aggregating `severity` must SKIP `na` cells (their 0
+ *  means "not applicable", never "perfectly covered"); `infested` cells keep
+ *  an honest hot severity for anything reading the number alone. */
 export interface HeatCell {
   floor: number;
   minX: number;
   maxX: number;
   severity: number;
+  tint?: "infested" | "na";
 }
 
 /** Batch-pricing target: an exact price, "default" to return to the neutral

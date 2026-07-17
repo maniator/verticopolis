@@ -63,5 +63,5 @@ export interface SimContext {
    * "no-route" means the staff network can't get there (surface it, don't
    * retry silently). Optional so hand-rolled test contexts without a crowd can
    * omit it. */
-  spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number): "sent" | "full" | "no-route";
+  spawnStaffTrip?(from: number, to: number, destX: number, cleanUnitId: number, cleanMinutes: number, fromX?: number): "sent" | "full" | "no-route";
 }

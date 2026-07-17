@@ -51,9 +51,19 @@ export function statsTemplate(sim: Simulation): TemplateResult {
   const parkingWorking = sim.tower.functionalParkingSet().size;
   const parkingDemand = sim.parkingDemand();
   const hk = sim.housekeepingCoverage();
-  // Compare capacity against CLEANABLE rooms: infested rooms can't be cleaned,
-  // so counting them as workload would over-report an under-provisioning.
-  const hkShort = hk.rooms > 0 && (hk.dailyCapacity < hk.rooms - hk.infested || hk.outOfReach > 0);
+  // The "enough housekeeping" verdict keys on what actually happened: rooms
+  // that survived yesterday's whole shift dirty (observed shortfall), rooms no
+  // crew can reach, and any active infestation, which is an at-risk state and
+  // never reads green whatever the throughput math says. The nominal
+  // maids-times-anchor comparison stays on as a gross-under-provision floor
+  // (it also covers the window between a big hotel build-out and the next
+  // morning's latched report); it is an optimistic best case, so it never
+  // subtracts the infested rooms out of the workload (that discount is how
+  // the old readout said "enough" while a wing rotted).
+  const hkReport = sim.economy.housekeepingReport();
+  const hkShort =
+    hk.rooms > 0 &&
+    (hk.infested > 0 || hk.outOfReach > 0 || (hkReport?.leftover ?? 0) > 0 || hk.dailyCapacity < hk.rooms);
   const extermRecovery = sim.rules.infestationRecovery();
   const extermPending = sim.exterminationDueDay !== undefined;
   const extermCost = extermRecovery ? extermRecovery.calloutFee + extermRecovery.perRoomFee * hk.infested : 0;
@@ -110,7 +120,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         <span class="k">Rooms to clean</span><span class="v" style="color:${s.dirty ? "var(--bad)" : "var(--good)"}">${s.dirty}</span>
         ${
           hk.rooms > 0
-            ? html`<span class="k">Housekeeping</span><span class="v" style="color:${hkShort ? "var(--bad)" : "var(--good)"}">${fmt(hk.crews)} crew${hk.crews === 1 ? "" : "s"}, ~${fmt(hk.dailyCapacity)}/day for ${fmt(hk.rooms)} room(s)${hk.outOfReach > 0 ? `, ${fmt(hk.outOfReach)} out of reach` : ""}</span>`
+            ? html`<span class="k">Housekeeping</span><span class="v" style="color:${hkShort ? "var(--bad)" : "var(--good)"}">${fmt(hk.crews)} crew${hk.crews === 1 ? "" : "s"} (${fmt(hk.maids)} maid${hk.maids === 1 ? "" : "s"}) for ${fmt(hk.rooms)} room(s)${hkReport && hkReport.leftover > 0 ? `, ${fmt(hkReport.leftover)} unserved yesterday` : ""}${hk.infested > 0 ? `, ${fmt(hk.infested)} infested` : ""}${hk.outOfReach > 0 ? `, ${fmt(hk.outOfReach)} out of reach` : ""}</span>`
             : nothing
         }
         ${
