@@ -83,8 +83,8 @@ export function serializeUnit(u: Unit): SerializedUnit {
  *  only on a room that reloads `dirty` (the one state it means anything in) and
  *  clamped to [0, INFEST_DAYS - 1], so the 3-day timer survives a reload but a
  *  forged value can't drive a nonsense count: a legal room can never carry more
- *  than INFEST_DAYS - 1 (the escalator infests it at the boundary and clears
- *  the field), and the ceiling also keeps a forged magnitude out of Modern's
+ *  than INFEST_DAYS - 1 (the escalation step infests it at the boundary and
+ *  clears the field), and the ceiling also keeps a forged magnitude out of Modern's
  *  triage score (a MAX_VALUE clock would ride distance-blind priority). Any
  *  other state or a non-hotel kind drops it to undefined. */
 export function coerceDirtyDays(state: UnitState, kind: FacilityKind, raw: unknown): number | undefined {
