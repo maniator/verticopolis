@@ -17,6 +17,7 @@ notes, never a past version's.
 
 - The tower now sounds alive: every area has its own ambience, built from real voice recordings. Lobbies murmur, restaurants clink, offices type and take calls, condos hum with a faint TV at midday, the party hall plays a dance remix of the game's theme with real laughs, the cinema rumbles behind its doors, and trains actually roll in and out of the metro.
 - What you hear is honest: empty venues stay quiet, full ones get lively, offices sleep at night, and zooming in brings the detail up close. The last of the old random beeps are gone.
+- Settings now has three volume sliders (Music, Ambience, Effects), so you can turn the music down and still hear the crowd, and the sliders respond evenly across their whole range.
 
 ## 1.61.1
 

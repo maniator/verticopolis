@@ -17,7 +17,7 @@ function makePorts() {
   const sim = { mode: "classic", tower: {} } as unknown as Simulation;
   const ports: GameAppPorts = {
     getSim: vi.fn(() => sim),
-    audio: { muted: true, musicVolume: 0.4, sfxVolume: 0.6 },
+    audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },
     saveLoad: {
       save: vi.fn(),
       load: vi.fn(),
@@ -114,7 +114,9 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(cb.isMuted()).toBe(true); // reads the live audio facade
     cb.onSetVolume("music", 0.5);
     expect(ports.setVolume).toHaveBeenCalledWith("music", 0.5);
-    expect(cb.getVolumes()).toEqual({ music: 0.4, sfx: 0.6 });
+    cb.onSetVolume("ambience", 0.9);
+    expect(ports.setVolume).toHaveBeenCalledWith("ambience", 0.9);
+    expect(cb.getVolumes()).toEqual({ music: 0.4, ambience: 0.7, sfx: 0.6 });
   });
 
   it("edit action routes to the editor port", () => {

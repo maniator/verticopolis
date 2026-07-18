@@ -17,6 +17,7 @@ interface StubUnit {
   x: number;
   width: number;
   occupants: number;
+  customersIn?: number;
 }
 
 function stubEngine(opts: {
@@ -63,6 +64,28 @@ describe("focus() crowd and hour plumbing", () => {
       }),
     );
     expect(f.crowd).toBe(1);
+  });
+
+  it("reads live customers, never the open-hour stamp, for commercial venues", () => {
+    // The economy pass stamps an OPEN restaurant's `occupants` to the full
+    // catalog population regardless of who is actually inside; the honest
+    // fill for commercial kinds is the routed-customer tally `customersIn`.
+    const cap = FACILITIES.restaurant.population;
+    const empty = focus(
+      stubEngine({
+        units: [{ kind: "restaurant", floor: 5, x: 4, width: 6, occupants: cap, customersIn: 0 }],
+      }),
+    );
+    expect(empty.dominant).toBe("restaurant");
+    expect(empty.crowd).toBe(0); // open but nobody eating: quiet
+    const half = focus(
+      stubEngine({
+        units: [
+          { kind: "restaurant", floor: 5, x: 4, width: 6, occupants: cap, customersIn: Math.round(cap / 2) },
+        ],
+      }),
+    );
+    expect(half.crowd).toBeCloseTo(0.5, 1);
   });
 
   it("uses the attendance capacity for population-0 venues", () => {

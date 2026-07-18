@@ -247,21 +247,25 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
 
   it("setVolumes clamps and holds its values before and after start()", () => {
     const eng = new ToneAudioEngine();
-    eng.setVolumes(1.5, -0.2); // pre-start: store only, clamped
+    eng.setVolumes(1.5, 2, -0.2); // pre-start: store only, clamped
     expect(eng.musicVolume).toBe(1);
+    expect(eng.ambienceVolume).toBe(1);
     expect(eng.sfxVolume).toBe(0);
     eng.start();
-    expect(() => eng.setVolumes(0.4, 0.6)).not.toThrow(); // live: ramps the buses
+    expect(() => eng.setVolumes(0.4, 0.8, 0.6)).not.toThrow(); // live: ramps the buses
     expect(eng.musicVolume).toBe(0.4);
+    expect(eng.ambienceVolume).toBe(0.8);
     expect(eng.sfxVolume).toBe(0.6);
     // Volume is independent of mute: flipping mute must not disturb the levels.
     eng.setMuted(true);
     eng.setMuted(false);
     expect(eng.musicVolume).toBe(0.4);
+    expect(eng.ambienceVolume).toBe(0.8);
     expect(eng.sfxVolume).toBe(0.6);
     // A non-finite input keeps that channel's level (never a NaN ramp target).
-    eng.setVolumes(NaN, 0.25);
+    eng.setVolumes(NaN, NaN, 0.25);
     expect(eng.musicVolume).toBe(0.4);
+    expect(eng.ambienceVolume).toBe(0.8);
     expect(eng.sfxVolume).toBe(0.25);
   });
 
@@ -385,9 +389,10 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
   it("volume sliders land perceptually: zero is zero, half is a quarter gain", () => {
     const eng = new ToneAudioEngine();
     eng.start();
-    eng.setVolumes(0, 0.5);
+    eng.setVolumes(0, 0.3, 0.5);
     const ramps = graph.nodes.filter((n) => n.kind === "Gain").flatMap((n) => n.ramps);
     expect(ramps.some((r) => r[0] === 0)).toBe(true); // music slider at zero silences its bus
+    expect(ramps.some((r) => Math.abs((r[0] as number) - 0.09) < 1e-9)).toBe(true); // ambience at 0.3 ramps to 0.3^2
     expect(ramps.some((r) => r[0] === 0.25)).toBe(true); // sfx at half ramps to 0.5^2
   });
 

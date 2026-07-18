@@ -13,7 +13,7 @@ interface AudioEngineImpl {
   readonly started: boolean;
   start(): void;
   setMuted(m: boolean): void;
-  setVolumes(music: number, sfx: number): void;
+  setVolumes(music: number, ambience: number, sfx: number): void;
   setProgram(program: ProgramKind): void;
   update(focus: ViewFocus): void;
   sfx(name: SfxName): void;
@@ -43,10 +43,11 @@ export class AudioEngine {
   /** Authoritative mute state — read synchronously by the UI toggle, forwarded
    *  to the real engine on load. */
   muted = false;
-  /** Authoritative player volume levels 0..1 (music & ambience / action
-   *  jingles), read synchronously by the settings sliders and forwarded to
-   *  the real engine on load. Independent of `muted`. */
+  /** Authoritative player volume levels 0..1 (music / crowd & room ambience /
+   *  action jingles), read synchronously by the settings sliders and forwarded
+   *  to the real engine on load. Independent of `muted`. */
   musicVolume = 1;
+  ambienceVolume = 1;
   sfxVolume = 1;
   /** Which composed track should play. Stored here (start screen vs. tower) so
    *  a pre-load switch lands on the engine the moment it builds. */
@@ -102,7 +103,7 @@ export class AudioEngine {
         // stays reachable by dispose() rather than leaking as an orphan.
         this.impl = impl;
         impl.setMuted(this.muted);
-        impl.setVolumes(this.musicVolume, this.sfxVolume);
+        impl.setVolumes(this.musicVolume, this.ambienceVolume, this.sfxVolume);
         impl.setProgram(this.program);
         impl.start();
         this.started = impl.started;
@@ -133,10 +134,11 @@ export class AudioEngine {
    *  through a min/max clamp and later blow up the native AudioParam ramp),
    *  so synchronous readers of the fields always see the same sane values
    *  the engine gets. */
-  setVolumes(music: number, sfx: number): void {
+  setVolumes(music: number, ambience: number, sfx: number): void {
     this.musicVolume = saneLevel(music, this.musicVolume);
+    this.ambienceVolume = saneLevel(ambience, this.ambienceVolume);
     this.sfxVolume = saneLevel(sfx, this.sfxVolume);
-    this.impl?.setVolumes(this.musicVolume, this.sfxVolume);
+    this.impl?.setVolumes(this.musicVolume, this.ambienceVolume, this.sfxVolume);
   }
 
   update(focus: ViewFocus): void {

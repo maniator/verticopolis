@@ -1,5 +1,5 @@
 import * as ex from "excalibur";
-import { GRID } from "../../engine/facilities";
+import { GRID, isCommercialKind } from "../../engine/facilities";
 import { FACILITIES } from "../../engine/facilitiesData";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
@@ -405,7 +405,16 @@ function censusCrowd(
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {
-        occ += u.occupants ?? 0;
+        // Population>0 commercial venues (restaurant, fast food, shop) get
+        // their `occupants` stamped to the full catalog population while open
+        // (EconomySystem's open-hour pass), so the live fill is `customersIn`,
+        // the routed-customer tally. Attendance venues (cinema, party hall)
+        // already mirror `customersIn` into `occupants`, and every other kind
+        // owns `occupants` via updatePresence, so both read `occupants`.
+        occ +=
+          isCommercialKind(u.kind) && def.population > 0
+            ? (u.customersIn ?? 0)
+            : (u.occupants ?? 0);
         cap += unitCap;
       }
     }

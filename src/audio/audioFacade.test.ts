@@ -18,6 +18,7 @@ class StubEngine {
   muted = false;
   disposed = false;
   music = 1;
+  amb = 1;
   sfxVol = 1;
   program = "game";
   lastFocus: unknown = null;
@@ -30,8 +31,9 @@ class StubEngine {
   setMuted(m: boolean): void {
     this.muted = m;
   }
-  setVolumes(music: number, sfx: number): void {
+  setVolumes(music: number, ambience: number, sfx: number): void {
     this.music = music;
+    this.amb = ambience;
     this.sfxVol = sfx;
   }
   setProgram(program: string): void {
@@ -104,12 +106,14 @@ describe("AudioEngine facade lazy loading", () => {
 
   it("forwards pre-load volumes to the engine on load (clamped)", async () => {
     const audio = new AudioEngine(loader);
-    audio.setVolumes(0.3, 1.7); // set before any load; must land after it
+    audio.setVolumes(0.3, -0.4, 1.7); // set before any load; must land after it
     expect(audio.musicVolume).toBe(0.3);
+    expect(audio.ambienceVolume).toBe(0); // clamped at the facade
     expect(audio.sfxVolume).toBe(1); // clamped at the facade
     audio.start();
     await vi.waitFor(() => expect(audio.started).toBe(true));
     expect(built[0].music).toBe(0.3);
+    expect(built[0].amb).toBe(0);
     expect(built[0].sfxVol).toBe(1);
   });
 
@@ -117,18 +121,21 @@ describe("AudioEngine facade lazy loading", () => {
     const audio = new AudioEngine(loader);
     audio.start();
     await vi.waitFor(() => expect(audio.started).toBe(true));
-    audio.setVolumes(0.6, 0.2);
+    audio.setVolumes(0.6, 0.4, 0.2);
     expect(built[0].music).toBe(0.6);
+    expect(built[0].amb).toBe(0.4);
     expect(built[0].sfxVol).toBe(0.2);
   });
 
   it("ignores non-finite volume inputs, keeping that channel's current level", () => {
     const audio = new AudioEngine(loader);
-    audio.setVolumes(NaN, 0.5); // NaN must not poison the stored state
+    audio.setVolumes(NaN, NaN, 0.5); // NaN must not poison the stored state
     expect(audio.musicVolume).toBe(1);
+    expect(audio.ambienceVolume).toBe(1);
     expect(audio.sfxVolume).toBe(0.5);
-    audio.setVolumes(0.7, Infinity);
+    audio.setVolumes(0.7, 0.3, Infinity);
     expect(audio.musicVolume).toBe(0.7);
+    expect(audio.ambienceVolume).toBe(0.3);
     expect(audio.sfxVolume).toBe(0.5);
   });
 

@@ -15,8 +15,10 @@ export interface Prefs {
   steadyClock?: boolean;
   /** Master mute (the top-bar speaker button). */
   muted?: boolean;
-  /** Music & ambience loudness 0..1 (scene themes, room tone, accents, rain). */
+  /** Music loudness 0..1 (the composed splash and gameplay tracks). */
   musicVolume?: number;
+  /** Ambience loudness 0..1 (room tone, crowd murmur, venue sounds, rain). */
+  ambienceVolume?: number;
   /** Action-jingle loudness 0..1 (build, sell, error, money, promote, click). */
   sfxVolume?: number;
 }
@@ -36,6 +38,8 @@ export function loadPrefs(): Prefs {
     if (typeof (p as Prefs).muted === "boolean") out.muted = (p as Prefs).muted;
     const music = volumeOrNull((p as Prefs).musicVolume);
     if (music !== null) out.musicVolume = music;
+    const ambience = volumeOrNull((p as Prefs).ambienceVolume);
+    if (ambience !== null) out.ambienceVolume = ambience;
     const sfx = volumeOrNull((p as Prefs).sfxVolume);
     if (sfx !== null) out.sfxVolume = sfx;
     return out;

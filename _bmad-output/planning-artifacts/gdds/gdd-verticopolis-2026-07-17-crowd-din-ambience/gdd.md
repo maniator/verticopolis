@@ -154,8 +154,11 @@ on a fixed grid, so nothing reads as a loop.
 
 ### Controls and Input
 
-None added. The layer obeys the existing music/ambience volume slider, the
-master mute, and the gesture-gated audio start.
+One control added during live preview testing: an independent Ambience volume
+slider in Settings (Music / Ambience / Effects), because the crowd and voices
+rode the music bus, so turning music down to hear the talking silenced the
+talking too. The layer otherwise obeys the master mute and the gesture-gated
+audio start.
 
 ---
 
@@ -198,8 +201,9 @@ The layer has one balance axis: it must sit under the music. Targets, from
 the approved previews: crowd layer master at roughly half the music bed's
 perceived level when zoomed fully in, near-inaudible when zoomed fully out;
 one-shot elements individually no louder than the murmur they decorate. The
-mute switch and music volume slider gate the whole layer (it lives on the
-music/ambience bus).
+mute switch gates the whole layer; its level rides the dedicated Ambience
+slider (its own bus, separate from the music bus), so the player can lower
+the music and still hear the crowd, or the reverse.
 
 ---
 
@@ -266,7 +270,11 @@ attacks and irregular timing.
   a mixed floor cannot churn programs while panning.
 - **Volume.** The player sliders are perceptual: the stored 0..1 is squared
   at the bus, so half slider is audibly half (a linear gain slider reads as
-  doing nothing across most of its travel).
+  doing nothing across most of its travel). Three channels, each on its own
+  bus: Music (the composed tracks), Ambience (room tone, crowd, venue sounds,
+  rain), and Effects (action jingles). The ambience bus split off the music
+  bus after live testing showed the two fought each other (lowering music to
+  hear the voices lowered the voices too).
 - **Determinism.** Ambience shares the music's non-determinism budget: it
   reads sim state but never writes it and draws no simulation RNG. Golden
   masters are untouched by construction.

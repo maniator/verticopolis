@@ -12,10 +12,11 @@ import { renderToFragment } from "../testing/litTestUtils";
  */
 
 describe("settingsTemplate structure and a11y", () => {
-  it("renders the two volume sliders (0..100 range) with labels and aria-hidden readouts", () => {
+  it("renders the three volume sliders (0..100 range) with labels and aria-hidden readouts", () => {
     const frag = renderToFragment(settingsTemplate("1.2.3"));
     for (const [id, label] of [
       ["vol-music", "Music"],
+      ["vol-ambience", "Ambience"],
       ["vol-sfx", "Effects"],
     ]) {
       const input = frag.querySelector<HTMLInputElement>(`#${id}`)!;

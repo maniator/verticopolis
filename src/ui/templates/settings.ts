@@ -25,6 +25,7 @@ export function settingsTemplate(version: string): TemplateResult {
       <h3>Sound</h3>
       <p style="color:var(--muted)">Levels apply right away and are remembered on this device. The 🔊 button up top mutes everything.</p>
       <div class="vol-row"><label for="vol-music">Music</label><input id="vol-music" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-music" aria-hidden="true"></span></div>
+      <div class="vol-row"><label for="vol-ambience">Ambience</label><input id="vol-ambience" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-ambience" aria-hidden="true"></span></div>
       <div class="vol-row"><label for="vol-sfx">Effects</label><input id="vol-sfx" type="range" min="0" max="100" step="1"><span class="vol-val" data-vol-val="vol-sfx" aria-hidden="true"></span></div>
       <h3>Motion and pace</h3>
       <div class="set-row">
