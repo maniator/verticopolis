@@ -79,8 +79,11 @@ export class CrowdVoices {
       }
     }
     if (start < 0) return null;
-    // ToneBufferSource.start's duration is wall-clock: the phrase plays for
-    // wallLen seconds, consuming srcLen seconds of (rate-shifted) source.
+    // The `duration` arg is wall-clock in Tone's wrapper (unlike the native
+    // BufferSource, whose duration is buffer-time). ToneBufferSource.start does
+    // not forward duration to the native node; it schedules `stop(time +
+    // duration)`, so the phrase plays for wallLen real seconds regardless of
+    // playbackRate, consuming srcLen = wallLen * rate seconds of source.
     this.emit(this.talk, gainNode, { rate, offset: start, wallDur: wallLen, fade: PHRASE_RAMP_S });
     return wallLen;
   }
@@ -118,8 +121,12 @@ export class CrowdVoices {
       src.playbackRate.setValueAtTime(whoopRate(0), now);
       src.playbackRate.linearRampToValueAtTime(whoopRate(0.5), now + wallLen * 0.5);
       src.playbackRate.linearRampToValueAtTime(whoopRate(1), now + wallLen);
-      src.start(now, start, wallLen + 0.1);
-      src.stop(now + wallLen + 0.06); // past the fadeOut so the tail never clicks
+      // No duration arg here: the whoop's length is governed by the explicit
+      // stop below (a scheduled stop from a duration arg would just be the one
+      // this stop() cancels and replaces). Stop past the fadeOut so the tail
+      // never clicks.
+      src.start(now, start);
+      src.stop(now + wallLen + 0.06);
       this.track(src, wallLen + 0.1);
     } catch {
       /* voice glitch: skip this whoop */
