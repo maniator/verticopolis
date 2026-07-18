@@ -128,12 +128,17 @@ phrases are per-scene (dense murmur: 0.3 to 1.7 s; occasional conversation:
 
 **Occupancy scaling.** Each scene defines a maximum talker count (and element
 rates). The live crowd factor (0 to 1, see Technical Specifications) scales
-them: `activeTalkers = round(maxTalkers * crowd)` (which legitimately rounds
-to zero in a near-empty room), element gaps stretch by `1 / activity` (with a
-0.2 floor), the layer master scales by activity as well as zoom, and below
-0.05 the layer is silent (room tone only). One deliberate exception: the
-street keeps a small crowd floor (0.35), because the city has pedestrians no
-matter what the tower tracks; no indoor scene has a floor.
+them: `activeTalkers = round(maxTalkers * crowd)`, floored at one while the
+room is live (a sparsely occupied room is a quiet conversation, not silence;
+see Progression and Balance and decision row 24), element gaps stretch by
+`1 / activity` (with a 0.2 floor), the layer master scales by the square root
+of activity as well as zoom (loudness is logarithmic; see decision row 23),
+and below 0.05 the layer is silent (room tone only). Both the floor and the
+sqrt sit behind that 0.05 activity gate, so a genuinely empty or closed room
+is still exactly silent. Two deliberate floors, both the city's own spaces
+rather than tower rooms: the street (0.35) and the metro platform (0.3) keep
+a small crowd floor because the city has pedestrians and trains no matter
+what the tower tracks; no indoor tower scene has a floor.
 
 **Zoom response.** The crowd layer routes through the existing distance
 lowpass (`bedFilter`, 650 to 7500 Hz across the detail ramp), so zooming in

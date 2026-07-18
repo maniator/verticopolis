@@ -211,7 +211,12 @@ class GameApp implements GameAppPorts {
     this.audio.setMuted(this.prefs.muted === true);
     this.audio.setVolumes(
       this.prefs.musicVolume ?? 1,
-      this.prefs.ambienceVolume ?? 1,
+      // Ambience used to ride the music bus, so a returning player who turned
+      // the music down expects the crowd and room tone turned down with it.
+      // With no explicit ambience pref yet (the slider is new), inherit the
+      // stored music level; once the player moves the Ambience slider it
+      // persists and takes over.
+      this.prefs.ambienceVolume ?? this.prefs.musicVolume ?? 1,
       this.prefs.sfxVolume ?? 1,
     );
 

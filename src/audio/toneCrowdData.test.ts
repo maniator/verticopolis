@@ -55,6 +55,25 @@ describe("CROWD_SCENES specs", () => {
   });
 });
 
+describe("crowd floors are city spaces only", () => {
+  it("floors exactly the street and the metro platform, never a tower room", () => {
+    const floored = Object.entries(CROWD_SCENES)
+      .filter(([, s]) => s.crowdFloor !== undefined)
+      .map(([k]) => k)
+      .sort();
+    // The floor is the deliberate honest-rooms exception: the city's own
+    // spaces have people and traffic regardless of what the tower tracks.
+    // Any tower room gaining a floor would break "empty means silent" indoors,
+    // so this pins the set closed.
+    expect(floored).toEqual(["metro", "outside"]);
+    for (const key of floored) {
+      const floor = CROWD_SCENES[key as CrowdSceneKey].crowdFloor!;
+      expect(floor, key).toBeGreaterThan(0);
+      expect(floor, key).toBeLessThanOrEqual(0.5);
+    }
+  });
+});
+
 describe("resolveCrowdScene", () => {
   it("splits the shared scenes on the dominant kind", () => {
     expect(resolveCrowdScene("food", "restaurant")).toBe("restaurant");

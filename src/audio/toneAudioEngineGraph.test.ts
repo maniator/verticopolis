@@ -329,6 +329,32 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     }
   });
 
+  it("city spaces stay alive off-hours while a closed tower room falls silent", () => {
+    vi.useFakeTimers();
+    try {
+      const eng = new ToneAudioEngine();
+      eng.start();
+      const settle = (f: ViewFocus) => {
+        eng.update(f);
+        eng.update(f);
+      };
+      const triggerCount = () => graph.nodes.reduce((n, r) => n + r.triggers.length, 0);
+      // An office at 3am is closed: nobody there, nothing fires (honest rooms).
+      settle(focus({ zoom: 2.4, dominant: "office", hour: 3, crowd: 0 }));
+      const beforeOffice = triggerCount();
+      vi.advanceTimersByTime(15_000);
+      expect(triggerCount()).toBe(beforeOffice);
+      // The metro platform is the city's own space: its crowd floor keeps the
+      // trains rolling and riders murmuring even at 3am with no drawn crowd.
+      settle(focus({ zoom: 2.0, dominant: "empty", centerFloor: -3, hour: 3, crowd: 0 }));
+      const beforeMetro = triggerCount();
+      vi.advanceTimersByTime(20_000);
+      expect(triggerCount()).toBeGreaterThan(beforeMetro);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("venue programs start only with live attendance and stop on scene exit", () => {
     const eng = new ToneAudioEngine();
     eng.start();

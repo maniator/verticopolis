@@ -411,6 +411,10 @@ function censusCrowd(
         // the routed-customer tally. Attendance venues (cinema, party hall)
         // already mirror `customersIn` into `occupants`, and every other kind
         // owns `occupants` via updatePresence, so both read `occupants`.
+        // (`customersIn` is not persisted: right after a save load a busy
+        // venue reads empty and quiet for the seconds it takes the crowd
+        // system to re-route diners in. That is honest, the sim really has
+        // nobody seated yet, and it self-heals; see the ambience backlog.)
         occ +=
           isCommercialKind(u.kind) && def.population > 0
             ? (u.customersIn ?? 0)
