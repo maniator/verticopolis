@@ -455,7 +455,15 @@ export function focus(engine: TowerEngine): ViewFocus {
   // The occupancy walk refreshes at most once per second (or when the
   // dominant kind changes, so a pan onto a new venue reads it immediately);
   // ambience level changes are slow ramps, so a 1 s census is plenty.
-  const now = typeof performance !== "undefined" ? performance.now() : 0;
+  // A real, monotonically advancing clock: `performance.now()` where it exists,
+  // else `Date.now()`. A constant 0 fallback would freeze `now - cached.at` at
+  // 0 forever, so the 1 s refresh window would never elapse and the census
+  // would stay stale for the life of the engine in any environment without
+  // `performance`.
+  const now =
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
   const cached = censusCache.get(engine);
   let crowd: number;
   if (cached && cached.dominant === dominant && now - cached.at < CENSUS_REFRESH_MS) {

@@ -81,9 +81,10 @@ export interface CrowdSceneSpec {
   murmur?: MurmurSpec;
   elements: ElementSpec[];
   gate: CrowdGate;
-  /** Deliberate exception for the street only: the city has people no matter
-   *  what the tower tracks, so outside never falls fully silent. Indoor
-   *  scenes never set this (honest rooms: empty means silent). */
+  /** Deliberate exception for the CITY'S OWN spaces (the street, the metro
+   *  platform): they have people and traffic no matter what the tower tracks,
+   *  so they never fall fully silent. The tower's indoor scenes never set
+   *  this (honest rooms: empty means silent). */
   crowdFloor?: number;
   /** Scene runs a composed program (party band, cinema score, metro train)
    *  built by the programs module rather than murmur alone. */
@@ -171,6 +172,10 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
     murmur: { maxTalkers: 4, pauseMin: 0.6, pauseVar: 1.6, muffleHz: 900, gain: 0.42 },
     elements: [],
     gate: "always",
+    // The platform belongs to the city, like the street: trains run and a few
+    // riders pass through whether or not the tower's drawn crowd is in view,
+    // so the station (and its train events) never falls fully silent.
+    crowdFloor: 0.3,
     program: "metro",
   },
   outside: {

@@ -205,6 +205,18 @@ mute switch gates the whole layer; its level rides the dedicated Ambience
 slider (its own bus, separate from the music bus), so the player can lower
 the music and still hear the crowd, or the reverse.
 
+Two rules keep a lightly-visited venue from collapsing to a bare hum (owner
+playtest, 2026-07-18). Loudness scales with the square root of activity
+(clock times occupancy), not linearly, because loudness perception is
+logarithmic: a linear curve read as near-silent for any half-full room, the
+same fallacy the volume sliders correct. And while a room is live at all, at
+least one talker plays: `round(maxTalkers * crowd)` alone rounded a sparsely
+occupied room to zero voices, muting a real conversation. Honest silence
+still holds because both rules sit behind the activity gate, an empty room
+(nobody there, or a closed hour) is exactly zero either way. The metro
+platform, like the street, is one of the city's own spaces rather than a
+tower room, so it carries a small crowd floor and never falls fully silent.
+
 ---
 
 ## Level Design Framework

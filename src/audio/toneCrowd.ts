@@ -168,19 +168,31 @@ export class CrowdLayer {
           : Math.max(rawCrowd, spec.crowdFloor ?? 0);
       this.activity = hourActivity(spec.gate, hour) * (crowd < EMPTY_CROWD ? 0 : crowd);
       // Honest loudness: the layer level scales with activity (clock times
-      // occupancy) as well as zoom, so a near-empty room is near-silent.
+      // occupancy) as well as zoom, so a near-empty room is near-silent. The
+      // activity term is square-rooted: loudness perception is logarithmic,
+      // and a linear scale read as dead below half fill (the owner heard
+      // "just a hum" over lightly-visited venues), the same fallacy the
+      // perceptual volume sliders fixed. Empty stays exactly zero.
       this.master.gain.rampTo(
-        this.activity <= 0 ? 0 : LAYER_LEVEL * (0.38 + 0.62 * detail) * Math.min(1, this.activity),
+        this.activity <= 0
+          ? 0
+          : LAYER_LEVEL * (0.38 + 0.62 * detail) * Math.sqrt(Math.min(1, this.activity)),
         0.5,
       );
       this.humGain?.gain.rampTo(key === "outside" && this.activity > 0 ? 0.5 : 0, 1.2);
       if (spec.murmur) {
         this.murmurFilter?.frequency.rampTo(spec.murmur.muffleHz, 0.4);
         this.murmurGain?.gain.rampTo(spec.murmur.gain, 0.4);
-        // The GDD formula: talkers = round(maxTalkers * crowd). It can
-        // legitimately round to zero (a nearly empty room has nobody talking).
+        // Talkers = round(maxTalkers * crowd), floored at ONE while the room
+        // is live: a couple eating in a big restaurant is still a quiet
+        // conversation, not silence (rounding 3 talkers * 0.14 fill to zero
+        // muted every lightly-visited venue). Empty rooms still fall fully
+        // silent through the activity gate above, so the honest-rooms rule
+        // holds: no people, no voices.
         const want =
-          this.activity <= 0 ? 0 : Math.round(spec.murmur.maxTalkers * Math.min(1, crowd));
+          this.activity <= 0
+            ? 0
+            : Math.max(1, Math.round(spec.murmur.maxTalkers * Math.min(1, crowd)));
         for (let i = 0; i < this.slots.length; i++) {
           this.setSlotActive(i, this.activity > 0 && i < want, key);
         }

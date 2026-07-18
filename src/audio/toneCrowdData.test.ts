@@ -33,7 +33,15 @@ describe("CROWD_SCENES specs", () => {
         expect(spec.murmur.gain, key).toBeLessThanOrEqual(0.55);
       }
       for (const el of spec.elements) {
-        expect(el.freqMax, key).toBeLessThanOrEqual(1900);
+        // `freqMax` is a NOISE filter cutoff for `burst` and a TONE pitch for
+        // `ping`/`thud`. The no-static rule is about noise: hold bursts to the
+        // audition's steep-filter ceiling (1800 Hz), while pitched tones may
+        // sit a little higher (a bird chirp, a bright clink) without hissing.
+        if (el.kind === "burst") {
+          expect(el.freqMax, key).toBeLessThanOrEqual(1800);
+        } else {
+          expect(el.freqMax, key).toBeLessThanOrEqual(1900);
+        }
         expect(el.gainMax, key).toBeLessThanOrEqual(0.25);
         expect(el.rateMin, key).toBeGreaterThan(0);
         expect(el.dur, key).toBeGreaterThan(0);

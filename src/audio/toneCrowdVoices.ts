@@ -32,6 +32,8 @@ export class CrowdVoices {
   private talkLen = 0;
   /** Live sources, tracked so dispose can cut tails. */
   private live = new Set<Tone.ToneBufferSource>();
+  /** Backstop reap timers, one per live source (see {@link track}). */
+  private reapTimers = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
 
   /** Begin fetching both seeds. Safe to call once, any time after the audio
@@ -118,7 +120,7 @@ export class CrowdVoices {
       src.playbackRate.linearRampToValueAtTime(whoopRate(1), now + wallLen);
       src.start(now, start, wallLen + 0.1);
       src.stop(now + wallLen + 0.06); // past the fadeOut so the tail never clicks
-      this.track(src);
+      this.track(src, wallLen + 0.1);
     } catch {
       /* voice glitch: skip this whoop */
     }
@@ -140,7 +142,7 @@ export class CrowdVoices {
       });
       src.connect(gainNode);
       src.start(Tone.now(), opts.offset, opts.wallDur);
-      this.track(src); // only a started source can reach onended
+      this.track(src, opts.wallDur); // only a started source can reach onended
     } catch {
       // A source that failed to connect or start never fires onended: reap it
       // here rather than stranding it in the live set.
@@ -152,9 +154,21 @@ export class CrowdVoices {
     }
   }
 
-  private track(src: Tone.ToneBufferSource): void {
+  /** Track a started source so it's reaped when done. `onended` is the primary
+   *  signal, but Tone does not guarantee it fires (a suspended context, a
+   *  duration past the buffer end), so a timer sized to the source's expected
+   *  lifetime is a guaranteed backstop: without it a source that never fires
+   *  onended would sit in `live` until layer teardown. Whichever fires first
+   *  reaps once (dispose is idempotent) and cancels the other. */
+  private track(src: Tone.ToneBufferSource, lifetimeS: number): void {
     this.live.add(src);
-    src.onended = () => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const reap = (): void => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        this.reapTimers.delete(timer);
+        timer = null;
+      }
       this.live.delete(src);
       try {
         src.dispose();
@@ -162,10 +176,15 @@ export class CrowdVoices {
         /* already gone */
       }
     };
+    src.onended = reap;
+    timer = setTimeout(reap, (Math.max(0, lifetimeS) + 0.3) * 1000);
+    this.reapTimers.add(timer);
   }
 
   dispose(): void {
     this.disposed = true;
+    for (const t of this.reapTimers) clearTimeout(t);
+    this.reapTimers.clear();
     for (const src of this.live) {
       try {
         src.stop();
