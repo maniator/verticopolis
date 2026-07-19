@@ -47,11 +47,12 @@ export interface SceneDef {
   gain: number;
   /** Low bass voice presence 0..1 (0 = silent). */
   bass: number;
-  /** Ambient room-tone bed on looping noise. `type` is `lowpass` for every
-   *  scene (seated warm and low so no scene re-emphasizes the mids and reads as
-   *  hiss); `freq` is the cutoff, `q` the resonance, `gain` the per-scene level.
+  /** Ambient room-tone bed on looping noise. `type` is pinned to `lowpass` for
+   *  every scene (seated warm and low so no scene re-emphasizes the mids and
+   *  reads as hiss); the literal type keeps a stray bandpass from creeping back
+   *  in. `freq` is the cutoff, `q` the resonance, `gain` the per-scene level.
    *  The steep rolloff and subsonic highpass are fixed in the engine. */
-  amb: { type: BiquadFilterType; freq: number; q: number; gain: number };
+  amb: { type: "lowpass"; freq: number; q: number; gain: number };
 }
 
 export const SCENES: Record<Scene, SceneDef> = {

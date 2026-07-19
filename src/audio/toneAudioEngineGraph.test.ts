@@ -396,6 +396,15 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     );
     expect(rumble, "metro rumble missing").toBeTruthy();
     expect(steepInto(rumble!)).toBe(true);
+    // The room-tone bed's pink noise (constructed with the bare "pink" string,
+    // unlike the rain layer's `{ type: "pink", ... }` options object) must sit
+    // behind the steep filter too: it is the de-static change, and without this
+    // pin a future edit could drop it back to a bright bandpass and stay green.
+    const roomTone = graph.nodes.find(
+      (n) => n.kind === "Noise" && n.args[0] === "pink",
+    );
+    expect(roomTone, "room-tone pink noise missing").toBeTruthy();
+    expect(steepInto(roomTone!)).toBe(true);
   });
 
   it("applies each scene's murmur level (the hotel whispers)", () => {

@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.63.0
 
-- The restaurants and fast food places have more life and variety: a wider mix of clinks, plate set-downs, tray clatter, register tones, and counter sounds on irregular timing, so a busy eatery no longer settles into the same short loop.
+- Restaurants and fast food have more variety: a wider mix of clinks, plate set-downs, tray clatter, and register tones on irregular timing, so a busy eatery no longer loops the same short pattern.
 - The background room tone sits lower and warmer behind every area, so scenes read as quiet rooms rather than faint static.
 
 ## 1.62.0

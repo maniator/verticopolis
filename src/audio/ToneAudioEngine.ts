@@ -202,7 +202,10 @@ export class ToneAudioEngine {
       // touches the rolloff, so every scene's bed stays steep. The source also
       // sits a touch quieter than the old bed.
       this.ambGain = new Tone.Gain(0).connect(this.bedFilter);
-      this.ambTone = new Tone.Filter({ type: "highpass", frequency: 100, rolloff: -12 }).connect(
+      // Truly subsonic (35 Hz): it clears speaker-flapping rumble without
+      // touching the deep beds of the low-cutoff scenes (metro lowpass 90,
+      // cinema 110), whose rush must survive.
+      this.ambTone = new Tone.Filter({ type: "highpass", frequency: 35, rolloff: -12 }).connect(
         this.ambGain,
       );
       this.ambFilter = new Tone.Filter({ type: "lowpass", frequency: 600, rolloff: -48 }).connect(
