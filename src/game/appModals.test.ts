@@ -1,0 +1,255 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { GameApp } from "../main";
+import type { Simulation } from "../engine/Simulation";
+import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./appModals";
+import { SaveGame } from "../storage/SaveGame";
+
+/**
+ * These pin the stats/exterminator/save-slot commands against a hand-built fake
+ * `GameApp`. `SaveGame` is fully mocked (no localStorage, no compression);
+ * `statsTemplate` is stubbed to a token so the fake sim only needs the handful
+ * of fields the commands themselves read, while `canCallExterminator` stays the
+ * REAL predicate so the handler gate is exercised against actual sim state.
+ */
+
+vi.mock("../storage/SaveGame", () => ({
+  SaveGame: {
+    listSlots: vi.fn(() => [{ slot: "auto", exists: false }]),
+    saveSlot: vi.fn(),
+    load: vi.fn(),
+    loadSlot: vi.fn(),
+    deleteSlot: vi.fn(),
+  },
+}));
+
+vi.mock("../ui/templates/stats", async (importActual) => {
+  const actual = await importActual<typeof import("../ui/templates/stats")>();
+  return { ...actual, statsTemplate: vi.fn(() => "STATS_BODY") };
+});
+
+interface Refusal {
+  ok: false;
+  reason?: "funds" | "pending" | "none" | string;
+  cost?: number;
+}
+
+interface SimShape {
+  view: unknown;
+  exterminationDueDay: number | undefined;
+  rules: { infestationRecovery: ReturnType<typeof vi.fn> };
+  housekeepingCoverage: ReturnType<typeof vi.fn>;
+  callExterminator: ReturnType<typeof vi.fn>;
+  emit: ReturnType<typeof vi.fn>;
+}
+
+/** A sim where the exterminator is offerable: Modern recovery exists, rooms are
+ *  infested, and none is en route. Callers dial the pieces they need. */
+function makeSim(over: Partial<SimShape> = {}): SimShape {
+  return {
+    view: null,
+    exterminationDueDay: undefined,
+    rules: { infestationRecovery: vi.fn(() => ({ calloutFee: 100, perRoomFee: 50 })) },
+    housekeepingCoverage: vi.fn(() => ({ infested: 2 })),
+    callExterminator: vi.fn(() => ({ ok: true })),
+    emit: vi.fn(),
+    ...over,
+  };
+}
+
+function makeApp(sim: SimShape) {
+  const ui = {
+    showStats: vi.fn(),
+    confirmModal: vi.fn(),
+    showSaves: vi.fn(),
+    toast: vi.fn(),
+  };
+  const engine = { viewState: vi.fn(() => ({ camera: "VIEW" })) };
+  const app = {
+    sim,
+    ui,
+    engine,
+    adoptSim: vi.fn(),
+  };
+  return { app: app as unknown as GameApp, ui, engine, adoptSim: app.adoptSim };
+}
+
+beforeEach(() => {
+  vi.mocked(SaveGame.listSlots).mockClear();
+  vi.mocked(SaveGame.saveSlot).mockClear();
+  vi.mocked(SaveGame.load).mockClear();
+  vi.mocked(SaveGame.loadSlot).mockClear();
+  vi.mocked(SaveGame.deleteSlot).mockClear();
+});
+
+describe("showStats", () => {
+  it("wires an exterminate handler when the action is offerable", () => {
+    const sim = makeSim(); // recovery, 2 infested, none en route → offerable
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    expect(ui.showStats).toHaveBeenCalledTimes(1);
+    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+    expect(typeof handlers.exterminate).toBe("function");
+  });
+
+  it("wires NO handlers when the action is not offerable", () => {
+    // No recovery rule (Classic-style): canCallExterminator is false.
+    const sim = makeSim({ rules: { infestationRecovery: vi.fn(() => null) } });
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+    expect(handlers).toEqual({});
+  });
+
+  it("also declines when a dispatch is already en route", () => {
+    const sim = makeSim({ exterminationDueDay: 5 });
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    expect(ui.showStats.mock.calls[0][1]).toEqual({});
+  });
+
+  it("also declines when nothing is infested", () => {
+    const sim = makeSim({ housekeepingCoverage: vi.fn(() => ({ infested: 0 })) });
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    expect(ui.showStats.mock.calls[0][1]).toEqual({});
+  });
+});
+
+/** Fire the exterminate handler that showStats wired, returning the confirmModal
+ *  spy so a test can drive its confirm callback. */
+function fireExterminate(app: GameApp, ui: ReturnType<typeof makeApp>["ui"]) {
+  showStats(app);
+  const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+  handlers.exterminate();
+}
+
+describe("confirmExterminate refusals surfaced by the confirm callback", () => {
+  const cases: Array<{ reason: string; cost?: number; message: string }> = [
+    { reason: "funds", cost: 500, message: "Not enough funds to book the exterminator ($500)." },
+    { reason: "pending", message: "An exterminator is already on the way." },
+    { reason: "none", message: "No infested rooms left to treat." },
+    { reason: "whatever", message: "The exterminator is unavailable." },
+  ];
+
+  for (const { reason, cost, message } of cases) {
+    it(`emits "${message}" for reason "${reason}"`, () => {
+      const res: Refusal = { ok: false, reason, ...(cost !== undefined ? { cost } : {}) };
+      const sim = makeSim({ callExterminator: vi.fn(() => res) });
+      const { app, ui } = makeApp(sim);
+      fireExterminate(app, ui);
+      expect(ui.confirmModal).toHaveBeenCalledTimes(1);
+      const onConfirm = ui.confirmModal.mock.calls[0][2] as () => void;
+      onConfirm();
+      expect(sim.callExterminator).toHaveBeenCalledTimes(1);
+      expect(sim.emit).toHaveBeenCalledExactlyOnceWith(message, "bad");
+    });
+  }
+
+  it("funds refusal falls back to the computed cost when the result omits one", () => {
+    // recovery 100 + 50/room * 2 infested = 200.
+    const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: false, reason: "funds" })) });
+    const { app, ui } = makeApp(sim);
+    fireExterminate(app, ui);
+    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    expect(sim.emit).toHaveBeenCalledExactlyOnceWith("Not enough funds to book the exterminator ($200).", "bad");
+  });
+
+  it("emits nothing extra and reopens stats on a successful dispatch", () => {
+    const sim = makeSim({ callExterminator: vi.fn(() => ({ ok: true })) });
+    const { app, ui } = makeApp(sim);
+    fireExterminate(app, ui);
+    (ui.confirmModal.mock.calls[0][2] as () => void)();
+    expect(sim.emit).not.toHaveBeenCalled();
+    // showStats runs again after the confirm (initial open + reopen).
+    expect(ui.showStats).toHaveBeenCalledTimes(2);
+  });
+
+  it("bails with a reason before confirming when the tower cleared between render and click", () => {
+    // Rooms cleared after the modal rendered: infested is now 0, so the handler
+    // says why instead of opening a confirm dialog.
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+    sim.housekeepingCoverage.mockReturnValue({ infested: 0 });
+    handlers.exterminate();
+    expect(ui.confirmModal).not.toHaveBeenCalled();
+    expect(sim.emit).toHaveBeenCalledExactlyOnceWith("No infested rooms left to treat.", "bad");
+  });
+
+  it("reports the exterminator unavailable when the recovery rule vanished", () => {
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    showStats(app);
+    const handlers = ui.showStats.mock.calls[0][1] as Record<string, () => void>;
+    sim.rules.infestationRecovery.mockReturnValue(null);
+    handlers.exterminate();
+    expect(ui.confirmModal).not.toHaveBeenCalled();
+    expect(sim.emit).toHaveBeenCalledExactlyOnceWith("The exterminator is unavailable.", "bad");
+  });
+});
+
+describe("showSaves", () => {
+  it("passes the SaveGame slot listing to the UI", () => {
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    showSaves(app);
+    expect(SaveGame.listSlots).toHaveBeenCalledTimes(1);
+    expect(ui.showSaves).toHaveBeenCalledExactlyOnceWith([{ slot: "auto", exists: false }]);
+  });
+});
+
+describe("saveToSlot", () => {
+  it("stamps the live camera view, writes the slot, and toasts success", () => {
+    const sim = makeSim();
+    const { app, ui, engine } = makeApp(sim);
+    saveToSlot(app, 2);
+    expect(engine.viewState).toHaveBeenCalledTimes(1);
+    expect(sim.view).toEqual({ camera: "VIEW" });
+    expect(SaveGame.saveSlot).toHaveBeenCalledExactlyOnceWith(2, sim);
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Saved to slot 2.", "good");
+  });
+});
+
+describe("loadFromSlot", () => {
+  it("adopts and toasts on a truthy manual-slot load", () => {
+    const loaded = { tag: "TOWER" } as unknown as Simulation;
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(loaded);
+    const sim = makeSim();
+    const { app, ui, adoptSim } = makeApp(sim);
+    loadFromSlot(app, 1);
+    expect(SaveGame.loadSlot).toHaveBeenCalledExactlyOnceWith(1);
+    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Tower loaded.", "good");
+  });
+
+  it("reads the autosave via load() when the slot is 'auto'", () => {
+    const loaded = { tag: "AUTO" } as unknown as Simulation;
+    vi.mocked(SaveGame.load).mockReturnValueOnce(loaded);
+    const sim = makeSim();
+    const { app, adoptSim } = makeApp(sim);
+    loadFromSlot(app, "auto");
+    expect(SaveGame.load).toHaveBeenCalledTimes(1);
+    expect(SaveGame.loadSlot).not.toHaveBeenCalled();
+    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+  });
+
+  it("toasts failure and does not adopt on a null (empty/corrupt) load", () => {
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(null);
+    const sim = makeSim();
+    const { app, ui, adoptSim } = makeApp(sim);
+    loadFromSlot(app, 3);
+    expect(adoptSim).not.toHaveBeenCalled();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("That slot is empty or corrupt.", "bad");
+  });
+});
+
+describe("deleteSlot", () => {
+  it("deletes the slot and toasts", () => {
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    deleteSlot(app, 3);
+    expect(SaveGame.deleteSlot).toHaveBeenCalledExactlyOnceWith(3);
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Deleted slot 3.", "info");
+  });
+});

@@ -8,7 +8,6 @@
 # engine
 # render
 # ui / app spine
-src/main.ts
 # storage
 # engine leaves
 # scripts

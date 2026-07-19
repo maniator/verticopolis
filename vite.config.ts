@@ -219,6 +219,13 @@ export default defineConfig({
         "src/preview.ts",
         "src/pwa.ts",
         "src/main.ts",
+        // The boot entry (bootstrap.ts) and constructor wiring (game/appBoot.ts)
+        // extracted from main.ts are MEASURED: both run headlessly and carry
+        // their own unit tests (bootstrap.test.ts covers the WebGL probe, the
+        // telemetry gate, and the boot/error branches; appBoot.test.ts drives
+        // runBootFlow and invokes every wireControllers adapter closure). Only
+        // main.ts itself stays excluded, because its ctor boots the real WebGL
+        // engine.
         // The Excalibur/WebGL render layer was split into friend-modules; the
         // headless-testable ones are now MEASURED (towerInputCamera, towerOverlay,
         // towerCrowd) with per-file floors below. What stays excluded genuinely

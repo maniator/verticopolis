@@ -409,16 +409,18 @@ describe("KeyboardPlay (commit announcements)", () => {
       clearSelection: () => {},
     });
     const isTransportTool = () => tool.type === "build" && !!FACILITIES[tool.kind].transport;
-    // Mirrors GameApp.pickedAt — the injected picker contract.
+    // Mirrors pickedAt in src/game/buildPreview.ts: the injected picker contract.
+    // Uses the shaft's OWN stored width (tr.width), matching the real impl, so an
+    // old save whose stored width differs from the catalog resolves identically.
     const pickedAt = (floor: number, tile: number): Picked | null => {
       const u = sim.tower.unitAt(floor, tile);
       if (u && u.kind !== "floor" && u.kind !== "lobby") return { type: "unit", id: u.id, kind: u.kind };
       const t = sim.tower.transports.find(
-        (tr) => tile >= tr.x && tile < tr.x + FACILITIES[tr.kind].width && floor >= tr.bottom && floor <= tr.top,
+        (tr) => tile >= tr.x && tile < tr.x + tr.width && floor >= tr.bottom && floor <= tr.top,
       );
       return t ? { type: "transport", id: t.id, kind: t.kind } : null;
     };
-    // Mirrors GameApp.placeSimpleBuild — the injected gesture-shared placement.
+    // Mirrors placeSimpleBuild in src/game/buildPreview.ts: the injected gesture-shared placement.
     const placeSimpleBuild = (kind: FacilityKind, tile: number, floor: number): PlaceOutcome | null => {
       if (kind === "floor" || kind === "lobby") {
         const r = build.paintBrush(kind, tile, floor);

@@ -227,6 +227,10 @@ How items flow:
 - **Origin-floor Simulate variants, peak-origin markers, and a demand-aimed Auto-tune seed need a per-floor origin accumulator (Acceptance Auditor + architect seat).** Captured as curated row `schedule-origin-accumulator` (#465).
 - **The serviced-floors fold-in, floors-by-cars staging grid, measured-demand ghost series, and mobile enrichment set are one bundled next increment (Acceptance Auditor F1/F2/F7/F8, party-ruled).** Captured as curated row `schedule-dialog-fold-in` (#464); spec §16 records the rulings and the canon evidence.
 
+### Deferred from: `main.ts` Stage-4 split (#365, 2026-07-19)
+
+- **`updateTraffic` was part of the any-cast `window.game` tooling surface (found by an isolate-diff render, PATCHED not deferred).** The screenshot scenes (`scripts/scenes/features.ts`, `scripts/screenshot-page-ops.ts`) call `window.game.updateTraffic()` to pin the traffic chip before capture; moving `updateTraffic` off `GameApp` without a delegator silently no-oped that call (optional chaining) and drifted the two `traffic-chip` screenshots. Restored as a delegator and the `window.game` surface doc in `src/main.ts` now lists it. Recorded here as the lesson: the any-cast runtime surface is wider than the four typed fields.
+
 ### Deferred from: `gds-code-review` of Modern smart dispatch (housekeeping-overhaul epic 4, PR #463) (adversarial, 2026-07-17)
 
 - **The triage travel proxy is blind to transport quality and crew saturation (Blind Hunter + Acceptance Auditor, low; refinement with the playtest weight pass).** The score's travel term is floor distance to the NEAREST staff-connected crew: a six-floor stairs-only climb scores like a six-floor service-elevator ride, and when the nearest crew's six maids are all out, a much farther crew is the one that actually travels while the score still reads "close". Documented as an accepted v1 proxy in the GDD's pinned-weight note; revisit alongside the `MODERN_HK_TRIAGE` weight tuning if playtest shows Modern towers mis-prioritizing (fix shapes: distance to the nearest crew WITH a free maid, or a transport-aware cost off the staff route length).
@@ -2276,3 +2280,58 @@ the record:
   sanctioned workflow, image diff reviewed as the blessing of the new
   visual truth. Canvas rasterization differing across Chromium builds is
   the documented reason local mints never bind.
+
+### Deferred from: `bmad-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
+
+Reviewed the follow-up delta on the main.ts friend-module split (input-guard
+consistency, coverage un-exclusion of `bootstrap.ts`/`appBoot.ts`, new headless
+tests). Blind Hunter + Edge Case Hunter, no spec (Acceptance Auditor skipped).
+No `patch` defects survived. Three findings were fixed in-branch rather than
+deferred: undo/redo now yields only to controls with a real native undo
+(INPUT/TEXTAREA/contentEditable), so a focused price-rung `<select>` keeps the
+tower undo live (`ownsNativeUndo` split from `isTypingTarget`); the audio kick
+stays armed when a gesture lands behind the crash card (manual listener removal
+instead of `once`), so audio still unlocks later regardless of the card being
+reload-only; and the Vercel-preview telemetry test now asserts both SDKs.
+Deferrals:
+
+- **`appBoot.ts` is closure-dense and MEASURED with no per-file floor (Edge,
+  low).** `wireControllers` alone defines ~40 counted closures, so a future
+  controller added with a few untested closures could drop the global
+  `functions` ratio (headroom ~1 pt) with the regression surfacing nowhere near
+  `appBoot.ts`. Not adding a per-file floor now: the coverage config's own
+  convention reserves per-file thresholds for genuine exemptions (files that
+  cannot meet the global), and `appBoot.ts` currently clears it. Revisit only if
+  the file grows another controller: at that point a per-file `functions` floor
+  would localize any regression.
+
+### Deferred from: `gds-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
+
+Requested gameplay/input-parity pass over the same delta. Blind Hunter + Edge
+Case Hunter, no spec. No `patch` defects: the two-predicate guard split is
+byte-for-byte parity-preserving for game keys, Escape/`#modal`/`#splash`/crash
+ordering stays correct, no conflicting global keydown listener, and the audio
+kick fixes a real pre-existing double-start (the old `once:true` pair removed
+only the listener that fired, so a pointerdown left the keydown listener live
+and a later keypress started the engine twice). Test added to pin both listeners
+being removed after the first successful start. Deferrals (all low, all
+pre-existing ordering, not introduced here):
+
+- **Undo/redo runs ahead of the `#modal` and `#splash` guards (Edge, low).**
+  `bindKeys` handles Ctrl/Cmd+Z before the modal/splash bails, so a Cmd+Z with a
+  modal or the first-run splash up undoes the paused tower behind it whenever
+  focus is not on a native-undo field (an open rung-picker `<select>`, or
+  nothing focused). Pre-existing (the old guard behaved the same); usually a
+  no-op at splash (a freshly adopted sim clears undo history). Fixing it means
+  gating undo behind the modal/splash guards, a deliberate change to
+  undo-during-modal semantics: take it up on its own, not folded into a refactor.
+- **`ownsNativeUndo`'s contentEditable branch is dead in production (Edge,
+  note).** No `contentEditable` region ships today, so the one true undo-behavior
+  change (yielding Ctrl/Cmd+Z to a focused contentEditable) reaches no live UI.
+  Kept as correct forward-looking cover mirroring `isTypingTarget`; the unit test
+  exercises it so a future contentEditable panel inherits the guard.
+- **Audio kick retries `audio.start()` on a throw instead of giving up (Blind,
+  note).** Manual removal runs after `start()` returns, so a throwing first
+  unlock leaves the listeners armed and retries on the next gesture (the old
+  `once` gave up permanently). `audio.start()` is idempotent, so the retry is a
+  robustness gain, not a defect; recorded for the record.
