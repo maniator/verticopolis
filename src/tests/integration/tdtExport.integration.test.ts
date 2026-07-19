@@ -429,7 +429,7 @@ describe("buildTDT: export → import round trip", () => {
   // sky story renders as a sky lobby (the game draws lobby arches); feeding raw
   // type-0 there would draw bare floor, but the exporter never emits that.
   it("a plain floor on a sky-lobby story exports as a lobby, byte-identical (gh-319)", () => {
-    const SKY = 30; // 30 % 15 === 0 -> a sky-lobby story
+    const SKY = GRID.lobbyInterval * 2; // a multiple of the interval -> a sky-lobby story
     const towerWith = (kind: "floor" | "lobby"): SerializedGame => ({
       version: SAVE_VERSION,
       seed: 1,
@@ -467,7 +467,7 @@ describe("buildTDT: export → import round trip", () => {
     // Contrast: the SAME plain floor on a NON-lobby story exports as empty floor
     // (type 0), not lobby. This pins that the type-24 above is sky-story-specific
     // (the isLobbyFloor gate), not "all paving is a lobby".
-    const NOTSKY = 31; // 31 % 15 !== 0
+    const NOTSKY = SKY + 1; // one story above a sky lobby -> not a lobby floor
     const plainNonSky: SerializedGame = { ...towerWith("floor"), units: [
       unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
       unit({ id: 2, kind: "floor", floor: NOTSKY, x: 40, width: 1 }),
