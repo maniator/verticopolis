@@ -129,6 +129,18 @@ Each floor record: a 6-byte header (`u16 unitCount`, `u16 leftEdge`,
 `u16 rightEdge`), then `unitCount` × 18-byte unit records, then a 188-byte remap
 table (94 × u16 indices into the unit array).
 
+> **Record order is significant (harness-confirmed).** A floor's unit records
+> must be written in **ascending left-edge order**, with the empty-floor (type-0)
+> paving spans interleaved at their real x-position (a game-written save reads
+> e.g. `…171, 187[type-0], 192, 201[type-0], 203…`). The 1994 renderer walks the
+> records left to right and **truncates the floor at the first record whose left
+> edge goes backwards**: everything past an out-of-order record draws as bare sky.
+> An exporter that appends its type-0 fillers after the rooms therefore blanks the
+> right side of any wide floor that has a mid-floor gap (the gh-318 sky-gap,
+> reproduced and fixed in the Wine harness). The remap table's zero-fill is
+> unrelated: a populated remap does **not** fix the truncation, and a real save
+> renders correctly on record order alone.
+
 **Unit record (18 bytes):** left/right extents in segments (u16 each; one
 segment = one of our tiles; half-open range); type byte (§5; negative ⇒ under
 construction [OS]); a flags byte (bit-mapped hotel state [TD]: bits for occupant
