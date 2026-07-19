@@ -24,7 +24,7 @@ export interface GameAppPorts {
   /** The audio facade. Read per call (never destructured), so it stays correct
    *  whatever its lifecycle: that per-call read is the guarantee, not any
    *  assumption that the facade is never replaced. */
-  readonly audio: Pick<AudioEngine, "muted" | "musicVolume" | "sfxVolume">;
+  readonly audio: Pick<AudioEngine, "muted" | "musicVolume" | "ambienceVolume" | "sfxVolume">;
   /** Save/load controller; each method re-asks its own live-sim thunk. */
   readonly saveLoad: Pick<
     SaveLoad,
@@ -39,7 +39,7 @@ export interface GameAppPorts {
   redo(): void;
   setOverlay(mode: string): void;
   toggleMute(): boolean;
-  setVolume(kind: "music" | "sfx", value: number): void;
+  setVolume(kind: "music" | "ambience" | "sfx", value: number): void;
   toggleReducedMotion(): boolean;
   toggleSteadyClock(): boolean;
   isSteadyClock(): boolean;
@@ -76,7 +76,11 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onToggleAudio: () => app.toggleMute(),
     isMuted: () => app.audio.muted,
     onSetVolume: (kind, value) => app.setVolume(kind, value),
-    getVolumes: () => ({ music: app.audio.musicVolume, sfx: app.audio.sfxVolume }),
+    getVolumes: () => ({
+      music: app.audio.musicVolume,
+      ambience: app.audio.ambienceVolume,
+      sfx: app.audio.sfxVolume,
+    }),
     onUndo: () => app.undo(),
     onRedo: () => app.redo(),
     onEditAction: (action, root) => app.editor.handleEditAction(action, root),

@@ -258,7 +258,7 @@ export function showSettings(ui: UI): void {
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
   const vols = ui.cb.getVolumes();
-  const wireVolume = (id: string, kind: "music" | "sfx", initial: number) => {
+  const wireVolume = (id: string, kind: "music" | "ambience" | "sfx", initial: number) => {
     const input = box.querySelector<HTMLInputElement>(`#${id}`)!;
     const readout = box.querySelector<HTMLElement>(`[data-vol-val="${id}"]`)!;
     const show = (v: number) => (readout.textContent = `${Math.round(v * 100)}%`);
@@ -271,6 +271,7 @@ export function showSettings(ui: UI): void {
     });
   };
   wireVolume("vol-music", "music", vols.music);
+  wireVolume("vol-ambience", "ambience", vols.ambience);
   wireVolume("vol-sfx", "sfx", vols.sfx);
   // Both switches show the LIVE state and re-read it from the callback's return
   // after every toggle, so a stuck pref can never desync the UI.

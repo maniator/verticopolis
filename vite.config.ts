@@ -105,7 +105,7 @@ export default defineConfig({
       workbox: {
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
-        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2}"],
+        globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
         globIgnores: ["**/gallery*", "**/preview*"],
         navigateFallback: "index.html",
         // Keep the tooling pages out of the app shell fallback, and let
@@ -252,13 +252,13 @@ export default defineConfig({
         // tier's job), so those files get a lower floor. A file that already
         // clears the global gets no line: a per-file threshold that just
         // restates the global earns nothing and is left off.
-        // ToneAudioEngine.ts is now the graph/lifecycle orchestrator; it clears
-        // the global on statements and lines, so only its function and branch
-        // floors remain. The procedural synthesis it used to hold moved to
-        // toneVoices.ts, which keeps the lower synth floor (the mocked-Tone graph
-        // test drives it end to end, but units can't reach every voice branch).
+        // ToneAudioEngine.ts is the graph/lifecycle orchestrator: it clears the
+        // global on statements and lines, so only its function and branch floors
+        // stay lower. The mocked-Tone graph test drives the wiring end to end,
+        // but units can't reach every construction and teardown branch.
+        // (toneVoices.ts, slimmed to the action jingles, now clears the global
+        // outright and needs no per-file floor.)
         "src/audio/ToneAudioEngine.ts": { functions: 80, branches: 72 },
-        "src/audio/toneVoices.ts": { statements: 68, lines: 68, branches: 72 },
         "src/render/sprites/**": { branches: 72 },
         "src/render/pixelSprites.ts": { statements: 82, lines: 84 },
         // towerCrowd.ts is MEASURED, but roughly half of it (syncMotion,

@@ -209,7 +209,16 @@ class GameApp implements GameAppPorts {
     // gesture listener exists, so the very first interaction (which starts the
     // engine) already carries the player's mute/volume choices.
     this.audio.setMuted(this.prefs.muted === true);
-    this.audio.setVolumes(this.prefs.musicVolume ?? 1, this.prefs.sfxVolume ?? 1);
+    this.audio.setVolumes(
+      this.prefs.musicVolume ?? 1,
+      // Ambience used to ride the music bus, so a returning player who turned
+      // the music down expects the crowd and room tone turned down with it.
+      // With no explicit ambience pref yet (the slider is new), inherit the
+      // stored music level; once the player moves the Ambience slider it
+      // persists and takes over.
+      this.prefs.ambienceVolume ?? this.prefs.musicVolume ?? 1,
+      this.prefs.sfxVolume ?? 1,
+    );
 
     // Controller modules — built BEFORE the UI because the UI constructor's
     // initial selectTool fires onSelectTool synchronously (which resets the
@@ -492,7 +501,7 @@ class GameApp implements GameAppPorts {
   }
 
   /** Set one audio channel's level (0..1) and persist it. */
-  setVolume(kind: "music" | "sfx", value: number): void {
+  setVolume(kind: "music" | "ambience" | "sfx", value: number): void {
     // A slider drag is a user gesture, so it may be the interaction that
     // starts the engine (a not-yet-started facade also covers the
     // retry-after-failed-load path). Once running, skip the call: input
@@ -501,10 +510,12 @@ class GameApp implements GameAppPorts {
     if (!this.audio.started) this.audio.start();
     this.audio.setVolumes(
       kind === "music" ? value : this.audio.musicVolume,
+      kind === "ambience" ? value : this.audio.ambienceVolume,
       kind === "sfx" ? value : this.audio.sfxVolume,
     );
     // Read back the facade's clamped values so prefs never store junk.
     this.prefs.musicVolume = this.audio.musicVolume;
+    this.prefs.ambienceVolume = this.audio.ambienceVolume;
     this.prefs.sfxVolume = this.audio.sfxVolume;
     this.schedulePrefsSave();
   }

@@ -116,7 +116,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onToggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => false),
     isMuted: vi.fn(() => false),
-    getVolumes: vi.fn(() => ({ music: 1, sfx: 1 })),
+    getVolumes: vi.fn(() => ({ music: 1, ambience: 1, sfx: 1 })),
     onSetVolume: vi.fn(),
     onReplayOnboarding: vi.fn(),
     onRenameTower: vi.fn(),
@@ -1619,14 +1619,17 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
 });
 
 describe("showSettings: the Settings dialog", () => {
-  it("renders both sliders at the current volumes with percent readouts", () => {
-    const { ui } = makeUI({ getVolumes: vi.fn(() => ({ music: 0.8, sfx: 0.55 })) });
+  it("renders all three sliders at the current volumes with percent readouts", () => {
+    const { ui } = makeUI({ getVolumes: vi.fn(() => ({ music: 0.8, ambience: 0.4, sfx: 0.55 })) });
     ui.showSettings();
     const music = dialog().querySelector<HTMLInputElement>("#vol-music")!;
+    const ambience = dialog().querySelector<HTMLInputElement>("#vol-ambience")!;
     const sfx = dialog().querySelector<HTMLInputElement>("#vol-sfx")!;
     expect(music.value).toBe("80");
+    expect(ambience.value).toBe("40");
     expect(sfx.value).toBe("55");
     expect(dialog().querySelector('[data-vol-val="vol-music"]')!.textContent).toBe("80%");
+    expect(dialog().querySelector('[data-vol-val="vol-ambience"]')!.textContent).toBe("40%");
     expect(dialog().querySelector('[data-vol-val="vol-sfx"]')!.textContent).toBe("55%");
   });
 
@@ -1638,6 +1641,11 @@ describe("showSettings: the Settings dialog", () => {
     music.dispatchEvent(new Event("input", { bubbles: true }));
     expect(cb.onSetVolume).toHaveBeenLastCalledWith("music", 0.3);
     expect(dialog().querySelector('[data-vol-val="vol-music"]')!.textContent).toBe("30%");
+    const ambience = dialog().querySelector<HTMLInputElement>("#vol-ambience")!;
+    ambience.value = "70";
+    ambience.dispatchEvent(new Event("input", { bubbles: true }));
+    expect(cb.onSetVolume).toHaveBeenLastCalledWith("ambience", 0.7);
+    expect(dialog().querySelector('[data-vol-val="vol-ambience"]')!.textContent).toBe("70%");
     const sfx = dialog().querySelector<HTMLInputElement>("#vol-sfx")!;
     sfx.value = "0";
     sfx.dispatchEvent(new Event("input", { bubbles: true }));
@@ -1650,7 +1658,7 @@ describe("showSettings: the Settings dialog", () => {
     ui.showSettings();
     const actions = dialog().querySelector(".modal-actions")!;
     expect(actions.querySelector("input")).toBeNull();
-    expect(dialog().querySelectorAll("input[type=range]")).toHaveLength(2);
+    expect(dialog().querySelectorAll("input[type=range]")).toHaveLength(3);
     // The two boolean prefs render as switches (checkbox with switch
     // semantics), each with a visible explanatory note.
     expect(dialog().querySelectorAll('input[role="switch"]')).toHaveLength(2);

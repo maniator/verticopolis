@@ -1,5 +1,6 @@
 import * as ex from "excalibur";
-import { GRID } from "../../engine/facilities";
+import { GRID, isCommercialKind } from "../../engine/facilities";
+import { FACILITIES } from "../../engine/facilitiesData";
 import type { FacilityKind, SerializedView, WeatherKind } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { clampCameraY, fitZoom } from "../cameraBounds";
@@ -44,6 +45,14 @@ export interface ViewFocus {
   zoom: number;
   /** Today's sky weather; drives an outdoor rain layer in the ambient bed. */
   weather: WeatherKind;
+  /** Sim clock hour as a float in [0, 24); the ambience layer's workday and
+   *  evening gates read it (offices type at 10:00, sleep at 03:00). */
+  hour: number;
+  /** 0..1 live fill of the dominant kind's units in view (occupants against
+   *  capacity), falling back to visible crowd density where the kind tracks no
+   *  occupants (lobbies, the street). Drives honest ambience loudness: an
+   *  empty venue is near-silent, a packed one murmurs. */
+  crowd: number;
 }
 
 /** What the pointer is over: transports by Excalibur collider hit-test,
@@ -370,6 +379,60 @@ export function setCamera(engine: TowerEngine, tileX: number, floor: number, zoo
 
 // ---- Audio focus --------------------------------------------------------
 
+/** Census cache per engine: the occupancy tally refreshes at most once per
+ *  second (the GDD's cap), while the cheap dominant/zoom/clock reads stay per
+ *  call. Keyed weakly so a torn-down engine drops its entry. */
+const censusCache = new WeakMap<TowerEngine, { at: number; dominant: string; crowd: number }>();
+const CENSUS_REFRESH_MS = 1000;
+
+/** The occupancy walk behind {@link ViewFocus.crowd}: fill of the dominant
+ *  kind's units in view, with a drawn-crowd fallback for kinds that track no
+ *  occupants (lobbies, the street). 24 visible people count as a full house
+ *  for the fallback. */
+function censusCrowd(
+  engine: TowerEngine,
+  dominant: ViewFocus["dominant"],
+  bounds: { t0: number; t1: number; f0: number; f1: number },
+): number {
+  let occ = 0;
+  let cap = 0;
+  if (dominant !== "empty" && dominant !== "outside") {
+    for (const u of engine.sim.tower.units) {
+      if (u.kind !== dominant) continue;
+      if (u.floor < bounds.f0 || u.floor > bounds.f1) continue;
+      if (u.x + u.width < bounds.t0 || u.x > bounds.t1) continue;
+      const def = FACILITIES[u.kind];
+      if (!def) continue; // a kind the catalog no longer knows: skip, never throw
+      const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
+      if (unitCap > 0) {
+        // Population>0 commercial venues (restaurant, fast food, shop) get
+        // their `occupants` stamped to the full catalog population while open
+        // (EconomySystem's open-hour pass), so the live fill is `customersIn`,
+        // the routed-customer tally. Attendance venues (cinema, party hall)
+        // already mirror `customersIn` into `occupants`, and every other kind
+        // owns `occupants` via updatePresence, so both read `occupants`.
+        // (`customersIn` is not persisted: right after a save load a busy
+        // venue reads empty and quiet for the seconds it takes the crowd
+        // system to re-route diners in. That is honest, the sim really has
+        // nobody seated yet, and it self-heals; see the ambience backlog.)
+        occ +=
+          isCommercialKind(u.kind) && def.population > 0
+            ? (u.customersIn ?? 0)
+            : (u.occupants ?? 0);
+        cap += unitCap;
+      }
+    }
+  }
+  if (cap > 0) return Math.min(1, Math.max(0, occ / cap));
+  let visible = 0;
+  for (const p of engine.sim.crowd.people) {
+    if (p.floor < bounds.f0 || p.floor > bounds.f1) continue;
+    if (p.x < bounds.t0 || p.x > bounds.t1) continue;
+    visible++;
+  }
+  return Math.min(1, visible / 24);
+}
+
 export function focus(engine: TowerEngine): ViewFocus {
   const centerFloor = engine.screenToFloor(engine.viewHeight / 2);
   const night = engine.sim.clock.isNight();
@@ -393,5 +456,34 @@ export function focus(engine: TowerEngine): ViewFocus {
     }
   }
   if (dominant === "empty" && centerFloor <= 0) dominant = "outside";
-  return { centerFloor, dominant, night, zoom: engine.cam.zoom, weather: engine.sim.weather };
+  // The occupancy walk refreshes at most once per second (or when the
+  // dominant kind changes, so a pan onto a new venue reads it immediately);
+  // ambience level changes are slow ramps, so a 1 s census is plenty.
+  // A real, monotonically advancing clock: `performance.now()` where it exists,
+  // else `Date.now()`. A constant 0 fallback would freeze `now - cached.at` at
+  // 0 forever, so the 1 s refresh window would never elapse and the census
+  // would stay stale for the life of the engine in any environment without
+  // `performance`.
+  const now =
+    typeof performance !== "undefined" && typeof performance.now === "function"
+      ? performance.now()
+      : Date.now();
+  const cached = censusCache.get(engine);
+  let crowd: number;
+  if (cached && cached.dominant === dominant && now - cached.at < CENSUS_REFRESH_MS) {
+    crowd = cached.crowd;
+  } else {
+    crowd = censusCrowd(engine, dominant, { t0, t1, f0, f1 });
+    censusCache.set(engine, { at: now, dominant, crowd });
+  }
+  const hour = engine.sim.clock.minuteOfDay / 60;
+  return {
+    centerFloor,
+    dominant,
+    night,
+    zoom: engine.cam.zoom,
+    weather: engine.sim.weather,
+    hour,
+    crowd,
+  };
 }

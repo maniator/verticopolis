@@ -59,9 +59,9 @@ export interface UICallbacks {
    *  (persisted mute must show 🔇 without a click). */
   isMuted(): boolean;
   /** A volume slider moved: set that channel's level (0..1) and persist it. */
-  onSetVolume(kind: "music" | "sfx", value: number): void;
+  onSetVolume(kind: "music" | "ambience" | "sfx", value: number): void;
   /** The live volume levels (0..1 each), for the sliders' initial positions. */
-  getVolumes(): { music: number; sfx: number };
+  getVolumes(): { music: number; ambience: number; sfx: number };
   onUndo(): void;
   onRedo(): void;
   onEditAction(action: string, root: HTMLElement): void;

@@ -218,11 +218,11 @@ describe("adoptCamera policy", () => {
 describe("focus resolves the dominant facility in the visible band", () => {
   it("reports the widest visible non-floor kind as dominant", () => {
     const units = [
-      { kind: "office", floor: 20, x: 100, width: 10 },
-      { kind: "shop", floor: 20, x: 120, width: 30 }, // widest in-band
-      { kind: "floor", floor: 20, x: 90, width: 200 }, // floors never win
+      { kind: "office", floor: 20, x: 100, width: 10, occupants: 0 },
+      { kind: "shop", floor: 20, x: 120, width: 30, occupants: 0 }, // widest in-band
+      { kind: "floor", floor: 20, x: 90, width: 200, occupants: 0 }, // floors never win
     ];
-    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units }, clock: { isNight: () => false }, weather: "clear" } });
+    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units }, clock: { isNight: () => false, minuteOfDay: 720 }, weather: "clear", crowd: { people: [] } } });
     setCamera(e, 130, 20, 1);
     const f = focus(e);
     expect(f.dominant).toBe("shop");
@@ -231,7 +231,7 @@ describe("focus resolves the dominant facility in the visible band", () => {
   });
 
   it("falls back to 'outside' at ground level with nothing in frame", () => {
-    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units: [] }, clock: { isNight: () => true }, weather: "rain" } });
+    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units: [] }, clock: { isNight: () => true, minuteOfDay: 60 }, weather: "rain", crowd: { people: [] } } });
     setCamera(e, 100, 0, 1); // centered at the ground/basement line (centerFloor <= 0)
     const f = focus(e);
     expect(f.dominant).toBe("outside");
@@ -240,8 +240,8 @@ describe("focus resolves the dominant facility in the visible band", () => {
   });
 
   it("maps the lobby kind through to the 'lobby' focus label", () => {
-    const units = [{ kind: "lobby", floor: 15, x: 100, width: 40 }];
-    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units }, clock: { isNight: () => false }, weather: "clear" } });
+    const units = [{ kind: "lobby", floor: 15, x: 100, width: 40, occupants: 0 }];
+    const e = eng({ sim: { tower: { highestFloor: 40, lowestFloor: 1, units }, clock: { isNight: () => false, minuteOfDay: 720 }, weather: "clear", crowd: { people: [] } } });
     setCamera(e, 120, 15, 1);
     expect(focus(e).dominant).toBe("lobby");
   });

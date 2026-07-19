@@ -87,7 +87,7 @@ that are easy to test.
 - **Global floor:** 85% statements / 85% lines / 80% functions / 80% branches,
   aggregated over the measured set.
 - **Per-file floors** for the render and audio layers (the sprite painters, the
-  pixel-sprite code, and the audio synthesis in `toneVoices`). These exist so a single weak file
+  pixel-sprite code, and the audio graph in `ToneAudioEngine`). These exist so a single weak file
   **can't hide behind strong siblings**. There is no cross-file masking. Draw
   code carries deliberately **lower BRANCH floors** because visual variants a spy
   2D context can't judge are the job of the Tier-2 Playwright visual tier, not

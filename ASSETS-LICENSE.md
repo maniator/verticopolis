@@ -26,6 +26,17 @@ Suggested attribution:
 
 ---
 
+## Voice seed recordings
+
+The two voice seed files under `src/public/audio/` (`voice-talk.mp3` and
+`voice-laughs.mp3`) are original gibberish and laughter recordings made by the
+project owner and family specifically for Verticopolis's crowd ambience. No
+third-party material is included, no intelligible words are present, and all
+rights are held by the project owner. They are licensed under the same
+**CC BY 4.0** terms as the rest of the assets above.
+
+---
+
 The project's **source code** is licensed separately under the **MIT License**;
 see [`LICENSE`](./LICENSE).
 

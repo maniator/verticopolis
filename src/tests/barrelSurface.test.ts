@@ -132,7 +132,7 @@ const RUNTIME_EXPORTS: Record<string, string[]> = {
     "DETAIL_ZOOM", "OVERVIEW_EXIT", "OVERVIEW_ZOOM", "SCENES", "clamp", "detailFor", "lerp",
     "midiToFreq", "sameNotes", "sceneFor",
   ],
-  toneVoices: ["accentHit", "maybeAccent", "playSfx", "scheduleStep"],
+  toneVoices: ["playSfx"],
 };
 
 const MODULES: Record<string, Record<string, unknown>> = {

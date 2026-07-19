@@ -12,8 +12,9 @@ import {
   type Scene,
   type SfxName,
 } from "./toneScenes";
-import { maybeAccent, playSfx, type AccentNodes } from "./toneVoices";
+import { playSfx } from "./toneVoices";
 import { programFor, type Program, type ProgramKind, type TrackVoice } from "./toneTracks";
+import { CrowdLayer } from "./toneCrowd";
 
 /**
  * Music + ambient audio for the tower, built on Tone.js.
@@ -26,10 +27,10 @@ import { programFor, type Program, type ProgramKind, type TrackVoice } from "./t
  * screen is up, `"game"` in the tower.
  *
  * Layered under it is the building's ambient life: a per-area "room tone" bed
- * (filtered noise) plus zoom-reactive close-up accents (elevator dings, dish
- * clatter, a train whoosh) that fade in as you zoom, and an outdoor rain layer.
- * This ambient layer seeds a richer occupancy-driven "crowd din" planned
- * separately; the music runs on its own path so it stays warm at any zoom.
+ * (filtered noise), an outdoor rain layer, and the crowd/venue ambience layer
+ * (see `./toneCrowd.ts`): voices, venue detail, and composed venue programs
+ * driven by scene, zoom, live occupancy, and the sim clock. The music runs on
+ * its own path so it stays warm at any zoom.
  *
  * Feature-detected and gesture-gated: with no AudioContext (tests / unsupported)
  * `start()` is a no-op and the engine stays inert. It carries the whole Tone.js
@@ -43,8 +44,14 @@ export type { SfxName };
 
 export class ToneAudioEngine {
   private master: Tone.Gain | null = null;
-  /** Music & ambience level: everything but the action jingles flows here. */
+  /** Player-set music level: the composed tracks only. */
   private musicBus: Tone.Gain | null = null;
+  /** Player-set ambience level: the crowd/venue layer, room tone, and rain,
+   *  so voices mix independently of the music (an owner request: turn the
+   *  music down and hear the crowd better). Two nodes because rain stays on
+   *  its deliberate dry path while the rest shares the reverb. */
+  private ambBus: Tone.Gain | null = null;
+  private ambDryBus: Tone.Gain | null = null;
   /** Player-set effects level: the one-shot action jingles only. */
   private sfxBus: Tone.Gain | null = null;
   /** Distance lowpass on the AMBIENT bed; opens up as you zoom in. The music
@@ -68,11 +75,8 @@ export class ToneAudioEngine {
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
 
   private sfxSynth: Tone.PolySynth | null = null;
-  private accentSynth: Tone.PolySynth | null = null;
-  private membrane: Tone.MembraneSynth | null = null;
-  private noiseAccent: Tone.NoiseSynth | null = null;
-  private accentFilter: Tone.Filter | null = null;
-  private accentGain: Tone.Gain | null = null;
+  /** The crowd/venue ambience layer (talkers, venue detail, venue programs). */
+  private crowd: CrowdLayer | null = null;
 
   // Ambient beds.
   private ambNoise: Tone.Noise | null = null;
@@ -89,10 +93,6 @@ export class ToneAudioEngine {
   private rainLfo: Tone.LFO | null = null;
   private rainGain: Tone.Gain | null = null;
 
-  private repeatId: number | null = null;
-  private step = 0;
-  /** Free-running step counter so ambient accents evolve across bars. */
-  private tick = 0;
   private scene: Scene = "lobby";
   private targetScene: Scene = "lobby";
   /** Hysteresis latch for the zoomed-out overview scene. */
@@ -106,6 +106,7 @@ export class ToneAudioEngine {
   /** Player-set levels 0..1, kept even while the graph isn't built so start()
    *  can apply them; independent of `muted` (the master kill switch). */
   musicVolume = 1;
+  ambienceVolume = 1;
   sfxVolume = 1;
   started = false;
 
@@ -123,31 +124,43 @@ export class ToneAudioEngine {
       typeof (globalThis as { webkitAudioContext?: unknown }).webkitAudioContext !== "undefined";
     if (!hasWebAudio) return; // no WebAudio (tests / unsupported)
     try {
+      // Prefer larger audio buffers over low latency: this is a sim, not an
+      // instrument, and the default interactive hint underruns on phones
+      // (heard as random crackles). Must happen before any node is built.
+      try {
+        Tone.setContext(new Tone.Context({ latencyHint: "playback" }));
+      } catch {
+        /* keep the default context */
+      }
       // Inside a user gesture, so resuming is allowed. Swallow rejections
       // (autoplay/permission) so a blocked context can't surface as unhandled.
       Tone.start().catch(() => {});
 
       this.master = new Tone.Gain(this.muted ? 0 : 0.35).toDestination();
 
-      // Player volume buses between content and master: music & ambience on one,
-      // action jingles on the other. Master keeps its fixed 0.35 (and the mute
-      // ramp); these two only scale within it.
-      this.musicBus = new Tone.Gain(this.musicVolume).connect(this.master);
-      this.sfxBus = new Tone.Gain(this.sfxVolume).connect(this.master);
+      // Player volume buses: music, ambience (voices, room tone, rain), and
+      // effects, each independently mixable. They sit ahead of the shared
+      // reverb; the master keeps its fixed 0.35 and the mute ramp. Values are
+      // squared (perceptual sliders).
+      const sq = (v: number) => v * v;
+      this.sfxBus = new Tone.Gain(sq(this.sfxVolume)).connect(this.master);
 
       // Shared reverb so the music and ambient life feel like rooms, not dry
       // oscillators.
-      this.reverb = new Tone.Reverb({ decay: 2.4, wet: 0.16 }).connect(this.musicBus);
+      this.reverb = new Tone.Reverb({ decay: 2.4, wet: 0.16 }).connect(this.master);
 
       // Ambient bed's distance lowpass: far out = muffled, up close = present.
+      this.ambBus = new Tone.Gain(sq(this.ambienceVolume)).connect(this.reverb);
+      this.ambDryBus = new Tone.Gain(sq(this.ambienceVolume)).connect(this.master);
       this.bedFilter = new Tone.Filter({ type: "lowpass", frequency: 3000, Q: 0.7 }).connect(
-        this.reverb,
+        this.ambBus,
       );
 
       // Composed music path (bypasses the zoom distance filter): voices -> level
-      // -> warm lowpass -> sub highpass -> reverb -> music bus. Kept warm and
+      // -> warm lowpass -> sub highpass -> music bus -> reverb. Kept warm and
       // band-limited so the loop never reads bright, harsh, or boomy.
-      this.musicSub = new Tone.Filter({ type: "highpass", frequency: 90, Q: 0.7 }).connect(this.reverb);
+      this.musicBus = new Tone.Gain(sq(this.musicVolume)).connect(this.reverb);
+      this.musicSub = new Tone.Filter({ type: "highpass", frequency: 90, Q: 0.7 }).connect(this.musicBus);
       this.musicTone = new Tone.Filter({ type: "lowpass", frequency: 2400, Q: 0.7 }).connect(this.musicSub);
       this.musicGain = new Tone.Gain(this.musicLevel).connect(this.musicTone);
 
@@ -157,6 +170,7 @@ export class ToneAudioEngine {
         envelope: { attack: 0.03, decay: 0.5, sustain: 0.05, release: 0.8 },
       }).connect(this.musicGain);
       this.arp.volume.value = -9;
+      this.arp.maxPolyphony = 12; // runaway voices are mobile CPU (crackle)
 
       // Soft triangle bass root under each bar.
       this.bassVoice = new Tone.Synth({
@@ -171,23 +185,13 @@ export class ToneAudioEngine {
         envelope: { attack: 0.025, decay: 0.3, sustain: 0.2, release: 0.3 },
       }).connect(this.musicGain);
       this.hook.volume.value = -6;
+      this.hook.maxPolyphony = 12;
 
-      // Close-up accents (dry, held well below the music so they read as faint
-      // background detail, never sharp blips competing with the composed track).
-      this.accentGain = new Tone.Gain(0.1).connect(this.musicBus);
-      this.accentSynth = new Tone.PolySynth(Tone.Synth, {
-        oscillator: { type: "sine" },
-        envelope: { attack: 0.005, decay: 0.2, sustain: 0, release: 0.4 },
-      }).connect(this.accentGain);
-      this.membrane = new Tone.MembraneSynth({ octaves: 4 }).connect(this.accentGain);
-      this.accentFilter = new Tone.Filter({ type: "bandpass", frequency: 1000, Q: 1 }).connect(
-        this.accentGain,
-      );
-      this.noiseAccent = new Tone.NoiseSynth({
-        noise: { type: "pink" },
-        envelope: { attack: 0.004, decay: 0.14, sustain: 0 },
-      }).connect(this.accentFilter);
-      this.noiseAccent.volume.value = -14;
+      // The crowd/venue ambience layer rides the distance-filtered bed so
+      // zoom muffles and opens it with everything else. Its two voice seeds
+      // fetch lazily and degrade to tone-only ambience if they never arrive.
+      const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./";
+      this.crowd = new CrowdLayer(this.bedFilter, base);
 
       // Ambient room-tone bed: pink noise + a strong roll-off, so a soft "room
       // rush" rather than bright tape hiss.
@@ -204,7 +208,7 @@ export class ToneAudioEngine {
 
       // Outdoor rain layer (dry, off the distance filter): a 600..3000 Hz band
       // with a slow gust swell so it reads as weather, not flat static.
-      this.rainGain = new Tone.Gain(0).connect(this.musicBus);
+      this.rainGain = new Tone.Gain(0).connect(this.ambDryBus);
       this.rainSwell = new Tone.Gain(1).connect(this.rainGain);
       this.rainLfo = new Tone.LFO({ frequency: 0.3, min: 0.7, max: 1 });
       this.rainLfo.connect(this.rainSwell.gain);
@@ -223,11 +227,11 @@ export class ToneAudioEngine {
       this.sfxSynth = new Tone.PolySynth(Tone.Synth, {
         envelope: { attack: 0.005, decay: 0.1, sustain: 0, release: 0.12 },
       }).connect(this.sfxBus);
+      this.sfxSynth.maxPolyphony = 12;
 
-      // Kick off the accent sequencer (8th-note grid) and the looping music part.
-      const transport = Tone.getTransport();
-      this.repeatId = transport.scheduleRepeat((time) => this.onStep(time), "8n");
-      transport.start();
+      // Kick off the Transport (the looping music part and the venue programs
+      // schedule on it).
+      Tone.getTransport().start();
       this.buildMusicPart();
 
       this.started = true;
@@ -249,11 +253,16 @@ export class ToneAudioEngine {
   /** Player volume levels, 0..1 each (clamped, ramped). Safe before start().
    *  A non-finite input keeps that channel's level (NaN survives clamp() and
    *  the native AudioParam rejects non-finite ramp targets). */
-  setVolumes(music: number, sfx: number): void {
+  setVolumes(music: number, ambience: number, sfx: number): void {
     if (Number.isFinite(music)) this.musicVolume = clamp(music, 0, 1);
+    if (Number.isFinite(ambience)) this.ambienceVolume = clamp(ambience, 0, 1);
     if (Number.isFinite(sfx)) this.sfxVolume = clamp(sfx, 0, 1);
-    this.musicBus?.gain.rampTo(this.musicVolume, 0.08);
-    this.sfxBus?.gain.rampTo(this.sfxVolume, 0.08);
+    // Loudness is logarithmic: a linear gain slider feels dead over most of
+    // its travel. Squaring the stored 0..1 makes half-slider audibly half.
+    this.musicBus?.gain.rampTo(this.musicVolume * this.musicVolume, 0.08);
+    this.ambBus?.gain.rampTo(this.ambienceVolume * this.ambienceVolume, 0.08);
+    this.ambDryBus?.gain.rampTo(this.ambienceVolume * this.ambienceVolume, 0.08);
+    this.sfxBus?.gain.rampTo(this.sfxVolume * this.sfxVolume, 0.08);
   }
 
   /** Choose which composed track plays: `"splash"` on the start screen,
@@ -309,6 +318,10 @@ export class ToneAudioEngine {
         this.targetScene = s;
         this.crossfadeTo(s);
       }
+
+      // The crowd/venue ambience follows the resolved scene, the live focus
+      // (occupancy, clock), and zoom every update.
+      this.crowd?.update(s, focus, this.detail, this.muted);
 
       // Outdoor rain only when the sky is visible (overview or the street), so
       // it reads as a real weather tell, not a smear behind indoor scenes.
@@ -388,36 +401,6 @@ export class ToneAudioEngine {
     this.ambGain.gain.rampTo(this.ambBase * (0.2 + 0.4 * this.detail), time);
   }
 
-  /** Transport tick (eighth notes): fire the zoom-reactive close-up accents.
-   *  The music runs on its own looping part, not this grid. */
-  private onStep(time: number): void {
-    if (this.muted) return;
-    try {
-      const def = SCENES[this.scene];
-      // Only well zoomed in, so accents stay a rare close-up detail behind the
-      // music (and a no-accent scene never resolves/discards the voice nodes).
-      if (this.detail > 0.62 && def.accent !== "none") {
-        const nodes = this.accentNodes();
-        if (nodes) maybeAccent(nodes, def, this.tick, this.detail, time);
-      }
-    } catch {
-      /* skip this step */
-    }
-    this.step = (this.step + 1) % 16;
-    this.tick++;
-  }
-
-  /** Resolve the close-up accent voices, or null if the graph isn't built. */
-  private accentNodes(): AccentNodes | null {
-    if (!this.accentSynth || !this.membrane || !this.noiseAccent || !this.accentFilter) return null;
-    return {
-      accentSynth: this.accentSynth,
-      membrane: this.membrane,
-      noiseAccent: this.noiseAccent,
-      accentFilter: this.accentFilter,
-    };
-  }
-
   // ---- One-shot action jingles ------------------------------------------
 
   sfx(name: SfxName): void {
@@ -426,16 +409,15 @@ export class ToneAudioEngine {
   }
 
   dispose(): void {
-    // Clear our scheduled repeat and stop the global Transport so no timer keeps
-    // ticking after teardown.
+    // Tear the crowd layer down first (it owns its own timers), then stop the
+    // global Transport so no scheduled part keeps ticking after teardown.
+    this.crowd?.dispose();
+    this.crowd = null;
     try {
-      const transport = Tone.getTransport();
-      if (this.repeatId !== null) transport.clear(this.repeatId);
-      transport.stop();
+      Tone.getTransport().stop();
     } catch {
       /* transport already gone */
     }
-    this.repeatId = null;
     if (this.swapTimer !== null) clearTimeout(this.swapTimer);
     this.swapTimer = null;
     try {
@@ -452,11 +434,6 @@ export class ToneAudioEngine {
       this.musicTone,
       this.musicSub,
       this.sfxSynth,
-      this.accentSynth,
-      this.membrane,
-      this.noiseAccent,
-      this.accentFilter,
-      this.accentGain,
       this.ambNoise,
       this.ambFilter,
       this.ambTone,
@@ -470,6 +447,8 @@ export class ToneAudioEngine {
       this.bedFilter,
       this.reverb,
       this.musicBus,
+      this.ambBus,
+      this.ambDryBus,
       this.sfxBus,
       this.master,
     ];
@@ -481,19 +460,18 @@ export class ToneAudioEngine {
       }
     }
     this.musicPart = null;
-    this.arp = this.hook = this.sfxSynth = this.accentSynth = null;
+    this.arp = this.hook = this.sfxSynth = null;
     this.bassVoice = null;
-    this.membrane = null;
-    this.noiseAccent = this.ambNoise = this.rainNoise = null;
-    this.accentFilter = this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
+    this.ambNoise = this.rainNoise = null;
+    this.ambFilter = this.ambTone = this.rainFilter = this.bedFilter = null;
     this.musicTone = this.musicSub = null;
     this.rainTone = null;
     this.rainLfo = null;
     this.rainSwell = null;
-    this.accentGain = this.ambGain = this.rainGain = null;
+    this.ambGain = this.rainGain = null;
     this.musicGain = null;
     this.reverb = null;
-    this.musicBus = this.sfxBus = null;
+    this.musicBus = this.ambBus = this.ambDryBus = this.sfxBus = null;
     this.master = null;
     this.started = false;
   }
