@@ -385,8 +385,9 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
         (t) => t.kind === "Filter" && ((t.args[0] ?? {}) as { rolloff?: number }).rolloff === -48,
       );
     // The crowd layer's NoiseSynth (venue bursts) and the metro's brown rumble
-    // must both pass the audition's no-static rule. The legacy pink beds (room
-    // tone, rain) keep their own band-shaping and are exempt by design.
+    // must both pass the audition's no-static rule. The room-tone bed now takes
+    // the same steep treatment (a steep rolloff -48 lowpass, per-scene cutoff);
+    // only the rain layer keeps its own deliberate 600-3000 Hz band-shaping.
     const noiseSynths = graph.nodes.filter((n) => n.kind === "NoiseSynth");
     expect(noiseSynths.length).toBeGreaterThan(0);
     for (const n of noiseSynths) expect(steepInto(n)).toBe(true);
@@ -395,6 +396,15 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
     );
     expect(rumble, "metro rumble missing").toBeTruthy();
     expect(steepInto(rumble!)).toBe(true);
+    // The room-tone bed's pink noise (constructed with the bare "pink" string,
+    // unlike the rain layer's `{ type: "pink", ... }` options object) must sit
+    // behind the steep filter too: it is the de-static change, and without this
+    // pin a future edit could drop it back to a bright bandpass and stay green.
+    const roomTone = graph.nodes.find(
+      (n) => n.kind === "Noise" && n.args[0] === "pink",
+    );
+    expect(roomTone, "room-tone pink noise missing").toBeTruthy();
+    expect(steepInto(roomTone!)).toBe(true);
   });
 
   it("applies each scene's murmur level (the hotel whispers)", () => {

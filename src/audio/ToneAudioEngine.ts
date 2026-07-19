@@ -193,17 +193,26 @@ export class ToneAudioEngine {
       const base = (import.meta as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "./";
       this.crowd = new CrowdLayer(this.bedFilter, base);
 
-      // Ambient room-tone bed: pink noise + a strong roll-off, so a soft "room
-      // rush" rather than bright tape hiss.
+      // Ambient room-tone bed: pink noise seated LOW behind a steep filter, so
+      // it reads as a soft room rush and never bright mid hiss. This applies the
+      // audition's no-static rule (steep rolloff -48, warm cutoff, low level)
+      // to the bed as well. The steepness and the subsonic-clearing highpass
+      // are FIXED here; applyScene re-points the lowpass cutoff and level per
+      // scene from SCENES[].amb (all lowpass now, seated warm), and never
+      // touches the rolloff, so every scene's bed stays steep. The source also
+      // sits a touch quieter than the old bed.
       this.ambGain = new Tone.Gain(0).connect(this.bedFilter);
-      this.ambTone = new Tone.Filter({ type: "lowpass", frequency: 2200, Q: 0.5 }).connect(
+      // Truly subsonic (35 Hz): it clears speaker-flapping rumble without
+      // touching the deep beds of the low-cutoff scenes (metro lowpass 90,
+      // cinema 110), whose rush must survive.
+      this.ambTone = new Tone.Filter({ type: "highpass", frequency: 35, rolloff: -12 }).connect(
         this.ambGain,
       );
-      this.ambFilter = new Tone.Filter({ type: "bandpass", frequency: 500, Q: 0.7 }).connect(
+      this.ambFilter = new Tone.Filter({ type: "lowpass", frequency: 600, rolloff: -48 }).connect(
         this.ambTone,
       );
       this.ambNoise = new Tone.Noise("pink").connect(this.ambFilter);
-      this.ambNoise.volume.value = -18;
+      this.ambNoise.volume.value = -20;
       this.ambNoise.start();
 
       // Outdoor rain layer (dry, off the distance filter): a 600..3000 Hz band

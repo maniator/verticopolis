@@ -181,8 +181,8 @@ the composed music bed.
 | Office | Typing: 2 typists, bursts of 4-12 keystrokes (10-15 ms dark ticks, 1400 Hz source cutoff, low gain), key spacing 0.08-0.18 s, thinking pauses 1.2-4.2 s, whole patter muffled 900 Hz and seated far back. One-sided phone call: 1 talker at -3.5 st, pauses 1.6-4.2 s, muffle 850 Hz. Page turns: soft 0.25-0.45 s dark swishes (700 Hz) every 4-8 s. Workday-gated. |
 | Residential (condo) | Midday: faint TV (1 talker at -2.5 st, pauses 0.4-1.3 s, heavy 480 Hz muffle, with occasional soft melody notes), sparse domestic one-shots (dish clink 1150-1350 Hz, cupboard thud 95 Hz), a passing vacuum (detuned triangle pair 112/113.5 Hz, 4.5 s swell) at most once per view. Evening: TV plus up to 3 family talkers. Night: silent. |
 | Hotel | Hushed hallway: housekeeping cart pass (dark 220 Hz noise swell under soft wheel bumps 64-76 Hz in a roll rhythm) occasionally; a door thud (110 + 70 Hz) rarely; one behind-door conversation (talker at -4 st, 420 Hz muffle, pauses 2.2-5.2 s). Overall level the lowest of any inhabited scene. |
-| Food: restaurant | Quiet ambient hum: 3 talkers, pauses 1.5-5 s, muffle 800 Hz, low level; sparse soft clinks (900-1900 Hz sine pings, gain at most 0.13 relative) every 1.2-3.4 s. |
-| Food: fast food | Busy cousin: 5 talkers, pauses 0.4-1.4 s, muffle 1050 Hz; frequent counter clatter (50-100 ms dark bursts at 1800 Hz source cutoff plus 1000-1900 Hz pings) every 0.5-1.6 s. |
+| Food: restaurant | Quiet ambient hum: 3 talkers, pauses 1.5-5 s, muffle 800 Hz, low level. Three one-shot characters on their own irregular cadences so no stretch repeats: a wide-pitch glass tinkle (850-1250 Hz sine ping with a two-note pair, the fundamental capped so the companion note stays in the warm band), a soft low plate set-down (150-210 Hz thud), and an occasional chair scrape (360-420 Hz soft-attack swish). Only the chair scrape uses the scene's single noise voice. Gains at most 0.13 relative. |
+| Food: fast food | Busy cousin: 5 talkers, pauses 0.4-1.4 s, muffle 1050 Hz. Varied counter life on distinct cadences: tray clatter in short 2-4 hit clusters (dark bursts at 1300-1800 Hz source cutoff), a two-note register tone at varied pitch (900-1400 Hz pings), and a low counter thud (120-170 Hz). Only the tray clatter uses the scene's single (mono) noise voice; the register and thud are pitched, so the frequent tray hits cannot chop a longer noise texture. |
 | Retail (shop) | Browse murmur: 2 talkers, pauses 1.2-3.6 s, muffle 950 Hz; occasional soft rustle (0.3-0.55 s dark swish, 1100 Hz) every 2.2-5 s. |
 | Cinema (dominant cinema) | Show-gated. Sparse plucked minor arpeggio (D4/F4/A4/D5 triangles, about 0.7 s decay, staggered, never sustained together); muffled dialogue (1 talker at -5.5 st, 650 Hz muffle); occasional riser (180 to 420 Hz over about 1 s) into a boom (55-60 Hz fundamental plus 110 and 225 Hz partials so small speakers render it). No sustained low swells, ever (they beat into a drone). |
 | Cinema (dominant partyHall or weddingHall; weddings are parties) | Event-gated. Upbeat remix of the game's own splash hook at 124 BPM: kick 54-56 Hz each beat, backbeat thud 210 Hz, bouncing root/octave triangle bass, chord stabs, hook melody on top, the whole band muffled about 1150 Hz (through the wall). Up to 2 talkers with long pauses; the owner's real laughs (the laugh seed) roughly twice a minute; voice whoops (a calm seed chunk pitch-bent upward, rate 0.9 to 1.9 accelerating over 0.4-0.55 s) at a similar rate. |
@@ -195,8 +195,18 @@ the composed music bed.
 The accent path (`maybeAccent`, `accentHit`, the accent synth/membrane/noise
 voices and their bandpass) and its seven cues are removed outright; the scenes
 above are their replacement. Action jingles (`build`, `sell`, `money`, and
-the rest), the rain layer, the room-tone bed, and the composed music are
-untouched.
+the rest), the rain layer, and the composed music are untouched.
+
+The room-tone bed keeps its role but was re-filtered (owner playtest,
+2026-07-18): the per-scene beds were mid-band bandpasses (e.g. food at 900 Hz)
+that read as mid-range static under occupied scenes. They now take the same
+no-static treatment as the crowd layer: a steep rolloff -48 over a subsonic
+highpass, seated about 2 dB quieter, with every scene's filter moved to a
+lowpass at a warm low cutoff (food 720 Hz, most scenes lower). The steepness
+and highpass are fixed in the engine; the per-scene cutoff and level still
+come from `SCENES[].amb`, so the bed reads as a soft low room rush rather than
+mid hiss while keeping each scene's own level (a deeper rumble under the
+cinema and metro, a lighter rush elsewhere).
 
 ---
 
