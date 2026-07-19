@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.63.0
+
+- The restaurants and fast food places have more life and variety: a wider mix of clinks, plate set-downs, tray clatter, register tones, and counter sounds on irregular timing, so a busy eatery no longer settles into the same short loop.
+- The background room tone sits lower and warmer behind every area, so scenes read as quiet rooms rather than faint static.
+
 ## 1.62.0
 
 - The tower now sounds alive: every area has its own ambience, built from real voice recordings. Lobbies murmur, restaurants clink, offices type and take calls, condos hum with a faint TV at midday, the party hall plays a dance remix of the game's theme with real laughs, the cinema rumbles behind its doors, and trains actually roll in and out of the metro.

@@ -385,8 +385,9 @@ describe("ToneAudioEngine — full graph driven with a mocked Tone.js", () => {
         (t) => t.kind === "Filter" && ((t.args[0] ?? {}) as { rolloff?: number }).rolloff === -48,
       );
     // The crowd layer's NoiseSynth (venue bursts) and the metro's brown rumble
-    // must both pass the audition's no-static rule. The legacy pink beds (room
-    // tone, rain) keep their own band-shaping and are exempt by design.
+    // must both pass the audition's no-static rule. The room-tone bed now takes
+    // the same steep treatment (a steep rolloff -48 lowpass, per-scene cutoff);
+    // only the rain layer keeps its own deliberate 600-3000 Hz band-shaping.
     const noiseSynths = graph.nodes.filter((n) => n.kind === "NoiseSynth");
     expect(noiseSynths.length).toBeGreaterThan(0);
     for (const n of noiseSynths) expect(steepInto(n)).toBe(true);

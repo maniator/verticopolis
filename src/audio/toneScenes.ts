@@ -47,7 +47,10 @@ export interface SceneDef {
   gain: number;
   /** Low bass voice presence 0..1 (0 = silent). */
   bass: number;
-  /** Ambient room-tone bed, shaped by a bandpass/lowpass on looping noise. */
+  /** Ambient room-tone bed on looping noise. `type` is `lowpass` for every
+   *  scene (seated warm and low so no scene re-emphasizes the mids and reads as
+   *  hiss); `freq` is the cutoff, `q` the resonance, `gain` the per-scene level.
+   *  The steep rolloff and subsonic highpass are fixed in the engine. */
   amb: { type: BiquadFilterType; freq: number; q: number; gain: number };
 }
 
@@ -73,7 +76,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.35,
     gain: 0.5,
     bass: 0.3,
-    amb: { type: "bandpass", freq: 320, q: 0.5, gain: 0.26 },
+    amb: { type: "lowpass", freq: 320, q: 0.5, gain: 0.26 },
   },
   lobby: {
     scale: [0, 2, 4, 5, 7, 9, 11],
@@ -84,7 +87,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.55,
     gain: 0.6,
     bass: 0.35,
-    amb: { type: "bandpass", freq: 520, q: 0.8, gain: 0.24 },
+    amb: { type: "lowpass", freq: 520, q: 0.8, gain: 0.24 },
   },
   office: {
     scale: [0, 2, 3, 5, 7, 9, 10],
@@ -95,7 +98,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.7,
     gain: 0.45,
     bass: 0.4,
-    amb: { type: "bandpass", freq: 220, q: 1.2, gain: 0.2 },
+    amb: { type: "lowpass", freq: 220, q: 1.2, gain: 0.2 },
   },
   residential: {
     scale: [0, 2, 4, 7, 9],
@@ -106,7 +109,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.4,
     gain: 0.55,
     bass: 0.3,
-    amb: { type: "bandpass", freq: 360, q: 0.7, gain: 0.14 },
+    amb: { type: "lowpass", freq: 360, q: 0.7, gain: 0.14 },
   },
   hotel: {
     scale: [0, 2, 3, 5, 7, 8, 10],
@@ -117,7 +120,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.3,
     gain: 0.5,
     bass: 0.35,
-    amb: { type: "bandpass", freq: 260, q: 0.9, gain: 0.12 },
+    amb: { type: "lowpass", freq: 260, q: 0.9, gain: 0.12 },
   },
   food: {
     scale: [0, 2, 4, 5, 7, 9, 11],
@@ -128,7 +131,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.8,
     gain: 0.55,
     bass: 0.4,
-    amb: { type: "bandpass", freq: 900, q: 0.6, gain: 0.26 },
+    amb: { type: "lowpass", freq: 720, q: 0.6, gain: 0.26 },
   },
   retail: {
     scale: [0, 2, 4, 7, 9, 11],
@@ -139,7 +142,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.65,
     gain: 0.55,
     bass: 0.35,
-    amb: { type: "bandpass", freq: 700, q: 0.7, gain: 0.24 },
+    amb: { type: "lowpass", freq: 700, q: 0.7, gain: 0.24 },
   },
   cinema: {
     scale: [0, 2, 3, 5, 7, 8, 11],
@@ -161,7 +164,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.3,
     gain: 0.4,
     bass: 0.3,
-    amb: { type: "bandpass", freq: 180, q: 1.5, gain: 0.18 },
+    amb: { type: "lowpass", freq: 180, q: 1.5, gain: 0.18 },
   },
   metro: {
     scale: [0, 3, 5, 7, 10],
@@ -183,7 +186,7 @@ export const SCENES: Record<Scene, SceneDef> = {
     density: 0.2,
     gain: 0.35,
     bass: 0.2,
-    amb: { type: "bandpass", freq: 400, q: 0.6, gain: 0.09 },
+    amb: { type: "lowpass", freq: 400, q: 0.6, gain: 0.09 },
   },
 };
 

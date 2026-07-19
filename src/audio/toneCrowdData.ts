@@ -133,18 +133,29 @@ export const CROWD_SCENES: Record<CrowdSceneKey, CrowdSceneSpec> = {
   },
   restaurant: {
     murmur: { maxTalkers: 3, pauseMin: 1.5, pauseVar: 3.5, muffleHz: 800, gain: 0.34 },
+    // Three distinct one-shot characters on their own irregular cadences so no
+    // stretch repeats: a wide-pitch glass tinkle (a two-note pair, the second
+    // note kept in the warm band by capping the fundamental), a soft low plate
+    // set-down, and an occasional chair scrape. Only the chair scrape uses the
+    // shared mono noise voice, so nothing fights over it.
     elements: [
-      // Sparse soft clinks, well under the murmur.
-      { kind: "ping", freqMin: 900, freqMax: 1900, dur: 0.2, gainMin: 0.06, gainMax: 0.13, rateMin: 1.2, rateVar: 2.2 },
+      { kind: "ping", freqMin: 850, freqMax: 1250, dur: 0.2, gainMin: 0.05, gainMax: 0.13, rateMin: 0.9, rateVar: 2.4, pair: { ratio: 1.5, delayS: 0.06, gainScale: 0.7 } },
+      { kind: "thud", freqMin: 150, freqMax: 210, dur: 0.18, gainMin: 0.06, gainMax: 0.1, rateMin: 4, rateVar: 4, attack: 0.006 },
+      { kind: "burst", freqMin: 360, freqMax: 420, dur: 0.4, gainMin: 0.06, gainMax: 0.1, rateMin: 6, rateVar: 5, attack: 0.12 },
     ],
     gate: "attendance",
   },
   fastFood: {
     murmur: { maxTalkers: 5, pauseMin: 0.4, pauseVar: 1.0, muffleHz: 1050, gain: 0.46 },
+    // Varied counter life on distinct cadences: tray clatter in short clusters
+    // (not a steady tick), a two-note register tone at varied pitch, and a low
+    // counter thud. Only the tray clatter uses the shared mono noise voice; the
+    // register and thud are pitched, so a long noise texture can't be chopped
+    // by the frequent tray hits.
     elements: [
-      // Counter clatter: dark tray bursts plus brighter pings, frequent.
-      { kind: "burst", freqMin: 1400, freqMax: 1700, dur: 0.07, gainMin: 0.06, gainMax: 0.1, rateMin: 0.5, rateVar: 1.1, attack: 0.015 },
-      { kind: "ping", freqMin: 1000, freqMax: 1900, dur: 0.16, gainMin: 0.05, gainMax: 0.08, rateMin: 0.8, rateVar: 1.4 },
+      { kind: "burst", freqMin: 1300, freqMax: 1800, dur: 0.06, gainMin: 0.05, gainMax: 0.1, rateMin: 0.09, rateVar: 0.09, cluster: { min: 2, max: 4, pauseMin: 0.7, pauseVar: 1.6 }, attack: 0.012 },
+      { kind: "ping", freqMin: 900, freqMax: 1400, dur: 0.15, gainMin: 0.05, gainMax: 0.08, rateMin: 1.3, rateVar: 1.8, pair: { ratio: 1.33, delayS: 0.11, gainScale: 0.7 } },
+      { kind: "thud", freqMin: 120, freqMax: 170, dur: 0.2, gainMin: 0.05, gainMax: 0.08, rateMin: 3, rateVar: 4, attack: 0.006 },
     ],
     gate: "attendance",
   },
