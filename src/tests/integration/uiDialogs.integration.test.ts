@@ -1058,6 +1058,19 @@ describe("export fidelity report: nothing downloads until the player confirms", 
 describe("toast — kind class and stack cap", () => {
   const wrap = (): HTMLElement => document.getElementById("toast-wrap")!;
 
+  // Each toast schedules a real self-removal timer. Fake the clock so a
+  // survivor's ~3.6s timer cannot fire on a detached node after the next test
+  // remounts the DOM (the intermittent teardown fire behind #368). The
+  // assertions below are all synchronous, so faking the clock changes nothing
+  // they observe; clearAllTimers drops any pending toast timer at teardown.
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.clearAllTimers();
+    vi.useRealTimers();
+  });
+
   it("stamps the kind class on the toast element (the left-edge color hook)", () => {
     const { ui } = makeUI();
     ui.toast("Office rented!", "good");

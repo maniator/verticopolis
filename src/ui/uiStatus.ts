@@ -29,6 +29,13 @@ const LOG_DOM_CAP = 300;
  *  A catch-up tick can flush a big batch; only the newest few pop. */
 const TOAST_MAX = 5;
 
+/** Pending hold/fade timer for each live toast node, so an early prune (below
+ *  the TOAST_MAX cap) can cancel it. Without this a pruned toast keeps its
+ *  ~3.6s hold timer, which then fires on a node already detached from the rail
+ *  (issue #368) and can even outlive a headless test's DOM teardown. Keyed by
+ *  the node so the entry is collected once the node is unreachable. */
+const toastTimers = new WeakMap<Element, number>();
+
 /** Refresh status bar, palette locks, tower stats and the bulletin log. */
 export function update(ui: UI, sim: Simulation): void {
   ui.el.money.textContent = `$${Math.round(sim.money).toLocaleString()}`;
@@ -152,11 +159,31 @@ export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): vo
   t.className = `toast ${kind}`;
   t.textContent = text;
   ui.el.toast.appendChild(t);
-  // The toast removes itself; no id registry to keep (nothing cancels toasts).
-  window.setTimeout(() => {
+  // Self-removing: hold, then a short fade. Track the pending timer under the
+  // node so an early prune (below) can cancel it; the fade step re-registers the
+  // removal timer under the same node so a prune mid-fade still cancels cleanly.
+  const hold = window.setTimeout(() => {
     t.style.transition = "opacity .3s";
     t.style.opacity = "0";
-    window.setTimeout(() => t.remove(), 300);
+    toastTimers.set(
+      t,
+      window.setTimeout(() => {
+        toastTimers.delete(t);
+        t.remove();
+      }, 300),
+    );
   }, 3600);
-  while (ui.el.toast.children.length > TOAST_MAX) ui.el.toast.firstElementChild?.remove();
+  toastTimers.set(t, hold);
+  // Cap the rail: prune the oldest, canceling its pending timer so it can never
+  // fire after the node has left the DOM.
+  while (ui.el.toast.children.length > TOAST_MAX) {
+    const oldest = ui.el.toast.firstElementChild;
+    if (!oldest) break;
+    const pending = toastTimers.get(oldest);
+    if (pending !== undefined) {
+      clearTimeout(pending);
+      toastTimers.delete(oldest);
+    }
+    oldest.remove();
+  }
 }
