@@ -5,7 +5,12 @@ import {
   TDT_DEFAULT_VIEW_X,
   TDT_DEFAULT_VIEW_Y,
   TDT_ELEVATOR_SCHEDULE_DEFAULT,
+  TDT_FLOOR_COUNT,
+  TDT_FLOOR_INDEX_ENTRIES,
+  TDT_FLOOR_OFFSET,
+  TDT_HEADER_SIZE,
   TDT_PERSON_RECORD_SIZE,
+  TDT_TENANT_RECORD_SIZE,
   TDT_ROUTING_TAIL_SIZE,
   parseTdtBinary,
 } from "../../storage/tdtFormat";
@@ -27,6 +32,30 @@ function unit(partial: Partial<Unit> & Pick<Unit, "id" | "kind" | "floor" | "x" 
     label: "",
     ...partial,
   };
+}
+
+/** Read one floor's raw unit records (in FILE order, not through parseTDT which
+ *  merges and re-sorts) straight from exported bytes, for the record-ordering
+ *  tests. Walks the 6-byte floor header + `count` × {@link TDT_TENANT_RECORD_SIZE}
+ *  records + the per-floor remap table, using the codec constants so it tracks
+ *  the format. */
+function readFloorRecords(bytes: Uint8Array, tdtIndex: number): { left: number; type: number }[] {
+  const u16 = (off: number) => bytes[off] | (bytes[off + 1] << 8);
+  let off = TDT_HEADER_SIZE;
+  for (let index = 0; index < TDT_FLOOR_COUNT; index++) {
+    const count = u16(off);
+    const base = off + 6;
+    if (index === tdtIndex) {
+      const recs: { left: number; type: number }[] = [];
+      for (let k = 0; k < count; k++) {
+        const ro = base + k * TDT_TENANT_RECORD_SIZE;
+        recs.push({ left: u16(ro), type: (bytes[ro + 4] << 24) >> 24 });
+      }
+      return recs;
+    }
+    off = base + count * TDT_TENANT_RECORD_SIZE + TDT_FLOOR_INDEX_ENTRIES * 2;
+  }
+  return [];
 }
 
 /** A realistic serialized tower: the sample fixture pulled through the
@@ -302,6 +331,96 @@ describe("buildTDT: export → import round trip", () => {
     expect(halls).toHaveLength(1);
     expect(halls[0].floor).toBe(100);
     expect(back.builtWeddingHall).toBe(true);
+  });
+
+  // Floor-record ordering (gh-318 sky-gap). Game-written saves list a floor's
+  // unit records in ascending left-edge order, with the empty-floor (type-0)
+  // paving spans interleaved at their real x-position. Our gather appends the
+  // type-0 fillers after the rooms, so a wide floor with a mid-floor gap used to
+  // emit records out of x-order; the real 1994 renderer then truncated the floor
+  // at the misplaced type-0 span and drew the rest of the floor as bare sky
+  // (verified in the Wine harness). The encoder now sorts each floor's records
+  // by left edge; this pins that a mid-floor gap keeps the records ascending.
+  it("emits a wide floor's records in ascending left order, type-0 gap interleaved (gh-318)", () => {
+    // A wide floor: three 9-wide offices, a 2-tile paving gap, then a fourth
+    // office past the gap. The gap becomes a type-0 span sitting BETWEEN the
+    // third and fourth office by x, but our gather appends it after every room.
+    const OURFLOOR = 3;
+    const save: SerializedGame = {
+      version: SAVE_VERSION,
+      seed: 1,
+      money: 2_000_000,
+      star: 1,
+      minutes: 7 * 60,
+      mode: "classic",
+      units: [
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "office", floor: OURFLOOR, x: 0, width: 9 }), // 0..9
+        unit({ id: 3, kind: "office", floor: OURFLOOR, x: 9, width: 9 }), // 9..18
+        unit({ id: 4, kind: "office", floor: OURFLOOR, x: 18, width: 9 }), // 18..27
+        unit({ id: 5, kind: "floor", floor: OURFLOOR, x: 27, width: 1 }), // paving gap
+        unit({ id: 6, kind: "floor", floor: OURFLOOR, x: 28, width: 1 }), // paving gap
+        unit({ id: 7, kind: "office", floor: OURFLOOR, x: 29, width: 9 }), // 29..38 (past the gap)
+      ],
+      transports: [],
+      nextId: 100,
+      towerName: "Ordering",
+      builtWeddingHall: false,
+      evaluatedTower: false,
+    };
+    const { bytes } = buildTDT(save);
+    const recs = readFloorRecords(bytes, OURFLOOR + TDT_FLOOR_OFFSET);
+
+    // The gap must round-trip as a type-0 record on this floor.
+    expect(recs.some((r) => r.type === 0)).toBe(true);
+    // Every record's left edge is non-decreasing: the type-0 span sits between
+    // the offices it separates, not appended after the last one.
+    const lefts = recs.map((r) => r.left);
+    expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
+    // Exactly one type-0 gap here (left 27); it must sit BEFORE the office past
+    // the gap (left 29) in file order, not appended after it. Anchor on the
+    // specific spans so a stray type-0 elsewhere can't satisfy the check.
+    const gapPos = recs.findIndex((r) => r.type === 0 && r.left === 27);
+    const officePastGapPos = recs.findIndex((r) => r.type === 7 && r.left === 29);
+    expect(gapPos).toBeGreaterThanOrEqual(0);
+    expect(officePastGapPos).toBeGreaterThanOrEqual(0);
+    expect(gapPos).toBeLessThan(officePastGapPos);
+  });
+
+  it("a forged out-of-range unit x still emits records in encoded-u16 order (sort guard, gh-318)", () => {
+    // The sort must key on the u16 value that gets WRITTEN (left & 0xffff), not
+    // the raw left: a non-finite or out-of-range left encodes to a different
+    // u16 than it sorts as (NaN -> 0, -1 -> 65535), so keying on the raw value
+    // could still emit records whose encoded left goes backwards and re-open the
+    // sky-gap. Records must come out ascending by the ENCODED value, and the
+    // export must be deterministic.
+    const OURFLOOR = 3;
+    const forged: SerializedGame = {
+      version: SAVE_VERSION,
+      seed: 1,
+      money: 2_000_000,
+      star: 1,
+      minutes: 7 * 60,
+      mode: "classic",
+      units: [
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        unit({ id: 2, kind: "office", floor: OURFLOOR, x: 0, width: 9 }),
+        unit({ id: 3, kind: "office", floor: OURFLOOR, x: Number.NaN, width: 9 }),
+        unit({ id: 4, kind: "office", floor: OURFLOOR, x: 18, width: 9 }),
+      ],
+      transports: [],
+      nextId: 100,
+      towerName: "Forged",
+      builtWeddingHall: false,
+      evaluatedTower: false,
+    };
+    const a = buildTDT(forged).bytes;
+    const b = buildTDT(forged).bytes;
+    expect(a).toEqual(b); // deterministic
+
+    // Records come out ascending by the ENCODED u16 left (the value written).
+    const lefts = readFloorRecords(a, OURFLOOR + TDT_FLOOR_OFFSET).map((r) => r.left);
+    expect(lefts).toEqual([...lefts].sort((x, y) => x - y));
   });
 
   it("warns when a kept-legacy narrow shaft would collide at 1994's fixed elevator width", () => {

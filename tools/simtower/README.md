@@ -63,6 +63,7 @@ extraction happens once. Force a re-pull with `./run.sh extract`.
 ./run.sh              # extract (first run) + build image + play in a window
 ./run.sh screenshot   # headless boot -> wineprefix/shot.png
 ./run.sh load  /wine/drive_c/saves/TOWER5.TDT   # headless load + screenshot
+./run.sh save  /wine/drive_c/saves/TOWER5.TDT 'c:\saves\OUT.TDT'  # load, then drive File>Save As so the REAL game rewrites the bytes (full round-trip). Best-effort: it drives the menu/dialog by fixed coordinates (tunable via SAVE_* env), so a missed click just means no file; it FAILS loudly (nonzero, no stale artifact) rather than reporting a false success, so retry on failure.
 ./run.sh shell        # bash inside the container (game at C:\SIMTOWER)
 ./run.sh build        # rebuild the image
 ./run.sh extract      # re-pull game files + manuals from the ISO

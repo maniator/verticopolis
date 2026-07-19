@@ -86,7 +86,9 @@ run_container() {
   # falls back to its defaults (1024x768, no maximize/zoom), so the load/
   # screenshot modes can't be aimed at a tall/wide tower.
   local envargs=()
-  for v in SCREEN MAXIMIZE ZOOM_CLICKS CLICK_SECS SHOT_DELAY SHOT_OUT; do
+  for v in SCREEN MAXIMIZE ZOOM_CLICKS CLICK_SECS SHOT_DELAY SHOT_OUT \
+           SAVE_FILE_X SAVE_FILE_Y SAVE_TITLE_X SAVE_TITLE_Y SAVE_ITEM_X SAVE_ITEM_Y \
+           SAVE_FN_X SAVE_FN_Y SAVE_OK_X SAVE_OK_Y; do
     [ -n "${!v:-}" ] && envargs+=(-e "$v=${!v}")
   done
   # Run as the host user so Wine accepts the bind-mounted prefix (it refuses a

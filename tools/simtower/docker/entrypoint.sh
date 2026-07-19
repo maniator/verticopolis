@@ -184,10 +184,101 @@ load_tdt() {
   wineserver -k 2>/dev/null || true
 }
 
+# Load a .TDT, then drive File -> Save As so the REAL game rewrites it in its
+# own canonical bytes (round-trip verification: our export -> game -> disk).
+#   save  <tdt-path-in-container>  [<out-win-path>]
+# The output path is optional and defaults to C:\saves\GAMEOUT.TDT.
+# e.g. save /wine/drive_c/saves/TOWER1.TDT 'C:\saves\GAMEOUT.TDT'
+save_tdt() {
+  init_prefix
+  install_game
+  local tdt="${1:?usage: save <in.TDT> [<out-win-path>]}"
+  local outwin="${2:-C:\\saves\\GAMEOUT.TDT}"
+  local shot="${SHOT_OUT:-/wine/save-shot.png}"
+  local win_path
+  win_path="$(winepath -w "$tdt" 2>/dev/null || echo "$tdt")"
+  # Resolve the Windows target to its mounted unix path so we can verify the
+  # real game actually wrote it. Remove any stale file first: the UI-driving
+  # xdotool steps below all `|| true`, so without this check a missed click or
+  # a rejected path would still exit 0 and let a caller diff a stale/absent
+  # file and think the game rewrote the bytes.
+  local out_unix
+  out_unix="$(winepath -u "$outwin" 2>/dev/null || echo "")"
+  [ -n "$out_unix" ] && rm -f "$out_unix" 2>/dev/null || true
+  local screen="${SCREEN:-1024x768}"
+  [[ "$screen" =~ ^[0-9]+x[0-9]+$ ]] || screen="1024x768"
+  echo "[harness] loading $win_path then File>Save As -> $outwin ..."
+  Xvfb :99 -screen 0 "${screen}x24" >/dev/null 2>&1 &
+  local xvfb=$!
+  export DISPLAY=:99
+  sleep 2
+  ( cd "$INSTALL" && wine explorer "/desktop=SimTower,${screen}" simtower.exe "$win_path" >/dev/null 2>&1 ) &
+  local game=$!
+  # Clear the boot dialogs (same sweep as load_tdt).
+  local sw="${screen%%x*}"; local sh="${screen##*x}"
+  [[ "$sw" =~ ^[0-9]+$ ]] || sw=1024; [[ "$sh" =~ ^[0-9]+$ ]] || sh=768
+  local cx=$(( sw / 2 )); local cy=$(( sh / 2 ))
+  sleep 8
+  for _ in $(seq 1 "${CLICK_SECS:-16}"); do
+    for dx in -60 -30 0 30 60; do
+      for dy in 20 35 50 70; do
+        xdotool mousemove $(( cx + dx )) $(( cy + dy )) click 1 >/dev/null 2>&1 || true
+      done
+    done
+    sleep 1
+  done
+  # Open the File menu and pick Save As. The inner tower window must hold focus
+  # first (click its title bar), then click the "File" menu text to drop it, and
+  # click the "Save Tower As..." item. Coordinates are for the default ~810px-wide
+  # window Wine places near the desktop's upper-left; tune via SAVE_* env.
+  sleep 2
+  local file_x="${SAVE_FILE_X:-220}"; local file_y="${SAVE_FILE_Y:-93}"
+  local title_x="${SAVE_TITLE_X:-600}"; local title_y="${SAVE_TITLE_Y:-69}"
+  local item_x="${SAVE_ITEM_X:-240}"; local item_y="${SAVE_ITEM_Y:-172}"
+  xdotool mousemove "$title_x" "$title_y" click 1 >/dev/null 2>&1 || true  # focus window
+  sleep 1
+  xdotool mousemove "$file_x" "$file_y" click 1 >/dev/null 2>&1 || true    # open File menu
+  sleep 1
+  import -window root "${shot%.png}-menu.png" 2>/dev/null || true          # diagnostic: open menu
+  xdotool mousemove "$item_x" "$item_y" click 1 >/dev/null 2>&1 || true    # Save Tower As...
+  sleep 2
+  import -window root "${shot%.png}-dialog.png" 2>/dev/null || true        # diagnostic: save dialog
+  # Click the File Name edit field, clear it, and type the full target path.
+  local fn_x="${SAVE_FN_X:-338}"; local fn_y="${SAVE_FN_Y:-176}"
+  local ok_x="${SAVE_OK_X:-610}"; local ok_y="${SAVE_OK_Y:-161}"
+  xdotool mousemove "$fn_x" "$fn_y" click 1 >/dev/null 2>&1 || true        # focus File Name field
+  sleep 1
+  xdotool key --clearmodifiers ctrl+a >/dev/null 2>&1 || true             # select-all (Wine commdlg)
+  xdotool key --clearmodifiers Delete >/dev/null 2>&1 || true
+  # Fallback clear: a run of backspaces in case select-all did not take.
+  for _ in $(seq 1 20); do xdotool key --clearmodifiers BackSpace >/dev/null 2>&1 || true; done
+  xdotool type --delay 60 "$outwin" >/dev/null 2>&1 || true
+  sleep 1
+  import -window root "${shot%.png}-typed.png" 2>/dev/null || true         # diagnostic: field content
+  xdotool mousemove "$ok_x" "$ok_y" click 1 >/dev/null 2>&1 || true        # click OK
+  sleep 3
+  xdotool key Return >/dev/null 2>&1 || true   # accept any replace-confirm
+  xdotool key y >/dev/null 2>&1 || true
+  sleep 3
+  import -window root "$shot" || true
+  kill "$game" "$xvfb" 2>/dev/null || true
+  wineserver -k 2>/dev/null || true
+  # The whole point of this mode is a trustworthy round-trip artifact, so fail
+  # loudly if the game did not actually write the file (a missed menu click, a
+  # rejected path, or an unavailable dialog). A caller must never diff a stale
+  # or absent output and conclude the real game rewrote the bytes.
+  if [ -z "$out_unix" ] || [ ! -s "$out_unix" ]; then
+    echo "[harness] ERROR: expected save output not written: $outwin ($out_unix); shot at $shot" >&2
+    return 1
+  fi
+  echo "[harness] saved $outwin ($(stat -c%s "$out_unix") bytes); shot at $shot"
+}
+
 case "${1:-run}" in
   run)        shift || true; run_game "$@" ;;
   screenshot) screenshot_game ;;
   load)       shift || true; load_tdt "$@" ;;
+  save)       shift || true; save_tdt "$@" ;;
   shell)      init_prefix; install_game; exec bash ;;
   *)          exec "$@" ;;
 esac

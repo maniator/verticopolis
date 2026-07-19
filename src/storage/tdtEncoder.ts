@@ -138,7 +138,22 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
     w.u16(tenants.length);
     w.u16(ext?.left ?? 0);
     w.u16(ext?.right ?? 0);
-    for (const t of tenants) {
+    // Game-written saves list a floor's unit records in ascending left-edge
+    // order, with the empty-floor (type-0) paving spans interleaved at their
+    // real x-position. Our gather appends the type-0 fillers after the rooms,
+    // so without this sort a wide floor's records arrive out of x-order and the
+    // 1994 renderer truncates the floor at the first out-of-place record (the
+    // #318 sky-gap: everything past the misplaced type-0 span draws as sky).
+    // Sort on the u16 value that actually gets WRITTEN (`w.u16` masks with
+    // & 0xffff), not the raw left. On a forged save a negative or out-of-range
+    // left encodes to a different u16 than it sorts as (e.g. -1 sorts first but
+    // writes 65535), so keying on the raw value could still emit records whose
+    // encoded left goes backwards and re-trip the game's truncation. Masking
+    // also coalesces a non-finite left to 0 (NaN & 0xffff === 0), matching the
+    // byte the writer emits, so the sorted order always matches the file order.
+    const leftKey = (t: { left: number }) => t.left & 0xffff;
+    const ordered = [...tenants].sort((a, b) => leftKey(a) - leftKey(b));
+    for (const t of ordered) {
       w.u16(t.left);
       w.u16(t.right);
       w.u8(t.type); // i8 via two's complement
