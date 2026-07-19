@@ -373,9 +373,9 @@ linking mechanism is undocumented.
 to TDT and reading it back can return a tower that differs from the source in
 ways the format cannot represent, so the importer canonicalizes to what TDT
 *can* mean. Two known, benign cases (observed in the engine's own
-`buildTDT`/`parseTDT` round-trips and pinned by the storage unit tests; live-game
-confirmation of the first is still pending, see below), both engine-behavior
-only, not data loss:
+`buildTDT`/`parseTDT` round-trips and pinned by the TDT storage integration
+tests; the first is also confirmed against the live 1994 game, see below), both
+engine-behavior only, not data loss:
 
 - **Sky-lobby stories normalize to lobbies.** A plain floor tile placed on a
   sky-lobby story (floors 15, 30, 45…) exports byte-identically to a sky lobby
@@ -393,6 +393,9 @@ Both are one-way to the canonical form and stable thereafter: a second
 export → import is byte-identical (the round-trip reaches a fixed point after the
 first import). Do **not** "fix" these by teaching `parseTDT` to reconstruct the
 pre-canonical state; that would encode a tower the format cannot hold and the
-game will not show. The first case is still pending a live-game confirmation (see
-the backlog `tdt-roundtrip-canonicalization` defer) once the harness `winevdm`
-boot flake is worked around.
+game will not show. The first case is **confirmed against the live 1994 game**
+(Wine harness, 2026-07-19): our type-24 export of a sky story renders as a proper
+sky lobby (the game draws the lobby arches), and every sky lobby the game writes
+in its own save is a type-24 record, never bare floor (feeding the game a raw
+type-0 record there draws empty floor, but the exporter never emits that). See
+the backlog `tdt-roundtrip-canonicalization` (#319).

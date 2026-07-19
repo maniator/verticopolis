@@ -423,6 +423,62 @@ describe("buildTDT: export → import round trip", () => {
     expect(lefts).toEqual([...lefts].sort((x, y) => x - y));
   });
 
+  // Sky-lobby canonicalization (gh-319, doc §14). A plain floor on a sky-lobby
+  // story (15/30/45…) exports byte-identically to a lobby there, and reads back
+  // as a lobby. Harness-confirmed on the live 1994 game: our type-24 export of a
+  // sky story renders as a sky lobby (the game draws lobby arches); feeding raw
+  // type-0 there would draw bare floor, but the exporter never emits that.
+  it("a plain floor on a sky-lobby story exports as a lobby, byte-identical (gh-319)", () => {
+    const SKY = GRID.lobbyInterval * 2; // a multiple of the interval -> a sky-lobby story
+    const towerWith = (kind: "floor" | "lobby"): SerializedGame => ({
+      version: SAVE_VERSION,
+      seed: 1,
+      money: 2_000_000,
+      star: 1,
+      minutes: 7 * 60,
+      mode: "classic",
+      units: [
+        unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+        // Same span on the sky story, only the KIND differs.
+        unit({ id: 2, kind, floor: SKY, x: 40, width: 1 }),
+        unit({ id: 3, kind, floor: SKY, x: 41, width: 1 }),
+        unit({ id: 4, kind, floor: SKY, x: 42, width: 1 }),
+      ],
+      transports: [],
+      nextId: 10,
+      towerName: "Sky",
+      builtWeddingHall: false,
+      evaluatedTower: false,
+    });
+    const asFloor = buildTDT(towerWith("floor")).bytes;
+    const asLobby = buildTDT(towerWith("lobby")).bytes;
+    // The format carries no floor-vs-lobby distinction at a sky story: identical bytes.
+    expect(asFloor).toEqual(asLobby);
+    // And the sky story's records are the lobby type (24), not empty floor (0).
+    const recs = readFloorRecords(asFloor, SKY + TDT_FLOOR_OFFSET);
+    expect(recs.length).toBeGreaterThan(0);
+    expect(recs.every((r) => r.type === 24)).toBe(true);
+    // Round-trips back as a lobby, not a bare floor.
+    const back = parseTDT(asFloor.buffer as ArrayBuffer, "SKY.TDT").save;
+    const skyKinds = new Set(back.units.filter((u) => u.floor === SKY).map((u) => u.kind));
+    expect(skyKinds.has("lobby")).toBe(true);
+    expect(skyKinds.has("floor")).toBe(false);
+
+    // Contrast: the SAME plain floor on a NON-lobby story exports as empty floor
+    // (type 0), not lobby. This pins that the type-24 above is sky-story-specific
+    // (the isLobbyFloor gate), not "all paving is a lobby".
+    const NOTSKY = SKY + 1; // one story above a sky lobby -> not a lobby floor
+    const plainNonSky: SerializedGame = { ...towerWith("floor"), units: [
+      unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
+      unit({ id: 2, kind: "floor", floor: NOTSKY, x: 40, width: 1 }),
+      unit({ id: 3, kind: "floor", floor: NOTSKY, x: 41, width: 1 }),
+      unit({ id: 4, kind: "floor", floor: NOTSKY, x: 42, width: 1 }),
+    ] };
+    const nonSkyRecs = readFloorRecords(buildTDT(plainNonSky).bytes, NOTSKY + TDT_FLOOR_OFFSET);
+    expect(nonSkyRecs.length).toBeGreaterThan(0);
+    expect(nonSkyRecs.every((r) => r.type === 0)).toBe(true);
+  });
+
   it("warns when a kept-legacy narrow shaft would collide at 1994's fixed elevator width", () => {
     // A boxed-in 3-wide standard the v5 migration preserved sits flush against
     // a 4-wide service shaft: legal in-engine, but the 1994 format has no
