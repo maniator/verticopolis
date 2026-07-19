@@ -106,13 +106,18 @@ export default defineConfig({
         // Precache the game shell only. The dev/tooling entry points and their
         // chunks are excluded so an install ships just the game.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
-        globIgnores: ["**/gallery*", "**/preview*"],
+        // og-image.png is the social/crawler share card, not part of the game
+        // shell, so keep it out of the offline precache.
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*"],
         navigateFallback: "index.html",
-        // Keep the tooling pages out of the app shell fallback, and let
-        // `version.json` fall through to the network: it is a real file (the
-        // update-check payload), not an app route, so a navigation straight to
-        // it must return the JSON rather than the game shell.
-        navigateFallbackDenylist: [/gallery/, /preview/, /version\.json$/],
+        // Keep the tooling pages out of the app shell fallback, and let the
+        // real static files fall through to the network rather than the game
+        // shell: `version.json` (the update-check payload), the crawler control
+        // files `robots.txt` / `sitemap.xml`, and the `og-image.png` share card
+        // (a direct navigation to it, e.g. opening the card in a new tab while
+        // the service worker controls the origin, must return the PNG, not the
+        // shell), none of which are app routes.
+        navigateFallbackDenylist: [/gallery/, /preview/, /version\.json$/, /robots\.txt$/, /sitemap\.xml$/, /og-image\.png$/],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
