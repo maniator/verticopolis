@@ -3,8 +3,66 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Verticopolis: a browser-native SimTower clone</title>
-    <meta name="description" content="A browser-native SimTower clone: build a vertical metropolis floor by floor." />
+    <title>Verticopolis: Play a SimTower Clone Free in Your Browser</title>
+    <meta
+      name="description"
+      content="Play Verticopolis, a free browser-based SimTower clone. Build a skyscraper floor by floor, wire the elevators, manage the crowds, and climb from a single lobby to a 5-star tower."
+    />
+    <link rel="canonical" href="https://verticopolis.com/" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+
+    <!-- Open Graph: how the link renders when shared (Discord, Reddit, forums,
+         chat). Absolute URLs are required here even though asset paths elsewhere
+         are relative (base: "./"), so the production origin is hardcoded. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Verticopolis" />
+    <meta property="og:title" content="Verticopolis: a free SimTower clone you play in the browser" />
+    <meta
+      property="og:description"
+      content="Build a skyscraper floor by floor: offices, condos, shops, and hotels wired with elevators. Manage the traffic and climb from a single lobby to a 5-star tower. No download, plays instantly."
+    />
+    <meta property="og:url" content="https://verticopolis.com/" />
+    <meta property="og:image" content="https://verticopolis.com/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Verticopolis: an art-deco skyline at dusk over the tagline Build a SimTower-style skyscraper, free in your browser." />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter/X large-image card. -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Verticopolis: a free SimTower clone you play in the browser" />
+    <meta
+      name="twitter:description"
+      content="Build a skyscraper floor by floor, wire the elevators, manage the crowds, and climb to a 5-star tower. No download, plays instantly."
+    />
+    <meta name="twitter:image" content="https://verticopolis.com/og-image.png" />
+    <meta name="twitter:image:alt" content="Verticopolis: an art-deco skyline at dusk over the tagline Build a SimTower-style skyscraper, free in your browser." />
+
+    <!-- Structured data: mark this up as a free, browser-playable game so it is
+         eligible for rich results. Kept in sync with the copy above. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "VideoGame",
+        "name": "Verticopolis",
+        "url": "https://verticopolis.com/",
+        "image": "https://verticopolis.com/og-image.png",
+        "description": "A free, browser-based SimTower clone. Build a skyscraper floor by floor: place offices, condos, shops, and hotels, wire the elevators, manage traffic, and climb from a single lobby to a 5-star tower.",
+        "applicationCategory": "GameApplication",
+        "genre": ["Simulation", "Construction and management simulation"],
+        "gamePlatform": "Web browser",
+        "operatingSystem": "Any (modern web browser)",
+        "browserRequirements": "Requires a modern browser with WebGL and JavaScript.",
+        "inLanguage": "en",
+        "playMode": "SinglePlayer",
+        "isAccessibleForFree": true,
+        "license": "https://opensource.org/licenses/MIT",
+        "sameAs": ["https://github.com/maniator/verticopolis"],
+        "author": { "@type": "Person", "name": "maniator" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+
     <!-- PWA: theme + iOS install affordances (the manifest link is injected by vite-plugin-pwa). -->
     <meta name="theme-color" content="#000080" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -17,6 +75,26 @@
   <body>
     <div id="a11y-live" class="visually-hidden" aria-live="polite" role="status"></div>
     <div id="app">
+      <!-- Indexable page heading and intro. Visually hidden (the game's own
+           chrome is the visible UI), but read by search engines and screen
+           readers, and the primary heading for the page. -->
+      <div class="visually-hidden">
+        <h1>Verticopolis: a free SimTower clone you play in the browser</h1>
+        <p>
+          Verticopolis is a from-scratch, browser-based homage to the classic tower simulation SimTower (1994).
+          Build a skyscraper floor by floor: place offices, condos, shops, restaurants, and hotels, wire them
+          with elevators and escalators, set the rents, manage elevator traffic, and climb the star ratings from
+          a single lobby all the way to a coveted 5-star tower. It is free, needs no download, and plays instantly
+          in any modern browser. You can also install it as an app and play offline.
+        </p>
+      </div>
+      <noscript>
+        <p>
+          Verticopolis is a free, browser-based SimTower clone. It needs JavaScript to run. Enable JavaScript and
+          reload to build your tower. Source and details:
+          <a href="https://github.com/maniator/verticopolis">github.com/maniator/verticopolis</a>.
+        </p>
+      </noscript>
       <header id="topbar">
         <div class="brand">🏙️ <span>VERTICO<b>POLIS</b></span></div>
         <div id="status">

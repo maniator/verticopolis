@@ -1,0 +1,10 @@
+# Verticopolis (https://verticopolis.com/) — a free browser SimTower clone.
+# The game is public; let every well-behaved crawler index it. The internal
+# tooling pages (the sprite gallery and the render preview) are not player
+# content, so keep them out of the index.
+User-agent: *
+Allow: /
+Disallow: /gallery.html
+Disallow: /preview.html
+
+Sitemap: https://verticopolis.com/sitemap.xml
