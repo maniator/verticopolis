@@ -373,9 +373,9 @@ linking mechanism is undocumented.
 to TDT and reading it back can return a tower that differs from the source in
 ways the format cannot represent, so the importer canonicalizes to what TDT
 *can* mean. Two known, benign cases (observed in the engine's own
-`buildTDT`/`parseTDT` round-trips and pinned by the storage unit tests; the first
-is also confirmed against the live 1994 game, see below), both engine-behavior
-only, not data loss:
+`buildTDT`/`parseTDT` round-trips and pinned by the TDT storage integration
+tests; the first is also confirmed against the live 1994 game, see below), both
+engine-behavior only, not data loss:
 
 - **Sky-lobby stories normalize to lobbies.** A plain floor tile placed on a
   sky-lobby story (floors 15, 30, 45…) exports byte-identically to a sky lobby
