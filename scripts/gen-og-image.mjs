@@ -7,26 +7,33 @@
  * It reuses the "Metropolis Dusk" identity from the app icons and splash: a
  * stepped art-deco skyline of lit towers under an indigo -> plum -> coral dusk,
  * with the wordmark and a one-line pitch. It is NOT part of the drift-checked
- * `docs/screenshots/**` gallery or the visual baselines, so it can be
- * regenerated here without the pinned-container rule; the SVG source below is
- * the source of truth.
+ * `docs/screenshots/**` gallery or the visual baselines, so no PR gate blocks a
+ * refresh. The card does render live text, though, so regenerate it in the same
+ * Linux render container as the screenshots (or any host with the pinned fonts
+ * below installed) to keep the output reproducible; the SVG source is the truth.
  *
  * Rasterized with the same headless Chromium the icon/screenshot harness uses,
  * so it needs no new image dependency. Output lands in src/public/ (Vite's
  * publicDir) and is committed, so `npm run build` needs no browser.
  *
- *   node scripts/gen-og-image.mjs                 # host
- *   PW_CHROME=... node scripts/gen-og-image.mjs   # docker/CI
+ *   node scripts/gen-og-image.mjs                 # host (uses Playwright's browser)
+ *   PW_CHROME=... node scripts/gen-og-image.mjs   # explicit browser (docker/CI)
  */
 import { chromium } from "playwright";
 import { mkdir } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const OUT_DIR = resolve(__dirname, "../src/public");
 const OUT = resolve(OUT_DIR, "og-image.png");
-const EXECUTABLE = process.env.PW_CHROME || "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+// Browser resolution mirrors scripts/screenshot-env.ts: PW_CHROME wins (the CI
+// container points it at the image's Chromium), else use the sandbox path only
+// when it exists, else fall back to Playwright's own bundled browser so a normal
+// `playwright install` checkout can run `npm run og-image` without any override.
+const SANDBOX_CHROME = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
+const EXECUTABLE = process.env.PW_CHROME || (existsSync(SANDBOX_CHROME) ? SANDBOX_CHROME : undefined);
 
 const W = 1200;
 const H = 630;
