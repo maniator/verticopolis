@@ -130,7 +130,13 @@ function svg() {
     ${skyline}
     <rect x="0" y="${ground}" width="${W}" height="${H - ground}" fill="url(#fg)"/>
     <text x="60" y="${ground + 68}" font-family="${FONT}" font-size="70" font-weight="800" letter-spacing="2" fill="#ffffff">VERTICO<tspan fill="${GOLD}">POLIS</tspan></text>
-    <text x="64" y="${ground + 120}" font-family="${FONT}" font-size="30" font-weight="500" letter-spacing="1" fill="#d7d2f0">Build a SimTower-style skyscraper, free in your browser.</text>
+    <text x="64" y="${ground + 120}" font-family="${FONT}" font-size="30" font-weight="500" letter-spacing="1" fill="#d7d2f0">Build a SimTower-style skyscraper in your browser.</text>
+    <!-- Call to action pill: "free" lives here now (not in the tagline) so it is
+         said once, and the play glyph reads the card as a game to play rather
+         than a static poster. -->
+    <rect x="905" y="${ground + 58}" width="250" height="62" rx="31" fill="${GOLD}"/>
+    <polygon points="940,${ground + 74} 940,${ground + 104} 966,${ground + 89}" fill="${INK}"/>
+    <text x="978" y="${ground + 100}" font-family="${FONT}" font-size="30" font-weight="700" letter-spacing="1" fill="${INK}">Play free</text>
   </svg>`;
 }
 
