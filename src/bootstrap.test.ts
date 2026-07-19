@@ -1,0 +1,206 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { hasWebGL, showBootMessage, bootGame } from "./bootstrap";
+import { injectSpeedInsights } from "@vercel/speed-insights";
+import { inject as injectWebAnalytics } from "@vercel/analytics";
+
+// The telemetry SDKs are gated on the host and best-effort; stub them so the
+// gate and its catch can be asserted without touching the real endpoints.
+vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
+vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
+
+/** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
+function stubWebGL(): void {
+  const real = document.createElement.bind(document);
+  vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+    if (tag === "canvas") return { getContext: () => ({}) } as unknown as HTMLCanvasElement;
+    return real(tag);
+  });
+}
+
+/**
+ * Unit tests for the boot entry. Everything runs headlessly under happy-dom:
+ * happy-dom's <canvas> returns a null WebGL context, so hasWebGL() is false by
+ * default and the true branch is exercised by stubbing document.createElement.
+ * bootGame's telemetry is gated on window.location.hostname (localhost by
+ * default here, so it is skipped) and registerPWA is real but returns early
+ * without a service worker.
+ */
+
+describe("hasWebGL", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns false when getContext yields null (happy-dom default)", () => {
+    expect(hasWebGL()).toBe(false);
+  });
+
+  it("returns true when a canvas hands back a truthy GL context", () => {
+    const real = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "canvas") {
+        return { getContext: () => ({}) } as unknown as HTMLCanvasElement;
+      }
+      return real(tag);
+    });
+    expect(hasWebGL()).toBe(true);
+  });
+
+  it("returns false when createElement throws", () => {
+    vi.spyOn(document, "createElement").mockImplementation(() => {
+      throw new Error("no dom");
+    });
+    expect(hasWebGL()).toBe(false);
+  });
+});
+
+describe("showBootMessage", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `<div id="stage"></div>`;
+  });
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("injects the message into #stage", () => {
+    showBootMessage("hello boot");
+    const stage = document.getElementById("stage")!;
+    expect(stage.innerHTML).toContain("hello boot");
+    expect(stage.querySelector("button")).toBeNull();
+  });
+
+  it("appends a Reload button when withReload is true", () => {
+    showBootMessage("reload me", true);
+    const stage = document.getElementById("stage")!;
+    const btn = stage.querySelector("button");
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toBe("Reload");
+    // Clicking is a no-op for location.reload under happy-dom; just prove the
+    // handler is wired and does not throw.
+    expect(() => btn!.click()).not.toThrow();
+  });
+
+  it("is a no-op when there is no #stage element", () => {
+    document.body.innerHTML = "";
+    expect(() => showBootMessage("nowhere")).not.toThrow();
+  });
+});
+
+describe("bootGame", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.body.innerHTML = "";
+    delete (window as unknown as { game?: unknown }).game;
+  });
+
+  it("boots immediately when the document is ready (WebGL present)", () => {
+    // Stub createElement so hasWebGL() sees a real GL context.
+    const real = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      if (tag === "canvas") {
+        return { getContext: () => ({}) } as unknown as HTMLCanvasElement;
+      }
+      return real(tag);
+    });
+    const app = { onUpdateAvailable: vi.fn() };
+    const create = vi.fn(() => app);
+
+    // readyState is "interactive" under happy-dom (non-loading), so boot runs now.
+    expect(document.readyState).not.toBe("loading");
+    bootGame(create);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect((window as unknown as { game: unknown }).game).toBe(app);
+  });
+
+  it("shows the no-WebGL message and never calls create when WebGL is missing", () => {
+    document.body.innerHTML = `<div id="stage"></div>`;
+    // Default happy-dom canvas.getContext returns null, so hasWebGL() is false.
+    const create = vi.fn(() => ({ onUpdateAvailable: vi.fn() }));
+    bootGame(create);
+
+    expect(create).not.toHaveBeenCalled();
+    expect(document.getElementById("stage")!.innerHTML).toContain("can't run WebGL");
+    expect((window as unknown as { game?: unknown }).game).toBeUndefined();
+  });
+
+  it("shows an error and rethrows when create() throws", () => {
+    document.body.innerHTML = `<div id="stage"></div>`;
+    stubWebGL(); // localhost host, so telemetry is skipped and boot reaches create()
+    const create = vi.fn(() => {
+      throw new Error("kaboom");
+    });
+
+    expect(() => bootGame(create)).toThrow("kaboom");
+    const html = document.getElementById("stage")!.innerHTML;
+    expect(html).toContain("Something went wrong");
+    expect(html).toContain("kaboom");
+  });
+
+  it("defers boot until DOMContentLoaded while the document is still loading", () => {
+    stubWebGL();
+    const ready = vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
+    const app = { onUpdateAvailable: vi.fn() };
+    const create = vi.fn(() => app);
+
+    bootGame(create);
+    expect(create).not.toHaveBeenCalled(); // parked on the DOMContentLoaded listener
+
+    ready.mockReturnValue("interactive");
+    document.dispatchEvent(new Event("DOMContentLoaded"));
+    expect(create).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("bootGame telemetry gate", () => {
+  const localhost = "http://localhost:3000/";
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.mocked(injectSpeedInsights).mockReset();
+    vi.mocked(injectWebAnalytics).mockReset();
+    window.location.href = localhost; // restore host for the rest of the suite
+    document.body.innerHTML = "";
+    delete (window as unknown as { game?: unknown }).game;
+  });
+
+  it("injects Vercel telemetry on the production host", () => {
+    stubWebGL();
+    window.location.href = "https://verticopolis.com/";
+    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+
+    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+  });
+
+  it("injects telemetry on a Vercel preview host too", () => {
+    stubWebGL();
+    window.location.href = "https://feature-branch.vercel.app/";
+    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+
+    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips telemetry on any other host", () => {
+    stubWebGL();
+    window.location.href = localhost;
+    bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
+
+    expect(injectSpeedInsights).not.toHaveBeenCalled();
+    expect(injectWebAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("never lets a telemetry failure block boot", () => {
+    stubWebGL();
+    window.location.href = "https://verticopolis.com/";
+    vi.mocked(injectSpeedInsights).mockImplementationOnce(() => {
+      throw new Error("telemetry down");
+    });
+    const app = { onUpdateAvailable: vi.fn() };
+
+    expect(() => bootGame(vi.fn(() => app))).not.toThrow();
+    // Boot still finished: the game handle is published despite the telemetry throw.
+    expect((window as unknown as { game?: unknown }).game).toBe(app);
+  });
+});
