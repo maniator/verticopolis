@@ -146,6 +146,13 @@ the zeroed-header-count export bug was found).
   tail, a nonzero people count, the elevator schedule block, and the view-scroll.
   A fixed-size routing tail is validated only to 2 stars; larger towers are a
   follow-up (backlog `tdt-export-routing-tail`).
+- **Never assert render on a zero-population export; seed a person first.** A
+  `.TDT` we export with rentable rooms present but **zero tenants** renders a
+  black frame in the real game (a game-side divide-by-zero in the 1994
+  evaluation, `Quality = 300 - total stress / tenants`, not our bytes: a truly
+  empty tower renders, and any seeded population renders fine). It bites only
+  synthetic all-vacant fixtures, never a real save. Party-ruled won't-fix
+  2026-07-20 (issue #510). See PARITY.md.
 - The game is 16-bit Windows 3.1 (`STOWER.EXE` on the disc is a Director autorun
   shell, not the game). It renders through the disc's WinG runtime.
 - Runs in a Wine **virtual desktop** so WSLg routes mouse input to the window.
