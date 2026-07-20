@@ -113,7 +113,7 @@ describe("Elevator dispatch: shaft fairness across an equivalent bank", () => {
     const crowd = new Crowd(1234);
     const graph = adjacency(crowd, tower);
     const raw = new Set<number>();
-    for (let i = 0; i < 50; i++) raw.add(bfsRoute(graph, 1, 8, 2)!.shafts[0]);
+    for (let i = 0; i < 50; i++) raw.add(bfsRoute(graph, 1, 8)!.shafts[0]);
     expect(raw.size).toBe(1);
   });
 });

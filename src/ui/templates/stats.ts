@@ -166,7 +166,7 @@ export function statsTemplate(sim: Simulation): TemplateResult {
         stranded || ratingRow !== nothing
           ? html`<div class="col kv">${
               stranded
-                ? html`<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors with no route from the lobby within two rides; they earn rating but draw no visitors. Add a sky-lobby transfer.</span>`
+                ? html`<span class="k" style="color:var(--muted);grid-column:1/-1">Stranded = leased floors with no route from the lobby at all; they earn rating but draw no visitors. Connect them with an elevator or stairs.</span>`
                 : nothing
             }${
               ratingRow !== nothing

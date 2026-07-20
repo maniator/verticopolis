@@ -102,12 +102,17 @@ describe("walkway willingness (#384)", () => {
     expect(reaches(tower, 1, 10)).toBe(true);
   });
 
-  it("Modern is unchanged by this story: stairs still spend the ride budget (cap 2)", () => {
-    // This story is Classic-only. Modern keeps the pre-change routing (each stair
-    // is a ride, cap 2), so it reaches 2 stair flights but not 3, pending its own
-    // comfort-penalty story. Pins that only Classic loosened.
-    const tower = walkwayColumn("modern", 7, "stairs");
-    expect(reaches(tower, 1, 3), "Modern: 2 flights").toBe(true);
-    expect(reaches(tower, 1, 4), "Modern: 3 flights still refused (unchanged)").toBe(false);
+  it("Modern reachability is uncapped and applies no hard walk budget (that is #502)", () => {
+    // Modern uncaps reachability like Classic (the party ruled Modern must never
+    // be more restrictive than Classic). Modern does NOT apply Classic's hard
+    // walkway-willingness refusal: a long climb feeds the deferred #502 comfort
+    // penalty instead, so it never blocks the trip. Modern therefore reaches a
+    // long stair chain that Classic (walk budget 4) would refuse.
+    const tower = walkwayColumn("modern", 12, "stairs");
+    expect(reaches(tower, 1, 5), "Modern: 4 flights").toBe(true);
+    expect(reaches(tower, 1, 11), "Modern: 10 flights, no walk-budget refusal").toBe(true);
+    // Classic, by contrast, still refuses past 4 (the walk budget holds).
+    const classic = walkwayColumn("classic", 12, "stairs");
+    expect(reaches(classic, 1, 11), "Classic: 10 flights refused").toBe(false);
   });
 });

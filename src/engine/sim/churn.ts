@@ -87,7 +87,7 @@ export function attemptMoveIns(sim: Simulation): void {
   // parking, fewer firms will move in, demand pressure, not eviction, so it
   // never destabilizes a built-out tower.
   const parkingPenalty = sim.officeParkingShort() ? 0.5 : 1;
-  // Per-pass memo for the ≤2-ride BFS in floorReachable: many empty units
+  // Per-pass memo for the reachability BFS in floorReachable: many empty units
   // share a floor, and the verdict can't change mid-pass. Lives only for
   // this call; Crowd's adjacency graph is the layer cached by revision.
   const reachMemo = new Map<number, boolean>();
@@ -111,14 +111,14 @@ export function attemptMoveIns(sim: Simulation): void {
     const f = FACILITIES[u.kind];
     if (f.population === 0 && !isHotelKind(u.kind)) continue; // non-tenant facility
     if (!servedSet.has(u.floor)) continue; // nobody moves to an unreachable floor
-    // Two-ride rule: a served floor with no admissible two-ride route from
-    // the lobby (3+ rides out, or a Classic express transfer at a plain
-    // floor) draws no commuters (Crowd.MAX_RIDES plus the Classic lobby
-    // transfer gate), so nobody can arrive to buy, lease, or check in. Same
-    // gate for every tenant kind; commercial visitor income
-    // already honors it (EconomySystem.collectTrafficIncome), this makes
-    // move-ins agree. (Quarterly office rent still gates on isFloorServed
-    // only, a deliberate grandfather for tenants already in place.)
+    // Reachability: a served floor the router cannot reach from the lobby (no
+    // connected transport path) draws no commuters, so nobody can arrive to buy,
+    // lease, or check in. Reachability is uncapped in both modes now (#503), so
+    // this rejects only a genuinely disconnected floor, not a merely deep one.
+    // Same gate for every tenant kind; commercial visitor income already honors
+    // it (EconomySystem.collectTrafficIncome), this makes move-ins agree.
+    // (Quarterly office rent still gates on isFloorServed only, a deliberate
+    // grandfather for tenants already in place.)
     if (!reachable(u.floor)) continue;
 
     const demand = sim.demandFactor(u);

@@ -43,7 +43,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
           <li><b>Move people.</b> Every floor needs an <b>elevator</b> or <b>stairs</b> chain back to the ground lobby, or tenants leave.</li>
           <li><b>Make money.</b> Offices pay quarterly rent, condos sell once, hotels earn nightly, shops &amp; restaurants earn from foot traffic.</li>
           <li><b>Grow your rating.</b> 2★ at 300 pop, 3★ at 1,000 (needs Security), 4★ at 5,000 (needs Medical, enough Recycling, suites &amp; a VIP), 5★ at 10,000 (needs a Metro). At 5★ a floor-100 payoff wins the game (under Going further).</li>
-          <li><b>Two rides, tops.</b> People take at most <b>two</b> elevator/stair rides to reach a floor. Add <b>sky lobbies</b> (every ~15 floors) so distant floors are one transfer away, or nobody comes.</li>
+          <li><b>Keep it moving.</b> People will ride as many elevators as it takes to reach a floor, but every transfer is another wait. Add <b>sky lobbies</b> (every ~15 floors) and <b>express</b> elevators so long trips stay quick; a tower that makes people transfer over and over crawls, and they give up.</li>
         </ul>
       </details>
       <details class="help-modes">

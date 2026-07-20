@@ -29,13 +29,13 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
  *  `dominantGripe` just read, never a rescan. */
 function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
   if (unmetCoverage(sim.demandMap(), u) === 0) {
-    // Coverage 0 also covers a tenant whose OWN floor sits beyond two rides:
-    // its people can reach nothing however well the shops are wired, and that
-    // cause already has the dedicated red "Access: too far" line, so the gripe
+    // Coverage 0 also covers a tenant whose OWN floor is unreachable: its people
+    // can reach nothing however well the shops are wired, and that cause already
+    // has the dedicated red "Access: no route" line, so the gripe
     // line stays silent for it (the defer-to-the-dedicated-line rule above)
     // instead of telling the player to fix retail that is not broken.
     if (!sim.floorReachable(u.floor)) return undefined;
-    return "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues within two rides of the lobby.";
+    return "shops and restaurants exist, but none of them are reachable from here. Reconnect your retail: shoppers only patronize venues they can actually reach from the lobby.";
   }
   // Every other value the gripe can carry (coverage in (0, 0.5), or a null
   // read from a hand-built context) is the capacity shortfall: more retail,

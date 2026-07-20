@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.67.0
+
+- People now ride as many elevators as it takes to reach a floor, matching the original, instead of giving up after two transfers. Long trips still cost you through crowding and waiting, so sky lobbies and express elevators keep a tall tower moving rather than being needed just to reach the top.
+
 ## 1.65.0
 
 - People will climb a few more flights of stairs before they need an elevator, matching the original. In Classic, stairs and escalators now carry a person up to 4 and 7 contiguous flights (an elevator ride resets the count) instead of dead-ending at two.

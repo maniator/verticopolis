@@ -362,14 +362,14 @@ describe("the Classic rung picker row (ux-pricing-split-editor §1)", () => {
 });
 
 describe("the editor access row's third state (#370)", () => {
-  it("a served but 3+ rides floor reads 'Too far (3+ rides)' in the bad color for commuter kinds", () => {
+  it("a served but unreachable (cut-off) floor reads 'No route' in the bad color for commuter kinds", () => {
     const { sim, unit } = simWith("office");
     expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
-    // Force the two-ride verdict: the template must read sim.floorReachable.
+    // Force the cut-off verdict: the template must read sim.floorReachable.
     sim.floorReachable = () => false;
     const frag = renderToFragment(unitEditorTemplate(sim, unit));
     const cell = frag.querySelector('[data-field="served"]')!;
-    expect(cell.textContent).toBe("Too far (3+ rides)");
+    expect(cell.textContent).toBe("No route");
     expect(cell.innerHTML).toContain("var(--bad)");
   });
 
@@ -385,7 +385,7 @@ describe("the editor access row's third state (#370)", () => {
     expect(no.innerHTML).toContain("var(--bad)");
   });
 
-  it("a zero-population service kind keeps plain Yes/No (the two-ride rule is about passenger trips)", () => {
+  it("a zero-population service kind keeps plain Yes/No (the reachability line is about passenger trips)", () => {
     const { sim, unit } = simWith("security");
     expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok).toBe(true); // served
     sim.floorReachable = () => false; // must be ignored for service kinds

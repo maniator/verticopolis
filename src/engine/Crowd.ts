@@ -36,10 +36,10 @@ export class Crowd {
   /** @internal Rolling fraction of recent travellers who waited too long (0..1). */
   frustration = 0;
   /** @internal Cached passenger stop-graph, rebuilt when the tower changes. */
-  adj: Map<number, { f: number; shaft: number; express: boolean; walkKind?: "stairs" | "escalator" }[]> | null = null;
+  adj: Map<number, { f: number; shaft: number; walkKind?: "stairs" | "escalator" }[]> | null = null;
   /** @internal */ adjRev = -1;
   /** @internal Cached STAFF stop-graph (service elevators / stairs). */
-  staffAdj: Map<number, { f: number; shaft: number; express: boolean; walkKind?: "stairs" | "escalator" }[]> | null = null;
+  staffAdj: Map<number, { f: number; shaft: number; walkKind?: "stairs" | "escalator" }[]> | null = null;
   /** @internal */ staffAdjRev = -1;
   /** @internal Cached equivalent-shaft banks, keyed "kind:from:to" → sorted
    *  shaft ids, rebuilt when the tower changes. Lets the shaft-balancing pass
@@ -158,7 +158,7 @@ export class Crowd {
     return view;
   }
 
-  /** Fewest-transfer passenger route (two-ride cap), delegated to routing. */
+  /** Fewest-transfer passenger route (uncapped reachability), delegated to routing. */
   route(tower: Tower, from: number, to: number): Route | null {
     return routing.route(this, tower, from, to);
   }
@@ -169,7 +169,7 @@ export class Crowd {
   }
 
   /** Pure passenger reachability probe (no rng draw), for callers that only
-   *  need "is this floor routable in two rides?" and discard the route. Kept
+   *  need "is this floor routable at all?" and discard the route. Kept
    *  separate from {@link route} so reachability checks never consume the
    *  seeded crowd rng the shaft-balancing path draws from. See routing.reachable. */
   reachable(tower: Tower, from: number, to: number): boolean {

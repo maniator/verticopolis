@@ -205,7 +205,7 @@ export function synthesizeTransports(
   const specs: { kind: FacilityKind; bottom: number; top: number; skipFloors?: number[] }[] = [];
   // Standard bands: ground first (basements included), then each sky-lobby
   // anchor that extends coverage upward. Consecutive bands overlap at a sky
-  // lobby, so a two-ride trip can always transfer.
+  // lobby, so riders can always transfer between them.
   let covered = -Infinity;
   const groundTop = Math.min(bottom + 30, top);
   if (groundTop > bottom) {
