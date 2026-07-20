@@ -7,12 +7,12 @@
 // #396 gates express only). A short 10-floor tower frames cleanly in the Wine
 // harness. Three office bands act as a reachability ladder:
 //   - band 1 (floor 3): 1 ride  (control, always reachable)
-//   - band 2 (floor 6): 2 rides (control, reachable under MAX_RIDES=2)
-//   - band 3 (floor 9): 3 rides (the test; only reachable if the budget >= 3)
+//   - band 2 (floor 6): 2 rides (reachable whenever the ride budget is >= 2)
+//   - band 3 (floor 9): 3 rides (the test; reachable only if the budget is >= 3)
 //
 // It prints OUR router's verdict for each band (a fast, Docker-free check that
-// the tower is a real discriminator: bands 1/2 reachable, band 3 refused under
-// our current MAX_RIDES=2), then exports a .TDT for the Wine harness to load in
+// the tower is a real discriminator: with a ride budget of 2, bands 1/2 are
+// reachable and band 3 is refused), then exports a .TDT for the Wine harness to load in
 // the real 1994 game. The saved camera view centers on the bands so the game
 // opens framed on them. Offices are marked occupied by default so the real game
 // has commuters to route; EMPTY_OFFICES=1 leaves them vacant for the
