@@ -28,8 +28,12 @@ import { inject as injectWebAnalytics } from "@vercel/analytics";
  * server-side (no `window`) context. Keeping the two telemetry surfaces on one
  * predicate means they can never drift out of gate parity.
  *
- * The match is exact on `verticopolis.com` plus a `.vercel.app` suffix, so a
- * look-alike host (a phishing mirror, a staging alias) gets nothing.
+ * This is a functional gate (only where the `/_vercel/*` endpoints are served),
+ * not a security boundary: it matches the production domain exactly plus any
+ * `.vercel.app` host, which covers the Vercel preview deployments. A non-Vercel
+ * look-alike such as `verticopolis.com.evil.example` falls outside it; an
+ * arbitrary `.vercel.app` subdomain would pass, which is harmless because only
+ * our own deployments serve this bundle.
  */
 export function telemetryHostAllowed(): boolean {
   if (typeof window === "undefined") return false;

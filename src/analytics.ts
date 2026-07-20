@@ -109,6 +109,7 @@ class GameplaySession {
    *  report is skipped. */
   private lastReportedSec = 0;
   private built = false;
+  private armed = false;
   private readonly toolsSeen = new Set<string>();
 
   /** Start or resume timing foreground play. Idempotent while already running,
@@ -186,12 +187,22 @@ class GameplaySession {
     trackEvent("session_end", { seconds });
   }
 
+  /** Claim the one-time listener wiring. Returns true exactly once (until
+   *  `reset`), so {@link startGameplaySession} attaches its page-hide listeners
+   *  at most once however many times it is called. */
+  arm(): boolean {
+    if (this.armed) return false;
+    this.armed = true;
+    return true;
+  }
+
   /** Test hook: forget all session state. */
   reset(): void {
     this.activeMs = 0;
     this.resumedAt = null;
     this.lastReportedSec = 0;
     this.built = false;
+    this.armed = false;
     this.toolsSeen.clear();
   }
 }
@@ -215,6 +226,10 @@ export const gameplaySession = new GameplaySession();
  */
 export function startGameplaySession(): void {
   if (!telemetryHostAllowed()) return;
+  // Idempotent: wire the listeners at most once, so a repeat call (a future
+  // refactor, a double boot) can't attach a second pair and double-count
+  // session_end.
+  if (!gameplaySession.arm()) return;
   gameplaySession.begin();
   window.addEventListener("pagehide", () => gameplaySession.end());
   document.addEventListener("visibilitychange", () => {

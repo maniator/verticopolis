@@ -28,7 +28,7 @@ export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSIO
 /** Classify why this boot happened, for the analytics boot snapshot. Mirrors
  *  `resolveBootScreen`: an "Update now" or WebGL-recovery reload only actually
  *  resumes the tower when a readable save survived, so "update" / "recovery" are
- *  gated on `hadReadableSave`. When a resume reload lands on an UNreadable save
+ *  gated on `hadReadableSave`. When a resume reload lands on an unreadable save
  *  (e.g. a save-format-breaking update), the player gets the splash and the
  *  corrupt message, so that outcome is reported as "corrupt", not the trigger.
  *  Otherwise a readable save is "continue" and nothing is "fresh". */

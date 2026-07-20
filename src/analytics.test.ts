@@ -34,7 +34,7 @@ describe("gameplay analytics events", () => {
     expect(track).toHaveBeenNthCalledWith(2, "star_reached", { star: 3 });
   });
 
-  it("fires no event off a deployed host (localhost, e2e preview, native shell)", () => {
+  it("fires no event on a non-deployed host (localhost, e2e preview, native shell)", () => {
     window.location.href = localhost;
     gameplaySession.noteNewGame("classic");
     gameplaySession.noteBuild("floor");
@@ -107,6 +107,13 @@ describe("gameplay analytics events", () => {
     expect(track).toHaveBeenNthCalledWith(1, "first_build", { tool: "floor" });
     expect(track).toHaveBeenNthCalledWith(2, "game_started", { mode: "modern" });
     expect(track).toHaveBeenNthCalledWith(3, "first_build", { tool: "office" });
+  });
+
+  it("arm claims the listener wiring exactly once until reset", () => {
+    expect(gameplaySession.arm()).toBe(true); // first start wires listeners
+    expect(gameplaySession.arm()).toBe(false); // a repeat start is a no-op
+    gameplaySession.reset();
+    expect(gameplaySession.arm()).toBe(true); // reset re-opens it (for tests)
   });
 
   it("reset re-opens the per-session dedup latches", () => {
@@ -190,7 +197,7 @@ describe("startGameplaySession wiring", () => {
     setVisibility("visible");
   });
 
-  it("arms nothing off a deployed host", () => {
+  it("arms nothing on a non-deployed host (localhost)", () => {
     window.location.href = localhost;
     startGameplaySession();
     setVisibility("hidden");
