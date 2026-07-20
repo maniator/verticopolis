@@ -3,11 +3,13 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "redirects": [
+    { "source": "/help/", "destination": "/help", "permanent": true },
+    { "source": "/gallery/", "destination": "/gallery", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/help", "destination": "/help.html" },
-    { "source": "/help/", "destination": "/help.html" },
-    { "source": "/gallery", "destination": "/gallery.html" },
-    { "source": "/gallery/", "destination": "/gallery.html" }
+    { "source": "/gallery", "destination": "/gallery.html" }
   ],
   "headers": [
     {
