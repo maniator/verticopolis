@@ -30,8 +30,10 @@ interface GameplayEvents {
   /** A fresh tower was founded (the funnel's entry point). `mode` is the
    *  rule-set: "classic" or "modern". */
   game_started: { mode: string };
-  /** The first facility placed this session (the funnel's "did they build
-   *  anything" step). `tool` is the facility/transport kind that broke the ice. */
+  /** The first facility placed in the current tower (the funnel's "did they
+   *  build anything" step). Re-opens when a new tower is founded, so it pairs
+   *  with `game_started` per tower. `tool` is the facility/transport kind that
+   *  broke the ice. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
@@ -90,8 +92,9 @@ class GameplaySession {
     trackEvent("game_started", { mode });
   }
 
-  /** A facility was placed. Fires `first_build` once per session; later builds
-   *  are silent, which is what keeps this off the per-click hot path. */
+  /** A facility was placed. Fires `first_build` once per founded tower (the
+   *  latch re-opens in `noteNewGame`); later builds in that tower are silent,
+   *  which is what keeps this off the per-click hot path. */
   noteBuild(tool: string): void {
     if (this.built) return;
     this.built = true;

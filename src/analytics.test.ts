@@ -43,7 +43,7 @@ describe("gameplay analytics events", () => {
     expect(track).not.toHaveBeenCalled();
   });
 
-  it("fires first_build once per session, then stays silent", () => {
+  it("fires first_build once per tower, then stays silent", () => {
     gameplaySession.noteBuild("floor");
     gameplaySession.noteBuild("office");
     expect(track).toHaveBeenCalledTimes(1);
