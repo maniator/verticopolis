@@ -163,17 +163,37 @@ load_tdt() {
     xdotool mousemove 600 68 click --repeat 2 --delay 120 1 >/dev/null 2>&1 || true
     sleep 2
   fi
-  # Optional zoom-out for tall towers: ZOOM_CLICKS>0 selects the palette
-  # magnifier tool, then clicks the tower to toggle SimTower's zoomed-out view
-  # so the whole tower (and every elevator shaft) fits one screenshot. The
-  # magnifier sits in the floating tool palette; the tower fills the desktop
-  # center. Diagnostic only; default 0 leaves the saved zoom untouched.
+  # Optional zoom toggle: ZOOM_CLICKS>0 selects the palette magnifier tool, then
+  # clicks the tower to toggle SimTower's zoom so the whole tower (or, toggled
+  # the other way, a legible close-up) fits one screenshot. The magnifier sits
+  # in the floating tool palette; the tower fills the desktop center. The
+  # tower-click point is tunable via ZOOM_TILE_X/ZOOM_TILE_Y (default 600,350,
+  # which assumes a tall tower whose body reaches the vertical center): a SHORT
+  # tower's body sits at the ground line, so the default click lands in empty
+  # sky and the toggle silently no-ops. Aim ZOOM_TILE_Y near the ground row
+  # (and ZOOM_TILE_X over the tower's built columns) to zoom a short tower.
+  # The magnifier tool position is likewise tunable via ZOOM_TOOL_X/ZOOM_TOOL_Y.
+  # Diagnostic only; default 0 leaves the saved zoom untouched.
   local zoom_clicks="${ZOOM_CLICKS:-0}"
+  # Coordinates are screen pixels: coerce each to a non-negative integer, falling
+  # back to the default (and warning) on a non-numeric/negative value, exactly
+  # like CLICK_SECS above. Without this an "x=" typo would make xdotool fail and,
+  # since every xdotool call is `|| true`, the zoom toggle would silently no-op.
+  local zoom_tool_x="${ZOOM_TOOL_X:-187}"; local zoom_tool_y="${ZOOM_TOOL_Y:-229}"
+  local zoom_tile_x="${ZOOM_TILE_X:-600}"; local zoom_tile_y="${ZOOM_TILE_Y:-350}"
+  local _zn _zd
+  for _zn in zoom_tool_x:187 zoom_tool_y:229 zoom_tile_x:600 zoom_tile_y:350; do
+    local _var="${_zn%%:*}"; _zd="${_zn##*:}"
+    if ! [[ "${!_var}" =~ ^[0-9]+$ ]]; then
+      echo "[harness] invalid ${_var^^}='${!_var}'; using ${_zd}" >&2
+      printf -v "$_var" '%s' "$_zd"
+    fi
+  done
   if [[ "$zoom_clicks" =~ ^[0-9]+$ ]] && [ "$zoom_clicks" -ge 1 ]; then
     for _ in $(seq 1 "$zoom_clicks"); do
-      xdotool mousemove 187 229 click 1 >/dev/null 2>&1 || true  # select magnifier tool
+      xdotool mousemove "$zoom_tool_x" "$zoom_tool_y" click 1 >/dev/null 2>&1 || true  # select magnifier tool
       sleep 1
-      xdotool mousemove 600 350 click 1 >/dev/null 2>&1 || true  # click tower to toggle zoom
+      xdotool mousemove "$zoom_tile_x" "$zoom_tile_y" click 1 >/dev/null 2>&1 || true  # click tower to toggle zoom
       sleep 2
     done
   fi
