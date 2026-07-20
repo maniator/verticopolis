@@ -659,6 +659,26 @@ a.btn {
   width: 100%;
   margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
 }
+/* Rule-set badge: names the active tower's rule-set and, on click, opens the
+   Classic vs Modern comparison. A real <button> (keyboard + pointer), styled as
+   a compact full-width status chip. It is its own element, kept OUT of
+   #tower-stats (the lit one-renderer container); UI.setMode is the only writer,
+   dirty-gated so the per-frame pump never touches the DOM unless the mode
+   changes. The accent only tints the label, so the win bevel reads the same for
+   both rule-sets (Classic is the faithful reference build, never the lesser one). */
+.mode-badge {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.mode-badge.is-modern {
+  color: var(--r-title, #000080);
+}
+.mode-badge.is-classic {
+  color: #5a3d00;
+}
 /* Stats-overlay picker: a labeled dropdown so every map mode is visible and
  *  directly selectable (no hidden cycle). */
 .overlay-picker {
@@ -903,6 +923,29 @@ dialog.crash-card::backdrop {
   line-height: 1.45;
   color: var(--muted);
   margin-top: 2px;
+}
+/* Founding-screen full comparison: the shared compareTemplate in a collapsed
+   <details>, so the dialog stays a commitment by default while the whole
+   comparison is one click away before founding. Reuses the Help caret grammar
+   (no motion, so it respects reduced-motion) and sits in a sunken .well. */
+.nt-compare {
+  margin-top: 4px;
+}
+.nt-compare > summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+  list-style: none;
+}
+.nt-compare > summary::-webkit-details-marker {
+  display: none;
+}
+.nt-compare > summary::before {
+  content: "▸ ";
+  color: var(--muted);
+}
+.nt-compare[open] > summary::before {
+  content: "▾ ";
 }
 .nt-mode {
   display: flex;

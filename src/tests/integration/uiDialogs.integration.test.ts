@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { html, type TemplateResult } from "lit-html";
 import { UI, type UICallbacks } from "../../ui/UI";
+import { setMode } from "../../ui/uiStatus";
 import { Simulation } from "../../engine/Simulation";
 import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
@@ -83,6 +84,7 @@ function mountAppDom(): void {
     <div id="palette-scroll"></div>
     <div id="tool-info"></div>
     <input id="tower-name" />
+    <button id="btn-mode" class="mode-badge is-classic btn">This tower: Classic</button>
     <div id="tower-stats"></div>
     <button id="btn-stats"></button>
     <div id="log"></div>
@@ -100,6 +102,7 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
   const cb: UICallbacks = {
     onSelectTool: vi.fn(),
     onSpeed: vi.fn(),
+    getSpeed: vi.fn(() => 1),
     onSave: vi.fn(),
     onLoad: vi.fn(),
     onExport: vi.fn(),
@@ -2751,5 +2754,82 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
     expect(when).not.toContain("<img>");
     expect(dialog().querySelector(".slot-when img")).toBeNull();
     expect(when).not.toMatch(/\bDay\b/);
+  });
+});
+
+describe("mode badge (UI.setMode) follows the live rule-set", () => {
+  beforeEach(() => mountAppDom());
+  afterEach(() => (document.body.innerHTML = ""));
+
+  const badge = (): HTMLButtonElement => document.getElementById("btn-mode") as HTMLButtonElement;
+
+  it("paints the Classic label and class", () => {
+    const { ui } = makeUI();
+    setMode(ui, "classic");
+    expect(badge().textContent).toBe("This tower: Classic");
+    expect(badge().classList.contains("is-classic")).toBe(true);
+    expect(badge().classList.contains("is-modern")).toBe(false);
+  });
+
+  it("switches to Modern when the mode changes", () => {
+    const { ui } = makeUI();
+    setMode(ui, "classic");
+    setMode(ui, "modern");
+    expect(badge().textContent).toBe("This tower: Modern");
+    expect(badge().classList.contains("is-modern")).toBe(true);
+    expect(badge().classList.contains("is-classic")).toBe(false);
+  });
+
+  it("is dirty-gated: an unchanged mode does not rewrite the DOM", () => {
+    const { ui } = makeUI();
+    setMode(ui, "modern");
+    // Poison the label; a same-mode call must leave it untouched (no DOM write).
+    badge().textContent = "SENTINEL";
+    setMode(ui, "modern");
+    expect(badge().textContent).toBe("SENTINEL");
+  });
+});
+
+describe("Compare modal (showCompare) pauses the tower and restores speed", () => {
+  beforeEach(() => mountAppDom());
+  afterEach(() => (document.body.innerHTML = ""));
+
+  it("opens the shared comparison through the single #modal", () => {
+    const { ui } = makeUI();
+    ui.showCompare();
+    expect(dialog().open).toBe(true);
+    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
+    expect(dialog().textContent).toContain("pixel-faithful to 1994");
+  });
+
+  it("pauses on open and restores the prior speed on Got it", () => {
+    const onSpeed = vi.fn();
+    const { ui } = makeUI({ getSpeed: () => 2, onSpeed });
+    ui.showCompare();
+    expect(onSpeed).toHaveBeenNthCalledWith(1, 0); // paused on open
+    click('[data-act="close"]');
+    expect(dialog().open).toBe(false);
+    expect(onSpeed).toHaveBeenNthCalledWith(2, 2); // restored on close
+  });
+
+  it("restores the prior speed on Esc/cancel too, exactly once", () => {
+    const onSpeed = vi.fn();
+    const { ui } = makeUI({ getSpeed: () => 3, onSpeed });
+    ui.showCompare();
+    // Esc routes through the dialog's cancel path (the ✕ dispatches it too).
+    dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
+    expect(dialog().open).toBe(false);
+    expect(onSpeed).toHaveBeenNthCalledWith(2, 3);
+    // A second dismissal must not restore again (finish fires once).
+    dialog().dispatchEvent(new Event("cancel", { cancelable: true }));
+    expect(onSpeed).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens from a click on the Tower-panel mode badge", () => {
+    const { ui } = makeUI();
+    void ui; // constructed for its side effect: the badge click is wired in the ctor
+    (document.getElementById("btn-mode") as HTMLButtonElement).click();
+    expect(dialog().open).toBe(true);
+    expect(dialog().textContent).toContain("Variant households");
   });
 });

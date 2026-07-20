@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { compareTemplate } from "./compare";
 
 /**
  * The How-to-play / Help dialog. Organized so it opens SHORT: a lead and the
@@ -58,20 +59,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Classic vs Modern</span></summary>
-        <p style="color:var(--muted)">You pick a rule-set when you <b>found a tower</b>, and it's fixed for that tower's life. <b>Classic</b> is the faithful 1994 game. <b>Modern</b> keeps all of it and adds things the original couldn't do. Want to play the other way? Start a new tower.</p>
-        <ul>
-          <li><b>Variant households.</b> A condo draws a 2–5 person family instead of the flat family of 3. The family sets the sale price and how demanding it is: a bigger family pays more but leans harder on your elevators.</li>
-          <li><b>Households come and go.</b> A sold condo's family can move out on its own now and then, a life event more likely for a bigger family, so you buy the condo back and resell as the tower turns over. Classic condos, once sold, stay sold.</li>
-          <li><b>A deeper economy.</b> Held space carries a monthly overhead, unsold condos are taxed, a noisy office neighbor can wear a tenant down to a move-out, and a tenant with too few reachable shops can eventually give notice. Classic runs the 1994 economy untouched, where late-game money gets comfortable.</li>
-          <li><b>Continuous pricing.</b> Set any rent on a slider. Classic keeps the 1994 four-rung price menu plus the "No Rate" off-market option.</li>
-          <li><b>Freer building.</b> Escalators can serve office floors, and express riders can switch elevators at any shared stop. Classic keeps escalators to commercial floors and routes express transfers only through a sky lobby, the rule that makes sky lobbies essential.</li>
-          <li><b>Smarter scheduling.</b> The per-shaft elevator schedule offers presets, a one-tap auto-tune from measured demand, and advice on the hours a shaft is overstaffed or understaffed. Classic gives you the raw grid to set by hand, the way the original did.</li>
-          <li><b>Cockroach recovery.</b> An infested hotel room can be cleared by a paid exterminator. In Classic an infestation is permanent, so the bulldozer is the only fix.</li>
-          <li><b>Build hints.</b> Hovering an invalid spot tells you why it's refused before you click. Classic refuses on the click with a toast, the way the original taught you.</li>
-          <li><b>A livelier day.</b> Condo kids leave for school and return, office workers run midday errands, some hotel guests linger past checkout for a lunch trip before they go, retail swings with weekdays and weekends, and rain thins the crowd more gently. Classic matches the literal 1994 visitor patterns.</li>
-          <li><b>Calendar pace.</b> Pick the friendlier real-world length (7-day week, 90-day quarter, 360-day year) or the authentic 1994 compressed calendar (3-day week, 3-day quarter, 12-day year) when you found the tower. Classic always runs the compressed one. Either way your income per in-game day is the same, only the cadence changes.</li>
-        </ul>
-        <p style="color:var(--muted)"><b>Classic aims to be pixel-faithful to 1994.</b> If something in Classic doesn't match the original, please report it below so we can fix it. And if there's a "what the original couldn't do" behavior Modern doesn't have yet, suggest it there too.</p>
+        ${compareTemplate()}
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Keyboard play</span></summary>

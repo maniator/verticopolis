@@ -160,6 +160,10 @@
           <div class="panel win docked">
             <h3>Tower</h3>
             <input id="tower-name" class="name-input field" maxlength="28" />
+            <!-- Seed carries no data-mode on purpose: uiStatus.setMode owns it and
+                 its dirty-gate keys on it. Do NOT hardcode data-mode here (a
+                 data-mode="classic" seed would skip the first Modern-boot repaint). -->
+            <button id="btn-mode" class="mode-badge is-classic btn" type="button" title="This tower's rule-set. Click for the full Classic vs Modern comparison.">This tower: Classic</button>
             <div id="tower-stats" class="kv"></div>
             <button id="btn-stats" class="wide-btn btn">📊 Full Statistics</button>
             <label class="overlay-picker" title="Tint every floor by a live metric, like the original's evaluation maps">

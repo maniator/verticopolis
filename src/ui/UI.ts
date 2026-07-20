@@ -41,6 +41,8 @@ const MODAL_TITLE_ID = "verticopolis-modal-title";
 export interface UICallbacks {
   onSelectTool(tool: Tool): void;
   onSpeed(speed: number): void;
+  /** The live game-speed index, so a dialog can pause and restore the tower. */
+  getSpeed(): number;
   onSave(): void;
   onLoad(): void;
   onExport(): void;
@@ -121,6 +123,7 @@ export class UI {
     modal: document.getElementById("modal")!,
     audioToggle: document.getElementById("audio-toggle")!,
     towerName: document.getElementById("tower-name") as HTMLInputElement,
+    modeBadge: document.getElementById("btn-mode") as HTMLButtonElement,
   };
 
   /** True while the user is pressing something inside the editor card. */
@@ -199,6 +202,7 @@ export class UI {
     });
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
+    this.el.modeBadge.addEventListener("click", () => this.showCompare()); // "tell me more"
     document.getElementById("btn-stats")!.addEventListener("click", () => this.cb.onShowStats());
     document.getElementById("overlay-mode")?.addEventListener("change", (e) => {
       this.cb.onSetOverlay((e.currentTarget as HTMLSelectElement).value);
@@ -459,6 +463,10 @@ export class UI {
 
   showHelp(): void {
     dialogs.showHelp(this);
+  }
+
+  showCompare(): void {
+    dialogs.showCompare(this);
   }
 
   showSettings(): void {

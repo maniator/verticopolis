@@ -1,6 +1,6 @@
 import type { Simulation, LogEntry } from "../engine/Simulation";
 import { FACILITIES } from "../engine/facilities";
-import type { FacilityKind } from "../engine/types";
+import type { FacilityKind, GameMode } from "../engine/types";
 import type { UI } from "./UI";
 import { render } from "lit-html";
 import { towerStatsTemplate } from "./templates/towerStats";
@@ -88,6 +88,10 @@ export function update(ui: UI, sim: Simulation): void {
   }
 
   ui.setTowerName(sim.tower.towerName);
+  // The rule-set badge follows the live mode. setMode is dirty-gated, so this
+  // per-pump call only writes the DOM when the mode changes (e.g. an adoptSim
+  // swap into a tower founded the other way).
+  setMode(ui, sim.mode);
 
   // lit render, not innerHTML: patches the changed text in place each pump, so
   // the grid's nodes keep their identity (E5-S0 gate) instead of a full reparse.
@@ -95,6 +99,24 @@ export function update(ui: UI, sim: Simulation): void {
   render(towerStatsTemplate(sim.stats()), ui.el.towerStats);
 
   renderLog(ui, sim.log, sim.logSeq);
+}
+
+/**
+ * Paint the active tower's rule-set on the Tower-panel badge. Called from the
+ * per-frame {@link update} pump with the live mode, so it is dirty-gated on the
+ * badge's own `data-mode` (no extra UI state): it writes the label and class
+ * only when the mode actually changes, including after an `adoptSim` swap into a
+ * tower founded the other way, and no-ops otherwise. The badge is its own
+ * element, kept out of `#tower-stats` (the lit one-renderer container).
+ */
+export function setMode(ui: UI, mode: GameMode): void {
+  const badge = ui.el.modeBadge;
+  if (badge.dataset.mode === mode) return;
+  badge.dataset.mode = mode;
+  const isModern = mode === "modern";
+  badge.textContent = `This tower: ${isModern ? "Modern" : "Classic"}`;
+  badge.classList.toggle("is-modern", isModern);
+  badge.classList.toggle("is-classic", !isModern);
 }
 
 function renderLog(ui: UI, log: LogEntry[], logSeq: number): void {
