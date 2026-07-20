@@ -151,11 +151,19 @@ names), measured against game-written saves (`my_tower` fast-food byte 6 =
 are undocumented; a **rent/lease byte** at offset 16 (0 = Very Low, 1 = Low,
 2 = Average, 3 = High, 4 = No Rate) [TD]; and a final byte 17 that earlier notes
 guessed was the retail variant or hotel days-dirty. It is neither: it reads `0`
-in every real save for BOTH retail AND hotels (measured across TOWER5's 338 hotel
-rooms and every game-written retail unit we have). Its role is unknown and it
-carries no data we import; a hotel's dirty/asleep/booked state and its occupant
-count all live in the flags byte (offset 5), which the importer decodes. There is
-no persisted "days-dirty" counter in the unit record.
+in every real save for retail, hotels, empty-floor, lobby, security, and
+housekeeping (measured across TOWER5's 338 hotel rooms and every game-written
+retail unit we have), so there is no persisted "days-dirty" counter in the unit
+record. It is **nonzero only for offices (type 7) and condos (type 9)** (the
+resident/worker kinds), where it carries a small per-unit value (`my_tower`
+offices `10,11,17`; condos `1,5,6,8,9,10,12,13,18`; `mo` similar), measured
+2026-07-19 on the Wine harness across `my_tower`/`mo`. Its exact meaning is still
+unknown, but it tracks only the crowd-bearing kinds and the game rebuilds the
+live crowd on load, so it is almost certainly a derived/live value, not
+persisted state: our exporter writes `0` and the game regenerates it (the same
+posture as the zero-filled people block). A hotel's dirty/asleep/booked state
+and its occupant count all live in the flags byte (offset 5), which the importer
+decodes.
 
 ## 5. Unit type IDs
 
