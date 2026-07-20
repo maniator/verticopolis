@@ -12,9 +12,10 @@ import { injectVercelTelemetry } from "./telemetry";
  *
  * No game code runs here: no Excalibur canvas, no simulation, nothing to pause.
  * The page reports the same host-gated Vercel telemetry the game and the gallery
- * report (production and preview only), and every link is a plain same-origin
- * anchor, so "Back to game" and the sibling nav work with JS disabled, from a
- * cold shared link, and inside the installed PWA.
+ * report (production and preview only). The shell's navigation links ("Back to
+ * game" and the sibling nav) are plain same-origin anchors, so they work with JS
+ * disabled, from a cold shared link, and inside the installed PWA; the footer
+ * additionally carries an outbound report link to GitHub.
  */
 
 /** The page body: the lead block over the shared comparison, wrapped in the

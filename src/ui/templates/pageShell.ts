@@ -28,8 +28,10 @@ export interface PageShellOptions {
  * shared Windows-3.1 chrome from `retro-components.css`: a navy sticky title bar
  * with the app icon, the page title, any sibling-page links, and a "Back to
  * game" button, wrapping the page body, with a footer carrying a second "Back to
- * game" link. Every link is a plain same-origin anchor, so navigation works with
- * JS disabled, from a cold shared link, and inside the installed PWA.
+ * game" link. Every link the shell itself renders (Back to game and the sibling
+ * nav) is a plain same-origin anchor, so navigation works with JS disabled, from
+ * a cold shared link, and inside the installed PWA. Caller-supplied `footer`
+ * content may include outbound links (the /help footer points to GitHub).
  *
  * Style comes entirely from `src/styles/retro-page.css` (which the page loads);
  * this helper only supplies structure and the shared class names.
