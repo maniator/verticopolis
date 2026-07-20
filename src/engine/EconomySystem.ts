@@ -35,6 +35,21 @@ export const TRAFFIC_FACTOR_MEAN = TRAFFIC_FACTOR_MIN + TRAFFIC_FACTOR_SPAN / 2;
  *  window is mode-specific ({@link GameRules.housekeepingShift}: Classic works
  *  the canon 12:00-17:00, Modern the longer 08:00-19:00). */
 export const HK_CHECKOUT_HOUR = 8;
+/** The hour the Modern late-checkout event runs (#304). It fires after the lunch
+ *  meal window `[11, 14)` closes, so a deferred guest is present for the whole
+ *  window, and before evening hotel fill (`isEvening()` is `[17, 21)`), so the
+ *  only rooms still `asleep` at this hour are exactly the ones morning checkout
+ *  deferred. Classic never defers (its `hotelDaytimePresence()` is 0), so the
+ *  event is a pure no-op there. */
+export const HK_LATE_CHECKOUT_HOUR = 14;
+/** The late-checkout event runs across `[HK_LATE_CHECKOUT_HOUR, HK_LATE_CHECKOUT_END)`
+ *  rather than on a single hour, mirroring the extermination/dispatch window so a
+ *  save reloaded later on the day (or a coarse catch-up tick that skips hour 14)
+ *  still clears the deferred rooms that day instead of stranding them. It stays a
+ *  no-op after its first firing (checkout leaves rooms `dirty`, not `asleep`), and
+ *  the end is the evening hotel-fill boundary (`Clock.isEvening`, hour 17), so it
+ *  never touches a guest who has just checked in for the night. */
+export const HK_LATE_CHECKOUT_END = 17;
 /** The legacy (and Modern) housekeeping day shift, kept as the no-rule-set
  *  fallback window (see `staffOnShift` in crowd/meals.ts and the housekeeping
  *  module's FALLBACK_SHIFT). The live dispatch window comes from
@@ -305,10 +320,39 @@ export class EconomySystem {
     // Report yesterday's shift and breed overnight cockroaches BEFORE this
     // morning's checkouts mark their rooms dirty.
     this.housekeeping.beforeCheckout();
+    // Modern only (#304): hold a deterministic fraction of last-night guests as a
+    // late checkout so they are present through lunch. `hotelDaytimePresence()` is
+    // 0 in Classic, so `deferCount` is 0 and every asleep room checks out now,
+    // exactly as before this feature (the Classic path is byte-identical).
+    // A rule-less bare context keeps the pre-feature behavior (check out every
+    // asleep room), so `?? 0` here, NOT the file's `?? MODERN_RULES` fallback:
+    // deferral is a Modern opt-in, never a default a synthetic context inherits.
+    const presence = this.sim.rules?.hotelDaytimePresence() ?? 0;
+    let deferCount = 0;
+    if (presence > 0) {
+      let asleep = 0;
+      for (const u of this.sim.tower.units) {
+        if (isHotelKind(u.kind) && u.state === "asleep") asleep++;
+      }
+      // Deterministic, no RNG: the first `deferCount` asleep rooms in
+      // `tower.units` iteration order (units are kept in build/insertion order)
+      // linger. Which specific rooms defer depends on build history, not on a
+      // draw, so the seeded economy/spawn stream is never perturbed and Classic
+      // (deferCount 0) stays byte-identical. Physical floor/x order is not used;
+      // any consistent order satisfies the guarantee, and this one allocates nothing.
+      deferCount = Math.round(presence * asleep);
+    }
     let revenue = 0;
+    let deferred = 0;
     for (const u of this.sim.tower.units) {
       if (!isHotelKind(u.kind)) continue;
       if (u.state === "asleep") {
+        // Hold the first `deferCount` asleep rooms for the afternoon late
+        // checkout: leave them present (still asleep), book no revenue yet.
+        if (deferred < deferCount) {
+          deferred++;
+          continue;
+        }
         revenue += rentOf(u);
         // Guest leaves; the room is now DIRTY and cannot be re-let until
         // housekeeping services it.
@@ -324,6 +368,32 @@ export class EconomySystem {
     // Fresh shift after the checkouts: each crew re-seeds with full capacity on
     // its first dispatch today (also how crews built mid-shift join the day).
     this.housekeeping.resetShift();
+  }
+
+  /** Modern late checkout (#304): the deferred guests held past the morning
+   *  checkout leave in the early afternoon, after the lunch window. Every hotel
+   *  room still `asleep` at {@link HK_LATE_CHECKOUT_HOUR} is one morning left
+   *  behind (evening fill has not run yet), so this checks out exactly that set,
+   *  needing no per-room flag. It books each room's rent once (the morning event
+   *  skipped it) and marks the room dirty for the day's remaining housekeeping to
+   *  service; it does NOT re-run the morning `beforeCheckout`/`resetShift`
+   *  lifecycle. Classic never defers, so this is a pure no-op there. */
+  hotelLateCheckout(): void {
+    if ((this.sim.rules?.hotelDaytimePresence() ?? 0) <= 0) return;
+    let revenue = 0;
+    for (const u of this.sim.tower.units) {
+      if (!isHotelKind(u.kind)) continue;
+      if (u.state === "asleep") {
+        revenue += rentOf(u);
+        u.state = "dirty";
+        u.occupants = 0;
+      }
+    }
+    if (revenue > 0) {
+      this.sim.money += revenue;
+      this.sim.recordMoney?.("hotels", revenue);
+      this.sim.emit(`Late hotel checkouts: $${revenue.toLocaleString()} earned.`, "money");
+    }
   }
 
   /** Send housekeepers to dirty rooms (delegated to the housekeeping module).
