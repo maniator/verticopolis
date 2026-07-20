@@ -3,7 +3,7 @@ title: "GDD — SimTower 1994 Parity: segments, walking, parking & placement"
 game: Verticopolis (browser SimTower clone)
 author: Samus Shepard (Game Designer — gds agent), with the parity-audit party
 date: 2026-07-06
-updated: 2026-07-19
+updated: 2026-07-20
 status: In design
 scope: A canon-alignment initiative. Move Verticopolis's spatial and pedestrian
   model onto the 1994 original's numbers wherever we can — facility segment
@@ -19,7 +19,7 @@ grounds:
   - _bmad-output/planning-artifacts/design/gdd-legibility-2026-07-01.md (§0 guardrails)
   - src/engine/facilities.ts (FACILITIES widths, GRID, PARKING_WORKERS_PER_SPACE, TRANSPORT_CAPACITY, maxSpanFor)
   - src/engine/Simulation.ts (SAVE_VERSION + migration seam :117-152; updateSatisfaction; parkingDemand)
-  - src/engine/Crowd.ts (routing, ≤2-ride rule, no distance penalty)
+  - src/engine/Crowd.ts (routing, uncapped reachability, no distance penalty)
   - src/engine/Tower.ts (functionalParkingSet, servedFloors)
   - src/main.ts / src/game/buildActions.ts / src/ui/placement.ts (build input, drag-paint)
   - src/render/sprites/facilities.ts (drawParking)
@@ -367,9 +367,9 @@ Willingness is **live routing behavior, not persisted** in the `.TDT` (the forma
 5. `.TDT` export/import bytes are unchanged (round-trip and fixed-point tests hold); the Wine-harness carryover check passes.
 6. Version bump + one plain changelog line ("People will climb a few more flights of stairs before they need an elevator, matching the original."); `/gds-code-review` clean.
 
-### 8.9 Open question (do NOT resolve in this story)
+### 8.9 Ride budget: RESOLVED (uncapped, v1.67.0)
 
-`MAX_RIDES = 2` may itself be too small for a legitimate tall-tower elevator journey (express to a sky-lobby standard to a local elevator can need three rides), independent of stairs. This surfaced while proving the stair cap. State the intended ride budget explicitly when investigating; do **not** change `MAX_RIDES` under cover of this story. Tracked as a sibling bug (see §11.4).
+The open question here (is `MAX_RIDES = 2` too small?) was answered in the Wine harness: the 1994 original routes commutes through **6+ elevator transfers** (4-zone then 6-zone discriminator towers each rented their top band from empty), so it has effectively **no reachability ride cap**. Per the owner + game/design party, both modes now route through **any connected path** (#503/#509): `MAX_RIDES` is removed, `bfsRoute` is uncapped, the express-transfer lobby gate (#396) is removed, and Classic keeps the §8 walk budget (`bfsRouteWalkBudget`). The cost of a bad layout is the **wait-time / congestion satisfaction model**, not a hard wall: the original penalized elevator WAIT TIME (`Quality = 300 - total stress / tenants`), which a multi-transfer commute accumulates more of, not the transfer count. So no transfer-count penalty exists in Classic (that would invent a mechanic the original lacks). Two follow-ups: the per-Sim-vs-tower-wide stress fidelity gap (#514) and Modern's legible, time-based commute-comfort readout (#502, reframed).
 
 ---
 
@@ -429,7 +429,7 @@ several PRs; each bumps `version` per CLAUDE.md.
 1. Does `Unit` persist `width`, or derive it at load? (Decides migration strategy, §9.1.) → architecture.
 2. Cinema 31 / suite 10 — second source before shipping the width change? → architecture spike.
 3. W3 penalty as income-scalar vs. draw-radius — pick during architecture.
-4. **Is `MAX_RIDES = 2` too small for tall towers?** (Added 2026-07-19, §8.9.) A legitimate express-to-sky-lobby-standard-to-local journey can need three rides and is refused today, independent of stairs. A possible second parity bug, surfaced while proving the stair cap. Do NOT change `MAX_RIDES` inside the walkway-willingness story; investigate separately with the intended ride budget stated explicitly.
+4. **Is `MAX_RIDES = 2` too small for tall towers?** RESOLVED 2026-07-20 (§8.9): yes, badly. The harness measured the real ceiling at 6+ transfers (no reachability cap), so both modes now route any connected path (#503) and the express-lobby gate is gone (#509), shipped v1.67.0. The layout cost is the wait-time/congestion satisfaction model (the original penalized wait time, not transfer count). Follow-ups: #514 (per-Sim stress fidelity) and #502 (reframed Modern commute-comfort readout).
 
 ---
 
@@ -442,7 +442,7 @@ several PRs; each bumps `version` per CLAUDE.md.
 | E3 | **Parking correctness** | ratio 12→24; sprite one-car; parking drag-chain | Low–Med |
 | E4 | **Input parity** | mobile floor/lobby/parking drag-paint | Low |
 | E5 | **Canon capacity & docs** | express 33→42; PARITY.md/AGENTS.md canon updates | Low |
-| E6 | **Walkway willingness** (added 2026-07-19, §8) | two-budget routing (walk run separate from ride budget); Classic hard refusal via `sim.rules`; staff + reachability parity; Wine carryover check. Modern comfort-penalty deferred to its own GDD. | Med (save-affecting reachability; route golden-masters move) |
+| E6 | **Walkway willingness** (added 2026-07-19, §8) | two-budget routing (walk run separate from ride budget); Classic hard refusal via `sim.rules`; staff + reachability parity; Wine carryover check. Modern comfort-penalty reframed (#502) as a legible, TIME-based commute-comfort readout (not a transfer-count penalty); folds in the elevator-wait discomfort. | Med (save-affecting reachability; route golden-masters move) |
 
 **Sequencing:** E1 first (everything else sits on the corrected geometry + a
 migration path), then E3/E4/E5 (low-risk, independent), then E2 (the balance-heavy
