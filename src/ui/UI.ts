@@ -31,7 +31,7 @@ export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } 
  *  of that span, and if `aria-labelledby` referenced the h2 the dialog's
  *  computed accessible name would run the title together with the ✕'s own
  *  accessible name ("Close"). The dialog's DOM is fully replaced on every open
- *  ({@link UI.openModalTemplate} resets `dialog.innerHTML`, and only one
+ *  ({@link UI.openModalTemplate} clears the dialog's children, and only one
  *  modal is ever live at a time, guarded by {@link UI.isModalOpen}), so
  *  successive modal titles never collide on this one constant id. DOM id
  *  uniqueness is document-wide, and no other element in the app uses this id,
@@ -233,15 +233,16 @@ export class UI {
    *  grammar (see {@link finishModal}). The template renders into a box that is
    *  FRESH per open and discarded by closeModal(), so lit's part-cache never
    *  shares a container across opens: one container, one renderer. render() only
-   *  ever touches this child box; innerHTML is only ever set on the dialog itself
-   *  (cleared here and in closeModal). It renders once per open (no re-render), so
+   *  ever touches this child box; the dialog itself is only ever cleared, via
+   *  replaceChildren (here and in closeModal), never written as HTML. It renders
+   *  once per open (no re-render), so
    *  the ✕ that finishModal appends into the rendered h2 is safe; any initial
    *  focus is the dialog controller's own explicit side effect, not this mount's
    *  job.
    *  @internal friend-module access (uiDialogs). */
   openModalTemplate(result: TemplateResult): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
-    dialog.innerHTML = "";
+    dialog.replaceChildren();
     const box = document.createElement("div");
     box.className = "modal-box win";
     render(result, box);
@@ -300,7 +301,7 @@ export class UI {
   closeModal(): void {
     const dialog = this.el.modal as HTMLDialogElement;
     if (dialog.open) dialog.close();
-    dialog.innerHTML = "";
+    dialog.replaceChildren();
     // The title h2 goes with the wiped content; drop the reference to it too,
     // so aria-labelledby never dangles at a stale/missing id while the dialog
     // is closed (finishModal re-sets it fresh on the next open).
