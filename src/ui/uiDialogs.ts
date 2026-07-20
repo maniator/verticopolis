@@ -248,12 +248,13 @@ export function showHelp(ui: UI): void {
   // Inside a native wrapper the report link routes to the system browser
   // through the platform port (see routeExternalInWrapper).
   routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
-  // "Open the full comparison page" is a real <a href="/help" target="_blank">,
-  // so a plain browser tab opens the shareable page as written. But from an
-  // installed standalone PWA (or the native shell, which has no /help route) a
-  // new tab drops to the system browser and loses the session, so there we keep
-  // the player in the running sim: swap the navigation for the in-app compare
-  // modal, which pauses the tower and shows the same comparison.
+  // "Open the full help page" is a real <a href="/help#classic-vs-modern"
+  // target="_blank">, so a plain browser tab opens the shareable help page
+  // (deep-linked to the comparison section) as written. But from an installed
+  // standalone PWA (or the native shell, which has no /help route) a new tab
+  // drops to the system browser and loses the session, so there we keep the
+  // player in the running sim: swap the navigation for the in-app compare modal,
+  // which pauses the tower and shows the same comparison.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
   fullPage?.addEventListener("click", (e) => {
     // Downgrade in an installed standalone PWA AND in the native Capacitor shell:
