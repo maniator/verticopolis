@@ -49,3 +49,24 @@ Forcing a screenshot for these would show two near-identical frames and mislead.
 If a planned pair cannot be captured deterministically, the scene logs the
 skipped pair and the card falls back to caption-only rather than shipping an
 empty or mismatched figure.
+
+## Screenshot impact on existing captures (P1, not just the new scene)
+
+CAP-8's new scene is additive, but the P1 UI changes render new pixels and will
+drift captures that already exist. Plan for regenerating them through the pinned
+container (never a host browser), so the drift gate does not surprise the P1 PR:
+
+- **Mode badge (CAP-2):** it lands in the Tower panel near `#tower-name`, so any
+  scene that frames the main game view or the tower panel now shows "This tower:
+  Classic / Modern" and its capture drifts.
+- **Gallery restyle + cell resize (CAP-7):** `gallery.html`'s rendered output
+  changes (new retro chrome, sibling links, corrected multi-floor cell heights),
+  so the gallery visual snapshot (`e2e/visual.spec.ts` and the gallery reference
+  in `milestones.spec.ts`) drifts and is regenerated.
+- **Help dialog (CAP-1):** the copy is only extracted verbatim into
+  `compareTemplate()`, so the "02-help" showcase scene (captured collapsed)
+  should not drift. Verify this at implementation rather than assume it; if it
+  does drift, regenerate it the same way.
+
+The `/help` page itself is new, so it has no prior capture to drift; its scene
+coverage is the CAP-8 shortlist above.
