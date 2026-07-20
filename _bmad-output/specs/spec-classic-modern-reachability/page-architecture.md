@@ -66,7 +66,7 @@ JS disabled, from a cold share link, and inside the installed PWA.
 ### Sibling-page cross-links
 
 The retro page shell carries a small nav of sibling links. `/help` links to the
-Sprite Gallery (`/gallery.html`); the gallery links to `/help` and "Back to
+Sprite Gallery at the clean `/gallery`; the gallery links to `/help` and "Back to
 game" (`/`). All are plain same-origin anchors (no `target="_blank"` between
 sibling pages), so navigation stays inside the same tab/window and works cold.
 
@@ -107,10 +107,9 @@ same telemetry the same way:
 ## SEO / OG head parity
 
 Both pages carry a full head like `index.html` / `gallery.html`: `title`, meta
-`description`, `rel="canonical"` (`/help` and `/gallery.html`), `robots`, the
-`og:*` and `twitter:*` tags with an image and alt text, and a sitemap entry. The
-`/help` canonical is the clean `/help` (served by the targeted Vercel rewrite
-above).
+`description`, `rel="canonical"` (the clean `/help` and `/gallery`), `robots`,
+the `og:*` and `twitter:*` tags with an image and alt text, and a sitemap entry.
+Both canonicals are the clean URLs served by the targeted Vercel rewrites above.
 
 ## Tests
 
