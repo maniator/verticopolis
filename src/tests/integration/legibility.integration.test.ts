@@ -52,7 +52,7 @@ describe("Legibility — functionalParkingSet (Tower)", () => {
 });
 
 describe("Legibility — reachability & stranded floors (Simulation)", () => {
-  function disconnectedTower(seed: number): Simulation {
+  function strandedTower(seed: number): Simulation {
     const sim = Simulation.newGame(seed);
     sim.money = 1e12;
     layFull(sim, "lobby", 1);
@@ -63,8 +63,8 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
     return sim;
   }
 
-  it("floorReachable distinguishes served-but-disconnected from truly reachable", () => {
-    const sim = disconnectedTower(3);
+  it("floorReachable distinguishes served-but-unreachable (long climb) from truly reachable", () => {
+    const sim = strandedTower(3);
     expect(sim.floorReachable(1)).toBe(true);
     expect(sim.tower.isFloorServed(40)).toBe(true); // a shaft stops there
     expect(sim.floorReachable(40)).toBe(false); // ...but only via a 10-flight climb
@@ -89,7 +89,7 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
   });
 
   it("emits the stranded nudge once per 0→>0 crossing, not repeatedly", () => {
-    const sim = disconnectedTower(5);
+    const sim = strandedTower(5);
     const count = () => sim.log.filter((e) => e.text.includes("reachable only by a long stair climb")).length;
     sim.tick(DAY);
     expect(count()).toBe(1); // fired on the crossing
@@ -99,9 +99,9 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
 });
 
 describe("Legibility — reachability gates move-ins (Simulation)", () => {
-  /** Like disconnectedTower, but with empty rentable units instead of a tenant:
-   *  condo/office/hotel on floor 40 (a disconnected upper island) and a control
-   *  condo on floor 14 (one ride up shaft A, reachable). */
+  /** Like strandedTower, but with empty rentable units instead of a tenant:
+   *  condo/office/hotel on floor 40 (served, but reachable only up a too-long
+   *  stair climb) and a control condo on floor 14 (one ride up the elevator). */
   function strandedMoveInTower(seed: number): {
     sim: Simulation;
     unit: (id: number) => { state: string; everOccupied: boolean };
@@ -129,7 +129,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
     return { sim, unit, ids };
   }
 
-  it("no tenant kind moves in on a served but disconnected floor, while a reachable floor fills", () => {
+  it("no tenant kind moves in on a served but unreachable floor (long climb), while a reachable floor fills", () => {
     const { sim, unit, ids } = strandedMoveInTower(8);
     expect(sim.tower.isFloorServed(40)).toBe(true); // served, so only the reachability gate blocks
     sim.tick(7 * DAY); // a week of hourly move-in rolls

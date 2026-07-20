@@ -111,10 +111,12 @@ export function attemptMoveIns(sim: Simulation): void {
     const f = FACILITIES[u.kind];
     if (f.population === 0 && !isHotelKind(u.kind)) continue; // non-tenant facility
     if (!servedSet.has(u.floor)) continue; // nobody moves to an unreachable floor
-    // Reachability: a served floor the router cannot reach from the lobby (no
-    // connected transport path) draws no commuters, so nobody can arrive to buy,
-    // lease, or check in. Reachability is uncapped in both modes now (#503), so
-    // this rejects only a genuinely disconnected floor, not a merely deep one.
+    // Reachability: this branch runs after the servedSet check, so the floor IS
+    // connected to the lobby; it still draws no commuters if the router cannot
+    // reach it. Reachability is uncapped in both modes now (#503), so the only
+    // served-but-unreachable case is Classic refusing a stair/escalator climb
+    // past the walk budget (in Modern, served equals reachable). Nobody can
+    // arrive to buy, lease, or check in.
     // Same gate for every tenant kind; commercial visitor income already honors
     // it (EconomySystem.collectTrafficIncome), this makes move-ins agree.
     // (Quarterly office rent still gates on isFloorServed only, a deliberate

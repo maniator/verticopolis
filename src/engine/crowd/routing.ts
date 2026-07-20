@@ -196,8 +196,9 @@ export function reachable(crowd: Crowd, tower: Tower, from: number, to: number):
 }
 
 /** Route over the STAFF network (service elevators / stairs).
- *  Like passenger routing now, the staff search is UNCAPPED and applies no walk
- *  budget (the BFS `seen` set terminates it), so it agrees with what
+ *  The staff search is UNCAPPED (like passenger routing now) and, unlike Classic
+ *  passenger routing, applies NO walk budget (the BFS `seen` set terminates it),
+ *  so it agrees with what
  *  Tower.staffConnected calls reachable: both walk the same
  *  isStaffTransportKind/stopsOf graph. (Parallel implementations: if they
  *  ever drift, spawnStaff reports "no-route" so dispatch can surface it

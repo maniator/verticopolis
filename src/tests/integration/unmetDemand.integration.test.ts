@@ -136,7 +136,9 @@ describe("W-new: unmet local demand (#395)", () => {
     // A ground elevator makes the floor-2 tenants reachable.
     expect(sim.tower.placeTransport("elevatorStandard", MID, 1, 30).ok).toBe(true);
     // A DISCONNECTED retail island: an elevator serving 35..40 only, with no shaft
-    // bridging 30..35, so floor 40 is served but never reaches the lobby.
+    // bridging 30..35, so floor 40 never connects to the ground lobby (neither
+    // served nor reachable). Modern has no walk budget, so a disconnected island
+    // is the only way to make its retail unreachable.
     expect(sim.tower.placeTransport("elevatorStandard", MID + 12, 35, 40).ok).toBe(true);
     // The tenants under test: reachable ground offices (their own floor is fine).
     for (const x of [X0, MID + 18]) placeUnit(sim, "office", 2, x).state = "occupied";
