@@ -35,7 +35,15 @@ function arg(name, fallback) {
   return inline ? inline.slice(name.length + 3) : fallback;
 }
 
-const DAYS = Math.max(1, Number(arg("days", "30")) || 30);
+// Clamp the look-back to a sane, finite integer. A stray value (0, negative,
+// non-numeric, or Infinity from something like 1e309) must never push `since`
+// to an invalid Date and make day() throw, which would break the never-throw
+// promise. Defaults to 30, caps at 365.
+function clampDays(v) {
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 1 ? Math.min(n, 365) : 30;
+}
+const DAYS = clampDays(arg("days", "30"));
 const OUT_DIR = arg("out", "reports");
 // Max groups an aggregate query returns. High enough that low-cardinality
 // breakdowns (mode, reason, version, tool) never truncate; a high-cardinality
