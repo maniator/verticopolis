@@ -40,7 +40,48 @@ describe("gameplay analytics events", () => {
     gameplaySession.noteBuild("floor");
     gameplaySession.noteToolUsed("lobby");
     gameplaySession.noteStar(2);
+    gameplaySession.noteBoot({
+      reason: "continue",
+      version: "1.0.0",
+      mode: "classic",
+      star: 3,
+      floors: 20,
+      population: 500,
+    });
     expect(track).not.toHaveBeenCalled();
+  });
+
+  it("reports a boot snapshot with origin, version, and standing tower state", () => {
+    const snapshot = {
+      reason: "continue",
+      version: "1.68.0",
+      mode: "modern",
+      star: 4,
+      floors: 42,
+      population: 1200,
+    };
+    gameplaySession.noteBoot(snapshot);
+    expect(track).toHaveBeenCalledWith("boot", snapshot);
+  });
+
+  it("reports a crash with its flattened description and context", () => {
+    const crash = {
+      kind: "webgl-context-lost",
+      repeat: true,
+      recoveryFailed: true,
+      saveFlushed: false,
+      behindSplash: false,
+      version: "1.68.0",
+      star: 3,
+      population: 800,
+    };
+    gameplaySession.noteCrash(crash);
+    expect(track).toHaveBeenCalledWith("crash", crash);
+  });
+
+  it("reports an applied update as from/to versions", () => {
+    gameplaySession.noteUpdate("1.68.0", "1.69.0");
+    expect(track).toHaveBeenCalledWith("update", { from: "1.68.0", to: "1.69.0" });
   });
 
   it("fires first_build once per tower, then stays silent", () => {

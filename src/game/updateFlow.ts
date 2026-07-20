@@ -1,5 +1,6 @@
 import type { GameApp } from "../main";
 import type { UpdateInfo } from "../pwa";
+import { gameplaySession } from "../analytics";
 
 /**
  * The PWA update-prompt flow, split out of the `GameApp` class as friend
@@ -87,6 +88,16 @@ export function showUpdatePrompt(app: GameApp): void {
       // fires, so any such latch could stick forever if the reload never comes,
       // and a second activation is idempotent (skipWaiting + reload) anyway.
       app.shownUpdate = false;
+      // Report the update the player just initiated (from this build to the
+      // incoming one) before the activating reload navigates away. This counts
+      // the apply action: a rare failed activation (below) still sends one, so
+      // the boot event's reason "update" is the authoritative applied count.
+      // Best-effort and host-gated inside; track() queues synchronously and the
+      // already-injected Vercel script delivers by beacon, surviving the reload.
+      gameplaySession.noteUpdate(
+        typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev",
+        app.pendingUpdateInfo?.version ?? "unknown",
+      );
       // Mark this reload as an update so the fresh build drops the player back
       // into their tower (paused) with an "Updated …" greeting instead of the
       // title screen, honoring the modal's "keep playing" promise.

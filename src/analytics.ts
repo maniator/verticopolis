@@ -43,6 +43,41 @@ interface GameplayEvents {
   star_reached: { star: number };
   /** The tab was hidden or unloaded: session length in whole seconds. */
   session_end: { seconds: number };
+  /** One snapshot per boot: why the session started (`reason`), the build it
+   *  runs (`version`), and the standing state of the tower it opened. Unlike the
+   *  delta events, this captures a returning player's established tower even when
+   *  they trigger nothing else, and pins every session to a build version.
+   *  `reason` is one of "update", "recovery" (a WebGL-loss auto-reload),
+   *  "corrupt", "continue" (readable save resumed), or "fresh" (no save). */
+  boot: {
+    reason: string;
+    version: string;
+    mode: string;
+    star: number;
+    floors: number;
+    population: number;
+  };
+  /** The game hit a crash screen (today only a lost WebGL context). Carries the
+   *  crash description flattened to primitives so a reliability read has the
+   *  detail without opening a report: whether it repeated within 90s, whether an
+   *  in-place recovery was tried and failed, whether the tower was flushed first,
+   *  and whether it happened behind the boot splash. Fired at crash time, so it
+   *  lands even when the player never reloads. */
+  crash: {
+    kind: string;
+    repeat: boolean;
+    recoveryFailed: boolean;
+    saveFlushed: boolean;
+    behindSplash: boolean;
+    version: string;
+    star: number;
+    population: number;
+  };
+  /** The player applied a waiting build ("Update now"). `from` is the build they
+   *  were on, `to` the incoming build's version (or "unknown" if its
+   *  `version.json` couldn't be read), so update adoption is visible build over
+   *  build. Fired just before the activating reload. */
+  update: { from: string; to: string };
 }
 
 /** Host-gated, best-effort custom-event send. The single choke point every
@@ -112,6 +147,24 @@ class GameplaySession {
   /** The tower reached a new star rating. */
   noteStar(star: number): void {
     trackEvent("star_reached", { star });
+  }
+
+  /** Report the boot snapshot: how the session started plus the loaded tower's
+   *  state and build version. Fired once at boot so returning players whose
+   *  established tower never fires a delta event still show up, and so every
+   *  event stream is anchored to a version. */
+  noteBoot(info: GameplayEvents["boot"]): void {
+    trackEvent("boot", info);
+  }
+
+  /** Report a crash (crash-screen moment) with its flattened description. */
+  noteCrash(info: GameplayEvents["crash"]): void {
+    trackEvent("crash", info);
+  }
+
+  /** Report that the player applied a waiting build, from one version to another. */
+  noteUpdate(from: string, to: string): void {
+    trackEvent("update", { from, to });
   }
 
   /** Bank the current foreground segment and report cumulative play seconds.
