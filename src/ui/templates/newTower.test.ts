@@ -59,7 +59,6 @@ describe("newTowerTemplate structure and defaults", () => {
     // structurally it must not be nested in the Modern-only block).
     const frag = renderToFragment(newTowerTemplate(false));
     const details = frag.querySelector<HTMLDetailsElement>("details.nt-compare")!;
-    expect(details, "expected a .nt-compare details").not.toBeNull();
     expect(details.hasAttribute("open")).toBe(false);
     expect(details.closest(".nt-modern-only")).toBeNull();
     expect(details.querySelector("summary")?.textContent?.trim()).toBe("Classic vs Modern: the full comparison");

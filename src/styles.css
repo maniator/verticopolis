@@ -662,7 +662,7 @@ a.btn {
 /* Rule-set badge: names the active tower's rule-set and, on click, opens the
    Classic vs Modern comparison. A real <button> (keyboard + pointer), styled as
    a compact full-width status chip. It is its own element, kept OUT of
-   #tower-stats (the lit one-renderer container); UI.setMode is the only writer,
+   #tower-stats (the lit one-renderer container); uiStatus.setMode is the only writer,
    dirty-gated so the per-frame pump never touches the DOM unless the mode
    changes. The accent only tints the label, so the win bevel reads the same for
    both rule-sets (Classic is the faithful reference build, never the lesser one). */

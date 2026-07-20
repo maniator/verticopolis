@@ -2757,7 +2757,7 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
   });
 });
 
-describe("mode badge (UI.setMode) follows the live rule-set", () => {
+describe("mode badge (uiStatus.setMode) follows the live rule-set", () => {
   beforeEach(() => mountAppDom());
   afterEach(() => (document.body.innerHTML = ""));
 
