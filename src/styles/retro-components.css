@@ -92,7 +92,11 @@ a.btn {
   font-size: 13px;
   padding: 3px 8px;
 }
-.win-title .btn {
+/* The title-bar close/skip button (the modal ✕, a DIRECT child of the bar) is
+   pushed to the right end. Scoped to a direct child so it never reaches a nav of
+   `.btn` links nested inside the bar (the standalone pageShell title bar), which
+   would otherwise each get `margin-left:auto` and blow the nav apart. */
+.win-title > .btn {
   margin-left: auto;
   flex: none;
 }

@@ -2896,4 +2896,22 @@ describe("Help dialog: the 'Open full page' link downgrades to the compare modal
     // The help modal is untouched: the click was left to the real <a target=_blank>.
     expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
   });
+
+  it("also intercepts in the native Capacitor wrapper, which has no /help route", () => {
+    setStandalone(false); // not a standalone PWA, but a native shell
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal: () => {},
+    });
+    const onSpeed = vi.fn();
+    const { ui } = makeUI({ getSpeed: () => 1, onSpeed });
+    ui.showHelp();
+
+    clickFullPage();
+
+    // Kept in the sim: the compare modal opens (paused) instead of a dead new tab.
+    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
+    expect(onSpeed).toHaveBeenCalledWith(0);
+  });
 });

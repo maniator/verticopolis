@@ -20,6 +20,7 @@ import type { ExportReport } from "../storage/tdtExport";
 import type { UpdateInfo } from "../pwa";
 import { routeExternalInWrapper } from "./externalLink";
 import { isInstalledStandalone } from "./standalone";
+import { getPlatform } from "../platform";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -255,7 +256,11 @@ export function showHelp(ui: UI): void {
   // modal, which pauses the tower and shows the same comparison.
   const fullPage = box.querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
   fullPage?.addEventListener("click", (e) => {
-    if (isInstalledStandalone()) {
+    // Downgrade in an installed standalone PWA AND in the native Capacitor shell:
+    // the shell renders the bundled snapshot with no /help route (and no Vercel
+    // rewrite), so a new tab would 404 or lose the session there just as it would
+    // for a standalone PWA.
+    if (isInstalledStandalone() || getPlatform().isNativeWrapper) {
       e.preventDefault();
       showCompare(ui);
     }
