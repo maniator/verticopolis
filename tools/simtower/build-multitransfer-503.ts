@@ -2,20 +2,24 @@
 //
 // Constructs a synthetic tower whose only path from the ground lobby to the
 // top office band requires THREE elevator boardings (no whole-tower express
-// shortcut: three standard shafts zoned 1..30, 30..60, 60..75 with sky-lobby
-// transfers). Three office bands act as a reachability ladder:
-//   - band 1 (floor 8):  1 ride  (control, always reachable)
-//   - band 2 (floor 44): 2 rides (control, reachable under MAX_RIDES=2)
-//   - band 3 (floor 68): 3 rides (the test; only reachable if the budget >= 3)
+// shortcut: three standard shafts zoned 1..4, 4..7, 7..10; standard-to-standard
+// transfers need no lobby, so the transfer floors 4 and 7 are plain floors,
+// #396 gates express only). A short 10-floor tower frames cleanly in the Wine
+// harness. Three office bands act as a reachability ladder:
+//   - band 1 (floor 3): 1 ride  (control, always reachable)
+//   - band 2 (floor 6): 2 rides (control, reachable under MAX_RIDES=2)
+//   - band 3 (floor 9): 3 rides (the test; only reachable if the budget >= 3)
 //
 // It prints OUR router's verdict for each band (a fast, Docker-free check that
 // the tower is a real discriminator: bands 1/2 reachable, band 3 refused under
 // our current MAX_RIDES=2), then exports a .TDT for the Wine harness to load in
-// the real 1994 game. The offices are marked occupied so the real game has
-// commuters to route; whether band 3 stays populated over a game-day tells us
-// the original's true ride budget.
+// the real 1994 game. The saved camera view centers on the bands so the game
+// opens framed on them. Offices are marked occupied by default so the real game
+// has commuters to route; EMPTY_OFFICES=1 leaves them vacant for the
+// assumption-free "which bands rent out" read. Whether band 3 stays populated /
+// rents tells us the original's true ride budget.
 //
-// Usage:  npx tsx tools/simtower/build-multitransfer-503.ts
+// Usage:  [EMPTY_OFFICES=1] npx tsx tools/simtower/build-multitransfer-503.ts
 // Writes: tools/simtower/saves/TESTMR.TDT
 import { writeFileSync, mkdirSync } from "node:fs";
 import { resolve, dirname } from "node:path";
