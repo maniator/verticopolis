@@ -19,49 +19,13 @@
    own thing (box art, not UI); it shares interaction grammar only.
    ===================================================================== */
 
-/* ---- 1. TOKENS ------------------------------------------------------ */
-:root {
-  /* Semantic tokens. The first four are ALIASES of the chrome tokens below —
-     they read better at usage sites ("body text", "highlight") and can never
-     diverge from the theme. */
-  --bg: var(--r-desktop);
-  --panel: var(--r-face);
-  --ink: var(--r-ink);       /* body text */
-  --accent: var(--r-title);  /* navy — titles & highlights */
-  --panel-light: #d7d7d7;
-  --muted: #2f2f38;       /* secondary text — dark enough to read on gray */
-  --good: #15722e;
-  --bad: #b01023;
-  --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
-  --money: #0a6e26;
-  --line: #7a7a7a;
-  /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
-  --r-face: #c0c0c0;
-  --r-shadow: #808080;
-  --r-dark: #000000;
-  --r-light: #dfdfdf;
-  --r-hi: #ffffff;
-  --r-title: #000080;
-  --r-title-fg: #ffffff;
-  --r-ink: #000000;
-  --r-desktop: #008080;
-  --r-font: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
-  --bevel-out: inset -1px -1px var(--r-dark), inset 1px 1px var(--r-hi),
-    inset -2px -2px var(--r-shadow), inset 2px 2px var(--r-light);
-  --bevel-in: inset 1px 1px var(--r-dark), inset -1px -1px var(--r-hi),
-    inset 2px 2px var(--r-shadow), inset -2px -2px var(--r-light);
-  /* Floating windows cast one hard shadow. */
-  --win-shadow: 2px 2px 0 rgba(0, 0, 0, 0.4);
-  /* The Classic rent-rung chip fills (1994's Blue/Green/Yellow/Red levels).
-     Chosen to read on gray chrome and to stay clear of every reserved sprite
-     state-cue literal; hexes proposed in ux-pricing-split-editor §1.3, pending
-     the pixel-art party's ratification. No Rate has no token: absence of a
-     price is absence of a fill (the chip renders hollow). */
-  --rung-vlow: #2048b0;
-  --rung-low: #1e7a2e;
-  --rung-avg: #c8a000;
-  --rung-high: #b02020;
-}
+/* ---- 1. TOKENS + SHARED CHROME (extracted for reuse by standalone pages) ---
+   The retro tokens and the shared window/button/well/kv components live in
+   src/styles/ so the /help page and the gallery wear the same chrome from one
+   source. Imported first so the game render is unchanged. See
+   _bmad-output/specs/spec-classic-modern-reachability/retro-design-system.md. */
+@import "./styles/retro-tokens.css";
+@import "./styles/retro-components.css";
 
 /* ---- 2. BASE --------------------------------------------------------- */
 * {
@@ -131,141 +95,6 @@ html.reduce-motion *::after {
 
 /* ---- 3. COMPONENTS --------------------------------------------------- */
 
-/* .btn — THE button. Gray face, bevel out; press = bevel in. No hover
-   state on purpose (period chrome gives press feedback only). */
-.btn {
-  background: var(--r-face);
-  color: var(--r-ink);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-out);
-  padding: 3px 9px;
-  font-family: var(--r-font);
-  font-size: 12px;
-  cursor: pointer;
-}
-.btn:active {
-  background: var(--r-face);
-  box-shadow: var(--bevel-in);
-}
-/* A .btn on an <a> (the Help "Report an issue" link, the app's only outbound
-   link): anchors are inline, so normalize them to a button box — drop the link
-   underline and use inline-flex so the coarse-pointer min-height (below) lands. */
-a.btn {
-  display: inline-flex;
-  align-items: center;
-  text-decoration: none;
-}
-/* Primary = the classic Win-style DEFAULT BUTTON: same gray face, an extra
-   dark ring around the bevel, bold label. One primary per dialog; its DOM
-   position encodes default focus — first when it should own focus (emergency
-   Pay), last when the safe action must be reached first (destructive
-   confirms). */
-.btn.primary {
-  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out);
-  font-weight: 700;
-}
-.btn.primary:active {
-  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in);
-}
-/* Danger = red bold label on the SAME chrome (editor Sell/Bulldoze,
-   saves-slot delete, any future destructive action). */
-.btn.danger {
-  color: var(--bad-ink);
-  font-weight: 700;
-}
-/* Disabled = classic GrayText on the same raised chrome (never a hover/
-   pointer affordance). The browser already suppresses :active. */
-.btn:disabled {
-  color: var(--r-shadow);
-  cursor: default;
-}
-/* Title-bar size: the ✕ on every dismissible surface, the coach's Skip. */
-.btn.xs {
-  min-width: 18px;
-  padding: 1px 4px;
-  font-size: 10px;
-  line-height: 1.3;
-}
-
-/* .win — a floating window: gray face, bevel, one hard shadow. Windows
-   with inner padding declare it via the --pad-y/--pad-x tokens so their
-   title bar can run full-bleed without hand-synced negative margins. */
-.win {
-  --pad-y: 0px;
-  --pad-x: 0px;
-  --title-gap: 0px;
-  background: var(--r-face);
-  color: var(--r-ink);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-out), var(--win-shadow);
-}
-/* Docked windows (palette, sidebar, its panels) sit in the app frame — same
-   face and bevel, no floating drop shadow. */
-.win.docked {
-  box-shadow: var(--bevel-out);
-}
-
-/* .win-title — the navy title bar every window wears: same type, same
-   padding, ✕ pinned right (give the ✕ .btn.xs). */
-.win-title {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: var(--r-title);
-  color: var(--r-title-fg);
-  font-weight: 700;
-  font-size: 13px;
-  padding: 3px 8px;
-}
-.win-title .btn {
-  margin-left: auto;
-  flex: none;
-}
-/* Mini variant — section strips inside a window (statistics headers) and
-   other panel-scale bars: smaller, uppercase, tighter padding. */
-.win-title.sm {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 1px;
-  padding: 2px 6px;
-}
-/* Full-bleed: a window's title bar cancels the window's own padding via the
-   tokens declared on .win, so the bar can never drift out of alignment with
-   the frame — on ANY window, not just the modal. */
-.win > .win-title {
-  margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) var(--title-gap);
-}
-
-/* .well — sunken white data area (the File Manager idiom): lists,
-   textareas, logs, gauges live on wells. .field is a well you type into. */
-.well,
-.field {
-  background: var(--r-hi);
-  color: var(--r-ink);
-  border: 0;
-  border-radius: 0;
-  box-shadow: var(--bevel-in);
-}
-.field {
-  font: inherit;
-}
-
-/* .kv — two-column key/value grid (editor stats, tower stats, statistics
-   dialog columns). */
-.kv {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-content: start;
-}
-.kv .k {
-  color: var(--muted);
-}
-.kv .v {
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
 
 /* .toast — a little gray alert box; the left edge carries the kind. */
 .toast {
@@ -892,11 +721,16 @@ dialog.crash-card::backdrop {
 .nt-lede {
   color: var(--muted);
 }
+.nt-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 0;
+}
 .nt-modes {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 12px 0;
+  gap: 8px;
 }
 /* The Modern-only reveal: the "Modern adds" label and the calendar pace picker.
    Shown by default and HIDDEN under Classic via `:has()`. Written this way round
@@ -908,7 +742,9 @@ dialog.crash-card::backdrop {
 .nt-modern-only {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
 }
 .nt-choice:has(input[name="nt-mode"][value="classic"]:checked) .nt-modern-only {
   display: none;
@@ -917,6 +753,16 @@ dialog.crash-card::backdrop {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+/* Small section caption inside the Modern-only reveal ("Modern adds", "Calendar
+   pace"): a quiet uppercase label, one clear step below the mode-card names, so
+   the grouped features and the calendar radios each read as a labeled set. */
+.nt-sublabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 /* Founding-screen full comparison: the shared compareTemplate in a collapsed
    <details>, so the dialog stays a commitment by default while the whole
@@ -957,14 +803,17 @@ dialog.crash-card::backdrop {
   gap: 10px;
   align-items: flex-start;
   padding: 10px 12px;
-  border: 2px solid var(--line, #b8b2a0);
-  border-radius: 6px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
   cursor: pointer;
 }
-/* The whole card lights up when its radio is chosen (label wraps the input). */
+/* The chosen card presses in (raised bevel flips to sunken) and its name turns
+   navy, the same selected-state grammar the rest of the retro chrome uses. */
 .nt-mode:has(input:checked) {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: var(--bevel-in);
+}
+.nt-mode:has(input:checked) .nt-mode-name {
+  color: var(--accent);
 }
 .nt-mode input {
   margin-top: 3px;
@@ -983,20 +832,14 @@ dialog.crash-card::backdrop {
   line-height: 1.45;
   color: var(--muted);
 }
-.nt-feature {
-  padding-left: 8px;
-  border-left: 3px solid var(--accent);
-}
-/* Calendar pace picker: same card idiom as the mode cards, a step lighter so it
-   reads as a secondary choice. It lives inside the Modern-only reveal, so the
-   parent's flex gap handles spacing (no bottom margin of its own). */
+/* Calendar pace picker: the two radios grouped under the "Calendar pace"
+   sublabel. It lives inside the Modern-only reveal, so the parent's flex gap
+   handles spacing and the reveal's left rail already sets it apart; the picker
+   itself is just the labeled radio group, no card of its own. */
 .nt-calendar {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 12px;
-  border: 2px solid var(--line, #b8b2a0);
-  border-radius: 6px;
 }
 .nt-cal-opt {
   display: block;
@@ -1012,7 +855,7 @@ dialog.crash-card::backdrop {
   font-size: 10px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   vertical-align: middle;
   background: var(--muted);
   color: #fff;
@@ -1446,6 +1289,11 @@ dialog.crash-card::backdrop {
    palette and cream/amber buttons, sharing only the interaction grammar
    (bevel press states, focus visibility). Everything below the splash —
    the coach card — is regular chrome. */
+/* The title-screen sky, shared by the JS splash and the static boot cover below
+   so the two never diverge. */
+:root {
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+}
 #splash {
   position: fixed;
   inset: 0;
@@ -1458,7 +1306,22 @@ dialog.crash-card::backdrop {
   text-align: center;
   padding: 24px 18px;
   font-family: var(--r-font);
-  background: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  background: var(--splash-sky);
+}
+
+/* Static boot cover: painted from the first frame (it lives in index.html, and
+   the render-blocking stylesheet styles it before paint) so a cold load opens on
+   the title sky instead of flashing the empty game while the engine and the JS
+   splash mount. It wears the SAME sky as #splash and sits ABOVE it (z 50 > 40),
+   so once the real splash mounts underneath, the boot flow removes this cover and
+   the identical gradient stays put while the skyline and title card fade in. The
+   fallback boot paths (no WebGL, a boot error) also remove it so their message is
+   never trapped behind it. */
+#boot-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--splash-sky);
 }
 .splash-stars,
 .splash-sun,

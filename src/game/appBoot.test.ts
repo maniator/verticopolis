@@ -325,6 +325,20 @@ describe("runBootFlow", () => {
     expect(arg.hasSave).toBe(true);
   });
 
+  it("removes the static boot cover once the boot screen is decided (both paths)", () => {
+    // Splash path: the cover comes down so the identical title sky underneath
+    // (the mounted splash) shows through.
+    document.body.innerHTML = `<div id="boot-cover"></div>`;
+    runBootFlow(makeApp({ hadReadableSave: false }));
+    expect(document.getElementById("boot-cover")).toBeNull();
+
+    // Resume path: same removal, uncovering the resumed tower.
+    document.body.innerHTML = `<div id="boot-cover"></div>`;
+    sessionStorage.setItem(RESUME_AFTER_UPDATE_KEY, String(Date.now()));
+    runBootFlow(makeApp({ hadReadableSave: true }));
+    expect(document.getElementById("boot-cover")).toBeNull();
+  });
+
   it("wires the onboarding + splash callbacks back to the app", () => {
     const app = makeApp({ hadReadableSave: true });
     runBootFlow(app);

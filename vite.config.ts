@@ -1,4 +1,4 @@
-import { defineConfig, type Plugin } from "vite";
+import { defineConfig, type Plugin, type HtmlTagDescriptor } from "vite";
 import { configDefaults } from "vitest/config";
 import { resolve } from "node:path";
 import { readFileSync } from "node:fs";
@@ -53,6 +53,60 @@ function emitVersionJson(): Plugin {
   };
 }
 
+/** The one alt text for the shared social share card (og-image.png), reused by
+ *  every page's og:image:alt / twitter:image:alt below. */
+const OG_IMAGE_ALT =
+  "Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action.";
+
+/**
+ * The SEO/OG head tags every deployed page shares, identical across the game,
+ * the gallery, and the /help page. Per-page UNIQUE tags (title, description,
+ * canonical, og:url, og:title/description, twitter:title/description) stay inline
+ * in each page's own HTML; only the invariant boilerplate is centralized here.
+ *
+ * These are injected at BUILD time (static HTML, so search crawlers and social
+ * unfurlers, which don't run JavaScript, see them) rather than copy-pasted per
+ * page. lit-html renders the page BODY at runtime, but the head must be static,
+ * so this build-time inject is the crawler-safe way to keep one source.
+ */
+const SHARED_HEAD_TAGS: HtmlTagDescriptor[] = [
+  { tag: "meta", attrs: { name: "robots", content: "index, follow, max-image-preview:large" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:type", content: "website" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:site_name", content: "Verticopolis" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:image", content: "https://verticopolis.com/og-image.png" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:image:width", content: "1200" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:image:height", content: "630" }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:image:alt", content: OG_IMAGE_ALT }, injectTo: "head" },
+  { tag: "meta", attrs: { property: "og:locale", content: "en_US" }, injectTo: "head" },
+  { tag: "meta", attrs: { name: "twitter:card", content: "summary_large_image" }, injectTo: "head" },
+  { tag: "meta", attrs: { name: "twitter:image", content: "https://verticopolis.com/og-image.png" }, injectTo: "head" },
+  { tag: "meta", attrs: { name: "twitter:image:alt", content: OG_IMAGE_ALT }, injectTo: "head" },
+  { tag: "meta", attrs: { name: "theme-color", content: "#000080" }, injectTo: "head" },
+  { tag: "link", attrs: { rel: "icon", href: "./favicon.png", type: "image/png" }, injectTo: "head" },
+  { tag: "link", attrs: { rel: "apple-touch-icon", href: "./apple-touch-icon.png" }, injectTo: "head" },
+];
+
+/** Inject the shared head tags into the three PUBLIC pages (the game, the
+ *  gallery, and /help). `preview.html` is the noindex screenshot harness, so it
+ *  is deliberately left out. */
+function sharedHead(): Plugin {
+  const pages = new Set(["index.html", "gallery.html", "help.html"]);
+  return {
+    name: "shared-head",
+    transformIndexHtml: {
+      order: "pre",
+      handler(_html, ctx) {
+        // ctx.path is the page path. The production build always passes the real
+        // filename (e.g. "/index.html"), but the dev server serves the game at
+        // "/", whose basename is "", so map an empty basename to index.html.
+        const base = (ctx.path.split("?")[0].split("/").pop() ?? "").toLowerCase();
+        const file = base === "" ? "index.html" : base;
+        return pages.has(file) ? SHARED_HEAD_TAGS : [];
+      },
+    },
+  };
+}
+
 export default defineConfig({
   root: "src",
   base: "./",
@@ -68,6 +122,7 @@ export default defineConfig({
   },
   plugins: [
     emitVersionJson(),
+    sharedHead(),
     // Installable PWA via Workbox (vite-plugin-pwa) — no hand-rolled service
     // worker. Registration is NOT auto-injected (`injectRegister: false`);
     // only the game entry (main.ts → src/pwa.ts) registers, so the tooling
@@ -110,14 +165,24 @@ export default defineConfig({
         // shell, so keep it out of the offline precache.
         globIgnores: ["**/gallery*", "**/preview*", "**/og-image*"],
         navigateFallback: "index.html",
-        // Keep the tooling pages out of the app shell fallback, and let the
-        // real static files fall through to the network rather than the game
-        // shell: `version.json` (the update-check payload), the crawler control
-        // files `robots.txt` / `sitemap.xml`, and the `og-image.png` share card
-        // (a direct navigation to it, e.g. opening the card in a new tab while
-        // the service worker controls the origin, must return the PNG, not the
-        // shell), none of which are app routes.
-        navigateFallbackDenylist: [/gallery/, /preview/, /version\.json$/, /robots\.txt$/, /sitemap\.xml$/, /og-image\.png$/],
+        // Keep the non-game pages and the real static files out of the app-shell
+        // fallback, letting them fall through to the network rather than the game
+        // shell: the `/gallery` and `/help` public pages, `version.json` (the
+        // update-check payload), the crawler control files `robots.txt` /
+        // `sitemap.xml`, and the `og-image.png` share card (a direct navigation to
+        // it, e.g. opening the card in a new tab while the service worker controls
+        // the origin, must return the PNG, not the shell), none of which are app
+        // routes. Without the `/help` entry the fallback would answer a `/help`
+        // navigation with the precached game shell.
+        //
+        // The built `help.html` IS precached (it is not in `globIgnores`), so an
+        // offline navigation to `/help.html` is cache-served; the CLEAN `/help`
+        // offline resolves only via the Vercel rewrite (online). A precache alias
+        // for the clean URL is deliberately NOT added: with generateSW it would
+        // make Workbox fetch `/help` at install, which 404s anywhere the Vercel
+        // rewrite is absent (`vite preview`, the e2e harness), failing the whole
+        // precache and taking the game's offline down with it.
+        navigateFallbackDenylist: [/gallery/, /help/, /preview/, /version\.json$/, /robots\.txt$/, /sitemap\.xml$/, /og-image\.png$/],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
         maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
@@ -142,6 +207,7 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, "src/index.html"),
         gallery: resolve(__dirname, "src/gallery.html"),
+        help: resolve(__dirname, "src/help.html"),
         preview: resolve(__dirname, "src/preview.html"),
       },
       output: {
@@ -221,6 +287,7 @@ export default defineConfig({
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
         "src/gallery.ts",
+        "src/helpPage.ts",
         "src/preview.ts",
         "src/pwa.ts",
         "src/main.ts",

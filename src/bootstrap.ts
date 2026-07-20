@@ -1,7 +1,6 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
-import { injectSpeedInsights } from "@vercel/speed-insights";
-import { inject as injectWebAnalytics } from "@vercel/analytics";
+import { injectVercelTelemetry } from "./telemetry";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -28,7 +27,17 @@ export function hasWebGL(): boolean {
   }
 }
 
+/** Remove the static boot cover (index.html) once the app has something real to
+ *  show: the mounted splash, the resumed tower, or a boot-fallback message. It
+ *  is idempotent, so every boot outcome can call it without coordinating. */
+export function hideBootCover(): void {
+  document.getElementById("boot-cover")?.remove();
+}
+
 export function showBootMessage(content: TemplateResult | string, withReload = false): void {
+  // A boot-fallback message (no WebGL, a boot error) must never be trapped
+  // behind the cover, so drop it unconditionally, before the #stage guard.
+  hideBootCover();
   const stage = document.getElementById("stage");
   if (!stage) return;
   // Render through lit-html (the app's renderer): an interpolated string is
@@ -54,24 +63,11 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 export function bootGame(create: () => BootApp): void {
   if (typeof document === "undefined") return;
   const boot = () => {
-    // Vercel Speed Insights + Web Analytics: report Core Web Vitals and page
-    // views, but only where the Vercel endpoints (/_vercel/speed-insights/* and
-    // /_vercel/insights/*) actually exist: the production domain and Vercel
-    // preview deployments. Gating on the host keeps the injected scripts' 404s
-    // (and the console errors they raise) out of localhost, the `vite preview`
-    // server the e2e console-error guards run against, and the native Capacitor
-    // shell (whose origin is not on this list, mirroring the service-worker
-    // registration's native gate). Wrapped so a telemetry hiccup can never throw
-    // past this line and suppress the WebGL fallback below.
-    const host = window.location.hostname;
-    if (host === "verticopolis.com" || host.endsWith(".vercel.app")) {
-      try {
-        injectSpeedInsights();
-        injectWebAnalytics();
-      } catch {
-        /* best-effort telemetry; never block boot on it */
-      }
-    }
+    // Report Core Web Vitals and page views through the shared, host-gated
+    // helper (the same inject the gallery and the /help page use), so a
+    // telemetry hiccup can never throw past this line and suppress the WebGL
+    // fallback below.
+    injectVercelTelemetry();
     if (!hasWebGL()) {
       showBootMessage(
         html`This viewer can't run WebGL, which Verticopolis needs to draw the

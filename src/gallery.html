@@ -8,70 +8,35 @@
       name="description"
       content="Browse every room, facility, and transport sprite in Verticopolis, the free browser-based SimTower clone. Each one is drawn procedurally in code, with no external art assets."
     />
-    <link rel="canonical" href="https://verticopolis.com/gallery.html" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Verticopolis" />
+    <link rel="canonical" href="https://verticopolis.com/gallery" />
+
+    <!-- Page-unique Open Graph / Twitter copy. The invariant tags (og:image,
+         twitter:card, theme-color, favicon, robots, etc.) are injected at build
+         time by the shared-head Vite plugin, so they live in one place. -->
     <meta property="og:title" content="Verticopolis Sprite Gallery: every room drawn in code" />
     <meta
       property="og:description"
       content="Every room, facility, and transport in the browser SimTower clone Verticopolis, drawn procedurally in code with no external art assets."
     />
-    <meta property="og:url" content="https://verticopolis.com/gallery.html" />
-    <meta property="og:image" content="https://verticopolis.com/og-image.png" />
-    <meta property="og:image:alt" content="Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action." />
-    <meta name="twitter:card" content="summary_large_image" />
+    <meta property="og:url" content="https://verticopolis.com/gallery" />
     <meta name="twitter:title" content="Verticopolis Sprite Gallery: every room drawn in code" />
     <meta
       name="twitter:description"
       content="Every room, facility, and transport in the browser SimTower clone Verticopolis, drawn procedurally in code with no external art assets."
     />
-    <meta name="twitter:image" content="https://verticopolis.com/og-image.png" />
-    <meta name="twitter:image:alt" content="Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action." />
-    <style>
-      /* Retro (Win3.1 / SimTower) theme, matching the main app. */
-      body {
-        margin: 0;
-        background: #008080; /* teal desktop */
-        color: #000;
-        font-family: "MS Sans Serif", "Tahoma", "Geneva", "Segoe UI", sans-serif;
-        -webkit-font-smoothing: none;
-      }
-      header {
-        margin: 8px;
-        padding: 8px 12px;
-        background: #c0c0c0; /* system gray */
-        box-shadow:
-          inset -1px -1px #000,
-          inset 1px 1px #fff,
-          inset -2px -2px #808080,
-          inset 2px 2px #dfdfdf;
-      }
-      header h1 {
-        margin: -8px -12px 8px;
-        padding: 3px 8px;
-        font-size: 14px;
-        background: #000080; /* navy title bar */
-        color: #fff;
-      }
-      header p {
-        margin: 4px 0 0;
-        font-size: 12px;
-        color: #000;
-      }
-      #gallery {
-        display: block;
-        margin: 0 auto;
-        image-rendering: pixelated;
-      }
-    </style>
+
+    <link rel="stylesheet" href="./styles/retro-page.css" />
   </head>
-  <body>
-    <header>
-      <h1>🏙️ Verticopolis: Sprite Gallery</h1>
-      <p>Every facility, transport and special state, drawn procedurally at game scale (evening lighting). Animated: elevators, cinema, metro.</p>
-    </header>
-    <canvas id="gallery"></canvas>
+  <body class="retro-page">
+    <div id="app">
+      <noscript>
+        <p style="max-width: 64ch; margin: 1em auto">
+          The Verticopolis sprite gallery draws every room and facility on a canvas, so it needs JavaScript.
+          <a href="/">Open the game</a> or see the source at
+          <a href="https://github.com/maniator/verticopolis">github.com/maniator/verticopolis</a>.
+        </p>
+      </noscript>
+    </div>
     <script type="module" src="./gallery.ts"></script>
   </body>
 </html>

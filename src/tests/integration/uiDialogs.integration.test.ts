@@ -2833,3 +2833,85 @@ describe("Compare modal (showCompare) pauses the tower and restores speed", () =
     expect(dialog().textContent).toContain("Variant households");
   });
 });
+
+describe("Help dialog: the 'Open full page' link downgrades to the compare modal when installed", () => {
+  beforeEach(() => mountAppDom());
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  /** Force (or clear) the installed-standalone signal the link's handler reads. */
+  const setStandalone = (on: boolean): void => {
+    vi.spyOn(window, "matchMedia").mockImplementation(
+      (q: string) =>
+        ({
+          matches: q.includes("display-mode: standalone") ? on : false,
+          media: q,
+          onchange: null,
+          addListener: () => {},
+          removeListener: () => {},
+          addEventListener: () => {},
+          removeEventListener: () => {},
+          dispatchEvent: () => false,
+        }) as unknown as MediaQueryList,
+    );
+  };
+
+  const clickFullPage = (): void => {
+    const a = dialog().querySelector<HTMLAnchorElement>('a[data-act="open-help"]');
+    expect(a, "expected the Open full page link in the Help dialog").not.toBeNull();
+    a!.click();
+  };
+
+  it("intercepts the click and opens the in-app compare modal when running standalone", () => {
+    setStandalone(true);
+    const onSpeed = vi.fn();
+    const { ui } = makeUI({ getSpeed: () => 2, onSpeed });
+    ui.showHelp();
+    expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
+
+    clickFullPage();
+
+    // The single #modal now shows the compare modal, and opening it paused the
+    // tower (showCompare's pause-on-open), so the player never left the sim.
+    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
+    expect(dialog().textContent).toContain("pixel-faithful to 1994");
+    expect(onSpeed).toHaveBeenCalledWith(0);
+  });
+
+  it("leaves the anchor to navigate in a plain browser tab (no interception)", () => {
+    setStandalone(false);
+    const { ui } = makeUI();
+    ui.showHelp();
+    // Suppress happy-dom's real new-tab navigation (it would fetch /help against
+    // no server): a test-only listener cancels the default AFTER the production
+    // handler has had its chance, so we still prove the handler itself did not
+    // hijack the click (the compare modal never opens; the Help modal stays put).
+    const a = dialog().querySelector<HTMLAnchorElement>('a[data-act="open-help"]')!;
+    a.addEventListener("click", (e) => e.preventDefault());
+
+    clickFullPage();
+
+    // The help modal is untouched: the click was left to the real <a target=_blank>.
+    expect(dialog().querySelector("h2")?.textContent).toContain("How to play");
+  });
+
+  it("also intercepts in the native Capacitor wrapper, which has no /help route", () => {
+    setStandalone(false); // not a standalone PWA, but a native shell
+    vi.spyOn(platformModule, "getPlatform").mockReturnValue({
+      isNativeWrapper: true,
+      saveFile: () => Promise.resolve(),
+      openExternal: () => {},
+    });
+    const onSpeed = vi.fn();
+    const { ui } = makeUI({ getSpeed: () => 1, onSpeed });
+    ui.showHelp();
+
+    clickFullPage();
+
+    // Kept in the sim: the compare modal opens (paused) instead of a dead new tab.
+    expect(dialog().querySelector("h2")?.textContent).toContain("Classic vs Modern");
+    expect(onSpeed).toHaveBeenCalledWith(0);
+  });
+});

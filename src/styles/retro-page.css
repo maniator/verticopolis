@@ -1,0 +1,206 @@
+/* Standalone retro page layer: the shared Windows-3.1 chrome (tokens +
+   components) plus the layout a full-page document needs (the teal desktop
+   ground, a centered window, a sticky title bar, a body, a card grid, and a
+   status bar). The /help page and the sprite gallery both load this so they wear
+   the same chrome as the game from one source. The game itself does NOT load
+   this file (it uses styles.css); this is page-only layout.
+
+   Unlike the game (which commits to the single light-silver world), a shared
+   page link can land in a dark viewer, so this layer defines a dark-theme token
+   override. It flips only the desktop ground and text legibility, never the
+   window chrome, which stays period-correct silver on both grounds. */
+
+@import "./retro-tokens.css";
+@import "./retro-components.css";
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body.retro-page {
+  margin: 0;
+  min-height: 100vh;
+  padding: 22px 14px 48px;
+  font-family: var(--r-font);
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--r-ink);
+  background-color: var(--r-desktop);
+  /* A faint dotted weave, like the 1994 desktop pattern. */
+  background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+  background-size: 3px 3px;
+  -webkit-font-smoothing: none;
+}
+
+/* The page window: a centered .win (chrome from retro-components.css) with inner
+   padding declared via the shared --pad tokens so its title bar runs full-bleed. */
+.page-win {
+  --pad-y: 0px;
+  --pad-x: 0px;
+  --title-gap: 0px;
+  max-width: 1040px;
+  margin: 0 auto;
+}
+
+/* The title bar stays put while the body scrolls, so "Back to game" is always
+   reachable. It is a .win-title (navy strip) with the nav pinned right. */
+.page-win > .win-title {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  gap: 10px;
+}
+.page-title-text {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The sibling-nav + Back-to-game links sit at the right of the title bar. */
+.page-nav {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}
+
+.win-body {
+  padding: 20px 22px 22px;
+}
+
+/* The shared comparison body (compareTemplate) renders its divergence list here
+   on the /help page; give it comfortable spacing (in-game it inherits the modal's
+   type scale instead). */
+.win-body ul {
+  margin: 12px 0;
+  padding-left: 22px;
+}
+.win-body li {
+  margin: 0 0 8px;
+}
+.win-body li:last-child {
+  margin-bottom: 0;
+}
+
+/* The sprite gallery's fixed-width canvas scrolls sideways inside its own box on
+   a narrow viewport, so the page body itself never scrolls horizontally. */
+.gallery-scroll {
+  overflow-x: auto;
+}
+.gallery-scroll canvas {
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
+}
+
+/* Lead block. */
+.page-lede {
+  max-width: 64ch;
+  margin: 0 0 14px;
+}
+.page-lede h1 {
+  font-size: 22px;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+.page-lede p {
+  margin: 0 0 10px;
+}
+.page-lede .sub {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* Card grid (the /help divergence cards; unused by the gallery, harmless). */
+.page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 16px;
+}
+.page-card {
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+  padding: 3px;
+}
+.page-card .card-head {
+  background: var(--panel-light);
+  box-shadow: var(--bevel-in);
+  margin: 3px;
+  padding: 6px 9px;
+  font-weight: 700;
+  font-size: 14px;
+}
+.page-card .card-body {
+  margin: 3px 3px 6px;
+  padding: 4px 6px 2px;
+  font-size: 13px;
+}
+
+/* Footer + status bar garnish. */
+.page-foot {
+  margin-top: 20px;
+  box-shadow: var(--bevel-in);
+  background: var(--panel-light);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: space-between;
+}
+.page-foot .actions {
+  display: flex;
+  gap: 8px;
+}
+.page-statusbar {
+  display: flex;
+  gap: 3px;
+  margin-top: 3px;
+  font-size: 11.5px;
+}
+.page-statusbar span {
+  box-shadow: var(--bevel-in);
+  padding: 2px 8px;
+  color: var(--muted);
+}
+.page-statusbar span:first-child {
+  flex: 1;
+}
+
+/* Dark viewer: only the ground and page-level text shift; the window chrome
+   stays silver. The media query is the OS default; the [data-theme] hooks let a
+   future in-page toggle win in both directions. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --r-desktop: #05403f;
+  }
+  body.retro-page {
+    color: #eafcfb;
+  }
+}
+:root[data-theme="dark"] {
+  --r-desktop: #05403f;
+}
+:root[data-theme="dark"] body.retro-page {
+  color: #eafcfb;
+}
+:root[data-theme="light"] {
+  --r-desktop: #008080;
+}
+:root[data-theme="light"] body.retro-page {
+  /* A light toggle on a dark-OS device has to win back the dark media rule's
+     near-white body text, or the "wins in both directions" claim above is false. */
+  color: var(--r-ink);
+}
+
+@media (max-width: 560px) {
+  .win-body {
+    padding: 16px 14px 18px;
+  }
+  .page-win > .win-title {
+    font-size: 12px;
+  }
+}
