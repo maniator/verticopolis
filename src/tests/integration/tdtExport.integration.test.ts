@@ -1217,11 +1217,14 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
     expect(u32(bytes, peopleOffset(bytes))).toBe(20 + 25);
   });
 
-  it("vacant commercial units do not add their catalog population to the census", () => {
+  it("vacant commercial units contribute 0 to the census (the honest occupied count)", () => {
     // Vacant units (state: empty) are not present; residentCount is never called
-    // for them. The room-count floor still produces a nonzero count (SimTower
-    // needs a nonzero people block for any non-empty tower), but it should be
-    // the small floor value, NOT the catalog population × rooms.
+    // for them. The census is the ACTUAL occupied population, so an all-vacant
+    // tower writes 0, NOT the catalog population and NOT a room-count floor (an
+    // earlier version floored at counts.rooms on the disproven belief a zero
+    // people block faults; a truly-empty tower loads fine at Pop 0). Such an
+    // all-vacant-rooms tower still renders black in the real game, but that is a
+    // separate game-side limitation (#510), independent of this count.
     const { bytes } = buildTDT(
       tower([
         unit({ id: 1, kind: "lobby", floor: 1, x: 0, width: 1 }),
@@ -1229,8 +1232,7 @@ describe("buildTDT: real-game loadability (people, routing tail, schedule, camer
         unit({ id: 3, kind: "restaurant", floor: 3, x: 0, width: 24, state: "empty" }),
       ]),
     );
-    // Room-count floor = 2 (the two vacant commercial rooms), not catalog pop × 2.
-    expect(u32(bytes, peopleOffset(bytes))).toBe(2);
+    expect(u32(bytes, peopleOffset(bytes))).toBe(0);
   });
 
   it("mixed tower census sums offices, condos, and present commercial correctly", () => {

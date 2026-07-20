@@ -179,11 +179,20 @@ export function encodeTower(save: SerializedGame, gathered: GatheredTower): Enco
   // venues when present), clamped to the canon maximum so a forged save can't
   // bloat the file. See TDT_ROUTING_TAIL_SIZE for the companion trailing-region
   // fix that lets the whole file reach the length the game reads.
-  // The floor at counts.rooms prevents a zero census for a tower that has rooms
-  // but all commercial venues are vacant/construction (finitePop = 0 then), which
-  // would fault like an empty people block. An empty tower stays at 0.
+  // Write the ACTUAL occupied census (peoplePop), clamped to the canon max so a
+  // forged save can't bloat the file. It must NOT exceed the occupied population:
+  // the game reads this many person records and seats each in an occupied unit,
+  // so a phantom count with no home to seat it in was a black-render risk. An
+  // earlier version floored this at `counts.rooms`, believing a zero people block
+  // faulted; the SimTower harness disproves that (a truly-empty tower loads fine
+  // at Pop 0, and the old zero-people fault was really the undersized routing
+  // tail, since fixed by TDT_ROUTING_TAIL_SIZE). The floor was itself dishonest
+  // (it wrote `rooms` homeless phantoms for an all-vacant tower). Note: an
+  // all-vacant-rooms tower still renders black in the real game regardless of
+  // this count, a separate game-side limitation (divide-by-zero on 0 tenants),
+  // see #510; that is not fixable here and is not what this census governs.
   const finitePop = Number.isFinite(peoplePop) ? Math.round(peoplePop) : 0;
-  const peopleCount = Math.max(0, Math.min(Math.max(finitePop, counts.rooms), TDT_MAX_CENSUS));
+  const peopleCount = Math.max(0, Math.min(finitePop, TDT_MAX_CENSUS));
   w.i32(peopleCount);
   w.pad(peopleCount * TDT_PERSON_RECORD_SIZE);
 
