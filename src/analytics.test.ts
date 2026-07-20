@@ -216,6 +216,20 @@ describe("startGameplaySession wiring", () => {
     expect(track).toHaveBeenCalledWith("session_end", { seconds: 3 });
   });
 
+  it("does not count time before the page first becomes visible", () => {
+    window.location.href = prod;
+    setVisibility("hidden"); // opened in a background tab / prerendered
+    vi.setSystemTime(0);
+    startGameplaySession(); // must not begin timing while hidden
+    vi.setSystemTime(5000);
+    setVisibility("visible"); // player focuses the tab at 5s
+    document.dispatchEvent(new Event("visibilitychange"));
+    vi.setSystemTime(8000);
+    setVisibility("hidden"); // leaves at 8s: only 3s of foreground play
+    document.dispatchEvent(new Event("visibilitychange"));
+    expect(track).toHaveBeenCalledWith("session_end", { seconds: 3 });
+  });
+
   it("ignores a visibilitychange that is not to hidden", () => {
     window.location.href = prod;
     startGameplaySession();

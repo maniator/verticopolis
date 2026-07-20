@@ -31,9 +31,10 @@ interface GameplayEvents {
    *  rule-set: "classic" or "modern". */
   game_started: { mode: string };
   /** The first facility placed in the current tower (the funnel's "did they
-   *  build anything" step). Re-opens when a new tower is founded, so it pairs
-   *  with `game_started` per tower. `tool` is the facility/transport kind that
-   *  broke the ice. */
+   *  build anything" step). Fires once per tower: for a founded tower it follows
+   *  that tower's `game_started` (the latch re-opens in `noteNewGame`); for the
+   *  boot tower that a continued save opens on, it fires with no preceding
+   *  `game_started`. `tool` is the facility/transport kind that broke the ice. */
   first_build: { tool: string };
   /** A tool was selected, reported once per distinct tool so the event captures
    *  the session's tool mix without a row per click. */
@@ -230,10 +231,14 @@ export function startGameplaySession(): void {
   // refactor, a double boot) can't attach a second pair and double-count
   // session_end.
   if (!gameplaySession.arm()) return;
-  gameplaySession.begin();
+  // Only start the clock if the page is actually visible. A background-tab or
+  // prerender open begins hidden; timing then starts when it first becomes
+  // visible below, so hidden time is never counted as foreground play.
+  if (document.visibilityState === "visible") gameplaySession.begin();
   window.addEventListener("pagehide", () => gameplaySession.end());
   document.addEventListener("visibilitychange", () => {
+    // Bank on hidden, (re)start on visible, ignore other states (e.g. prerender).
     if (document.visibilityState === "hidden") gameplaySession.end();
-    else gameplaySession.begin();
+    else if (document.visibilityState === "visible") gameplaySession.begin();
   });
 }
