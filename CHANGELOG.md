@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.67.0
 
-- People now ride as many elevators as it takes to reach a floor, matching the original, instead of giving up after two transfers. Long trips still cost you through crowding and waiting, so sky lobbies and express elevators keep a tall tower moving rather than being needed just to reach the top.
+- People now ride as many elevators as it takes to reach a floor, matching the original, instead of giving up after two rides. Long trips still cost you through crowding and waiting, so sky lobbies and express elevators keep a tall tower moving rather than being needed just to reach the top.
 
 ## 1.65.0
 

@@ -335,7 +335,7 @@ describe("bulldoze AFTER return-route computed (arch §8 test 6)", () => {
   });
 });
 
-describe("meal round-trippers respect the two-ride reachability rule", () => {
+describe("meal round-trippers respect reachability (a venue with no transport draws none)", () => {
   it("spawns nothing when the venue is unreachable (no transport)", () => {
     const sim = new Simulation(2024, "modern", "realWorld");
     sim.money = 1_000_000;
