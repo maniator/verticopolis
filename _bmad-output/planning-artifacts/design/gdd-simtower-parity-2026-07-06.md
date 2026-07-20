@@ -3,6 +3,7 @@ title: "GDD — SimTower 1994 Parity: segments, walking, parking & placement"
 game: Verticopolis (browser SimTower clone)
 author: Samus Shepard (Game Designer — gds agent), with the parity-audit party
 date: 2026-07-06
+updated: 2026-07-19
 status: In design
 scope: A canon-alignment initiative. Move Verticopolis's spatial and pedestrian
   model onto the 1994 original's numbers wherever we can — facility segment
@@ -302,13 +303,83 @@ tool is held.
 
 ---
 
-## 8. Version bump & save migration (v1 → v2)
+## 8. Walkway willingness (vertical-reach parity)
+
+**Added 2026-07-19** (design party: Samus / Cloud / Link + a SimTower veteran, after web research and direct `bfsRoute` probing). Answers to the **Canon is the default** and **No save left behind** pillars.
+
+**The rule:** in the 1994 original a person will chain at most **4 contiguous stair flights** or **7 escalators** on a single trip before refusing; boarding any elevator car resets that count. A stair/escalator is a WALK, not a ride, and does not spend the elevator transfer budget.
+
+### 8.1 The parity bug this fixes
+
+Verified, not assumed: the crowd router counts each single stair flight as one boarding against the same 2-boarding budget as elevators, so a **3-flight stair climb is refused today** (`route(1 → 4)` returns null). Pure-stair reach is currently **2 floors**, stricter than the canon 4. Stairs also wrongly starve the transfer budget: a single stair after an express-to-standard journey is refused because both rides are spent. We are more restrictive than the game we clone, in the wrong direction.
+
+### 8.2 Model
+
+- Two separate budgets: the elevator **ride budget** (unchanged) and a new **contiguous-walk budget**.
+- A walk run may cross at most `WALKWAY_WILLINGNESS[kind]` flights of its kind (stairs 4 / escalators 7; the constant already ships in `facilityCaps.ts`).
+- A mixed stair-plus-escalator run on one uninterrupted walk is bounded by the **stricter** remaining threshold (a stair on the run caps it at 4).
+- Boarding **any** passenger car resets the walk count to zero.
+- **Passengers only. Staff are excluded** (corrected 2026-07-19 during implementation prep): `staffRoute` runs UNCAPPED today (`maxRides = Infinity`) and PARITY.md deliberately does not reproduce the 1994 seven-plus-floor staff-stair degradation ("our staff routing has no such degradation"). Applying a 4-flight walk budget to housekeepers would TIGHTEN staff against that ratified divergence, the opposite direction from the passenger fix. So the walk budget applies to the PASSENGER network only; the staff network (`staffAdjacency` / `staffRoute`) is untouched. This supersedes the party's "housekeeper obeys the same budget" note.
+- Net effect (passengers): stairs LOOSEN from 2 to 4 reachable floors. This changes reachability in existing towers, so it is **save-affecting** (a floor a tower was starving may connect on load).
+
+### 8.3 Tuning (the willingness values)
+
+| Kind | Contiguous limit | Source |
+|---|---|---|
+| Stairs | **4** flights | roadwolf "4 sets of stairs per trip"; relentlessoptimizer "maximum of four flights"; GameFAQs. The "5 levels" some guides cite counts the origin floor. |
+| Escalators | **7** flights | roadwolf / relentlessoptimizer / GameFAQs. |
+
+### 8.4 Mode split
+
+| | Classic | Modern |
+|---|---|---|
+| Behavior | **Hard refusal** past the threshold (the 1994 wall). Net effect is MORE reach than today (2 → 4), matching the original. | **No refusal**; a comfort/satisfaction penalty at the same 4/7 knee (climb allowed, tenant unhappy, pays less, eventually leaves). Uncapped stairs are a dominant strategy that deletes the elevator game, so "unlimited" is not an option. |
+| Scope here | **Implemented** by this GDD's story. | **Deferred** to its own tuning pass and GDD: this story only defines the `sim.rules` seam so no mode string leaks into the router. |
+
+### 8.5 Edge-case matrix (Classic)
+
+| Scenario | Expected |
+|---|---|
+| 1 / 3 / 4 stair flights, no car | admissible (3 is the fix; today refused) |
+| 5 stair flights | refused (5 > 4) |
+| 7 / 8 escalators | 7 admissible, 8 refused |
+| mixed 3 stairs + 2 escalators, contiguous | refused (bounded by the stricter stair 4 on the shared run) |
+| stairs, ride a car, stairs | admissible (the car ride resets the walk count) |
+| 1 stair after a full 2-ride elevator trip | admissible (a walk, not a third ride); today refused |
+| housekeeper (staff) climbs 6 stairs | admissible; staff are EXCLUDED (uncapped, PARITY.md no-degradation), unchanged by this story |
+| Modern, 8 stair flights | admissible route (no hard refusal); comfort penalty applies, not modeled here |
+| `floorReachable` / `reachable` vs `route` | identical admissibility (all share the budget logic) |
+
+### 8.6 Implementation surface (detail is `gds-game-architecture`'s job)
+
+Passenger router only: `src/engine/crowd/routing.ts` (`bfsRoute` / `bfsRouteExpressGated` carry a per-path walk-run counter; `buildAdjacency` tags each edge walk-vs-ride + kind), plus a `sim.rules` gate method for the Classic-only hard refusal. The staff path (`staffAdjacency` / `staffRoute`) is UNTOUCHED (stays uncapped). Reachability probes stay rng-free. No DOM. `WALKWAY_WILLINGNESS` is consumed for the first time.
+
+### 8.7 TDT parity (round-trip and Wine carryover)
+
+Willingness is **live routing behavior, not persisted** in the `.TDT` (the format stores per-floor stop settings only, no willingness bytes). So this change does **not** alter export/import bytes: a round-trip stays byte-identical and the existing round-trip / fixed-point tests must not move. But an imported real 1994 save with stair columns must route faithfully under the new 4-flight model. Verification therefore includes a **Wine-harness save-carryover check**: export a stair-heavy tower and load it in the real game (renders unchanged, routing is not drawn from the file), and run the full save-in-game round-trip (our export, load, File > Save As, reimport) confirming rooms and transports carry over exactly as before.
+
+### 8.8 Acceptance criteria
+
+1. Classic: a 3-flight and 4-flight pure-stair climb is admissible; a 5-flight climb is refused; escalators 7 admissible, 8 refused (the §8.5 matrix passes as route AND reachability tests).
+2. A stair after a full 2-ride elevator trip is admissible; boarding any car (passenger or service) resets the walk count.
+3. Modern admits an 8-stair route Classic refuses; no `mode ===` check outside `gameRules.ts`.
+4. Staff routing is UNCHANGED (stays uncapped, PARITY.md divergence); `floorReachable` agrees with passenger `route` on every matrix row; no rng drift on the seeded crowd stream.
+5. `.TDT` export/import bytes are unchanged (round-trip and fixed-point tests hold); the Wine-harness carryover check passes.
+6. Version bump + one plain changelog line ("People will climb a few more flights of stairs before they need an elevator, matching the original."); `/gds-code-review` clean.
+
+### 8.9 Open question (do NOT resolve in this story)
+
+`MAX_RIDES = 2` may itself be too small for a legitimate tall-tower elevator journey (express to a sky-lobby standard to a local elevator can need three rides), independent of stairs. This surfaced while proving the stair cap. State the intended ride budget explicitly when investigating; do **not** change `MAX_RIDES` under cover of this story. Tracked as a sibling bug (see §11.4).
+
+---
+
+## 9. Version bump & save migration (v1 → v2)
 
 **The rule:** the width and lot changes alter geometry, so existing saves must
 migrate. `SAVE_VERSION` 1 → 2, using the already-stubbed upgrade seam
 (`Simulation.ts:150`).
 
-### 8.1 Migration intent
+### 9.1 Migration intent
 
 - **Lot 340→375:** additive on the right; existing unit x-positions are unchanged.
 - **Facility width changes need a real reflow.** Units persist their own `width`
@@ -326,13 +397,13 @@ migrate. `SAVE_VERSION` 1 → 2, using the already-stubbed upgrade seam
 - **Goal:** an old tower loads, adopts canon widths, and doesn't look broken — the
   user's `towerone_6` is the golden migration fixture (assertions in arch §1.3).
 
-### 8.2 `package.json` version
+### 9.2 `package.json` version
 
 Player-facing behavior changes across the board → **minor** bumps per shipped
 story (new capability), patch for pure fixes. The initiative as a whole lands over
 several PRs; each bumps `version` per CLAUDE.md.
 
-### 8.3 Acceptance criteria
+### 9.3 Acceptance criteria
 
 1. `SAVE_VERSION === 2`; a v1 save loads through `upgradeV1toV2` with no thrown
    errors and no overlapping units.
@@ -344,7 +415,7 @@ several PRs; each bumps `version` per CLAUDE.md.
 
 ---
 
-## 9. Out of scope / deferred
+## 10. Out of scope / deferred
 
 - **Elevator/service-room widths** (undocumented in canon) — not touched.
 - **Per-pair noise constants** beyond 11/21 — single rule, no invented numbers.
@@ -353,15 +424,16 @@ several PRs; each bumps `version` per CLAUDE.md.
   conflict (4 vs 5); deferred, tracked as an open question.
 - **Map width beyond 375 / vertical basement changes** — not in scope.
 
-## 10. Open questions
+## 11. Open questions
 
-1. Does `Unit` persist `width`, or derive it at load? (Decides migration strategy — §8.1.) → architecture.
+1. Does `Unit` persist `width`, or derive it at load? (Decides migration strategy, §9.1.) → architecture.
 2. Cinema 31 / suite 10 — second source before shipping the width change? → architecture spike.
 3. W3 penalty as income-scalar vs. draw-radius — pick during architecture.
+4. **Is `MAX_RIDES = 2` too small for tall towers?** (Added 2026-07-19, §8.9.) A legitimate express-to-sky-lobby-standard-to-local journey can need three rides and is refused today, independent of stairs. A possible second parity bug, surfaced while proving the stair cap. Do NOT change `MAX_RIDES` inside the walkway-willingness story; investigate separately with the intended ride budget stated explicitly.
 
 ---
 
-## 11. Development epics (summary — detail in `epics.md`)
+## 12. Development epics (summary; detail in `epics.md`)
 
 | # | Epic | Stories | Risk |
 |---|---|---|---|
@@ -370,6 +442,7 @@ several PRs; each bumps `version` per CLAUDE.md.
 | E3 | **Parking correctness** | ratio 12→24; sprite one-car; parking drag-chain | Low–Med |
 | E4 | **Input parity** | mobile floor/lobby/parking drag-paint | Low |
 | E5 | **Canon capacity & docs** | express 33→42; PARITY.md/AGENTS.md canon updates | Low |
+| E6 | **Walkway willingness** (added 2026-07-19, §8) | two-budget routing (walk run separate from ride budget); Classic hard refusal via `sim.rules`; staff + reachability parity; Wine carryover check. Modern comfort-penalty deferred to its own GDD. | Med (save-affecting reachability; route golden-masters move) |
 
 **Sequencing:** E1 first (everything else sits on the corrected geometry + a
 migration path), then E3/E4/E5 (low-risk, independent), then E2 (the balance-heavy
