@@ -92,10 +92,17 @@ export function helpAboutBody(version: string): TemplateResult {
 /** The "Found a bug?" report call to action (heading + blurb + external link).
  *  The wrapping `<p>` keeps `class="help-report"` so the modal controller's
  *  `.help-report a` selector finds the link and routes it through the platform
- *  wrapper (`routeExternalInWrapper`). */
-export function helpReportBlock(): TemplateResult {
+ *  wrapper (`routeExternalInWrapper`).
+ *
+ *  The heading level is caller-chosen so each surface keeps a consistent document
+ *  outline without forking the prose: the modal uses `h3` (matching its
+ *  `aria-level="3"` section summaries), the standalone page uses `h2` (a
+ *  top-level section like the guide sections around it). */
+export function helpReportBlock(heading: "h2" | "h3" = "h3"): TemplateResult {
+  const title =
+    heading === "h2" ? html`<h2>Found a bug? Have an idea?</h2>` : html`<h3>Found a bug? Have an idea?</h3>`;
   return html`
-    <h3>Found a bug? Have an idea?</h3>
+    ${title}
     <p style="color:var(--muted)">Help us improve Verticopolis. Report a bug, request a feature, or flag anything that doesn't match the 1994 original.</p>
     <p class="help-report"><a class="btn" target="_blank" rel="noopener noreferrer" href="https://github.com/maniator/verticopolis/issues/new/choose">Let us know…<span class="visually-hidden"> (opens GitHub in a new tab)</span></a></p>
   `;

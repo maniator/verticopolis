@@ -37,7 +37,7 @@ export function helpPageTemplate(): TemplateResult {
       (s) => html`<section id=${s.id} class="help-section"><h2>${s.title}</h2>${s.body()}</section>`,
     )}
     <section id="about" class="help-section"><h2>About</h2>${helpAboutBody(APP_VERSION)}</section>
-    <section class="help-section">${helpReportBlock()}</section>
+    <section class="help-section">${helpReportBlock("h2")}</section>
   `;
   return pageShell({
     title: "Verticopolis: How to Play",
