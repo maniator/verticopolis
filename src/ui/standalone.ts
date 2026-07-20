@@ -15,7 +15,10 @@
  */
 export function isInstalledStandalone(): boolean {
   if (typeof window === "undefined") return false;
-  const displayModeStandalone = window.matchMedia?.("(display-mode: standalone)").matches ?? false;
+  // The `?.` already short-circuits the whole chain when matchMedia is missing;
+  // the second `?.` also covers an embedded webview that returns a nullish
+  // MediaQueryList for an unsupported query (non-spec, but seen in the wild).
+  const displayModeStandalone = window.matchMedia?.("(display-mode: standalone)")?.matches ?? false;
   const iosHomeScreen = (window.navigator as { standalone?: boolean }).standalone === true;
   return displayModeStandalone || iosHomeScreen;
 }
