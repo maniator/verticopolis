@@ -73,7 +73,7 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
            </div>
          </div>
        </div>
-       <details class="nt-compare well">
+       <details class="nt-compare">
          <summary><span role="heading" aria-level="3">Classic vs Modern: the full comparison</span></summary>
          ${compareTemplate()}
        </details>
