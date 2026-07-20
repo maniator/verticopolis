@@ -2402,17 +2402,28 @@ the previously-untested `pageShell` footer branch), a `<noscript>` fallback on
 (the document `<title>` comes from each page's static head, not the entry
 script). Deferrals (low, out of scope for this PR):
 
-- **Clean-`/help` offline precache alias omitted (Acceptance, deliberate
-  deviation).** SPEC.md CAP-5 / page-architecture.md prescribe a generateSW
-  precache alias so the clean `/help` resolves from cache offline. It is
-  deliberately NOT implemented: a generateSW manifest entry for `/help` makes
-  Workbox fetch `/help` at SW install, which 404s anywhere the Vercel rewrite is
-  absent (`vite preview`, the e2e harness), failing the whole precache and taking
-  the game's own offline down with it. The built `help.html` IS precached, so
-  `/help.html` works offline; the clean `/help` resolves online via the rewrite.
-  Revisit only if a robust generateSW clean-URL alias (or an injectManifest move)
-  is ever worth the risk. The SPEC constraint should be corrected to match on the
-  next bmad-spec pass.
+- **Clean-`/help` offline precache alias still omitted (Acceptance, deliberate
+  deviation).** SPEC.md CAP-5 / page-architecture.md originally prescribed a
+  generateSW precache alias so the clean `/help` resolves from cache offline. The
+  alias is deliberately NOT implemented: a generateSW manifest entry for `/help`
+  makes Workbox fetch `/help` at SW install, which 404s anywhere the Vercel
+  rewrite is absent (`vite preview`, the e2e harness), failing the whole precache
+  and taking the game's own offline down with it. With the v1.69.1 fix below,
+  `/help` is intentionally online-only, so there is no offline `/help` to alias;
+  revisit only if an offline `/help` is ever wanted AND a dependable generateSW
+  clean-URL alias (or an injectManifest move) is worth the risk.
+- **RESOLVED v1.69.1: clean `/help` served a stale page from precache.** After
+  #519 shipped the full How-to-Play page, a returning visitor's `/help` still
+  rendered the pre-#519 comparison-only page. Root cause: `help.html` was
+  precached and Workbox precaching defaults `cleanURLs` to true, so a `/help`
+  navigation matched the precached `/help.html` and was served from the
+  SW-install snapshot across deploys (and `/help` does not register the SW, so a
+  `/help`-only visitor never updates it). Fix: exclude `help.html` and its
+  `help-*.js` page entry from precache (`workbox.globIgnores`), as with
+  `/gallery`, so the clean `/help` always resolves fresh over the network; the
+  shared `helpContent-*.js` chunk stays precached for the in-game Help modal
+  offline. Trade-off: `/help` is online-only (no offline copy). Reconciled in
+  SPEC.md + page-architecture.md + `.memlog.md` on the same pass.
 - **Resume-path boot cover can still flash an unpainted frame (Edge, low).** The
   cover is dropped synchronously at the end of `runBootFlow`; on the cold/splash
   path the splash mounts under the cover first, so it is seamless, but on an
