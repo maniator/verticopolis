@@ -1,0 +1,52 @@
+name: Analytics Report
+
+# Twice-weekly rollup of the Vercel Web Analytics custom events (see
+# src/analytics.ts). Runs scripts/analytics-report.mjs and uploads the generated
+# markdown + JSON as a downloadable workflow artifact. Read-only: it queries the
+# Web Analytics API and writes nothing back to the repo.
+#
+# Requires one repository secret: VERCEL_TOKEN (Vercel > Account Settings >
+# Tokens, scoped to the team). The project and team IDs are not secrets.
+
+on:
+  schedule:
+    # Tuesdays and Fridays at 13:00 UTC.
+    - cron: "0 13 * * 2,5"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "Look-back window in days"
+        required: false
+        default: "30"
+
+permissions:
+  contents: read
+
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Generate report
+        # The dispatch input goes through env, never interpolated into the shell
+        # command, so a crafted "days" value can't inject into the run step.
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_PROJECT_ID: prj_06eFZFQdFZ49EiEWmXkkphKAOSSF
+          VERCEL_TEAM_ID: team_ArE8nhexpkACNIlDHVKU80Pj
+          DAYS_INPUT: ${{ github.event.inputs.days || '30' }}
+        run: node scripts/analytics-report.mjs --days "$DAYS_INPUT" --out reports
+
+      - name: Upload report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: analytics-report
+          path: reports/
+          retention-days: 90
