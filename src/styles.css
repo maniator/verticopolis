@@ -659,6 +659,26 @@ a.btn {
   width: 100%;
   margin-top: 8px; /* padding stays the .btn default (3px 9px), as shipped */
 }
+/* Rule-set badge: names the active tower's rule-set and, on click, opens the
+   Classic vs Modern comparison. A real <button> (keyboard + pointer), styled as
+   a compact full-width status chip. It is its own element, kept OUT of
+   #tower-stats (the lit one-renderer container); uiStatus.setMode is the only writer,
+   dirty-gated so the per-frame pump never touches the DOM unless the mode
+   changes. The accent only tints the label, so the win bevel reads the same for
+   both rule-sets (Classic is the faithful reference build, never the lesser one). */
+.mode-badge {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+.mode-badge.is-modern {
+  color: var(--r-title, #000080);
+}
+.mode-badge.is-classic {
+  color: #5a3d00;
+}
 /* Stats-overlay picker: a labeled dropdown so every map mode is visible and
  *  directly selectable (no hidden cycle). */
 .overlay-picker {
@@ -898,11 +918,39 @@ dialog.crash-card::backdrop {
   flex-direction: column;
   gap: 4px;
 }
-.nt-more {
+/* Founding-screen full comparison: the shared compareTemplate in a collapsed
+   <details>, so the dialog stays a commitment by default while the whole
+   comparison is one click away before founding. Reuses the Help caret grammar
+   (no motion, so it respects reduced-motion) but pitched one step quieter than
+   the mode cards: it is optional reference, not the decision. A hairline rule
+   above sets it apart from the Modern card. It is deliberately NOT a .well: a
+   sunken white box would read as a stray empty text field. */
+.nt-compare {
+  margin: 14px 0 2px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.nt-compare > summary {
+  cursor: pointer;
   font-size: 12px;
-  line-height: 1.45;
+  font-weight: 600;
   color: var(--muted);
-  margin-top: 2px;
+  list-style: none;
+}
+.nt-compare > summary::-webkit-details-marker {
+  display: none;
+}
+.nt-compare > summary::before {
+  content: "▸ ";
+}
+.nt-compare[open] > summary::before {
+  content: "▾ ";
+}
+/* Open: a little air below the summary so the first paragraph doesn't hug the
+   caret. The modal itself scrolls (.modal-box overflow-y:auto), so the long
+   shared list just flows; no inner scroller (which would fight that scroll). */
+.nt-compare[open] > summary {
+  margin-bottom: 8px;
 }
 .nt-mode {
   display: flex;

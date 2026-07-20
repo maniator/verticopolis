@@ -50,6 +50,35 @@ describe("newTowerTemplate structure and defaults", () => {
     expect(frag.querySelector('[data-act="found"]')?.textContent).toBe("Found Tower");
     expect(frag.querySelector('[data-act="cancel"]')?.textContent).toBe("Cancel");
   });
+
+  it("carries the full comparison in a collapsed .nt-compare details, in both modes", () => {
+    // The shared compareTemplate lives beneath the mode cards in a COLLAPSED
+    // <details>, so the dialog stays a commitment by default while the whole
+    // comparison is one click away before founding. It sits outside
+    // `.nt-modern-only`, so it is reachable under Classic too (no CSS here, but
+    // structurally it must not be nested in the Modern-only block).
+    const frag = renderToFragment(newTowerTemplate(false));
+    const details = frag.querySelector<HTMLDetailsElement>("details.nt-compare")!;
+    expect(details.hasAttribute("open")).toBe(false);
+    expect(details.closest(".nt-modern-only")).toBeNull();
+    expect(details.querySelector("summary")?.textContent?.trim()).toBe("Classic vs Modern: the full comparison");
+    // A signature phrase from the shared body is present.
+    expect(details.textContent).toContain("pixel-faithful to 1994");
+    expect(details.textContent).toContain("Variant households");
+  });
+
+  it("keeps the three-feature teaser and adds no 'Modern adds N' count", () => {
+    // Parity-pride: the founding screen names three headline Modern features but
+    // never a feature count, and the pointer now sends the reader to the inline
+    // comparison rather than the Help screen.
+    const frag = renderToFragment(newTowerTemplate(false));
+    const adds = frag.querySelector(".nt-adds")!;
+    expect(adds.querySelectorAll(".nt-feature").length).toBe(3);
+    // No "see the full comparison below" pointer: the collapsed .nt-compare
+    // details right below is self-labeled, so the pointer was redundant.
+    expect(frag.querySelector(".nt-more")).toBeNull();
+    expect(frag.textContent).not.toMatch(/Modern adds \d/);
+  });
 });
 
 describe("newTowerTemplate abandon warning, gated on an existing tower", () => {

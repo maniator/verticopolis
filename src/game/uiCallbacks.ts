@@ -35,6 +35,8 @@ export interface GameAppPorts {
 
   handleSelectTool(tool: Tool): void;
   setSpeed(speed: number): void;
+  /** The live game-speed index, so a dialog can restore it after pausing. */
+  getSpeed(): number;
   undo(): void;
   redo(): void;
   setOverlay(mode: string): void;
@@ -65,6 +67,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
   return {
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
+    getSpeed: () => app.getSpeed(),
     onSave: () => app.saveLoad.save(),
     onLoad: () => app.saveLoad.load(),
     onExport: () => void app.saveLoad.exportGame(),

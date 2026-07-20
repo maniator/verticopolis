@@ -321,6 +321,12 @@ class GameApp implements GameAppPorts {
     );
   }
 
+  /** The live speed index, so a dialog (the Compare modal) can pause the tower
+   *  and later restore the player's prior speed. */
+  getSpeed(): number {
+    return this.speed;
+  }
+
   /** Set the colored stats overlay from the picker value ("" = off). An
    *  unrecognized value falls back to off, so a stale/forged value can't push a
    *  bad mode into the renderer. */

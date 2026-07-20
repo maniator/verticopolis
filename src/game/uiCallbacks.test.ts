@@ -31,6 +31,7 @@ function makePorts() {
     inspector: { dismiss: vi.fn() },
     handleSelectTool: vi.fn(),
     setSpeed: vi.fn(),
+    getSpeed: vi.fn(() => 1),
     undo: vi.fn(),
     redo: vi.fn(),
     setOverlay: vi.fn(),
@@ -59,6 +60,10 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.handleSelectTool).toHaveBeenCalledExactlyOnceWith(tool);
     cb.onSpeed(2);
     expect(ports.setSpeed).toHaveBeenCalledExactlyOnceWith(2);
+    // getSpeed delegates (and returns) the port's value, so the Compare modal's
+    // pause/restore reads the live speed rather than a dropped call.
+    expect(cb.getSpeed()).toBe(1);
+    expect(ports.getSpeed).toHaveBeenCalledTimes(1);
     cb.onUndo();
     expect(ports.undo).toHaveBeenCalledTimes(1);
     cb.onRedo();

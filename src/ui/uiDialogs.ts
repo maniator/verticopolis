@@ -4,6 +4,7 @@ import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
+import { compareModalTemplate } from "./templates/compare";
 import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
 import { exportConfirmTemplate, importReportTemplate, exportReportTemplate } from "./templates/reports";
@@ -246,6 +247,42 @@ export function showHelp(ui: UI): void {
   // through the platform port (see routeExternalInWrapper).
   routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
   ui.wireActions(box);
+}
+
+/**
+ * The in-game Classic vs Modern comparison, opened from the Tower-panel mode
+ * badge. It renders the shared {@link compareModalTemplate} through the single
+ * `#modal`. Reading the reference should never cost the player elevator time, so
+ * the tower pauses on open and its prior speed is restored on close, no matter
+ * how the modal is dismissed (Got it, Esc, the backdrop, or the title-bar ✕).
+ * The restore fires exactly once through a shared `finish`, wired to every close
+ * path, so a double dismissal can't over-restore or leave the tower stuck paused.
+ */
+export function showCompare(ui: UI): void {
+  const dialog = ui.el.modal as HTMLDialogElement;
+  // Open the modal FIRST, then pause. If the render/open ever threw, pausing
+  // first would leave the tower stuck at speed 0 with no modal to dismiss and no
+  // restore path; opening first means a failure never pauses at all.
+  const box = ui.openModalTemplate(compareModalTemplate());
+  const prevSpeed = ui.cb.getSpeed();
+  ui.cb.onSpeed(0);
+  let restored = false;
+  const finish = () => {
+    if (restored) return;
+    restored = true;
+    ui.closeModal();
+    ui.cb.onSpeed(prevSpeed);
+  };
+  // The "Got it" button, the backdrop, and Esc/✕ all route through finish so the
+  // speed is always restored. Passing a `close` handler overrides wireActions'
+  // default plain-close binding. These property handlers are re-set by
+  // finishModal on the next modal open (as with showEventChoice), so they do not
+  // leak to a later dialog.
+  ui.wireActions(box, { close: finish });
+  dialog.onclick = (e) => {
+    if (e.target === dialog) finish();
+  };
+  dialog.oncancel = () => finish();
 }
 
 /** The Settings dialog: sound levels plus the presentation toggles. */

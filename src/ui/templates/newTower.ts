@@ -1,4 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
+import { compareTemplate } from "./compare";
 
 /**
  * The Found a New Tower rule-set picker body. The dialog leads with the one
@@ -19,8 +20,10 @@ import { html, nothing, type TemplateResult } from "lit-html";
  * or otherwise let the block stay visible under Classic on a capable browser; the
  * Modern-only reveal is the whole point of this layout. (Always-visible in both
  * modes is fine ONLY as the no-`:has()` fallback above.) The full Classic-vs-Modern
- * comparison lives on the Help screen, so this dialog stays a commitment rather
- * than a spec sheet.
+ * comparison is a collapsed `.nt-compare` `<details>` beneath the mode cards
+ * (the shared `compareTemplate`, also shown in the Help dialog and the in-game
+ * mode badge), so the dialog stays a commitment by default while the full detail
+ * is one click away for anyone who wants it before founding.
  *
  * The radios keep their sane defaults even while hidden: `nt-cal`'s `realWorld`
  * stays `checked` so founding Modern without touching the picker still gets the
@@ -61,7 +64,6 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
              <span class="nt-feature"><b>Variant households</b>: condos draw families of 2–5. A bigger family pays more but leans harder on your elevators.</span>
              <span class="nt-feature"><b>Households come and go</b>: a sold condo's family can move out on its own, so even a settled tower keeps turning over.</span>
              <span class="nt-feature"><b>A deeper economy</b>: held space, taxes on unsold condos, and noisy neighbors all bite, so late-game money stays a real decision.</span>
-             <span class="nt-more">Open Help for the full Classic vs Modern comparison.</span>
            </div>
            <div class="nt-calendar">
              <span class="nt-mode-name">Calendar pace</span>
@@ -70,6 +72,10 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
            </div>
          </div>
        </div>
+       <details class="nt-compare">
+         <summary><span role="heading" aria-level="3">Classic vs Modern: the full comparison</span></summary>
+         ${compareTemplate()}
+       </details>
        ${abandon}
        <div class="modal-actions">
          <button class="btn" data-act="cancel">Cancel</button>
