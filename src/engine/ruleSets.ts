@@ -52,8 +52,13 @@ export const CLASSIC_RULES: GameRules = {
   hasVariantHouseholds: false,
   showsPreviewReason: false, // canon-faithful pedagogy: click-to-refuse, learn by doing
   allowsEscalatorOnOfficeFloors: false, // canon: escalators link commercial floors only
-  expressTransferNeedsLobby() {
-    return true; // canon: express riders switch to local transports only at a (sky) lobby
+  walkwayWillingnessApplies() {
+    // Classic uses the uncapped walk-budget router (parity GDD): reachability is
+    // not ride-capped (the original routes through arbitrarily many transfers,
+    // #503), stairs/escalators spend a contiguous-walk budget (#384), and there
+    // is no express-transfer lobby gate (#509). All three were verified against
+    // the 1994 game via the Wine harness.
+    return true;
   },
   elevatorScheduleUX() {
     // 1994 fidelity: raw grid only. Classic withholds advice, never information.
@@ -156,8 +161,14 @@ export const MODERN_RULES: GameRules = {
   hasVariantHouseholds: true,
   showsPreviewReason: true, // Modern surfaces refusal reasons on the invalid preview
   allowsEscalatorOnOfficeFloors: true, // Modern lifts the commercial-only escalator rule
-  expressTransferNeedsLobby() {
-    return false; // Modern keeps the forgiving transfer-at-any-shared-stop routing
+  walkwayWillingnessApplies() {
+    // Modern's reachability is uncapped, same as Classic (the party ruled Modern
+    // must never be more restrictive than Classic). It does NOT apply Classic's
+    // hard walkway-willingness refusal: instead a long stair climb or a
+    // many-transfer trip feeds a satisfaction/comfort penalty (allowed but the
+    // tenant is unhappy and eventually leaves), the deferred #502 track with its
+    // own owner-tuned curve. So the plain uncapped BFS here, no walk budget.
+    return false;
   },
   elevatorScheduleUX() {
     // Modern assistance: presets, auto-tune, advice; the raw grid behind Advanced.

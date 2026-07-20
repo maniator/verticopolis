@@ -232,10 +232,10 @@ describe("the Main gripe inspector line", () => {
 
   it("stays silent when coverage 0 comes from the tenant's own far floor (access owns it)", () => {
     // The tower's retail is perfectly connected; what fails is the TENANT's
-    // floor, served but beyond two rides (three chained shafts). Coverage
-    // reads 0 for it, and the gripe copy defers to the dedicated red
-    // "Access: too far" line rather than blaming retail that is not broken
-    // (review finding: the reconnect copy would misprescribe here).
+    // floor, served (a network connects it) but reachably-close only past the
+    // Classic walk budget (a 10-flight stair climb). Coverage reads 0 for it, and
+    // the gripe copy defers to the dedicated red "Access: no route" line rather
+    // than blaming retail that is not broken (the reconnect copy would misprescribe).
     const sim = Simulation.newGame(21);
     sim.money = 1e9;
     sim.star = 5;
@@ -247,15 +247,14 @@ describe("the Main gripe inspector line", () => {
     };
     for (let x = X0; x <= X1; x++) put("lobby", 1, x);
     for (let f = 2; f <= 40; f++) for (let x = X0; x <= X1; x++) put("floor", f, x);
-    expectOk(sim.tower.placeTransport("elevatorStandard", C, 1, 15));
-    expectOk(sim.tower.placeTransport("elevatorStandard", C + 6, 15, 30));
-    expectOk(sim.tower.placeTransport("elevatorStandard", C + 12, 30, 40));
+    expectOk(sim.tower.placeTransport("elevatorStandard", C, 1, 30));
+    for (let f = 30; f < 40; f++) expectOk(sim.tower.placeTransport("stairs", C + 20, f, f + 1));
     placeUnit(sim, "office", 2, X0).state = "occupied";
     placeUnit(sim, "fastFood", 2, C + 30).state = "occupied";
     const far = placeUnit(sim, "office", 40, C + 30);
     far.state = "occupied";
     expect(sim.tower.isFloorServed(40)).toBe(true); // served (no access "not connected")...
-    expect(sim.floorReachable(40)).toBe(false); // ...but beyond two rides
+    expect(sim.floorReachable(40)).toBe(false); // ...but only via a 10-flight stair climb
     expect(unmetCoverage(sim.demandMap(), far)).toBe(0);
     expect(gripeLineText(sim, far, "unmetDemand")).toBeUndefined();
     // The reachable ground-floor office still reads the honest capacity copy

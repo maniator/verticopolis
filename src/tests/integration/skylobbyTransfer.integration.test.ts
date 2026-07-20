@@ -5,19 +5,14 @@ import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { FacilityKind, GameMode } from "../../engine/types";
 
 /**
- * Contiguous sky-lobby transfer (#396): in the 1994 game a rider switches
- * between an EXPRESS elevator and a local transport (standard elevator, stairs,
- * escalator) only through a lobby that touches both, which is what forces the
- * layered-tower architecture (express spine, sky lobbies every 15 floors, local
- * banks between them). Classic gates the crowd BFS on it via
- * GameRules.expressTransferNeedsLobby; Modern keeps the forgiving
- * transfer-at-any-shared-stop routing. v1 is the FLOOR-LEVEL rule (the shared
- * stop must be a lobby floor, ground floor 1 included); tile-level lobby-span
- * contiguity between the two shafts is a documented later refinement.
- *
- * Express stops are already locked to lobby floors EXCEPT a shaft's endpoints
- * (bottom and top always stop), so the hole this rule closes is the express
- * endpoint parked on a plain floor acting as a free transfer hub.
+ * Express transfers route at any express STOP, both modes (#509 parity). The
+ * former Classic "express transfer needs a lobby" gate (#396, shipped from web
+ * guides) was disproven in the Wine harness: the 1994 original completes an
+ * express<->local transfer at a NON-lobby floor (the express terminus), so a
+ * test office reachable only that way rents out. The gate is removed. Express
+ * stops are still lobby-locked EXCEPT a shaft's endpoints (bottom and top always
+ * stop), so a plain-floor express transfer is only possible at an endpoint, and
+ * now it routes like any other shared stop.
  */
 
 const TOWER_W = 40;
@@ -50,7 +45,7 @@ function baseTower(mode: GameMode, top: number, skyLobbies: number[] = []): Towe
   return tower;
 }
 
-describe("express transfers are lobby-gated in Classic (#396)", () => {
+describe("express transfers route at any express stop (#509 parity)", () => {
   /** Express 1..20 (endpoint 20 is a PLAIN floor, no lobby anywhere between)
    *  plus a local bank 20..25: the only path to 25 transfers off the express
    *  at the non-lobby floor 20. */
@@ -61,13 +56,17 @@ describe("express transfers are lobby-gated in Classic (#396)", () => {
     return { tower, express, local };
   }
 
-  it("Classic: an express-to-local transfer at a plain shared stop no longer routes", () => {
-    const { tower } = nonLobbyHubTower("classic");
-    const crowd = new Crowd();
-    // Before the gate this routed express 1->20, local 20->25 (two rides).
-    // Floor 20 carries no lobby tile, so the express transfer is inadmissible
-    // and the trip gives up.
-    expect(crowd.route(tower, 1, 25)).toBeNull();
+  it("an express-to-local transfer at a plain (non-lobby) express endpoint routes in BOTH modes (#509)", () => {
+    for (const mode of ["classic", "modern"] as const) {
+      const { tower, express, local } = nonLobbyHubTower(mode);
+      const crowd = new Crowd();
+      // Floor 20 is the express endpoint (a plain floor), where the local bank
+      // begins. The 1994 original transfers here, so we do too, in both modes.
+      const r = crowd.route(tower, 1, 25);
+      expect(r, `mode ${mode}`).not.toBeNull();
+      expect(r!.shafts).toEqual([express, local]);
+      expect(r!.floors).toContain(20); // transfers at the plain express endpoint
+    }
   });
 
   it("Classic: direct rides on each shaft are untouched (only the transfer is gated)", () => {
@@ -133,50 +132,49 @@ describe("express transfers are lobby-gated in Classic (#396)", () => {
     }
   });
 
-  it("Classic: an inadmissible express arrival does not shadow a legal local route (strand risk)", () => {
+  it("Classic: a two-ride route through a plain express endpoint is found (no strand)", () => {
     // Express 1..20 AND a parallel local 1..20 both stop at the plain floor 20,
-    // where a second local carries on to 25. The express is placed FIRST, so
-    // the BFS enumerates its arrival at 20 first; if the search collapsed both
-    // arrivals into one per-floor state, the gated express arrival would mark
-    // 20 seen and strand floor 25 even though the all-local two-ride route is
-    // perfectly legal. The state-per-arrival-class search must find it.
+    // where a second local carries on to 25. With no express gate, floor 25 is
+    // reachable in two rides; the fewest-edges search takes the first-listed
+    // shaft off floor 1 (the express, placed first) then the upper local.
     const tower = baseTower("classic", 25);
     const express = shaftOk(tower, "elevatorExpress", 4, 1, 20);
-    const localLow = shaftOk(tower, "elevatorStandard", 10, 1, 20);
+    shaftOk(tower, "elevatorStandard", 10, 1, 20);
     const localHigh = shaftOk(tower, "elevatorStandard", 16, 20, 25);
     const crowd = new Crowd();
     const r = crowd.route(tower, 1, 25);
     expect(r).not.toBeNull();
-    expect(r!.shafts).toEqual([localLow, localHigh]); // rides the locals, not the express
-    expect(r!.shafts).not.toContain(express);
+    expect(r!.shafts).toEqual([express, localHigh]);
+    expect(r!.floors).toContain(20);
   });
 
-  it("Classic: a stairs-to-express transfer at a plain floor is gated too (either leg counts)", () => {
+  it("a stairs-to-express transfer at a plain floor routes in BOTH modes (either leg)", () => {
     // Express 1..20 with its endpoint on the plain floor 20, stairs 20..21:
-    // reaching 21 needs express then stairs, a transfer involving an express
-    // leg at a non-lobby floor. Stairs are a passenger transport, so the gate
-    // must read the EDGE's express flag, not "is this an elevator pair".
-    const tower = baseTower("classic", 25);
-    shaftOk(tower, "elevatorExpress", 4, 1, 20);
-    shaftOk(tower, "stairs", 10, 20, 21);
-    const crowd = new Crowd();
-    expect(crowd.route(tower, 1, 21)).toBeNull();
-    // Modern keeps the forgiving transfer, pinning that only Classic gates it.
-    tower.rules = MODERN_RULES;
-    expect(crowd.route(tower, 1, 21)).not.toBeNull();
+    // reaching 21 needs express then a stair flight. With no gate, the transfer
+    // is admissible in both modes (a single stair flight is within Classic's
+    // walk budget).
+    for (const rules of [CLASSIC_RULES, MODERN_RULES]) {
+      const tower = baseTower("classic", 25);
+      tower.rules = rules;
+      shaftOk(tower, "elevatorExpress", 4, 1, 20);
+      shaftOk(tower, "stairs", 10, 20, 21);
+      const crowd = new Crowd();
+      expect(crowd.route(tower, 1, 21), rules.mode).not.toBeNull();
+    }
   });
 
-  it("Classic: an express-to-express transfer at a plain shared endpoint is gated", () => {
+  it("an express-to-express transfer at a plain shared endpoint routes in BOTH modes", () => {
     // Two spines meeting at the plain floor 20 (express stops are lobby-locked
     // EXCEPT endpoints, so a shared plain floor is only possible endpoint to
-    // endpoint). Switching spines belongs at a lobby just the same.
-    const tower = baseTower("classic", 35);
-    shaftOk(tower, "elevatorExpress", 4, 1, 20);
-    shaftOk(tower, "elevatorExpress", 10, 20, 35);
-    const crowd = new Crowd();
-    expect(crowd.route(tower, 1, 35)).toBeNull();
-    tower.rules = MODERN_RULES;
-    expect(crowd.route(tower, 1, 35)).not.toBeNull();
+    // endpoint). With no gate, switching spines there routes in both modes.
+    for (const rules of [CLASSIC_RULES, MODERN_RULES]) {
+      const tower = baseTower("classic", 35);
+      tower.rules = rules;
+      shaftOk(tower, "elevatorExpress", 4, 1, 20);
+      shaftOk(tower, "elevatorExpress", 10, 20, 35);
+      const crowd = new Crowd();
+      expect(crowd.route(tower, 1, 35), rules.mode).not.toBeNull();
+    }
   });
 
   it("no-express tower: the gated search returns the identical route to the plain BFS", () => {
@@ -205,45 +203,40 @@ describe("express transfers are lobby-gated in Classic (#396)", () => {
     }
   });
 
-  it("the pure reachability probe honors the SAME gate as route (no rng, no divergence)", () => {
+  it("the pure reachability probe agrees with route in both modes (no rng, no divergence)", () => {
     // crowd.reachable backs floorReachable (the ~6 Hz editor probe) and must
-    // agree with route() on the Classic express-transfer gate: a floor route()
-    // refuses in Classic must not read as reachable, and Modern's forgiving
-    // routing must read reachable, exactly as route() would ride it.
-    const classic = nonLobbyHubTower("classic");
-    const cc = new Crowd();
-    expect(cc.route(classic.tower, 1, 25)).toBeNull(); // gated off
-    expect(cc.reachable(classic.tower, 1, 25)).toBe(false); // probe agrees
-
-    const modern = nonLobbyHubTower("modern");
-    const mc = new Crowd();
-    expect(mc.route(modern.tower, 1, 25)).not.toBeNull(); // forgiving
-    expect(mc.reachable(modern.tower, 1, 25)).toBe(true); // probe agrees
-
-    // A direct single-ride hop is reachable in Classic too (the gate never
-    // fires without a transfer), and the probe draws no rng doing it.
+    // agree with route(): with no express gate, the plain-endpoint transfer is
+    // reachable in both modes.
+    for (const mode of ["classic", "modern"] as const) {
+      const { tower } = nonLobbyHubTower(mode);
+      const c = new Crowd();
+      expect(c.route(tower, 1, 25), mode).not.toBeNull();
+      expect(c.reachable(tower, 1, 25), mode).toBe(true); // probe agrees
+    }
+    // The probe draws no rng: a repeated reachability check leaves the stream
+    // exactly where an untouched crowd's does.
+    const { tower } = nonLobbyHubTower("classic");
     const probe = new Crowd(4242);
     const untouched = new Crowd(4242);
-    expect(probe.reachable(classic.tower, 1, 20)).toBe(true);
+    expect(probe.reachable(tower, 1, 20)).toBe(true);
     expect(probe.rng.int(0, 1_000_000)).toBe(untouched.rng.int(0, 1_000_000));
   });
 
-  it("Classic: a sky lobby added later reopens the gated transfer (cache refreshes)", () => {
-    // Same shape as the sky-lobby case, but the lobby lands AFTER a failed
-    // route: placing it bumps the tower revision, the adjacency cache and the
-    // gate both see the new lobby floor, and the trip routes.
+  it("adding a sky lobby does not change an already-reachable express transfer", () => {
+    // Under the old gate this transfer was refused until floor 15 became a sky
+    // lobby. With the gate gone it routes with 15 plain, and still routes after
+    // 15 is committed as a sky lobby (the adjacency cache refreshes on the
+    // revision bump either way).
     const tower = baseTower("classic", 30, []);
     shaftOk(tower, "elevatorExpress", 4, 1, 15);
     shaftOk(tower, "elevatorStandard", 10, 15, 25);
     const crowd = new Crowd();
-    expect(crowd.route(tower, 1, 25)).toBeNull(); // floor 15 is still plain
-    // Committing floor 15 as a sky lobby requires clearing its plain tiles
-    // first (the sky-lobby-commit rule refuses a lobby over non-lobby content).
+    expect(crowd.route(tower, 1, 25)).not.toBeNull(); // floor 15 plain: already routes
     for (let x = 0; x < TOWER_W; x++) {
       const u = tower.unitAt(15, x);
       if (u && u.kind === "floor") tower.removeUnit(u.id);
     }
     for (let x = 0; x < TOWER_W; x++) placeOk(tower, "lobby", 15, x);
-    expect(crowd.route(tower, 1, 25)).not.toBeNull();
+    expect(crowd.route(tower, 1, 25)).not.toBeNull(); // still routes with the lobby
   });
 });

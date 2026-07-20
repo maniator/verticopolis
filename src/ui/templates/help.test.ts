@@ -82,7 +82,7 @@ describe("helpTemplate structure and a11y", () => {
     sellCondo: "sets the sale price", // the 2-5 family draw scales the price
     showsPreviewReason: "Hovering an invalid spot",
     allowsEscalatorOnOfficeFloors: "Escalators can serve office floors",
-    expressTransferNeedsLobby: "switch elevators at any shared stop",
+    walkwayWillingnessApplies: null, // no longer a player-facing divergence: reachability is uncapped and express transfers are ungated in both modes (#503/#509); the Modern walkway/transfer comfort penalty is deferred (#502)
     priceOptions: "Continuous pricing",
     condoRelocationChance: "move out on its own",
     operatingOverheadPerUnit: "monthly overhead",

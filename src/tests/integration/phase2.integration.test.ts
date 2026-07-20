@@ -209,8 +209,8 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     // (3 parallel locals per band), staggered so adjacent bands sharing a
     // sky-lobby endpoint never collide, plus 2 express shafts that stop at the
     // ground lobby, every sky lobby, and their own endpoints (endpoints always
-    // stop, so floor 100 is served even without a lobby there), giving the
-    // ≤2-ride hop to every band. 23 shafts, inside the 24-shaft pool.
+    // stop, so floor 100 is served even without a lobby there), giving a fast
+    // express-then-local hop to every band. 23 shafts, inside the 24-shaft pool.
     sim.star = 5;
     const addShaft = (kind: string, x: number, b: number, t: number) => {
       const r = sim.buildTransport(kind as never, x, b, t);
@@ -224,8 +224,8 @@ describe("F2 / Step 5 — honest v2 endgame: a served, well-zoned tower wins und
     bands.forEach(([b, t], i) => {
       for (const g of groups) addShaft("elevatorStandard", g + (i % 2 ? 5 : 0), b, t);
     });
-    // The zoning holds the two-ride rule everywhere: express to a sky lobby,
-    // local to the floor. Nothing in this tower is stranded.
+    // The zoning keeps every band a fast express-then-local hop from the lobby:
+    // express to a sky lobby, local to the floor. Nothing in this tower is stranded.
     for (let f = 2; f <= 100; f++) expect(sim.floorReachable(f)).toBe(true);
 
     // Services distributed up the tower (coverage radius), a metro, and offices.

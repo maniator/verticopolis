@@ -62,21 +62,18 @@ export interface GameRules {
    *  Modern drops the restriction and lets escalators serve office floors. */
   readonly allowsEscalatorOnOfficeFloors: boolean;
   /**
-   * True when a passenger transfer involving an EXPRESS elevator is admissible
-   * only at a (sky) lobby floor, the ground lobby included. "Involving" means
-   * EITHER leg: express to or from a standard elevator, stairs, or escalator,
-   * and also express to express (two express shafts can only share a plain
-   * floor at their endpoints, and switching spines belongs at a lobby just the
-   * same). The 1994 game routes riders
-   * from the express spine onto local banks only through a sky lobby, which is
-   * what forces the layered-tower architecture (express spine, sky lobbies
-   * every 15 floors, local banks between them). Classic enforces it; Modern
-   * keeps the forgiving any-shared-stop routing. Transfers between two
-   * non-express transports are untouched in both modes, and the two-ride trip
-   * cap is unchanged. Read by the crowd routing BFS only; it never changes
+   * True when Classic's hard walkway-willingness refusal applies: a contiguous
+   * stair/escalator run may cross at most WALKWAY_WILLINGNESS[kind] flights (the
+   * stricter kind governing a mixed run), reset by any elevator ride (#384).
+   * Classic returns true; Modern returns false and instead feeds a long
+   * climb/many-transfer trip into a satisfaction comfort penalty (deferred
+   * #502). It also selects the router: both modes have UNCAPPED reachability now
+   * (the 1994 original routes through arbitrarily many transfers, #503, and
+   * gates no express transfer to a lobby, #509), so the only routing difference
+   * is this walk budget. Read by the crowd routing BFS only; it never changes
    * what the builder accepts.
    */
-  expressTransferNeedsLobby(): boolean;
+  walkwayWillingnessApplies(): boolean;
   /** The Classic/Modern authoring-affordance split for the per-shaft schedule
    *  dialog (#305 Phase 3). UI-only; the sim never reads it. The flag semantics
    *  live on {@link ElevatorScheduleUX} in `elevatorSchedule.ts`. */

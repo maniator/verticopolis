@@ -13,18 +13,7 @@ import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./pe
  * `route` / `staffRoute` / `elevatorCalls` methods that delegate here.
  */
 
-type AdjGraph = Map<number, { f: number; shaft: number; express: boolean; walkKind?: "stairs" | "escalator" }[]>;
-
-/**
- * BFS over the transport network for the fewest-transfer route. Each edge is
- * one transport ride, and, per the original ("Sims will only take two methods
- * of transportation to their destination"), a trip is capped at TWO rides
- * (i.e. one transfer). A destination with no admissible route within the cap
- * returns null (3+ rides in either mode; in Classic, also a two-ride path
- * whose express transfer sits away from any lobby floor, see {@link route}),
- * so a badly-zoned tower's commuters give up rather than teleporting there.
- */
-const MAX_RIDES = 2;
+type AdjGraph = Map<number, { f: number; shaft: number; walkKind?: "stairs" | "escalator" }[]>;
 
 /**
  * The floor → one-ride-reachable-floors graph, built from elevator stops.
@@ -70,19 +59,15 @@ export function buildAdjacency(
     // hops travel on foot and BFS still prefers a single long elevator ride
     // (one transfer) over many stair flights for tall trips.
     const stops = tower.stopsOf(t);
-    // Each edge carries whether its shaft is an express elevator, so the
-    // Classic transfer gate (see {@link route}) can tell an express leg from a
-    // local one without a per-hop transport lookup.
-    const express = t.kind === "elevatorExpress";
     // A stair/escalator flight is a WALK, not a car ride: the Classic router
-    // (bfsRouteExpressGated) charges walks against a separate contiguous-walk
-    // budget (WALKWAY_WILLINGNESS), not the ride budget. Tag the edge so the BFS
+    // (bfsRouteWalkBudget) charges walks against a separate contiguous-walk
+    // budget (WALKWAY_WILLINGNESS), not a ride. Tag the edge so the BFS
     // classifies it without a per-hop transport lookup.
     const walkKind = t.kind === "stairs" || t.kind === "escalator" ? t.kind : undefined;
     for (const a of stops) {
       let list = adj.get(a);
       if (!list) adj.set(a, (list = []));
-      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, express, walkKind });
+      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, walkKind });
     }
   }
   return adj;
@@ -91,30 +76,30 @@ export function buildAdjacency(
 /**
  * The chosen fewest-transfer passenger PATH, before any shaft balancing.
  *
- * Classic gates express transfers to (sky) lobby floors (1994 canon, see
- * GameRules.expressTransferNeedsLobby); Modern keeps the plain BFS, byte-for-
- * byte the pre-gate behavior. The rule object decides, never the mode string.
- * v1 uses the FLOOR-LEVEL rule: the shared stop must be a lobby floor (has
- * lobby tiles, or is the ground floor 1, the tower's entrance lobby). This is
- * a deliberate simplification: the 1994 game's finer notion, a contiguous
- * lobby SPAN actually touching both shafts on that floor, is not modeled yet,
- * so a lobby tile anywhere on the floor admits the transfer tower-wide.
+ * BOTH modes have uncapped reachability now: the 1994 original routes through
+ * arbitrarily many transfers (harness-verified to 6+, #503), so neither mode
+ * refuses a connected path. The only routing difference is the #384 walkway
+ * budget: Classic applies it (a stair/escalator run refuses past the willingness
+ * threshold), Modern does not yet (its walkway/transfer discomfort is the
+ * satisfaction-side comfort penalty, tracked in #502, not a routing refusal).
+ * Neither mode gates express transfers to lobbies any more (#509). The rule
+ * object decides via {@link GameRules.walkwayWillingnessApplies}, never the mode
+ * string.
  *
  * Shared by {@link route} (which then balances the shaft, drawing rng) and
  * {@link reachable} (which only asks whether a path exists, no rng), so the two
- * can never diverge on whether the Classic gate applies.
+ * can never diverge on which router applies.
  */
 function passengerPath(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
   const adj = adjacency(crowd, tower);
-  return tower.rules.expressTransferNeedsLobby()
-    ? bfsRouteExpressGated(adj, from, to, MAX_RIDES, (floor) => floor === 1 || tower.floorHasLobby(floor))
-    : bfsRoute(adj, from, to, MAX_RIDES);
+  return tower.rules.walkwayWillingnessApplies()
+    ? bfsRouteWalkBudget(adj, from, to)
+    : bfsRoute(adj, from, to);
 }
 
 export function route(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  // The chosen PATH (and thus the express-transfer decision) is fixed;
-  // balanceShafts only re-picks WHICH physical shaft of an equivalent bank
-  // carries each leg, so the gate outcome is untouched.
+  // The chosen PATH is fixed; balanceShafts only re-picks WHICH physical shaft
+  // of an equivalent bank carries each leg, so the route itself is untouched.
   const r = passengerPath(crowd, tower, from, to);
   return r && balanceShafts(crowd, tower, r);
 }
@@ -204,21 +189,22 @@ export function shaftBanks(crowd: Crowd, tower: Tower): Map<string, number[]> {
  *  runs on the editor's ~6 Hz repaint pump; routing there through the balancing
  *  path would let UI timing perturb the seeded crowd stream on a banked tower,
  *  so a probe that never rides must never draw. It runs the SAME
- *  {@link passengerPath} route() does (Classic express-transfer gate included),
- *  so a floor route() would refuse in Classic never reads as reachable here. */
+ *  {@link passengerPath} route() does (the same per-mode router), so a floor
+ *  route() would refuse never reads as reachable here. */
 export function reachable(crowd: Crowd, tower: Tower, from: number, to: number): boolean {
   return passengerPath(crowd, tower, from, to) !== null;
 }
 
 /** Route over the STAFF network (service elevators / stairs).
- *  Staff aren't bound by the two-ride comfort rule: the search is UNCAPPED
- *  (the BFS `seen` set terminates it), so it agrees with what
+ *  The staff search is UNCAPPED (like passenger routing now) and, unlike Classic
+ *  passenger routing, applies NO walk budget (the BFS `seen` set terminates it),
+ *  so it agrees with what
  *  Tower.staffConnected calls reachable: both walk the same
  *  isStaffTransportKind/stopsOf graph. (Parallel implementations: if they
  *  ever drift, spawnStaff reports "no-route" so dispatch can surface it
  *  instead of retrying silently.) */
 export function staffRoute(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  const r = bfsRoute(staffAdjacency(crowd, tower), from, to, Infinity);
+  const r = bfsRoute(staffAdjacency(crowd, tower), from, to);
   return r && balanceShafts(crowd, tower, r);
 }
 
@@ -227,19 +213,15 @@ export function staffRoute(crowd: Crowd, tower: Tower, from: number, to: number)
  *  service-first ordering expresses the routing preference. Don't replace
  *  this with a priority frontier or Set-deduped adjacency without keeping
  *  that tie-break. */
-export function bfsRoute(
-  adj: AdjGraph,
-  from: number,
-  to: number,
-  maxRides: number,
-): Route | null {
+export function bfsRoute(adj: AdjGraph, from: number, to: number): Route | null {
   if (from === to) return { floors: [from], shafts: [] };
   const prev = new Map<number, { f: number; shaft: number }>();
   const seen = new Set<number>([from]);
   let frontier = [from];
-  let rides = 0;
-  while (frontier.length && rides < maxRides) {
-    rides++;
+  // Uncapped: the `seen` set (marked on enqueue) terminates the search on a
+  // finite graph. Both callers (Modern passengers and staff) route through any
+  // connected path, matching the 1994 original's uncapped reachability (#503).
+  while (frontier.length) {
     const next: number[] = [];
     for (const f of frontier) {
       for (const edge of adj.get(f) ?? []) {
@@ -270,50 +252,35 @@ export function bfsRoute(
 }
 
 /**
- * {@link bfsRoute} with the Classic express-transfer gate: switching transports
- * at a shared stop is a TRANSFER, and a transfer involving an express elevator
- * on either leg (express to or from a standard elevator, stairs, or escalator,
- * and express to express alike) is admissible only where `isTransferFloor`
- * says so (the (sky) lobby floors). Transfers between two non-express legs are
- * untouched, and the ride cap works exactly as in {@link bfsRoute}. Boarding
- * the SAME shaft again also counts as a gated transfer; that loses nothing,
- * because {@link buildAdjacency} emits a complete stop-pair clique per shaft,
- * so any same-shaft continuation is already covered by a direct one-ride edge.
- *
- * The search state is (floor, arrived-by-express), not the bare floor: the same
- * floor reached by an express leg and by a local leg admits DIFFERENT onward
- * transfers, so each arrival class is tracked (and `seen`-marked) separately. A
- * single per-floor seen set would let an express arrival enumerated first
- * shadow a local arrival to the same floor and strand a destination the local
- * path legally reaches in two rides. In a tower with no express shaft every
- * arrival is the local class, keys stay unique per floor, and the search
- * matches {@link bfsRoute} edge for edge, tie-breaks included. Pure graph
+ * The CLASSIC passenger router: a fewest-transfer route with the #384 walkway
+ * budget and, per the 1994 original, NO ride cap and NO express-transfer lobby
+ * gate. Reachability is uncapped (harness-verified to 6+ transfers, #503) and an
+ * express transfer is admissible wherever the express stops, not only at (sky)
+ * lobbies (#509); both were web-guide artifacts the harness disproved. The only
+ * per-path budget is the contiguous-walk budget (see the body). Pure graph
  * admissibility: no RNG, deterministic for a given tower.
  */
-export function bfsRouteExpressGated(
-  adj: AdjGraph,
-  from: number,
-  to: number,
-  maxRides: number,
-  isTransferFloor: (floor: number) => boolean,
-): Route | null {
+export function bfsRouteWalkBudget(adj: AdjGraph, from: number, to: number): Route | null {
   if (from === to) return { floors: [from], shafts: [] };
-  // Fewest-EDGES BFS (each edge is one level), exactly as the pre-change search,
-  // so a single elevator ride still beats many stair flights and edge order
-  // still breaks ties toward the first-listed shaft. Two budgets ride ALONG the
-  // path: `rides` counts elevator boardings (capped at maxRides, unchanged), and
-  // a SEPARATE contiguous-walk budget lets a stair/escalator RUN cross at most
+  // Fewest-EDGES BFS (each edge is one level), so a single elevator ride still
+  // beats many stair flights and edge order still breaks ties toward the
+  // first-listed shaft. Classic reachability is UNCAPPED: the 1994 original
+  // routes a commute through arbitrarily many elevator transfers as long as a
+  // connected path exists (verified in the Wine harness to 6+ transfers, #503),
+  // so rides are not counted or capped. There is also NO express-transfer gate:
+  // the original transfers off an express wherever the express stops, not only
+  // at (sky) lobbies (#509), and express edges only ever exist at express stops
+  // anyway. The one budget that rides ALONG the path is the contiguous-walk
+  // budget (#384, parity GDD §8): a stair/escalator RUN may cross at most
   // WALKWAY_WILLINGNESS[kind] flights (the stricter threshold governing a mixed
-  // run), reset to zero on any elevator ride (#384, parity GDD §8). Walk legs
-  // therefore do NOT spend a ride, which fixes the old over-restriction (stairs
-  // dead-ended at 2 because they wrongly consumed the ride budget) without making
-  // walking cheaper than riding. Search state is (floor, arrived-by-express,
-  // rides, walkRun, runCap): the same floor reached under a different arrival
-  // class or with a different remaining budget admits different onward moves.
+  // run), reset to zero on any elevator ride. Search state is (floor, walkRun,
+  // runCap): every elevator arrival collapses to (floor, 0, NO_CAP), so despite
+  // the uncapped rides the state space stays bounded (floors x walkRun 0..7 x
+  // runCap in {NO_CAP, 4, 7}) and the search is O(V+E) with a small constant.
   const NO_CAP = Infinity; // runCap sentinel: no walk flight taken yet on the current run
-  interface St { floor: number; express: boolean; rides: number; walkRun: number; runCap: number }
-  const key = (s: St) => `${s.floor}:${s.express ? 1 : 0}:${s.rides}:${s.walkRun}:${s.runCap}`;
-  const origin: St = { floor: from, express: false, rides: 0, walkRun: 0, runCap: NO_CAP };
+  interface St { floor: number; walkRun: number; runCap: number }
+  const key = (s: St) => `${s.floor}:${s.walkRun}:${s.runCap}`;
+  const origin: St = { floor: from, walkRun: 0, runCap: NO_CAP };
   const originKey = key(origin);
   const prev = new Map<string, { key: string; floor: number; shaft: number }>();
   const seen = new Set<string>([originKey]);
@@ -326,11 +293,6 @@ export function bfsRouteExpressGated(
       for (const edge of adj.get(s.floor) ?? []) {
         let ns: St;
         if (edge.walkKind) {
-          // A walk off an express-arrival leg is STILL an express transfer
-          // (either leg counts, #396), gated at a non-lobby floor exactly like a
-          // ride off express. edge.express is always false for a walk, so only
-          // the arriving leg (s.express) can trip the gate here.
-          if (s.rides >= 1 && s.express && !isTransferFloor(s.floor)) continue;
           // Walk leg: charge the contiguous-walk budget, not a ride. The
           // WALKWAY_WILLINGNESS type guarantees a finite limit for the two walk
           // kinds; the isFinite guard fails CLOSED (refuse the flight) if a
@@ -338,16 +300,10 @@ export function bfsRouteExpressGated(
           // undefined limit can never make walkRun grow unbounded and hang here.
           const cap = Math.min(s.runCap, WALKWAY_WILLINGNESS[edge.walkKind]);
           if (!Number.isFinite(cap) || s.walkRun + 1 > cap) continue; // over the walk budget for this run
-          ns = { floor: edge.f, express: false, rides: s.rides, walkRun: s.walkRun + 1, runCap: cap };
+          ns = { floor: edge.f, walkRun: s.walkRun + 1, runCap: cap };
         } else {
-          // Elevator ride: charge a ride, reset the walk run. Past the first
-          // ride, boarding here is a transfer off the leg that brought us to
-          // s.floor; gate it when either leg is express (walk arrivals are
-          // express=false, so a ride off a walk leg is gated only by the new
-          // leg). s.rides === 0 is the trip's first boarding, never gated.
-          if (s.rides + 1 > maxRides) continue;
-          if (s.rides >= 1 && (s.express || edge.express) && !isTransferFloor(s.floor)) continue;
-          ns = { floor: edge.f, express: edge.express, rides: s.rides + 1, walkRun: 0, runCap: NO_CAP };
+          // Elevator ride: reset the walk run. No ride cap (Classic parity, #503).
+          ns = { floor: edge.f, walkRun: 0, runCap: NO_CAP };
         }
         const nk = key(ns);
         if (seen.has(nk)) continue;

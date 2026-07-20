@@ -43,12 +43,13 @@ describe("makeRules", () => {
     expect(MODERN_RULES.allowsEscalatorOnOfficeFloors).toBe(true);
   });
 
-  it("gates the express-transfer-at-lobby rule by mode (#396)", () => {
-    // Canon: express riders switch to a local transport only at a (sky) lobby,
-    // which forces the layered-tower architecture. Modern keeps the forgiving
-    // transfer-at-any-shared-stop routing.
-    expect(CLASSIC_RULES.expressTransferNeedsLobby()).toBe(true);
-    expect(MODERN_RULES.expressTransferNeedsLobby()).toBe(false);
+  it("selects the Classic walk-budget router by mode (#503/#509)", () => {
+    // Classic uses the uncapped walk-budget router (parity: no ride cap, no
+    // express lobby gate, walkway willingness applies). Modern uses the plain
+    // uncapped BFS with no walk budget (its commute discomfort is the deferred
+    // #502 comfort track).
+    expect(CLASSIC_RULES.walkwayWillingnessApplies()).toBe(true);
+    expect(MODERN_RULES.walkwayWillingnessApplies()).toBe(false);
   });
 });
 

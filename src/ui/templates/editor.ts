@@ -88,19 +88,19 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // whose diagnostics emit NO access line, so its connectivity still shows.
   if (!mobile || !hasAccessDiagnostic(u)) {
     const served = sim.tower.isFloorServed(u.floor);
-    // The third state (#370): a floor can be connected yet sit 3+ rides from
-    // the lobby, where no commuter ever comes, so "Yes" would lie. Only kinds
-    // that draw commuters/visitors read it (hasAccessDiagnostic, the same
-    // predicate the diagnostics line uses); zero-population service kinds keep
-    // plain Yes/No, because the two-ride rule is about passenger trips they do
-    // not make. "(3+ rides)" deliberately echoes the inspector sentence and
-    // the stats footnote, one phrase for one concept.
-    const tooFar = served && hasAccessDiagnostic(u) && !sim.floorReachable(u.floor);
-    const text = !served ? "No" : tooFar ? "Too far (3+ rides)" : "Yes";
+    // The third state (#370): the floor is CONNECTED to the lobby (served) yet no
+    // commuter completes the trip, so "Yes" would lie. Reachability is uncapped
+    // now (#503), so this happens only in Classic, when the sole path is a
+    // stair/escalator climb past the walk budget. Only kinds that draw
+    // commuters/visitors read it (hasAccessDiagnostic, the same predicate the
+    // diagnostics line uses); zero-population service kinds keep plain Yes/No.
+    // "No route" echoes the inspector sentence and the stats footnote.
+    const cutOff = served && hasAccessDiagnostic(u) && !sim.floorReachable(u.floor);
+    const text = !served ? "No" : cutOff ? "No route" : "Yes";
     rows.push(
       kv(
         "Elevator access",
-        html`<span style="color:${served && !tooFar ? "var(--good)" : "var(--bad)"}">${text}</span>`,
+        html`<span style="color:${served && !cutOff ? "var(--good)" : "var(--bad)"}">${text}</span>`,
         "served",
       ),
     );
