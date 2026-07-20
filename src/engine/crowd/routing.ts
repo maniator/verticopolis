@@ -330,9 +330,13 @@ export function bfsRouteExpressGated(
           // ride off express. edge.express is always false for a walk, so only
           // the arriving leg (s.express) can trip the gate here.
           if (s.rides >= 1 && s.express && !isTransferFloor(s.floor)) continue;
-          // Walk leg: charge the contiguous-walk budget, not a ride.
+          // Walk leg: charge the contiguous-walk budget, not a ride. The
+          // WALKWAY_WILLINGNESS type guarantees a finite limit for the two walk
+          // kinds; the isFinite guard fails CLOSED (refuse the flight) if a
+          // future walk kind is ever tagged without a willingness entry, so an
+          // undefined limit can never make walkRun grow unbounded and hang here.
           const cap = Math.min(s.runCap, WALKWAY_WILLINGNESS[edge.walkKind]);
-          if (s.walkRun + 1 > cap) continue; // over the walk budget for this run
+          if (!Number.isFinite(cap) || s.walkRun + 1 > cap) continue; // over the walk budget for this run
           ns = { floor: edge.f, express: false, rides: s.rides, walkRun: s.walkRun + 1, runCap: cap };
         } else {
           // Elevator ride: charge a ride, reset the walk run. Past the first
