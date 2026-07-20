@@ -1,0 +1,141 @@
+/* Shared retro chrome components: the window frame, title bar, button, sunken
+   well/field, and key/value grid. Skinned entirely from retro-tokens.css (which
+   the consumer imports alongside this file). Used by the game (via styles.css)
+   and by standalone pages (via retro-page.css). Keep game-only components
+   (.toast, .evalbar, etc.) in styles.css, not here. */
+
+/* .btn — THE button. Gray face, bevel out; press = bevel in. No hover
+   state on purpose (period chrome gives press feedback only). */
+.btn {
+  background: var(--r-face);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-out);
+  padding: 3px 9px;
+  font-family: var(--r-font);
+  font-size: 12px;
+  cursor: pointer;
+}
+.btn:active {
+  background: var(--r-face);
+  box-shadow: var(--bevel-in);
+}
+/* A .btn on an <a> (the Help "Report an issue" link, the app's only outbound
+   link): anchors are inline, so normalize them to a button box — drop the link
+   underline and use inline-flex so the coarse-pointer min-height (below) lands. */
+a.btn {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+/* Primary = the classic Win-style DEFAULT BUTTON: same gray face, an extra
+   dark ring around the bevel, bold label. One primary per dialog; its DOM
+   position encodes default focus — first when it should own focus (emergency
+   Pay), last when the safe action must be reached first (destructive
+   confirms). */
+.btn.primary {
+  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-out);
+  font-weight: 700;
+}
+.btn.primary:active {
+  box-shadow: 0 0 0 1px var(--r-dark), var(--bevel-in);
+}
+/* Danger = red bold label on the SAME chrome (editor Sell/Bulldoze,
+   saves-slot delete, any future destructive action). */
+.btn.danger {
+  color: var(--bad-ink);
+  font-weight: 700;
+}
+/* Disabled = classic GrayText on the same raised chrome (never a hover/
+   pointer affordance). The browser already suppresses :active. */
+.btn:disabled {
+  color: var(--r-shadow);
+  cursor: default;
+}
+/* Title-bar size: the ✕ on every dismissible surface, the coach's Skip. */
+.btn.xs {
+  min-width: 18px;
+  padding: 1px 4px;
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+/* .win — a floating window: gray face, bevel, one hard shadow. Windows
+   with inner padding declare it via the --pad-y/--pad-x tokens so their
+   title bar can run full-bleed without hand-synced negative margins. */
+.win {
+  --pad-y: 0px;
+  --pad-x: 0px;
+  --title-gap: 0px;
+  background: var(--r-face);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-out), var(--win-shadow);
+}
+/* Docked windows (palette, sidebar, its panels) sit in the app frame — same
+   face and bevel, no floating drop shadow. */
+.win.docked {
+  box-shadow: var(--bevel-out);
+}
+
+/* .win-title — the navy title bar every window wears: same type, same
+   padding, ✕ pinned right (give the ✕ .btn.xs). */
+.win-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--r-title);
+  color: var(--r-title-fg);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 3px 8px;
+}
+.win-title .btn {
+  margin-left: auto;
+  flex: none;
+}
+/* Mini variant — section strips inside a window (statistics headers) and
+   other panel-scale bars: smaller, uppercase, tighter padding. */
+.win-title.sm {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  padding: 2px 6px;
+}
+/* Full-bleed: a window's title bar cancels the window's own padding via the
+   tokens declared on .win, so the bar can never drift out of alignment with
+   the frame — on ANY window, not just the modal. */
+.win > .win-title {
+  margin: calc(-1 * var(--pad-y)) calc(-1 * var(--pad-x)) var(--title-gap);
+}
+
+/* .well — sunken white data area (the File Manager idiom): lists,
+   textareas, logs, gauges live on wells. .field is a well you type into. */
+.well,
+.field {
+  background: var(--r-hi);
+  color: var(--r-ink);
+  border: 0;
+  border-radius: 0;
+  box-shadow: var(--bevel-in);
+}
+.field {
+  font: inherit;
+}
+
+/* .kv — two-column key/value grid (editor stats, tower stats, statistics
+   dialog columns). */
+.kv {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-content: start;
+}
+.kv .k {
+  color: var(--muted);
+}
+.kv .v {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
