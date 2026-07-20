@@ -1,6 +1,24 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { isInstalledStandalone } from "./standalone";
 
+// happy-dom does not always define matchMedia, and `vi.spyOn` needs the property
+// to exist before it can replace it, so seed a stub when it is missing (mirrors
+// the polyfill in the uiDialogs integration suite). The per-test spies below
+// override this.
+if (typeof window.matchMedia !== "function") {
+  window.matchMedia = ((query: string) =>
+    ({
+      media: query,
+      matches: false,
+      onchange: null,
+      addListener: () => {},
+      removeListener: () => {},
+      addEventListener: () => {},
+      removeEventListener: () => {},
+      dispatchEvent: () => false,
+    }) as unknown as MediaQueryList) as typeof window.matchMedia;
+}
+
 /**
  * Installed-standalone detection. It gates the one place a `target="_blank"`
  * link is unreliable (the in-app "Open full page" affordance), so both signals
