@@ -537,7 +537,7 @@ describe("Deep-review regressions (must not come back)", () => {
 import { ECON } from "../../engine/econConfig";
 
 describe("Fine FAQ mechanics", () => {
-  it("≤2-ride limit: a trip needing 3 rides doesn't route; a 2-ride trip does", () => {
+  it("uncapped reachability: a trip needing 3+ rides routes, matching the 1994 original (#503)", () => {
     const sim = Simulation.newGame(1);
     sim.money = 1e12;
     const x0 = C - 15;
@@ -547,7 +547,10 @@ describe("Fine FAQ mechanics", () => {
     sim.tower.placeTransport("elevatorStandard", x0 + 6, 15, 30);  // B (transfer at 15)
     sim.tower.placeTransport("elevatorStandard", x0 + 12, 30, 45); // C (transfer at 30)
     expect(sim.crowd.route(sim.tower, 1, 25)).not.toBeNull(); // A→15, B→25 = 2 rides
-    expect(sim.crowd.route(sim.tower, 1, 40)).toBeNull();     // would need A→15→30→40 = 3 rides
+    // A→15→30→40 = 3 rides. The 1994 original routes commutes through many
+    // transfers (harness-verified to 6+), so this now routes rather than giving
+    // up: reachability is uncapped in both modes.
+    expect(sim.crowd.route(sim.tower, 1, 40)).not.toBeNull();
   });
 
   it("blockbuster vs average film: two-tier booking cost exists and both occur", () => {

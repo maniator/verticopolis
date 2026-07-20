@@ -116,14 +116,13 @@ describe("W-new: unmet local demand (#395)", () => {
     expect(office.state).toBe("occupied");
   }, 30000);
 
-  it("names unmet demand as the dominant gripe for a served tenant that can reach no retail (Modern)", () => {
-    // A tenant three rides up: connected to the ground (served, so no access
-    // drain) but not reachable within two rides, so it can reach no retail even
-    // though the tower has some (coverage 0). Modern erodes coverage 0, so unmet
-    // demand is an active, attributable gripe. Its floor is far from the ground
-    // lobby, so lobby distance would out-rank it; drop the lobby penalty for this
-    // one tenant (the very-far ceiling) so the test isolates the unmet-demand
-    // attribution rather than re-testing #394.
+  it("names unmet demand as the dominant gripe for a reachable tenant when all retail is on a disconnected island (Modern)", () => {
+    // Reachability is uncapped in Modern now, so a tenant is served iff reachable
+    // (no "served but too far" state). To get 0 reachable retail coverage for a
+    // SERVED tenant, strand the RETAIL instead: the tower has retail, but it sits
+    // on a disconnected elevator island the tenant cannot reach. Coverage 0 with
+    // retail present ⇒ unmet demand, not an access gripe (the tenant's own floor
+    // is reachable) and not "no retail at all".
     const sim = Simulation.newGame(21, "modern");
     sim.money = 1e12;
     sim.star = 5;
@@ -134,23 +133,25 @@ describe("W-new: unmet local demand (#395)", () => {
     };
     strip("lobby", 1);
     for (let f = 2; f <= 40; f++) strip("floor", f);
-    expect(sim.tower.placeTransport("elevatorStandard", MID, 1, 15).ok).toBe(true);
-    expect(sim.tower.placeTransport("elevatorStandard", MID + 6, 15, 30).ok).toBe(true);
-    expect(sim.tower.placeTransport("elevatorStandard", MID + 12, 30, 40).ok).toBe(true);
-    // Reachable retail + a little floor-2 demand, so the tower HAS retail (share > 0).
+    // A ground elevator makes the floor-2 tenants reachable.
+    expect(sim.tower.placeTransport("elevatorStandard", MID, 1, 30).ok).toBe(true);
+    // A DISCONNECTED retail island: an elevator serving 35..40 only, with no shaft
+    // bridging 30..35, so floor 40 never connects to the ground lobby (neither
+    // served nor reachable). Modern has no walk budget, so a disconnected island
+    // is the only way to make its retail unreachable.
+    expect(sim.tower.placeTransport("elevatorStandard", MID + 12, 35, 40).ok).toBe(true);
+    // The tenants under test: reachable ground offices (their own floor is fine).
     for (const x of [X0, MID + 18]) placeUnit(sim, "office", 2, x).state = "occupied";
-    placeUnit(sim, "fastFood", 2, MID + 30).state = "occupied";
-    const stranded = placeUnit(sim, "office", 40, MID + 30);
-    stranded.state = "occupied";
-    expect(sim.tower.isFloorServed(40)).toBe(true); // served (no access drain)...
-    expect(sim.floorReachable(40)).toBe(false); // ...but not reachable within two rides
-    expect(unmetCoverage(computeDemandMap(sim), stranded)).toBe(0); // retail exists, it reaches none
-    // Suppress the lobby-distance flag (this floor is far from the ground lobby,
-    // which would otherwise out-rank unmet demand and re-test #394) and let
-    // dominantGripe RECOMPUTE the unmet flag from the demand map: the office is
-    // served, uncongested, market-rent, near a shaft, and un-noisy, so unmet
-    // demand is the dominant, attributable gripe.
-    const cong = sim.simModel === "v2" ? (sim.spatialCongestionByFloor().get(40) ?? 0) : sim.congestion();
-    expect(dominantGripe(sim, stranded, true, cong, false, false, false)).toBe("unmetDemand");
+    const tenant = sim.tower.units.find((u) => u.kind === "office" && u.floor === 2)!;
+    // The tower's only retail sits on the unreachable island.
+    placeUnit(sim, "fastFood", 40, MID + 30).state = "occupied";
+    expect(sim.tower.isFloorServed(2)).toBe(true);
+    expect(sim.floorReachable(2)).toBe(true); // the tenant is reachable (no access drain)
+    expect(sim.floorReachable(40)).toBe(false); // ...but the retail island is not
+    expect(unmetCoverage(computeDemandMap(sim), tenant)).toBe(0); // retail exists, tenant reaches none
+    // The tenant is served, uncongested, market-rent, near a shaft, un-noisy, and
+    // near the ground lobby, so unmet demand is the dominant, attributable gripe.
+    const cong = sim.simModel === "v2" ? (sim.spatialCongestionByFloor().get(2) ?? 0) : sim.congestion();
+    expect(dominantGripe(sim, tenant, true, cong, false, false, false)).toBe("unmetDemand");
   }, 30000);
 });

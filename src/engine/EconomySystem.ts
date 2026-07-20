@@ -137,20 +137,20 @@ export class EconomySystem {
     // census split across the reachable venues (commercial demand pools). Pure
     // and deterministic, so it adds no draw to the seeded economy stream.
     const demandMap = computeDemandMap(this.sim);
-    // Visitor income obeys the two-ride rule: a floor more than two rides from
-    // the lobby draws no patrons (the same "no visitors will come" condition the
-    // stranded-floor advisory reports), so its commercial rooms earn nothing —
-    // the transport puzzle has real economic teeth, not just a warning. This is
-    // stricter than mere connectivity (`isFloorServed`): a floor with no
-    // admissible two-ride route (3+ rides, or a Classic express transfer away
-    // from any lobby) is served but unreachable to visitors, and earns $0.
-    // Memoized per call since the route BFS isn't free and rooms share floors.
+    // Visitor income obeys reachability: a floor the crowd router can't reach
+    // from the lobby draws no patrons (the same "no visitors will come" condition
+    // the stranded-floor advisory reports), so its commercial rooms earn nothing.
+    // Reachability is uncapped now (#503), so this is stricter than mere
+    // connectivity (`isFloorServed`) only in Classic, where a floor reachable
+    // solely up a stair climb past the walk budget is served but unreachable to
+    // visitors, and earns $0. Memoized per call since the route BFS isn't free
+    // and rooms share floors.
     const reachCache = new Map<number, boolean>();
     const drawsVisitors = (floor: number): boolean => {
       const cached = reachCache.get(floor);
       if (cached !== undefined) return cached;
-      // Two-ride reachability when the context provides it (the real sim);
-      // minimal test contexts without a crowd fall back to plain connectivity.
+      // Full reachability when the context provides it (the real sim); minimal
+      // test contexts without a crowd fall back to plain connectivity.
       const hit = this.sim.floorReachable
         ? this.sim.floorReachable(floor)
         : this.sim.tower.isFloorServed(floor);
@@ -181,7 +181,7 @@ export class EconomySystem {
       const attendanceCapV = attendanceCap(u.kind);
       const attends = attendanceCapV !== undefined;
       if (!drawsVisitors(u.floor)) {
-        // Unreachable within two rides (stranded, or not connected at all) → no
+        // Unreachable (stranded up a long climb, or not connected at all) → no
         // patrons. Clear any lingering occupancy so a newly-stranded venue reads
         // empty instead of frozen at its last busy state.
         if (u.state === "occupied") {

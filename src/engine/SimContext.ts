@@ -36,10 +36,13 @@ export interface SimContext {
   /** Tag money to a stats-breakdown category (positive income, negative
    *  expense). Optional so a hand-rolled test context can omit it. */
   recordMoney?(cat: LedgerCat, amount: number): void;
-  /** True when a floor draws visitors: reachable from the lobby within the
-   *  two-ride rule (≤1 transfer). Stricter than {@link Tower.isFloorServed}
-   *  (mere connectivity). Optional so a minimal hand-rolled test context can
-   *  omit it — callers fall back to `tower.isFloorServed` when it's absent. */
+  /** True when a floor draws visitors: the passenger router can reach it from the
+   *  lobby (uncapped, #503). Stricter than {@link Tower.isFloorServed} (which
+   *  means the floor is CONNECTED to the lobby) because in Classic it applies the
+   *  walkway-willingness budget, so a floor connected only by a too-long
+   *  stair/escalator climb is served but not reachable. Optional so a minimal
+   *  hand-rolled test context can omit it; callers fall back to
+   *  `tower.isFloorServed` when it's absent. */
   floorReachable?(floor: number): boolean;
   /** True if the tower contains at least one unit of this kind. */
   hasAny(kind: FacilityKind): boolean;

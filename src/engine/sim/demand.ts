@@ -22,7 +22,7 @@ import { isOperational, isTenanted } from "../types";
  * their fraction from `customersIn / attendanceCap` directly.
  *
  * Because the engine's reachability is lobby-anchored (a floor either draws
- * visitors within the two-ride rule or it does not, the same gate the income
+ * visitors when the router can reach it or it does not, the same gate the income
  * loop already applies), every connected origin reaches the same set of
  * reachable venues, so the capacity-proportional split reduces to a uniform
  * `share = pool / reachableCapacity` across those venues. Venue COUNT and MIX
@@ -114,7 +114,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   const reachableVenuesByOrigin = new Map<number, number>();
 
   // The same lobby-anchored reachability the income loop uses: a floor draws
-  // visitors when it is reachable within the two-ride rule (or merely served in
+  // visitors when the router can reach it (or merely served in
   // a minimal test context that omits the crowd BFS).
   const reachCache = new Map<number, boolean>();
   const draws = (floor: number): boolean => {

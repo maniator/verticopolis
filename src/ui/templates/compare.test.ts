@@ -17,7 +17,6 @@ const DIVERGENCE_PHRASES = [
   "move out on its own",
   "monthly overhead",
   "Continuous pricing",
-  "switch elevators at any shared stop",
   "Smarter scheduling",
   "paid exterminator",
   "Hovering an invalid spot",
