@@ -5,7 +5,9 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/help", "destination": "/help.html" },
-    { "source": "/gallery", "destination": "/gallery.html" }
+    { "source": "/help/", "destination": "/help.html" },
+    { "source": "/gallery", "destination": "/gallery.html" },
+    { "source": "/gallery/", "destination": "/gallery.html" }
   ],
   "headers": [
     {
