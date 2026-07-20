@@ -20,8 +20,8 @@ duplication this capability removes).
 
 Split the shared layer out of `styles.css` into two files under `src/styles/`,
 then re-import so the game's computed styles and render are unchanged (the
-extraction moves rules between files; the guarantee is on the rendered result,
-not on byte-identical CSS):
+extraction only moves rules between files and adds the `@import`s; the guarantee
+is on the rendered result):
 
 | File | Holds |
 | --- | --- |
