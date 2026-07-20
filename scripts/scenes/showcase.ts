@@ -94,7 +94,7 @@ export const SHOWCASE_SCENES: Scene[] = [
           // it; this is the only home of Export/Import, so the gallery must
           // show that footer.
           await page.evaluate(() => {
-            document.getElementById("btn-save")?.click();
+            document.getElementById("btn-save-top")?.click();
             document.getElementById("btn-load")?.click();
           });
           await page.waitForSelector("#modal .slots", { timeout: 4000 });

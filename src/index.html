@@ -126,6 +126,7 @@
           <button class="btn" data-speed="3" title="Fast">▶▶▶</button>
           <button class="btn" id="btn-undo" title="Undo (Ctrl+Z)" aria-label="Undo">↩</button>
           <button class="btn" id="btn-redo" title="Redo (Ctrl+Shift+Z)" aria-label="Redo">↪</button>
+          <button class="btn" id="btn-save-top" title="Quick Save" aria-label="Quick Save">💾</button>
           <button class="btn" id="audio-toggle" title="Toggle sound">🔊</button>
           <button class="btn" id="panel-toggle" title="Show/hide panels">☰</button>
           <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden>↻ Update</button>
@@ -178,11 +179,10 @@
           </div>
           <div class="panel win docked">
             <h3>Game</h3>
+            <!-- Quick Save lives in the top bar (💾, next to the audio toggle);
+                 this panel keeps the save MANAGER and the tower-level actions. -->
             <div class="btn-row">
-              <button class="btn" id="btn-save">Quick Save</button>
               <button class="btn" id="btn-load">Saves…</button>
-            </div>
-            <div class="btn-row">
               <button class="btn" id="btn-settings">⚙️ Settings</button>
             </div>
             <div class="btn-row">

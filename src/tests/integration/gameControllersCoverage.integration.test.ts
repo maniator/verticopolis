@@ -825,7 +825,12 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
   it("save writes the autosave slot and toasts; silent mode saves without feedback", () => {
     saveLoad.save();
     expect(SaveGame.hasSave()).toBe(true);
-    expect(f.toasts).toEqual([{ text: "Tower saved.", kind: "good" }]);
+    // Trailing time is locale-formatted (digits, separators, and any AM/PM vary
+    // by locale), so assert the stable prefix plus some trailing content rather
+    // than an ASCII digit.
+    expect(f.toasts).toHaveLength(1);
+    expect(f.toasts[0].kind).toBe("good");
+    expect(f.toasts[0].text).toMatch(/^Saved ✓ · .+/);
     localStorage.clear();
     saveLoad.save(true);
     expect(SaveGame.hasSave()).toBe(true);
