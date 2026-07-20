@@ -918,12 +918,6 @@ dialog.crash-card::backdrop {
   flex-direction: column;
   gap: 4px;
 }
-.nt-more {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--muted);
-  margin-top: 2px;
-}
 /* Founding-screen full comparison: the shared compareTemplate in a collapsed
    <details>, so the dialog stays a commitment by default while the whole
    comparison is one click away before founding. Reuses the Help caret grammar

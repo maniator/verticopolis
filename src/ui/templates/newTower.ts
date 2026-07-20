@@ -64,7 +64,6 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
              <span class="nt-feature"><b>Variant households</b>: condos draw families of 2–5. A bigger family pays more but leans harder on your elevators.</span>
              <span class="nt-feature"><b>Households come and go</b>: a sold condo's family can move out on its own, so even a settled tower keeps turning over.</span>
              <span class="nt-feature"><b>A deeper economy</b>: held space, taxes on unsold condos, and noisy neighbors all bite, so late-game money stays a real decision.</span>
-             <span class="nt-more">See the full Classic vs Modern comparison below.</span>
            </div>
            <div class="nt-calendar">
              <span class="nt-mode-name">Calendar pace</span>

@@ -123,7 +123,7 @@ export class UI {
     modal: document.getElementById("modal")!,
     audioToggle: document.getElementById("audio-toggle")!,
     towerName: document.getElementById("tower-name") as HTMLInputElement,
-    modeBadge: document.getElementById("btn-mode") as HTMLButtonElement,
+    modeBadge: document.getElementById("btn-mode")!,
   };
 
   /** True while the user is pressing something inside the editor card. */

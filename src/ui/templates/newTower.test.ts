@@ -74,7 +74,9 @@ describe("newTowerTemplate structure and defaults", () => {
     const frag = renderToFragment(newTowerTemplate(false));
     const adds = frag.querySelector(".nt-adds")!;
     expect(adds.querySelectorAll(".nt-feature").length).toBe(3);
-    expect(frag.querySelector(".nt-more")?.textContent).toContain("below");
+    // No "see the full comparison below" pointer: the collapsed .nt-compare
+    // details right below is self-labeled, so the pointer was redundant.
+    expect(frag.querySelector(".nt-more")).toBeNull();
     expect(frag.textContent).not.toMatch(/Modern adds \d/);
   });
 });
