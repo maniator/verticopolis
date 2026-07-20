@@ -19,7 +19,9 @@ duplication this capability removes).
 ## The extraction
 
 Split the shared layer out of `styles.css` into two files under `src/styles/`,
-then re-import so the game is byte-for-byte unchanged:
+then re-import so the game's computed styles and render are unchanged (the
+extraction moves rules between files; the guarantee is on the rendered result,
+not on byte-identical CSS):
 
 | File | Holds |
 | --- | --- |

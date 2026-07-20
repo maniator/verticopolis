@@ -1,7 +1,8 @@
 # Media plan: paired Classic vs Modern stills
 
-Load-bearing detail for CAP-7 (the screenshots that demo Classic vs Modern on the
-`/help` page). SPEC.md cites this companion. Phase P2.
+Load-bearing detail for CAP-8 (the paired stills that demo Classic vs Modern),
+which is Phase P2. CAP-7 (the gallery restyle) also cites this companion for its
+screenshot-impact note below. SPEC.md cites both from their success criteria.
 
 ## Format decision
 

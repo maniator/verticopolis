@@ -20,7 +20,7 @@ protecting every surface at once.
 | Concern | Change |
 | --- | --- |
 | Vite input | Add `src/help.html` to `rollupOptions.input` alongside `src/index.html`, `src/gallery.html`, `src/preview.html`. |
-| Precache | Leave `src/help.html` OUT of `globIgnores` so Workbox `globPatterns` (which already matches `.html`) precaches it. `gallery.html` / `preview.html` stay ignored (tooling pages). |
+| Precache | Leave `src/help.html` OUT of `globIgnores` so Workbox `globPatterns` (which already matches `.html`) precaches it (it is small and its offline value is high, a reference). `preview.html` stays ignored as the non-deployed e2e/screenshot harness. `gallery.html` stays ignored as a deliberate size choice (its canvas catalog is a browse-online page, low offline value), not because it is tooling; it is a public page and can be promoted into precache later if wanted. |
 | SW registration | `help.html` does NOT register a service worker. The root-scope game SW (registered only by `main.ts` -> `pwa.ts`) already covers `/help` because it is same-origin under the root scope. |
 | navigateFallback | Add `/help` (and `/help.html`) to `navigateFallbackDenylist` so an offline hard-load of `/help` serves the precached `help.html`, not `index.html`. |
 
