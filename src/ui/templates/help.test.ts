@@ -94,11 +94,11 @@ describe("helpTemplate structure and a11y", () => {
     demographicRoutines: "leave for school and return",
     rainCrowdFactor: "rain thins the crowd",
     hotelDaytimePresence: "linger past checkout", // #304, the late-checkout lunch trip
+    elevatorScheduleUX: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
     // No dedicated player-facing copy (folded, internal, load-only, or UI-only):
     coerceResidents: null, // load-only household sanitizer
     coerceNoRate: null, // load-only No-Rate sanitizer
     churnMultiplier: null, // internal variant-household churn tuning
-    elevatorScheduleUX: null, // schedule-dialog authoring affordance (#305), not a rule line here
     housekeepingShift: null, // internal maid-shift window
     housekeepingTriage: null, // internal maid dispatch order
     demandModel: null, // internal commercial-demand magnitudes
