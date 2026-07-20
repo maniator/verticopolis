@@ -7,7 +7,8 @@ export interface PageShellLink {
 }
 
 export interface PageShellOptions {
-  /** Title-bar text (also the document title, set by the page's entry script). */
+  /** Title-bar text shown in the navy window title bar. (The document `<title>`
+   *  is set by each page's own static HTML head, not from this value.) */
   title: string;
   /** Where "Back to game" points. Standalone pages use "/" (the game root). */
   backHref: string;

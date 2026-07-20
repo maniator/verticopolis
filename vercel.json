@@ -3,6 +3,10 @@
   "framework": null,
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/help", "destination": "/help.html" },
+    { "source": "/gallery", "destination": "/gallery.html" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",

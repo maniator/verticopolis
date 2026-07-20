@@ -721,11 +721,16 @@ dialog.crash-card::backdrop {
 .nt-lede {
   color: var(--muted);
 }
+.nt-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 12px 0 0;
+}
 .nt-modes {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin: 12px 0;
+  gap: 8px;
 }
 /* The Modern-only reveal: the "Modern adds" label and the calendar pace picker.
    Shown by default and HIDDEN under Classic via `:has()`. Written this way round
@@ -737,7 +742,9 @@ dialog.crash-card::backdrop {
 .nt-modern-only {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
 }
 .nt-choice:has(input[name="nt-mode"][value="classic"]:checked) .nt-modern-only {
   display: none;
@@ -746,6 +753,16 @@ dialog.crash-card::backdrop {
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+/* Small section caption inside the Modern-only reveal ("Modern adds", "Calendar
+   pace"): a quiet uppercase label, one clear step below the mode-card names, so
+   the grouped features and the calendar radios each read as a labeled set. */
+.nt-sublabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
 }
 /* Founding-screen full comparison: the shared compareTemplate in a collapsed
    <details>, so the dialog stays a commitment by default while the whole
@@ -786,14 +803,17 @@ dialog.crash-card::backdrop {
   gap: 10px;
   align-items: flex-start;
   padding: 10px 12px;
-  border: 2px solid var(--line, #b8b2a0);
-  border-radius: 6px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
   cursor: pointer;
 }
-/* The whole card lights up when its radio is chosen (label wraps the input). */
+/* The chosen card presses in (raised bevel flips to sunken) and its name turns
+   navy, the same selected-state grammar the rest of the retro chrome uses. */
 .nt-mode:has(input:checked) {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  box-shadow: var(--bevel-in);
+}
+.nt-mode:has(input:checked) .nt-mode-name {
+  color: var(--accent);
 }
 .nt-mode input {
   margin-top: 3px;
@@ -812,20 +832,14 @@ dialog.crash-card::backdrop {
   line-height: 1.45;
   color: var(--muted);
 }
-.nt-feature {
-  padding-left: 8px;
-  border-left: 3px solid var(--accent);
-}
-/* Calendar pace picker: same card idiom as the mode cards, a step lighter so it
-   reads as a secondary choice. It lives inside the Modern-only reveal, so the
-   parent's flex gap handles spacing (no bottom margin of its own). */
+/* Calendar pace picker: the two radios grouped under the "Calendar pace"
+   sublabel. It lives inside the Modern-only reveal, so the parent's flex gap
+   handles spacing and the reveal's left rail already sets it apart; the picker
+   itself is just the labeled radio group, no card of its own. */
 .nt-calendar {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 10px 12px;
-  border: 2px solid var(--line, #b8b2a0);
-  border-radius: 6px;
 }
 .nt-cal-opt {
   display: block;
@@ -841,7 +855,7 @@ dialog.crash-card::backdrop {
   font-size: 10px;
   font-weight: 700;
   padding: 1px 5px;
-  border-radius: 3px;
+  border-radius: 0;
   vertical-align: middle;
   background: var(--muted);
   color: #fff;
@@ -1275,6 +1289,11 @@ dialog.crash-card::backdrop {
    palette and cream/amber buttons, sharing only the interaction grammar
    (bevel press states, focus visibility). Everything below the splash —
    the coach card — is regular chrome. */
+/* The title-screen sky, shared by the JS splash and the static boot cover below
+   so the two never diverge. */
+:root {
+  --splash-sky: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+}
 #splash {
   position: fixed;
   inset: 0;
@@ -1287,7 +1306,22 @@ dialog.crash-card::backdrop {
   text-align: center;
   padding: 24px 18px;
   font-family: var(--r-font);
-  background: linear-gradient(#161634 0%, #241f4c 34%, #5b3560 62%, #c65a63 86%, #ef8560 100%);
+  background: var(--splash-sky);
+}
+
+/* Static boot cover: painted from the first frame (it lives in index.html, and
+   the render-blocking stylesheet styles it before paint) so a cold load opens on
+   the title sky instead of flashing the empty game while the engine and the JS
+   splash mount. It wears the SAME sky as #splash and sits ABOVE it (z 50 > 40),
+   so once the real splash mounts underneath, the boot flow removes this cover and
+   the identical gradient stays put while the skyline and title card fade in. The
+   fallback boot paths (no WebGL, a boot error) also remove it so their message is
+   never trapped behind it. */
+#boot-cover {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: var(--splash-sky);
 }
 .splash-stars,
 .splash-sun,

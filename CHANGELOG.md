@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.67.0
+
+- The Classic vs Modern comparison now has its own shareable page you can link to, reachable from Help, and the sprite gallery wears the same title-bar look.
+- The game opens straight onto the title screen now, instead of briefly flashing an empty tower first.
+
 ## 1.65.0
 
 - People will climb a few more flights of stairs before they need an elevator, matching the original. In Classic, stairs and escalators now carry a person up to 4 and 7 contiguous flights (an elevator ride resets the count) instead of dead-ending at two.

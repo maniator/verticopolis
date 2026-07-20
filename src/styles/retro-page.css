@@ -69,6 +69,31 @@ body.retro-page {
   padding: 20px 22px 22px;
 }
 
+/* The shared comparison body (compareTemplate) renders its divergence list here
+   on the /help page; give it comfortable spacing (in-game it inherits the modal's
+   type scale instead). */
+.win-body ul {
+  margin: 12px 0;
+  padding-left: 22px;
+}
+.win-body li {
+  margin: 0 0 8px;
+}
+.win-body li:last-child {
+  margin-bottom: 0;
+}
+
+/* The sprite gallery's fixed-width canvas scrolls sideways inside its own box on
+   a narrow viewport, so the page body itself never scrolls horizontally. */
+.gallery-scroll {
+  overflow-x: auto;
+}
+.gallery-scroll canvas {
+  display: block;
+  margin: 0 auto;
+  image-rendering: pixelated;
+}
+
 /* Lead block. */
 .page-lede {
   max-width: 64ch;
@@ -164,6 +189,11 @@ body.retro-page {
 }
 :root[data-theme="light"] {
   --r-desktop: #008080;
+}
+:root[data-theme="light"] body.retro-page {
+  /* A light toggle on a dark-OS device has to win back the dark media rule's
+     near-white body text, or the "wins in both directions" claim above is false. */
+  color: var(--r-ink);
 }
 
 @media (max-width: 560px) {

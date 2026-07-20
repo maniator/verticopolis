@@ -3,11 +3,12 @@ import { html, type TemplateResult } from "lit-html";
 /**
  * The Classic vs Modern comparison body: the single source of truth for the
  * rule-set comparison. It is rendered by the Help dialog (inside its "Classic vs
- * Modern" section), by the in-game Compare modal, and by the founding screen, so
- * the copy has one home and cannot drift (it had drifted twice before this
- * extraction). This exports the BODY only, the intro paragraph, the divergence
- * list, and the "pixel-faithful to 1994" closer, with no `<details>`/`<summary>`
- * or `<h2>` wrapper; each caller supplies its own.
+ * Modern" section), by the in-game Compare modal, by the founding screen, and by
+ * the standalone `/help` page (`helpPage.ts`), so the copy has one home and
+ * cannot drift (it had drifted twice before this extraction). This exports the
+ * BODY only, the intro paragraph, the divergence list, and the "pixel-faithful
+ * to 1994" closer, with no `<details>`/`<summary>` or `<h2>` wrapper; each caller
+ * supplies its own.
  *
  * The drift guard in `src/ui/templates/help.test.ts` (the `RULE_TO_HELP` map and
  * the copy-sync check) inspects the Help "Classic vs Modern" section, which

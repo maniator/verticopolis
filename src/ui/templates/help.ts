@@ -60,6 +60,7 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Classic vs Modern</span></summary>
         ${compareTemplate()}
+        <p class="help-fullpage"><a class="btn" href="/help" target="_blank" rel="noopener" data-act="open-help">Open the full comparison page<span class="visually-hidden"> (opens in a new tab)</span></a></p>
       </details>
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">Keyboard play</span></summary>

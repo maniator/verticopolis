@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { hasWebGL, showBootMessage, bootGame } from "./bootstrap";
+import { hasWebGL, showBootMessage, bootGame, hideBootCover } from "./bootstrap";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -83,6 +83,30 @@ describe("showBootMessage", () => {
   it("is a no-op when there is no #stage element", () => {
     document.body.innerHTML = "";
     expect(() => showBootMessage("nowhere")).not.toThrow();
+  });
+
+  it("removes the boot cover so a fallback message is never trapped behind it", () => {
+    document.body.innerHTML = `<div id="boot-cover"></div><div id="stage"></div>`;
+    showBootMessage("no WebGL here");
+    expect(document.getElementById("boot-cover")).toBeNull();
+    expect(document.getElementById("stage")!.innerHTML).toContain("no WebGL here");
+  });
+});
+
+describe("hideBootCover", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("removes the cover element when present", () => {
+    document.body.innerHTML = `<div id="boot-cover"></div>`;
+    hideBootCover();
+    expect(document.getElementById("boot-cover")).toBeNull();
+  });
+
+  it("is a safe no-op when there is no cover (idempotent across boot outcomes)", () => {
+    document.body.innerHTML = "";
+    expect(() => hideBootCover()).not.toThrow();
   });
 });
 

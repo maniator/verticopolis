@@ -1,7 +1,10 @@
+import { html, render } from "lit-html";
 import { FACILITIES, GRID } from "./engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
+import { pageShell } from "./ui/templates/pageShell";
+import { injectVercelTelemetry } from "./telemetry";
 
 void GRID;
 
@@ -155,10 +158,36 @@ const ENTRIES: Entry[] = [
 
 const COLS = 3;
 const CELL_W = 300;
-// Tall enough that a two-floor kind (cinema, party hall) shows at full height
-// and a three-floor kind (metro) still gets most of its proportion.
-const CELL_H = 170;
+// Tall enough that even the tallest kind renders at its TRUE proportion, never
+// shrunk to fit: a three-floor metro at full tile is 26 * 2 * 3 = 156px, and the
+// sprite box is `CELL_H - 8 - 26`, so this clears it (200 - 34 = 166 >= 156). The
+// two-floor kinds (cinema, party hall) and every single-floor room sit inside the
+// same box with headroom, so no cell is vertically compressed next to another.
+const CELL_H = 200;
 const PAD = 12;
+
+// Render the shared retro page shell (title bar, Back to game, sibling nav) and
+// report the same host-gated telemetry the game and /help report, then draw the
+// catalog into the shell's canvas.
+injectVercelTelemetry();
+render(
+  pageShell({
+    title: "Verticopolis: Sprite Gallery",
+    backHref: "/",
+    main: html`
+      <div class="page-lede">
+        <h1>Sprite Gallery</h1>
+        <p class="sub">
+          Every facility, transport, and special state, drawn procedurally at game scale (evening lighting). Animated:
+          elevators, cinema, metro.
+        </p>
+      </div>
+      <div class="gallery-scroll"><canvas id="gallery"></canvas></div>
+    `,
+    links: [{ href: "/help", label: "Classic vs Modern" }],
+  }),
+  document.getElementById("app")!,
+);
 
 const canvas = document.getElementById("gallery") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;

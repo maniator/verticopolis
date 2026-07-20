@@ -70,6 +70,7 @@ How items flow:
 
 | Date | Story | GH | Epic | Type | Priority | Severity | Owner | Status | Notes |
 | ---- | ----- | -- | ---- | ---- | -------- | -------- | ----- | ------ | ----- |
+| 2026-07-20 | classic-modern-reachability | #516 | classic-modern-reachability | feature-request | P3 | — | — | idea | **Prerender the static /help page body at build (Lit SSR) for no-JS crawler visibility.** /help renders `compareTemplate()` client-side today; its head is static (the shared-head plugin) so unfurls and share cards work, but the comparison prose only appears after JS runs. /help is 100% static (no interactivity), so a build-time prerender of `helpPageTemplate()` into `help.html` would give no-JS crawlers the body while keeping `compareTemplate` single-source (no drift), no hydration. Gated on a spec change: SSR/prerender is a current non-goal in the classic-modern-reachability SPEC, and `@lit-labs/ssr` is experimental (pre-release, needs `--experimental-vm-modules`), so flip the non-goal via bmad-spec first, add it build-only, scope strictly to /help (the gallery is canvas-drawn, not a candidate). Raised in the CAP-5/CAP-7 PR review. `/bmad-code-review`. |
 | 2026-07-17 | custom-music-track | — | audio-music | feature-request | P2 | — | — | done | **DONE (v1.60.0, PR #482 for #479; issue auto-closed on merge).** Composed splash-screen music theme (looping). Character agreed by an agent party (game designer + two player personas + generalist + music enthusiast, 2026-07-17); owner picked "warm & wistful." A short looping hook on the splash / start screen, built in the engine's own Tone.js palette (triangle melody, sine pad, sine bass) so it drops in natively. DNA: D major, ~100 BPM (walking pace), progression D–Bm–G–A (I–vi–IV–V; the vi is the ache, IV–V the lift), rising A→D→F#5 hook that dips through the Bm and resolves home. Adapted in spirit (not copied) from the peppy home-screen theme in `maniator/blipit-legends`. Must ride the existing music volume/mute controls and the lazy engine facade (no Tone in the boot bundle); player-facing so version bump + changelog note. Preview WAVs auditioned by the owner before implementation. `/gds-code-review`. |
 | 2026-07-17 | audio-button-panel | #483 | audio-music | feature-request | P3 | — | — | idea | **Ready. UX follow-on to the composed music (#479/#480); its own PR.** The top 🔊 button mutes everything in one tap and is the only audio control most players find, so the common outcome is "music was a bit much, nuke all sound", now a real loss with actual music worth keeping. Make the button surface the audio controls. Agent-party pass (2026-07-17) favored a small popover over the button (mute toggle + music/SFX sliders) rather than opening the full Settings dialog, keeping instant-mute reachable. Two shapes to decide in design: (A) popover with mute as a toggle inside (mute becomes two taps); (B) tap still mutes instantly, a caret/long-press opens the panel. Open questions the party flagged as blocking: icon semantics (🔊/🔇 is a STATE today, a menu-opener is a door), ARIA role (toggle vs menu button; the Settings copy "The 🔊 button up top mutes everything" also needs a true-up), and mobile tap targets/occlusion. `/bmad-code-review`. |
 | 2026-07-17 | crowd-din-ambience | #481 | audio-music | feature-request | P2 | — | — | impl-review | **IMPLEMENTED v1.62.0 (issue #481; issue closes on merge), spec-first per the crowd-din GDD (`gdd-verticopolis-2026-07-17-crowd-din-ambience`, validated; decision log records all seventeen audition rulings).** The crowd/venue ambience layer (`src/audio/toneCrowd*.ts`) replaces the old synthesized accents outright: per-scene talkers cut live from two owner-recorded voice seeds (81 KB total, the game's first audio assets, licensed in ASSETS-LICENSE.md, PWA-precached), venue one-shots, and composed venue programs (party hall plays a 124 BPM remix of the splash hook with the owner's real laughs and voice-bent whoops; cinema runs plucked score, muffled dialogue, riser-booms; the metro runs scripted train arrival/departure events with a da-dum wheel rhythm). Driven by zoom (rides the bed distance filter), live occupancy (`ViewFocus.crowd`, honest-rooms: empty venues stay silent), and the sim clock (`ViewFocus.hour`: offices workday-gated, condos midday-quiet). Audition rules enforced in code and pinned by tests: voices shift down only, every noise source behind a steep rolloff -48 filter at warm cutoffs (a graph regression test walks every noise node). Earlier interim step v1.61.1 quieted the old accents; this removes them (`maybeAccent`/`accentHit`/`scheduleStep` retired, `toneVoices` is jingles only). `/gds-code-review` ran (Blind Hunter + Edge Case Hunter + Acceptance Auditor against the GDD): the triage patched every mechanics deviation back to spec (silence threshold, honest talker formula, per-scene murmur gains and fixed voices, element-rate scaling, cluster math, program start/stop on live attendance, scene-key settling, the 1 Hz census cache, slot and timer lifecycle races, buffer-source reaping, granular program teardown) plus the owner's two live reports (phone crackle: playback latency hint + capped polyphony + soft dark one-shot envelopes; flat-feeling volume slider: perceptual squared curve); five findings recorded in the Deferral inbox (three texture defers, one evidence note, one dismissal with evidence). The tower looks alive but does not sound alive: `src/audio/` has a generic per-scene "room rush" noise bed plus a few sparingly-fired zoomed-in accents (`ding`/`clatter`/`keys`/`rumble`/`boom`/`register`/`chatter`), which read as texture, not people. Deepen (not rewrite) that layer into a real crowd bed keyed to what the player views and to live census (honest-rooms pillar: a fuller venue sounds fuller): talking/murmur that scales with crowd, walking/footfall on lobby+transit, eating (cutlery+chatter) for food, playing for recreation, a muffled movie-soundtrack murmur for cinema, and party-hall ambience (music-through-a-wall + cheer) for weddings/parties. Felt zoomed out, resolves to per-venue detail on zoom-in (reuse the existing `detail` ramp + `bedFilter`). All procedural (no files), through the music/ambience volume bus + mute, gesture-gated. Player-facing → version bump + changelog when it ships. Independent PR; can land after or in parallel with #479/#480. `/gds-code-review`. |
@@ -2381,3 +2382,60 @@ teardown flake the source fix alone did not cover. Deferrals (low, out of scope)
   `window.setTimeout` (DOM lib signature returns `number`). Dropping the `window.`
   prefix would resolve to `@types/node`'s `setTimeout` returning `NodeJS.Timeout`
   and break the typing. Keep the `window.` prefix; no action needed now.
+
+### Deferred from: `bmad-code-review` of the Classic vs Modern pages PR (CAP-5, CAP-7, 2026-07-20)
+
+The P1 pages slice (standalone `/help` page, sprite gallery on the shared retro
+kit, shared telemetry, build-time shared-head plugin, founding-picker cleanup,
+cold-boot cover). Three adversarial layers ran (Blind Hunter, Edge Case Hunter
+with a real build + test run, Acceptance Auditor against the
+classic-modern-reachability SPEC). Patched in-branch: the shared-head plugin's
+dev-server root basename gap (map `""`/`"/"` to `index.html`), unconditional
+`hideBootCover()` before the `#stage` guard in `showBootMessage`, the dark-theme
+`[data-theme="light"]` body-color reset (making the "wins in both directions"
+comment true), a `/help` report call-to-action in the page footer (also covers
+the previously-untested `pageShell` footer branch), a `<noscript>` fallback on
+`gallery.html` to match `help.html`, and a `pageShell` doc-comment correction
+(the document `<title>` comes from each page's static head, not the entry
+script). Deferrals (low, out of scope for this PR):
+
+- **Clean-`/help` offline precache alias omitted (Acceptance, deliberate
+  deviation).** SPEC.md CAP-5 / page-architecture.md prescribe a generateSW
+  precache alias so the clean `/help` resolves from cache offline. It is
+  deliberately NOT implemented: a generateSW manifest entry for `/help` makes
+  Workbox fetch `/help` at SW install, which 404s anywhere the Vercel rewrite is
+  absent (`vite preview`, the e2e harness), failing the whole precache and taking
+  the game's own offline down with it. The built `help.html` IS precached, so
+  `/help.html` works offline; the clean `/help` resolves online via the rewrite.
+  Revisit only if a robust generateSW clean-URL alias (or an injectManifest move)
+  is ever worth the risk. The SPEC constraint should be corrected to match on the
+  next bmad-spec pass.
+- **Resume-path boot cover can still flash an unpainted frame (Edge, low).** The
+  cover is dropped synchronously at the end of `runBootFlow`; on the cold/splash
+  path the splash mounts under the cover first, so it is seamless, but on an
+  app-initiated resume reload (post-update / GPU-recovery) there is no splash
+  under the cover and `engine.start()` is still async, so a single unpainted
+  `#view` frame is possible. The PR targets the cold/splash path (the reported
+  bug), which is fixed. Revisit by deferring the resume-path removal to the first
+  rendered frame if it ever proves visible.
+- **`window.helpReady` is set but not consumed by the screenshot readiness guard
+  (Edge, note).** `helpPage.ts` sets it mirroring `galleryReady`, but
+  `scripts/screenshots.ts` only waits on `galleryReady || previewReady`. Harmless
+  today (no `/help` screenshot scene exists); a future `/help` shot must add
+  `helpReady` to that guard or it will hang.
+- **No "styles.css still resolves every retro token / render unchanged" test
+  (Acceptance, retro-design-system companion).** The CAP-6 companion names such a
+  guard; only the `--r-face` single-source guard shipped. The render-unchanged
+  half is covered in practice by the screenshot drift gate (any cascade shift from
+  moving the component `@import`s earlier would drift the game shots). A unit-level
+  assertion (styles.css imports both kit files; the token file defines the core
+  tokens) is a cheap nice-to-have if the area is touched again.
+
+Dismissed with reason (no action): the `.nt-feature` class is not inert (the
+shared `.nt-mode-desc, .nt-feature` type rule still styles it); the em-dashes in
+`retro-tokens.css` / `retro-components.css` are verbatim relocations of
+grandfathered `styles.css` comments (the house rule says do not sweep
+grandfathered comments); the unanchored `/help/` denylist regex matches the
+existing `/gallery/` / `/preview/` style and is not over-broad in practice; the
+directly-fetchable `/help.html` duplicate is mitigated by the clean-URL canonical,
+same as the gallery.

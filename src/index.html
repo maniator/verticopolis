@@ -9,34 +9,25 @@
       content="Play Verticopolis, a free SimTower clone in your browser. Build a skyscraper floor by floor, wire the elevators, and climb to a 5-star tower."
     />
     <link rel="canonical" href="https://verticopolis.com/" />
-    <meta name="robots" content="index, follow, max-image-preview:large" />
 
-    <!-- Open Graph: how the link renders when shared (Discord, Reddit, forums,
-         chat). Absolute URLs are required here even though asset paths elsewhere
-         are relative (base: "./"), so the production origin is hardcoded. -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="Verticopolis" />
+    <!-- Page-unique Open Graph / Twitter copy (Discord, Reddit, forums, chat).
+         The invariant tags (og:type, og:site_name, og:image + dimensions + alt,
+         og:locale, twitter:card, twitter:image + alt, robots, theme-color,
+         favicon) are injected once at build time by the shared-head Vite plugin
+         (see vite.config.ts), so no page copies them. Absolute URLs are required
+         even though asset paths elsewhere are relative (base: "./"), so the
+         production origin is hardcoded. -->
     <meta property="og:title" content="Verticopolis: a free SimTower clone you play in the browser" />
     <meta
       property="og:description"
       content="Build a skyscraper floor by floor: offices, condos, shops, and hotels wired with elevators. Climb to a 5-star tower. No download, plays instantly."
     />
     <meta property="og:url" content="https://verticopolis.com/" />
-    <meta property="og:image" content="https://verticopolis.com/og-image.png" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action." />
-    <meta property="og:locale" content="en_US" />
-
-    <!-- Twitter/X large-image card. -->
-    <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="Verticopolis: a free SimTower clone you play in the browser" />
     <meta
       name="twitter:description"
       content="Build a skyscraper floor by floor, wire the elevators, and climb to a 5-star tower. No download, plays instantly."
     />
-    <meta name="twitter:image" content="https://verticopolis.com/og-image.png" />
-    <meta name="twitter:image:alt" content="Verticopolis: an art-deco skyline at dusk with the tagline Build a SimTower-style skyscraper in your browser and a Play free call to action." />
 
     <!-- Structured data: mark this up as a free, browser-playable game so it is
          eligible for rich results. Kept in sync with the copy above. -->
@@ -63,16 +54,20 @@
       }
     </script>
 
-    <!-- PWA: theme + iOS install affordances (the manifest link is injected by vite-plugin-pwa). -->
-    <meta name="theme-color" content="#000080" />
+    <!-- iOS install affordances (theme-color, favicon, and apple-touch-icon are
+         injected by the shared-head plugin; the manifest link by vite-plugin-pwa). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Verticopolis" />
-    <link rel="icon" href="./favicon.png" type="image/png" />
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <!-- Boot cover: paints the title sky from the first frame so a cold load
+         never flashes the empty game before the engine and splash mount. Removed
+         by the boot flow once the splash is up (or by the fallback boot paths).
+         The inline background is a solid fallback for the sliver before the
+         stylesheet applies; styles.css upgrades it to the shared gradient. -->
+    <div id="boot-cover" aria-hidden="true" style="position: fixed; inset: 0; z-index: 50; background: #161634"></div>
     <div id="a11y-live" class="visually-hidden" aria-live="polite" role="status"></div>
     <div id="app">
       <!-- Indexable page heading and intro. Visually hidden (the game's own

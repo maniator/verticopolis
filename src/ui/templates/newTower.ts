@@ -60,13 +60,13 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
          </div>
          <div class="nt-modern-only">
            <div class="nt-adds">
-             <span class="nt-mode-name">Modern adds</span>
-             <span class="nt-feature"><b>Variant households</b>: condos draw families of 2–5. A bigger family pays more but leans harder on your elevators.</span>
-             <span class="nt-feature"><b>Households come and go</b>: a sold condo's family can move out on its own, so even a settled tower keeps turning over.</span>
-             <span class="nt-feature"><b>A deeper economy</b>: held space, taxes on unsold condos, and noisy neighbors all bite, so late-game money stays a real decision.</span>
+             <span class="nt-sublabel">Modern adds</span>
+             <span class="nt-feature"><b>Variant households</b>: condos draw families of 2–5, and a bigger family leans harder on your elevators.</span>
+             <span class="nt-feature"><b>Households come and go</b>: a sold condo's family can move out, so even a settled tower turns over.</span>
+             <span class="nt-feature"><b>A deeper economy</b>: held space, taxes on unsold condos, and noisy neighbors all bite.</span>
            </div>
-           <div class="nt-calendar">
-             <span class="nt-mode-name">Calendar pace</span>
+           <div class="nt-calendar" role="radiogroup" aria-labelledby="nt-cal-label">
+             <span class="nt-sublabel" id="nt-cal-label">Calendar pace</span>
              <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="realWorld" checked /> <b>Real-world length</b>: a 7-day week, 90-day quarter and 360-day year, the friendlier pace.</label>
              <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="canon" /> <b>Short (1994)</b>: a 3-day week, 3-day quarter and 12-day year, the authentic SimTower rhythm.</label>
            </div>

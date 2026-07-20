@@ -8,6 +8,7 @@ import { attemptContextRecovery } from "./contextRecovery";
 import { showCrashScreen } from "../ui/crashScreen";
 import { OnboardingController } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
+import { hideBootCover } from "../bootstrap";
 import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 
@@ -213,6 +214,11 @@ export function runBootFlow(app: GameApp): void {
       },
     });
   }
+
+  // The first real screen (the splash, or the resumed tower) is now mounted, so
+  // drop the static boot cover: on the splash path it uncovers the identical
+  // title sky underneath, on the resume path the running tower.
+  hideBootCover();
 
   // Tell the player plainly when their save couldn't be read, rather than
   // dropping them into a fresh tower with no explanation. Goes to the bulletin
