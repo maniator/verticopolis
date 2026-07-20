@@ -162,6 +162,14 @@ export const ECON = {
    *  over roughly once every ~5 in-game years on average: rare texture, not a
    *  treadmill. Classic never relocates a condo (its rule-set returns 0). */
   condoRelocationChanceMonthly: 0.015,
+  /** Modern only. Fraction of last-night-occupied hotel rooms held past the
+   *  morning checkout as a late checkout, so the guest is present through the
+   *  daytime meal windows and takes a lunch trip (#304). At 0.2 roughly one room
+   *  in five lingers to lunch: enough that a big hotel earns a midday murmur a
+   *  pure office tower does not, small enough to stay a texture rather than a
+   *  second population. Classic holds none (its rule-set returns 0). PROVISIONAL,
+   *  wants a playtest tuning pass. */
+  hotelDaytimePresence: 0.2,
   /** Player-adjustable price ranges (per the original's rent dropdown). The
    *  `default` is what an un-set unit charges; income, move-in odds and tenant
    *  satisfaction all key off how far the chosen price sits from it. */

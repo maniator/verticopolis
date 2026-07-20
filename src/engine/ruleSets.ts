@@ -142,6 +142,13 @@ export const CLASSIC_RULES: GameRules = {
     // fill less.
     return ECON.rainCrowdFactor.classic;
   },
+  hotelDaytimePresence() {
+    // Canon: a 1994 hotel guest checks out through the morning and is gone by
+    // midday (rooms are cleaned noon to 5), so none linger to lunch. Returning 0
+    // short-circuits the deferral before any room is held, keeping the Classic
+    // checkout byte-identical and the lunch hotel-origin bin empty.
+    return 0;
+  },
 };
 
 export const MODERN_RULES: GameRules = {
@@ -267,5 +274,12 @@ export const MODERN_RULES: GameRules = {
     // Modern smooths: rain thins the crowd, but less sharply than the canon hit,
     // so a rainy day reads as a slower tower rather than a near-empty one.
     return ECON.rainCrowdFactor.modern;
+  },
+  hotelDaytimePresence() {
+    // Modern lets a small, bounded fraction of last-night guests take a late
+    // checkout, so they are still in the tower at lunch and take a meal trip: the
+    // midday hotel murmur the original never had. Tuned in ECON; deterministic
+    // (tower-order selection, no RNG), so it never perturbs the seeded stream.
+    return ECON.hotelDaytimePresence;
   },
 };

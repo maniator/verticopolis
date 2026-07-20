@@ -154,18 +154,59 @@ In both models: Classic is `p = 0` and byte-identical, the Classic golden master
 is the tripwire, and the effect is bounded above by the real last-night room
 count (an empty hotel contributes nothing).
 
+## 4b. Decision: Model A (chosen 2026-07-20)
+
+A design party (game designer, game architect, adversarial edge-case hunter) argued
+the two models with the housekeeping cost on the table. **Model A (late checkout)
+was chosen**, and the owner signed off on the bounded Modern midday-population lift.
+
+Why Model A won:
+
+- It reuses the shipped `hotelFloors -> pushMealOptions -> spawnMealOutbound` path
+  (already covered by `mealCadence.integration.test.ts`) with no `spawn.ts` change,
+  and needs **no new serialized field**. Model B (phantom day-use) would have added
+  a gate-bypassing parallel spawn, a new persisted "rooms occupied last night" count,
+  and return-leg handling for an origin with no backing room: more surface, in the
+  crowd core that produced the `visibleOccupants > 0` finding that reverted the first
+  pass.
+- The housekeeping worry is bounded. `spreadCockroaches()` runs once in the morning
+  `beforeCheckout()` and already sees every last-night room `asleep`, so deferral adds
+  **no** extra infestation-spread surface. The only real cost: deferred rooms turn
+  `dirty` in the early afternoon (14:00) instead of the morning, so on a chronically
+  understaffed Modern hotel they can miss the evening re-let or age toward infestation
+  a little faster. On a normally-staffed Modern hotel the 08:00-19:00 shift absorbs it.
+  That is a Modern-only price signal on the lunch traffic, not a leak.
+
+The six guardrails the party attached (all implemented in Phase 1):
+
+1. **Deterministic selection.** The deferred rooms are the first `Math.round(p * N)`
+   asleep hotel rooms in `tower.units` insertion order (not physical floor/x), with no
+   RNG draw, so neither seeded stream moves.
+2. **Afternoon event over still-asleep rooms.** Checkout is split: the morning event
+   checks out all but the deferred rooms; a new `HK_LATE_CHECKOUT_HOUR` (14:00) event
+   checks out every room still `asleep`. Because evening fill is the only thing that
+   sets `asleep` and runs later, "still asleep at 14:00" is exactly the deferred set,
+   so no new saved field is needed.
+3. **Revenue once.** The morning event books rent for the rooms it flips; the afternoon
+   event books rent for the deferred rooms it flips. No room is charged twice or dropped.
+4. **Housekeeping regression covered.** A test confirms the afternoon event does not
+   re-run the morning `beforeCheckout`/`resetShift` lifecycle and that late-checkout
+   rooms are handled like ordinary dirty rooms.
+5. **Bounded, non-gating census lift.** The extra midday population is exactly the
+   deferred `asleep` rooms (at most `Math.round(p * N)`), the same guests counted once.
+6. **Classic tripwire.** The Classic golden master stays byte-identical and a Classic
+   full-hotel-plus-open-lunch-restaurant tower produces zero hotel-origin lunch trips.
+
 ## 5. Phasing
 
-- **Phase 0 (this doc):** GDD plus the backlog row update. Docs only,
-  `/bmad-code-review` lane.
-- **Design gate (blocks Phase 1):** pick Model A (late checkout, recommended) or
-  Model B (phantom day-use). Model A needs an owner/party sign-off on the modest
-  Modern midday-population lift, because it bends the "never touch the census"
-  guardrail (for the same guest, not a double count).
-- **Phase 1 (Modern feature):** implement the chosen model behind
-  `GameRules.hotelDaytimePresence()` (0 Classic, provisional 0.2 Modern), with the
-  Classic golden master as the tripwire; version bump (Modern player-facing).
-  `/gds-code-review`.
+- **Phase 0:** GDD plus the backlog row update. Docs only, `/bmad-code-review` lane.
+  (Merged: PR #494.)
+- **Design gate:** RESOLVED. Model A chosen (section 4b), owner signed off.
+- **Phase 1 (Modern feature):** implemented behind `GameRules.hotelDaytimePresence()`
+  (0 Classic, provisional 0.2 Modern via `ECON.hotelDaytimePresence`), the deferral in
+  `EconomySystem.hotelCheckout()` plus the new `hotelLateCheckout()` scheduled at
+  `HK_LATE_CHECKOUT_HOUR`, with the Classic golden master as the tripwire and a minor
+  version bump (Modern player-facing). `/gds-code-review`.
 
 There is no Classic engine change: Classic is already faithful. The only Classic
 artifact is this document recording why the issue's literal ask was declined. A

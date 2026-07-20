@@ -201,6 +201,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `gds-code-review` of hotel late-checkout (#304 Phase 1, 2026-07-20)
+
+- **Deferred rent is lost if a late-checkout room is destroyed between 08:00 and 14:00 (Edge Case Hunter + Blind Hunter, minor).** Modern's morning `hotelCheckout()` skips booking rent for the deferred rooms; `hotelLateCheckout()` books it at 14:00. If a deferred room is bulldozed or catches fire in that window, its rent is never booked, a small revenue delta versus the pre-feature single 08:00 checkout (which had already collected it). Narrow and arguably fair (the player destroyed an occupied room), and bounded by `round(0.2 * N)` rooms. Fix shape if it ever matters: book the deferred rent at the morning checkout and only defer the room STATE, or clear the deferral (book immediately) in the bulldoze/fire path. Not worth a serialized field for a rare, self-inflicted case. All three review layers otherwise confirmed the guardrails hold (determinism, revenue-once under normal play, bounded non-duplicating census, housekeeping lifecycle).
+
 ### Deferred from: `gds-code-review` of the crowd/venue ambience (#481/#485, 2026-07-17)
 
 - **A busy commercial venue reads silent for the post-load rebuild window (Edge Case Hunter, low).** For population>0 commercial kinds (restaurant, fastFood, shop) the view-focus census reads the live `customersIn` tally, which is deliberately not persisted: right after a save load a venue that was full reads empty (and so plays no ambience) for the seconds it takes the crowd system to re-route diners in. This is honest (the sim really has nobody seated yet) and self-heals, so it is accepted for v1 and documented at the census site in `towerInputCamera.ts`. Fix shape if it ever bothers a player: seed a transient fill estimate from `occupants` for the first post-load hour, or reconcile `customersIn` on load like the attendance mirror does.

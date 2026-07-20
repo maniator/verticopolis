@@ -1,7 +1,7 @@
 import { Simulation } from "../Simulation";
 
 import { CROWD_SECONDS_PER_MINUTE } from "../Crowd";
-import { HK_CHECKOUT_HOUR } from "../EconomySystem";
+import { HK_CHECKOUT_HOUR, HK_LATE_CHECKOUT_HOUR, HK_LATE_CHECKOUT_END } from "../EconomySystem";
 
 import { FACILITIES } from "../facilities";
 
@@ -116,6 +116,15 @@ export function onHour(sim: Simulation): void {
   // population is still present at the midnight TOWER/VIP evaluation.
   if (sim.clock.hour === HK_CHECKOUT_HOUR) {
     sim.economy.hotelCheckout();
+  }
+  // Modern late checkout (#304): guests held past the morning checkout leave in
+  // the early afternoon, after lunch. Classic never defers, so this is a no-op
+  // there. Runs across a window (not a single hour) so a save reloaded later in
+  // the day still clears the deferred rooms; it self-gates on `asleep` and leaves
+  // rooms `dirty`, so repeat firings across the window are idempotent. Runs before
+  // the housekeeping dispatch below so the freshly dirtied rooms join the shift.
+  if (sim.clock.hour >= HK_LATE_CHECKOUT_HOUR && sim.clock.hour < HK_LATE_CHECKOUT_END) {
+    sim.economy.hotelLateCheckout();
   }
   // Housekeeping works the mode's day shift (GameRules: Classic the canon
   // 12:00-17:00, Modern 08:00-19:00). A booked exterminator lands AFTER this

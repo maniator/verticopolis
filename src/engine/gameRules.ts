@@ -243,6 +243,20 @@ export interface GameRules {
    * unaffected here (it keeps its own `rainMult`).
    */
   rainCrowdFactor(): number;
+  /**
+   * Fraction of last-night-occupied hotel rooms held past the morning checkout as
+   * a late checkout, so the guest is still present through the daytime meal windows
+   * and takes a lunch meal trip (#304, "what the original couldn't do"). Classic
+   * returns 0: a 1994 hotel guest is gone by midday, so a Classic tower feeds no
+   * hotel lunch trips, and callers MUST short-circuit on a `<= 0` return BEFORE
+   * deferring any room, so the Classic checkout stays byte-identical. Modern returns
+   * a small bounded fraction (`ECON.hotelDaytimePresence`). The deferred rooms are
+   * chosen deterministically in tower order with no RNG draw, and each still checks
+   * out the same day (an afternoon event), so this is the same guest for a slightly
+   * longer real stay, never a second census body. Provisional magnitude, pending a
+   * calibration pass.
+   */
+  hotelDaytimePresence(): number;
 }
 
 /** Per-routine spawn weights, see {@link GameRules.demographicRoutines}. */
