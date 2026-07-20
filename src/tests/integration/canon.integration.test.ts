@@ -8,6 +8,7 @@ import {
   STAR_THRESHOLDS,
   TOWER_POPULATION,
   TRANSPORT_CAPACITY,
+  WALKWAY_WILLINGNESS,
   maxSpanFor,
 } from "../../engine/facilities";
 import { ECON } from "../../engine/econConfig";
@@ -64,6 +65,17 @@ describe("canon: transport pools (tdt-format.md §8)", () => {
     expect(TRANSPORT_CAPACITY.elevatorExpress).toBe(42);
     expect(TRANSPORT_CAPACITY.elevatorStandard).toBe(21);
     expect(TRANSPORT_CAPACITY.elevatorService).toBe(10);
+  });
+});
+
+describe("canon: walkway willingness (guide-derived; #384)", () => {
+  // Cumulative-walk willingness: the 1994 game lets a person chain at most 4
+  // contiguous stair flights / 7 escalators before refusing (roadwolf /
+  // relentlessoptimizer / GameFAQs; the "5" some guides cite counts the origin
+  // floor). Canon value only; the router does not enforce it yet.
+  it("is stairs 4 / escalators 7 (canon)", () => {
+    expect(WALKWAY_WILLINGNESS.stairs).toBe(4);
+    expect(WALKWAY_WILLINGNESS.escalator).toBe(7);
   });
 });
 

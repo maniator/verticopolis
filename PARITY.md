@@ -30,7 +30,7 @@ abstraction · ⬜ not present.
 - ✅ Wedding Hall on floor 100 (religion-agnostic stand-in for the Cathedral)
 
 ## Transport
-- ✅ Stairs, Escalators (single-floor links, animated climbers)
+- ✅ Stairs, Escalators (single-flight links, animated climbers). Canon (#384, #323): the 1994 game builds only **single flights** (never multi-story units, though the TDT format has bytes for 2/3-story variants), and a person will chain at most **4 contiguous stair flights / 7 escalators** on a trip before refusing (an elevator ride resets the count). The willingness numbers live in `WALKWAY_WILLINGNESS` (`src/engine/facilityCaps.ts`) as canon but nothing reads them yet. The router has no walkway-specific limit today; it caps a whole trip at 2 legs (`MAX_RIDES` BFS edges in `src/engine/crowd/routing.ts`), and each stair flight is one such leg, so pure-stair reach is currently 2 floors (stricter than the canon 4) and stairs share that budget with elevators. Matching canon means giving walk legs their own contiguous budget (4/7, reset by an elevator ride) separate from the 2-ride elevator budget, which loosens stair reach: a gated gameplay change, Classic a hard refusal vs Modern a comfort/satisfaction penalty at the same threshold.
 - ✅ Standard / Service / Express elevators with multiple cars (service elevators are staff-only: housekeepers ride them, passengers never do)
 - ✅ Per-elevator car count and **per-floor stop configuration** (express / skip); per-shift car scheduling and per-car home/waiting floors are a tracked gap (see Known parity gaps)
 - ✅ Demand-driven car dispatch (SCAN): cars serve waiting passengers, idle at the lobby when empty

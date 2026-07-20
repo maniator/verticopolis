@@ -76,7 +76,33 @@ export function maxSpanFor(kind: FacilityKind): number {
 /** True for transports that are a FIXED two-floor unit (stairs, escalators):
  *  placed with one tap, never dragged to size, never extended. The single
  *  home for the concept, placement, gestures, ghosts, editor buttons and
- *  span messages all key off this, so a new kind can't flip half of them. */
+ *  span messages all key off this, so a new kind can't flip half of them.
+ *
+ *  Canon (#323, party ruling 2026-07-19): the 1994 game only ever BUILDS single
+ *  flights (each links two adjacent floors); no source shows the shipped editor
+ *  placing a multi-story stair/escalator, so we hold walkways to single flights.
+ *  The TDT format has type bytes for 2- and 3-story variants; our exporter still
+ *  collapses stacked flights into those records (`src/storage/tdtEncoder.ts`), and whether
+ *  the real game ever WRITES a multi-story record itself is an open harness
+ *  question (#323), so this comment does not claim it. */
 export function isFixedSpanTransport(kind: FacilityKind): boolean {
   return FACILITIES[kind]?.transport === true && maxSpanFor(kind) === 1;
 }
+
+/**
+ * Canon cumulative-walk willingness: the most CONTIGUOUS flights of each walkway
+ * kind a person will chain on one trip before refusing in the 1994 original, an
+ * elevator ride resetting the count. **Stairs 4, escalators 7** (roadwolf "4 sets
+ * of stairs per trip"; relentlessoptimizer "maximum of four flights"; GameFAQs;
+ * the "5 levels" some guides cite counts the origin floor). Ratified by the
+ * design party 2026-07-19 (#384).
+ *
+ * Canon VALUE only: nothing consumes it yet. Enforcing it is a mode-split
+ * gameplay change (Classic refuses past the threshold, Modern applies a comfort
+ * penalty at the same knee) that loosens today's passenger stair reach. Enforcement is the #384 story
+ * (its design lives in the parity GDD), not shipped here.
+ */
+export const WALKWAY_WILLINGNESS: Record<"stairs" | "escalator", number> = {
+  stairs: 4,
+  escalator: 7,
+};
