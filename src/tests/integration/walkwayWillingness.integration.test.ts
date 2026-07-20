@@ -60,6 +60,24 @@ describe("walkway willingness (#384)", () => {
     expect(reaches(tower, 1, 9), "8 flights").toBe(false);
   });
 
+  it("Classic: a mixed stair+escalator run is governed by the stricter (stairs=4) threshold", () => {
+    // One contiguous walk run of escalators and stairs. As pure escalators this
+    // many flights would pass (the cap is 7), but a single stair anywhere in the
+    // run pulls the whole run's budget down to 4: floor 5 is the 4th flight (one
+    // of them a stair) and reachable; floor 6 is the 5th and refused, even though
+    // it is only two escalator flights past a reachable floor. This pins that the
+    // stricter kind governs and that runCap ratchets down but never back up.
+    const tower = baseTower("classic", 7);
+    shaftOk(tower, "escalator", 2, 1, 2);
+    shaftOk(tower, "escalator", 2, 2, 3);
+    shaftOk(tower, "escalator", 2, 3, 4);
+    shaftOk(tower, "stairs", 2, 4, 5); // the stair that tightens the run to 4
+    shaftOk(tower, "escalator", 2, 5, 6);
+    shaftOk(tower, "escalator", 2, 6, 7);
+    expect(reaches(tower, 1, 5), "4 flights, one a stair (at the stricter cap)").toBe(true);
+    expect(reaches(tower, 1, 6), "5th flight in a stair-tainted run (refused, though pure-escalator 5 would pass)").toBe(false);
+  });
+
   it("Classic: an elevator ride resets the walk budget (stairs, car, stairs)", () => {
     // Stairs 1..5 (4 flights) is the cap; add a standard elevator 5..6 and
     // stairs 6..10 (4 more). Without the reset, floor 10 is 8 stair flights and

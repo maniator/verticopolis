@@ -310,7 +310,7 @@ export function bfsRouteExpressGated(
   // walking cheaper than riding. Search state is (floor, arrived-by-express,
   // rides, walkRun, runCap): the same floor reached under a different arrival
   // class or with a different remaining budget admits different onward moves.
-  const NO_CAP = 999; // runCap sentinel: no walk flight taken yet on the current run
+  const NO_CAP = Infinity; // runCap sentinel: no walk flight taken yet on the current run
   interface St { floor: number; express: boolean; rides: number; walkRun: number; runCap: number }
   const key = (s: St) => `${s.floor}:${s.express ? 1 : 0}:${s.rides}:${s.walkRun}:${s.runCap}`;
   const origin: St = { floor: from, express: false, rides: 0, walkRun: 0, runCap: NO_CAP };
@@ -322,6 +322,7 @@ export function bfsRouteExpressGated(
   while (frontier.length) {
     const next: St[] = [];
     for (const s of frontier) {
+      const sk = key(s); // hoisted out of the edge loop: one key string per state, not per edge (hot path)
       for (const edge of adj.get(s.floor) ?? []) {
         let ns: St;
         if (edge.walkKind) {
@@ -351,7 +352,7 @@ export function bfsRouteExpressGated(
         const nk = key(ns);
         if (seen.has(nk)) continue;
         seen.add(nk);
-        prev.set(nk, { key: key(s), floor: s.floor, shaft: edge.shaft });
+        prev.set(nk, { key: sk, floor: s.floor, shaft: edge.shaft });
         if (edge.f === to) {
           const floors = [to];
           const shafts: number[] = [];
