@@ -162,8 +162,14 @@ export default defineConfig({
         // chunks are excluded so an install ships just the game.
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
         // og-image.png is the social/crawler share card, not part of the game
-        // shell, so keep it out of the offline precache.
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*"],
+        // shell, so keep it out of the offline precache. `help.html` and its own
+        // page entry chunk (`help-*.js`) are excluded too (see the note below).
+        // The two help patterns are deliberately narrow: `**/help.html` and
+        // `**/help-*.js` match the page and its entry chunk, while the shared
+        // `helpContent-*.js` chunk (which starts with `helpC`, not `help-`) is
+        // left precached, because the in-game Help modal imports it and needs it
+        // offline. A broad `**/help*` would wrongly sweep `helpContent-*.js` too.
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -175,13 +181,23 @@ export default defineConfig({
         // routes. Without the `/help` entry the fallback would answer a `/help`
         // navigation with the precached game shell.
         //
-        // The built `help.html` IS precached (it is not in `globIgnores`), so an
-        // offline navigation to `/help.html` is cache-served; the CLEAN `/help`
-        // offline resolves only via the Vercel rewrite (online). A precache alias
-        // for the clean URL is deliberately NOT added: with generateSW it would
-        // make Workbox fetch `/help` at install, which 404s anywhere the Vercel
-        // rewrite is absent (`vite preview`, the e2e harness), failing the whole
-        // precache and taking the game's offline down with it.
+        // `help.html` is kept OUT of precache (the `globIgnores` entries above),
+        // exactly like `gallery.html`, so the CLEAN `/help` always resolves over
+        // the network via the Vercel rewrite and is never stale. This matters
+        // because Workbox precaching defaults `cleanURLs` to true: a navigation to
+        // `/help` generates a `/help.html` variation, so a precached `/help.html`
+        // would answer the clean `/help` FROM THE CACHE, pinning it to whatever was
+        // cached when the service worker installed and serving an outdated page
+        // across deploys until the worker updates (and the `/help` page does not
+        // register the worker, so a `/help`-only visitor never triggers that
+        // update). The `navigateFallbackDenylist` alone does not prevent this: it
+        // governs only the app-shell NavigationRoute, not the precache route. Not
+        // precaching the page is the fix; the trade-off is that `/help` is
+        // online-only (no offline copy), the same call already made for `/gallery`.
+        // A precache alias for the clean URL is separately rejected: with
+        // generateSW it would make Workbox fetch `/help` at install, which 404s
+        // anywhere the Vercel rewrite is absent (`vite preview`, the e2e harness),
+        // failing the whole precache and taking the game's offline down with it.
         navigateFallbackDenylist: [/gallery/, /help/, /preview/, /version\.json$/, /robots\.txt$/, /sitemap\.xml$/, /og-image\.png$/],
         cleanupOutdatedCaches: true,
         // Excalibur's bundle is comfortably large; lift the precache ceiling.
