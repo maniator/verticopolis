@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.69.0
+
+- The shareable Help page at /help is now the full how-to-play guide: the basics, growing your rating, keyboard controls, and the Classic vs Modern comparison. In-game Help links straight to the comparison section of it.
+
 ## 1.68.0
 
 - The Classic vs Modern comparison now has its own shareable page you can link to, reachable from Help, and the sprite gallery wears the same title-bar look.

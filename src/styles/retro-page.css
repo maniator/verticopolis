@@ -83,6 +83,42 @@ body.retro-page {
   margin-bottom: 0;
 }
 
+/* The /help page renders the full how-to-play guide: every shared HELP_SECTIONS
+   section expanded under a heading (the in-game Help modal renders the same
+   content collapsed). These mirror the game's kbd and report-row styling so the
+   shared helpContent looks right on the page too. */
+.help-section {
+  margin: 0 0 22px;
+}
+.help-section h2 {
+  font-size: 18px;
+  margin: 0 0 8px;
+  text-wrap: balance;
+}
+/* A deep link (e.g. /help#classic-vs-modern) highlights the section it lands on. */
+.help-section:target h2 {
+  color: var(--accent);
+}
+.help-keys {
+  line-height: 1.9;
+}
+.win-body kbd {
+  display: inline-block;
+  min-width: 1.1em;
+  padding: 0 5px;
+  margin: 0 1px;
+  font: 600 0.85em "Courier New", monospace;
+  text-align: center;
+  color: var(--r-ink);
+  background: #f4f4f4;
+  box-shadow: var(--bevel-out);
+}
+.help-report {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* The sprite gallery's fixed-width canvas scrolls sideways inside its own box on
    a narrow viewport, so the page body itself never scrolls horizontally. */
 .gallery-scroll {

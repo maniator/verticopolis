@@ -5,15 +5,19 @@ cites this companion; it holds the per-file catalog the kernel would bloat.
 
 ## The page and its single source
 
-`src/help.html` is a new Vite input rendering the same `compareTemplate()` the
-Help modal, the compare modal, and the founding `<details>` render (CAP-1). It is
+`src/help.html` is a Vite input rendering the **full how-to-play guide** (the
+CAP-5 rescope): the same sections the in-game Help modal shows, the basics, going
+further, Classic vs Modern, keyboard, About, plus the report call to action. It is
 a full document in the retro page shell (CAP-6, `pageShell(...)`): a title bar
-reading "Verticopolis - Classic vs Modern", the lead paragraph, the divergence
-grid, and the report call to action. No game code, no Excalibur canvas, no sim.
+reading "Verticopolis: How to Play", the lead, the guide sections, and the report
+call to action. No game code, no Excalibur canvas, no sim.
 
-The page does NOT duplicate the comparison prose. It imports `compareTemplate()`
-and renders it once at build/runtime, so the drift guard in `help.test.ts` keeps
-protecting every surface at once.
+The page does NOT duplicate the guide prose. Both the modal (`help.ts`) and the
+page (`helpPage.ts`) render the one shared source `src/ui/templates/helpContent.ts`
+(`HELP_SECTIONS` + `helpLede`/`helpAboutBody`/`helpReportBlock`), with the Classic
+vs Modern section still coming from `compareTemplate()`; so the guide copy has one
+home and the `help.test.ts` drift guard keeps protecting every surface at once.
+Classic vs Modern is a section anchored `/help#classic-vs-modern`.
 
 ## Build inputs
 
@@ -23,7 +27,7 @@ protecting every surface at once.
 | Precache | Leave `src/help.html` OUT of `globIgnores` so Workbox `globPatterns` (which already matches `.html`) precaches it (it is small and its offline value is high, a reference). `preview.html` stays ignored: it is a Rollup input, so it is built and reachable, but it is a test/screenshot harness, kept out of precache and unlinked and unindexed. `gallery.html` stays ignored as a deliberate size choice (its canvas catalog is a browse-online page, low offline value), not because it is tooling; it is a public page and can be promoted into precache later if wanted. |
 | SW registration | `help.html` does NOT register a service worker. The root-scope game SW (registered only by `main.ts` -> `pwa.ts`) already covers `/help` because it is same-origin under the root scope. |
 | navigateFallback | Add `/help` to `navigateFallbackDenylist` so the `index.html` app-shell fallback does not hijack a `/help` navigation. Without it, Workbox answers every navigation (including `/help`) with the precached `index.html`, serving the game instead of the help page. |
-| Clean-URL offline | Precache stores the built file at `/help.html`, NOT at the clean `/help`. The denylist entry alone therefore leaves an offline navigation to `/help` falling through to the network (it works online via the Vercel rewrite, fails offline). To make the clean URL resolve from cache, register `/help` as a precache alias for the `/help.html` content (generateSW `workbox.additionalManifestEntries` or a `manifestTransform` that duplicates the `help.html` entry under the `/help` URL, keeping the current generateSW strategy, no injectManifest). Then Workbox's precache route answers an offline `/help` navigation from cache. `/gallery` gets no alias: the gallery is intentionally not precached, so offline `/gallery` is unsupported by design. |
+| Clean-URL offline | Precache stores the built file at `/help.html`, NOT at the clean `/help`, so an offline navigation to the clean `/help` falls through to the network (it works online via the Vercel rewrite, fails offline; `/help.html` itself is cache-served). This spec originally prescribed a precache alias to make the clean URL resolve offline, but that is **deliberately not implemented** (recorded in the backlog): a generateSW `additionalManifestEntries` / `manifestTransform` alias makes Workbox FETCH `/help` at SW install, which 404s anywhere the Vercel rewrite is absent (`vite preview`, the e2e harness), failing the whole precache and taking the game's own offline down with it. `/gallery` likewise gets no alias (intentionally not precached at all). |
 
 ## Vercel routing
 
@@ -114,9 +118,10 @@ Both canonicals are the clean URLs served by the targeted Vercel rewrites above.
 
 ## Tests
 
-- A page test asserts `src/help.html` renders `compareTemplate()` output (the
-  divergence phrases and "pixel-faithful to 1994" closer are present) and that
-  the "Back to game" anchor targets `/`.
+- A page test asserts the `/help` page renders every shared guide section (each
+  under an anchored heading, including the `classic-vs-modern` section whose
+  `compareTemplate()` divergence phrases and "pixel-faithful to 1994" closer are
+  present) and that the "Back to game" anchor targets `/`.
 - A telemetry test (mirroring `bootstrap.test.ts`): the shared helper injects on
   `verticopolis.com` / `*.vercel.app` and no-ops elsewhere; the gallery and
   `/help` entry scripts call it.
