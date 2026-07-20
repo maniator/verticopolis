@@ -6,6 +6,7 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, snapX } from "../ui/placement";
+import { gameplaySession } from "../analytics";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -46,6 +47,7 @@ export class BuildActions {
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
     const res = this.deps.getSim().build(kind, floor, x);
     if (res.ok) {
+      gameplaySession.noteBuild(kind); // funnel: first placement of the session
       if (!quiet) this.deps.audio.sfx("build");
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
@@ -64,6 +66,7 @@ export class BuildActions {
     top: number,
   ): { ok: boolean; reason: string } {
     const res = this.deps.getSim().buildTransport(kind, x, bottom, top);
+    if (res.ok) gameplaySession.noteBuild(kind); // a shaft counts as a first build too
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
     if (!res.ok) this.deps.ui.toast(reason, "bad");
@@ -107,6 +110,7 @@ export class BuildActions {
         }
       }
     }
+    if (placed > 0) gameplaySession.noteBuild(kind); // brush path bypasses tryBuild
     this.paint = { tile, floor };
     if (placed === 0 && tiles.every((tx) => sim.tower.structureKindAt(floor, tx) === kind)) {
       return { placed, reason: `${FACILITIES[kind].name} already built here` };

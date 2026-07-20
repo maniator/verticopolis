@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
-import { wireControllers, runBootFlow, APP_VERSION } from "./appBoot";
+import { wireControllers, runBootFlow, bootReason, APP_VERSION } from "./appBoot";
 import { RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { RESUME_AFTER_UPDATE_KEY } from "./updateFlow";
 import { showCrashScreen } from "../ui/crashScreen";
 import { attemptContextRecovery } from "./contextRecovery";
 import { rebuildEngine } from "./engineWiring";
+import { gameplaySession } from "../analytics";
 
 /**
  * Headless unit tests for the constructor collaborators.
@@ -94,7 +95,7 @@ describe("wireControllers", () => {
   /** A fake app whose every collaborator is a spy, so each wiring closure can be
    *  invoked and asserted to route to the matching app member. */
   function makeWiringApp() {
-    const sim = { id: "sim" };
+    const sim = { id: "sim", star: 3, population: 800 };
     const engine = { viewState: vi.fn(() => ({ view: 1 })), onContextRestored: null as unknown };
     const app = {
       sim,
@@ -220,9 +221,24 @@ describe("wireControllers", () => {
     expect(app.ui.showImportReport).toHaveBeenCalledWith("r", "cb");
     d.ui.showExportReport("r", "cb");
     expect(app.ui.showExportReport).toHaveBeenCalledWith("r", "cb");
-    // Crash screen: the dep forwards the app context (version) and its own getSim.
-    d.showCrashScreen({ error: "boom" });
+    // Crash screen: the dep forwards the app context (version) and its own
+    // getSim, and reports the crash to analytics with its flattened description.
+    const crashSpy = vi.spyOn(gameplaySession, "noteCrash");
+    d.showCrashScreen({
+      crash: { kind: "webgl-context-lost", repeat: false, saveFlushed: true, behindSplash: false, recoveryFailed: false },
+      error: "boom",
+    });
     expect(showCrashScreen).toHaveBeenCalledWith(expect.objectContaining({ error: "boom", version: APP_VERSION }));
+    expect(crashSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "webgl-context-lost",
+        repeat: false,
+        version: APP_VERSION,
+        star: 3,
+        population: 800,
+      }),
+    );
+    crashSpy.mockRestore();
     // Graphics recovery: the mocked attemptContextRecovery drives onRestored,
     // the unsubscribe it returns, and rebuild.
     const done = vi.fn();
@@ -271,7 +287,9 @@ describe("runBootFlow", () => {
       audio: { sfx: vi.fn(), setProgram: vi.fn() },
       setSpeed: vi.fn(),
       ui: { toast: vi.fn(), newTowerModal: vi.fn(), showHelp: vi.fn() },
-      sim: { emit: vi.fn() },
+      // The boot snapshot (gameplaySession.noteBoot) reads these off the live
+      // sim; stub the shape so runBootFlow's snapshot call doesn't throw.
+      sim: { emit: vi.fn(), mode: "classic", star: 1, population: 0, tower: { highestFloor: 1 } },
       saveLoad: { autosave: vi.fn(), newGame: vi.fn() },
       hadReadableSave: false,
       saveWasCorrupt: false,
@@ -430,5 +448,45 @@ describe("runBootFlow", () => {
     vi.advanceTimersByTime(30000);
 
     expect((app.saveLoad.autosave as unknown as ReturnType<typeof vi.fn>)).not.toHaveBeenCalled();
+  });
+});
+
+describe("bootReason", () => {
+  const flags = {
+    justUpdated: false,
+    justRecovered: false,
+    hadReadableSave: false,
+    saveWasCorrupt: false,
+  };
+
+  it("prioritizes update over recovery, corrupt, and a readable save", () => {
+    expect(
+      bootReason({ justUpdated: true, justRecovered: true, hadReadableSave: true, saveWasCorrupt: true }),
+    ).toBe("update");
+  });
+
+  it("reports recovery for the WebGL-loss auto-reload", () => {
+    expect(bootReason({ ...flags, justRecovered: true, hadReadableSave: true })).toBe("recovery");
+  });
+
+  it("reports corrupt when a save existed but could not be read", () => {
+    expect(bootReason({ ...flags, saveWasCorrupt: true })).toBe("corrupt");
+  });
+
+  it("reports corrupt (not update) when an update reload lands on an unreadable save", () => {
+    // A save-format-breaking update: the reload sets justUpdated, but the new
+    // build can't read the old save, so the player got the splash + corrupt
+    // message. The outcome (corrupt) wins over the trigger, mirroring resolveBootScreen.
+    expect(
+      bootReason({ justUpdated: true, justRecovered: false, hadReadableSave: false, saveWasCorrupt: true }),
+    ).toBe("corrupt");
+  });
+
+  it("reports continue for a readable save resumed", () => {
+    expect(bootReason({ ...flags, hadReadableSave: true })).toBe("continue");
+  });
+
+  it("reports fresh for a first-time boot with no save", () => {
+    expect(bootReason(flags)).toBe("fresh");
   });
 });

@@ -11,6 +11,7 @@ import { resolveBootScreen } from "../bootScreen";
 import { hideBootCover } from "../bootstrap";
 import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
+import { gameplaySession } from "../analytics";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -23,6 +24,25 @@ import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow"
 
 /** Compile-time app version (see vite.config.ts `define`); "dev" outside a build. */
 export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
+/** Classify why this boot happened, for the analytics boot snapshot. Mirrors
+ *  `resolveBootScreen`: an "Update now" or WebGL-recovery reload only actually
+ *  resumes the tower when a readable save survived, so "update" / "recovery" are
+ *  gated on `hadReadableSave`. When a resume reload lands on an unreadable save
+ *  (e.g. a save-format-breaking update), the player gets the splash and the
+ *  corrupt message, so that outcome is reported as "corrupt", not the trigger.
+ *  Otherwise a readable save is "continue" and nothing is "fresh". */
+export function bootReason(flags: {
+  justUpdated: boolean;
+  justRecovered: boolean;
+  hadReadableSave: boolean;
+  saveWasCorrupt: boolean;
+}): string {
+  if (flags.justUpdated && flags.hadReadableSave) return "update";
+  if (flags.justRecovered && flags.hadReadableSave) return "recovery";
+  if (flags.saveWasCorrupt) return "corrupt";
+  return flags.hadReadableSave ? "continue" : "fresh";
+}
 
 /** Build the controller modules onto `app`. Called from the constructor BEFORE
  *  the UI, because the `UI` ctor's initial selectTool fires `onSelectTool`
@@ -73,14 +93,28 @@ export function wireControllers(app: GameApp): void {
     },
     // SaveLoad owns the crash shape and the reload action; the app supplies
     // the context only it has (version, the live sim, the frame-error ring).
-    showCrashScreen: (info) =>
+    showCrashScreen: (info) => {
+      // Render the recovery UI FIRST: it is the whole point of this path, and
+      // analytics must never precede or block it.
       showCrashScreen({
         ...info,
         version: APP_VERSION,
         speed: app.speed,
         getSim: () => app.sim,
         frameErrors: app.frameErrors,
-      }),
+      });
+      // Then report the crash the moment its screen is shown (not just via the
+      // next boot's reason), flattening the description plus build and tower
+      // context. Sim reads are defensive: a crash is when sim state is least
+      // trustworthy, and a telemetry payload must never throw into the crash
+      // handler. Host-gated and best-effort inside noteCrash.
+      gameplaySession.noteCrash({
+        ...info.crash,
+        version: APP_VERSION,
+        star: app.sim?.star ?? 0,
+        population: app.sim?.population ?? 0,
+      });
+    },
     attemptGraphicsRecovery: (done) =>
       attemptContextRecovery(
         {
@@ -170,6 +204,26 @@ export function runBootFlow(app: GameApp): void {
   } catch {
     /* sessionStorage can throw in private mode, so treat it as not-a-recovery */
   }
+  // One analytics snapshot per boot: the origin (update / recovery / corrupt /
+  // continue / fresh) plus the loaded tower's standing state and the build
+  // version. Fired here, once both resume flags are resolved, so a returning
+  // player's established tower is captured even if they trigger no other event.
+  // Best-effort and host-gated inside; never blocks boot.
+  gameplaySession.noteBoot({
+    reason: bootReason({
+      justUpdated,
+      justRecovered,
+      hadReadableSave: app.hadReadableSave,
+      saveWasCorrupt: app.saveWasCorrupt,
+    }),
+    version: APP_VERSION,
+    // Defensive reads: a telemetry payload must never throw and abort boot.
+    mode: app.sim?.mode ?? "unknown",
+    star: app.sim?.star ?? 0,
+    floors: app.sim?.tower?.highestFloor ?? 0,
+    population: app.sim?.population ?? 0,
+  });
+
   if (resolveBootScreen({ hadReadableSave: app.hadReadableSave, justUpdated, justRecovered }) === "resume") {
     // An app-initiated resume reload (update or GPU-crash recovery): drop the
     // player straight back into their tower, skipping the title screen. Land

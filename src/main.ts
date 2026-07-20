@@ -30,6 +30,7 @@ import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./ga
 import { updateTraffic } from "./game/trafficHud";
 import { onUpdateAvailable } from "./game/updateFlow";
 import { bootGame } from "./bootstrap";
+import { gameplaySession } from "./analytics";
 
 /**
  * The game controller. Excalibur (via {@link TowerEngine}) owns the render
@@ -193,6 +194,11 @@ class GameApp implements GameAppPorts {
     // future version may recover it. Best-effort, never blocks boot.
     if (boot.corrupt) SaveGame.preserveUnreadable();
     this.sim = boot.sim ?? Simulation.newGame(Date.parse("2024-01-01"));
+    // Seed the promotion latch to the boot tower's rating (adoptSim does the same
+    // for later swaps). The boot sim is assigned directly, never through
+    // adoptSim, so without this a reloaded 2★-6★ tower reads star > lastStar(1)
+    // on the first frame and fires a phantom promotion (jingle + star_reached).
+    this.lastStar = this.sim.star;
     this.engine = new TowerEngine(this.canvas, this.sim);
 
     // Restore persisted audio prefs onto the facade BEFORE any UI wiring or
@@ -262,6 +268,14 @@ class GameApp implements GameAppPorts {
 
   /** Switch the active build/inspect tool, dropping any in-flight gesture. */
   handleSelectTool(tool: Tool): void {
+    // Report the tool mix (deduped once per distinct tool for the session), but
+    // only on a genuine switch: the UI constructor's initial inspect selection
+    // matches the default tool, so comparing against the current tool skips that
+    // boot no-op instead of logging an inspect for every session. A build tool
+    // reports its facility kind; other tools their bare mode.
+    const label = tool.type === "build" ? tool.kind : tool.type;
+    const prevLabel = this.tool.type === "build" ? this.tool.kind : this.tool.type;
+    if (label !== prevLabel) gameplaySession.noteToolUsed(label);
     this.tool = tool;
     this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
     // Drop any in-flight paint gesture too: onActionUp/onActionMove read the

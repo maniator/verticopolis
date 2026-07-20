@@ -7,6 +7,7 @@ import type { BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { shouldArm } from "../ui/Onboarding";
+import { gameplaySession } from "../analytics";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 import type { UI } from "../ui/UI";
 
@@ -457,6 +458,7 @@ export class SaveLoad {
    *  `modernCalendar` is only consulted for Modern. */
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): void {
     this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar));
+    gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     this.deps.ui.toast(
       mode === "modern" ? "New Modern tower founded. Good luck!" : "New tower founded. Good luck!",
       "good",
