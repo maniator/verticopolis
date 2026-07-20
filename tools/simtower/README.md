@@ -82,11 +82,16 @@ only (`screenshot` boots a fixed 1024x768 frame):
 ```bash
 SCREEN=1600x1000    # (load) Xvfb size; widen to fit a tall/wide tower in one shot
 MAXIMIZE=1          # (load) maximize the inner tower window
-ZOOM_CLICKS=1       # (load) zoom the tower out N times so the whole shaft fits
+ZOOM_CLICKS=1       # (load) toggle the magnifier N times (zoom the tower in/out)
+ZOOM_TOOL_X=187     # (load) screen px of the palette magnifier tool (default 187,229)
+ZOOM_TOOL_Y=229     # (load) ...its y; move if the palette is elsewhere
+ZOOM_TILE_X=600     # (load) screen px on the TOWER to zoom toward (default 600,350
+ZOOM_TILE_Y=350     # (load) assumes a tall tower; aim near the ground row for a short one)
 CLICK_SECS=20       # (load) how long to sweep-click boot dialogs away
 SHOT_DELAY=18       # (load + screenshot) settle seconds before the capture
 SHOT_OUT=/wine/x.png # (load + screenshot) output path
 # e.g.: SCREEN=1600x1000 MAXIMIZE=1 ./run.sh load /wine/drive_c/saves/TOWER5.TDT
+# short tower zoom-in: ZOOM_CLICKS=1 ZOOM_TILE_X=400 ZOOM_TILE_Y=550 ./run.sh load ...
 ```
 
 Only the interactive `run`/`shell` modes mount the host display; the headless

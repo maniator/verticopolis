@@ -175,8 +175,20 @@ load_tdt() {
   # The magnifier tool position is likewise tunable via ZOOM_TOOL_X/ZOOM_TOOL_Y.
   # Diagnostic only; default 0 leaves the saved zoom untouched.
   local zoom_clicks="${ZOOM_CLICKS:-0}"
+  # Coordinates are screen pixels: coerce each to a non-negative integer, falling
+  # back to the default (and warning) on a non-numeric/negative value, exactly
+  # like CLICK_SECS above. Without this an "x=" typo would make xdotool fail and,
+  # since every xdotool call is `|| true`, the zoom toggle would silently no-op.
   local zoom_tool_x="${ZOOM_TOOL_X:-187}"; local zoom_tool_y="${ZOOM_TOOL_Y:-229}"
   local zoom_tile_x="${ZOOM_TILE_X:-600}"; local zoom_tile_y="${ZOOM_TILE_Y:-350}"
+  local _zn _zd
+  for _zn in zoom_tool_x:187 zoom_tool_y:229 zoom_tile_x:600 zoom_tile_y:350; do
+    local _var="${_zn%%:*}"; _zd="${_zn##*:}"
+    if ! [[ "${!_var}" =~ ^[0-9]+$ ]]; then
+      echo "[harness] invalid ${_var^^}='${!_var}'; using ${_zd}" >&2
+      printf -v "$_var" '%s' "$_zd"
+    fi
+  done
   if [[ "$zoom_clicks" =~ ^[0-9]+$ ]] && [ "$zoom_clicks" -ge 1 ]; then
     for _ in $(seq 1 "$zoom_clicks"); do
       xdotool mousemove "$zoom_tool_x" "$zoom_tool_y" click 1 >/dev/null 2>&1 || true  # select magnifier tool

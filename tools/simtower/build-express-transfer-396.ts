@@ -61,7 +61,7 @@ for (const o of [CONTROL, TEST]) {
 const crowd = new Crowd();
 console.log("OUR ROUTER (Classic, express-transfer-needs-lobby) from floor 1:");
 for (const o of [CONTROL, TEST]) {
-  const ok = crowd.route(t, 1, o.floor) !== null;
+  const ok = crowd.reachable(t, 1, o.floor);
   console.log(`  ${o.name} floor ${o.floor}: ${ok ? "REACHABLE" : "REFUSED"}`);
 }
 
@@ -75,6 +75,10 @@ const save: SerializedGame = sim.serialize();
 //                    move-in is still what decides whether floor 26 ever fills.
 const mixed = process.env.MIXED === "1";
 const emptyAll = process.env.EMPTY_OFFICES === "1";
+if (mixed && emptyAll) {
+  console.error("Set only one of MIXED=1 or EMPTY_OFFICES=1, not both.");
+  process.exit(2);
+}
 for (const u of save.units) {
   if (u.kind !== "office" || !officeFloors.has(u.floor)) continue;
   const isTest = u.floor === TEST.floor;

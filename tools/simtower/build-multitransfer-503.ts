@@ -76,9 +76,9 @@ for (const b of BANDS) {
 
 // --- Discriminator check: OUR router's verdict for each band (no Docker). ---
 const crowd = new Crowd();
-console.log("OUR ROUTER (Classic, MAX_RIDES=2) reachability from floor 1:");
+console.log("OUR ROUTER (Classic, current ride budget) reachability from floor 1:");
 for (const b of BANDS) {
-  const ok = crowd.route(t, 1, b.floor) !== null;
+  const ok = crowd.reachable(t, 1, b.floor);
   console.log(`  ${b.name} (floor ${b.floor}, needs ${b.rides} ride(s)): ${ok ? "REACHABLE" : "REFUSED"}`);
 }
 
