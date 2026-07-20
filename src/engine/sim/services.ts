@@ -263,22 +263,22 @@ export function nudgeServiceShortfalls(sim: Simulation): void {
   sim.suiteParkingNudged = suiteShort;
 }
 
-/** Once-per-day, edge-triggered log nudge when a floor with tenant space has
- *  no route from the lobby at all (invisible otherwise). Reachability is
- *  uncapped in both modes now (#503), so this fires only for a genuinely
- *  disconnected floor (no connected transport path back to the ground lobby),
- *  not for a merely deep one. Uses the wide `rentable` scope: empty units on
- *  such a floor can never move in (see the reachability gate in
- *  {@link attemptMoveIns}), and with no tenant there is no other symptom, so
- *  the advisory is the only tell. Log-only (never a toast); de-duped by a
- *  latch so it can't repeat while the condition persists. */
+/** Once-per-day, edge-triggered log nudge when a floor with tenant space is
+ *  served but not reachably-close (invisible otherwise). Reachability is
+ *  uncapped in both modes now (#503), so a served (connected) floor is stranded
+ *  only when its sole path to the lobby is a stair/escalator climb past Classic's
+ *  walk budget; in Modern, served always equals reachable, so nothing strands.
+ *  Uses the wide `rentable` scope: empty units on such a floor can never move in
+ *  (see the reachability gate in {@link attemptMoveIns}), and with no tenant
+ *  there is no other symptom, so the advisory is the only tell. Log-only (never
+ *  a toast); de-duped by a latch so it can't repeat while the condition persists. */
 export function nudgeStranded(sim: Simulation): void {
   const stranded = sim.strandedFloors("rentable").length > 0;
   if (stranded && !sim.strandedNudged) {
     // "info", not "bad": the UI toasts every good/bad log entry, and this
     // advisory is meant to be log-only (a quiet bulletin line, not a toast).
     sim.emit(
-      "A floor with tenant space has no route from the lobby at all. Nobody will move in or visit. Connect it with an elevator or stairs and check it in the inspector.",
+      "A floor with tenant space is reachable only by a long stair climb no one will make. Nobody will move in or visit. Add an elevator that reaches it, then check it in the inspector.",
       "info",
     );
   }
@@ -352,11 +352,14 @@ export function isStrandedCandidate(_sim: Simulation, u: Unit, scope: "leased" |
 const reachMemos = new WeakMap<Simulation, { revision: number; verdicts: Map<number, boolean> }>();
 
 /**
- * True when a commuter can actually reach `floor` from the ground lobby by any
- * connected transport path ({@link Crowd.route} is uncapped now, #503). A floor
- * can be {@link Tower.isFloorServed} (a transport stops there) yet return false
- * here, if that transport connects to nothing that reaches the lobby, so no
- * commuter ever spawns for it. The reachability BFS runs at most once per floor
+ * True when a commuter can actually reach `floor` from the ground lobby
+ * ({@link Crowd.route} is uncapped now, #503). Stricter than
+ * {@link Tower.isFloorServed}, which means the floor is CONNECTED to the lobby by
+ * some chain of passenger transports: this runs the passenger router, which in
+ * Classic applies the walkway-willingness budget, so a floor connected only by a
+ * stair/escalator climb longer than the budget is served yet returns false here
+ * (no commuter spawns for it). In Modern, with no walk budget, served equals
+ * reachable. The reachability BFS runs at most once per floor
  * per `tower.revision`: the verdict
  * is memoized (like Tower.stopsOf) because the editor card's access row now
  * reads it on the ~6 Hz editor pump, which must never pay a fresh routing BFS

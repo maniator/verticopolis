@@ -90,7 +90,7 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
 
   it("emits the stranded nudge once per 0→>0 crossing, not repeatedly", () => {
     const sim = disconnectedTower(5);
-    const count = () => sim.log.filter((e) => e.text.includes("no route from the lobby")).length;
+    const count = () => sim.log.filter((e) => e.text.includes("reachable only by a long stair climb")).length;
     sim.tick(DAY);
     expect(count()).toBe(1); // fired on the crossing
     sim.tick(DAY);
@@ -168,7 +168,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
     // Wide scope sees the empty units; the stats-modal (leased) scope does not.
     expect(sim.strandedFloors("rentable")).toContain(40);
     expect(sim.strandedFloors()).toEqual([]);
-    const entries = () => sim.log.filter((e) => e.text.includes("no route from the lobby"));
+    const entries = () => sim.log.filter((e) => e.text.includes("reachable only by a long stair climb"));
     sim.tick(DAY);
     expect(entries()).toHaveLength(1); // fired with nothing leased up there
     expect(entries()[0].kind).toBe("info"); // log-only advisory, never a toast
@@ -196,7 +196,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
     floor40[2].state = "fire";
     expect(sim.strandedFloors("rentable")).toEqual([]); // nothing rentable up there
     sim.tick(DAY);
-    expect(sim.log.filter((e) => e.text.includes("no route from the lobby"))).toHaveLength(0);
+    expect(sim.log.filter((e) => e.text.includes("reachable only by a long stair climb"))).toHaveLength(0);
   });
 
   it("shift: a reachable floor that loses its shortcut stops filling, keeps its tenants, and re-nudges", () => {
@@ -206,7 +206,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
     expect(shortcut.ok).toBe(true);
     sim.tick(3 * DAY);
     expect(unit(ids.condo40).everOccupied).toBe(true);
-    const entries = () => sim.log.filter((e) => e.text.includes("no route from the lobby"));
+    const entries = () => sim.log.filter((e) => e.text.includes("reachable only by a long stair climb"));
     expect(entries()).toHaveLength(0); // nothing stranded yet, latch is unarmed
 
     // The shortcut goes away: the floor shifts reachable → stranded.
@@ -250,7 +250,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
 
   it("shift: the advisory latch re-arms after the floor is fixed, and fires again on a relapse", () => {
     const { sim } = strandedMoveInTower(15);
-    const entries = () => sim.log.filter((e) => e.text.includes("no route from the lobby"));
+    const entries = () => sim.log.filter((e) => e.text.includes("reachable only by a long stair climb"));
     sim.tick(DAY);
     expect(entries()).toHaveLength(1); // stranded from the start → first nudge
 

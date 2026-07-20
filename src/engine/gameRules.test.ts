@@ -45,8 +45,9 @@ describe("makeRules", () => {
 
   it("selects the Classic walk-budget router by mode (#503/#509)", () => {
     // Classic uses the uncapped walk-budget router (parity: no ride cap, no
-    // express lobby gate, walkway willingness applies). Modern keeps the plain
-    // ride-capped BFS pending the game/design party's transfer-model ruling.
+    // express lobby gate, walkway willingness applies). Modern uses the plain
+    // uncapped BFS with no walk budget (its commute discomfort is the deferred
+    // #502 comfort track).
     expect(CLASSIC_RULES.walkwayWillingnessApplies()).toBe(true);
     expect(MODERN_RULES.walkwayWillingnessApplies()).toBe(false);
   });

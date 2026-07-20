@@ -196,17 +196,20 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // recycling, notice, retail. Any rule that does not apply pushes nothing, so
   // the array is empty for a plain, well-placed unit with nothing to warn about.
   const lines: TemplateResult[] = [];
-  // Access is the whole truth, not just "served": a transport can stop on a
-  // floor yet its network reach nothing that connects back to the lobby, in
-  // which case no commuter ever comes. Reachability is uncapped now (#503), so
-  // this flags a genuinely cut-off floor, not a merely deep one.
+  // Access is the whole truth, not just "served". `isFloorServed` already means
+  // the floor is connected to the ground lobby by some chain of passenger
+  // transports; `floorReachable` is stricter because it runs the passenger
+  // router, which in Classic applies the walkway-willingness budget. So a floor
+  // connected only by a stair/escalator climb longer than the budget is served
+  // yet not reachably-close, and no commuter ever comes. (In Modern, served
+  // always equals reachable, so this middle state is Classic-only.)
   if (hasAccessDiagnostic(u)) {
     lines.push(
       !sim.tower.isFloorServed(u.floor)
         ? html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`
         : sim.floorReachable(u.floor)
           ? html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`
-          : html`<div style="color:var(--bad)">Access: no route. This floor's elevators and stairs never connect back to the lobby, so no one travels here. Link it into the lobby network.</div>`,
+          : html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`,
     );
   }
   // No Rate (off-market) legibility: a chosen setting, so plain ink, neither

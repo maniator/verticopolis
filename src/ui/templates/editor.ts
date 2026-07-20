@@ -88,10 +88,10 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
   // whose diagnostics emit NO access line, so its connectivity still shows.
   if (!mobile || !hasAccessDiagnostic(u)) {
     const served = sim.tower.isFloorServed(u.floor);
-    // The third state (#370): a transport can stop on this floor yet its network
-    // reach nothing that connects back to the lobby, so no commuter ever comes
-    // and "Yes" would lie. Reachability is uncapped now (#503), so this means the
-    // floor is genuinely cut off, not merely deep. Only kinds that draw
+    // The third state (#370): the floor is CONNECTED to the lobby (served) yet no
+    // commuter completes the trip, so "Yes" would lie. Reachability is uncapped
+    // now (#503), so this happens only in Classic, when the sole path is a
+    // stair/escalator climb past the walk budget. Only kinds that draw
     // commuters/visitors read it (hasAccessDiagnostic, the same predicate the
     // diagnostics line uses); zero-population service kinds keep plain Yes/No.
     // "No route" echoes the inspector sentence and the stats footnote.
