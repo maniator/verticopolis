@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.65.0
+
+- People will climb a few more flights of stairs before they need an elevator, matching the original. In Classic, stairs and escalators now carry a person up to 4 and 7 contiguous flights (an elevator ride resets the count) instead of dead-ending at two.
+
 ## 1.64.0
 
 - Towers exported as an original 1994 SimTower save (.TDT) now render every floor in the real game. Wide floors with an empty-floor gap used to lose everything past the gap to open sky; they now show all their rooms.

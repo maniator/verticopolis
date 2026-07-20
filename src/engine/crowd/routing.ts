@@ -1,6 +1,6 @@
 import type { Tower } from "../Tower";
 import type { Transport } from "../types";
-import { isStaffOnlyTransport, isStaffTransportKind, isElevatorKind } from "../facilities";
+import { isStaffOnlyTransport, isStaffTransportKind, isElevatorKind, WALKWAY_WILLINGNESS } from "../facilities";
 import type { Crowd } from "../Crowd";
 import { STRESS_WAIT } from "./person";
 import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./person";
@@ -13,7 +13,7 @@ import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./pe
  * `route` / `staffRoute` / `elevatorCalls` methods that delegate here.
  */
 
-type AdjGraph = Map<number, { f: number; shaft: number; express: boolean }[]>;
+type AdjGraph = Map<number, { f: number; shaft: number; express: boolean; walkKind?: "stairs" | "escalator" }[]>;
 
 /**
  * BFS over the transport network for the fewest-transfer route. Each edge is
@@ -74,10 +74,15 @@ export function buildAdjacency(
     // Classic transfer gate (see {@link route}) can tell an express leg from a
     // local one without a per-hop transport lookup.
     const express = t.kind === "elevatorExpress";
+    // A stair/escalator flight is a WALK, not a car ride: the Classic router
+    // (bfsRouteExpressGated) charges walks against a separate contiguous-walk
+    // budget (WALKWAY_WILLINGNESS), not the ride budget. Tag the edge so the BFS
+    // classifies it without a per-hop transport lookup.
+    const walkKind = t.kind === "stairs" || t.kind === "escalator" ? t.kind : undefined;
     for (const a of stops) {
       let list = adj.get(a);
       if (!list) adj.set(a, (list = []));
-      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, express });
+      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, express, walkKind });
     }
   }
   return adj;
@@ -293,34 +298,60 @@ export function bfsRouteExpressGated(
   isTransferFloor: (floor: number) => boolean,
 ): Route | null {
   if (from === to) return { floors: [from], shafts: [] };
-  // State key: floor doubled plus the arrival-class bit (works for basement
-  // floors too, doubling keeps negative floors collision-free).
-  const stateKey = (floor: number, express: boolean) => floor * 2 + (express ? 1 : 0);
-  const originKey = stateKey(from, false);
-  const prev = new Map<number, { key: number; floor: number; shaft: number }>();
-  const seen = new Set<number>([originKey]);
-  let frontier: { floor: number; express: boolean }[] = [{ floor: from, express: false }];
-  let rides = 0;
-  while (frontier.length && rides < maxRides) {
-    rides++;
-    const next: typeof frontier = [];
+  // Fewest-EDGES BFS (each edge is one level), exactly as the pre-change search,
+  // so a single elevator ride still beats many stair flights and edge order
+  // still breaks ties toward the first-listed shaft. Two budgets ride ALONG the
+  // path: `rides` counts elevator boardings (capped at maxRides, unchanged), and
+  // a SEPARATE contiguous-walk budget lets a stair/escalator RUN cross at most
+  // WALKWAY_WILLINGNESS[kind] flights (the stricter threshold governing a mixed
+  // run), reset to zero on any elevator ride (#384, parity GDD §8). Walk legs
+  // therefore do NOT spend a ride, which fixes the old over-restriction (stairs
+  // dead-ended at 2 because they wrongly consumed the ride budget) without making
+  // walking cheaper than riding. Search state is (floor, arrived-by-express,
+  // rides, walkRun, runCap): the same floor reached under a different arrival
+  // class or with a different remaining budget admits different onward moves.
+  const NO_CAP = 999; // runCap sentinel: no walk flight taken yet on the current run
+  interface St { floor: number; express: boolean; rides: number; walkRun: number; runCap: number }
+  const key = (s: St) => `${s.floor}:${s.express ? 1 : 0}:${s.rides}:${s.walkRun}:${s.runCap}`;
+  const origin: St = { floor: from, express: false, rides: 0, walkRun: 0, runCap: NO_CAP };
+  const originKey = key(origin);
+  const prev = new Map<string, { key: string; floor: number; shaft: number }>();
+  const seen = new Set<string>([originKey]);
+
+  let frontier: St[] = [origin];
+  while (frontier.length) {
+    const next: St[] = [];
     for (const s of frontier) {
       for (const edge of adj.get(s.floor) ?? []) {
-        // Past the first ride, boarding `edge` at s.floor is a transfer off the
-        // leg that brought us here. Gate it when either leg is express. (The
-        // origin only ever sits in the rides === 1 frontier, so a trip's first
-        // boarding is never gated.)
-        if (rides > 1 && (s.express || edge.express) && !isTransferFloor(s.floor)) continue;
-        const k = stateKey(edge.f, edge.express);
-        if (seen.has(k)) continue;
-        seen.add(k);
-        prev.set(k, { key: stateKey(s.floor, s.express), floor: s.floor, shaft: edge.shaft });
+        let ns: St;
+        if (edge.walkKind) {
+          // A walk off an express-arrival leg is STILL an express transfer
+          // (either leg counts, #396), gated at a non-lobby floor exactly like a
+          // ride off express. edge.express is always false for a walk, so only
+          // the arriving leg (s.express) can trip the gate here.
+          if (s.rides >= 1 && s.express && !isTransferFloor(s.floor)) continue;
+          // Walk leg: charge the contiguous-walk budget, not a ride.
+          const cap = Math.min(s.runCap, WALKWAY_WILLINGNESS[edge.walkKind]);
+          if (s.walkRun + 1 > cap) continue; // over the walk budget for this run
+          ns = { floor: edge.f, express: false, rides: s.rides, walkRun: s.walkRun + 1, runCap: cap };
+        } else {
+          // Elevator ride: charge a ride, reset the walk run. Past the first
+          // ride, boarding here is a transfer off the leg that brought us to
+          // s.floor; gate it when either leg is express (walk arrivals are
+          // express=false, so a ride off a walk leg is gated only by the new
+          // leg). s.rides === 0 is the trip's first boarding, never gated.
+          if (s.rides + 1 > maxRides) continue;
+          if (s.rides >= 1 && (s.express || edge.express) && !isTransferFloor(s.floor)) continue;
+          ns = { floor: edge.f, express: edge.express, rides: s.rides + 1, walkRun: 0, runCap: NO_CAP };
+        }
+        const nk = key(ns);
+        if (seen.has(nk)) continue;
+        seen.add(nk);
+        prev.set(nk, { key: key(s), floor: s.floor, shaft: edge.shaft });
         if (edge.f === to) {
-          // Reconstruct along the state chain (floors can repeat across
-          // classes; states cannot).
           const floors = [to];
           const shafts: number[] = [];
-          let cur = k;
+          let cur = nk;
           while (cur !== originKey) {
             const p = prev.get(cur)!;
             floors.push(p.floor);
@@ -331,7 +362,7 @@ export function bfsRouteExpressGated(
           shafts.reverse();
           return { floors, shafts };
         }
-        next.push({ floor: edge.f, express: edge.express });
+        next.push(ns);
       }
     }
     frontier = next;
