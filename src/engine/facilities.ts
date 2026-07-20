@@ -37,6 +37,7 @@ export {
   POOLED_CAPS,
   maxSpanFor,
   isFixedSpanTransport,
+  WALKWAY_WILLINGNESS,
 } from "./facilityCaps";
 export {
   residentCount,
