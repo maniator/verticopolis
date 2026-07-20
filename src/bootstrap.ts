@@ -1,6 +1,7 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { injectVercelTelemetry } from "./telemetry";
+import { startGameplaySession } from "./analytics";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -76,6 +77,11 @@ export function bootGame(create: () => BootApp): void {
       );
       return;
     }
+    // Start the gameplay session clock (foreground time + funnel state) only once
+    // we know the game will actually run: a no-WebGL visitor bails above, so its
+    // session never opens and can't dilute the length signal. Host-gated inside,
+    // like the page-view inject just above.
+    startGameplaySession();
     try {
       const app = create();
       // Expose for screenshot tooling / debugging.

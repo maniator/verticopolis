@@ -4,6 +4,7 @@ import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
+import { gameplaySession } from "../analytics";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -82,6 +83,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // A jingle on every star promotion (2★–5★), not just the TOWER win.
     if (app.sim.star > app.lastStar) {
       app.lastStar = app.sim.star;
+      gameplaySession.noteStar(app.sim.star); // progression depth signal
       if (app.sim.star < 6) app.audio.sfx("promote");
     }
     // Auto-surfaced modals must never stack over the boot/return splash. A
