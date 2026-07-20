@@ -88,7 +88,8 @@ function mountAppDom(): void {
     <div id="tower-stats"></div>
     <button id="btn-stats"></button>
     <div id="log"></div>
-    <button id="btn-save"></button><button id="btn-load"></button>
+    <button id="btn-load"></button>
+    <button id="btn-save-top"></button>
     <button id="btn-settings"></button>
     <button id="btn-new"></button><button id="btn-help"></button>
     <div id="inspector" class="win hidden"></div>
@@ -1589,18 +1590,22 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     expect(dialog().querySelector("h2")!.textContent).toContain("Settings");
   });
 
-  it("undo / redo / save / load / stats each route to their callback", () => {
+  it("undo / redo / load / stats each route to their callback", () => {
     const { cb } = makeUI();
     document.getElementById("btn-undo")!.click();
     document.getElementById("btn-redo")!.click();
-    document.getElementById("btn-save")!.click();
     document.getElementById("btn-load")!.click();
     document.getElementById("btn-stats")!.click();
     expect(cb.onUndo).toHaveBeenCalledOnce();
     expect(cb.onRedo).toHaveBeenCalledOnce();
-    expect(cb.onSave).toHaveBeenCalledOnce();
     expect(cb.onShowSaves).toHaveBeenCalledOnce();
     expect(cb.onShowStats).toHaveBeenCalledOnce();
+  });
+
+  it("the top-bar Quick Save button routes to the same onSave callback", () => {
+    const { cb } = makeUI();
+    document.getElementById("btn-save-top")!.click();
+    expect(cb.onSave).toHaveBeenCalledOnce();
   });
 
   it("the panel toggle opens the mobile drawer; close and scrim shut it", () => {

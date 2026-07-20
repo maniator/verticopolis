@@ -186,14 +186,13 @@ export class UI {
     document.getElementById("btn-undo")?.addEventListener("click", () => this.cb.onUndo());
     document.getElementById("btn-redo")?.addEventListener("click", () => this.cb.onRedo());
 
-    document.getElementById("panel-toggle")?.addEventListener("click", () => {
-      document.body.classList.toggle("panels-open");
-    });
+    document.getElementById("panel-toggle")?.addEventListener("click", () => document.body.classList.toggle("panels-open"));
     const closePanels = () => document.body.classList.remove("panels-open");
     document.getElementById("panel-close")?.addEventListener("click", closePanels);
     document.getElementById("scrim")?.addEventListener("click", closePanels);
 
-    document.getElementById("btn-save")!.addEventListener("click", () => this.cb.onSave());
+    // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
+    document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
     document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves());
     document.getElementById("btn-new")!.addEventListener("click", () => {
       // The toolbar always has a live tower to abandon, so the picker shows its

@@ -113,7 +113,13 @@ export class SaveLoad {
     const sim = this.deps.getSim();
     this.stampView(sim);
     SaveGame.save(sim);
-    if (!silent) this.deps.ui.toast("Tower saved.", "good");
+    if (!silent) {
+      // Confirm the manual save landed, and when: a checkmark plus the
+      // wall-clock time it was written (real time, not the in-sim clock), so a
+      // deliberate or accidental Quick Save is always visibly acknowledged.
+      const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      this.deps.ui.toast(`Saved ✓ · ${at}`, "good");
+    }
   }
 
   autosave(): Promise<void> {
