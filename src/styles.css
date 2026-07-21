@@ -583,6 +583,12 @@ html.reduce-motion *::after {
   --pad-y: 18px;
   --pad-x: 20px;
   --title-gap: 12px;
+  /* The dialog title bar's rendered height (13px font + 3px vertical padding,
+     .win-title in retro-components.css). Not set ON the title (its height
+     stays font-driven); this mirrors it for in-body sticky bars that pin flush
+     under the stuck title (the schedule grid head). Update in step with any
+     .win-title metric change. */
+  --title-h: 21px;
   padding: var(--pad-y) var(--pad-x);
   max-height: 82vh;
   overflow-y: auto;
@@ -1096,13 +1102,13 @@ dialog.crash-card::backdrop {
   /* With the grid uncapped, the head sticks in the .modal-box scrollport,
      tucked flush under the stuck title bar. Same baseline as the title's own
      sticky offset (the title pins at the box top with `-1 * --pad-y`; see
-     `.modal-box > .win-title`), plus the title's rendered 21px height, so the
-     head's top meets the title's bottom exactly (measured gap 0 at every
-     scroll depth). If the title ever wraps taller than 21px it overlaps the
-     head cosmetically; z-index 1 keeps the head under the title (z-index 2).
-     Clamped to the grid's own bounds, it slides away once the grid scrolls
-     past. */
-  top: calc(-1 * var(--pad-y, 18px) + 21px);
+     `.modal-box > .win-title`), plus the title's rendered height
+     (`--title-h`, defined on .modal-box), so the head's top meets the
+     title's bottom exactly (measured gap 0 at every scroll depth). If the
+     title ever wraps taller than --title-h it overlaps the head cosmetically;
+     z-index 1 keeps the head under the title (z-index 2). Clamped to the
+     grid's own bounds, it slides away once the grid scrolls past. */
+  top: calc(-1 * var(--pad-y, 18px) + var(--title-h, 21px));
   background: var(--r-face);
   z-index: 1;
 }
