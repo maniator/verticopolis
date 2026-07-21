@@ -5,7 +5,7 @@ import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
-import { brushTiles, dragRunTiles, snapX } from "../ui/placement";
+import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
 import { gameplaySession } from "../analytics";
 
 /**
@@ -114,8 +114,21 @@ export class BuildActions {
     }
     if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
     this.paint = { tile, floor };
-    if (placed === 0 && tiles.every((tx) => sim.tower.structureKindAt(floor, tx) === kind)) {
-      return { placed, reason: `${FACILITIES[kind].name} already built here` };
+    if (placed === 0) {
+      const alreadyAll = tiles.every((tx) => sim.tower.structureKindAt(floor, tx) === kind);
+      // A press aimed past the lot line arrives clamped onto the edge column
+      // (see isOffLot), so against a built-out edge it laid nothing and, before
+      // this, said nothing: the canon 375-tile boundary read as a dead click.
+      // The boundary is the story only when nothing else blocked the press: an
+      // engine reason (say, "Not enough money.") on still-empty edge tiles
+      // keeps precedence, and an on-lot press keeps today's quiet channels.
+      if (isOffLot(tile) && (alreadyAll || reason === undefined)) {
+        const edge = "That's the edge of the lot.";
+        this.deps.audio.sfx("error"); // every refusal toast pairs with the sfx
+        this.deps.ui.toast(edge, "bad");
+        return { placed, reason: edge };
+      }
+      if (alreadyAll) return { placed, reason: `${FACILITIES[kind].name} already built here` };
     }
     return { placed, reason };
   }

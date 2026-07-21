@@ -4,9 +4,15 @@
  */
 export class RNG {
   private state: number;
+  /** The seed this stream was constructed with, fixed for the stream's whole
+   *  life, unlike {@link seed}, which is the live mutating state. Persistent
+   *  cosmetic looks (the scenery outside the lot) key off this so they never
+   *  reshuffle mid-game; save/load carries it so they survive sessions too. */
+  initialSeed: number;
 
   constructor(seed = 1) {
     this.state = seed >>> 0 || 1;
+    this.initialSeed = seed >>> 0;
   }
 
   /** Float in [0, 1). */
