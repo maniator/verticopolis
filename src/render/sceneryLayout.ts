@@ -13,7 +13,8 @@ import type { Unit } from "../engine/types";
  * actors.
  *
  * Geometry contract (owner-approved mockups, 2026-07-21): the buildable lot
- * (tiles 0..GRID.width) is untouched canon. All scenery lives OUTSIDE it or
+ * (GRID.width tile columns, indices 0 through GRID.width - 1) is untouched
+ * canon. All scenery lives OUTSIDE it or
  * on its ground line, and everything draws BEHIND the tower (z order), so no
  * scenery can ever cover a built room.
  */

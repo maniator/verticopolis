@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import * as ex from "excalibur";
 import { Simulation } from "../../engine/Simulation";
 import { apronRange, plantSpots, plantVisible, skylineRects } from "../sceneryLayout";
@@ -43,6 +43,12 @@ beforeAll(() => {
       set: (t, p, v) => ((t[p] = v), true),
     }) as unknown as HTMLCanvasElement;
   }) as typeof document.createElement);
+});
+
+// Restore document.createElement so the stub cannot leak into other test
+// files sharing this worker.
+afterAll(() => {
+  vi.restoreAllMocks();
 });
 
 function fakeEngine(sim: Simulation): { eng: TowerEngine; added: ex.Actor[]; swap: (s: Simulation) => void } {
