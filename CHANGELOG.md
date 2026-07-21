@@ -13,10 +13,14 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 1.72.0
+## 1.73.0
 
 - The world outside your tower came to life: a city skyline behind the building, grass and trees on the open lot that make way as you pave it, a neighboring building across the alley at one end of the lot, and a street with a lamp and a 375 ST sign at the other.
 - Building past the edge of the lot now says "That's the edge of the lot" instead of doing nothing silently.
+
+## 1.72.0
+
+- The Classic vs Modern guide now covers how stairs and escalators differ: Modern lets people climb any number of flights, while Classic keeps the 1994 limit and needs an elevator for a long climb.
 
 ## 1.71.0
 

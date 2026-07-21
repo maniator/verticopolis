@@ -82,7 +82,7 @@ describe("helpTemplate structure and a11y", () => {
     sellCondo: "sets the sale price", // the 2-5 family draw scales the price
     showsPreviewReason: "Hovering an invalid spot",
     allowsEscalatorOnOfficeFloors: "Escalators can serve office floors",
-    walkwayWillingnessApplies: null, // no longer a player-facing divergence: reachability is uncapped and express transfers are ungated in both modes (#503/#509); the Modern walkway/transfer comfort penalty is deferred (#502)
+    walkwayWillingnessApplies: "Longer climbs", // Classic refuses a climb past a few flights, Modern lets people climb any number (#384/#503/#509); the "Longer climbs" compare bullet documents the divergence (#502)
     priceOptions: "Continuous pricing",
     condoRelocationChance: "move out on its own",
     operatingOverheadPerUnit: "monthly overhead",
