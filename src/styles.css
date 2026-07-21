@@ -1075,9 +1075,10 @@ dialog.crash-card::backdrop {
   /* No height cap on desktop (#513): the old 200px well made the grid a second
      live scroller next to the .modal-box one, so the dialog wore two vertical
      scrollbars at once. The grid now grows to its content and the box is the
-     dialog's single scroller. Phones get the 200px cap back in the phone block
-     below, where scrollbars are overlay (invisible) and the cap keeps the
-     steppers and OK button within a swipe. */
+     dialog's single scroller. The phone and coarse-pointer blocks below
+     restore the 200px cap: there the priority is keeping the steppers and OK
+     button within a swipe on a long span (and scrollbars are typically
+     overlay on those devices, so the double bar rarely shows). */
   padding: 2px;
   background: var(--r-face);
   box-shadow: var(--bevel-in);
@@ -1670,10 +1671,12 @@ dialog.crash-card::backdrop {
   #editor {
     width: min(250px, 80vw);
   }
-  /* The schedule floors grid keeps its 200px well on phones (#513): overlay
-     scrollbars are invisible here, and the cap keeps the steppers and the OK
-     button within a swipe on a long span. The head sticks inside the grid's
-     own scroller again. */
+  /* The schedule floors grid keeps its 200px well on small screens (#513):
+     the cap keeps the steppers and the OK button within reach on a long span
+     when vertical space is scarce. The head sticks inside the grid's own
+     scroller again. A narrow desktop window matches this block too and can
+     show the well's scrollbar next to the box's; accepted so small-screen
+     reachability wins. */
   .es-grid {
     max-height: 200px;
     overflow-y: auto;
@@ -1764,14 +1767,15 @@ dialog.crash-card::backdrop {
     background: var(--r-face);
     padding: 2px 0;
   }
-  /* Touch keeps the capped grid well (#513 applies to fine pointers only):
-     overlay scrollbars are invisible on touch, so the double bar the desktop
-     fix removes never shows here, and the cap keeps the steppers and OK
-     button within a swipe. This also keeps the grid head pinning inside the
-     grid's own scrollport, where it cannot collide with the sticky day
-     toggle above (uncapped, a box-pinned head overlapped the toggle's
-     buttons on tablet-width touch screens). Mirrors the phone block; on
-     phones both blocks apply with identical values. */
+  /* Coarse pointers keep the capped grid well (#513's uncapped-grid fix
+     applies to fine pointers only), for two behavioral reasons: the cap keeps
+     the steppers and OK button within a swipe on a long span, and it keeps
+     the grid head pinning inside the grid's own scrollport, where it cannot
+     collide with the sticky day toggle above (uncapped, a box-pinned head
+     overlapped the toggle's buttons on tablet-width touch screens). Coarse
+     devices also typically draw overlay scrollbars, so the well's second bar
+     rarely shows. Mirrors the phone block; on phones both blocks apply with
+     identical values. */
   .es-grid {
     max-height: 200px;
     overflow-y: auto;
