@@ -22,6 +22,7 @@
 
 import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const API = "https://api.vercel.com";
 const TOKEN = process.env.VERCEL_TOKEN;
@@ -55,17 +56,21 @@ const ROW_LIMIT = 100;
 // layout and styling can be previewed without a token or any real traffic.
 const DEMO = process.argv.includes("--demo");
 
-if (!DEMO && !TOKEN) {
-  console.error(
-    "VERCEL_TOKEN is not set. Create a token at Vercel > Account Settings > Tokens\n" +
-      "and expose it as the VERCEL_TOKEN environment variable (a GitHub Actions secret in CI).\n" +
-      "Or pass --demo to render sample data with no API calls.",
-  );
-  process.exit(1);
-}
-if (!DEMO && (!PROJECT_ID || !TEAM_ID)) {
-  console.error("VERCEL_PROJECT_ID and VERCEL_TEAM_ID must be set (plain env, not secrets).");
-  process.exit(1);
+/** Fail fast when a live run is missing its credentials. Kept out of module load
+ *  so the pure helpers can be imported (and unit-tested) without a token. */
+function requireEnv() {
+  if (!DEMO && !TOKEN) {
+    console.error(
+      "VERCEL_TOKEN is not set. Create a token at Vercel > Account Settings > Tokens\n" +
+        "and expose it as the VERCEL_TOKEN environment variable (a GitHub Actions secret in CI).\n" +
+        "Or pass --demo to render sample data with no API calls.",
+    );
+    process.exit(1);
+  }
+  if (!DEMO && (!PROJECT_ID || !TEAM_ID)) {
+    console.error("VERCEL_PROJECT_ID and VERCEL_TEAM_ID must be set (plain env, not secrets).");
+    process.exit(1);
+  }
 }
 
 // Web Analytics wants plain YYYY-MM-DD dates; production data only.
@@ -202,6 +207,41 @@ function bucketSeconds(res) {
   return buckets;
 }
 
+// Weighted percentiles from an aggregate value histogram. Vercel Web Analytics
+// has no percentile function and no per-session correlation, so the depth
+// distribution is reconstructed here from the {value -> count} rows the
+// group-by DOES return: each row is `count` sessions that reported `value`.
+// Nearest-rank method (the smallest value whose cumulative weight reaches
+// ceil(p*N)). Non-numeric keys are skipped, matching bucketSeconds. Returns null
+// when there is no usable sample. Because the aggregate caps at ROW_LIMIT value
+// groups (sorted by frequency), a truncated result covers only the commonest
+// values, so its percentiles are approximate; the flag is carried through so the
+// report can mark it.
+function percentiles(res, ps) {
+  if (!res.ok || !res.rows) return null;
+  const hist = res.rows
+    .map((r) => {
+      // Trim first so a blank or whitespace key becomes NaN, not 0: Number("")
+      // and Number("  ") are both 0 and would otherwise inject phantom zeros.
+      const raw = String(r.key).trim();
+      return { v: raw === "" ? NaN : Number(raw), c: Number(r.count) };
+    })
+    .filter((r) => Number.isFinite(r.v) && r.c > 0)
+    .sort((a, b) => a.v - b.v);
+  const total = hist.reduce((s, r) => s + r.c, 0);
+  if (!total) return null;
+  const at = (p) => {
+    const target = Math.max(1, Math.ceil(p * total));
+    let cum = 0;
+    for (const r of hist) {
+      cum += r.c;
+      if (cum >= target) return r.v;
+    }
+    return hist[hist.length - 1].v;
+  };
+  return { samples: total, values: ps.map(at), max: hist[hist.length - 1].v, truncated: !!res.truncated };
+}
+
 // Self-contained styles for the HTML report. No external assets. The palette,
 // font, and bevels mirror the game's own design tokens (src/styles/retro-tokens
 // .css: the Windows 3.1 / SimTower look), copied here as literal values rather
@@ -241,6 +281,7 @@ tr:last-child td { border-bottom:0; }
 thead th { background:var(--face); color:var(--ink); font-weight:700; font-size:11px; border-bottom:1px solid var(--shadow); }
 td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
 .empty { color:var(--muted); background:var(--face); box-shadow:var(--bevel-in); padding:8px 12px; margin:6px 0; }
+td.empty-cell { color:var(--muted); }
 .note { color:var(--muted); font-size:11px; margin:5px 2px; }
 footer { color:var(--muted); font-size:11px; text-align:center; margin-top:20px; padding:10px; box-shadow:var(--bevel-in); background:var(--face); }
 `;
@@ -270,6 +311,33 @@ function htmlTable(t) {
   return `${cap}<p class="empty">${msg}</p>`;
 }
 
+/** The per-session Depth section (p50 / p90 / max), or nothing when absent. */
+function htmlDepth(depth) {
+  if (!depth || !depth.length) return "";
+  const rows = depth
+    .map((d) => {
+      if (!d.p) {
+        // Show WHY there is no distribution, like every other section, instead
+        // of a bare row of n/a: a skipped aggregate (Pro-gated / network) is
+        // not the same as an empty window.
+        const msg = d.skipped ? `Skipped: ${escapeHtml(d.hint ?? "error")}` : "No data in this window.";
+        return `<tr><td>${escapeHtml(d.label)}</td><td class="empty-cell" colspan="4">${msg}</td></tr>`;
+      }
+      const [p50, p90] = d.p.values;
+      // Truncation keeps the top ROW_LIMIT value groups by FREQUENCY, not by
+      // value, so a dropped group can sit anywhere in the range, including below
+      // the median. Every stat is therefore approximate under truncation; flag
+      // them all (p50 included).
+      const flag = d.p.truncated ? " *" : "";
+      return `<tr><td>${escapeHtml(d.label)}</td><td class="n">${fmt(d.p.samples)}${flag}</td><td class="n">${fmt(p50)}${flag}</td><td class="n">${fmt(p90)}${flag}</td><td class="n">${fmt(d.p.max)}${flag}</td></tr>`;
+    })
+    .join("");
+  const approx = depth.some((d) => d.p?.truncated)
+    ? `<p class="note">* Truncated to the top ${fmt(ROW_LIMIT)} value groups by frequency, so every percentile is approximate (Max is a lower bound).</p>`
+    : "";
+  return `<section><h2>Depth (per session)</h2><div class="scroll"><table><thead><tr><th>Metric</th><th class="n">Samples</th><th class="n">p50</th><th class="n">p90</th><th class="n">Max</th></tr></thead><tbody>${rows}</tbody></table></div><p class="note">Percentiles come from Vercel's value histograms; with no session id, per-tool splits are not available. The depth events (builds, peak floor, tool uses) fire once per session; foreground seconds counts every tab-hide, so that row is event-weighted and reads low for tab-switchers.</p>${approx}</section>`;
+}
+
 /** The full self-contained HTML report. */
 function renderHtml(m) {
   const kpis = m.kpis
@@ -290,10 +358,45 @@ function renderHtml(m) {
 <div class="body">
 <div class="kpis">${kpis}</div>
 <ul class="highlights">${highlights}</ul>
+${htmlDepth(m.depth)}
 ${sections}
 <footer>Vercel Web Analytics &middot; Events = total custom events, Visitors = unique visitors &middot; generated ${escapeHtml(m.generated)}</footer>
 </div>
 </div></body></html>`;
+}
+
+/** The per-session Depth block for the markdown report / job summary. */
+function markdownDepth(depth) {
+  if (!depth || !depth.length) return [];
+  const lines = [
+    `## Depth (per session)`,
+    ``,
+    `| Metric | Samples | p50 | p90 | Max |`,
+    `| --- | ---: | ---: | ---: | ---: |`,
+  ];
+  for (const d of depth) {
+    if (!d.p) {
+      // Carry the skip reason into the Samples cell (markdown has no colspan),
+      // so a Pro-gated or errored aggregate reads as such, not as an empty window.
+      const msg = d.skipped ? mdCell(`Skipped: ${d.hint ?? "error"}`) : "No data";
+      lines.push(`| ${mdCell(d.label)} | ${msg} | n/a | n/a | n/a |`);
+      continue;
+    }
+    const [p50, p90] = d.p.values;
+    // Truncation drops the least-frequent value groups, which can sit anywhere
+    // in the range, so every stat is approximate; flag them all (p50 included).
+    const flag = d.p.truncated ? " \\*" : "";
+    lines.push(`| ${mdCell(d.label)} | ${fmt(d.p.samples)}${flag} | ${fmt(p50)}${flag} | ${fmt(p90)}${flag} | ${fmt(d.p.max)}${flag} |`);
+  }
+  lines.push(
+    ``,
+    `_Percentiles come from Vercel value histograms; with no session id, per-tool splits are not available. The depth events (builds, peak floor, tool uses) fire once per session; foreground seconds counts every tab-hide, so that row is event-weighted and reads low for tab-switchers._`,
+  );
+  if (depth.some((d) => d.p?.truncated)) {
+    lines.push(`_\\* Truncated to the top ${fmt(ROW_LIMIT)} value groups by frequency, so every percentile is approximate (Max is a lower bound)._`);
+  }
+  lines.push(``);
+  return lines;
 }
 
 /** The report as GitHub-flavored markdown, from the same model as the HTML.
@@ -313,6 +416,7 @@ function renderMarkdown(m) {
     ``,
     ...m.highlights.map(([k, v]) => `- ${k}: **${v}**`),
     ``,
+    ...markdownDepth(m.depth),
   ];
   for (const s of m.sections) {
     lines.push(`## ${s.title}`, ``);
@@ -344,6 +448,9 @@ function demoData() {
     bootByReason: rows([["continue", 2600, 1500], ["fresh", 2100, 2100], ["update", 480, 360], ["recovery", 140, 120], ["corrupt", 80, 70]]),
     bootByVersion: rows([["1.69.1", 3200, 1700], ["1.69.0", 1500, 900], ["1.68.0", 700, 500]]),
     sessionBySeconds: { ok: true, truncated: true, rows: [["12", 180, 140], ["45", 220, 170], ["90", 260, 190], ["300", 300, 210], ["720", 180, 150], ["1500", 90, 80]].map(([key, count, visitors]) => ({ key, count, visitors })) },
+    sessionBuilds: rows([["2", 210, 160], ["5", 180, 140], ["11", 140, 110], ["24", 90, 75], ["60", 40, 35], ["140", 12, 11]]),
+    sessionPeakFloors: rows([["-3", 30, 26], ["4", 150, 120], ["9", 170, 130], ["18", 120, 95], ["35", 60, 50], ["70", 18, 16]]),
+    toolUses: rows([["1", 320, 210], ["2", 210, 150], ["4", 150, 110], ["9", 80, 65], ["20", 28, 24], ["55", 7, 7]]),
     crashByRepeat: rows([["false", 30, 27], ["true", 7, 6]]),
     crashByRecovery: rows([["false", 25, 22], ["true", 12, 11]]),
     crashByVersion: rows([["1.69.1", 20, 18], ["1.69.0", 12, 11], ["1.68.0", 5, 5]]),
@@ -352,6 +459,7 @@ function demoData() {
 }
 
 async function main() {
+  requireEnv();
   mkdirSync(OUT_DIR, { recursive: true });
   const raw = {};
   let results;
@@ -381,6 +489,9 @@ async function main() {
       bootByReason: await q("boot_by_reason", aggregateEvent("boot", "reason")),
       bootByVersion: await q("boot_by_version", aggregateEvent("boot", "version")),
       sessionBySeconds: await q("session_end_by_seconds", aggregateEvent("session_end", "seconds")),
+      sessionBuilds: await q("session_builds_by_builds", aggregateEvent("session_builds", "builds")),
+      sessionPeakFloors: await q("session_peak_floors_by_floors", aggregateEvent("session_peak_floors", "floors")),
+      toolUses: await q("tool_session_uses_by_uses", aggregateEvent("tool_session_uses", "uses")),
       crashByRepeat: await q("crash_by_repeat", aggregateEvent("crash", "repeat")),
       crashByRecovery: await q("crash_by_recoveryFailed", aggregateEvent("crash", "recoveryFailed")),
       crashByVersion: await q("crash_by_version", aggregateEvent("crash", "version")),
@@ -391,9 +502,26 @@ async function main() {
     gameStarted, firstBuild, starReached, sessionEnd, bootTotal, crashTotal, updateTotal,
     toolMix, starDist, bootByStar, bootByMode, bootByReason, bootByVersion,
     sessionBySeconds, crashByRepeat, crashByRecovery, crashByVersion, updateByTo,
+    sessionBuilds, sessionPeakFloors, toolUses,
   } = results;
 
   const buckets = bucketSeconds(sessionBySeconds);
+  // Per-session depth distributions (median / p90 / max), computed client-side
+  // from each event's value histogram. Session length reuses the session_end
+  // seconds breakdown already fetched for the length buckets.
+  const depth = [
+    { label: "Builds per session", res: sessionBuilds },
+    { label: "Peak floor reached", res: sessionPeakFloors },
+    { label: "Placements per tool-session", res: toolUses },
+    { label: "Foreground seconds", res: sessionBySeconds },
+  ].map((d) => ({
+    label: d.label,
+    p: percentiles(d.res, [0.5, 0.9]),
+    // Carry the skip state so the renderers can show the reason (Pro-gated,
+    // network) instead of a bare n/a when the aggregate never returned.
+    skipped: !d.res.ok,
+    hint: d.res.hint,
+  }));
   const crashPerBoot = bootTotal.total ? pct(crashTotal.total ?? 0, bootTotal.total) : "n/a";
   const lengthText = buckets
     ? Object.entries(buckets).map(([k, v]) => `${k}: ${fmt(v)}`).join(" / ") +
@@ -418,6 +546,7 @@ async function main() {
       ["Crash to boot ratio", crashPerBoot],
       ["Foreground length", lengthText],
     ],
+    depth,
     sections: [
       { title: "Tool mix", tables: [{ header: "Tool", res: toolMix }] },
       {
@@ -471,7 +600,17 @@ async function main() {
   console.log(`\nWrote ${htmlPath}`);
 }
 
-main().catch((err) => {
-  console.error("Report failed:", err);
-  process.exit(1);
-});
+// Run only when invoked directly (node scripts/analytics-report.mjs), so a test
+// can import the pure helpers without kicking off a live report. Compare as
+// file URLs (not raw paths): process.argv[1] resolves to an absolute path, and
+// pathToFileURL normalizes it to the same form as import.meta.url regardless of
+// how the script was invoked (relative path, absolute, or symlink).
+if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) {
+  main().catch((err) => {
+    console.error("Report failed:", err);
+    process.exit(1);
+  });
+}
+
+// Exported for unit tests; the script itself uses them directly above.
+export { percentiles, bucketSeconds, clampDays, extractRows, extractCount };
