@@ -1,0 +1,4 @@
+# Reruns of the harness scripts write Chrome profile data here; browser
+# profiles must never enter version control.
+profile/
+profile-tmp-*/
