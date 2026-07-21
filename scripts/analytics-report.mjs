@@ -170,20 +170,6 @@ function extractRows(json) {
 
 const fmt = (n) => (n == null ? "n/a" : Number(n).toLocaleString("en-US"));
 const pct = (num, den) => (den ? `${((num / den) * 100).toFixed(1)}%` : "n/a");
-/** Escape a markdown table cell so a pipe or newline in a value can't break the row. */
-const mdCell = (s) => String(s).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
-
-/** Render an aggregate result as a markdown table, or a skipped-section note. */
-function renderRows(res, valueHeader) {
-  if (res.ok && res.rows && res.rows.length) {
-    const lines = [`| ${valueHeader} | Events | Visitors |`, "| --- | ---: | ---: |"];
-    for (const r of res.rows) lines.push(`| ${mdCell(r.key)} | ${fmt(r.count)} | ${fmt(r.visitors)} |`);
-    if (res.truncated) lines.push(`\n_Showing the top ${fmt(ROW_LIMIT)} groups; more may exist._`);
-    return lines.join("\n");
-  }
-  if (res.ok) return "_No data in this window._";
-  return `_Skipped: ${res.hint}._`;
-}
 
 /** Sum aggregate rows (used to bucket session length client-side). */
 function bucketSeconds(res) {
@@ -290,35 +276,6 @@ ${sections}
 <footer>Vercel Web Analytics &middot; Events = total custom events, Visitors = unique visitors &middot; generated ${escapeHtml(m.generated)}</footer>
 </div>
 </div></body></html>`;
-}
-
-/** The markdown report, from the same model as the HTML. */
-function renderMarkdown(m) {
-  const lines = [
-    `# Verticopolis analytics report`,
-    ``,
-    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only.`,
-    `Generated ${m.generated}.`,
-    ``,
-    `> Property breakdowns (the tables) need a Vercel Pro plan; on a lower plan they show as skipped.`,
-    ``,
-    `## Totals`,
-    ``,
-    `| Metric | Value |`,
-    `| --- | ---: |`,
-    ...m.kpis.map(([k, v]) => `| ${k} | ${fmt(v)} |`),
-    ``,
-    ...m.highlights.map(([k, v]) => `- ${k}: **${v}**`),
-    ``,
-  ];
-  for (const s of m.sections) {
-    lines.push(`## ${s.title}`, ``);
-    for (const t of s.tables) {
-      if (t.caption) lines.push(`${t.caption}:`, ``);
-      lines.push(renderRows(t.res, t.header), ``);
-    }
-  }
-  return lines.join("\n");
 }
 
 /** Built-in sample results for --demo, shaped exactly like the real query
@@ -450,15 +407,12 @@ async function main() {
   };
 
   const stamp = day(until);
-  const mdPath = join(OUT_DIR, `analytics-report-${stamp}.md`);
   const htmlPath = join(OUT_DIR, `analytics-report-${stamp}.html`);
-  const jsonPath = join(OUT_DIR, `analytics-report-${stamp}.json`);
-  const md = renderMarkdown(model);
-  writeFileSync(mdPath, md);
   writeFileSync(htmlPath, renderHtml(model));
-  writeFileSync(jsonPath, JSON.stringify({ window: model.window, raw }, null, 2));
-  console.log(md);
-  console.log(`\nWrote ${mdPath}, ${htmlPath}, and ${jsonPath}`);
+  // The raw API responses (the JSON) go to the run log rather than a file, so the
+  // artifact is just the HTML. Grep the "Generate report" step for this block.
+  console.log(JSON.stringify({ window: model.window, raw }, null, 2));
+  console.log(`\nWrote ${htmlPath}`);
 }
 
 main().catch((err) => {
