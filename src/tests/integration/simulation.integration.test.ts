@@ -1519,6 +1519,29 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
   });
 });
 
+describe("Founding seed: RNG.initialSeed outlives the live RNG stream", () => {
+  it("stays the founding seed while the RNG state moves on, and survives a round trip", () => {
+    const sim = Simulation.newGame(987654321);
+    expect(sim.rng.initialSeed).toBe(987654321);
+    // Consume the RNG stream the way hours of events and churn do in play.
+    for (let i = 0; i < 10; i++) sim.rng.next();
+    expect(sim.rng.seed).not.toBe(987654321);
+    expect(sim.rng.initialSeed).toBe(987654321);
+    const revived = Simulation.deserialize(sim.serialize());
+    expect(revived.rng.initialSeed).toBe(987654321);
+  });
+
+  it("a save from before the field falls back to its stored RNG state", () => {
+    const sim = Simulation.newGame(24680);
+    const doc = JSON.parse(JSON.stringify(sim.serialize()));
+    delete doc.initialSeed;
+    const revived = Simulation.deserialize(doc);
+    // The stored RNG state is fixed for an already-written file, so the
+    // fallback is just as stable an identity as the real field.
+    expect(revived.rng.initialSeed).toBe(doc.seed >>> 0);
+  });
+});
+
 describe("Commercial-venue inspector: patronage/profit accumulation, rollover, save shape", () => {
   function buildOne(sim: Simulation, kind: FacilityKind, x: number): Unit {
     sim.money = 1e12;

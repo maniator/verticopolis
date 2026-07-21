@@ -32,6 +32,7 @@ export function serialize(sim: Simulation): SerializedGame {
   return {
     version: SAVE_VERSION,
     seed: sim.rng.seed,
+    initialSeed: sim.rng.initialSeed,
     money: sim.money,
     star: sim.star,
     minutes: sim.clock.minutes,
@@ -75,6 +76,7 @@ export function deserialize(raw: SerializedGame): Simulation {
     isGameMode(data.mode) ? data.mode : "classic",
     coerceCalendarKind(data.modernCalendar),
   );
+  if (typeof data.initialSeed === "number" && Number.isFinite(data.initialSeed)) sim.rng.initialSeed = data.initialSeed >>> 0; // else: the constructor's data.seed fallback (see RNG.initialSeed)
   // Coerce money to a finite number (untrusted save): a forged NaN/Infinity or
   // non-number poisons the ledger; a broken value keeps the start balance, not NaN.
   sim.money = typeof data.money === "number" && Number.isFinite(data.money) ? data.money : sim.money;
