@@ -70,11 +70,13 @@ describe("helpPageTemplate", () => {
     expect(report!.getAttribute("rel")).toBe("noopener noreferrer");
   });
 
-  it("clears prerendered #app content before rendering, so the guide never doubles", async () => {
+  it("removes prerendered #app content after rendering, so the guide never doubles", async () => {
     // The build prerenders the page's markup into #app (scripts/prerender-help.ts).
-    // main() must clear that copy before lit renders, or lit-html appends a
-    // second guide after the foreign children. Seed a stand-in prerendered copy,
-    // then import the module fresh so its top-level main() runs against it.
+    // main() renders first, then removes that copy (removal only after a
+    // successful render, so a render error keeps the prerendered guide visible);
+    // without the removal, lit-html would leave a second guide after the foreign
+    // children. Seed a stand-in prerendered copy, then import the module fresh
+    // so its top-level main() runs against it.
     const root = document.createElement("div");
     root.id = "app";
     root.innerHTML = "<h1>How to Play</h1><section id='basics'>prerendered stand-in</section>";
