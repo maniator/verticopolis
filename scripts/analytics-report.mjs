@@ -3,11 +3,12 @@
  * Vercel Web Analytics rollup for Verticopolis custom events.
  *
  * Pulls the custom events the game reports through `@vercel/analytics` (see
- * src/analytics.ts) from Vercel's Web Analytics API and writes two files into
- * the output directory: a human-readable `analytics-report-<date>.md` and a
- * machine-readable `analytics-report-<date>.json` that carries every raw API
- * response. The JSON is always complete even if a section fails to render, so a
- * run is never a total loss.
+ * src/analytics.ts) from Vercel's Web Analytics API and produces the report in
+ * three forms: a self-contained styled HTML file in the output directory
+ * (`analytics-report-<date>.html`), a plain-markdown version appended to the
+ * GitHub Actions job summary when run in CI (`$GITHUB_STEP_SUMMARY`), and the
+ * raw JSON of every API response printed to stdout. The JSON is always complete
+ * even if a section fails to render, so a run is never a total loss.
  *
  * Runs on plain Node (18+, uses global fetch), no dependencies. Driven by the
  * scheduled GitHub Actions workflow (.github/workflows/analytics-report.yml) or
