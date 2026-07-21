@@ -159,12 +159,14 @@ function extractRows(json) {
 
 const fmt = (n) => (n == null ? "n/a" : Number(n).toLocaleString("en-US"));
 const pct = (num, den) => (den ? `${((num / den) * 100).toFixed(1)}%` : "n/a");
+/** Escape a markdown table cell so a pipe or newline in a value can't break the row. */
+const mdCell = (s) => String(s).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
 
 /** Render an aggregate result as a markdown table, or a skipped-section note. */
 function renderRows(res, valueHeader) {
   if (res.ok && res.rows && res.rows.length) {
     const lines = [`| ${valueHeader} | Events | Visitors |`, "| --- | ---: | ---: |"];
-    for (const r of res.rows) lines.push(`| ${r.key} | ${fmt(r.count)} | ${fmt(r.visitors)} |`);
+    for (const r of res.rows) lines.push(`| ${mdCell(r.key)} | ${fmt(r.count)} | ${fmt(r.visitors)} |`);
     if (res.truncated) lines.push(`\n_Showing the top ${fmt(ROW_LIMIT)} groups; more may exist._`);
     return lines.join("\n");
   }
