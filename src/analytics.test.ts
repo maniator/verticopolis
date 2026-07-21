@@ -182,6 +182,68 @@ describe("gameplay session length", () => {
     gameplaySession.end();
     expect(track).toHaveBeenCalledWith("session_end", { seconds: 8 });
   });
+
+  it("emits build volume, peak floor, and per-tool depth at session end", () => {
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    gameplaySession.noteBuild("office", 5, 2); // 2 placements, floor 5
+    gameplaySession.noteBuild("floor", 3, 1); // 1 placement, floor 3
+    vi.setSystemTime(4000);
+    gameplaySession.end();
+    expect(track).toHaveBeenCalledWith("session_builds", { builds: 3 });
+    expect(track).toHaveBeenCalledWith("session_peak_floors", { floors: 5 });
+    expect(track).toHaveBeenCalledWith("tool_session_uses", { tool: "office", uses: 2 });
+    expect(track).toHaveBeenCalledWith("tool_session_uses", { tool: "floor", uses: 1 });
+  });
+
+  it("emits no depth events when nothing was built", () => {
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    vi.setSystemTime(3000);
+    gameplaySession.end();
+    expect(track).toHaveBeenCalledWith("session_end", { seconds: 3 });
+    expect(track).not.toHaveBeenCalledWith("session_builds", expect.anything());
+    expect(track).not.toHaveBeenCalledWith("tool_session_uses", expect.anything());
+  });
+
+  it("emits depth only once even when the tab is hidden repeatedly", () => {
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    gameplaySession.noteBuild("office", 5, 2);
+    vi.setSystemTime(3000);
+    gameplaySession.end(); // first background: depth emitted (builds so far)
+    gameplaySession.begin();
+    gameplaySession.noteBuild("floor", 3, 1); // more play after returning
+    vi.setSystemTime(9000);
+    gameplaySession.end(); // second background: session_end again, depth NOT re-emitted
+    const buildsCalls = vi.mocked(track).mock.calls.filter(([name]) => name === "session_builds");
+    expect(buildsCalls).toHaveLength(1);
+    expect(buildsCalls[0][1]).toEqual({ builds: 2 }); // the value at first background
+  });
+
+  it("reports a negative peak floor for a basement-only session", () => {
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    gameplaySession.noteBuild("parking", -5, 1); // built underground (B6)
+    vi.setSystemTime(2000);
+    gameplaySession.end();
+    expect(track).toHaveBeenCalledWith("session_peak_floors", { floors: -5 });
+  });
+
+  it("still records depth when the session ends within the first rounded second", () => {
+    // A build-and-close under 0.5s foreground rounds to 0 == lastReportedSec, so
+    // session_end is deduped away. Depth must still emit (it is latched
+    // separately and runs before the dedup), or fast sessions vanish from depth.
+    vi.setSystemTime(0);
+    gameplaySession.begin();
+    gameplaySession.noteBuild("office", 5, 2);
+    vi.setSystemTime(300); // 0.3s -> rounds to 0
+    gameplaySession.end();
+    expect(track).not.toHaveBeenCalledWith("session_end", expect.anything());
+    expect(track).toHaveBeenCalledWith("session_builds", { builds: 2 });
+    expect(track).toHaveBeenCalledWith("session_peak_floors", { floors: 5 });
+    expect(track).toHaveBeenCalledWith("tool_session_uses", { tool: "office", uses: 2 });
+  });
 });
 
 describe("startGameplaySession wiring", () => {

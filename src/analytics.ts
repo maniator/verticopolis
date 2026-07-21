@@ -79,6 +79,18 @@ interface GameplayEvents {
    *  `version.json` couldn't be read), so update adoption is visible build over
    *  build. Fired just before the activating reload. */
   update: { from: string; to: string };
+  /** Usage depth of one tool in a session (one event per tool the session used):
+   *  `uses` is how many placements that tool made. A floor/lobby brush stamps a
+   *  strip of 1-wide tiles in one action, each counted as a placement, so those
+   *  paint tools read heavier per action than a single-room tool; read per-tool
+   *  depth with that in mind. Emitted once per session. */
+  tool_session_uses: { tool: string; uses: number };
+  /** Total placements in a session (build volume). Emitted once per session. */
+  session_builds: { builds: number };
+  /** Highest floor built on during a session. Can be negative: the ground floor
+   *  is 1 and basements run 0 down to -9, so a basement-heavy session reports a
+   *  low or negative peak. Emitted once per session. */
+  session_peak_floors: { floors: number };
 }
 
 /** Host-gated, best-effort custom-event send. The single choke point every
@@ -112,6 +124,15 @@ class GameplaySession {
   private built = false;
   private armed = false;
   private readonly toolsSeen = new Set<string>();
+  /** Placement counts this session, per tool, for the depth events. */
+  private readonly toolUses = new Map<string, number>();
+  /** Total placements this session (build volume). */
+  private builds = 0;
+  /** Highest floor built on this session; seeded low so a basement-only session
+   *  (floors 0 to -9) reports its real peak, not the ground-floor default. */
+  private peakFloors = Number.NEGATIVE_INFINITY;
+  /** Depth events fire at most once per session (see `end`). */
+  private depthReported = false;
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -129,10 +150,19 @@ class GameplaySession {
     trackEvent("game_started", { mode });
   }
 
-  /** A facility was placed. Fires `first_build` once per founded tower (the
-   *  latch re-opens in `noteNewGame`); later builds in that tower are silent,
-   *  which is what keeps this off the per-click hot path. */
-  noteBuild(tool: string): void {
+  /** A facility was placed. Counts toward the session's build volume, per-tool
+   *  usage depth, and peak height (all emitted once at session end), and fires
+   *  `first_build` once per founded tower. The unit is PLACEMENTS, not tiles: a
+   *  wide or multi-story room is one placement (`count` 1); a floor/lobby brush
+   *  lays several 1-wide tiles at once, so it passes `count` = how many it laid,
+   *  each its own placement. `floor` is the TOP occupied story of what was placed
+   *  (callers add the facility height), so the session peak reflects real height.
+   *  The counting is O(1) (a Map bump and two numeric compares, no sim reads), so
+   *  this stays cheap on the per-placement path. */
+  noteBuild(tool: string, floor = 0, count = 1): void {
+    this.builds += count;
+    this.toolUses.set(tool, (this.toolUses.get(tool) ?? 0) + count);
+    if (floor > this.peakFloors) this.peakFloors = floor;
     if (this.built) return;
     this.built = true;
     trackEvent("first_build", { tool });
@@ -182,6 +212,21 @@ class GameplaySession {
       this.activeMs += Date.now() - this.resumedAt;
       this.resumedAt = null;
     }
+    // Session depth, emitted AT MOST ONCE per session (the first `end` after
+    // something was built). `end` re-fires on every tab-hide, and these events
+    // carry no session id, so re-emitting the growing cumulative totals would
+    // flood the stream and bias a downstream median/p90 that can't be deduped
+    // per visitor. Firing once at first background is a conservative lower bound
+    // on the session's depth. `builds > 0` guarantees `peakFloors` is finite.
+    // Kept AHEAD of the whole-second dedup below, and latched on its own flag, so
+    // a build-and-close inside the first rounded second (seconds === 0 ===
+    // lastReportedSec) still records its depth even though session_end is skipped.
+    if (this.builds > 0 && !this.depthReported) {
+      this.depthReported = true;
+      trackEvent("session_builds", { builds: this.builds });
+      trackEvent("session_peak_floors", { floors: this.peakFloors });
+      for (const [tool, uses] of this.toolUses) trackEvent("tool_session_uses", { tool, uses });
+    }
     const seconds = Math.round(this.activeMs / 1000);
     if (seconds === this.lastReportedSec) return;
     this.lastReportedSec = seconds;
@@ -204,7 +249,11 @@ class GameplaySession {
     this.lastReportedSec = 0;
     this.built = false;
     this.armed = false;
+    this.builds = 0;
+    this.peakFloors = Number.NEGATIVE_INFINITY;
+    this.depthReported = false;
     this.toolsSeen.clear();
+    this.toolUses.clear();
   }
 }
 

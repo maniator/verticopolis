@@ -1,5 +1,5 @@
 import type { Simulation } from "../engine/Simulation";
-import { FACILITIES } from "../engine/facilities";
+import { FACILITIES, facilityFloors } from "../engine/facilities";
 import { resaleRefund } from "../engine/econConfig";
 import type { FacilityKind, Transport, Unit } from "../engine/types";
 import type { Picked } from "../render/excalibur/TowerEngine";
@@ -47,7 +47,9 @@ export class BuildActions {
   tryBuild(kind: FacilityKind, floor: number, x: number, quiet = false): void {
     const res = this.deps.getSim().build(kind, floor, x);
     if (res.ok) {
-      gameplaySession.noteBuild(kind); // funnel: first placement of the session
+      // Report the TOP occupied story for the session peak: a multi-story room
+      // (cinema, party hall) reaches floor + its height - 1, not just its base.
+      gameplaySession.noteBuild(kind, floor + facilityFloors(kind) - 1); // funnel + depth
       if (!quiet) this.deps.audio.sfx("build");
     } else if (!quiet && res.reason) {
       this.deps.audio.sfx("error");
@@ -66,7 +68,7 @@ export class BuildActions {
     top: number,
   ): { ok: boolean; reason: string } {
     const res = this.deps.getSim().buildTransport(kind, x, bottom, top);
-    if (res.ok) gameplaySession.noteBuild(kind); // a shaft counts as a first build too
+    if (res.ok) gameplaySession.noteBuild(kind, top); // a shaft counts too; top is its reach
     this.deps.audio.sfx(res.ok ? "build" : "error");
     const reason = res.reason ?? this.transportReason(kind, x, bottom, top);
     if (!res.ok) this.deps.ui.toast(reason, "bad");
@@ -110,7 +112,7 @@ export class BuildActions {
         }
       }
     }
-    if (placed > 0) gameplaySession.noteBuild(kind); // brush path bypasses tryBuild
+    if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
     this.paint = { tile, floor };
     if (placed === 0 && tiles.every((tx) => sim.tower.structureKindAt(floor, tx) === kind)) {
       return { placed, reason: `${FACILITIES[kind].name} already built here` };
