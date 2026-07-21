@@ -159,10 +159,13 @@ function extractRows(json) {
     .map((r) => {
       const dimKey = r && typeof r === "object" ? Object.keys(r).find((k) => !METRIC_FIELDS.has(k)) : undefined;
       const value = dimKey != null ? r[dimKey] : undefined;
+      // Keep the two apart so a shape change stays visible: "(unknown)" means no
+      // dimension field was found at all (drift), "(none)" a real empty value.
+      const key = dimKey == null ? "(unknown)" : value == null || value === "" ? "(none)" : String(value);
       return {
-        key: value == null || value === "" ? "(none)" : String(value),
-        count: Number(r.count ?? r.total ?? 0),
-        visitors: Number(r.visitors ?? 0),
+        key,
+        count: Number(r?.count ?? r?.total ?? 0),
+        visitors: Number(r?.visitors ?? 0),
       };
     })
     .sort((a, b) => b.count - a.count);
