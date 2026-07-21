@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "1.70.1",
+  "version": "1.71.0",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-help.ts",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit",
     "watch": "tsc --watch",

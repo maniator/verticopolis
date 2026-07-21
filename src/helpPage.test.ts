@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { helpPageTemplate } from "./helpPage";
 import { renderToFragment } from "./ui/testing/litTestUtils";
 import { HELP_SECTIONS } from "./ui/templates/helpContent";
@@ -68,5 +68,27 @@ describe("helpPageTemplate", () => {
     expect(report).not.toBeNull();
     expect(report!.getAttribute("target")).toBe("_blank");
     expect(report!.getAttribute("rel")).toBe("noopener noreferrer");
+  });
+
+  it("clears prerendered #app content before rendering, so the guide never doubles", async () => {
+    // The build prerenders the page's markup into #app (scripts/prerender-help.ts).
+    // main() must clear that copy before lit renders, or lit-html appends a
+    // second guide after the foreign children. Seed a stand-in prerendered copy,
+    // then import the module fresh so its top-level main() runs against it.
+    const root = document.createElement("div");
+    root.id = "app";
+    root.innerHTML = "<h1>How to Play</h1><section id='basics'>prerendered stand-in</section>";
+    document.body.appendChild(root);
+    try {
+      vi.resetModules();
+      await import("./helpPage");
+      expect(document.querySelectorAll("#app h1").length).toBe(1);
+      expect(document.querySelectorAll("#app #basics").length).toBe(1);
+      expect(root.textContent).not.toContain("prerendered stand-in");
+      expect((window as unknown as { helpReady?: boolean }).helpReady).toBe(true);
+    } finally {
+      root.remove();
+      delete (window as unknown as { helpReady?: boolean }).helpReady;
+    }
   });
 });

@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.71.0
+
+- The Help page at /help now shows the full guide, pictures included, even before scripts run or with JavaScript off, so shared links and search results carry the real content.
+
 ## 1.70.1
 
 - The elevator schedule dialog scrolls as one piece on desktop, instead of showing a second scrollbar inside the floors grid.

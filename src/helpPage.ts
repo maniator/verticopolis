@@ -55,6 +55,12 @@ function main(): void {
   injectVercelTelemetry();
   const root = document.getElementById("app");
   if (!root) return;
+  // The build prerenders this page's markup into #app (scripts/prerender-help.ts)
+  // so crawlers and no-JS visitors get the guide without running this script.
+  // lit-html appends rather than adopting foreign children, so clear the
+  // prerendered copy (or the noscript fallback) before rendering the identical
+  // markup; the swap is same-frame and not visible.
+  root.replaceChildren();
   render(helpPageTemplate(), root);
   // Signal readiness for screenshot tooling (mirrors the gallery's flag).
   (window as unknown as { helpReady: boolean }).helpReady = true;
