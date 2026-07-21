@@ -45,19 +45,24 @@ function clampDays(v) {
 }
 const DAYS = clampDays(arg("days", "30"));
 const OUT_DIR = arg("out", "reports");
-// Max groups an aggregate query returns. High enough that low-cardinality
-// breakdowns (mode, reason, version, tool) never truncate; a high-cardinality
-// one (session_end by raw seconds) can still hit it, so results flag truncation.
-const ROW_LIMIT = 1000;
+// Max groups an aggregate query returns. 100 is the API's hard cap (a larger
+// value is a 400). Low-cardinality breakdowns (mode, reason, version, tool,
+// star) stay well under it; only session_end by raw seconds can reach it, so
+// results flag truncation.
+const ROW_LIMIT = 100;
+// --demo renders the report from built-in sample data with no API calls, so the
+// layout and styling can be previewed without a token or any real traffic.
+const DEMO = process.argv.includes("--demo");
 
-if (!TOKEN) {
+if (!DEMO && !TOKEN) {
   console.error(
     "VERCEL_TOKEN is not set. Create a token at Vercel > Account Settings > Tokens\n" +
-      "and expose it as the VERCEL_TOKEN environment variable (a GitHub Actions secret in CI).",
+      "and expose it as the VERCEL_TOKEN environment variable (a GitHub Actions secret in CI).\n" +
+      "Or pass --demo to render sample data with no API calls.",
   );
   process.exit(1);
 }
-if (!PROJECT_ID || !TEAM_ID) {
+if (!DEMO && (!PROJECT_ID || !TEAM_ID)) {
   console.error("VERCEL_PROJECT_ID and VERCEL_TEAM_ID must be set (plain env, not secrets).");
   process.exit(1);
 }
@@ -180,133 +185,267 @@ function bucketSeconds(res) {
   return buckets;
 }
 
+// Self-contained styles for the HTML report. No external assets. The palette,
+// font, and bevels mirror the game's own design tokens (src/styles/retro-tokens
+// .css: the Windows 3.1 / SimTower look), copied here as literal values rather
+// than imported, because this is a headless, build-free CI script. Keep in sync
+// with that file if the theme changes. This commits to the retro look (one
+// theme), so no dark-mode variant.
+const HTML_STYLE = `
+:root {
+  --face:#c0c0c0; --shadow:#808080; --dark:#000; --light:#dfdfdf; --hi:#fff;
+  --title:#000080; --title-fg:#fff; --ink:#000; --desktop:#008080;
+  --muted:#2f2f38; --line:#7a7a7a;
+  --font:"MS Sans Serif","Tahoma","Geneva","Segoe UI",sans-serif;
+  --bevel-out: inset -1px -1px var(--dark), inset 1px 1px var(--hi), inset -2px -2px var(--shadow), inset 2px 2px var(--light);
+  --bevel-in: inset 1px 1px var(--dark), inset -1px -1px var(--hi), inset 2px 2px var(--shadow), inset -2px -2px var(--light);
+}
+* { box-sizing:border-box; }
+body { margin:0; padding:24px; background:var(--desktop); color:var(--ink); font:13px/1.45 var(--font); }
+.wrap { max-width:900px; margin:0 auto; background:var(--face); box-shadow:var(--bevel-out); padding:3px; }
+.titlebar { background:var(--title); color:var(--title-fg); padding:5px 9px; display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+.titlebar h1 { margin:0; font-size:14px; font-weight:700; }
+.titlebar .sub { color:#c9c9ff; font-size:11px; }
+.body { padding:14px; }
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:14px; }
+.kpi { background:var(--face); box-shadow:var(--bevel-out); padding:10px 12px; }
+.kpi-v { font-size:22px; font-weight:700; font-variant-numeric:tabular-nums; }
+.kpi-k { color:var(--muted); font-size:11px; margin-top:2px; }
+.highlights { list-style:none; padding:0; margin:0 0 18px; display:grid; gap:6px; }
+.highlights li { display:flex; justify-content:space-between; gap:12px; background:var(--face); box-shadow:var(--bevel-in); padding:6px 12px; }
+.highlights b { font-variant-numeric:tabular-nums; }
+section { margin-bottom:18px; }
+section h2 { font-size:13px; margin:0 0 8px; background:var(--title); color:var(--title-fg); padding:3px 9px; }
+h3 { font-size:12px; color:var(--muted); margin:12px 0 5px; font-weight:700; }
+.scroll { overflow-x:auto; box-shadow:var(--bevel-in); background:#fff; }
+table { width:100%; border-collapse:collapse; background:#fff; }
+th, td { text-align:left; padding:5px 10px; border-bottom:1px solid #d5d5d5; }
+tr:last-child td { border-bottom:0; }
+thead th { background:var(--face); color:var(--ink); font-weight:700; font-size:11px; border-bottom:1px solid var(--shadow); }
+td.n, th.n { text-align:right; font-variant-numeric:tabular-nums; }
+.empty { color:var(--muted); background:var(--face); box-shadow:var(--bevel-in); padding:8px 12px; margin:6px 0; }
+.note { color:var(--muted); font-size:11px; margin:5px 2px; }
+footer { color:var(--muted); font-size:11px; text-align:center; margin-top:20px; padding:10px; box-shadow:var(--bevel-in); background:var(--face); }
+`;
+
+function escapeHtml(s) {
+  return String(s).replace(
+    /[&<>"']/g,
+    (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c],
+  );
+}
+
+/** One breakdown table as HTML, or an empty/skipped note. */
+function htmlTable(t) {
+  const cap = t.caption ? `<h3>${escapeHtml(t.caption)}</h3>` : "";
+  const res = t.res;
+  if (res.ok && res.rows && res.rows.length) {
+    const body = res.rows
+      .map(
+        (r) =>
+          `<tr><td>${escapeHtml(r.key)}</td><td class="n">${fmt(r.count)}</td><td class="n">${fmt(r.visitors)}</td></tr>`,
+      )
+      .join("");
+    const trunc = res.truncated ? `<p class="note">Showing the top ${fmt(ROW_LIMIT)} groups; more may exist.</p>` : "";
+    return `${cap}<div class="scroll"><table><thead><tr><th>${escapeHtml(t.header)}</th><th class="n">Events</th><th class="n">Visitors</th></tr></thead><tbody>${body}</tbody></table></div>${trunc}`;
+  }
+  const msg = res.ok ? "No data in this window." : `Skipped: ${escapeHtml(res.hint ?? "error")}`;
+  return `${cap}<p class="empty">${msg}</p>`;
+}
+
+/** The full self-contained HTML report. */
+function renderHtml(m) {
+  const kpis = m.kpis
+    .map(([k, v]) => `<div class="kpi"><div class="kpi-v">${fmt(v)}</div><div class="kpi-k">${escapeHtml(k)}</div></div>`)
+    .join("");
+  const highlights = m.highlights
+    .map(([k, v]) => `<li><span>${escapeHtml(k)}</span><b>${escapeHtml(String(v))}</b></li>`)
+    .join("");
+  const sections = m.sections
+    .map((s) => `<section><h2>${escapeHtml(s.title)}</h2>${s.tables.map(htmlTable).join("")}</section>`)
+    .join("");
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Verticopolis analytics</title><style>${HTML_STYLE}</style></head>
+<body><div class="wrap">
+<div class="titlebar"><h1>Verticopolis analytics</h1>
+<span class="sub">${escapeHtml(m.window.since)} to ${escapeHtml(m.window.until)} &middot; ${m.window.days} days &middot; production</span></div>
+<div class="body">
+<div class="kpis">${kpis}</div>
+<ul class="highlights">${highlights}</ul>
+${sections}
+<footer>Vercel Web Analytics &middot; Events = total custom events, Visitors = unique visitors &middot; generated ${escapeHtml(m.generated)}</footer>
+</div>
+</div></body></html>`;
+}
+
+/** The markdown report, from the same model as the HTML. */
+function renderMarkdown(m) {
+  const lines = [
+    `# Verticopolis analytics report`,
+    ``,
+    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only.`,
+    `Generated ${m.generated}.`,
+    ``,
+    `> Property breakdowns (the tables) need a Vercel Pro plan; on a lower plan they show as skipped.`,
+    ``,
+    `## Totals`,
+    ``,
+    `| Metric | Value |`,
+    `| --- | ---: |`,
+    ...m.kpis.map(([k, v]) => `| ${k} | ${fmt(v)} |`),
+    ``,
+    ...m.highlights.map(([k, v]) => `- ${k}: **${v}**`),
+    ``,
+  ];
+  for (const s of m.sections) {
+    lines.push(`## ${s.title}`, ``);
+    for (const t of s.tables) {
+      if (t.caption) lines.push(`${t.caption}:`, ``);
+      lines.push(renderRows(t.res, t.header), ``);
+    }
+  }
+  return lines.join("\n");
+}
+
+/** Built-in sample results for --demo, shaped exactly like the real query
+ *  returns, so the same model and renderers exercise a populated report. */
+function demoData() {
+  const n = (total) => ({ ok: true, total });
+  const rows = (pairs) => ({ ok: true, truncated: false, rows: pairs.map(([key, count, visitors]) => ({ key: String(key), count, visitors })) });
+  return {
+    gameStarted: n(1240),
+    firstBuild: n(1012),
+    starReached: n(438),
+    sessionEnd: n(3120),
+    bootTotal: n(5400),
+    crashTotal: n(37),
+    updateTotal: n(214),
+    toolMix: rows([["office", 820, 410], ["fast food", 560, 300], ["floor", 540, 295], ["condo", 300, 180], ["elevator", 260, 170], ["restaurant", 190, 120]]),
+    starDist: rows([["2", 260, 190], ["3", 110, 90], ["4", 48, 40], ["5", 20, 18]]),
+    bootByStar: rows([["1", 2600, 1400], ["2", 1500, 900], ["3", 800, 520], ["4", 350, 240], ["5", 150, 110]]),
+    bootByMode: rows([["classic", 3800, 1900], ["modern", 1600, 1000]]),
+    bootByReason: rows([["continue", 2600, 1500], ["fresh", 2100, 2100], ["update", 480, 360], ["recovery", 140, 120], ["corrupt", 80, 70]]),
+    bootByVersion: rows([["1.69.1", 3200, 1700], ["1.69.0", 1500, 900], ["1.68.0", 700, 500]]),
+    sessionBySeconds: { ok: true, truncated: true, rows: [["12", 180, 140], ["45", 220, 170], ["90", 260, 190], ["300", 300, 210], ["720", 180, 150], ["1500", 90, 80]].map(([key, count, visitors]) => ({ key, count, visitors })) },
+    crashByRepeat: rows([["false", 30, 27], ["true", 7, 6]]),
+    crashByRecovery: rows([["false", 25, 22], ["true", 12, 11]]),
+    crashByVersion: rows([["1.69.1", 20, 18], ["1.69.0", 12, 11], ["1.68.0", 5, 5]]),
+    updateByTo: rows([["1.69.1", 130, 110], ["1.69.0", 84, 70]]),
+  };
+}
+
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const raw = {};
-  const q = async (label, promise) => {
-    const r = await promise;
-    raw[label] = r.json ?? { status: r.status, hint: r.hint };
-    return r;
-  };
-
-  // Top-line totals (plan-independent).
-  const gameStarted = await q("game_started", countEvent("game_started"));
-  const firstBuild = await q("first_build", countEvent("first_build"));
-  const starReached = await q("star_reached", countEvent("star_reached"));
-  const sessionEnd = await q("session_end", countEvent("session_end"));
-  const bootTotal = await q("boot", countEvent("boot"));
-  const crashTotal = await q("crash", countEvent("crash"));
-  const updateTotal = await q("update", countEvent("update"));
-
-  // Property breakdowns (Vercel Pro).
-  const toolMix = await q("tool_used_by_tool", aggregateEvent("tool_used", "tool"));
-  const starDist = await q("star_reached_by_star", aggregateEvent("star_reached", "star"));
-  const bootByStar = await q("boot_by_star", aggregateEvent("boot", "star"));
-  const bootByMode = await q("boot_by_mode", aggregateEvent("boot", "mode"));
-  const bootByReason = await q("boot_by_reason", aggregateEvent("boot", "reason"));
-  const bootByVersion = await q("boot_by_version", aggregateEvent("boot", "version"));
-  const sessionBySeconds = await q("session_end_by_seconds", aggregateEvent("session_end", "seconds"));
-  const crashByRepeat = await q("crash_by_repeat", aggregateEvent("crash", "repeat"));
-  const crashByRecovery = await q("crash_by_recoveryFailed", aggregateEvent("crash", "recoveryFailed"));
-  const crashByVersion = await q("crash_by_version", aggregateEvent("crash", "version"));
-  const updateByTo = await q("update_by_to", aggregateEvent("update", "to"));
+  let results;
+  if (DEMO) {
+    results = demoData();
+    raw.demo = "sample data (no API calls)";
+  } else {
+    const q = async (label, promise) => {
+      const r = await promise;
+      raw[label] = r.json ?? { status: r.status, hint: r.hint };
+      return r;
+    };
+    results = {
+      // Top-line totals (plan-independent).
+      gameStarted: await q("game_started", countEvent("game_started")),
+      firstBuild: await q("first_build", countEvent("first_build")),
+      starReached: await q("star_reached", countEvent("star_reached")),
+      sessionEnd: await q("session_end", countEvent("session_end")),
+      bootTotal: await q("boot", countEvent("boot")),
+      crashTotal: await q("crash", countEvent("crash")),
+      updateTotal: await q("update", countEvent("update")),
+      // Property breakdowns (Vercel Pro).
+      toolMix: await q("tool_used_by_tool", aggregateEvent("tool_used", "tool")),
+      starDist: await q("star_reached_by_star", aggregateEvent("star_reached", "star")),
+      bootByStar: await q("boot_by_star", aggregateEvent("boot", "star")),
+      bootByMode: await q("boot_by_mode", aggregateEvent("boot", "mode")),
+      bootByReason: await q("boot_by_reason", aggregateEvent("boot", "reason")),
+      bootByVersion: await q("boot_by_version", aggregateEvent("boot", "version")),
+      sessionBySeconds: await q("session_end_by_seconds", aggregateEvent("session_end", "seconds")),
+      crashByRepeat: await q("crash_by_repeat", aggregateEvent("crash", "repeat")),
+      crashByRecovery: await q("crash_by_recoveryFailed", aggregateEvent("crash", "recoveryFailed")),
+      crashByVersion: await q("crash_by_version", aggregateEvent("crash", "version")),
+      updateByTo: await q("update_by_to", aggregateEvent("update", "to")),
+    };
+  }
+  const {
+    gameStarted, firstBuild, starReached, sessionEnd, bootTotal, crashTotal, updateTotal,
+    toolMix, starDist, bootByStar, bootByMode, bootByReason, bootByVersion,
+    sessionBySeconds, crashByRepeat, crashByRecovery, crashByVersion, updateByTo,
+  } = results;
 
   const buckets = bucketSeconds(sessionBySeconds);
   const crashPerBoot = bootTotal.total ? pct(crashTotal.total ?? 0, bootTotal.total) : "n/a";
+  const lengthText = buckets
+    ? Object.entries(buckets).map(([k, v]) => `${k}: ${fmt(v)}`).join(" / ") +
+      (sessionBySeconds.truncated ? ` (top ${fmt(ROW_LIMIT)} second-values)` : "")
+    : `unavailable (${sessionBySeconds.hint ?? "no data"})`;
 
-  const md = [
-    `# Verticopolis analytics report`,
-    ``,
-    `Window: **${day(since)} to ${day(until)}** (${DAYS} days), production only.`,
-    `Generated ${until.toISOString()}.`,
-    ``,
-    `> Property breakdowns (the tables below) need a Vercel Pro plan; on Hobby they`,
-    `> show as skipped. Top-line counts work on any plan.`,
-    ``,
-    `## First-tower funnel`,
-    ``,
-    `| Step | Events |`,
-    `| --- | ---: |`,
-    `| Towers founded (game_started) | ${fmt(gameStarted.total)} |`,
-    `| First build (first_build) | ${fmt(firstBuild.total)} |`,
-    `| Star promotions (star_reached) | ${fmt(starReached.total)} |`,
-    ``,
-    `- Founded to first build: **${pct(firstBuild.total ?? 0, gameStarted.total ?? 0)}**`,
-    ``,
-    `## Engagement`,
-    ``,
-    `- Sessions ended (session_end): **${fmt(sessionEnd.total)}**`,
-    buckets
-      ? `- Foreground length: ${Object.entries(buckets).map(([k, v]) => `${k}: ${fmt(v)}`).join(", ")}` +
-        (sessionBySeconds.truncated ? ` (top ${fmt(ROW_LIMIT)} second-values only)` : "")
-      : `- Foreground length distribution: _unavailable (${sessionBySeconds.hint ?? "no data"})._`,
-    ``,
-    `## Tool mix`,
-    ``,
-    renderRows(toolMix, "Tool"),
-    ``,
-    `## Progression`,
-    ``,
-    `Star promotions by star:`,
-    ``,
-    renderRows(starDist, "Star reached"),
-    ``,
-    `Standing tower rating at boot:`,
-    ``,
-    renderRows(bootByStar, "Star"),
-    ``,
-    `## Boots and existing towers`,
-    ``,
-    `- Total boots: **${fmt(bootTotal.total)}**`,
-    ``,
-    `By origin (fresh / continue / update / recovery / corrupt):`,
-    ``,
-    renderRows(bootByReason, "Reason"),
-    ``,
-    `By mode:`,
-    ``,
-    renderRows(bootByMode, "Mode"),
-    ``,
-    `## Reliability`,
-    ``,
-    `- Crashes: **${fmt(crashTotal.total)}**  (crash-to-boot ratio: **${crashPerBoot}**)`,
-    ``,
-    `By repeat-within-90s:`,
-    ``,
-    renderRows(crashByRepeat, "Repeat"),
-    ``,
-    `By failed in-place recovery:`,
-    ``,
-    renderRows(crashByRecovery, "Recovery failed"),
-    ``,
-    `By build version:`,
-    ``,
-    renderRows(crashByVersion, "Version"),
-    ``,
-    `## Version adoption`,
-    ``,
-    `- Updates applied (update): **${fmt(updateTotal.total)}**`,
-    ``,
-    `Boots by build version:`,
-    ``,
-    renderRows(bootByVersion, "Version"),
-    ``,
-    `Updates by target version:`,
-    ``,
-    renderRows(updateByTo, "To version"),
-    ``,
-  ].join("\n");
+  // One model feeds both the markdown and the HTML, so they never drift.
+  const model = {
+    window: { since: day(since), until: day(until), days: DAYS },
+    generated: until.toISOString(),
+    kpis: [
+      ["Towers founded", gameStarted.total],
+      ["First builds", firstBuild.total],
+      ["Star promotions", starReached.total],
+      ["Sessions", sessionEnd.total],
+      ["Boots", bootTotal.total],
+      ["Crashes", crashTotal.total],
+      ["Updates", updateTotal.total],
+    ],
+    highlights: [
+      ["Founded to first build", pct(firstBuild.total ?? 0, gameStarted.total ?? 0)],
+      ["Crash to boot ratio", crashPerBoot],
+      ["Foreground length", lengthText],
+    ],
+    sections: [
+      { title: "Tool mix", tables: [{ header: "Tool", res: toolMix }] },
+      {
+        title: "Progression",
+        tables: [
+          { caption: "Star promotions by star", header: "Star reached", res: starDist },
+          { caption: "Standing tower rating at boot", header: "Star", res: bootByStar },
+        ],
+      },
+      {
+        title: "Boots and existing towers",
+        tables: [
+          { caption: "By origin (fresh / continue / update / recovery / corrupt)", header: "Reason", res: bootByReason },
+          { caption: "By mode", header: "Mode", res: bootByMode },
+        ],
+      },
+      {
+        title: "Reliability",
+        tables: [
+          { caption: "By repeat within 90s", header: "Repeat", res: crashByRepeat },
+          { caption: "By failed in-place recovery", header: "Recovery failed", res: crashByRecovery },
+          { caption: "By build version", header: "Version", res: crashByVersion },
+        ],
+      },
+      {
+        title: "Version adoption",
+        tables: [
+          { caption: "Boots by build version", header: "Version", res: bootByVersion },
+          { caption: "Updates by target version", header: "To version", res: updateByTo },
+        ],
+      },
+    ],
+  };
 
   const stamp = day(until);
   const mdPath = join(OUT_DIR, `analytics-report-${stamp}.md`);
+  const htmlPath = join(OUT_DIR, `analytics-report-${stamp}.html`);
   const jsonPath = join(OUT_DIR, `analytics-report-${stamp}.json`);
+  const md = renderMarkdown(model);
   writeFileSync(mdPath, md);
-  writeFileSync(
-    jsonPath,
-    JSON.stringify({ window: { since: day(since), until: day(until), days: DAYS }, raw }, null, 2),
-  );
+  writeFileSync(htmlPath, renderHtml(model));
+  writeFileSync(jsonPath, JSON.stringify({ window: model.window, raw }, null, 2));
   console.log(md);
-  console.log(`\nWrote ${mdPath} and ${jsonPath}`);
+  console.log(`\nWrote ${mdPath}, ${htmlPath}, and ${jsonPath}`);
 }
 
 main().catch((err) => {

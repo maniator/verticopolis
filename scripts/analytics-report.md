@@ -8,9 +8,14 @@ star progression, existing-tower state, crash reliability, and version adoption.
 
 `.github/workflows/analytics-report.yml` runs `scripts/analytics-report.mjs`
 twice a week (Tuesday and Friday) and uploads the result as a workflow artifact
-named `analytics-report` (markdown + JSON, 90-day retention). You can also run it
-on demand from the Actions tab with **Run workflow** and an optional look-back in
-days.
+named `analytics-report` (a styled HTML report plus markdown and JSON, 90-day
+retention). You can also run it on demand from the Actions tab with **Run
+workflow** and an optional look-back in days.
+
+The HTML report is a self-contained page styled to match the game's own look
+(the Windows 3.1 / SimTower tokens from `src/styles/retro-tokens.css`, copied in
+as literal values since this is a build-free script). Open the `.html` from the
+artifact in any browser.
 
 ## Setup (one secret)
 
@@ -31,8 +36,14 @@ VERCEL_TEAM_ID=team_ArE8nhexpkACNIlDHVKU80Pj \
 node scripts/analytics-report.mjs --days 30 --out reports
 ```
 
-Output goes to `reports/analytics-report-<date>.md` and `.json`. The JSON keeps
+Output goes to `reports/analytics-report-<date>.{html,md,json}`. The JSON keeps
 every raw API response, so a run is useful even if a section fails to render.
+
+To preview the layout and styling with sample data (no token or traffic needed):
+
+```bash
+node scripts/analytics-report.mjs --demo --out reports
+```
 
 ## Plan note
 
