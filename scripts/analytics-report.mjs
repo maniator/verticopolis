@@ -3,11 +3,12 @@
  * Vercel Web Analytics rollup for Verticopolis custom events.
  *
  * Pulls the custom events the game reports through `@vercel/analytics` (see
- * src/analytics.ts) from Vercel's Web Analytics API and writes two files into
- * the output directory: a human-readable `analytics-report-<date>.md` and a
- * machine-readable `analytics-report-<date>.json` that carries every raw API
- * response. The JSON is always complete even if a section fails to render, so a
- * run is never a total loss.
+ * src/analytics.ts) from Vercel's Web Analytics API and produces the report in
+ * three forms: a self-contained styled HTML file in the output directory
+ * (`analytics-report-<date>.html`), a plain-markdown version appended to the
+ * GitHub Actions job summary when run in CI (`$GITHUB_STEP_SUMMARY`), and the
+ * raw JSON of every API response printed to stdout. The JSON is always complete
+ * even if a section fails to render, so a run is never a total loss.
  *
  * Runs on plain Node (18+, uses global fetch), no dependencies. Driven by the
  * scheduled GitHub Actions workflow (.github/workflows/analytics-report.yml) or
@@ -19,7 +20,7 @@
  * a skipped section with the API's reason, not a crash.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const API = "https://api.vercel.com";
@@ -144,16 +145,30 @@ function extractCount(json) {
   return null;
 }
 
-/** Normalize aggregate `data: [{ eventData, count, visitors }]` into rows. */
+/** Metric fields on an aggregate row; everything else is the grouped dimension. */
+const METRIC_FIELDS = new Set(["count", "visitors", "total"]);
+
+/** Normalize an aggregate `data` array into rows. Vercel returns the grouped
+ *  value under a field named after the dimension, and that name varies by query
+ *  (it is NOT reliably `eventData`), so read whichever field is not a metric
+ *  rather than a fixed name. That is why every breakdown label read "(unknown)"
+ *  before: the counts parsed but the value field was missed. */
 function extractRows(json) {
   const arr = Array.isArray(json?.data) ? json.data : null;
   if (!arr) return null;
   return arr
-    .map((r) => ({
-      key: String(r.eventData ?? r.key ?? r.value ?? "(unknown)"),
-      count: Number(r.count ?? r.total ?? 0),
-      visitors: Number(r.visitors ?? 0),
-    }))
+    .map((r) => {
+      const dimKey = r && typeof r === "object" ? Object.keys(r).find((k) => !METRIC_FIELDS.has(k)) : undefined;
+      const value = dimKey != null ? r[dimKey] : undefined;
+      // Keep the two apart so a shape change stays visible: "(unknown)" means no
+      // dimension field was found at all (drift), "(none)" a real empty value.
+      const key = dimKey == null ? "(unknown)" : value == null || value === "" ? "(none)" : String(value);
+      return {
+        key,
+        count: Number(r?.count ?? r?.total ?? 0),
+        visitors: Number(r?.visitors ?? 0),
+      };
+    })
     .sort((a, b) => b.count - a.count);
 }
 
@@ -281,15 +296,14 @@ ${sections}
 </div></body></html>`;
 }
 
-/** The markdown report, from the same model as the HTML. */
+/** The report as GitHub-flavored markdown, from the same model as the HTML.
+ *  Used for the Actions job summary, which renders inline on the run page (no
+ *  download) but is sanitized, so it is the plain view without the retro CSS. */
 function renderMarkdown(m) {
   const lines = [
     `# Verticopolis analytics report`,
     ``,
-    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only.`,
-    `Generated ${m.generated}.`,
-    ``,
-    `> Property breakdowns (the tables) need a Vercel Pro plan; on a lower plan they show as skipped.`,
+    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only. Generated ${m.generated}.`,
     ``,
     `## Totals`,
     ``,
@@ -439,15 +453,22 @@ async function main() {
   };
 
   const stamp = day(until);
-  const mdPath = join(OUT_DIR, `analytics-report-${stamp}.md`);
   const htmlPath = join(OUT_DIR, `analytics-report-${stamp}.html`);
-  const jsonPath = join(OUT_DIR, `analytics-report-${stamp}.json`);
-  const md = renderMarkdown(model);
-  writeFileSync(mdPath, md);
   writeFileSync(htmlPath, renderHtml(model));
-  writeFileSync(jsonPath, JSON.stringify({ window: model.window, raw }, null, 2));
-  console.log(md);
-  console.log(`\nWrote ${mdPath}, ${htmlPath}, and ${jsonPath}`);
+  // In GitHub Actions, also render the report as markdown into the job summary,
+  // so it shows inline on the run page with no download. GitHub sanitizes this
+  // (no custom CSS), so it is the plain view; the artifact keeps the styled HTML.
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderMarkdown(model) + "\n");
+    } catch {
+      /* best-effort; a summary write must never fail the run */
+    }
+  }
+  // The raw API responses (the JSON) go to the run log rather than a file, so the
+  // artifact is just the HTML. Grep the "Generate report" step for this block.
+  console.log(JSON.stringify({ window: model.window, raw }, null, 2));
+  console.log(`\nWrote ${htmlPath}`);
 }
 
 main().catch((err) => {
