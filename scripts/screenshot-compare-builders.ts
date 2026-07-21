@@ -123,8 +123,13 @@ export function buildEscalatorOfficeClassic(): void {
   const e3 = s.tower.placeTransport("escalator", cx, 3, 4);
   if (!e1.ok) throw new Error("Classic lobby-to-shops escalator should place but was refused");
   if (e2.ok || e3.ok) throw new Error("Classic must refuse escalators touching office floors, but one placed");
-  if (!/office floors/.test(e2.reason || "")) {
-    throw new Error(`Classic office-escalator refusal reason changed: ${e2.reason}`);
+  // Both office-touching flights must be refused FOR THE OFFICE RULE, so a
+  // refusal that merely happens for some other reason cannot pass as the
+  // divergence this pair documents.
+  for (const refused of [e2, e3]) {
+    if (!/office floors/.test(refused.reason || "")) {
+      throw new Error(`Classic office-escalator refusal reason changed: ${refused.reason}`);
+    }
   }
   s.evaluateStar();
   g.engine.setSim(s);
