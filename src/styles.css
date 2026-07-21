@@ -1072,8 +1072,12 @@ dialog.crash-card::backdrop {
    floors-by-cars shape: floors down the left, one chip per car. */
 .es-floors { display: grid; gap: 6px; }
 .es-grid {
-  max-height: 200px;
-  overflow-y: auto;
+  /* No height cap on desktop (#513): the old 200px well made the grid a second
+     live scroller next to the .modal-box one, so the dialog wore two vertical
+     scrollbars at once. The grid now grows to its content and the box is the
+     dialog's single scroller. Phones get the 200px cap back in the phone block
+     below, where scrollbars are overlay (invisible) and the cap keeps the
+     steppers and OK button within a swipe. */
   padding: 2px;
   background: var(--r-face);
   box-shadow: var(--bevel-in);
@@ -1088,7 +1092,16 @@ dialog.crash-card::backdrop {
 .es-grid-head {
   font-weight: 700;
   position: sticky;
-  top: 0;
+  /* With the grid uncapped, the head sticks in the .modal-box scrollport,
+     tucked flush under the stuck title bar. Same baseline as the title's own
+     sticky offset (the title pins at the box top with `-1 * --pad-y`; see
+     `.modal-box > .win-title`), plus the title's rendered 21px height, so the
+     head's top meets the title's bottom exactly (measured gap 0 at every
+     scroll depth). If the title ever wraps taller than 21px it overlaps the
+     head cosmetically; z-index 1 keeps the head under the title (z-index 2).
+     Clamped to the grid's own bounds, it slides away once the grid scrolls
+     past. */
+  top: calc(-1 * var(--pad-y, 18px) + 21px);
   background: var(--r-face);
   z-index: 1;
 }
@@ -1657,6 +1670,17 @@ dialog.crash-card::backdrop {
   #editor {
     width: min(250px, 80vw);
   }
+  /* The schedule floors grid keeps its 200px well on phones (#513): overlay
+     scrollbars are invisible here, and the cap keeps the steppers and the OK
+     button within a swipe on a long span. The head sticks inside the grid's
+     own scroller again. */
+  .es-grid {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .es-grid-head {
+    top: 0;
+  }
 }
 
 /* Tablet block: portrait tablets and the compact 861–1023 band (wide enough to
@@ -1739,6 +1763,21 @@ dialog.crash-card::backdrop {
     z-index: 1;
     background: var(--r-face);
     padding: 2px 0;
+  }
+  /* Touch keeps the capped grid well (#513 applies to fine pointers only):
+     overlay scrollbars are invisible on touch, so the double bar the desktop
+     fix removes never shows here, and the cap keeps the steppers and OK
+     button within a swipe. This also keeps the grid head pinning inside the
+     grid's own scrollport, where it cannot collide with the sticky day
+     toggle above (uncapped, a box-pinned head overlapped the toggle's
+     buttons on tablet-width touch screens). Mirrors the phone block; on
+     phones both blocks apply with identical values. */
+  .es-grid {
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .es-grid-head {
+    top: 0;
   }
   /* Touch breathing room (owner's phone feedback): the 36px controls need more
      air between sections than the desktop's 8px, the quick actions must not
