@@ -19,7 +19,7 @@
  * a skipped section with the API's reason, not a crash.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
+import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const API = "https://api.vercel.com";
@@ -170,6 +170,20 @@ function extractRows(json) {
 
 const fmt = (n) => (n == null ? "n/a" : Number(n).toLocaleString("en-US"));
 const pct = (num, den) => (den ? `${((num / den) * 100).toFixed(1)}%` : "n/a");
+/** Escape a markdown table cell so a pipe or newline in a value can't break the row. */
+const mdCell = (s) => String(s).replace(/\|/g, "\\|").replace(/\r?\n/g, " ");
+
+/** Render an aggregate result as a markdown table, or a skipped-section note. */
+function renderRows(res, valueHeader) {
+  if (res.ok && res.rows && res.rows.length) {
+    const lines = [`| ${valueHeader} | Events | Visitors |`, "| --- | ---: | ---: |"];
+    for (const r of res.rows) lines.push(`| ${mdCell(r.key)} | ${fmt(r.count)} | ${fmt(r.visitors)} |`);
+    if (res.truncated) lines.push(`\n_Showing the top ${fmt(ROW_LIMIT)} groups; more may exist._`);
+    return lines.join("\n");
+  }
+  if (res.ok) return "_No data in this window._";
+  return `_Skipped: ${res.hint}._`;
+}
 
 /** Sum aggregate rows (used to bucket session length client-side). */
 function bucketSeconds(res) {
@@ -276,6 +290,34 @@ ${sections}
 <footer>Vercel Web Analytics &middot; Events = total custom events, Visitors = unique visitors &middot; generated ${escapeHtml(m.generated)}</footer>
 </div>
 </div></body></html>`;
+}
+
+/** The report as GitHub-flavored markdown, from the same model as the HTML.
+ *  Used for the Actions job summary, which renders inline on the run page (no
+ *  download) but is sanitized, so it is the plain view without the retro CSS. */
+function renderMarkdown(m) {
+  const lines = [
+    `# Verticopolis analytics report`,
+    ``,
+    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only. Generated ${m.generated}.`,
+    ``,
+    `## Totals`,
+    ``,
+    `| Metric | Value |`,
+    `| --- | ---: |`,
+    ...m.kpis.map(([k, v]) => `| ${k} | ${fmt(v)} |`),
+    ``,
+    ...m.highlights.map(([k, v]) => `- ${k}: **${v}**`),
+    ``,
+  ];
+  for (const s of m.sections) {
+    lines.push(`## ${s.title}`, ``);
+    for (const t of s.tables) {
+      if (t.caption) lines.push(`${t.caption}:`, ``);
+      lines.push(renderRows(t.res, t.header), ``);
+    }
+  }
+  return lines.join("\n");
 }
 
 /** Built-in sample results for --demo, shaped exactly like the real query
@@ -409,6 +451,16 @@ async function main() {
   const stamp = day(until);
   const htmlPath = join(OUT_DIR, `analytics-report-${stamp}.html`);
   writeFileSync(htmlPath, renderHtml(model));
+  // In GitHub Actions, also render the report as markdown into the job summary,
+  // so it shows inline on the run page with no download. GitHub sanitizes this
+  // (no custom CSS), so it is the plain view; the artifact keeps the styled HTML.
+  if (process.env.GITHUB_STEP_SUMMARY) {
+    try {
+      appendFileSync(process.env.GITHUB_STEP_SUMMARY, renderMarkdown(model) + "\n");
+    } catch {
+      /* best-effort; a summary write must never fail the run */
+    }
+  }
   // The raw API responses (the JSON) go to the run log rather than a file, so the
   // artifact is just the HTML. Grep the "Generate report" step for this block.
   console.log(JSON.stringify({ window: model.window, raw }, null, 2));

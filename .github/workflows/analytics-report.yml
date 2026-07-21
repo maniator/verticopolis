@@ -1,10 +1,10 @@
 name: Analytics Report
 
 # Twice-weekly rollup of the Vercel Web Analytics custom events (see
-# src/analytics.ts). Runs scripts/analytics-report.mjs and uploads the generated
-# HTML report as a downloadable workflow artifact; the raw JSON responses are
-# printed to the run log rather than saved as a file. Read-only: it queries the
-# Web Analytics API and writes nothing back to the repo.
+# src/analytics.ts). Runs scripts/analytics-report.mjs, which renders the report
+# inline into the run's job summary (viewable with no download) and uploads the
+# styled HTML as a downloadable artifact; the raw JSON responses print to the run
+# log. Read-only: it queries the Web Analytics API and writes nothing to the repo.
 #
 # Requires one repository secret: VERCEL_TOKEN (Vercel > Account Settings >
 # Tokens, scoped to the team). The project and team IDs are not secrets.

@@ -13,6 +13,11 @@ raw JSON API responses are printed to the run log rather than saved as a file.
 You can also run it on demand from the Actions tab with **Run workflow** and an
 optional look-back in days.
 
+It also writes a plain-markdown version to the run's **job summary**, so you can
+read the report inline on the workflow run page with no download. GitHub
+sanitizes the summary (no custom CSS), so that view is plain; the HTML artifact
+carries the retro styling.
+
 Note: GitHub always packages an artifact as a `.zip` on download, even for one
 file, so the download is `analytics-report.zip` containing the single `.html`.
 
