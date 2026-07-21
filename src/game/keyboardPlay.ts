@@ -6,6 +6,7 @@ import type { Tool, UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { announceForPlacement, snapX, stepCursor, type PlaceOutcome } from "../ui/placement";
 import type { BuildActions } from "./buildActions";
+import { gameplaySession } from "../analytics";
 
 /**
  * Keyboard play (F50–52): the virtual build cursor moved with arrows/WASD,
@@ -150,6 +151,10 @@ export class KeyboardPlay {
         this.kbAnchor = null;
         this.deps.engine().transportPreview = null;
         if (res.ok) {
+          // This drag-sized shaft builds via getSim() directly, not through
+          // BuildActions, so count it for build-depth telemetry the same way
+          // tryBuildTransport does (top is the shaft's reach for the peak).
+          gameplaySession.noteBuild(kind, top);
           this.deps.audio.sfx("build");
           this.deps.announce(`${FACILITIES[kind].name} built, floors ${bottom} to ${top}`);
         } else {

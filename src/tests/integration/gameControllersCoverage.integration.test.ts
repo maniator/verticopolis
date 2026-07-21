@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { BatchTarget, BatchRentOptions, BatchRentResult } from "../../engine/Simulation";
-import { FACILITIES, GRID, maxCarsFor } from "../../engine/facilities";
+import { FACILITIES, GRID, maxCarsFor, facilityFloors } from "../../engine/facilities";
 import { ECON, rentOf, resaleRefund } from "../../engine/econConfig";
 import type { PriceOptions } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
@@ -21,6 +21,7 @@ import { EditorActions } from "../../game/editorActions";
 import { SaveLoad } from "../../game/saveLoad";
 import { InspectorController } from "../../game/inspector";
 import { KeyboardPlay } from "../../game/keyboardPlay";
+import { gameplaySession } from "../../analytics";
 
 /** Coverage companion to gameControllers.integration.test.ts: the same harness idioms
  *  (recording fakes, fixture placements asserted with .ok, real Simulation)
@@ -1281,6 +1282,28 @@ describe("InspectorController (stale-pick hygiene)", () => {
   });
 });
 
+describe("build-depth telemetry: multi-story peak floor", () => {
+  it("reports the top occupied story of a multi-story room, not its base floor", () => {
+    // Stub the implementation so the assertion pins the call-site arguments
+    // without mutating the shared gameplaySession singleton across tests.
+    const noteBuild = vi.spyOn(gameplaySession, "noteBuild").mockImplementation(() => {});
+    // Stub the sim so the build always succeeds: this pins WHAT FLOOR the call
+    // site reports for the session peak, not the engine's placement rules.
+    const build = new BuildActions({
+      getSim: () => ({ build: () => ({ ok: true }) }) as unknown as Simulation,
+      ui: { toast: () => {} },
+      audio: { sfx: () => {} },
+      selectedId: () => null,
+      clearSelection: () => {},
+    });
+    expect(facilityFloors("metro")).toBeGreaterThan(1); // a genuinely multi-story kind
+    build.tryBuild("metro", -8, 0); // placed at its deep-basement base
+    // Peak is the top story reached (base + height - 1), not the base floor.
+    expect(noteBuild).toHaveBeenCalledWith("metro", -8 + facilityFloors("metro") - 1);
+    noteBuild.mockRestore();
+  });
+});
+
 describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => {
   const mid = Math.floor(GRID.width / 2);
   let sim: Simulation;
@@ -1380,6 +1403,10 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
   });
 
   it("elevator two-press flow: first Enter anchors and announces, second builds the span", () => {
+    // The drag-sized keyboard shaft builds via getSim() directly, so it must
+    // still count toward build-depth telemetry like the mouse path does. Stub
+    // the impl so the spy doesn't mutate the shared gameplaySession singleton.
+    const noteBuild = vi.spyOn(gameplaySession, "noteBuild").mockImplementation(() => {});
     tool = { type: "build", kind: "elevatorStandard" };
     keyboard.moveCursor(0, 0); // (mid, 1)
     keyboard.commitCursor(); // anchor
@@ -1403,6 +1430,9 @@ describe("KeyboardPlay (cursor bounds, transport anchor flow, previews)", () => 
     expect(last(f.sfx)).toBe("build");
     expect(last(announced)).toBe(`${FACILITIES.elevatorStandard.name} built, floors 1 to 2`);
     expect(engine.transportPreview).toBeNull();
+    // The built shaft was counted for depth, with its top floor as the reach.
+    expect(noteBuild).toHaveBeenCalledWith("elevatorStandard", 2);
+    noteBuild.mockRestore();
     // Both presses bracket undo like any other gesture.
     expect(undoLog).toEqual([
       "capture:Build Standard Elevator",
