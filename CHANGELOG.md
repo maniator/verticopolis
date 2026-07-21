@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.74.0
+
+- The lot's left edge is now a grand arrival: a sidewalk leads to a fountain roundabout with live, splashing water, flanked by street lamps that come on at dusk with pools of warm light, and the road runs off past the city. The right-edge street lamp lights up at night now too.
+- The city skyline behind your tower grew to city scale: real high-rises in two depths instead of a distant low ridge.
+
 ## 1.73.0
 
 - The world outside your tower came to life: a city skyline behind the building, grass and trees on the open lot that make way as you pave it, a neighboring building across the alley at one end of the lot, and a street with a lamp and a 375 ST sign at the other.

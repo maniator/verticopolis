@@ -2,10 +2,12 @@ import * as ex from "excalibur";
 import { GRID } from "../../engine/facilities";
 import { FLOOR, TILE } from "../scale";
 import {
-  ALLEY_TILES,
   FORECOURT_TILES,
-  NEIGHBOR_FLOORS,
-  NEIGHBOR_TILES,
+  FOUNTAIN_TILE,
+  PLAZA_LAMP_TILES,
+  PLAZA_SIDEWALK_TILES,
+  ROUNDABOUT_START,
+  ROUNDABOUT_TILES,
   ROAD_START,
   ROAD_TILES,
   SIDEWALK_START,
@@ -16,14 +18,16 @@ import {
   skylineRects,
   type PlantSpot,
 } from "../sceneryLayout";
+import { drawBush, drawFountain, drawPlanter, drawPlazaLamp, drawRoundabout, drawStreetLamp, drawTree, lampAlpha } from "./towerSceneryDraw";
 import type { Simulation } from "../../engine/Simulation";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
  * The world outside the tower (owner-approved scenery pass, 2026-07-21): a
- * continuous two-depth skyline behind everything, a neighbor building across a
- * narrow alley at the left lot line, a paved forecourt, sidewalk, street lamp,
- * "375 ST" sign and road at the right one, and a living ground line on the lot
+ * continuous two-depth skyline of city-scale towers behind everything, a
+ * fountain-roundabout arrival plaza with lamps at the left lot line, a paved
+ * forecourt, sidewalk, street lamp, "375 ST" sign and road at the right one,
+ * and a living ground line on the lot
  * itself: grass that yields to a cement apron as the tower's ground floor
  * grows, with trees and bushes that stand until construction paves them over.
  *
@@ -90,31 +94,92 @@ function makeScenery(engine: TowerEngine): SceneryRec {
 
   // ---- static pieces (identical for every tower) --------------------------
 
-  // Alley paving between the neighbor's wall and the lot line. Its top edge
-  // matches the gray ground line's (y -3), so no sliver of line peeks above.
-  addRect(engine, -ALLEY_TILES * TILE, -3, ALLEY_TILES * TILE, 11, Z_EDGE, "#5c5c56");
-
-  // Neighbor building, wall flush against the alley. Height rounds to whole
-  // pixels so the canvas raster and the actor's footprint agree exactly.
+  // Left edge: sidewalk off the lot line, then a fountain roundabout where
+  // arriving traffic turns around, then the road off the scene's left side.
   {
-    const w = NEIGHBOR_TILES * TILE;
-    const h = Math.round(NEIGHBOR_FLOORS * FLOOR);
-    const parapet = 5;
+    const w = PLAZA_SIDEWALK_TILES * TILE;
     const cv = new ex.Canvas({
       width: w,
-      height: h + parapet,
+      height: 11,
       cache: true,
-      draw: (ctx) => drawNeighbor(ctx, w, h, parapet),
+      draw: (ctx) => {
+        ctx.fillStyle = "#b4b4aa";
+        ctx.fillRect(0, 0, w, 11);
+        ctx.fillStyle = "#8e8e86";
+        for (let x = 0; x < w; x += TILE) ctx.fillRect(x, 0, 1, 7);
+      },
     });
-    const a = new ex.Actor({
-      pos: ex.vec((-ALLEY_TILES - NEIGHBOR_TILES) * TILE, -h - parapet),
-      width: w,
-      height: h + parapet,
-      anchor: ex.vec(0, 0),
-      z: Z_EDGE,
-    });
+    const a = new ex.Actor({ pos: ex.vec(-PLAZA_SIDEWALK_TILES * TILE, -7), width: w, height: 11, anchor: ex.vec(0, 0), z: Z_EDGE });
     a.graphics.use(cv);
     engine.engine.add(a);
+  }
+  {
+    // Roundabout: an elliptical drive around a grassy center island.
+    const w = ROUNDABOUT_TILES * TILE;
+    const h = 48;
+    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawRoundabout(ctx, w) });
+    const a = new ex.Actor({ pos: ex.vec(ROUNDABOUT_START * TILE, -30), width: w, height: h, anchor: ex.vec(0, 0), z: Z_EDGE });
+    a.graphics.use(cv);
+    engine.engine.add(a);
+  }
+  {
+    // The fountain on the island, in front of the ring's back edge. LIVE:
+    // cache:false (the sky's pattern) so the water re-rasters each frame from
+    // the decorative clock; it freezes with pause and reduced motion, and the
+    // stepped clock keeps screenshots deterministic. The canvas is tiny, so
+    // the per-frame cost is noise.
+    const w = 100;
+    const h = 112;
+    const cv = new ex.Canvas({ width: w, height: h, cache: false, draw: (ctx) => drawFountain(ctx, w, h, engine.d.anim) });
+    const a = new ex.Actor({ pos: ex.vec(FOUNTAIN_TILE * TILE - w / 2, -102), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+    a.graphics.use(cv);
+    engine.engine.add(a);
+  }
+  {
+    // Plaza lamps flanking the drive. Live like the fountain (cache:false):
+    // dark fixtures by day, fading in through dusk to a warm glow with a pool
+    // of light on the pavement, keyed to the sim clock so pause and the
+    // stepped screenshot clock behave.
+    for (const tile of PLAZA_LAMP_TILES) {
+      const w = 84;
+      const h = Math.round(FLOOR * 1.6) + 14;
+      const cv = new ex.Canvas({
+        width: w,
+        height: h,
+        cache: false,
+        draw: (ctx) => drawPlazaLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
+      });
+      const a = new ex.Actor({ pos: ex.vec(tile * TILE - w / 2, -h + 4), width: w, height: h, anchor: ex.vec(0, 0), z: Z_PLANT });
+      a.graphics.use(cv);
+      engine.engine.add(a);
+    }
+  }
+  {
+    // Road running from the roundabout to the dirt's left edge, in
+    // texture-safe segments (the full run is far past the 2048 cap).
+    const from = -GRID.width;
+    const to = -36;
+    const total = (to - from) * TILE;
+    const segments = Math.ceil(total / STRIP_MAX_SEG);
+    const segW = Math.ceil(total / segments / TILE) * TILE;
+    for (let i = 0; i < segments; i++) {
+      const x0 = from * TILE + i * segW;
+      const w = Math.min(segW, to * TILE - x0) + 1; // 1px overlap hides seams
+      const cv = new ex.Canvas({
+        width: w,
+        height: 14,
+        cache: true,
+        draw: (ctx) => {
+          ctx.fillStyle = "#34343c";
+          ctx.fillRect(0, 0, w, 14);
+          ctx.fillStyle = "#c8b040";
+          for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
+        },
+      });
+      const a = new ex.Actor({ pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
+      a.graphics.use(cv);
+      engine.engine.add(a);
+    }
   }
 
   // Forecourt (cement, same finish as the tower apron so it reads as yours).
@@ -174,11 +239,17 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     engine.engine.add(a);
   }
 
-  // Street lamp with the 375 ST sign, on the sidewalk.
+  // Street lamp with the 375 ST sign, on the sidewalk. Same live day/night
+  // head as the plaza lamps; the sign reads at any hour.
   {
     const w = 8 * TILE;
     const h = Math.round(FLOOR * 1.8);
-    const cv = new ex.Canvas({ width: w, height: h, cache: true, draw: (ctx) => drawStreetLamp(ctx, w, h) });
+    const cv = new ex.Canvas({
+      width: w,
+      height: h,
+      cache: false,
+      draw: (ctx) => drawStreetLamp(ctx, w, h, lampAlpha(engine.sim.clock.minuteOfDay / 60)),
+    });
     const a = new ex.Actor({
       pos: ex.vec(Math.round((SIDEWALK_START + 1) * TILE - w / 2), -h - 7),
       width: w,
@@ -315,11 +386,6 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
 
 // ---- draw helpers (plain 2D canvas, pixel-crisp fills) ----------------------
 
-function addRect(engine: TowerEngine, x: number, yTop: number, w: number, h: number, z: number, hex: string): void {
-  const a = new ex.Actor({ pos: ex.vec(x + w / 2, yTop + h / 2), width: w, height: h, anchor: ex.vec(0.5, 0.5), z, color: ex.Color.fromHex(hex) });
-  engine.engine.add(a);
-}
-
 function drawStrip(ctx: CanvasRenderingContext2D, rec: SceneryRec, x0: number, w: number): void {
   // The canvas is w+1 wide (segment overlap); clear it all so a repaint from
   // grass to cement leaves no stale blade pixels above the pave line.
@@ -346,85 +412,3 @@ function drawStrip(ctx: CanvasRenderingContext2D, rec: SceneryRec, x0: number, w
     }
   }
 }
-
-function drawNeighbor(ctx: CanvasRenderingContext2D, w: number, h: number, parapet: number): void {
-  ctx.fillStyle = "#7d7268";
-  ctx.fillRect(0, parapet, w, h);
-  ctx.fillStyle = "#8d8278";
-  ctx.fillRect(0, 0, w, parapet);
-  // Corner shading on the alley-facing wall.
-  ctx.fillStyle = "#665c52";
-  ctx.fillRect(w - 3, parapet, 3, h);
-  // Window grid; a deterministic scatter of lit panes reads at any hour.
-  const cols = Math.floor(w / (TILE * 2));
-  const rows = Math.floor(h / (FLOOR * 0.98));
-  for (let f = 0; f < rows; f++) {
-    for (let c = 0; c < cols; c++) {
-      const wx = TILE * (1 + c * 2);
-      const wy = parapet + FLOOR * (0.4 + f * 0.98);
-      if (wx + TILE > w - 4) continue;
-      ctx.fillStyle = hash01(f * 31 + c * 7) < 0.25 ? "#c8b878" : "#4e463e";
-      ctx.fillRect(wx, wy, TILE, FLOOR * 0.4);
-    }
-  }
-}
-
-function drawStreetLamp(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  const poleX = Math.round(w * 0.4);
-  ctx.fillStyle = "#3a3a42";
-  ctx.fillRect(poleX, 0, 2, h);
-  ctx.fillRect(poleX, 0, Math.round(TILE * 1.8), 3);
-  ctx.fillStyle = "#ffd890";
-  ctx.fillRect(poleX + Math.round(TILE * 1.5), 3, 6, 4);
-  // The street-name sign: the lot is 375 tiles wide, and the road knows it.
-  const sw = Math.round(TILE * 3.4);
-  const sh = 10;
-  const sy = Math.round(h * 0.42);
-  const sx = Math.round(poleX + 1 - sw / 2); // whole-pixel plate, crisp fills
-  ctx.fillStyle = "#1e6e3c";
-  ctx.fillRect(sx, sy, sw, sh);
-  ctx.strokeStyle = "#e8e8e0";
-  ctx.lineWidth = 1;
-  ctx.strokeRect(sx + 0.5, sy + 0.5, sw - 1, sh - 1);
-  ctx.fillStyle = "#f0f0e8";
-  ctx.font = "bold 7px monospace";
-  ctx.textAlign = "center";
-  ctx.fillText("375 ST", poleX + 1, sy + 8);
-  ctx.textAlign = "left";
-}
-
-function drawPlanter(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  ctx.fillStyle = "#6a6a62";
-  ctx.fillRect(0, h - 6, w, 6);
-  ctx.fillStyle = "#4a7c36";
-  ctx.fillRect(1, h - 12, w - 2, 6);
-  ctx.fillStyle = "#568c3e";
-  ctx.fillRect(Math.round(w * 0.2), h - 16, Math.round(w * 0.6), 5);
-}
-
-function drawTree(ctx: CanvasRenderingContext2D, w: number, h: number, seed: number): void {
-  const trunkW = Math.max(2, Math.round(w * 0.12));
-  const trunkH = Math.round(h * 0.3);
-  ctx.fillStyle = "#6d4c2a";
-  ctx.fillRect(Math.round(w / 2 - trunkW / 2), h - trunkH, trunkW, trunkH);
-  const layers: [number, number, string][] = [
-    [1.0, 0.32, "#3e6b2e"],
-    [0.78, 0.52, "#4a7c36"],
-    [0.5, 0.72, "#568c3e"],
-  ];
-  layers.forEach(([lw, ly, col], li) => {
-    // Integer hash key (hash01 truncates): the layer index, not the fractional
-    // layer offset, carries the per-layer variation.
-    const jitter = Math.round((hash01(seed + li * 97) - 0.5) * 2);
-    ctx.fillStyle = col;
-    ctx.fillRect(Math.round(w * (1 - lw) / 2) + jitter, Math.round(h - trunkH - h * ly), Math.round(w * lw), Math.round(h * 0.26));
-  });
-}
-
-function drawBush(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-  ctx.fillStyle = "#4a7c36";
-  ctx.fillRect(0, Math.round(h * 0.4), w, Math.ceil(h * 0.6));
-  ctx.fillStyle = "#568c3e";
-  ctx.fillRect(Math.round(w * 0.16), 0, Math.round(w * 0.68), Math.round(h * 0.5));
-}
-

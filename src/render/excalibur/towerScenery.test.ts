@@ -20,10 +20,10 @@ import type { TowerEngine } from "./TowerEngine";
  *  never as magic numbers). */
 const SEED = 4400;
 
-/** Static actors makeScenery adds once: alley paving, neighbor building,
- *  forecourt, sidewalk, road, street lamp, planter, and 3 ground-strip
- *  segments. */
-const STATIC_ACTORS = 10;
+/** Static actors makeScenery adds once: the left plaza (sidewalk, roundabout,
+ *  fountain, 2 lamps, 3 road segments), the right street (forecourt, sidewalk,
+ *  road, street lamp, planter), and 3 ground-strip segments. */
+const STATIC_ACTORS = 16;
 
 // happy-dom canvases have no 2d context, which excalibur's Raster requires at
 // construction (bootstrap.test.ts stubs the same seam). A permissive Proxy
@@ -53,7 +53,7 @@ afterAll(() => {
 
 function fakeEngine(sim: Simulation): { eng: TowerEngine; added: ex.Actor[]; swap: (s: Simulation) => void } {
   const added: ex.Actor[] = [];
-  const eng = { engine: { add: (a: ex.Actor) => void added.push(a) }, sim } as unknown as TowerEngine;
+  const eng = { engine: { add: (a: ex.Actor) => void added.push(a) }, sim, d: { anim: 0 } } as unknown as TowerEngine;
   return { eng, added, swap: (s) => ((eng as { sim: Simulation }).sim = s) };
 }
 
@@ -61,7 +61,7 @@ function fakeEngine(sim: Simulation): { eng: TowerEngine; added: ex.Actor[]; swa
 function spyCtx(): { ctx: CanvasRenderingContext2D; log: string[] } {
   const log: string[] = [];
   const ctx: Record<string, unknown> = {};
-  for (const m of ["clearRect", "fillRect", "strokeRect", "fillText"]) {
+  for (const m of ["clearRect", "fillRect", "strokeRect", "fillText", "beginPath", "ellipse", "fill", "stroke"]) {
     ctx[m] = (...a: unknown[]) => log.push(`${m}:${JSON.stringify(a)}`);
   }
   for (const p of ["fillStyle", "strokeStyle", "lineWidth", "font", "textAlign"]) {
@@ -77,11 +77,11 @@ function spyCtx(): { ctx: CanvasRenderingContext2D; log: string[] } {
   return { ctx: ctx as unknown as CanvasRenderingContext2D, log };
 }
 
-/** Plant actors in plantSpots order. They share a z with the lamp and the
- *  planter (all in front of the strip), so when the list still carries the
- *  statics (`leadingStatics` 2) those two are dropped; a rebuild-only slice
- *  has no statics to drop. */
-function plantActors(added: ex.Actor[], leadingStatics = 2): ex.Actor[] {
+/** Plant actors in plantSpots order. They share a z with the fountain, the
+ *  three lamps, and the planter (all in front of the strip), so when the list
+ *  still carries the statics (`leadingStatics` 5) those are dropped; a
+ *  rebuild-only slice has no statics to drop. */
+function plantActors(added: ex.Actor[], leadingStatics = 5): ex.Actor[] {
   const z = added[added.length - 1].z; // the last actor added is always a plant
   return added.filter((a) => a.z === z).slice(leadingStatics);
 }
@@ -90,7 +90,9 @@ const stripCanvases = (added: ex.Actor[]): ex.Canvas[] =>
   added
     .map((a) => a.graphics.current)
     .filter((g): g is ex.Canvas => g instanceof ex.Canvas)
-    .filter((g) => g.height === 11); // the thin ground strip; nothing else is 11px tall
+    // The thin ground strip: 11px tall and segment-wide (the sidewalks are
+    // 11px tall too, but far narrower).
+    .filter((g) => g.height === 11 && g.width > 1000);
 
 describe("towerScenery", () => {
   it("builds the whole world lazily on the first sync, plants tracking the starter apron", () => {
@@ -111,15 +113,14 @@ describe("towerScenery", () => {
     expect(plants.some((p) => p.graphics.opacity === 1)).toBe(true);
   });
 
-  it("every canvas draw closure paints (strip, neighbor, street, plants)", () => {
+  it("every canvas draw closure paints (strip, plaza, street, plants)", () => {
     const sim = Simulation.newGame(SEED);
     const { eng, added } = fakeEngine(sim);
     syncScenery(eng);
     const canvases = added.map((a) => a.graphics.current).filter((g): g is ex.Canvas => g instanceof ex.Canvas);
-    // Strips, neighbor, forecourt, sidewalk, road, lamp, planter, and a canvas
-    // per plant; both plant kinds exist for this seed, so drawTree and drawBush
-    // both run.
-    expect(canvases.length).toBe(7 + 2 + plantSpots(SEED).length);
+    // Every static is a canvas actor now, plus a canvas per plant; both plant
+    // kinds exist for this seed, so drawTree and drawBush both run.
+    expect(canvases.length).toBe(STATIC_ACTORS + plantSpots(SEED).length);
     expect(plantSpots(SEED).map((s) => s.kind)).toContain("tree");
     expect(plantSpots(SEED).map((s) => s.kind)).toContain("bush");
     for (const cv of canvases) {

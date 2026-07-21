@@ -2,10 +2,14 @@ import { describe, it, expect } from "vitest";
 import { GRID } from "../engine/facilities";
 import type { Unit } from "../engine/types";
 import {
-  ALLEY_TILES,
   APRON_PAD_TILES,
   FORECOURT_TILES,
+  FOUNTAIN_TILE,
+  PLAZA_LAMP_TILES,
+  PLAZA_SIDEWALK_TILES,
   ROAD_START,
+  ROUNDABOUT_START,
+  ROUNDABOUT_TILES,
   SIDEWALK_START,
   apronRange,
   hash01,
@@ -87,6 +91,18 @@ describe("sceneryLayout", () => {
   it("street geometry starts beyond the lot: forecourt, then sidewalk, then road", () => {
     expect(SIDEWALK_START).toBe(GRID.width + FORECOURT_TILES);
     expect(ROAD_START).toBeGreaterThan(SIDEWALK_START);
-    expect(ALLEY_TILES).toBeGreaterThan(0);
+  });
+
+  it("plaza geometry sits fully left of the lot: sidewalk, then the roundabout", () => {
+    expect(PLAZA_SIDEWALK_TILES).toBeGreaterThan(0);
+    // The roundabout's drive ends flush against the sidewalk's left edge.
+    expect(ROUNDABOUT_START + ROUNDABOUT_TILES).toBe(-PLAZA_SIDEWALK_TILES);
+    // The fountain stands inside the roundabout, lamps flank the drive.
+    expect(FOUNTAIN_TILE).toBeGreaterThan(ROUNDABOUT_START);
+    expect(FOUNTAIN_TILE).toBeLessThan(ROUNDABOUT_START + ROUNDABOUT_TILES);
+    for (const lamp of PLAZA_LAMP_TILES) {
+      expect(lamp).toBeGreaterThanOrEqual(ROUNDABOUT_START + 1);
+      expect(lamp).toBeLessThan(0);
+    }
   });
 });
