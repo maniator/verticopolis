@@ -184,7 +184,7 @@ render(
       </div>
       <div class="gallery-scroll"><canvas id="gallery"></canvas></div>
     `,
-    links: [{ href: "/help", label: "Classic vs Modern" }],
+    links: [{ href: "/help", label: "Help" }],
   }),
   document.getElementById("app")!,
 );

@@ -163,13 +163,16 @@ export default defineConfig({
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff,woff2,mp3}"],
         // og-image.png is the social/crawler share card, not part of the game
         // shell, so keep it out of the offline precache. `help.html` and its own
-        // page entry chunk (`help-*.js`) are excluded too (see the note below).
-        // The two help patterns are deliberately narrow: `**/help.html` and
-        // `**/help-*.js` match the page and its entry chunk, while the shared
-        // `helpContent-*.js` chunk (which starts with `helpC`, not `help-`) is
-        // left precached, because the in-game Help modal imports it and needs it
-        // offline. A broad `**/help*` would wrongly sweep `helpContent-*.js` too.
-        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js"],
+        // page entry chunk (`help-*.js`) are excluded too (see the note below),
+        // and so is `assets/help-media/**`, the `/help` page's Classic vs Modern
+        // stills (online-only, like the rest of `/help`; see the build's
+        // `assetFileNames` note). The two help patterns are deliberately narrow:
+        // `**/help.html` and `**/help-*.js` match the page and its entry chunk,
+        // while the shared `helpContent-*.js` chunk (which starts with `helpC`,
+        // not `help-`) is left precached, because the in-game Help modal imports
+        // it and needs it offline. A broad `**/help*` would wrongly sweep
+        // `helpContent-*.js` too.
+        globIgnores: ["**/gallery*", "**/preview*", "**/og-image*", "**/help.html", "**/help-*.js", "**/help-media/**"],
         navigateFallback: "index.html",
         // Keep the non-game pages and the real static files out of the app-shell
         // fallback, letting them fall through to the network rather than the game
@@ -227,6 +230,18 @@ export default defineConfig({
         preview: resolve(__dirname, "src/preview.html"),
       },
       output: {
+        // The `/help` page's paired Classic vs Modern stills are imported from
+        // `docs/screenshots` (one source with the docs gallery). Route those
+        // assets into a dedicated `assets/help-media/` folder so the
+        // service-worker precache can exclude them with a single `**/help-media/**`
+        // glob: the `/help` page is online-only (see the workbox globIgnores note),
+        // so its images do not belong in the game-shell install. Every other asset
+        // keeps Vite's default `assets/[name]-[hash][extname]` path.
+        assetFileNames(info) {
+          const sources = info.originalFileNames ?? (info.originalFileName ? [info.originalFileName] : []);
+          const fromHelpMedia = sources.some((p) => p.replace(/\\/g, "/").includes("docs/screenshots/"));
+          return fromHelpMedia ? "assets/help-media/[name]-[hash][extname]" : "assets/[name]-[hash][extname]";
+        },
         // Split the Excalibur engine into its own vendor chunk, separate from our
         // TowerEngine app code. Sharing a hash with our own code meant every
         // TowerEngine edit re-downloaded all ~550 kB of the pinned engine.

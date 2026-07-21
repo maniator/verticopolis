@@ -38,12 +38,26 @@ already shot elsewhere; the first four can reuse or extend existing paired still
 An optional "livelier day" still at a fixed clock hour can show the daytime
 presence difference.
 
+**Implemented (2026-07-20):** `scripts/scenes/classic-vs-modern.ts` captures the
+**escalator-on-office** pair (`escalator-office-modern.png` /
+`escalator-office-classic.png`, `features/`), off two mode-forked builders that
+share seed 4600 and fail closed on the placement divergence. The first four cards
+**reuse existing committed pairs** (`00b-onboarding-classic/modern`,
+`editor-pricing-classic/modern`, `schedule-classic` / `schedule-express`,
+`stats-tenancy-classic/modern`). The **build-hint** pair falls back to
+caption-only (see below): the Modern hover tooltip and the Classic click toast are
+transient states, not a deterministic paired frame, so forcing a still would risk
+a mismatched or near-identical figure.
+
 ## Caption-only (no still)
 
 Divergences that are data or math, not a distinct on-screen frame, get a caption
 under the card and no figure: variant-household relocation odds, operating
 overhead / hold tax, churn tuning, cockroach recovery, express-transfer routing.
 Forcing a screenshot for these would show two near-identical frames and mislead.
+The **build-hint** pair joins this list (2026-07-20): its Modern hover tooltip and
+Classic click toast are transient, timing-dependent states, so a deterministic
+paired still is not capturable; it reads as a caption instead.
 
 ## No silent gaps
 

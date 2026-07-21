@@ -13,6 +13,8 @@
  *     stepping, chrome sweeps, palette/overlay/clock nudges, camera framing).
  *   - `screenshot-tower-builders.ts`: `buildCanonTower`, `buildBasement`,
  *     `buildModernPricingTower`, `pgGrowToStar`.
+ *   - `screenshot-compare-builders.ts`: the CAP-8 escalator-on-office pair
+ *     (`buildEscalatorOfficeModern` / `buildEscalatorOfficeClassic`).
  *   - `screenshot-scene-builders.ts`: the engine/crowd/fire/condo/stats/hotspot/
  *     overlay/tablet builders folded in from the old shot-*.mjs generators.
  *
@@ -22,4 +24,5 @@
 
 export * from "./screenshot-page-ops.ts";
 export * from "./screenshot-tower-builders.ts";
+export * from "./screenshot-compare-builders.ts";
 export * from "./screenshot-scene-builders.ts";

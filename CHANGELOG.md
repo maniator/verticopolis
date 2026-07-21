@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.70.0
+
+- The Help page's Classic vs Modern section now shows side-by-side screenshots of the two rule-sets, and the Sprite Gallery's link to that page now reads "Help".
+
 ## 1.69.1
 
 - Opening /help now always loads the current guide, instead of a saved older copy on a return visit.
