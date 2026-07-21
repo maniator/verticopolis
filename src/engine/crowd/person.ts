@@ -39,6 +39,11 @@ export interface Person {
   x: number;
   /** Per-leg transport route: floors[0]=origin … floors[n]=destination. */
   floors: number[];
+  /** Immutable origin floor stamped at spawn. `floors[0]` is rewritten for a
+   *  round-tripper's return leg (it becomes the venue floor), so the commute-
+   *  stress accumulator (#514) keys on THIS instead, keeping a round-trip's wait
+   *  attributed to the tenant's true origin rather than the venue they visited. */
+  originFloor: number;
   /** shaft id used for leg i (floors[i] → floors[i+1]); always a valid id. An
    *  unreachable destination yields no route at all (routing returns null), so
    *  this array never holds a sentinel. */
@@ -50,6 +55,13 @@ export interface Person {
   destX: number;
   /** Seconds spent waiting on the current call (drives stress). */
   wait: number;
+  /** Cumulative landing-wait seconds across this whole trip (every leg). Unlike
+   *  {@link wait}, which is per-call and zeroed on boarding, this sums each
+   *  served call's wait so a multi-transfer commute contributes the wait of
+   *  every leg, not just the last. Folded into the per-origin commute-stress
+   *  accumulator at {@link finish} (read-only measurement, #514); in-memory
+   *  only, like every Person field. */
+  tripWait: number;
   /** Total seconds in transit (origin → destination), for the give-up valve. */
   age: number;
   /** Idle timer once arrived, before despawning. */
@@ -245,6 +257,11 @@ export function visibleOccupants(u: { occupants: number; outForMeal?: number }):
 }
 
 export const STRESS_WAIT = 25; // seconds of waiting that counts as "fed up"
+/** Smoothing factor for the per-origin-floor commute-stress EMA (#514). Applied
+ *  once per finished trip (event cadence, not per frame), so it is deterministic.
+ *  A readout-smoothing knob only: it feeds no behavior, so tuning it changes
+ *  nothing a golden master asserts. */
+export const COMMUTE_STRESS_ALPHA = 0.15;
 /**
  * A commuter who hasn't reached their floor within this many real seconds gives
  * up and leaves: a safety valve so nobody is ever stranded forever (a car the

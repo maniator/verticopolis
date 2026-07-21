@@ -269,6 +269,10 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
         // The call is served: clear the wait so a once-slow pickup doesn't
         // keep counting toward frustration for the whole ride (and doesn't
         // leave the figure red-"!" while strolling off at the destination).
+        // Bank it into the whole-trip total first, so the per-origin
+        // commute-stress accumulator (#514) sees every leg's wait, not just
+        // the last one, when the trip finishes.
+        p.tripWait += p.wait;
         p.wait = 0;
         break;
       }
@@ -390,6 +394,9 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   p.wait = 0;
   p.age = 0;
   p.linger = 0;
+  // `tripWait` is deliberately NOT reset: it spans the whole round trip so the
+  // outbound leg's landing wait folds together with the return leg's into one
+  // commute-stress sample at finish (#514), keyed on the immutable originFloor.
   // An outside visitor who rode the train in returns to the platform story,
   // which has no floor tiles for pickX (it would strand them at the lot edge).
   // Place the return destX inside the station footprint, the same treatment
@@ -438,6 +445,19 @@ export function finish(crowd: Crowd, p: Person, tower: Tower): void {
     if (p.cleanUnitId !== undefined) {
       crowd.staffDone.push({ unitId: p.cleanUnitId, ok: p.state === "toDest" });
     }
+  } else {
+    // Read-only commute-stress measurement (#514): fold this non-staff trip's
+    // whole-journey landing wait into the per-origin-floor accumulator (every
+    // non-staff person, including outside/metro visitors under their origin
+    // floor; #502 filters to tenant floors when it surfaces this). The trailing
+    // `p.wait` catches a give-up while still queued (unbanked by the boarding
+    // fold). Keyed on the immutable `originFloor`, NOT `floors[0]`: a
+    // round-tripper's `floors[0]` has been rewritten to the venue by
+    // transitionToReturn, so keying on it would misattribute the commute to the
+    // venue floor. Staff are excluded (they never count toward tenant stress,
+    // matching crowd.frustration). This changes no behavior: nothing reads the
+    // accumulator into satisfaction yet (that is #502).
+    crowd.recordCommute(p.originFloor, p.tripWait + p.wait);
   }
   // Meal round-tripper: decrement the origin's outForMeal on ANY despawn
   // path (successful return arrival, mid-transit give-up, mid-dwell
