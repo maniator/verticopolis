@@ -3,6 +3,7 @@ import type { Tower } from "./Tower";
 import type { WeatherKind } from "./types";
 import { RNG } from "./rng";
 import type { Person, Route, ElevatorCalls, ElevatorQueueView } from "./crowd/person";
+import { COMMUTE_STRESS_ALPHA } from "./crowd/person";
 import * as routing from "./crowd/routing";
 import * as motion from "./crowd/motion";
 import * as crowdSpawn from "./crowd/spawn";
@@ -35,6 +36,12 @@ export class Crowd {
   carRiders = new Map<string, number>();
   /** @internal Rolling fraction of recent travellers who waited too long (0..1). */
   frustration = 0;
+  /** @internal Per-origin-floor commute-stress EMA, in seconds of whole-trip
+   *  landing wait (#514). Updated once per finished non-staff trip (event
+   *  cadence, so deterministic, unlike the per-frame {@link frustration}).
+   *  Read-only measurement: nothing feeds it into satisfaction yet (that is the
+   *  owner-gated #502 track). In-memory only, never persisted. */
+  commuteWaitByFloor = new Map<number, number>();
   /** @internal Cached passenger stop-graph, rebuilt when the tower changes. */
   adj: Map<number, { f: number; shaft: number; walkKind?: "stairs" | "escalator" }[]> | null = null;
   /** @internal */ adjRev = -1;
@@ -79,6 +86,7 @@ export class Crowd {
     this.people = [];
     this.carRiders.clear();
     this.frustration = 0;
+    this.commuteWaitByFloor.clear();
     // Drop the partial spawn accumulator and id counter too, so a fresh sim
     // doesn't immediately spawn a backlog or grow ids without bound.
     this.spawnAcc = 0;
@@ -101,6 +109,30 @@ export class Crowd {
   /** 0..1: how stressed the current crowd is by elevator waits. */
   get stress(): number {
     return this.frustration;
+  }
+
+  /** @internal Fold one finished non-staff trip's whole-journey landing wait into
+   *  the origin floor's commute-stress EMA. Called once per non-staff despawn
+   *  from {@link motion.finish} (event cadence, no rng, no wall clock), so the
+   *  accumulator is deterministic for a given seed. Counts every non-staff trip,
+   *  including outside/metro visitors (folded under their platform/lobby origin);
+   *  #502 filters to tenant floors when it surfaces this. Read-only measurement:
+   *  see {@link commuteWaitByFloor}. */
+  recordCommute(originFloor: number, waitSeconds: number): void {
+    const prev = this.commuteWaitByFloor.get(originFloor) ?? waitSeconds;
+    this.commuteWaitByFloor.set(originFloor, prev + (waitSeconds - prev) * COMMUTE_STRESS_ALPHA);
+  }
+
+  /** Rolling mean whole-trip landing wait, in seconds, for non-staff trips that
+   *  originate on `floor`; 0 when no such trip has finished. Read-only; the
+   *  substrate #502 reads to surface a per-origin commute-comfort readout. */
+  commuteStressAt(floor: number): number {
+    return this.commuteWaitByFloor.get(floor) ?? 0;
+  }
+
+  /** Read-only view of the per-origin-floor commute-stress EMA (seconds). */
+  get commuteStressByFloor(): ReadonlyMap<number, number> {
+    return this.commuteWaitByFloor;
   }
 
   /**

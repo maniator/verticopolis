@@ -88,8 +88,8 @@ describe("Crowd: routing and movement", () => {
     const r = crowd.route(tower, 1, 7)!;
     crowd.people.push({
       id: 1, seed: 7, state: "toShaft", floor: 1, fy: 1, x: 5,
-      floors: r.floors, shafts: r.shafts, leg: 0, shaftId: r.shafts[0],
-      carIndex: null, destX: 30, wait: 0, age: 0, linger: 0,
+      floors: r.floors, originFloor: 1, shafts: r.shafts, leg: 0, shaftId: r.shafts[0],
+      carIndex: null, destX: 30, wait: 0, tripWait: 0, age: 0, linger: 0,
     });
     let delivered = false;
     for (let i = 0; i < 400 && !delivered; i++) {
