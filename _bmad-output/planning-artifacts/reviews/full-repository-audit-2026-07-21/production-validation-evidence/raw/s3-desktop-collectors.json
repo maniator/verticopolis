@@ -1,0 +1,70 @@
+{
+  "summary": {
+    "consoleErrors": 0,
+    "consoleWarnings": 9,
+    "pageErrors": 0,
+    "failedRequests": 0,
+    "badResponses": 0
+  },
+  "detail": {
+    "console": [
+      {
+        "t": 1784669091000,
+        "type": "warning",
+        "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091538,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091540,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091540,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091565,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091585,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091587,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669091589,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669095042,
+        "type": "warning",
+        "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+        "url": "https://verticopolis.com/"
+      }
+    ],
+    "pageErrors": [],
+    "failedRequests": [],
+    "badResponses": []
+  }
+}

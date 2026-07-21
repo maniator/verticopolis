@@ -1,0 +1,153 @@
+{
+  "when": "2026-07-21T21:18:20.613Z",
+  "versionInfo": {
+    "status": 200,
+    "headers": {
+      "cache-control": "no-store",
+      "content-length": "223",
+      "content-type": "application/json; charset=utf-8",
+      "last-modified": "Tue, 21 Jul 2026 19:45:17 GMT"
+    },
+    "body": {
+      "version": "1.71.0",
+      "sha": "aaea605",
+      "notes": [
+        "The Help page at /help now shows the full guide, pictures included, even before scripts run or with JavaScript off, so shared links and search results carry the real content."
+      ]
+    }
+  },
+  "loadMs": 637,
+  "appFacts": {
+    "splashVersion": "v1.71.0",
+    "jsonLd": true,
+    "h1": "Verticopolis: a free SimTower clone you play in the browser",
+    "title": "Verticopolis: Play a SimTower Clone Free in Your Browser",
+    "toastAriaLive": "assertive",
+    "toastRole": "status",
+    "dpr": 1,
+    "ua": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+  },
+  "sw": {
+    "supported": true,
+    "registered": true,
+    "scope": "https://verticopolis.com/",
+    "active": {
+      "scriptURL": "https://verticopolis.com/sw.js",
+      "state": "activating"
+    },
+    "installing": null,
+    "waiting": null,
+    "controller": null,
+    "updateViaCache": "imports"
+  },
+  "cacheNames": {
+    "workbox-precache-v2-https://verticopolis.com/": 21
+  },
+  "cachesDetail": {
+    "workbox-precache-v2-https://verticopolis.com/": [
+      "https://verticopolis.com/pwa-maskable-512x512.png?__WB_REVISION__=fdaa69541e8a7108b417418c645c457e",
+      "https://verticopolis.com/pwa-512x512.png?__WB_REVISION__=1dc397935e0d74b14aee094b150b5014",
+      "https://verticopolis.com/pwa-192x192.png?__WB_REVISION__=3b175846b064df19b230bb5459697983",
+      "https://verticopolis.com/index.html?__WB_REVISION__=85114c166eafc4169d06affaada66af8",
+      "https://verticopolis.com/favicon.png?__WB_REVISION__=f31a70686d1913228bed411f372544a7",
+      "https://verticopolis.com/apple-touch-icon.png?__WB_REVISION__=921d38fce87505732052eeb0dd10d454",
+      "https://verticopolis.com/audio/voice-talk.mp3?__WB_REVISION__=41d06302bdfd734552cbbad062f1a378",
+      "https://verticopolis.com/audio/voice-laughs.mp3?__WB_REVISION__=ab5ea67700dfd5dcf7286f7fb2a6e21e",
+      "https://verticopolis.com/assets/workbox-window.prod.es5-BBnX5xw4.js",
+      "https://verticopolis.com/assets/vendor-excalibur-DkRNwGU5.js",
+      "https://verticopolis.com/assets/telemetry-d0lDSeCX.js",
+      "https://verticopolis.com/assets/sprites-BnXVMf6p.js",
+      "https://verticopolis.com/assets/pixelSprites-C1IEEgTa.js",
+      "https://verticopolis.com/assets/pageShell-C1I0nd74.css",
+      "https://verticopolis.com/assets/pageShell-BOX8KBpy.js",
+      "https://verticopolis.com/assets/modulepreload-polyfill-B5Qt9EMX.js",
+      "https://verticopolis.com/assets/main-DdX5cBz0.css",
+      "https://verticopolis.com/assets/main-CBWLaTre.js",
+      "https://verticopolis.com/assets/helpContent-QPJO7yur.js",
+      "https://verticopolis.com/assets/ToneAudioEngine-BSIhyHVe.js",
+      "https://verticopolis.com/manifest.webmanifest?__WB_REVISION__=1b48e62f04a24a572e401b32dee36322"
+    ]
+  },
+  "gpu": {
+    "webgl": true,
+    "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x00002504) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "vendor": "Google Inc. (NVIDIA)"
+  },
+  "refresh": {
+    "medianFrameMs": 13.300000000000182,
+    "impliedHz": 75
+  },
+  "headerChecks": {
+    "sw": {
+      "path": "/sw.js",
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "swAllowed": "/",
+      "xVercelCache": "HIT"
+    },
+    "manifest": {
+      "path": "/manifest.webmanifest",
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "swAllowed": null,
+      "xVercelCache": "HIT"
+    },
+    "asset": {
+      "path": "/assets/main-CBWLaTre.js",
+      "status": 200,
+      "cacheControl": "public, max-age=31536000, immutable",
+      "swAllowed": null,
+      "xVercelCache": "HIT"
+    },
+    "help": {
+      "path": "/help",
+      "status": 200,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "swAllowed": null,
+      "xVercelCache": "HIT"
+    },
+    "assetlinks": {
+      "path": "/.well-known/assetlinks.json",
+      "status": 404,
+      "cacheControl": "public, max-age=0, must-revalidate",
+      "swAllowed": null,
+      "xVercelCache": null
+    },
+    "indexCacheControl": "public, max-age=0, must-revalidate"
+  },
+  "collectors": {
+    "summary": {
+      "consoleErrors": 1,
+      "consoleWarnings": 1,
+      "pageErrors": 0,
+      "failedRequests": 0,
+      "badResponses": 1
+    },
+    "detail": {
+      "console": [
+        {
+          "t": 1784668698423,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668700613,
+          "type": "error",
+          "text": "Failed to load resource: the server responded with a status of 404 ()",
+          "url": "https://verticopolis.com/"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [],
+      "badResponses": [
+        {
+          "t": 1784668700613,
+          "url": "https://verticopolis.com/.well-known/assetlinks.json",
+          "status": 404,
+          "pageUrl": "https://verticopolis.com/"
+        }
+      ]
+    }
+  }
+}

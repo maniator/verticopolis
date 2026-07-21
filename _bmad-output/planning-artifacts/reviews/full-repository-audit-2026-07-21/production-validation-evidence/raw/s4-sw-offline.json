@@ -1,0 +1,244 @@
+{
+  "when": "2026-07-21T21:26:12.022Z",
+  "repeatLoad": {
+    "ms": 503,
+    "controller": "https://verticopolis.com/sw.js",
+    "swState": "activated",
+    "responses": [
+      {
+        "url": "/",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/main-DdX5cBz0.css",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/modulepreload-polyfill-B5Qt9EMX.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/sprites-BnXVMf6p.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/helpContent-QPJO7yur.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/telemetry-d0lDSeCX.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/pixelSprites-C1IEEgTa.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/manifest.webmanifest",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/main-CBWLaTre.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/assets/vendor-excalibur-DkRNwGU5.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/_vercel/insights/script.js",
+        "fromSW": false,
+        "status": 200
+      },
+      {
+        "url": "/_vercel/speed-insights/script.js",
+        "fromSW": false,
+        "status": 200
+      },
+      {
+        "url": "/assets/workbox-window.prod.es5-BBnX5xw4.js",
+        "fromSW": true,
+        "status": 200
+      },
+      {
+        "url": "/pwa-192x192.png",
+        "fromSW": true,
+        "status": 200
+      }
+    ],
+    "swServed": 12,
+    "network": 2
+  },
+  "caches": {
+    "workbox-precache-v2-https://verticopolis.com/": [
+      "/pwa-maskable-512x512.png?__WB_REVISION__=fdaa69541e8a7108b417418c645c457e",
+      "/pwa-512x512.png?__WB_REVISION__=1dc397935e0d74b14aee094b150b5014",
+      "/pwa-192x192.png?__WB_REVISION__=3b175846b064df19b230bb5459697983",
+      "/index.html?__WB_REVISION__=85114c166eafc4169d06affaada66af8",
+      "/favicon.png?__WB_REVISION__=f31a70686d1913228bed411f372544a7",
+      "/apple-touch-icon.png?__WB_REVISION__=921d38fce87505732052eeb0dd10d454",
+      "/audio/voice-talk.mp3?__WB_REVISION__=41d06302bdfd734552cbbad062f1a378",
+      "/audio/voice-laughs.mp3?__WB_REVISION__=ab5ea67700dfd5dcf7286f7fb2a6e21e",
+      "/assets/workbox-window.prod.es5-BBnX5xw4.js",
+      "/assets/vendor-excalibur-DkRNwGU5.js",
+      "/assets/telemetry-d0lDSeCX.js",
+      "/assets/sprites-BnXVMf6p.js",
+      "/assets/pixelSprites-C1IEEgTa.js",
+      "/assets/pageShell-C1I0nd74.css",
+      "/assets/pageShell-BOX8KBpy.js",
+      "/assets/modulepreload-polyfill-B5Qt9EMX.js",
+      "/assets/main-DdX5cBz0.css",
+      "/assets/main-CBWLaTre.js",
+      "/assets/helpContent-QPJO7yur.js",
+      "/assets/ToneAudioEngine-BSIhyHVe.js",
+      "/manifest.webmanifest?__WB_REVISION__=1b48e62f04a24a572e401b32dee36322"
+    ]
+  },
+  "versionJsonBypass": {
+    "inCacheEntries": [],
+    "body": {
+      "version": "1.71.0",
+      "sha": "aaea605",
+      "notes": [
+        "The Help page at /help now shows the full guide, pictures included, even before scripts run or with JavaScript off, so shared links and search results carry the real content."
+      ]
+    },
+    "fetch": {
+      "url": "/version.json",
+      "fromSW": false,
+      "status": 200
+    }
+  },
+  "ordinaryReload": {
+    "swServed": 13,
+    "network": 2
+  },
+  "hardReload": {
+    "swServed": 0,
+    "network": 13,
+    "controllerAfter": null
+  },
+  "updateCheck": {
+    "active": "activated",
+    "installing": null,
+    "waiting": null
+  },
+  "offline": {
+    "bootError": null,
+    "facts": {
+      "splash": true,
+      "gameWired": true,
+      "version": "v1.71.0"
+    },
+    "versionFetch": {
+      "threw": "TypeError: Failed to fetch"
+    },
+    "swServed": 13,
+    "network": 2
+  },
+  "offlinePlay": {
+    "splashGone": true,
+    "units": 40,
+    "mode": "classic"
+  },
+  "recovery": {
+    "versionAfterRestore": {
+      "version": "1.71.0",
+      "sha": "aaea605",
+      "notes": [
+        "The Help page at /help now shows the full guide, pictures included, even before scripts run or with JavaScript off, so shared links and search results carry the real content."
+      ]
+    },
+    "swServed": 13,
+    "network": 3
+  },
+  "routing": {
+    "helpSlash": {
+      "path": "/help/",
+      "finalUrl": "/help",
+      "status": 200,
+      "redirected": true
+    },
+    "gallery": {
+      "path": "/gallery",
+      "finalUrl": "/gallery",
+      "status": 200,
+      "redirected": false
+    },
+    "gallerySlash": {
+      "path": "/gallery/",
+      "finalUrl": "/gallery",
+      "status": 200,
+      "redirected": true
+    }
+  },
+  "collectors": {
+    "summary": {
+      "consoleErrors": 1,
+      "consoleWarnings": 5,
+      "pageErrors": 0,
+      "failedRequests": 1,
+      "badResponses": 0
+    },
+    "detail": {
+      "console": [
+        {
+          "t": 1784669172510,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784669173058,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784669173283,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784669179194,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784669179205,
+          "type": "error",
+          "text": "Failed to load resource: net::ERR_INTERNET_DISCONNECTED",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784669180829,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        }
+      ],
+      "pageErrors": [],
+      "failedRequests": [
+        {
+          "t": 1784669179205,
+          "url": "https://verticopolis.com/version.json",
+          "failure": "net::ERR_INTERNET_DISCONNECTED",
+          "pageUrl": "https://verticopolis.com/"
+        }
+      ],
+      "badResponses": []
+    }
+  }
+}

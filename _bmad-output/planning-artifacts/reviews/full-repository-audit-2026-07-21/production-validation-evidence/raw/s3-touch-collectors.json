@@ -1,0 +1,64 @@
+{
+  "summary": {
+    "consoleErrors": 0,
+    "consoleWarnings": 8,
+    "pageErrors": 0,
+    "failedRequests": 0,
+    "badResponses": 0
+  },
+  "detail": {
+    "console": [
+      {
+        "t": 1784669096595,
+        "type": "warning",
+        "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097288,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097291,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097292,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097320,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097338,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097342,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      },
+      {
+        "t": 1784669097344,
+        "type": "warning",
+        "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+        "url": "https://verticopolis.com/"
+      }
+    ],
+    "pageErrors": [],
+    "failedRequests": [],
+    "badResponses": []
+  }
+}

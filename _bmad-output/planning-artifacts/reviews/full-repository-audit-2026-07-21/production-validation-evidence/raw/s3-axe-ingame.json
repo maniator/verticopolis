@@ -1,0 +1,48 @@
+[
+  {
+    "id": "color-contrast",
+    "impact": "serious",
+    "help": "Elements must meet minimum color contrast ratio thresholds",
+    "nodes": [
+      "#stat-money"
+    ],
+    "count": 1
+  },
+  {
+    "id": "heading-order",
+    "impact": "moderate",
+    "help": "Heading levels should only increase by one",
+    "nodes": [
+      ".panel.docked.win:nth-child(2) > h3"
+    ],
+    "count": 1
+  },
+  {
+    "id": "label",
+    "impact": "critical",
+    "help": "Form elements must have labels",
+    "nodes": [
+      "#tower-name"
+    ],
+    "count": 1
+  },
+  {
+    "id": "landmark-unique",
+    "impact": "moderate",
+    "help": "Landmarks should have a unique role or role/label/title (i.e. accessible name) combination",
+    "nodes": [
+      "#palette"
+    ],
+    "count": 1
+  },
+  {
+    "id": "region",
+    "impact": "moderate",
+    "help": "All page content should be contained by landmarks",
+    "nodes": [
+      "#app > .visually-hidden",
+      "#onboard"
+    ],
+    "count": 2
+  }
+]

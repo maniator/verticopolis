@@ -1,0 +1,598 @@
+{
+  "when": "2026-07-21T21:37:51.116Z",
+  "machine": "AMD Ryzen 5 5600X / RTX 3060 / 32GB / Win11 Pro / Chrome 150.0.7871.125 / 75Hz / DPR 1 / DevTools closed / headed",
+  "warmupMs": 10000,
+  "sampleMs": 30000,
+  "results": [
+    {
+      "name": "fresh-40u",
+      "save": null,
+      "runs": [
+        {
+          "frames": 2253,
+          "wallS": 30,
+          "avgFps": 75.1,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 13.4,
+          "p99FrameMs": 13.5,
+          "maxFrameMs": 13.5,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 181.2225729167958,
+          "hourBoundariesCrossed": 3,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 79232418,
+            "total": 130062422
+          },
+          "memAfter": {
+            "used": 82605457,
+            "total": 130324577
+          }
+        },
+        {
+          "frames": 2252,
+          "wallS": 30,
+          "avgFps": 75.1,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 13.4,
+          "p99FrameMs": 13.5,
+          "maxFrameMs": 13.6,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 82.85333333333438,
+          "hourBoundariesCrossed": 1,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 82605457,
+            "total": 130324577
+          },
+          "memAfter": {
+            "used": 68403429,
+            "total": 130848865
+          }
+        },
+        {
+          "frames": 2252,
+          "wallS": 30,
+          "avgFps": 75.1,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 13.4,
+          "p99FrameMs": 13.5,
+          "maxFrameMs": 13.6,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 271.4290763890002,
+          "hourBoundariesCrossed": 5,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 68403429,
+            "total": 130848865
+          },
+          "memAfter": {
+            "used": 65463397,
+            "total": 131111141
+          }
+        }
+      ],
+      "facts": {
+        "units": 40,
+        "pop": "0",
+        "star": "★☆☆☆☆",
+        "money": 2000000
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 8,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    },
+    {
+      "name": "towerone_4",
+      "save": "towerone_4.vctower",
+      "runs": [
+        {
+          "frames": 1972,
+          "wallS": 30,
+          "avgFps": 65.7,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 26.7,
+          "p99FrameMs": 26.8,
+          "maxFrameMs": 53.4,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 390.57913194573484,
+          "hourBoundariesCrossed": 6,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 128649613,
+            "total": 176004541
+          },
+          "memAfter": {
+            "used": 99700646,
+            "total": 167185222
+          }
+        },
+        {
+          "frames": 2002,
+          "wallS": 30,
+          "avgFps": 66.7,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 26.7,
+          "p99FrameMs": 26.8,
+          "maxFrameMs": 40.1,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 614.4019375026692,
+          "hourBoundariesCrossed": 11,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 99700646,
+            "total": 167185222
+          },
+          "memAfter": {
+            "used": 100979943,
+            "total": 169037111
+          }
+        },
+        {
+          "frames": 2030,
+          "wallS": 30,
+          "avgFps": 67.7,
+          "medianFrameMs": 13.3,
+          "medianFps": 75.2,
+          "p95FrameMs": 26.7,
+          "p99FrameMs": 26.8,
+          "maxFrameMs": 53.3,
+          "longTaskCount": 0,
+          "longTaskTotalMs": 0,
+          "longestTaskMs": 0,
+          "mainThreadBusyPct": 0,
+          "simMinutesAdvanced": 84.0984895832371,
+          "hourBoundariesCrossed": 1,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 100979943,
+            "total": 169037111
+          },
+          "memAfter": {
+            "used": 125111943,
+            "total": 173589395
+          }
+        }
+      ],
+      "importMs": 224,
+      "facts": {
+        "units": 11875,
+        "pop": "2,066",
+        "star": "★★★☆☆",
+        "money": 12342031
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 8,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    },
+    {
+      "name": "sixseven_8",
+      "save": "sixseven_8.vctower",
+      "runs": [
+        {
+          "frames": 1192,
+          "wallS": 30,
+          "avgFps": 39.7,
+          "medianFrameMs": 26.6,
+          "medianFps": 37.6,
+          "p95FrameMs": 40,
+          "p99FrameMs": 53.4,
+          "maxFrameMs": 106.6,
+          "longTaskCount": 18,
+          "longTaskTotalMs": 1021,
+          "longestTaskMs": 72,
+          "mainThreadBusyPct": 3.4,
+          "simMinutesAdvanced": 600.0328750004992,
+          "hourBoundariesCrossed": 10,
+          "spikeCount": 1,
+          "spikes": [
+            {
+              "i": 652,
+              "ms": 106.6,
+              "simMinute": 1665068.9496961662,
+              "minuteOfHour": 8.949696166208014
+            }
+          ],
+          "memBefore": {
+            "used": 140631000,
+            "total": 188658040
+          },
+          "memAfter": {
+            "used": 138841049,
+            "total": 239454585
+          }
+        },
+        {
+          "frames": 1309,
+          "wallS": 30,
+          "avgFps": 43.6,
+          "medianFrameMs": 26.6,
+          "medianFps": 37.6,
+          "p95FrameMs": 39.9,
+          "p99FrameMs": 40.1,
+          "maxFrameMs": 66.6,
+          "longTaskCount": 6,
+          "longTaskTotalMs": 321,
+          "longestTaskMs": 60,
+          "mainThreadBusyPct": 1.1,
+          "simMinutesAdvanced": 157.12978125037625,
+          "hourBoundariesCrossed": 3,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 138841049,
+            "total": 239454585
+          },
+          "memAfter": {
+            "used": 173463859,
+            "total": 221367103
+          }
+        },
+        {
+          "frames": 1143,
+          "wallS": 30,
+          "avgFps": 38.1,
+          "medianFrameMs": 26.6,
+          "medianFps": 37.6,
+          "p95FrameMs": 40,
+          "p99FrameMs": 53.3,
+          "maxFrameMs": 79.9,
+          "longTaskCount": 8,
+          "longTaskTotalMs": 422,
+          "longestTaskMs": 58,
+          "mainThreadBusyPct": 1.4,
+          "simMinutesAdvanced": 99.75157291814685,
+          "hourBoundariesCrossed": 2,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 173463859,
+            "total": 221367103
+          },
+          "memAfter": {
+            "used": 130431030,
+            "total": 193862366
+          }
+        }
+      ],
+      "importMs": 475,
+      "facts": {
+        "units": 20155,
+        "pop": "5,085",
+        "star": "★★★★☆",
+        "money": 48688564
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 9,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    },
+    {
+      "name": "sixseven_15",
+      "save": "sixseven_15.vctower",
+      "runs": [
+        {
+          "frames": 1234,
+          "wallS": 30,
+          "avgFps": 41.1,
+          "medianFrameMs": 26.6,
+          "medianFps": 37.6,
+          "p95FrameMs": 39.9,
+          "p99FrameMs": 40,
+          "maxFrameMs": 80,
+          "longTaskCount": 2,
+          "longTaskTotalMs": 134,
+          "longestTaskMs": 77,
+          "mainThreadBusyPct": 0.4,
+          "simMinutesAdvanced": 149.4276874982752,
+          "hourBoundariesCrossed": 3,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 150750230,
+            "total": 204334318
+          },
+          "memAfter": {
+            "used": 265169017,
+            "total": 304379245
+          }
+        },
+        {
+          "frames": 1119,
+          "wallS": 30,
+          "avgFps": 37.3,
+          "medianFrameMs": 26.6,
+          "medianFps": 37.6,
+          "p95FrameMs": 40,
+          "p99FrameMs": 66.5,
+          "maxFrameMs": 106.6,
+          "longTaskCount": 25,
+          "longTaskTotalMs": 1481,
+          "longestTaskMs": 84,
+          "mainThreadBusyPct": 4.9,
+          "simMinutesAdvanced": 112.32189583359286,
+          "hourBoundariesCrossed": 2,
+          "spikeCount": 1,
+          "spikes": [
+            {
+              "i": 753,
+              "ms": 106.6,
+              "simMinute": 2221253.8942172164,
+              "minuteOfHour": 53.89421721640974
+            }
+          ],
+          "memBefore": {
+            "used": 265169017,
+            "total": 304379245
+          },
+          "memAfter": {
+            "used": 131338975,
+            "total": 232577311
+          }
+        },
+        {
+          "frames": 914,
+          "wallS": 30,
+          "avgFps": 30.5,
+          "medianFrameMs": 26.7,
+          "medianFps": 37.5,
+          "p95FrameMs": 53.3,
+          "p99FrameMs": 66.6,
+          "maxFrameMs": 93.2,
+          "longTaskCount": 64,
+          "longTaskTotalMs": 3550,
+          "longestTaskMs": 75,
+          "mainThreadBusyPct": 11.8,
+          "simMinutesAdvanced": 250.02132638916373,
+          "hourBoundariesCrossed": 4,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 131338975,
+            "total": 232577311
+          },
+          "memAfter": {
+            "used": 142424805,
+            "total": 213864553
+          }
+        }
+      ],
+      "importMs": 472,
+      "facts": {
+        "units": 25217,
+        "pop": "6,807",
+        "star": "★★★★☆",
+        "money": 288542428
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 9,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    },
+    {
+      "name": "sixseven_15-congestion-overlay",
+      "save": "sixseven_15.vctower",
+      "overlay": "congestion",
+      "runs": [
+        {
+          "frames": 855,
+          "wallS": 30,
+          "avgFps": 28.5,
+          "medianFrameMs": 26.7,
+          "medianFps": 37.5,
+          "p95FrameMs": 53.4,
+          "p99FrameMs": 66.7,
+          "maxFrameMs": 106.7,
+          "longTaskCount": 113,
+          "longTaskTotalMs": 6496,
+          "longestTaskMs": 85,
+          "mainThreadBusyPct": 21.6,
+          "simMinutesAdvanced": 566.7466458347626,
+          "hourBoundariesCrossed": 10,
+          "spikeCount": 1,
+          "spikes": [
+            {
+              "i": 209,
+              "ms": 106.7,
+              "simMinute": 2221862.807446381,
+              "minuteOfHour": 2.8074463810771704
+            }
+          ],
+          "memBefore": {
+            "used": 141067741,
+            "total": 192597113
+          },
+          "memAfter": {
+            "used": 148670339,
+            "total": 205273999
+          }
+        },
+        {
+          "frames": 1002,
+          "wallS": 30,
+          "avgFps": 33.4,
+          "medianFrameMs": 26.7,
+          "medianFps": 37.5,
+          "p95FrameMs": 53.2,
+          "p99FrameMs": 66.6,
+          "maxFrameMs": 119.9,
+          "longTaskCount": 28,
+          "longTaskTotalMs": 1645,
+          "longestTaskMs": 88,
+          "mainThreadBusyPct": 5.5,
+          "simMinutesAdvanced": 302.6060104202479,
+          "hourBoundariesCrossed": 5,
+          "spikeCount": 1,
+          "spikes": [
+            {
+              "i": 259,
+              "ms": 119.9,
+              "simMinute": 2222449.2948630503,
+              "minuteOfHour": 49.29486305033788
+            }
+          ],
+          "memBefore": {
+            "used": 148670339,
+            "total": 205273999
+          },
+          "memAfter": {
+            "used": 138090650,
+            "total": 223452902
+          }
+        }
+      ],
+      "reuse": "sixseven_15",
+      "facts": {
+        "units": 25217,
+        "pop": "6,711",
+        "star": "★★★★☆",
+        "money": 289682047
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 9,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    },
+    {
+      "name": "sixseven_15-speed3",
+      "save": "sixseven_15.vctower",
+      "speed": 3,
+      "runs": [
+        {
+          "frames": 676,
+          "wallS": 30.1,
+          "avgFps": 22.5,
+          "medianFrameMs": 40,
+          "medianFps": 25,
+          "p95FrameMs": 66.7,
+          "p99FrameMs": 80,
+          "maxFrameMs": 93.4,
+          "longTaskCount": 238,
+          "longTaskTotalMs": 13840,
+          "longestTaskMs": 102,
+          "mainThreadBusyPct": 46,
+          "simMinutesAdvanced": 3379.7984999930486,
+          "hourBoundariesCrossed": 57,
+          "spikeCount": 0,
+          "spikes": [],
+          "memBefore": {
+            "used": 133715439,
+            "total": 223999699
+          },
+          "memAfter": {
+            "used": 140947057,
+            "total": 213307169
+          }
+        },
+        {
+          "frames": 661,
+          "wallS": 30,
+          "avgFps": 22,
+          "medianFrameMs": 40.1,
+          "medianFps": 24.9,
+          "p95FrameMs": 66.6,
+          "p99FrameMs": 80,
+          "maxFrameMs": 119.9,
+          "longTaskCount": 237,
+          "longTaskTotalMs": 13546,
+          "longestTaskMs": 96,
+          "mainThreadBusyPct": 45.2,
+          "simMinutesAdvanced": 3968.0994791779667,
+          "hourBoundariesCrossed": 66,
+          "spikeCount": 4,
+          "spikes": [
+            {
+              "i": 108,
+              "ms": 106.6,
+              "simMinute": 2228403.3005505437,
+              "minuteOfHour": 3.300550543703139
+            },
+            {
+              "i": 501,
+              "ms": 106.8,
+              "simMinute": 2230035.051342219,
+              "minuteOfHour": 15.051342219114304
+            },
+            {
+              "i": 595,
+              "ms": 119.9,
+              "simMinute": 2230738.6284672194,
+              "minuteOfHour": 58.62846721941605
+            },
+            {
+              "i": 645,
+              "ms": 106.5,
+              "simMinute": 2231288.9038422187,
+              "minuteOfHour": 8.903842218685895
+            }
+          ],
+          "memBefore": {
+            "used": 140947057,
+            "total": 213307169
+          },
+          "memAfter": {
+            "used": 118533575,
+            "total": 210797183
+          }
+        }
+      ],
+      "reuse": "sixseven_15",
+      "facts": {
+        "units": 25217,
+        "pop": "6,011",
+        "star": "★★★★☆",
+        "money": 290842413
+      },
+      "collectors": {
+        "consoleErrors": 0,
+        "consoleWarnings": 9,
+        "pageErrors": 0,
+        "failedRequests": 0,
+        "badResponses": 0
+      }
+    }
+  ]
+}
