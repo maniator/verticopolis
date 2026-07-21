@@ -119,6 +119,58 @@ body.retro-page {
   gap: 8px;
 }
 
+/* CAP-8: the paired Classic vs Modern stills on the /help page. Modern beside
+   Classic on a wide viewport, stacked on a narrow one. The captures sit in a
+   beveled well so they read as part of the retro chrome. */
+.compare-figures {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  margin: 14px 0 0;
+}
+.compare-figure {
+  margin: 0;
+  padding: 12px;
+  background: var(--r-face);
+  box-shadow: var(--bevel-out);
+}
+.compare-figure-title {
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+.compare-figure-pair {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) {
+  .compare-figure-pair {
+    grid-template-columns: 1fr;
+  }
+}
+.compare-shot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.compare-shot-label {
+  font: 600 12px system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.compare-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  box-shadow: var(--bevel-in);
+}
+.compare-figure-note {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
 /* The sprite gallery's fixed-width canvas scrolls sideways inside its own box on
    a narrow viewport, so the page body itself never scrolls horizontally. */
 .gallery-scroll {
