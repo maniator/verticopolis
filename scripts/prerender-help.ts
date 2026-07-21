@@ -25,9 +25,11 @@
  *      skips this step still degrade the way they always did.
  *
  * The client script still runs on load and re-renders the same template over
- * the container (see `src/helpPage.ts`, which clears the prerendered children
- * first so lit-html does not append a duplicate). The markup is identical, so
- * the swap is not visible; there is no hydration and none is needed.
+ * the container (see `src/helpPage.ts`, which removes the prerendered children
+ * after a successful render so lit-html does not leave a duplicate, while a
+ * render error keeps the prerendered guide on screen). The markup is
+ * identical, so the swap is not visible; there is no hydration and none is
+ * needed.
  *
  * This step needs only happy-dom, which is already a devDependency (it is the
  * vitest test environment), so the build gains no new dependency and stays

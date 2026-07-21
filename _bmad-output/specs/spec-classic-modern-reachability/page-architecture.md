@@ -26,10 +26,11 @@ happy-dom and injects the resulting markup into `dist/help.html`'s `#app`, so
 crawlers and no-JS visitors get the full guide with the hashed figure URLs. It
 is regenerated from the same chunk on every build and cannot drift from the
 source; the script fails the build loudly if the guide prose or any figure
-asset is missing. The client script clears the prerendered children and
-re-renders identical markup (no hydration); the SOURCE `src/help.html` keeps
-its noscript for dev and non-prerendered builds, while the built file's
-noscript is replaced by the real content.
+asset is missing. The client script renders identical markup and then removes
+the prerendered children (no hydration; removal happens only after a
+successful render, so a render error keeps the prerendered guide visible);
+the SOURCE `src/help.html` keeps its noscript for dev and non-prerendered
+builds, while the built file's noscript is replaced by the real content.
 
 ## Build inputs
 
@@ -142,8 +143,8 @@ Both canonicals are the clean URLs served by the targeted Vercel rewrites above.
 - Progressive-enhancement handler: a unit test that with standalone detection
   true the click is intercepted (compare modal opens, no navigation) and with it
   false the anchor is left to navigate.
-- Prerender: the page module clears any prerendered `#app` children before
-  rendering (a unit test seeds the container and asserts a single copy after
-  load), and `scripts/prerender-help.ts` enforces its own output at build time
+- Prerender: the page module removes the prerendered `#app` children after a
+  successful render (a unit test seeds the container and asserts a single copy
+  after load), and `scripts/prerender-help.ts` enforces its own output at build time
   (guide prose present, every figure `src` a hashed `help-media` URL resolving
   to an emitted file, exact figure count), failing `npm run build` otherwise.

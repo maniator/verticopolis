@@ -57,11 +57,14 @@ function main(): void {
   if (!root) return;
   // The build prerenders this page's markup into #app (scripts/prerender-help.ts)
   // so crawlers and no-JS visitors get the guide without running this script.
-  // lit-html appends rather than adopting foreign children, so clear the
-  // prerendered copy (or the noscript fallback) before rendering the identical
-  // markup; the swap is same-frame and not visible.
-  root.replaceChildren();
+  // lit-html appends rather than adopting foreign children, so the prerendered
+  // copy must go or the guide doubles; it is removed only AFTER a successful
+  // render, so a render error leaves the prerendered guide on screen instead
+  // of a blank page. Both steps run in one synchronous frame, so the swap is
+  // not visible.
+  const prerendered = [...root.childNodes];
   render(helpPageTemplate(), root);
+  for (const node of prerendered) node.remove();
   // Signal readiness for screenshot tooling (mirrors the gallery's flag).
   (window as unknown as { helpReady: boolean }).helpReady = true;
 }
