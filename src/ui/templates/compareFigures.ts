@@ -10,7 +10,9 @@ import { html, type TemplateResult } from "lit-html";
  * with no distinct on-screen frame (the data/math divergences, and the transient
  * build-hint tooltip/toast) are covered by the guide text that renders above this
  * section on the page, so a captioned card with no image would just repeat that
- * text. See media-plan.md for the shortlist and the caption-only rationale.
+ * text. See media-plan.md for the shortlist and the caption-only rationale. Both
+ * halves of every pair come from the same features-scale capture set, so the two
+ * frames sit side by side at matching proportions.
  *
  * The images are the SAME deterministic captures the screenshot pipeline already
  * commits under `docs/screenshots` (the CAP-8 `classic-vs-modern` scene plus the
@@ -22,10 +24,12 @@ import modePickerModern from "../../../docs/screenshots/00b-onboarding-modern.pn
 import modePickerClassic from "../../../docs/screenshots/00b-onboarding-classic.png";
 import pricingModern from "../../../docs/screenshots/features/editor-pricing-modern.png";
 import pricingClassic from "../../../docs/screenshots/features/editor-pricing-classic.png";
-import scheduleModern from "../../../docs/screenshots/27-elevator-schedule.png";
+import scheduleModern from "../../../docs/screenshots/features/schedule-express.png";
 import scheduleClassic from "../../../docs/screenshots/features/schedule-classic.png";
 import statsModern from "../../../docs/screenshots/features/stats-tenancy-modern.png";
 import statsClassic from "../../../docs/screenshots/features/stats-tenancy-classic.png";
+import escalatorModern from "../../../docs/screenshots/features/escalator-office-modern.png";
+import escalatorClassic from "../../../docs/screenshots/features/escalator-office-classic.png";
 
 interface FigurePair {
   /** Short heading for the card. */
@@ -56,7 +60,7 @@ const PAIRS: readonly FigurePair[] = [
     title: "Elevator scheduling",
     caption:
       "Modern offers presets, a one-tap auto-tune from measured demand, and advice on over- and understaffed hours. Classic gives you the raw 24-hour grid to set by hand.",
-    modern: { src: scheduleModern, alt: "The elevator schedule dialog with Modern presets and an advice line" },
+    modern: { src: scheduleModern, alt: "The elevator schedule dialog with Modern presets and a recommended preset" },
     classic: { src: scheduleClassic, alt: "The elevator schedule dialog with the Classic raw 24-hour grid" },
   },
   {
@@ -65,6 +69,13 @@ const PAIRS: readonly FigurePair[] = [
       "Modern tracks variant households that come and go, held-space overhead, and unmet-demand notices. Classic runs the 1994 economy untouched.",
     modern: { src: statsModern, alt: "The statistics panel with the Modern households and economy readouts" },
     classic: { src: statsClassic, alt: "The statistics panel under Classic rules" },
+  },
+  {
+    title: "Escalators on office floors",
+    caption:
+      "Modern lets escalators serve office floors. Classic keeps them to commercial floors only, the way the original did: the same tower keeps only its lobby-to-shops flight.",
+    modern: { src: escalatorModern, alt: "A tower with escalators climbing from the lobby up through two office floors" },
+    classic: { src: escalatorClassic, alt: "The same tower under Classic rules, with a single escalator on the shop floor only" },
   },
 ];
 

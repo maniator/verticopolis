@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.70.0
 
-- The Sprite Gallery now links to the full Help guide, and the Help page's Classic vs Modern section gains side-by-side screenshots of the two rule-sets.
+- The Help page's Classic vs Modern section now shows side-by-side screenshots of the two rule-sets, and the Sprite Gallery's link to that page now reads "Help".
 
 ## 1.69.1
 

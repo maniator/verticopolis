@@ -13,8 +13,8 @@ describe("compareFigures", () => {
     const frag = renderToFragment(compareFigures());
     const figures = [...frag.querySelectorAll("figure.compare-figure")];
     const withImages = figures.filter((f) => f.querySelector("img"));
-    // Four visual pairs today; each pair is exactly two shots (Modern, Classic).
-    expect(withImages.length).toBe(4);
+    // Five visual pairs; each pair is exactly two shots (Modern, Classic).
+    expect(withImages.length).toBe(5);
     for (const fig of withImages) {
       const imgs = [...fig.querySelectorAll("img")];
       expect(imgs.length).toBe(2);
@@ -36,6 +36,7 @@ describe("compareFigures", () => {
     expect(titles).toContain("Pricing a unit");
     expect(titles).toContain("Elevator scheduling");
     expect(titles).toContain("Tenancy and economy");
+    expect(titles).toContain("Escalators on office floors");
     for (const fig of frag.querySelectorAll("figure.compare-figure")) {
       expect((fig.querySelector(".compare-figure-note")?.textContent?.length ?? 0) > 0).toBe(true);
     }
