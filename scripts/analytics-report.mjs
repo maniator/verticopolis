@@ -144,16 +144,27 @@ function extractCount(json) {
   return null;
 }
 
-/** Normalize aggregate `data: [{ eventData, count, visitors }]` into rows. */
+/** Metric fields on an aggregate row; everything else is the grouped dimension. */
+const METRIC_FIELDS = new Set(["count", "visitors", "total"]);
+
+/** Normalize an aggregate `data` array into rows. Vercel returns the grouped
+ *  value under a field named after the dimension, and that name varies by query
+ *  (it is NOT reliably `eventData`), so read whichever field is not a metric
+ *  rather than a fixed name. That is why every breakdown label read "(unknown)"
+ *  before: the counts parsed but the value field was missed. */
 function extractRows(json) {
   const arr = Array.isArray(json?.data) ? json.data : null;
   if (!arr) return null;
   return arr
-    .map((r) => ({
-      key: String(r.eventData ?? r.key ?? r.value ?? "(unknown)"),
-      count: Number(r.count ?? r.total ?? 0),
-      visitors: Number(r.visitors ?? 0),
-    }))
+    .map((r) => {
+      const dimKey = r && typeof r === "object" ? Object.keys(r).find((k) => !METRIC_FIELDS.has(k)) : undefined;
+      const value = dimKey != null ? r[dimKey] : undefined;
+      return {
+        key: value == null || value === "" ? "(none)" : String(value),
+        count: Number(r.count ?? r.total ?? 0),
+        visitors: Number(r.visitors ?? 0),
+      };
+    })
     .sort((a, b) => b.count - a.count);
 }
 
