@@ -472,12 +472,13 @@ export class SaveLoad {
     });
   }
 
-  /** Found a fresh tower under the chosen rule-set. The mode (and, for Modern,
-   *  the calendar choice) is baked into the new Simulation at creation and is
-   *  immutable for that tower's life. Classic always runs the canon calendar, so
-   *  `modernCalendar` is only consulted for Modern. */
-  newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar));
+  /** Found a fresh tower under the chosen rule-set. The mode, and for Modern the
+   *  calendar choice and the manual-structure option, are baked into the new
+   *  Simulation at creation and immutable for that tower's life. Classic always
+   *  runs the canon calendar and auto structure, so `modernCalendar` and
+   *  `manualStructure` are only consulted for Modern. */
+  newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false): void {
+    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, manualStructure));
     gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI

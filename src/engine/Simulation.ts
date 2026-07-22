@@ -72,23 +72,21 @@ export class Simulation implements SimContext {
    *  towers and pre-view saves (the renderer then centers as it always has). */
   view: SerializedView | null = null;
 
-  /** Rule-set this tower was founded under, {@link GameMode}. Set once at
-   *  construction, `readonly`, so the engine never guards against a mid-game
-   *  flip. Old saves with no persisted mode deserialize as `classic` (condos
-   *  stay flat 3s, census unchanged). The UI stamps the player's choice at
-   *  tower creation. This is the persisted IDENTITY; the BEHAVIOR that hangs
-   *  off it lives in {@link rules}. */
+  /** Rule-set this tower was founded under, {@link GameMode}, set once at
+   *  construction. Old saves load as `classic`; the BEHAVIOR lives in {@link rules}. */
   readonly mode: GameMode;
 
-  /**
-   * A Modern tower's calendar choice, made at New Tower and persisted. Only
-   * meaningful for Modern (Classic ALWAYS runs the canon calendar); a Classic
-   * tower stores the harmless default. The resolved model lives on
-   * {@link clock}.calendar (see `resolveCalendar`); read the calendar there, not
-   * this raw choice. Old saves without the field coerce to `realWorld`, so a
-   * legacy Modern tower keeps the shipped 7/90/360 behavior.
-   */
+  /** A Modern tower's calendar choice, made at New Tower and persisted. Only
+   *  meaningful for Modern (Classic always runs canon and stores the harmless
+   *  default). The resolved model lives on {@link clock}.calendar; old saves
+   *  without it coerce to `realWorld`, the shipped 7/90/360 behavior. */
   readonly modernCalendar: CalendarKind;
+
+  /** Modern "manual structure" build option, chosen at New Tower and persisted.
+   *  When true the game never auto-lays or bills the floor/lobby substrate: a
+   *  room over a missing floor refuses rather than laying that floor for you.
+   *  Default false; Modern-only (Classic false), so Classic building is unchanged. */
+  readonly manualStructure: boolean;
 
   /**
    * The mode's behavior, resolved once from {@link mode}. Every place Classic and
@@ -204,10 +202,12 @@ export class Simulation implements SimContext {
   exterminationDueDay?: number;
   exterminationRoomIds?: number[];
 
-  constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld") {
+  constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false) {
     this.rng = new RNG(seed);
     this.mode = mode;
     this.rules = makeRules(mode);
+    // Modern-only: a Classic tower always stores false (byte-identical building).
+    this.manualStructure = mode === "modern" && manualStructure;
     // Hand the tower the same strategy object, so mode-dependent placement
     // checks (the Classic-only escalator/office rule) agree with the sim.
     this.tower.rules = this.rules;
@@ -496,5 +496,5 @@ export class Simulation implements SimContext {
 
   static deserialize(raw: SerializedGame): Simulation { return serialization.deserialize(raw); }
 
-  static newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): Simulation { return serialization.newGame(seed, mode, modernCalendar); }
+  static newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false): Simulation { return serialization.newGame(seed, mode, modernCalendar, manualStructure); }
 }

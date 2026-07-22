@@ -107,7 +107,7 @@ export function confirmModal(
  */
 export function newTowerModal(
   ui: UI,
-  opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind) => void },
+  opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean) => void },
 ): void {
   const box = ui.openModalTemplate(newTowerTemplate(opts.hasSave));
   ui.wireActions(
@@ -117,16 +117,18 @@ export function newTowerModal(
       found: () => {
         const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
         const mode: GameMode = picked === "modern" ? "modern" : "classic";
-        // The calendar choice only applies to Modern; Classic is always canon,
-        // so a Classic founding pins the harmless default regardless of what
-        // the Modern sub-picker reads.
+        // The calendar choice and manual-structure option only apply to Modern;
+        // Classic is always canon and always auto-structure, so a Classic
+        // founding pins the harmless defaults regardless of the Modern sub-picker.
         let modernCalendar: CalendarKind = "realWorld";
+        let manualStructure = false;
         if (mode === "modern") {
           const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
           if (pickedCal === "canon") modernCalendar = "canon";
+          manualStructure = box.querySelector<HTMLInputElement>('input[name="nt-manual"]')?.checked === true;
         }
         ui.closeModal();
-        opts.onFound(mode, modernCalendar);
+        opts.onFound(mode, modernCalendar, manualStructure);
       },
     },
     { close: false },

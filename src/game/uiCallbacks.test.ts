@@ -88,8 +88,8 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.saveLoad.importLegacy).toHaveBeenCalledExactlyOnceWith(buf, "tower.TDT");
     cb.onExportLegacy();
     expect(ports.saveLoad.exportLegacy).toHaveBeenCalledTimes(1);
-    cb.onNew("modern", "realWorld");
-    expect(ports.saveLoad.newGame).toHaveBeenCalledExactlyOnceWith("modern", "realWorld");
+    cb.onNew("modern", "realWorld", true);
+    expect(ports.saveLoad.newGame).toHaveBeenCalledExactlyOnceWith("modern", "realWorld", true);
   });
 
   it("getMode reads the live sim's mode", () => {

@@ -55,7 +55,7 @@ export interface UICallbacks {
   /** The live tower's rules mode, so the export dialog can gate the 1994 path
    *  (Classic only) without serializing the whole tower. */
   getMode(): GameMode;
-  onNew(mode: GameMode, modernCalendar: CalendarKind): void;
+  onNew(mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean): void;
   onToggleAudio(): boolean; // returns new muted state
   /** The live muted state, so the toggle's glyph can be initialized at boot
    *  (persisted mute must show 🔇 without a click). */
@@ -197,7 +197,7 @@ export class UI {
     document.getElementById("btn-new")!.addEventListener("click", () => {
       // The toolbar always has a live tower to abandon, so the picker shows its
       // fold-in abandon warning; the mode choice and the confirm are one step.
-      this.newTowerModal({ hasSave: true, onFound: (mode, cal) => this.cb.onNew(mode, cal) });
+      this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
     });
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
@@ -448,7 +448,7 @@ export class UI {
     dialogs.confirmModal(this, title, body, onYes, yesLabel);
   }
 
-  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind) => void }): void {
+  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean) => void }): void {
     dialogs.newTowerModal(this, opts);
   }
 

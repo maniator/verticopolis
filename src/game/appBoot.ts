@@ -260,9 +260,9 @@ export function runBootFlow(app: GameApp): void {
         // warning.
         app.ui.newTowerModal({
           hasSave,
-          onFound: (mode, modernCalendar) => {
+          onFound: (mode, modernCalendar, manualStructure) => {
             dismiss();
-            app.saveLoad.newGame(mode, modernCalendar);
+            app.saveLoad.newGame(mode, modernCalendar, manualStructure);
           },
         });
       },

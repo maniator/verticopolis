@@ -398,9 +398,9 @@ describe("runBootFlow", () => {
     expect(app.ui.newTowerModal).toHaveBeenCalledTimes(1);
     const modalArg = (app.ui.newTowerModal as unknown as ReturnType<typeof vi.fn>).mock.calls[0][0];
     expect(modalArg.hasSave).toBe(true);
-    modalArg.onFound("classic", true);
+    modalArg.onFound("modern", "canon", true);
     expect(dismiss).toHaveBeenCalled();
-    expect(app.saveLoad.newGame).toHaveBeenCalledWith("classic", true);
+    expect(app.saveLoad.newGame).toHaveBeenCalledWith("modern", "canon", true);
   });
 
   it("splashes (never resumes) when a resume flag lands on an unreadable save", () => {
