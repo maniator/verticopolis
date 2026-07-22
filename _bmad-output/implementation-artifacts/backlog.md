@@ -20,6 +20,20 @@ How items flow:
    under a dated `### Deferred from:` heading.
 2. Triage folds inbox entries into the table as a curated row (and removes the
    raw inbox note once captured). Pick items up when you next touch the area.
+
+   **Standing triage cadence (per-PR, adopted 2026-07-21 per #545 / audit
+   AUD-004).** A PR that parks a `defer` finding triages its OWN new inbox
+   entries before it merges: fold each into a curated row (with a mirror issue
+   when unresolved), mark it absorbed or superseded with a pointer to the
+   destination, or retire it with a one-line factual reason. The inbox is a
+   hand-off buffer for the change in flight, so it holds only entries from work
+   that has not yet merged and does not accrete into a standing archive. The
+   weekly-batch alternative
+   was the recorded dissent (audit §14a Round 3); per-PR was adopted because the
+   inbox had already accreted ~90 dated sections over two weeks under batch-only
+   sweeping, the exact invisible-work rot AUD-004 describes: a batch that never
+   quite runs leaves findings untracked by both backlogs. The one-time clearing
+   pass that adopted this cadence is #545.
 3. **GitHub mirror (standing rule, 2026-07-15):** every curated row that is not
    finished has a matching GitHub issue, recorded in the `GH` column as `#NNN`.
    Finished means `done`, `resolved`, `shipped-v1` (its remainders live on
@@ -111,6 +125,14 @@ How items flow:
 | 2026-07-15 | star-blockers-checklist | — | UI legibility | feature-request | P2 | — | — | done | **SHIPPED v1.35.0 (PR #409): the "Next: N★" checklist in the Tower Statistics modal, driven by the shared `cumulativeStarGates` read model in `sim/star.ts` so the checklist can never disagree with `evaluateStar`/`checkVip` promotion; issue #399 closed.** Original ask: a player stalls at 3 stars with population met and no idea a Medical Center or a favorable VIP review is missing; the gate booleans exist in `sim/star.ts` (security, medical, `recyclingDemandMet`, two-plus suites, `vipFavorable`, metro) but are scattered across the stats modal. Render one "To reach Nx" checklist section from those booleans, cloning the milestone-checklist renderer in `stats.ts`. Classic shows the checklist (information, not advice); Modern may add a cheapest-missing-gate hint. |
 | 2026-07-15 | inspector-eval-reason | — | UI legibility | feature-request | P3 | — | — | done | **DONE; true-up per full-repository-audit 2026-07-21 (`_bmad-output/planning-artifacts/reviews/full-repository-audit-2026-07-21/`): shipped as the inspector Main gripe line (`src/game/facilityDiagnostics.ts:375-392` + `gripeCopy.ts`); issue #400 closed.** **Historical context (the pre-delivery proposal, from `gdd-simtower-optimization-gaps-2026-07-15`; delivered as above):** the inspector showed a bare satisfaction percentage until a tenant was already on notice, though the dominant `vacateCause` was attributed in `sim/satisfaction.ts` all along; the proposal was to surface it as one plain-language "Main gripe" line before notice, relabeling internal terms, with Modern optionally suggesting the fix. |
 | 2026-07-15 | housekeeping-coverage-overlay | — | UI legibility | feature-request | P3 | — | — | done | **DONE (v1.46.0, PR #434). From `gdd-simtower-optimization-gaps-2026-07-15`.** Added a fourth map-overlay heat mode, "Housekeeping", tinting hotel rooms by service coverage: green where an operational housekeeping crew can reach them over the staff network, amber for a dirty room waiting, red for a room no crew can reach (the "build another housekeeping station" nudge). Reuses the existing `floorHeatmap`/`drawStatsMap` pipeline (one new `HeatmapMode` case + legend entry), reads the same reach predicate the dispatcher uses (`staffConnected` + operational crews), skips non-operational shells, mode-agnostic. Wired through the overlay-mode select, `HEATMAP_MODES`/`HEATMAP_LABELS`, and a dedicated screenshot scene. `/bmad-code-review` ran (3 layers); fixes applied (isOperational guard, crew-reachability precompute, README row, test asserts) and two low findings deferred (see the Deferral inbox). Guarded by `heatmap.integration.test.ts`. |
+| 2026-07-21 | housekeeping-modern-refinements | #547 | housekeeping-overhaul | review-deferral | P2 | med | — | open | **Folded from the deferral inbox by #545 (from the PR #461/#462/#463 reviews).** Three unresolved Modern housekeeping refinements with no prior curated home. (1) P2 driver: the "enough housekeeping" capacity verdict lies below ~114 rooms/crew because `housekeepingCoverage.dailyCapacity` uses the nominal `crews*6*19` while real throughput is travel-dominated, so `housekeepingDiagnostics.ts`/`stats.ts` read GREEN while a hotel infests; key it on OBSERVED shortfall (yesterday's leftover). (2) Maids have no return leg: they despawn inside a cleaned room instead of walking home (reuse the meal round-trip machinery; free the ledger at result time, not despawn). (3) The Modern smart-dispatch triage travel proxy is blind to transport quality and crew saturation (nearest-crew floor distance ignores stairs-only climbs and all-maids-out crews); revisit with the `MODERN_HK_TRIAGE` weight tuning. `/gds-code-review`. |
+| 2026-07-21 | demand-pools-calibration | #548 | SimTower parity | design-decision | P3 | — | — | idea | **Gated. Folded from the deferral inbox by #545 (from the #393/#395/#424 reviews).** Bundles the PROVISIONAL Modern demand tuning left conservative for v1: the Modern `perCapita` retune (Phase C shipped only the `floor` divergence), the unmet-demand eviction region (Modern nets negative only below coverage ~0.023, so only a fully-stranded tenant sheds), pairwise-floor coverage reachability (a cross-bank tenant can read met demand it cannot reach; reshapes income too, own golden re-pin), the `towerDemandBonus` census-purity residual, and whether attendance venues count toward coverage. Retune against a reference tower in one pass. `/gds-code-review`. |
+| 2026-07-21 | inspector-advice-mode-gate | #549 | UI legibility | feature-request | P2 | med | — | idea | **Folded from the deferral inbox by #545 (from the #400/#398/#393 reviews).** One pass routing ALL inspector advice through a `GameRules` gate (Classic = cause only, Modern = cause + fix), since the existing Access/W1/W3/gripe lines all embed advice with no mode gate (GDD reserves advice for Modern). Also reconciles the framings deferred to it: the weekend "booming/quiet" calendar skew (weekend-agnostic baseline), the Modern under-served-vs-venue-verdict tension, and the demand-percentage display-vs-raw-`share` rounding boundary. `/gds-code-review`. |
+| 2026-07-21 | vacate-cause-reattribution | #550 | gameplay-feel | review-deferral | P3 | low | — | idea | **Ready. Folded from the deferral inbox by #545 (from the #394/#435 reviews).** Generalize the vacate-cause re-attribution so a stale reason whose original cause has cleared re-stamps to the current dominant cause (today only a stale `noise` stamp re-attributes via `noiseCannotEvict`). Covers a fixed-access tenant now transport-far, and the pre-recalibration carried-in `lobbyFar` notice at distance 8-11 that departs under a cause the current bands cannot produce. Eviction decisions are correct; only the named cause is wrong (cosmetic). `/gds-code-review`. |
+| 2026-07-21 | pr-drift-check-scenes-glob | #551 | tooling | review-deferral | P3 | low | — | open | **Ready. Folded from the deferral inbox by #545 (from the excalibur-preview-drop review).** `pr-drift-check.yml`'s `changes` job classifies render edits with a `scripts/screenshot-*.ts` glob that misses `scripts/scenes/*.ts`, so a scene-only edit (no co-edit of `screenshot-shards.ts`) could skip the drift capture and merge a stale gallery. Fix: widen the filter to `scripts/scenes/**`. Watch-only until a scene-only PR lands. `/bmad-code-review`. |
+| 2026-07-21 | venue-crowd-real-occupancy | #552 | pixel-art | feature-request | P3 | — | — | idea | **Gated. Folded from the deferral inbox by #545 (from the E3/E5/E6 pixel-art reviews and the `venue-people-routing` traffic-seam defers).** Draw the venue/platform crowd from real occupancy instead of a seeded scatter, on the `spec-pixelart-people-system` occupancy seam: retire the metro-platform and party-hall `scatterPeople` calls, give cinema/party hall an engine-side visible-attendance count so they stop drawing an empty house (both are population 0 today), and reconcile a baked stair/escalator incline rider with the empty-tower invariant. Do not reintroduce a population-independent ghost crowd. `/gds-code-review`. |
+| 2026-07-21 | audio-first-cue-latency | #554 | audio-music | bug | P3 | low | — | open | **Ready. Folded from the deferral inbox by #545 (from the audio-baking party, 2026-07-13).** `ToneAudioEngine.sfx()` no-ops until `this.started`, so the very first click/build cue before the Tone graph unlocks is silent; arm or queue the first cue on unlock (its own small PR). Gated sibling: bake the ~6 one-shot jingles (via `Tone.Offline` or small Opus assets) ONLY if a real mid-Android first-cue-latency measurement shows a problem (do not bake on spec; add audio to Workbox `globPatterns` and re-check the precache budget if done). The ambient-score WAV bake was rejected unconditionally; sampled stems are a separate future project. `/bmad-code-review`. |
+| 2026-07-21 | lit-string-builder-retirement | #557 | ui-rendering-engine | task | P3 | — | — | idea | **Gated. Folded from the deferral inbox by #545 (from the E2/E3/E4/E5 lit-migration reviews).** Every migrated dialog left its `*Html` string builder as dead production code feeding an `assertDomEquivalent` guard; retire all of them and their transitional tests in one sweep when the last string dialog (editor/inspector, E6/E7) converts. Parked so far: `confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`, `savesHtml`, `stopsHtml`, `newTowerHtml`, `batchPricingHtml`, `buildToolInfoHtml`, `BULLDOZE_TOOL_INFO_HTML`, `INSPECT_TOOL_INFO_HTML`, the three TDT report builders, and the `statsHtml.ts` builders. Where a builder is the sole guard for static copy, add a direct text assertion first. `/bmad-code-review`. |
 | 2026-07-15 | main-ts-split | — | refactor-large-files | task | P2 | med | — | done | **DONE (PR #487, merged 2026-07-19; issue #365 auto-closed on merge).** Split `src/main.ts` from 1,676 lines into a 462-line shell plus the remaining `game/` friend-modules (engineWiring, inputKeys, frameLoop, buildPreview, panelAnchoring, updateFlow, audioPrefs, appModals, trafficHud, appBoot) and `bootstrap.ts`, moves not rewrites, honoring the ratified laws (sim is a guest; narrow constructors; no event bus). Removed the `src/main.ts` entry from `src/tests/fileSize.ratchet.txt` so the size guard now enforces the 500-line ceiling on it (CAP-2 met; CAP-6, an empty ratchet for this file, met). `bootstrap.ts` and `game/appBoot.ts` are measured under coverage with headless tests (the wireControllers adapter closures are invoked and asserted). Mandatory `/gds-code-review` + `/bmad-code-review` both ran; confirmed findings fixed, deferrals recorded in the inbox below. First wave shipped earlier (buildActions, editorActions, saveLoad, inspector, keyboardPlay, later uiCallbacks/mealRush/gesture). |
 | 2026-07-15 | render-perf-region-composition | — | render-perf | perf | P2 | med | — | done | **DONE; true-up per full-repository-audit 2026-07-21 (`_bmad-output/planning-artifacts/reviews/full-repository-audit-2026-07-21/`): CAP-2 region composition shipped (PR #388, `towerRegions.ts`, regions e2e green, spec invariants I1-I4 audited and holding); issue #366 closed. The optional drain-tuning story stays gated on field FPS data (see the session-fps-telemetry row) and rides `spec-render-perf-mobile-zoom`.** **Historical context (pre-delivery note, superseded by the DONE prefix):** the row read: ACTIVE INITIATIVE, executing its spec story order (CAP-1 zoom cull PR #296, CAP-3 deferred hour reconcile PR #297, picking via grid lookup PRs #301/#364 all shipped). The then-remaining core story was CAP-2 region composition (since shipped, PR #388) per `_bmad-output/specs/spec-render-perf-mobile-zoom/region-design.md` (room actors collapse into shared region canvases with a budgeted upload drain), gated on the spec's pre-region gates (full-tower day/night visual baseline, one-region pixel-diff spike, texture-upload micro-bench with its verdict already in the memlog, blame-split probe). The optional drain-tuning story rides the same spec. Pixel-hash census (738 day / 1,302 night unique bitmaps) already falsified the shared-bake alternative; regions ruled unanimously (party 2026-07-15). |
 | 2026-07-15 | onhour-amortization-consult | — | render-perf | design-decision | P2 | med | — | done | **Promoted from prose (the render-perf S1 defer section) to a row 2026-07-15.** `updateSatisfaction` and `collectTrafficIncome` scan the whole tower on the hour and are load-bearing for determinism and the golden master, so splitting their scans across frames needs a checkpoint-the-inputs design consult first (party verdict 2026-07-14: spec non-goal). Once CAP-2 removes the render share of the on-the-hour hitch, this becomes the residual hitch on big towers. Spec-first; do not attempt as a rider. **Resolved 2026-07-15 (#403, closing #367):** the consult ran (party 2026-07-14, `spec-onhour-boundary-cost`) and shipped the outcome-identical hourly noise-scan memo plus served-set hoists, cutting the owner-save median boundary tick about 36 percent (71 to 45ms) with the golden master unmoved. The determinism-breaking frame-splitting stays a non-goal; reopen #367 only if the Pixel 8a still hitches after on-device acceptance. |
@@ -236,7 +258,26 @@ How items flow:
 
 - **Deferred rent is lost if a late-checkout room is destroyed between 08:00 and 14:00 (Edge Case Hunter + Blind Hunter, minor).** Modern's morning `hotelCheckout()` skips booking rent for the deferred rooms; `hotelLateCheckout()` books it at 14:00. If a deferred room is bulldozed or catches fire in that window, its rent is never booked, a small revenue delta versus the pre-feature single 08:00 checkout (which had already collected it). Narrow and arguably fair (the player destroyed an occupied room), and bounded by `round(0.2 * N)` rooms. Fix shape if it ever matters: book the deferred rent at the morning checkout and only defer the room STATE, or clear the deferral (book immediately) in the bulldoze/fire path. Not worth a serialized field for a rare, self-inflicted case. All three review layers otherwise confirmed the guardrails hold (determinism, revenue-once under normal play, bounded non-duplicating census, housekeeping lifecycle).
 
+---
+
+## Triaged (2026-07-21, #545)
+
+This heading marks the one-time clearing pass adopted with the per-PR cadence
+(see "How items flow"). The pass processed every `### Deferred from:` section
+dated 2026-07-19 or older, wherever it sits in this file (most follow directly
+below; a few live in the lower clusters): each was folded into a curated row,
+marked absorbed or superseded with a pointer, or retired with a reason, and its
+leading blockquote records the disposition with the evidence kept beneath it.
+Four `### Deferred from:` sections dated 2026-07-20 are the current in-flight
+window and are left un-triaged (three sit just above this heading; the Classic
+vs Modern pages defer sits in a lower cluster). Other note kinds in this file
+(`### Followups from:`, decision logs, initiative rows) are outside this pass's
+`### Deferred from:` scope and are not dispositioned here. Counts are tallied in
+the triage summary at the end of this section.
+
 ### Deferred from: `gds-code-review` of the crowd/venue ambience (#481/#485, 2026-07-17)
+
+> **RETIRED (#545).** All findings are accepted-for-v1, cosmetic, or dismissed with evidence: the post-load silent-venue window is honest and self-heals, the in-flight voice-tail bleed is masked by the ramps, and the zoom double-attenuation flag was dismissed. The two texture add-later items (condo vacuum / TV melody, hotel cart noise bed) resurface organically when the ambience layer is next touched; not worth a standing row.
 
 - **A busy commercial venue reads silent for the post-load rebuild window (Edge Case Hunter, low).** For population>0 commercial kinds (restaurant, fastFood, shop) the view-focus census reads the live `customersIn` tally, which is deliberately not persisted: right after a save load a venue that was full reads empty (and so plays no ambience) for the seconds it takes the crowd system to re-route diners in. This is honest (the sim really has nobody seated yet) and self-heals, so it is accepted for v1 and documented at the census site in `towerInputCamera.ts`. Fix shape if it ever bothers a player: seed a transient fill estimate from `occupants` for the first post-load hour, or reconcile `customersIn` on load like the attendance mirror does.
 - **Condo vacuum pass and TV melody notes (Acceptance Auditor, texture).** Two approved prototype details not yet in the shipped condo scene (the faint TV talker, dish clink, and cupboard thud are in). Add as elements when next touching the layer; the GDD Out of Scope notes the deferral.
@@ -247,15 +288,21 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of the composed music tracks (#479/#480, 2026-07-17)
 
+> **RETIRED (#545).** All four are browser-constraint, narrow-window, or cosmetic and accepted for v1: the splash theme only gliding on New Tower (not instant Continue) is the autoplay-gesture constraint, and the crossfade suspend-click, mid-Transport-phase entry, and rapid-toggle silence are unreachable from the two normal UI transitions. No standing work.
+
 - **Splash theme only sounds on the New Tower path, not on an instant Continue dismiss (Blind Hunter + Edge Case Hunter, med).** Audio is autoplay-gated (the Tone chunk loads on the first gesture), and on Continue the only gesture is the one that tears down the splash and sets the program to `"game"` before the engine finishes loading, so it builds straight into the in-game bed. On New Tower (and first run) the splash stays up through the rule-set modal while the chunk loads, so the theme plays and then crossfades to the bed. This is a browser constraint: audio cannot sound before a gesture, and that gesture dismisses the splash. Accepted for v1 (the primary "start a tower" path works, and the changelog is worded to that). If we want Continue to glide too, the fix shapes are: eagerly begin the audio-chunk load when the splash mounts (build the engine under `"splash"` before dismiss), or hold the `"game"` handoff until the engine has actually started under `"splash"`. Documented at the wiring site in `src/main.ts`.
 - **Crossfade uses a wall-clock `setTimeout` alongside audio-context `rampTo` (Edge Case Hunter, low).** If the AudioContext suspends mid-dip (tab backgrounded), the fade-out ramp freezes while the swap timer still fires on wall-clock time, so on resume the gain can jump into the swell instead of dipping first (a possible click). Narrow window (program switches are gestures that keep the context running, and `update()` nudges resume). Revisit if it ever surfaces.
 - **A crossfaded-in track begins at the Transport's current phase, not the track's opening (Edge Case Hunter, low).** `part.start(0)` on a rebuild mid-Transport enters the loop at `transportTime mod loopEnd`. Harmless for the ambient game bed; a switch back to the splash theme (rare) would drop into the middle of the hook. Cosmetic.
 - **Rapid `setProgram` toggling faster than the 0.8 s fade holds the music near silence (Edge Case Hunter, low).** Each call re-ramps to 0 and re-arms the swap timer, so the swell is deferred until the toggling stops. Not reachable from the two normal UI transitions.
 ### Deferred from: `gds-code-review` of the fold-in increment (#464, 2026-07-17)
 
+> **ABSORBED (#545) into `schedule-dialog-live-rings` (#475).** The one finding (the dialog is half-live: the stops port re-reads the sim but cars/bottom/top/title/hourly freeze at open) is the same live-geometry staleness that row already tracks; the data stays safe on OK via `coerceSchedule`/snap.
+
 - **The dialog is half-live by construction (Blind Hunter F5, low-medium).** The stops port re-reads the live sim per call, but `cars`/`bottom`/`top`/`title`/`hourly` freeze at open; an undo that resizes the shaft or changes its fleet mid-dialog leaves the grid drawing chips for phantom cars or floors until reopened (engine-side `coerceSchedule`/snap keep the DATA safe on OK). A fully live geometry read is a larger controller rework; revisit if a player actually hits it (undo while the dialog is open is already an edge posture).
 
 ### Deferred from: `gds-code-review` of the schedule dialog build (#305 Phase 3c, 2026-07-17)
+
+> **ABSORBED (#545): already captured.** Every bullet was folded into a curated row at the time: `schedule-advice-day-split` (#466, done), `stop-edit-home-recoercion` (#467, done), `schedule-origin-accumulator` (#465, done), and `schedule-dialog-fold-in` (#464, done). Nothing open remains.
 
 - **Day-type-blind measured curve vs day-named advice (Edge Case Hunter, low).** Captured as curated row `schedule-advice-day-split` (#466).
 - **Home floors not re-coerced on stop edits (Edge Case Hunter, low).** Captured as curated row `stop-edit-home-recoercion` (#467); the dialog-side snap shipped in the build.
@@ -264,9 +311,13 @@ How items flow:
 
 ### Deferred from: `main.ts` Stage-4 split (#365, 2026-07-19)
 
+> **RETIRED (#545).** The single item was patched, not deferred (the `updateTraffic` delegator was restored and the `window.game` any-cast surface documented). Kept only as a recorded lesson; no open work.
+
 - **`updateTraffic` was part of the any-cast `window.game` tooling surface (found by an isolate-diff render, PATCHED not deferred).** The screenshot scenes (`scripts/scenes/features.ts`, `scripts/screenshot-page-ops.ts`) call `window.game.updateTraffic()` to pin the traffic chip before capture; moving `updateTraffic` off `GameApp` without a delegator silently no-oped that call (optional chaining) and drifted the two `traffic-chip` screenshots. Restored as a delegator and the `window.game` surface doc in `src/main.ts` now lists it. Recorded here as the lesson: the any-cast runtime surface is wider than the four typed fields.
 
 ### Deferred from: `gds-code-review` of Modern smart dispatch (housekeeping-overhaul epic 4, PR #463) (adversarial, 2026-07-17)
+
+> **ABSORBED + RETIRED (#545).** The triage travel proxy (blind to transport quality and crew saturation) folds into `housekeeping-modern-refinements` (#547). The `crowd/spawn.ts` and `gameRules.ts` 500-line file-size heads-ups are informational, owned by `fileSize.guard.test.ts` (its own CI gate), not defers: retired.
 
 - **The triage travel proxy is blind to transport quality and crew saturation (Blind Hunter + Acceptance Auditor, low; refinement with the playtest weight pass).** The score's travel term is floor distance to the NEAREST staff-connected crew: a six-floor stairs-only climb scores like a six-floor service-elevator ride, and when the nearest crew's six maids are all out, a much farther crew is the one that actually travels while the score still reads "close". Documented as an accepted v1 proxy in the GDD's pinned-weight note; revisit alongside the `MODERN_HK_TRIAGE` weight tuning if playtest shows Modern towers mis-prioritizing (fix shapes: distance to the nearest crew WITH a free maid, or a transport-aware cost off the staff route length).
 - **`crowd/spawn.ts` sits at exactly the 500-line file-size ceiling (staff-pool fix 2026-07-17, informational).** Same hazard as the `gameRules.ts` row below: the next added line trips the guard mid-feature. Natural split candidates when next touched: the meal/venue option-pool builders, or the staff spawn path (`spawnStaff`/`maxStaffFor`/`takeStaffResults`) into a `staff.ts` leaf mirroring `trips.ts`/`visits.ts`.
@@ -274,10 +325,14 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of housekeeping legibility layer (housekeeping-overhaul epic 3, PR #462) (adversarial, 2026-07-17)
 
+> **ABSORBED + RETIRED (#545).** The missing maid return-leg (maids despawn inside the cleaned room) folds into `housekeeping-modern-refinements` (#547). The escalation-morning double-signal is by design and honest per-line (a room truly went unserved AND is now infested); retired.
+
 - **Maids never visibly leave a cleaned room: no return leg (Acceptance Auditor, low; player-noticeable polish).** After the cleaning dwell expires, a staff person hits the non-round-tripper branch in `crowd/motion.ts` and despawns inside the room; the GDD's "walk in, dwell, and leave a room clean" (and the agent model's `returning` state) is under-delivered by the vanish. Spawn is now pinned to the unit footprint (epic 3), so the remaining gap is only the exit. Fix shape: reuse the meal round-trip machinery (a `returning` staff leg back to the crew floor that despawns at the unit), taking care the job RESULT still fires at dwell end (cleaning must not wait for the walk home) and the maid ledger frees at result time, not despawn time, or throughput regresses.
 - **Escalation-morning double-signal (Edge Case Hunter, nit; by design, recorded).** `leftover` is latched before `escalateInfestations()`, so a room on its third dirty day counts in "N unserved yesterday" AND flips into the `Infested` row the same morning; the two lines can name the same rooms and read as more problems than exist. Honest per-line (it truly went unserved AND is now infested); revisit the aggregate copy only if playtest shows players double-counting.
 
 ### Deferred from: `gds-code-review` of time-simulated maids (housekeeping-overhaul epic 2, PR #461) (adversarial, 2026-07-17)
+
+> **ABSORBED + RETIRED (#545).** The capacity verdict lying below ~114 rooms/crew (the medium finding) folds into `housekeeping-modern-refinements` (#547). Retired: the `MAX_STAFF` pool cap was RESOLVED in v1.57.0 (`maxStaffFor(tower)`); the tick-granularity throughput sensitivity is inherent and informational; the `onResult` stale-token desync is test-model-only (v1 coarse ticks, provably closed under production v2); and the save-after-cutoff lost-cleaning-day is inherent to the transient crowd and gated on a playtest signal.
 
 - **The nominal-capacity shortfall verdicts compare demand to an unreachable best case and are now ~5.7x too optimistic (Blind Hunter + Edge Case Hunter, medium; epic 3 charter).** `housekeepingCoverage.dailyCapacity` is `crews * 6 * 19 = 114/crew` (was 20), but real throughput is travel-dominated (car speed 0.8 floors/min; every job is a fresh one-way trip from the crew floor; one maid per floor per unit), so a basement crew serving 90 rooms on floors 20-28 reads GREEN (114 > 90) while actually clearing ~40-55/day and infesting. The red verdicts in `housekeepingDiagnostics.ts` (`dailyCapacity < rooms - infested`) and `stats.ts` (`hkShort`) are effectively dead below 114 rooms/crew. This is exactly the "the 'enough housekeeping' verdict stops lying" item in the overhaul GDD's epic 3 (legibility layer), queued next; the fix should key the verdict on OBSERVED shortfall (yesterday's leftover / rooms that survived a shift) rather than any nominal constant.
 - **[RESOLVED 2026-07-17 (v1.57.0)] The global `MAX_STAFF = 64` pool caps ~10 housekeeping units' worth of maids (Edge Case Hunter + Acceptance Auditor, informational).** A real tower hit it: a 395-room save with 22 crews saturated the 64-maid pool all shift (~295 rooms/day cleaned against ~344 bookable), so a fully de-infested hotel re-infested within 4 days. Canon research confirmed the 1994 game has NO tower-wide staff pool (each housekeeping room fields its own 6 maids; documented near-max towers run 12-16 units per hotel section) and no build cap on housekeeping rooms. Fixed by replacing the constant with `maxStaffFor(tower)` (operational crews x `HK_MAIDS_PER_UNIT`) in the single consumer (`spawn.ts`), so the spawn gate can never bind below built capacity; the per-crew ledgers remain the real constraint. Original: No per-unit cap exists (spec satisfied), but an 11th+ unit's maids can be pool-starved into transient "full" retries on a very large hotel tower. Single consumer (`spawn.ts`); raise or make it scale with built units when a real tower hits it.
@@ -287,17 +342,23 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of weather-shapes-crowd (#430) (adversarial, 2026-07-16)
 
-- **Retail rain stays a bolt-on multiplier, not emergent from the thinner crowd (Acceptance Auditor, med by intent, low by impact; scope).** The issue asks that "retail patronage and attendance fill drop because fewer people show up." This ships that for ATTENDANCE (thinner crowd lowers `customersIn`, `rainMult` dropped there), but retail income is statistical (`computeDemandMap` reads the connected census, not the drawn crowd), so thinning the crowd does not touch retail income and rain reaches retail only through the surviving `rainMult`. Making retail patronage crowd-emergent is a demand-pool rearchitecture (route the pool through delivered foot traffic), out of scope for this P3 texture pass. Recorded so the issue's fuller "one source of truth" ambition stays tracked; revisit with `commercial-demand-pools` (#393) if a playtest wants rain to visibly starve shops through their emptier aisles rather than a multiplier.
+> **RETIRED (#545).** Making retail patronage crowd-emergent (rather than the surviving `rainMult`) is a demand-pool rearchitecture explicitly out of scope for a P3 texture pass; `commercial-demand-pools` (#393) already shipped the statistical model, so if a playtest ever wants rain to visibly starve shops the direction lives with the open `demand-pools-calibration` (#548) retune, not a standing row here. The attendance rain magnitude, the `weatherFor` layering smell, and the one-tick day-boundary weather lag are provisional/cosmetic and fold into the general playtest weight-tuning.
+
+- **Retail rain stays a bolt-on multiplier, not emergent from the thinner crowd (Acceptance Auditor, med by intent, low by impact; scope).** The issue asks that "retail patronage and attendance fill drop because fewer people show up." This ships that for ATTENDANCE (thinner crowd lowers `customersIn`, `rainMult` dropped there), but retail income is statistical (`computeDemandMap` reads the connected census, not the drawn crowd), so thinning the crowd does not touch retail income and rain reaches retail only through the surviving `rainMult`. Making retail patronage crowd-emergent is a demand-pool rearchitecture (route the pool through delivered foot traffic), out of scope for this P3 texture pass. Recorded so the issue's fuller "one source of truth" ambition stays tracked; revisit under `demand-pools-calibration` (#548) if a playtest wants rain to visibly starve shops through their emptier aisles rather than a multiplier (`commercial-demand-pools` #393 shipped and closed).
 - **The attendance rain magnitude is now emergent and non-linear, not the old clean 0.5, and nothing pins it (Blind Hunter, low; calibration).** A rainy attendance house used to take a flat x0.5; it now takes whatever fill reduction the thinned spawn stream produces, which is non-linear in the spawn rate (seat-cap saturation, elevator throughput). `rainCrowdFactor` 0.5/0.7 are PROVISIONAL (flagged in `econConfig.ts`); the end-to-end test asserts direction only (`rainMinutes < clearMinutes`), never a magnitude. Fold a magnitude calibration (does a rainy cinema land near the intended take?) into the same playtest tuning pass as the other provisional crowd/economy weights.
 - **The crowd-only spawn path still recomputes `weatherFor(clock.day)` and imports it from `sim/build` (Edge Case Hunter, low; layering smell).** The production loop now passes `sim.weather` (single source shared with the economy), but `spawnStep`'s fallback for the no-Simulation paths (`motion.update`, crowd-driven tests) still derives weather from the day hash, keeping a `crowd/spawn.ts` -> `sim/build.ts` import. Not circular (verified: `sim/build` imports `Simulation` type-only plus leaves), just a leaf living next to `build`/`sellAt`. Hoist `weatherFor` into a dedicated leaf (`weather.ts`) that both `sim/build` and `crowd/spawn` import if the smell is worth a follow-up.
 - **Crowd and economy weather can lag the true day by one tick at a day boundary, though they now agree (Edge Case + Blind Hunter, low; cosmetic).** `sim.weather` is refreshed in `onDay`, after `onHour`/`collectTrafficIncome` in the same step, so the midnight-crossing tick's spawns and income both read yesterday's weather for that one hour. The patch made the two layers read the SAME value (so they no longer DISAGREE, which was the real bug), but both lag by one step until `onDay` latches the new day. Reordering the `sim.weather` refresh ahead of the hour reads would remove the lag; deferred as cosmetic (at most one hour per day change, self-correcting) rather than risk reordering `onDay`.
 
 ### Deferred from: `gds-code-review` of elevator-schedule-model (#305 Phase 1) (adversarial, 2026-07-16)
 
+> **ABSORBED (#545) into the `elevator-scheduling` epic (#305).** Both items are sub-concerns of that epic: `setCars` not re-coercing an in-memory schedule is a Phase 2/3 dispatch-clamp concern (a save/load self-heals it today), and the provisional `WAITING_CAR_RESPONSE_MAX`/`STANDARD_FLOOR_DEPARTURE_MAX` clamp bounds reconcile with the Phase 3 stepper ranges when that spec lands.
+
 - **`setCars` does not resize or re-coerce an in-memory schedule; Phase 2 dispatch must clamp against the live car count (Edge Case Hunter, low; Phase 2 concern).** `Tower.setCars` (`tower/transport.ts`) mutates `cars`/`carPositions`/`carDir` but leaves an authored `schedule` untouched, so after a player shrinks a shaft's cars (Phase 3 UI) an authored `homeFloors` can be longer than the new car count and `activeCars` rows can hold values above it. A save/load self-heals it (`coerceSchedule` re-clamps against the new `cars`), and Phase 1 never reads the schedule, so it is inert now. Fix belongs in Phase 2: the dispatch read must clamp active-car and home-floor indices against the live `cars`, not the stored schedule length (and Phase 3's `setCars` path may re-coerce the schedule on the spot). Recorded so the Phase 2 dispatch story picks it up.
 - **The `WAITING_CAR_RESPONSE_MAX` (30) / `STANDARD_FLOOR_DEPARTURE_MAX` (60) clamp bounds are PROVISIONAL and not yet validated against the spec's stated stepper ranges (Acceptance Auditor, note; calibration).** The arch/gdd (in PR #452, not yet on main) own the real ranges; these leaf bounds are a defensive trust-boundary clamp, marked provisional in `elevatorSchedule.ts`. Reconcile them with the Phase 3 UI stepper ranges when that PR lands, widening if calibration needs more room. No code defect; a bounds-vs-spec cross-check deferred until the spec doc is on main.
 
 ### Deferred from: `gds-code-review` of elevator-dispatch-schedule (#305 Phase 2) (adversarial, 2026-07-17)
+
+> **ABSORBED + RETIRED (#545).** The off-shift car abandoning an in-cab rider and the absolute-vs-comparative `waitingCarResponse` mapping are Phase 3 concerns of the `elevator-scheduling` epic (#305), reachable only once the dialog can author an active-car cut. The `dwellMinutesFor` vs arch `dwellSecondsFor` naming/unit divergence is a doc-only nit (behavior is correct): retired.
 
 - **An off-shift car abandons an in-cab rider mid-trip instead of delivering them first (Blind Hunter, Edge Case Hunter, Acceptance Auditor; low, under-specified interaction).** When a scheduled active-car count drops at an hour boundary, a car whose index becomes `>= activeCount` is parked before the cab-call scan and its statistical `carLoad` is zeroed, matching the GDD's "off-shift cars carry no statistical load". A real drawn rider aboard (state `riding`, `carIndex === i`) then gets no forced cab stop; the car drifts home, and the rider only alights if that drift crosses their destination floor, else the existing give-up valve (`crowd/motion.ts` patience cull) despawns them as frustrated. This is the SAME safety path as a bulldozed shaft or a `setCars` trim, so no rider is stranded forever and routing/reachability is untouched (invariant GDD 6.3 holds); the ungraceful part is the frustration spike on a routine scheduled shift-change. A "deliver current cab riders, then park" drain (an off-shift car serves only its own cab stops until empty, answering no new hall/statistical calls) would avoid punishing mid-ride passengers. Deferred to Phase 3: the interaction is only reachable once the dialog lets a player author an active-car cut, and it wants an end-to-end (crowd + dispatch) test then, not a dispatch-only one now.
 - **Waiting Car Response is an absolute span-distance gate, not the spec's comparative "closer than the currently-assigned car" threshold (Acceptance Auditor; medium by spec text, low by impact; provisional mapping).** GDD §4.1/§4.2.3 define `waitingCarResponse` relative to the already-assigned car, but our SCAN core (`claimed` set + `nextDemandStop`) has no per-car assignment-cost function to compare against, so Phase 2 maps it onto an absolute `reach = span - response` hold for a parked car (flagged "Provisional mapping" in `elevatorSchedule.ts`/`ElevatorDispatch.ts`). It preserves the stepper's direction (higher = stays put longer) and the no-op default, and answers a within-reach call in either scan direction. Reconcile the exact geometry with the Phase 3 stepper range and, if the SCAN core ever grows a per-car assignment cost, revisit the literal comparative semantics. Pairs with the provisional-bounds defer above.
@@ -305,10 +366,14 @@ How items flow:
 
 ### Deferred from: bmad-code-review of screenshot-gallery-mode-fork (#443) (adversarial, 2026-07-16)
 
+> **ABSORBED + RETIRED (#545).** The Classic batch-rung dialog opening with its select displaying "No Rate" (a pre-existing PR #440 first-frame bug) folds into `batch-pricing-v1.1` (#383). The two stats shots running on a live unpaused sim under an auto-kept modal is a latent flake to fix by freezing them the next time their pixels are re-minted (freezing now would drift the committed images for no visual gain): retired.
+
 - **The Classic batch rung dialog opens with its select DISPLAYING "No Rate" while the engine truth and preview line read Average (found by Blind Hunter chasing the pair's parallelism, confirmed against the shipped pixels; pre-existing from PR #440, low).** `showBatchRungDialog` opens on choice 2 (Average) and calls `syncRungSelects(box)` post-attach, but the modal autofocuses the select and `syncRungSelects` deliberately leaves a FOCUSED select alone, so the unsynced select falls to a browser-default option and the dialog's first frame shows "No Rate" over a "Set 0 of N offices to Average" preview. Visible in the owner-approved committed gallery image (`10-batch-pricing-classic.png`, minted on PR #440), so it is the shipped app's real first frame, not a capture artifact. Fix belongs in the dialog (sync once unconditionally BEFORE focus lands, or skip only DIRTY focused selects), in `src/ui/uiBatchPricing.ts` + `src/ui/templates/rungPicker.ts`, with the gallery pair re-minted after.
 - **The two pre-existing stats shots run on a live, unpaused sim under an auto-kept modal (Edge Case Hunter, low, latent flake; pre-existing).** `buildStatsTower` leaves speed 1 / unpaused, and `stats-dialog-demand` / `stats-income-elevators` are modal crops whose default `keepDialogs` skips the transient sweep, so a random event dialog popping during their settles would ride over the stats dialog into the committed crop. The new `stats-tenancy-classic` shot freezes the sim in its setup; apply the same freeze to (or before) the two existing shots the next time their pixels are re-minted anyway, since freezing them now would drift their committed images for no visual gain.
 
 ### Deferred from: `gds-code-review` of contiguous-skylobby-transfer (#396) (adversarial, 2026-07-16)
+
+> **RETIRED (#545).** The silently-retroactive gate on pre-1.48 Classic saves was a one-time rollout window now long past (we are at v1.70+), and real-save validation stranded zero floors; the in-PR advisory/copy rewording already shipped. The dispatch still serving gate-stranded floors and the floor-level (not tile-contiguous) gate are documented deliberate v1 simplifications; they resurface with a future reachability-unification pass, not worth a standing row now.
 
 - **The gate is silently retroactive on pre-1.48 Classic saves (Edge Case Hunter, med; rollout edge of an intended rule).** A Classic tower built around a plain-floor express endpoint acting as a transfer hub loads in 1.48.0 with those upper floors flipped to unreachable: commercial income there stops, move-ins stop, sitting tenants are grandfathered on `isFloorServed` rent, so the tower decays quietly. The strand risk was the named acceptance concern and the rule is canon, so the behavior itself is intended; what is deferred is a friendlier rollout surface: a load-time advisory when a just-loaded Classic tower has gate-stranded floors, or a "what changed" line in the update modal beyond the Player-note. Partially mitigated in-PR: the stranded-floor advisory, stats legend, and inspector access line were reworded from the false "3+ rides" to the accurate "no route from the lobby within two rides", and the daily nudge plus inspector line do fire for gate-stranded floors. Real-save validation: a 100-floor player tower with sky lobbies every 15 floors strands zero floors.
 - **Elevator dispatch still serves gate-stranded floors (Edge Case Hunter, low; pre-existing divergence class, widened).** `ElevatorDispatch` gates statistical waiting demand on `servedFloors()` only, so occupied units on floors the router treats as unreachable (3+ rides before this PR; now also Classic gate-stranded floors) keep accruing demand and cars keep visiting, while income, move-ins, and the drawn crowd all agree the floor draws no one. Same class as the known `servedFloors`-vs-two-ride divergence (`servedFloors` ignores MAX_RIDES too); fold into any future reachability-unification pass rather than a bespoke dispatch patch here.
@@ -316,10 +381,14 @@ How items flow:
 
 ### Deferred from: gds-code-review of deserialize-coercion (adversarial, 2026-07-16)
 
+> **ABSORBED (#545) into `deserialize-coercion` (#306).** Both findings are the same save-hardening seam: a forged huge-but-finite `minutes` (past ~2^53) freezes the clock via the `+=` precision trap (fix: a `CLOCK_MINUTES_CAP` alongside the finite/non-negative clamp, matching the existing `VIP_VISITS_CAP`/`ID_CAP`), and a forged huge-but-finite `money` can re-introduce `Infinity` on the next ledger add (money has no canonical ceiling, so it stays a designer question). They were out of scope for #306's original non-finite fix but belong to that coercion story.
+
 - **A forged huge-but-finite `minutes` (at or past ~2^53) still freezes the clock via the `+=` precision trap (Blind Hunter + Edge Case Hunter, med; out-of-scope for #306).** The minutes coercion guards NaN/Infinity/negative/non-number but does not upper-bound magnitude, so a forged finite value like `1e18` is accepted verbatim; then `Clock.advance` does `this.minutes += dtMinutes` every tick, and at that magnitude the float ulp exceeds a normal step, so the clock never advances (day/quarter/year stall, hour/day boundary handlers never fire). This is the same 2^53 increment trap the file already caps for `VIP_VISITS_CAP` and `ID_CAP`, so minutes is the inconsistent one. Out of scope here: issue #306 is the non-finite/negative class, and this change does not worsen the pre-existing raw behavior (an uncapped huge minutes passed before too). Fix by adding a `CLOCK_MINUTES_CAP` (well above any real tower age, comfortably below 2^53) alongside the finite/non-negative clamp when this seam is next touched.
 - **A forged huge-but-finite `money` (near `Number.MAX_VALUE`) passes the finite check and can re-introduce `Infinity` on the next ledger add (Blind Hunter, med/low; out-of-scope for #306).** `Number.isFinite(1.79e308)` is true, so it loads as-is; the first `money + cost` that overflows yields `Infinity`, the non-finite state the fix exists to prevent. Deliberately not clamped here: the spec (#306) asks only for a finite money, and a magnitude cap risks clipping a legitimately large late-game fortune (money has no canonical ceiling, unlike star/vipVisits). Record only; revisit with a designer if a money ceiling is ever wanted.
 
 ### Deferred from: gds-code-review of dispatch-shaft-fairness (adversarial, 2026-07-16)
+
+> **RETIRED (#545).** The section records its own outcome: no findings deferred (1 patch fixed in-branch, 5 dismissed with evidence, 0 defer). Nothing to track.
 
 - **No findings deferred.** All three adversarial layers ran against the isolated diff (branch `claude/dispatch-shaft-fairness`, #303). Triage: 1 patch, 5 dismiss, 0 defer.
   - PATCH (fixed in-branch): **`route()` became rng-impure, but `floorReachable`'s pure reachability probe (which discards the route and runs on the ~6 Hz editor repaint pump) called it, so UI timing could perturb the seeded crowd stream on a banked tower (Edge Case Hunter, major).** Fixed by adding a pure `crowd.reachable` (bfsRoute only, no balancing draw) and switching `floorReachable` to it; a regression test asserts the probe draws no rng even on a banked tower.
@@ -328,11 +397,15 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of condo-demographic-routines (#397) (adversarial, 2026-07-16)
 
+> **RETIRED (#545).** All four are provisional-weight, texture, or v1-loop items and measured non-issues on a real 100-floor save (crowd peaked 63/140, at most 3 concurrent callers): the sales-call cap pressure, the school-run statistical asymmetry, the no-op routine spawn pass, and the coarse v1-tick window skip. They ride the routines calibration pass, itself gated on a playtest signal; no standing row.
+
 - **Sales-call dwellers pool in the ground lobby and could pressure the MAX_PEOPLE cap in very populous towers (Edge Case Hunter, med by analysis, low by measurement; calibration).** Structurally there is no throttle beyond one visible occupant per office, and the shared 140-person crowd cap hard-stops spawns, so a tower with hundreds of staffed offices could in theory hold tens of stationary floor-1 dwellers through the 10-15 window and starve lunch spawns. Measured on a real 100-floor, 22k-unit player save, the effect did not materialize: crowd peaked at 63/140 with at most 3 concurrent callers, so the analytic worst case overestimates how often the 0.35 weight wins the shared spawn pool. The weights are PROVISIONAL; fold a cap-pressure check (and any needed per-window throttle) into the routines calibration pass rather than pre-tuning against a scenario the data does not show.
 - **School-run waves are statistically asymmetric and contend for the single weekday-daytime condo occupant (Blind Hunter + Edge Case Hunter, low; texture).** Returns are decoupled from departures by design (no identity), so afternoon returns are not conserved against morning departures (a save loaded at 14:50 still gets returns; a cap-throttled morning still gets a full 15:00 wave); during 7-8 the in-flight child holds `outForMeal`, so the condo's breakfast meal trips and further school picks pause until the lobby arrival, and one single-occupant condo can emit several "children" across the hour while the stay-home adult visibly vanishes for each walk out. All within the statistical no-identity mandate and mostly invisible at normal zoom; revisit only if playtesting reads it as wrong, in the same calibration pass as the weights.
 - **A picked routine option can no-op and consume its spawn pass (Blind Hunter, low; statistical dampening).** Both spawners pick a floor before filtering to eligible units and return silently when none qualifies, so an in-window pass that drew the routine option can produce nothing, slightly suppressing competing meal/commute options during the windows. Harmless at current weights; fold any restructuring (filter before push) into the calibration pass.
 - **The legacy v1 sim model can skip the 1-hour routine windows on coarse catch-up ticks (Edge Case Hunter, low; pre-existing class).** v1 advances the clock wholesale and samples spawn once per tick, so a single 7:00-to-9:00 tick emits no school run at all; the v2 loop's hour-boundary substeps are immune. The same limitation already applies to the wider meal windows; these are just the narrowest. Belongs to any future v1-loop retirement or substepping pass, not a bespoke fix here.
 ### Deferred from: gds-code-review of pricing-split (#299) (adversarial, 2026-07-16)
+
+> **ABSORBED + RETIRED (#545).** The batch apply silently returning off-market units to the market with no preview sentence folds into `batch-pricing-v1.1` (#383) (the pinned-copy home). Retired: the stats Vacancies off-market split covering offices only (matches the UX spec §2.3 letter), the `satisfaction.ts` `rentConfig().default` vs `priceNeutral` anchor (behaviorally identical, do it if the anchor ever moves), and the two ladder apply-summary copy back-fills into the UX spec §5 (doc-only).
 
 - **A batch rung apply silently returns off-market (No Rate) units to the market with no preview sentence (Blind Hunter, med/low; UX copy).** Entering No Rate kind-wide is protected by the armed two-click confirm, but exiting it kind-wide ("Set all offices to Low" while some sit off-market) reprices those units with zero notice beyond the aggregate changed count: `batchRungPreviewMessage` has no "N off-market returned to the market" sentence, and it also omits the `customOverwritten` qualifier the Modern preview itemizes (a rung batch overwrites hand-picked rungs silently; both Edge Case Hunters flagged the same asymmetry). The engine behavior is ratified (an explicit reprice returns a unit to market, FR4/priceUnit parity), and the UX spec's §5 copy inventory pins the preview sentences exactly, so adding copy needs the spec owner: back-fill a pinned sentence into ux-pricing-split-editor §5 and then surface the count. Deferred for the owner's copy call, not a code blocker.
 - **The stats Vacancies off-market split covers the office-only headline number; off-market hotel rooms and unsold condos have no stats surface (Blind Hunter + Acceptance Auditor, low; UX scope).** `stats().vacant` has always counted vacant offices only and the new `vacantNoRate` mirrors that scope, matching the UX spec §2.3 letter (split the number the player is asked to fix). A player parking hotel rooms or condos off-market sees that only in the editor/diagnostics. Recording the scope limit as a choice; widening the Tenancy section is a spec question for a later stats pass.
@@ -340,6 +413,8 @@ How items flow:
 - **Two ladder apply-summary strings are not in the UX spec §5 copy inventory (Acceptance Auditor, low; doc back-fill).** `Set <n> <noun> to <Rung> ($<amount>).` and `Took <n> <noun> off the market (No Rate).` are the post-apply toast/announce lines of the Classic batch dialog; §5 pins the previews but never specified the apply summaries. Back-fill both rows into ux-pricing-split-editor-2026-07-15 §5 so the copy inventory stays the single source for announce-path tests.
 
 ### Deferred from: `gds-code-review` of leave-tower-unmet-demand (#395) (adversarial, 2026-07-16)
+
+> **ABSORBED + RETIRED (#545).** The narrow eviction region, the lobby-anchored (not pairwise) coverage reachability, and the recycling demand-bonus crowd-coupling fold into `demand-pools-calibration` (#548); the memoized-demand inspector lag folds into `render-perf-region-composition` (#366, the memoization thread); the coverage-0-usually-attributed-to-lobbyFar item folds into `vacate-cause-reattribution` (#550). Retired: the missing coverage-0 end-to-end eviction test is a coverage note to add when the eviction region is widened.
 
 - **The Modern eviction region is far narrower than `UNMET_DEMAND_EVICT_FLOOR` implies (Acceptance Auditor + Edge Case Hunter, low; PROVISIONAL tuning).** Modern erosion eases in linearly from 0 at coverage `UNMET_DEMAND_EVICT_FLOOR` (0.25) to `ECON.unmetDemandErosion` (0.055) at coverage 0. Net drift (`SERVED_RECOVERY 0.05 - erosion`) is negative only for coverage below ~0.023, i.e. effectively only coverage 0 (a served tenant that can reach zero retail). For all realistic partial coverage (0.05-0.5) Modern merely CAPS, identical to Classic, and never evicts. So the "tenants leave the tower for unmet demand" headline really fires only for a fully-stranded (coverage-0) tenant; the cap is the part that bites in the common case. The magnitudes are all PROVISIONAL (like the LOBBY_* and demand-pool constants). Fold into the demand-pools calibration pass: either raise `unmetDemandErosion` / lower the evict floor so a genuinely under-provisioned (not just fully-stranded) tower can shed tenants, or rename the constant to reflect that it is a cap threshold. Deliberately left conservative for v1 so the feature cannot rage-evict a mid-fill tower before a playtest tuning pass.
 - **A coverage-0 stranded tenant is usually attributed to `lobbyFar`, not `unmetDemand` (Edge Case Hunter, low; attribution).** Reaching coverage 0 (served but not two-ride-reachable) almost always means the floor is also very-far from any (sky) lobby, and `lobbyFar` out-ranks `unmetDemand` in the gripe ladder, so the departure is usually named lobby distance even when unmet demand co-drives it. Consistent with the ladder's single-dominant-cause model (the same limitation the #394 deferral notes). Revisit if/when the eviction region is widened in the calibration pass; a genuinely reachable-but-under-provisioned tenant (once the erosion is retuned) would attribute to `unmetDemand` cleanly.
@@ -350,33 +425,47 @@ How items flow:
 
 ### Deferred from: gds-code-review of attendance-finish-tripwire (#302) (adversarial, 2026-07-16)
 
+> **RETIRED (#545).** The empirically-tuned tick bounds (450/480/220/240/30) are the accepted suite idiom: every loop is followed by an assertion of the condition it waited for, so a bound exit fails loudly, and the pre-existing suite carries the same style. Derive the bounds from the dwell/window constants only if they ever churn; no standing work.
+
 - **The teardown scenarios ride empirically tuned tick bounds (Blind Hunter, low; accepted suite idiom).** The mid-visit tests bound their searches and drains at 450/480/220/240/30 ticks, values tuned against today's dwell times, meal windows, and travel speeds rather than derived from named constants. Every loop is followed by an assertion of the condition it waited for, so a bound exit fails loudly (a precondition failure, never a vacuous pass), which is the intended tripwire behavior; the cost is that a benign engine timing change (slower elevators, longer dwells) surfaces as a confusing fixture failure rather than a clear message. The pre-existing suite (the overnight drain's 290, the bulldozed-origin 480/240) carries the same idiom, so a bespoke fix here would only split the style. If the bounds ever churn, derive them from the dwell/window constants in `crowd/meals.ts` and `crowd/visits.ts` in one pass across the whole file.
 
 ### Deferred from: `bmad-code-review` of housekeeping-coverage-overlay (#401) (adversarial, 2026-07-16)
+
+> **ABSORBED + RETIRED (#545).** The cleanliness overlay's up-to-an-hour-stale tints are the same hourly-cache staleness the satisfaction/occupancy overlays share; the right fix is a general per-tick overlay-freshness signal, folded into `render-perf-region-composition` (#366). The hardcoded 0.6 amber severity is a cosmetic nit, extract to a shared constant if a future overlay pass standardizes the mid-severity tint: retired.
 
 - **The cleanliness overlay can show up-to-an-hour-stale tints (Copilot + Codex P2, low; shared with every overlay).** `drawStatsMap` caches non-congestion heatmaps by mode + hour + `tower.revision`, but the cleanliness amber tier reads the transient `dirty` flag, which a housekeeper arrival flips `dirty -> empty` mid-hour without bumping the revision, so a just-cleaned room can keep drawing amber until the next hourly refresh (or a layout edit). This is the SAME hourly-cache staleness the `satisfaction` and `occupancy` overlays already have (both read per-tick state cached on the same key), so a bespoke cleanliness-only invalidation would make it inconsistent with its siblings. The right fix is a general per-tick overlay-freshness signal for every mode (mirroring the `mealOverlayRevision` the congestion overlay already uses), which belongs in the render-perf memoization thread, not a one-off cleanliness counter here. Fold in there. Two reviewers flagged it; recorded for that pass.
 - **The amber "dirty" severity is a hardcoded 0.6 rather than a shared ramp constant (Blind Hunter, low; nit).** The cleanliness overlay tints a reachable-but-dirty hotel room at severity 0.6, inlined at the one call site in `src/engine/sim/congestion.ts`. The heat ramp's amber stop sits at 2/3 (about 0.667), so 0.6 renders in the chartreuse-to-amber band rather than exactly on amber. It reads clearly as a mid-severity warning between green (covered-clean) and red (unreached), so this is cosmetic. Left inlined because the value is a deliberate "dirty is less severe than unreached" weight, not a sim-anchored threshold like the congestion churn amber; if a future overlay pass standardizes the mid-severity tint, extract it to a shared constant then rather than as a bespoke tweak here.
 
 ### Deferred from: `gds-code-review` of weekend-patronage-curve (#398) (adversarial, 2026-07-16)
 
+> **ABSORBED + RETIRED (#545).** The "booming/quiet" verdict skewing with the day of week (a weekend-agnostic baseline against a weekend-folded `patronageYest`) folds into `inspector-advice-mode-gate` (#549), the holistic verdict-framing pass. Retired: the missing attendance-exclusion end-to-end test is gated on a deterministic attendance harness (the attendance draw is crowd-driven and stochastic); unit-level coverage stands.
+
 - **The commercial inspector's "booming/quiet" verdict now skews with the day of the week (Edge Case Hunter, low; advisory/UX, feature is provisional).** `patronageToday` now folds in `weekendMult`, and it rolls into `patronageYest` at midnight, but the inspector verdict scores `patronageYest / baseline` where `baseline = (daily / spend) * TRAFFIC_FACTOR_MEAN` is a deliberately weekend-agnostic reference. So a Modern fast-food counter at full appeal, well placed, dry, reads its weekend day at 0.7x and can tip from "Business is average" into "Very few customers," and a Classic retail venue reads inflated "Business is booming" on its weekend day, purely from the calendar, which the player cannot control. This conflates a calendar phase with the appeal/placement/weather the verdict comment says it measures. Not patched here: the clean fix is a weekend-aware baseline (multiply the baseline by the same `rules.weekendMultiplier(kind, isWeekend)`) or a disclosure line, and it wants to be reconciled with the other inspector-advice framings in the holistic inspector-advice pass already noted under the #400 and #393 reviews below, not a bespoke tweak. Fold in there when that pass runs.
 - **No integration test covers the attendance-venue (cinema/party hall) exclusion end-to-end (Edge Case Hunter, low; coverage).** The unit tests pin `weekendMultiplier` to 1.0 for cinema/party hall and the money loop gates the multiplier out for the attendance path, but there is no integration test asserting a cinema's day-over-day income is unaffected by the flat multiplier (its weekend swing comes only from live attendance). Left as unit-level coverage because isolating a clean cinema income signal across weekday/weekend is noisy (attendance is crowd-driven and stochastic); revisit if the attendance-draw calibration pass (see the `weather-shapes-crowd` row) builds a deterministic attendance harness.
 
 ### Deferred from: `gds-code-review` of lobby-distance-recalibration (#435) (adversarial, 2026-07-16)
+
+> **ABSORBED (#545).** Reclaiming a built-through sky-lobby slot being a full-block teardown (the humane fix is an in-place floor-to-lobby conversion) folds into `tdt-quirkAB-faithfulness` (#317, part A: a sky-lobby story cannot carry bare floor tiles without a lobby), where both halves already live. The pre-recalibration carried-in `lobbyFar` notice completing an eviction under bands that no longer evict there folds into `vacate-cause-reattribution` (#550).
 
 - **Reclaiming a built-through sky-lobby slot is a full-block teardown; the humane fix is an in-place floor-to-lobby conversion (Codex P2 follow-on, low; copy is honest, the underlying cost stands).** When a skipped slot carries floor tiles that support stories above, `removalReason` refuses clearing it until those stories come down, so fixing a mid-tower skipped lobby means demolishing everything the slot supports. The inspector now says so plainly ("the stories above it must come down before it can be cleared"), which is honest but brutal. The real relief is an engine change: let a lobby placement convert bare floor tiles in place on a legal slot, or prevent the state at placement time; both halves already live in the gated `tdt-quirkAB-faithfulness` row (#317, part A: a sky-lobby story cannot carry bare floor tiles without a lobby). Fold this UX motivation into that spec when it runs; no separate row.
 - **A pre-recalibration save with a live `lobbyFar` notice at distance 8-11 can still complete its eviction under rules that no longer evict there (Edge Case Hunter, low; one-time migration sliver).** A save written under v1.44.0/v1.45.x can carry a tenant on notice (`vacateReason: "lobbyFar"`, satisfaction near 0) at a distance the recalibrated bands only cap (8-11, erosion 0). The notice is rescinded solely via satisfaction reaching the 0.4 rescind bar; recovery is +0.05/hr, so a tenant with fewer than ~8 served game-hours left on its window (or one held down by congestion, which suppresses recovery) departs attributed to a cause the current rules cannot produce at that distance. Self-limiting: fires at most once per carried-in notice, then never again. The deliberate precedent is the noise-rescind path for carried-in notices (`noiseCannotEvict`); fold a matching "the stamped cause can no longer evict here" rescind or re-stamp into the same generalized re-attribution pass as the stale-cause row below, not as a bespoke migration.
 
 ### Deferred from: `gds-code-review` of graduated-lobby-distance-eval (#394) (adversarial, 2026-07-16)
 
+> **ABSORBED (#545) into `vacate-cause-reattribution` (#550).** The single finding (a very-far tenant that gave notice for another cause departs stamped with the stale cause because `lobbyFar` erosion pins satisfaction at 0 and the notice never rescinds) is exactly the generalized re-attribution that row owns.
+
 - **A very-far tenant that gave notice for another cause can depart stamped with the stale cause (Edge Case Hunter, low; pre-existing attribution limit made newly reachable).** If a served office/condo gives notice for `access`/`congestion`/`rent`/`transportFar`, the player fixes that original cause, but the floor is very-far from any lobby, the lobby erosion pins satisfaction at 0 so the notice never rescinds and the tenant leaves stamped with the stale original reason instead of `lobbyFar`. The eviction itself is correct; only the named cause is wrong. The attribution model only ever re-attributes a stale `noise` stamp (the `noiseCannotEvict` path); `lobbyFar` was added to `nonNoiseProblem` (so it correctly blocks the noise rescind) but nothing re-stamps a stale NON-noise reason to the live cause. This is a pre-existing single-cause-at-notice-time limitation that #394 makes newly reachable, not a new bug. Fix is to generalize the re-attribution (re-stamp any stale reason whose original cause has cleared to the current dominant cause) in its own pass, so it also covers, e.g., a fixed-access tenant that is now transport-far. Low: cosmetic (the toast/inspector names a plausible but not-current cause) and only on a specific fix-then-still-isolated sequence.
 
 ### Deferred from: `gds-code-review` of attendance-venue-demand (#424, #393) (adversarial, 2026-07-16)
+
+> **ABSORBED + RETIRED (#545).** `reachableVenuesByOrigin` counting retail only (so an attendance-only tower reads 0 coverage) is the attendance-coverage decision folded into `demand-pools-calibration` (#548); no live consumer reads the field yet. Retired: attendance income being an hourly point-sample of the live `customersIn` counter is inherent to the "earns from live fill" model and self-corrects across a day of samples.
 
 - **`reachableVenuesByOrigin` now counts retail venues only, so an attendance-only tower reads 0 coverage (Edge Case Hunter, low; latent).** With attendance venues out of the pool, the per-origin reachable-venue count in `demand.ts` is retail-only. A tower whose only reachable venue is a cinema reports every origin as reaching 0 venues. No production consumer reads this field yet (only the integration test), so there is no live wrong behavior. The field doc now flags it. When `leave-tower-unmet-demand` (#395) lands and treats 0 as "nowhere to go," its author must decide whether attending a cinema counts as somewhere residents can spend time and fold in attendance coverage separately. Belongs to #395, not a bespoke fix here.
 - **Attendance income is an hourly point-sample of a volatile live counter (Edge Case Hunter, low; inherent to the design).** A cinema's earned fraction reads `customersIn` once at the top of each open hour, while the daily figure is spread over `openHoursPerDay`; if `customersIn` swings within the hour (patrons cycling between showings) the sampled fill can be unrepresentative, so the day's take depends on crowd phase rather than average occupancy. This is the intended "earns from live fill" model (the income loop already samples live crowd state for the reachability gate), and it self-corrects across a day of samples. If it ever reads wrong, average the fill over the hour instead of sampling at the boundary; fold into any future attendance-draw calibration (see the `weather-shapes-crowd` row and the GDD §6 note), not a bespoke fix.
 
 ### Deferred from: `gds-code-review` of commercial-demand-pools Phase C (#393) (adversarial, 2026-07-15)
+
+> **ABSORBED (#545).** The Modern under-served advice reading against a venue's own verdict and the demand-percentage display-vs-raw-`share` rounding boundary both fold into `inspector-advice-mode-gate` (#549). The dropped Modern per-capita retune (Phase C shipped only the `floor` divergence) folds into `demand-pools-calibration` (#548).
 
 - **The Modern under-served advice can read against a specific venue's own verdict (Edge Case Hunter, low).** The tower-level advice ("The tower's shoppers outstrip its retail space; another venue would still sell.") fires on a tower-wide `share >= 1`, but the hovered venue can still show a red patronage verdict or a W3 "too far from a lobby" line because its OWN placement is poor. The two are not contradictory (the tower has room for more commerce AND this particular venue is badly placed), and the advice now speaks about the tower rather than "here" to keep that honest, but a player could still read them as tension. Left as-is: the fix is the same holistic "route all inspector advice through a `GameRules` gate and reconcile the venue-level vs tower-level framings" pass already noted under the #400 review below. Fold in there rather than a bespoke tweak.
 - **The demand-percentage display rounds while the advice keys on the raw `share`, so the two can disagree at the rounding boundary (Edge Case Hunter, low/cosmetic).** `Local demand: N% of capacity` is `Math.round(min(1, fraction) * 100)`, but the under-served nudge fires on the unrounded `share >= 1` and the over-built nudge on `share < 0.5`. So a venue at `share` in `[0.995, 1)` reads "100% of capacity" yet withholds "another venue would still sell", and a venue at `share` in `[0.495, 0.5)` reads "50% of capacity" yet shows the over-built line. Bounded to a 0.5% band and purely cosmetic. Not patched because the clean fix (round the display and the advice threshold off the same number) would either couple the display to the raw share or sacrifice the deliberate raw-`share` keying (which keeps the Modern floor from masking a genuinely thin tower, and is robust to a future higher floor). If it ever reads wrong to players, reconcile it inside the same holistic inspector-advice pass, not as a bespoke rounding tweak.
@@ -384,19 +473,27 @@ How items flow:
 
 ### Deferred from: `gds-code-review` of commercial-demand-pools Phase B (#393) (adversarial, 2026-07-15)
 
+> **ABSORBED (#545) into `render-perf-region-composition` (#366).** The single finding (the inspector's "Local demand: N%" line lags an occupancy change by up to an hour because `facilityDiagnostics` reads the `(revision, hour)`-memoized `sim.demandMap()`) is the same overlay/inspector memoization-freshness work that thread owns; income is unaffected (the money loop reads fresh).
+
 - **The inspector's "Local demand: N%" line can lag an occupancy change by up to an hour (Edge Case Hunter, low).** `facilityDiagnostics` reads the memoized `sim.demandMap()`, keyed on `(tower.revision, hour)`; a lease signed mid-hour does not bump `tower.revision`, so the surfaced percentage (and the income loop's fresh per-tick fraction) can differ until the hour rolls. Bounded, self-healing, and income is unaffected (the money loop calls `computeDemandMap` fresh). Phase B fixed the worst case (a venue ABSENT from the memo now omits the line rather than showing a false 0%). If the residual lag ever reads wrong to players, switch the inspector to a fresh `computeDemandMap` read (accepting the per-hover recompute) or key the memo on an occupancy epoch; fold into the render-perf memoization thread rather than a bespoke fix.
 
 ### Deferred from: `gds-code-review` of commercial-demand-pools Phase A (#393) (adversarial, 2026-07-15)
+
+> **ABSORBED + RETIRED (#545).** The attendance-venues-distort-the-retail-pool finding was already promoted to the `attendance-venue-demand` row (#424, done). The `demandModel()` missing `smoothing`/soft-shoulder field was RESOLVED as won't-build in the Phase C review: a conservation-preserving soft shoulder does not exist (it would invert the model's core cannibalization property), so the field was dropped by design. Retired.
 
 - **Attendance venues (cinema/partyHall) distort the retail demand pool (Edge Case Hunter, medium; GDD-flagged revisit).** Promoted to a curated row: `attendance-venue-demand` (#424). A cinema/party hall enters the demand pool's `totalCap` as a capacity sink and can collapse retail income; fix is an attendance-fill fraction that drops them from the retail `totalCap`. Per-spec today (Acceptance Auditor), so a balance refinement. See the row for detail.
 - **`GameRules.demandModel()` omits the spec's `smoothing` field and soft-shoulder cap (Acceptance Auditor, low; Phase C).** RESOLVED as WON'T-BUILD (Phase C review, 2026-07-15). The soft shoulder is not implementable without breaking the flagship. A per-venue "soft" curve that lifts a venue's earned fraction above the identity `min(1, share)` below the cap makes total delivered demand `sum(frac * cap_v)` exceed the pool as venues are added (the `1 - (1 - share)^2` shape gives total/pool of 1.2 / 1.6 / 1.8 at share 0.8 / 0.4 / 0.2), which INVERTS the model's core cannibalization property (adding a venue would raise total commerce instead of diluting each venue's share). Conservation holds only when every venue earns exactly `min(1, share)` below the cap, so a conservation-preserving soft shoulder does not exist. Phase C therefore drops the `smoothing` field entirely and keeps the seam at `{ perCapita; floor }`; the Modern-vs-Classic difference is the small-tower `floor` today (a street-trade baseline: Classic 0, Modern `demandFloorModern`), with per-capita magnitude shared by both modes for now and reserved for the calibration pass, never a per-venue cap curve. The GDD/arch `smoothing` language is superseded; a future Modern demand assist must live outside the per-venue split (e.g. a larger `floor` or a pool multiplier) to stay conservative.
 
 ### Deferred from: code review of #400 inspector "Main gripe" line (`gds-code-review` adversarial, 2026-07-15)
 
+> **ABSORBED (#545).** Classic showing fix advice while the GDD reserves advice for Modern (the medium finding, and the reason a holistic pass is needed since every existing inspector line embeds advice with no mode gate) folds into `inspector-advice-mode-gate` (#549). `dominantGripe` rebuilding the spatial congestion map per inspector render in v2 folds into `render-perf-region-composition` (#366, the congestion memoization thread).
+
 - **Classic shows fix advice, but the GDD reserves advice for Modern (Acceptance Auditor, medium).** The `GRIPE_TEXT` strings in `src/game/facilityDiagnostics.ts` bake the fix into the line ("Add cars or a parallel shaft", "Lower it to keep them", "a lobby tile between them shields it"), shown in both modes, while `gdd-simtower-optimization-gaps-2026-07-15.md` says Classic shows information and only Modern adds advice. Not fixed in #400 because the fix is holistic: the existing inspector lines (Access "Add a sky-lobby transfer", W1 "Put a stairway...", W3 "Keep it within 2 floors...") ALL embed advice with no mode gate, so mode-gating only the new line would be inconsistent. The right move is one pass that routes all inspector advice through a `GameRules` gate (Classic = cause only, Modern = cause + fix). Scope it as its own story before touching it.
 - **`dominantGripe` rebuilds the spatial congestion map per inspector render in v2 (Edge Case Hunter, low/perf).** `sim.dominantGripe(u)` calls `sim.congestionAt(u.floor)`, which in the v2 model rebuilds the whole `spatialCongestionByFloor` map (unmemoized) to read one floor; the inspector card re-renders on pointer-move and to tick live countdowns, so an unhappy office/condo/hotel hover pays one full-tower scan per render. Bounded (hover only, unhappy tenants only, v2 only) and the stats overlay already does the same, so it is not new-in-kind. Fold into the render-perf memoization work (see the `congestion` memoization / on-hour amortization threads) rather than a bespoke fix.
 
 ### Deferred from: code review of dropping the excalibur-preview screenshot scene (`/bmad-code-review` adversarial, 2026-07-15)
+
+> **ABSORBED (#545) into the new `pr-drift-check-scenes-glob` row (#551).** The one deferred finding (the `pr-drift-check.yml` render-path filter's `scripts/screenshot-*.ts` glob misses `scripts/scenes/*.ts`, so a scene-only edit could skip drift capture and merge a stale gallery) is now tracked there.
 
 Change: removed the redundant `excalibur-preview` screenshot scene (it captured the
 standalone `excalibur.html` dev page and rendered blank under the container's
@@ -426,6 +523,8 @@ One defer:
 
 ### Deferred from: code review of the Modern escalator/office rule gate (`gds-code-review` adversarial, 2026-07-14)
 
+> **RETIRED (#545).** The one defer (whether `validateTransport` should block an escalator floor-wide or only near the landing) is a pre-existing canon question, unchanged by the diff and now pinned floor-wide by tests; it is gated on a faq-canon research finding and Modern is unaffected either way. Narrow the Classic check only if research shows the 1994 original was landing-local; no standing work.
+
 Change: gated the Classic-canon "escalators link commercial floors only" placement
 refusal behind `GameRules.allowsEscalatorOnOfficeFloors` (Classic false, Modern
 true); `Tower` now carries the mode's rule-set, assigned by the `Simulation`
@@ -446,6 +545,8 @@ rules are mode-identical). One defer:
   tests; Modern is unaffected either way.
 
 ### Deferred from: code review of spec-pixelart-retail (E4) (`gds-code-review` adversarial, 2026-07-14)
+
+> **RETIRED (#545).** Both defers are watch-only and gated on hypothetical future changes: the latent interior geometry underflow only bites if shops ever become variable-size (they are fixed 132x44 and each bakes into its own clipped canvas today), and the salon seated-client stand-in is spec-compliant and only worth revisiting if the honesty model tightens to real per-shop occupancy. Resurface with those changes; no standing row.
 
 Change: enriched the eleven canon retail interiors in `src/render/pixelSprites/shop.ts`
 plus a new `src/render/pixelSprites/shop.interiors.ts` (per-trade draws, a lit sign
@@ -477,6 +578,8 @@ untouched. Two findings deferred, both watch-only:
   whether the salon client should gate on a real occupant rather than the stand-in.
   Watch-only, no behavior change wanted now.
 ### Deferred from: E3 pixel-art food and entertainment (`/gds-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The entertainment honest-attendance gap (cinema and party hall draw an empty house because they are population 0) and the metro-platform `scatterPeople` retirement fold into `venue-crowd-real-occupancy` (#552). Retired: the `f`/`glow`/`box`/`twall` primitives and geography seed duplicated across `food.interiors.ts` and `venue.ts` are an eventual shared-helper cleanup with no behavior risk, and the ice-cream parlor clock `#E8A050` passes the reserved-color rule (outside the within-10 collision band of notice amber `#E8A030`).
 
 Change: enriched the food and entertainment rooms (5 fast-food subtypes, 5
 restaurants, the two-floor cinema, and `drawPartyHall`) and tied every visible
@@ -524,6 +627,8 @@ Second review pass (three adversarial layers) on the finished branch:
   state cue, so it passes the reserved-color rule. Noted for a future glance if
   the amber hue family is ever tightened.
 ### Deferred from: code review of spec-pixelart-structure-transport (`gds-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The metro-platform / party-hall `scatterPeople` retirement and the un-baked ~17px stair/escalator incline rider fold into `venue-crowd-real-occupancy` (#552). Retired: the reception/info desk occupying lobby variant slot 1 is a spec-internal doc inconsistency to reconcile in a spec touch-up (the contract, `LOBBY_VARIANTS` and the sentinels, is untouched), and the two 2px full-height elevator guide-rail fills are cosmetic and pre-existing, to fold in only if a future pass bands the shaft backing per-floor.
 
 Change: E6 structure and transport pixel art. Ports the page-05 board
 composition into `structure/shell.ts` (banded deck), `structure/lobby.ts`
@@ -574,6 +679,8 @@ above a very short tile). Four findings deferred:
 
 ### Deferred from: code review of facilities.ts split (`bmad-code-review` adversarial, 2026-07-14)
 
+> **RETIRED (#545).** Both defers are cosmetic and pre-existing to the pure move: the broad `facilities/service.ts` bucket sits at 252/500 lines (split to `transit.ts`/`garage.ts` only if it grows), and the dead `u: Unit` param on `drawParkingRamp` drops when that draw is next touched for real. No standing work.
+
 Change: `src/render/sprites/facilities.ts` (375 lines, 12 draw exports) split into
 `facilities/service.ts` (in-tower service kinds), `facilities/vehicles.ts` (moving
 actors), and `facilities/venue.ts` (event venues), with the original file kept as a
@@ -597,6 +704,8 @@ deferred, both cosmetic and both pre-existing to the move:
   param when the parking-ramp draw is next touched for real. (Low; cosmetic.)
 
 ### Deferred from: code review of pixelart-elevator-queue-seam (`/gds-code-review`, 2026-07-14)
+
+> **RESOLVED (#545).** Delivered 2026-07-15 in E6-S7 (#314): `ElevatorQueueView.boarded` now reads the drawn `crowd.carRiders` (single-population invariant), with a real non-hand-written same-individuals reconciliation test (`queueView.test.ts`). Nothing open; the original defer text is kept below for the record.
 
 - **DELIVERED 2026-07-15 (E6-S7, GH #314, branch `claude/queue-view-reconcile`).**
   Picked `crowd.carRiders` (the drawn per-car occupancy) as the single population.
@@ -647,6 +756,8 @@ imperative-to-declarative bridge for `main.ts`, and a baseline-regeneration plan
 
 ### Deferred from: party consultation on audio baking (2026-07-13)
 
+> **ABSORBED + RETIRED (#545).** The first-gesture-silence bug (the concrete deliverable) and the gated jingle-bake fold into `audio-first-cue-latency` (#554). Retired: baking the ambient score to WAV was rejected unconditionally (a closed decision, net loss on bytes/feel/CPU), and feeding sampled stems through the mixer is a separate future exploration to park if the procedural palette ever feels thin.
+
 Owner follow-up to the Tone.js audio work: should we bake WAV files into the
 PWA cache instead of generating tones on the fly? Party (dev + UX voices,
 general-purpose research on how comparable browser games ship audio) returned a
@@ -692,6 +803,8 @@ clear verdict with three separate threads:
 
 ### Deferred from: code review of express-elevator-parity (`gds-quick-dev` step-04, 2026-07-13)
 
+> **ABSORBED + RETIRED (#545).** The express lobby-stop coercion silently normalizing a loaded pre-fix save folds into the general widen/coerce load-note tracked in `e1c-migration` (#327). Retired the rest, all low / coverage-only / forged-only: the 172 to 188 in-game-minute build-time rise as a side effect of the width 4 to 6 change (confirm it reads fine in play), the formula-vs-index divergence on an unbuilt sky-lobby floor (harmless, unify when the area is next touched), the missing dedicated round-trip-at-6 test (behavior verified indirectly), and the forged-endpoint-in-`skipFloors` scrub for non-express transports (forged-only, self-inflicted; a general "endpoints always stop" scrub would close it if forged-save hardening is ever swept).
+
 - **Express build time rises 172 -> 188 in-game minutes as a side effect of the width 4->6 change.** `facilities.ts` `buildMinutes = round(60 + width*8 + cost/5000)`, so a 6-wide express takes 16 min longer to build. Arguably correct (bigger footprint = longer build) and never surfaced as a bug, but it is an un-called-out player-facing behavior change. Confirm the value reads fine in play; if not, decouple build time from width for elevators. Low. (Edge Case Hunter.)
 - **The express lobby-stop coercion silently normalizes a pre-existing `.vctower` whose express was given non-lobby stops via the old (now-removed) UI.** On load, `coerceExpressStops` re-skips those floors. This is the INTENDED parity fix (those stops were the break), and the shaft never disconnects (endpoints + lobbies still serve), but it mutates a loaded save's config without notice. Fold into the general widen/coerce load-note tracked in the `e1c-migration` row (one honest line when a load changed a shaft), not per-fix. Low. (Edge Case Hunter.)
 - **Formula-vs-index divergence for an UNBUILT sky-lobby floor.** `tdtImport.ts` builds an express's stops from the positional `isLobbyFloor` (floor % 15), while `coerceExpressStops` uses actual `floorHasLobby` tile counts. On a sparse tower whose floor 15 has no built lobby tile, the importer marks it a stop and coercion re-skips it. Harmless (nothing built there to serve) and they agree whenever the lobby is actually built; unify on one source if the area is next touched. Low. (Edge Case Hunter.)
@@ -700,9 +813,13 @@ clear verdict with three separate threads:
 
 ### Deferred from: code review of mobile-tap-hover (`/gds-code-review`, 2026-07-13)
 
+> **RETIRED (#545).** A mobile inspect-tap raising both the editor (bottom-left) and the quick-info card (top-left), so the facility name and floor render twice, matches desktop (hover card plus selected editor coexist) and docks to opposite corners: minor clutter, not a bug. A future mobile-UX pass could dedupe (suppress the card header when the editor is open, or slim the mobile card to the stats the editor lacks); no standing row.
+
 - **A mobile inspect-tap now raises both the editor and the inspector card, so the facility name and floor render twice at once.** The tap opens the editor (docked bottom-left) and the quick-info card (docked top-left), which duplicates the header. It matches desktop (hover card plus selected editor coexist) and the two panels dock to opposite corners, so it reads as minor clutter, not a bug. A future mobile-UX pass could dedupe (suppress the card's header when the editor is open for the same facility, or slim the mobile card to the stats the editor lacks: access, patronage, satisfaction). Low, both hunters. (Blind Hunter L3 + Edge Case Hunter.)
 
 ### Deferred from: code review of commercial-venue-inspector (`/gds-code-review`, 2026-07-13, PR #205)
+
+> **RETIRED (#545).** `rollOverRetailDay` skipping a non-operational (burning-across-midnight, not-yet-gutted) venue leaves a stale `patronageToday`, but it is largely mitigated: the verdict reads `patronageYest` (the last completed day), fire status shows separately, and `gut` resets the fields once gutted. Revisit only if a burning venue's stale card reads wrong in playtest.
 
 - **`rollOverRetailDay` skips a non-operational venue, so a burning-across-midnight unit keeps a stale `patronageToday`.** The `isOperational` gate (added to preserve the "no data yet" state for gutted/mid-build units) also skips a unit that traded, then caught fire, but is not yet gutted, across a midnight; its `patronageToday` is not rolled. Mitigated: the verdict now reads `patronageYest` (the last completed day), the fire status shows separately, and `gut` resets the fields once the unit is gutted. Revisit only if a burning venue's stale card reads wrong in playtest. (Blind Hunter, Low, largely mitigated.)
 
@@ -765,10 +882,14 @@ quietly reintroduces the very blind spots PR #188 removed.
 
 ### Deferred from: code review of spec-pr-drift-check (`/bmad-code-review`, 2026-07-13)
 
+> **RETIRED (#545).** Both are low, documented repo-config invariants: the `screenshot-approval` environment failing open if deleted is a PREREQUISITE flagged in the workflow header (mitigate with an org policy or a preflight REST check only if it ever bites), and the fork-PR advisory being a silent no-op does not apply since PRs come from same-repo `claude/*` branches.
+
 - **The `screenshot-approval` environment fails OPEN if it is deleted or its required reviewer is removed.** Referencing an undefined GitHub Environment auto-creates it with no protection rules, so `commit-on-approval` would then run with no human gate and auto-commit on every drift. The workflow cannot detect an unprotected environment from within a run, so this stays a repo-configuration invariant (documented in the workflow header as a PREREQUISITE). Mitigation if it ever bites: an org-level environment policy, or a preflight job that calls the REST API (`GET /repos/{o}/{r}/environments/{name}`) to assert `protection_rules` includes a required-reviewer rule and hard-fails otherwise. (Low; the maintainer configured the environment, and the header flags the risk.)
 - **Fork-PR advisory comment is a silent no-op.** A `pull_request` from a fork gets a read-only `GITHUB_TOKEN`, so the sticky comment 403s and is swallowed by `continue-on-error`; the fork author sees no drift guidance, and `commit-on-approval` (correctly) never gates on forks anyway. This repo's PRs come from same-repo `claude/*` branches, so it does not bite today. Follow-up if forks become common: post the drift guidance via a `pull_request_target`-scoped commenter, or surface it in the check summary instead of a comment. (Low; repo uses same-repo branches.)
 
 ### Deferred from: code review of pr-drift-check marker skip (`/bmad-code-review`, 2026-07-13)
+
+> **RETIRED (#545).** Both residuals were properties of the marker-skip branch, which was removed when `update-screenshots.yml` was retired (2026-07-16); neither edge case can occur anymore. The section says so itself.
 
 Both residuals here (a marker head reached via `opened`/`reopened` with no
 concurrent regen, and the `[update-screenshots]` substring collision) were
@@ -778,6 +899,8 @@ the RESOLVED note under "Followups from: screenshot-determinism" above), so neit
 edge case can occur anymore. Nothing to action.
 
 ### Deferred from: code review of ToneAudioEngine split (`bmad-code-review` adversarial, 2026-07-14, Wave C-1)
+
+> **RETIRED (#545).** Nothing was left deferred: both findings (the throwaway `AccentNodes` alloc on no-accent scenes and the empty-`def.scale` NaN in `scheduleStep`) were patched in-PR, the latter with a `toneVoices.test.ts` case.
 
 Change: `ToneAudioEngine.ts` (831 lines) split into `toneScenes.ts` (data + pure
 math), `toneVoices.ts` (synthesis free functions), and the orchestrator class.
@@ -797,9 +920,13 @@ Copilot. Nothing left deferred; both findings were patched in-PR:
 
 ### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
 
+> **RETIRED (#545).** Both are low and pre-existing: the a/b determinism guard only catching divergence between two same-environment runs is inherent to the two-run design (seed the varying input in the generator if an env/time leak ever slips it), and the `resolve-image` pin `.replace` on `undefined` cannot bite with the current top-level `playwright` devDependency.
+
 - **The a/b determinism guard only catches nondeterminism that diverges between two near-simultaneous, same-environment runs.** Both legs render in the same pinned image within the same time window, so entropy that is stable across the pair but varies run-to-run (wall-clock/date-stamped content, font/driver/locale changes) passes the diff yet still drifts. This is a pre-existing property of the two-run design, not introduced by sharding, and PR #188 already removed the known time leak by mocking the clock. If a future env/time leak slips it, the fix is to seed/pin the varying input in the generator, not to add a third run. (Low; inherent to the guard's scope.)
 - **`resolve-image` pin step can throw if Playwright is not a top-level devDependency.** `require('./package.json').devDependencies.playwright.replace(...)` is the fallback when `package-lock.json` has no `node_modules/playwright` entry; if Playwright is only present via `@playwright/test` or under `dependencies`, `.replace` is called on `undefined`. Pre-existing code, unchanged by this PR. Harden with a `?.` + explicit error if it ever bites. (Low; pre-existing, current layout has top-level `playwright`.)
 ### Deferred from: code review of spec-standard-elevator-dimensions (BMGD 3-layer, 2026-07-12)
+
+> **RETIRED (#545).** All four deferrals were fixed in the same PR (overlap cross-check on deserialize, idempotent v5 widening, TDT export collision warning, lot-width doc fix), plus a second-review medium (loader clamps stored transport widths to catalog). The one residual, a still-boxed 3-wide shaft cannot round-trip a TDT export losslessly, is an unfixable-in-format ceiling intentionally not tracked (the 1994 format has no shaft-width field).
 
 All four deferrals from this review were FIXED in the same PR at the owner's ask, so nothing
 here needs triage: `Simulation.deserialize` now cross-checks transport overlaps (drops a
@@ -818,6 +945,8 @@ and counts drops by emulating the importer's keep/drop rule.
 
 ### Deferred from: spec-pixel-8a-crash-fix (2026-07-12)
 
+> **ABSORBED (#545) into `render-perf-region-composition` (#366).** Batching or culling the ~935 room actors (~16ms of a paused desktop frame on a 10,344-unit save) the way floor/lobby tiles were TileMap-ified is exactly that thread's region-composition work for huge towers on phones.
+
 - Renderer: the ~935 room actors still cost ~16ms of a paused desktop frame on a
   10,344-unit save (ablation in the crash investigation). Batching or culling
   them the way floor/lobby tiles were TileMap-ified is the next big win for
@@ -826,10 +955,14 @@ and counts drops by emulating the importer's keep/drop rule.
 
 ### Deferred from: code review of screenshot-determinism (`/gds-code-review`, 2026-07-12)
 
+> **RETIRED (#545).** Both are low latent constraints, not live bugs: `pgRefreshUi` depending on the ~160ms throttle living in `GameApp.update` (expose an unthrottled `UI.forceUpdate()` only if the throttle ever moves into `UI.update`), and scene builders/`assertReady` running against the frozen clock (a non-issue for every current builder, which mutates the sim synchronously).
+
 - **`pgRefreshUi` depends on the ~160ms UI throttle living in the caller (`main.ts` `update()`), not inside `ui.update()`.** The screenshot runner repaints throttled DOM chrome before capture by calling `ui.update()` / `updateTraffic()` directly, which works only because the `performance.now()`-based throttle guard sits in `GameApp.update`, not in `UI.update`. If that throttle ever moves into `UI.update` (or becomes `performance.now`-based inside it), the direct call would be silently swallowed under stepped frames (a few wall-clock ms), capturing stale chrome with no error. Follow-up if it ever bites: expose an unthrottled `UI.forceUpdate()` entry point for the generator. (Low; fragile invariant, not a live bug.)
 - **Scene builders and `assertReady` run against the already-adopted (frozen) clock.** `pgAdoptTestClock` precedes `pgDismissSplash`, `scene.build`, and `assertReady` in `runScene`, and no frames step until the first `settle()`. Every current builder mutates the sim synchronously (places units, `setSim`) and `assertReady` reads synchronous sim state, so this is a non-issue today. But a future builder that needs an engine tick to materialize something would spin to the `waitForFunction` timeout instead of passing as it would under the live clock. Latent constraint to remember when adding scenes. (Low; no current scene affected.)
 
 ### Deferred from: code review of spec-stranded-floor-move-ins (2026-07-12)
+
+> **RETIRED (#545).** The single tower-wide `strandedNudged` latch suppressing a later floor's advisory (widened since the latch sits in the `rentable` scope while the modal lists only `leased` floors) is a low legibility nicety; resurface with a per-floor or count-based latch if a missed nudge reads wrong in play.
 
 - Stranded-floor advisory latch is a single tower-wide boolean (`Simulation.strandedNudged`): while any stranded floor persists, a different floor going stranded on a later day emits no new advisory. Widened surface since the latch is now held by the `rentable` scope while the stats modal lists only `leased` floors, so an all-empty stranded slab (invisible in the modal) can consume the one-shot nudge a later leased-and-stranded floor would otherwise get. Consider a per-floor or count-based latch.
 
@@ -839,11 +972,15 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of story-mobile-pinch-pointer-tracking (`/gds-code-review`, 2026-07-12)
 
+> **RETIRED (#545).** Three low, pre-existing, self-healing edge cases: a swallowed mouse pointerup outside the window leaking a transient tracker contact (heals on the next press), a pinch-aborted paint run losing its undo step (immediate Ctrl+Z still works), and the elevator hover ghost ignoring dry-run/funds (cosmetic, desktop-only). Add pointer capture / a `cancelled` flag when the touch path is next touched.
+
 - **Swallowed mouse pointerup outside the window leaks a transient tracker contact (Edge F3).** Mouse-down on the canvas, drag out of the window, release there: no up/cancel reaches Excalibur's canvas listener, so the contact stays tracked and the NEXT one-finger touch press reads as a pinch. Self-heals on the next mouse press (the stable native id overwrites, size stays 1) or a tower swap (`setSim` input reset). Pre-existing in the old `pointers` map; now transient instead of permanent. Follow-up if it ever bites: pointer capture on mouse-down or a window-blur `tracker.reset()`. (Low, pre-existing, hybrid devices only.)
 - **Pinch-aborted paint run loses its undo step (Edge F4).** `captureUndo` fires in `onActionDown`; a pinch aborts the gesture without `onActionUp`, so the pending pre-paint snapshot is overwritten by the next gesture's capture and the pre-pinch strip can never be undone (immediate Ctrl+Z still works). Documented overwrite semantics in `UndoHistory.capture`; pre-existing, unchanged by the fix. (Low, pre-existing.)
 - **Elevator hover ghost validity ignores dry-run/funds (investigation side finding).** `main.ts` `updateBuildPreview` sets `valid: isUnlocked(kind)` for drag-sized transports, so a desktop hover shows a gold ghost where a drop would refuse. Cosmetic, desktop-only. (Low, pre-existing.)
 
 ### Deferred from: saves-modal party ruling (2026-07-13)
+
+> **RETIRED (#545).** Tower thumbnails rendered from save data is a future UX-owned UI story (Sally's IOU) with open design questions (sizing, per-`savedAt` caching, the cost of deserializing four slots at open time); resurface when UX picks it up.
 
 - **Tower thumbnails in the Saves dialog, rendered FROM save data.** The save
   already carries every unit, so the modal could draw a small silhouette per
@@ -852,6 +989,8 @@ Triage them into the table above, then delete the raw note._
   cost of deserializing four slots at open time are the design questions.
 
 ### Deferred from: code review of story-save-metadata-and-log-tail (`/gds-code-review`, 2026-07-12)
+
+> **RETIRED (#545).** The one item (undo/redo trimming bulletin scrollback to the save cap) was done 2026-07-12: `LOG_SAVE_CAP` now equals the 300-entry ring cap, so saves and undo snapshots hold exactly the live ring.
 
 - ~~**Undo/redo trims bulletin scrollback to the save cap (Edge, medium).**~~
   Done 2026-07-12 (owner-delegated party ruling, same day): `LOG_SAVE_CAP`
@@ -863,6 +1002,8 @@ Triage them into the table above, then delete the raw note._
   second serialize behavior to keep in sync forever.
 
 ### Deferred from: code review of PR #184 commercial census takeover (`/gds-code-review` + party, 2026-07-12)
+
+> **ABSORBED + RETIRED (#545).** The missing commercial "counts toward stars" inspector cue folds into `commercial-venue-inspector` (#313). Retired the rest, all accepted-by-design, cosmetic, latent, coverage, or aware-no-action: the congestion-overlay meal-invalidation test gap, the closed shutter hiding variety, over-capacity arrivals eating uncounted, `Crowd.reset()` stranding venue counters (tests-only today), the eating increment skipping state-at-arrival, returners counting until despawn (ratified), and the time-of-day save-slot pop snapshot.
 
 - **Congestion-overlay meal invalidation lacks a direct test (Edge, layouts round).** `drawStatsMap` now invalidates on `mealOverlayRevision` for the congestion mode, but no test drives the private render path across a revision bump; `towerEngineMealOverlay.test.ts` covers the sync trigger only. Add one if a TowerEngine test harness ever exists. (Low, coverage.)
 
@@ -877,6 +1018,8 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of tower-wide-meal-cadence (`/gds-code-review`, 2026-07-09)
 
+> **RETIRED (#545).** All six are low and inherited, documented-intent, or negligible-perf: the spawn-vs-`updatePresence` hour-boundary ordering, the day-0 breakfast bulletin skip, the post-dinner pacing sprint, the multi-day catch-up bulletin miss, the evening-flow dilution by meal options, and the per-`pushMealOptions` allocation. Playtest and re-tune weights if a healthy tower's flow reads wrong.
+
 - **Spawn-vs-updatePresence ordering (Edge F3).** `advanceStep` calls `crowd.spawn` BEFORE `onHour -> updatePresence` runs. On the first tick that crosses into a new hour, spawnFloors sees `u.occupants` from the PRIOR hour. Normally benign because presence was already correct at the previous boundary; the diff's "no explicit isWeekend check needed" claim depends on this invariant, which is not asserted anywhere. Add a targeted regression if a bug ever surfaces on the Saturday-08:00 load edge. (Low, inherited, not caused by this diff.)
 - **Day-0 breakfast bulletin silently skipped (Edge F5).** The sim starts at exactly 07:00, so `dayOfKind = floor((420 - 420)/1440) + 1 = 1` and `absMinute = 1860`; a first tick that stays under 1860 minutes cannot fire the breakfast bulletin. Consistent with the strict-after semantics the shipped lunch code has (lunch DOES fire day 0 because noon > 07:00). Documented behavior; breakfast fires from day 1 onward. (Low, inherited.)
 - **Post-dinner 2.26x pacing sprint (Edge F6).** The 18:30-21:00 sub-period runs at 1.25 min/frame (2.26x normal) because the dinner-crawl budget is carved out of the shipped 400-frame 17-21 block. Real-time-to-simulate is invariant; the player watches the clock lurch after the dinner crawl ends. Design consequence, not a bug. Consider a bigger day budget as a follow-up if the lurch reads awkward in playtest. (Low.)
@@ -886,6 +1029,8 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: retail-subtypes-and-variety scope split (`/gds-quick-dev`, 2026-07-09)
 
+> **ABSORBED (#545).** Both PR-B items are already curated rows: `facility-visual-variety` and `commercial-venue-inspector` (#313). Nothing untracked; the detailed implementation notes here remain useful reference for those rows.
+
 Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shipping PR under the token ceiling. PR-A ships the retail-subtype engine seam + TDT round-trip + inspector title + "Change variety" reroll (closes backlog `retail-subtypes`). PR-B is deferred; both items below are cleared to start immediately AFTER PR-A merges, since they read `Unit.subtype` on retail and share no engine surface with each other.
 
 - **`facility-visual-variety` (P3, idea, remains open).** Same-kind rooms look a little different. Retail sprites read `u.subtype` for a per-variant palette (11 shop / 5 restaurant / 5 fast-food shades). Office/hotel*/condo sprites derive a stable per-unit variant from `hash(u.id)` at render time (never stored, no engine impact). Model: `src/render/excalibur/pixelSprites.ts:267` condo wall-color pattern (already reads `hash(u.id)`); extend to `src/render/excalibur/TowerEngine.ts:1444` sprite-cache `sig` so a rerolled subtype re-bakes. Cosmetic-only. No save impact. Version bump patch.
@@ -893,16 +1038,22 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: code review of classic-calendar-parity (`/gds-code-review`, 2026-07-08)
 
+> **RETIRED (#545).** The 999-year day-counter roll is not player-reachable in normal play (~33 real-days at fast speed) and out of GDD acceptance scope; the trailing-slots weekend model fits the canon "2 weekday + 1 weekend" week and needs a non-trailing offset only if the owner harness validation finds the retail game phases the weekend on a non-trailing slot (contingent).
+
 - **999-year day-counter roll unimplemented.** Canon (`docs/canon/tdt-format.md` §3, GDD §0) says the day counter rolls at 11,987 (999 years); our `Clock.year = floor(day / yearDays)` grows unbounded with no wrap, so a tower run for 999+ canon years (≈11,988 days) shows Year 1000+ where the real game wraps. Out of the GDD §5 acceptance scope and not player-reachable in normal play (12-day years, but still ~33 real-days of play at fast speed); flagged by the Acceptance Auditor for completeness. Add a wrap in `Clock.day`/`year` (and confirm the TDT export clamps `currentDay` to the same modulus) if it ever matters. (Info/Low.)
 - **Weekend-phase model is trailing-slots only.** `Calendar.weekendDays` sets how many TRAILING day-slots are the weekend, so the model cannot express a NON-trailing canon weekend (slot 0 or 1). The canon "2 weekday + 1 weekend" week is naturally trailing, so this is only a problem if the owner harness-validation (task on the `classic-calendar-parity` row) finds the retail game phases the weekend on a non-trailing slot; then add an explicit weekend-phase offset to the Calendar + Clock arithmetic. Contingent on the harness result. (Auditor, Low/contingent.)
 
 ### Deferred from: code review of TDT import trailing-structure fix (`/bmad-code-review`, 2026-07-08)
+
+> **ABSORBED (#545) into `tdt-real-game-fidelity` (#300).** The silent stair loss on a non-truncated locate-failure and the `locateStairs` max-built-scan heuristic are TDT-import reliability items for that fidelity epic (validate against more real saves, esp. a low-stair-count tower with populated trailing blocks). The per-car 348-byte stride being unverified overlaps `tdt-header-counts-verify` (#348): verify against a real multi-car save.
 
 - **Silent stair loss (no warning on locate-failure).** PARTIALLY ADDRESSED (Copilot re-review 2026-07-08): the clear truncation case (file ends right after the elevator table, before finance) now warns in `walkTolerantTail`. Still open for a non-truncated file: `locateStairs` (`src/storage/tdtFormat.ts`) returns `[]` both when a tower genuinely has no stairs AND when it fails to locate a real table; the old code pushed a player-visible "stairways and escalators stayed behind" warning on truncation. There is no reliable signal to distinguish the two (the scan is anchor-on-a-built-record). The scan is reliable on the one real sample; revisit with a truncation heuristic (e.g. warn if elevators decoded but the file is implausibly short for its content) if a real save ever shows a false-negative. Confirmed by Blind + Edge Case hunters (Med).
 - **Per-car 348-byte term unverified.** The elevator record stride `3140 + 324*servicedFloors + 348*cars` is validated end-to-end only against my_tower.TDT, whose 3 shafts are all cars=1, and the fixture pads with the SAME formula (self-referential), so no test independently pins the 348 per-car size (or the 3140 base). Verify against a real save containing a MULTI-CAR built shaft before trusting exports/imports of many-car towers. Confirmed (Low, coverage gap).
 - **`locateStairs` max-built scan is a heuristic, not a guarantee.** It picks the 64-record window with the most in-range built records; a coincidental later region (e.g. the §11 lobby/reachability 528x6 table, or §12 named-tenant bytes) could theoretically out-count a small real table and import phantom flights. Mitigated in practice (my_tower with those trailing blocks imported exactly 6 correct flights; parking's stall bytes inject rejecting values; window tightened to 4 KB; x>=1 rejects the common `01 00..` garbage). Harden with a contiguity/cluster check or calibrate against more real saves (esp. a low-stair-count tower with populated trailing blocks). Suspected (Edge Case hunter, Med).
 
 ### Deferred from: splash-on-cold-reopen (`/bmad-code-review`, 2026-07-08)
+
+> **RETIRED (#545).** A newly founded tower (New Tower) landing at play speed rather than paused is pre-existing and harmless (an empty tower loses no game-hours, and every other boot lands paused); have `newGame` call `setSpeed(0)` if "every boot lands paused" is ever wanted uniform.
 
 - **A newly founded tower (New Tower) lands at play speed, not paused.** From the
   splash, New Tower → `dismiss()` runs `teardownSplash()` → `pauseForSplash(false)`
@@ -916,6 +1067,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   cold-reopen review.)
 
 ### Deferred from: code review of story-e1a-platform-port (`/gds-code-review`, 2026-07-08)
+
+> **ABSORBED + RETIRED (#545).** The wrong-shaped native export toast (`exportGame` toasts synchronously before the port's async `saveFile` settles) belongs to E3b, the native bridge shell, in the mobile-distribution stream (#385). The native-mode resolution path being unreachable from vitest (`import.meta.env.MODE` pinned to `"test"`) is covered operationally by E1c's `--mode native` bundle acceptance check: retired, observe both resolution paths there.
 
 - **Native export feedback is wrong-shaped for the platform port.** `exportGame`
   (`src/game/saveLoad.ts:168-170`) toasts "Tower exported (X KB). Check your
@@ -944,6 +1097,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: code review of breathing-clock wire-up (PR #154, `/gds-code-review`, 2026-07-07)
 
+> **ABSORBED (#545) into #541 (AUD-024's `accMinutes` guard).** The backgrounded-tab burst amplified by night pacing is the same tab-restore / `accMinutes` surface item 4 of the a11y-UX sweep covers; verify Excalibur's >200ms clamp covers the tab-restore path on real devices before adding any `accMinutes` cap of our own.
+
 - **Backgrounded-tab burst simulation is amplified by night pacing (pre-existing
   class, wider now).** `main.ts update()` accrues `accMinutes` from raw `dtMs`;
   Excalibur clamps a >200 ms frame down to 1 ms, which bounds ordinary hitches,
@@ -954,6 +1109,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   cap of our own.
 
 ### Deferred from: code review of the .TDT importer (2026-07-07)
+
+> **RETIRED (#545).** Structure-aware shaft placement concerns only the `synthesizeTransports` FALLBACK for corrupt or truncated files (real saves decode their shafts directly since canon doc v2) and is harmless to the sim (dispatch ignores structure, only a visually floating shaft the player bulldozes); improve the per-band x heuristic if the synthesis fallback is next touched.
 
 - **Structure-aware shaft placement for imported towers**: `synthesizeTransports`
   (`src/storage/tdtImport.ts`) places every shaft in one x-run around the GLOBAL
@@ -971,6 +1128,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   .TDT importer review, both rounds.)
 
 ### Deferred from: traffic-indicator fix (PR #141, `/gds-code-review`)
+
+> **ABSORBED + RETIRED (#545).** The traffic-chip hotspot floor jittering and spamming the `aria-live` region on near-tie crossings folds into #541 (the a11y live-region sweep; move the floor number out of the live region or debounce it). The multi-tier upward jumps entering the higher tier ~0.02 congestion early is a negligible pre-existing calibration asymmetry: retired.
 
 - **Traffic chip's hotspot floor can jitter and spam the `aria-live` region on
   near-tie crossings**, `updateTraffic` (`src/main.ts`) recomputes
@@ -990,6 +1149,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: gds-code-review E3.1 (parking ratio + one-car sprite), 2026-07-07
 
+> **RETIRED (#545).** The dev sprite catalog stretching the single-stall parking sprite to the full cell width is dev-only tooling and cosmetic (not player-facing); render parking at its true footprint, and revisit the sprite-gallery shot, when the E1b parking width change (6 to 4) lands and screenshots regenerate.
+
 - **Dev sprite catalog stretches parking to the cell width**, `gallery.ts:144`
   (`w≈292`) and `preview.ts:79` render `drawParking` at the full catalog-cell
   width, so the new single-stall parking sprite reads as one small car adrift in
@@ -999,6 +1160,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   lands and screenshots regenerate, revisit the sprite-gallery shot then._
 
 ### Deferred from: gds-code-review E4 (mobile floor/lobby drag-paint), 2026-07-07
+
+> **RETIRED (#545).** A jittery touch tap over-painting one adjacent tile is low: floor/lobby runs are contiguous by intent and cheap, and a pure no-move tap still lays exactly one strip. Gate `paintFloorRun` behind a small on-touch movement threshold mirroring the pan-tap slop if it ever annoys.
 
 - **Jittery touch tap with floor/lobby can over-paint one adjacent tile**, the
   "action" path has no movement slop (`TowerEngine.pointerMove` fires
@@ -1010,6 +1173,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   movement threshold mirroring the tap slop. (Blind Hunter finding 2.)
 
 ### Deferred from: gds-code-review (mobile tap lays the full brush strip), 2026-07-08
+
+> **RETIRED (#545).** Two low, pre-existing touch-cancel edge cases: a browser `pointercancel` on an unmoved press committing the tap placement (Excalibur routes `cancel` into the same handler as `up`), and a pinch interrupting a just-seeded paint drag escaping undo. Thread a `cancelled` flag from the engine's cancel event into `onActionUp` (drop the tap and transport commit on cancel) when the touch path is next touched.
 
 - **A browser `pointercancel` on an unmoved touch press commits the tap
   placement**: Excalibur routes `cancel` into the same handler as `up`
@@ -1037,6 +1202,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: party-mode chrome restructure, 2026-07-12
 
+> **ABSORBED (#545) into the a11y-UX sweep (#541).** Exposing the shipped `colorblindCue` pref (default on, gates optional color-redundant markers) in the Settings dialog is a small a11y-UI item that fits that sweep; it deserves a demo of the gated markers and explanatory copy.
+
 - **`colorblindCue` pref has no UI**: the Prefs field ships (default on, gates
   optional color-redundant markers) but nothing exposes it. The new Settings
   dialog is its natural home; exposing it deserves its own story with a demo
@@ -1044,6 +1211,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   2026-07-12.)
 
 ### Deferred from: gds-code-review (rain shaping / overview doubling), 2026-07-12
+
+> **RETIRED (#545).** The overview melody doubling passing through the 650 Hz distance lowpass was shipped as-is and verified to still land (500-2000 Hz energy rose 5.6x zoomed out in the built app); route the doubling dry to the music bus only if phones read too quiet zoomed out.
 
 - **The overview melody doubling passes through the 650 Hz distance lowpass**,
   which attenuates the upper half of its 523-1975 Hz range by roughly 9-19 dB
@@ -1054,6 +1223,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   the reverb/scene mix. (Edge Case Hunter, 2026-07-12.)
 
 ### Deferred from: bmad-code-review (settings modal), 2026-07-12
+
+> **ABSORBED (#545) into the a11y-UX sweep (#541).** The splash no longer reaching the sound/accessibility controls (the Settings entry sits behind the splash focus trap, so a motion-sensitive player without OS `prefers-reduced-motion` cannot enable the override before dismissing the animated splash) is a real a11y gap for that sweep: add a small Settings affordance on the splash, or hoist the Reduced-motion toggle there.
 
 - **The splash can no longer reach the sound/accessibility controls**: the
   Help dialog (openable from the splash's "How to Play") used to host the
@@ -1067,6 +1238,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: bmad-code-review (persisted volume settings), 2026-07-12
 
+> **RETIRED (#545).** Cross-tab `savePrefs` being whole-object last-writer-wins is a pre-existing shape (reducedMotion/steadyClock had it), only slightly widened by the volume debounce and bounded by the pagehide flush; do a read-merge-write inside `savePrefs` or add a `storage`-event listener when the prefs path is next touched.
+
 - **Cross-tab prefs writes are whole-object last-writer-wins**: `savePrefs`
   rewrites the entire `vc.prefs` blob from a per-tab in-memory copy loaded
   once at boot, so a write from tab A (e.g. the debounced volume save) can
@@ -1078,6 +1251,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   (Edge Case Hunter, 2026-07-12.)
 
 ### Deferred from: bmad-code-review (test-reorg infra, PR #229, 2026-07-13)
+
+> **RETIRED (#545).** The confirmed findings were all patched in the PR (drift-check path filter, stale docs, the `unit` project spreading Vitest's default excludes back in). The one low residual, nothing enforces the `.integration.test.ts` naming convention, is a nice-to-have guard to add if the two-tier split ever drifts.
 
 Two-tier Vitest projects (unit + integration) plus the colocation pilot. Blind
 Hunter and Edge Case Hunter ran (Copilot also reviewed). The confirmed findings
@@ -1096,6 +1271,40 @@ parked here:
   is never lost, but it defeats the tier split and can blow the unit tier's
   timing assumptions. Consider a small naming check (a guard test or lint rule)
   as the per-area colocation reorg spreads. (Blind Hunter, Low.)
+
+### Triage summary (#545, 2026-07-21)
+
+One-time clearing pass over the deferral inbox, adopting the per-PR cadence
+recorded in "How items flow". Every `### Deferred from:` section dated
+2026-07-19 or older was given a leading disposition blockquote; its evidence is
+preserved beneath. Counts:
+
+- **95** total `### Deferred from:` sections.
+- **4** still-recent, left un-triaged as the 2026-07-20 in-flight window
+  (reachability PR1 gds + bmad, hotel late-checkout, and the Classic vs Modern
+  pages defer; the first three sit just above the Triaged heading, the last in a
+  lower cluster).
+- **91** triaged, of which:
+  - **46 absorbed** into a curated row (existing or one of the new rows below).
+    27 of these also retired a spent remainder in the same blockquote (the
+    "ABSORBED + RETIRED" marker), folding the live part and closing the rest.
+  - **44 retired** with a factual reason (accepted-for-v1, cosmetic, dismissed
+    with evidence, or obsoleted by later work); no standing row warranted.
+  - **1 resolved** (the deferred work had already shipped).
+- **8 newly tracked** curated rows, each bundling a recurring orphaned theme
+  with no prior home and each with a newly created mirrored issue:
+  `housekeeping-modern-refinements` (#547), `demand-pools-calibration` (#548),
+  `inspector-advice-mode-gate` (#549), `vacate-cause-reattribution` (#550),
+  `pr-drift-check-scenes-glob` (#551), `venue-crowd-real-occupancy` (#552),
+  `audio-first-cue-latency` (#554), `lit-string-builder-retirement` (#557).
+
+Folds into an existing row point at their destination in the section's
+blockquote (for example the fold-in dialog defer into `schedule-dialog-live-rings`
+#475). The tab-restore / undo-behind-guards / traffic aria-live items point at
+the `a11y-ux-sweep` (#541) row, which landed on main via #559 while this pass was
+in flight; those folds now resolve to that real curated destination. No
+pre-existing curated row was rewritten; the table changed only by appending new
+rows.
 
 ## Completed / superseded
 
@@ -1160,6 +1369,8 @@ parked here:
 
 ### Deferred from: code review of E1 pixel-art shared language (`/gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** No residual defers: every finding was patched in-PR, including the one Edge Case Hunter parking item (`shade()` yielding `rgb(NaN,...)` for a non-hex argument), which now returns a non-hex argument unchanged so the helpers degrade gracefully while every shipped caller stays byte-identical.
+
 Change: E1 adds the finalized `person()` build family, `moodTint`, new `PAL`
 keys, and the shared helpers (`windowView`, `roomGlow`, `ceilingFixture`,
 `dado`, `castShadow`) to `pixelSprites/common.ts`, plus the food/shop
@@ -1178,6 +1389,8 @@ argument unchanged, so those helpers degrade gracefully; every shipped caller
 still passes a `#RRGGBB` literal, so current output is byte-identical.
 
 ### Deferred from: code review of E2 pixel-art tenant rooms (`/gds-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** No residual defers: all ten findings were patched in-PR and the rest were dismissed as intended-by-design or already-guarded (sub-production window math, occupancy-keyed downlights, per-layout seat caps, the `w > 44` grade exclusions, draw order, the mirrored sleeper, and the minimal-barrel `residential.looks.ts`/`dollhouse.ts` non-export).
 
 Change: E2 ports office, condo, and the three hotel grades to the ratified
 page-02 warm-dollhouse composition. New `pixelSprites/dollhouse.ts` (the
@@ -1239,6 +1452,8 @@ consumer like the food/shop look tables do, and the `barrelSurface.test.ts`
 deliberately curates a minimal barrel surface, so re-exporting would add dead
 surface against an intentional guard).
 ### Deferred from: E5 pixel-art utilities and service (`/gds-code-review`, 2026-07-14)
+
+> **ABSORBED (#545) into `venue-crowd-real-occupancy` (#552).** All three items ride the people-system traffic seam: the metro real-commuter platform crowd (this PR removed the ghost `scatterPeople` and left the platform empty per spec), the party-hall `scatterPeople` retirement, and the fixed-size figures not scaling with the room rect at non-bake sizes (handle figure sizing in the people-system compositor, not per facility). No live defect: the real render bakes at identity.
 
 Change: E5 enriches the seven utilities-and-service looks (recycling, metro,
 medical, security, housekeeping, parking, parking ramp) by porting each from its
@@ -1349,6 +1564,8 @@ the stair / escalator sprites:
 
 ### Deferred from: code review of E6 structure/transport art followup (`gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** The sky-lobby-unstaffed item was resolved by owner decision (the sky lobby stays unstaffed; amend the frozen I/O matrix line, no code). The stairs/escalator no-rider item is an intentional spec renegotiation for traceability (amend the frozen AC via the renegotiation ritual). The marquee overpainting the compact grand-solo door header and a narrow 1-tile lobby showing no receptionist are low, degenerate-case cosmetics.
+
 Change: `src/render/sprites/structure/lobby.ts` (reception moved out of repeating
 variant 1 into a person-free console/bench; `skyGlass` tones down the sky lobby),
 `src/render/sprites/structure/entrance.ts` (one reception desk + attendant in the
@@ -1396,6 +1613,8 @@ were corrected to note the compact 1-tile fallback shows no receptionist. Defers
 
 ### Deferred from: code review of E6 grand hotel entrance redraw (`gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** The wide grand entrance carrying one palm (right flank) rather than one on each side is a 22px layout conflict with the required reception desk that needs an owner decision, not a code fix. The fixed 18px door height (not proportional to `h`) is test-fidelity/robustness only: entrance tiles always bake at `FLOOR = 44` in production. Derive the door height from `h` only if entrances ever bake at another height.
+
 Change: `src/render/sprites/structure/entrance.ts` grand forms redrawn from the
 glass storefront + green marquee to the page-05 `grandEnt` grand hotel entrance
 (red scalloped awning, gold double doors, glass curtain wall, red carpet, potted
@@ -1429,6 +1648,8 @@ derives its base from the `fy = h - 6` floor line. Defers:
   (Edge Case Hunter. Low; robustness.)
 
 ### Deferred from: code review of E1 (createUICallbacks split) (`/bmad-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** The residuals are behavior-preserving-split byproducts intentionally not actioned (a behavior-preserving E1 must not change behavior or over-grow the composition root): the controller ports widening from `private readonly` to public `readonly` to back `GameAppPorts`. Revisit the visibility surface if the composition root is ever restructured.
 
 Change: E1 extracts the ~30-callback `UICallbacks` literal out of the `GameApp`
 constructor into `createUICallbacks(app: GameAppPorts)` in `src/game/uiCallbacks.ts`,
@@ -1474,6 +1695,8 @@ composition root):
 
 ### Deferred from: code review of E2-S1 (event-choice lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `eventChoiceHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the lost fail-loud `[data-act]` lookup is inherent to inline `@click` dispatch (the binding is co-located), and the pre-existing input behaviors (no `isModalOpen` guard, empty message/costLabel, throwing `onResolve`) are later input-hardening candidates unchanged by the migration.
+
 Change: E2-S1 migrates `showEventChoice` (the emergency modal) onto the E0
 `openModalTemplate` seam with a lit `eventChoiceTemplate` and inline `@click`,
 keeping the resolve-exactly-once `finish` guard and the Esc/backdrop/x decline
@@ -1507,6 +1730,8 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
   throwing escapes the handler. Candidates for a later hardening pass, not here.
 ### Deferred from: code review of E2-S2 (update-prompt lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `updatePromptHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: `fireAndForget` silently swallowing a failed Update (`.catch(() => {})`, unchanged from main) and the malformed non-array `notes` throw are pre-existing, behavior-preserving; a later hardening pass could surface a toast/log.
+
 Change: E2-S2 migrates `showUpdatePrompt` onto the E0 `openModalTemplate` seam with
 a lit `updatePromptTemplate` (inline `@click`, nested sub-templates for the
 optional What's-new and build-id blocks), keeping the fire-once `done` guard, the
@@ -1537,6 +1762,8 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
 
 ### Deferred from: code review of E2-S3 (settings lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED (#545) into `lit-string-builder-retirement` (#557).** The only residual is the `settingsHtml` retirement; the stateful wiring (volume sliders, live-re-read switches, OS-forced reduced-motion relabel, the retained loud `[data-act]` Close) stayed verbatim in the controller.
+
 Change: E2-S3 migrates the Settings dialog structure (`settingsHtml`) onto the E0
 `openModalTemplate` seam with a STATIC lit `settingsTemplate`. Settings is stateful,
 so the controller (`showSettings`) keeps all the wiring verbatim: the volume sliders
@@ -1551,6 +1778,8 @@ relabels the switch. The Close button remains wired by the shared `wireActions` 
   and its transitional test when the last string dialog converts (E6/E7).
 
 ### Deferred from: code review of E2-S4 (help lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `helpHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the `.help-report a` non-null assertion (a defensive guard can wait until the body becomes conditional) and the un-deduped Replay double-activation (`onReplayOnboarding` is idempotent), both pre-existing and behavior-preserving.
 
 Change: E2-S4 migrates the Help / How-to-play dialog (`helpHtml`) onto the E0
 `openModalTemplate` seam with a lit `helpTemplate`. The large body is authored
@@ -1582,6 +1811,8 @@ Residual defers (behavior-preserving):
   is idempotent enough that a fast double-click is harmless; no change needed now.
 
 ### Deferred from: code review of E3-S1 (saves lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `savesHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the `when`-line/population/funds boundary paths are exercised only via the equivalence guard but are unreachable in practice (`infoFrom` already bounds `SlotInfo`), and the locale-dependent date/number formatting is deliberately guard-only rather than pinned to brittle literals.
 
 Change: E3-S1 migrates the Saved Towers slot manager (`savesHtml`) onto the E0
 `openModalTemplate` seam with a lit `savesTemplate`. Slot rows are nested
@@ -1616,6 +1847,8 @@ fixed in `saves.test.ts`. Residual defers (behavior-preserving):
 
 ### Deferred from: code review of E3-S2 (stops lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `stopsHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the un-pinned second `@change` (the modal renders once, so a dropped listener is unreachable), the single-lobby-row-only coverage (one lobby run per tower is the norm), and the `floor === 0` "B0" quirk (floor 0 is unreachable, callers index ground as 1), all pre-existing.
+
 Change: E3-S2 migrates the per-floor elevator stops dialog (`stopsHtml`) onto the
 E0 `openModalTemplate` seam with a lit `stopsTemplate`. Rows are nested
 `TemplateResult`s (not a joined string), the title auto-escapes (no `escapeHtml`),
@@ -1644,6 +1877,8 @@ confirmed all seven ACs; Edge Case Hunter found no `patch` gaps. Residual defers
 
 ### Deferred from: code review of E3-S3 (new-tower lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `newTowerHtml` retirement joins `lit-string-builder-retirement` (#557) (which carries the note to add a direct copy assertion for the lede / mode descriptions / calendar copy before deleting the builder). Retired: the calendar tab-order / keyboard reachability being verifiable only in e2e (confirm the e2e suite covers the new-tower dialog's tab order; source order is pinned at the unit tier).
+
 Change: E3-S3 migrates the Found a New Tower rule-set picker (`newTowerHtml`) onto
 the E0 `openModalTemplate` seam with a lit `newTowerTemplate`. Static structure:
 only the abandon warning is conditional (on `hasSave`); the `.nt-calendar`
@@ -1671,6 +1906,8 @@ byte-for-byte equivalence (incl. the `2×–2.5×` / `2–5` numeric-range glyph
   order; add one if it does not.
 
 ### Deferred from: code review of E3-S4 (TDT reports lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED (#545) into `lit-string-builder-retirement` (#557).** The three report builders (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`) join the retirement list; the import-rounds/export-does-not asymmetry and the previously-unasserted `#a11y-live` announcement were both fixed in-PR.
 
 Change: E3-S4 migrates the export-choice modal and the TDT import/export fidelity
 reports (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`) onto the E0
@@ -1739,6 +1976,8 @@ Residual defers (behavior-preserving):
 
 ### Deferred from: code review of E4 (batch-pricing reactive lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `batchPricingHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: announcing the bulk-reset arming to screen readers is a deferred a11y WIN (fits the a11y-UX sweep #541 when picked up), and the low-value reactive paths (set-to-default round-trip, only-default re-preview, inc/dec from empty/NaN) are near-verbatim mirrors of the old controller with low regression risk.
+
 Change: E4 migrates the batch-pricing dialog (`batchPricingHtml`) onto the E0
 `openModalTemplate` seam and, per the E4 story, replaces the imperative `refresh()`
 with a re-render from local dialog state on every input event. The controller holds
@@ -1768,6 +2007,8 @@ which skips the write when the DOM already matches. Residual defers
   of the old controller; low regression risk, defer.
 
 ### Deferred from: code review of E5-S0 (perf gate harness) (`/bmad-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** All three PATCH findings were fixed before landing. The "E5-S1 should assert X once a live-view write path exists" residuals (the write-before-`positionPanels` ordering, the `towerStatsChildStable` node-identity) were resolved in E5-S1, which shipped (recorded as a structural guarantee / promoted to an assertion). The remaining notes are low tuning knobs: widen `B_FLOOR_TOL` if CI proves noisier, and tighten the `@perf` substring-grep tag convention if the suite grows.
 
 Change: E5-S0 lands the blocking Playwright perf gate ahead of the live-view
 migrations: `e2e/perf-harness.ts` (browser-side measurement helpers),
@@ -1844,6 +2085,8 @@ an invariant no current writer can violate (the container ships empty and
 ever wanted, is asserting `#tower-stats` is empty at UI construction.
 
 ### Deferred from: code review of E5-S2 (tool-info lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `buildToolInfoHtml` / `BULLDOZE_TOOL_INFO_HTML` / `INSPECT_TOOL_INFO_HTML` retirements join `lit-string-builder-retirement` (#557). Retired: the tightened catalog-copy escaping (lit auto-escapes the trusted static `name`/`description`) is a free hardening, not a behavior change.
 
 Change: E5-S2 renders the tool-info panel through lit on tool select (event-driven,
 not a pump path). `UI.selectTool` calls `render()` into `#tool-info` with
@@ -2037,6 +2280,8 @@ departed while culled never flashes at a stale position). Standing defers:
 
 ### Deferred from: `/gds-code-review` of cockroach-infestation lifecycle (2026-07-16)
 
+> **RETIRED (#545).** The HIGH (infested rooms self-clearing) and MED (exterminator over-clearing) findings were patched in-PR. The three deferrals are all low: a multi-tile burning room climbing only through its left column is consistent with the existing same-floor fire simplification (not a regression), billing-then-destroying an infested room wasting the fee is player-controlled and documented (a refund path is not worth the state), and a hand-edited save resetting `dirtyDays` is self-cheating only (the persisted-clock guarantee holds for normal reloads).
+
 Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
 Auditor). One HIGH finding (infested rooms self-clearing to `empty` because
 `isDormant` omitted the new state) and the MED exterminator "clears more than it
@@ -2060,6 +2305,8 @@ billed" finding were both PATCHED in the same PR (`isDormant` now includes
 
 ### Deferred from: `/gds-code-review` of cockroach sprite redesign (2026-07-17)
 
+> **RETIRED (#545).** The one robustness gap (`roachOval` divide-by-zero into a NaN rect) was patched in-PR, and the owner-requested leg-wiggle is already tracked under `pixelart-interior-animations` (#377). The two remaining notes are dismissed cosmetics: roach decals drawing outside `maybeMirrored` (the cue is pixel-identical regardless of flip, as intended) and the `seam`/`collar` verticals using `cx`/`cy` rather than the flip helpers (stays inside the symmetric body).
+
 Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
 Auditor) of the redesigned roach decals (`drawRoach`/`roachOval`/`roachLine` and
 the infested/dirty placement in `residential.ts`). One robustness gap was PATCHED
@@ -2079,6 +2326,8 @@ tracked under #377 above. Non-actionable notes (dismissed):
   the "wrong" way, but stays inside the symmetric body silhouette.
 
 ### Deferred from: code review of venue-people-routing (`/gds-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** All three are low and deliberate: the party hall carrying ~2x the cinema's visit-option weight in hotel towers fits the canon "hotel guests mingle" flavor (retune only if halls visibly starve cinemas), the hotel-mingle spawn picking a floor before a room is the same idiom `spawnMealOutbound` uses (keep them aligned), and the attendance tally's single decrement path (`finish()`) is defused, guarded by the `attendance-finish-tripwire` source tripwire (#302, done) that enforces the standing rule for any future despawn shortcut.
 
 - **Party hall carries roughly 2x the cinema's visit-option weight in hotel
   towers (Blind, low).** `pushVenueVisitOptions` contributes one lobby option
@@ -2319,6 +2568,8 @@ the record:
 
 ### Deferred from: `bmad-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
 
+> **RETIRED (#545).** Three findings were fixed in-branch (the native-undo yield split, the crash-card audio kick, the Vercel-preview telemetry test). The one deferral, `appBoot.ts` being closure-dense and MEASURED with no per-file floor, is low: it currently clears the global `functions` ratio, and a per-file floor is reserved for genuine exemptions; add one only if the file grows another controller.
+
 Reviewed the follow-up delta on the main.ts friend-module split (input-guard
 consistency, coverage un-exclusion of `bootstrap.ts`/`appBoot.ts`, new headless
 tests). Blind Hunter + Edge Case Hunter, no spec (Acceptance Auditor skipped).
@@ -2342,6 +2593,8 @@ Deferrals:
   would localize any regression.
 
 ### Deferred from: `gds-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
+
+> **ABSORBED + RETIRED (#545).** Undo/redo running ahead of the `#modal`/`#splash` guards is AUD-021, already tracked as item 2 of the a11y-UX sweep (#541). Retired: the `ownsNativeUndo` contentEditable branch is correct forward-looking cover (no contentEditable ships today, but the unit test exercises it), and the audio kick retrying `audio.start()` on a throw is a robustness gain (`start()` is idempotent), not a defect.
 
 Requested gameplay/input-parity pass over the same delta. Blind Hunter + Edge
 Case Hunter, no spec. No `patch` defects: the two-predicate guard split is
@@ -2373,6 +2626,8 @@ pre-existing ordering, not introduced here):
   robustness gain, not a defect; recorded for the record.
 
 ### Deferred from: `bmad-code-review` of the toast-timer cancel-on-prune fix (#368, 2026-07-19)
+
+> **RETIRED (#545).** The review was acted on in-branch (strengthened prune-mid-fade tests, deterministic fake-timer integration block). Both deferrals are low and out of scope: the `#toast-wrap` `replaceChildren()` clear-all sites stranding timers are screenshot/e2e-only, callbacks are no-ops on detached nodes, and it is self-cleaning (revisit only if a toast clear-all ever ships in app code); the `WeakMap<Element, number>` timer-id type just needs the `window.setTimeout` prefix kept (a note, no action).
 
 Fixed the pruned-toast timer leak (a pruned node kept its ~3.6s fade timer, which
 then fired on a detached node and could outlive a test's DOM teardown). Blind
