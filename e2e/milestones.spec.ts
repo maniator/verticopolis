@@ -6,7 +6,7 @@ import { buildToStar, fitCamera } from "./helpers";
 /**
  * Visual progression proof: one tower grown cumulatively through every rating
  * rung, with a screenshot captured at each. The STAR assertion at each rung is
- * the test (screenshots are artifacts, never pixel-compared — a game canvas
+ * the test (screenshots are artifacts, never pixel-compared: a game canvas
  * renders a hair differently per machine). The images land in e2e/output/
  * (UNTRACKED, gitignored) and CI uploads them as the per-run artifact
  * (test.yml). They must never write into the committed gallery: the
