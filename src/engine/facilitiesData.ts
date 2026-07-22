@@ -187,6 +187,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a bay of small independent trades (florist, barber, phone repair, vintage, tattoo, record store, gallery). Earns from foot traffic and offers the widest variety of any single build, busier on weekends.",
   },
+  fitnessClub: {
+    kind: "fitnessClub",
+    category: "entertainment",
+    name: "Fitness Club",
+    width: 16,
+    cost: 220000,
+    minStar: 3,
+    population: 20,
+    color: "#4a86c8",
+    modernOnly: true,
+    description: "Modern: a members' gym (weight floor, yoga, spin, boxing, climbing). Pays a membership lease like an office, and nearby condos are happier for having it close (a capped bonus that fades with distance).",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",

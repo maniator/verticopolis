@@ -6,7 +6,7 @@ import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isCommercialKind, isOpenAt, isHotelKind, residentCount, syncAttendanceOccupants } from "../facilities";
 import type { FacilityKind, Unit, VacateReason } from "../types";
 
-import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
+import { isDormant, isOperational, isTenanted, VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, GRIPE_WARN, NOISE_EROSION, CONDO_NOISE_EROSION, TRANSPORT_FAR_TILES, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES, LOBBY_NO_DRAIN, SERVED_RECOVERY } from "./constants";
 import { computeDemandMap, type DemandMap } from "./demand";
@@ -88,6 +88,14 @@ export function updateSatisfaction(sim: Simulation): void {
   // One set read per sweep instead of a 4-deep delegation per unit: the set
   // itself is already revision-memoized (tower/routing.ts servedFloors).
   const servedSet = sim.tower.servedFloors();
+  // Modern-only Fitness Club amenity halo: the floors of every operational club,
+  // gathered once so a nearby condo can read its floor-distance to the closest.
+  // Pure (no RNG). A Classic tower holds no club, so this stays empty and the
+  // halo seam returns 0, leaving Classic satisfaction byte-identical.
+  const clubFloors: number[] = [];
+  for (const c of sim.tower.units) {
+    if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
+  }
   // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
   // income loop) rather than through the hour-memoized accessor, so an occupancy
   // change is reflected the same tick and the inspector memo is not perturbed. It
@@ -121,10 +129,27 @@ export function updateSatisfaction(sim: Simulation): void {
     // top of the band, so a gouged office trends to a net-negative drift and
     // eventually vacates, otherwise rent would be free money (fill cheap,
     // then crank to max with no downside).
-    if (u.kind === "office" && served) {
-      const cfg = rentConfig("office")!;
+    // The Modern Fitness Club is a lease tenant too, so its membership dues carry
+    // the same discipline: gouge past the going rate and the club sours and
+    // eventually gives up its lease. Classic never has one, so this stays office-
+    // only there.
+    if ((u.kind === "office" || u.kind === "fitnessClub") && served) {
+      const cfg = rentConfig(u.kind)!;
       const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
       u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
+    }
+    // Modern amenity halo: a condo near an operational Fitness Club is a little
+    // happier. Only the NEAREST club counts (no compounding), capped and
+    // distance-decayed by the rule-set (0 in Classic, so Classic is untouched).
+    // Applied on top of the served recovery and clamped to 1.
+    if (u.kind === "condo" && served && clubFloors.length > 0) {
+      let nearest = Infinity;
+      for (const cf of clubFloors) {
+        const d = Math.abs(cf - u.floor);
+        if (d < nearest) nearest = d;
+      }
+      const bonus = sim.rules.fitnessHaloBonus(nearest);
+      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
     }
     // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
     // away"): a served room is worn down in two phases, an immediate annoyance
@@ -231,7 +256,7 @@ export function updateSatisfaction(sim: Simulation): void {
     // miserable room simply fails to hold its guest right away (review F25).
     // Commercial venues aren't here: their income already requires a served
     // floor, so poor access starves them directly rather than via move-out.
-    const leaseTenant = u.kind === "office" || u.kind === "condo";
+    const leaseTenant = u.kind === "office" || u.kind === "condo" || u.kind === "fitnessClub";
     if (leaseTenant && u.state === "vacating") {
       // A relocation is a life event, not a complaint: nothing the player does
       // (not even a fully satisfied tenant) rescinds it, and it is never

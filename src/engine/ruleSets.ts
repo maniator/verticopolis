@@ -10,6 +10,8 @@ import {
   UNMET_DEMAND_FLOOR,
   UNMET_DEMAND_CAP,
   UNMET_DEMAND_EVICT_FLOOR,
+  FITNESS_HALO_FLOORS,
+  FITNESS_HALO_MAX,
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS } from "./pricing";
 import {
@@ -149,6 +151,11 @@ export const CLASSIC_RULES: GameRules = {
     // never evicts, exactly like noise in Classic. A ceiling only, no erosion.
     if (coverage >= UNMET_DEMAND_FLOOR) return LOBBY_NO_DRAIN;
     return { cap: UNMET_DEMAND_CAP, erosion: 0 };
+  },
+  fitnessHaloBonus() {
+    // No Fitness Club exists in a Classic tower, so it never grants a halo. A
+    // flat 0 keeps Classic satisfaction (and its golden-master hash) untouched.
+    return 0;
   },
   weekendMultiplier(kind, isWeekend) {
     // Canon: every commercial kind is busier on the weekend (the literal 1994
@@ -300,6 +307,14 @@ export const MODERN_RULES: GameRules = {
     const cap = 1 - capT * (1 - UNMET_DEMAND_CAP);
     const eroT = Math.max(0, Math.min(1, (UNMET_DEMAND_EVICT_FLOOR - coverage) / UNMET_DEMAND_EVICT_FLOOR));
     return { cap, erosion: eroT * ECON.unmetDemandErosion };
+  },
+  fitnessHaloBonus(floorDistance) {
+    // Capped, linearly fading with floor distance to the NEAREST operational
+    // club: FITNESS_HALO_MAX on the club's own floor, easing to 0 at the edge of
+    // the range and beyond. The caller passes only the nearest club's distance,
+    // so more gyms never compound the bonus.
+    if (floorDistance < 0 || floorDistance >= FITNESS_HALO_FLOORS) return 0;
+    return FITNESS_HALO_MAX * (1 - floorDistance / FITNESS_HALO_FLOORS);
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday

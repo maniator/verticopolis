@@ -230,6 +230,17 @@ export interface GameRules {
    */
   unmetDemandDrain(coverage: number): { cap: number; erosion: number };
   /**
+   * Modern-only amenity halo (gdd-modern-expansion): a Fitness Club makes nearby
+   * condos a little happier, a capped positive nudge that fades with the FLOOR
+   * distance to the nearest operational club (largest on the club's own floor,
+   * reaching zero past `FITNESS_HALO_FLOORS`). Only the NEAREST club counts, so
+   * stacking gyms never compounds the bonus (the GDD's anti-spam guard). Classic
+   * returns 0 (no such facility exists there), so Classic satisfaction stays
+   * byte-identical. Pure and deterministic (no RNG). Applies to condos; the
+   * caller gates on `served` and kind.
+   */
+  fitnessHaloBonus(floorDistance: number): number;
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food

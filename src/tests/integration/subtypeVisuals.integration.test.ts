@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, FASTFOOD_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT } from "../../storage/tdtExport";
 import { parseTDT } from "../../storage/tdtImport";
 import type { FacilityKind } from "../../engine/types";
@@ -127,6 +127,35 @@ describe("Modern Boutique Bay trade looks", () => {
     // shopfront, so all seven render unmistakably differently.
     expect(walls.size, "two trades share a wall color").toBe(BOUTIQUE_SUBTYPES.length);
     expect(trades.size, "two trades share an interior").toBe(BOUTIQUE_SUBTYPES.length);
+  });
+});
+
+// The Modern Fitness Club formats carry the same "every variant is visually
+// distinct" guarantee, and like the other Modern containers they are Modern-only
+// and so are deliberately NOT in the TDT round-trip loop below: a Modern tower is
+// never exported to the 1994 .TDT format, so these formats have no ordinal.
+describe("Modern Fitness Club format looks", () => {
+  it("every format has a look, and no look is orphaned", () => {
+    expect(Object.keys(FITNESS_LOOKS).sort()).toEqual([...FITNESS_SUBTYPES].sort());
+  });
+
+  it("every format look is visually distinct", () => {
+    const seen = new Map<string, string>();
+    const walls = new Set<string>();
+    const formats = new Set<string>();
+    for (const name of FITNESS_SUBTYPES) {
+      const look = FITNESS_LOOKS[name];
+      const key = JSON.stringify(look);
+      const clash = seen.get(key);
+      expect(clash, `${name} and ${clash ?? "?"} share an identical look`).toBeUndefined();
+      seen.set(key, name);
+      walls.add(look.wall);
+      formats.add(look.format);
+    }
+    // Distinct WALL colors AND distinct formats: each draws its own equipment,
+    // not a recolor, so all five render unmistakably differently.
+    expect(walls.size, "two formats share a wall color").toBe(FITNESS_SUBTYPES.length);
+    expect(formats.size, "two formats share an interior").toBe(FITNESS_SUBTYPES.length);
   });
 });
 

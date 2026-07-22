@@ -124,6 +124,15 @@ export const LOBBY_NO_DRAIN: { readonly cap: number; readonly erosion: number } 
  *  "capped but stable" tenant from one actually sliding toward a notice). */
 export const SERVED_RECOVERY = 0.05;
 
+/** Modern-only Fitness Club amenity halo (gdd-modern-expansion). A condo within
+ *  `FITNESS_HALO_FLOORS` floors of an operational Fitness Club gets a small
+ *  per-hour satisfaction bonus, `FITNESS_HALO_MAX` on the club's own floor and
+ *  fading linearly to 0 at the edge of the range. Deliberately below
+ *  `SERVED_RECOVERY` (a garnish on recovery, not a substitute), and only the
+ *  nearest club counts, so gym spam can't compound into an outsized buff. */
+export const FITNESS_HALO_FLOORS = 5;
+export const FITNESS_HALO_MAX = 0.03;
+
 /**
  * Unmet local-demand thresholds (leave-tower-unmet-demand, #395). A tenant's
  * retail demand-coverage sits in [0, 1] (1 = the reachable shops and eateries

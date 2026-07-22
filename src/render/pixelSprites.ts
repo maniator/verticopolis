@@ -5,6 +5,7 @@ import { condo, hotel, office } from "./pixelSprites/residential";
 import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
 import { amusements } from "./pixelSprites/amusements";
 import { boutiqueBay } from "./pixelSprites/boutique";
+import { fitnessClub } from "./pixelSprites/fitness";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -77,6 +78,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // phone repair, vintage, tattoo, records, gallery) draws its own shopfront.
       boutiqueBay(d, u, x, y, w, h);
       break;
+    case "fitnessClub":
+      // A Modern members' gym; each format subtype (weights, yoga, spin, boxing,
+      // climbing) draws its own equipment under a shared mirror strip.
+      fitnessClub(d, u, x, y, w, h);
+      break;
     case "shop":
       shop(d, u, x, y, w, h);
       break;
@@ -113,4 +119,5 @@ export { PAL, SHIRTS, SKIN, person, personSeated, personStanding, type RoomCtx }
 export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, FOODHALL_LOOKS, type FastFoodLook, type RestaurantLook } from "./pixelSprites/food";
 export { AMUSEMENTS_LOOKS, type AmusementsLook } from "./pixelSprites/amusements";
 export { BOUTIQUE_LOOKS, type BoutiqueLook } from "./pixelSprites/boutique";
+export { FITNESS_LOOKS, type FitnessLook } from "./pixelSprites/fitness";
 export { SHOP_LOOKS, type ShopLook } from "./pixelSprites/shop";

@@ -52,7 +52,9 @@ export function unmetCoverage(dm: DemandMap, u: Unit): number | null {
  * `updateSatisfaction`: an unreachable floor is harshest, then elevator crowding,
  * then an over-market office rent, then a far-walk office (W1), then very-far
  * lobby distance (#394), then office/commercial noise (W2), and finally unmet
- * local demand (#395, the gentlest sink). Where {@link vacateCause} falls back to
+ * local demand (#395, the gentlest sink). A Modern Fitness Club is handled on its
+ * own: over-market dues report "rent", and it feels no other placement drain.
+ * Where {@link vacateCause} falls back to
  * "access" as the bottom-out catch-all, this returns null so the "Main gripe"
  * inspector line can stay silent for a content tenant. Read-only.
  *
@@ -124,6 +126,16 @@ export function dominantGripe(
     if (noisy ?? sim.noiseAfflicted(u)) return "noise";
     // Unmet local demand is the gentlest sink, named last.
     if (unmetActive()) return "unmetDemand";
+    return null;
+  }
+  if (u.kind === "fitnessClub") {
+    // A Modern Fitness Club's only self-inflicted souring is gouged membership
+    // dues; it feels none of the noise, lobby-distance, or unmet-demand drains
+    // (those gate on office/condo/hotel), so "rent" is the one cause to name. A
+    // non-gouged club that sours can only be unserved, left to the "access"
+    // catch-all, so it never falls through to the hotel/condo causes below.
+    const cfg = rentConfig("fitnessClub");
+    if (cfg && rentOf(u) > cfg.default) return "rent";
     return null;
   }
   // A served, uncongested hotel/condo is drained by lobby distance, then by
