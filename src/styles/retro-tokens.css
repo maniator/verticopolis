@@ -16,7 +16,7 @@
   --good: #15722e;
   --bad: #b01023;
   --bad-ink: #9a0e1f;     /* danger text small enough to need AA 4.5:1 on gray chrome */
-  --money: #0a6e26;
+  --money: #005000; /* dark forest green: >=4.5:1 WCAG AA on the #c0c0c0 stat chip (#0a6e26 was 3.53:1, below AA) */
   --line: #7a7a7a;
   /* Win3.1 chrome tokens + the signature two-pixel bevels. Swap to re-theme. */
   --r-face: #c0c0c0;
