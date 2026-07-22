@@ -12,6 +12,8 @@ import { gameplaySession } from "../analytics";
 // gameplaySession on a deployed host in places, so stub the relay to keep a real
 // beacon from firing (the note methods are also spied, but this is belt-and-braces).
 vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
+// Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
+vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 
 /**
  * Headless unit tests for the constructor collaborators.
