@@ -1,0 +1,91 @@
+# Reaps the "Action required" zombie runs the screenshot drift-check leaves behind.
+#
+# The drift-check's `commit-on-approval` job runs in the gated `screenshot-approval`
+# environment, so every push that has gallery drift parks a run "waiting" for a
+# reviewer. Only the final run before merge is ever approved; merging or closing the
+# PR does not clear the earlier parked runs, and workflow concurrency does not reap a
+# run that is waiting on a deployment reviewer. Left alone they pile up into pages of
+# stale "Action required" entries in the Actions tab.
+#
+# This reaper cancels those parked runs (cancelling needs only `actions: write`; the
+# GITHUB_TOKEN is not a `screenshot-approval` reviewer, so it cannot approve or reject
+# the deployment, but cancelling the run resolves the same "waiting" state, with
+# force-cancel as a fallback). It runs when a PR closes, and on a weekly sweep for any
+# that slip through (e.g. a branch deleted without a close event, or an aborted run).
+# The sweep never touches a run whose PR is still open, and if it cannot even list the
+# open PRs it skips rather than risk cancelling a legitimately pending approval.
+name: Screenshot approval reaper
+
+on:
+  pull_request:
+    types: [closed]
+  schedule:
+    - cron: "17 6 * * 1" # Mondays 06:17 UTC
+  workflow_dispatch:
+
+# Least privilege: cancelling runs needs `actions: write`; the sweep reads open PRs.
+permissions:
+  actions: write
+  pull-requests: read
+
+# Per-event group so concurrent PR-close reaps don't serialize and drop each other;
+# each scheduled/manual sweep gets its own group via run_id.
+concurrency:
+  group: screenshot-reaper-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  reap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cancel stale screenshot-approval runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_BRANCH: ${{ github.event.pull_request.head.ref }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        # No `-e`: this is best-effort cleanup, so a single failed API call must not
+        # abort the run. Each call carries its own fallback.
+        run: |
+          set -uo pipefail
+
+          # Clear a run parked at the deployment gate. `gh run cancel` (actions:
+          # write) resolves a `waiting` run; force-cancel is the fallback if the
+          # regular cancel is refused, so the reaper can't silently no-op.
+          cancel_run() {
+            id="$1"
+            gh run cancel "$id" --repo "$REPO" >/dev/null 2>&1 \
+              || gh api --method POST "repos/$REPO/actions/runs/$id/force-cancel" >/dev/null 2>&1 \
+              || echo "  (could not cancel $id)"
+          }
+
+          if [ "$EVENT" = "pull_request" ]; then
+            echo "PR #${PR_NUMBER} closed; cancelling its waiting drift-check runs on ${PR_BRANCH}"
+            ids=$(gh run list --repo "$REPO" --workflow pr-drift-check.yml \
+              --branch "$PR_BRANCH" --status waiting --limit 100 \
+              --json databaseId --jq '.[].databaseId' 2>/dev/null || true)
+            for id in $ids; do echo "  cancel run ${id}"; cancel_run "$id"; done
+          else
+            echo "Weekly sweep: cancelling waiting drift-check runs whose PR is not open"
+            # Fail SAFE: if the open-PR list can't be fetched, skip the sweep rather
+            # than risk cancelling a legitimately pending approval on an open PR.
+            if ! open_raw=$(gh pr list --repo "$REPO" --state open --limit 500 \
+              --json headRefName --jq '.[].headRefName' 2>/dev/null); then
+              echo "Could not list open PRs; skipping sweep to stay safe."
+              exit 0
+            fi
+            open_branches=" $(printf '%s' "$open_raw" | tr '\n' ' ') "
+            waiting=$(gh run list --repo "$REPO" --workflow pr-drift-check.yml \
+              --status waiting --limit 200 \
+              --json databaseId,headBranch --jq '.[] | "\(.databaseId)\t\(.headBranch)"' 2>/dev/null || true)
+            printf '%s\n' "$waiting" | while IFS="$(printf '\t')" read -r id br; do
+              [ -z "$id" ] && continue
+              [ -z "$br" ] && { echo "  skip ${id} (no branch)"; continue; }
+              case "$open_branches" in
+                *" $br "*) echo "  keep run ${id} (${br} is an open PR)" ;;
+                *) echo "  cancel run ${id} (${br})"; cancel_run "$id" ;;
+              esac
+            done
+          fi
+          echo "Reaper done."
