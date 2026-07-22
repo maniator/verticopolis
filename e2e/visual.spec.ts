@@ -16,24 +16,18 @@ import { buildToStar } from "./helpers";
  * on CI failure the actual/diff images land in test-results/ (uploaded as
  * the playwright-visual-diffs artifact).
  *
- * Determinism: the gallery pins performance.now before load (same trick as
- * scripts/screenshots.mjs) so canvas animation frames bake at one instant.
- * The dialog shots capture opaque DOM windows — no canvas bleed-through —
- * over a paused game (buildToStar sets speed 0) with the clock pinned.
+ * Determinism: the dialog shots capture opaque DOM windows (no canvas
+ * bleed-through) over a paused game (buildToStar sets speed 0) with the clock
+ * pinned, and the tower-scene shots step the sim to a fixed state. (The sprite
+ * gallery is no longer shot here: the drift-gate already pins gallery.html as
+ * docs/screenshots/06-sprite-gallery.png, so a second baseline was redundant.)
  */
 
-test.describe("sprite gallery", () => {
-  test.use({ viewport: { width: 960, height: 1200 } });
-
-  test("sprite catalog matches baseline", async ({ page }) => {
-    await page.addInitScript(() => {
-      performance.now = () => 12125;
-    });
-    await page.goto("/gallery.html", { waitUntil: "networkidle" });
-    await page.waitForFunction(() => (window as unknown as { galleryReady?: boolean }).galleryReady === true);
-    await expect(page).toHaveScreenshot("sprite-gallery.png", { fullPage: true });
-  });
-});
+// The sprite gallery (gallery.html) is a pure canvas of every facility, and the
+// drift-gate already renders and pins it as docs/screenshots/06-sprite-gallery.png
+// (a hard required check). A second pixel baseline here was redundant with that,
+// so it was dropped; the DOM-chrome and tower-scene shots below stay, since they
+// catch selector/media-query/composition regressions the canvas drift shots can't.
 
 test.describe("dialog chrome", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */

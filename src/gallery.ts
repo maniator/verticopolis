@@ -156,8 +156,11 @@ const ENTRIES: Entry[] = [
   transportEntry("Express Elevator", "elevatorExpress", 3),
 ];
 
-const COLS = 3;
-const CELL_W = 300;
+// Responsive grid: `COLS` and `CELL_W` are recomputed from the available width
+// in `relayout()` so the gallery fits the viewport and scrolls DOWN, never
+// sideways on a phone (3 columns wide, 2 on a tablet, 1 on a phone).
+let COLS = 3;
+let CELL_W = 300;
 // Tall enough that even the tallest kind renders at its TRUE proportion, never
 // shrunk to fit: a three-floor metro at full tile is 26 * 2 * 3 = 156px, and the
 // sprite box is `CELL_H - 8 - 26`, so this clears it (200 - 34 = 166 >= 156). The
@@ -166,22 +169,33 @@ const CELL_W = 300;
 const CELL_H = 200;
 const PAD = 12;
 const HEADER_H = 48;
+const SUBHEADER_H = 34;
 
 /** Modern-only additions, shown in their own titled section AFTER the full 1994
- *  catalog, so the canon-vs-Modern line the game is careful about stays clear in
- *  the gallery too. The other containers (Boutique, Fitness, Clinic, Amusements)
- *  will fall in here as they land. */
-const MODERN_ENTRIES: Entry[] = [
-  roomEntry("Food Hall", "foodHall"),
-  ...retailEntries("foodHall", FOODHALL_SUBTYPES),
+ *  catalog so the canon-vs-Modern line stays clear. Each Modern kind is its own
+ *  labeled sub-group, so the zone reads as a catalog (not one undifferentiated
+ *  block) as the other containers (Boutique, Fitness, Clinic, Amusements) land. */
+const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
+  {
+    label: "Food Hall",
+    entries: [roomEntry("Food Hall", "foodHall"), ...retailEntries("foodHall", FOODHALL_SUBTYPES)],
+  },
 ];
 
-/** A full-width section title drawn across the grid between groups. */
+/** A full-width section title (`header`) or a lighter per-kind label
+ *  (`subHeader`) drawn across the grid between groups. */
 interface SectionHeader {
   header: string;
 }
-type GalleryItem = Entry | SectionHeader;
-const ITEMS: GalleryItem[] = [...ENTRIES, { header: "Modern additions" }, ...MODERN_ENTRIES];
+interface SubHeader {
+  subHeader: string;
+}
+type GalleryItem = Entry | SectionHeader | SubHeader;
+const ITEMS: GalleryItem[] = [
+  ...ENTRIES,
+  { header: "Modern additions" },
+  ...MODERN_GROUPS.flatMap((g): GalleryItem[] => [{ subHeader: g.label }, ...g.entries]),
+];
 
 /** Assign each item a screen cell. A header closes the current row, spans the
  *  full width in its own shorter band, and forces the next item onto a fresh
@@ -191,13 +205,13 @@ function layoutItems(items: GalleryItem[]): { placed: Array<{ item: GalleryItem;
   let col = 0;
   let y = PAD;
   for (const item of items) {
-    if ("header" in item) {
+    if ("header" in item || "subHeader" in item) {
       if (col > 0) {
         y += CELL_H; // finish the open cell row
         col = 0;
       }
       placed.push({ item, x: PAD, y });
-      y += HEADER_H;
+      y += "header" in item ? HEADER_H : SUBHEADER_H;
     } else {
       placed.push({ item, x: PAD + col * CELL_W, y });
       col++;
@@ -236,13 +250,43 @@ render(
 
 const canvas = document.getElementById("gallery") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
-const { placed, height: canvasH } = layoutItems(ITEMS);
-const dpr = Math.min(2, window.devicePixelRatio || 1);
-canvas.style.width = `${COLS * CELL_W + PAD * 2}px`;
-canvas.style.height = `${canvasH}px`;
-canvas.width = (COLS * CELL_W + PAD * 2) * dpr;
-canvas.height = canvasH * dpr;
-ctx.scale(dpr, dpr);
+let dpr = Math.min(2, window.devicePixelRatio || 1);
+
+// Recompute the grid to fit the current width, relaid on resize. The cell
+// shrinks to fill the row but never upscales past its design width, so a wide
+// monitor keeps the 3-column catalog centered rather than stretching it.
+let placed: { item: GalleryItem; x: number; y: number }[] = [];
+let canvasH = 0;
+function relayout(): void {
+  // Recompute the device-pixel-ratio too: dragging to another monitor or an OS
+  // zoom fires resize, and a stale dpr would blur the backing store.
+  dpr = Math.min(2, window.devicePixelRatio || 1);
+  // No lower clamp on the width: the canvas must never exceed its container, or
+  // the sideways scroll this whole function exists to kill would come back on a
+  // very narrow screen. The sprites scale to whatever cell width results.
+  const avail = Math.max(1, (canvas.parentElement?.clientWidth ?? window.innerWidth) - PAD * 2);
+  COLS = avail >= 860 ? 3 : avail >= 560 ? 2 : 1;
+  CELL_W = Math.min(300, Math.floor(avail / COLS));
+  const laid = layoutItems(ITEMS);
+  placed = laid.placed;
+  canvasH = laid.height;
+  const cssW = COLS * CELL_W + PAD * 2;
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${canvasH}px`;
+  canvas.width = cssW * dpr;
+  canvas.height = canvasH * dpr;
+  // Resizing the backing store clears the context transform, so re-apply the dpr scale.
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+relayout();
+let resizePending = 0;
+window.addEventListener("resize", () => {
+  if (resizePending) return;
+  resizePending = requestAnimationFrame(() => {
+    resizePending = 0;
+    relayout();
+  });
+});
 
 function frame() {
   const anim = performance.now() / 1000;
@@ -265,6 +309,14 @@ function frame() {
       ctx.moveTo(cx, cy + HEADER_H - 6.5);
       ctx.lineTo(cx + COLS * CELL_W - 8, cy + HEADER_H - 6.5);
       ctx.stroke();
+      return;
+    }
+    if ("subHeader" in item) {
+      // A lighter per-kind label within the Modern section.
+      ctx.fillStyle = "#cdd6e6";
+      ctx.font = "600 14px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(item.subHeader, cx + 4, cy + SUBHEADER_H - 12);
       return;
     }
     // Cell background.
