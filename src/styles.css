@@ -1440,6 +1440,29 @@ dialog.crash-card::backdrop {
   flex-wrap: wrap;
   margin-top: 22px;
 }
+/* Splash mute: the meeting-saver corner toggle (SPEC-splash-mute CAP-1). Box-art
+   styled like the splash's own controls (the splash stays un-unified per the
+   design system), pinned to the top-right so it never competes with the action
+   stack, and sized past the 44px comfortable-target floor because the player
+   reaching for it is doing so urgently. Sighted users read state from the glyph;
+   AT reads it from aria-pressed (the accessible name stays fixed). */
+.splash-mute {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  min-width: 48px;
+  min-height: 48px;
+  font-size: 22px;
+  line-height: 1;
+  color: #e6dcc0;
+  background: rgba(13, 13, 16, 0.35);
+  border: 2px solid rgba(230, 220, 192, 0.55);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.splash-mute:hover { background: rgba(13, 13, 16, 0.55); }
+.splash-mute:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
+
 .splash-btn {
   font-family: var(--r-font);
   font-size: 15px;

@@ -104,6 +104,29 @@ describe("AudioEngine facade lazy loading", () => {
     expect(built[0].muted).toBe(true);
   });
 
+  it("boots the splash SILENT for a returning muted player, in either order (SPEC-splash-mute CAP-3)", async () => {
+    // The meeting-saver: boot applies the persisted mute, the splash then
+    // requests its theme, the first gesture starts the engine. The engine must
+    // come up muted with the splash program regardless of which of mute and
+    // program was stored first.
+    const audio = new AudioEngine(loader);
+    audio.setMuted(true); // boot applies prefs.muted (main.ts, at construction)
+    audio.setProgram("splash"); // splash mounts and asks for its theme
+    audio.start();
+    await vi.waitFor(() => expect(audio.started).toBe(true));
+    expect(built[0].muted).toBe(true);
+    expect(built[0].program).toBe("splash");
+
+    built.length = 0;
+    const reversed = new AudioEngine(loader);
+    reversed.setProgram("splash");
+    reversed.setMuted(true);
+    reversed.start();
+    await vi.waitFor(() => expect(reversed.started).toBe(true));
+    expect(built[0].muted).toBe(true);
+    expect(built[0].program).toBe("splash");
+  });
+
   it("forwards pre-load volumes to the engine on load (clamped)", async () => {
     const audio = new AudioEngine(loader);
     audio.setVolumes(0.3, -0.4, 1.7); // set before any load; must land after it
