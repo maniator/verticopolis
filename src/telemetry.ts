@@ -22,23 +22,33 @@ import { analyticsAdapter } from "./analyticsAdapter";
 /**
  * The one host gate every Vercel telemetry call shares: the page-view inject
  * below and the gameplay events in `analytics.ts`. True only where the Vercel
- * endpoints actually exist (`/_vercel/*`): the production domain and Vercel
- * preview deployments. False on localhost, the `vite preview` server the e2e
- * console-error guards run against, the native Capacitor shell, and any
- * server-side (no `window`) context. Keeping the two telemetry surfaces on one
- * predicate means they can never drift out of gate parity.
+ * endpoints actually exist (`/_vercel/*`) and the same-origin `/api/ingest` relay
+ * is served: the production domain, our own subdomains (a `*.preview.verticopolis.com`
+ * preview deployment), and the raw `*.vercel.app` deploy URLs. False on localhost,
+ * the `vite preview` server the e2e console-error guards run against, the native
+ * Capacitor shell, and any server-side (no `window`) context. Keeping every
+ * telemetry surface on one predicate means they can never drift out of gate parity.
  *
- * This is a functional gate (only where the `/_vercel/*` endpoints are served),
- * not a security boundary: it matches the production domain exactly plus any
- * `.vercel.app` host, which covers the Vercel preview deployments. A non-Vercel
- * look-alike such as `verticopolis.com.evil.example` falls outside it; an
- * arbitrary `.vercel.app` subdomain would pass, which is harmless because only
- * our own deployments serve this bundle.
+ * IMPORTANT: this host set mirrors `originAllowed` in `analyticsIngest.ts` (the
+ * server-side same-origin guard on the relay). Change the two together; the
+ * client emits from here, the server accepts there, and a drift silently drops
+ * events (client dark, or server 403). The server side additionally refuses the
+ * shared `*.vercel.app` suffix in production, since it is common to every Vercel
+ * customer; here on the client it is harmless because only our own deployments
+ * ever serve this bundle.
+ *
+ * This is a functional gate (only where the endpoints are served), not a security
+ * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
+ * outside it (it does not end with `.verticopolis.com`).
  */
 export function telemetryHostAllowed(): boolean {
   if (typeof window === "undefined") return false;
   const host = window.location.hostname;
-  return host === "verticopolis.com" || host.endsWith(".vercel.app");
+  return (
+    host === "verticopolis.com" ||
+    host.endsWith(".verticopolis.com") ||
+    host.endsWith(".vercel.app")
+  );
 }
 
 export function injectVercelTelemetry(): void {
