@@ -137,7 +137,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   let retailVenueCount = 0;
   // Capacity reads the SAME mode headline the money loop earns against
   // (GameRules.commercialDailyIncome, #572), so a venue's pool bid and its
-  // income ceiling are one number in either mode; bare contexts fall back to
+  // income anchor are one number in either mode; bare contexts fall back to
   // Modern, the file's standard.
   const rules = sim.rules ?? MODERN_RULES;
   for (const u of sim.tower.units) {

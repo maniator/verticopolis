@@ -34,7 +34,7 @@ export const ECON = {
     shop: 20_000,
     cinema: 10_000,
     partyHall: 20_000,
-  } as Record<string, number>,
+  } as Partial<Record<string, number>>,
   /** Assumed average ticket per customer, used by the commercial-venue
    *  inspector to convert a venue's traffic income into a customer estimate
    *  (see `EconomySystem.collectTrafficIncome`). Cosmetic-only: the money loop

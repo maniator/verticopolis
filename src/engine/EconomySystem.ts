@@ -166,7 +166,7 @@ export class EconomySystem {
     const rules = this.sim.rules ?? MODERN_RULES;
     const isWeekend = this.sim.clock.isWeekend;
     for (const u of this.sim.tower.units) {
-      // Mode headline (#572); the demand map reads the same seam, so the income ceiling and the pool capacity always match.
+      // Mode headline (#572); the demand map reads the same seam, so the income anchor and the pool capacity always match.
       const daily = rules.commercialDailyIncome(u.kind);
       if (daily === undefined) continue;
       if (!isOperational(u)) continue; // gutted/burning/under-construction earn nothing (and must not be revived to "occupied" below)
