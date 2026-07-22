@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { FASTFOOD_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
+import { FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { FASTFOOD_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT } from "../../storage/tdtExport";
 import { parseTDT } from "../../storage/tdtImport";
 import type { FacilityKind } from "../../engine/types";
@@ -44,6 +44,32 @@ describe("retail subtype look tables", () => {
       }
     });
   }
+});
+
+// The Modern Food Hall's stalls carry the same "every variant is visually
+// distinct" guarantee, but they are Modern-only content and so are deliberately
+// NOT in the TDT round-trip loop below: a Modern tower is never exported to the
+// 1994 .TDT format, so these stalls have no ordinal and never touch it.
+describe("Modern Food Hall stall looks", () => {
+  it("every stall has a look, and no look is orphaned", () => {
+    expect(Object.keys(FOODHALL_LOOKS).sort()).toEqual([...FOODHALL_SUBTYPES].sort());
+  });
+
+  it("every stall look is visually distinct", () => {
+    const seen = new Map<string, string>();
+    const walls = new Set<string>();
+    for (const name of FOODHALL_SUBTYPES) {
+      const look = FOODHALL_LOOKS[name];
+      const key = JSON.stringify(look);
+      const clash = seen.get(key);
+      expect(clash, `${name} and ${clash ?? "?"} share an identical look`).toBeUndefined();
+      seen.set(key, name);
+      walls.add(look.wall);
+    }
+    // Distinct WALL colors too, not just distinct objects: two stalls whose only
+    // difference is an imperceptible field would still read as the same room.
+    expect(walls.size, "two stalls share a wall color").toBe(FOODHALL_SUBTYPES.length);
+  });
 });
 
 describe("every canon subtype survives the TDT round-trip (visuals carry over)", () => {

@@ -2,7 +2,7 @@ import { visibleOccupants } from "../../engine/Crowd";
 import type { Unit } from "../../engine/types";
 import { geoVariant, type RoomCtx } from "./common";
 import { drawCinema, drawFastFood, drawRestaurant } from "./food.interiors";
-import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS } from "./food.looks";
+import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, FOODHALL_DEFAULT, FOODHALL_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS } from "./food.looks";
 
 /**
  * Food and entertainment room art: fast food, restaurant, and cinema. Each KIND
@@ -23,7 +23,7 @@ import { FASTFOOD_DEFAULT, FASTFOOD_LOOKS, RESTAURANT_DEFAULT, RESTAURANT_LOOKS 
 // The canon look tables live in `food.looks.ts` (split out for file-size
 // headroom). Re-exported here so the `pixelSprites.ts` barrel and
 // `subtypeVisuals` keep importing them from `./food` unchanged.
-export { FASTFOOD_LOOKS, RESTAURANT_LOOKS };
+export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, FOODHALL_LOOKS };
 export type { FastFoodLook, RestaurantLook } from "./food.looks";
 
 /** A stable per-room shirt seed from GEOGRAPHY (floor, x), so the crowd's colors
@@ -40,6 +40,14 @@ export function fastFood(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
 
 export function restaurant(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
   const look = (u.subtype !== undefined && RESTAURANT_LOOKS[u.subtype]) || RESTAURANT_DEFAULT;
+  drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
+}
+
+/** The Modern Food Hall: rendered with the restaurant dining-room drawer, but
+ *  each stall subtype (Ramen Bar, Taco Stand, ...) supplies its own look so the
+ *  stalls read as visibly different counters instead of identical restaurants. */
+export function foodHall(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+  const look = (u.subtype !== undefined && FOODHALL_LOOKS[u.subtype]) || FOODHALL_DEFAULT;
   drawRestaurant(d.ctx, x, y, w, h, look, d.lit, visibleOccupants(u), figureSeed(u));
 }
 

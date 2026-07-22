@@ -6,8 +6,6 @@ import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
 
-void GRID;
-
 /** A catalog entry to render in the gallery grid. */
 interface Entry {
   label: string;
@@ -52,12 +50,18 @@ function roomEntry(
       // instead of squished into one floor. Scale the width down to preserve
       // aspect if the full height would overflow the cell.
       const floors = f.floors ?? 1;
-      const tile = Math.min(9 * 2.0, (cw - 16) / f.width);
-      let w = f.width * tile;
+      // The metro spans the full lot (GRID.width columns): an aspect so wide that
+      // fitting its true width shrinks the tile to nearly nothing and collapses
+      // the height to a sliver. Its platform art is width-responsive (it composes
+      // a whole station into whatever box it is handed), so size it by HEIGHT like
+      // the other multi-floor rooms and let it fill the cell width.
+      const fullLot = f.width >= GRID.width;
+      const tile = fullLot ? 9 * 2.0 : Math.min(9 * 2.0, (cw - 16) / f.width);
+      let w = fullLot ? cw - 16 : f.width * tile;
       let h = 26 * (tile / 9) * floors;
       const maxH = ch - 26;
       if (h > maxH) {
-        w *= maxH / h;
+        if (!fullLot) w *= maxH / h;
         h = maxH;
       }
       const x = cx + (cw - w) / 2;
