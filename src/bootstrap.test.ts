@@ -97,6 +97,52 @@ describe("showBootMessage", () => {
     expect(document.getElementById("boot-cover")).toBeNull();
     expect(document.getElementById("stage")!.innerHTML).toContain("no WebGL here");
   });
+
+  it("overlays a POPULATED stage instead of flowing below its children (live Firefox no-WebGL regression)", () => {
+    // The real #stage is never empty: the static canvas and hint fill it, lit
+    // appends its part after them, and #stage clips without scrolling, so a
+    // statically-positioned message rendered below a full-height canvas sat
+    // off-screen and the player saw a dead page with no explanation. Pin the
+    // wrapper as an absolute overlay with its own opaque background so stage
+    // layout can never push the message out of view again. The fixture leaves
+    // #stage WITHOUT position on purpose: establishing the containing block
+    // is the function's job now, so CSS drift cannot re-anchor the overlay.
+    document.body.innerHTML = `<div id="stage" style="height:600px;overflow:hidden"><canvas id="view" style="display:block;width:100%;height:600px"></canvas><div id="hint">Drag to pan</div></div>`;
+    showBootMessage("no WebGL here");
+    const wrapper = [...document.querySelectorAll<HTMLElement>("#stage > div")].find((d) =>
+      d.textContent?.includes("no WebGL here"),
+    );
+    expect(wrapper).toBeDefined();
+    // Longhand offsets (never the `inset` shorthand): this code path serves
+    // old and hardened engines where the shorthand may not parse, which would
+    // strand the wrapper at static position and resurrect the bug.
+    expect(wrapper!.style.position).toBe("absolute");
+    expect(wrapper!.style.top).toBe("0px");
+    expect(wrapper!.style.right).toBe("0px");
+    expect(wrapper!.style.bottom).toBe("0px");
+    expect(wrapper!.style.left).toBe("0px");
+    expect(wrapper!.getAttribute("style") ?? "").not.toContain("inset");
+    expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(0);
+    // An OPAQUE background: the overlay must actually cover the dead canvas.
+    expect(wrapper!.style.background || wrapper!.style.backgroundColor).toBe("#1c2030");
+    // The containing block is established by the function itself.
+    expect(document.getElementById("stage")!.style.position).toBe("relative");
+    // The static children survive (lit appends; it must not clobber the app's
+    // stage), and the message sits after them in the DOM as the top layer.
+    expect(document.getElementById("view")).not.toBeNull();
+    expect(document.getElementById("hint")).not.toBeNull();
+  });
+
+  it("drops a mounted splash/onboarding so a boot-fallback message is never buried behind them", () => {
+    // A boot ERROR can land after runBootFlow mounts the splash (fixed, a
+    // higher z-index than the stage-local overlay); the message must own the
+    // screen the same way it already owns the boot cover.
+    document.body.innerHTML = `<div id="splash"></div><div id="onboard"></div><div id="stage"></div>`;
+    showBootMessage("boot failed");
+    expect(document.getElementById("splash")).toBeNull();
+    expect(document.getElementById("onboard")).toBeNull();
+    expect(document.getElementById("stage")!.textContent).toContain("boot failed");
+  });
 });
 
 describe("hideBootCover", () => {
@@ -150,7 +196,12 @@ describe("bootGame", () => {
     bootGame(create);
 
     expect(create).not.toHaveBeenCalled();
-    expect(document.getElementById("stage")!.innerHTML).toContain("can't run WebGL");
+    expect(document.getElementById("stage")!.innerHTML).toContain("can't use WebGL");
+    // The remedy copy leads with what to change (acceleration/WebGL), and a
+    // real Reload button closes the loop after the setting flips.
+    expect(document.getElementById("stage")!.innerHTML).toContain("hardware acceleration");
+    const reload = [...document.querySelectorAll("#stage button")].find((b) => b.textContent === "Reload");
+    expect(reload).toBeDefined();
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
   });
 
