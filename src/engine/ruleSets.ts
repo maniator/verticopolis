@@ -1,3 +1,4 @@
+import { REAL_WORLD } from "./calendar";
 import { ECON } from "./econConfig";
 import { GRID } from "./facilities";
 import {
@@ -85,6 +86,19 @@ export const CLASSIC_RULES: GameRules = {
     // The 1994 four-rung dropdown plus No Rate, at the full canon dollar
     // tables (see CLASSIC_RENT_LADDERS for the provenance notes).
     return CLASSIC_PRICE_OPTIONS[kind] ?? null;
+  },
+  quarterlyRentScale(_quarterDays) {
+    // Canon cadence: the full 1994 rent lump lands at every quarter boundary,
+    // and Classic's calendar is always canon, so that is every 3 days (an
+    // Average office pays its whole $10,000 each quarter), per the period FAQ
+    // sources (snippet-corroborated, provisional pending a primary source,
+    // #575; spec-classic-economy-canon-cadence).
+    // WHEN rent lands is the quarter boundary's job (sim/loop.ts onDay); this
+    // factor only says the lump never rescales with the quarter's length,
+    // which is why `_quarterDays` is deliberately ignored: the calendar-parity
+    // rescale's premise ("we do not have the canon rent numbers") expired when
+    // the canon ladders shipped.
+    return 1;
   },
   // Classic is pixel-faithful: none of the Modern economy sinks apply.
   operatingOverheadPerUnit() {
@@ -200,6 +214,14 @@ export const MODERN_RULES: GameRules = {
   priceOptions(kind) {
     // Today's tuned continuous ranges, unchanged; Modern never offers No Rate.
     return MODERN_PRICE_OPTIONS[kind] ?? null;
+  },
+  quarterlyRentScale(quarterDays) {
+    // Income-invariant rescale (gdd-classic-calendar-parity §3): Modern's
+    // New-Tower calendar choice changes the cadence and lump size of rent,
+    // never per-in-game-day income. The divisor is REAL_WORLD.quarterDays (not
+    // a bare 90) so the real-world factor is structurally exactly 1
+    // (byte-identical) and cannot drift if that constant is ever retuned.
+    return quarterDays / REAL_WORLD.quarterDays;
   },
   // Modern runs the deeper-economy sinks at their tuned values.
   operatingOverheadPerUnit() {

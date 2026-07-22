@@ -45,29 +45,36 @@ export type PriceOptions =
  * Provenance (record honestly, GDD §2 / epics AR5): the rent-class STRUCTURE
  * (one 4-level dropdown plus No Rate, TDT byte 0-4) comes from the
  * reverse-engineered TDT docs (docs/canon/tdt-format.md §4). The DOLLAR tables
- * come from the Relentless Optimizer fan reference, a SINGLE source (the
- * archive.org SimTower manual was unfetchable); verify each table against the
- * manual if it becomes readable. Classic uses the FULL canon values by the
- * owner's call of 2026-07-08.
+ * originally came from the Relentless Optimizer fan reference alone; on
+ * 2026-07-22 search snippets of the GameFAQs FAQ lineage (BStuart, furdude2,
+ * Aristotle47) matched every table below, rung for rung, nightly hotel cadence
+ * included (spec-classic-economy-canon-cadence-2026-07-22 §2). That is
+ * snippet-level, same-lineage corroboration, NOT established independence, so
+ * every confidence tier below stays provisional until a primary or genuinely
+ * independent source is read directly (#575). The archive.org manual remains
+ * unread; if a primary source ever contradicts these, re-open the pricing
+ * GDD's Decision 2 and the cadence spec's ruling. Classic uses the FULL canon
+ * values by the owner's call of 2026-07-08.
  */
 const CLASSIC_RENT_LADDERS: Readonly<Partial<Record<string, readonly [number, number, number, number]>>> = {
-  // Office, quarterly. HARD confidence: matches our band anchors; 2k/10k
-  // corroborated. (Relentless Optimizer; verify against the manual if readable.)
+  // Office, quarterly. HARD confidence: matches our band anchors; FAQ-lineage
+  // snippets match the full ladder (2/5/10/15k quarterly).
   office: [2_000, 5_000, 10_000, 15_000],
-  // Condo, one-time sale (locked after it sells). MED confidence: a 40k-vs-50k
-  // minimum stays unresolved; 50k until verified. Classic MAY list below the
-  // $80k build cost (canon firesale); Modern keeps its break-even floor.
-  // (Relentless Optimizer; verify against the manual if readable.)
+  // Condo, one-time sale (locked after it sells). MED confidence: FAQ-lineage
+  // snippets match the $150k one-time figure, but a 40k-vs-50k minimum stays
+  // unresolved; 50k until verified. Classic MAY list below the $80k build
+  // cost (canon firesale); Modern keeps its break-even floor.
   condo: [50_000, 100_000, 150_000, 200_000],
-  // Hotel single, nightly. SOFT confidence, single-source, ~10x our old band;
-  // accepted per GDD §2. (Relentless Optimizer; verify against the manual if
-  // readable.)
+  // Hotel single, nightly. SOFT confidence, provisionally reinforced:
+  // single-source (~10x our old band, accepted per GDD §2), FAQ-lineage
+  // snippets match (500-1500-2k-3k nightly) but are not established as
+  // independent of that source (#575).
   hotelSingle: [500, 1_500, 2_000, 3_000],
-  // Hotel double, nightly. SOFT confidence, single-source.
-  // (Relentless Optimizer; verify against the manual if readable.)
+  // Hotel double, nightly. SOFT confidence, provisionally reinforced
+  // (800-2k-3k-4500; see the single's note).
   hotelDouble: [800, 2_000, 3_000, 4_500],
-  // Hotel suite, nightly. SOFT confidence, single-source.
-  // (Relentless Optimizer; verify against the manual if readable.)
+  // Hotel suite, nightly. SOFT confidence, provisionally reinforced
+  // (1500-4k-6k-9k; see the single's note).
   hotelSuite: [1_500, 4_000, 6_000, 9_000],
 };
 

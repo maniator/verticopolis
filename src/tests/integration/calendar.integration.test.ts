@@ -6,6 +6,7 @@ import { EconomySystem } from "../../engine/EconomySystem";
 import { Tower } from "../../engine/Tower";
 import { RNG } from "../../engine/rng";
 import { ECON } from "../../engine/econConfig";
+import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { SimContext } from "../../engine/SimContext";
 import type { FacilityKind } from "../../engine/types";
 
@@ -105,17 +106,20 @@ describe("income-invariant rent rescale", () => {
     expect(ctx.money).toBe(3 * ECON.rent.office.default);
   });
 
-  it("canon collects 1/30 per collection (3-day quarter vs real-world's 90)", () => {
+  it("canon collects 1/30 per collection on a rule-less context (Modern fallback)", () => {
+    // A bare context has no `rules`, so collectRent reads the file's standard
+    // MODERN_RULES fallback: the income-invariant rescale. This pins that the
+    // seam's fallback kept the pre-seam behavior byte-identical.
     const ctx = officeContext(3, CANON);
     new EconomySystem(ctx).collectRent();
-    // Divisor mirrors the production rescale: quarterDays / REAL_WORLD.quarterDays.
+    // Divisor mirrors the Modern rescale: quarterDays / REAL_WORLD.quarterDays.
     // Using the constant keeps the test aligned if real-world is ever retuned.
     expect(ctx.money).toBe(
       Math.round((3 * ECON.rent.office.default * CANON.quarterDays) / REAL_WORLD.quarterDays),
     );
   });
 
-  it("keeps rent income per in-game day equal across calendars", () => {
+  it("keeps rent income per in-game day equal across calendars (rule-less/Modern path)", () => {
     const real = officeContext(3, REAL_WORLD);
     const canon = officeContext(3, CANON);
     new EconomySystem(real).collectRent();
@@ -124,6 +128,30 @@ describe("income-invariant rent rescale", () => {
     const perDayReal = real.money / REAL_WORLD.quarterDays;
     const perDayCanon = canon.money / CANON.quarterDays;
     expect(Math.abs(perDayReal - perDayCanon)).toBeLessThan(1);
+  });
+
+  it("collects the FULL lump under CLASSIC_RULES, whatever the calendar says (canon cadence)", () => {
+    // The ratified seam (spec-classic-economy-canon-cadence): Classic pays the
+    // whole 1994 rent every quarter, no rescale. Same bare context, with the
+    // Classic rule-set attached.
+    const ctx = { ...officeContext(3, CANON), rules: CLASSIC_RULES };
+    new EconomySystem(ctx).collectRent();
+    expect(ctx.money).toBe(3 * ECON.rent.office.default);
+    // And through collectRent on a REAL_WORLD-calendar context too (review
+    // finding): Classic's factor is 1 for any quarter length, not a canon-only
+    // special case, so the title's "whatever the calendar says" is exercised.
+    const real = { ...officeContext(3, REAL_WORLD), rules: CLASSIC_RULES };
+    new EconomySystem(real).collectRent();
+    expect(real.money).toBe(3 * ECON.rent.office.default);
+  });
+
+  it("quarterlyRentScale: Classic is 1, Modern is quarterDays/REAL_WORLD.quarterDays (exactly 1 on real-world)", () => {
+    // Structural seam pins: the factors themselves, so a retune of either
+    // constant or rule-set is a deliberate, visible change.
+    expect(CLASSIC_RULES.quarterlyRentScale(CANON.quarterDays)).toBe(1);
+    expect(CLASSIC_RULES.quarterlyRentScale(REAL_WORLD.quarterDays)).toBe(1);
+    expect(MODERN_RULES.quarterlyRentScale(CANON.quarterDays)).toBe(CANON.quarterDays / REAL_WORLD.quarterDays);
+    expect(MODERN_RULES.quarterlyRentScale(REAL_WORLD.quarterDays)).toBe(1);
   });
 });
 
@@ -313,8 +341,25 @@ describe("Modern real-world (7/90/360) end-to-end regression: nothing drifts", (
 describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat", () => {
   // Parallel to the Modern real-world regression but for the CANON path: rent
   // collects on every 3-day quarter, maintenance every 3 days, the weekend is
-  // the trailing slot every 3rd day. Where real-world's factor is 1 (identity),
-  // canon's is 3/90 = 1/30 for rent and 3/30 = 1/10 for maintenance.
+  // the trailing slot every 3rd day. Classic rent collects the FULL lump each
+  // quarter (quarterlyRentScale 1, the canon cadence); maintenance still rides
+  // the income-invariant 3/30 = 1/10 rescale in both modes (the canon
+  // maintenance dollar table is unverified; see the backlog row).
+
+  /** Lay the shared one-served-office footprint on a fresh sim (lobby, floor,
+   *  elevator, one occupied default-rent office), asserting each step per the
+   *  fixture discipline (a silently degraded footprint tests a different tower
+   *  than the one described). */
+  function layServedOffice(sim: Simulation): void {
+    for (let x = 0; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok, `lobby at ${x}`).toBe(true);
+    for (let x = 0; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok, `floor at ${x}`).toBe(true);
+    expect(sim.tower.placeTransport("elevatorStandard", 4, 1, 2).ok, "elevator 1-2").toBe(true);
+    const r = sim.tower.place("office", 2, 10);
+    expect(r.ok, `office placement: ${JSON.stringify(r)}`).toBe(true);
+    const u = r.unitId !== undefined ? sim.tower.getUnit(r.unitId) : undefined;
+    if (!u) throw new Error(`test fixture: office unit missing: ${JSON.stringify(r)}`);
+    u.state = "occupied";
+  }
 
   /** Same one-office fixture as the Modern-realWorld regression but Classic. */
   function classicCanonOneOfficeTower(): Simulation {
@@ -323,13 +368,7 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     const sim = new Simulation(2024, "classic");
     sim.money = 1_000_000;
     sim.star = 1;
-    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
-    for (let x = 0; x < 40; x++) sim.tower.place("floor", 2, x);
-    sim.tower.placeTransport("elevatorStandard", 4, 1, 2);
-    const r = sim.tower.place("office", 2, 10);
-    const u = sim.tower.units.find((x) => x.id === r.unitId);
-    if (!u) throw new Error(`test fixture: office placement failed: ${JSON.stringify(r)}`);
-    u.state = "occupied";
+    layServedOffice(sim);
     return sim;
   }
 
@@ -344,15 +383,18 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     expect(sim.clock.calendar.maintPeriodDays).toBe(3);
   });
 
-  it("the rescale factor is EXACTLY 1/30 for canon rent (CANON.quarterDays / REAL_WORLD.quarterDays)", () => {
-    // Structural: the canon rescale is a pure integer ratio, so any integer rent
-    // total that is divisible by 30 collects exactly and any that isn't collects
-    // Math.round of the exact fraction. This pins the shipped divisor and
-    // catches a future retune of either constant.
+  it("the MODERN canon-calendar rent factor is EXACTLY 1/30 (CANON.quarterDays / REAL_WORLD.quarterDays)", () => {
+    // Structural: MODERN's income-invariant rescale is a pure integer ratio, so
+    // any integer rent total divisible by 30 collects exactly and any that
+    // isn't collects Math.round of the exact fraction. Classic no longer uses
+    // this factor (its quarterlyRentScale is 1, the canon full lump; see the
+    // seam tests above); this pins the Modern divisor and catches a future
+    // retune of either constant.
     const factor = CANON.quarterDays / REAL_WORLD.quarterDays;
     expect(factor).toBe(3 / 90);
-    // Table of shipped/likely rent totals → the canon per-collection amount.
-    // Verified against the production `collectRent` formula.
+    expect(MODERN_RULES.quarterlyRentScale(CANON.quarterDays)).toBe(factor);
+    // Table of shipped/likely rent totals → the Modern-canon per-collection
+    // amount. Verified against the production `collectRent` formula.
     for (const total of [10_000, 15_000, 30_000, 87_000]) {
       const canonCollection = Math.round(total * factor);
       expect(canonCollection).toBe(Math.round(total / 30));
@@ -370,19 +412,21 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     }
   });
 
-  it("the day-3 rent lump is EXACTLY $333 (canon quarter = 3 days, 1/30 of $10k)", () => {
-    // Delta across the canon quarter boundary: with one $10k-default office,
-    // each canon collection is Math.round(10_000 * 3/90) = 333. Real-world would
-    // pay 10_000 here (see the mirror test above) — the delta is the whole
-    // point of the calendar rescale.
+  it("the day-3 rent lump is the FULL $10,000 (canon cadence: the whole 1994 rent every 3-day quarter)", () => {
+    // Delta across the canon quarter boundary: a Classic office pays its whole
+    // Average rent each canon quarter, the ratified 1994 cadence
+    // (spec-classic-economy-canon-cadence-2026-07-22). Before that spec this
+    // collected the rescaled $333; the regression pins the shift into the new
+    // behavior. Day 3 also crosses the canon maintenance boundary, so the
+    // elevator upkeep lump nets the delta down a little; the band still proves
+    // the full rent landed (far above the old 333, at most the raw 10,000).
     const sim = classicCanonOneOfficeTower();
     for (let d = 0; d < CANON.quarterDays - 1; d++) sim.tick(1440);
     const beforeRent = sim.money;
-    sim.tick(1440); // roll into day 3 — canon quarter boundary
+    sim.tick(1440); // roll into day 3, the canon quarter boundary
     const delta = sim.money - beforeRent;
-    // Tight-ish bound: the lump is 333, interim flows are much smaller.
-    expect(delta).toBeGreaterThanOrEqual(250);
-    expect(delta).toBeLessThan(500);
+    expect(delta).toBeGreaterThan(9_000);
+    expect(delta).toBeLessThanOrEqual(10_000);
   });
 
   it("charges maintenance on the 3-day canon beat (not the old 30-day month)", () => {
@@ -423,31 +467,34 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     }
   });
 
-  it("keeps rent income per in-game DAY identical across canon and real-world (the whole point of the rescale)", () => {
-    // Two towers, same fixture, both running for one full quarter of THEIR
-    // calendar (canon 3 days, real-world 90 days). Per-day rent must match
-    // within one collection's rounding: canon 333/3 ≈ 111/day, real-world
-    // 10000/90 ≈ 111.11/day. Same tower, same tenant, different calendar.
+  it("keeps MODERN rent income per in-game DAY identical across its two calendars (the rescale's remaining home)", () => {
+    // The income-invariance contract now belongs to Modern's New-Tower calendar
+    // choice alone: a Modern-canon tower and a Modern-real-world tower earn the
+    // same per day within one collection's rounding (canon 333/3 ≈ 111/day,
+    // real-world 10000/90 ≈ 111.11/day).
+    const factors = {
+      canon: MODERN_RULES.quarterlyRentScale(CANON.quarterDays),
+      real: MODERN_RULES.quarterlyRentScale(REAL_WORLD.quarterDays),
+    };
+    const perDayCanon = Math.round(10_000 * factors.canon) / CANON.quarterDays;
+    const perDayReal = Math.round(10_000 * factors.real) / REAL_WORLD.quarterDays;
+    expect(Math.abs(perDayCanon - perDayReal)).toBeLessThan(1);
+    // End-to-end through PRODUCTION collectRent (review finding: the prior
+    // draft asserted constants against constants): a Modern tower FOUNDED on
+    // the canon calendar collects the rescaled $333 lump, so the seam provably
+    // reads the live calendar through the sim, while the identical Classic
+    // tower collects the full $10,000. Both sides measured from the engine.
+    const modernCanon = new Simulation(2024, "modern", "canon");
+    expect(modernCanon.clock.calendar.kind).toBe("canon");
+    layServedOffice(modernCanon);
+    modernCanon.money = 0;
+    modernCanon.economy.collectRent();
+    expect(modernCanon.money).toBe(Math.round((10_000 * CANON.quarterDays) / REAL_WORLD.quarterDays));
     const classic = classicCanonOneOfficeTower();
-    for (let d = 0; d < CANON.quarterDays; d++) classic.tick(1440);
-    const classicPerDayRent = 333 / CANON.quarterDays;
-    // Modern real-world does its own quarter over 90 days. Use the Modern
-    // fixture directly for the twin (same tower shape).
-    const modern = new Simulation(2024, "modern", "realWorld");
-    modern.money = 0;
-    modern.star = 5;
-    for (let x = 0; x < 40; x++) modern.tower.place("lobby", 1, x);
-    for (let x = 0; x < 40; x++) modern.tower.place("floor", 2, x);
-    modern.tower.placeTransport("elevatorStandard", 4, 1, 2);
-    const rr = modern.tower.place("office", 2, 10);
-    const uu = modern.tower.units.find((x) => x.id === rr.unitId);
-    if (uu) uu.state = "occupied";
-    for (let d = 0; d < REAL_WORLD.quarterDays; d++) modern.tick(1440);
-    const modernPerDayRent = 10_000 / REAL_WORLD.quarterDays;
-    // Byte-identical? Within one Math.round: 111.11 (real-world) vs 111 (canon,
-    // 333/3), so the per-day rate matches to 0.12 dollars — the rounding
-    // residue arch §3 documents.
-    expect(Math.abs(classicPerDayRent - modernPerDayRent)).toBeLessThan(1);
+    classic.money = 0;
+    classic.economy.collectRent();
+    expect(classic.money).toBe(10_000);
+    expect(classic.money).toBeGreaterThan(modernCanon.money * 25); // the deliberate Classic divergence
   });
 });
 

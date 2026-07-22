@@ -113,16 +113,16 @@ export class EconomySystem {
         count++;
       }
     }
-    // Income-invariant calendar rescale: rent collects once per quarter, so a
-    // shorter quarter must pay proportionally less to keep a tower's income per
-    // in-game day unchanged. Canon's 3-day quarter pays 3/90 = 1/30 of a
-    // real-world collection, thirty times as often. The divisor is
-    // REAL_WORLD.quarterDays (not a bare 90) so the real-world factor is
-    // structurally exactly 1 (byte-identical) and can't drift if that constant
-    // is ever retuned. Round once on the summed total so per-office rounding
-    // can't accumulate (`total` is a sum of integer rents). See
-    // gdd/arch-classic-calendar-parity-2026-07-08.
-    const collected = Math.round((total * this.sim.clock.calendar.quarterDays) / REAL_WORLD.quarterDays);
+    // The collection factor is a rule-set decision (quarterlyRentScale):
+    // Classic pays the FULL 1994 lump every canon 3-day quarter (ratified
+    // cadence, spec-classic-economy-canon-cadence-2026-07-22); Modern keeps
+    // the income-invariant rescale (gdd/arch-classic-calendar-parity): its
+    // shorter quarter pays proportionally less so per-in-game-day income never
+    // changes, and its real-world factor is structurally exactly 1. Bare test
+    // contexts read the Modern fallback, the file's standard. Round once on
+    // the summed total so per-office rounding can't accumulate.
+    const rules = this.sim.rules ?? MODERN_RULES;
+    const collected = Math.round(total * rules.quarterlyRentScale(this.sim.clock.calendar.quarterDays));
     if (collected > 0) {
       this.sim.money += collected;
       this.sim.recordMoney?.("offices", collected);
