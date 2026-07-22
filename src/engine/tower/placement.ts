@@ -88,6 +88,12 @@ export function canPlace(tower: Tower, kind: FacilityKind, floor: number, x: num
   if (f.transport) {
     return { ok: false, reason: "Use placeTransport for vertical transport." };
   }
+  // Founding is lobby-first, as in 1994: an empty tower's first placement must
+  // be the ground lobby (reachable since Classic founds canon-zero; see
+  // spec-starter-lobby-mode-split). isSupported then pins it to floor 1.
+  if (tower.units.length === 0 && kind !== "lobby") {
+    return { ok: false, reason: "Lay a lobby on the ground line first to open your tower." };
+  }
 
   if (isStructural(kind)) {
     if (kind === "lobby" && !isLobbyFloor(floor)) {

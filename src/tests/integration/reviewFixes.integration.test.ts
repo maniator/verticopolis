@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation, ECON } from "../../engine/Simulation";
 import { EconomySystem } from "../../engine/EconomySystem";
 import { Tower } from "../../engine/Tower";
@@ -25,7 +26,7 @@ function layFloor(sim: Simulation, kind: "floor" | "lobby", floor: number): void
 
 /** A full-width ground lobby + floors 2..top, no transport. */
 function structuredTower(seed: number, top: number, money = 100_000_000, halfWidth?: number): Simulation {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   sim.money = money;
   // Optionally build only a centered strip (much cheaper to tick over on the
   // wide 375-tile lot) when a test doesn't need the full width.
@@ -270,7 +271,7 @@ describe("F14 — the Recycling Centre has a real effect", () => {
 
 describe("F21 — buried treasure is one-time per tile (no build/bulldoze farming)", () => {
   it("rebuilding on the same basement tiles never yields a second find", () => {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.star = 3;
     sim.money = 100_000_000;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, C - 20 + x);
@@ -283,7 +284,7 @@ describe("F21 — buried treasure is one-time per tile (no build/bulldoze farmin
   });
 
   it("persists excavation history across save/reload (no farming after a reload)", () => {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.star = 3;
     sim.money = 100_000_000;
     for (let x = 0; x < 40; x++) sim.tower.place("floor", 0, C - 20 + x);
@@ -313,7 +314,7 @@ describe("F24 — hardened transport deserialization", () => {
 
 describe("F8 — served-floor cache stays correct as transports change", () => {
   it("invalidates on add/remove (revision-keyed)", () => {
-    const sim = Simulation.newGame(9);
+    const sim = newSeededGame(9);
     layFloor(sim, "floor", 2);
     expect(sim.tower.isFloorServed(2)).toBe(false);
     expect(sim.buildTransport("elevatorStandard", C, 1, 2).ok).toBe(true);

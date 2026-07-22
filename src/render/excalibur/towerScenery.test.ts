@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import * as ex from "excalibur";
 import { Simulation } from "../../engine/Simulation";
+import { newSeededGame } from "../../tests/fixtures/towerFixtures";
 import { apronRange, plantSpots, plantVisible, skylineRects } from "../sceneryLayout";
 import { syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
@@ -96,7 +97,7 @@ const stripCanvases = (added: ex.Actor[]): ex.Canvas[] =>
 
 describe("towerScenery", () => {
   it("builds the whole world lazily on the first sync, plants tracking the starter apron", () => {
-    const sim = Simulation.newGame(SEED);
+    const sim = newSeededGame(SEED);
     const { eng, added } = fakeEngine(sim);
     syncScenery(eng);
     expect(added.length).toBe(STATIC_ACTORS + skylineRects(SEED).length + plantSpots(SEED).length);
@@ -114,7 +115,7 @@ describe("towerScenery", () => {
   });
 
   it("every canvas draw closure paints (strip, plaza, street, plants)", () => {
-    const sim = Simulation.newGame(SEED);
+    const sim = newSeededGame(SEED);
     const { eng, added } = fakeEngine(sim);
     syncScenery(eng);
     const canvases = [...new Set(added.map((a) => a.graphics.current).filter((g): g is ex.Canvas => g instanceof ex.Canvas))];
@@ -144,7 +145,7 @@ describe("towerScenery", () => {
   });
 
   it("building outward repaints the strip and fells the plant it reaches; a no-op sync stays silent", () => {
-    const sim = Simulation.newGame(SEED);
+    const sim = newSeededGame(SEED);
     const { eng, added } = fakeEngine(sim);
     syncScenery(eng);
     const spots = plantSpots(SEED);
@@ -172,7 +173,7 @@ describe("towerScenery", () => {
   });
 
   it("a swapped sim with the same founding seed keeps the city but re-derives the apron, even at an equal revision", () => {
-    const sim = Simulation.newGame(SEED);
+    const sim = newSeededGame(SEED);
     const { eng, added, swap } = fakeEngine(sim);
     syncScenery(eng);
     const snapshot = sim.serialize();
@@ -198,7 +199,7 @@ describe("towerScenery", () => {
   });
 
   it("a different founding seed rebuilds the city for the new tower", () => {
-    const sim = Simulation.newGame(SEED);
+    const sim = newSeededGame(SEED);
     const { eng, added, swap } = fakeEngine(sim);
     syncScenery(eng);
     const oldSkyline = added[STATIC_ACTORS]; // first seeded actor
@@ -208,7 +209,7 @@ describe("towerScenery", () => {
     const count = added.length;
 
     const other = 20260713;
-    swap(Simulation.newGame(other));
+    swap(newSeededGame(other));
     syncScenery(eng);
     expect(killed).toHaveBeenCalled();
     expect(added.length).toBe(count + skylineRects(other).length + plantSpots(other).length);

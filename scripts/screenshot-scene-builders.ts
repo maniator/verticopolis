@@ -27,9 +27,9 @@
 export function buildEngineTower(): void {
   const g = (window as unknown as { game: any }).game;
   const sim = g.sim;
-  // Center on the seeded lobby (newGame seeds a 40-tile strip at the grid
-  // center); a ground row only connects by touching the tower, so it must grow
-  // outward from center, not from a far edge.
+  // Lay the ground row outward from the grid center: the first tile founds
+  // the tower (a Classic lot is empty now) and every later ground tile only
+  // connects by touching it, so growth must start at center, not a far edge.
   const cx = Math.floor(g.grid.width / 2);
   const left = cx - 30;
   for (let x = cx; x < left + 60; x++) sim.tower.place("lobby", 1, x);

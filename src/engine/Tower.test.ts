@@ -181,13 +181,16 @@ describe("Tower placement", () => {
 
   it("keeps the ground floor (level 1) as a lobby-only concourse", () => {
     // Even a plain (non-lobby) floor tile on level 1 rejects rooms — the whole
-    // ground floor is the entrance concourse, never a room floor.
-    for (let i = 0; i < 20; i++) tower.place("floor", 1, i);
-    expect(tower.canPlace("office", 1, 0).ok).toBe(false);
-    expect(tower.canPlace("shop", 1, 0).ok).toBe(false);
+    // ground floor is the entrance concourse, never a room floor. Founding is
+    // lobby-first now, so open the lot with one lobby tile, then run plain
+    // floor tiles beside it.
+    expect(tower.place("lobby", 1, 0).ok).toBe(true);
+    for (let i = 1; i < 20; i++) expect(tower.place("floor", 1, i).ok).toBe(true);
+    expect(tower.canPlace("office", 1, 1).ok).toBe(false);
+    expect(tower.canPlace("shop", 1, 1).ok).toBe(false);
     // A two-story facility starting on the ground floor is rejected too.
-    for (let i = 0; i < 20; i++) tower.place("floor", 2, i);
-    expect(tower.canPlace("cinema", 1, 0).ok).toBe(false);
+    for (let i = 0; i < 20; i++) expect(tower.place("floor", 2, i).ok).toBe(true);
+    expect(tower.canPlace("cinema", 1, 1).ok).toBe(false);
     // Rooms are fine one floor up.
     expect(tower.canPlace("office", 2, 0).ok).toBe(true);
   });

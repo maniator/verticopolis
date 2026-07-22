@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { rentOf } from "../../engine/econConfig";
@@ -16,7 +17,7 @@ const SNAP_BULLETIN =
 
 /** A served floor-2 strip wide enough for several rooms, mode-selectable. */
 function strip(mode: "classic" | "modern" = "classic", seed = 7): Simulation {
-  const sim = Simulation.newGame(seed, mode);
+  const sim = newSeededGame(seed, mode);
   const mid = Math.floor(GRID.width / 2);
   const x0 = mid - 30;
   // Widen the starter ground lobby first so the floor strip above is supported

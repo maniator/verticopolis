@@ -446,6 +446,9 @@ class GameApp implements GameAppPorts {
     // from the old tower would silently mute the inspector on whichever new
     // facility happens to reuse the id.
     this.inspector.clear();
+    // A live Getting Started session must follow the swap, or it keeps
+    // ticking the abandoned sim and teaches that tower's next step.
+    this.onboarding.adoptSim(sim);
     this.shownWin = false;
     this.lastStar = sim.star;
     this.accMinutes = 0;

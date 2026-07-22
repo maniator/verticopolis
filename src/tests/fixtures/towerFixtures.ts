@@ -1,4 +1,4 @@
-import type { Simulation } from "../../engine/Simulation";
+import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
 
@@ -43,4 +43,24 @@ export function placeUnit(sim: Simulation, kind: Parameters<Simulation["tower"][
   const u = sim.tower.units.find((q) => q.id === r.unitId);
   if (!u) throw new Error(`place ${kind} at ${floor},${x}: unit ${r.unitId} not found`);
   return u;
+}
+
+/** Ensure the centered 40-tile ground lobby a Modern founding seeds: assert
+ *  it present, or lay it tile by tile on a Classic empty lot. Landed one
+ *  commit before the founding change, when every mode still seeded it and
+ *  this was a pure assertion; that commit moved no golden-master hash, the
+ *  decoupling proof for spec-starter-lobby-mode-split. Now Classic founds
+ *  canon-zero, so on a Classic tower this actively lays the strip. */
+export function ensureStarterLobby(sim: Simulation): void {
+  const startX = MID - 20;
+  for (let x = startX; x < startX + 40; x++) layTile(sim, "lobby", 1, x);
+}
+
+/** Found a game the pre-split way: `newGame` plus the ensured centered lobby.
+ *  For suites written against the seeded start (their towers stand on it);
+ *  brand-new tests should lay their own structure instead. */
+export function newSeededGame(...args: Parameters<typeof Simulation.newGame>): Simulation {
+  const sim = Simulation.newGame(...args);
+  ensureStarterLobby(sim);
+  return sim;
 }

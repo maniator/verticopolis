@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { HK_CLEAN_MINUTES, HK_MAIDS_PER_UNIT } from "../../engine/economy/housekeeping";
@@ -19,7 +20,7 @@ const X0 = Math.floor(GRID.width / 2) - 20;
 /** A 2★ tower with a passenger elevator and a floor-2 slab, opening at 7:00.
  *  Every placement is asserted so a silent refusal can't make a scenario lie. */
 function baseTower(seed: number, mode: GameMode = "classic"): Simulation {
-  const sim = Simulation.newGame(seed, mode);
+  const sim = newSeededGame(seed, mode);
   sim.star = 2;
   placeSlab(sim, 2);
   expect(sim.buildTransport("elevatorStandard", X0 + 26, 1, 2).ok).toBe(true);

@@ -483,12 +483,17 @@ export function deserialize(raw: SerializedGame): Simulation {
  *  immutable for the tower's life. */
 export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): Simulation {
   const sim = new Simulation(seed, mode, modernCalendar);
-  // Seed a starter ground-floor lobby strip so the player has a base.
-  const startX = Math.floor(GRID.width / 2) - 20;
-  for (let i = 0; i < 40; i++) {
-    sim.tower.place("lobby", 1, startX + i);
-  }
-  sim.emit("Welcome! Build floors, add elevators, and attract tenants.", "info");
+  // The founding seed is a mode rule: Modern's centered lobby strip, or
+  // Classic's 1994 empty lot (spec-starter-lobby-mode-split).
+  const sl = sim.rules.starterLobby();
+  if (sl)
+    for (let i = 0; i < sl.width; i++) {
+      const r = sim.tower.place("lobby", 1, sl.x + i);
+      // A rule-set that seeds out of bounds (or against placement rules) is a
+      // programming error; fail at founding rather than emit a lying welcome.
+      if (!r.ok) throw new Error(`starter lobby seed failed at x=${sl.x + i}: ${r.reason ?? "unknown"}`);
+    }
+  sim.emit(sl ? "Welcome! Build floors, add elevators, and attract tenants." : "Welcome! Lay a lobby on the ground line to open your tower.", "info");
   return sim;
 }
 

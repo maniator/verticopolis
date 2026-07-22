@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
 import type { FacilityKind, GameMode } from "../../engine/types";
+import { ensureStarterLobby } from "../fixtures/towerFixtures";
 
 /**
  * Golden-master determinism net for the large-file split refactor.
@@ -21,15 +22,16 @@ import type { FacilityKind, GameMode } from "../../engine/types";
  */
 
 /**
- * Deterministic build script over the starter lobby footprint (newGame seeds a
- * 40-tile ground lobby centered on the lot). We lay a floor slab on floors 2..6
+ * Deterministic build script over the centered 40-tile lobby footprint that
+ * buildFixedTower ENSURES (Modern founds it, Classic lays it since the
+ * canon-zero split). We lay a floor slab on floors 2..6
  * directly above it, then drop rooms and an elevator onto that slab, so nothing
  * is detached and no surprise bridge-fill runs. `SLAB_LEFT`/`SLAB_RIGHT` sit
- * inside the starter lobby span. Each build step is asserted to succeed, so a
+ * inside that lobby span. Each build step is asserted to succeed, so a
  * silently-degraded fixture can't quietly test a different tower.
  */
 const SLAB_LEFT = 168;
-const SLAB_RIGHT = 205; // inclusive; inside the starter lobby (≈167..206)
+const SLAB_RIGHT = 205; // inclusive; inside the ensured lobby (≈167..206)
 const ROOM_FLOORS = [2, 3, 4, 5, 6];
 
 const BUILD_SCRIPT: { kind: FacilityKind; floor: number; x: number }[] = [
@@ -54,6 +56,14 @@ const BUILD_SCRIPT: { kind: FacilityKind; floor: number; x: number }[] = [
 
 function buildFixedTower(sim: Simulation): void {
   sim.money = 500_000_000;
+  // The scenario stands on the centered 40-tile ground lobby. Ensure it
+  // rather than read it from the founding seed. This landed one commit
+  // before the founding change, when newGame still seeded it and ensure was
+  // a pure assertion (neither pinned hash moved, the proof the fixture
+  // decoupling is behavior-free). Now Classic founds canon-zero
+  // (spec-starter-lobby-mode-split), so this lays the strip for Classic and
+  // only the Classic hash re-pinned.
+  ensureStarterLobby(sim);
   for (const step of BUILD_SCRIPT) {
     const res = sim.build(step.kind, step.floor, step.x);
     expect(res.ok, `build ${step.kind} @ f${step.floor} x${step.x}: ${res.reason ?? ""}`).toBe(true);
@@ -166,14 +176,14 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * three-day week), so its fixed three-day run reaches the weekend on day 2,
  * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-// Re-pinned for the founding-seed field (outside-scenery identity): serialize()
-// now writes the additive optional `initialSeed` (RNG.initialSeed, here the
-// fixture's 20260713 founding seed). That is the ONLY difference: the field is
-// written at save time and read back verbatim, no simulation math touches it.
-// The deterministic and round-trip golden tests (unchanged) prove no other
-// drift. The prior re-pin was the #305 Phase 1 SAVE_VERSION 6 -> 7 bump for
-// the additive optional Transport.schedule field.
-const PINNED_STATE_HASH = "ebabd11691414b861110ecdfbe8ef4cbb5d910b2bb74a6dfdde01d65fb2b9cd9";
+// Re-pinned for Classic canon-zero founding (spec-starter-lobby-mode-split):
+// newGame no longer seeds the Classic lobby, so the fixture's ensureStarterLobby
+// now LAYS the 40 tiles itself (different unit ids and revision history than
+// the founding seed produced, hence the new fingerprint). The Modern hash below
+// is UNCHANGED in the same change, which is the proof the divergence flows only
+// through rules.starterLobby. The prior re-pin was the additive initialSeed
+// save field (outside-scenery identity).
+const PINNED_STATE_HASH = "d608c2a32117ba5170fbff586e16067902d078fe204da401853e4cb2188d87a8";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run

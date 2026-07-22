@@ -83,6 +83,13 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
       const g = (window as any).game;
       g.speed = 0; // freeze time; input handling is frame-driven, not sim-driven
       g.sim.money = 1e9; // placement must only depend on the gesture, never funds
+      // Classic founds an empty lot now; lay the 40-tile concourse the taps
+      // below place their offices on top of.
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      for (let i = 0; i < 40; i++) {
+        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
     });
 
     const cx = await page.evaluate(() => (document.getElementById("view") as HTMLCanvasElement).clientWidth / 2);
@@ -118,7 +125,7 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const g = (window as any).game;
       const e = g.engine;
-      // Middle of floor 2, over the seeded ground lobby: a valid office spot.
+      // Middle of floor 2, over the ground concourse laid above: a valid office spot.
       const zoomPx = Math.abs(e.worldToScreenY(1) - e.worldToScreenY(2));
       return { x: e.worldToScreenX(g.grid.width / 2), y: e.worldToScreenY(2) + zoomPx / 2 };
     });
@@ -182,6 +189,13 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
       const g = (window as any).game;
       g.speed = 0;
       g.sim.money = 1e9;
+      // Classic founds an empty lot now; lay the 40-tile concourse the office
+      // tap below needs beneath it.
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      for (let i = 0; i < 40; i++) {
+        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
     });
 
     // Build an office to inspect, then switch to the inspect tool, both at the

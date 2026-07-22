@@ -51,6 +51,14 @@ export interface GameRules {
   /** True when condos house variable-size families — gates variant-household UI
    *  and readouts. */
   readonly hasVariantHouseholds: boolean;
+  /**
+   * The founding seed. Modern lays a centered ground-lobby strip so a new
+   * tower starts with a base (a quality-of-life nicety, the build-hints
+   * family); Classic returns null and founds the 1994 way: an empty lot, and
+   * the first lobby is the player's first decision. Consumed exactly once by
+   * `newGame`; nothing else may branch on founding.
+   */
+  starterLobby(): { x: number; width: number } | null;
   /** True when the build preview surfaces the refusal reason on hover (Modern
    *  pedagogy: hover, read, understand, then click). Classic is pixel-faithful:
    *  clicks refuse with a toast, the player learns by doing. Purely a UI gate;

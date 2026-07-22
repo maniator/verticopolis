@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { UndoHistory, towerStateSig } from "../../engine/UndoHistory";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
@@ -104,7 +105,7 @@ describe("UndoHistory — stack semantics", () => {
 
 describe("towerStateSig", () => {
   it("includes money but not the clock", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const FIXED = 500_000; // hold money constant so we isolate the clock's effect
     const sig0 = towerStateSig(sim.tower, FIXED);
     const units0 = sim.tower.units.length;
@@ -117,7 +118,7 @@ describe("towerStateSig", () => {
   });
 
   it("changes when structure is added", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const cx = Math.floor(GRID.width / 2);
     const sig0 = towerStateSig(sim.tower, sim.money);
     expect(sim.tower.place("floor", 2, cx).ok).toBe(true); // supported by the starter lobby
@@ -125,7 +126,7 @@ describe("towerStateSig", () => {
   });
 
   it("changes when a unit is renamed", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const cx = Math.floor(GRID.width / 2);
     for (let x = cx - 10; x <= cx + 10; x++) sim.tower.place("floor", 2, x);
     expect(sim.build("office", 2, cx).ok).toBe(true);
@@ -140,7 +141,7 @@ describe("towerStateSig", () => {
     // ONLY mutation of a gesture; without noRate in the signature, commitUndo
     // would drop that edit as a no-op and Ctrl+Z could not restore the market
     // state. Pin it, like the subtype reroll below.
-    const sim = Simulation.newGame(1, "classic");
+    const sim = newSeededGame(1, "classic");
     const cx = Math.floor(GRID.width / 2);
     for (let x = cx - 10; x <= cx + 10; x++) sim.tower.place("floor", 2, x);
     expect(sim.build("office", 2, cx).ok).toBe(true);
@@ -155,7 +156,7 @@ describe("towerStateSig", () => {
     // Setting the schedule can be the ONLY mutation of a gesture (the dialog's
     // apply writes nothing else), so a signature blind to it would drop the
     // "Set elevator schedule" undo step as a no-op. Pin it, like noRate above.
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e12;
     const cx = Math.floor(GRID.width / 2);
     for (let x = cx - 10; x <= cx + 10; x++) sim.tower.place("floor", 2, x);
@@ -169,7 +170,7 @@ describe("towerStateSig", () => {
   it("changes when a retail unit's canon subtype rerolls (Change variety is undoable)", () => {
     // Without subtype in the signature, commitUndo would drop the reroll step
     // (see towerStateSig) so the player couldn't undo a Change variety. Pin it.
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e12;
     sim.star = 5;
     const cx = Math.floor(GRID.width / 2);
@@ -185,7 +186,7 @@ describe("towerStateSig", () => {
 
 describe("UndoHistory + Simulation — round-trip", () => {
   it("restores the exact serialized sim on undo", () => {
-    let sim = Simulation.newGame(7);
+    let sim = newSeededGame(7);
     const notes: string[] = [];
     const hist = new UndoHistory({
       snapshot: () => JSON.stringify(sim.serialize()),

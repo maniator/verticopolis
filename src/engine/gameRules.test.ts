@@ -51,6 +51,15 @@ describe("makeRules", () => {
     expect(CLASSIC_RULES.walkwayWillingnessApplies()).toBe(true);
     expect(MODERN_RULES.walkwayWillingnessApplies()).toBe(false);
   });
+
+  it("splits the founding seed by mode (spec-starter-lobby-mode-split)", () => {
+    // Classic founds the 1994 way: zero tiles. Modern seeds the centered
+    // 40-tile ground strip. This is the seam contract itself; newGame's
+    // consumption of it is covered by the onboarding founding test and both
+    // golden masters.
+    expect(CLASSIC_RULES.starterLobby()).toBeNull();
+    expect(MODERN_RULES.starterLobby()).toEqual({ x: Math.floor(GRID.width / 2) - 20, width: 40 });
+  });
 });
 
 describe("lobby-distance band geometry (both rule-sets)", () => {

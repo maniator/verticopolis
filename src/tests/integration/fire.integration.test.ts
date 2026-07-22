@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { isOperational } from "../../engine/types";
@@ -6,7 +7,7 @@ import { isOperational } from "../../engine/types";
 /** A floor-2 tower served by an elevator, with `n` occupied offices — the only
  *  flammable rooms, so `startFire()` ignites an office deterministically. */
 function firePrep(seed: number, n = 1) {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   const x0 = Math.floor(GRID.width / 2) - 20;
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
   sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -105,7 +106,7 @@ describe("Fire aftermath — gutted shells (canon), not auto-repair", () => {
   it("a gutted COMMERCIAL venue stays gutted and is never revived to earn income", () => {
     // Regression: collectTrafficIncome() force-set commercial rooms to "occupied"
     // each hour, resurrecting a gutted shop/restaurant/cinema and defeating the fix.
-    const sim = Simulation.newGame(11);
+    const sim = newSeededGame(11);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2); // served floor

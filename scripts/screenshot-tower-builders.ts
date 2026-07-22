@@ -34,9 +34,9 @@ export function buildCanonTower(): void {
   s.money = 50_000_000;
   s.star = 5;
   const HALF = 55;
-  // Ground lobby grows OUTWARD from the seeded center strip: a ground tile only
+  // Ground lobby grows OUTWARD from the center: a ground tile only
   // connects by touching the tower, so laying from a far edge would silently
-  // drop every tile left of the seed and clip the tower. (Same rule below for
+  // drop every tile left of the start and clip the tower. (Same rule below for
   // every basement row.) Upper floors then rest on the full story beneath them.
   for (let x = cx; x <= cx + HALF; x++) s.tower.place("lobby", 1, x);
   for (let x = cx - 1; x >= cx - HALF; x--) s.tower.place("lobby", 1, x);

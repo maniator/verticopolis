@@ -99,9 +99,20 @@ export interface OnboardStep {
   done: (sim: Simulation) => boolean;
 }
 
-/** The four steps: empty-ish lot (a ground lobby is pre-seeded) → first office
- *  earning rent. Advance on real game state, not scripted clicks. */
+/** The five steps: empty lot → first office earning rent. Modern pre-seeds a
+ *  ground lobby, so its towers satisfy step one instantly and start at step
+ *  two; Classic founds the 1994 empty lot and step one teaches the first lay.
+ *  Advance on real game state, not scripted clicks. */
 export const ONBOARD_STEPS: OnboardStep[] = [
+  {
+    id: "lobby",
+    title: "Open your lobby",
+    sub: "Every tower opens at street level. Lay a lobby strip on the ground line, anywhere you like.",
+    hintDesktop: "Pick Lobby in the palette, then click or drag along the ground line (the row above the dirt).",
+    hintMobile: "Tap Lobby, then tap or drag along the ground line.",
+    pulse: '.pal-item[data-kind="lobby"]',
+    done: (sim) => sim.tower.units.some((u) => u.kind === "lobby"),
+  },
   {
     id: "floor",
     title: "Add a floor",
@@ -314,6 +325,23 @@ export class OnboardingController {
     this.render();
     this.applyHintAndPulse();
     return true;
+  }
+
+  /** Retarget a live session at a swapped-in sim (GameApp.adoptSim: New Tower,
+   *  Load, Import, undo/redo restore). Without this the checklist keeps ticking
+   *  the abandoned instance: progress on the live tower never advances it, and
+   *  since founding went mode-split its card can even teach the wrong first
+   *  step. No-ops when no session is active, so it never raises the panel. */
+  adoptSim(sim: Simulation): void {
+    if (!this.active) return;
+    this.sim = sim;
+    this.step = firstIncompleteStep(sim);
+    if (this.step >= ONBOARD_STEPS.length) {
+      this.finish();
+      return;
+    }
+    this.render();
+    this.applyHintAndPulse();
   }
 
   /** Called from the host's throttled update loop (~6 Hz). Advances on real progress. */

@@ -33,7 +33,13 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       const t = s.tower;
       g.speed = 0; // freeze time so the crowd sim can't churn the setup
       s.money = 10_000_000;
-      const x0 = Math.floor(g.grid.width / 2) - 20; // over the starter ground lobby
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      // Classic founds an empty lot now; lay the 40-tile concourse this
+      // scenario used to inherit from the founding seed.
+      for (let i = 0; i < 40; i++) {
+        const r = t.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
       // Drive the real build controller (what a click calls), quietly to keep the
       // no-error assertion clean, not sim.build directly.
       g.build.tryBuild("office", 2, x0, true); // A: [x0, x0+9)
@@ -84,6 +90,12 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       g.speed = 0;
       s.money = 10_000_000;
       const x0 = Math.floor(g.grid.width / 2) - 20;
+      // Classic founds an empty lot now; lay the 40-tile concourse this
+      // scenario used to inherit from the founding seed.
+      for (let i = 0; i < 40; i++) {
+        const r = t.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
       g.build.tryBuild("office", 2, x0, true); // neighbor A
       const cost = s.canBuild("office", 2, x0 + 15).cost; // office + own floors + bridge
       s.money = cost - 1; // one dollar short of the whole run
@@ -115,7 +127,14 @@ test.describe("auto-floor bridge between modules (e2e)", () => {
       const t = s.tower;
       g.speed = 0;
       s.money = 10_000_000;
-      const x0 = Math.floor(g.grid.width / 2) - 20; // starter concourse [x0, x0+40)
+      const x0 = Math.floor(g.grid.width / 2) - 20;
+      // Classic founds an empty lot now; lay the 40-tile concourse this
+      // scenario used to inherit from the founding seed.
+      // The concourse [x0, x0+40).
+      for (let i = 0; i < 40; i++) {
+        const r = t.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
       // Drop a lobby past the concourse edge with a gap; the bridge is what lets a
       // ground tile that would otherwise float land connected.
       g.build.tryBuild("lobby", 1, x0 + 45, true);
@@ -145,6 +164,12 @@ test.describe("sky-lobby canon (e2e)", () => {
       g.speed = 0;
       s.money = 1e10;
       const x0 = Math.floor(g.grid.width / 2) - 20;
+      // Classic founds an empty lot now; lay the 40-tile concourse this
+      // scenario used to inherit from the founding seed.
+      for (let i = 0; i < 40; i++) {
+        const r = t.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
       // Build a support column up through floor 14 so floor 15 has support below.
       for (let f = 2; f <= 14; f++) for (let i = 0; i < 40; i++) t.place("floor", f, x0 + i);
       // Claim floor 15 by placing a lobby there (goes through the real gesture).
@@ -178,7 +203,13 @@ test.describe("sky-lobby canon (e2e)", () => {
       const t = s.tower;
       g.speed = 0;
       const x0 = Math.floor(g.grid.width / 2) - 20;
-      // The starter ground lobby has a lobby at (1, x0).
+      // Classic founds an empty lot now; lay the 40-tile concourse this
+      // scenario used to inherit from the founding seed.
+      for (let i = 0; i < 40; i++) {
+        const r = t.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
+      // The concourse has a lobby at (1, x0).
       const lobby = t.unitAt(1, x0);
       const kindBefore = lobby?.kind;
       const removed = g.build.tryRemoveUnit(lobby, "bulldoze");

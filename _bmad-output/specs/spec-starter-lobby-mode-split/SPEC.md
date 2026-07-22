@@ -44,7 +44,7 @@ A fidelity debt to settle and a design question to close. The 1994 original star
 ## Non-goals
 
 - Left-edge start for new towers: rejected unanimously (it flattens tower-shape variety, fights the bidirectional camera and build promise, and couples cosmetic scenery to sim geometry).
-- Any change to lobby placement rules, costs, or the 375-tile lot canon.
+- Any change to lobby placement rules, costs, or the 375-tile lot canon. One owner-approved amendment (2026-07-22): founding is lobby-first, an empty tower's first placement must be the ground lobby (1994's flow); canon-zero made non-lobby founding reachable and the owner chose to close it.
 - Any scenery-to-gameplay coupling: the arrival plaza stays pure render.
 - Mode-splitting anything beyond the starter seed.
 

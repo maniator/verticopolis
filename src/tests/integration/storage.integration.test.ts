@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { deflateSync } from "fflate";
 import { SAVE_VERSION, Simulation, ECON } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
@@ -12,7 +13,7 @@ describe("SaveGame", () => {
   afterEach(() => vi.unstubAllGlobals());
 
   function sampleGame(): Simulation {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 12; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
