@@ -86,18 +86,28 @@ resolving review threads). On top of that, in an agent session:
   The rule lives in the backlog's "How items flow" section and
   `src/tests/backlogIssueMirror.test.ts` fails the suite when a row half
   drifts.
-- **If Copilot review is down, loop the review skill until it's clean.** With
-  no outside reviewer available (Copilot outage, not invoked, or no response),
-  the deep review skill has to stand in for it. Run the BMGD/BMAD review skill
+- **If the automated PR reviewers are down, loop the review skill until it's
+  clean.** With Copilot/Codex unavailable, the deep review skill has to stand
+  in for the outside reviewer. First request the review as usual, then confirm
+  from the PR's checks and review status that the outside review is genuinely
+  unavailable (errored or never started), not merely pending; if it ran and is
+  only pending, wait for it. If one of the two reviewers can still review, use
+  it; only stand in when neither Copilot nor Codex can. Only loop where the
+  change would already need the deep review: the non-trivial-change bar still
+  applies, so a trivial change just waits for the bots to return (ask the user
+  if that wait blocks something). Run the BMGD/BMAD review skill
   (`/gds-code-review` or `/bmad-code-review`, per the same gameplay-vs-plumbing
-  split, and both when the change spans both) over the whole change, fix every
-  `patch` finding, record every `defer`, then re-run the skill on the updated
-  diff. Keep cycling BMAD/GDS reviews until a full pass finds nothing new to
-  fix. Check the PR's GitHub Actions runs and checks to confirm the Copilot
-  review job actually failed to run before falling back to this loop; if it
-  ran and is only pending, wait for it instead. Copilot being offline never
-  lowers the bar or unblocks merge; re-request it and resolve its threads as
-  usual once it returns.
+  split, both when the change spans both) over the whole change, fix every
+  `patch` finding, record every `defer` in the backlog, then re-run the skill
+  on the updated diff. Keep cycling until a full pass surfaces no new `patch`
+  findings; one clean run straight after a fix round is not enough on its own,
+  since each fix can open the next finding, so take one more confirming pass.
+  If it does not converge after a couple of rounds, a `patch` finding needs
+  human judgment you cannot settle, or the reviewers stay down once the change
+  is clean, stop and ask the user instead of looping forever or merging solo.
+  Copilot/Codex being offline never lowers the bar or unblocks merge; note it
+  on the PR, re-request them, and resolve their threads as usual once they
+  return.
 - **Bring in the agents relevant to the change** rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;

@@ -95,23 +95,32 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the merge-commits-only rule above) may be armed without asking again.
   If Copilot raises a finding or a required check fails, hold the PR and fix it
   rather than let it merge.
-- **When Copilot review is down, loop the BMAD/GDS review skill until the
-  changes are clean.** Copilot being unavailable (outage, not invoked, no
-  response) never lowers the bar or unblocks merge; it just removes the outside
-  reviewer, so the deep review skill has to carry that load too. Run the review
-  skill on the full change per the gameplay-vs-plumbing split above
-  (`/gds-code-review` or `/bmad-code-review`, and both when the change spans
-  both surfaces), fix every `patch` finding and record every `defer` in
+- **When the automated PR reviewers are down, loop the BMGD/BMAD review skill
+  until the changes are clean.** Copilot/Codex being unavailable never lowers
+  the bar or unblocks merge; it just removes the outside reviewer, so the deep
+  review skill has to carry that load too. First request the review as usual,
+  then confirm from the PR's checks and review status that the outside review
+  is genuinely unavailable rather than merely slow: a job that errored or never
+  started counts as down, one that ran and is only pending means wait for it,
+  not loop. If one of the two reviewers can still review, use it; only stand in
+  with the skill when neither Copilot nor Codex can. This applies only where the
+  change would already need the deep review; the non-trivial-change bar in the
+  first non-negotiable still governs, so a one-line or docs-only tweak the bots
+  would have waved through does not suddenly require the loop (it just waits for
+  the bots to return, or you ask the user if that wait blocks something). Run
+  the review skill on the full change per the gameplay-vs-plumbing split above
+  (`/gds-code-review` or `/bmad-code-review`, both when the change spans both
+  surfaces), fix every `patch` finding and record every `defer` in
   `_bmad-output/implementation-artifacts/backlog.md`, then run the skill again
-  on the updated diff. Keep cycling reviews this way until a full pass surfaces
-  no new `patch` findings ("nothing left to fix"); a single clean run straight
-  after a fix round is not enough on its own, since each fix can open the next
-  finding. To tell whether Copilot review is actually down (versus just slow or
-  never triggered), check the PR's GitHub Actions runs and checks for the
-  Copilot review job: if it never ran, failed to start, or errored out, treat
-  the reviewer as down and run this loop; if it ran and is just pending, wait
-  for it instead. Note in the PR that Copilot was down and how many review
-  rounds ran. Re-request Copilot and hold merge as usual the moment it is back.
+  on the updated diff. Keep cycling until a full pass surfaces no new `patch`
+  findings ("nothing left to fix"); one clean run straight after a fix round is
+  not enough on its own, since each fix can open the next finding, so take one
+  more confirming pass. If the loop does not converge after a couple of rounds,
+  a `patch` finding needs human judgment you cannot settle, or the reviewers
+  stay down once the change is clean, stop and ask the user rather than loop
+  forever or merge on your own. Note on the PR that the reviewers were down and
+  how many rounds ran. Re-request Copilot/Codex and hold merge as usual the
+  moment they are back.
 
 ## Canon reference (don't re-derive from memory)
 
