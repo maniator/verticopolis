@@ -1,4 +1,4 @@
-# Spec: Classic economy canon cadence and the verified 1994 tables
+# Spec: Classic economy canon cadence and the 1994 tables (snippet-corroborated, provisional)
 
 - **Date:** 2026-07-22
 - **Lane:** GDS (gameplay/engine parity), party-ratified, owner pre-authorized
@@ -23,27 +23,35 @@ where the 1994 original ran the two at rough parity.
 
 Fetched via web search on 2026-07-22; direct page fetches were blocked by the
 session network policy, so values were mined from search snippets of the pages
-named below. The GameFAQs FAQ lineage (BStuart, furdude2, Aristotle47; mirrored
-at Neoseeker and CheatCodes) independently corroborates the Relentless
-Optimizer tables the pricing split shipped on:
+named below. Search snippets from the GameFAQs FAQ lineage (BStuart, furdude2,
+Aristotle47; mirrored at Neoseeker and CheatCodes) corroborate the Relentless
+Optimizer tables the pricing split shipped on, rung for rung. Two honest
+limits on that corroboration (owner review, PR #574): the pages themselves
+were not read, only snippets, and a lineage mirrored across sites is not
+established as independent of the fan reference. So every "corroborated"
+verdict below is explicitly PROVISIONAL until a primary or genuinely
+independent source is read directly (backlog row
+`classic-rent-primary-source-verification`, issue #575; the Wine harness is
+the definitive path, as it was for stairs willingness and the calendar phase):
 
-| Item | 1994 sources | Verticopolis Classic | Verdict |
+| Item | 1994 sources (snippet-level) | Verticopolis Classic | Verdict |
 | --- | --- | --- | --- |
-| Office rent | $2k/5k/10k/15k per quarter; quarter = 3 days; paid "every 1st weekday" | same ladder, but each collection pays 1/30 of the rung | ladder **verified**; cadence **deviates** (this spec fixes it) |
-| Hotel single | $500/1,500/2,000/3,000 nightly | same, nightly, full | **verified** |
-| Hotel double | $800/2,000/3,000/4,500 nightly | same | **verified** |
-| Hotel suite | $1,500/4,000/6,000/9,000 nightly | same | **verified** |
-| Condo | $150k one-time (build cost $80k) | $150k Average rung | **verified** (Very Low 40k-vs-50k still open) |
+| Office rent | $2k/5k/10k/15k per quarter; quarter = 3 days; paid "every 1st weekday" | same ladder, but each collection pays 1/30 of the rung | ladder **corroborated (provisional)**; cadence **deviates** (this spec fixes it) |
+| Hotel single | $500/1,500/2,000/3,000 nightly | same, nightly, full | **corroborated (provisional)** |
+| Hotel double | $800/2,000/3,000/4,500 nightly | same | **corroborated (provisional)** |
+| Hotel suite | $1,500/4,000/6,000/9,000 nightly | same | **corroborated (provisional)** |
+| Condo | $150k one-time (build cost $80k) | $150k Average rung | **corroborated (provisional)** (Very Low 40k-vs-50k still open) |
 | Fast food | ~$3k/day ($9k/qtr) at normal population | $2k/day headline, demand-scaled | deviates low; deferred calibration |
 | Restaurant | ~$6k/day ($18k/qtr) | $4k/day headline | deviates low; deferred calibration |
 | Shop | $4k-20k/day by popularity | $2.5k/day headline | deviates low; deferred calibration |
 | Cinema | $0-10k/day by performance, film booked monthly | $8k/day headline, 150k/300k bookings | comparable; deferred with the rest |
 | Maintenance | full amounts charged per quarter | modern-tuned monthly values, 1/10 per canon period | canon dollar table unverified; deferred |
 
-Confidence upgrades recorded in `src/engine/pricing.ts` provenance comments and
-the pricing GDD: office/hotel/condo tables move from single-source (SOFT/MED) to
-two-lineage corroborated. The archive.org manual remains unread; if it ever
-contradicts these, re-open here.
+Provenance notes in `src/engine/pricing.ts` and the pricing GDD record this
+snippet-level corroboration without a confidence-tier upgrade: the tables stay
+at their shipped SOFT/MED tiers, marked provisionally reinforced. The
+archive.org manual remains unread; if any primary source ever contradicts
+these, re-open here and in the pricing GDD's Decision 2.
 
 **Answer to the owner's question:** the amount of money is valid. The 1994 game
 famously drowned a 4-star tower in cash; stars gate on population, never on
@@ -145,3 +153,9 @@ the Help drift guard was done during implementation). Findings and triage:
 - `canon-maintenance-table`: verify the 1994 maintenance dollar table (FAQ
   lineage lists per-quarter amounts) and decide whether Classic charges full
   canon amounts per canon period, replacing the 1/10 rescale.
+- `classic-rent-primary-source-verification` (owner review, PR #574): establish
+  the rent ladders and the full-per-quarter office cadence from a primary or
+  genuinely independent source (read the FAQ pages directly, OCR the manual,
+  or read the retail game via the Wine harness). Until then every
+  corroboration in §2 stays provisional; a contradiction re-opens this spec's
+  ruling and the pricing GDD's Decision 2.

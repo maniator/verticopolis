@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.78.0
 
-- Classic offices now pay their full 1994 rent every quarter (an Average office pays its whole $10,000 each 3-day quarter), the fast office money the original was known for. Verified against period sources; Modern towers are unchanged.
+- Classic offices now pay their full 1994 rent every quarter (an Average office pays its whole $10,000 each 3-day quarter), the fast office money the original was known for, matching what period guides describe. Modern towers are unchanged.
 
 ## 1.76.0
 

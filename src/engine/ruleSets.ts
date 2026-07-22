@@ -90,8 +90,9 @@ export const CLASSIC_RULES: GameRules = {
   quarterlyRentScale(_quarterDays) {
     // Canon cadence: the full 1994 rent lump lands at every quarter boundary,
     // and Classic's calendar is always canon, so that is every 3 days (an
-    // Average office pays its whole $10,000 each quarter). Verified against
-    // the GameFAQs FAQ lineage 2026-07-22 (spec-classic-economy-canon-cadence).
+    // Average office pays its whole $10,000 each quarter), per the period FAQ
+    // sources (snippet-corroborated, provisional pending a primary source,
+    // #575; spec-classic-economy-canon-cadence).
     // WHEN rent lands is the quarter boundary's job (sim/loop.ts onDay); this
     // factor only says the lump never rescales with the quarter's length,
     // which is why `_quarterDays` is deliberately ignored: the calendar-parity

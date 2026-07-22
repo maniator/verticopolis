@@ -414,7 +414,7 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
 
   it("the day-3 rent lump is the FULL $10,000 (canon cadence: the whole 1994 rent every 3-day quarter)", () => {
     // Delta across the canon quarter boundary: a Classic office pays its whole
-    // Average rent each canon quarter, the verified 1994 cadence
+    // Average rent each canon quarter, the ratified 1994 cadence
     // (spec-classic-economy-canon-cadence-2026-07-22). Before that spec this
     // collected the rescaled $333; the regression pins the shift into the new
     // behavior. Day 3 also crosses the canon maintenance boundary, so the

@@ -54,12 +54,17 @@ control (fixed per-facility income). Canon values:
 > unfetchable (403) and no second source corroborates them. Our hotel rates are
 > ~10× BELOW these numbers today. This drives Decision 2.
 >
-> **CLOSED 2026-07-22 (spec-classic-economy-canon-cadence §2):** the GameFAQs
-> FAQ lineage (BStuart, furdude2, Aristotle47) independently corroborates every
-> table above, rung for rung, nightly hotel cadence included; confidence raised
-> SOFT to MED (manual still unread). The same sweep verified the office cadence
-> (the full lump each 3-day quarter), which retired the calendar-parity rescale
-> for Classic, and surfaced the commercial daily-income gap now on the backlog.
+> **PROVISIONALLY REINFORCED 2026-07-22 (spec-classic-economy-canon-cadence
+> §2), not closed:** search snippets of the GameFAQs FAQ lineage (BStuart,
+> furdude2, Aristotle47) match every table above, rung for rung, nightly hotel
+> cadence included. The pages themselves could not be read and the lineage is
+> not established as independent of the Relentless Optimizer reference, so the
+> SOFT tiers stand and the gap stays open until a primary or genuinely
+> independent source is read directly (#575; the Wine harness is the
+> definitive path). The same sweep surfaced the office cadence (the full lump
+> each 3-day quarter, per the same snippets), which retired the calendar-parity
+> rescale for Classic under the owner's call, and the commercial daily-income
+> gap now on the backlog (#572).
 
 ## 1. Decision: pricing split shape (unanimous)
 

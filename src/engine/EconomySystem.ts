@@ -114,7 +114,7 @@ export class EconomySystem {
       }
     }
     // The collection factor is a rule-set decision (quarterlyRentScale):
-    // Classic pays the FULL 1994 lump every canon 3-day quarter (verified
+    // Classic pays the FULL 1994 lump every canon 3-day quarter (ratified
     // cadence, spec-classic-economy-canon-cadence-2026-07-22); Modern keeps
     // the income-invariant rescale (gdd/arch-classic-calendar-parity): its
     // shorter quarter pays proportionally less so per-in-game-day income never
