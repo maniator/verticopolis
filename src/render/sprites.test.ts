@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit } from "../engine/types";
-import { AMUSEMENTS_SUBTYPES, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   craneAnchorTile,
@@ -73,6 +73,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["restaurant", { kind: "restaurant" }],
     ["food hall", { kind: "foodHall" }],
     ["amusements", { kind: "amusements" }],
+    ["boutique bay", { kind: "boutiqueBay" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -183,6 +184,34 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // A 132px bay fits only a handful of watchers; nowhere near a billion.
     const people = s.log.filter((l) => l === "fillStyle=rgba(0,0,0,0.24)").length;
     expect(people).toBeLessThan(20);
+  });
+
+  it("each Boutique Bay trade draws its own distinct shopfront", () => {
+    // Seven trades, seven interiors: the same guarantee the distinctness test
+    // pins on the look table must show up in the actual drawing.
+    const sigs = new Set<string>();
+    for (const name of BOUTIQUE_SUBTYPES) {
+      const s = spyCtx();
+      expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "boutiqueBay", subtype: name, occupants: 2 }), 0, 0, 132, 44)).not.toThrow();
+      expect(s.painted()).toBe(true);
+      sigs.add(s.sig());
+    }
+    expect(sigs.size, "two trades drew identically").toBe(BOUTIQUE_SUBTYPES.length);
+  });
+
+  it("a Boutique Bay's browsers are bounded and gated on occupancy", () => {
+    // The browsing-customer loop is width-bounded (a forged occupant count can't
+    // spin it), and an empty shop draws no customer.
+    const empty = spyCtx();
+    const full = spyCtx();
+    const forged = spyCtx();
+    drawUnit(draw({}, empty.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 0 }), 0, 0, 132, 44);
+    drawUnit(draw({}, full.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 3 }), 0, 0, 132, 44);
+    expect(() => drawUnit(draw({}, forged.ctx), unit({ kind: "boutiqueBay", subtype: "Florist", occupants: 1e9 }), 0, 0, 132, 44)).not.toThrow();
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    expect(empty.log).not.toContain(occupant);
+    expect(full.log).toContain(occupant);
+    expect(forged.log.filter((l) => l === occupant).length).toBeLessThan(20);
   });
 });
 

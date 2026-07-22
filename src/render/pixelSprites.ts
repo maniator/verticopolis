@@ -4,6 +4,7 @@ import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSpri
 import { condo, hotel, office } from "./pixelSprites/residential";
 import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
 import { amusements } from "./pixelSprites/amusements";
+import { boutiqueBay } from "./pixelSprites/boutique";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -71,6 +72,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // claw, mini-golf) draws its own interior under a shared neon marquee.
       amusements(d, u, x, y, w, h);
       break;
+    case "boutiqueBay":
+      // A Modern bay of small trades; each trade subtype (florist, barber,
+      // phone repair, vintage, tattoo, records, gallery) draws its own shopfront.
+      boutiqueBay(d, u, x, y, w, h);
+      break;
     case "shop":
       shop(d, u, x, y, w, h);
       break;
@@ -106,4 +112,5 @@ export function sampleState(kind: FacilityKind): UnitState {
 export { PAL, SHIRTS, SKIN, person, personSeated, personStanding, type RoomCtx } from "./pixelSprites/common";
 export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, FOODHALL_LOOKS, type FastFoodLook, type RestaurantLook } from "./pixelSprites/food";
 export { AMUSEMENTS_LOOKS, type AmusementsLook } from "./pixelSprites/amusements";
+export { BOUTIQUE_LOOKS, type BoutiqueLook } from "./pixelSprites/boutique";
 export { SHOP_LOOKS, type ShopLook } from "./pixelSprites/shop";

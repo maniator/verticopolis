@@ -68,6 +68,22 @@ export const AMUSEMENTS_SUBTYPES = [
 ] as const;
 
 /**
+ * The trades a Modern Boutique Bay can present. Like the other Modern container
+ * rosters, these are Modern-only and carry NO ordinal: a Modern tower is never
+ * exported to the 1994 `.TDT` format, and the native save persists the trade by
+ * NAME, not by index, so order carries no meaning.
+ */
+export const BOUTIQUE_SUBTYPES = [
+  "Florist",
+  "Barber",
+  "Phone Repair",
+  "Vintage",
+  "Tattoo",
+  "Record Store",
+  "Gallery",
+] as const;
+
+/**
  * The subtype (stall/variant) name list for `kind`, or null when the kind
  * carries none. The canon retail kinds (shop / fastFood / restaurant) return
  * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
@@ -88,6 +104,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return FOODHALL_SUBTYPES;
     case "amusements":
       return AMUSEMENTS_SUBTYPES;
+    case "boutiqueBay":
+      return BOUTIQUE_SUBTYPES;
     default:
       return null;
   }
