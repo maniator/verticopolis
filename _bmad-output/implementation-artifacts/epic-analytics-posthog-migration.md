@@ -1,0 +1,72 @@
+---
+title: "Analytics migration: Vercel Web Analytics to cookieless PostHog (rule D-1)"
+type: "epic"
+created: "2026-07-22"
+status: "in-progress"
+spec: "../specs/spec-analytics-posthog-migration/SPEC.md"
+adr: "../planning-artifacts/prds/prd-mobile-distribution-2026-07-08/decision-log.md (entry 14)"
+rules: "D-1 (#542), specced in PR #571"
+---
+
+## What this tracks
+
+The story sequence that carries the D-1 ruling (migrate off Vercel Web Analytics to
+a cookieless PostHog relay) from the current single-vendor code to the shipped
+migration. The SPEC and its companions (`reverse-proxy.md`, `edge-fn-setup.md`,
+`transparency-note.md`) are the canonical contract; this file is only the running
+order and status. If they disagree, the SPEC wins. Recreate this file from the
+SPEC's "Process" constraint if it is ever lost.
+
+## Hard invariants (every story obeys)
+
+- Cookieless: no cookie, no localStorage identifier, no cross-session or
+  cross-device identity, no consent banner. This is the load-bearing invariant.
+- `posthog-js` is never shipped. The client sends typed events by
+  `fetch`/`sendBeacon` to a same-origin `/api/ingest`; a Vercel edge function
+  forwards to PostHog with the key server-side (`POSTHOG_KEY`/`POSTHOG_HOST`,
+  never `VITE_`-prefixed, never in the bundle).
+- One gate: `telemetryHostAllowed`, unchanged. Every telemetry call is
+  best-effort and never throws past its caller.
+- Environment split is server-side via `VERCEL_ENV` (production / preview /
+  development), not client-derived.
+- The measured mobile bundle delta stays at most 5 KB gzipped with no cold-start
+  regression; the implementing PR records the measured number.
+- Cross-session retention stays OUT of scope (parked): cookieless PostHog has no
+  identity, so it needs a future funded identity decision (the E4 gate).
+
+## Process (per story)
+
+One story per PR. Each PR passes the four quality gates (typecheck, lint, test,
+build) and runs `/gds-code-review` in-session (analytics correctness is
+gameplay-progression semantics, per the TDT-is-storage-but-gds-reviewed
+precedent). Fix every `patch` finding; record every `defer` finding in
+`backlog.md` and keep the backlog-to-issue mirror true. Merge commits only, no
+em-dashes in new prose. A version bump applies only where a player-facing surface
+changes. Verify version-sensitive Vercel and PostHog API details against current
+docs at build time (the `edge-fn-setup.md` verify-at-build checklist); do not
+guess.
+
+## Stories
+
+| ID | Story | CAP | Review | Version bump | Status |
+|----|-------|-----|--------|--------------|--------|
+| S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | in-progress |
+| S2 | `api/ingest.ts` edge function: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, `ctx.waitUntil` non-blocking, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | todo |
+| S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | as measured | todo |
+| S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | as measured | todo |
+| S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
+| S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
+
+## S1 seam (as built)
+
+- `src/analyticsAdapter.ts` is the single vendor seam: it owns the only
+  `@vercel/analytics` and `@vercel/speed-insights` imports and exposes the
+  vendor-neutral `AnalyticsAdapter` (`send`, `injectPageTelemetry`).
+  `vercelAdapter` is the production binding; `setAnalyticsAdapter` swaps it (the
+  S2/S3 provider swap is a new adapter plus that one binding).
+- `src/analytics.ts` (`trackEvent`) and `src/telemetry.ts`
+  (`injectVercelTelemetry`) reach the vendor only through `analyticsAdapter()`.
+  The host gate and the never-throw try/catch stay with those callers, unchanged.
+- `src/analyticsAdapter.test.ts` drives the whole typed vocabulary through a stub
+  adapter and asserts the vendor is untouched while the stub is active, proving a
+  transport swap is a one-file change.

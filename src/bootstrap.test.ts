@@ -5,8 +5,12 @@ import { inject as injectWebAnalytics } from "@vercel/analytics";
 
 // The telemetry SDKs are gated on the host and best-effort; stub them so the
 // gate and its catch can be asserted without touching the real endpoints.
+// The adapter imports both @vercel/analytics symbols (`track` and `inject`) from
+// one module, so mock both here even though this file only drives the inject
+// path: a partial mock leaves `track` undefined, and any later test reaching the
+// send path would throw into the best-effort catch and silently drop the event.
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
-vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
+vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {

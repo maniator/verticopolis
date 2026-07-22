@@ -1,21 +1,22 @@
-import { track } from "@vercel/analytics";
+import { analyticsAdapter } from "./analyticsAdapter";
 import { telemetryHostAllowed } from "./telemetry";
 
 /**
  * Gameplay analytics: a small, typed vocabulary of custom events reported
- * through the SAME Vercel Web Analytics channel the page-view telemetry uses
- * (`@vercel/analytics`'s `track`). Page views and Core Web Vitals answer "who
- * showed up and was it fast"; these answer the questions the raw feed can't: a
- * first-tower funnel (`game_started` then `first_build`), which tools players
- * reach for, how far they climb the star ladder, and how long a session runs.
+ * through the SAME transport the page-view telemetry uses, reached via the one
+ * analytics adapter (`analyticsAdapter`, today Vercel Web Analytics `track`).
+ * Page views and Core Web Vitals answer "who showed up and was it fast"; these
+ * answer the questions the raw feed can't: a first-tower funnel (`game_started`
+ * then `first_build`), which tools players reach for, how far they climb the
+ * star ladder, and how long a session runs.
  *
  * Every event goes through the SAME host gate as the page-view inject
  * (`telemetryHostAllowed`) and is best-effort: nothing fires on localhost, the
- * e2e preview server, or the native shell, and a `track` hiccup can never throw
- * past the caller into the game loop.
+ * e2e preview server, or the native shell, and a transport hiccup can never
+ * throw past the caller into the game loop.
  *
  * The vocabulary is deliberately low-volume so a busy session stays well inside
- * Vercel's event budget instead of streaming a row per click: `tool_used` is
+ * the provider's event budget instead of streaming a row per click: `tool_used` is
  * deduped to one fire per distinct tool, `first_build` to one per session, and
  * `star_reached` (at most a handful of promotions) and `session_end` (one per
  * tab) are naturally bounded.
@@ -99,7 +100,7 @@ interface GameplayEvents {
 function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
   if (!telemetryHostAllowed()) return;
   try {
-    track(name, props);
+    analyticsAdapter().send(name, props);
   } catch {
     /* best-effort telemetry; never block gameplay on it */
   }
