@@ -79,7 +79,7 @@ jobs:
     outputs:
       render: ${{ steps.filter.outputs.render }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -144,14 +144,14 @@ jobs:
     env:
       SHARDS_JSON: ${{ needs.capture.outputs.shards }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
           persist-credentials: false
 
       - name: Download the shard artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: /tmp/dl
           pattern: shots-*
@@ -197,7 +197,7 @@ jobs:
       - name: Advisory sticky comment
         if: ${{ !cancelled() && steps.drift.outcome == 'success' }}
         continue-on-error: true
-        uses: actions/github-script@v7
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7.1.0
         with:
           script: |
             const marker = '<!-- screenshot-drift-check -->';
@@ -244,13 +244,13 @@ jobs:
       # for a while, and a non-gated push landing meanwhile would not trigger a fresh
       # run to supersede this one, so committing onto the tip could bury newer code
       # under stale pixels. The push step refuses if the branch advanced past HEAD_SHA.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 0
 
       - name: Download the shard artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           path: /tmp/dl
           pattern: shots-*

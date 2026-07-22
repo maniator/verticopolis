@@ -47,7 +47,7 @@ jobs:
     outputs:
       image: ${{ steps.pin.outputs.image }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - id: pin
         run: |
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
@@ -66,7 +66,7 @@ jobs:
       # this run is queued behind the sibling screenshots run, the tip already has
       # that run's commit, so the push here fast-forwards. Full history (depth 0)
       # also lets the rebase-retry below reconcile cleanly if anything did land.
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
@@ -79,7 +79,7 @@ jobs:
       # The image ships Node 20; install the repo's pinned Node over it (keeping
       # the image's browsers).
       - name: Use Node.js (from .nvmrc)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: ".nvmrc"
 
