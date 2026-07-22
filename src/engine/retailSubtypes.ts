@@ -38,11 +38,12 @@ export const SHOP_SUBTYPES = [
 ] as const;
 
 /**
- * The stalls a Modern Food Hall can present. Unlike the three lists above these
- * are NOT canon and carry NO TDT ordinal: Food Hall is Modern-only content, and
- * a Modern tower is never exported to the 1994 `.TDT` format, so order is not
- * fidelity-load-bearing (only stability across saves matters). Extend at the
- * end so a persisted ordinal keeps pointing at the same stall.
+ * The stalls a Modern Food Hall can present. Unlike the three canon lists above,
+ * these are NOT canon and carry NO ordinal: Food Hall is Modern-only content, a
+ * Modern tower is never exported to the 1994 `.TDT` format, and the native save
+ * persists the stall by NAME (a string, see `serializeUnit`), not by index. So
+ * order carries no meaning at all: reordering or inserting is safe, and a saved
+ * name reloads to the same stall regardless of position.
  */
 export const FOODHALL_SUBTYPES = [
   "Ramen Bar",
