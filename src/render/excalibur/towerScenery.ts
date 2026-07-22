@@ -158,7 +158,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     // Road running from the roundabout to the dirt's left edge, in
     // texture-safe segments (the full run is far past the 2048 cap).
     const from = -GRID.width;
-    const to = -36;
+    const to = ROUNDABOUT_START;
     const total = (to - from) * TILE;
     const segments = Math.ceil(total / STRIP_MAX_SEG);
     const segW = Math.ceil(total / segments / TILE) * TILE;

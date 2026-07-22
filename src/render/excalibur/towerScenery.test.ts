@@ -14,10 +14,10 @@ import type { TowerEngine } from "./TowerEngine";
  * Pixel fidelity stays the Playwright visual tier's job.
  */
 
-/** Founding seed whose layout the assertions lean on: 263 skyline rects, 13
- *  plant spots (both kinds present), and a starter-lobby apron that hides at
- *  least one spot while sparing others (verified in sceneryLayout terms below,
- *  never as magic numbers). */
+/** Founding seed whose layout the assertions lean on: its plant spots carry
+ *  both kinds, and the starter-lobby apron hides at least one spot while
+ *  sparing others. Counts are always derived from skylineRects/plantSpots at
+ *  run time, never written down here, so skyline tuning cannot stale this. */
 const SEED = 4400;
 
 /** Static actors makeScenery adds once: the left plaza (sidewalk, roundabout,
