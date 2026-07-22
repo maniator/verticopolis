@@ -1,6 +1,6 @@
 # Story: Desktop build-refusal tooltip visibility + Shift-drag panning
 
-Status: ready-for-dev
+Status: done
 
 Ships as one PR on branch `claude/desktop-visibility-navigation-btty71`.
 Review skill: `/gds-code-review` (input routing and build-preview legibility are
@@ -70,12 +70,20 @@ party memlog.
    card's pointer-events or dismiss behavior on either tier.
 3. With any build or bulldoze tool armed, Shift+left-drag pans the camera on
    mouse: no paint strip is laid, no shaft is anchored or sized, no bulldoze
-   fires, on down, move, or up. Works identically over empty sky and over
-   built tiles. Inspect tool with Shift+drag still pans (unchanged).
+   fires, on down, move, or up. This includes a press landing on a selected
+   elevator's extend arrows: the pan key skips the arrow hit-test, so
+   Shift+drag never resizes the shaft (AMENDED per review 2026-07-22; the
+   first cut left the arrow branch ahead of classification, Space-parity).
+   Works identically over empty sky and over built tiles. Inspect tool with
+   Shift+drag still pans (unchanged).
 4. Without Shift, every existing left-drag behavior is byte-identical:
    elevator drag-sizing, floor/lobby/parking painting, bulldoze drag, inspect
-   pan, space-hold pan, middle/right-button pan, touch routing (touch is
-   unaffected by the modifier).
+   pan, space-hold pan, middle/right-button pan, and all touch routing. With
+   a hardware Shift held on a hybrid touch device, a touch press routes to
+   pan the same way a held Space always has: the pan key is one rule across
+   pointer types (CLARIFIED per review 2026-07-22; this AC originally claimed
+   touch was unaffected by the modifier, contradicting the ratified
+   "matching the space-hold gate" design and the shipped test).
 5. Gesture classification reads the modifier at pointer-down, matching the
    space-hold behavior (releasing Shift mid-drag keeps the pan until
    pointer-up).
@@ -153,3 +161,39 @@ party memlog.
   findings, backlog `defer` findings.
 - Screenshot note: if any committed gallery screenshot shows the refusal card,
   the pr-drift-check will flag it; refresh via the pinned-container flow only.
+
+### Review Findings (gds-code-review, 2026-07-22)
+
+Layers run: Blind Hunter, Edge Case Hunter, Acceptance Auditor (all completed).
+
+- [x] [Review][Patch] Shift+press on a selected elevator's extend arrow
+  resized the shaft (arrow hit-test ran before classification)
+  [src/render/excalibur/towerInputCamera.ts] — fixed: the pan key now skips
+  the arrow branch, with a regression test; AC3 amended to cover it.
+- [x] [Review][Patch] Shift+wheel zoomed out-only (browsers remap Shift+wheel
+  to deltaX, so deltaY read 0 every notch)
+  [src/render/excalibur/towerInputCamera.ts] — fixed: deltaX fallback, dead
+  events dropped, both directions pinned by test.
+- [x] [Review][Patch] Help lede still opened with the flat "drag to pan"
+  claim AC6 ordered rewritten [src/ui/templates/helpContent.ts] — fixed:
+  "drag to pan with the Inspect tool; with a build tool, hold Shift...".
+- [x] [Review][Patch] AC4's "touch is unaffected by the modifier" contradicted
+  the deliberate hybrid-touch behavior (Space precedent) — fixed: AC4
+  reworded; one pan-key rule across pointer types.
+- [x] [Review][Patch] Docked narrow-viewport refusal card rendered translucent
+  on hover devices (capability gate vs width-based dock tier)
+  [src/styles.css] — fixed: the opacity media query now also requires the
+  exact complement of the GameApp.mobileMq dock query.
+- [x] [Review][Patch] buildRefusalShowing leaked true through the inspector
+  ✕-dismiss path (latent; the flag is now a positioning input)
+  [src/game/uiCallbacks.ts, src/main.ts] — fixed: onInspectorClose clears the
+  refusal latch through a new GameAppPorts.clearBuildRefusal port.
+- [x] [Review][Defer] Hybrid touch: a held pan key suppresses drag-paint but a
+  touch TAP still places (onTap has no modifier guard)
+  [src/game/engineWiring.ts] — deferred, pre-existing Space parity; recorded
+  in the backlog Deferral inbox.
+- Dismissed (3): camera Shift test title overstating what the mocked
+  classifier pins (the argument assertion is the real pin and
+  gesture.test.ts covers routing); AC8's help-test clause (help tests do not
+  pin the lede, verified); the .preview-refuse CSS contract "unpinned" claim
+  (inspector.test.ts:171 already pins the class).
