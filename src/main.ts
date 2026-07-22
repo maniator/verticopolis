@@ -15,6 +15,7 @@ import { OnboardingController } from "./ui/Onboarding";
 import type { BuildActions } from "./game/buildActions";
 import type { EditorActions } from "./game/editorActions";
 import type { SaveLoad } from "./game/saveLoad";
+import { announceLive } from "./game/liveRegion";
 import type { InspectorController } from "./game/inspector";
 import type { KeyboardPlay } from "./game/keyboardPlay";
 import { createUICallbacks, type GameAppPorts } from "./game/uiCallbacks";
@@ -350,8 +351,7 @@ class GameApp implements GameAppPorts {
 
   /** Announce to the screen-reader live region. @internal */
   announce(msg: string): void {
-    const el = document.getElementById("a11y-live");
-    if (el) el.textContent = msg;
+    announceLive(msg);
   }
 
   // ---- Placement / preview ports (bodies in game/buildPreview.ts) ---------
