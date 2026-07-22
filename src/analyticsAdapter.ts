@@ -1,5 +1,6 @@
 import { track, inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
+import { sendToRelay } from "./analyticsRelay";
 
 /**
  * The analytics transport seam: ONE module owns the vendor SDK imports and the
@@ -55,11 +56,36 @@ export const vercelAdapter: AnalyticsAdapter = {
 };
 
 /**
- * The active adapter. A module-level indirection so the D-1 provider swap is this
- * one binding plus a new adapter, and so a test can drive the whole vocabulary
- * through a stub (see {@link setAnalyticsAdapter}) with no vendor SDK involved.
+ * The dual-write adapter for the migration's validation window (S3): every custom
+ * event goes to BOTH the existing Vercel `track` and the new same-origin PostHog
+ * relay (`sendToRelay`), so the two feeds can be compared before Vercel is retired
+ * (S6). The two writes are independent: a throw in the Vercel path cannot suppress
+ * the relay write (`sendToRelay` is itself never-throw). Page-view and Core Web
+ * Vitals telemetry stays Vercel-only until that keep-or-drop call at cutover.
  */
-let activeAdapter: AnalyticsAdapter = vercelAdapter;
+export const dualWriteAdapter: AnalyticsAdapter = {
+  send(event, props) {
+    try {
+      track(event, props);
+    } catch {
+      /* Vercel best-effort; keep the relay write independent of a Vercel hiccup */
+    }
+    sendToRelay(event, props);
+  },
+  injectPageTelemetry() {
+    injectSpeedInsights();
+    injectWebAnalytics();
+  },
+};
+
+/**
+ * The active adapter. Defaults to {@link dualWriteAdapter} for the S3 validation
+ * window (both Vercel and the PostHog relay receive each event). A module-level
+ * indirection so cutover (S6) is this one binding plus a relay-only adapter, and
+ * so a test can drive the whole vocabulary through a stub (see {@link
+ * setAnalyticsAdapter}) with no transport involved.
+ */
+let activeAdapter: AnalyticsAdapter = dualWriteAdapter;
 
 /** The adapter every caller reaches telemetry through. */
 export function analyticsAdapter(): AnalyticsAdapter {
