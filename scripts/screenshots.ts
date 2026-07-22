@@ -51,6 +51,7 @@ import { join } from "node:path";
 import { DIRS, DESKTOP, PHONE, EXECUTABLE, PORT, BASE, assertReady, type OutDir, type Scene, type Shot } from "./screenshot-env.ts";
 import { pgAdoptTestClock, pgClearTransients, pgDismissSplash, pgFrame, pgMaskVersion, pgRefreshUi, pgSetClock, pgSetOverlay, pgStep, pgStepNoDraw } from "./screenshot-builders.ts";
 import { SCENES } from "./screenshot-scenes.ts";
+import { resolveOnlyFilter } from "../src/tests/screenshotOnlyFilter.ts";
 
 // ---- Runner -----------------------------------------------------------------
 
@@ -265,6 +266,27 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
 // ---- main -------------------------------------------------------------------
 
 async function main(): Promise<void> {
+  // ONLY=scene-id[,scene-id] re-shoots a subset (fast iteration); default all.
+  // Resolved BEFORE the preview server spawns so a bad filter fails fast with
+  // nothing to clean up. A non-empty filter selecting NOTHING is a hard error,
+  // never an empty success: a typo'd or removed scene id would otherwise
+  // "pass" while rendering zero shots (AUD-033). Partially-unmatched entries
+  // warn but still render the matched remainder.
+  const { selected, unmatched } = resolveOnlyFilter(
+    SCENES.map((sc) => sc.id),
+    process.env.ONLY,
+  );
+  if (selected.length === 0) {
+    throw new Error(
+      `ONLY="${process.env.ONLY}" matched no scenes (unmatched: ${unmatched.join(", ")}). ` +
+        `Known scene ids: ${SCENES.map((sc) => sc.id).join(", ")}`,
+    );
+  }
+  if (unmatched.length > 0) {
+    console.warn(`ONLY entries matched no scene and are ignored: ${unmatched.join(", ")}`);
+  }
+  const scenes = SCENES.filter((sc) => selected.includes(sc.id));
+
   let server: ChildProcess | null = null;
   if (process.env.RUN_SERVER) {
     server = spawn("npx", ["vite", "preview", "--port", String(PORT)], { stdio: "inherit" });
@@ -287,9 +309,6 @@ async function main(): Promise<void> {
     }
   }
 
-  // ONLY=scene-id[,scene-id] re-shoots a subset (fast iteration); default all.
-  const only = (process.env.ONLY || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const scenes = only.length ? SCENES.filter((sc) => only.includes(sc.id)) : SCENES;
   // Launch INSIDE the try so a launch failure still runs the finally that kills
   // the spawned vite preview (otherwise it orphans on :4173 and the next run
   // captures against a stale build).
