@@ -22,18 +22,11 @@ import { buildToStar } from "./helpers";
  * over a paused game (buildToStar sets speed 0) with the clock pinned.
  */
 
-test.describe("sprite gallery", () => {
-  test.use({ viewport: { width: 960, height: 1200 } });
-
-  test("sprite catalog matches baseline", async ({ page }) => {
-    await page.addInitScript(() => {
-      performance.now = () => 12125;
-    });
-    await page.goto("/gallery.html", { waitUntil: "networkidle" });
-    await page.waitForFunction(() => (window as unknown as { galleryReady?: boolean }).galleryReady === true);
-    await expect(page).toHaveScreenshot("sprite-gallery.png", { fullPage: true });
-  });
-});
+// The sprite gallery (gallery.html) is a pure canvas of every facility, and the
+// drift-gate already renders and pins it as docs/screenshots/06-sprite-gallery.png
+// (a hard required check). A second pixel baseline here was redundant with that,
+// so it was dropped; the DOM-chrome and tower-scene shots below stay, since they
+// catch selector/media-query/composition regressions the canvas drift shots can't.
 
 test.describe("dialog chrome", () => {
   /* eslint-disable @typescript-eslint/no-explicit-any */

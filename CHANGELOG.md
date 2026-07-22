@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.83.0
+
+- The Sprite Gallery is friendlier: it now fits your screen and scrolls down instead of sideways (no more sideways scroll on a phone), Modern-only content sits in its own labeled section, and the title-bar buttons are a comfortable size.
+
 ## 1.82.0
 
 - Modern towers can build a new Food Hall: a hall of food stalls (ramen, tacos, bubble tea, and more) that earns from foot traffic and satisfies many cravings from one spot, so it feeds a wide reach of hungry tenants. Modern only; Classic keeps the 1994 catalog.

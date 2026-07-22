@@ -61,8 +61,19 @@ body.retro-page {
 /* The sibling-nav + Back-to-game links sit at the right of the title bar. */
 .page-nav {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   flex: none;
+}
+/* Those links default to the tiny `.btn.xs` size, but on a standalone page they
+   are the ONLY navigation, so give them a comfortable hit target (readable on a
+   phone, easy to click on desktop). A size bump only; the chrome is unchanged. */
+.page-nav .btn.xs {
+  font-size: 13px;
+  line-height: 1.35;
+  padding: 6px 12px;
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .win-body {
