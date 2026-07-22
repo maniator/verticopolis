@@ -106,8 +106,12 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   on the updated diff. Keep cycling reviews this way until a full pass surfaces
   no new `patch` findings ("nothing left to fix"); a single clean run straight
   after a fix round is not enough on its own, since each fix can open the next
-  finding. Note in the PR that Copilot was down and how many review rounds ran.
-  Re-request Copilot and hold merge as usual the moment it is back.
+  finding. To tell whether Copilot review is actually down (versus just slow or
+  never triggered), check the PR's GitHub Actions runs and checks for the
+  Copilot review job: if it never ran, failed to start, or errored out, treat
+  the reviewer as down and run this loop; if it ran and is just pending, wait
+  for it instead. Note in the PR that Copilot was down and how many review
+  rounds ran. Re-request Copilot and hold merge as usual the moment it is back.
 
 ## Canon reference (don't re-derive from memory)
 

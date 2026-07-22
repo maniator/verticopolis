@@ -93,8 +93,11 @@ resolving review threads). On top of that, in an agent session:
   split, and both when the change spans both) over the whole change, fix every
   `patch` finding, record every `defer`, then re-run the skill on the updated
   diff. Keep cycling BMAD/GDS reviews until a full pass finds nothing new to
-  fix. Copilot being offline never lowers the bar or unblocks merge; re-request
-  it and resolve its threads as usual once it returns.
+  fix. Check the PR's GitHub Actions runs and checks to confirm the Copilot
+  review job actually failed to run before falling back to this loop; if it
+  ran and is only pending, wait for it instead. Copilot being offline never
+  lowers the bar or unblocks merge; re-request it and resolve its threads as
+  usual once it returns.
 - **Bring in the agents relevant to the change** rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
