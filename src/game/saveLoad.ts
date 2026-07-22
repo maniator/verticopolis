@@ -1,7 +1,7 @@
 import { Simulation } from "../engine/Simulation";
 import type { GameMode, SerializedView } from "../engine/types";
 import type { CalendarKind } from "../engine/calendar";
-import { SLOT_COUNT, SaveGame } from "../storage/SaveGame";
+import { SLOT_COUNT, SaveGame, isStorageWriteError, saveFailureMessage } from "../storage/SaveGame";
 import { LegacyExportError, buildTDT } from "../storage/tdtExport";
 import type { BuiltLegacyTower } from "../storage/tdtExport";
 import { LegacyImportError, parseTDT } from "../storage/tdtImport";
@@ -111,15 +111,33 @@ export class SaveLoad {
 
   save(silent = false): void {
     const sim = this.deps.getSim();
-    this.stampView(sim);
-    SaveGame.save(sim);
-    if (!silent) {
-      // Confirm the manual save landed, and when: a checkmark plus the
-      // wall-clock time it was written (real time, not the in-sim clock), so a
-      // deliberate or accidental Quick Save is always visibly acknowledged.
-      const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-      this.deps.ui.toast(`Saved ✓ · ${at}`, "good");
+    try {
+      // Stamp inside the try: a disposed or context-lost engine can throw
+      // from viewState() too, and the manual path's no-escaped-throw contract
+      // must cover it (saveToSlot makes the same call the same way). Silent
+      // callers see no change: they caught a stampView throw before this
+      // reorder too, via the rethrow below.
+      this.stampView(sim);
+      SaveGame.save(sim);
+    } catch (err) {
+      // Silent callers rely on the THROW: saveBeforeUpdate's caller must not
+      // reload on a failed write, recoverFromContextLoss words the failure on
+      // the crash screen, and the autosave drain treats it as best-effort.
+      // Each owns its own failure surface, so the silent path never toasts.
+      if (silent) throw err;
+      // A manual Quick Save must never fail silently: without this catch the
+      // throw escapes the button handler as an uncaught error, the player
+      // gets no feedback at all, and believes the tower saved. A failed
+      // setItem is atomic (it never clobbers), so any prior save is intact.
+      this.deps.ui.toast(saveFailureMessage(err), "bad");
+      return;
     }
+    if (silent) return;
+    // Confirm the manual save landed, and when: a checkmark plus the
+    // wall-clock time it was written (real time, not the in-sim clock), so a
+    // deliberate or accidental Quick Save is always visibly acknowledged.
+    const at = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    this.deps.ui.toast(`Saved ✓ · ${at}`, "good");
   }
 
   autosave(): Promise<void> {
@@ -222,11 +240,7 @@ export class SaveLoad {
         // private-mode, or disabled. A serialize/stringify/compression bug
         // throws here too, and "free up space" would send the player down the
         // wrong path; those get the neutral wording.
-        storageBlame =
-          err instanceof DOMException &&
-          (err.name === "QuotaExceededError" ||
-            err.name === "SecurityError" ||
-            err.name === "NS_ERROR_DOM_QUOTA_REACHED"); // Firefox's quota name
+        storageBlame = isStorageWriteError(err);
       }
     }
 

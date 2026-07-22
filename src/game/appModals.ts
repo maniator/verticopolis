@@ -1,5 +1,5 @@
 import type { GameApp } from "../main";
-import { SaveGame } from "../storage/SaveGame";
+import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 
 /**
@@ -70,10 +70,20 @@ export function showSaves(app: GameApp): void {
 
 /** Save the live tower into a manual slot, stamping the live camera view. */
 export function saveToSlot(app: GameApp, slot: number): void {
-  // Manual slots carry the view too: stamp the live camera the same way
-  // SaveLoad does for the autosave and exports.
-  app.sim.view = app.engine.viewState();
-  SaveGame.saveSlot(slot, app.sim);
+  try {
+    // Manual slots carry the view too: stamp the live camera the same way
+    // SaveLoad does for the autosave and exports. Inside the try on purpose:
+    // a disposed or context-lost engine can throw from viewState() too, and
+    // that failure must reach the same honest toast, not the click handler.
+    app.sim.view = app.engine.viewState();
+    SaveGame.saveSlot(slot, app.sim);
+  } catch (err) {
+    // Same contract as Quick Save: a manual save must never fail silently or
+    // toast success on a failed write (the throw would otherwise escape the
+    // slot button's click handler with no player feedback at all).
+    app.ui.toast(saveFailureMessage(err), "bad");
+    return;
+  }
   app.ui.toast(`Saved to slot ${slot}.`, "good");
 }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { FACILITIES, GRID, isFixedSpanTransport } from "../../engine/facilities";
 import { ECON, rentOf, carResaleRefund, resaleRefund } from "../../engine/econConfig";
@@ -348,6 +348,71 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(f.toasts).toHaveLength(1);
     expect(f.toasts[0].kind).toBe("bad");
     expect(f.toasts[0].text).toMatch(/^Import failed: /);
+  });
+
+  it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {
+    // Instance spy, the storage suite's idiom: prototype spies do not re-arm
+    // reliably after a mockRestore in the same file.
+    const spy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    try {
+      expect(() => saveLoad.save()).not.toThrow();
+    } finally {
+      spy.mockRestore();
+    }
+    expect(f.toasts).toEqual([
+      {
+        text: "Save failed: storage is full or blocked. Free up space or allow site storage, then try again.",
+        kind: "bad",
+      },
+    ]);
+    // The success path still works once storage recovers, with its normal copy.
+    saveLoad.save();
+    expect(f.toasts).toHaveLength(2);
+    expect(f.toasts[1].kind).toBe("good");
+    expect(f.toasts[1].text).toMatch(/^Saved ✓ · /);
+    // The recovery save above wrote a real autosave; drop it so this test
+    // leaks no storage state into later suites in the file.
+    localStorage.clear();
+  });
+
+  it("a camera-stamp throw (context-lost engine) reaches the same failure toast, never the click handler", () => {
+    // getView -> engine.viewState() can throw on a disposed/context-lost
+    // engine; the manual path's no-escaped-throw contract covers the stamp
+    // too, while the silent path still propagates it to its own callers.
+    const f2 = fakes();
+    const throwing = new SaveLoad({
+      getSim: () => sim,
+      getView: () => {
+        throw new Error("context lost");
+      },
+      adoptSim: () => {},
+      ui: f2.ui,
+      showCrashScreen: () => {},
+      attemptGraphicsRecovery: () => {},
+      armOnboarding: () => {},
+    });
+    expect(() => throwing.save()).not.toThrow();
+    expect(f2.toasts).toEqual([{ text: "Save failed: context lost", kind: "bad" }]);
+    expect(() => throwing.save(true)).toThrow(/context lost/);
+  });
+
+  it("the SILENT save path still throws on a storage failure (saveBeforeUpdate's callers rely on it)", () => {
+    // saveBeforeUpdate must not reload on a failed write, and the context-loss
+    // flush words the failure on the crash screen: both catch the throw
+    // themselves, so the quota guard on the manual path must not swallow it.
+    const spy = vi.spyOn(localStorage, "setItem").mockImplementation(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    try {
+      // Match the quota error specifically: a refactor that throws some
+      // unrelated TypeError before reaching storage must not satisfy this pin.
+      expect(() => saveLoad.save(true)).toThrow(/quota/i);
+    } finally {
+      spy.mockRestore();
+    }
+    expect(f.toasts).toEqual([]); // silent path: no toast of either kind
   });
 });
 

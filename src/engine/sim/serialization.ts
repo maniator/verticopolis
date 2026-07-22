@@ -16,6 +16,7 @@ import type { FacilityKind, GameMode, SerializedGame, Transport } from "../types
 import { isGameMode, isUnitState, isVacateReason } from "../types";
 import { coerceSchedule } from "../elevatorSchedule";
 import { SAVE_VERSION, migrateSave } from "../saveMigration";
+import { UNIT_CAP, assertSaneUnitCount, dropOverlappingUnits, repairEntityIds } from "./deserializeGuards";
 
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE, LOG_SAVE_CAP } from "./constants";
 
@@ -157,11 +158,23 @@ export function deserialize(raw: SerializedGame): Simulation {
   // `units` to a non-array scalar/object, and `.filter` on it throws, same
   // hard-load-failure this hardening exists to prevent. Matches the
   // Array.isArray guard the sibling arrays (excavated/milestones) already use.
-  sim.tower.units = (Array.isArray(data.units) ? data.units : [])
-    // Drop a null/non-object entry BEFORE reading `.kind`: a forged or
-    // partially-written save can hold a `null` in the array, and `u.kind`
-    // on it throws, aborting the whole load instead of dropping one entry.
-    .filter((u) => u != null && isFacilityKind(u.kind))
+  // Collect the kind-valid entries with the forged-count ceiling applied AS
+  // WE GO, before the map below constructs any unit object: a crafted file
+  // could otherwise freeze the tab at load (see deserializeGuards). Counting
+  // only kind-valid entries means a salvageable partially-written save padded
+  // with junk is not hard-rejected for garbage this loop drops anyway, and
+  // bailing on the first entry past the cap keeps both the work and the kept
+  // array bounded by the cap even when the file holds millions of entries.
+  // The null check runs BEFORE reading `.kind`: a forged or partially-written
+  // save can hold a `null` in the array, and `u.kind` on it throws, aborting
+  // the whole load instead of dropping one entry.
+  const rawUnits: SerializedGame["units"] = [];
+  for (const u of Array.isArray(data.units) ? data.units : []) {
+    if (u == null || !isFacilityKind(u.kind)) continue;
+    rawUnits.push(u);
+    if (rawUnits.length > UNIT_CAP) assertSaneUnitCount(rawUnits.length);
+  }
+  sim.tower.units = rawUnits
     .map((u) => {
       // Coerce geometry to finite integers, and keep the whole FOOTPRINT on
       // the lot (not just the origin): forged floor/x/width would otherwise
@@ -289,6 +302,9 @@ export function deserialize(raw: SerializedGame): Simulation {
         outForMeal: undefined,
       };
     });
+  // Unit-layer overlap filter, the mirror of the transport pass below: first
+  // kept wins, later overlappers drop, per index layer (see deserializeGuards).
+  sim.tower.units = dropOverlappingUnits(sim.tower.units);
   // Snap-on-load (pricing split, NFR3): in a ladder-priced mode (Classic),
   // every stored rent snaps once onto the canon rungs, nearest rung with ties
   // rounding UP, uniformly for every kind with no intent-guessing (the labeled
@@ -423,30 +439,9 @@ export function deserialize(raw: SerializedGame): Simulation {
       keptTransports.push(t);
       return true;
     });
-  // Ids drive every by-id lookup, and the renderer keys its retained actors
-  // by them, so they must be sane and unique, and the id counter must sit
-  // above them all (a corrupt/hand-edited nextId would otherwise mint
-  // duplicates for new placements, permanently drawing the wrong room).
-  // "Sane" is stricter than finite: a forged id near/past 2^53 would make
-  // the ++ repair (and allocateId later) a precision no-op that re-mints the
-  // same id forever, so ids must be positive integers under a bound no legit
-  // tower approaches. Max over the SANE ids only, then hand each corrupt or
-  // duplicated id a fresh one.
-  const ID_CAP = 2 ** 31; // ~2.1e9 placements, far past any real save
-  const saneId = (n: unknown): n is number =>
-    typeof n === "number" && Number.isInteger(n) && n > 0 && n < ID_CAP;
-  const entities: { id: number }[] = [...sim.tower.units, ...sim.tower.transports];
-  let maxLoadedId = 0;
-  for (const e of entities) if (saneId(e.id) && e.id > maxLoadedId) maxLoadedId = e.id;
-  const seenIds = new Set<number>();
-  for (const e of entities) {
-    if (!saneId(e.id) || seenIds.has(e.id)) e.id = ++maxLoadedId;
-    seenIds.add(e.id);
-  }
-  // The saved counter gets the same sanity gate: a forged huge nextId would
-  // otherwise win the max and park the counter where ++ stops incrementing.
-  const savedNextId = saneId(data.nextId) ? data.nextId : 0;
-  sim.tower.setNextId(Math.max(savedNextId, maxLoadedId + 1));
+  // Repair corrupt/duplicate ids and park the id counter above them all
+  // (forged-save guard; rationale and the sanity bound live in deserializeGuards).
+  sim.tower.setNextId(repairEntityIds([...sim.tower.units, ...sim.tower.transports], data.nextId));
   sim.tower.towerName = data.towerName;
   sim.tower.builtWeddingHall = data.builtWeddingHall;
   sim.tower.reindex();

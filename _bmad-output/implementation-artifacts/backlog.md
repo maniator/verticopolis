@@ -240,6 +240,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `gds-code-review` of the save-integrity bundle (#537, 2026-07-21)
+
+- **Id re-mint drift near ID_CAP (Edge Case Hunter, minor, pre-existing).** `repairEntityIds` (`src/engine/sim/deserializeGuards.ts`, extracted verbatim from `serialization.ts`) mints replacement ids with `++maxLoadedId` and does not itself re-check ID_CAP, so a forged save carrying one sane id just under 2^31 plus corrupt/duplicate ids can mint repaired ids at or past ID_CAP; the next load then classifies those as insane and re-mints again, so ids are unstable across loads (unique within a session, never corrupting). Pathological forged-save corner only; a legit tower sits orders of magnitude below the cap. Fix shape if picked up: when `maxLoadedId` is within `entities.length` of ID_CAP, renumber the whole entity list from 1.
+
 ### Deferred from: `gds-code-review` of Classic vs Modern in-game reachability (PR 1, 2026-07-20)
 
 - **Patched, not deferred (Blind Hunter, minor):** the shared `compareTemplate` closer said "report it below" / "suggest it there too", which dangled in the Compare modal and the founding `<details>` (their only element below is a Got it / Found button, no report affordance). Made the closer context-neutral ("report it so we can fix it" / "suggest it too"); it still reads correctly in the Help dialog, where the report link sits below. `help.test.ts` does not assert that sentence, so it stayed green.

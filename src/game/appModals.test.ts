@@ -12,15 +12,22 @@ import { SaveGame } from "../storage/SaveGame";
  * REAL predicate so the handler gate is exercised against actual sim state.
  */
 
-vi.mock("../storage/SaveGame", () => ({
-  SaveGame: {
-    listSlots: vi.fn(() => [{ slot: "auto", exists: false }]),
-    saveSlot: vi.fn(),
-    load: vi.fn(),
-    loadSlot: vi.fn(),
-    deleteSlot: vi.fn(),
-  },
-}));
+vi.mock("../storage/SaveGame", async (importActual) => {
+  // Spread the real module so isStorageWriteError/saveFailureMessage stay
+  // REAL: the quota tests below exercise the actual failure classification
+  // and copy, not stubs of them. Only the SaveGame writer object is mocked.
+  const actual = await importActual<typeof import("../storage/SaveGame")>();
+  return {
+    ...actual,
+    SaveGame: {
+      listSlots: vi.fn(() => [{ slot: "auto", exists: false }]),
+      saveSlot: vi.fn(),
+      load: vi.fn(),
+      loadSlot: vi.fn(),
+      deleteSlot: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../ui/templates/stats", async (importActual) => {
   const actual = await importActual<typeof import("../ui/templates/stats")>();
@@ -208,6 +215,29 @@ describe("saveToSlot", () => {
     expect(sim.view).toEqual({ camera: "VIEW" });
     expect(SaveGame.saveSlot).toHaveBeenCalledExactlyOnceWith(2, sim);
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Saved to slot 2.", "good");
+  });
+
+  it("surfaces a storage failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {
+    vi.mocked(SaveGame.saveSlot).mockImplementationOnce(() => {
+      throw new DOMException("quota", "QuotaExceededError");
+    });
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    expect(() => saveToSlot(app, 2)).not.toThrow();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith(
+      "Save failed: storage is full or blocked. Free up space or allow site storage, then try again.",
+      "bad",
+    );
+  });
+
+  it("keeps the raw detail (no storage blame) when a non-storage bug throws instead", () => {
+    vi.mocked(SaveGame.saveSlot).mockImplementationOnce(() => {
+      throw new Error("serialize exploded");
+    });
+    const sim = makeSim();
+    const { app, ui } = makeApp(sim);
+    expect(() => saveToSlot(app, 4)).not.toThrow();
+    expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Save failed: serialize exploded", "bad");
   });
 });
 
