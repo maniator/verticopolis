@@ -38,12 +38,30 @@ export const SHOP_SUBTYPES = [
 ] as const;
 
 /**
- * The canon name list for `kind`, or null when the kind carries no canon
- * subtype (every kind that isn't shop / fastFood / restaurant). Callers use
- * the null return as the pre-RNG-draw short-circuit: a Classic tower whose
- * diet skips retail must NOT touch `sim.rng`, or its seeded rent/event stream
- * would drift. Mirrors the `Simulation.rollCondoRelocations` short-circuit
- * where `chance <= 0` returns before the roll.
+ * The stalls a Modern Food Hall can present. Unlike the three canon lists above,
+ * these are NOT canon and carry NO ordinal: Food Hall is Modern-only content, a
+ * Modern tower is never exported to the 1994 `.TDT` format, and the native save
+ * persists the stall by NAME (a string, see `serializeUnit`), not by index. So
+ * order carries no meaning at all: reordering or inserting is safe, and a saved
+ * name reloads to the same stall regardless of position.
+ */
+export const FOODHALL_SUBTYPES = [
+  "Ramen Bar",
+  "Taco Stand",
+  "Bubble Tea",
+  "Poke Bowl",
+  "Deli Counter",
+  "Coffee Cart",
+] as const;
+
+/**
+ * The subtype (stall/variant) name list for `kind`, or null when the kind
+ * carries none. The canon retail kinds (shop / fastFood / restaurant) return
+ * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
+ * roster. Callers use the null return as the pre-RNG-draw short-circuit: a
+ * Classic tower whose diet skips retail must NOT touch `sim.rng`, or its seeded
+ * rent/event stream would drift. Mirrors the `Simulation.rollCondoRelocations`
+ * short-circuit where `chance <= 0` returns before the roll.
  */
 export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
   switch (kind) {
@@ -53,6 +71,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return FASTFOOD_SUBTYPES;
     case "shop":
       return SHOP_SUBTYPES;
+    case "foodHall":
+      return FOODHALL_SUBTYPES;
     default:
       return null;
   }

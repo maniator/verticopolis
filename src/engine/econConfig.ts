@@ -7,6 +7,7 @@ export const ECON = {
   dailyTrafficIncome: {
     fastFood: 2_000,
     restaurant: 4_000,
+    foodHall: 6_500,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -43,11 +44,14 @@ export const ECON = {
    *  retune here shifts customer readouts but never dollars.
    *  Typed as `Partial` so a lookup for a kind we haven't tabled reads
    *  `undefined` (not a spurious `number`), forcing every caller to guard
-   *  before dividing. `src/tests/integration/canon.integration.test.ts` pins that every retail kind
-   *  with a canon subtype list is tabled here. */
+   *  before dividing. Every demand-pool venue that carries a stall/subtype
+   *  roster is tabled here: the canon retail kinds and the Modern-only Food
+   *  Hall alike. `src/tests/integration/canon.integration.test.ts` pins the
+   *  canon retail set; the Modern-only entries are covered by their own tests. */
   retailSpendPerCustomer: {
     fastFood: 10,
     restaurant: 30,
+    foodHall: 25,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -57,8 +61,9 @@ export const ECON = {
    * counter lives on the weekday office-lunch crowd, so it QUIETS on weekends,
    * while restaurants and shops (leisure trade) pick up. Classic instead matches
    * the literal 1994 visitor targets (all retail busier on weekends), resolved in
-   * `GameRules.weekendMultiplier`. Only the three demand-pool retail kinds appear
-   * here: attendance venues (cinema, party hall) are deliberately left out,
+   * `GameRules.weekendMultiplier`. Only the demand-pool retail kinds appear
+   * here (the canon three plus the Modern-only Food Hall): attendance venues
+   * (cinema, party hall) are deliberately left out,
    * because their take reads the live-attendance fill (#424), which the crowd
    * already spawns with its own weekday/weekend rhythm, so a flat multiplier on
    * top would double-count the weekend. PROVISIONAL magnitudes, pending a playtest
@@ -67,6 +72,7 @@ export const ECON = {
   weekendTrafficMultiplier: {
     fastFood: 0.7,
     restaurant: 1.35,
+    foodHall: 1.25,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**

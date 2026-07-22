@@ -103,8 +103,10 @@ describe("staffOnShift gate", () => {
 describe("MEAL_WINDOWS + ECON.mealPopulationWeights constants pinned", () => {
   it("defines all four windows with the party's boundaries", () => {
     expect(MEAL_WINDOWS.breakfast).toEqual({ start: 6, end: 9, venues: ["fastFood"] });
-    expect(MEAL_WINDOWS.lunch).toEqual({ start: 11, end: 14, venues: ["fastFood", "restaurant"] });
-    expect(MEAL_WINDOWS.dinner).toEqual({ start: 17, end: 20, venues: ["fastFood", "restaurant"] });
+    // The Modern-only Food Hall joins lunch and dinner (its open windows); it
+    // has no effect in a Classic tower, which never holds one.
+    expect(MEAL_WINDOWS.lunch).toEqual({ start: 11, end: 14, venues: ["fastFood", "restaurant", "foodHall"] });
+    expect(MEAL_WINDOWS.dinner).toEqual({ start: 17, end: 20, venues: ["fastFood", "restaurant", "foodHall"] });
     expect(MEAL_WINDOWS.lateNight).toEqual({ start: 21, end: 24, venues: ["fastFood", "cinema"] });
   });
   it("pins the condo 0.3x meal-population weight (the single new tunable)", () => {

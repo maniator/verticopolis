@@ -114,6 +114,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     color: "#d4564a",
     description: "Fine dining, busy at lunch and dinner. Needs good elevator access.",
   },
+  foodHall: {
+    kind: "foodHall",
+    category: "food",
+    name: "Food Hall",
+    width: 24,
+    cost: 250000,
+    minStar: 3,
+    population: 40,
+    color: "#e0965a",
+    modernOnly: true,
+    description: "Modern: a hall of food stalls. Earns from foot traffic and satisfies many cravings from one spot, so it covers a wide reach of hungry tenants.",
+  },
   shop: {
     kind: "shop",
     category: "retail",

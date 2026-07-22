@@ -17,7 +17,11 @@ import type { FacilityKind, WeatherKind } from "../types";
 export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } {
   if (!isFacilityKind(kind)) return { ok: false, reason: "Unknown facility.", cost: 0 };
   const f = FACILITIES[kind];
-  if (!sim.isUnlocked(kind)) return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.`, cost: f.cost };
+  if (!sim.isUnlocked(kind)) {
+    // A Modern-only kind refused in Classic is not a star gate; say why honestly.
+    const reason = f.modernOnly && sim.mode !== "modern" ? `${f.name} is a Modern-only facility.` : `${f.name} unlocks at ${f.minStar}★.`;
+    return { ok: false, reason, cost: f.cost };
+  }
 
   if (!sim.isRoomKind(kind)) {
     // Manual structure (Modern option): no auto-bridge. A structural tile that
@@ -247,8 +251,12 @@ export function isRoomKind(_sim: Simulation, kind: FacilityKind): boolean {
   return kind !== "floor" && kind !== "lobby" && !FACILITIES[kind].transport;
 }
 
-/** Whether a facility kind is currently unlocked by star rating. */
+/** Whether a facility kind is buildable now: gated by the tower's star rating,
+ *  and, for Modern-only kinds, by the mode (never unlocked in a Classic tower). */
 export function isUnlocked(sim: Simulation, kind: FacilityKind): boolean {
+  // Modern-only content is never buildable in a Classic tower (parity), on top
+  // of the usual star gate.
+  if (FACILITIES[kind].modernOnly && sim.mode !== "modern") return false;
   return sim.star >= FACILITIES[kind].minStar;
 }
 

@@ -18,8 +18,8 @@ import type { StaffKind } from "./person";
 
 export const MEAL_WINDOWS = {
   breakfast: { start: 6, end: 9, venues: ["fastFood"] as FacilityKind[] },
-  lunch: { start: 11, end: 14, venues: ["fastFood", "restaurant"] as FacilityKind[] },
-  dinner: { start: 17, end: 20, venues: ["fastFood", "restaurant"] as FacilityKind[] },
+  lunch: { start: 11, end: 14, venues: ["fastFood", "restaurant", "foodHall"] as FacilityKind[] },
+  dinner: { start: 17, end: 20, venues: ["fastFood", "restaurant", "foodHall"] as FacilityKind[] },
   lateNight: { start: 21, end: 24, venues: ["fastFood", "cinema"] as FacilityKind[] },
 } as const;
 
