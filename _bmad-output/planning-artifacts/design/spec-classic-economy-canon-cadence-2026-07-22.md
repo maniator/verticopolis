@@ -53,6 +53,21 @@ at their shipped SOFT/MED tiers, marked provisionally reinforced. The
 archive.org manual remains unread; if any primary source ever contradicts
 these, re-open here and in the pricing GDD's Decision 2.
 
+**#575 UPDATE 2026-07-22 (primary manual + Wine harness read; owner call: keep
+open).** The CADENCE line above is now **primary-confirmed**, no longer
+provisional: the official manual, read directly off the disc (Italian full text
+plus English OCR), states a quarter is 3 in-game days, a year is 4 quarters, and
+the Finance window reports per quarter (figures x100), and the rent-class
+structure round-trips into the retail 1994 game under the Wine harness. The
+manual is SILENT on the dollar tables. The independence assessment resolved
+NEGATIVE (RO, the FAQ lineage, and Fandom are one lineage, not independent), so
+the value tiers stay provisional; office and condo gained a genuine second
+source (patcoston.com), hotels remain single-lineage. A headless per-class
+dollar read was not achievable (imported tenants never instantiate, so info
+windows divide by zero; an all-vacant fixture crashes on load). #575 stays open,
+narrowed to an independent dollar read of the hotel ladders and the condo
+minimum. Full record in the pricing GDD's verification blockquote.
+
 **Answer to the owner's question:** the amount of money is valid. The 1994 game
 famously drowned a 4-star tower in cash; stars gate on population, never on
 income. A true 1994 tower of SixSeven's shape would earn roughly $4M per day

@@ -18,15 +18,19 @@ export const ECON = {
    * sold-out ceiling: the demand-pool fraction and the live-attendance fill
    * then produce the lower tiers on their own, which lands a busy venue near
    * the chart's "normal" figures (fast food ~3k/day, restaurant ~6k/day).
-   * Provenance (issue #572, spec-classic-economy-followups-2026-07-22):
-   * search snippets of the period FAQ chart give fast food (-3k)-2k-5k daily,
-   * restaurant 4k-6k-10k, retail shop 4k-10k-15k-20k by popularity, theater
-   * 0-2k-10k by performance, party hall a flat 20k. The chart's own "normal"
-   * fast-food figure (3k) sits between its recorded 2k middle and 5k top
-   * tiers, an intra-lineage wobble flagged in the spec. Snippet-level and
-   * same-lineage, so PROVISIONAL (see #575); the demand-side calibration
-   * (whether `demandPerCapita` supplies canon-normal income in a mid-size
-   * tower) stays on the row's playtest pass.
+   * Provenance (issue #572; #575 source sweep 2026-07-22). The TOP tiers below
+   * are confirmed correct against the sources (fast food 5k, restaurant 10k,
+   * shop 20k, cinema 10k, party hall 20k). The full tier breakdown, corrected
+   * from an earlier misreading: fast food climbs 2k/3k/5k by customer count
+   * (20-24 -> 2k, 25-49 -> 3k, 50+ -> 5k), plus an early/low-patronage LOSS the
+   * engine has no mechanic for; restaurant is -6k/+4k/+10k by evaluation (the
+   * 6k is a LOSS tier, not a positive middle; RO's "$6k/day normal" is a
+   * separate normal-population average); shop 4k/10k/15k/20k by popularity (RO
+   * confirms the 15k normal tier); theater 0/2k/10k by performance; party hall
+   * a flat 20k. All values trace to ONE lineage (BStuart FAQ -> RO -> Fandom,
+   * not independent) and the manual is silent on them, so PROVISIONAL (see
+   * #575); the demand-side calibration (whether `demandPerCapita` supplies
+   * canon-normal income in a mid-size tower) stays on the row's playtest pass.
    */
   classicDailyTrafficIncome: {
     fastFood: 5_000,
