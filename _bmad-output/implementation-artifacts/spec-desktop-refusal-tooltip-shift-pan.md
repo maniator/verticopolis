@@ -85,9 +85,11 @@ party memlog.
    touch was unaffected by the modifier, contradicting the ratified
    "matching the space-hold gate" design and the shipped test). One sanctioned
    Space-side change rides the AC3 arrow skip: Space+click on a selected
-   elevator's extend arrow used to extend one floor and now pans (a no-move
-   modifier tap then behaves like any inspect-tool tap at that spot, so over
-   empty sky it deselects). The one-pan-key rule covers Space and Shift alike.
+   elevator's extend arrow used to extend one floor and now pans. A no-move
+   modifier tap over the arrow then follows the armed tool's tap rule: with
+   Inspect it acts like a tap at that spot (over empty sky, deselect); with a
+   build or bulldoze tool it stays a dead tap and the selection persists. The
+   one-pan-key rule covers Space and Shift alike.
 5. Gesture classification reads the modifier at pointer-down, matching the
    space-hold behavior (releasing Shift mid-drag keeps the pan until
    pointer-up).
@@ -236,3 +238,20 @@ fixes ship as the v1.84.1 follow-up PR on the re-cut branch.
   one-pan-key semantics, now documented in AC4); the round-1 CSS complement
   algebra (verified correct at integer sizes; the fractional gap is the
   range-syntax fix above).
+
+### Review Findings, round 3 (2026-07-22)
+
+Two layers on the v1.84.1 diff (Blind Hunter; combined Edge Case Hunter +
+Acceptance Auditor with repo access). All seven round-2 fixes verified
+genuinely landed; the wheel ternary held under attack (right-associative,
+correct for every deltaY/shiftKey combination); Excalibur's dispatch site
+confirmed to pass the native DOM event as `WheelEvent.ev` (and a rename
+would fail typecheck, closing the fake-shape worry); no other rule touches
+the card's opacity, closing the cascade-order worry.
+
+- [x] [Review][Patch] AC4's deselect parenthetical held only with the
+  Inspect tool armed; with build/bulldoze the modifier tap stays dead and
+  the selection persists (fixed: AC4 reworded to state the per-tool rule).
+
+Round 4 (single verifier) confirmed the reword and no regressions: campaign
+closed with nothing left to fix.
