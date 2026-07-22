@@ -106,14 +106,24 @@ describe("wheel zoom", () => {
     // instead of treating "deltaY not negative" as zoom-out on every notch.
     const { e, handlers } = inputEng();
     const z0 = e.cam.zoom;
-    handlers.wheel({ deltaY: 0, deltaX: -1, x: 400, y: 300 });
+    handlers.wheel({ deltaY: 0, deltaX: -1, x: 400, y: 300, ev: { shiftKey: true } });
     expect(e.cam.zoom).toBeGreaterThan(z0);
     const z1 = e.cam.zoom;
-    handlers.wheel({ deltaY: 0, deltaX: 1, x: 400, y: 300 });
+    handlers.wheel({ deltaY: 0, deltaX: 1, x: 400, y: 300, ev: { shiftKey: true } });
     expect(e.cam.zoom).toBeLessThan(z1);
     const z2 = e.cam.zoom;
-    handlers.wheel({ deltaY: 0, deltaX: 0, x: 400, y: 300 }); // dead event: no-op
-    expect(e.cam.zoom).toBe(z2);
+    handlers.wheel({ deltaY: 0, deltaX: 0, x: 400, y: 300, ev: { shiftKey: true } });
+    expect(e.cam.zoom).toBe(z2); // dead event: no-op
+  });
+
+  it("an unmodified horizontal scroll never zooms (the deltaX fallback is Shift-only)", () => {
+    // A two-finger sideways trackpad swipe is a scroll gesture, not a zoom;
+    // only the Shift remap earns the fallback axis.
+    const { e, handlers } = inputEng();
+    const z0 = e.cam.zoom;
+    handlers.wheel({ deltaY: 0, deltaX: -3, x: 400, y: 300, ev: { shiftKey: false } });
+    handlers.wheel({ deltaY: 0, deltaX: 3, x: 400, y: 300 }); // no native ev at all
+    expect(e.cam.zoom).toBe(z0);
   });
 });
 
