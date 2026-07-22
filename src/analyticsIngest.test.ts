@@ -339,6 +339,10 @@ describe("originAllowed", () => {
     // In production the shared *.vercel.app suffix is NOT trusted: it is common to
     // every Vercel customer, so any site on it would otherwise pass.
     expect(originAllowed("https://someone-else.vercel.app", "production")).toBe(false);
+    // An absent/empty VERCEL_ENV fails CLOSED: without knowing we are
+    // non-production, the shared suffix is refused rather than trusted.
+    expect(originAllowed("https://feature-branch.vercel.app", undefined)).toBe(false);
+    expect(originAllowed("https://feature-branch.vercel.app", "")).toBe(false);
   });
 
   it("allows an absent Origin (non-browser client or curl smoke test)", () => {

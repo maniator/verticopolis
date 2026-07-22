@@ -157,9 +157,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  *
  * The check is environment-aware. Our own domain (the apex `verticopolis.com` and
  * any subdomain, for example a `*.preview.verticopolis.com` preview deployment) is
- * always trusted. The shared `*.vercel.app` suffix is trusted only OUTSIDE
- * production: it is common to every Vercel customer, so any site on it could
- * otherwise pass, but a preview's own origin is `<branch>.vercel.app` and preview
+ * always trusted. The shared `*.vercel.app` suffix is trusted only on a KNOWN
+ * non-production deployment (a truthy `VERCEL_ENV` that is not `production`, so an
+ * absent env fails closed): it is common to every Vercel customer, so any site on
+ * it could otherwise pass, but a preview's own origin is `<branch>.vercel.app` and preview
  * traffic is isolated from production (the `environment` tag, a preview-scoped key
  * when configured, and Vercel deployment protection). In production the only real
  * origin is our own domain, so the shared suffix is refused there. (One deliberate
@@ -182,7 +183,11 @@ export function originAllowed(origin: string | null, environment: string | undef
     return false;
   }
   if (host === "verticopolis.com" || host.endsWith(".verticopolis.com")) return true;
-  if (environment !== "production") return host.endsWith(".vercel.app");
+  // Trust the shared *.vercel.app suffix only when we KNOW we are non-production
+  // (a truthy VERCEL_ENV other than "production"). An absent or empty VERCEL_ENV
+  // (a misconfiguration) falls through to the strict default below rather than
+  // failing open into trusting a suffix common to every Vercel customer.
+  if (environment && environment !== "production") return host.endsWith(".vercel.app");
   return false;
 }
 
