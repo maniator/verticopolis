@@ -356,7 +356,7 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     expect(sim.tower.placeTransport("elevatorStandard", 4, 1, 2).ok, "elevator 1-2").toBe(true);
     const r = sim.tower.place("office", 2, 10);
     expect(r.ok, `office placement: ${JSON.stringify(r)}`).toBe(true);
-    const u = sim.tower.units.find((x) => x.id === r.unitId);
+    const u = r.unitId !== undefined ? sim.tower.getUnit(r.unitId) : undefined;
     if (!u) throw new Error(`test fixture: office unit missing: ${JSON.stringify(r)}`);
     u.state = "occupied";
   }
