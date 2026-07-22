@@ -27,8 +27,10 @@ concurrency:
 env:
   PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
 
+# Default read-only; only the update job (which pushes the refreshed baseline)
+# requests the narrow write it needs.
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   # Pin the container to the repo's Playwright version so the baseline is minted
@@ -40,6 +42,8 @@ jobs:
       image: ${{ steps.pin.outputs.image }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
       - id: pin
         run: |
           ver=$(node -e "const l=require('./package-lock.json');const p=l.packages&&l.packages['node_modules/playwright'];process.stdout.write((p&&p.version)||require('./package.json').devDependencies.playwright.replace(/[^0-9.]/g,''))")
@@ -48,14 +52,25 @@ jobs:
   update:
     needs: resolve-image
     runs-on: ubuntu-latest
+    # Earns write: it pushes the refreshed baseline. The write token is only
+    # ever exposed to the credentialed push step below, never to the steps
+    # that execute branch code (see persist-credentials on the checkout).
+    permissions:
+      contents: write
     container:
       image: ${{ needs.resolve-image.outputs.image }}
 
     steps:
+      # persist-credentials: false keeps the token out of .git/config: this job
+      # runs whatever the branch contains (npm ci, the build, Playwright), and a
+      # malicious dependency postinstall must not be able to read a write token
+      # off disk. Same pattern screenshot-capture.yml documents; the push step
+      # below authenticates explicitly instead.
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: ${{ github.ref_name }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Trust the workspace
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -75,19 +90,34 @@ jobs:
         run: npm run perf:capture
 
       - name: Commit refreshed baseline
+        id: commit
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add e2e/perf/baseline.json
           if git diff --cached --quiet; then
             echo "Perf baseline already matches this environment, nothing to commit."
+            echo "committed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "Update perf baseline from CI"
+          echo "committed=true" >> "$GITHUB_OUTPUT"
+
+      # The ONLY step that sees the write token. Everything above ran without
+      # credentials (persist-credentials: false), so branch code never had a
+      # token to steal; here no branch code runs, only git. The token rides an
+      # explicit per-invocation URL, never lands in .git/config, and the runner
+      # masks it in logs.
+      - name: Push refreshed baseline
+        if: steps.commit.outputs.committed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           for attempt in 1 2 3 4 5; do
-            if git push origin "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            if git push "$remote" "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
             echo "push rejected, rebasing on the remote and retrying ($attempt)"
-            git pull --rebase origin "${GITHUB_REF_NAME}"
+            git pull --rebase "$remote" "${GITHUB_REF_NAME}"
           done
           echo "could not push refreshed baseline after retries" >&2
           exit 1
