@@ -88,12 +88,15 @@ export const CLASSIC_RULES: GameRules = {
     return CLASSIC_PRICE_OPTIONS[kind] ?? null;
   },
   quarterlyRentScale(_quarterDays) {
-    // Canon cadence: the full 1994 rent lump lands every 3-day quarter (an
-    // Average office pays its whole $10,000 each quarter), verified against
+    // Canon cadence: the full 1994 rent lump lands at every quarter boundary,
+    // and Classic's calendar is always canon, so that is every 3 days (an
+    // Average office pays its whole $10,000 each quarter). Verified against
     // the GameFAQs FAQ lineage 2026-07-22 (spec-classic-economy-canon-cadence).
-    // The quarter length is deliberately ignored (named `_` to say so): the
-    // calendar-parity rescale never applies here, because its premise ("we do
-    // not have the canon rent numbers") expired when the canon ladders shipped.
+    // WHEN rent lands is the quarter boundary's job (sim/loop.ts onDay); this
+    // factor only says the lump never rescales with the quarter's length,
+    // which is why `_quarterDays` is deliberately ignored: the calendar-parity
+    // rescale's premise ("we do not have the canon rent numbers") expired when
+    // the canon ladders shipped.
     return 1;
   },
   // Classic is pixel-faithful: none of the Modern economy sinks apply.

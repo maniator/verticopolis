@@ -347,14 +347,17 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
   // maintenance dollar table is unverified; see the backlog row).
 
   /** Lay the shared one-served-office footprint on a fresh sim (lobby, floor,
-   *  elevator, one occupied default-rent office), asserting each step. */
+   *  elevator, one occupied default-rent office), asserting each step per the
+   *  fixture discipline (a silently degraded footprint tests a different tower
+   *  than the one described). */
   function layServedOffice(sim: Simulation): void {
-    for (let x = 0; x < 40; x++) sim.tower.place("lobby", 1, x);
-    for (let x = 0; x < 40; x++) sim.tower.place("floor", 2, x);
-    sim.tower.placeTransport("elevatorStandard", 4, 1, 2);
+    for (let x = 0; x < 40; x++) expect(sim.tower.place("lobby", 1, x).ok, `lobby at ${x}`).toBe(true);
+    for (let x = 0; x < 40; x++) expect(sim.tower.place("floor", 2, x).ok, `floor at ${x}`).toBe(true);
+    expect(sim.tower.placeTransport("elevatorStandard", 4, 1, 2).ok, "elevator 1-2").toBe(true);
     const r = sim.tower.place("office", 2, 10);
+    expect(r.ok, `office placement: ${JSON.stringify(r)}`).toBe(true);
     const u = sim.tower.units.find((x) => x.id === r.unitId);
-    if (!u) throw new Error(`test fixture: office placement failed: ${JSON.stringify(r)}`);
+    if (!u) throw new Error(`test fixture: office unit missing: ${JSON.stringify(r)}`);
     u.state = "occupied";
   }
 
