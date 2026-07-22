@@ -45,14 +45,16 @@ export function update(ui: UI, sim: Simulation): void {
   ui.el.time.textContent = sim.clock.format();
   ui.el.date.textContent = sim.clock.formatRetroDate();
 
-  // Dirty-gate the palette lock/afford scan (E5-S3): its DOM pass depends only
-  // on the star (isUnlocked is star-vs-minStar) and on which kinds the current
-  // funds can afford, so it reruns only when the star or an affordability
-  // boundary crossed since the last scan. Money moves every pump; the bitmask
-  // below changes only at a crossing, so the ~6 Hz pump skips the two
-  // querySelectorAll walks and the class writes almost always. The key is a
-  // cheap string over engine data (no DOM reads).
-  let scanKey = String(sim.star);
+  // Dirty-gate the palette lock/afford scan (E5-S3): its DOM pass depends on the
+  // star and the mode (isUnlocked is star-vs-minStar, plus a Modern-only gate for
+  // modernOnly kinds like the Food Hall) and on which kinds the current funds can
+  // afford, so it reruns only when the star, the mode, or an affordability
+  // boundary crossed since the last scan. Mode is founded-once but a New Tower
+  // swap can flip it under an identical star/money, so it must be in the key.
+  // Money moves every pump; the bitmask below changes only at a crossing, so the
+  // ~6 Hz pump skips the two querySelectorAll walks and the class writes almost
+  // always. The key is a cheap string over engine data (no DOM reads).
+  let scanKey = sim.mode + ":" + sim.star;
   for (const kind in FACILITIES) scanKey += sim.money >= FACILITIES[kind as FacilityKind].cost ? "1" : "0";
   if (scanKey !== ui.paletteScanKey) {
     ui.paletteScanKey = scanKey;

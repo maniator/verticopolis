@@ -28,6 +28,9 @@ export function isOpenAt(kind: FacilityKind, hour: number): boolean {
       return hour >= 7 && hour < 22;
     case "restaurant":
       return (hour >= 11 && hour < 14) || (hour >= 17 && hour < 23);
+    case "foodHall":
+      // A food court trades all day, breakfast through late dinner.
+      return hour >= 10 && hour < 22;
     case "shop":
       return hour >= 10 && hour < 21;
     case "cinema":
@@ -48,13 +51,15 @@ export function openHoursPerDay(kind: FacilityKind): number {
   return h || 1;
 }
 
-/** The canon foot-traffic commercial kinds, fast food, restaurant, retail
- *  (shop), cinema. This is the exact set the 1994 noise (W2) and lobby-proximity
- *  (W3) rules name. `partyHall` earns traffic income too but is deliberately NOT
- *  in the canon commercial set, so it is exempt from both, keep W2 and W3 keyed
- *  off this one predicate so they can never drift apart. */
+/** Foot-traffic commercial kinds: the canon 1994 set (fast food, restaurant,
+ *  retail shop, cinema) plus the Modern-only Food Hall, which is a shopper-drawing
+ *  food venue and so feels the same noise (W2) and lobby-proximity (W3) rules.
+ *  A Classic tower never holds a Food Hall, so Classic stays the exact 1994 set.
+ *  `partyHall` earns traffic income too but is deliberately NOT commercial, so it
+ *  is exempt from both; keep W2 and W3 keyed off this one predicate so they can
+ *  never drift apart. */
 export function isCommercialKind(kind: FacilityKind): boolean {
-  return kind === "fastFood" || kind === "restaurant" || kind === "shop" || kind === "cinema";
+  return kind === "fastFood" || kind === "restaurant" || kind === "foodHall" || kind === "shop" || kind === "cinema";
 }
 
 /** True for facilities that keep posted business hours (can be "closed"). */
@@ -62,6 +67,7 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
   return (
     kind === "fastFood" ||
     kind === "restaurant" ||
+    kind === "foodHall" ||
     kind === "shop" ||
     kind === "cinema" ||
     kind === "partyHall"

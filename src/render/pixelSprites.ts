@@ -60,6 +60,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
     case "restaurant":
       restaurant(d, u, x, y, w, h);
       break;
+    case "foodHall":
+      // A hall of food stalls reads as a food venue; reuse the restaurant
+      // dollhouse interior until it earns bespoke stall art.
+      restaurant(d, u, x, y, w, h);
+      break;
     case "shop":
       shop(d, u, x, y, w, h);
       break;
