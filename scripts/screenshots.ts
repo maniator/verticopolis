@@ -268,10 +268,13 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
 async function main(): Promise<void> {
   // ONLY=scene-id[,scene-id] re-shoots a subset (fast iteration); default all.
   // Resolved BEFORE the preview server spawns so a bad filter fails fast with
-  // nothing to clean up. A non-empty filter selecting NOTHING is a hard error,
-  // never an empty success: a typo'd or removed scene id would otherwise
-  // "pass" while rendering zero shots (AUD-033). Partially-unmatched entries
-  // warn but still render the matched remainder.
+  // nothing to clean up. A filter with at least one non-blank entry that
+  // selects NOTHING is a hard error, never an empty success: a typo'd or
+  // removed scene id would otherwise "pass" while rendering zero shots
+  // (AUD-033). A blank ONLY (unset, empty, or only commas/whitespace) means
+  // "render all", the ordinary env-var-off convention; the unit tests pin
+  // both readings. Partially-unmatched entries warn but still render the
+  // matched remainder.
   const { selected, unmatched } = resolveOnlyFilter(
     SCENES.map((sc) => sc.id),
     process.env.ONLY,

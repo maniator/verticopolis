@@ -238,8 +238,12 @@ to add before/after images to a pull request.
 ### From a lobby to a legend: the ★ progression
 
 A humble ground floor climbs the whole rating ladder to the coveted **TOWER**.
-These frames are captured by the end-to-end test itself (`e2e/milestones.spec.ts`),
-one per rung, so they can't drift from what the game actually does.
+These frames come from the pinned-container screenshot pipeline (the
+`milestones` scene in `scripts/scenes/milestones.ts`), the same one that
+renders the rest of the gallery. The end-to-end test (`e2e/milestones.spec.ts`)
+independently earns every rung on each run and uploads its own captures as a
+CI artifact (to the untracked `e2e/output/`, never this gallery), so the rungs
+shown here are continuously proven against what the game actually does.
 
 | 1★ | 2★ | 3★ |
 | --- | --- | --- |

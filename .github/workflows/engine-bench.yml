@@ -67,6 +67,8 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: engine-bench-${{ github.run_id }}
+          # run_attempt keeps a manual re-run from colliding with the first
+          # attempt's immutable artifact name and failing an otherwise green run.
+          name: engine-bench-${{ github.run_id }}-${{ github.run_attempt }}
           path: bench-output.txt
           retention-days: 90
