@@ -28,6 +28,14 @@ export const SPEEDS = [0, 10, 30, 120];
 const MAX_CATCHUP_MINUTES = 30;
 
 export function runFrame(app: GameApp, dtMs: number): void {
+  // Sample the rendered frame-rate for the session_fps signal (#538). noteFrame
+  // reads its OWN wall-clock delta (not the `dtMs` the engine passes: that value
+  // is spike-clamped to 1ms for any frame over 200ms, which would hide the very
+  // hitches this metric exists to catch). Foreground-gated and best-effort
+  // inside; done first so it captures every rendered frame, including the ones a
+  // modal freeze returns early on below (fps is a render metric, not a sim-tick
+  // one).
+  gameplaySession.noteFrame();
   // While a blocking modal is open, freeze time so nothing changes under it:
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted
