@@ -38,41 +38,60 @@ export function hideBootCover(): void {
 export function showBootMessage(content: TemplateResult | string, withReload = false): void {
   // A boot-fallback message (no WebGL, a boot error) must never be trapped
   // behind the cover, so drop it unconditionally, before the #stage guard.
-  // The splash and onboarding surfaces sit ABOVE the stage overlay (fixed,
-  // higher z-index) and can already be mounted when a boot error lands after
-  // runBootFlow, so drop those too: a fatal message behind a stuck title
-  // screen is the same invisible-failure class this function exists to end.
   hideBootCover();
-  document.getElementById("splash")?.remove();
-  document.getElementById("onboard")?.remove();
+  // The stage check stays as the "is this the app page" gate, but the overlay
+  // mounts in its OWN host under <body>: rendered inside #stage, its fixed
+  // positioning would be hostage to any future transformed or filtered
+  // ancestor (CSS makes such an ancestor the containing block for fixed
+  // descendants, quietly shrinking "full viewport" to the stage box). A
+  // direct child of <body> has no ancestors to capture it. Reused across
+  // calls, so a second boot failure re-renders the same host.
   const stage = document.getElementById("stage");
   if (!stage) return;
+  let host = document.getElementById("boot-fallback-host");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "boot-fallback-host";
+    document.body.appendChild(host);
+  }
   // Render through lit-html (the app's renderer): an interpolated string is
   // escaped to a text node, so a dynamic value (a caught boot error's message)
   // can never inject markup, while a caller that needs formatting passes a lit
   // template. No innerHTML.
   //
-  // The message is an overlay because flow content cannot be trusted here:
-  // lit appends its part AFTER the stage's static children (the canvas, the
-  // hint), and #stage clips without scrolling, so a statically-positioned
-  // message lands below the fold behind the dead canvas and the player sees
-  // an unexplained empty page (the live Firefox no-WebGL report this fixes).
-  // Longhand top/right/bottom/left instead of the `inset` shorthand on
-  // purpose: this path serves old and hardened engines, exactly the crowd a
-  // newer shorthand can strand at static position, which would resurrect the
-  // very bug. The stage's own position is pinned here too, so a future CSS
-  // reshuffle of #stage cannot quietly re-anchor the overlay to an ancestor.
-  stage.style.position = "relative";
+  // The message is a FIXED full-viewport overlay above everything, because
+  // nothing weaker can be trusted here. Flow content sinks below the fold
+  // behind the dead canvas (the live Firefox no-WebGL report). A stage-local
+  // absolute overlay loses to the splash on the boot-error path (a boot
+  // throw after runBootFlow leaves the title screen mounted at z-index 40),
+  // and REMOVING the splash is worse: its controller keeps a document
+  // keydown listener, the autosave interval gates on the splash node's
+  // presence, and the game chrome behind it would become reachable around a
+  // fatal message. Covering everything at z-index 100 (the stylesheet tops
+  // out at 50) leaves every owner's state intact while the player sees only
+  // the message. Longhand top/right/bottom/left instead of the `inset`
+  // shorthand on purpose: this path serves old and hardened engines, exactly
+  // the crowd a newer shorthand can strand at static position. The inner
+  // wrapper centers itself with margin:auto rather than justify-content, so
+  // copy taller than a short viewport scrolls from its first line instead of
+  // clipping unreachably above the scroll origin.
+  // The id is a stable hook: the screenshot runner's boot-fallback scenes and
+  // the tests wait on it (there is no `window.game` to wait for on this path).
   render(
     html`<div
-      style="position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;background:#1c2030;overflow:auto;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;padding:24px;text-align:center;color:#cdd3da;font:15px/1.5 system-ui,sans-serif"
+      id="boot-fallback"
+      style="position:fixed;top:0;right:0;bottom:0;left:0;z-index:100;background:#1c2030;overflow:auto;display:flex;flex-direction:column;align-items:center;padding:24px;text-align:center;color:#cdd3da;font:15px/1.5 system-ui,sans-serif"
     >
-      <div>${content}</div>
-      ${withReload
-        ? html`<button style="padding:8px 24px;font:inherit;cursor:pointer" @click=${() => location.reload()}>Reload</button>`
-        : nothing}
+      <div
+        style="margin:auto;max-width:100%;overflow-wrap:anywhere;display:flex;flex-direction:column;gap:16px;align-items:center"
+      >
+        <div>${content}</div>
+        ${withReload
+          ? html`<button style="padding:8px 24px;font:inherit;cursor:pointer" @click=${() => location.reload()}>Reload</button>`
+          : nothing}
+      </div>
     </div>`,
-    stage,
+    host,
   );
 }
 
