@@ -95,6 +95,19 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   the merge-commits-only rule above) may be armed without asking again.
   If Copilot raises a finding or a required check fails, hold the PR and fix it
   rather than let it merge.
+- **When Copilot review is down, loop the BMAD/GDS review skill until the
+  changes are clean.** Copilot being unavailable (outage, not invoked, no
+  response) never lowers the bar or unblocks merge; it just removes the outside
+  reviewer, so the deep review skill has to carry that load too. Run the review
+  skill on the full change per the gameplay-vs-plumbing split above
+  (`/gds-code-review` or `/bmad-code-review`, and both when the change spans
+  both surfaces), fix every `patch` finding and record every `defer` in
+  `_bmad-output/implementation-artifacts/backlog.md`, then run the skill again
+  on the updated diff. Keep cycling reviews this way until a full pass surfaces
+  no new `patch` findings ("nothing left to fix"); a single clean run straight
+  after a fix round is not enough on its own, since each fix can open the next
+  finding. Note in the PR that Copilot was down and how many review rounds ran.
+  Re-request Copilot and hold merge as usual the moment it is back.
 
 ## Canon reference (don't re-derive from memory)
 

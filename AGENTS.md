@@ -86,6 +86,15 @@ resolving review threads). On top of that, in an agent session:
   The rule lives in the backlog's "How items flow" section and
   `src/tests/backlogIssueMirror.test.ts` fails the suite when a row half
   drifts.
+- **If Copilot review is down, loop the review skill until it's clean.** With
+  no outside reviewer available (Copilot outage, not invoked, or no response),
+  the deep review skill has to stand in for it. Run the BMGD/BMAD review skill
+  (`/gds-code-review` or `/bmad-code-review`, per the same gameplay-vs-plumbing
+  split, and both when the change spans both) over the whole change, fix every
+  `patch` finding, record every `defer`, then re-run the skill on the updated
+  diff. Keep cycling BMAD/GDS reviews until a full pass finds nothing new to
+  fix. Copilot being offline never lowers the bar or unblocks merge; re-request
+  it and resolve its threads as usual once it returns.
 - **Bring in the agents relevant to the change** rather than reviewing solo:
   - **Cloud Dragonborn** (`gds-agent-game-architect`) / **Winston**
     (`bmad-agent-architect`) for engine, data-model, or structural changes;
