@@ -111,6 +111,26 @@ describe("write-time provenance stamps (savedAt + appVersion)", () => {
     expect(forgedDay(360_001 * 1440).day).toBeUndefined(); // just past the ceiling
   });
 
+  it("loadResult surfaces the autosave's write time for the boot return-recency bucket", () => {
+    const before = Date.now();
+    SaveGame.save(new Simulation()); // writes the autosave slot
+    const stamp = SaveGame.loadResult().savedAt;
+    expect(stamp).toBeGreaterThanOrEqual(before);
+    // It agrees with the raw stamp the writer laid down.
+    expect(stamp).toBe(decodeSlot("verticopolis-save").savedAt);
+  });
+
+  it("loadResult reads a forged autosave stamp as absent (same trust posture as the Saves dialog)", () => {
+    SaveGame.save(new Simulation());
+    const data = decodeSlot("verticopolis-save") as Omit<SerializedGame, "savedAt"> & { savedAt: unknown };
+    data.savedAt = "yesterday";
+    localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
+    expect(SaveGame.loadResult().savedAt).toBeUndefined();
+    data.savedAt = 1e20; // finite but beyond Date's range
+    localStorage.setItem("verticopolis-save", repackSlot(data as unknown as SerializedGame));
+    expect(SaveGame.loadResult().savedAt).toBeUndefined();
+  });
+
   it("the stamps are file provenance, not live state: deserialize does not carry them", () => {
     const data = { ...new Simulation().serialize(), savedAt: 12345, appVersion: "9.9.9" };
     const sim = Simulation.deserialize(data);

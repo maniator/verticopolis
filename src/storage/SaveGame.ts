@@ -119,6 +119,15 @@ function autosaveKey(): string {
  *  "Invalid Date", so the read treats it as absent. */
 const MAX_DATE_MS = 8.64e15;
 
+/** A save's write time, trusted only when it is a finite number Date can
+ *  represent (+/-8.64e15 ms). A forged savedAt (string, NaN, or out of range)
+ *  reads as absent, never as a confidently wrong date. Shared by the Saves
+ *  dialog metadata and the boot-time return-recency read so the trust posture
+ *  is defined once. */
+function parseSavedAt(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_DATE_MS ? value : undefined;
+}
+
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
   const data = readSlot(key);
   if (!data) return { slot, exists: false };
@@ -135,15 +144,11 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
     star: data.star,
     population,
     funds: data.money,
-    // Same trust posture as every other save field: a forged savedAt (string,
-    // NaN, or a finite value outside the range Date can represent, +/-8.64e15
-    // ms) reads as absent, so the Saves dialog shows an empty timestamp
+    // Same trust posture as every other save field: a forged savedAt reads as
+    // absent (see parseSavedAt), so the Saves dialog shows an empty timestamp
     // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
     // display a confidently wrong date.
-    savedAt:
-      typeof data.savedAt === "number" && Number.isFinite(data.savedAt) && Math.abs(data.savedAt) <= MAX_DATE_MS
-        ? data.savedAt
-        : undefined,
+    savedAt: parseSavedAt(data.savedAt),
     // Founded mode, run through the same isGameMode coercion deserialize
     // uses (absent/forged = classic), so the dialog's chip can never carry a
     // raw file string.
@@ -192,7 +197,7 @@ export const SaveGame = {
    * "Continue" (which would drop the player into a fresh tower behind a title
    * that promised their old one) — see main.ts.
    */
-  loadResult(): { sim: Simulation | null; corrupt: boolean } {
+  loadResult(): { sim: Simulation | null; corrupt: boolean; savedAt: number | undefined } {
     // Try the Verticopolis key first, then the legacy key: a partial migration
     // or multi-tab divergence can leave an unreadable value on one key beside a
     // healthy save on the other, and the healthy one must still load. `corrupt`
@@ -205,14 +210,19 @@ export const SaveGame = {
       const data = readSlot(key); // null ⇒ present but undecodable
       if (data) {
         try {
-          return { sim: Simulation.deserialize(data), corrupt };
+          const sim = Simulation.deserialize(data);
+          // Surface the loaded tower's write time from the SAME decoded data and
+          // the SAME key that actually loaded (legacy fallback included), so the
+          // boot return-recency bucket needs no second decode of the slot. A
+          // forged or out-of-range stamp reads as absent (parseSavedAt).
+          return { sim, corrupt, savedAt: parseSavedAt(data.savedAt) };
         } catch {
           /* decoded, but the schema won't load; treated as unreadable below */
         }
       }
       corrupt = true;
     }
-    return { sim: null, corrupt };
+    return { sim: null, corrupt, savedAt: undefined };
   },
   clear(): void {
     localStorage.removeItem(AUTO_KEY);

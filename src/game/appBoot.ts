@@ -6,12 +6,13 @@ import { InspectorController } from "./inspector";
 import { KeyboardPlay } from "./keyboardPlay";
 import { attemptContextRecovery } from "./contextRecovery";
 import { showCrashScreen } from "../ui/crashScreen";
-import { OnboardingController } from "../ui/Onboarding";
+import { OnboardingController, isOnboarded } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
 import { hideBootCover } from "../bootstrap";
 import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
-import { gameplaySession } from "../analytics";
+import { gameplaySession, setCommonProps } from "../analytics";
+import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -157,8 +158,10 @@ export function wireControllers(app: GameApp): void {
 /** First-paint boot flow: build the onboarding controller, consume the two
  *  resume flags, show the splash (or drop straight back into the tower on a
  *  resume reload), report an unreadable save, and start the autosave timer.
- *  Called at the end of the constructor once the engine is running. */
-export function runBootFlow(app: GameApp): void {
+ *  Called at the end of the constructor once the engine is running. `savedAtBoot`
+ *  is the loaded tower's write time (from `SaveGame.loadResult`), passed in for
+ *  the S4 return-recency bucket; undefined with no readable save. */
+export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -204,6 +207,28 @@ export function runBootFlow(app: GameApp): void {
   } catch {
     /* sessionStorage can throw in private mode, so treat it as not-a-recovery */
   }
+  // One-time boot enrichment merged into EVERY event (S4): the platform
+  // dimension (AUD-036) plus anonymous on-device buckets. Cookieless: coarse
+  // buckets derived from state the device already holds (the onboarding flag,
+  // the loaded tower's in-game age, and the autosave's write time), no id and no
+  // new storage. Set BEFORE the boot event below so the very first event carries
+  // it. Each read is individually defensive, but the whole compute is wrapped so
+  // an enrichment hiccup can never throw past this point and abort boot: matching
+  // the never-block-boot posture the boot snapshot below relies on.
+  try {
+    setCommonProps(
+      bootCommonProps({
+        platform: platformLabel(),
+        onboarded: isOnboarded(),
+        tenureDay: app.sim?.clock?.day,
+        savedAt: savedAtBoot,
+        now: Date.now(),
+      }),
+    );
+  } catch {
+    /* best-effort enrichment; a returning/tenure/platform read must never block boot */
+  }
+
   // One analytics snapshot per boot: the origin (update / recovery / corrupt /
   // continue / fresh) plus the loaded tower's standing state and the build
   // version. Fired here, once both resume flags are resolved, so a returning
