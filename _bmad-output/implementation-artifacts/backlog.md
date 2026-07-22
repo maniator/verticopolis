@@ -20,6 +20,19 @@ How items flow:
    under a dated `### Deferred from:` heading.
 2. Triage folds inbox entries into the table as a curated row (and removes the
    raw inbox note once captured). Pick items up when you next touch the area.
+
+   **Standing triage cadence (per-PR, adopted 2026-07-21 per #545 / audit
+   AUD-004).** A PR that parks a `defer` finding triages its OWN new inbox
+   entries before it merges: fold each into a curated row (with a mirror issue
+   when unresolved), mark it absorbed or superseded with a pointer to the
+   destination, or retire it with a one-line factual reason. The inbox is a
+   hand-off buffer for the change in flight, not a growing archive, so it holds
+   only entries from work that has not yet merged. The weekly-batch alternative
+   was the recorded dissent (audit §14a Round 3); per-PR was adopted because the
+   inbox had already accreted ~90 dated sections over two weeks under batch-only
+   sweeping, the exact invisible-work rot AUD-004 describes: a batch that never
+   quite runs leaves findings untracked by both backlogs. The one-time clearing
+   pass that adopted this cadence is #545.
 3. **GitHub mirror (standing rule, 2026-07-15):** every curated row that is not
    finished has a matching GitHub issue, recorded in the `GH` column as `#NNN`.
    Finished means `done`, `resolved`, `shipped-v1` (its remainders live on
