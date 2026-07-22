@@ -103,6 +103,7 @@ describe("helpTemplate structure and a11y", () => {
     housekeepingShift: null, // internal maid-shift window
     housekeepingTriage: null, // internal maid dispatch order
     demandModel: null, // internal commercial-demand magnitudes
+    commercialDailyIncome: null, // internal commercial headline magnitudes (#572), same species as demandModel
     lobbyDistanceDrain: null, // subtle band-vs-continuous shape of the lobby-distance pressure
   };
 

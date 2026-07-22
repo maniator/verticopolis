@@ -94,7 +94,10 @@ describe("commercial demand pools", () => {
   });
 
   it("caps a venue's fraction at 1 when demand exceeds its capacity", () => {
-    const sim = servedTower();
+    // Modern fixture: the cap mechanism is mode-shared, but Classic's 1994
+    // top-tier shop ceiling (#572) is several times this block's pool, so the
+    // over-demanded precondition only holds against the Modern capacity.
+    const sim = servedTower(1, "modern");
     // A large office block (packed left of the center shaft): pool far exceeds
     // the single shop's daily capacity.
     for (let i = 0; i < 20; i++) occupied(sim, "office", 2, i * 9);
@@ -102,6 +105,19 @@ describe("commercial demand pools", () => {
     const pool = 20 * OFFICE_POP * ECON.mealPopulationWeights.office * PC;
     expect(pool).toBeGreaterThan(ECON.dailyTrafficIncome.shop); // precondition: over-demanded
     expect(computeDemandMap(sim).fractionByUnit.get(shop.id)).toBe(1);
+  });
+
+  it("reads the CLASSIC capacity through the seam: the same block leaves a 1994-ceiling shop unsaturated (#572)", () => {
+    // The identical tower in Classic: capacity is the seam's 1994 top-tier
+    // ceiling, so the same pool covers only its pool/capacity share. Pins that
+    // the demand map and the money loop read one mode headline.
+    const sim = servedTower(1, "classic");
+    for (let i = 0; i < 20; i++) occupied(sim, "office", 2, i * 9);
+    const shop = occupied(sim, "shop", 2, C + 20);
+    const pool = 20 * OFFICE_POP * ECON.mealPopulationWeights.office * PC;
+    const classicCap = CLASSIC_RULES.commercialDailyIncome("shop")!;
+    expect(classicCap).toBeGreaterThan(pool); // precondition: NOT over-demanded in Classic
+    expect(computeDemandMap(sim).fractionByUnit.get(shop.id)).toBeCloseTo(pool / classicCap, 6);
   });
 
   it("counts reachable venues per origin, and zeroes a stranded origin's coverage", () => {
@@ -164,22 +180,30 @@ describe("commercial demand pools", () => {
     };
     const classic = build("classic");
     const modern = build("modern");
-    const share = classic.map.share;
-    // Precondition: pin the identity band `floor < share < 1`. Above the Modern
-    // floor (so `max(floor, ...)` is not what lifts Modern's fraction here, the
-    // test genuinely exercises `min(1, share)`) and below the cap (so the shape
-    // matters, not the clamp).
-    expect(share).toBeGreaterThan(ECON.demandFloorModern);
-    expect(share).toBeLessThan(1);
-    expect(modern.map.share).toBeCloseTo(share, 6); // share is mode-independent (pool and capacity are the same)
+    // The pool (weighted census × per-capita) is mode-shared; CAPACITY is not
+    // (#572: Classic reads the 1994 top-tier ceilings), so each mode has its
+    // own share = pool / its own capacity, related by the capacity ratio.
+    const mShare = modern.map.share;
+    const cShare = classic.map.share;
+    expect(cShare).toBeCloseTo(
+      mShare * (ECON.dailyTrafficIncome.shop / CLASSIC_RULES.commercialDailyIncome("shop")!),
+      6,
+    );
+    // Precondition for the Modern identity: pin the band `floor < share < 1`
+    // (so `max(floor, ...)` is not what lifts Modern's fraction here and the
+    // clamp is not what shapes it).
+    expect(mShare).toBeGreaterThan(ECON.demandFloorModern);
+    expect(mShare).toBeLessThan(1);
     const cFrac = classic.map.fractionByUnit.get(classic.shopId)!;
     const mFrac = modern.map.fractionByUnit.get(modern.shopId)!;
-    expect(cFrac).toBeCloseTo(Math.min(1, share), 6); // Classic: plain min(1, share)
-    expect(mFrac).toBeCloseTo(Math.min(1, share), 6); // Modern: same identity (its floor is far below this share)
+    expect(cFrac).toBeCloseTo(Math.min(1, cShare), 6); // Classic: plain min(1, share), floor 0
+    expect(mFrac).toBeCloseTo(Math.min(1, mShare), 6); // Modern: same identity (its floor is far below this share)
   });
 
   it("exposes the raw uncapped share even when the earned fraction is capped at 1 (Phase C)", () => {
-    const sim = servedTower(1, "classic");
+    // Modern fixture: over-demanded only against the Modern capacity (#572,
+    // see the saturation twin above for the Classic side).
+    const sim = servedTower(1, "modern");
     for (let i = 0; i < 20; i++) occupied(sim, "office", 2, i * 9); // over-demanded: pool exceeds the shop's capacity
     const shop = occupied(sim, "shop", 2, C + 20);
     const map = computeDemandMap(sim);

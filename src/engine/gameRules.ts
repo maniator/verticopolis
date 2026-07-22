@@ -126,6 +126,24 @@ export interface GameRules {
    * structurally exactly 1 (byte-identical). Pure and deterministic (no RNG).
    */
   quarterlyRentScale(quarterDays: number): number;
+  /**
+   * Headline daily take for a commercial traffic venue, or undefined for a
+   * kind with no traffic income. For the RETAIL-POOL kinds (fast food,
+   * restaurant, shop) this one number is both the income figure in the money
+   * loop and the capacity bid in the commercial demand-pool map, so those two
+   * can never desync; attendance venues (cinema, party hall) sit outside the
+   * pool by design (#424) and read their live-attendance fill against this
+   * figure instead. It is a top-tier ANCHOR, not a hard cap: the weekend and
+   * blockbuster multipliers ride above it, matching canon's own weekend
+   * visitor lift. Classic reads the 1994 chart's top tiers
+   * (`ECON.classicDailyTrafficIncome`, provenance there; the demand fraction
+   * and attendance fill produce the chart's lower tiers on their own); Modern
+   * keeps today's tuned `ECON.dailyTrafficIncome`. Kind CLASSIFICATION (is
+   * this a traffic venue at all?) stays on the shared `ECON.dailyTrafficIncome`
+   * key set, which both tables mirror, so a kind cannot be a venue in one mode
+   * and not the other. Pure and deterministic.
+   */
+  commercialDailyIncome(kind: string): number | undefined;
 
   // ---- The Modern "deeper economy" layer -------------------------------------
   // Three mechanics the 1994 original never had, added (gdd-economy-depth,

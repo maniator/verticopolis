@@ -11,6 +11,30 @@ export const ECON = {
     cinema: 8_000,
     partyHall: 3_000,
   } as Record<string, number>,
+  /**
+   * Classic-only headline daily takes, resolved through
+   * {@link GameRules.commercialDailyIncome} (Modern reads `dailyTrafficIncome`
+   * above, unchanged). Each value is the 1994 chart's TOP tier, read as the
+   * sold-out ceiling: the demand-pool fraction and the live-attendance fill
+   * then produce the lower tiers on their own, which lands a busy venue near
+   * the chart's "normal" figures (fast food ~3k/day, restaurant ~6k/day).
+   * Provenance (issue #572, spec-classic-economy-followups-2026-07-22):
+   * search snippets of the period FAQ chart give fast food (-3k)-2k-5k daily,
+   * restaurant 4k-6k-10k, retail shop 4k-10k-15k-20k by popularity, theater
+   * 0-2k-10k by performance, party hall a flat 20k. The chart's own "normal"
+   * fast-food figure (3k) sits between its recorded 2k middle and 5k top
+   * tiers, an intra-lineage wobble flagged in the spec. Snippet-level and
+   * same-lineage, so PROVISIONAL (see #575); the demand-side calibration
+   * (whether `demandPerCapita` supplies canon-normal income in a mid-size
+   * tower) stays on the row's playtest pass.
+   */
+  classicDailyTrafficIncome: {
+    fastFood: 5_000,
+    restaurant: 10_000,
+    shop: 20_000,
+    cinema: 10_000,
+    partyHall: 20_000,
+  } as Partial<Record<string, number>>,
   /** Assumed average ticket per customer, used by the commercial-venue
    *  inspector to convert a venue's traffic income into a customer estimate
    *  (see `EconomySystem.collectTrafficIncome`). Cosmetic-only: the money loop

@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.81.0
+
+- Classic shops, restaurants, fast food, cinemas, and party halls now earn toward their 1994 figures (a sold-out shop can take $20,000 a day, and a full party hall can too), so a busy tower's commercial floors pay the way they did in the original. Modern towers are unchanged.
+
 ## 1.80.0
 
 - New Tower now offers a Modern "manual structure" option: turn it on and you place and pay for every floor and lobby tile yourself, with rooms no longer auto-laying the floor beneath them. For players who want full control of the build. Off by default, so nothing changes unless you pick it.
