@@ -250,7 +250,9 @@ function frame() {
   // art (cars in bays, the garbage pile + gauge) actually shows in the catalog.
   const d: DrawCtx = { ctx, lit: true, anim, hour: 19, parkingUse: 0.7, recycleFill: 0.66 };
   ctx.fillStyle = "#12151d";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  // ctx is scaled by dpr, so fill in LOGICAL (CSS) pixels, not the device-pixel
+  // canvas.width/height (which would overdraw by dpr^2 every frame).
+  ctx.fillRect(0, 0, COLS * CELL_W + PAD * 2, canvasH);
   placed.forEach(({ item, x: cx, y: cy }) => {
     if ("header" in item) {
       // Full-width section divider: a title with a rule under it.
