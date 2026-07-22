@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { buildToStar } from "./helpers";
 import { benchmarkUiUpdate, measureSimSpeed, checkNodeIdentity } from "./perf-harness";
+import { aboveFloor, withinCeiling } from "../src/tests/perfBudget";
 
 /**
  * The E5-S0 perf gate (BLOCKING, ahead of any live-view migration). It holds a
@@ -204,13 +205,24 @@ test.describe("E5-S0 perf gate @perf", () => {
       windowMs: SPEED_WINDOW_MS,
       windows: SPEED_WINDOWS,
     });
-    // (A) median must not rise more than 5%; p95 not more than 10%.
-    expect(uiUpdate.medianMs, `ui.update median ${uiUpdate.medianMs.toFixed(4)}ms vs baseline ${baseline.uiUpdate.medianMs.toFixed(4)}ms`)
-      .toBeLessThanOrEqual(baseline.uiUpdate.medianMs * A_MEDIAN_TOL);
-    expect(uiUpdate.p95Ms, `ui.update p95 ${uiUpdate.p95Ms.toFixed(4)}ms vs baseline ${baseline.uiUpdate.p95Ms.toFixed(4)}ms`)
-      .toBeLessThanOrEqual(baseline.uiUpdate.p95Ms * A_P95_TOL);
+    // (A) median must not rise more than 5%; p95 not more than 10%. The
+    // comparisons go through withinCeiling/aboveFloor (src/tests/perfBudget.ts),
+    // which widen the computed budget by a documented 1e-9 relative epsilon: a
+    // strict <= against `baseline * tol` once failed a docs-only diff by 4e-13 ms
+    // of float-representation noise at the exact boundary (AUD-009). The
+    // effective tolerances stay 5%/10%.
+    expect(
+      withinCeiling(uiUpdate.medianMs, baseline.uiUpdate.medianMs, A_MEDIAN_TOL),
+      `ui.update median ${uiUpdate.medianMs.toFixed(4)}ms vs baseline ${baseline.uiUpdate.medianMs.toFixed(4)}ms (x${A_MEDIAN_TOL})`,
+    ).toBe(true);
+    expect(
+      withinCeiling(uiUpdate.p95Ms, baseline.uiUpdate.p95Ms, A_P95_TOL),
+      `ui.update p95 ${uiUpdate.p95Ms.toFixed(4)}ms vs baseline ${baseline.uiUpdate.p95Ms.toFixed(4)}ms (x${A_P95_TOL})`,
+    ).toBe(true);
     // (B) end-to-end speed must be at least the baseline (same speed or faster).
-    expect(simMinutesPerRealSecond, `sim-min/s ${simMinutesPerRealSecond.toFixed(2)} vs baseline ${baseline.simSpeed.simMinutesPerRealSecond.toFixed(2)}`)
-      .toBeGreaterThanOrEqual(baseline.simSpeed.simMinutesPerRealSecond * B_FLOOR_TOL);
+    expect(
+      aboveFloor(simMinutesPerRealSecond, baseline.simSpeed.simMinutesPerRealSecond, B_FLOOR_TOL),
+      `sim-min/s ${simMinutesPerRealSecond.toFixed(2)} vs baseline ${baseline.simSpeed.simMinutesPerRealSecond.toFixed(2)} (x${B_FLOOR_TOL})`,
+    ).toBe(true);
   });
 });
