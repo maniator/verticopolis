@@ -1,0 +1,74 @@
+name: Engine hour-boundary bench
+
+# Tracks engine-tick cost over time by running the existing opt-in
+# RUN_HOUR_BENCH bench (src/tests/integration/hourCost.bench.integration.test.ts)
+# on a weekly schedule. The bench builds a ~20k-unit tower shaped like the
+# audit's noise-scan diagnosis and walks 24 in-game hours, reporting regular
+# vs hour-boundary tick cost; the audit's one-off numbers (8.6 ms regular /
+# 53 ms boundary at 25k units, 2026-07-21) become a series instead of a
+# single measurement (audit §14a commitment, #540).
+#
+# NON-BLOCKING by design: this workflow never runs on pull requests and gates
+# nothing. Timings on shared runners are venue-noisy, so the numbers are
+# trend evidence for humans (the run's job summary and a downloadable log),
+# never assertions; the bench itself contains only a structural sanity check.
+
+on:
+  schedule:
+    # Mondays at 05:17 UTC (off the top of the hour to dodge scheduler load).
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+# Read-only: the bench checks out and measures; it never writes to the repo.
+permissions:
+  contents: read
+
+jobs:
+  bench:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js (from .nvmrc)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: ".nvmrc"
+          cache: "npm"
+
+      - name: Install dependencies
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: "1"
+        run: npm ci
+
+      - name: Run the hour-boundary bench
+        env:
+          RUN_HOUR_BENCH: "1"
+        run: |
+          set -o pipefail
+          node -e "console.log('runner:', require('os').cpus()[0].model, 'x', require('os').cpus().length)" | tee bench-output.txt
+          npx vitest run src/tests/integration/hourCost.bench.integration.test.ts --disable-console-intercept 2>&1 | tee -a bench-output.txt
+
+      - name: Publish the numbers to the job summary
+        if: always()
+        run: |
+          {
+            echo "## Engine hour-boundary bench ($(date -u +%F))"
+            echo
+            echo "Commit: \`${GITHUB_SHA}\`. Shared-runner timings: read as a trend, not an absolute."
+            echo
+            echo '```'
+            grep -E "^(runner:|bench |regular |boundary |per hour)" bench-output.txt || echo "bench lines not found; see the uploaded log"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload the full bench log
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # run_attempt keeps a manual re-run from colliding with the first
+          # attempt's immutable artifact name and failing an otherwise green run.
+          name: engine-bench-${{ github.run_id }}-${{ github.run_attempt }}
+          path: bench-output.txt
+          retention-days: 90
