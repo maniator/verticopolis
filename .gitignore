@@ -17,6 +17,13 @@ coverage/
 __pycache__/
 node_modules
 
+# Local env files (Vite overrides; `vercel dev` pulls development secrets here)
+.env.local
+.env.*.local
+
+# Vercel CLI project link and local config
+.vercel
+
 # Playwright
 /test-results/
 /playwright-report/
