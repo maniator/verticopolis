@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.89.0
+
+- Modern towers can build a new Fitness Club: a members' gym that comes as a weight floor, yoga studio, spin studio, boxing gym, or climbing wall, each with its own art. It pays a membership lease you can price like an office (rather than earning from foot traffic), and condos near it are a little happier for having a gym close by, a bonus that is strongest on the club's own floor and fades over the next few floors. Unlocks at 3 stars. Modern only; Classic keeps the 1994 catalog.
+
 ## 1.88.0
 
 - The title screen now has a mute button, and the game remembers your choice: mute once and every later visit opens silent, so you can start a tower mid-meeting without a note escaping.

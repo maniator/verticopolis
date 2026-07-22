@@ -229,6 +229,10 @@ export const ECON = {
     hotelSingle: { default: 90, min: 40, max: 200, step: 10 },
     hotelDouble: { default: 180, min: 80, max: 400, step: 20 },
     hotelSuite: { default: 500, min: 200, max: 1_000, step: 50 },
+    // Modern-only Fitness Club membership dues, collected on the quarterly rent
+    // cadence like an office (a smaller lease than a full office floor). Modern
+    // never charges a Classic tower this: the kind is modernOnly.
+    fitnessClub: { default: 6_000, min: 2_000, max: 12_000, step: 1_000 },
   } as Record<string, { default: number; min: number; max: number; step: number }>,
   serviceMaintenanceMonthly: {
     security: 2_000,
@@ -240,7 +244,7 @@ export const ECON = {
 } as const;
 
 /** Unit kinds whose price the player sets (and can batch-edit). */
-export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite"] as const;
+export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub"] as const;
 
 /** The price band for a unit kind, or null if its price isn't player-set. */
 export function rentConfig(kind: string): { default: number; min: number; max: number; step: number } | null {

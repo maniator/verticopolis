@@ -102,49 +102,49 @@ export class EconomySystem {
     );
   }
 
-  /** Quarterly office rent from occupied, reachable offices — a tenant on
-   *  notice (`vacating`) is still in the space and keeps paying until they go. */
+  /** Quarterly office rent plus Modern Fitness Club membership dues, from occupied,
+   *  served units (fitness banks to its own category; 0 in a Classic tower). */
   collectRent(): void {
     let total = 0;
     let count = 0;
+    let fitTotal = 0;
+    let fitCount = 0;
     for (const u of this.sim.tower.units) {
-      if (u.kind === "office" && isTenanted(u) && this.sim.tower.isFloorServed(u.floor)) {
+      if (!isTenanted(u) || !this.sim.tower.isFloorServed(u.floor)) continue;
+      if (u.kind === "office") {
         total += rentOf(u);
         count++;
+      } else if (u.kind === "fitnessClub") {
+        fitTotal += rentOf(u);
+        fitCount++;
       }
     }
-    // The collection factor is a rule-set decision (quarterlyRentScale):
-    // Classic pays the FULL 1994 lump every canon 3-day quarter (ratified
-    // cadence, spec-classic-economy-canon-cadence-2026-07-22); Modern keeps
-    // the income-invariant rescale (gdd/arch-classic-calendar-parity): its
-    // shorter quarter pays proportionally less so per-in-game-day income never
-    // changes, and its real-world factor is structurally exactly 1. Bare test
-    // contexts read the Modern fallback, the file's standard. Round once on
-    // the summed total so per-office rounding can't accumulate.
-    const rules = this.sim.rules ?? MODERN_RULES;
-    const collected = Math.round(total * rules.quarterlyRentScale(this.sim.clock.calendar.quarterDays));
+    const scale = (this.sim.rules ?? MODERN_RULES).quarterlyRentScale(this.sim.clock.calendar.quarterDays);
+    const collected = Math.round(total * scale); // round each total once so per-unit rounding can't accumulate
     if (collected > 0) {
       this.sim.money += collected;
       this.sim.recordMoney?.("offices", collected);
       this.sim.emit(`Quarterly office rent collected: $${collected.toLocaleString()} (${count} offices).`, "money");
     }
+    const fitness = Math.round(fitTotal * scale);
+    if (fitness > 0) {
+      this.sim.money += fitness;
+      this.sim.recordMoney?.("entertainment", fitness);
+      this.sim.emit(`Fitness Club membership dues collected: $${fitness.toLocaleString()} (${fitCount} club${fitCount > 1 ? "s" : ""}).`, "money");
+    }
   }
 
   /** Hourly food/retail/entertainment takings, scaled by foot traffic. */
   collectTrafficIncome(): void {
-    // Per-venue demand fractions replace the old tower-wide appeal scalar: each
-    // reachable venue earns a share of its daily figure driven by the connected
-    // census split across the reachable venues (commercial demand pools). Pure
-    // and deterministic, so it adds no draw to the seeded economy stream.
+    // Per-venue demand fractions (commercial demand pools): each reachable venue
+    // earns a share of its daily figure from the connected census split across
+    // reachable venues. Pure/deterministic, so it adds no draw to the RNG stream.
     const demandMap = computeDemandMap(this.sim);
-    // Visitor income obeys reachability: a floor the crowd router can't reach
-    // from the lobby draws no patrons (the same "no visitors will come" condition
-    // the stranded-floor advisory reports), so its commercial rooms earn nothing.
-    // Reachability is uncapped now (#503), so this is stricter than mere
-    // connectivity (`isFloorServed`) only in Classic, where a floor reachable
-    // solely up a stair climb past the walk budget is served but unreachable to
-    // visitors, and earns $0. Memoized per call since the route BFS isn't free
-    // and rooms share floors.
+    // Visitor income obeys reachability: a floor the router can't reach from the
+    // lobby draws no patrons and earns nothing. Reachability is uncapped now
+    // (#503), so this is stricter than connectivity (`isFloorServed`) only in
+    // Classic (a floor reachable solely up a past-budget stair climb is served
+    // but unreachable). Memoized per call: the route BFS isn't free, rooms share floors.
     const reachCache = new Map<number, boolean>();
     const drawsVisitors = (floor: number): boolean => {
       const cached = reachCache.get(floor);

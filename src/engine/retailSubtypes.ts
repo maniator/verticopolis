@@ -84,6 +84,20 @@ export const BOUTIQUE_SUBTYPES = [
 ] as const;
 
 /**
+ * The formats a Modern Fitness Club can present. Like the other Modern container
+ * rosters, these are Modern-only and carry NO ordinal: a Modern tower is never
+ * exported to the 1994 `.TDT` format, and the native save persists the format by
+ * NAME, not by index, so order carries no meaning.
+ */
+export const FITNESS_SUBTYPES = [
+  "Weight Floor",
+  "Yoga Studio",
+  "Spin Studio",
+  "Boxing Gym",
+  "Climbing Wall",
+] as const;
+
+/**
  * The subtype (stall/variant) name list for `kind`, or null when the kind
  * carries none. The canon retail kinds (shop / fastFood / restaurant) return
  * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
@@ -106,6 +120,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return AMUSEMENTS_SUBTYPES;
     case "boutiqueBay":
       return BOUTIQUE_SUBTYPES;
+    case "fitnessClub":
+      return FITNESS_SUBTYPES;
     default:
       return null;
   }

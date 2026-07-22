@@ -128,6 +128,11 @@ export function attemptMoveIns(sim: Simulation): void {
       if (!weekend && sim.rng.chance(0.25 * demand * parkingPenalty)) sim.moveIn(u);
     } else if (u.kind === "condo") {
       if (sim.rng.chance(0.18 * demand)) sim.moveIn(u);
+    } else if (u.kind === "fitnessClub") {
+      // A Modern-only lease amenity, filled like an office (any day of the week).
+      // Classic never reaches here: it holds no fitness club, so no rng is drawn
+      // and the Classic seeded stream is untouched.
+      if (sim.rng.chance(0.22 * demand)) sim.moveIn(u);
     } else if (isHotelKind(u.kind)) {
       // Hotel rooms fill in the evening only and must be clean.
       if (sim.clock.isEvening() && sim.rng.chance(0.5 * demand)) {
@@ -263,6 +268,17 @@ export function moveIn(sim: Simulation, u: Unit): void {
     u.label = sim.companyName();
     sim.moveInsToday.offices++;
   }
+  if (u.kind === "fitnessClub") {
+    u.everOccupied = true;
+    u.label = gymName(sim);
+    sim.moveInsToday.fitness++;
+  }
+}
+
+export function gymName(sim: Simulation): string {
+  const a = ["Ironworks", "Summit", "Pulse", "Apex", "Vertex", "Kinetic", "Anvil", "Ascend", "Cobalt", "Momentum"];
+  const b = ["Fitness", "Athletic Club", "Gym", "Strength", "Studio", "Wellness"];
+  return `${sim.rng.pick(a)} ${sim.rng.pick(b)}`;
 }
 
 export function companyName(sim: Simulation): string {
@@ -279,6 +295,7 @@ export function reportMoveIns(sim: Simulation): void {
   if (m.offices) parts.push(`${m.offices} office${m.offices > 1 ? "s" : ""} leased`);
   if (m.condos) parts.push(`${m.condos} condo${m.condos > 1 ? "s" : ""} sold`);
   if (m.rooms) parts.push(`${m.rooms} hotel room${m.rooms > 1 ? "s" : ""} booked`);
+  if (m.fitness) parts.push(`${m.fitness} fitness club${m.fitness > 1 ? "s" : ""} leased`);
   if (parts.length) sim.emit(`New tenants: ${parts.join(", ")}.`, "good");
-  sim.moveInsToday = { offices: 0, condos: 0, rooms: 0 };
+  sim.moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0 };
 }

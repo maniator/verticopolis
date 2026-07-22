@@ -180,7 +180,7 @@ export class Simulation implements SimContext {
   /** Move-ins since the last daily summary (offices leased, condos sold, hotel
    *  rooms booked), reported as one quiet log line per day rather than a toast
    *  per tenant, matching SimTower's readout-driven feel. */
-  moveInsToday = { offices: 0, condos: 0, rooms: 0 };
+  moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0 };
   /** Pending VIP inspection day (for the TOWER rating). */
   vipVisitDay = -1;
   /** Whether a VIP has given the tower a favorable suite review (a 4★ gate). */

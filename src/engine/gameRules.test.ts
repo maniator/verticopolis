@@ -374,7 +374,9 @@ describe("priceOptions (the Classic/Modern pricing split, #299)", () => {
   };
 
   it("Classic returns the discrete 4-rung canon ladder plus the No Rate sentinel for every priced kind", () => {
-    for (const kind of PRICED_KINDS) {
+    // Modern-only priced kinds (e.g. the Fitness Club) have no 1994 rent ladder
+    // and never exist in a Classic tower, so Classic offers no options for them.
+    for (const kind of PRICED_KINDS.filter((k) => !FACILITIES[k].modernOnly)) {
       const opts = CLASSIC_RULES.priceOptions(kind);
       expect(opts).not.toBeNull();
       if (opts?.shape !== "ladder") throw new Error(`expected a ladder for ${kind}`);
@@ -384,6 +386,8 @@ describe("priceOptions (the Classic/Modern pricing split, #299)", () => {
       // Rung levels double as the TDT rent-class bytes 0-3.
       expect(opts.rungs.map((r) => r.level)).toEqual([0, 1, 2, 3]);
     }
+    // The Modern-only Fitness Club is priced in Modern but has no Classic option.
+    expect(CLASSIC_RULES.priceOptions("fitnessClub")).toBeNull();
   });
 
   it("Modern returns today's continuous band unchanged (the live ECON entry)", () => {

@@ -1,4 +1,5 @@
 import { ECON, PRICED_KINDS } from "./econConfig";
+import { FACILITIES } from "./facilitiesData";
 
 /**
  * The Classic/Modern pricing split's SHAPE layer (gdd-classic-modern-pricing-
@@ -104,7 +105,10 @@ const RUNG_LABELS = ["Very Low", "Low", "Average", "High"] as const;
  *  Consumed by the rule-sets in gameRules.ts (the one mode decision point). */
 export const CLASSIC_PRICE_OPTIONS: Readonly<Record<string, PriceOptions>> = Object.freeze(
   Object.fromEntries(
-    PRICED_KINDS.map((kind) => {
+    // Modern-only priced kinds (e.g. the Fitness Club) have no 1994 rent ladder
+    // and never exist in a Classic tower, so they are excluded here; the throw
+    // below still guards a genuine Classic priced kind that forgot its ladder.
+    PRICED_KINDS.filter((kind) => !FACILITIES[kind].modernOnly).map((kind) => {
       const values = CLASSIC_RENT_LADDERS[kind];
       if (!values) throw new Error(`Classic rent ladder missing for priced kind ${kind}`);
       const rungs = Object.freeze(

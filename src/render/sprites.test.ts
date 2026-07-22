@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit } from "../engine/types";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   craneAnchorTile,
@@ -74,6 +74,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["food hall", { kind: "foodHall" }],
     ["amusements", { kind: "amusements" }],
     ["boutique bay", { kind: "boutiqueBay" }],
+    ["fitness club", { kind: "fitnessClub" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -197,6 +198,27 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
       sigs.add(s.sig());
     }
     expect(sigs.size, "two trades drew identically").toBe(BOUTIQUE_SUBTYPES.length);
+  });
+
+  it("each Fitness Club format draws its own distinct room", () => {
+    const sigs = new Set<string>();
+    for (const name of FITNESS_SUBTYPES) {
+      const s = spyCtx();
+      expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "fitnessClub", subtype: name, occupants: 3 }), 0, 0, 176, 44)).not.toThrow();
+      expect(s.painted()).toBe(true);
+      sigs.add(s.sig());
+    }
+    expect(sigs.size, "two formats drew identically").toBe(FITNESS_SUBTYPES.length);
+  });
+
+  it("an empty Fitness Club draws no member; a busy one does", () => {
+    const empty = spyCtx();
+    const full = spyCtx();
+    drawUnit(draw({}, empty.ctx), unit({ kind: "fitnessClub", subtype: "Weight Floor", occupants: 0 }), 0, 0, 176, 44);
+    drawUnit(draw({}, full.ctx), unit({ kind: "fitnessClub", subtype: "Weight Floor", occupants: 4 }), 0, 0, 176, 44);
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    expect(empty.log).not.toContain(occupant);
+    expect(full.log).toContain(occupant);
   });
 
   it("a Boutique Bay's browsers are bounded and gated on occupancy", () => {
