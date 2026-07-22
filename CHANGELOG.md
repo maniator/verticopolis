@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.82.0
+
+- On desktop you can now hold Shift and drag to move around the tower with any tool selected, so you no longer have to switch to Inspect or reach for the spacebar mid-build.
+- The "Can't build here" hover card now sits below the spot it explains, and lets the red preview show through, so you can actually see where a placement fails.
+
 ## 1.81.0
 
 - Classic shops, restaurants, fast food, cinemas, and party halls now earn toward their 1994 figures (a sold-out shop can take $20,000 a day, and a full party hall can too), so a busy tower's commercial floors pay the way they did in the original. Modern towers are unchanged.

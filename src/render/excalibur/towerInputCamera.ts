@@ -150,7 +150,13 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   engine.moved = 0;
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  const space = engine.engine.input.keyboard.isHeld(ex.Keys.Space);
+  // Pan key: Space (via Excalibur's keyboard) or Shift. Shift comes off the
+  // native pointer event, which snapshots modifier state at the press itself,
+  // so a Shift+drag routes to pan even when a focus quirk kept Excalibur from
+  // seeing the keydown. Read at pointer-down only, matching Space: releasing
+  // the key mid-drag keeps the pan until pointer-up.
+  const native = ev.nativeEvent as { shiftKey?: boolean } | undefined;
+  const panKey = engine.engine.input.keyboard.isHeld(ex.Keys.Space) || native?.shiftKey === true;
   // Left-click on a selected elevator's extend arrow grows the shaft.
   if (buttonNum(ev) === 0 && engine.onExtendTo) {
     const ps = ev.screenPos;
@@ -172,7 +178,7 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     engine.gesture = null;
     return;
   }
-  engine.gesture = engine.classifyDown ? engine.classifyDown(buttonNum(ev), touch, space) : "pan";
+  engine.gesture = engine.classifyDown ? engine.classifyDown(buttonNum(ev), touch, panKey) : "pan";
   if (engine.gesture === "action") {
     const { tile, floor } = tf(ev);
     engine.onActionDown?.(tile, floor, touch, pickEntityAt(engine, ev.worldPos));

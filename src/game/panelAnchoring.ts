@@ -30,7 +30,14 @@ export function positionPanels(app: GameApp): void {
   }
   if (app.inspectAnchor && app.ui.isInspectorOpen()) {
     const sx = app.engine.worldToScreenX(app.inspectAnchor.x);
-    const sy = app.engine.worldToScreenY(app.inspectAnchor.floor);
+    // The build-refusal card is a caption UNDER the invalid preview strip: its
+    // top edge anchors at the anchored row's bottom edge (floor - 1's top,
+    // worldToScreenY(floor) being a row's TOP edge) so the red strip that
+    // explains the refusal stays visible. Room ghosts extend upward from their
+    // anchor floor, so one row down clears the ghost at every facility height.
+    // The inspect-tool hover card keeps the row-top anchor it always had.
+    const floor = app.buildRefusalShowing ? app.inspectAnchor.floor - 1 : app.inspectAnchor.floor;
+    const sy = app.engine.worldToScreenY(floor);
     app.ui.anchorInspector(sx, sy, vw, vh);
     app.panelsAnchored = true;
   }

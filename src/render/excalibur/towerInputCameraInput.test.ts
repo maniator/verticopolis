@@ -75,6 +75,7 @@ function ptr(opts: {
   button?: ex.PointerButton;
   touch?: boolean;
   pointerId?: number;
+  shift?: boolean;
 }): unknown {
   const tile = opts.tile ?? 10;
   const floor = opts.floor ?? 5;
@@ -82,7 +83,7 @@ function ptr(opts: {
     button: opts.button ?? ex.PointerButton.Left,
     pointerType: opts.touch ? "Touch" : "Mouse",
     pointerId: opts.pointerId ?? 1,
-    nativeEvent: { pointerId: opts.pointerId ?? 1 },
+    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false },
     worldPos: ex.vec(tile * TILE, -floor * FLOOR),
     screenPos: { x: opts.sx ?? 400, y: opts.sy ?? 300 },
   };
@@ -106,6 +107,30 @@ describe("pointer down routing", () => {
     handlers.down(ptr({ tile: 12, floor: 7 }));
     expect(e.gesture).toBe("action");
     expect(e.onActionDown).toHaveBeenCalledWith(12, 7, false, null);
+  });
+
+  it("Shift at the press reaches classifyDown as the pan key (Shift+drag pans)", () => {
+    const classifyDown = vi.fn(() => "pan");
+    const { e, handlers } = inputEng({ classifyDown });
+    handlers.down(ptr({ shift: true }));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, true);
+    expect(e.gesture).toBe("pan");
+    expect(e.onActionDown).not.toHaveBeenCalled();
+  });
+
+  it("without Shift (and no Space) the pan key is false", () => {
+    const classifyDown = vi.fn(() => "action");
+    const { handlers } = inputEng({ classifyDown });
+    handlers.down(ptr({}));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, false);
+  });
+
+  it("held Space still reaches classifyDown as the pan key (unchanged by Shift support)", () => {
+    const classifyDown = vi.fn(() => "pan");
+    const { e, handlers } = inputEng({ classifyDown });
+    e.engine.input.keyboard.isHeld = () => true;
+    handlers.down(ptr({}));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, true);
   });
 
   it("a right-click inspects under the cursor without starting a gesture", () => {

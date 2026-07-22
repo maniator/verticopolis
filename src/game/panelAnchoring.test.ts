@@ -22,6 +22,7 @@ interface FakeParts {
   inspectAnchor?: { x: number; floor: number } | null;
   isEditorOpen?: boolean;
   isInspectorOpen?: boolean;
+  buildRefusalShowing?: boolean;
   unit?: { x: number; width: number; floor: number; kind: string } | null;
   transport?: { x: number; width: number; top: number } | null;
 }
@@ -41,6 +42,7 @@ function makeApp(parts: FakeParts = {}) {
     engine: { viewWidth: 800, viewHeight: 600, worldToScreenX, worldToScreenY },
     selected: parts.selected ?? null,
     inspectAnchor: parts.inspectAnchor ?? null,
+    buildRefusalShowing: parts.buildRefusalShowing ?? false,
     selectedUnit: () => parts.unit ?? null,
     selectedTransport: () => parts.transport ?? null,
   };
@@ -120,6 +122,20 @@ describe("positionPanels", () => {
     expect(ui.anchorInspector).toHaveBeenCalledWith(worldToScreenX(20), worldToScreenY(9), 800, 600);
     expect(app.panelsAnchored).toBe(true);
     expect(ui.anchorEditor).not.toHaveBeenCalled();
+  });
+
+  it("anchors the build-refusal card one floor BELOW its cell so the invalid preview strip stays visible", () => {
+    const { app, ui } = makeApp({
+      inspectAnchor: { x: 20, floor: 9 },
+      isInspectorOpen: true,
+      buildRefusalShowing: true,
+    });
+    positionPanels(app);
+
+    // worldToScreenY(floor) is a row's TOP edge, so floor - 1's top is the
+    // anchored row's bottom edge: the card hangs under the strip as a caption.
+    expect(ui.anchorInspector).toHaveBeenCalledWith(worldToScreenX(20), worldToScreenY(8), 800, 600);
+    expect(app.panelsAnchored).toBe(true);
   });
 
   it("on desktop, does NOT anchor the inspector when it is closed", () => {

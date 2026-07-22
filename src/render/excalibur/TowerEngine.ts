@@ -89,9 +89,9 @@ export class TowerEngine {
    *  during in-place recovery and rebuilds on it. */
   onContextRestored: (() => void) | null = null;
 
-  // Controller-supplied input hooks (the controller owns tool semantics). The
-  // `picked` argument is the entity Excalibur found under the pointer, or null.
-  classifyDown: ((button: number, touch: boolean, space: boolean) => "pan" | "action") | null = null;
+  // Controller-supplied input hooks (the controller owns tool semantics). `picked` is the
+  // entity under the pointer (or null); `panKey` is a held pan modifier (Space or Shift).
+  classifyDown: ((button: number, touch: boolean, panKey: boolean) => "pan" | "action") | null = null;
   onTap: ((tile: number, floor: number, touch: boolean, picked: Picked | null) => void) | null = null;
   onActionDown: ((tile: number, floor: number, touch: boolean, picked: Picked | null) => void) | null = null;
   onActionMove: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
