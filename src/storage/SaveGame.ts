@@ -365,6 +365,35 @@ export const SaveGame = {
   },
 };
 
+/** True when a failed save write is STORAGE's fault (quota full, private
+ *  mode, storage disabled) rather than a serialize/compression bug. Callers
+ *  word their failure feedback on this: "free up space or allow site storage"
+ *  is real advice for a storage failure and a wild-goose chase for a code bug.
+ *  Matched by NAME, not `instanceof DOMException`: a cross-realm exception or
+ *  a wrapper rethrowing a plain error-like object fails the instanceof check
+ *  while still being a genuine quota/security failure. SecurityError is only
+ *  trusted on a real DOMException (the name is too generic on arbitrary
+ *  objects); the two quota names are unambiguous wherever they appear. */
+export function isStorageWriteError(err: unknown): boolean {
+  const name = (err as { name?: unknown } | null | undefined)?.name;
+  if (name === "QuotaExceededError" || name === "NS_ERROR_DOM_QUOTA_REACHED") return true; // Firefox's quota name
+  return err instanceof DOMException && err.name === "SecurityError";
+}
+
+/**
+ * Honest manual-save failure copy, shared by Quick Save (saveLoad) and the
+ * slot saves (appModals). Blames storage only when it IS a storage failure:
+ * the "free up space or allow site storage" advice matches the
+ * reload-hardening spec's crash-card wording, and would misdirect the player
+ * if a serialize/compression bug threw instead (those keep the raw detail,
+ * the same diagnosability contract as "Import failed: <message>").
+ */
+export function saveFailureMessage(err: unknown): string {
+  return isStorageWriteError(err)
+    ? "Save failed: storage is full or blocked. Free up space or allow site storage, then try again."
+    : "Save failed: " + (err instanceof Error && err.message ? err.message : String(err));
+}
+
 function writeSlot(key: string, value: string): void {
   if (key !== AUTO_KEY) {
     localStorage.setItem(key, value);
