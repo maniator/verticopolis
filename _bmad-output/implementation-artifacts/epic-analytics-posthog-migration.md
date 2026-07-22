@@ -25,8 +25,10 @@ SPEC's "Process" constraint if it is ever lost.
   `fetch`/`sendBeacon` to a same-origin `/api/ingest`; a Vercel edge function
   forwards to PostHog with the key server-side (`POSTHOG_KEY`/`POSTHOG_HOST`,
   never `VITE_`-prefixed, never in the bundle).
-- One gate: `telemetryHostAllowed`, unchanged. Every telemetry call is
-  best-effort and never throws past its caller.
+- One gate: `telemetryHostAllowed` stays the single client-side predicate every
+  telemetry call obeys (its host set is mirrored server-side by `originAllowed` on
+  the relay; change the two together). Every telemetry call is best-effort and
+  never throws past its caller.
 - Environment split is server-side via `VERCEL_ENV` (production / preview /
   development), not client-derived.
 - The measured mobile bundle delta stays at most 5 KB gzipped with no cold-start
@@ -52,7 +54,7 @@ guess.
 |----|-------|-----|--------|--------------|--------|
 | S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | done (PR #577) |
 | S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | done (PR #580) |
-| S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | in-progress |
+| S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | done (PR #582) |
 | S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | as measured | todo |
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
 | S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
@@ -135,3 +137,58 @@ guess.
   (nothing runs at module load; the session id is minted lazily on the first
   send). The on-device frame-health number rides the perf harness when a device
   run is taken.
+
+## Gate alignment + forward logging (follow-up to S3)
+
+- **Both host gates now recognize our own domain.** `telemetryHostAllowed`
+  (client, `telemetry.ts`) and `originAllowed` (server, `analyticsIngest.ts`) both
+  allow `verticopolis.com` and any `.verticopolis.com` subdomain, so a custom
+  preview-suffix deployment (`*.preview.verticopolis.com`) emits from the client
+  and is accepted by the relay. Without this the client was dark on the custom
+  preview domain (the beacon never fired), which would have made the S6 dual-write
+  parity check impossible to validate on preview. The two host sets carry
+  reciprocal cross-reference comments (change one, change the other), and a
+  prefix-glued look-alike test on both gates locks the `.verticopolis.com` dot
+  boundary so a future edit cannot silently regress it. They are not identical
+  predicates: the client cannot read `VERCEL_ENV`, so it trusts `*.vercel.app`
+  everywhere while the server refuses that shared suffix in production.
+- **`*.vercel.app` is kept, and stays production-strict on the server.** The raw
+  Vercel deploy URL (`verticopolis-<hash>.vercel.app`) still exists alongside the
+  custom preview alias, so dropping it would 403 a preview opened via that URL.
+  `originAllowed` trusts `*.vercel.app` only outside production; production trusts
+  only our own domain. (Decision reached in a party-mode review: the shared suffix
+  is a preview-only, auth-gated, rate-limited exposure, and the paid Vercel
+  preview-suffix was judged not worth it since production is already apex-locked.)
+- **Server-side forward logging.** The relay's PostHog forward now logs a non-2xx
+  response (for example a wrong-key 401) to the server console, which lands in
+  Vercel's runtime logs. `fetch` resolves rather than rejects on an HTTP error, so
+  this is the only place a bad key would otherwise fail silently. Status only,
+  never the key or the payload. The client stays silent by design (best-effort
+  misses are expected and logging them would just be player-console noise).
+
+## S4 plan: on-device returning/tenure identity (decided in party-mode)
+
+The retention/identity question ("identify by save file") resolves into three
+tiers. The save file is a fine SOURCE for an anonymous bucket, but a stable id
+derived from it that LEAVES the device is a persistent identifier and re-triggers
+consent. Decision:
+
+- **Tier 1 (S4, now):** `returning` and `tenure` buckets derived on-device from
+  EXISTING save state (has-a-save, star level, in-game age). The splash "Continue"
+  button already makes the returning bit visible to the player, so this is the
+  most transparent possible source: no id, no new storage, banner-free.
+- **Tier 2 (S4, deliberate):** an on-device return-recency bucket (came back
+  within 1d / 7d / 30d), computed locally and emitted only as a coarse bucket; the
+  id never leaves the device. A retention-shaped signal that stays cookieless.
+- **Tier 3 (parked at E4, needs consent):** a save-derived persistent
+  `distinct_id` that leaves the device, enabling true per-cohort unique-return
+  curves. This is a persistent online identifier: GDPR/ePrivacy consent plus Apple
+  ATT. "The player sees Continue" does NOT authorize it (a new purpose, a
+  different actor, sent to a server), but because Continue already establishes
+  "there is local state," the honest consent can be a gentle settings opt-in
+  rather than a blocking cookie banner. It rides the E4 monetization gate, where
+  the funded identity decision travels with a privacy review. No id that leaves
+  the device ships before that ruling.
+- **Bonus (player feature, no consent):** if Continue means "welcome back," a
+  local "your tower has been quiet N days" touch on the Continue card is the same
+  save data spent on delight, computed and shown on-device, never transmitted.

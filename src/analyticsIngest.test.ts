@@ -246,6 +246,36 @@ describe("handleIngest", () => {
     expect(res.status).toBe(204); // the throw is caught, the 204 still returns
     expect(deps.waitUntil).not.toHaveBeenCalled();
   });
+
+  it("logs a failed PostHog forward (non-2xx) to the server console, status only", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const deps = makeDeps();
+      // A wrong key returns a 401 that `fetch` resolves (does not reject), so this
+      // is the only place it would otherwise fail silently.
+      deps.fetchImpl.mockResolvedValueOnce(new Response(null, { status: 401 }));
+      await handleIngest(postRequest({ event: "boot" }), deps);
+      await deps.waitUntil.mock.calls[0][0]; // let the forward settle
+      expect(warn).toHaveBeenCalledTimes(1);
+      const message = String(warn.mock.calls[0][0]);
+      expect(message).toContain("401");
+      expect(message).not.toContain(KEY); // never log the key
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
+  it("does not log when the PostHog forward succeeds", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const deps = makeDeps(); // default fetch resolves a 200
+      await handleIngest(postRequest({ event: "boot" }), deps);
+      await deps.waitUntil.mock.calls[0][0];
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      warn.mockRestore();
+    }
+  });
 });
 
 describe("buildCaptureBody", () => {
@@ -294,9 +324,14 @@ describe("buildCaptureBody", () => {
 });
 
 describe("originAllowed", () => {
-  it("allows the custom domain in every environment", () => {
+  it("allows the custom domain and our own subdomains in every environment", () => {
     expect(originAllowed("https://verticopolis.com", "production")).toBe(true);
     expect(originAllowed("https://verticopolis.com", "preview")).toBe(true);
+    // A custom-suffix preview deployment (*.preview.verticopolis.com) is ours.
+    expect(originAllowed("https://branch.preview.verticopolis.com", "production")).toBe(true);
+    expect(originAllowed("https://branch.preview.verticopolis.com", "preview")).toBe(true);
+    // The canonical absolute FQDN (trailing dot) is matched like the usual form.
+    expect(originAllowed("https://verticopolis.com.", "production")).toBe(true);
   });
 
   it("trusts *.vercel.app only outside production", () => {
@@ -306,6 +341,10 @@ describe("originAllowed", () => {
     // In production the shared *.vercel.app suffix is NOT trusted: it is common to
     // every Vercel customer, so any site on it would otherwise pass.
     expect(originAllowed("https://someone-else.vercel.app", "production")).toBe(false);
+    // An absent/empty VERCEL_ENV fails CLOSED: without knowing we are
+    // non-production, the shared suffix is refused rather than trusted.
+    expect(originAllowed("https://feature-branch.vercel.app", undefined)).toBe(false);
+    expect(originAllowed("https://feature-branch.vercel.app", "")).toBe(false);
   });
 
   it("allows an absent Origin (non-browser client or curl smoke test)", () => {
@@ -317,6 +356,15 @@ describe("originAllowed", () => {
     expect(originAllowed("https://verticopolis.com.evil.example", "production")).toBe(false);
     expect(originAllowed("https://verticopolis.com.evil.example", "preview")).toBe(false);
     expect(originAllowed("not a url", "preview")).toBe(false);
+  });
+
+  it("rejects a prefix-glued look-alike (the dot boundary matters)", () => {
+    // The leading dot in `.verticopolis.com` is load-bearing: without it these
+    // would wrongly pass. Lock the boundary so a future edit dropping the dot
+    // fails here rather than silently accepting a look-alike origin.
+    expect(originAllowed("https://evilverticopolis.com", "production")).toBe(false);
+    expect(originAllowed("https://evilverticopolis.com", "preview")).toBe(false);
+    expect(originAllowed("https://notverticopolis.com", "production")).toBe(false);
   });
 });
 

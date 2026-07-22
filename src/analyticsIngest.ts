@@ -155,15 +155,24 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * (a non-browser client, the `curl` smoke test) cannot be checked, so it is
  * allowed.
  *
- * The check is environment-aware. In production the only legitimate origin is the
- * custom domain `verticopolis.com`. The `*.vercel.app` suffix is deliberately NOT
- * trusted in production: it is shared across every Vercel customer, so any site
- * on it could otherwise pass. That suffix is accepted only on preview and
- * development deployments, whose own origin is `<branch>.vercel.app` and whose
- * traffic is isolated from production (the `environment` tag, and a
- * preview-scoped key when configured). To tighten previews too, serve them on a
- * `verticopolis.com` subdomain (a Vercel preview deployment suffix) and drop the
- * `.vercel.app` branch.
+ * The check is environment-aware. Our own domain (the apex `verticopolis.com` and
+ * any subdomain, for example a `*.preview.verticopolis.com` preview deployment) is
+ * always trusted. The shared `*.vercel.app` suffix is trusted only on a KNOWN
+ * non-production deployment (a truthy `VERCEL_ENV` that is not `production`, so an
+ * absent env fails closed): it is common to every Vercel customer, so any site on
+ * it could otherwise pass, but a preview's own origin is `<branch>.vercel.app` and preview
+ * traffic is isolated from production (the `environment` tag, a preview-scoped key
+ * when configured, and Vercel deployment protection). In production the only real
+ * origin is our own domain, so the shared suffix is refused there. (One deliberate
+ * asymmetry: the client `telemetryHostAllowed` cannot read `VERCEL_ENV`, so it
+ * trusts `*.vercel.app` in every context; a production visit via the raw
+ * `*.vercel.app` deploy URL therefore emits client-side but is refused here. That
+ * is rare and accepted, since production traffic comes from the custom domain.)
+ *
+ * IMPORTANT: this host set mirrors `telemetryHostAllowed` in `telemetry.ts` (the
+ * client-side gate that decides where the browser emits). Change the two together:
+ * the client emits from there, the server accepts here, and a drift silently drops
+ * events (client dark, or a 403 on a same-origin beacon).
  */
 export function originAllowed(origin: string | null, environment: string | undefined): boolean {
   if (!origin) return true;
@@ -173,8 +182,15 @@ export function originAllowed(origin: string | null, environment: string | undef
   } catch {
     return false;
   }
-  if (host === "verticopolis.com") return true;
-  if (environment !== "production") return host.endsWith(".vercel.app");
+  // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
+  // matched like the usual form. Mirror this in `telemetryHostAllowed`.
+  host = host.replace(/\.$/, "");
+  if (host === "verticopolis.com" || host.endsWith(".verticopolis.com")) return true;
+  // Trust the shared *.vercel.app suffix only when we KNOW we are non-production
+  // (a truthy VERCEL_ENV other than "production"). An absent or empty VERCEL_ENV
+  // (a misconfiguration) falls through to the strict default below rather than
+  // failing open into trusting a suffix common to every Vercel customer.
+  if (environment && environment !== "production") return host.endsWith(".vercel.app");
   return false;
 }
 
@@ -266,8 +282,16 @@ export async function handleIngest(request: Request, deps: IngestDeps): Promise<
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ api_key: key, ...captureBody }),
         })
+        .then((res) => {
+          // Surface a failed forward in the server runtime logs. `fetch` resolves
+          // (does not reject) on an HTTP error, so a wrong `POSTHOG_KEY` returns a
+          // 401 that would otherwise fail completely silently. Log the status only,
+          // never the key or the payload. Still best-effort: the client already got
+          // its 204.
+          if (!res.ok) console.warn(`analytics relay: PostHog capture returned ${res.status}`);
+        })
         .catch(() => {
-          /* best-effort relay; never surface a PostHog hiccup */
+          /* network failure (offline, DNS): best-effort, stays silent */
         }),
     );
   } catch {

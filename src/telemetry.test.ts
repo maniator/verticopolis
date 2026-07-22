@@ -41,6 +41,20 @@ describe("injectVercelTelemetry host gate", () => {
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
+  it("injects on a custom-suffix preview subdomain (*.preview.verticopolis.com)", () => {
+    window.location.href = "https://branch.preview.verticopolis.com/";
+    injectVercelTelemetry();
+    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+  });
+
+  it("injects on the canonical absolute FQDN (trailing dot)", () => {
+    window.location.href = "https://verticopolis.com./";
+    injectVercelTelemetry();
+    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+  });
+
   it("skips on any other host (localhost, preview server, native shell)", () => {
     window.location.href = localhost;
     injectVercelTelemetry();
@@ -49,12 +63,26 @@ describe("injectVercelTelemetry host gate", () => {
   });
 
   it("does not name a bare hostname that merely contains the production domain", () => {
-    // The gate is an exact match on verticopolis.com plus a .vercel.app suffix,
-    // so a look-alike host (a phishing mirror, a staging alias) gets no inject.
+    // The gate allows verticopolis.com, its subdomains (`.verticopolis.com`), and
+    // `.vercel.app`, so a look-alike host that only ends with the wrong suffix
+    // (a phishing mirror, a staging alias) gets no inject: this one ends with
+    // `.evil.example`, not `.verticopolis.com`.
     window.location.href = "https://verticopolis.com.evil.example/";
     injectVercelTelemetry();
     expect(injectSpeedInsights).not.toHaveBeenCalled();
     expect(injectWebAnalytics).not.toHaveBeenCalled();
+  });
+
+  it("does not accept a prefix-glued look-alike (the dot boundary matters)", () => {
+    // The leading dot in `.verticopolis.com` is load-bearing: without it,
+    // `evilverticopolis.com` would wrongly pass. This locks that boundary so a
+    // future edit dropping the dot fails here instead of silently regressing.
+    for (const host of ["https://evilverticopolis.com/", "https://notverticopolis.com/"]) {
+      window.location.href = host;
+      injectVercelTelemetry();
+      expect(injectSpeedInsights).not.toHaveBeenCalled();
+      expect(injectWebAnalytics).not.toHaveBeenCalled();
+    }
   });
 
   it("never lets a telemetry failure throw past the caller", () => {
