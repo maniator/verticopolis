@@ -1,0 +1,37 @@
+{
+  "when": "2026-07-21T21:39:01.199Z",
+  "url": "https://verticopolis.com/?src=twa",
+  "analyticsReqs": [
+    {
+      "url": "https://verticopolis.com/assets/telemetry-d0lDSeCX.js",
+      "method": "GET",
+      "postData": null
+    },
+    {
+      "url": "https://verticopolis.com/_vercel/speed-insights/script.js",
+      "method": "GET",
+      "postData": null
+    },
+    {
+      "url": "https://verticopolis.com/_vercel/insights/script.js",
+      "method": "GET",
+      "postData": null
+    }
+  ],
+  "contrast": {
+    "color": "rgb(10, 110, 38)",
+    "background": "rgb(192, 192, 192)",
+    "fontSize": "13px",
+    "fontWeight": "700",
+    "ratio": 3.53,
+    "passesAA": false,
+    "passesAALarge": true
+  },
+  "collectors": {
+    "consoleErrors": 0,
+    "consoleWarnings": 1,
+    "pageErrors": 0,
+    "failedRequests": 0,
+    "badResponses": 0
+  }
+}

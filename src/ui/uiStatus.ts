@@ -180,6 +180,11 @@ export function toast(ui: UI, text: string, kind: LogEntry["kind"] = "info"): vo
   const t = document.createElement("div");
   t.className = `toast ${kind}`;
   t.textContent = text;
+  // The rail is polite (role="status") so routine good/info toasts never
+  // interrupt a screen reader mid-sentence, and a catch-up flush of several at
+  // once queues instead of barging. A genuine error is the exception: mark it
+  // role="alert" (an assertive live region of its own) so it still cuts in.
+  if (kind === "bad") t.setAttribute("role", "alert");
   ui.el.toast.appendChild(t);
   // Self-removing: hold, then a short fade. Track the pending timer under the
   // node so an early prune (below) can cancel it; the fade step re-registers the

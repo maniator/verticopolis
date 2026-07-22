@@ -143,6 +143,42 @@ describe("undo / redo", () => {
     press("z", { ctrlKey: true });
     expect(app.undo).not.toHaveBeenCalled();
   });
+
+  it("is inert behind the first-run splash (never mutate the tower behind it, #541)", () => {
+    const app = makeApp();
+    const splash = document.createElement("div");
+    splash.id = "splash";
+    document.body.appendChild(splash);
+    press("z", { ctrlKey: true });
+    press("z", { ctrlKey: true, shiftKey: true });
+    expect(app.undo).not.toHaveBeenCalled();
+    expect(app.redo).not.toHaveBeenCalled();
+  });
+
+  it("is inert while a modal dialog is open (the tower must not change under a dialog, #541)", () => {
+    const app = makeApp();
+    const dialog = document.createElement("dialog");
+    dialog.id = "modal";
+    document.body.appendChild(dialog);
+    dialog.open = true;
+    press("z", { ctrlKey: true });
+    press("y", { ctrlKey: true });
+    expect(app.undo).not.toHaveBeenCalled();
+    expect(app.redo).not.toHaveBeenCalled();
+  });
+
+  it("resumes normally once the modal closes", () => {
+    const app = makeApp();
+    const dialog = document.createElement("dialog");
+    dialog.id = "modal";
+    document.body.appendChild(dialog);
+    dialog.open = true;
+    press("z", { ctrlKey: true });
+    expect(app.undo).not.toHaveBeenCalled();
+    dialog.open = false;
+    press("z", { ctrlKey: true });
+    expect(app.undo).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("speed", () => {

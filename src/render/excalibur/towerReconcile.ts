@@ -16,6 +16,7 @@ import { facadeGeometry, type FloorEdge } from "../facadeGeometry";
 import { FLOOR, TILE, TRANSPORT_BAND_FLOORS } from "../scale";
 import { reap } from "./towerCrowd";
 import { dropRegionUnit, markRegionUnit } from "./towerRegions";
+import { syncScenery } from "./towerScenery";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
@@ -38,6 +39,10 @@ import type { TowerEngine } from "./TowerEngine";
 
 export function syncScene(engine: TowerEngine): void {
   const tower = engine.sim.tower;
+  // The scenery pass rides the same sync: it no-ops unless the tower revision
+  // or the sim identity moved (grass yields to the apron, plants get paved
+  // over, a swapped-in tower re-derives its seed-driven skyline and greenery).
+  syncScenery(engine);
   // Refresh the floor-1 entrance map BEFORE the unit loop that will call
   // addStruct / lobbyTileGfx: those consumers need to see a map as fresh as
   // the tiles they're about to bake, so a newly-placed leftmost tile picks

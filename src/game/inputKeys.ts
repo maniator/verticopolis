@@ -43,7 +43,17 @@ export function bindKeys(app: GameApp): void {
     // box). A focused SELECT is NOT yielded to: it has no native undo, so the
     // tower undo stays live there (see ownsNativeUndo).
     {
-      if (!ownsNativeUndo(document.activeElement) && (e.ctrlKey || e.metaKey)) {
+      // Never mutate the tower behind the first-run splash or an open dialog:
+      // this block runs BEFORE the modal/splash guards further down (so Ctrl+Z
+      // isn't swallowed by the modifier bail), so it must repeat those two
+      // checks itself. A choice-bearing dialog (the Saves picker) must not have
+      // builds undone under it, and the splash must stay inert; gating any open
+      // #modal is the conservative call and leaves undo fully live in normal
+      // play. A field with its own undo history still keeps it (ownsNativeUndo).
+      const guardsUndo =
+        !!document.getElementById("splash") ||
+        !!(document.getElementById("modal") as HTMLDialogElement | null)?.open;
+      if (!guardsUndo && !ownsNativeUndo(document.activeElement) && (e.ctrlKey || e.metaKey)) {
         const k = e.key.toLowerCase();
         if (k === "z" && !e.shiftKey) {
           e.preventDefault();

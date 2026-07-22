@@ -17,6 +17,14 @@ export function clampTile(x: number): number {
   return Math.max(0, Math.min(GRID.width - 1, x));
 }
 
+/** True when a raw (pre-clamp) tile falls outside the buildable lot. Every
+ *  gesture clamps such a click onto the edge column before the engine sees it,
+ *  so this predicate is the only place that still knows the player aimed past
+ *  the line; the build path uses it to say so instead of a silent no-op. */
+export function isOffLot(tile: number): boolean {
+  return tile < 0 || tile >= GRID.width;
+}
+
 /** The placement column for `kind` at `tile`: shifted left just enough that
  *  the facility's full width stays inside the lot, so a wide room dropped
  *  near the right edge places instead of failing. */

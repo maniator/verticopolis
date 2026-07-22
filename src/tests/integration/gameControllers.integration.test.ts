@@ -131,6 +131,34 @@ describe("BuildActions (the money boundary)", () => {
     expect(broke.placed).toBe(0);
     expect(broke.reason).toBe("Not enough money.");
   });
+
+  it("a press aimed past the lot line onto a built edge says so (#513 sibling: the silent boundary)", () => {
+    // Build the left edge out with lobby, the way a wall-to-wall tower has it.
+    expect(build.paintBrush("lobby", 3, 1).placed).toBeGreaterThan(0);
+    f.toasts.length = 0;
+    f.sfx.length = 0;
+    // A press beyond the lot clamps onto the edge column; every clamped tile
+    // already carries lobby, so before the fix this was a silent dead click.
+    const edge = build.paintBrush("lobby", -5, 1);
+    expect(edge.placed).toBe(0);
+    expect(edge.reason).toBe("That's the edge of the lot.");
+    expect(f.toasts).toEqual([{ text: "That's the edge of the lot.", kind: "bad" }]);
+    expect(f.sfx).toEqual(["error"]); // refusal toasts always pair with the sfx
+    // The same dead press ON the lot keeps today's quiet already-built report.
+    f.toasts.length = 0;
+    const on = build.paintBrush("lobby", 3, 1);
+    expect(on.placed).toBe(0);
+    expect(on.reason).toBe("Lobby already built here");
+    expect(f.toasts).toEqual([]);
+    // And an engine refusal keeps precedence even when aiming off-lot: the
+    // boundary only claims presses nothing else blocked.
+    f.toasts.length = 0;
+    sim.money = 0;
+    const brokeOff = build.paintBrush("floor", 900, 3);
+    expect(brokeOff.placed).toBe(0);
+    expect(brokeOff.reason).not.toBe("That's the edge of the lot.");
+    expect(f.toasts).toEqual([]);
+  });
 });
 
 describe("EditorActions (editor-card money paths)", () => {

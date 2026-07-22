@@ -202,7 +202,11 @@ html.reduce-motion *::after {
   color: var(--r-ink);
 }
 .value.money {
-  color: #008000;
+  /* The effective color is set every frame as an inline style in uiStatus.update
+     (`var(--money)` for positive, `var(--bad)` for negative), so THIS rule is only
+     the pre-first-frame default; keep it on the same token so both agree. The AA
+     contrast fix lives on --money itself (retro-tokens.css). */
+  color: var(--money);
 }
 .value.stars {
   letter-spacing: 2px;

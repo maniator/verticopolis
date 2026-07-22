@@ -1,0 +1,271 @@
+{
+  "when": "2026-07-21T21:22:59.909Z",
+  "origin": "https://verticopolis.com",
+  "steps": [
+    {
+      "name": "load + new Classic + a few builds",
+      "t": "2026-07-21T21:22:51.385Z",
+      "result": {
+        "units": 43,
+        "money": 2000000
+      },
+      "ok": true
+    },
+    {
+      "name": "dialog Tab-trace (containment detail)",
+      "t": "2026-07-21T21:22:53.139Z",
+      "result": {
+        "trace": [
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Save",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Save",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Export to file",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Import from file",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Close",
+            "isBody": false
+          },
+          {
+            "inModal": false,
+            "tag": "BODY",
+            "text": "Verticopolis: a free Sim",
+            "isBody": true
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "✕",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Save",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Save",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Save",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Export to file",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Import from file",
+            "isBody": false
+          },
+          {
+            "inModal": true,
+            "tag": "BUTTON",
+            "text": "Close",
+            "isBody": false
+          },
+          {
+            "inModal": false,
+            "tag": "BODY",
+            "text": "Verticopolis: a free Sim",
+            "isBody": true
+          }
+        ],
+        "escapes": [
+          "BODY:Verticopolis: a free Sim:BODY",
+          "BODY:Verticopolis: a free Sim:BODY"
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "export .vctower (two-step confirm)",
+      "t": "2026-07-21T21:22:53.260Z",
+      "result": {
+        "confirmText": "Export tower?✕ Your tower will be packed into a .vctower file and downloaded. You can also save it for the original 1994 game (.TDT); a summ",
+        "file": "tower-one.vctower",
+        "size": 942,
+        "toast": "New tower founded. Good luck!Tower exported (0.9 KB). Check your downloads."
+      },
+      "ok": true
+    },
+    {
+      "name": "legacy .TDT export path (Classic tower)",
+      "t": "2026-07-21T21:22:54.118Z",
+      "result": {
+        "reportText": "Export for SimTower (1994)✕ Work in progress. Exporting to the original 1994 format is still experimental. It has been verified to load and play in the real game for smaller Classi",
+        "file": "TOWERONE.TDT",
+        "size": 65150
+      },
+      "ok": true
+    },
+    {
+      "name": "import the exported .vctower (round trip)",
+      "t": "2026-07-21T21:22:54.355Z",
+      "result": {
+        "pre": {
+          "units": 43,
+          "money": 2000000
+        },
+        "post": {
+          "units": 43,
+          "money": 2000000,
+          "toast": "New tower founded. Good luck!Tower exported (0.9 KB). Check your downloads.Tower imported."
+        }
+      },
+      "ok": true
+    },
+    {
+      "name": "quota failure injection on Quick Save (AUD-010)",
+      "t": "2026-07-21T21:22:55.957Z",
+      "result": {
+        "toastBefore": "New tower founded. Good luck!Tower exported (0.9 KB). Check your downloads.Tower imported.",
+        "toastAfter": "Tower exported (0.9 KB). Check your downloads.Tower imported.",
+        "uncaughtErrors": [
+          "QuotaExceededError"
+        ],
+        "toastChanged": true
+      },
+      "ok": true
+    },
+    {
+      "name": "quota injection on SLOT save (AUD-010 second site)",
+      "t": "2026-07-21T21:22:56.874Z",
+      "result": {
+        "toastBefore": "Tower exported (0.9 KB). Check your downloads.Tower imported.",
+        "toastAfter": "Tower imported.",
+        "uncaughtErrors": [
+          "QuotaExceededError"
+        ],
+        "slot2Row": "Slot 2emptySave"
+      },
+      "ok": true
+    },
+    {
+      "name": "save still works after probes",
+      "t": "2026-07-21T21:22:58.134Z",
+      "result": {
+        "toast": "Saved ✓ · 05:22 PM"
+      },
+      "ok": true
+    },
+    {
+      "name": "new Modern game",
+      "t": "2026-07-21T21:22:58.881Z",
+      "result": {
+        "mode": "modern",
+        "badge": "This tower: Modern",
+        "money": 2000000,
+        "units": 40,
+        "abandonWarning": "⚠️ This abandons your current tower (it is not auto-saved).",
+        "calendarVisibleWhenModern": true
+      },
+      "ok": true
+    }
+  ],
+  "collectors": {
+    "summary": {
+      "consoleErrors": 0,
+      "consoleWarnings": 8,
+      "pageErrors": 2,
+      "failedRequests": 0,
+      "badResponses": 0
+    },
+    "detail": {
+      "console": [
+        {
+          "t": 1784668972266,
+          "type": "warning",
+          "text": "<meta name=\"apple-mobile-web-app-capable\" content=\"yes\"> is deprecated. Please include <meta name=\"mobile-web-app-capable\" content=\"yes\">",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972551,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972555,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972557,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972583,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972604,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972607,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668972611,
+          "type": "warning",
+          "text": "The AudioContext is \"suspended\". Invoke Tone.start() from a user action to start the audio.",
+          "url": "https://verticopolis.com/"
+        }
+      ],
+      "pageErrors": [
+        {
+          "t": 1784668975961,
+          "message": "Simulated quota exceeded (validation probe)",
+          "url": "https://verticopolis.com/"
+        },
+        {
+          "t": 1784668976913,
+          "message": "Simulated quota exceeded (validation probe)",
+          "url": "https://verticopolis.com/"
+        }
+      ],
+      "failedRequests": [],
+      "badResponses": []
+    }
+  }
+}

@@ -13,6 +13,28 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.75.0
+
+- Accessibility polish: routine notices no longer interrupt a screen reader mid-sentence (only real errors do), repeated announcements speak again reliably, the tower-name box reads clearly to assistive tech, and the money readout has stronger contrast so it is easier to read.
+
+## 1.74.0
+
+- The lot's left edge is now a grand arrival: a sidewalk leads to a fountain roundabout with live, splashing water, flanked by street lamps that come on at dusk with pools of warm light, and the road runs off past the city. The right-edge street lamp lights up at night now too.
+- The city skyline behind your tower grew to city scale: real high-rises in two depths instead of a distant low ridge.
+
+## 1.73.0
+
+- The world outside your tower came to life: a city skyline behind the building, grass and trees on the open lot that make way as you pave it, a neighboring building across the alley at one end of the lot, and a street with a lamp and a 375 ST sign at the other.
+- Building past the edge of the lot now says "That's the edge of the lot" instead of doing nothing silently.
+
+## 1.72.0
+
+- The Classic vs Modern guide now covers how stairs and escalators differ: Modern lets people climb any number of flights, while Classic keeps the 1994 limit and needs an elevator for a long climb.
+
+## 1.71.0
+
+- The Help page at /help now shows the full guide, pictures included, even before scripts run or with JavaScript off, so shared links and search results carry the real content.
+
 ## 1.70.1
 
 - The elevator schedule dialog scrolls as one piece on desktop, instead of showing a second scrollbar inside the floors grid.

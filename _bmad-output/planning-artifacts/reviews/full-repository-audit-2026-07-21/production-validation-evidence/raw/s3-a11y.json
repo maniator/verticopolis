@@ -1,0 +1,151 @@
+{
+  "when": "2026-07-21T21:24:59.047Z",
+  "steps": [
+    {
+      "name": "axe: splash",
+      "t": "2026-07-21T21:24:50.292Z",
+      "result": {
+        "label": "splash",
+        "violations": 5,
+        "detail": [
+          "serious:color-contrast x1",
+          "moderate:heading-order x1",
+          "critical:label x1",
+          "moderate:landmark-unique x1",
+          "moderate:region x1"
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "axe: in-game",
+      "t": "2026-07-21T21:24:51.304Z",
+      "result": {
+        "label": "ingame",
+        "violations": 5,
+        "detail": [
+          "serious:color-contrast x1",
+          "moderate:heading-order x1",
+          "critical:label x1",
+          "moderate:landmark-unique x1",
+          "moderate:region x2"
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "axe: help page",
+      "t": "2026-07-21T21:24:52.364Z",
+      "result": {
+        "label": "help",
+        "violations": 0,
+        "detail": []
+      },
+      "ok": true
+    },
+    {
+      "name": "unaffordable palette cue with low funds (AUD-026)",
+      "t": "2026-07-21T21:24:53.648Z",
+      "result": {
+        "total": 27,
+        "unaffordable": 6,
+        "sample": {
+          "kind": "lobby",
+          "opacity": "0.85",
+          "ariaDisabled": null,
+          "disabled": false,
+          "ariaLabel": "Lobby, $5k",
+          "title": null,
+          "textHasCost": true
+        },
+        "affordableOpacity": "1"
+      },
+      "ok": true
+    },
+    {
+      "name": "reduced motion load",
+      "t": "2026-07-21T21:24:54.852Z",
+      "result": {
+        "pageErrorsSoFar": 0,
+        "splashVisible": true
+      },
+      "ok": true
+    },
+    {
+      "name": "narrow viewport load + overflow",
+      "t": "2026-07-21T21:24:55.970Z",
+      "result": {
+        "scrollW": 375,
+        "innerW": 375,
+        "horizontalOverflow": false,
+        "topbarVisible": true,
+        "splashMobileClass": "splash--mobile"
+      },
+      "ok": true
+    },
+    {
+      "name": "touch: start game + tap palette",
+      "t": "2026-07-21T21:24:57.024Z",
+      "result": {
+        "mode": "classic",
+        "units": 40
+      },
+      "ok": true
+    },
+    {
+      "name": "coarse-pointer touch-target sizes (AUD-025)",
+      "t": "2026-07-21T21:24:58.031Z",
+      "result": {
+        "coarseMatch": true,
+        "buttons": [
+          {
+            "where": "modal",
+            "cls": "modal-x btn xs",
+            "w": 18,
+            "h": 15,
+            "padding": "1px 4px",
+            "meets24": false,
+            "meets36": false
+          },
+          {
+            "where": "modal-slot",
+            "cls": "btn",
+            "w": 45.1,
+            "h": 36,
+            "padding": "5px 10px",
+            "meets24": true,
+            "meets36": true
+          },
+          {
+            "where": "modal-slot",
+            "cls": "btn",
+            "w": 45.1,
+            "h": 36,
+            "padding": "5px 10px",
+            "meets24": true,
+            "meets36": true
+          },
+          {
+            "where": "modal-slot",
+            "cls": "btn",
+            "w": 45.1,
+            "h": 36,
+            "padding": "5px 10px",
+            "meets24": true,
+            "meets36": true
+          }
+        ]
+      },
+      "ok": true
+    },
+    {
+      "name": "inspector close button size (AUD-025)",
+      "t": "2026-07-21T21:24:58.452Z",
+      "result": {
+        "inspectorVisible": false,
+        "buttons": []
+      },
+      "ok": true
+    }
+  ]
+}

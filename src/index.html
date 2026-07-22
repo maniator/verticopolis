@@ -57,6 +57,7 @@
     <!-- iOS install affordances (theme-color, favicon, and apple-touch-icon are
          injected by the shared-head plugin; the manifest link by vite-plugin-pwa). -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Verticopolis" />
     <link rel="stylesheet" href="./styles.css" />
@@ -144,7 +145,7 @@
           <div id="hint" class="win">Drag to pan · Scroll to zoom · Click to build · Inspect tool to edit a room</div>
           <div id="inspector" class="win hidden"></div>
           <div id="editor" class="win hidden"></div>
-          <div id="toast-wrap" role="status" aria-live="assertive" aria-atomic="false"></div>
+          <div id="toast-wrap" role="status" aria-live="polite" aria-atomic="false"></div>
         </section>
 
         <aside id="sidebar" class="win docked">
@@ -155,7 +156,7 @@
           </div>
           <div class="panel win docked">
             <h3>Tower</h3>
-            <input id="tower-name" class="name-input field" maxlength="28" />
+            <input id="tower-name" class="name-input field" maxlength="28" aria-label="Tower name" />
             <!-- Seed carries no data-mode on purpose: uiStatus.setMode owns it and
                  its dirty-gate keys on it. Do NOT hardcode data-mode here (a
                  data-mode="classic" seed would skip the first Modern-boot repaint). -->

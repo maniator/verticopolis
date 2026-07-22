@@ -133,6 +133,25 @@ describe("runFrame simulation stepping", () => {
     runFrame(app, 1000);
     expect(sim.tick).not.toHaveBeenCalled();
   });
+
+  it("survives a non-finite dtMs: one NaN frame cannot freeze the sim forever (#541)", () => {
+    const { app, raw, sim } = makeApp({ speed: 3, accMinutes: 0 });
+    // Without the guard, accMinutes becomes NaN and every comparison below fails
+    // forever, so the sim would stop ticking permanently. The guard resets it.
+    runFrame(app, NaN);
+    expect(Number.isFinite(raw.accMinutes)).toBe(true);
+    expect(raw.accMinutes).toBe(0);
+    expect(sim.tick).not.toHaveBeenCalled(); // the poisoned frame simply does nothing
+    // The very next finite frame ticks normally: the sim recovered.
+    runFrame(app, 1000);
+    expect(sim.tick).toHaveBeenCalled();
+  });
+
+  it("survives an Infinity dtMs the same way (#541)", () => {
+    const { app, raw } = makeApp({ speed: 3, accMinutes: 0 });
+    runFrame(app, Number.POSITIVE_INFINITY);
+    expect(Number.isFinite(raw.accMinutes)).toBe(true);
+  });
 });
 
 describe("runFrame throttled UI/audio block", () => {
