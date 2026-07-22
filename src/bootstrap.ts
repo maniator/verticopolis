@@ -2,6 +2,7 @@ import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { injectVercelTelemetry } from "./telemetry";
 import { startGameplaySession } from "./analytics";
+import { installErrorTracking } from "./analyticsErrors";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -101,6 +102,12 @@ export function showBootMessage(content: TemplateResult | string, withReload = f
 export function bootGame(create: () => BootApp): void {
   if (typeof document === "undefined") return;
   const boot = () => {
+    // Install the cookieless error listeners first, so an uncaught throw during
+    // the rest of boot is captured (a throw during module eval, before this line,
+    // is inherently out of reach). Host-gated per report (nothing is sent on a
+    // dark host), never-throw, and only two passive listeners, so it is safe to
+    // run before anything else.
+    installErrorTracking();
     // Report Core Web Vitals and page views through the shared, host-gated
     // helper (the same inject the gallery and the /help page use), so a
     // telemetry hiccup can never throw past this line and suppress the WebGL

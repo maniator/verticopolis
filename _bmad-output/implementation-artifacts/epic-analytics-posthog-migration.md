@@ -56,7 +56,8 @@ guess.
 | S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | done (PR #580) |
 | S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | done (PR #582) |
 | S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | none (analytics-only, no player-facing surface) | done (PR #597) |
-| S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
+| S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | minor (`session_fps` emission) | done (PR #604) |
+| S5b | Cookieless JS error tracking: `$exception` through the relay (follow-up feature, not a CAP story). | CAP-2 posture | `/bmad-code-review` | minor (new emission) | in review |
 | S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
 
 ## S1 seam (as built)
@@ -364,3 +365,77 @@ is signal + report + dashboard, not the relay).
   The frame-rate signal fires from the running game, so the build changes what
   the client does even though nothing on screen moves; the report and dashboard
   are tooling and would not bump on their own.
+
+## Cookieless error tracking (S5 follow-up feature, as built)
+
+A new capability beyond CAP-1..CAP-4: report GENUINELY uncaught JavaScript
+exceptions (a throw during boot, in an event handler, or in an async callback)
+and unhandled promise rejections to PostHog Error Tracking through the same
+cookieless relay, without shipping `posthog-js`, without a cookie or persistent
+id, and without a consent banner. Ruled in during the S5 party-mode session and
+built on its own branch/PR per the one-story-one-PR convention.
+
+Scope, stated precisely (the review corrected an earlier overclaim): this does
+NOT capture the two crash classes that never surface as uncaught window errors,
+and that is deliberate. A throw inside the render frame loop is swallowed by the
+frame-error guard (`engineWiring.ts`) and never escapes to `window`; and the
+Pixel 8a / #538 failure is a WebGL context loss, not a throw, already handled and
+reported by the typed `crash` gameplay event. So `$exception` complements `crash`
+(the two paths are disjoint), giving visibility into the uncaught-error class the
+game has none of today, rather than duplicating the WebGL-crash reporting.
+
+- **Two global listeners, relay-only.** `installErrorTracking` (`analyticsErrors
+  .ts`) attaches `window` `error` (uncaught throws) and `unhandledrejection`
+  handlers, installed first thing in `bootGame`'s `boot()` so an exception during
+  the rest of boot is still caught. Each report goes straight through the new
+  `sendException` (`analyticsRelay.ts`), never the dual-write adapter: `$exception`
+  is a PostHog Error Tracking event with a nested `$exception_list` that has no
+  Vercel Web Analytics equivalent, so it must not be sent to Vercel. The report
+  rides the SAME per-tab session id every event carries, so a crash correlates
+  with the play session it came from, plus the boot common props (platform /
+  build version) for context.
+- **Canonical `$exception_list`, raw stack, no frame parsing yet.** The payload is
+  the canonical PostHog shape: `$exception_list: [{ type, value, mechanism:
+  { handled:false, synthetic:false }, stacktrace: { type:"raw", frames: [] } }]`
+  plus a `$exception_fingerprint` and a bounded `$exception_stack_trace_raw`.
+  Structured stack FRAMES are deliberately left empty in this first version: with
+  no source maps uploaded they would point at minified positions, so the bounded
+  raw stack string carries the same debugging value at far less code. Frame
+  parsing plus a source-map upload is the natural follow-up.
+- **Guardrails, because it runs on the error path.** Host-gated by
+  `telemetryHostAllowed` (nothing fires on localhost, the e2e preview server, or
+  the native shell), never-throw (every handler wrapped, plus a re-entrancy latch
+  so a report cannot trigger a report and spiral), deduplicated by fingerprint
+  (type + message + first stack frame) so a crash thrown every frame reports once,
+  and hard-capped at 10 `$exception` events per session (the relay's per-IP rate
+  limit is the outer backstop). Message and raw stack are length-bounded (500 /
+  2000 chars) before they leave the page, comfortably inside the relay's 8 KB
+  body cap.
+- **Cookieless invariant preserved.** No cookie, no `localStorage` id, no
+  cross-session or cross-device identity, no consent banner; the report carries
+  only the session-scoped id and the coarse common-prop buckets, never an
+  identifier. The relay forwards no IP and disables GeoIP, so an exception is not
+  a de-anonymizing signal. Privacy note recorded in the module: an exception
+  `value` is the thrown message, which the game builds from its own strings and
+  could occasionally interpolate a player-authored tower name. The 500/2000-char
+  bounds cap payload SIZE, not sensitivity (a tower name within the bound is
+  forwarded verbatim); it stays acceptable because with no IP, no persistent id,
+  and no cross-session linkage a leaked free-text string is bound to no stable
+  identity and does not de-anonymize. Redacting known player-authored fields from
+  the outgoing message is tracked as a follow-up (#607).
+- **Relay widened for nested props.** `sendToRelay` kept its primitive-only
+  `EventProps` signature (the typed gameplay vocabulary stays honest at the call
+  site); the transport core was extracted so the new `sendException` path can
+  carry the nested `$exception_list`. The server already accepts any plain-object
+  `properties` and spreads it through, so no server change was needed.
+- **Bundle delta (measured): +550 bytes gzipped in the main chunk**, measured by
+  building with and without the feature (tree-shaken out when unimported). Well
+  under the 5 KB ceiling. No cold-start cost: installation is two passive
+  listeners; work happens only when an error actually fires.
+- **Version bump: minor (a new emission from the running game).** The review
+  flagged that the first draft cited the wrong precedent: S4 took no bump because
+  it added PROPERTIES to already-emitted events (enrichment), whereas this, like
+  S5's `session_fps`, installs handlers that emit a BRAND-NEW event type from the
+  running client. Under the epic's own codified rule ("a new emission from the
+  running game" bumps minor, even when nothing on screen changes), this matches
+  S5, not S4, so it takes a minor bump (1.86.0 to 1.87.0), lockfile in lockstep.
