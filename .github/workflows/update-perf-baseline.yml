@@ -103,21 +103,33 @@ jobs:
           git commit -m "Update perf baseline from CI"
           echo "committed=true" >> "$GITHUB_OUTPUT"
 
-      # The ONLY step that sees the write token. Everything above ran without
-      # credentials (persist-credentials: false), so branch code never had a
-      # token to steal; here no branch code runs, only git. The token rides an
-      # explicit per-invocation URL, never lands in .git/config, and the runner
-      # masks it in logs.
+      # The only step whose commands receive the write token, and every
+      # credentialed git call runs in a PRISTINE throwaway repo with global and
+      # system git config disabled. The steps above ran branch code (npm ci,
+      # the build, Playwright) with no token on disk (persist-credentials:
+      # false), but that code could still have planted hostile git state in
+      # the workspace or HOME (insteadOf rewrites, core.fsmonitor, a pre-push
+      # hook), so no credentialed git may run against the workspace either.
+      # The one command that reads the workspace (the local fetch) runs with
+      # the token stripped from its environment. The token rides an explicit
+      # per-invocation URL derived from GITHUB_SERVER_URL, never lands in any
+      # config file, and the runner masks it in logs.
       - name: Push refreshed baseline
         if: steps.commit.outputs.committed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          remote="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+          remote="https://x-access-token:${GITHUB_TOKEN}@${GITHUB_SERVER_URL#https://}/${GITHUB_REPOSITORY}.git"
+          pushdir="$(mktemp -d)"
+          git init -q "$pushdir"
+          env -u GITHUB_TOKEN git -C "$pushdir" -c safe.directory='*' fetch -q "$GITHUB_WORKSPACE" HEAD
+          git -C "$pushdir" checkout -q FETCH_HEAD
           for attempt in 1 2 3 4 5; do
-            if git push "$remote" "HEAD:${GITHUB_REF_NAME}"; then exit 0; fi
+            if git -C "$pushdir" push "$remote" "HEAD:refs/heads/${GITHUB_REF_NAME}"; then exit 0; fi
             echo "push rejected, rebasing on the remote and retrying ($attempt)"
-            git pull --rebase "$remote" "${GITHUB_REF_NAME}"
+            git -C "$pushdir" fetch "$remote" "${GITHUB_REF_NAME}"
+            git -C "$pushdir" -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" rebase FETCH_HEAD
           done
           echo "could not push refreshed baseline after retries" >&2
           exit 1
