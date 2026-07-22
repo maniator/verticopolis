@@ -3,6 +3,7 @@ import { deflateSync } from "fflate";
 import { SAVE_VERSION, Simulation, ECON } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
 import { FACILITIES, GRID } from "../../engine/facilities";
+import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
 
 describe("SaveGame", () => {
   beforeEach(() => localStorage.clear());
@@ -324,6 +325,86 @@ describe("SaveGame", () => {
     const loaded = Simulation.deserialize(sim.serialize());
     expect(loaded.weather).toBe(Simulation.weatherFor(loaded.clock.day));
     expect(loaded.weather).toBe(sim.weather);
+  });
+
+  it("drops a later unit whose footprint overlaps an earlier one (forged save), per layer like the TDT importer", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    const office = data.units.find((u) => u.kind === "office")!;
+    const floorTile = data.units.find((u) => u.kind === "floor")!;
+    // Forged twins: one exact-footprint room copy, one partially-shifted room
+    // copy, and one structural (floor-tile) copy. Fresh ids so the id-repair
+    // pass isn't what resolves them; the overlap claim is.
+    data.units.push({ ...office, id: 999_001 });
+    data.units.push({ ...office, id: 999_002, x: office.x + 1 });
+    data.units.push({ ...floorTile, id: 999_003 });
+    const loaded = Simulation.deserialize(data);
+    // First kept wins, all three overlappers dropped: the tower matches the
+    // original, and the per-tile room index points at the kept office. The
+    // office legally sitting ON structure survives untouched (rooms and
+    // structure are separate index layers, each claiming only against itself).
+    expect(loaded.tower.units).toHaveLength(sim.tower.units.length);
+    expect(loaded.tower.roomAt(office.floor, office.x)?.id).toBe(office.id);
+    expect(loaded.tower.hasStructure(office.floor, office.x)).toBe(true);
+    // Round-trip idempotence on the repaired tower: nothing re-drops.
+    const again = Simulation.deserialize(loaded.serialize());
+    expect(again.tower.units).toHaveLength(loaded.tower.units.length);
+  });
+
+  it("rejects a forged save whose unit count exceeds the lot's capacity, before building any units", () => {
+    const sim = sampleGame();
+    const data = sim.serialize();
+    // Pin the LITERAL cap, not the implementation's formula: two index layers
+    // (structure + rooms) times the 375 x 110 lot. If the formula drifts,
+    // this number is the tripwire.
+    const cap = 82_500;
+    expect(UNIT_CAP).toBe(cap);
+    // Entries carry a REAL kind (the count filter reads it) but a poisoned
+    // `floor` getter: if the per-unit map ever runs, its `...u` spread fires
+    // the getter and this test fails with "map touched a unit" instead of
+    // the honest cap message. That pins "rejected BEFORE building any units"
+    // structurally, with no flaky wall-clock assertion.
+    const poisoned = Object.defineProperty({ kind: "office" }, "floor", {
+      enumerable: true,
+      get() {
+        throw new Error("map touched a unit past the cap");
+      },
+    });
+    data.units = Array.from({ length: cap + 1 }, () => poisoned) as typeof data.units;
+    expect(() => Simulation.deserialize(data)).toThrow(/cannot be a real tower/);
+    // Junk entries do NOT count toward the cap (the kind filter drops them
+    // first): a salvageable save padded with garbage still loads.
+    data.units = [
+      ...Array.from({ length: 3 }, () => ({ ...sim.serialize().units[0] })),
+      ...Array.from({ length: cap }, () => null),
+    ] as typeof data.units;
+    const salvaged = Simulation.deserialize(data);
+    expect(salvaged.tower.units.length).toBeGreaterThan(0);
+    // AT the cap it still loads in bounded time: the overlap pass then keeps
+    // the first of the identical entries and drops the rest, so even a
+    // max-count forged file resolves to a consistent tower.
+    const forged = sim.serialize().units[0];
+    data.units = Array.from({ length: cap }, () => forged) as typeof data.units;
+    const loaded = Simulation.deserialize(data);
+    expect(loaded.tower.units).toHaveLength(1);
+  });
+
+  it("a storage-layer quota throw propagates out of saveSlot (the manual-save catch depends on it)", () => {
+    // Pins the OTHER half of the #537 AC at the localStorage layer: appModals
+    // catches what SaveGame.saveSlot lets through, so a swallow added inside
+    // writeSlot's non-autosave path would break the slot-save failure toast
+    // without this test noticing at the mock layer.
+    const sim = sampleGame();
+    const realSetItem = localStorage.setItem.bind(localStorage);
+    const setSpy = vi.spyOn(localStorage, "setItem").mockImplementation((key, value) => {
+      if (key.includes("slot")) throw new DOMException("The quota has been exceeded.", "QuotaExceededError");
+      return realSetItem(key, value);
+    });
+    try {
+      expect(() => SaveGame.saveSlot(2, sim)).toThrow(/quota/i);
+    } finally {
+      setSpy.mockRestore();
+    }
   });
 
   it("round-trips through localStorage", () => {
