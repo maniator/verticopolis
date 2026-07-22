@@ -16,6 +16,16 @@ ZOOM_TOOL_X="${ZOOM_TOOL_X:-16}"; ZOOM_TOOL_Y="${ZOOM_TOOL_Y:-170}"
 ZOOM_TILE_X="${ZOOM_TILE_X:-140}"; ZOOM_TILE_Y="${ZOOM_TILE_Y:-300}"
 TARGETS="${TARGETS:-90,285,test}"
 
+# Clean up the background Xvfb/Wine processes on ANY exit (normal end, error, or
+# Ctrl-C), so an early failure never leaves them running.
+game=""; xvfb=""
+cleanup() {
+  [ -n "$game" ] && kill "$game" 2>/dev/null || true
+  [ -n "$xvfb" ] && kill "$xvfb" 2>/dev/null || true
+  wineserver -k 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
+
 Xvfb :99 -screen 0 "${SCREEN}x24" >/dev/null 2>&1 &
 xvfb=$!
 export DISPLAY=:99

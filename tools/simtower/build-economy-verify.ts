@@ -22,7 +22,7 @@ import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Simulation } from "../../src/engine/Simulation";
 import { buildTDT } from "../../src/storage/tdtExport";
-import type { SerializedGame } from "../../src/engine/types";
+import type { FacilityKind, SerializedGame } from "../../src/engine/types";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SAVES = resolve(HERE, "saves");
@@ -49,7 +49,7 @@ must(shaft.ok, `shaft: ${shaft.reason}`);
 
 // The rooms. Each entry: kind, floor, x, and the rent value we want the TDT
 // class byte to encode (buildTDT snaps our dollar value to the nearest class).
-type Room = { kind: string; floor: number; x: number; rent: number; tag: string };
+type Room = { kind: FacilityKind; floor: number; x: number; rent: number; tag: string };
 const rooms: Room[] = [
   { kind: "office", floor: 2, x: 6, rent: 2_000, tag: "office Very Low" },
   { kind: "office", floor: 2, x: 16, rent: 5_000, tag: "office Low" },
@@ -60,7 +60,7 @@ const rooms: Room[] = [
   { kind: "hotelSuite", floor: 4, x: 19, rent: 6_000, tag: "suite Average" },
   { kind: "condo", floor: 5, x: 6, rent: 150_000, tag: "condo Average" },
 ];
-for (const r of rooms) must(t.place(r.kind as never, r.floor, r.x).ok, `place ${r.tag}`);
+for (const r of rooms) must(t.place(r.kind, r.floor, r.x).ok, `place ${r.tag}`);
 
 const save: SerializedGame = sim.serialize();
 

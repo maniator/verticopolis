@@ -26,7 +26,7 @@ export const ECON = {
    * engine has no mechanic for; restaurant is -6k/+4k/+10k by evaluation (the
    * 6k is a LOSS tier, not a positive middle; RO's "$6k/day normal" is a
    * separate normal-population average); shop 4k/10k/15k/20k by popularity (RO
-   * confirms the 15k normal tier); theater 0/2k/10k by performance; party hall
+   * confirms the 15k normal tier); cinema 0/2k/10k by performance; party hall
    * a flat 20k. All values trace to ONE lineage (BStuart FAQ -> RO -> Fandom,
    * not independent) and the manual is silent on them, so PROVISIONAL (see
    * #575); the demand-side calibration (whether `demandPerCapita` supplies
