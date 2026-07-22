@@ -20,6 +20,7 @@ export function drawRoundabout(ctx: CanvasRenderingContext2D, w: number): void {
   ctx.fillStyle = "#34343c";
   ctx.fillRect(0, 28, 24, 14);
   // The drive: a flattened asphalt ellipse with curbs.
+  ctx.fillStyle = "#34343c";
   ctx.beginPath();
   ctx.ellipse(cx, cy, cx - 3, 19, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -89,10 +90,14 @@ export function drawFountain(ctx: CanvasRenderingContext2D, w: number, h: number
   ctx.beginPath();
   ctx.ellipse(cx, h - 22, 38, 10, 0, 0, Math.PI * 2);
   ctx.fill();
-  // Sparkle: light dashes drifting across the water.
+  // Sparkle: light dashes drifting across the water, clipped to the basin.
   ctx.fillStyle = WATER_HI;
   const slide = (t * 9) % 22;
-  for (let i = -4; i <= 3; i++) ctx.fillRect(cx - 8 + i * 11 + slide - 11, h - 24 + ((i + 4) % 3), 5, 2);
+  for (let i = -4; i <= 3; i++) {
+    const sx = cx - 8 + i * 11 + slide - 11;
+    if (sx < cx - 33 || sx + 5 > cx + 33) continue;
+    ctx.fillRect(sx, h - 24 + ((i + 4) % 3), 5, 2);
+  }
   // Rim front face.
   ctx.fillStyle = STONE_D;
   ctx.beginPath();
@@ -117,11 +122,11 @@ export function drawPlazaLamp(ctx: CanvasRenderingContext2D, w: number, h: numbe
     // Pool of light on the pavement, then the halo around the head.
     ctx.fillStyle = "rgba(255, 214, 140, " + (0.16 * a).toFixed(3) + ")";
     ctx.beginPath();
-    ctx.ellipse(cx, h - 6, 38, 7, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, h - 7, 38, 7, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = "rgba(255, 214, 140, " + (0.35 * a).toFixed(3) + ")";
     ctx.beginPath();
-    ctx.ellipse(cx, 8, 11, 9, 0, 0, Math.PI * 2);
+    ctx.ellipse(cx, 9, 11, 9, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   // Pole on a small base.
@@ -141,7 +146,7 @@ export function drawStreetLamp(ctx: CanvasRenderingContext2D, w: number, h: numb
   if (a > 0) {
     ctx.fillStyle = "rgba(255, 214, 140, " + (0.3 * a).toFixed(3) + ")";
     ctx.beginPath();
-    ctx.ellipse(poleX + Math.round(TILE * 1.5) + 3, 5, 10, 8, 0, 0, Math.PI * 2);
+    ctx.ellipse(poleX + Math.round(TILE * 1.5) + 3, 6, 10, 6, 0, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.fillStyle = "#3a3a42";
