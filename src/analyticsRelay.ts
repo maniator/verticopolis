@@ -9,11 +9,14 @@ import type { EventProps } from "./analyticsAdapter";
  * with `keepalive`. Best-effort and never-throw, exactly like the Vercel `track`
  * path it runs alongside during the dual-write window.
  *
- * Within-session correlation comes from {@link SESSION}, a per-session id made
- * once in memory at module load and NEVER written to storage: every event from
- * one play session shares it, a new tab starts a fresh one, and nothing points
- * back to the visitor across sessions. This is the cookieless, memory-persistence
- * posture that keeps the game consent-banner-free.
+ * Within-session correlation comes from the per-session id (see {@link
+ * sessionId}), created lazily in memory on the first send and NEVER written to
+ * storage: every event from one play session shares it, a new tab starts a fresh
+ * one, and nothing points back to the visitor across sessions. It is created on
+ * first send rather than at module load because `crypto.randomUUID` is
+ * secure-context-only and evaluating it eagerly could throw at import. This is
+ * the cookieless, memory-persistence posture that keeps the game
+ * consent-banner-free.
  */
 
 /** The same-origin relay path. No key, no cookie, no third-party domain. */

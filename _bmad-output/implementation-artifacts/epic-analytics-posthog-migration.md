@@ -116,9 +116,11 @@ guess.
 - `src/analyticsRelay.ts` is the cookieless client transport: `sendToRelay` posts
   `{ event, properties, session, ts }` to same-origin `/api/ingest` via
   `navigator.sendBeacon` (fetch `keepalive` fallback). No `posthog-js`, no key.
-  `SESSION` is a `crypto.randomUUID()` made once in memory and never persisted, so
-  a new tab is a new session and there is no cross-session identity. Best-effort
-  and never-throw.
+  The per-session id is a `crypto.randomUUID()` created lazily on the first send
+  (with a `Math.random` fallback for a non-secure context) and never persisted, so
+  a new tab is a new session and there is no cross-session identity. It is made on
+  first send rather than at module load so an absent or throwing `randomUUID`
+  cannot crash boot. Best-effort and never-throw.
 - `dualWriteAdapter` in `analyticsAdapter.ts` is the new default active adapter:
   every event goes to BOTH Vercel `track` and `sendToRelay`, independently (a
   Vercel throw cannot suppress the relay write), so the two feeds can be compared
@@ -130,5 +132,6 @@ guess.
   as expected: the client gains a small `sendBeacon` function; a full SDK would
   have added roughly 50 KB.
   No cold-start regression by construction: the transport runs only on an event
-  (nothing added to the boot path beyond one `randomUUID` at module load). The
-  on-device frame-health number rides the perf harness when a device run is taken.
+  (nothing runs at module load; the session id is minted lazily on the first
+  send). The on-device frame-health number rides the perf harness when a device
+  run is taken.
