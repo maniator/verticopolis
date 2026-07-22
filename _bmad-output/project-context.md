@@ -8,7 +8,27 @@ full spec see the PRD under `_bmad-output/planning-artifacts/prds/`.
 - **Verticopolis**: a from-scratch, browser-native clone of **SimTower (1994, Maxis/OPeNBooK)**.
 - **The single source of truth is SimTower 1994**, specifically the GameFAQs/Kiwizoid
   FAQ (summarized with attribution under `_bmad-output/planning-artifacts/reviews/faq-parity-2026-06-30/faq-canon.md`).
-  The bar is **gameplay parity**, not reinvention. New mechanics are out of scope.
+  For **Classic**, the bar is **gameplay parity**, not reinvention: Classic is
+  parity-locked to 1994 and new mechanics are out of scope there.
+
+## Scope: Classic parity-locked, Modern is a curated sandbox (2026-07-22)
+- **Classic** stays pixel-and-rule-faithful to SimTower 1994. No new mechanics,
+  no new content. Its golden masters must stay byte-stable.
+- **Modern** is the sanctioned home for **post-1994 additions**: new room types,
+  new economy behaviors, and freeform build controls the original could not do.
+  These are **added deliberately** through the design process (party ratification
+  → design doc / spec → `/gds-code-review`), never ad hoc. A Modern addition must
+  leave Classic byte-identical.
+- **No TDT for Modern.** The 1994 `.TDT` format (`src/storage/tdt*`, save
+  round-trip) is **Classic-only**. No Modern-only feature adds TDT handling (no
+  new ordinals, no format-version bump for Modern content); Modern persists
+  through the native save format only. Round-tripping post-1994 content through a
+  1994 format is lossy by definition.
+- **Connected / multi-tower** ideas remain an **owner-gated epic** (the 375-wide
+  single-lot `LOT_WIDTH` and save format make it a rewrite, not a Modern toggle),
+  not part of the standing Modern-sandbox sanction.
+- The living plan for Modern additions is
+  `_bmad-output/planning-artifacts/gdds/gdd-modern-expansion-2026-07-22.md`.
 
 ## Stack: NOT a Unity/Unreal/Godot game
 - **TypeScript** on the **Excalibur.js** game engine, built with **Vite**. Runs in any

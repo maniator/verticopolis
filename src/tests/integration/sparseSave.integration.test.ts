@@ -53,7 +53,9 @@ function sampleSim(): Simulation {
     if (!placed) throw new Error(`placed ${kind} not found at ${floor}:${x}`);
     return placed;
   };
-  for (let i = 0; i < 16; i++) place("lobby", 1, 207 + i); // widen the seeded ground strip
+  // Modern founds an empty lot now, so lay the full ground lobby strip the
+  // floors below rest on (previously this only widened a seeded center strip).
+  for (let i = 0; i < 56; i++) place("lobby", 1, 167 + i);
   for (let i = 0; i < 56; i++) place("floor", 2, 167 + i);
   const office = place("office", 2, 168);
   office.state = "occupied";

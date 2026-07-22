@@ -60,7 +60,7 @@ describe("Onboarding — steps advance on real progress", () => {
     expect(firstIncompleteStep(sim)).toBe(ONBOARD_STEPS.length); // all done
   });
 
-  it("founding decides step one: a Classic empty lot teaches the lobby, a Modern seed skips it", () => {
+  it("founding is lobby-first in both modes: an empty lot teaches the lobby", () => {
     const classic = Simulation.newGame(1, "classic");
     expect(ONBOARD_STEPS[0].id).toBe("lobby");
     expect(classic.tower.units.length).toBe(0); // canon-zero founding
@@ -77,8 +77,13 @@ describe("Onboarding — steps advance on real progress", () => {
     expect(classic.tower.place("lobby", 1, C).ok).toBe(true);
     expect(firstIncompleteStep(classic)).toBe(1); // laying the lobby advances
 
+    // Modern founds the same empty lot now (no seeded lobby), so step one is
+    // taught identically: it is not skipped until the player lays the lobby.
     const modern = Simulation.newGame(1, "modern");
-    expect(firstIncompleteStep(modern)).toBe(1); // the seed satisfies step one instantly
+    expect(modern.tower.units.length).toBe(0);
+    expect(firstIncompleteStep(modern)).toBe(0);
+    expect(modern.tower.place("lobby", 1, C).ok).toBe(true);
+    expect(firstIncompleteStep(modern)).toBe(1);
   });
 
   it("each step has distinct desktop and mobile hint copy and a pulse target", () => {

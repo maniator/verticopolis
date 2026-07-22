@@ -478,22 +478,13 @@ export function deserialize(raw: SerializedGame): Simulation {
   return sim;
 }
 
-/** Convenience for the initial empty lot (ground lobby seed). The `mode`
- *  chosen at the New Tower screen is baked in here, at creation, and is
- *  immutable for the tower's life. */
+/** Found a new tower on an empty lot. Both rule-sets found the 1994 way now:
+ *  an empty lot, and where to lay the lobby that opens the tower is the
+ *  player's first decision. The `mode` chosen at the New Tower screen is baked
+ *  in here, at creation, and is immutable for the tower's life. */
 export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): Simulation {
   const sim = new Simulation(seed, mode, modernCalendar);
-  // The founding seed is a mode rule: Modern's centered lobby strip, or
-  // Classic's 1994 empty lot (spec-starter-lobby-mode-split).
-  const sl = sim.rules.starterLobby();
-  if (sl)
-    for (let i = 0; i < sl.width; i++) {
-      const r = sim.tower.place("lobby", 1, sl.x + i);
-      // A rule-set that seeds out of bounds (or against placement rules) is a
-      // programming error; fail at founding rather than emit a lying welcome.
-      if (!r.ok) throw new Error(`starter lobby seed failed at x=${sl.x + i}: ${r.reason ?? "unknown"}`);
-    }
-  sim.emit(sl ? "Welcome! Build floors, add elevators, and attract tenants." : "Welcome! Lay a lobby on the ground line to open your tower.", "info");
+  sim.emit("Welcome! Lay a lobby on the ground line to open your tower.", "info");
   return sim;
 }
 

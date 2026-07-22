@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.79.0
+
+- Modern towers now start on an empty lot too, just like Classic and the 1994 original: where to lay the first lobby is your first decision. (Modern used to begin with a ready lobby at the center.)
+
 ## 1.78.0
 
 - Classic offices now pay their full 1994 rent every quarter (an Average office pays its whole $10,000 each 3-day quarter), the fast office money the original was known for, matching what period guides describe. Modern towers are unchanged.

@@ -99,10 +99,10 @@ export interface OnboardStep {
   done: (sim: Simulation) => boolean;
 }
 
-/** The five steps: empty lot → first office earning rent. Modern pre-seeds a
- *  ground lobby, so its towers satisfy step one instantly and start at step
- *  two; Classic founds the 1994 empty lot and step one teaches the first lay.
- *  Advance on real game state, not scripted clicks. */
+/** The five steps: empty lot → first office earning rent. Both rule-sets found
+ *  the 1994 empty lot now, so step one always teaches the first lobby lay (its
+ *  `done` predicate reads live state and fires once any lobby exists, whatever
+ *  the mode). Advance on real game state, not scripted clicks. */
 export const ONBOARD_STEPS: OnboardStep[] = [
   {
     id: "lobby",
