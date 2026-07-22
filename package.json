@@ -12,7 +12,7 @@
     "build": "vite build",
     "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts",
     "preview": "vite preview --port 4173",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json",
     "watch": "tsc --watch",
     "test": "vitest run",
     "test:unit": "vitest run --project unit",
@@ -23,8 +23,8 @@
     "e2e": "playwright test --grep-invert @perf",
     "perf": "playwright test --grep @perf",
     "perf:capture": "PERF_CAPTURE=1 playwright test --grep @perf",
-    "lint": "eslint src --ext .ts,.tsx",
-    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "lint": "eslint src api --ext .ts,.tsx",
+    "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs"
@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@vercel/analytics": "^2.0.1",
+    "@vercel/functions": "^3.7.5",
     "@vercel/speed-insights": "^2.0.0",
     "excalibur": "^0.32.0",
     "fflate": "^0.8.3",

@@ -31,4 +31,22 @@ export default [
       "@typescript-eslint/no-explicit-any": "off",
     },
   },
+  {
+    // The same-origin analytics relay: a Node.js-runtime Vercel Function plus its
+    // env-read entry. Same rule set as src, module source.
+    files: ["api/**/*.ts"],
+    languageOptions: {
+      ecmaVersion: 2022,
+      sourceType: "module",
+    },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },
+      ],
+      "prefer-const": "error",
+      "no-var": "error",
+    },
+  },
 ];

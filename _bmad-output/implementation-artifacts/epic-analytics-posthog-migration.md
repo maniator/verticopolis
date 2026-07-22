@@ -50,8 +50,8 @@ guess.
 
 | ID | Story | CAP | Review | Version bump | Status |
 |----|-------|-----|--------|--------------|--------|
-| S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | in-progress |
-| S2 | `api/ingest.ts` edge function: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, `ctx.waitUntil` non-blocking, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | todo |
+| S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | done (PR #577) |
+| S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | in-progress |
 | S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | as measured | todo |
 | S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | as measured | todo |
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
@@ -70,3 +70,34 @@ guess.
 - `src/analyticsAdapter.test.ts` drives the whole typed vocabulary through a stub
   adapter and asserts the vendor is untouched while the stub is active, proving a
   transport swap is a one-file change.
+
+## S2 relay (as built)
+
+- `src/analyticsIngest.ts` is the pure, fully tested server core: method gate
+  (405), best-effort 204 no-op when the secrets are absent, per-IP fixed-window
+  rate limit (429), body validation (400), and the PostHog capture forward with
+  the key added server-side only at the forward. `buildCaptureBody` writes the
+  server-authoritative fields (`distinct_id`, `$process_person_profile: false`,
+  `environment` from `VERCEL_ENV`) AFTER the client property spread, so a crafted
+  client body cannot spoof the session, flip the no-person-profile posture, or
+  mislabel its environment.
+- `api/ingest.ts` is the thin Vercel entry (served at `POST /api/ingest`). It
+  reads `POSTHOG_KEY` / `POSTHOG_HOST` / `VERCEL_ENV` from the environment and
+  delegates to the core. The four gates cover `api/` too: `api/tsconfig.json`
+  plus a chained `tsc` in the `typecheck` script, and `eslint src api` with an
+  `api/**` rule block.
+- **Runtime deviation from the spec, verified against current docs.** The spec
+  sketched a Vercel Edge Function (`export const config = { runtime: "edge" }`
+  with the context `waitUntil`). Vercel deprecated the Edge runtime in mid-2026
+  and now recommends Node.js-runtime Functions with the web-standard `fetch`
+  handler, so S2 ships that instead, with `waitUntil` from the `@vercel/functions`
+  package (server-only, never in the client bundle). This is exactly the
+  verify-at-build substitution the spec's `edge-fn-setup.md` anticipated. The
+  cookieless and non-blocking properties are unchanged.
+- **Env vars are set at deploy time in the Vercel project.** `POSTHOG_KEY` and
+  `POSTHOG_HOST` live in the Vercel project (Production and Preview scopes), never committed.
+  Until they are set the relay no-ops with 204, so merging this is safe before the
+  secrets exist.
+- PostHog capture contract (`POST {host}/capture/`, `api_key` at the top level,
+  `distinct_id` inside `properties`, `$process_person_profile: false`, ISO
+  `timestamp`) confirmed against PostHog's current capture API docs.
