@@ -145,7 +145,7 @@ describe("income-invariant rent rescale", () => {
     expect(real.money).toBe(3 * ECON.rent.office.default);
   });
 
-  it("quarterlyRentScale: Classic is 1, Modern is quarterDays/90 (exactly 1 on real-world)", () => {
+  it("quarterlyRentScale: Classic is 1, Modern is quarterDays/REAL_WORLD.quarterDays (exactly 1 on real-world)", () => {
     // Structural seam pins: the factors themselves, so a retune of either
     // constant or rule-set is a deliberate, visible change.
     expect(CLASSIC_RULES.quarterlyRentScale(CANON.quarterDays)).toBe(1);

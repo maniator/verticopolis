@@ -52,8 +52,9 @@ export type PriceOptions =
  * snippet-level, same-lineage corroboration, NOT established independence, so
  * every confidence tier below stays provisional until a primary or genuinely
  * independent source is read directly (#575). The archive.org manual remains
- * unread; if a primary source ever contradicts these, re-open there. Classic
- * uses the FULL canon values by the owner's call of 2026-07-08.
+ * unread; if a primary source ever contradicts these, re-open the pricing
+ * GDD's Decision 2 and the cadence spec's ruling. Classic uses the FULL canon
+ * values by the owner's call of 2026-07-08.
  */
 const CLASSIC_RENT_LADDERS: Readonly<Partial<Record<string, readonly [number, number, number, number]>>> = {
   // Office, quarterly. HARD confidence: matches our band anchors; FAQ-lineage
