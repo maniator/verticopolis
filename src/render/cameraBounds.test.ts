@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM } from "./cameraBounds";
+import { clampCameraY, fitZoom, FIT_SKY_FLOORS, MIN_FIT_SPAN_FLOORS, MAX_FIT_ZOOM, SKY_HEADROOM_FLOORS } from "./cameraBounds";
 import { VIEW_ZOOM_MIN } from "../engine/types";
 import { GRID } from "../engine/facilities";
+import { CRANE_H } from "./sprites/structure/rooftop";
 // Pull the buildable bounds from the real GRID and FLOOR from the pure
 // render/scale module so the test can't drift if the tower geometry or the
 // render scale changes (the helper itself is parameterized by floorPx).
@@ -11,7 +12,7 @@ const MAX_FLOOR = GRID.maxFloor;
 const VIEW_H = 800;
 
 // The world edges the clamp is built around.
-const TOP_Y = -(MAX_FLOOR + 2) * FLOOR;
+const TOP_Y = -(MAX_FLOOR + SKY_HEADROOM_FLOORS) * FLOOR;
 const BOTTOM_Y = -(MIN_FLOOR - 2) * FLOOR;
 
 const clamp = (y: number, zoom: number) =>
@@ -35,6 +36,21 @@ describe("clampCameraY", () => {
       const y = clamp(-1e6, zoom); // try to pan all the way up
       expect(topEdge(y, zoom)).toBeGreaterThanOrEqual(TOP_Y - 1e-6);
     }
+  });
+
+  // Regression (crane-rescale review, E1): the sky headroom was a hardcoded
+  // 2 floors, sized for the original 76 px crane. The scaled crane perches on
+  // the highest built floor (at most MAX_FLOOR - 1; at MAX_FLOOR it comes
+  // down) and rises CRANE_H above it, so the clamp ceiling must sit at or
+  // above the crane's apex or floors 98-99 play out with the beacon and jib
+  // tops unreachable at every legal zoom and pan.
+  it("gives the rooftop crane full headroom at the tallest under-construction floor", () => {
+    const craneTopY = -(MAX_FLOOR - 1) * FLOOR - CRANE_H; // apex on a 99-floor build
+    expect(TOP_Y).toBeLessThanOrEqual(craneTopY);
+    // And the camera can actually frame it: panning fully up at a detail zoom
+    // puts the visible top edge at (or above) the crane apex.
+    const y = clamp(-1e6, 1);
+    expect(topEdge(y, 1)).toBeLessThanOrEqual(craneTopY);
   });
 
   it("leaves an in-bounds target untouched when zoomed in", () => {

@@ -2,6 +2,21 @@
  * Pure camera-bounds math, split out from the Excalibur-bound {@link TowerEngine}
  * so it can be unit-tested without a canvas/WebGL context.
  */
+import { CRANE_H } from "./sprites/structure/rooftop";
+import { FLOOR } from "./scale";
+
+/** Sky floors above the top buildable floor the camera may reveal. Derived
+ *  from the rooftop crane's height (plus a breath above the beacon) instead of
+ *  a hardcoded count: the crane perches ON the top floor and rises CRANE_H
+ *  world px above it, so a fixed 2-floor headroom (fine for the original
+ *  76 px crane) would clip the scaled crane's apex at floors 98-99 at every
+ *  legal zoom. Deriving keeps any future CRANE_SCALE retune from silently
+ *  decapitating it again. The value is a FLOOR COUNT, not pixels, and the
+ *  ratio is scale-free: CRANE_H and FLOOR come from the same render-scale
+ *  family, so "how many floors tall is the crane" transfers to any floorPx a
+ *  caller passes to clampCameraY, which multiplies the count by that
+ *  caller's own floor size. */
+export const SKY_HEADROOM_FLOORS = Math.ceil(CRANE_H / FLOOR) + 1;
 
 /**
  * Clamp the camera's vertical *center* so the visible window stays within the
@@ -35,7 +50,7 @@ export function clampCameraY(
   // never become Infinity/NaN, regardless of what a caller passes.
   const safeZoom = Number.isFinite(zoom) && zoom > 0 ? zoom : 1;
   const halfH = viewHeight / 2 / safeZoom;
-  const topY = -(maxFloor + 2) * floorPx; // a little sky above the top floor
+  const topY = -(maxFloor + SKY_HEADROOM_FLOORS) * floorPx; // sky above the top floor, crane included
   const bottomY = -(minFloor - 2) * floorPx; // ~2 floors of dirt below the basement
 
   // If the whole world is shorter than the viewport (very zoomed out), pin the

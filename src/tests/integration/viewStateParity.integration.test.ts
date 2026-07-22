@@ -6,6 +6,7 @@ import { FLOOR, TILE, TowerEngine } from "../../render/excalibur/TowerEngine";
 import { GRID } from "../../engine/facilities";
 import type { SerializedGame, SerializedView } from "../../engine/types";
 import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
+import { SKY_HEADROOM_FLOORS } from "../../render/cameraBounds";
 import { SaveGame } from "../../storage/SaveGame";
 import { SaveLoad } from "../../game/saveLoad";
 import {
@@ -274,10 +275,11 @@ describe("TowerEngine camera restore (prototype on a fake: no canvas)", () => {
     const fake = fakeEngine();
     proto.applyView.call(fake, { tile: 100, floor: 20, zoom: 99 });
     expect(fake.engine.currentScene.camera.zoom).toBe(3); // MAX_ZOOM
-    // A view over the top of the world pulls back inside the vertical bounds.
-    proto.applyView.call(fake, { tile: 100, floor: 100, zoom: 0.3 });
+    // A view over the top of the world pulls back inside the vertical bounds
+    // (the sky ceiling derives from the crane height; see cameraBounds).
+    proto.applyView.call(fake, { tile: 100, floor: GRID.maxFloor, zoom: 0.3 });
     const cam = fake.engine.currentScene.camera;
-    expect(cam.pos.y).toBeGreaterThanOrEqual(-(100 + 2) * FLOOR + 600 / 2 / 0.3);
+    expect(cam.pos.y).toBeGreaterThanOrEqual(-(GRID.maxFloor + SKY_HEADROOM_FLOORS) * FLOOR + 600 / 2 / 0.3);
   });
 
   it("a zoomless view (TDT import) keeps the session's current zoom", () => {

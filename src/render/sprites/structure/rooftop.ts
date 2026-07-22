@@ -1,12 +1,24 @@
 /**
  * The tower's exterior-facade family: the rooftop tower crane, the exterior
  * fire-escape stairs that clad the floors, and the ground-floor entrance
- * awning. Extracted verbatim from `structure.ts`; all pure ctx-only draws.
+ * awning. Extracted from `structure.ts` (and since grown the crane scale
+ * constants); all pure ctx-only draws.
  */
 
-/** Canvas size of the rooftop tower-crane graphic. */
-export const CRANE_W = 128;
-export const CRANE_H = 76;
+/** The hand-tuned base raster of the crane drawing (every coordinate in
+ *  drawCrane is authored against this grid; scale, never retune). */
+const CRANE_BASE_W = 128;
+const CRANE_BASE_H = 76;
+/** How much the base raster is blown up when rendered. The base crane stands
+ *  1.7 floors tall, which reads fine against an empty sky but collapses next
+ *  to the city skyline (10-36 floor buildings) and the street-level plaza:
+ *  a real tower crane rises 4-8 floors above the roof it builds. The scale
+ *  keeps the crane a fixed size (it never grows with the tower; the skyline
+ *  only calibrates the scene if everything obeys it). */
+export const CRANE_SCALE = 3;
+/** Canvas size of the rooftop tower-crane graphic (scaled). */
+export const CRANE_W = CRANE_BASE_W * CRANE_SCALE;
+export const CRANE_H = CRANE_BASE_H * CRANE_SCALE;
 
 /**
  * Where to perch the rooftop crane along the top floor, in world-tile units
@@ -49,7 +61,16 @@ export function craneAnchorTile(builtTiles: Iterable<number>): number {
  * pause/reduced-motion freezes it with everything else.
  */
 export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean): void {
-  const baseY = CRANE_H; // canvas bottom sits on the roof line
+  // Every coordinate below is authored on the 128x76 base grid; the scale
+  // transform blows the whole drawing up uniformly, line widths included. An
+  // INTEGER scale keeps every edge on the pixel grid (fully chunky-crisp); a
+  // fractional scale like 2.5 lands odd base coordinates on half-pixels,
+  // which Canvas2D anti-aliases into the cached raster, a slight softness
+  // accepted knowingly when the owner picks a non-integer size (the engine
+  // renders pixelArt, so integer scales are preferred when the size works).
+  ctx.save();
+  ctx.scale(CRANE_SCALE, CRANE_SCALE);
+  const baseY = CRANE_BASE_H; // canvas bottom sits on the roof line
   const mx = 56; // mast center
   const jibY = 18; // jib chord height
   const steel = "#e0a83c";
@@ -72,7 +93,7 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
   }
   ctx.stroke();
   // Jib out to the right, counter-jib to the left.
-  const jibEnd = CRANE_W - 4;
+  const jibEnd = CRANE_BASE_W - 4;
   const cjEnd = mx - 26;
   ctx.fillStyle = steel;
   ctx.fillRect(cjEnd, jibY, jibEnd - cjEnd, 2);
@@ -107,7 +128,7 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
   // Trolley slides along the jib; the hook line reels a girder up and down.
   const span = jibEnd - (mx + 14) - 6;
   const trolleyX = mx + 14 + (Math.sin(t * 0.45) * 0.5 + 0.5) * span;
-  const drop = 10 + (Math.sin(t * 0.27 + 2.1) * 0.5 + 0.5) * (CRANE_H - jibY - 28);
+  const drop = 10 + (Math.sin(t * 0.27 + 2.1) * 0.5 + 0.5) * (CRANE_BASE_H - jibY - 28);
   ctx.fillStyle = dark;
   ctx.fillRect(trolleyX - 2, jibY + 4, 5, 3);
   ctx.strokeStyle = "#3c3f45";
@@ -122,6 +143,7 @@ export function drawCrane(ctx: CanvasRenderingContext2D, t: number, lit: boolean
   // Aircraft-warning beacon at the apex, blinking after dark.
   ctx.fillStyle = lit && Math.sin(t * 3.2) > 0 ? "#ff5a4a" : "#8a2f26";
   ctx.fillRect(mx - 1, jibY - 14, 2, 2);
+  ctx.restore();
 }
 
 /** Width in px of one exterior fire-escape segment. */
