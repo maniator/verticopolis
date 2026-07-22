@@ -1,4 +1,4 @@
-import { analyticsAdapter } from "./analyticsAdapter";
+import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { telemetryHostAllowed } from "./telemetry";
 
 /**
@@ -94,13 +94,32 @@ interface GameplayEvents {
   session_peak_floors: { floors: number };
 }
 
+/**
+ * Cross-cutting props merged into EVERY event: the platform dimension plus the
+ * anonymous on-device returning / tenure / recency buckets (S4). Populated once
+ * at boot via {@link setCommonProps}; empty until then, so the merge is a no-op
+ * before boot and every existing per-event assertion is unaffected. These are
+ * coarse, cookieless buckets, never an identifier (see `analyticsEnrichment.ts`).
+ */
+let commonProps: EventProps = {};
+
+/** Install the boot-computed common props (see `analyticsEnrichment.ts`). Called
+ *  once from the boot flow BEFORE the first event so `boot` already carries them.
+ *  A later call replaces the whole set. Copied so a caller that later mutates the
+ *  object it passed cannot rewrite what every event carries. */
+export function setCommonProps(props: EventProps): void {
+  commonProps = { ...props };
+}
+
 /** Host-gated, best-effort custom-event send. The single choke point every
  *  gameplay event flows through, so the gate and the never-throw guarantee live
- *  in one place. */
+ *  in one place. The common props are spread FIRST so a per-event prop always
+ *  wins on a key collision (the typed vocabulary is never shadowed by an
+ *  enrichment key). */
 function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
   if (!telemetryHostAllowed()) return;
   try {
-    analyticsAdapter().send(name, props);
+    analyticsAdapter().send(name, { ...commonProps, ...props });
   } catch {
     /* best-effort telemetry; never block gameplay on it */
   }
@@ -243,7 +262,8 @@ class GameplaySession {
     return true;
   }
 
-  /** Test hook: forget all session state. */
+  /** Test hook: forget all session state, including the boot-set common props
+   *  (module-level, so cleared here to keep tests isolated). */
   reset(): void {
     this.activeMs = 0;
     this.resumedAt = null;
@@ -255,6 +275,7 @@ class GameplaySession {
     this.depthReported = false;
     this.toolsSeen.clear();
     this.toolUses.clear();
+    commonProps = {};
   }
 }
 

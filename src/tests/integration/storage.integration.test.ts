@@ -607,19 +607,22 @@ describe("SaveGame", () => {
   });
 
   it("loadResult distinguishes an absent save from a present-but-unreadable one (for an honest boot)", () => {
-    // Absent → not corrupt, no sim.
-    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: false });
+    // Absent → not corrupt, no sim, no write time.
+    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: false, savedAt: undefined });
 
-    // A real save → readable, not corrupt.
+    // A real save → readable, not corrupt, and its write time comes back for the
+    // boot recency bucket (no second decode of the slot).
     const sim = sampleGame();
+    const before = Date.now();
     SaveGame.save(sim);
     const ok = SaveGame.loadResult();
     expect(ok.corrupt).toBe(false);
     expect(ok.sim?.money).toBe(sim.money);
+    expect(ok.savedAt).toBeGreaterThanOrEqual(before);
 
     // Present but undecodable → corrupt (so boot warns instead of a silent fresh start).
     localStorage.setItem(AUTO_KEY, "VCZ1:" + btoa("not a deflate stream at all"));
-    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: true });
+    expect(SaveGame.loadResult()).toEqual({ sim: null, corrupt: true, savedAt: undefined });
     expect(SaveGame.hasSave()).toBe(true); // …yet the key IS present — the exact trap this guards
   });
 
@@ -646,6 +649,9 @@ describe("SaveGame", () => {
     expect(boot.sim).not.toBeNull(); // the legacy tower is rescued...
     expect(boot.sim!.money).toBe(555_555);
     expect(boot.corrupt).toBe(true); // ...while boot still preserves + warns
+    // The write time comes from the tower that ACTUALLY loaded (the legacy key),
+    // not the unreadable primary, so the boot recency bucket stays honest.
+    expect(boot.savedAt).toBe(123);
   });
 
   it("does not consult the legacy key (or flag corruption) when the Verticopolis autosave reads fine", () => {

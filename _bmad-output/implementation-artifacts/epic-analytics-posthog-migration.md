@@ -55,7 +55,7 @@ guess.
 | S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | done (PR #577) |
 | S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | done (PR #580) |
 | S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | done (PR #582) |
-| S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | as measured | todo |
+| S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | none (analytics-only, no player-facing surface) | done (PR #597) |
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
 | S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
 
@@ -165,6 +165,57 @@ guess.
   this is the only place a bad key would otherwise fail silently. Status only,
   never the key or the payload. The client stays silent by design (best-effort
   misses are expected and logging them would just be player-console noise).
+
+## S4 event enrichment (as built)
+
+- **One merge point, above the seam.** `analytics.ts` holds a module-level
+  `commonProps` and a `setCommonProps` setter; `trackEvent` spreads the common
+  props into EVERY event FIRST, then the per-event props, so a per-event field
+  always wins on a key collision (the typed vocabulary is never shadowed). The
+  merge sits above the adapter, so it is provider-neutral and the S6 relay-only
+  swap is unaffected. `commonProps` starts empty (a no-op merge before boot) and
+  is cleared by `reset()` for test isolation.
+- **`src/analyticsEnrichment.ts` is the pure, fully tested enrichment core.**
+  `resolvePlatformLabel(isNativeWrapper, search)` resolves the platform dimension
+  (AUD-036) in priority order: the native wrapper port (`ios`) outranks the TWA
+  start-URL marker (`?src=twa` -> `twa`), else `web`; `platformLabel()` is the
+  thin wrapper reading the live `getPlatform()` flag and `location.search`.
+  `tenureBucket(day)` and `recencyBucket(msSinceSave)` are coarse anonymous
+  buckets (tenure `d0`/`d1-6`/`d7-29`/`d30+`; recency `1d`/`7d`/`30d`/`30d+`),
+  each reading a missing/non-finite/negative input as `unknown`. `bootCommonProps`
+  assembles the four props from live signals passed in, so the field mapping and
+  the recency delta are unit-testable without the boot harness.
+- **Computed once at boot, banner-free, no new storage.** `runBootFlow` calls
+  `setCommonProps(bootCommonProps(...))` just BEFORE the `boot` event, so every
+  event (boot included) carries the enrichment. `returning` is `isOnboarded()`
+  (the onboarding-seen flag, the SPEC's cookieless on-device returning signal),
+  `tenure` is the loaded tower's in-game age (`sim.clock.day`), `recency` comes
+  from the loaded tower's write time. `SaveGame.loadResult()` now surfaces
+  `savedAt` from the SAME decode it already runs (and the SAME key that actually
+  loaded, legacy fallback included), so the recency read costs no second decode
+  and reflects the tower that really opened; a forged/out-of-range stamp reads as
+  absent (`parseSavedAt`, shared with the Saves dialog). The ctor passes that
+  `savedAt` straight into `runBootFlow(app, savedAt)`, so no new field lands on
+  the app. The whole compute is wrapped best-effort so an enrichment read can
+  never throw past boot, matching the boot snapshot's never-block posture.
+- **The first-tower funnel** (`game_started` -> `first_build` -> `star_reached(2)`)
+  is composed of events that already fire; S4 makes each one carry `platform` /
+  `returning` / `tenure` / `recency`, so the funnel is segmentable. Modeling it
+  as a real PostHog funnel insight (with drop rates) is report-side and lands at
+  S5 with the report re-target.
+- **No id, nothing persisted, nothing crosses a session or device**, so this
+  stays inside the cookieless / banner-free invariant. The persistent
+  save-derived `distinct_id` (Tier 3) is deliberately NOT here (parked at E4).
+- **Bundle delta: the `telemetry` chunk is 4.97 KB gzipped (from 4.95 at S3,
+  +~0.02 KB)**, the enrichment being a handful of pure functions; the boot-wiring
+  bytes land in the main chunk and are negligible. Far under the 5 KB ceiling. No
+  cold-start regression: the enrichment is one synchronous compute at boot from
+  state already in hand (no network, no new persistent storage, and no new
+  decode: the recency stamp rides the autosave decode `loadResult` already runs,
+  and `returning` is a `getItem` on the onboarding flag the boot flow already
+  consults).
+- **No version bump:** analytics-only, invisible to players (no UI or gameplay
+  change).
 
 ## S4 plan: on-device returning/tenure identity (decided in party-mode)
 

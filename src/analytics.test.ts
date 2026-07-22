@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@vercel/analytics";
-import { gameplaySession, startGameplaySession } from "./analytics";
+import { gameplaySession, setCommonProps, startGameplaySession } from "./analytics";
 
 // The custom-event channel is host-gated and best-effort; stub the whole vendor
 // surface so the gate, the dedup, and the never-throw guarantee can be asserted
@@ -136,6 +136,54 @@ describe("gameplay analytics events", () => {
       throw new Error("analytics down");
     });
     expect(() => gameplaySession.noteStar(4)).not.toThrow();
+  });
+});
+
+describe("common event enrichment (S4)", () => {
+  beforeEach(() => {
+    window.location.href = prod;
+    gameplaySession.reset();
+    vi.mocked(track).mockReset();
+  });
+
+  afterEach(() => {
+    window.location.href = localhost;
+    setVisibility("visible");
+  });
+
+  it("merges the boot-set common props into every event", () => {
+    setCommonProps({ platform: "twa", returning: true, tenure: "d7-29", recency: "7d" });
+    gameplaySession.noteNewGame("modern");
+    gameplaySession.noteStar(3);
+    expect(track).toHaveBeenNthCalledWith(1, "game_started", {
+      platform: "twa",
+      returning: true,
+      tenure: "d7-29",
+      recency: "7d",
+      mode: "modern",
+    });
+    expect(track).toHaveBeenNthCalledWith(2, "star_reached", {
+      platform: "twa",
+      returning: true,
+      tenure: "d7-29",
+      recency: "7d",
+      star: 3,
+    });
+  });
+
+  it("lets a per-event prop win over a common prop on a key collision", () => {
+    // The typed vocabulary must never be shadowed by an enrichment key: event
+    // props are spread last.
+    setCommonProps({ mode: "should-be-overridden" });
+    gameplaySession.noteNewGame("classic");
+    expect(track).toHaveBeenCalledWith("game_started", { mode: "classic" });
+  });
+
+  it("clears the common props on reset, so a later event carries none", () => {
+    setCommonProps({ platform: "ios" });
+    gameplaySession.reset();
+    gameplaySession.noteStar(2);
+    expect(track).toHaveBeenCalledWith("star_reached", { star: 2 });
   });
 });
 

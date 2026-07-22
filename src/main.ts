@@ -259,7 +259,7 @@ class GameApp implements GameAppPorts {
 
     // First-paint boot flow: onboarding, resume-flag handling, splash, the
     // corrupt-save message, and the autosave timer (see runBootFlow).
-    runBootFlow(this);
+    runBootFlow(this, boot.savedAt);
   }
 
   // ---- UI command ports (GameAppPorts; createUICallbacks delegates here) ----

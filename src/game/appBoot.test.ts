@@ -96,6 +96,7 @@ vi.mock("../ui/Onboarding", () => ({
       this.opts = opts;
     }
   },
+  isOnboarded: vi.fn(() => true), // runBootFlow reads this for the S4 `returning` bucket
 }));
 
 describe("wireControllers", () => {
