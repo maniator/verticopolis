@@ -78,6 +78,13 @@ export function retailStatsLines(
   advice = false,
 ): TemplateResult[] {
   const spend = ECON.retailSpendPerCustomer[kind];
+  // Deliberately the tuned Modern-table figure in BOTH modes (#572 review):
+  // the verdict baseline means "an average good day", and Classic's seam
+  // headline is the 1994 sold-out ceiling, several times that. Scoring against
+  // the ceiling would read most healthy Classic venues as red forever, so the
+  // verdict keeps the pre-#572 yardstick (identical verdicts for pool-limited
+  // towers, better ones where the new ceilings let a venue earn more) until
+  // the verdict-band calibration in the recorded playtest pass.
   const daily = ECON.dailyTrafficIncome[kind];
   if (spend === undefined || spend <= 0 || daily === undefined) return [];
   // The reference is an "average good day": a venue at full local demand, well

@@ -120,6 +120,29 @@ describe("CLASSIC_RULES", () => {
     expect(CLASSIC_RULES.noiseErosionScale()).toBe(0);
   });
 
+  it("reads the 1994 top-tier commercial ceilings; Modern keeps its tuned table (#572)", () => {
+    // Classic: the period chart's top tiers (provenance on the econConfig
+    // table; provisional, #575). Pinned per kind so a retune is deliberate.
+    expect(CLASSIC_RULES.commercialDailyIncome("fastFood")).toBe(5_000);
+    expect(CLASSIC_RULES.commercialDailyIncome("restaurant")).toBe(10_000);
+    expect(CLASSIC_RULES.commercialDailyIncome("shop")).toBe(20_000);
+    expect(CLASSIC_RULES.commercialDailyIncome("cinema")).toBe(10_000);
+    expect(CLASSIC_RULES.commercialDailyIncome("partyHall")).toBe(20_000);
+    // Modern reads the live tuned table, so the two can never share a retune
+    // by accident.
+    for (const kind of ["fastFood", "restaurant", "shop", "cinema", "partyHall"]) {
+      expect(MODERN_RULES.commercialDailyIncome(kind)).toBe(ECON.dailyTrafficIncome[kind]);
+    }
+    // Kind classification is shared: both tables answer for exactly the same
+    // kinds, so a venue kind cannot exist in one mode only.
+    expect(Object.keys(ECON.classicDailyTrafficIncome).sort()).toEqual(
+      Object.keys(ECON.dailyTrafficIncome).sort(),
+    );
+    // A non-venue kind is undefined in both modes.
+    expect(CLASSIC_RULES.commercialDailyIncome("office")).toBeUndefined();
+    expect(MODERN_RULES.commercialDailyIncome("office")).toBeUndefined();
+  });
+
   it("reads lobby distance as two discrete bands: near, far (cap only), very far (cap + erosion)", () => {
     expect(CLASSIC_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS)).toEqual({ cap: 1, erosion: 0 }); // at the edge: still near
     expect(CLASSIC_RULES.lobbyDistanceDrain(LOBBY_FAR_FLOORS + 1)).toEqual({ cap: LOBBY_FAR_CAP, erosion: 0 }); // far: ceiling only

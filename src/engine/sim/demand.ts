@@ -135,8 +135,13 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   const venues: { id: number; cap: number }[] = [];
   let totalCap = 0;
   let retailVenueCount = 0;
+  // Capacity reads the SAME mode headline the money loop earns against
+  // (GameRules.commercialDailyIncome, #572), so a venue's pool bid and its
+  // income ceiling are one number in either mode; bare contexts fall back to
+  // Modern, the file's standard.
+  const rules = sim.rules ?? MODERN_RULES;
   for (const u of sim.tower.units) {
-    const cap = ECON.dailyTrafficIncome[u.kind];
+    const cap = rules.commercialDailyIncome(u.kind);
     if (cap === undefined) continue; // not a traffic venue
     if (attendanceCap(u.kind) !== undefined) continue; // attendance venue: earns from live fill, not the retail pool (#424)
     if (!isOperational(u)) continue; // gutted / burning / under construction earns nothing
@@ -148,7 +153,6 @@ export function computeDemandMap(sim: SimContext): DemandMap {
 
   // The connected demand pool: weighted census of occupied origins whose own
   // floor is reachable (a stranded origin's residents cannot reach any venue).
-  const rules = sim.rules ?? MODERN_RULES;
   const { perCapita, floor } = rules.demandModel();
   const reachableVenueCount = venues.length;
   let pool = 0;

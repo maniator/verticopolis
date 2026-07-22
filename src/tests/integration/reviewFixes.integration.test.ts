@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
-import { Simulation, ECON } from "../../engine/Simulation";
+import { Simulation } from "../../engine/Simulation";
 import { EconomySystem } from "../../engine/EconomySystem";
 import { Tower } from "../../engine/Tower";
 import { Clock } from "../../engine/Clock";
@@ -218,7 +218,10 @@ describe("F7 — commercial income never exceeds its headline daily figure", () 
     // the income measurement).
     for (let i = 0; i < 16; i++) sim.tick(60);
     const earnedThatDay = sim.money - before;
-    expect(earnedThatDay).toBeLessThanOrEqual(ECON.dailyTrafficIncome.shop);
+    // The ceiling is the fixture's own mode headline through the seam (#572:
+    // Classic reads the 1994 top tier, far above Modern's table). Day 0 is a
+    // weekday on both calendars, so no weekend lift rides above the anchor.
+    expect(earnedThatDay).toBeLessThanOrEqual(sim.rules.commercialDailyIncome("shop")!);
     expect(earnedThatDay).toBeGreaterThan(0);
   });
 });

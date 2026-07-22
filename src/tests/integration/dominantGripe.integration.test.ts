@@ -173,8 +173,11 @@ describe("the Main gripe inspector line", () => {
     // office reaches it, but the pool dwarfs its capacity (share > 2, coverage
     // below the 0.5 floor), so the gripe prescribes more venues anywhere
     // connected (the demand model is tower-uniform, so nearness carries
-    // nothing and "near this floor" would be a false promise).
-    const sim = Simulation.newGame(1);
+    // nothing and "near this floor" would be a false promise). Modern fixture:
+    // the mechanism under test is mode-shared, and Classic's 1994 top-tier
+    // ceilings (#572) give one venue several times the capacity, so this
+    // office block would no longer oversubscribe it there.
+    const sim = Simulation.newGame(1, "modern");
     sim.money = 1e9;
     sim.star = 1;
     lay(sim, "lobby", 1);

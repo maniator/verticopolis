@@ -98,6 +98,12 @@ export const CLASSIC_RULES: GameRules = {
     // the canon ladders shipped.
     return 1;
   },
+  commercialDailyIncome(kind) {
+    // The 1994 chart's top-tier daily ceilings (#572); the demand fraction and
+    // attendance fill produce the chart's lower tiers. Provenance and the
+    // PROVISIONAL caveat live on the table (econConfig).
+    return ECON.classicDailyTrafficIncome[kind];
+  },
   // Classic is pixel-faithful: none of the Modern economy sinks apply.
   operatingOverheadPerUnit() {
     return 0;
@@ -219,6 +225,10 @@ export const MODERN_RULES: GameRules = {
     // a bare 90) so the real-world factor is structurally exactly 1
     // (byte-identical) and cannot drift if that constant is ever retuned.
     return quarterDays / REAL_WORLD.quarterDays;
+  },
+  commercialDailyIncome(kind) {
+    // Today's tuned headline daily takes, unchanged (#572 touched Classic only).
+    return ECON.dailyTrafficIncome[kind];
   },
   // Modern runs the deeper-economy sinks at their tuned values.
   operatingOverheadPerUnit() {

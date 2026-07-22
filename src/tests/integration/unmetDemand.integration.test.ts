@@ -71,7 +71,10 @@ describe("W-new: unmet local demand (#395)", () => {
     // far-walk penalty can confound the unmet-demand drain under test.
     for (let sx = 10; sx < W - 10; sx += 40) expect(sim.buildTransport("elevatorStandard", sx, 1, top).ok).toBe(true);
     if (withFood) {
-      // One fast food (capacity 2000) near the right edge: the only reachable retail.
+      // One fast food near the right edge: the only reachable retail. Its
+      // capacity is the mode headline through the seam (#572): Modern 2,000,
+      // Classic 5,000, so a Classic caller needs a denser office pool to stay
+      // clearly under the coverage floor.
       expect(sim.tower.place("fastFood", 2, W - 30).ok).toBe(true);
       sim.tower.units.find((u) => u.kind === "fastFood")!.state = "occupied";
     }
@@ -92,7 +95,10 @@ describe("W-new: unmet local demand (#395)", () => {
   }
 
   it("caps an office in an under-served tower at the unmet-demand ceiling without evicting it (Classic)", () => {
-    const { sim, office, coverage } = denseOfficeTower("classic", true, 3);
+    // Four floors of offices (review finding): against the Classic 5,000
+    // fast-food capacity (#572), the old three-floor pool sat within 4% of the
+    // coverage floor, one small retune from flipping the precondition.
+    const { sim, office, coverage } = denseOfficeTower("classic", true, 4);
     expect(coverage).not.toBeNull();
     expect(coverage!).toBeLessThan(UNMET_DEMAND_FLOOR); // precondition: genuinely under-served
     for (let i = 0; i < 40; i++) sim.tick(60);

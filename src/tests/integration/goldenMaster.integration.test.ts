@@ -176,15 +176,19 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * three-day week), so its fixed three-day run reaches the weekend on day 2,
  * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-// Re-pinned for the Classic canon rent cadence
-// (spec-classic-economy-canon-cadence-2026-07-22): Classic's quarterlyRentScale
-// is now 1, so the fixture's occupied offices collect their FULL rent at each
-// canon 3-day quarter boundary instead of the old 1/30 rescale, moving money
-// and the fields downstream of it. This Classic hash is UNCHANGED by the Modern
-// empty-lot founding change (Classic already founded empty). The prior re-pin
-// was Classic canon-zero founding (spec-starter-lobby-mode-split), where
-// ensureStarterLobby began laying the 40 tiles itself.
-const PINNED_STATE_HASH = "c9b43b091e1e52d1d03506c74ac7d32058ab9045e6646f7d76020692995c551d";
+// Re-pinned for the Classic 1994 commercial ceilings (#572,
+// spec-classic-economy-followups-2026-07-22): Classic's commercialDailyIncome
+// now reads the period chart's top-tier daily takes, so the fixture's traffic
+// venues earn against larger ceilings and bid larger capacities into the
+// demand pool, moving money, pendingIncome, and the demand fractions
+// downstream. The Modern hash below is UNCHANGED in the same change, which is
+// the proof the divergence flows only through rules.commercialDailyIncome.
+// The prior re-pin was the Classic canon rent cadence
+// (spec-classic-economy-canon-cadence-2026-07-22), where quarterlyRentScale
+// became 1 and the fixture's offices began collecting their full rent each
+// canon quarter; that hash was itself unchanged by the Modern empty-lot
+// founding (Classic already founded empty).
+const PINNED_STATE_HASH = "8dd8445a0f36c9f7662f4a845eac775ecdd37e00b5937d70dc391d5fe69f35d4";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
