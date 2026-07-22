@@ -8,6 +8,7 @@ export const ECON = {
     fastFood: 2_000,
     restaurant: 4_000,
     foodHall: 6_500,
+    amusements: 4_500,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -56,6 +57,7 @@ export const ECON = {
     fastFood: 10,
     restaurant: 30,
     foodHall: 25,
+    amusements: 15,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -77,6 +79,7 @@ export const ECON = {
     fastFood: 0.7,
     restaurant: 1.35,
     foodHall: 1.25,
+    amusements: 1.4,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**

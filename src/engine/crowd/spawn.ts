@@ -47,11 +47,11 @@ const NO_RESULTS: readonly { unitId: number; ok: boolean }[] = Object.freeze([])
 export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const hour = clock.hour;
   const weekend = clock.isWeekend;
-  // The one-way ambient venue pool: shoppers/diners who stroll in, linger, and
-  // despawn at the venue. Cinema left this set for the round-trip attendance
-  // flow (pushVenueVisitOptions): entertainment visitors register at the house
-  // and travel back, so the audience the art draws is real.
-  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood";
+  // The one-way ambient venue pool: shoppers/diners/players who stroll in and
+  // despawn at the venue. Modern Amusements joins it as a footfall venue, so
+  // people travel to it (foot traffic + transport demand) like a shop instead of
+  // it being a dead destination. Cinema stays out (round-trip attendance flow).
+  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "amusements";
   const isStaffKind = (k: FacilityKind): k is StaffKind =>
     k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
   const leased = new Set<number>();

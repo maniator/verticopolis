@@ -33,6 +33,9 @@ export function isOpenAt(kind: FacilityKind, hour: number): boolean {
       return hour >= 10 && hour < 22;
     case "shop":
       return hour >= 10 && hour < 21;
+    case "amusements":
+      // An arcade opens late morning and runs to midnight.
+      return hour >= 10 && hour < 24;
     case "cinema":
       return hour >= 12 && hour < 24;
     case "partyHall":
@@ -52,14 +55,21 @@ export function openHoursPerDay(kind: FacilityKind): number {
 }
 
 /** Foot-traffic commercial kinds: the canon 1994 set (fast food, restaurant,
- *  retail shop, cinema) plus the Modern-only Food Hall, which is a shopper-drawing
- *  food venue and so feels the same noise (W2) and lobby-proximity (W3) rules.
- *  A Classic tower never holds a Food Hall, so Classic stays the exact 1994 set.
- *  `partyHall` earns traffic income too but is deliberately NOT commercial, so it
- *  is exempt from both; keep W2 and W3 keyed off this one predicate so they can
- *  never drift apart. */
+ *  retail shop, cinema) plus the Modern-only Food Hall and Amusements, which are
+ *  shopper-drawing footfall venues and so feel the same noise (W2) and
+ *  lobby-proximity (W3) rules. A Classic tower never holds either, so Classic
+ *  stays the exact 1994 set. `partyHall` earns traffic income too but is
+ *  deliberately NOT commercial, so it is exempt from both; keep W2 and W3 keyed
+ *  off this one predicate so they can never drift apart. */
 export function isCommercialKind(kind: FacilityKind): boolean {
-  return kind === "fastFood" || kind === "restaurant" || kind === "foodHall" || kind === "shop" || kind === "cinema";
+  return (
+    kind === "fastFood" ||
+    kind === "restaurant" ||
+    kind === "foodHall" ||
+    kind === "amusements" ||
+    kind === "shop" ||
+    kind === "cinema"
+  );
 }
 
 /** True for facilities that keep posted business hours (can be "closed"). */
@@ -68,6 +78,7 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
     kind === "fastFood" ||
     kind === "restaurant" ||
     kind === "foodHall" ||
+    kind === "amusements" ||
     kind === "shop" ||
     kind === "cinema" ||
     kind === "partyHall"

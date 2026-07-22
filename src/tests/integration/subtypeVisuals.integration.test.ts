@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { FASTFOOD_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
+import { AMUSEMENTS_SUBTYPES, FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { AMUSEMENTS_LOOKS, FASTFOOD_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT } from "../../storage/tdtExport";
 import { parseTDT } from "../../storage/tdtImport";
 import type { FacilityKind } from "../../engine/types";
@@ -69,6 +69,35 @@ describe("Modern Food Hall stall looks", () => {
     // Distinct WALL colors too, not just distinct objects: two stalls whose only
     // difference is an imperceptible field would still read as the same room.
     expect(walls.size, "two stalls share a wall color").toBe(FOODHALL_SUBTYPES.length);
+  });
+});
+
+// The Modern Amusements attractions carry the same "every variant is visually
+// distinct" guarantee, and like the Food Hall they are Modern-only and so are
+// deliberately NOT in the TDT round-trip loop below: a Modern tower is never
+// exported to the 1994 .TDT format, so these attractions have no ordinal.
+describe("Modern Amusements attraction looks", () => {
+  it("every attraction has a look, and no look is orphaned", () => {
+    expect(Object.keys(AMUSEMENTS_LOOKS).sort()).toEqual([...AMUSEMENTS_SUBTYPES].sort());
+  });
+
+  it("every attraction look is visually distinct", () => {
+    const seen = new Map<string, string>();
+    const walls = new Set<string>();
+    const attractions = new Set<string>();
+    for (const name of AMUSEMENTS_SUBTYPES) {
+      const look = AMUSEMENTS_LOOKS[name];
+      const key = JSON.stringify(look);
+      const clash = seen.get(key);
+      expect(clash, `${name} and ${clash ?? "?"} share an identical look`).toBeUndefined();
+      seen.set(key, name);
+      walls.add(look.wall);
+      attractions.add(look.attraction);
+    }
+    // Distinct WALL colors AND distinct interiors: each attraction draws its own
+    // room, not just a recolor, so all four render unmistakably differently.
+    expect(walls.size, "two attractions share a wall color").toBe(AMUSEMENTS_SUBTYPES.length);
+    expect(attractions.size, "two attractions share an interior").toBe(AMUSEMENTS_SUBTYPES.length);
   });
 });
 
