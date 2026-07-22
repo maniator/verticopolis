@@ -165,6 +165,10 @@ function makeScenery(engine: TowerEngine): SceneryRec {
     for (let i = 0; i < segments; i++) {
       const x0 = from * TILE + i * segW;
       const w = Math.min(segW, to * TILE - x0) + 1; // 1px overlap hides seams
+      // Phase the lane dashes off WORLD x, not segment-local x, so the dash
+      // rhythm carries across segment seams unbroken.
+      const period = TILE * 4;
+      const phase = (((4 - x0) % period) + period) % period;
       const cv = new ex.Canvas({
         width: w,
         height: 14,
@@ -173,7 +177,7 @@ function makeScenery(engine: TowerEngine): SceneryRec {
           ctx.fillStyle = "#34343c";
           ctx.fillRect(0, 0, w, 14);
           ctx.fillStyle = "#c8b040";
-          for (let x = 4; x < w; x += TILE * 4) ctx.fillRect(x, 6, TILE, 2);
+          for (let x = phase - period; x < w; x += period) ctx.fillRect(x, 6, TILE, 2);
         },
       });
       const a = new ex.Actor({ pos: ex.vec(x0, -2), width: w, height: 14, anchor: ex.vec(0, 0), z: Z_EDGE });
@@ -342,17 +346,34 @@ function rebuildSeeded(engine: TowerEngine, rec: SceneryRec, seed: number): void
   rec.seeded = [];
   rec.plants = [];
 
-  // Skyline: continuous behind everything, two depths.
+  // Skyline: continuous behind everything, two depths. Every rect is a solid
+  // color, so all of them share ONE tiny raster per depth, stretched by actor
+  // scale (nearest sampling keeps a solid fill exact). A colored Actor would
+  // rasterize its own full-size bitmap per rect, and at city-scale heights
+  // that added up to tens of MB of GPU textures on the old mobile GPUs this
+  // renderer budgets for; two 2x2 bitmaps replace all of it.
+  const sharedFill = (css: string): ex.Canvas =>
+    new ex.Canvas({
+      width: 2,
+      height: 2,
+      cache: true,
+      draw: (ctx) => {
+        ctx.fillStyle = css;
+        ctx.fillRect(0, 0, 2, 2);
+      },
+    });
+  const fills: [ex.Canvas, ex.Canvas] = [sharedFill("rgba(70, 86, 120, 0.55)"), sharedFill("rgba(52, 66, 96, 0.75)")];
   for (const r of skylineRects(seed)) {
     const h = r.hFloors * FLOOR;
     const a = new ex.Actor({
       pos: ex.vec(r.tile * TILE, -h),
-      width: r.w * TILE,
-      height: h,
+      width: 2,
+      height: 2,
       anchor: ex.vec(0, 0),
       z: r.depth === 0 ? Z_SKY_FAR : Z_SKY_NEAR,
-      color: r.depth === 0 ? ex.Color.fromRGB(70, 86, 120, 0.55) : ex.Color.fromRGB(52, 66, 96, 0.75),
+      scale: ex.vec((r.w * TILE) / 2, h / 2),
     });
+    a.graphics.use(fills[r.depth]);
     engine.engine.add(a);
     rec.seeded.push(a);
   }

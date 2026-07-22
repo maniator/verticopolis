@@ -90,7 +90,7 @@ export interface PlantSpot {
 }
 
 /** Tree and bush spots on the open lot, deterministic per tower seed. Spots
- *  keep clear of both lot edges so nothing crowds the alley or the sidewalk. */
+ *  keep clear of both lot edges so nothing crowds the plaza sidewalk or the street. */
 export function plantSpots(seed: number): PlantSpot[] {
   const spots: PlantSpot[] = [];
   for (let t = 6; t < GRID.width - 6; t += 13) {

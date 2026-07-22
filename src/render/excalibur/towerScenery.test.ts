@@ -16,8 +16,8 @@ import type { TowerEngine } from "./TowerEngine";
 
 /** Founding seed whose layout the assertions lean on: its plant spots carry
  *  both kinds, and the starter-lobby apron hides at least one spot while
- *  sparing others. Counts are always derived from skylineRects/plantSpots at
- *  run time, never written down here, so skyline tuning cannot stale this. */
+ *  sparing others. Counts derive from skylineRects/plantSpots at run time, so
+ *  skyline tuning cannot stale this comment. */
 const SEED = 4400;
 
 /** Static actors makeScenery adds once: the left plaza (sidewalk, roundabout,
@@ -117,10 +117,13 @@ describe("towerScenery", () => {
     const sim = Simulation.newGame(SEED);
     const { eng, added } = fakeEngine(sim);
     syncScenery(eng);
-    const canvases = added.map((a) => a.graphics.current).filter((g): g is ex.Canvas => g instanceof ex.Canvas);
-    // Every static is a canvas actor now, plus a canvas per plant; both plant
-    // kinds exist for this seed, so drawTree and drawBush both run.
-    expect(canvases.length).toBe(STATIC_ACTORS + plantSpots(SEED).length);
+    const canvases = [...new Set(added.map((a) => a.graphics.current).filter((g): g is ex.Canvas => g instanceof ex.Canvas))];
+    // Every static is a canvas actor, plus a canvas per plant, plus exactly
+    // TWO shared skyline fills: the whole skyline must reuse one tiny raster
+    // per depth (the texture-memory contract), so unique canvases stay flat
+    // no matter how many skyline rects the seed lays. Both plant kinds exist
+    // for this seed, so drawTree and drawBush both run.
+    expect(canvases.length).toBe(STATIC_ACTORS + plantSpots(SEED).length + 2);
     expect(plantSpots(SEED).map((s) => s.kind)).toContain("tree");
     expect(plantSpots(SEED).map((s) => s.kind)).toContain("bush");
     for (const cv of canvases) {

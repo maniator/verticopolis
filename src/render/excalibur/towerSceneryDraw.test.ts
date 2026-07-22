@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { lampAlpha } from "./towerSceneryDraw";
+import { drawPlazaLamp, drawStreetLamp, lampAlpha } from "./towerSceneryDraw";
 
 /**
  * The lamp fade windows are pure math with four boundary hours; pin them so a
- * future retune of the dusk/dawn ramps is a deliberate edit, not a drift. The
+ * future retune of the dusk/dawn ramps is a deliberate edit instead of a
+ * silent drift. The
  * painters themselves are driven through recording contexts in
  * towerScenery.test.ts.
  */
@@ -35,6 +36,45 @@ describe("lampAlpha", () => {
       const a = lampAlpha(m / 60);
       expect(a).toBeGreaterThanOrEqual(0);
       expect(a).toBeLessThanOrEqual(1);
+    }
+  });
+});
+
+/** Minimal recording context for the lit-path checks below. */
+function spyCtx(): { ctx: CanvasRenderingContext2D; log: string[] } {
+  const log: string[] = [];
+  const ctx: Record<string, unknown> = {};
+  for (const m of ["clearRect", "fillRect", "strokeRect", "fillText", "beginPath", "ellipse", "fill", "stroke"]) {
+    ctx[m] = () => log.push(m);
+  }
+  let fill: unknown;
+  Object.defineProperty(ctx, "fillStyle", {
+    get: () => fill,
+    set: (v) => {
+      fill = v;
+      log.push("fillStyle=" + String(v));
+    },
+  });
+  for (const pr of ["strokeStyle", "lineWidth", "font", "textAlign"]) {
+    Object.defineProperty(ctx, pr, { get: () => undefined, set: () => undefined });
+  }
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, log };
+}
+
+describe("lit lamp painters", () => {
+  it("paint the warm glow and head at full night, and neither at noon", () => {
+    for (const [painter, w, h] of [
+      [drawPlazaLamp, 84, 84],
+      [drawStreetLamp, 88, 79],
+    ] as const) {
+      const night = spyCtx();
+      painter(night.ctx, w, h, 1);
+      expect(night.log.some((l) => l.startsWith("fillStyle=rgba(255, 214, 140"))).toBe(true);
+      expect(night.log).toContain("fillStyle=#ffd890");
+      const noon = spyCtx();
+      painter(noon.ctx, w, h, 0);
+      expect(noon.log.some((l) => l.startsWith("fillStyle=rgba"))).toBe(false);
+      expect(noon.log).toContain("fillStyle=#55555e");
     }
   });
 });
