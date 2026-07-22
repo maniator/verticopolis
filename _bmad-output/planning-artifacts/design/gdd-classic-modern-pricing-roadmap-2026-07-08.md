@@ -65,6 +65,29 @@ control (fixed per-facility income). Canon values:
 > each 3-day quarter, per the same snippets), which retired the calendar-parity
 > rescale for Classic under the owner's call, and the commercial daily-income
 > gap now on the backlog (#572).
+>
+> **#575 READ 2026-07-22 (primary manual + Wine harness + independence
+> assessment), still open, per the owner's call to upgrade honestly and keep the
+> row.** The independence question resolved NEGATIVE: RO, the GameFAQs FAQ
+> lineage (BStuart ~1995 -> Aristotle47 -> furdude2 -> kiwizoid), and the Fandom
+> wiki are ONE lineage (RO admits consulting the FAQ walkthroughs; the lineage
+> roots in the game's own README/help plus BStuart's direct play, and BStuart
+> notes the manual's own figures are wrong). Per the PR #574 ruling that is not
+> corroboration. What DID land: (1) the CADENCE is primary-confirmed. The
+> official manual, read directly off the disc (Italian full text + English OCR),
+> states a quarter is 3 in-game days, a year is 4 quarters, and the Finance
+> window reports per quarter (figures x100); the manual is SILENT on the dollar
+> tables. (2) The rent-class STRUCTURE round-trips into the retail 1994 game
+> under the Wine harness (a tower carrying these rungs loads and renders
+> correctly), but a headless per-class dollar read was not achievable (an
+> imported tower's tenants never instantiate, so a facility info window divides
+> by zero; an all-vacant fixture crashes on load; a genuinely game-populated
+> tower needs interactive in-game building over many in-game days). (3) A second
+> independent source, patcoston.com (outside the lineage), gives office 2k/5k/10k
+> and condo $150k sale / $80k build. Net: OFFICE and CONDO gain a genuine second
+> source and the office cadence is primary-confirmed; HOTEL values remain
+> single-lineage. The standing #575 gap is now narrowed to an independent dollar
+> read of the hotel ladders and the condo minimum.
 
 ## 1. Decision: pricing split shape (unanimous)
 

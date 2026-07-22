@@ -42,39 +42,58 @@ export type PriceOptions =
  * The Classic canon rent ladders, dollars per kind in rung order
  * (Very Low / Low / Average / High).
  *
- * Provenance (record honestly, GDD §2 / epics AR5): the rent-class STRUCTURE
+ * Provenance (record honestly, GDD §2 / epics AR5). The rent-class STRUCTURE
  * (one 4-level dropdown plus No Rate, TDT byte 0-4) comes from the
- * reverse-engineered TDT docs (docs/canon/tdt-format.md §4). The DOLLAR tables
- * originally came from the Relentless Optimizer fan reference alone; on
- * 2026-07-22 search snippets of the GameFAQs FAQ lineage (BStuart, furdude2,
- * Aristotle47) matched every table below, rung for rung, nightly hotel cadence
- * included (spec-classic-economy-canon-cadence-2026-07-22 §2). That is
- * snippet-level, same-lineage corroboration, NOT established independence, so
- * every confidence tier below stays provisional until a primary or genuinely
- * independent source is read directly (#575). The archive.org manual remains
- * unread; if a primary source ever contradicts these, re-open the pricing
+ * reverse-engineered TDT docs (docs/canon/tdt-format.md §4) and is CONFIRMED to
+ * round-trip into the retail 1994 game: a tower carrying these rungs loads and
+ * renders correctly under the Wine harness (tools/simtower/, #575 read
+ * 2026-07-22). The per-quarter CADENCE is now primary-confirmed: the official
+ * manual, read directly off the disc (Italian full text + English OCR), states
+ * a quarter is 3 in-game days, a year is 4 quarters, and the Finance window
+ * reports per quarter (figures x100). The DOLLAR VALUES are a separate matter.
+ * They originated in the Relentless Optimizer fan reference; the 2026-07-22
+ * #575 source sweep established that RO, the GameFAQs FAQ lineage (BStuart
+ * ~1995 -> Aristotle47 -> furdude2 -> kiwizoid), and the Fandom wiki are ONE
+ * lineage, NOT independent (RO admits consulting the FAQ walkthroughs; the
+ * lineage roots in the game's own README/help plus BStuart's direct play, and
+ * BStuart notes the manual's own figures are wrong). Per the owner's PR #574
+ * ruling a single lineage is not corroboration, so the value tiers stay
+ * provisional. Two genuinely independent anchors were found: the official
+ * manual (confirms the structure and cadence but is SILENT on the dollar
+ * tables) and patcoston.com (outside the lineage; independently gives office
+ * 2k/5k/10k and condo $150k sale / $80k build). Hotels have only the single
+ * lineage. The retail game IS the definitive value source, but a headless
+ * per-class dollar read was not achievable in this pass (an imported tower's
+ * tenants never instantiate, so a facility info window divides by zero; an
+ * all-vacant fixture crashes on load; a genuinely game-populated tower needs
+ * interactive in-game building over many in-game days). Remaining gap (#575,
+ * still open): an independent dollar read of the hotel ladders and the condo
+ * minimum. If a primary source ever contradicts these, re-open the pricing
  * GDD's Decision 2 and the cadence spec's ruling. Classic uses the FULL canon
  * values by the owner's call of 2026-07-08.
  */
 const CLASSIC_RENT_LADDERS: Readonly<Partial<Record<string, readonly [number, number, number, number]>>> = {
-  // Office, quarterly. HARD confidence: matches our band anchors; FAQ-lineage
-  // snippets match the full ladder (2/5/10/15k quarterly).
+  // Office, quarterly. HARD confidence: matches our band anchors; the quarterly
+  // cadence is primary-confirmed (manual); patcoston.com independently gives
+  // 2k/5k/10k, so the low three rungs have a second source outside the lineage.
+  // The High 15k rung and the exact 4-value shape are still lineage-only.
   office: [2_000, 5_000, 10_000, 15_000],
-  // Condo, one-time sale (locked after it sells). MED confidence: FAQ-lineage
-  // snippets match the $150k one-time figure, but a 40k-vs-50k minimum stays
-  // unresolved; 50k until verified. Classic MAY list below the $80k build
-  // cost (canon firesale); Modern keeps its break-even floor.
+  // Condo, one-time sale (locked after it sells). MED confidence: patcoston.com
+  // independently confirms the $150k sale against the $80k build cost, outside
+  // the FAQ lineage. The 40k-vs-50k minimum stays unresolved (lineage-only); 50k
+  // until verified. Classic MAY list below the $80k build cost (canon firesale);
+  // Modern keeps its break-even floor.
   condo: [50_000, 100_000, 150_000, 200_000],
-  // Hotel single, nightly. SOFT confidence, provisionally reinforced:
-  // single-source (~10x our old band, accepted per GDD §2), FAQ-lineage
-  // snippets match (500-1500-2k-3k nightly) but are not established as
-  // independent of that source (#575).
+  // Hotel single, nightly. SOFT confidence: single lineage only (BStuart FAQ ->
+  // RO -> Fandom, established as one lineage, not independent; #575). The manual
+  // is silent on the dollar tables and the headless harness could not read them,
+  // so this ladder (500-1500-2k-3k nightly) is the standing #575 gap.
   hotelSingle: [500, 1_500, 2_000, 3_000],
-  // Hotel double, nightly. SOFT confidence, provisionally reinforced
-  // (800-2k-3k-4500; see the single's note).
+  // Hotel double, nightly. SOFT confidence, single-lineage only
+  // (800-2k-3k-4500; see the single's note; #575).
   hotelDouble: [800, 2_000, 3_000, 4_500],
-  // Hotel suite, nightly. SOFT confidence, provisionally reinforced
-  // (1500-4k-6k-9k; see the single's note).
+  // Hotel suite, nightly. SOFT confidence, single-lineage only
+  // (1500-4k-6k-9k; see the single's note; #575).
   hotelSuite: [1_500, 4_000, 6_000, 9_000],
 };
 
