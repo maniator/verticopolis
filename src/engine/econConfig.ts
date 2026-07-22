@@ -61,8 +61,9 @@ export const ECON = {
    * counter lives on the weekday office-lunch crowd, so it QUIETS on weekends,
    * while restaurants and shops (leisure trade) pick up. Classic instead matches
    * the literal 1994 visitor targets (all retail busier on weekends), resolved in
-   * `GameRules.weekendMultiplier`. Only the three demand-pool retail kinds appear
-   * here: attendance venues (cinema, party hall) are deliberately left out,
+   * `GameRules.weekendMultiplier`. Only the demand-pool retail kinds appear
+   * here (the canon three plus the Modern-only Food Hall): attendance venues
+   * (cinema, party hall) are deliberately left out,
    * because their take reads the live-attendance fill (#424), which the crowd
    * already spawns with its own weekday/weekend rhythm, so a flat multiplier on
    * top would double-count the weekend. PROVISIONAL magnitudes, pending a playtest

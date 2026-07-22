@@ -55,12 +55,13 @@ export const FOODHALL_SUBTYPES = [
 ] as const;
 
 /**
- * The canon name list for `kind`, or null when the kind carries no canon
- * subtype (every kind that isn't shop / fastFood / restaurant). Callers use
- * the null return as the pre-RNG-draw short-circuit: a Classic tower whose
- * diet skips retail must NOT touch `sim.rng`, or its seeded rent/event stream
- * would drift. Mirrors the `Simulation.rollCondoRelocations` short-circuit
- * where `chance <= 0` returns before the roll.
+ * The subtype (stall/variant) name list for `kind`, or null when the kind
+ * carries none. The canon retail kinds (shop / fastFood / restaurant) return
+ * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
+ * roster. Callers use the null return as the pre-RNG-draw short-circuit: a
+ * Classic tower whose diet skips retail must NOT touch `sim.rng`, or its seeded
+ * rent/event stream would drift. Mirrors the `Simulation.rollCondoRelocations`
+ * short-circuit where `chance <= 0` returns before the roll.
  */
 export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
   switch (kind) {
