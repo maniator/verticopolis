@@ -83,7 +83,13 @@ party memlog.
    pan the same way a held Space always has: the pan key is one rule across
    pointer types (CLARIFIED per review 2026-07-22; this AC originally claimed
    touch was unaffected by the modifier, contradicting the ratified
-   "matching the space-hold gate" design and the shipped test).
+   "matching the space-hold gate" design and the shipped test). One sanctioned
+   Space-side change rides the AC3 arrow skip: Space+click on a selected
+   elevator's extend arrow used to extend one floor and now pans. A no-move
+   modifier tap over the arrow then follows the armed tool's tap rule: with
+   Inspect it acts like a tap at that spot (over empty sky, deselect); with a
+   build or bulldoze tool it stays a dead tap and the selection persists. The
+   one-pan-key rule covers Space and Shift alike.
 5. Gesture classification reads the modifier at pointer-down, matching the
    space-hold behavior (releasing Shift mid-drag keeps the pan until
    pointer-up).
@@ -168,32 +174,84 @@ Layers run: Blind Hunter, Edge Case Hunter, Acceptance Auditor (all completed).
 
 - [x] [Review][Patch] Shift+press on a selected elevator's extend arrow
   resized the shaft (arrow hit-test ran before classification)
-  [src/render/excalibur/towerInputCamera.ts] — fixed: the pan key now skips
-  the arrow branch, with a regression test; AC3 amended to cover it.
+  [src/render/excalibur/towerInputCamera.ts] (fixed: the pan key skips the
+  arrow branch, with a regression test; AC3 amended to cover it).
 - [x] [Review][Patch] Shift+wheel zoomed out-only (browsers remap Shift+wheel
   to deltaX, so deltaY read 0 every notch)
-  [src/render/excalibur/towerInputCamera.ts] — fixed: deltaX fallback, dead
-  events dropped, both directions pinned by test.
+  [src/render/excalibur/towerInputCamera.ts] (fixed: deltaX fallback, dead
+  events dropped, both directions pinned by test).
 - [x] [Review][Patch] Help lede still opened with the flat "drag to pan"
-  claim AC6 ordered rewritten [src/ui/templates/helpContent.ts] — fixed:
-  "drag to pan with the Inspect tool; with a build tool, hold Shift...".
+  claim that AC6 ordered rewritten [src/ui/templates/helpContent.ts] (fixed:
+  "drag to pan with the Inspect tool; with a build tool, hold Shift...").
 - [x] [Review][Patch] AC4's "touch is unaffected by the modifier" contradicted
-  the deliberate hybrid-touch behavior (Space precedent) — fixed: AC4
-  reworded; one pan-key rule across pointer types.
+  the deliberate hybrid-touch behavior (Space precedent) (fixed: AC4
+  reworded; one pan-key rule across pointer types).
 - [x] [Review][Patch] Docked narrow-viewport refusal card rendered translucent
   on hover devices (capability gate vs width-based dock tier)
-  [src/styles.css] — fixed: the opacity media query now also requires the
-  exact complement of the GameApp.mobileMq dock query.
+  [src/styles.css] (fixed: the opacity media query now also requires the
+  exact complement of the GameApp.mobileMq dock query).
 - [x] [Review][Patch] buildRefusalShowing leaked true through the inspector
   ✕-dismiss path (latent; the flag is now a positioning input)
-  [src/game/uiCallbacks.ts, src/main.ts] — fixed: onInspectorClose clears the
-  refusal latch through a new GameAppPorts.clearBuildRefusal port.
+  [src/game/uiCallbacks.ts, src/main.ts] (fixed: onInspectorClose clears the
+  refusal latch through a new GameAppPorts.clearBuildRefusal port).
 - [x] [Review][Defer] Hybrid touch: a held pan key suppresses drag-paint but a
   touch TAP still places (onTap has no modifier guard)
-  [src/game/engineWiring.ts] — deferred, pre-existing Space parity; recorded
-  in the backlog Deferral inbox.
+  [src/game/engineWiring.ts] (deferred, pre-existing Space parity; recorded
+  as curated backlog row hybrid-touch-pan-key-tap-paint with issue #589).
 - Dismissed (3): camera Shift test title overstating what the mocked
   classifier pins (the argument assertion is the real pin and
   gesture.test.ts covers routing); AC8's help-test clause (help tests do not
   pin the lede, verified); the .preview-refuse CSS contract "unpinned" claim
   (inspector.test.ts:171 already pins the class).
+
+### Review Findings, round 2 (post-merge follow-up, 2026-07-22)
+
+PR #590 merged mid-campaign; round 2 ran four layers (Blind Hunter, Edge Case
+Hunter, Acceptance Auditor, and a BMAD plumbing lens) on the net diff, and its
+fixes ship as the v1.84.1 follow-up PR on the re-cut branch.
+
+- [x] [Review][Patch] The wheel deltaX fallback was not gated on Shift, so an
+  unmodified sideways trackpad scroll zoomed direction-dependently
+  [src/render/excalibur/towerInputCamera.ts] (fixed: fallback reads the
+  native event's shiftKey; unmodified deltaX-only events drop; both the
+  Shift remap and the no-op are pinned by tests).
+- [x] [Review][Patch] The opacity gate sat in section 4 as a third unlinked
+  copy of the phone breakpoint, with an integer-only complement
+  [src/styles.css] (fixed: moved to section 5 beside the sibling capability
+  rules, switched to range syntax so fractional viewports cannot fall
+  between the queries, and back-pointed from the phone block and
+  GameApp.mobileMq).
+- [x] [Review][Patch] Seven em-dashes used as prose punctuation in round 1's
+  findings log (fixed: reworded to the parenthetical house idiom).
+- [x] [Review][Patch] The defer bullet claimed the finding lived in the
+  Deferral inbox; it lives as a curated row with issue #589 (fixed above).
+- [x] [Review][Patch] AC4 did not carve out the sanctioned Space-side change
+  (Space+arrow-click now pans instead of extending one floor; a no-move
+  modifier tap behaves like an inspect-tool tap) (fixed: AC4 amended).
+- [x] [Review][Patch] The party memlog recorded the ship as v1.82.0 (fixed:
+  superseding correction appended; the release is v1.84.0).
+- [x] [Review][Patch] Copy and comment polish: onboarding hint and help lede
+  now say "hold Shift or Space AND DRAG"; "actually" dropped from the
+  CHANGELOG line; the wheel comment's dated "now" and main.ts's positional
+  "directly above" reworded; Ready. leads added to the two P3 backlog rows.
+- Dismissed (2): the modifier-tap deselect over an extend arrow (intended
+  one-pan-key semantics, now documented in AC4); the round-1 CSS complement
+  algebra (verified correct at integer sizes; the fractional gap is the
+  range-syntax fix above).
+
+### Review Findings, round 3 (2026-07-22)
+
+Two layers on the v1.84.1 diff (Blind Hunter; combined Edge Case Hunter +
+Acceptance Auditor with repo access). All seven round-2 fixes verified
+genuinely landed; the wheel ternary held under attack (right-associative,
+correct for every deltaY/shiftKey combination); Excalibur's dispatch site
+confirmed to pass the native DOM event as `WheelEvent.ev` (and a rename
+would fail typecheck, closing the fake-shape worry); no other rule touches
+the card's opacity, closing the cascade-order worry.
+
+- [x] [Review][Patch] AC4's deselect parenthetical held only with the
+  Inspect tool armed; with build/bulldoze the modifier tap stays dead and
+  the selection persists (fixed: AC4 reworded to state the per-tool rule).
+
+Round 4 (single verifier) confirmed the reword and no regressions: campaign
+closed with nothing left to fix.

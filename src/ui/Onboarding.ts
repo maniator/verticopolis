@@ -117,7 +117,7 @@ export const ONBOARD_STEPS: OnboardStep[] = [
     id: "floor",
     title: "Add a floor",
     sub: "Every room needs a floor under it. Lay one just above your lobby.",
-    hintDesktop: "Pick Floor in the palette, then drag across the row above your lobby. (To pan, hold Shift and drag, or hold Space.)",
+    hintDesktop: "Pick Floor in the palette, then drag across the row above your lobby. (To pan, hold Shift or Space and drag.)",
     hintMobile: "Tap Floor, then tap the row just above your lobby to lay floor tiles.",
     pulse: '.pal-item[data-kind="floor"]',
     done: (sim) => sim.tower.units.some((u) => u.kind === "floor" && u.floor >= 2),

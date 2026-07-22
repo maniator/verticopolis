@@ -97,9 +97,10 @@ export function bindInput(engine: TowerEngine): void {
   ptr.on("wheel", (ev) => {
     const w = ev as ex.WheelEvent;
     // Browsers remap Shift+wheel to horizontal scroll (deltaY 0, motion in
-    // deltaX). Shift is a sanctioned pan key now, so fall back to deltaX and
-    // drop dead events instead of reading deltaY 0 as zoom-out every notch.
-    const d = w.deltaY !== 0 ? w.deltaY : w.deltaX;
+    // deltaX), so under the Shift pan key the fallback axis carries the zoom
+    // intent. Gated on Shift (w.ev is the native DOM event): an unmodified
+    // sideways trackpad swipe is a scroll, not a zoom, and dead events drop.
+    const d = w.deltaY !== 0 ? w.deltaY : (w.ev as { shiftKey?: boolean } | undefined)?.shiftKey ? w.deltaX : 0;
     if (d === 0) return;
     zoomAt(engine, d < 0 ? 1.12 : 0.89, w.x, w.y);
   });
@@ -155,9 +156,8 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   engine.moved = 0;
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  // Pan key: Space (Excalibur keyboard) or Shift, read off the native pointer
-  // event (the press itself carries the modifier, surviving focus quirks).
-  // Down-only read, matching Space: releasing mid-drag keeps the pan.
+  // Pan key: Space (Excalibur keyboard) or Shift off the native pointer event
+  // (the press carries the modifier). Down-only, like Space: release mid-drag keeps the pan.
   const native = ev.nativeEvent as { shiftKey?: boolean } | undefined;
   const panKey = engine.engine.input.keyboard.isHeld(ex.Keys.Space) || native?.shiftKey === true;
   // Left-click on a selected elevator's extend arrow grows the shaft. A held

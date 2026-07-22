@@ -374,23 +374,9 @@ html.reduce-motion *::after {
   display: none;
   pointer-events: auto;
 }
-/* The Modern build-refusal card anchors a row BELOW the invalid preview strip
-   (see panelAnchoring), but viewport clamping can still push it back over the
-   strip near the bottom edge. On hover devices the card goes slightly
-   translucent as insurance for that case: 0.85 keeps the gray face and navy
-   title fully legible while the red strip underneath still reads through.
-   Hover devices only, and only on the world-anchored tier: the two width
-   branches below are the exact complement of the docked mobile tier
-   ("max-width: 767px, or max-width: 1023px and max-height: 599px", the same
-   query GameApp.mobileMq uses), so a hover-capable browser narrowed into the
-   docked layout keeps the pinned card (dismissed via ✕) fully opaque. The
-   inspect-tool hover card carries no .preview-refuse, so it is untouched. */
-@media (hover: hover) and (pointer: fine) and (min-width: 768px) and (min-height: 600px),
-  (hover: hover) and (pointer: fine) and (min-width: 1024px) {
-  #inspector:has(.preview-refuse) {
-    opacity: 0.85;
-  }
-}
+/* The build-refusal card's hover-tier translucency lives with the other
+   capability/tier rules in section 5 MEDIA (the block after the coarse-pointer
+   rules), because its gate is the complement of the phone block's query. */
 
 /* ---- Toasts ---- */
 #toast-wrap {
@@ -1544,7 +1530,9 @@ dialog.crash-card::backdrop {
 /* Phone block: true phones (≤767px) plus short landscape phones (wide but under
    600px tall). Portrait tablets (≥768px wide AND ≥600px tall) fall through to the
    tablet block below; a landscape phone has no vertical room for docked panels, so
-   it stays on the bottom-strip + drawer here. */
+   it stays on the bottom-strip + drawer here. Mirrored by GameApp.mobileMq, and
+   the refusal-card opacity gate (end of this section) encodes its COMPLEMENT:
+   a breakpoint change here must land in both. */
 @media (max-width: 767px), (max-width: 1023px) and (max-height: 599px) {
   #topbar {
     gap: 8px;
@@ -1859,5 +1847,24 @@ dialog.crash-card::backdrop {
      not a width breakpoint, is why a new width tier can't silently lose it. */
   #inspector .insp-close {
     display: inline-block;
+  }
+}
+
+/* The Modern build-refusal card anchors a row BELOW the invalid preview strip
+   (see panelAnchoring), but viewport clamping can still push it back over the
+   strip near the bottom edge. On hover devices the card goes slightly
+   translucent as insurance for that case: 0.85 keeps the gray face and navy
+   title fully legible while the red strip underneath still reads through.
+   Hover devices only, and only on the world-anchored tier: the two width
+   branches are the EXACT complement (range syntax, so fractional viewport
+   sizes cannot fall between the queries) of the phone block above and of
+   GameApp.mobileMq, which both name this rule; a breakpoint change must land
+   in all three places. A hover-capable browser narrowed into the docked
+   layout keeps the pinned card (dismissed via ✕) fully opaque, and the
+   inspect-tool hover card carries no .preview-refuse, so it is untouched. */
+@media (hover: hover) and (pointer: fine) and (width > 767px) and (height > 599px),
+  (hover: hover) and (pointer: fine) and (width > 1023px) {
+  #inspector:has(.preview-refuse) {
+    opacity: 0.85;
   }
 }

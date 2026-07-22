@@ -29,7 +29,7 @@ export interface HelpSection {
 export function helpLede(): TemplateResult {
   return html`
     <p>Build a thriving high-rise and earn your way to a coveted <b>TOWER</b> rating.</p>
-    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> and drag to pan (middle or right drag, or holding Space, works too). Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
+    <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle or right button drag pans too. Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
   `;
 }
 
