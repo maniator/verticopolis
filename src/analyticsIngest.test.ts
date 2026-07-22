@@ -3,6 +3,7 @@ import {
   buildCaptureBody,
   handleIngest,
   MAX_BODY_BYTES,
+  originAllowed,
   RateLimiter,
   type IngestDeps,
 } from "./analyticsIngest";
@@ -52,6 +53,35 @@ describe("handleIngest", () => {
     const res = await handleIngest(new Request("https://verticopolis.com/api/ingest"), deps);
     expect(res.status).toBe(405);
     expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects a cross-site Origin with 403 before doing any work", async () => {
+    // `Origin` is a forbidden header to set on a real Request (the browser sets
+    // it), so drive the guard with a minimal request. The json spy proves the
+    // cross-site POST is rejected before the body is even parsed.
+    const deps = makeDeps();
+    const json = vi.fn();
+    const req = {
+      method: "POST",
+      headers: { get: (n: string) => (n === "origin" ? "https://evil.example" : null) },
+      json,
+    } as unknown as Request;
+    const res = await handleIngest(req, deps);
+    expect(res.status).toBe(403);
+    expect(json).not.toHaveBeenCalled();
+    expect(deps.fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("allows a same-origin POST whose Origin header is ours", async () => {
+    const deps = makeDeps();
+    const req = {
+      method: "POST",
+      headers: { get: (n: string) => (n === "origin" ? "https://verticopolis.com" : null) },
+      json: async () => ({ event: "boot" }),
+    } as unknown as Request;
+    const res = await handleIngest(req, deps);
+    expect(res.status).toBe(204);
+    expect(deps.fetchImpl).toHaveBeenCalledTimes(1);
   });
 
   it("no-ops with 204 when the PostHog secrets are absent", async () => {
@@ -260,6 +290,33 @@ describe("buildCaptureBody", () => {
   it("falls back to an unknown environment when VERCEL_ENV is absent", () => {
     const body = buildCaptureBody({ event: "boot" }, undefined);
     expect(body.properties.environment).toBe("unknown");
+  });
+});
+
+describe("originAllowed", () => {
+  it("allows the custom domain in every environment", () => {
+    expect(originAllowed("https://verticopolis.com", "production")).toBe(true);
+    expect(originAllowed("https://verticopolis.com", "preview")).toBe(true);
+  });
+
+  it("trusts *.vercel.app only outside production", () => {
+    // A preview deployment's own origin is <branch>.vercel.app: allowed there.
+    expect(originAllowed("https://feature-branch.vercel.app", "preview")).toBe(true);
+    expect(originAllowed("https://feature-branch.vercel.app", "development")).toBe(true);
+    // In production the shared *.vercel.app suffix is NOT trusted: it is common to
+    // every Vercel customer, so any site on it would otherwise pass.
+    expect(originAllowed("https://someone-else.vercel.app", "production")).toBe(false);
+  });
+
+  it("allows an absent Origin (non-browser client or curl smoke test)", () => {
+    expect(originAllowed(null, "production")).toBe(true);
+  });
+
+  it("rejects a foreign, look-alike, or malformed Origin", () => {
+    expect(originAllowed("https://evil.example", "production")).toBe(false);
+    expect(originAllowed("https://verticopolis.com.evil.example", "production")).toBe(false);
+    expect(originAllowed("https://verticopolis.com.evil.example", "preview")).toBe(false);
+    expect(originAllowed("not a url", "preview")).toBe(false);
   });
 });
 

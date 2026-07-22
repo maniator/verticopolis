@@ -9,6 +9,8 @@
  *
  * What it does, per the spec:
  * - Accept only POST; other methods get 405.
+ * - Reject a cross-site browser POST (a present, foreign `Origin`) with 403, so
+ *   the public endpoint cannot be used as a cross-site spam target.
  * - No-op with 204 when the PostHog secrets are absent, so a missing env var can
  *   never break the site (telemetry is best-effort).
  * - Rate-limit per client IP with a fixed window; over-limit requests get 429
@@ -146,6 +148,37 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * Same-origin guard for the public POST endpoint. A browser always sends an
+ * `Origin` header on a cross-origin POST (even a "simple" `text/plain` one that
+ * skips the CORS preflight), so a present-but-foreign origin means another site
+ * is trying to use the relay as a spam target and is rejected. An absent `Origin`
+ * (a non-browser client, the `curl` smoke test) cannot be checked, so it is
+ * allowed.
+ *
+ * The check is environment-aware. In production the only legitimate origin is the
+ * custom domain `verticopolis.com`. The `*.vercel.app` suffix is deliberately NOT
+ * trusted in production: it is shared across every Vercel customer, so any site
+ * on it could otherwise pass. That suffix is accepted only on preview and
+ * development deployments, whose own origin is `<branch>.vercel.app` and whose
+ * traffic is isolated from production (the `environment` tag, and a
+ * preview-scoped key when configured). To tighten previews too, serve them on a
+ * `verticopolis.com` subdomain (a Vercel preview deployment suffix) and drop the
+ * `.vercel.app` branch.
+ */
+export function originAllowed(origin: string | null, environment: string | undefined): boolean {
+  if (!origin) return true;
+  let host: string;
+  try {
+    host = new URL(origin).hostname;
+  } catch {
+    return false;
+  }
+  if (host === "verticopolis.com") return true;
+  if (environment !== "production") return host.endsWith(".vercel.app");
+  return false;
+}
+
+/**
  * Build the PostHog capture body from the client payload. Every server-authored
  * field (`distinct_id`, `$process_person_profile`, `environment`) is written
  * AFTER the client property spread, so a crafted client body can never override
@@ -183,6 +216,13 @@ export function buildCaptureBody(
  */
 export async function handleIngest(request: Request, deps: IngestDeps): Promise<Response> {
   if (request.method !== "POST") return new Response(null, { status: 405 });
+
+  // Reject a cross-site browser POST before doing any work: a foreign Origin has
+  // no business posting to our same-origin relay. Production trusts only the
+  // custom domain, not the shared `*.vercel.app` suffix (see `originAllowed`).
+  if (!originAllowed(request.headers.get("origin"), deps.environment)) {
+    return new Response(null, { status: 403 });
+  }
 
   // Best-effort: a missing secret must never break the site, so no-op with 204
   // (the same success shape a forwarded request returns) instead of erroring.
