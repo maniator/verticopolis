@@ -48,6 +48,13 @@ describe("injectVercelTelemetry host gate", () => {
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
+  it("injects on the canonical absolute FQDN (trailing dot)", () => {
+    window.location.href = "https://verticopolis.com./";
+    injectVercelTelemetry();
+    expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+  });
+
   it("skips on any other host (localhost, preview server, native shell)", () => {
     window.location.href = localhost;
     injectVercelTelemetry();

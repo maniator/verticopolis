@@ -182,6 +182,9 @@ export function originAllowed(origin: string | null, environment: string | undef
   } catch {
     return false;
   }
+  // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
+  // matched like the usual form. Mirror this in `telemetryHostAllowed`.
+  host = host.replace(/\.$/, "");
   if (host === "verticopolis.com" || host.endsWith(".verticopolis.com")) return true;
   // Trust the shared *.vercel.app suffix only when we KNOW we are non-production
   // (a truthy VERCEL_ENV other than "production"). An absent or empty VERCEL_ENV

@@ -26,16 +26,19 @@ import { analyticsAdapter } from "./analyticsAdapter";
  * is served: the production domain, our own subdomains (a `*.preview.verticopolis.com`
  * preview deployment), and the raw `*.vercel.app` deploy URLs. False on localhost,
  * the `vite preview` server the e2e console-error guards run against, the native
- * Capacitor shell, and any server-side (no `window`) context. Keeping every
- * telemetry surface on one predicate means they can never drift out of gate parity.
+ * Capacitor shell, and any server-side (no `window`) context. The page-view inject
+ * and the gameplay events both gate on this one predicate, so those two client
+ * surfaces never diverge from each other.
  *
- * IMPORTANT: this host set mirrors `originAllowed` in `analyticsIngest.ts` (the
- * server-side same-origin guard on the relay). Change the two together; the
- * client emits from here, the server accepts there, and a drift silently drops
- * events (client dark, or server 403). The server side additionally refuses the
- * shared `*.vercel.app` suffix in production, since it is common to every Vercel
- * customer; here on the client it is harmless because only our own deployments
- * ever serve this bundle.
+ * IMPORTANT: keep this host set in step with `originAllowed` in
+ * `analyticsIngest.ts` (the server-side same-origin guard on the relay): change
+ * the two together, since the client emits from here and the server accepts there.
+ * They agree on our own domain but are NOT identical predicates. The server is
+ * environment-aware and refuses the shared `*.vercel.app` suffix in production; the
+ * client cannot read `VERCEL_ENV`, so it trusts that suffix everywhere. The one
+ * consequence: a production visit via the raw `*.vercel.app` deploy alias emits
+ * from the client and is refused (403) by the relay. That is rare and accepted,
+ * since production traffic comes from the custom domain.
  *
  * This is a functional gate (only where the endpoints are served), not a security
  * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
@@ -43,7 +46,9 @@ import { analyticsAdapter } from "./analyticsAdapter";
  */
 export function telemetryHostAllowed(): boolean {
   if (typeof window === "undefined") return false;
-  const host = window.location.hostname;
+  // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
+  // matched like the usual form. Mirror this in `originAllowed`.
+  const host = window.location.hostname.replace(/\.$/, "");
   return (
     host === "verticopolis.com" ||
     host.endsWith(".verticopolis.com") ||

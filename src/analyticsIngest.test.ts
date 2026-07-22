@@ -330,6 +330,8 @@ describe("originAllowed", () => {
     // A custom-suffix preview deployment (*.preview.verticopolis.com) is ours.
     expect(originAllowed("https://branch.preview.verticopolis.com", "production")).toBe(true);
     expect(originAllowed("https://branch.preview.verticopolis.com", "preview")).toBe(true);
+    // The canonical absolute FQDN (trailing dot) is matched like the usual form.
+    expect(originAllowed("https://verticopolis.com.", "production")).toBe(true);
   });
 
   it("trusts *.vercel.app only outside production", () => {
