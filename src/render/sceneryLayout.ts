@@ -3,8 +3,8 @@ import type { Unit } from "../engine/types";
 
 /**
  * Pure layout for the world outside the tower (the scenery pass): the skyline
- * silhouettes, the neighbor building across the alley, the street on the far
- * side, the grass/apron split along the ground line, and the tree and bush
+ * silhouettes, the fountain-roundabout plaza at the left lot edge, the street
+ * on the far side, the grass/apron split along the ground line, and the tree and bush
  * spots on the open lot. Everything here is a pure function of the tower's
  * founding seed (RNG.initialSeed, fixed for the tower's whole life; the live
  * RNG state mutates every roll and must never key visuals) and the built
@@ -19,11 +19,14 @@ import type { Unit } from "../engine/types";
  * scenery can ever cover a built room.
  */
 
-/** Tiles of breathing room between the lot line and the neighbor's wall. */
-export const ALLEY_TILES = 3;
-/** The neighbor building's facade width and height, in tiles and floors. */
-export const NEIGHBOR_TILES = 26;
-export const NEIGHBOR_FLOORS = 6.4;
+/** Left edge, walking away from the lot: sidewalk, then the fountain
+ *  roundabout (an elliptical drive around a grass island), then the road
+ *  running to the dirt's far edge. All in tiles; negative = left of the lot. */
+export const PLAZA_SIDEWALK_TILES = 4;
+export const ROUNDABOUT_START = -36;
+export const ROUNDABOUT_TILES = 32;
+export const FOUNTAIN_TILE = -20;
+export const PLAZA_LAMP_TILES = [-35, -5] as const;
 /** Right-edge strip: paved forecourt, then sidewalk, then the road. */
 export const FORECOURT_TILES = 3;
 export const SIDEWALK_TILES = 4;
@@ -69,13 +72,13 @@ export function skylineRects(seed: number): SkylineRect[] {
   const rects: SkylineRect[] = [];
   const from = -SKYLINE_OVERSCAN_TILES;
   const to = GRID.width + SKYLINE_OVERSCAN_TILES;
-  for (let t = from; t < to; t += 7) {
-    const w = 4 + hash01(seed + t) * 5;
-    rects.push({ tile: t, w, hFloors: 2.6 * (0.5 + hash01(seed + t * 3) * 0.5), depth: 0 });
+  for (let t = from; t < to; t += 16) {
+    const w = 9 + hash01(seed + t) * 8;
+    rects.push({ tile: t, w, hFloors: 10 + hash01(seed + t * 3) * 26, depth: 0 });
   }
-  for (let t = from + 3; t < to; t += 11) {
-    const w = 5 + hash01(seed + t * 7) * 6;
-    rects.push({ tile: t, w, hFloors: 1.55 * (0.5 + hash01(seed + t * 13) * 0.5), depth: 1 });
+  for (let t = from + 5; t < to; t += 23) {
+    const w = 12 + hash01(seed + t * 7) * 10;
+    rects.push({ tile: t, w, hFloors: 5 + hash01(seed + t * 13) * 13, depth: 1 });
   }
   return rects;
 }
