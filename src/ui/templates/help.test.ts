@@ -96,6 +96,7 @@ describe("helpTemplate structure and a11y", () => {
     rainCrowdFactor: "rain thins the crowd",
     hotelDaytimePresence: "linger past checkout", // #304, the late-checkout lunch trip
     elevatorScheduleUX: "Smarter scheduling", // #305, presets + auto-tune + advice vs the raw grid
+    quarterlyRentScale: "full 1994 rent lump", // Classic collects the full canon lump each 3-day quarter; Modern smooths per-day income across its calendar choice (spec-classic-economy-canon-cadence)
     // No dedicated player-facing copy (folded, internal, load-only, or UI-only):
     coerceResidents: null, // load-only household sanitizer
     coerceNoRate: null, // load-only No-Rate sanitizer

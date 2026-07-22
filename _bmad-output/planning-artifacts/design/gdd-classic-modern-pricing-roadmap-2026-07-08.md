@@ -53,6 +53,13 @@ control (fixed per-facility income). Canon values:
 > (Relentless Optimizer); the authoritative archive.org SimTower manual was
 > unfetchable (403) and no second source corroborates them. Our hotel rates are
 > ~10× BELOW these numbers today. This drives Decision 2.
+>
+> **CLOSED 2026-07-22 (spec-classic-economy-canon-cadence §2):** the GameFAQs
+> FAQ lineage (BStuart, furdude2, Aristotle47) independently corroborates every
+> table above, rung for rung, nightly hotel cadence included; confidence raised
+> SOFT to MED (manual still unread). The same sweep verified the office cadence
+> (the full lump each 3-day quarter), which retired the calendar-parity rescale
+> for Classic, and surfaced the commercial daily-income gap now on the backlog.
 
 ## 1. Decision: pricing split shape (unanimous)
 

@@ -176,14 +176,16 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
  * three-day week), so its fixed three-day run reaches the weekend on day 2,
  * where Classic applies the literal 1994 visitor lift (fast food at 48/35).
  */
-// Re-pinned for Classic canon-zero founding (spec-starter-lobby-mode-split):
-// newGame no longer seeds the Classic lobby, so the fixture's ensureStarterLobby
-// now LAYS the 40 tiles itself (different unit ids and revision history than
-// the founding seed produced, hence the new fingerprint). The Modern hash below
-// is UNCHANGED in the same change, which is the proof the divergence flows only
-// through rules.starterLobby. The prior re-pin was the additive initialSeed
-// save field (outside-scenery identity).
-const PINNED_STATE_HASH = "d608c2a32117ba5170fbff586e16067902d078fe204da401853e4cb2188d87a8";
+// Re-pinned for the Classic canon rent cadence
+// (spec-classic-economy-canon-cadence-2026-07-22): Classic's quarterlyRentScale
+// is now 1, so the fixture's occupied offices collect their FULL rent at each
+// canon 3-day quarter boundary instead of the old 1/30 rescale, moving money
+// and the fields downstream of it. The Modern hash below is UNCHANGED in the
+// same change, which is the proof the divergence flows only through
+// rules.quarterlyRentScale. The prior re-pin was Classic canon-zero founding
+// (spec-starter-lobby-mode-split), where ensureStarterLobby began laying the
+// 40 tiles itself.
+const PINNED_STATE_HASH = "c9b43b091e1e52d1d03506c74ac7d32058ab9045e6646f7d76020692995c551d";
 
 /**
  * The Modern-mode golden-master fingerprint: the same fixed build-and-run
