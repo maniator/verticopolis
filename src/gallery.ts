@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { FACILITIES, GRID } from "./engine/facilities";
-import { AMUSEMENTS_SUBTYPES, FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
@@ -187,6 +187,10 @@ const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
   {
     label: "Amusements",
     entries: [roomEntry("Amusements", "amusements"), ...retailEntries("amusements", AMUSEMENTS_SUBTYPES)],
+  },
+  {
+    label: "Boutique Bay",
+    entries: [roomEntry("Boutique Bay", "boutiqueBay"), ...retailEntries("boutiqueBay", BOUTIQUE_SUBTYPES)],
   },
 ];
 

@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.87.0
+
+- Modern towers can build a new Boutique Bay: a bay of small independent trades that comes as a florist, barber, phone repair, vintage shop, tattoo parlor, record store, or gallery, each with its own art. It earns from foot traffic and is busier on weekends, and it packs the widest variety of any single build. Unlocks at 3 stars. Modern only; Classic keeps the 1994 catalog.
+
 ## 1.85.0
 
 - Modern towers can build a new Amusements hall: an arcade and games venue that comes as a classic arcade, a VR lounge, a claw parlor, or a mini-golf bay, each with its own lively art. It draws teens and families for foot-traffic income and is busier on weekends. Unlocks at 3 stars. Modern only; Classic keeps the 1994 catalog.

@@ -48,10 +48,10 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const hour = clock.hour;
   const weekend = clock.isWeekend;
   // The one-way ambient venue pool: shoppers/diners/players who stroll in and
-  // despawn at the venue. Modern Amusements joins it as a footfall venue, so
-  // people travel to it (foot traffic + transport demand) like a shop instead of
-  // it being a dead destination. Cinema stays out (round-trip attendance flow).
-  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "amusements";
+  // despawn at the venue. The Modern footfall venues (Amusements, Boutique Bay)
+  // join it so people travel to them (foot traffic + transport demand) like a
+  // shop instead of being dead destinations. Cinema stays out (attendance flow).
+  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "amusements" || k === "boutiqueBay";
   const isStaffKind = (k: FacilityKind): k is StaffKind =>
     k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
   const leased = new Set<number>();

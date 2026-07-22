@@ -175,6 +175,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: an arcade and amusements hall (classic cabinets, VR, claw machines, mini-golf). Draws teens and families for games and earns from foot traffic, and is busier on weekends.",
   },
+  boutiqueBay: {
+    kind: "boutiqueBay",
+    category: "retail",
+    name: "Boutique Bay",
+    width: 12,
+    cost: 150000,
+    minStar: 3,
+    population: 22,
+    color: "#3aa88c",
+    modernOnly: true,
+    description: "Modern: a bay of small independent trades (florist, barber, phone repair, vintage, tattoo, record store, gallery). Earns from foot traffic and offers the widest variety of any single build, busier on weekends.",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",
