@@ -120,6 +120,7 @@ How items flow:
 | 2026-07-21 | pr-drift-check-scenes-glob | #551 | tooling | review-deferral | P3 | low | — | open | **Ready. Folded from the deferral inbox by #545 (from the excalibur-preview-drop review).** `pr-drift-check.yml`'s `changes` job classifies render edits with a `scripts/screenshot-*.ts` glob that misses `scripts/scenes/*.ts`, so a scene-only edit (no co-edit of `screenshot-shards.ts`) could skip the drift capture and merge a stale gallery. Fix: widen the filter to `scripts/scenes/**`. Watch-only until a scene-only PR lands. `/bmad-code-review`. |
 | 2026-07-21 | venue-crowd-real-occupancy | #552 | pixel-art | feature-request | P3 | — | — | idea | **Gated. Folded from the deferral inbox by #545 (from the E3/E6 pixel-art reviews and the `venue-people-routing` note).** Draw the venue/platform crowd from real occupancy instead of a seeded scatter, on the `spec-pixelart-people-system` occupancy seam: retire the metro-platform and party-hall `scatterPeople` calls, give cinema/party hall an engine-side visible-attendance count so they stop drawing an empty house (both are population 0 today), and reconcile a baked stair/escalator incline rider with the empty-tower invariant. Do not reintroduce a population-independent ghost crowd. `/gds-code-review`. |
 | 2026-07-21 | audio-first-cue-latency | #554 | audio-music | bug | P3 | low | — | open | **Ready. Folded from the deferral inbox by #545 (from the audio-baking party, 2026-07-13).** `ToneAudioEngine.sfx()` no-ops until `this.started`, so the very first click/build cue before the Tone graph unlocks is silent; arm or queue the first cue on unlock (its own small PR). Gated sibling: bake the ~6 one-shot jingles (via `Tone.Offline` or small Opus assets) ONLY if a real mid-Android first-cue-latency measurement shows a problem (do not bake on spec; add audio to Workbox `globPatterns` and re-check the precache budget if done). The ambient-score WAV bake was rejected unconditionally; sampled stems are a separate future project. `/bmad-code-review`. |
+| 2026-07-21 | lit-string-builder-retirement | #557 | ui-rendering-engine | task | P3 | — | — | idea | **Gated. Folded from the deferral inbox by #545 (from the E2/E3/E4/E5 lit-migration reviews).** Every migrated dialog left its `*Html` string builder as dead production code feeding an `assertDomEquivalent` guard; retire all of them and their transitional tests in one sweep when the last string dialog (editor/inspector, E6/E7) converts. Parked so far: `confirmHtml`, `eventChoiceHtml`, `updatePromptHtml`, `settingsHtml`, `helpHtml`, `savesHtml`, `stopsHtml`, `newTowerHtml`, the three TDT report builders, and the `statsHtml.ts` builders. Where a builder is the sole guard for static copy, add a direct text assertion first. `/bmad-code-review`. |
 | 2026-07-15 | main-ts-split | — | refactor-large-files | task | P2 | med | — | done | **DONE (PR #487, merged 2026-07-19; issue #365 auto-closed on merge).** Split `src/main.ts` from 1,676 lines into a 462-line shell plus the remaining `game/` friend-modules (engineWiring, inputKeys, frameLoop, buildPreview, panelAnchoring, updateFlow, audioPrefs, appModals, trafficHud, appBoot) and `bootstrap.ts`, moves not rewrites, honoring the ratified laws (sim is a guest; narrow constructors; no event bus). Removed the `src/main.ts` entry from `src/tests/fileSize.ratchet.txt` so the size guard now enforces the 500-line ceiling on it (CAP-2 met; CAP-6, an empty ratchet for this file, met). `bootstrap.ts` and `game/appBoot.ts` are measured under coverage with headless tests (the wireControllers adapter closures are invoked and asserted). Mandatory `/gds-code-review` + `/bmad-code-review` both ran; confirmed findings fixed, deferrals recorded in the inbox below. First wave shipped earlier (buildActions, editorActions, saveLoad, inspector, keyboardPlay, later uiCallbacks/mealRush/gesture). |
 | 2026-07-15 | render-perf-region-composition | #366 | render-perf | perf | P2 | med | — | in-progress | **ACTIVE INITIATIVE, recorded so the mirror stays complete: the render-perf effort is executing its spec story order** (CAP-1 zoom cull PR #296, CAP-3 deferred hour reconcile PR #297, picking via grid lookup PRs #301/#364 all shipped). Remaining core story: CAP-2 region composition per `_bmad-output/specs/spec-render-perf-mobile-zoom/region-design.md` (room actors collapse into shared region canvases with a budgeted upload drain), gated on the spec's pre-region gates (full-tower day/night visual baseline, one-region pixel-diff spike, texture-upload micro-bench with its verdict already in the memlog, blame-split probe). The optional drain-tuning story rides the same spec. Pixel-hash census (738 day / 1,302 night unique bitmaps) already falsified the shared-bake alternative; regions ruled unanimously (party 2026-07-15). |
 | 2026-07-15 | onhour-amortization-consult | — | render-perf | design-decision | P2 | med | — | done | **Promoted from prose (the render-perf S1 defer section) to a row 2026-07-15.** `updateSatisfaction` and `collectTrafficIncome` scan the whole tower on the hour and are load-bearing for determinism and the golden master, so splitting their scans across frames needs a checkpoint-the-inputs design consult first (party verdict 2026-07-14: spec non-goal). Once CAP-2 removes the render share of the on-the-hour hitch, this becomes the residual hitch on big towers. Spec-first; do not attempt as a rider. **Resolved 2026-07-15 (#403, closing #367):** the consult ran (party 2026-07-14, `spec-onhour-boundary-cost`) and shipped the outcome-identical hourly noise-scan memo plus served-set hoists, cutting the owner-save median boundary tick about 36 percent (71 to 45ms) with the golden master unmoved. The determinism-breaking frame-splitting stays a non-goal; reopen #367 only if the Pixel 8a still hitches after on-device acceptance. |
@@ -1184,6 +1185,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: party-mode chrome restructure, 2026-07-12
 
+> **ABSORBED (#545) into the a11y-UX sweep (#541).** Exposing the shipped `colorblindCue` pref (default on, gates optional color-redundant markers) in the Settings dialog is a small a11y-UI item that fits that sweep; it deserves a demo of the gated markers and explanatory copy.
+
 - **`colorblindCue` pref has no UI**: the Prefs field ships (default on, gates
   optional color-redundant markers) but nothing exposes it. The new Settings
   dialog is its natural home; exposing it deserves its own story with a demo
@@ -1191,6 +1194,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   2026-07-12.)
 
 ### Deferred from: gds-code-review (rain shaping / overview doubling), 2026-07-12
+
+> **RETIRED (#545).** The overview melody doubling passing through the 650 Hz distance lowpass was shipped as-is and verified to still land (500-2000 Hz energy rose 5.6x zoomed out in the built app); route the doubling dry to the music bus only if phones read too quiet zoomed out.
 
 - **The overview melody doubling passes through the 650 Hz distance lowpass**,
   which attenuates the upper half of its 523-1975 Hz range by roughly 9-19 dB
@@ -1201,6 +1206,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   the reverb/scene mix. (Edge Case Hunter, 2026-07-12.)
 
 ### Deferred from: bmad-code-review (settings modal), 2026-07-12
+
+> **ABSORBED (#545) into the a11y-UX sweep (#541).** The splash no longer reaching the sound/accessibility controls (the Settings entry sits behind the splash focus trap, so a motion-sensitive player without OS `prefers-reduced-motion` cannot enable the override before dismissing the animated splash) is a real a11y gap for that sweep: add a small Settings affordance on the splash, or hoist the Reduced-motion toggle there.
 
 - **The splash can no longer reach the sound/accessibility controls**: the
   Help dialog (openable from the splash's "How to Play") used to host the
@@ -1214,6 +1221,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: bmad-code-review (persisted volume settings), 2026-07-12
 
+> **RETIRED (#545).** Cross-tab `savePrefs` being whole-object last-writer-wins is a pre-existing shape (reducedMotion/steadyClock had it), only slightly widened by the volume debounce and bounded by the pagehide flush; do a read-merge-write inside `savePrefs` or add a `storage`-event listener when the prefs path is next touched.
+
 - **Cross-tab prefs writes are whole-object last-writer-wins**: `savePrefs`
   rewrites the entire `vc.prefs` blob from a per-tab in-memory copy loaded
   once at boot, so a write from tab A (e.g. the debounced volume save) can
@@ -1225,6 +1234,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   (Edge Case Hunter, 2026-07-12.)
 
 ### Deferred from: bmad-code-review (test-reorg infra, PR #229, 2026-07-13)
+
+> **RETIRED (#545).** The confirmed findings were all patched in the PR (drift-check path filter, stale docs, the `unit` project spreading Vitest's default excludes back in). The one low residual, nothing enforces the `.integration.test.ts` naming convention, is a nice-to-have guard to add if the two-tier split ever drifts.
 
 Two-tier Vitest projects (unit + integration) plus the colocation pilot. Blind
 Hunter and Edge Case Hunter ran (Copilot also reviewed). The confirmed findings
@@ -1243,6 +1254,37 @@ parked here:
   is never lost, but it defeats the tier split and can blow the unit tier's
   timing assumptions. Consider a small naming check (a guard test or lint rule)
   as the per-area colocation reorg spreads. (Blind Hunter, Low.)
+
+### Triage summary (#545, 2026-07-21)
+
+One-time clearing pass over the deferral inbox, adopting the per-PR cadence
+recorded in "How items flow". Every `### Deferred from:` section dated
+2026-07-19 or older was given a leading disposition blockquote; its evidence is
+preserved beneath. Counts:
+
+- **95** total `### Deferred from:` sections.
+- **4** still-recent, left live above the divider (the 2026-07-20 in-flight
+  window: reachability PR1 gds + bmad, hotel late-checkout, CAP-5/7 pages).
+- **91** triaged, of which:
+  - **46 absorbed** into a curated row (existing or one of the 8 new rows
+    below). 27 of these also retired a spent remainder in the same blockquote
+    (the "ABSORBED + RETIRED" marker), folding the live part and closing the
+    rest.
+  - **44 retired** with a factual reason (accepted-for-v1, cosmetic, dismissed
+    with evidence, or obsoleted by later work); no standing row warranted.
+  - **1 resolved** (the deferred work had already shipped).
+- **8 newly tracked** curated rows + mirrored issues, each bundling a recurring
+  orphaned theme with no prior home: `housekeeping-modern-refinements` (#547),
+  `demand-pools-calibration` (#548), `inspector-advice-mode-gate` (#549),
+  `vacate-cause-reattribution` (#550), `pr-drift-check-scenes-glob` (#551),
+  `venue-crowd-real-occupancy` (#552), `audio-first-cue-latency` (#554),
+  `lit-string-builder-retirement` (#557).
+
+Folds into pre-existing rows point at their destination in the section's
+blockquote (for example the fold-in dialog defer into `schedule-dialog-live-rings`
+#475, and the tab-restore / undo-behind-guards / traffic aria-live items into the
+A11y/UX small-fix sweep #541). No pre-existing curated row was rewritten by this
+pass; only new rows were added.
 
 ## Completed / superseded
 
@@ -1307,6 +1349,8 @@ parked here:
 
 ### Deferred from: code review of E1 pixel-art shared language (`/gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** No residual defers: every finding was patched in-PR, including the one Edge Case Hunter parking item (`shade()` yielding `rgb(NaN,...)` for a non-hex argument), which now returns a non-hex argument unchanged so the helpers degrade gracefully while every shipped caller stays byte-identical.
+
 Change: E1 adds the finalized `person()` build family, `moodTint`, new `PAL`
 keys, and the shared helpers (`windowView`, `roomGlow`, `ceilingFixture`,
 `dado`, `castShadow`) to `pixelSprites/common.ts`, plus the food/shop
@@ -1325,6 +1369,8 @@ argument unchanged, so those helpers degrade gracefully; every shipped caller
 still passes a `#RRGGBB` literal, so current output is byte-identical.
 
 ### Deferred from: code review of E2 pixel-art tenant rooms (`/gds-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** No residual defers: all ten findings were patched in-PR and the rest were dismissed as intended-by-design or already-guarded (sub-production window math, occupancy-keyed downlights, per-layout seat caps, the `w > 44` grade exclusions, draw order, the mirrored sleeper, and the minimal-barrel `residential.looks.ts`/`dollhouse.ts` non-export).
 
 Change: E2 ports office, condo, and the three hotel grades to the ratified
 page-02 warm-dollhouse composition. New `pixelSprites/dollhouse.ts` (the
@@ -1386,6 +1432,8 @@ consumer like the food/shop look tables do, and the `barrelSurface.test.ts`
 deliberately curates a minimal barrel surface, so re-exporting would add dead
 surface against an intentional guard).
 ### Deferred from: E5 pixel-art utilities and service (`/gds-code-review`, 2026-07-14)
+
+> **ABSORBED (#545) into `venue-crowd-real-occupancy` (#552).** All three items ride the people-system traffic seam: the metro real-commuter platform crowd (this PR removed the ghost `scatterPeople` and left the platform empty per spec), the party-hall `scatterPeople` retirement, and the fixed-size figures not scaling with the room rect at non-bake sizes (handle figure sizing in the people-system compositor, not per facility). No live defect: the real render bakes at identity.
 
 Change: E5 enriches the seven utilities-and-service looks (recycling, metro,
 medical, security, housekeeping, parking, parking ramp) by porting each from its
@@ -1496,6 +1544,8 @@ the stair / escalator sprites:
 
 ### Deferred from: code review of E6 structure/transport art followup (`gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** The sky-lobby-unstaffed item was resolved by owner decision (the sky lobby stays unstaffed; amend the frozen I/O matrix line, no code). The stairs/escalator no-rider item is an intentional spec renegotiation for traceability (amend the frozen AC via the renegotiation ritual). The marquee overpainting the compact grand-solo door header and a narrow 1-tile lobby showing no receptionist are low, degenerate-case cosmetics.
+
 Change: `src/render/sprites/structure/lobby.ts` (reception moved out of repeating
 variant 1 into a person-free console/bench; `skyGlass` tones down the sky lobby),
 `src/render/sprites/structure/entrance.ts` (one reception desk + attendant in the
@@ -1543,6 +1593,8 @@ were corrected to note the compact 1-tile fallback shows no receptionist. Defers
 
 ### Deferred from: code review of E6 grand hotel entrance redraw (`gds-code-review`, 2026-07-14)
 
+> **RETIRED (#545).** The wide grand entrance carrying one palm (right flank) rather than one on each side is a 22px layout conflict with the required reception desk that needs an owner decision, not a code fix. The fixed 18px door height (not proportional to `h`) is test-fidelity/robustness only: entrance tiles always bake at `FLOOR = 44` in production. Derive the door height from `h` only if entrances ever bake at another height.
+
 Change: `src/render/sprites/structure/entrance.ts` grand forms redrawn from the
 glass storefront + green marquee to the page-05 `grandEnt` grand hotel entrance
 (red scalloped awning, gold double doors, glass curtain wall, red carpet, potted
@@ -1576,6 +1628,8 @@ derives its base from the `fy = h - 6` floor line. Defers:
   (Edge Case Hunter. Low; robustness.)
 
 ### Deferred from: code review of E1 (createUICallbacks split) (`/bmad-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** The residuals are behavior-preserving-split byproducts intentionally not actioned (a behavior-preserving E1 must not change behavior or over-grow the composition root): the controller ports widening from `private readonly` to public `readonly` to back `GameAppPorts`. Revisit the visibility surface if the composition root is ever restructured.
 
 Change: E1 extracts the ~30-callback `UICallbacks` literal out of the `GameApp`
 constructor into `createUICallbacks(app: GameAppPorts)` in `src/game/uiCallbacks.ts`,
@@ -1621,6 +1675,8 @@ composition root):
 
 ### Deferred from: code review of E2-S1 (event-choice lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `eventChoiceHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the lost fail-loud `[data-act]` lookup is inherent to inline `@click` dispatch (the binding is co-located), and the pre-existing input behaviors (no `isModalOpen` guard, empty message/costLabel, throwing `onResolve`) are later input-hardening candidates unchanged by the migration.
+
 Change: E2-S1 migrates `showEventChoice` (the emergency modal) onto the E0
 `openModalTemplate` seam with a lit `eventChoiceTemplate` and inline `@click`,
 keeping the resolve-exactly-once `finish` guard and the Esc/backdrop/x decline
@@ -1654,6 +1710,8 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
   throwing escapes the handler. Candidates for a later hardening pass, not here.
 ### Deferred from: code review of E2-S2 (update-prompt lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `updatePromptHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: `fireAndForget` silently swallowing a failed Update (`.catch(() => {})`, unchanged from main) and the malformed non-array `notes` throw are pre-existing, behavior-preserving; a later hardening pass could surface a toast/log.
+
 Change: E2-S2 migrates `showUpdatePrompt` onto the E0 `openModalTemplate` seam with
 a lit `updatePromptTemplate` (inline `@click`, nested sub-templates for the
 optional What's-new and build-id blocks), keeping the fire-once `done` guard, the
@@ -1684,6 +1742,8 @@ Residual defers (real but intentionally not actioned, behavior-preserving):
 
 ### Deferred from: code review of E2-S3 (settings lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED (#545) into `lit-string-builder-retirement` (#557).** The only residual is the `settingsHtml` retirement; the stateful wiring (volume sliders, live-re-read switches, OS-forced reduced-motion relabel, the retained loud `[data-act]` Close) stayed verbatim in the controller.
+
 Change: E2-S3 migrates the Settings dialog structure (`settingsHtml`) onto the E0
 `openModalTemplate` seam with a STATIC lit `settingsTemplate`. Settings is stateful,
 so the controller (`showSettings`) keeps all the wiring verbatim: the volume sliders
@@ -1698,6 +1758,8 @@ relabels the switch. The Close button remains wired by the shared `wireActions` 
   and its transitional test when the last string dialog converts (E6/E7).
 
 ### Deferred from: code review of E2-S4 (help lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `helpHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the `.help-report a` non-null assertion (a defensive guard can wait until the body becomes conditional) and the un-deduped Replay double-activation (`onReplayOnboarding` is idempotent), both pre-existing and behavior-preserving.
 
 Change: E2-S4 migrates the Help / How-to-play dialog (`helpHtml`) onto the E0
 `openModalTemplate` seam with a lit `helpTemplate`. The large body is authored
@@ -1729,6 +1791,8 @@ Residual defers (behavior-preserving):
   is idempotent enough that a fast double-click is harmless; no change needed now.
 
 ### Deferred from: code review of E3-S1 (saves lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `savesHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the `when`-line/population/funds boundary paths are exercised only via the equivalence guard but are unreachable in practice (`infoFrom` already bounds `SlotInfo`), and the locale-dependent date/number formatting is deliberately guard-only rather than pinned to brittle literals.
 
 Change: E3-S1 migrates the Saved Towers slot manager (`savesHtml`) onto the E0
 `openModalTemplate` seam with a lit `savesTemplate`. Slot rows are nested
@@ -1763,6 +1827,8 @@ fixed in `saves.test.ts`. Residual defers (behavior-preserving):
 
 ### Deferred from: code review of E3-S2 (stops lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `stopsHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: the un-pinned second `@change` (the modal renders once, so a dropped listener is unreachable), the single-lobby-row-only coverage (one lobby run per tower is the norm), and the `floor === 0` "B0" quirk (floor 0 is unreachable, callers index ground as 1), all pre-existing.
+
 Change: E3-S2 migrates the per-floor elevator stops dialog (`stopsHtml`) onto the
 E0 `openModalTemplate` seam with a lit `stopsTemplate`. Rows are nested
 `TemplateResult`s (not a joined string), the title auto-escapes (no `escapeHtml`),
@@ -1791,6 +1857,8 @@ confirmed all seven ACs; Edge Case Hunter found no `patch` gaps. Residual defers
 
 ### Deferred from: code review of E3-S3 (new-tower lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `newTowerHtml` retirement joins `lit-string-builder-retirement` (#557) (which carries the note to add a direct copy assertion for the lede / mode descriptions / calendar copy before deleting the builder). Retired: the calendar tab-order / keyboard reachability being verifiable only in e2e (confirm the e2e suite covers the new-tower dialog's tab order; source order is pinned at the unit tier).
+
 Change: E3-S3 migrates the Found a New Tower rule-set picker (`newTowerHtml`) onto
 the E0 `openModalTemplate` seam with a lit `newTowerTemplate`. Static structure:
 only the abandon warning is conditional (on `hasSave`); the `.nt-calendar`
@@ -1818,6 +1886,8 @@ byte-for-byte equivalence (incl. the `2×–2.5×` / `2–5` numeric-range glyph
   order; add one if it does not.
 
 ### Deferred from: code review of E3-S4 (TDT reports lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED (#545) into `lit-string-builder-retirement` (#557).** The three report builders (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`) join the retirement list; the import-rounds/export-does-not asymmetry and the previously-unasserted `#a11y-live` announcement were both fixed in-PR.
 
 Change: E3-S4 migrates the export-choice modal and the TDT import/export fidelity
 reports (`exportConfirmHtml`, `importReportHtml`, `exportReportHtml`) onto the E0
@@ -1886,6 +1956,8 @@ Residual defers (behavior-preserving):
 
 ### Deferred from: code review of E4 (batch-pricing reactive lit migration) (`/bmad-code-review`, 2026-07-14)
 
+> **ABSORBED + RETIRED (#545).** The `batchPricingHtml` retirement joins `lit-string-builder-retirement` (#557). Retired: announcing the bulk-reset arming to screen readers is a deferred a11y WIN (fits the a11y-UX sweep #541 when picked up), and the low-value reactive paths (set-to-default round-trip, only-default re-preview, inc/dec from empty/NaN) are near-verbatim mirrors of the old controller with low regression risk.
+
 Change: E4 migrates the batch-pricing dialog (`batchPricingHtml`) onto the E0
 `openModalTemplate` seam and, per the E4 story, replaces the imperative `refresh()`
 with a re-render from local dialog state on every input event. The controller holds
@@ -1915,6 +1987,8 @@ which skips the write when the DOM already matches. Residual defers
   of the old controller; low regression risk, defer.
 
 ### Deferred from: code review of E5-S0 (perf gate harness) (`/bmad-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** All three PATCH findings were fixed before landing. The "E5-S1 should assert X once a live-view write path exists" residuals (the write-before-`positionPanels` ordering, the `towerStatsChildStable` node-identity) were resolved in E5-S1, which shipped (recorded as a structural guarantee / promoted to an assertion). The remaining notes are low tuning knobs: widen `B_FLOOR_TOL` if CI proves noisier, and tighten the `@perf` substring-grep tag convention if the suite grows.
 
 Change: E5-S0 lands the blocking Playwright perf gate ahead of the live-view
 migrations: `e2e/perf-harness.ts` (browser-side measurement helpers),
@@ -1991,6 +2065,8 @@ an invariant no current writer can violate (the container ships empty and
 ever wanted, is asserting `#tower-stats` is empty at UI construction.
 
 ### Deferred from: code review of E5-S2 (tool-info lit migration) (`/bmad-code-review`, 2026-07-14)
+
+> **ABSORBED + RETIRED (#545).** The `buildToolInfoHtml` / `BULLDOZE_TOOL_INFO_HTML` / `INSPECT_TOOL_INFO_HTML` retirements join `lit-string-builder-retirement` (#557). Retired: the tightened catalog-copy escaping (lit auto-escapes the trusted static `name`/`description`) is a free hardening, not a behavior change.
 
 Change: E5-S2 renders the tool-info panel through lit on tool select (event-driven,
 not a pump path). `UI.selectTool` calls `render()` into `#tool-info` with
@@ -2184,6 +2260,8 @@ departed while culled never flashes at a stale position). Standing defers:
 
 ### Deferred from: `/gds-code-review` of cockroach-infestation lifecycle (2026-07-16)
 
+> **RETIRED (#545).** The HIGH (infested rooms self-clearing) and MED (exterminator over-clearing) findings were patched in-PR. The three deferrals are all low: a multi-tile burning room climbing only through its left column is consistent with the existing same-floor fire simplification (not a regression), billing-then-destroying an infested room wasting the fee is player-controlled and documented (a refund path is not worth the state), and a hand-edited save resetting `dirtyDays` is self-cheating only (the persisted-clock guarantee holds for normal reloads).
+
 Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
 Auditor). One HIGH finding (infested rooms self-clearing to `empty` because
 `isDormant` omitted the new state) and the MED exterminator "clears more than it
@@ -2207,6 +2285,8 @@ billed" finding were both PATCHED in the same PR (`isDormant` now includes
 
 ### Deferred from: `/gds-code-review` of cockroach sprite redesign (2026-07-17)
 
+> **RETIRED (#545).** The one robustness gap (`roachOval` divide-by-zero into a NaN rect) was patched in-PR, and the owner-requested leg-wiggle is already tracked under `pixelart-interior-animations` (#377). The two remaining notes are dismissed cosmetics: roach decals drawing outside `maybeMirrored` (the cue is pixel-identical regardless of flip, as intended) and the `seam`/`collar` verticals using `cx`/`cy` rather than the flip helpers (stays inside the symmetric body).
+
 Three-layer adversarial review (Blind Hunter, Edge Case Hunter, Acceptance
 Auditor) of the redesigned roach decals (`drawRoach`/`roachOval`/`roachLine` and
 the infested/dirty placement in `residential.ts`). One robustness gap was PATCHED
@@ -2226,6 +2306,8 @@ tracked under #377 above. Non-actionable notes (dismissed):
   the "wrong" way, but stays inside the symmetric body silhouette.
 
 ### Deferred from: code review of venue-people-routing (`/gds-code-review`, 2026-07-14)
+
+> **RETIRED (#545).** All three are low and deliberate: the party hall carrying ~2x the cinema's visit-option weight in hotel towers fits the canon "hotel guests mingle" flavor (retune only if halls visibly starve cinemas), the hotel-mingle spawn picking a floor before a room is the same idiom `spawnMealOutbound` uses (keep them aligned), and the attendance tally's single decrement path (`finish()`) is defused, guarded by the `attendance-finish-tripwire` source tripwire (#302, done) that enforces the standing rule for any future despawn shortcut.
 
 - **Party hall carries roughly 2x the cinema's visit-option weight in hotel
   towers (Blind, low).** `pushVenueVisitOptions` contributes one lobby option
@@ -2466,6 +2548,8 @@ the record:
 
 ### Deferred from: `bmad-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
 
+> **RETIRED (#545).** Three findings were fixed in-branch (the native-undo yield split, the crash-card audio kick, the Vercel-preview telemetry test). The one deferral, `appBoot.ts` being closure-dense and MEASURED with no per-file floor, is low: it currently clears the global `functions` ratio, and a per-file floor is reserved for genuine exemptions; add one only if the file grows another controller.
+
 Reviewed the follow-up delta on the main.ts friend-module split (input-guard
 consistency, coverage un-exclusion of `bootstrap.ts`/`appBoot.ts`, new headless
 tests). Blind Hunter + Edge Case Hunter, no spec (Acceptance Auditor skipped).
@@ -2489,6 +2573,8 @@ Deferrals:
   would localize any regression.
 
 ### Deferred from: `gds-code-review` of the main.ts-split follow-up (#487, 2026-07-19)
+
+> **ABSORBED + RETIRED (#545).** Undo/redo running ahead of the `#modal`/`#splash` guards is AUD-021, already tracked as item 2 of the a11y-UX sweep (#541). Retired: the `ownsNativeUndo` contentEditable branch is correct forward-looking cover (no contentEditable ships today, but the unit test exercises it), and the audio kick retrying `audio.start()` on a throw is a robustness gain (`start()` is idempotent), not a defect.
 
 Requested gameplay/input-parity pass over the same delta. Blind Hunter + Edge
 Case Hunter, no spec. No `patch` defects: the two-predicate guard split is
@@ -2520,6 +2606,8 @@ pre-existing ordering, not introduced here):
   robustness gain, not a defect; recorded for the record.
 
 ### Deferred from: `bmad-code-review` of the toast-timer cancel-on-prune fix (#368, 2026-07-19)
+
+> **RETIRED (#545).** The review was acted on in-branch (strengthened prune-mid-fade tests, deterministic fake-timer integration block). Both deferrals are low and out of scope: the `#toast-wrap` `replaceChildren()` clear-all sites stranding timers are screenshot/e2e-only, callbacks are no-ops on detached nodes, and it is self-cleaning (revisit only if a toast clear-all ever ships in app code); the `WeakMap<Element, number>` timer-id type just needs the `window.setTimeout` prefix kept (a note, no action).
 
 Fixed the pruned-toast timer leak (a pruned node kept its ~3.6s fade timer, which
 then fired on a detached node and could outlive a test's DOM teardown). Blind
