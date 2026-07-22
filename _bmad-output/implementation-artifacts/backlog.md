@@ -864,10 +864,14 @@ quietly reintroduces the very blind spots PR #188 removed.
 
 ### Deferred from: code review of spec-pr-drift-check (`/bmad-code-review`, 2026-07-13)
 
+> **RETIRED (#545).** Both are low, documented repo-config invariants: the `screenshot-approval` environment failing open if deleted is a PREREQUISITE flagged in the workflow header (mitigate with an org policy or a preflight REST check only if it ever bites), and the fork-PR advisory being a silent no-op does not apply since PRs come from same-repo `claude/*` branches.
+
 - **The `screenshot-approval` environment fails OPEN if it is deleted or its required reviewer is removed.** Referencing an undefined GitHub Environment auto-creates it with no protection rules, so `commit-on-approval` would then run with no human gate and auto-commit on every drift. The workflow cannot detect an unprotected environment from within a run, so this stays a repo-configuration invariant (documented in the workflow header as a PREREQUISITE). Mitigation if it ever bites: an org-level environment policy, or a preflight job that calls the REST API (`GET /repos/{o}/{r}/environments/{name}`) to assert `protection_rules` includes a required-reviewer rule and hard-fails otherwise. (Low; the maintainer configured the environment, and the header flags the risk.)
 - **Fork-PR advisory comment is a silent no-op.** A `pull_request` from a fork gets a read-only `GITHUB_TOKEN`, so the sticky comment 403s and is swallowed by `continue-on-error`; the fork author sees no drift guidance, and `commit-on-approval` (correctly) never gates on forks anyway. This repo's PRs come from same-repo `claude/*` branches, so it does not bite today. Follow-up if forks become common: post the drift guidance via a `pull_request_target`-scoped commenter, or surface it in the check summary instead of a comment. (Low; repo uses same-repo branches.)
 
 ### Deferred from: code review of pr-drift-check marker skip (`/bmad-code-review`, 2026-07-13)
+
+> **RETIRED (#545).** Both residuals were properties of the marker-skip branch, which was removed when `update-screenshots.yml` was retired (2026-07-16); neither edge case can occur anymore. The section says so itself.
 
 Both residuals here (a marker head reached via `opened`/`reopened` with no
 concurrent regen, and the `[update-screenshots]` substring collision) were
@@ -877,6 +881,8 @@ the RESOLVED note under "Followups from: screenshot-determinism" above), so neit
 edge case can occur anymore. Nothing to action.
 
 ### Deferred from: code review of ToneAudioEngine split (`bmad-code-review` adversarial, 2026-07-14, Wave C-1)
+
+> **RETIRED (#545).** Nothing was left deferred: both findings (the throwaway `AccentNodes` alloc on no-accent scenes and the empty-`def.scale` NaN in `scheduleStep`) were patched in-PR, the latter with a `toneVoices.test.ts` case.
 
 Change: `ToneAudioEngine.ts` (831 lines) split into `toneScenes.ts` (data + pure
 math), `toneVoices.ts` (synthesis free functions), and the orchestrator class.
@@ -896,9 +902,13 @@ Copilot. Nothing left deferred; both findings were patched in-PR:
 
 ### Deferred from: code review of spec-shard-screenshots-ci (`/bmad-code-review`, 2026-07-13)
 
+> **RETIRED (#545).** Both are low and pre-existing: the a/b determinism guard only catching divergence between two same-environment runs is inherent to the two-run design (seed the varying input in the generator if an env/time leak ever slips it), and the `resolve-image` pin `.replace` on `undefined` cannot bite with the current top-level `playwright` devDependency.
+
 - **The a/b determinism guard only catches nondeterminism that diverges between two near-simultaneous, same-environment runs.** Both legs render in the same pinned image within the same time window, so entropy that is stable across the pair but varies run-to-run (wall-clock/date-stamped content, font/driver/locale changes) passes the diff yet still drifts. This is a pre-existing property of the two-run design, not introduced by sharding, and PR #188 already removed the known time leak by mocking the clock. If a future env/time leak slips it, the fix is to seed/pin the varying input in the generator, not to add a third run. (Low; inherent to the guard's scope.)
 - **`resolve-image` pin step can throw if Playwright is not a top-level devDependency.** `require('./package.json').devDependencies.playwright.replace(...)` is the fallback when `package-lock.json` has no `node_modules/playwright` entry; if Playwright is only present via `@playwright/test` or under `dependencies`, `.replace` is called on `undefined`. Pre-existing code, unchanged by this PR. Harden with a `?.` + explicit error if it ever bites. (Low; pre-existing, current layout has top-level `playwright`.)
 ### Deferred from: code review of spec-standard-elevator-dimensions (BMGD 3-layer, 2026-07-12)
+
+> **RETIRED (#545).** All four deferrals were fixed in the same PR (overlap cross-check on deserialize, idempotent v5 widening, TDT export collision warning, lot-width doc fix), plus a second-review medium (loader clamps stored transport widths to catalog). The one residual, a still-boxed 3-wide shaft cannot round-trip a TDT export losslessly, is an unfixable-in-format ceiling intentionally not tracked (the 1994 format has no shaft-width field).
 
 All four deferrals from this review were FIXED in the same PR at the owner's ask, so nothing
 here needs triage: `Simulation.deserialize` now cross-checks transport overlaps (drops a
@@ -917,6 +927,8 @@ and counts drops by emulating the importer's keep/drop rule.
 
 ### Deferred from: spec-pixel-8a-crash-fix (2026-07-12)
 
+> **ABSORBED (#545) into `render-perf-region-composition` (#366).** Batching or culling the ~935 room actors (~16ms of a paused desktop frame on a 10,344-unit save) the way floor/lobby tiles were TileMap-ified is exactly that thread's region-composition work for huge towers on phones.
+
 - Renderer: the ~935 room actors still cost ~16ms of a paused desktop frame on a
   10,344-unit save (ablation in the crash investigation). Batching or culling
   them the way floor/lobby tiles were TileMap-ified is the next big win for
@@ -925,10 +937,14 @@ and counts drops by emulating the importer's keep/drop rule.
 
 ### Deferred from: code review of screenshot-determinism (`/gds-code-review`, 2026-07-12)
 
+> **RETIRED (#545).** Both are low latent constraints, not live bugs: `pgRefreshUi` depending on the ~160ms throttle living in `GameApp.update` (expose an unthrottled `UI.forceUpdate()` only if the throttle ever moves into `UI.update`), and scene builders/`assertReady` running against the frozen clock (a non-issue for every current builder, which mutates the sim synchronously).
+
 - **`pgRefreshUi` depends on the ~160ms UI throttle living in the caller (`main.ts` `update()`), not inside `ui.update()`.** The screenshot runner repaints throttled DOM chrome before capture by calling `ui.update()` / `updateTraffic()` directly, which works only because the `performance.now()`-based throttle guard sits in `GameApp.update`, not in `UI.update`. If that throttle ever moves into `UI.update` (or becomes `performance.now`-based inside it), the direct call would be silently swallowed under stepped frames (a few wall-clock ms), capturing stale chrome with no error. Follow-up if it ever bites: expose an unthrottled `UI.forceUpdate()` entry point for the generator. (Low; fragile invariant, not a live bug.)
 - **Scene builders and `assertReady` run against the already-adopted (frozen) clock.** `pgAdoptTestClock` precedes `pgDismissSplash`, `scene.build`, and `assertReady` in `runScene`, and no frames step until the first `settle()`. Every current builder mutates the sim synchronously (places units, `setSim`) and `assertReady` reads synchronous sim state, so this is a non-issue today. But a future builder that needs an engine tick to materialize something would spin to the `waitForFunction` timeout instead of passing as it would under the live clock. Latent constraint to remember when adding scenes. (Low; no current scene affected.)
 
 ### Deferred from: code review of spec-stranded-floor-move-ins (2026-07-12)
+
+> **RETIRED (#545).** The single tower-wide `strandedNudged` latch suppressing a later floor's advisory (widened since the latch sits in the `rentable` scope while the modal lists only `leased` floors) is a low legibility nicety; resurface with a per-floor or count-based latch if a missed nudge reads wrong in play.
 
 - Stranded-floor advisory latch is a single tower-wide boolean (`Simulation.strandedNudged`): while any stranded floor persists, a different floor going stranded on a later day emits no new advisory. Widened surface since the latch is now held by the `rentable` scope while the stats modal lists only `leased` floors, so an all-empty stranded slab (invisible in the modal) can consume the one-shot nudge a later leased-and-stranded floor would otherwise get. Consider a per-floor or count-based latch.
 
@@ -938,11 +954,15 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of story-mobile-pinch-pointer-tracking (`/gds-code-review`, 2026-07-12)
 
+> **RETIRED (#545).** Three low, pre-existing, self-healing edge cases: a swallowed mouse pointerup outside the window leaking a transient tracker contact (heals on the next press), a pinch-aborted paint run losing its undo step (immediate Ctrl+Z still works), and the elevator hover ghost ignoring dry-run/funds (cosmetic, desktop-only). Add pointer capture / a `cancelled` flag when the touch path is next touched.
+
 - **Swallowed mouse pointerup outside the window leaks a transient tracker contact (Edge F3).** Mouse-down on the canvas, drag out of the window, release there: no up/cancel reaches Excalibur's canvas listener, so the contact stays tracked and the NEXT one-finger touch press reads as a pinch. Self-heals on the next mouse press (the stable native id overwrites, size stays 1) or a tower swap (`setSim` input reset). Pre-existing in the old `pointers` map; now transient instead of permanent. Follow-up if it ever bites: pointer capture on mouse-down or a window-blur `tracker.reset()`. (Low, pre-existing, hybrid devices only.)
 - **Pinch-aborted paint run loses its undo step (Edge F4).** `captureUndo` fires in `onActionDown`; a pinch aborts the gesture without `onActionUp`, so the pending pre-paint snapshot is overwritten by the next gesture's capture and the pre-pinch strip can never be undone (immediate Ctrl+Z still works). Documented overwrite semantics in `UndoHistory.capture`; pre-existing, unchanged by the fix. (Low, pre-existing.)
 - **Elevator hover ghost validity ignores dry-run/funds (investigation side finding).** `main.ts` `updateBuildPreview` sets `valid: isUnlocked(kind)` for drag-sized transports, so a desktop hover shows a gold ghost where a drop would refuse. Cosmetic, desktop-only. (Low, pre-existing.)
 
 ### Deferred from: saves-modal party ruling (2026-07-13)
+
+> **RETIRED (#545).** Tower thumbnails rendered from save data is a future UX-owned UI story (Sally's IOU) with open design questions (sizing, per-`savedAt` caching, the cost of deserializing four slots at open time); resurface when UX picks it up.
 
 - **Tower thumbnails in the Saves dialog, rendered FROM save data.** The save
   already carries every unit, so the modal could draw a small silhouette per
@@ -951,6 +971,8 @@ Triage them into the table above, then delete the raw note._
   cost of deserializing four slots at open time are the design questions.
 
 ### Deferred from: code review of story-save-metadata-and-log-tail (`/gds-code-review`, 2026-07-12)
+
+> **RETIRED (#545).** The one item (undo/redo trimming bulletin scrollback to the save cap) was done 2026-07-12: `LOG_SAVE_CAP` now equals the 300-entry ring cap, so saves and undo snapshots hold exactly the live ring.
 
 - ~~**Undo/redo trims bulletin scrollback to the save cap (Edge, medium).**~~
   Done 2026-07-12 (owner-delegated party ruling, same day): `LOG_SAVE_CAP`
@@ -962,6 +984,8 @@ Triage them into the table above, then delete the raw note._
   second serialize behavior to keep in sync forever.
 
 ### Deferred from: code review of PR #184 commercial census takeover (`/gds-code-review` + party, 2026-07-12)
+
+> **ABSORBED + RETIRED (#545).** The missing commercial "counts toward stars" inspector cue folds into `commercial-venue-inspector` (#313). Retired the rest, all accepted-by-design, cosmetic, latent, coverage, or aware-no-action: the congestion-overlay meal-invalidation test gap, the closed shutter hiding variety, over-capacity arrivals eating uncounted, `Crowd.reset()` stranding venue counters (tests-only today), the eating increment skipping state-at-arrival, returners counting until despawn (ratified), and the time-of-day save-slot pop snapshot.
 
 - **Congestion-overlay meal invalidation lacks a direct test (Edge, layouts round).** `drawStatsMap` now invalidates on `mealOverlayRevision` for the congestion mode, but no test drives the private render path across a revision bump; `towerEngineMealOverlay.test.ts` covers the sync trigger only. Add one if a TowerEngine test harness ever exists. (Low, coverage.)
 
@@ -976,6 +1000,8 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: code review of tower-wide-meal-cadence (`/gds-code-review`, 2026-07-09)
 
+> **RETIRED (#545).** All six are low and inherited, documented-intent, or negligible-perf: the spawn-vs-`updatePresence` hour-boundary ordering, the day-0 breakfast bulletin skip, the post-dinner pacing sprint, the multi-day catch-up bulletin miss, the evening-flow dilution by meal options, and the per-`pushMealOptions` allocation. Playtest and re-tune weights if a healthy tower's flow reads wrong.
+
 - **Spawn-vs-updatePresence ordering (Edge F3).** `advanceStep` calls `crowd.spawn` BEFORE `onHour -> updatePresence` runs. On the first tick that crosses into a new hour, spawnFloors sees `u.occupants` from the PRIOR hour. Normally benign because presence was already correct at the previous boundary; the diff's "no explicit isWeekend check needed" claim depends on this invariant, which is not asserted anywhere. Add a targeted regression if a bug ever surfaces on the Saturday-08:00 load edge. (Low, inherited, not caused by this diff.)
 - **Day-0 breakfast bulletin silently skipped (Edge F5).** The sim starts at exactly 07:00, so `dayOfKind = floor((420 - 420)/1440) + 1 = 1` and `absMinute = 1860`; a first tick that stays under 1860 minutes cannot fire the breakfast bulletin. Consistent with the strict-after semantics the shipped lunch code has (lunch DOES fire day 0 because noon > 07:00). Documented behavior; breakfast fires from day 1 onward. (Low, inherited.)
 - **Post-dinner 2.26x pacing sprint (Edge F6).** The 18:30-21:00 sub-period runs at 1.25 min/frame (2.26x normal) because the dinner-crawl budget is carved out of the shipped 400-frame 17-21 block. Real-time-to-simulate is invariant; the player watches the clock lurch after the dinner crawl ends. Design consequence, not a bug. Consider a bigger day budget as a follow-up if the lurch reads awkward in playtest. (Low.)
@@ -985,6 +1011,8 @@ Triage them into the table above, then delete the raw note._
 
 ### Deferred from: retail-subtypes-and-variety scope split (`/gds-quick-dev`, 2026-07-09)
 
+> **ABSORBED (#545).** Both PR-B items are already curated rows: `facility-visual-variety` and `commercial-venue-inspector` (#313). Nothing untracked; the detailed implementation notes here remain useful reference for those rows.
+
 Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shipping PR under the token ceiling. PR-A ships the retail-subtype engine seam + TDT round-trip + inspector title + "Change variety" reroll (closes backlog `retail-subtypes`). PR-B is deferred; both items below are cleared to start immediately AFTER PR-A merges, since they read `Unit.subtype` on retail and share no engine surface with each other.
 
 - **`facility-visual-variety` (P3, idea, remains open).** Same-kind rooms look a little different. Retail sprites read `u.subtype` for a per-variant palette (11 shop / 5 restaurant / 5 fast-food shades). Office/hotel*/condo sprites derive a stable per-unit variant from `hash(u.id)` at render time (never stored, no engine impact). Model: `src/render/excalibur/pixelSprites.ts:267` condo wall-color pattern (already reads `hash(u.id)`); extend to `src/render/excalibur/TowerEngine.ts:1444` sprite-cache `sig` so a rerolled subtype re-bakes. Cosmetic-only. No save impact. Version bump patch.
@@ -992,16 +1020,22 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: code review of classic-calendar-parity (`/gds-code-review`, 2026-07-08)
 
+> **RETIRED (#545).** The 999-year day-counter roll is not player-reachable in normal play (~33 real-days at fast speed) and out of GDD acceptance scope; the trailing-slots weekend model fits the canon "2 weekday + 1 weekend" week and needs a non-trailing offset only if the owner harness validation finds the retail game phases the weekend on a non-trailing slot (contingent).
+
 - **999-year day-counter roll unimplemented.** Canon (`docs/canon/tdt-format.md` §3, GDD §0) says the day counter rolls at 11,987 (999 years); our `Clock.year = floor(day / yearDays)` grows unbounded with no wrap, so a tower run for 999+ canon years (≈11,988 days) shows Year 1000+ where the real game wraps. Out of the GDD §5 acceptance scope and not player-reachable in normal play (12-day years, but still ~33 real-days of play at fast speed); flagged by the Acceptance Auditor for completeness. Add a wrap in `Clock.day`/`year` (and confirm the TDT export clamps `currentDay` to the same modulus) if it ever matters. (Info/Low.)
 - **Weekend-phase model is trailing-slots only.** `Calendar.weekendDays` sets how many TRAILING day-slots are the weekend, so the model cannot express a NON-trailing canon weekend (slot 0 or 1). The canon "2 weekday + 1 weekend" week is naturally trailing, so this is only a problem if the owner harness-validation (task on the `classic-calendar-parity` row) finds the retail game phases the weekend on a non-trailing slot; then add an explicit weekend-phase offset to the Calendar + Clock arithmetic. Contingent on the harness result. (Auditor, Low/contingent.)
 
 ### Deferred from: code review of TDT import trailing-structure fix (`/bmad-code-review`, 2026-07-08)
+
+> **ABSORBED (#545) into `tdt-real-game-fidelity` (#300).** The silent stair loss on a non-truncated locate-failure and the `locateStairs` max-built-scan heuristic are TDT-import reliability items for that fidelity epic (validate against more real saves, esp. a low-stair-count tower with populated trailing blocks). The per-car 348-byte stride being unverified overlaps `tdt-header-counts-verify` (#348): verify against a real multi-car save.
 
 - **Silent stair loss (no warning on locate-failure).** PARTIALLY ADDRESSED (Copilot re-review 2026-07-08): the clear truncation case (file ends right after the elevator table, before finance) now warns in `walkTolerantTail`. Still open for a non-truncated file: `locateStairs` (`src/storage/tdtFormat.ts`) returns `[]` both when a tower genuinely has no stairs AND when it fails to locate a real table; the old code pushed a player-visible "stairways and escalators stayed behind" warning on truncation. There is no reliable signal to distinguish the two (the scan is anchor-on-a-built-record). The scan is reliable on the one real sample; revisit with a truncation heuristic (e.g. warn if elevators decoded but the file is implausibly short for its content) if a real save ever shows a false-negative. Confirmed by Blind + Edge Case hunters (Med).
 - **Per-car 348-byte term unverified.** The elevator record stride `3140 + 324*servicedFloors + 348*cars` is validated end-to-end only against my_tower.TDT, whose 3 shafts are all cars=1, and the fixture pads with the SAME formula (self-referential), so no test independently pins the 348 per-car size (or the 3140 base). Verify against a real save containing a MULTI-CAR built shaft before trusting exports/imports of many-car towers. Confirmed (Low, coverage gap).
 - **`locateStairs` max-built scan is a heuristic, not a guarantee.** It picks the 64-record window with the most in-range built records; a coincidental later region (e.g. the §11 lobby/reachability 528x6 table, or §12 named-tenant bytes) could theoretically out-count a small real table and import phantom flights. Mitigated in practice (my_tower with those trailing blocks imported exactly 6 correct flights; parking's stall bytes inject rejecting values; window tightened to 4 KB; x>=1 rejects the common `01 00..` garbage). Harden with a contiguity/cluster check or calibrate against more real saves (esp. a low-stair-count tower with populated trailing blocks). Suspected (Edge Case hunter, Med).
 
 ### Deferred from: splash-on-cold-reopen (`/bmad-code-review`, 2026-07-08)
+
+> **RETIRED (#545).** A newly founded tower (New Tower) landing at play speed rather than paused is pre-existing and harmless (an empty tower loses no game-hours, and every other boot lands paused); have `newGame` call `setSpeed(0)` if "every boot lands paused" is ever wanted uniform.
 
 - **A newly founded tower (New Tower) lands at play speed, not paused.** From the
   splash, New Tower → `dismiss()` runs `teardownSplash()` → `pauseForSplash(false)`
@@ -1015,6 +1049,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   cold-reopen review.)
 
 ### Deferred from: code review of story-e1a-platform-port (`/gds-code-review`, 2026-07-08)
+
+> **ABSORBED + RETIRED (#545).** The wrong-shaped native export toast (`exportGame` toasts synchronously before the port's async `saveFile` settles) belongs to E3b, the native bridge shell, in the mobile-distribution stream (#385). The native-mode resolution path being unreachable from vitest (`import.meta.env.MODE` pinned to `"test"`) is covered operationally by E1c's `--mode native` bundle acceptance check: retired, observe both resolution paths there.
 
 - **Native export feedback is wrong-shaped for the platform port.** `exportGame`
   (`src/game/saveLoad.ts:168-170`) toasts "Tower exported (X KB). Check your
@@ -1043,6 +1079,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: code review of breathing-clock wire-up (PR #154, `/gds-code-review`, 2026-07-07)
 
+> **ABSORBED (#545) into #541 (AUD-024's `accMinutes` guard).** The backgrounded-tab burst amplified by night pacing is the same tab-restore / `accMinutes` surface item 4 of the a11y-UX sweep covers; verify Excalibur's >200ms clamp covers the tab-restore path on real devices before adding any `accMinutes` cap of our own.
+
 - **Backgrounded-tab burst simulation is amplified by night pacing (pre-existing
   class, wider now).** `main.ts update()` accrues `accMinutes` from raw `dtMs`;
   Excalibur clamps a >200 ms frame down to 1 ms, which bounds ordinary hitches,
@@ -1053,6 +1091,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   cap of our own.
 
 ### Deferred from: code review of the .TDT importer (2026-07-07)
+
+> **RETIRED (#545).** Structure-aware shaft placement concerns only the `synthesizeTransports` FALLBACK for corrupt or truncated files (real saves decode their shafts directly since canon doc v2) and is harmless to the sim (dispatch ignores structure, only a visually floating shaft the player bulldozes); improve the per-band x heuristic if the synthesis fallback is next touched.
 
 - **Structure-aware shaft placement for imported towers**: `synthesizeTransports`
   (`src/storage/tdtImport.ts`) places every shaft in one x-run around the GLOBAL
@@ -1070,6 +1110,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   .TDT importer review, both rounds.)
 
 ### Deferred from: traffic-indicator fix (PR #141, `/gds-code-review`)
+
+> **ABSORBED + RETIRED (#545).** The traffic-chip hotspot floor jittering and spamming the `aria-live` region on near-tie crossings folds into #541 (the a11y live-region sweep; move the floor number out of the live region or debounce it). The multi-tier upward jumps entering the higher tier ~0.02 congestion early is a negligible pre-existing calibration asymmetry: retired.
 
 - **Traffic chip's hotspot floor can jitter and spam the `aria-live` region on
   near-tie crossings**, `updateTraffic` (`src/main.ts`) recomputes
@@ -1089,6 +1131,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
 
 ### Deferred from: gds-code-review E3.1 (parking ratio + one-car sprite), 2026-07-07
 
+> **RETIRED (#545).** The dev sprite catalog stretching the single-stall parking sprite to the full cell width is dev-only tooling and cosmetic (not player-facing); render parking at its true footprint, and revisit the sprite-gallery shot, when the E1b parking width change (6 to 4) lands and screenshots regenerate.
+
 - **Dev sprite catalog stretches parking to the cell width**, `gallery.ts:144`
   (`w≈292`) and `preview.ts:79` render `drawParking` at the full catalog-cell
   width, so the new single-stall parking sprite reads as one small car adrift in
@@ -1098,6 +1142,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   lands and screenshots regenerate, revisit the sprite-gallery shot then._
 
 ### Deferred from: gds-code-review E4 (mobile floor/lobby drag-paint), 2026-07-07
+
+> **RETIRED (#545).** A jittery touch tap over-painting one adjacent tile is low: floor/lobby runs are contiguous by intent and cheap, and a pure no-move tap still lays exactly one strip. Gate `paintFloorRun` behind a small on-touch movement threshold mirroring the pan-tap slop if it ever annoys.
 
 - **Jittery touch tap with floor/lobby can over-paint one adjacent tile**, the
   "action" path has no movement slop (`TowerEngine.pointerMove` fires
@@ -1109,6 +1155,8 @@ Owner split the retail-subtypes-and-variety spec at CHECKPOINT 1 to keep the shi
   movement threshold mirroring the tap slop. (Blind Hunter finding 2.)
 
 ### Deferred from: gds-code-review (mobile tap lays the full brush strip), 2026-07-08
+
+> **RETIRED (#545).** Two low, pre-existing touch-cancel edge cases: a browser `pointercancel` on an unmoved press committing the tap placement (Excalibur routes `cancel` into the same handler as `up`), and a pinch interrupting a just-seeded paint drag escaping undo. Thread a `cancelled` flag from the engine's cancel event into `onActionUp` (drop the tap and transport commit on cancel) when the touch path is next touched.
 
 - **A browser `pointercancel` on an unmoved touch press commits the tap
   placement**: Excalibur routes `cancel` into the same handler as `up`
