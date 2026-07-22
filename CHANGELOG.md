@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.84.3
+
+- If your browser can't use WebGL right now (often hardware acceleration turned off), the game says so and how to fix it, with a Reload button, instead of showing an empty page.
+
 ## 1.84.2
 
 - Food Hall stalls now look different from each other: a Ramen Bar, Taco Stand, Bubble Tea, Poke Bowl, Deli Counter, and Coffee Cart each get their own colors and layout, instead of every hall drawing the same.
