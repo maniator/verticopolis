@@ -249,6 +249,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `bmad-code-review` of the boot-overlay hardening (2026-07-22)
+
+- **Boot-error path: splash controls stay armed behind the fatal overlay (Edge Case Hunter, minor, pre-existing).** When a boot error lands after `runBootFlow` mounts the splash, the fatal overlay now stacks above it (fixed, z-index 100) without removing it, so the splash controller's document keydown listener stays armed: a returning player pressing Escape behind the fatal screen runs the normal Continue dismissal invisibly (teardown, music program flip, welcome toast, and the splash-presence autosave gate opens for the half-booted sim). Pre-existing exposure: the old flow-content message left the splash and listener alive the same way; the overlay only makes it invisible rather than new. Fix shape if picked up: a boot-fatal latch the splash controller and the autosave interval both consult (or an inert/input-capture layer on the overlay that spares its own Reload button).
+
 ### Deferred from: `gds-code-review` of the save-integrity bundle (#537, 2026-07-21)
 
 - **Id re-mint drift near ID_CAP (Edge Case Hunter, minor, pre-existing).** `repairEntityIds` (`src/engine/sim/deserializeGuards.ts`, extracted verbatim from `serialization.ts`) mints replacement ids with `++maxLoadedId` and does not itself re-check ID_CAP, so a forged save carrying one sane id just under 2^31 plus corrupt/duplicate ids can mint repaired ids at or past ID_CAP; the next load then classifies those as insane and re-mints again, so ids are unstable across loads (unique within a session, never corrupting). Pathological forged-save corner only; a legit tower sits orders of magnitude below the cap. Fix shape if picked up: when `maxLoadedId` is within `entities.length` of ID_CAP, renumber the whole entity list from 1.

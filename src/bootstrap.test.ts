@@ -68,17 +68,20 @@ describe("showBootMessage", () => {
     document.body.innerHTML = "";
   });
 
-  it("injects the message into #stage", () => {
+  it("mounts the message in its body-level host (gated on #stage being present)", () => {
     showBootMessage("hello boot");
-    const stage = document.getElementById("stage")!;
-    expect(stage.innerHTML).toContain("hello boot");
-    expect(stage.querySelector("button")).toBeNull();
+    const host = document.getElementById("boot-fallback-host")!;
+    // A DIRECT child of <body>: mounted anywhere inside #stage, the fixed
+    // overlay's containing block would be hostage to a future transformed or
+    // filtered ancestor, the exact hazard the host exists to escape.
+    expect(host.parentElement).toBe(document.body);
+    expect(host.innerHTML).toContain("hello boot");
+    expect(host.querySelector("button")).toBeNull();
   });
 
   it("appends a Reload button when withReload is true", () => {
     showBootMessage("reload me", true);
-    const stage = document.getElementById("stage")!;
-    const btn = stage.querySelector("button");
+    const btn = document.getElementById("boot-fallback-host")!.querySelector("button");
     expect(btn).not.toBeNull();
     expect(btn!.textContent).toBe("Reload");
     // Clicking is a no-op for location.reload under happy-dom; just prove the
@@ -86,16 +89,17 @@ describe("showBootMessage", () => {
     expect(() => btn!.click()).not.toThrow();
   });
 
-  it("is a no-op when there is no #stage element", () => {
+  it("is a no-op when there is no #stage element (and mounts no host)", () => {
     document.body.innerHTML = "";
     expect(() => showBootMessage("nowhere")).not.toThrow();
+    expect(document.getElementById("boot-fallback-host")).toBeNull();
   });
 
   it("removes the boot cover so a fallback message is never trapped behind it", () => {
     document.body.innerHTML = `<div id="boot-cover"></div><div id="stage"></div>`;
     showBootMessage("no WebGL here");
     expect(document.getElementById("boot-cover")).toBeNull();
-    expect(document.getElementById("stage")!.innerHTML).toContain("no WebGL here");
+    expect(document.getElementById("boot-fallback-host")!.innerHTML).toContain("no WebGL here");
   });
 
   it("overlays a POPULATED stage instead of flowing below its children (live Firefox no-WebGL regression)", () => {
@@ -109,39 +113,56 @@ describe("showBootMessage", () => {
     // is the function's job now, so CSS drift cannot re-anchor the overlay.
     document.body.innerHTML = `<div id="stage" style="height:600px;overflow:hidden"><canvas id="view" style="display:block;width:100%;height:600px"></canvas><div id="hint">Drag to pan</div></div>`;
     showBootMessage("no WebGL here");
-    const wrapper = [...document.querySelectorAll<HTMLElement>("#stage > div")].find((d) =>
-      d.textContent?.includes("no WebGL here"),
-    );
-    expect(wrapper).toBeDefined();
-    // Longhand offsets (never the `inset` shorthand): this code path serves
-    // old and hardened engines where the shorthand may not parse, which would
-    // strand the wrapper at static position and resurrect the bug.
-    expect(wrapper!.style.position).toBe("absolute");
+    const wrapper = document.getElementById("boot-fallback") as HTMLElement | null;
+    // Found by the stable id the screenshot runner and tooling key on.
+    expect(wrapper).not.toBeNull();
+    // Never a descendant of #stage: that parentage would re-expose the fixed
+    // overlay to a future transformed ancestor capturing its containing block.
+    expect(document.getElementById("stage")!.contains(wrapper)).toBe(false);
+    // FIXED and full-viewport with longhand offsets (never the `inset`
+    // shorthand: this code path serves old and hardened engines where the
+    // shorthand may not parse, stranding the wrapper at static position).
+    expect(wrapper!.style.position).toBe("fixed");
     expect(wrapper!.style.top).toBe("0px");
     expect(wrapper!.style.right).toBe("0px");
     expect(wrapper!.style.bottom).toBe("0px");
     expect(wrapper!.style.left).toBe("0px");
     expect(wrapper!.getAttribute("style") ?? "").not.toContain("inset");
-    expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(0);
+    // Above every stylesheet layer (the app tops out at z-index 50, the
+    // splash sits at 40): the overlay must win without removing anything.
+    expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(50);
     // An OPAQUE background: the overlay must actually cover the dead canvas.
     expect(wrapper!.style.background || wrapper!.style.backgroundColor).toBe("#1c2030");
-    // The containing block is established by the function itself.
-    expect(document.getElementById("stage")!.style.position).toBe("relative");
+    // Centering comes from the inner wrapper's margin:auto with the outer
+    // wrapper scrollable: centered flex overflow extends above the scroll
+    // origin and clips the first lines unreachably on short viewports. The
+    // parsed property (never the style string) catches every spelling.
+    expect(wrapper!.style.justifyContent).toBe("");
+    expect(wrapper!.style.overflow).toBe("auto");
+    const inner = wrapper!.firstElementChild as HTMLElement;
+    expect(inner.style.margin).toBe("auto");
+    expect(inner.textContent).toContain("no WebGL here");
     // The static children survive (lit appends; it must not clobber the app's
     // stage), and the message sits after them in the DOM as the top layer.
     expect(document.getElementById("view")).not.toBeNull();
     expect(document.getElementById("hint")).not.toBeNull();
   });
 
-  it("drops a mounted splash/onboarding so a boot-fallback message is never buried behind them", () => {
-    // A boot ERROR can land after runBootFlow mounts the splash (fixed, a
-    // higher z-index than the stage-local overlay); the message must own the
-    // screen the same way it already owns the boot cover.
+  it("stacks above a mounted splash without removing it (boot-error path; owners keep their state)", () => {
+    // A boot ERROR can land after runBootFlow mounts the splash. The overlay
+    // must WIN THE STACKING (fixed, z-index above the splash's 40), never
+    // remove the node: the splash controller keeps a document keydown
+    // listener, and the autosave interval gates on the splash node's
+    // presence, so tearing it out would orphan the listener and reopen the
+    // ghost-autosave path the guard exists to close.
     document.body.innerHTML = `<div id="splash"></div><div id="onboard"></div><div id="stage"></div>`;
     showBootMessage("boot failed");
-    expect(document.getElementById("splash")).toBeNull();
-    expect(document.getElementById("onboard")).toBeNull();
-    expect(document.getElementById("stage")!.textContent).toContain("boot failed");
+    expect(document.getElementById("splash")).not.toBeNull();
+    expect(document.getElementById("onboard")).not.toBeNull();
+    const wrapper = document.getElementById("boot-fallback") as HTMLElement | null;
+    expect(wrapper).not.toBeNull();
+    expect(wrapper!.style.position).toBe("fixed");
+    expect(Number(wrapper!.style.zIndex)).toBeGreaterThan(50);
   });
 });
 
@@ -196,11 +217,11 @@ describe("bootGame", () => {
     bootGame(create);
 
     expect(create).not.toHaveBeenCalled();
-    expect(document.getElementById("stage")!.innerHTML).toContain("can't use WebGL");
+    expect(document.getElementById("boot-fallback-host")!.innerHTML).toContain("can't use WebGL");
     // The remedy copy leads with what to change (acceleration/WebGL), and a
     // real Reload button closes the loop after the setting flips.
-    expect(document.getElementById("stage")!.innerHTML).toContain("hardware acceleration");
-    const reload = [...document.querySelectorAll("#stage button")].find((b) => b.textContent === "Reload");
+    expect(document.getElementById("boot-fallback-host")!.innerHTML).toContain("hardware acceleration");
+    const reload = [...document.querySelectorAll("#boot-fallback-host button")].find((b) => b.textContent === "Reload");
     expect(reload).toBeDefined();
     expect((window as unknown as { game?: unknown }).game).toBeUndefined();
   });
@@ -213,7 +234,7 @@ describe("bootGame", () => {
     });
 
     expect(() => bootGame(create)).toThrow("kaboom");
-    const html = document.getElementById("stage")!.innerHTML;
+    const html = document.getElementById("boot-fallback-host")!.innerHTML;
     expect(html).toContain("Something went wrong");
     expect(html).toContain("kaboom");
   });
