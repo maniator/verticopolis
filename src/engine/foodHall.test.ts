@@ -3,6 +3,7 @@ import { Simulation } from "./Simulation";
 import { GRID, FACILITIES } from "./facilities";
 import { FOODHALL_SUBTYPES, subtypeListFor } from "./retailSubtypes";
 import { isCommercialKind } from "./facilityPredicates";
+import { MEAL_WINDOWS } from "./crowd/meals";
 import { ECON } from "./econConfig";
 
 /**
@@ -55,6 +56,15 @@ describe("Food Hall", () => {
     // One kind, many faces: the reskin variety the container pattern is built on.
     expect(subtypeListFor("foodHall")).toBe(FOODHALL_SUBTYPES);
     expect([...FOODHALL_SUBTYPES]).toContain(u!.subtype);
+  });
+
+  it("is a lunch and dinner meal destination (its open windows)", () => {
+    // A food court that couldn't receive diners would contradict "satisfies
+    // many cravings"; it belongs in the meal-cadence windows it is open for.
+    expect(MEAL_WINDOWS.lunch.venues).toContain("foodHall");
+    expect(MEAL_WINDOWS.dinner.venues).toContain("foodHall");
+    // Closed at breakfast (6-9) and effectively at late night (open 10-22).
+    expect(MEAL_WINDOWS.breakfast.venues).not.toContain("foodHall");
   });
 
   it("is a demand-pool venue in Modern, absent from Classic's income table", () => {
