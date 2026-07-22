@@ -479,16 +479,15 @@ export class SaveLoad {
   newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld"): void {
     this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar));
     gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
-    // An empty lot (canon-zero founding) gets an actionable line: the engine's
-    // welcome log entry is rebased past by the UI cursor, so the toast is the
-    // one visible cue. Keyed on tower state, never on the mode string.
+    // Both rule-sets found an empty lot now, so the toast is the actionable
+    // first-lobby cue (the engine's welcome log entry is rebased past by the UI
+    // cursor, so the toast is the one visible signal). Keyed on tower state,
+    // never on the mode string, so it stays correct if founding ever seeds again.
     const founded = this.deps.getSim();
     this.deps.ui.toast(
       founded.tower.units.length === 0
         ? "New tower founded. Lay a lobby on the ground line to open it."
-        : mode === "modern"
-          ? "New Modern tower founded. Good luck!"
-          : "New tower founded. Good luck!",
+        : "New tower founded. Good luck!",
       "good",
     );
     // Auto-arm onboarding only for a genuine first-timer. A returning player (a

@@ -1,6 +1,5 @@
 import { REAL_WORLD } from "./calendar";
 import { ECON } from "./econConfig";
-import { GRID } from "./facilities";
 import {
   LOBBY_FAR_FLOORS,
   LOBBY_VERY_FAR_FLOORS,
@@ -51,7 +50,6 @@ const MODERN_HK_TRIAGE: HousekeepingTriage = Object.freeze({ perDirtyDay: 10, pe
 
 export const CLASSIC_RULES: GameRules = {
   mode: "classic",
-  starterLobby: () => null,
   hasVariantHouseholds: false,
   showsPreviewReason: false, // canon-faithful pedagogy: click-to-refuse, learn by doing
   allowsEscalatorOnOfficeFloors: false, // canon: escalators link commercial floors only
@@ -174,7 +172,6 @@ export const CLASSIC_RULES: GameRules = {
 
 export const MODERN_RULES: GameRules = {
   mode: "modern",
-  starterLobby: () => ({ x: Math.floor(GRID.width / 2) - 20, width: 40 }),
   hasVariantHouseholds: true,
   showsPreviewReason: true, // Modern surfaces refusal reasons on the invalid preview
   allowsEscalatorOnOfficeFloors: true, // Modern lifts the commercial-only escalator rule

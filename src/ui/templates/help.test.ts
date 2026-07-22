@@ -79,7 +79,6 @@ describe("helpTemplate structure and a11y", () => {
   const RULE_TO_HELP: Record<keyof GameRules, string | null> = {
     mode: null, // identity, not a divergence
     hasVariantHouseholds: "Variant households",
-    starterLobby: "A ready lobby", // Modern seeds the centered strip; Classic founds the 1994 empty lot
     sellCondo: "sets the sale price", // the 2-5 family draw scales the price
     showsPreviewReason: "Hovering an invalid spot",
     allowsEscalatorOnOfficeFloors: "Escalators can serve office floors",

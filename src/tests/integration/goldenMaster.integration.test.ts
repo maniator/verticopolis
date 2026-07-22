@@ -180,11 +180,10 @@ describe("golden master (modern): Simulation serialize() is byte-stable across r
 // (spec-classic-economy-canon-cadence-2026-07-22): Classic's quarterlyRentScale
 // is now 1, so the fixture's occupied offices collect their FULL rent at each
 // canon 3-day quarter boundary instead of the old 1/30 rescale, moving money
-// and the fields downstream of it. The Modern hash below is UNCHANGED in the
-// same change, which is the proof the divergence flows only through
-// rules.quarterlyRentScale. The prior re-pin was Classic canon-zero founding
-// (spec-starter-lobby-mode-split), where ensureStarterLobby began laying the
-// 40 tiles itself.
+// and the fields downstream of it. This Classic hash is UNCHANGED by the Modern
+// empty-lot founding change (Classic already founded empty). The prior re-pin
+// was Classic canon-zero founding (spec-starter-lobby-mode-split), where
+// ensureStarterLobby began laying the 40 tiles itself.
 const PINNED_STATE_HASH = "c9b43b091e1e52d1d03506c74ac7d32058ab9045e6646f7d76020692995c551d";
 
 /**
@@ -208,8 +207,11 @@ const PINNED_STATE_HASH = "c9b43b091e1e52d1d03506c74ac7d32058ab9045e6646f7d76020
  * before any rng use), which is why the Classic hash above is UNCHANGED in that
  * PR: the unchanged value is the proof of the zero-draw gate.
  */
-// Re-pinned for the same additive `initialSeed` save field as the Classic hash
-// above; the only serialized difference is the new field (the fixture's
-// founding seed, written verbatim, read by nothing in the sim). The prior
-// re-pin was the #305 Phase 1 SAVE_VERSION 6 -> 7 bump.
-const PINNED_MODERN_STATE_HASH = "61c1d422cd294b552c5fee8b8060c09de891d070affa18d756b2473db3e056c0";
+// Re-pinned for Modern empty-lot founding (gdd-modern-expansion): newGame no
+// longer seeds the Modern center lobby, so the fixture's ensureStarterLobby now
+// LAYS those 40 tiles itself (different unit ids and revision history than the
+// founding seed produced, hence the new fingerprint). The Classic hash above is
+// UNCHANGED in this change, since Classic already founded empty. The prior
+// re-pin was the additive `initialSeed` save field (the fixture's founding seed,
+// written verbatim, read by nothing in the sim).
+const PINNED_MODERN_STATE_HASH = "65d6b4c06ad309f849c81ac7f76d2b9f1c9396b51f3543a12689365297ec30d9";
