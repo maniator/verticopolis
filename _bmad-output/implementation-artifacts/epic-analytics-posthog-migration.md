@@ -166,6 +166,46 @@ guess.
   never the key or the payload. The client stays silent by design (best-effort
   misses are expected and logging them would just be player-console noise).
 
+## Relay correctness follow-ups (geoIP + session continuity)
+
+Two small fixes found while validating the live pipeline in PostHog, shipped
+together ahead of S5 so the data goes clean immediately (decided in party-mode).
+
+- **GeoIP disabled at the relay.** `buildCaptureBody` now writes
+  `$geoip_disable: true` as a server-authoritative prop (after the client
+  spread, un-overridable). We never forward the player's IP (raw IP is a spec
+  non-goal), so PostHog was GeoIP-ing the only IP it saw: the relay's own Vercel
+  egress, making every event geo-locate to one datacenter (Ashburn VA / `iad1`).
+  Disabling the enrichment drops that misleading uniform location and keeps us
+  IP-free, rather than forwarding the client IP to get real geography.
+- **Session id survives a reload within the tab.** The client session id
+  (`analyticsRelay.ts`) now rides `sessionStorage` instead of a bare in-memory
+  variable, so an app-initiated resume reload (an "Update now" reload, a
+  WebGL-context-recovery reload) or a manual refresh keeps one continuous play
+  session as ONE analytics session, instead of minting a new id per reload and
+  fragmenting it. Still cookieless: `sessionStorage` is cleared on tab close, so a
+  genuinely new tab is a fresh session and nothing links a visitor across sessions
+  or devices (no cookie, no `localStorage` id, no consent banner). The one edge is
+  browser "Duplicate Tab" / session-restore, which copies `sessionStorage` on the
+  same device and browsing lineage, so a duplicated tab briefly continues the id;
+  rare and privacy-benign (no cross-device or persisted-across-sessions identity).
+  Wrapped never-throw: a private-mode storage throw degrades to the old in-memory
+  behavior.
+- **SPEC CAP-2 amended to match.** CAP-2 originally specified an "in-memory,
+  never persisted" `distinct_id`; this change moves it to `sessionStorage`
+  (session-scoped, never persisted across sessions), so CAP-2's intent and
+  success wording were updated to bless the session-scoped stored id and keep the
+  canonical contract accurate. The privacy goal CAP-2 protected (no cross-session
+  or cross-device identity) is unchanged; only the fragment-on-reload behavior is
+  fixed. This mirrors how S2 recorded its Node-runtime deviation from the sketched
+  Edge Function.
+- **Single PostHog project, environment-tagged (matches the SPEC).** Production
+  and preview both route to the `verticopolis` project (id 524085, US Cloud),
+  separated by the server-stamped `environment` prop; dashboards default to
+  `environment = production`. The earlier `verticopolis-preview` project is left
+  dormant. This is the SPEC's one-project design, recorded here since the setup
+  briefly diverged.
+
 ## S4 event enrichment (as built)
 
 - **One merge point, above the seam.** `analytics.ts` holds a module-level

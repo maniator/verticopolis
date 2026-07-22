@@ -196,14 +196,21 @@ export function originAllowed(origin: string | null, environment: string | undef
 
 /**
  * Build the PostHog capture body from the client payload. Every server-authored
- * field (`distinct_id`, `$process_person_profile`, `environment`) is written
- * AFTER the client property spread, so a crafted client body can never override
- * them: it cannot spoof the session id, flip the no-person-profile posture, or
- * mislabel its environment. Junk shapes are neutralized here too (a non-object
- * `properties` is dropped, an empty or non-string `session` falls back to the
- * anonymous bucket, a non-ISO `ts` is omitted so PostHog defaults the time). The
- * `api_key` is deliberately not added here; the handler adds it only at the
- * forward so the key never passes through this pure builder.
+ * field (`distinct_id`, `$process_person_profile`, `$geoip_disable`,
+ * `environment`) is written AFTER the client property spread, so a crafted client
+ * body can never override them: it cannot spoof the session id, flip the
+ * no-person-profile posture, re-enable GeoIP, or mislabel its environment. Junk
+ * shapes are neutralized here too (a non-object `properties` is dropped, an empty
+ * or non-string `session` falls back to the anonymous bucket, a non-ISO `ts` is
+ * omitted so PostHog defaults the time). The `api_key` is deliberately not added
+ * here; the handler adds it only at the forward so the key never passes through
+ * this pure builder.
+ *
+ * `$geoip_disable: true` is deliberate. We never forward the player's IP (raw IP
+ * is a spec non-goal), so the only IP PostHog would see is the relay's own egress
+ * (the Vercel function's region), which made every event geo-locate to one
+ * datacenter. Disabling GeoIP drops that misleading, uniform location data and
+ * keeps us IP-free, rather than forwarding the client IP to get real geography.
  */
 export function buildCaptureBody(
   body: IngestBody & { event: string },
@@ -220,6 +227,7 @@ export function buildCaptureBody(
       ...props,
       distinct_id: session,
       $process_person_profile: false,
+      $geoip_disable: true,
       environment: environment ?? "unknown",
     },
   };
