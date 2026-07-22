@@ -283,3 +283,84 @@ consent. Decision:
 - **Bonus (player feature, no consent):** if Continue means "welcome back," a
   local "your tower has been quiet N days" touch on the Continue card is the same
   save data spent on delight, computed and shown on-device, never transmitted.
+
+## S5 frame-rate signal + report re-target (as built)
+
+CAP-3's raw frame-rate signal and CAP-4's report re-target, plus the live
+dashboard as code. All three landed together (design settled in party-mode; the
+two relay-correctness fixes shipped ahead in the follow-up section above, so S5
+is signal + report + dashboard, not the relay).
+
+- **`session_fps` reports per-session frame-rate percentiles, not Vercel's
+  buckets.** `GameplaySession.noteFrame()` reservoir-samples per-frame fps with
+  Algorithm R capped at 256 samples, and `end()` emits
+  `session_fps { p50, low, samples }` once per session alongside `session_end` /
+  `session_builds`, where `low` is the 5th-percentile (worst-frame) fps. The two
+  fps numbers are session estimates over the bounded reservoir; PostHog computes
+  the exact CROSS-session quantiles from them, so we are no longer forced into the
+  fixed histogram buckets Vercel required. `p50` is typical smoothness; `low` is
+  the hitch a player actually feels. The gate `FPS_MIN_SAMPLES = 120` drops
+  sessions too short to characterize (no misleading fps from a five-frame visit).
+- **The sampler measures real wall-clock frame time, not the engine's delta.**
+  The gds-code-review caught that Excalibur's clock clamps any frame longer than
+  200ms down to 1ms as a sim spike-guard, so feeding `noteFrame` the engine's
+  frame delta would have recorded a genuine hitch (the whole point of #538) as
+  ~1000fps at the GOOD end of the distribution and inverted the worst-frame `low`
+  signal. `noteFrame` now reads its own `performance.now()` gap between frames,
+  which keeps the hitch; a regression test drives real 500ms freezes and asserts
+  they land in the low tail as ~2fps. The frame anchor is reset on each resume
+  (`begin`) so a backgrounded tab's gap is never sampled as one giant slow frame,
+  and the fast end is capped so a sub-millisecond delta cannot inject a spike.
+- **Sampling cost was the #1 audit risk, kept near zero.** `noteFrame` is the
+  first line of `runFrame` (before the modal-freeze early return, so it captures
+  every RENDERED frame, fps being a render metric not a sim-tick one). It is one
+  `performance.now` read, a subtract, a divide, and either a push or a single
+  random-index write into a fixed 256-slot array: O(1), no allocation on the hot
+  path. Foreground-gated (`resumedAt !== null`) so a backgrounded tab's frames
+  never pollute the sample. The reservoir is emitted once (`fpsReported` latch)
+  and cleared in `reset()`. A known minor limitation (idle/paused frames still
+  sampled, diluting the signal on big towers) is tracked as a deferral (#603).
+- **Report re-targeted to PostHog (HogQL), Vercel kept until S6.**
+  `scripts/posthog-report.mjs` is a new dependency-free Node script that queries
+  PostHog with HogQL and renders the same three outputs the Vercel report did
+  (styled HTML artifact, markdown job summary, raw JSON to the log). It is a
+  SECOND script, not an edit of `analytics-report.mjs`: the Vercel path stays
+  live so the two run side by side through the cutover, and S6 removes the Vercel
+  one. The re-target buys precision: HogQL `quantile(0.5)(...)` computes EXACT
+  percentiles instead of reconstructing them from a capped value histogram, and
+  because every event now carries a per-tab session id (`distinct_id`), the
+  report does the per-session and per-tool splits the Vercel path could not
+  (Vercel Web Analytics has no session correlation). All queries filter
+  `properties.environment = 'production'`; the look-back is a clamped integer and
+  the one string interpolated into HogQL (event/property names) is hardcoded and
+  escaped (`lit`), so there is no injection surface. Never-throw, same as the
+  Vercel report: a failed query renders a skipped section, not a crash. Pure
+  helpers (query builders + response normalizers) are unit-tested in
+  `src/posthog-report.test.ts` without a live key.
+- **Dashboard as code.** `scripts/posthog-dashboard.mjs` provisions the live
+  "Verticopolis: Gameplay Analytics" dashboard idempotently (find-or-create the
+  dashboard and each insight by name, then create-or-PATCH), so the dashboard the
+  game reports into is reproducible and reviewable rather than a pile of
+  hand-clicked tiles. It carries the core trends and the first-tower funnel, the
+  S4 enrichment breakdowns (platform / reason / returning / tenure / recency),
+  exact session-length and depth percentiles, the new `session_fps` frame-health
+  tile, and a set of KPI BoldNumbers and at-a-glance tables. Every tile filters
+  to `environment = production`; GeoIP is disabled at the relay so there are no
+  geo tiles. Run with a `phx_...` personal API key: it needs `insight:*` and
+  `dashboard:*`, distinct from the `phc_...` ingest key.
+- **CI wiring.** `.github/workflows/analytics-report.yml` now runs the PostHog
+  report first, then the Vercel report (labeled "retires at S6"). New secret
+  `POSTHOG_PERSONAL_API_KEY` (a `phx_...` key with `query:read`); optional repo
+  vars `POSTHOG_PROJECT_ID` (default 524085) and `POSTHOG_HOST` (default
+  `https://us.posthog.com`). The dispatch `days` input still passes through env,
+  never interpolated into the shell.
+- **Bundle delta (hard gate, measured): the telemetry chunk is 4.95 KB gzipped
+  (5072 bytes), flat against S4's 4.97 KB.** `session_fps` adds a handful of pure
+  lines to the sampler; the one `noteFrame` call in the frame loop lands in the
+  main chunk and is negligible. No measurable net weight and no cold-start cost:
+  the sampler is one `performance.now` read and O(1) arithmetic per frame, no
+  network and no allocation on the hot path. Well under the 5 KB ceiling.
+- **Version bump: minor (`session_fps` is a new player-observable emission).**
+  The frame-rate signal fires from the running game, so the build changes what
+  the client does even though nothing on screen moves; the report and dashboard
+  are tooling and would not bump on their own.
