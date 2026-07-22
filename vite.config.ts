@@ -135,7 +135,15 @@ export default defineConfig({
     VitePWA({
       registerType: "prompt",
       injectRegister: false,
-      includeAssets: ["apple-touch-icon.png", "favicon.png"],
+      // Every icon (favicon, apple-touch-icon, the three manifest icons) is
+      // already precached ONCE by the workbox globPatterns below (**/*.png over
+      // the build output). `includeAssets` and the plugin's default
+      // includeManifestIcons: true would add the same five files a second time,
+      // which double-listed them in the generated service-worker manifest and
+      // overstated the build log's precache count (26 listed, 21 unique;
+      // PROD-003). Workbox deduped at install, so nothing user-facing changed,
+      // but the manifest and its reported count should tell the truth.
+      includeManifestIcons: false,
       manifest: {
         name: "Verticopolis",
         short_name: "Verticopolis",
