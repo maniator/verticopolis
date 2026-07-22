@@ -163,6 +163,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     color: "#cf7fb0",
     description: "A two-story rentable function space for events. Guests enter on the lower floor. Periodic income.",
   },
+  amusements: {
+    kind: "amusements",
+    category: "entertainment",
+    name: "Amusements",
+    width: 12,
+    cost: 180000,
+    minStar: 3,
+    population: 25,
+    color: "#d24a9c",
+    modernOnly: true,
+    description: "Modern: an arcade and amusements hall (classic cabinets, VR, claw machines, mini-golf). Draws teens and families for games and earns from foot traffic, and is busier on weekends.",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",

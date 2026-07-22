@@ -133,14 +133,16 @@ describe("CLASSIC_RULES", () => {
     for (const kind of ["fastFood", "restaurant", "shop", "cinema", "partyHall"]) {
       expect(MODERN_RULES.commercialDailyIncome(kind)).toBe(ECON.dailyTrafficIncome[kind]);
     }
-    // The Modern-only Food Hall is a venue in Modern only: it earns in Modern
-    // and does not exist in the Classic 1994 table at all.
-    expect(MODERN_RULES.commercialDailyIncome("foodHall")).toBe(ECON.dailyTrafficIncome.foodHall);
-    expect(ECON.dailyTrafficIncome.foodHall).toBeGreaterThan(0);
-    expect(ECON.classicDailyTrafficIncome.foodHall).toBeUndefined();
+    // The Modern-only venues (Food Hall, Amusements) earn in Modern only and do
+    // not exist in the Classic 1994 table at all.
+    for (const kind of ["foodHall", "amusements"]) {
+      expect(MODERN_RULES.commercialDailyIncome(kind)).toBe(ECON.dailyTrafficIncome[kind]);
+      expect(ECON.dailyTrafficIncome[kind]).toBeGreaterThan(0);
+      expect(ECON.classicDailyTrafficIncome[kind]).toBeUndefined();
+    }
     // Kind classification is shared for every CANON venue; Modern additionally
-    // carries its Modern-only venues (Food Hall), which never exist in Classic.
-    const MODERN_ONLY_VENUES = ["foodHall"];
+    // carries its Modern-only venues (Food Hall, Amusements), never in Classic.
+    const MODERN_ONLY_VENUES = ["foodHall", "amusements"];
     expect(Object.keys(ECON.classicDailyTrafficIncome).sort()).toEqual(
       Object.keys(ECON.dailyTrafficIncome)
         .filter((k) => !MODERN_ONLY_VENUES.includes(k))

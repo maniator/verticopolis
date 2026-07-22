@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.85.0
+
+- Modern towers can build a new Amusements hall: an arcade and games venue that comes as a classic arcade, a VR lounge, a claw parlor, or a mini-golf bay, each with its own lively art. It draws teens and families for foot-traffic income and is busier on weekends. Unlocks at 3 stars. Modern only; Classic keeps the 1994 catalog.
+
 ## 1.84.3
 
 - If your browser can't use WebGL right now (often hardware acceleration turned off), the game says so and how to fix it, with a Reload button, instead of showing an empty page.

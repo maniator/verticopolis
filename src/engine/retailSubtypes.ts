@@ -55,6 +55,19 @@ export const FOODHALL_SUBTYPES = [
 ] as const;
 
 /**
+ * The attractions a Modern Amusements hall can present. Like the Food Hall
+ * roster above, these are Modern-only and carry NO ordinal: a Modern tower is
+ * never exported to the 1994 `.TDT` format, and the native save persists the
+ * attraction by NAME, not by index, so order carries no meaning.
+ */
+export const AMUSEMENTS_SUBTYPES = [
+  "Classic Arcade",
+  "VR Lounge",
+  "Claw Parlor",
+  "Mini Golf",
+] as const;
+
+/**
  * The subtype (stall/variant) name list for `kind`, or null when the kind
  * carries none. The canon retail kinds (shop / fastFood / restaurant) return
  * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
@@ -73,6 +86,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return SHOP_SUBTYPES;
     case "foodHall":
       return FOODHALL_SUBTYPES;
+    case "amusements":
+      return AMUSEMENTS_SUBTYPES;
     default:
       return null;
   }

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit } from "../engine/types";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { AMUSEMENTS_SUBTYPES, FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   craneAnchorTile,
@@ -72,6 +72,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["fast food", { kind: "fastFood" }],
     ["restaurant", { kind: "restaurant" }],
     ["food hall", { kind: "foodHall" }],
+    ["amusements", { kind: "amusements" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -142,6 +143,46 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     // than the closed shutter; EXIT green #6bd47a is a non-reserved canon color.
     expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "cinema" }), 0, 0, 341, 88)).not.toThrow();
     expect(s.log).toContain("fillStyle=#6bd47a");
+  });
+
+  it("each Amusements attraction draws its own distinct room", () => {
+    // Four attractions, four interiors: the same guarantee the distinctness
+    // test pins on the look table must show up in the actual drawing.
+    const sigs = new Set<string>();
+    for (const name of AMUSEMENTS_SUBTYPES) {
+      const s = spyCtx();
+      expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "amusements", subtype: name, occupants: 3 }), 0, 0, 132, 44)).not.toThrow();
+      expect(s.painted()).toBe(true);
+      sigs.add(s.sig());
+    }
+    expect(sigs.size, "two attractions drew identically").toBe(AMUSEMENTS_SUBTYPES.length);
+  });
+
+  it("every Amusements attraction reads empty when empty and full when full", () => {
+    // The room draws either way (cabinets, pods, machines, turf), but the people
+    // (person builds, 1px contact shadow) appear ONLY when occupied. Checked for
+    // ALL four attractions: VR and mini-golf used to draw a lone figure even at
+    // zero occupancy, contradicting the "empty hall reads empty" invariant.
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    for (const name of AMUSEMENTS_SUBTYPES) {
+      const empty = spyCtx();
+      const full = spyCtx();
+      drawUnit(draw({}, empty.ctx), unit({ kind: "amusements", subtype: name, occupants: 0 }), 0, 0, 132, 44);
+      drawUnit(draw({}, full.ctx), unit({ kind: "amusements", subtype: name, occupants: 6 }), 0, 0, 132, 44);
+      expect(empty.log, `${name} drew a person while empty`).not.toContain(occupant);
+      expect(full.log, `${name} drew no person while full`).toContain(occupant);
+    }
+  });
+
+  it("an Amusements hall can't be hung by a forged occupant count", () => {
+    // The mini-golf watcher loop is bounded by the bay width, not the raw
+    // occupant count, so a corrupt save with a huge `occupants` paints a bounded
+    // number of figures and returns instead of spinning.
+    const s = spyCtx();
+    expect(() => drawUnit(draw({}, s.ctx), unit({ kind: "amusements", subtype: "Mini Golf", occupants: 1e9 }), 0, 0, 132, 44)).not.toThrow();
+    // A 132px bay fits only a handful of watchers; nowhere near a billion.
+    const people = s.log.filter((l) => l === "fillStyle=rgba(0,0,0,0.24)").length;
+    expect(people).toBeLessThan(20);
   });
 });
 
