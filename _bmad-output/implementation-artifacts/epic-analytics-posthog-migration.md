@@ -51,8 +51,8 @@ guess.
 | ID | Story | CAP | Review | Version bump | Status |
 |----|-------|-----|--------|--------------|--------|
 | S1 | Extract the vendor and transport into one adapter behind the typed `note*` vocabulary. Vercel stays byte-identical; stub adapter for tests; no `@vercel/analytics` import outside the adapter. | CAP-1 | `/gds-code-review` | none (internal) | done (PR #577) |
-| S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | in-progress |
-| S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | as measured | todo |
+| S2 | `api/ingest.ts` relay: forward to PostHog capture, key server-side, `VERCEL_ENV` tag, rate-limit, non-blocking forward, plus the Vercel env vars. | CAP-2 | `/gds-code-review` | none (server-only) | done (PR #580) |
+| S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | in-progress |
 | S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | as measured | todo |
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | none (tooling) | todo |
 | S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
@@ -101,3 +101,37 @@ guess.
 - PostHog capture contract (`POST {host}/capture/`, `api_key` at the top level,
   `distinct_id` inside `properties`, `$process_person_profile: false`, ISO
   `timestamp`) confirmed against PostHog's current capture API docs.
+- **Same-origin guard decision (from #580 review).** `originAllowed` rejects a
+  cross-site browser POST with 403. It is environment-aware: production trusts
+  only `verticopolis.com`, never the shared `*.vercel.app` suffix (common to every
+  Vercel customer). `*.vercel.app` is accepted only on preview and development,
+  whose own origin is `<branch>.vercel.app` and whose traffic is auth-gated (Vercel
+  deployment protection) and isolated by the `environment` tag. Vercel's paid
+  preview-suffix (a `verticopolis.com` preview subdomain) would let the
+  `.vercel.app` branch be dropped everywhere, but it was judged not worth the cost:
+  production, the only public endpoint, is already locked to the custom domain.
+
+## S3 client transport (as built)
+
+- `src/analyticsRelay.ts` is the cookieless client transport: `sendToRelay` posts
+  `{ event, properties, session, ts }` to same-origin `/api/ingest` via
+  `navigator.sendBeacon` (fetch `keepalive` fallback). No `posthog-js`, no key.
+  The per-session id is a `crypto.randomUUID()` created lazily on the first send
+  (with a `Math.random` fallback for a non-secure context) and never persisted, so
+  a new tab is a new session and there is no cross-session identity. It is made on
+  first send rather than at module load so an absent or throwing `randomUUID`
+  cannot crash boot. Best-effort and never-throw.
+- `dualWriteAdapter` in `analyticsAdapter.ts` is the new default active adapter:
+  every event goes to BOTH Vercel `track` and `sendToRelay`, independently (a
+  Vercel throw cannot suppress the relay write), so the two feeds can be compared
+  before Vercel is retired at S6. Page-view and Core Web Vitals inject stays
+  Vercel-only. The host gate and never-throw guarantee are unchanged (upstream in
+  `analytics.ts`).
+- **Measured mobile bundle delta: +0.23 KB gzipped** (the `telemetry` chunk went
+  from 4.72 to 4.95 KB gzipped; all other chunks flat). Far under the 5 KB ceiling,
+  as expected: the client gains a small `sendBeacon` function; a full SDK would
+  have added roughly 50 KB.
+  No cold-start regression by construction: the transport runs only on an event
+  (nothing runs at module load; the session id is minted lazily on the first
+  send). The on-device frame-health number rides the perf harness when a device
+  run is taken.

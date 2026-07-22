@@ -3,11 +3,12 @@ import { track, inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import {
   analyticsAdapter,
+  dualWriteAdapter,
   setAnalyticsAdapter,
-  vercelAdapter,
   type AnalyticsAdapter,
   type EventProps,
 } from "./analyticsAdapter";
+import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 import { injectVercelTelemetry } from "./telemetry";
 
@@ -15,6 +16,9 @@ import { injectVercelTelemetry } from "./telemetry";
 // takes over the whole surface: under the stub, none of these vendor calls fire.
 vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
+// The default adapter dual-writes to the PostHog relay too (S3); stub it so the
+// relay side is observable without a real beacon.
+vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
 const prod = "https://verticopolis.com/";
 const localhost = "http://localhost:3000/";
@@ -47,6 +51,7 @@ describe("analytics adapter seam", () => {
     vi.mocked(track).mockReset();
     vi.mocked(injectWebAnalytics).mockReset();
     vi.mocked(injectSpeedInsights).mockReset();
+    vi.mocked(sendToRelay).mockReset();
     stub = makeStub();
     restore = setAnalyticsAdapter(stub);
   });
@@ -56,10 +61,10 @@ describe("analytics adapter seam", () => {
     window.location.href = localhost;
   });
 
-  it("defaults to the Vercel adapter until one is swapped in", () => {
-    // The swap in beforeEach handed back the adapter that was active before it,
-    // which is the module's production default.
-    expect(restore).toBe(vercelAdapter);
+  it("defaults to the dual-write adapter until one is swapped in", () => {
+    // The swap in the outer beforeEach handed back the adapter that was active
+    // before it, which is the module's production default (S3 dual-write).
+    expect(restore).toBe(dualWriteAdapter);
   });
 
   it("routes the active adapter through the accessor", () => {
@@ -143,12 +148,12 @@ describe("analytics adapter seam", () => {
     expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
 
-  it("restores the vendor adapter cleanly, re-reaching the Vercel transport", () => {
-    setAnalyticsAdapter(restore); // put the production adapter back
+  it("restores the default adapter cleanly, re-reaching the real transports", () => {
+    setAnalyticsAdapter(restore); // put the production (dual-write) adapter back
     gameplaySession.noteStar(5);
     injectVercelTelemetry();
-    // With the vendor adapter active again, the real transport is reached and the
-    // stub sees nothing more.
+    // With the default adapter active again, the real transports are reached and
+    // the stub sees nothing more.
     expect(track).toHaveBeenCalledWith("star_reached", { star: 5 });
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
@@ -158,5 +163,23 @@ describe("analytics adapter seam", () => {
       vi.mocked(injectWebAnalytics).mock.invocationCallOrder[0],
     );
     expect(stub.events.some(([name]) => name === "star_reached")).toBe(false);
+  });
+
+  it("dual-writes each event to both Vercel and the PostHog relay", () => {
+    setAnalyticsAdapter(restore); // the default dual-write adapter
+    gameplaySession.noteStar(5);
+    expect(track).toHaveBeenCalledWith("star_reached", { star: 5 });
+    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5 });
+  });
+
+  it("still writes to the relay when the Vercel transport throws", () => {
+    setAnalyticsAdapter(restore);
+    vi.mocked(track).mockImplementationOnce(() => {
+      throw new Error("vercel down");
+    });
+    expect(() => gameplaySession.noteStar(6)).not.toThrow();
+    // The Vercel throw is swallowed inside the adapter, so the relay write still
+    // happens: the two feeds are independent during the dual-write window.
+    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 6 });
   });
 });

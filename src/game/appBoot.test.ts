@@ -8,6 +8,11 @@ import { attemptContextRecovery } from "./contextRecovery";
 import { rebuildEngine } from "./engineWiring";
 import { gameplaySession } from "../analytics";
 
+// The default adapter dual-writes to the PostHog relay (S3). This suite drives
+// gameplaySession on a deployed host in places, so stub the relay to keep a real
+// beacon from firing (the note methods are also spied, but this is belt-and-braces).
+vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
+
 /**
  * Headless unit tests for the constructor collaborators.
  *

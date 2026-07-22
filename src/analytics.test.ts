@@ -11,6 +11,9 @@ import { gameplaySession, startGameplaySession } from "./analytics";
 // best-effort catch and silently drop the event.
 vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
+// The active adapter dual-writes to the PostHog relay too (S3); stub it so these
+// tests assert the Vercel `track` contract without a real beacon firing.
+vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
 const prod = "https://verticopolis.com/";
 const localhost = "http://localhost:3000/";
