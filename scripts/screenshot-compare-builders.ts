@@ -34,8 +34,11 @@ export function buildEscalatorOfficeModern(): void {
   const cx = Math.floor(W / 2);
   const left = cx - 12;
   const right = cx + 12;
-  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
-  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  // Ground lobby spans the full Modern seed footprint (cx-20..cx+19) in BOTH
+  // builders so the pair keeps one tower shape: here the lay is a no-op over
+  // the founding seed; the Classic twin lays the same span on its empty lot.
+  for (let x = cx; x <= cx + 19; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= cx - 20; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 4; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   // Floor 2 is commercial (shops); floors 3-4 are offices. Escalators may touch
   // the commercial floor in BOTH modes; only Modern lets them touch offices.
@@ -93,8 +96,10 @@ export function buildEscalatorOfficeClassic(): void {
   const cx = Math.floor(W / 2);
   const left = cx - 12;
   const right = cx + 12;
-  for (let x = cx; x <= right; x++) s.tower.place("lobby", 1, x);
-  for (let x = cx - 1; x >= left; x--) s.tower.place("lobby", 1, x);
+  // Match the Modern twin's ground span: its founding seed covers cx-20..cx+19,
+  // so lay the same 40 tiles here (canon-zero Classic founds nothing).
+  for (let x = cx; x <= cx + 19; x++) s.tower.place("lobby", 1, x);
+  for (let x = cx - 1; x >= cx - 20; x--) s.tower.place("lobby", 1, x);
   for (let f = 2; f <= 4; f++) for (let x = left; x <= right; x++) s.tower.place("floor", f, x);
   for (let x = left; x + 1 <= right; ) {
     const r = s.tower.place("shop", 2, x);

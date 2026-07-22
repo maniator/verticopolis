@@ -339,7 +339,9 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(adopted).toHaveLength(1);
     expect(adopted[0]).toBeInstanceOf(Simulation);
     expect(adopted[0]).not.toBe(sim);
-    expect(f.toasts).toEqual([{ text: "New tower founded. Good luck!", kind: "good" }]);
+    // Classic founds an empty lot, so the founding toast carries the
+    // actionable lobby line instead of the plain send-off.
+    expect(f.toasts).toEqual([{ text: "New tower founded. Lay a lobby on the ground line to open it.", kind: "good" }]);
   });
 
   it("importGame rejects garbage JSON with a toast and never touches the sim", async () => {

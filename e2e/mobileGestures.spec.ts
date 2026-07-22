@@ -86,7 +86,10 @@ test.describe("mobile multi-touch gestures: pinch survives any finger lift order
       // Classic founds an empty lot now; lay the 40-tile concourse the taps
       // below place their offices on top of.
       const x0 = Math.floor(g.grid.width / 2) - 20;
-      for (let i = 0; i < 40; i++) g.sim.tower.place("lobby", 1, x0 + i);
+      for (let i = 0; i < 40; i++) {
+        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
     });
 
     const cx = await page.evaluate(() => (document.getElementById("view") as HTMLCanvasElement).clientWidth / 2);
@@ -189,7 +192,10 @@ test.describe("mobile inspect: a tap opens ONE panel with the diagnostics folded
       // Classic founds an empty lot now; lay the 40-tile concourse the office
       // tap below needs beneath it.
       const x0 = Math.floor(g.grid.width / 2) - 20;
-      for (let i = 0; i < 40; i++) g.sim.tower.place("lobby", 1, x0 + i);
+      for (let i = 0; i < 40; i++) {
+        const r = g.sim.tower.place("lobby", 1, x0 + i);
+        if (!r.ok) throw new Error(`concourse lobby at x=${x0 + i}: ${r.reason ?? "refused"}`);
+      }
     });
 
     // Build an office to inspect, then switch to the inspect tool, both at the

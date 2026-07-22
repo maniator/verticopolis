@@ -327,6 +327,23 @@ export class OnboardingController {
     return true;
   }
 
+  /** Retarget a live session at a swapped-in sim (GameApp.adoptSim: New Tower,
+   *  Load, Import, undo/redo restore). Without this the checklist keeps ticking
+   *  the abandoned instance: progress on the live tower never advances it, and
+   *  since founding went mode-split its card can even teach the wrong first
+   *  step. No-ops when no session is active, so it never raises the panel. */
+  adoptSim(sim: Simulation): void {
+    if (!this.active) return;
+    this.sim = sim;
+    this.step = firstIncompleteStep(sim);
+    if (this.step >= ONBOARD_STEPS.length) {
+      this.finish();
+      return;
+    }
+    this.render();
+    this.applyHintAndPulse();
+  }
+
   /** Called from the host's throttled update loop (~6 Hz). Advances on real progress. */
   tick(): void {
     if (!this.active || !this.sim) return;

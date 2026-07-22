@@ -136,9 +136,9 @@ describe("TDT round-trip preserves the retail varieties' paint (geometry + subty
     // isolate the persisted inputs (subtype + geography).
     const sim = newSeededGame(3);
     sim.money = 1e12;
-    // Anchor at the starter lobby's left edge (newGame seeds 40 lobby tiles
-    // from mid - 20) and grow rightward: lobbies and floors must connect to
-    // the existing tower, so a detached strip would be refused.
+    // Anchor at the ensured starter lobby's left edge (the fixture lays 40
+    // lobby tiles from mid - 20) and grow rightward: lobbies and floors must
+    // connect to the existing tower, so a detached strip would be refused.
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 40; i < 110; i++) sim.tower.place("lobby", 1, x0 + i);
     for (let f = 2; f <= 8; f++) for (let i = 0; i < 110; i++) sim.tower.place("floor", f, x0 + i);

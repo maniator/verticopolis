@@ -69,7 +69,12 @@ describe("Onboarding — steps advance on real progress", () => {
     // lot edge is as legal as the center.
     expect(Simulation.newGame(1, "classic").tower.place("lobby", 1, 0).ok).toBe(true);
     expect(Simulation.newGame(1, "classic").tower.place("lobby", 1, GRID.width - 1).ok).toBe(true);
-    classic.tower.place("lobby", 1, C);
+    // And it must BE a lobby: founding is lobby-first, as in 1994. Any other
+    // kind is refused with the actionable reason until the lobby exists.
+    const floorFirst = Simulation.newGame(1, "classic").tower.place("floor", 1, 0);
+    expect(floorFirst.ok).toBe(false);
+    expect(floorFirst.reason).toContain("Lay a lobby");
+    expect(classic.tower.place("lobby", 1, C).ok).toBe(true);
     expect(firstIncompleteStep(classic)).toBe(1); // laying the lobby advances
 
     const modern = Simulation.newGame(1, "modern");
@@ -145,7 +150,7 @@ describe("Onboarding — controller lifecycle", () => {
     sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
     sim.tower.placeTransport("elevatorStandard", cX + 5, 1, 2);
     const c = makeController();
-    expect(c.arm(sim)).toBe(false); // all four steps already satisfied
+    expect(c.arm(sim)).toBe(false); // all five steps already satisfied
     expect(document.getElementById("onboard")).toBeNull();
   });
 });
@@ -289,11 +294,28 @@ describe("Onboarding — splash / title screen", () => {
 describe("Onboarding — tick advances and finishes on real progress", () => {
   beforeEach(() => clearOnboarded());
 
+  it("adoptSim retargets a live session at the swapped-in tower", () => {
+    // Mid-onboarding tower swap (New Tower / Load / undo restore): the session
+    // must follow the live sim, or ticks keep reading the abandoned one and the
+    // card teaches that tower's next step.
+    const { c } = makeSpyController();
+    c.arm(newSeededGame(1)); // seeded: armed at step 1 (add a floor)
+    const empty = Simulation.newGame(2, "classic");
+    expect(empty.tower.units.length).toBe(0);
+    c.adoptSim(empty);
+    // The panel now shows the empty lot's first step: the lobby.
+    expect(document.querySelector("#onboard .ob-cur")?.textContent).toContain("Open your lobby");
+    // Progress on the NEW sim advances the session.
+    expect(empty.tower.place("lobby", 1, C).ok).toBe(true);
+    c.tick();
+    expect(document.querySelector("#onboard .ob-cur")?.textContent).toContain("Add a floor");
+  });
+
   it("advancing a step chimes and re-renders the new current step", () => {
     const sim = newSeededGame(1);
     sim.money = 1e9;
     const { c, opts } = makeSpyController();
-    c.arm(sim); // step 0 — add a floor
+    c.arm(sim); // seeded fixture: the lobby step is done, so step 1 (add a floor) is armed
     expect(opts.chime).not.toHaveBeenCalled();
     for (let x = C - 6; x < C + 6; x++) sim.tower.place("floor", 2, x);
     c.tick();
@@ -337,7 +359,7 @@ describe("Onboarding — tick advances and finishes on real progress", () => {
       '</div><div id="speed"></div>';
     const mq = { matches: false, addEventListener() {}, removeEventListener() {} } as unknown as MediaQueryList;
     const c = new OnboardingController({ mq, showHelp() {}, pauseForSplash() {}, chime() {} });
-    c.arm(newSeededGame(1)); // step 0 pulses the Floor palette item
+    c.arm(newSeededGame(1)); // seeded: arms at step 1, which pulses the Floor palette item
     expect(document.querySelector('.pal-item[data-kind="floor"]')!.classList.contains("tt-pulse")).toBe(true);
     expect(document.querySelector('.pal-item[data-kind="office"]')!.classList.contains("tt-pulse")).toBe(false);
   });
