@@ -17,7 +17,9 @@ export function announceLive(msg: string): void {
   const el = document.getElementById("a11y-live");
   if (!el) return;
   el.textContent = "";
-  const set = (): string => (el.textContent = msg);
+  const set = (): void => {
+    el.textContent = msg;
+  };
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(set);
   else set();
 }

@@ -41,7 +41,7 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-describe("#541 a11y sweep — markup + CSS", () => {
+describe("#541 a11y sweep: markup + CSS", () => {
   it("1. the toast rail is polite, never assertive (AUD-020)", () => {
     const tag = indexHtml.match(/<div id="toast-wrap"[^>]*>/)?.[0] ?? "";
     expect(tag).toContain('aria-live="polite"');

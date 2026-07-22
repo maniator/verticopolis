@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 1.75.0
 
-- Accessibility and touch polish: routine notices no longer interrupt a screen reader mid-sentence (only real errors do), repeated announcements speak again reliably, the tower-name box and the money readout are clearer to assistive tech and easier to read, and the little close buttons are easier to tap on a touch screen.
+- Accessibility polish: routine notices no longer interrupt a screen reader mid-sentence (only real errors do), repeated announcements speak again reliably, the tower-name box reads clearly to assistive tech, and the money readout has stronger contrast so it is easier to read.
 
 ## 1.74.0
 
