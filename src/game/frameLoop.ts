@@ -44,6 +44,11 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // the speed buttons keep their meaning.
   const pace = app.prefs.steadyClock ? 1 : paceFactor(app.sim.clock.minuteOfDay);
   app.accMinutes += (dtMs / 1000) * minutesPerSecond * pace;
+  // A non-finite dtMs (a NaN/Infinity timestamp delta from a hung or restored
+  // frame source) would poison accMinutes to NaN, and NaN fails every
+  // comparison below, so the sim would stop ticking FOREVER with no recovery.
+  // Reset to 0 and skip this frame's catch-up; the next finite frame resumes.
+  if (!Number.isFinite(app.accMinutes)) app.accMinutes = 0;
   // Cap the catch-up debt. Owed minutes grow with real frame time, so on a
   // device that can't simulate the fastest speed in real time every frame
   // would carry ever more sim work, stretching frames toward seconds of

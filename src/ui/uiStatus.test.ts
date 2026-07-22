@@ -85,4 +85,21 @@ describe("toast rail", () => {
     expect(rail.children.length).toBe(0);
     expect(vi.getTimerCount()).toBe(0);
   });
+
+  // The rail is polite (role="status" on #toast-wrap); only a genuine error
+  // interrupts, via its own role="alert" (#541 / AUD-020).
+  it("marks a 'bad' toast role=alert so errors still interrupt the polite rail", () => {
+    const { ui, rail } = makeUI();
+    toast(ui, "quota full", "bad");
+    expect((rail.lastElementChild as HTMLElement).getAttribute("role")).toBe("alert");
+  });
+
+  it("leaves routine good/info toasts polite (no assertive role)", () => {
+    const { ui, rail } = makeUI();
+    toast(ui, "saved", "good");
+    toast(ui, "heads up", "info");
+    for (const node of Array.from(rail.children)) {
+      expect(node.getAttribute("role")).toBeNull();
+    }
+  });
 });

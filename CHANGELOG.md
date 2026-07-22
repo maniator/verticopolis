@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.75.0
+
+- Accessibility polish: routine notices no longer interrupt a screen reader mid-sentence (only real errors do), repeated announcements speak again reliably, the tower-name box reads clearly to assistive tech, and the money readout has stronger contrast so it is easier to read.
+
 ## 1.74.0
 
 - The lot's left edge is now a grand arrival: a sidewalk leads to a fountain roundabout with live, splashing water, flanked by street lamps that come on at dusk with pools of warm light, and the road runs off past the city. The right-edge street lamp lights up at night now too.
