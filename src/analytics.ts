@@ -120,6 +120,16 @@ export function setCommonProps(props: EventProps): void {
   commonProps = { ...props };
 }
 
+/** A copy of the boot-computed common props (platform / version / returning /
+ *  tenure / recency), for a surface that sends OUTSIDE the typed gameplay
+ *  vocabulary and so does not flow through `trackEvent`'s merge, namely the
+ *  cookieless error reporter (`analyticsErrors.ts`): a `$exception` should carry
+ *  the same platform and build context every gameplay event does. Copied so a
+ *  caller cannot mutate the shared set. */
+export function getCommonProps(): EventProps {
+  return { ...commonProps };
+}
+
 /** Host-gated, best-effort custom-event send. The single choke point every
  *  gameplay event flows through, so the gate and the never-throw guarantee live
  *  in one place. The common props are spread FIRST so a per-event prop always

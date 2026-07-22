@@ -28,10 +28,14 @@ import type { EventProps } from "./analyticsAdapter";
 /** The same-origin relay path. No key, no cookie, no third-party domain. */
 const INGEST_PATH = "/api/ingest";
 
-/** The body shape the relay expects (matches `IngestBody` on the server side). */
+/** The body shape the relay expects (matches `IngestBody` on the server side).
+ *  `properties` is widened to arbitrary JSON here (not just the primitive
+ *  `EventProps` the gameplay vocabulary uses) so the error path can carry the
+ *  nested `$exception_list` PostHog Error Tracking expects; the server accepts
+ *  any plain-object `properties` and spreads it through untouched. */
 interface RelayBody {
   event: string;
-  properties: EventProps;
+  properties: Record<string, unknown>;
   session: string;
   ts: string;
 }
@@ -115,16 +119,18 @@ function sessionId(): string {
 }
 
 /**
- * Post one typed event to the relay. Best-effort and never-throw: a serialization
+ * Post one event to the relay. Best-effort and never-throw: a serialization
  * failure or a transport hiccup drops the event silently rather than surfacing to
- * the caller (the host gate and the game loop live upstream in `analytics.ts`).
+ * the caller (the host gate and the game loop live upstream in `analytics.ts` and
+ * `analyticsErrors.ts`). Shared by the typed gameplay path ({@link sendToRelay})
+ * and the error path ({@link sendException}).
  */
-export function sendToRelay(event: string, props: EventProps): void {
+function postToRelay(event: string, properties: Record<string, unknown>): void {
   let body: string;
   try {
     const payload: RelayBody = {
       event,
-      properties: props,
+      properties,
       session: sessionId(),
       ts: new Date().toISOString(),
     };
@@ -145,4 +151,25 @@ export function sendToRelay(event: string, props: EventProps): void {
   } catch {
     /* best-effort telemetry; never block the caller */
   }
+}
+
+/**
+ * Post one typed gameplay event to the relay. The primitive-only `EventProps`
+ * keeps the typed vocabulary honest at the call site; the transport itself does
+ * not care about the shape.
+ */
+export function sendToRelay(event: string, props: EventProps): void {
+  postToRelay(event, props);
+}
+
+/**
+ * Post a `$exception` event for cookieless error tracking (see
+ * `analyticsErrors.ts`). Kept relay-only (never through the dual-write adapter):
+ * `$exception` is a PostHog Error Tracking event with a nested `$exception_list`
+ * that has no Vercel Web Analytics equivalent, so it must not be sent to Vercel.
+ * Same never-throw transport, same per-tab session id as every other event, so an
+ * error report correlates with the play session it came from.
+ */
+export function sendException(properties: Record<string, unknown>): void {
+  postToRelay("$exception", properties);
 }
