@@ -109,14 +109,16 @@ jobs:
       - name: Perf gate (E5-S0)
         run: npm run perf
 
-      # Per-run visual proof of the ★-progression (the committed gallery in
-      # docs/screenshots/milestones/ is the human-blessed baseline).
+      # Per-run visual proof of the ★-progression. milestones.spec.ts writes to
+      # the untracked e2e/output/ dir (never the committed, human-blessed
+      # docs/screenshots/milestones/ gallery, which only the pinned-container
+      # pipeline may regenerate), and this uploads that per-run set.
       - name: Upload milestone screenshots
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: milestone-screenshots
-          path: docs/screenshots/milestones/
+          path: e2e/output/milestones/
           if-no-files-found: warn
 
       # When a visual baseline (visual.spec.ts) fails, Playwright writes the

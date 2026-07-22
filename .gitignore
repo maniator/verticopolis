@@ -21,3 +21,7 @@ node_modules
 /test-results/
 /playwright-report/
 /playwright/.cache/
+# E2E capture output (milestones.spec.ts): per-run artifacts, uploaded by CI,
+# never committed (the committed docs/screenshots gallery comes only from the
+# pinned-container pipeline).
+/e2e/output/

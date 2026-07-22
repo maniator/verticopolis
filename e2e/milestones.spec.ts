@@ -1,14 +1,22 @@
 import { test, expect } from "@playwright/test";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { buildToStar, fitCamera } from "./helpers";
 
 /**
  * Visual progression proof: one tower grown cumulatively through every rating
  * rung, with a screenshot captured at each. The STAR assertion at each rung is
  * the test (screenshots are artifacts, never pixel-compared — a game canvas
- * renders a hair differently per machine). The images land in
- * docs/screenshots/milestones/ — committed as a gallery, and uploaded per-run in
- * CI. The final frame catches the "TOWER achieved!" modal over the full tower.
+ * renders a hair differently per machine). The images land in e2e/output/
+ * (UNTRACKED, gitignored) and CI uploads them as the per-run artifact
+ * (test.yml). They must never write into the committed gallery: the
+ * docs/screenshots/milestones/ baseline is rendered only by the pinned
+ * Playwright container (scripts/screenshots.ts via pr-drift-check), and a
+ * local `npm run e2e` on a host browser would silently dirty it with
+ * different pixels (audit finding AUD-005). The final frame catches the
+ * "TOWER achieved!" modal over the full tower.
  */
+const OUT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "output", "milestones");
 const FRAMES: ReadonlyArray<readonly [number, string]> = [
   [1, "1-star"],
   [2, "2-star"],
@@ -40,6 +48,6 @@ test("progression: a screenshot at each ★ milestone, 1★ → TOWER", async ({
     if (star === 6) await expect(page.locator("#modal")).toContainText("TOWER achieved");
     await page.evaluate(fitCamera);
     await page.waitForTimeout(300); // let the frame settle at the new zoom
-    await page.screenshot({ path: `docs/screenshots/milestones/${name}.png` });
+    await page.screenshot({ path: path.join(OUT_DIR, `${name}.png`) });
   }
 });
