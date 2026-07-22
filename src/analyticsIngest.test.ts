@@ -296,6 +296,7 @@ describe("buildCaptureBody", () => {
     expect(body.properties).toEqual({
       distinct_id: "anon",
       $process_person_profile: false,
+      $geoip_disable: true,
       environment: "production",
     });
   });
@@ -312,9 +313,25 @@ describe("buildCaptureBody", () => {
         mode: "modern",
         distinct_id: "s1",
         $process_person_profile: false,
+        $geoip_disable: true,
         environment: "preview",
       },
     });
+  });
+
+  it("disables GeoIP so PostHog never geo-locates the relay's own egress IP", () => {
+    const body = buildCaptureBody({ event: "boot" }, "production");
+    expect(body.properties.$geoip_disable).toBe(true);
+  });
+
+  it("does not let the client re-enable GeoIP through its props", () => {
+    // We never forward the player IP, so GeoIP must stay off regardless of a
+    // crafted client body that tries to flip it back on.
+    const body = buildCaptureBody(
+      { event: "boot", properties: { $geoip_disable: false } as unknown as Record<string, unknown> },
+      "production",
+    );
+    expect(body.properties.$geoip_disable).toBe(true);
   });
 
   it("falls back to an unknown environment when VERCEL_ENV is absent", () => {
