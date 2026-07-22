@@ -2,7 +2,7 @@ import type { FacilityKind, Unit, UnitState } from "../engine/types";
 import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
 import { condo, hotel, office } from "./pixelSprites/residential";
-import { cinema, fastFood, restaurant } from "./pixelSprites/food";
+import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -61,9 +61,9 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       restaurant(d, u, x, y, w, h);
       break;
     case "foodHall":
-      // A hall of food stalls reads as a food venue; reuse the restaurant
-      // dollhouse interior until it earns bespoke stall art.
-      restaurant(d, u, x, y, w, h);
+      // A hall of food stalls: rendered with the restaurant drawer, but each
+      // stall subtype carries its own look so the stalls read as distinct.
+      foodHall(d, u, x, y, w, h);
       break;
     case "shop":
       shop(d, u, x, y, w, h);
@@ -98,5 +98,5 @@ export function sampleState(kind: FacilityKind): UnitState {
 
 // ---- Barrel: preserve the original public surface of this module. ----
 export { PAL, SHIRTS, SKIN, person, personSeated, personStanding, type RoomCtx } from "./pixelSprites/common";
-export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, type FastFoodLook, type RestaurantLook } from "./pixelSprites/food";
+export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, FOODHALL_LOOKS, type FastFoodLook, type RestaurantLook } from "./pixelSprites/food";
 export { SHOP_LOOKS, type ShopLook } from "./pixelSprites/shop";

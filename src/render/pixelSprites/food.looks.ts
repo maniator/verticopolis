@@ -62,3 +62,20 @@ export const RESTAURANT_LOOKS: Record<string, RestaurantLook> = {
   "Sushi Bar": { wall: "#B89A6A", floor: "#8A6E48", fixture: "none", interior: "sushi" },
   "Steak House": { wall: "#4A2A22", floor: "#33201A", fixture: "ember", interior: "booths" },
 };
+
+// The Modern Food Hall reuses the restaurant renderer, so each stall gets its
+// OWN look and they no longer render identically. `drawRestaurant` dispatches on
+// `interior` (the fixture geometry is baked into each interior body, so the
+// `fixture` field is documentation only, kept accurate to what the interior
+// actually draws). The six stalls spread across the five interior styles (one
+// reuse of `cloth`, split by a distinct wall palette). Reusing the restaurant
+// interiors is deliberate for now; bespoke stall art is a future refinement.
+export const FOODHALL_DEFAULT: RestaurantLook = { wall: "#5A4028", floor: "#3A2A1A", fixture: "lanterns", interior: "banquet" };
+export const FOODHALL_LOOKS: Record<string, RestaurantLook> = {
+  "Ramen Bar": { wall: "#5A2424", floor: "#3A1818", fixture: "lanterns", interior: "banquet" },
+  "Taco Stand": { wall: "#7A5620", floor: "#4A3616", fixture: "ember", interior: "booths" },
+  "Bubble Tea": { wall: "#6A3A5A", floor: "#43243A", fixture: "chandelier", interior: "cloth" },
+  "Poke Bowl": { wall: "#245A54", floor: "#183A36", fixture: "none", interior: "sushi" },
+  "Deli Counter": { wall: "#4A3A26", floor: "#332818", fixture: "lamps", interior: "pub" },
+  "Coffee Cart": { wall: "#7A5030", floor: "#523620", fixture: "chandelier", interior: "cloth" },
+};
