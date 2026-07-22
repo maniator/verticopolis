@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.82.0
+
+- Modern towers can build a new Food Hall: a hall of food stalls (ramen, tacos, bubble tea, and more) that earns from foot traffic and satisfies many cravings from one spot, so it feeds a wide reach of hungry tenants. Modern only; Classic keeps the 1994 catalog.
+
 ## 1.81.0
 
 - Classic shops, restaurants, fast food, cinemas, and party halls now earn toward their 1994 figures (a sold-out shop can take $20,000 a day, and a full party hall can too), so a busy tower's commercial floors pay the way they did in the original. Modern towers are unchanged.

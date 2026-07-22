@@ -249,6 +249,9 @@ export function isRoomKind(_sim: Simulation, kind: FacilityKind): boolean {
 
 /** Whether a facility kind is currently unlocked by star rating. */
 export function isUnlocked(sim: Simulation, kind: FacilityKind): boolean {
+  // Modern-only content is never buildable in a Classic tower (parity), on top
+  // of the usual star gate.
+  if (FACILITIES[kind].modernOnly && sim.mode !== "modern") return false;
   return sim.star >= FACILITIES[kind].minStar;
 }
 

@@ -57,6 +57,7 @@ export type FacilityKind =
   | "hotelSuite"
   | "fastFood"
   | "restaurant"
+  | "foodHall"
   | "shop"
   | "cinema"
   | "partyHall"
@@ -196,6 +197,10 @@ export interface Facility {
   population: number;
   /** Hex color used by the procedural sprite renderer. */
   color: string;
+  /** Modern-only content: a facility the 1994 game never had. Gated out of
+   *  Classic entirely (unbuildable, hidden from the Classic palette), so a
+   *  Classic tower stays pixel-faithful. Absent (falsy) for every canon kind. */
+  modernOnly?: boolean;
   /** True for vertical transport (occupies multiple floors). */
   transport?: boolean;
   /** True for transports that carry only tower staff (housekeepers), never

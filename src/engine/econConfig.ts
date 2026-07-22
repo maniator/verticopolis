@@ -7,6 +7,7 @@ export const ECON = {
   dailyTrafficIncome: {
     fastFood: 2_000,
     restaurant: 4_000,
+    foodHall: 5_000,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -48,6 +49,7 @@ export const ECON = {
   retailSpendPerCustomer: {
     fastFood: 10,
     restaurant: 30,
+    foodHall: 15,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -67,6 +69,7 @@ export const ECON = {
   weekendTrafficMultiplier: {
     fastFood: 0.7,
     restaurant: 1.35,
+    foodHall: 1.25,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**

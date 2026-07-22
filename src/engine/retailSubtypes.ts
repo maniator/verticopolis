@@ -38,6 +38,22 @@ export const SHOP_SUBTYPES = [
 ] as const;
 
 /**
+ * The stalls a Modern Food Hall can present. Unlike the three lists above these
+ * are NOT canon and carry NO TDT ordinal: Food Hall is Modern-only content, and
+ * a Modern tower is never exported to the 1994 `.TDT` format, so order is not
+ * fidelity-load-bearing (only stability across saves matters). Extend at the
+ * end so a persisted ordinal keeps pointing at the same stall.
+ */
+export const FOODHALL_SUBTYPES = [
+  "Ramen Bar",
+  "Taco Stand",
+  "Bubble Tea",
+  "Poke Bowl",
+  "Deli Counter",
+  "Coffee Cart",
+] as const;
+
+/**
  * The canon name list for `kind`, or null when the kind carries no canon
  * subtype (every kind that isn't shop / fastFood / restaurant). Callers use
  * the null return as the pre-RNG-draw short-circuit: a Classic tower whose
@@ -53,6 +69,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return FASTFOOD_SUBTYPES;
     case "shop":
       return SHOP_SUBTYPES;
+    case "foodHall":
+      return FOODHALL_SUBTYPES;
     default:
       return null;
   }
