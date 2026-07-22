@@ -107,12 +107,19 @@ export class RateLimiter {
   allow(key: string, now: number): boolean {
     const rec = this.hits.get(key);
     if (rec && now - rec.windowStart < this.windowMs) {
+      // Touch the key so any active key (hot or currently blocked) moves to the
+      // newest position: `Map` insertion order does not update on `get`, so
+      // without this a frequently-hit key could be the oldest and get evicted
+      // below, resetting its window. Eviction then only ever removes idle keys.
+      this.hits.delete(key);
+      this.hits.set(key, rec);
       if (rec.count >= this.max) return false;
       rec.count += 1;
       return true;
     }
-    // Start a fresh window. Re-inserting also moves the key to the newest
-    // position, so a hot legitimate key is never the eviction target below.
+    // Start a fresh window for this key. At the ceiling, evict the oldest (least
+    // recently touched) entry first, so a flood of unique keys cannot grow the
+    // map and an active key is never the one dropped.
     this.hits.delete(key);
     if (this.hits.size >= this.maxKeys) {
       const oldest = this.hits.keys().next().value;
@@ -126,9 +133,11 @@ export class RateLimiter {
 /** The process-wide limiter used by the real handler. */
 const defaultLimiter = new RateLimiter();
 
-/** Strip every trailing slash so `${host}/capture/` never doubles it. */
-function trimTrailingSlashes(host: string): string {
-  return host.replace(/\/+$/, "");
+/** Normalize the configured host: strip surrounding whitespace (env vars often
+ *  pick it up from a copy/paste) and every trailing slash, so `${host}/capture/`
+ *  is a valid, non-doubled URL rather than a silently dropped forward. */
+function normalizeHost(host: string): string {
+  return host.trim().replace(/\/+$/, "");
 }
 
 /** True for a plain JSON object (not null, not an array). */
@@ -147,13 +156,16 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * `api_key` is deliberately not added here; the handler adds it only at the
  * forward so the key never passes through this pure builder.
  */
-export function buildCaptureBody(body: IngestBody, environment: string | undefined): CaptureBody {
+export function buildCaptureBody(
+  body: IngestBody & { event: string },
+  environment: string | undefined,
+): CaptureBody {
   const session =
     typeof body.session === "string" && body.session.length > 0 ? body.session : "anon";
   const hasValidTs = typeof body.ts === "string" && Number.isFinite(Date.parse(body.ts));
   const props = isPlainObject(body.properties) ? body.properties : {};
   return {
-    event: body.event as string,
+    event: body.event,
     ...(hasValidTs ? { timestamp: body.ts as string } : {}),
     properties: {
       ...props,
@@ -209,7 +221,7 @@ export async function handleIngest(request: Request, deps: IngestDeps): Promise<
   try {
     deps.waitUntil(
       deps
-        .fetchImpl(`${trimTrailingSlashes(host)}/capture/`, {
+        .fetchImpl(`${normalizeHost(host)}/capture/`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({ api_key: key, ...captureBody }),

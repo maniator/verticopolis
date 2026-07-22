@@ -1,5 +1,8 @@
 import { ipAddress, waitUntil } from "@vercel/functions";
-import { handleIngest } from "../src/analyticsIngest";
+// Explicit .js extension: Vercel compiles /api functions as ESM with nodenext
+// resolution (package.json "type": "module"), which requires it. `api/tsconfig.json`
+// uses nodenext too so `npm run typecheck` matches the Vercel build.
+import { handleIngest } from "../src/analyticsIngest.js";
 
 /**
  * Same-origin PostHog capture relay (spec CAP-2). Vercel serves this file at
@@ -23,8 +26,10 @@ import { handleIngest } from "../src/analyticsIngest";
 export default {
   fetch(request: Request): Promise<Response> {
     return handleIngest(request, {
-      key: process.env.POSTHOG_KEY,
-      host: process.env.POSTHOG_HOST,
+      // Trim so stray whitespace from a copy/pasted env var does not disable the
+      // relay (an empty string after trimming falls through to the 204 no-op).
+      key: process.env.POSTHOG_KEY?.trim(),
+      host: process.env.POSTHOG_HOST?.trim(),
       environment: process.env.VERCEL_ENV,
       fetchImpl: fetch,
       waitUntil,

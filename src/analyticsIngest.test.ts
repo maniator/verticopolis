@@ -159,8 +159,10 @@ describe("handleIngest", () => {
     expect(forwardedBody(deps.fetchImpl).event).toBe("boot");
   });
 
-  it("normalizes a host with trailing slashes so the capture URL is not doubled", async () => {
-    const deps = makeDeps({ host: "https://us.i.posthog.com//" });
+  it("normalizes a host with surrounding whitespace and trailing slashes", async () => {
+    // Env vars often pick up stray whitespace from a copy/paste; without trimming
+    // the forward URL would be invalid and the event silently dropped.
+    const deps = makeDeps({ host: "  https://us.i.posthog.com//  " });
     await handleIngest(postRequest({ event: "boot" }), deps);
     expect(deps.fetchImpl.mock.calls[0][0]).toBe("https://us.i.posthog.com/capture/");
   });
@@ -281,15 +283,18 @@ describe("RateLimiter", () => {
     expect(limiter.allow("a", 0)).toBe(false);
   });
 
-  it("bounds memory by evicting the oldest key once the ceiling is reached", () => {
-    // Ceiling of 2 live keys: inserting a third evicts the oldest ("a"), so the
-    // map never exceeds the cap even under a flood of unique, still-live keys.
-    const limiter = new RateLimiter(5, 60_000, 2);
-    expect(limiter.allow("a", 0)).toBe(true);
+  it("bounds memory by evicting the least-recently-touched key (LRU)", () => {
+    // Ceiling of 2 keys. "a" stays hot, so it must survive eviction while the
+    // idle key is dropped, and the map never exceeds the cap.
+    const limiter = new RateLimiter(3, 60_000, 2);
+    limiter.allow("a", 0); // a: count 1, order [a]
+    limiter.allow("a", 0); // a: count 2, touched -> still newest [a]
+    limiter.allow("b", 0); // b: count 1, order [a, b]
+    limiter.allow("a", 0); // a: count 3 (== max), touched -> order [b, a]
+    limiter.allow("c", 0); // at cap: evict oldest "b", order [a, c]
+    // "a" was hot, so it survived with its window intact and is now at the limit.
+    expect(limiter.allow("a", 0)).toBe(false);
+    // "b" was the idle key, so it was evicted and starts a fresh window.
     expect(limiter.allow("b", 0)).toBe(true);
-    expect(limiter.allow("c", 0)).toBe(true); // evicts "a"
-    // "a" was evicted, so it starts a fresh window (allowed) rather than being
-    // remembered; the map still holds only two keys.
-    expect(limiter.allow("a", 0)).toBe(true); // evicts "b"
   });
 });
