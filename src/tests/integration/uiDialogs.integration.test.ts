@@ -1275,7 +1275,7 @@ describe("newTowerModal — the rule-set picker", () => {
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("classic", "realWorld");
+    expect(onFound).toHaveBeenCalledWith("classic", "realWorld", false);
     expect(dialog().open).toBe(false); // and it closes on commit
   });
 
@@ -1285,7 +1285,7 @@ describe("newTowerModal — the rule-set picker", () => {
     ui.newTowerModal({ hasSave: false, onFound });
     dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("modern", "realWorld");
+    expect(onFound).toHaveBeenCalledWith("modern", "realWorld", false);
   });
 
   it("passes the Modern short-calendar choice when picked", () => {
@@ -1295,7 +1295,28 @@ describe("newTowerModal — the rule-set picker", () => {
     dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
     dialog().querySelector<HTMLInputElement>('input[name="nt-cal"][value="canon"]')!.checked = true;
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("modern", "canon");
+    expect(onFound).toHaveBeenCalledWith("modern", "canon", false);
+  });
+
+  it("passes Modern manual-structure when the checkbox is ticked", () => {
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-manual"]')!.checked = true;
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("modern", "realWorld", true);
+  });
+
+  it("ignores the manual-structure checkbox when founding Classic", () => {
+    // Manual structure is Modern-only; a Classic founding pins false even if the
+    // (Modern-only) checkbox was somehow ticked.
+    const onFound = vi.fn();
+    const { ui } = makeUI();
+    ui.newTowerModal({ hasSave: false, onFound });
+    dialog().querySelector<HTMLInputElement>('input[name="nt-manual"]')!.checked = true;
+    click('[data-act="found"]');
+    expect(onFound).toHaveBeenCalledWith("classic", "realWorld", false);
   });
 
   it("ignores the calendar radio when founding Classic (persists the harmless default)", () => {
@@ -1307,7 +1328,7 @@ describe("newTowerModal — the rule-set picker", () => {
     // Classic pre-checked; a user toggles the Modern-calendar radio anyway.
     dialog().querySelector<HTMLInputElement>('input[name="nt-cal"][value="canon"]')!.checked = true;
     click('[data-act="found"]');
-    expect(onFound).toHaveBeenCalledWith("classic", "realWorld");
+    expect(onFound).toHaveBeenCalledWith("classic", "realWorld", false);
   });
 
   it("cancels without founding anything", () => {

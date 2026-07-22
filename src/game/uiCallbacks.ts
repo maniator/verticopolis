@@ -75,7 +75,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onImportLegacy: (buffer, filename) => app.saveLoad.importLegacy(buffer, filename),
     onExportLegacy: () => app.saveLoad.exportLegacy(),
     getMode: () => app.getSim().mode,
-    onNew: (mode, modernCalendar) => app.saveLoad.newGame(mode, modernCalendar),
+    onNew: (mode, modernCalendar, manualStructure) => app.saveLoad.newGame(mode, modernCalendar, manualStructure),
     onToggleAudio: () => app.toggleMute(),
     isMuted: () => app.audio.muted,
     onSetVolume: (kind, value) => app.setVolume(kind, value),

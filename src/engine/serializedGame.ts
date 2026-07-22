@@ -28,6 +28,11 @@ export interface SerializedGame {
    *  written before the calendar toggle, and on all legacy Modern saves, so a
    *  missing value loads as `realWorld` — the shipped 7/90/360 behavior. */
   modernCalendar?: CalendarKind;
+  /** Modern "manual structure" build option, chosen at New Tower. When true the
+   *  game never auto-lays/bills the floor and lobby substrate under a placement.
+   *  Ignored for Classic (always false). Absent on saves written before the
+   *  option, so a missing value loads as false, the shipped auto-bridge behavior. */
+  manualStructure?: boolean;
   /** Balance entering the current quarter (snapshotted at each quarter rollover
    *  before rent is collected), so the TDT exporter can write the header's
    *  `lastQuarterMoney` (0x10). `serialize()` always writes it (0 on a fresh
