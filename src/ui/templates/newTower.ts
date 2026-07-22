@@ -70,8 +70,8 @@ export function newTowerTemplate(hasSave: boolean): TemplateResult {
              <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="realWorld" checked /> <b>Real-world length</b>: a 7-day week, 90-day quarter and 360-day year, the friendlier pace.</label>
              <label class="nt-cal-opt"><input type="radio" name="nt-cal" value="canon" /> <b>Short (1994)</b>: a 3-day week, 3-day quarter and 12-day year, the authentic SimTower rhythm.</label>
            </div>
-           <div class="nt-building">
-             <span class="nt-sublabel">Building</span>
+           <div class="nt-building" role="group" aria-labelledby="nt-building-label">
+             <span class="nt-sublabel" id="nt-building-label">Building</span>
              <label class="nt-cal-opt"><input type="checkbox" name="nt-manual" /> <b>Manual structure</b>: place and pay for every floor and lobby tile yourself. Rooms will not auto-lay the floor beneath them. For players who want full control of the build.</label>
            </div>
          </div>

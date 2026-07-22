@@ -5,9 +5,9 @@ import { GRID } from "../facilities";
 /**
  * Modern "manual structure" build option (gdd-modern-expansion): when on, the
  * game never auto-lays or bills the floor/lobby substrate under a placement.
- * A room dropped where its floor is missing refuses instead of auto-bridging.
- * Default off (the shipped auto-bridge behavior). Modern-only: Classic ignores
- * the flag entirely, so Classic building stays byte-identical.
+ * A room dropped where its floor is missing refuses instead of the game
+ * auto-laying that floor. Default off (the shipped auto behavior). Modern-only:
+ * Classic ignores the flag entirely, so Classic building stays byte-identical.
  */
 
 const C = Math.floor(GRID.width / 2);
