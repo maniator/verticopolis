@@ -57,9 +57,12 @@ for (let i = open; i < sw.length; i++) {
 if (end === -1) fail("could not bracket-match the precache manifest array in dist/sw.js");
 const manifest = sw.slice(open, end + 1);
 
-// generateSW emits entries as {url:"...",revision:"..."} (unquoted keys in the
-// minified output); tolerate quoted keys too in case the emitter changes.
-const urls = [...manifest.matchAll(/["']?url["']?\s*:\s*"([^"]+)"/g)].map((m) => m[1]);
+// generateSW emits entries as {url:"...",revision:"..."} (unquoted keys,
+// double-quoted values in the minified output); tolerate quoted keys and
+// single-quoted values too, and normalize a leading "./" or "/", so a purely
+// cosmetic emitter change cannot false-fail the build. A real format change
+// still lands in the zero-entries failure below.
+const urls = [...manifest.matchAll(/["']?url["']?\s*:\s*(["'])(.*?)\1/g)].map((m) => m[2].replace(/^\.?\//, ""));
 if (urls.length === 0) fail("the precache manifest parsed to zero url entries; the entry format may have changed");
 
 const seen = new Map<string, number>();
