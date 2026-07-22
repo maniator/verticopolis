@@ -38,16 +38,34 @@ export function hideBootCover(): void {
 export function showBootMessage(content: TemplateResult | string, withReload = false): void {
   // A boot-fallback message (no WebGL, a boot error) must never be trapped
   // behind the cover, so drop it unconditionally, before the #stage guard.
+  // The splash and onboarding surfaces sit ABOVE the stage overlay (fixed,
+  // higher z-index) and can already be mounted when a boot error lands after
+  // runBootFlow, so drop those too: a fatal message behind a stuck title
+  // screen is the same invisible-failure class this function exists to end.
   hideBootCover();
+  document.getElementById("splash")?.remove();
+  document.getElementById("onboard")?.remove();
   const stage = document.getElementById("stage");
   if (!stage) return;
   // Render through lit-html (the app's renderer): an interpolated string is
   // escaped to a text node, so a dynamic value (a caught boot error's message)
   // can never inject markup, while a caller that needs formatting passes a lit
   // template. No innerHTML.
+  //
+  // The message is an overlay because flow content cannot be trusted here:
+  // lit appends its part AFTER the stage's static children (the canvas, the
+  // hint), and #stage clips without scrolling, so a statically-positioned
+  // message lands below the fold behind the dead canvas and the player sees
+  // an unexplained empty page (the live Firefox no-WebGL report this fixes).
+  // Longhand top/right/bottom/left instead of the `inset` shorthand on
+  // purpose: this path serves old and hardened engines, exactly the crowd a
+  // newer shorthand can strand at static position, which would resurrect the
+  // very bug. The stage's own position is pinned here too, so a future CSS
+  // reshuffle of #stage cannot quietly re-anchor the overlay to an ancestor.
+  stage.style.position = "relative";
   render(
     html`<div
-      style="display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;color:#cdd3da;font:15px/1.5 system-ui,sans-serif"
+      style="position:absolute;top:0;right:0;bottom:0;left:0;z-index:10;background:#1c2030;overflow:auto;display:flex;flex-direction:column;gap:16px;align-items:center;justify-content:center;padding:24px;text-align:center;color:#cdd3da;font:15px/1.5 system-ui,sans-serif"
     >
       <div>${content}</div>
       ${withReload
@@ -70,10 +88,18 @@ export function bootGame(create: () => BootApp): void {
     // fallback below.
     injectVercelTelemetry();
     if (!hasWebGL()) {
+      // The copy leads with the remedy (every current browser, Firefox
+      // included, runs WebGL once hardware acceleration is on; most real hits
+      // here are acceleration turned off, a driver blocklist, or a hardened
+      // profile, all fixable in place) and keeps another browser or device as
+      // the honest last resort. The reload button closes the loop after the
+      // setting flips.
       showBootMessage(
-        html`This viewer can't run WebGL, which Verticopolis needs to draw the
-          tower.<br /><br />Open this page in <b>Safari</b>, <b>Chrome</b>, or another full web
-          browser to play.`,
+        html`This browser can't use WebGL right now, and Verticopolis needs it to
+          draw the tower.<br /><br />Enable <b>hardware acceleration</b> (or WebGL) in your
+          browser's settings and reload. If that doesn't help, another browser or
+          device should run it.`,
+        true,
       );
       return;
     }

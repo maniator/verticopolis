@@ -17,6 +17,10 @@ import { isOnboarded } from "../ui/Onboarding";
 
 // Controller modules are built by wireControllers, not runBootFlow; stub them so
 // importing appBoot stays light (they are never instantiated by these tests).
+// Mock `virtual:pwa-register` (Vite virtual module via the appBoot import
+// chain) so the import resolves on Windows too, as bootstrap.test.ts and
+// appBoot.test.ts do.
+vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 vi.mock("./buildActions", () => ({ BuildActions: class {} }));
 vi.mock("./inspector", () => ({ InspectorController: class {} }));
 vi.mock("./editorActions", () => ({ EditorActions: class {} }));
