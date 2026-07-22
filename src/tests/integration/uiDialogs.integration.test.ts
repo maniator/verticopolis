@@ -8,6 +8,8 @@ import { CLASSIC_RULES, MODERN_RULES } from "../../engine/gameRules";
 import type { ScheduleDialogCtx } from "../../ui/uiElevatorSchedule";
 import type { Unit } from "../../engine/types";
 import { unitEditorTemplate } from "../../ui/templates/editor";
+import { toggleMute } from "../../game/audioPrefs";
+import { loadPrefs } from "../../storage/Prefs";
 import * as platformModule from "../../platform";
 
 /**
@@ -1588,19 +1590,46 @@ describe("wireControls — toolbar buttons route to callbacks (no dead buttons)"
     expect(btns.filter((b) => b.classList.contains("active"))).toHaveLength(1); // only one active
   });
 
-  it("audio toggle flips the icon to match the reported muted state", () => {
-    const { cb } = makeUI({ onToggleAudio: vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false) });
-    const audio = document.getElementById("audio-toggle")!;
-    audio.click();
-    expect(audio.textContent).toBe("🔇");
-    audio.click();
-    expect(audio.textContent).toBe("🔊");
-    expect(cb.onToggleAudio).toHaveBeenCalledTimes(2);
-  });
+  it("end-to-end: a toggle persists and a reload shows the same muted topbar, no sync step (CAP-2)", () => {
+    // Spans the REAL chain the unit tests only cross through mocks: the real
+    // toggleMute command, real prefs persistence, and the real topbar glyph.
+    // The topbar and the splash consume toggleMute through DIFFERENT channels:
+    // the topbar via the ui.setAudioGlyph SIDE EFFECT, the splash via the
+    // RETURN VALUE (Onboarding maps it onto its own button). This test pins
+    // BOTH against the real command: the topbar glyph (side effect) and the
+    // returned boolean (the splash's input); the splash unit test separately
+    // proves the splash maps that boolean to its glyph.
+    localStorage.clear();
+    const audio = {
+      started: true,
+      muted: false,
+      start() {
+        this.started = true;
+      },
+      setMuted(m: boolean) {
+        this.muted = m;
+      },
+    };
+    const app = { audio, prefs: {} as Record<string, unknown>, ui: null as unknown as UI };
+    let lastReturn: boolean | undefined;
+    const { ui } = makeUI({ onToggleAudio: () => (lastReturn = toggleMute(app as never)), isMuted: () => false });
+    app.ui = ui;
 
-  it("audio toggle icon is initialized from the persisted muted state, no click needed", () => {
-    makeUI({ isMuted: vi.fn(() => true) });
-    expect(document.getElementById("audio-toggle")!.textContent).toBe("🔇");
+    const topbar = () => document.getElementById("audio-toggle")!;
+    expect(topbar().textContent).toBe("🔊");
+    topbar().click();
+    expect(audio.muted).toBe(true);
+    expect(topbar().textContent).toBe("🔇"); // topbar view: the setAudioGlyph side effect
+    expect(lastReturn).toBe(true); // splash view: the real command returns the new state, not void
+    expect(loadPrefs().muted).toBe(true); // persisted for real
+
+    // Reload: a fresh DOM (mountAppDom replaces the body, so exactly one topbar
+    // exists) + a fresh UI initialized from persisted prefs shows the muted
+    // glyph immediately, no click and no cross-view sync step.
+    mountAppDom();
+    expect(document.querySelectorAll("#audio-toggle")).toHaveLength(1); // no stale toggle survives the reload
+    makeUI({ isMuted: () => loadPrefs().muted === true });
+    expect(topbar().textContent).toBe("🔇");
   });
 
   it("the Settings button opens the Settings dialog", () => {

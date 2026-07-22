@@ -270,6 +270,12 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     const hasSave = app.hadReadableSave;
     app.onboarding.showSplash({
       hasSave,
+      // The splash mute is a second view of the ONE persisted master mute
+      // (SPEC-splash-mute CAP-2): it drives the same toggleMute the topbar
+      // button does, which also keeps the topbar glyph in sync for when the
+      // splash dismisses into the game.
+      muted: () => app.audio.muted,
+      onToggleMute: () => app.toggleMute(),
       onContinue: () => {
         // Only rendered when `hasSave`. teardownSplash() resumes the engine to
         // play speed, so re-pause: a returning player lands back in their tower

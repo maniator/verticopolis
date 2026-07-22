@@ -176,13 +176,9 @@ export class UI {
       });
     });
 
-    // Initialize the glyph from the persisted state (the HTML default is 🔊,
-    // wrong for a player who muted last session), then follow every toggle.
-    this.el.audioToggle.textContent = this.cb.isMuted() ? "🔇" : "🔊";
-    this.el.audioToggle.addEventListener("click", () => {
-      const muted = this.cb.onToggleAudio();
-      this.el.audioToggle.textContent = muted ? "🔇" : "🔊";
-    });
+    // Init from persisted state; toggleMute owns every later update (splash too).
+    this.setAudioGlyph(this.cb.isMuted());
+    this.el.audioToggle.addEventListener("click", () => this.cb.onToggleAudio());
     document.getElementById("btn-undo")?.addEventListener("click", () => this.cb.onUndo());
     document.getElementById("btn-redo")?.addEventListener("click", () => this.cb.onRedo());
 
@@ -343,6 +339,11 @@ export class UI {
    *  and its pending handlers. */
   isModalOpen(): boolean {
     return (this.el.modal as HTMLDialogElement).open;
+  }
+
+  /** Topbar mute glyph, set by toggleMute for every caller so all views agree (SPEC-splash-mute CAP-2). */
+  setAudioGlyph(muted: boolean): void {
+    this.el.audioToggle.textContent = muted ? "🔇" : "🔊";
   }
 
   /** Hand the player an exported file. Routed through the platform port so a

@@ -15,6 +15,11 @@ export function toggleMute(app: GameApp): boolean {
   app.audio.setMuted(!app.audio.muted);
   app.prefs.muted = app.audio.muted;
   savePrefs(app.prefs);
+  // Keep the topbar glyph honest for EVERY caller: the splash mute toggles
+  // this same state while the topbar is behind the overlay, and a stale 🔊
+  // there would contradict the muted game after dismissal (SPEC-splash-mute
+  // CAP-2, one source of truth includes its visible views).
+  app.ui.setAudioGlyph(app.audio.muted);
   return app.audio.muted;
 }
 

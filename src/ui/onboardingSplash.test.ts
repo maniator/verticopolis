@@ -1,0 +1,132 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import { OnboardingController } from "./Onboarding";
+
+const STYLES_CSS = resolve(dirname(fileURLToPath(import.meta.url)), "..", "styles.css");
+
+/**
+ * Splash-mute contract (SPEC-splash-mute, `_bmad-output/specs/spec-splash-mute/`):
+ * the splash renders a mute toggle from its first frame (CAP-1) as a second
+ * view of the ONE persisted master mute (CAP-2). These drive the REAL
+ * showSplash against happy-dom; the persisted-silent-boot half (CAP-3) is
+ * pinned at the facade in audioFacade.test.ts and at the command in
+ * audioPrefs.test.ts (glyph agreement).
+ */
+
+function makeController() {
+  const opts = {
+    mq: { matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() } as unknown as MediaQueryList,
+    showHelp: vi.fn(),
+    pauseForSplash: vi.fn(),
+    chime: vi.fn(),
+    setMusicProgram: vi.fn(),
+  };
+  return { ctl: new OnboardingController(opts), opts };
+}
+
+function mountSplash(o: { hasSave?: boolean; muted?: boolean; onToggleMute?: () => boolean }) {
+  const { ctl } = makeController();
+  ctl.showSplash({
+    hasSave: o.hasSave ?? false,
+    onContinue: vi.fn(),
+    onNewTower: vi.fn(),
+    muted: () => o.muted ?? false,
+    onToggleMute: o.onToggleMute,
+  });
+  return document.getElementById("splash")!;
+}
+
+afterEach(() => {
+  document.getElementById("splash")?.remove();
+  document.body.innerHTML = "";
+});
+
+describe("splash mute toggle (CAP-1)", () => {
+  it("renders the corner toggle with unmuted state and does not steal initial focus", () => {
+    const el = mountSplash({});
+    const btn = el.querySelector<HTMLButtonElement>('button.splash-mute[data-splash="mute"]');
+    expect(btn).not.toBeNull();
+    expect(btn!.textContent).toBe("🔊");
+    expect(btn!.getAttribute("aria-pressed")).toBe("false");
+    expect(btn!.getAttribute("aria-label")).toBe("Mute sound");
+    // Initial focus belongs to the action stack (New Tower on a first run),
+    // never the corner toggle.
+    expect(document.activeElement?.getAttribute("data-splash")).toBe("new");
+  });
+
+  it("mounts already-muted for a returning player who muted last session", () => {
+    const el = mountSplash({ muted: true });
+    const btn = el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!;
+    expect(btn.textContent).toBe("🔇");
+    // Toggle-button pattern: the name is STABLE; aria-pressed carries state.
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    expect(btn.getAttribute("aria-label")).toBe("Mute sound");
+  });
+
+  it("carries a comfortable touch target: the .splash-mute rule floors both dimensions at >= 44px (CAP-1)", () => {
+    // happy-dom applies no stylesheet, so read the shipped CSS rule directly:
+    // the 44px WCAG floor is the spec requirement, and no unit DOM can measure
+    // layout. Pins the rule against a future value trim below the floor.
+    const css = readFileSync(STYLES_CSS, "utf8");
+    const rule = css.match(/\.splash-mute\s*\{([^}]*)\}/)?.[1] ?? "";
+    const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
+    expect(px("min-width")).toBeGreaterThanOrEqual(44);
+    expect(px("min-height")).toBeGreaterThanOrEqual(44);
+  });
+
+  it("joins the focus trap's button cycle, LAST in reading order (title -> actions -> utility)", () => {
+    const el = mountSplash({ hasSave: true });
+    const items = Array.from(el.querySelectorAll<HTMLElement>("button:not([disabled])"));
+    // Rendered last so AT reads the primary actions before the corner utility.
+    expect(items[items.length - 1].getAttribute("data-splash")).toBe("mute");
+    // Tab from the last button (mute) wraps to the first (the trap's own logic).
+    items[items.length - 1].focus();
+    el.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab", bubbles: true, cancelable: true }));
+    expect(document.activeElement).toBe(items[0]);
+    expect(items[0].getAttribute("data-splash")).not.toBe("mute");
+  });
+});
+
+describe("splash mute binding (CAP-2)", () => {
+  it("clicking drives the shared toggle and mirrors the returned state onto the button", () => {
+    let muted = false;
+    const onToggleMute = vi.fn(() => {
+      muted = !muted;
+      return muted;
+    });
+    const el = mountSplash({ onToggleMute });
+    const btn = el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!;
+
+    btn.click();
+    expect(onToggleMute).toHaveBeenCalledTimes(1);
+    expect(btn.textContent).toBe("🔇");
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+    // The name never changes across states (toggle-button pattern).
+    expect(btn.getAttribute("aria-label")).toBe("Mute sound");
+
+    btn.click();
+    expect(onToggleMute).toHaveBeenCalledTimes(2);
+    expect(btn.textContent).toBe("🔊");
+    expect(btn.getAttribute("aria-pressed")).toBe("false");
+    expect(btn.getAttribute("aria-label")).toBe("Mute sound");
+  });
+
+  it("clicking the toggle never dismisses the splash", () => {
+    const el = mountSplash({ onToggleMute: () => true });
+    el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!.click();
+    expect(document.getElementById("splash")).not.toBeNull();
+  });
+
+  it("does not wire a lying click when no toggle handler is given (button stays truthful)", () => {
+    // A caller that supplies muted but omits onToggleMute must not get a button
+    // that flips its glyph while the real audio state is unchanged: no handler,
+    // no flip (Edge Case Hunter, round 1).
+    const el = mountSplash({ muted: true }); // onToggleMute omitted
+    const btn = el.querySelector<HTMLButtonElement>('[data-splash="mute"]')!;
+    btn.click();
+    expect(btn.textContent).toBe("🔇"); // unchanged: never lied
+    expect(btn.getAttribute("aria-pressed")).toBe("true");
+  });
+});

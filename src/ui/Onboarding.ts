@@ -6,14 +6,26 @@ import type { Simulation } from "../engine/Simulation";
  * checklist with device-aware hints. Pure DOM chrome: it READS the simulation to
  * detect real progress but never mutates it (no engine coupling, no new save
  * state), preserving the diegesis split. The splash and checklist bodies render
- * through lit; the focus trap, backdrop/Esc dismissal, and the `data-splash` /
- * `data-onboard` click delegation stay imperative on the container. Once-only,
- * skippable, re-openable from Help. See the design docs under
- * _bmad-output/planning-artifacts/design/.
+ * through lit, and the per-button clicks bind through lit `@click` too; only the
+ * overlay-level focus trap and backdrop/Esc dismissal stay imperative on the
+ * container (they are not per-button handlers). `data-splash` attributes remain
+ * for focus targeting and tests. Once-only, skippable, re-openable from Help.
+ * See the design docs under _bmad-output/planning-artifacts/design/.
  */
 
 const FLAG = "tt.onboarded";
 const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
+
+/** Click handlers the splash template binds through lit `@click`. `onToggleMute`
+ *  is optional: when a caller can't toggle (no audio port), it is undefined, lit
+ *  binds no listener, and the mute button can't flip its glyph while the real
+ *  audio state stays put (SPEC-splash-mute CAP-2). */
+interface SplashHandlers {
+  onContinue: () => void;
+  onNewTower: () => void;
+  onHelp: () => void;
+  onToggleMute?: (e: Event) => void;
+}
 
 /** "Metropolis Dusk" title screen body: an art-deco skyline + setting sun under
  *  an indigo->coral dusk sky, with the Verticopolis wordmark. The wordmark and
@@ -29,7 +41,7 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
  *  those display rules, or collapse the whitespace here, if either becomes
  *  inline/inline-block. No whitespace is added inside any `<text>`/`<tspan>` (it
  *  would shift the `textLength`-fitted glyphs). */
-function splashTemplate(hasSave: boolean, premise: string): TemplateResult {
+function splashTemplate(hasSave: boolean, premise: string, muted: boolean, h: SplashHandlers): TemplateResult {
   return html`<div class="splash-stars" aria-hidden="true"></div>
     <div class="splash-sun" aria-hidden="true"></div>
     <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
@@ -57,12 +69,27 @@ function splashTemplate(hasSave: boolean, premise: string): TemplateResult {
       <p class="splash-premise">${premise}</p>
     </div>
     <div class="splash-actions">
-      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue">▶ Continue</button>` : nothing}
-      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new">＋ New Tower</button>
-      <button class="splash-btn ghost" data-splash="help">？ How to Play</button>
+      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>▶ Continue</button>` : nothing}
+      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>＋ New Tower</button>
+      <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>？ How to Play</button>
     </div>
     <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
-    <p class="splash-version">v${APP_VERSION}</p>`;
+    <p class="splash-version">v${APP_VERSION}</p>
+    <!-- The mute toggle renders LAST so the reading and Tab order run
+         title -> premise -> actions -> utility; it is pinned visually to the
+         top-right corner by .splash-mute (absolute), un-unified per the design
+         system. Following the WAI-ARIA toggle-button pattern, the accessible
+         name is STABLE ("Mute sound") and aria-pressed carries the on/off
+         state; the glyph flips for sighted users. An absent onToggleMute binds
+         no @click, so a caller that can't toggle gets an inert, truthful
+         button. SPEC-splash-mute CAP-1. -->
+    <button
+      class="splash-mute"
+      data-splash="mute"
+      aria-pressed=${muted ? "true" : "false"}
+      aria-label="Mute sound"
+      @click=${h.onToggleMute}
+    >${muted ? "🔇" : "🔊"}</button>`;
 }
 
 export function isOnboarded(): boolean {
@@ -214,9 +241,20 @@ export class OnboardingController {
 
   // ---- Splash -------------------------------------------------------------
 
-  showSplash(o: { hasSave: boolean; onContinue: () => void; onNewTower: (dismiss: () => void) => void }): void {
+  showSplash(o: {
+    hasSave: boolean;
+    onContinue: () => void;
+    onNewTower: (dismiss: () => void) => void;
+    /** Current persisted mute state, read at mount (SPEC-splash-mute CAP-2). */
+    muted?: () => boolean;
+    /** Toggle the ONE master mute (the same state the topbar toggle drives);
+     *  returns the new muted state so the splash button can mirror it. */
+    onToggleMute?: () => boolean;
+  }): void {
     this.opts.pauseForSplash(true);
     // The start screen has its own looping theme; the tower gets the calm bed.
+    // A player who muted last session boots silent regardless: the audio boot
+    // applies persisted mute before any program starts (SPEC-splash-mute CAP-3).
     this.opts.setMusicProgram?.(true);
     const mobile = this.opts.mq.matches;
     const el = document.createElement("div");
@@ -230,23 +268,36 @@ export class OnboardingController {
     const premise = mobile
       ? "Raise a high-rise floor by floor and climb to the TOWER."
       : "Raise a living high-rise floor by floor: lease offices, open shops, run hotels, and thread the elevators that keep the city moving. Climb from 1★ to the legendary TOWER.";
-    litRender(splashTemplate(o.hasSave, premise), el);
+    // The splash renders once; the mute toggle reflects its new state onto its
+    // own button (glyph + aria-pressed) rather than re-rendering the whole
+    // overlay for one control. An absent onToggleMute leaves the template's
+    // @click unbound, so the button is inert and never lies (CAP-2).
+    const onToggleMute = o.onToggleMute;
+    const handlers: SplashHandlers = {
+      onContinue: () => {
+        this.teardownSplash();
+        o.onContinue();
+      },
+      // Keep the splash mounted + the engine paused; the host dismisses only
+      // once the (possibly-confirmed) new game is actually starting, so a
+      // cancelled confirmation leaves the title screen in place and time frozen.
+      onNewTower: () => o.onNewTower(() => this.teardownSplash()),
+      // Help stacks over the splash (its own modal); the splash stays behind it.
+      onHelp: () => this.opts.showHelp(),
+      onToggleMute: onToggleMute
+        ? (e: Event) => {
+            const btn = e.currentTarget as HTMLButtonElement;
+            const muted = onToggleMute();
+            btn.textContent = muted ? "🔇" : "🔊";
+            btn.setAttribute("aria-pressed", String(muted));
+          }
+        : undefined,
+    };
+    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, handlers), el);
     document.body.appendChild(el);
     this.splashEl = el;
 
     const q = (sel: string) => el.querySelector<HTMLElement>(sel);
-    q('[data-splash="continue"]')?.addEventListener("click", () => {
-      this.teardownSplash();
-      o.onContinue();
-    });
-    q('[data-splash="new"]')?.addEventListener("click", () => {
-      // Keep the splash mounted + the engine paused; the host dismisses only
-      // once the (possibly-confirmed) new game is actually starting, so a
-      // cancelled confirmation leaves the title screen in place and time frozen.
-      o.onNewTower(() => this.teardownSplash());
-    });
-    // Help stacks over the splash (its own modal); the splash stays behind it.
-    q('[data-splash="help"]')?.addEventListener("click", () => this.opts.showHelp());
     // Move initial focus into the overlay, then TRAP Tab within it so keyboard
     // users can't reach the game behind the modal (its buttons are the only
     // focusable controls, so Tab just cycles among them).

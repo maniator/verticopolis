@@ -61,14 +61,16 @@ function makeApp() {
     }),
   };
   const engine = { setReducedMotion: vi.fn() };
+  const ui = { setAudioGlyph: vi.fn() };
   const app = {
     audio,
     engine,
+    ui,
     reduceMq: { matches: false },
     prefs: {} as Record<string, unknown>,
     prefsSaveTimer: null as number | null,
   };
-  return { app: app as unknown as GameApp, raw: app, audio, engine };
+  return { app: app as unknown as GameApp, raw: app, audio, engine, ui };
 }
 
 beforeEach(() => {
@@ -78,21 +80,25 @@ beforeEach(() => {
 
 describe("toggleMute", () => {
   it("starts audio, flips the facade, mirrors into prefs, persists, and returns the new state", () => {
-    const { app, raw, audio } = makeApp();
+    const { app, raw, audio, ui } = makeApp();
     const result = toggleMute(app);
     expect(audio.start).toHaveBeenCalledTimes(1);
     expect(audio.setMuted).toHaveBeenCalledExactlyOnceWith(true);
     expect(audio.muted).toBe(true);
     expect(raw.prefs.muted).toBe(true);
     expect(savePrefs).toHaveBeenCalledExactlyOnceWith(raw.prefs);
+    // The topbar glyph follows every caller (splash toggle included), so the
+    // two views of the one mute can never disagree (SPEC-splash-mute CAP-2).
+    expect(ui.setAudioGlyph).toHaveBeenCalledExactlyOnceWith(true);
     expect(result).toBe(true);
   });
 
   it("toggles back to unmuted on a second call", () => {
-    const { app, audio } = makeApp();
+    const { app, audio, ui } = makeApp();
     toggleMute(app);
     const result = toggleMute(app);
     expect(audio.muted).toBe(false);
+    expect(ui.setAudioGlyph).toHaveBeenLastCalledWith(false);
     expect(result).toBe(false);
   });
 });
