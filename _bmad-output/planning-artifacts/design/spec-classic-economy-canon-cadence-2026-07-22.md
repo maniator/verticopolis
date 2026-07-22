@@ -109,6 +109,33 @@ and makes hotels look like an exploit when they are simply canonical.
 - Owner's save as evidence: SixSeven's 886 offices move from ~$250k to ~$8.9M
   per quarter after this change. That is canon.
 
+## 5b. Review record (2026-07-22, PR #574)
+
+`/gds-code-review` ran in-session. Layers: Blind Hunter and Acceptance Auditor
+completed; the Edge Case Hunter run was stopped by the owner mid-flight, so
+that layer did not report (recorded per the workflow's failure handling; a
+manual edge-walk of collectRent callers, bare contexts, the golden master, and
+the Help drift guard was done during implementation). Findings and triage:
+
+- **patch (blind med + auditor low, merged):** the rebuilt Modern invariance
+  test asserted constants against constants and its "end-to-end" comment
+  overclaimed. Fixed: both sides now measure production `collectRent` (a
+  Modern-canon sim collects the rescaled $333, the identical Classic sim the
+  full $10,000).
+- **patch (blind low):** the Classic full-lump test title said "whatever the
+  calendar says" but only exercised the canon calendar through `collectRent`.
+  Fixed: a REAL_WORLD-calendar context asserts the same full lump.
+- **patch (Copilot):** `CLASSIC_RULES.quarterlyRentScale` names its ignored
+  parameter (`_quarterDays`); the Calendar-pace bullet reads "earns the same
+  money per in-game day".
+- **dismiss:** help.test phrase lives in compare.ts (by design: compareTemplate
+  is the single source rendered into the Help section; the guard checks the
+  rendered Help text and passes); CHANGELOG has no 1.77.0 section (that
+  version shipped with no player-facing notes, per the changelog's own
+  convention, and predates this PR); `MODERN_RULES` import "missing" (a
+  diff-only artifact; the import was already present and typecheck is green).
+- **defer:** none new; the two pre-triaged rows below carry the deferred scope.
+
 ## 6. Deferred (backlog rows, mirrored to issues)
 
 - `classic-commercial-income-canon`: calibrate Classic's
