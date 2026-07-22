@@ -423,7 +423,7 @@ describe("Classic canon (3/3/12) end-to-end regression: fires on the canon beat"
     const sim = classicCanonOneOfficeTower();
     for (let d = 0; d < CANON.quarterDays - 1; d++) sim.tick(1440);
     const beforeRent = sim.money;
-    sim.tick(1440); // roll into day 3 — canon quarter boundary
+    sim.tick(1440); // roll into day 3, the canon quarter boundary
     const delta = sim.money - beforeRent;
     expect(delta).toBeGreaterThan(9_000);
     expect(delta).toBeLessThanOrEqual(10_000);

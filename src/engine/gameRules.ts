@@ -124,9 +124,9 @@ export interface GameRules {
    * Factor applied to the summed quarterly office rent at each collection,
    * given the running calendar's quarter length in days. Classic returns 1:
    * the full 1994 lump lands every canon 3-day quarter (an Average office pays
-   * its whole $10,000 each quarter), the canon cadence period FAQ sources
-   * report (snippet-corroborated, provisional pending a primary source, #575;
-   * spec-classic-economy-canon-cadence).
+   * its whole $10,000 each quarter), the canon cadence that period FAQ
+   * sources report (snippet-corroborated, provisional pending a primary
+   * source, #575; spec-classic-economy-canon-cadence).
    * Modern returns the income-invariant rescale
    * `quarterDays / REAL_WORLD.quarterDays` (gdd-classic-calendar-parity §3), so
    * its New-Tower calendar choice changes only the cadence and lump size of
