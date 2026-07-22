@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import type { FacilityKind, SerializedGame, Transport, Unit } from "../../engine/types";
 import { SAVE_VERSION } from "../../engine/saveMigration";
 import {
@@ -15,7 +16,6 @@ import {
   parseTdtBinary,
 } from "../../storage/tdtFormat";
 import { LegacyExportError, buildTDT, classFromRent, legacyFilename } from "../../storage/tdtExport";
-import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 import { FAMILY_STORIES, PART_FAMILY, parseTDT } from "../../storage/tdtImport";
@@ -162,7 +162,7 @@ describe("buildTDT: export → import round trip", () => {
     // Build a real Simulation, populate three retail units with distinct
     // canon subtypes, serialize, export, and re-import through parseTDT.
     // The resulting units must carry the same variant names on both sides.
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     sim.money = 1e12;
     sim.star = 5;
     const x0 = Math.floor(GRID.width / 2) - 20;

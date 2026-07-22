@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation, ECON, VACATE_RESCIND } from "../../engine/Simulation";
 import { rentOf } from "../../engine/econConfig";
 import { ElevatorDispatch } from "../../engine/ElevatorDispatch";
@@ -10,7 +11,7 @@ import { SHOP_SUBTYPES } from "../../engine/retailSubtypes";
 describe("Rent / price controls", () => {
   it("steps and clamps a unit's price within its band (Modern) and its ladder (Classic)", () => {
     // Modern keeps the continuous band: one step per nudge, clamped at the ends.
-    const sim = Simulation.newGame(1, "modern");
+    const sim = newSeededGame(1, "modern");
     const x0 = Math.floor(GRID.width / 2);
     for (let i = 0; i < 12; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -23,7 +24,7 @@ describe("Rent / price controls", () => {
     for (let i = 0; i < 50; i++) sim.adjustRent(id, -1);
     expect(sim.tower.units.find((u) => u.id === id)!.rent).toBe(ECON.rent.office.min);
     // Classic steps whole canon rungs and clamps at the ladder ends.
-    const classic = Simulation.newGame(1);
+    const classic = newSeededGame(1);
     for (let i = 0; i < 12; i++) classic.tower.place("floor", 2, x0 + i);
     classic.buildTransport("elevatorStandard", x0, 1, 2);
     const cid = classic.tower.place("office", 2, x0 + 1).unitId!;
@@ -34,7 +35,7 @@ describe("Rent / price controls", () => {
   });
 
   it("won't change a condo's price once it has sold", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const x0 = Math.floor(GRID.width / 2);
     for (let i = 0; i < 20; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -64,7 +65,7 @@ describe("Rent / price controls", () => {
 
 /** Build a serviced office tower with `n` offices on floor 2. */
 function builtTower(seed = 7): Simulation {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   const x0 = Math.floor(GRID.width / 2) - 20;
   // Floor 2 structure.
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
@@ -75,13 +76,13 @@ function builtTower(seed = 7): Simulation {
 
 describe("Simulation economy", () => {
   it("starts with the correct money and one star", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     expect(sim.money).toBe(ECON.startingMoney);
     expect(sim.star).toBe(1);
   });
 
   it("charges for building and refunds on sell", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     const before = sim.money;
     const res = sim.build("floor", 2, Math.floor(GRID.width / 2) - 20);
     expect(res.ok).toBe(true);
@@ -91,7 +92,7 @@ describe("Simulation economy", () => {
   });
 
   it("auto-lays a room's floor when placed against the tower", () => {
-    const sim = Simulation.newGame(7); // starter lobby on floor 1
+    const sim = newSeededGame(7); // starter lobby on floor 1
     const x0 = Math.floor(GRID.width / 2) - 20;
     const before = sim.money;
     // No floor on level 2 yet — drop an office straight above the lobby.
@@ -105,7 +106,7 @@ describe("Simulation economy", () => {
   });
 
   it("refuses to sell a floor that supports the story above", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.build("floor", 2, x0);
     sim.build("floor", 3, x0);
@@ -118,13 +119,13 @@ describe("Simulation economy", () => {
   });
 
   it("won't build a room floating in midair", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const r = sim.build("office", 6, 5); // far from the starter lobby
     expect(r.ok).toBe(false);
   });
 
   it("rejects floating overhangs above ground (no diagonal stacking)", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 30; i++) sim.tower.place("floor", 2, x0 + i);
     // Office on floor 3 sitting fully on floor 2 → fine (auto-floors level 3).
@@ -134,14 +135,14 @@ describe("Simulation economy", () => {
   });
 
   it("blocks building when unaffordable", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     sim.money = 100;
     const res = sim.build("office", 1, 0);
     expect(res.ok).toBe(false);
   });
 
   it("locks facilities behind star ratings", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     expect(sim.isUnlocked("office")).toBe(true);
     expect(sim.isUnlocked("cinema")).toBe(false); // needs 3 stars
     sim.star = 3;
@@ -186,7 +187,7 @@ describe("Simulation economy", () => {
 
 describe("Simulation ratings", () => {
   it("promotes to 2 stars when population crosses 300", () => {
-    const sim = Simulation.newGame(9);
+    const sim = newSeededGame(9);
     // Fabricate population by marking many occupied offices.
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 2; f <= 20; f++) {
@@ -209,7 +210,7 @@ describe("Simulation ratings", () => {
   });
 
   it("gates 3 stars on having security", () => {
-    const sim = Simulation.newGame(11);
+    const sim = newSeededGame(11);
     // Force a large population. Build in the connected region above the
     // starter lobby (centered near width/2).
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -240,7 +241,7 @@ describe("Simulation ratings", () => {
 
 describe("Construction time", () => {
   it("puts new rooms under construction, then opens them on the global clock", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 12; i++) sim.tower.place("floor", 2, x0 + i);
     const res = sim.build("office", 2, x0);
@@ -254,7 +255,7 @@ describe("Construction time", () => {
   });
 
   it("does not delay structural floors/lobbies", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const x0 = Math.floor(GRID.width / 2) - 20;
     const r = sim.build("floor", 2, x0);
     expect(r.ok).toBe(true);
@@ -265,7 +266,7 @@ describe("Construction time", () => {
 
 describe("Hotel housekeeping", () => {
   function hotelTower(seed = 4): Simulation {
-    const sim = Simulation.newGame(seed);
+    const sim = newSeededGame(seed);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 20; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -476,7 +477,7 @@ describe("Hotel housekeeping", () => {
 
 describe("Transport editing", () => {
   function base(seed = 1): Simulation {
-    const sim = Simulation.newGame(seed);
+    const sim = newSeededGame(seed);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 2; f <= 10; f++) for (let i = 0; i < 20; i++) sim.tower.place("floor", f, x0 + i);
     return sim;
@@ -544,7 +545,7 @@ describe("Transport editing", () => {
     // outer tiles of the new floor, since only the shaft's own column has
     // structure below. The auto-floor refuses rather than lay a partial,
     // floating floor, and leaves nothing behind.
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const c = Math.floor(GRID.width / 2) - 20; // the starter lobby's left edge (floor 1 is lobby here)
     for (let f = 2; f <= 6; f++) expect(sim.tower.place("floor", f, c).ok).toBe(true); // a 1-wide column on the lobby
     expect(sim.buildTransport("elevatorStandard", c, 1, 6).ok).toBe(true); // width 4 over a 1-wide column
@@ -609,7 +610,7 @@ describe("Transport editing", () => {
     // player still has to place). So extending through an unbuilt floor 15
     // refuses and names the fix, instead of auto-committing a lobby or laying
     // plain floor there.
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 2; f <= 14; f++) for (let i = 0; i < 4; i++) expect(sim.tower.place("floor", f, x0 + i).ok).toBe(true);
     expect(sim.buildTransport("elevatorStandard", x0, 1, 14).ok).toBe(true);
@@ -685,14 +686,14 @@ describe("Transport editing", () => {
 
 describe("Simulation time", () => {
   it("advances the clock and tracks days", () => {
-    const sim = Simulation.newGame();
+    const sim = newSeededGame();
     const startDay = sim.clock.day;
     sim.tick(60 * 24);
     expect(sim.clock.day).toBe(startDay + 1);
   });
 
   it("evicts tenants from unreachable floors after a notice period", () => {
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Floor 5 with an office but NO transport reaching it.
     for (let f = 2; f <= 5; f++)
@@ -714,7 +715,7 @@ describe("Simulation time", () => {
   });
 
   it("a tenant on notice rescinds when access is restored in time", () => {
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 1; f <= 5; f++)
       for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
@@ -735,7 +736,7 @@ describe("Simulation time", () => {
   });
 
   it("rescinding is silent and does not spam a good/bad toast pair", () => {
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 1; f <= 5; f++)
       for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
@@ -756,7 +757,7 @@ describe("Simulation time", () => {
   });
 
   it("batches a mass move-out into one notice toast, not one per unit", () => {
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Four offices on an unreachable floor, all equally unhappy → they bottom
     // out on the same tick and should raise a single aggregated alarm.
@@ -776,7 +777,7 @@ describe("Simulation time", () => {
   });
 
   it("a unit only stabilized below the 0.40 rescind bar still evicts (stabilized ≠ fixed)", () => {
-    const sim = Simulation.newGame(2);
+    const sim = newSeededGame(2);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 1; f <= 5; f++)
       for (let i = 0; i < 12; i++) sim.tower.place(f === 1 ? "lobby" : "floor", f, x0 + i);
@@ -848,7 +849,7 @@ describe("Simulation events", () => {
   });
 
   it("elevator cars travel toward floors with passenger demand", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 2; f <= 10; f++) for (let i = 0; i < 12; i++) sim.tower.place("floor", f, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 10);
@@ -872,7 +873,7 @@ describe("Simulation events", () => {
   });
 
   it("metro and parking relieve elevator congestion", () => {
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let f = 2; f <= 20; f++) for (let i = 0; i < 30; i++) sim.tower.place("floor", f, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 20);
@@ -896,7 +897,7 @@ describe("Simulation events", () => {
   });
 
   it("excavating basement rooms can unearth treasure", () => {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.star = 3; // parking unlocks at 3★ (canon)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -914,7 +915,7 @@ describe("Simulation events", () => {
 
 describe("Auto-floor bridge between modules", () => {
   it("fills the floor gap between two rooms on the same story", () => {
-    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    const sim = newSeededGame(7); // starter floor-1 lobby spans [x0, x0+40)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     expect(sim.build("office", 2, x0).ok).toBe(true); // A: [x0, x0+9)
@@ -927,7 +928,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges symmetrically when the second room lands to the left", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.build("office", 2, x0 + 15); // placed first
@@ -936,7 +937,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("charges for the bridge floor and blocks placement when it can't be afforded", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.build("office", 2, x0); // A
@@ -954,7 +955,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("leaves a lone room with only its own floor (no neighbor, no bridge)", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const before = sim.money;
@@ -965,7 +966,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("fills the gap between two sky lobbies with lobby tiles, not floor", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const lf = GRID.lobbyInterval; // 15, a sky-lobby floor
@@ -980,7 +981,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges a plain floor tool across a gap to a neighboring floor", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     expect(sim.build("floor", 2, x0).ok).toBe(true);
@@ -992,7 +993,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("charges floor tiles for a floor-tool bridge and blocks one that can't be afforded", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     expect(sim.build("floor", 2, x0).ok).toBe(true); // the neighbor to bridge back to
@@ -1007,7 +1008,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges a floor tool on the GROUND, rescuing a placement that isn't yet connected", () => {
-    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    const sim = newSeededGame(7); // starter floor-1 lobby spans [x0, x0+40)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     // A floor tile right at the lobby's edge connects normally (adjacent to the
@@ -1022,7 +1023,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges a floor tool in the BASEMENT, rescuing a detached tile the same as the ground", () => {
-    const sim = Simulation.newGame(7); // starter floor-1 lobby spans [x0, x0+40)
+    const sim = newSeededGame(7); // starter floor-1 lobby spans [x0, x0+40)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     // A B1 (floor 0) tile under the lobby's edge hangs off the lobby above it and
@@ -1037,7 +1038,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges to the nearest neighbor even across a wide gap (no distance cap)", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.build("office", 2, x0); // A: [x0, x0+9)
@@ -1047,7 +1048,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges identically in Modern mode (mode-agnostic, like auto-floor-under-room)", () => {
-    const sim = Simulation.newGame(7, "modern");
+    const sim = newSeededGame(7, "modern");
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     sim.build("office", 2, x0);
@@ -1056,7 +1057,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges a basement gap with floor (the ground/basement outward-fill path)", () => {
-    const sim = Simulation.newGame(7); // floor-1 lobby (support from above) spans [x0, x0+40)
+    const sim = newSeededGame(7); // floor-1 lobby (support from above) spans [x0, x0+40)
     sim.money = 10_000_000;
     sim.star = 3; // parking unlocks at 3 stars
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -1067,7 +1068,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("charges lobby tiles for a lobby bridge and blocks one that can't be afforded", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const lf = GRID.lobbyInterval; // 15
@@ -1087,7 +1088,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges every story of a stacked multi-story facility above ground", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 20_000_000;
     sim.star = 3; // cinema unlocks at 3 stars
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -1104,7 +1105,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("bridges a detached ground concourse lobby with lobby tiles", () => {
-    const sim = Simulation.newGame(7); // starter ground lobby spans [x0, x0+40)
+    const sim = newSeededGame(7); // starter ground lobby spans [x0, x0+40)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     // A ground tile this far from the concourse can't stand alone today; the
@@ -1117,7 +1118,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("charges a ground lobby bridge at lobby price and blocks an unaffordable drop", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const can = sim.canBuild("lobby", 1, x0 + 45);
@@ -1133,7 +1134,7 @@ describe("Auto-floor bridge between modules", () => {
   });
 
   it("still refuses a lobby with no reachable lobby neighbor (bridge rescue is narrow)", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Floor 7 is not a lobby floor and has no lobby to bridge to: the rescue must
@@ -1147,7 +1148,7 @@ describe("Auto-floor bridge between modules", () => {
     // it stays refused, because laying an adjacent lobby bridge does not build
     // that vertical support. Guard against the Codex-flagged regression where a
     // sky lobby with a neighbor plus a supported gap tile would sneak through.
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
     const lf = GRID.lobbyInterval; // 15
@@ -1169,7 +1170,7 @@ describe("Auto-floor bridge between modules", () => {
     // tiles from the neighbor inward so each rests on the last, not primary-side
     // outward (which would need O(gap²) retry passes). Pin it: a wide gap fills
     // completely, so if the retry loop ever regresses we would leave holes.
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     sim.money = 10_000_000;
     sim.star = 3;
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -1192,7 +1193,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   }
 
   it("claims a sky-lobby floor the moment a lobby lands on it", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 14);
     // Floor 15 is unclaimed to start: floorHasLobby is false.
     expect(sim.tower.floorHasLobby(15)).toBe(false);
@@ -1205,7 +1206,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("refuses a single-story room on a claimed sky-lobby floor", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 14);
     sim.star = 5;
     sim.buildTransport("elevatorStandard", x0 + 20, 1, 15);
@@ -1216,7 +1217,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("refuses a multi-story room whose span crosses a claimed sky-lobby floor", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 14);
     sim.star = 5; // unlock cinema
     sim.buildTransport("elevatorStandard", x0 + 20, 1, 15);
@@ -1229,7 +1230,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("refuses a sky lobby on a floor that already carries rooms", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 15); // includes plain floor on 15, no rooms yet
     sim.star = 5;
     sim.buildTransport("elevatorStandard", x0 + 20, 1, 15); // service floor 15 so office builds
@@ -1244,7 +1245,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     // floor tiles laid across a sky-lobby floor, then a lobby placed on top.
     // Every tile of the lobby must be refused, loudly, so a fixture (or player)
     // that skips checking ok ends up with NO sky lobby rather than a partial one.
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 15); // lays plain floor tiles up through 15
     const r = sim.build("lobby", 15, x0);
     expect(r.ok).toBe(false);
@@ -1253,7 +1254,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("does not restrict a plain floor on an unclaimed sky-lobby floor", () => {
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = towerToFloor(sim, 14); // support up through floor 14, floor 15 empty
     expect(sim.tower.floorHasLobby(15)).toBe(false); // unclaimed sky-lobby floor
     // A plain floor tile on an unclaimed sky-lobby floor is allowed (the rule
@@ -1262,7 +1263,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("does not fire on ground floor 1 (the concourse keeps its rules)", () => {
-    const sim = Simulation.newGame(7); // ground concourse pre-seeded with lobby
+    const sim = newSeededGame(7); // ground concourse pre-seeded with lobby
     const x0 = Math.floor(GRID.width / 2) - 20;
     // Floor 1 has a lobby (from newGame), but adding more plain floor tiles on
     // it is still allowed, unlike a claimed sky-lobby floor.
@@ -1270,7 +1271,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("refuses to bulldoze a lobby tile at any floor (1994 canon: lobbies are permanent)", () => {
-    const sim = Simulation.newGame(7); // starter lobby on floor 1
+    const sim = newSeededGame(7); // starter lobby on floor 1
     const x0 = Math.floor(GRID.width / 2) - 20;
     const lobby = sim.tower.unitAt(1, x0);
     expect(lobby?.kind).toBe("lobby");
@@ -1286,7 +1287,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   it("still allows internal engine callers to remove a lobby (bridge / auto-floor rollback)", () => {
     // Rollback paths call tower.removeUnit(id) directly, bypassing removalReason.
     // Pin the bypass so the sky-lobby-canon guard cannot break internal rollback.
-    const sim = Simulation.newGame(7);
+    const sim = newSeededGame(7);
     const x0 = Math.floor(GRID.width / 2) - 20;
     const id = sim.tower.unitAt(1, x0)!.id;
     expect(sim.tower.removeUnit(id)).toBeDefined();
@@ -1295,7 +1296,7 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
 
   it("enforces the placement rule identically in Classic and Modern", () => {
     for (const mode of ["classic", "modern"] as const) {
-      const sim = Simulation.newGame(7, mode);
+      const sim = newSeededGame(7, mode);
       const x0 = towerToFloor(sim, 14);
       expect(sim.build("lobby", 15, x0).ok).toBe(true);
       const r = sim.build("floor", 15, x0 + 20);
@@ -1305,15 +1306,15 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
   });
 
   it("gates the preview-reason hover surface by mode (Modern true, Classic false)", () => {
-    const classic = Simulation.newGame(7, "classic");
-    const modern = Simulation.newGame(7, "modern");
+    const classic = newSeededGame(7, "classic");
+    const modern = newSeededGame(7, "modern");
     expect(classic.rules.showsPreviewReason).toBe(false);
     expect(modern.rules.showsPreviewReason).toBe(true);
   });
 
   it("hands the tower the mode's rule-set, so escalator placement follows the mode", () => {
-    const classic = Simulation.newGame(7, "classic");
-    const modern = Simulation.newGame(7, "modern");
+    const classic = newSeededGame(7, "classic");
+    const modern = newSeededGame(7, "modern");
     expect(classic.tower.rules).toBe(classic.rules);
     expect(modern.tower.rules).toBe(modern.rules);
     // Build the same second story on the seeded ground-lobby strip.
@@ -1521,7 +1522,7 @@ describe("Retail subtypes: build roll, RNG discipline, reroll, and cosmetic inva
 
 describe("Founding seed: RNG.initialSeed outlives the live RNG stream", () => {
   it("stays the founding seed while the RNG state moves on, and survives a round trip", () => {
-    const sim = Simulation.newGame(987654321);
+    const sim = newSeededGame(987654321);
     expect(sim.rng.initialSeed).toBe(987654321);
     // Consume the RNG stream the way hours of events and churn do in play.
     for (let i = 0; i < 10; i++) sim.rng.next();
@@ -1532,7 +1533,7 @@ describe("Founding seed: RNG.initialSeed outlives the live RNG stream", () => {
   });
 
   it("a save from before the field falls back to its stored RNG state", () => {
-    const sim = Simulation.newGame(24680);
+    const sim = newSeededGame(24680);
     const doc = JSON.parse(JSON.stringify(sim.serialize()));
     delete doc.initialSeed;
     const revived = Simulation.deserialize(doc);

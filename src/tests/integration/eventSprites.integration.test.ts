@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { drawSanta, drawExplosion, drawThief, drawTreasure, drawVipLimo } from "../../render/sprites/events";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
@@ -93,7 +94,7 @@ describe("event sprites", () => {
 
 describe("event fx signals on the Simulation (cosmetic, transient)", () => {
   it("each trigger bumps the counter the renderer polls", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     expect(sim.santaFxSeq).toBe(0);
     sim.triggerSanta();
     sim.triggerSanta();
@@ -116,7 +117,7 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
     // Mirrors simulation.integration.test's deterministic treasure dig (seed 42): digging
     // parking into a fresh B1 slab turns up treasure, which must also bump the
     // cosmetic treasureFx the renderer polls.
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.star = 3;
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
@@ -128,7 +129,7 @@ describe("event fx signals on the Simulation (cosmetic, transient)", () => {
   });
 
   it("the fx signals are NOT serialized — they never ride along in a save", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.triggerSanta();
     sim.triggerExplosion(9, 30);
     sim.triggerThief(false, 3);

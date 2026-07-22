@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import type { GameMode } from "../../engine/types";
 
@@ -22,7 +23,7 @@ function venueTower(
   mode: GameMode,
   venue: "restaurant" | "fastFood",
 ): { sim: Simulation; venueId: number } {
-  const sim = Simulation.newGame(seed, mode);
+  const sim = newSeededGame(seed, mode);
   sim.money = 1e9;
   const { x0, x1 } = lobbyBounds(sim);
   for (let x = x0; x <= x1; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true);

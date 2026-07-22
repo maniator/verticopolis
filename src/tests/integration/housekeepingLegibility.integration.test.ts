@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { formatFloors, INFEST_DAYS } from "../../engine/economy/housekeeping";
@@ -14,7 +15,7 @@ import { formatFloors, INFEST_DAYS } from "../../engine/economy/housekeeping";
 const X0 = Math.floor(GRID.width / 2) - 20;
 
 function baseTower(seed: number): Simulation {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   sim.star = 2;
   for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", 2, X0 + i).ok).toBe(true);
   expect(sim.buildTransport("elevatorStandard", X0 + 26, 1, 2).ok).toBe(true);

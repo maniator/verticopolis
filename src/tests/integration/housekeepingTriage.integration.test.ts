@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { GameMode, Unit } from "../../engine/types";
@@ -16,7 +17,7 @@ const X0 = Math.floor(GRID.width / 2) - 20;
 /** A 2★ tower with floors 2..8, a passenger elevator, and a service shaft
  *  linking every floor, plus a crew on floor 2. Placements asserted. */
 function triageTower(seed: number, mode: GameMode): { sim: Simulation; crew: Unit } {
-  const sim = Simulation.newGame(seed, mode);
+  const sim = newSeededGame(seed, mode);
   sim.star = 2;
   for (let f = 2; f <= 8; f++) for (let i = 0; i < 30; i++) expect(sim.tower.place("floor", f, X0 + i).ok).toBe(true);
   expect(sim.buildTransport("elevatorStandard", X0 + 26, 1, 8).ok).toBe(true);

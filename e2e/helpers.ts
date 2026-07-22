@@ -25,7 +25,7 @@ export function buildToStar(target: number): number {
   const officeTop = { 1: 3, 2: 6, 3: 12, 4: 37, 5: 62, 6: 99 }[target] as number;
   const structTop = target === 6 ? 100 : officeTop; // floor 100 carries the hall
 
-  // Ground lobby, extended OUTWARD from centre (newGame seeds a centre strip and
+  // Ground lobby, extended OUTWARD from center (lay from the center out:
   // ground floors must connect to existing structure).
   const c = Math.floor(W / 2);
   for (let x = c; x < W; x++) t.place("lobby", 1, x);
@@ -83,7 +83,7 @@ export function buildToStar(target: number): number {
 }
 
 /**
- * Frame the whole tower: centre the camera, then zoom so the built floor span
+ * Frame the whole tower: center the camera, then zoom so the built floor span
  * fits the viewport height (clamped to the engine's 0.3–3 range — which lands
  * small towers low with sky above and fills the frame at TOWER). Derives the
  * current zoom from two world points since there's no absolute-zoom setter.
@@ -102,6 +102,6 @@ export function fitCamera(): void {
   }
   const floors = maxF - minF + 8; // a little sky/margin
   const desired = e.viewHeight / (floors * FLOOR);
-  e.zoomAt(desired / cur, g.grid.width * 0, e.viewHeight / 2); // vertical fit; recentre next
+  e.zoomAt(desired / cur, g.grid.width * 0, e.viewHeight / 2); // vertical fit; recenter next
   e.center();
 }

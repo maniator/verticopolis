@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, attendanceCap } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
@@ -133,7 +134,7 @@ describe("TDT round-trip preserves the retail varieties' paint (geometry + subty
     // Diner/shopper presence still reads the grandfathered hash(u.id), so the
     // comparison paints both sides with occupants pinned and the same id to
     // isolate the persisted inputs (subtype + geography).
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     sim.money = 1e12;
     // Anchor at the starter lobby's left edge (newGame seeds 40 lobby tiles
     // from mid - 20) and grow rightward: lobbies and floors must connect to

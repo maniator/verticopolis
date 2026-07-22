@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Simulation } from "../../engine/Simulation";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { GRID } from "../../engine/facilities";
 import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
 
@@ -8,7 +8,7 @@ import { rentOf, PRICED_KINDS } from "../../engine/econConfig";
  *  (exact targets, clamping, band steps) run against the shape that still has
  *  them; the Classic ladder semantics get their own describe below. */
 function officeTower(seed = 1, n = 4) {
-  const sim = Simulation.newGame(seed, "modern");
+  const sim = newSeededGame(seed, "modern");
   const x0 = Math.floor(GRID.width / 2) - 20;
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
   sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -60,7 +60,7 @@ describe("Batch pricing", () => {
   });
 
   it("never reprices a sold condo (counted as skippedSold)", () => {
-    const sim = Simulation.newGame(2, "modern");
+    const sim = newSeededGame(2, "modern");
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -165,7 +165,7 @@ describe("No-Rate units earn nothing until repriced", () => {
   });
 
   it("a batch reprice clears No-Rate only on repriced units; a skipped sold condo keeps it", () => {
-    const sim = Simulation.newGame(2, "modern");
+    const sim = newSeededGame(2, "modern");
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -186,7 +186,7 @@ describe("No-Rate units earn nothing until repriced", () => {
 
 /** A served floor-2 CLASSIC tower with `n` offices (all on the Average rung). */
 function classicOfficeTower(seed = 1, n = 4) {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   const x0 = Math.floor(GRID.width / 2) - 20;
   for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
   sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -229,7 +229,7 @@ describe("Batch pricing on the Classic ladder", () => {
   });
 
   it("'noRate' skips sold condos (price-locked) and is refused by Modern (seam law)", () => {
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);
     sim.buildTransport("elevatorStandard", x0, 1, 2);
@@ -244,7 +244,7 @@ describe("Batch pricing on the Classic ladder", () => {
     expect(condos[0].noRate).toBeUndefined();
     expect(condos[1].noRate).toBe(true);
     // Modern's engine never holds the state: a "noRate" batch is refused whole.
-    const modern = Simulation.newGame(3, "modern");
+    const modern = newSeededGame(3, "modern");
     expect(modern.previewRentBatch("office", "noRate")).toBeNull();
     expect(modern.applyRentBatch("office", "noRate")).toBeNull();
   });

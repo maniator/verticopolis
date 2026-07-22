@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
@@ -48,7 +49,7 @@ describe("retail subtype look tables", () => {
 describe("every canon subtype survives the TDT round-trip (visuals carry over)", () => {
   /** One Classic tower with a single retail unit of `kind`, ready to export. */
   function fixture(kind: FacilityKind): { sim: Simulation; unitId: number } {
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     sim.money = 1e12;
     const x0 = Math.floor(GRID.width / 2) - 20;
     for (let i = 0; i < 40; i++) sim.tower.place("floor", 2, x0 + i);

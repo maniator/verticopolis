@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID, FACILITIES } from "../../engine/facilities";
 import type { Unit } from "../../engine/types";
@@ -15,7 +16,7 @@ function lay(sim: Simulation, kind: "floor" | "lobby", floor: number): void {
 }
 /** Fabricate `target` occupant-population of occupied offices across full floors. */
 function towerWithPop(seed: number, target: number): Simulation {
-  const sim = Simulation.newGame(seed);
+  const sim = newSeededGame(seed);
   sim.money = 1e12;
   lay(sim, "lobby", 1);
   let pop = 0;
@@ -89,7 +90,7 @@ describe("Canon star ladder (FAQ)", () => {
 
 describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
   it("hotel guests count for the rating below 4★ but not at/above it", () => {
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -165,7 +166,7 @@ describe("Hotel population counts while climbing up through 4★ (FAQ)", () => {
 
 describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
   it("a hotel within the office noise band loses satisfaction; one well beyond it does not", () => {
-    const sim = Simulation.newGame(4);
+    const sim = newSeededGame(4);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -187,7 +188,7 @@ describe("Office noise (FAQ): offices annoy adjacent hotels/condos", () => {
 describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
   /** A served suite hotel, optionally with the canon one-space-per-suite parking. */
   function suiteTower(withParking: boolean): { sim: Simulation; suite: Unit } {
-    const sim = Simulation.newGame(5);
+    const sim = newSeededGame(5);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 2);
@@ -263,7 +264,7 @@ describe("VIP stay (FAQ): only in a suite, gates the favorable review", () => {
 describe("Events & amounts (FAQ Cluster B)", () => {
   it("rain depresses commercial income vs a clear day", () => {
     function dayIncome(weather: "clear" | "rain"): number {
-      const sim = Simulation.newGame(7);
+      const sim = newSeededGame(7);
       sim.money = 1e12;
       sim.star = 3;
       lay(sim, "lobby", 1);
@@ -288,7 +289,7 @@ describe("Events & amounts (FAQ Cluster B)", () => {
   });
 
   it("a cinema carries a recurring film-booking cost, per its maintenance period", () => {
-    const sim = Simulation.newGame(8);
+    const sim = newSeededGame(8);
     sim.money = 1e9;
     sim.star = 3;
     lay(sim, "lobby", 1);
@@ -305,7 +306,7 @@ describe("Events & amounts (FAQ Cluster B)", () => {
   });
 
   it("an unguarded bomb levels several rooms across ~5 floors", () => {
-    const sim = Simulation.newGame(9);
+    const sim = newSeededGame(9);
     sim.money = 1e9;
     sim.star = 4;
     const x0 = C - 20;
@@ -323,7 +324,7 @@ describe("Events & amounts (FAQ Cluster B)", () => {
   });
 
   it("buried treasure is worth about half a million", () => {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.money = 1e9;
     sim.star = 3;
     for (let x = 0; x < 60; x++) sim.tower.place("floor", 0, C - 30 + x);
@@ -337,7 +338,7 @@ describe("Events & amounts (FAQ Cluster B)", () => {
 
 describe("Office parking demand (FAQ): offices want parking from 3★", () => {
   function occupiedFill(withParking: boolean): number {
-    const sim = Simulation.newGame(123);
+    const sim = newSeededGame(123);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 4; f++) lay(sim, "floor", f);
@@ -366,7 +367,7 @@ describe("Office parking demand (FAQ): offices want parking from 3★", () => {
 
 describe("Interactive event choices (FAQ): fire rescue / bomb ransom", () => {
   it("offers a paid choice the player can accept (pays exactly the quoted cost)", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e9;
     sim.star = 4; // enables both fire and bomb-threat rolls
     lay(sim, "lobby", 1);
@@ -389,7 +390,7 @@ import { STAR_THRESHOLDS, TOWER_POPULATION } from "../../engine/facilities";
 
 describe("Deep-review regressions (must not come back)", () => {
   it("D1: cockroaches spread even with ZERO housekeeping (worst case isn't immune)", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e9;
     sim.star = 3;
     lay(sim, "lobby", 1);
@@ -413,7 +414,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D25: a condo next to an office is worn down by noise and eventually gives notice + moves out", () => {
-    const sim = Simulation.newGame(2, "modern"); // noise EVICTION is the Modern churn feature (Classic caps, never evicts)
+    const sim = newSeededGame(2, "modern"); // noise EVICTION is the Modern churn feature (Classic caps, never evicts)
     sim.money = 1e9;
     sim.star = 1; // 1★ → no random fire/bomb events, isolating the noise effect
     lay(sim, "lobby", 1);
@@ -447,7 +448,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D25b: removing the noisy office lets a condo on notice recover and stay", () => {
-    const sim = Simulation.newGame(2, "modern"); // noise recovery from the Modern erosion mechanic
+    const sim = newSeededGame(2, "modern"); // noise recovery from the Modern erosion mechanic
     sim.money = 1e9;
     sim.star = 1;
     lay(sim, "lobby", 1);
@@ -473,7 +474,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D25c: a sold condo is sticky; a transient noisy neighbor annoys but never evicts an owner", () => {
-    const sim = Simulation.newGame(2, "modern"); // sold-condo stickiness under the Modern noise erosion
+    const sim = newSeededGame(2, "modern"); // sold-condo stickiness under the Modern noise erosion
     sim.money = 1e9;
     sim.star = 1;
     lay(sim, "lobby", 1);
@@ -502,7 +503,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D10: buried treasure is capped per tower (no basement parking farm)", () => {
-    const sim = Simulation.newGame(42);
+    const sim = newSeededGame(42);
     sim.money = 1e9;
     sim.star = 3;
     for (let fl = 0; fl >= -3; fl--) for (let x = 0; x < W; x++) sim.tower.place("floor", fl, x);
@@ -513,7 +514,7 @@ describe("Deep-review regressions (must not come back)", () => {
   });
 
   it("D24: an unresolved event choice survives save/reload (no bomb save-scum)", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e9;
     sim.star = 4;
     lay(sim, "lobby", 1);
@@ -538,7 +539,7 @@ import { ECON } from "../../engine/econConfig";
 
 describe("Fine FAQ mechanics", () => {
   it("uncapped reachability: a trip needing 3+ rides routes, matching the 1994 original (#503)", () => {
-    const sim = Simulation.newGame(1);
+    const sim = newSeededGame(1);
     sim.money = 1e12;
     const x0 = C - 15;
     for (let x = x0; x < x0 + 30; x++) sim.tower.place("lobby", 1, x);
@@ -558,7 +559,7 @@ describe("Fine FAQ mechanics", () => {
     // Classic on purpose: this isolates the cinema BOOKING mechanic (which exists
     // in both modes) from the Modern-only operating overhead, so the assertion
     // reads the booking cost alone rather than folding in an unrelated sink.
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     // This test only exercises the recurring booking economy (no crowd/spatial
     // sim), so run the lighter v1 model (one step per tick instead of 24 hourly
     // sub-steps) which keeps a year-long loop well under the CI timeout.
@@ -585,7 +586,7 @@ describe("Fine FAQ mechanics", () => {
   });
 
   it("strict parking alignment: only ramp-chained spaces function", () => {
-    const sim = Simulation.newGame(4);
+    const sim = newSeededGame(4);
     sim.money = 1e12;
     const x0 = C - 20; // start inside the seeded centre lobby so the strip connects
     for (let x = x0; x < x0 + 140; x++) sim.tower.place("lobby", 1, x);
@@ -607,7 +608,7 @@ describe("Canon-numbers review regressions (must not come back)", () => {
   });
 
   it("M2: stacked parking with no ramp between floors does NOT connect", () => {
-    const sim = Simulation.newGame(4);
+    const sim = newSeededGame(4);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     lay(sim, "floor", 0);
@@ -622,7 +623,7 @@ describe("Canon-numbers review regressions (must not come back)", () => {
   });
 
   it("M3: blockbuster bookings survive save/reload", () => {
-    const sim = Simulation.newGame(3);
+    const sim = newSeededGame(3);
     sim.money = 1e12;
     sim.star = 1; // keep random events (fire) out of the way
     lay(sim, "lobby", 1);

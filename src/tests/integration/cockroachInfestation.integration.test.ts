@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { HK_MAIDS_PER_UNIT, HK_NOMINAL_ROOMS_PER_MAID, INFEST_DAYS } from "../../engine/economy/housekeeping";
@@ -16,7 +17,7 @@ const X0 = Math.floor(GRID.width / 2) - 20;
 /** A floor-2 tower with room to place hotel rooms + a housekeeping crew, served
  *  by a passenger elevator. Star 2 so hotels are unlocked. */
 function hotelTower(seed: number, mode: GameMode = "classic"): Simulation {
-  const sim = Simulation.newGame(seed, mode);
+  const sim = newSeededGame(seed, mode);
   sim.star = 2;
   for (let i = 0; i < 30; i++) {
     expect(sim.tower.place("floor", 2, X0 + i).ok, `place(floor, 2, ${X0 + i}) failed`).toBe(true);

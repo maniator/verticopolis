@@ -99,9 +99,20 @@ export interface OnboardStep {
   done: (sim: Simulation) => boolean;
 }
 
-/** The four steps: empty-ish lot (a ground lobby is pre-seeded) → first office
- *  earning rent. Advance on real game state, not scripted clicks. */
+/** The five steps: empty lot → first office earning rent. Modern pre-seeds a
+ *  ground lobby, so its towers satisfy step one instantly and start at step
+ *  two; Classic founds the 1994 empty lot and step one teaches the first lay.
+ *  Advance on real game state, not scripted clicks. */
 export const ONBOARD_STEPS: OnboardStep[] = [
+  {
+    id: "lobby",
+    title: "Open your lobby",
+    sub: "Every tower opens at street level. Lay a lobby strip on the ground line, anywhere you like.",
+    hintDesktop: "Pick Lobby in the palette, then click or drag along the ground line (the row above the dirt).",
+    hintMobile: "Tap Lobby, then tap or drag along the ground line.",
+    pulse: '.pal-item[data-kind="lobby"]',
+    done: (sim) => sim.tower.units.some((u) => u.kind === "lobby"),
+  },
   {
     id: "floor",
     title: "Add a floor",
