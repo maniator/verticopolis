@@ -374,6 +374,23 @@ html.reduce-motion *::after {
   display: none;
   pointer-events: auto;
 }
+/* The Modern build-refusal card anchors a row BELOW the invalid preview strip
+   (see panelAnchoring), but viewport clamping can still push it back over the
+   strip near the bottom edge. On hover devices the card goes slightly
+   translucent as insurance for that case: 0.85 keeps the gray face and navy
+   title fully legible while the red strip underneath still reads through.
+   Hover devices only, and only on the world-anchored tier: the two width
+   branches below are the exact complement of the docked mobile tier
+   ("max-width: 767px, or max-width: 1023px and max-height: 599px", the same
+   query GameApp.mobileMq uses), so a hover-capable browser narrowed into the
+   docked layout keeps the pinned card (dismissed via ✕) fully opaque. The
+   inspect-tool hover card carries no .preview-refuse, so it is untouched. */
+@media (hover: hover) and (pointer: fine) and (min-width: 768px) and (min-height: 600px),
+  (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  #inspector:has(.preview-refuse) {
+    opacity: 0.85;
+  }
+}
 
 /* ---- Toasts ---- */
 #toast-wrap {

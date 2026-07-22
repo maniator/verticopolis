@@ -75,6 +75,7 @@ function ptr(opts: {
   button?: ex.PointerButton;
   touch?: boolean;
   pointerId?: number;
+  shift?: boolean;
 }): unknown {
   const tile = opts.tile ?? 10;
   const floor = opts.floor ?? 5;
@@ -82,7 +83,7 @@ function ptr(opts: {
     button: opts.button ?? ex.PointerButton.Left,
     pointerType: opts.touch ? "Touch" : "Mouse",
     pointerId: opts.pointerId ?? 1,
-    nativeEvent: { pointerId: opts.pointerId ?? 1 },
+    nativeEvent: { pointerId: opts.pointerId ?? 1, shiftKey: opts.shift ?? false },
     worldPos: ex.vec(tile * TILE, -floor * FLOOR),
     screenPos: { x: opts.sx ?? 400, y: opts.sy ?? 300 },
   };
@@ -98,6 +99,22 @@ describe("wheel zoom", () => {
     handlers.wheel({ deltaY: 1, x: 400, y: 300 });
     expect(e.cam.zoom).toBeLessThan(z1);
   });
+
+  it("Shift+wheel (browser-remapped to deltaX) still zooms both directions", () => {
+    // Browsers move Shift+wheel motion into deltaX with deltaY 0. Shift is a
+    // sanctioned held pan key, so the handler must read the fallback axis
+    // instead of treating "deltaY not negative" as zoom-out on every notch.
+    const { e, handlers } = inputEng();
+    const z0 = e.cam.zoom;
+    handlers.wheel({ deltaY: 0, deltaX: -1, x: 400, y: 300 });
+    expect(e.cam.zoom).toBeGreaterThan(z0);
+    const z1 = e.cam.zoom;
+    handlers.wheel({ deltaY: 0, deltaX: 1, x: 400, y: 300 });
+    expect(e.cam.zoom).toBeLessThan(z1);
+    const z2 = e.cam.zoom;
+    handlers.wheel({ deltaY: 0, deltaX: 0, x: 400, y: 300 }); // dead event: no-op
+    expect(e.cam.zoom).toBe(z2);
+  });
 });
 
 describe("pointer down routing", () => {
@@ -106,6 +123,30 @@ describe("pointer down routing", () => {
     handlers.down(ptr({ tile: 12, floor: 7 }));
     expect(e.gesture).toBe("action");
     expect(e.onActionDown).toHaveBeenCalledWith(12, 7, false, null);
+  });
+
+  it("Shift at the press reaches classifyDown as the pan key (Shift+drag pans)", () => {
+    const classifyDown = vi.fn(() => "pan");
+    const { e, handlers } = inputEng({ classifyDown });
+    handlers.down(ptr({ shift: true }));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, true);
+    expect(e.gesture).toBe("pan");
+    expect(e.onActionDown).not.toHaveBeenCalled();
+  });
+
+  it("without Shift (and no Space) the pan key is false", () => {
+    const classifyDown = vi.fn(() => "action");
+    const { handlers } = inputEng({ classifyDown });
+    handlers.down(ptr({}));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, false);
+  });
+
+  it("held Space still reaches classifyDown as the pan key (unchanged by Shift support)", () => {
+    const classifyDown = vi.fn(() => "pan");
+    const { e, handlers } = inputEng({ classifyDown });
+    e.engine.input.keyboard.isHeld = () => true;
+    handlers.down(ptr({}));
+    expect(classifyDown).toHaveBeenCalledWith(0, false, true);
   });
 
   it("a right-click inspects under the cursor without starting a gesture", () => {
@@ -124,6 +165,19 @@ describe("pointer down routing", () => {
     handlers.down(ptr({ sx: 400, sy: 300 }));
     expect(e.arrowDrag).toEqual({ end: "up" });
     expect(e.gesture).toBeNull();
+  });
+
+  it("a held pan key skips the extend arrow: Shift+press on it pans, never resizes", () => {
+    // The modifier's promise is that the drag only pans; a shaft resize is a
+    // paid mutation, exactly what it exists to escape.
+    const { e, handlers } = inputEng({
+      onExtendTo: vi.fn(),
+      arrowHit: { up: { x: 380, y: 280, w: 40, h: 40 } },
+    });
+    handlers.down(ptr({ sx: 400, sy: 300, shift: true }));
+    expect(e.arrowDrag).toBeNull();
+    expect(e.gesture).toBe("pan");
+    expect(e.onExtendTo).not.toHaveBeenCalled();
   });
 
   it("a second finger forming a pinch cancels a live arrow drag and clears previews", () => {

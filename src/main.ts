@@ -295,6 +295,12 @@ class GameApp implements GameAppPorts {
     clearBuildRefusal(this);
   }
 
+  /** Port for the inspector ✕ path (see GameAppPorts.clearBuildRefusal); the
+   *  body is the same free function tool switches call directly above. */
+  clearBuildRefusal(): void {
+    clearBuildRefusal(this);
+  }
+
   // Audio / accessibility / prefs commands, bodies in game/audioPrefs.ts.
   toggleMute(): boolean { return toggleMute(this); }
   setVolume(kind: "music" | "ambience" | "sfx", value: number): void { setVolume(this, kind, value); }

@@ -42,6 +42,7 @@ function makePorts() {
     isSteadyClock: vi.fn(() => true),
     replayOnboarding: vi.fn(),
     renameTower: vi.fn(),
+    clearBuildRefusal: vi.fn(),
     showStats: vi.fn(),
     showSaves: vi.fn(),
     saveToSlot: vi.fn(),
@@ -151,6 +152,10 @@ describe("createUICallbacks delegates every callback to its port", () => {
     expect(ports.showStats).toHaveBeenCalledTimes(1);
     cb.onInspectorClose();
     expect(ports.inspector.dismiss).toHaveBeenCalledTimes(1);
+    // The ✕ may be closing the build-refusal card, whose ownership latch is
+    // GameApp state the InspectorController never touches: a leaked latch
+    // would offset the next inspect card's anchor one floor down.
+    expect(ports.clearBuildRefusal).toHaveBeenCalledTimes(1);
   });
 
   it("save slots: show, save, load (incl. auto), delete", () => {

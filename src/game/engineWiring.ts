@@ -24,8 +24,9 @@ export function wireEngine(app: GameApp): void {
   // paint tool (floor/lobby/parking) owns the one-finger drag so mobile can
   // paint a run; panning is via the inspect tool or a two-finger drag (which
   // also zooms). Before this, a floor/lobby/parking drag only ever panned on
-  // touch, so mobile couldn't paint a run at all.
-  app.engine.classifyDown = (button, touch, space) => classifyGesture(app.tool, button, touch, space);
+  // touch, so mobile couldn't paint a run at all. On mouse the pan key
+  // (Space or Shift, resolved in towerInputCamera) pans with any tool armed.
+  app.engine.classifyDown = (button, touch, panKey) => classifyGesture(app.tool, button, touch, panKey);
 
   // A press-without-drag: select (inspect) or, on touch, run the tool. The
   // picked entity resolves transports by collider hit-test and units by the

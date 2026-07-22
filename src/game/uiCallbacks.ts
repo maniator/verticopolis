@@ -47,6 +47,12 @@ export interface GameAppPorts {
   isSteadyClock(): boolean;
   replayOnboarding(): void;
   renameTower(name: string): void;
+  /** Drop the Modern build-refusal card and its ownership latch (no-op when
+   *  the build path doesn't own the card). The inspector ✕ routes through
+   *  this before the dismissal latch: the refusal card shares the inspector
+   *  DOM, and a leaked latch would silently offset a later card's anchor
+   *  (panelAnchoring reads it as the caption-below signal). */
+  clearBuildRefusal(): void;
   showStats(): void;
   showSaves(): void;
   saveToSlot(slot: number): void;
@@ -95,8 +101,14 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onShowStats: () => app.showStats(),
     onSetOverlay: (mode) => app.setOverlay(mode),
     // dismiss() latches the ✕ so the next hover pick over the same facility
-    // does not instantly re-open the card the player just closed.
-    onInspectorClose: () => app.inspector.dismiss(),
+    // does not instantly re-open the card the player just closed. The ✕ may
+    // instead be closing the build-refusal card (the build path borrows the
+    // same DOM surface), so drop that ownership latch first; it is a no-op
+    // when the inspect tool owns the card.
+    onInspectorClose: () => {
+      app.clearBuildRefusal();
+      app.inspector.dismiss();
+    },
     onShowSaves: () => app.showSaves(),
     onSaveSlot: (slot) => app.saveToSlot(slot),
     onLoadSlot: (slot) => app.loadFromSlot(slot),

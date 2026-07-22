@@ -96,7 +96,12 @@ export function bindInput(engine: TowerEngine): void {
   ptr.on("cancel", (ev) => pointerUp(engine, ev as ex.PointerEvent));
   ptr.on("wheel", (ev) => {
     const w = ev as ex.WheelEvent;
-    zoomAt(engine, w.deltaY < 0 ? 1.12 : 0.89, w.x, w.y);
+    // Browsers remap Shift+wheel to horizontal scroll (deltaY 0, motion in
+    // deltaX). Shift is a sanctioned pan key now, so fall back to deltaX and
+    // drop dead events instead of reading deltaY 0 as zoom-out every notch.
+    const d = w.deltaY !== 0 ? w.deltaY : w.deltaX;
+    if (d === 0) return;
+    zoomAt(engine, d < 0 ? 1.12 : 0.89, w.x, w.y);
   });
 }
 
@@ -150,9 +155,15 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   engine.moved = 0;
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  const space = engine.engine.input.keyboard.isHeld(ex.Keys.Space);
-  // Left-click on a selected elevator's extend arrow grows the shaft.
-  if (buttonNum(ev) === 0 && engine.onExtendTo) {
+  // Pan key: Space (Excalibur keyboard) or Shift, read off the native pointer
+  // event (the press itself carries the modifier, surviving focus quirks).
+  // Down-only read, matching Space: releasing mid-drag keeps the pan.
+  const native = ev.nativeEvent as { shiftKey?: boolean } | undefined;
+  const panKey = engine.engine.input.keyboard.isHeld(ex.Keys.Space) || native?.shiftKey === true;
+  // Left-click on a selected elevator's extend arrow grows the shaft. A held
+  // pan key skips the arrow: the modifier promises the drag only pans, and a
+  // shaft resize is exactly the paid mutation it exists to escape.
+  if (buttonNum(ev) === 0 && !panKey && engine.onExtendTo) {
     const ps = ev.screenPos;
     const inRect = (r?: ScreenRect) =>
       !!r && ps.x >= r.x && ps.x <= r.x + r.w && ps.y >= r.y && ps.y <= r.y + r.h;
@@ -172,7 +183,7 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     engine.gesture = null;
     return;
   }
-  engine.gesture = engine.classifyDown ? engine.classifyDown(buttonNum(ev), touch, space) : "pan";
+  engine.gesture = engine.classifyDown ? engine.classifyDown(buttonNum(ev), touch, panKey) : "pan";
   if (engine.gesture === "action") {
     const { tile, floor } = tf(ev);
     engine.onActionDown?.(tile, floor, touch, pickEntityAt(engine, ev.worldPos));

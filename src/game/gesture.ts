@@ -29,15 +29,18 @@ export function isPaintKind(kind: FacilityKind): boolean {
  *
  * On touch, one finger pans EXCEPT for gestures that OWN the drag: drag-sized
  * transports (elevators) size with it, and paint tools (floor/lobby/parking) lay
- * a run with it. On mouse, everything but inspect acts (pan is space/right-button).
+ * a run with it. On mouse, everything but inspect acts; pan is a non-left button
+ * or a held pan key (Space or Shift). The pan key deliberately beats BOTH
+ * drag-owning gestures: it is the escape hatch that lets a mouse pan while a
+ * paint tool or drag-sized shaft is armed.
  */
 export function classifyGesture(
   tool: Tool,
   button: number,
   touch: boolean,
-  space: boolean,
+  panKey: boolean,
 ): "pan" | "action" {
-  if (button > 0 || space) return "pan"; // middle/right button or held space
+  if (button > 0 || panKey) return "pan"; // middle/right button or held Space/Shift
   if (tool.type === "inspect") return "pan"; // inspect: drag pans, tap selects
   // Narrow to the build variant IN the condition so `tool.kind` is unambiguously
   // in scope (a `const build = tool.type === "build"` alias only narrows under TS's
