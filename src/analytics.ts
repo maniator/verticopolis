@@ -92,6 +92,15 @@ interface GameplayEvents {
    *  is 1 and basements run 0 down to -9, so a basement-heavy session reports a
    *  low or negative peak. Emitted once per session. */
   session_peak_floors: { floors: number };
+  /** Render frame-rate for the session, sampled off the frame loop and emitted
+   *  once per session as a per-session summary (not histogram-bucketed, unlike
+   *  the old Vercel report): `p50` is the median frame's fps, `low` the
+   *  5th-percentile fps (the worst frames, the hitch signal), and `samples` how
+   *  many foreground frames fed the estimate. The two fps numbers are computed
+   *  over a bounded per-session reservoir, so they are session ESTIMATES; PostHog
+   *  computes the exact CROSS-session fps percentiles from them (issue #538).
+   *  Emitted once per session, above a minimum sample count. */
+  session_fps: { p50: number; low: number; samples: number };
 }
 
 /**
@@ -125,6 +134,23 @@ function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEven
   }
 }
 
+/** Fixed cap on the per-session fps sample reservoir: bounded memory no matter
+ *  how long a session runs, large enough for a stable p50/p5. */
+const FPS_RESERVOIR = 256;
+/** Minimum foreground frames before `session_fps` is worth emitting (about two
+ *  seconds at 60fps), so a blink-and-leave visit does not report a meaningless
+ *  percentile. */
+const FPS_MIN_SAMPLES = 120;
+/** Longest wall-clock gap still treated as one rendered frame (1 second = 1fps).
+ *  A gap longer than this is not a slow frame but a loop interruption that did
+ *  not route through hide/resume: an in-place WebGL context-loss recovery
+ *  (`rebuildEngine`) restarts the render loop while this same page-lifetime
+ *  session stays active, so its first frame back would otherwise charge the whole
+ *  outage as one sub-1fps sample straight into the worst-frame `low` tail (the
+ *  Pixel 8a recovery is exactly #538's scenario). Such a gap re-anchors and is
+ *  dropped instead. Realistic device jank down to 1fps is still captured. */
+const FPS_MAX_FRAME_MS = 1000;
+
 /**
  * Per-tab session bookkeeping for the funnel and engagement events. One instance
  * (the exported {@link gameplaySession}) lives for the page's lifetime: the game
@@ -153,6 +179,19 @@ class GameplaySession {
   private peakFloors = Number.NEGATIVE_INFINITY;
   /** Depth events fire at most once per session (see `end`). */
   private depthReported = false;
+  /** Foreground per-frame fps samples (wall-clock 1000/frameMs), reservoir-sampled
+   *  to a fixed cap so a long session's memory stays bounded; sorted at session
+   *  end for the `session_fps` percentiles. */
+  private readonly fpsSamples: number[] = [];
+  /** Foreground frames offered to the reservoir this session: drives the
+   *  reservoir replacement probability and the minimum-samples gate. */
+  private fpsSeen = 0;
+  /** `session_fps` fires at most once per session (like the depth events). */
+  private fpsReported = false;
+  /** Timestamp of the previous sampled frame, for the wall-clock frame delta;
+   *  null between segments so the first frame after a resume re-anchors instead
+   *  of charging the whole background gap as one slow frame. */
+  private lastFrameAt: number | null = null;
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -160,6 +199,10 @@ class GameplaySession {
   begin(): void {
     if (this.resumedAt !== null) return;
     this.resumedAt = Date.now();
+    // Re-anchor the fps sampler: the first frame of this segment establishes the
+    // baseline, so the wall-clock gap the tab spent hidden is never sampled as
+    // one enormous slow frame.
+    this.lastFrameAt = null;
   }
 
   /** A new tower was founded: the funnel's entry point. Re-opens the
@@ -219,6 +262,45 @@ class GameplaySession {
     trackEvent("update", { from, to });
   }
 
+  /** Sample this frame's rendered frame-rate for the `session_fps` signal, called
+   *  every frame from the frame loop. It measures the REAL wall-clock gap between
+   *  frames with its own `performance.now()` read rather than the engine's frame
+   *  delta: the engine clock clamps any frame longer than 200ms down to 1ms as a
+   *  sim spike-guard (Excalibur `Clock.update`), so a genuine hitch (the whole
+   *  point of #538) would reach us as ~1000fps at the GOOD end of the distribution
+   *  and blind the worst-frame `low` signal. The wall-clock gap keeps the hitch.
+   *  Foreground-only (samples only while a visible segment is running, keyed off
+   *  the same `resumedAt` the session clock uses), so background-tab throttling
+   *  can't masquerade as bad performance; the anchor is reset on each resume
+   *  (`begin`) so a background gap is not sampled. Reservoir sampling (Algorithm R)
+   *  keeps a uniform sample of the whole session in bounded memory, so an early
+   *  hitch is as likely to be captured as a late one, unlike a last-N ring. */
+  noteFrame(): void {
+    if (this.resumedAt === null) return; // foreground segments only
+    const now = globalThis.performance ? performance.now() : Date.now();
+    const prev = this.lastFrameAt;
+    this.lastFrameAt = now;
+    if (prev === null) return; // first frame of the segment: just set the anchor
+    const dtMs = now - prev;
+    // Drop a delta that is not a plausible single rendered frame: <= 0 (a clock
+    // anomaly) or longer than a second (a loop interruption that skipped the
+    // hide/resume re-anchor, e.g. an in-place graphics-recovery rebuild). Because
+    // `lastFrameAt` was already advanced to `now` above, returning here re-anchors
+    // the sampler, so the gap is dropped rather than banked as a sub-1fps sample.
+    if (!Number.isFinite(dtMs) || dtMs <= 0 || dtMs > FPS_MAX_FRAME_MS) return;
+    // Cap the fast end so a sub-millisecond delta (a doubled callback, a very
+    // high refresh display) can't inject an implausible spike; the slow end, the
+    // hitch this metric exists to catch, is left untouched.
+    const fps = Math.min(1000, 1000 / dtMs);
+    this.fpsSeen++;
+    if (this.fpsSamples.length < FPS_RESERVOIR) {
+      this.fpsSamples.push(fps);
+      return;
+    }
+    const j = Math.floor(Math.random() * this.fpsSeen);
+    if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
+  }
+
   /** Bank the current foreground segment and report cumulative play seconds.
    *  Called when the tab is hidden or the page unloads. The clock re-arms on the
    *  next `begin` (tab visible again), so tabbing away and back keeps ONE growing
@@ -247,6 +329,20 @@ class GameplaySession {
       trackEvent("session_peak_floors", { floors: this.peakFloors });
       for (const [tool, uses] of this.toolUses) trackEvent("tool_session_uses", { tool, uses });
     }
+    // Per-session frame-rate summary, emitted once per session above a minimum
+    // sample count. Latched on its own flag (independent of the build depth
+    // above) so a build-free but long session still reports its fps. `low` is the
+    // 5th-percentile fps: sorted ascending, the low tail IS the worst frames, the
+    // hitch signal. The percentiles are computed over the bounded reservoir (so
+    // they are session estimates, not exact), while `samples` is the true
+    // foreground frame count behind them. Rounded to whole fps; PostHog does the
+    // exact cross-session percentiles.
+    if (this.fpsSeen >= FPS_MIN_SAMPLES && !this.fpsReported) {
+      this.fpsReported = true;
+      const sorted = [...this.fpsSamples].sort((a, b) => a - b);
+      const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
+      trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
+    }
     const seconds = Math.round(this.activeMs / 1000);
     if (seconds === this.lastReportedSec) return;
     this.lastReportedSec = seconds;
@@ -273,6 +369,10 @@ class GameplaySession {
     this.builds = 0;
     this.peakFloors = Number.NEGATIVE_INFINITY;
     this.depthReported = false;
+    this.fpsSamples.length = 0;
+    this.fpsSeen = 0;
+    this.fpsReported = false;
+    this.lastFrameAt = null;
     this.toolsSeen.clear();
     this.toolUses.clear();
     commonProps = {};

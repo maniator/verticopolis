@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { GameApp } from "../main";
 import { SPEEDS, runFrame, emitMealRushes } from "./frameLoop";
 import { decideMealRush } from "./mealRush";
+import { gameplaySession } from "../analytics";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -101,6 +102,19 @@ describe("runFrame freeze path", () => {
     runFrame(app, 1000);
     expect(raw.accMinutes).toBe(0);
     expect(sim.tick).not.toHaveBeenCalled();
+  });
+
+  it("still samples the frame for session_fps before the freeze returns early", () => {
+    // noteFrame is a render metric, so it must run on every frame INCLUDING the
+    // ones a modal freeze bails out on. This guards the call-ordering: a refactor
+    // moving the noteFrame call below the freeze return would silently drop fps
+    // sampling whenever a modal is open.
+    const spy = vi.spyOn(gameplaySession, "noteFrame").mockImplementation(() => {});
+    const { app, sim } = makeApp({ shownChoice: true, accMinutes: 12 });
+    runFrame(app, 1000);
+    expect(spy).toHaveBeenCalledTimes(1); // sampled despite the frozen frame
+    expect(sim.tick).not.toHaveBeenCalled(); // and the freeze still held
+    spy.mockRestore();
   });
 });
 
