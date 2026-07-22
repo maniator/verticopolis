@@ -32,13 +32,19 @@ function fail(msg: string): never {
   process.exit(1);
 }
 
-const sw = readFileSync(SW, "utf8");
+let sw: string;
+try {
+  sw = readFileSync(SW, "utf8");
+} catch (e) {
+  fail(`could not read ${SW} (run the build first): ${e instanceof Error ? e.message : String(e)}`);
+}
 const start = sw.indexOf("precacheAndRoute(");
 if (start === -1) fail("no precacheAndRoute call found in dist/sw.js; did the workbox output format change?");
 
 // Bracket-match the manifest array so URLs elsewhere in the worker (routing
 // regexes, cache names) can never leak into the count.
 const open = sw.indexOf("[", start);
+if (open === -1) fail("no manifest array follows the precacheAndRoute call in dist/sw.js");
 let depth = 0;
 let end = -1;
 for (let i = open; i < sw.length; i++) {
@@ -48,7 +54,7 @@ for (let i = open; i < sw.length; i++) {
     break;
   }
 }
-if (open === -1 || end === -1) fail("could not bracket-match the precache manifest array in dist/sw.js");
+if (end === -1) fail("could not bracket-match the precache manifest array in dist/sw.js");
 const manifest = sw.slice(open, end + 1);
 
 // generateSW emits entries as {url:"...",revision:"..."} (unquoted keys in the
