@@ -11,6 +11,8 @@ import { inject as injectWebAnalytics } from "@vercel/analytics";
 // send path would throw into the best-effort catch and silently drop the event.
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
+// Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
+vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 
 /** Make hasWebGL() see a real GL context (happy-dom canvas returns null). */
 function stubWebGL(): void {
