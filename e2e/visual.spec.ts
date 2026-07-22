@@ -16,10 +16,11 @@ import { buildToStar } from "./helpers";
  * on CI failure the actual/diff images land in test-results/ (uploaded as
  * the playwright-visual-diffs artifact).
  *
- * Determinism: the gallery pins performance.now before load (same trick as
- * scripts/screenshots.mjs) so canvas animation frames bake at one instant.
- * The dialog shots capture opaque DOM windows — no canvas bleed-through —
- * over a paused game (buildToStar sets speed 0) with the clock pinned.
+ * Determinism: the dialog shots capture opaque DOM windows (no canvas
+ * bleed-through) over a paused game (buildToStar sets speed 0) with the clock
+ * pinned, and the tower-scene shots step the sim to a fixed state. (The sprite
+ * gallery is no longer shot here: the drift-gate already pins gallery.html as
+ * docs/screenshots/06-sprite-gallery.png, so a second baseline was redundant.)
  */
 
 // The sprite gallery (gallery.html) is a pure canvas of every facility, and the
