@@ -219,6 +219,22 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       // wall-waits regardless of the draw flag; passing true is harmless and
       // keeps one code path for route settles.
       await settle(page, 800, true);
+    } else if (scene.expectBootFallback) {
+      // A staged boot failure: `window.game` never appears and there is no
+      // engine clock to adopt or splash to dismiss; the ready signal is the
+      // fallback overlay itself. A missing overlay means the failure did not
+      // stage (or the fallback regressed to invisible, the bug class the scene
+      // exists to pin), so skip the shots rather than capture a broken frame.
+      try {
+        await page.waitForSelector("#boot-fallback", { timeout: READY_TIMEOUT_MS });
+      } catch {
+        for (const shot of scene.shots) {
+          failures.push(`${scene.id}/${shot.name}: boot fallback never appeared, skipped (no new image written)`);
+          console.error(`  ✗ ${shot.name}: boot fallback never appeared, skipped`);
+        }
+        return;
+      }
+      await settle(page, 800, true);
     } else {
       await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
       // From here on, frames advance only when settle()/pgStep drives them:

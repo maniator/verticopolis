@@ -14,6 +14,7 @@
  *   - scenes/schedule.ts: the elevator Schedule dialog scenes (#305 Phase 3).
  *   - scenes/classic-vs-modern.ts: the CAP-8 paired escalator-on-office stills.
  *   - scenes/milestones.ts: the star-rank growth set + the TOWER capstone.
+ *   - scenes/boot-fallback.ts: the no-WebGL boot screen (staged boot failure).
  * The Node-side drivers (fixture load, star assertions) live in
  * screenshot-scenes-drivers.ts. Keep every file ERASABLE.
  */
@@ -24,6 +25,7 @@ import { PRICING_SCENES } from "./scenes/pricing.ts";
 import { SCHEDULE_SCENES } from "./scenes/schedule.ts";
 import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
 import { MILESTONE_SCENES } from "./scenes/milestones.ts";
+import { BOOT_FALLBACK_SCENES } from "./scenes/boot-fallback.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -32,4 +34,5 @@ export const SCENES: Scene[] = [
   ...SCHEDULE_SCENES,
   ...CLASSIC_VS_MODERN_SCENES,
   ...MILESTONE_SCENES,
+  ...BOOT_FALLBACK_SCENES,
 ];
