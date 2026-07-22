@@ -38,12 +38,38 @@ produce it, both in the image pinned to the **exact Playwright version locked in
   head commit message and push.
 
 The bot commits the refreshed images on the same branch; review that commit's
-image diff like code. Because the bot pushes with `GITHUB_TOKEN`, that commit
-fires no workflow run of its own. For the visual baselines that just means the
-commit carries no CI run. For the docs gallery it also means the required
-`drift-gate` check does not re-run on the new head by itself, so re-trigger CI on
-that commit for the gate to re-evaluate the refreshed gallery and go green before
-merge.
+image diff like code.
+
+The docs-gallery push (`commit-on-approval` in `pr-drift-check.yml`) uses the
+`SCREENSHOT_COMMIT_TOKEN` secret when it is set, so the commit fires
+`pull_request: synchronize` and the required checks (Test CI, `drift-gate`, e2e)
+re-run on the refreshed head and clear the gate automatically. Without that
+secret it falls back to `GITHUB_TOKEN`, whose push fires no workflow run of its
+own (GitHub's recursion guard), so the required `drift-gate` check does not
+re-run on the new head by itself and a maintainer must re-trigger CI on that
+commit for the gate to re-evaluate the refreshed gallery and go green before
+merge. (The `update-visual-baselines.yml` baselines always push with
+`GITHUB_TOKEN`, so that commit simply carries no CI run.)
+
+#### Enabling the automatic re-trigger (`SCREENSHOT_COMMIT_TOKEN`)
+
+To make the approved gallery commit clear the required checks without a manual
+re-trigger, add a repository secret named `SCREENSHOT_COMMIT_TOKEN`:
+
+1. Create a **fine-grained personal access token** (GitHub -> Settings ->
+   Developer settings -> Fine-grained tokens) scoped to **only this repository**,
+   with the **Contents** permission set to **Read and write**. No other
+   permission is needed.
+2. Add it to the repo at **Settings -> Secrets and variables -> Actions -> New
+   repository secret**, named exactly `SCREENSHOT_COMMIT_TOKEN`.
+
+When the secret is present, `commit-on-approval` pushes with it and the required
+checks re-run automatically. When it is absent, the job still works via the
+`GITHUB_TOKEN` fallback; it just needs the manual CI re-trigger described above.
+As an alternative to a PAT, a GitHub App installation token
+(`actions/create-github-app-token`) with `contents: write` can supply the same
+value; the workflow only cares that the push is not attributed to
+`GITHUB_TOKEN`.
 
 ### `npm run screenshots` (local preview only)
 
