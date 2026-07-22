@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { createHash } from "node:crypto";
 import { Simulation } from "../../engine/Simulation";
 import type { FacilityKind, GameMode } from "../../engine/types";
+import { ensureStarterLobby } from "../fixtures/towerFixtures";
 
 /**
  * Golden-master determinism net for the large-file split refactor.
@@ -54,6 +55,13 @@ const BUILD_SCRIPT: { kind: FacilityKind; floor: number; x: number }[] = [
 
 function buildFixedTower(sim: Simulation): void {
   sim.money = 500_000_000;
+  // The scenario stands on the centered 40-tile ground lobby. Ensure it
+  // rather than read it from the founding seed: while newGame still seeds it
+  // this is a pure assertion (neither pinned hash moves, the proof the
+  // fixture decoupling is behavior-free); once Classic founds canon-zero
+  // (spec-starter-lobby-mode-split), the Classic fixture lays it here and
+  // only the Classic hash re-pins.
+  ensureStarterLobby(sim);
   for (const step of BUILD_SCRIPT) {
     const res = sim.build(step.kind, step.floor, step.x);
     expect(res.ok, `build ${step.kind} @ f${step.floor} x${step.x}: ${res.reason ?? ""}`).toBe(true);

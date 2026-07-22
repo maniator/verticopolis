@@ -44,3 +44,13 @@ export function placeUnit(sim: Simulation, kind: Parameters<Simulation["tower"][
   if (!u) throw new Error(`place ${kind} at ${floor},${x}: unit ${r.unitId} not found`);
   return u;
 }
+
+/** Ensure the centered 40-tile ground lobby a Modern founding seeds: assert
+ *  it present, or lay it tile by tile on a Classic empty lot. While every
+ *  mode still seeds it, this is a pure assertion, which is the decoupling
+ *  proof for spec-starter-lobby-mode-split: a fixture that ensures its own
+ *  lobby moves no golden-master hash until founding itself changes. */
+export function ensureStarterLobby(sim: Simulation): void {
+  const startX = MID - 20;
+  for (let x = startX; x < startX + 40; x++) layTile(sim, "lobby", 1, x);
+}
