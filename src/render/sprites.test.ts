@@ -71,6 +71,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["hotel suite", { kind: "hotelSuite" }],
     ["fast food", { kind: "fastFood" }],
     ["restaurant", { kind: "restaurant" }],
+    ["food hall", { kind: "foodHall" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],

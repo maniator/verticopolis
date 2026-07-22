@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { FACILITIES, GRID } from "./engine/facilities";
-import { FASTFOOD_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
+import { FASTFOOD_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
@@ -137,6 +137,8 @@ const ENTRIES: Entry[] = [
   ...retailEntries("fastFood", FASTFOOD_SUBTYPES),
   roomEntry("Restaurant (generic)", "restaurant"),
   ...retailEntries("restaurant", RESTAURANT_SUBTYPES),
+  roomEntry("Food Hall (Modern)", "foodHall"),
+  ...retailEntries("foodHall", FOODHALL_SUBTYPES),
   roomEntry("Retail Shop (generic)", "shop"),
   ...retailEntries("shop", SHOP_SUBTYPES),
   roomEntry("Cinema (playing)", "cinema"),

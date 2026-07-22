@@ -17,7 +17,11 @@ import type { FacilityKind, WeatherKind } from "../types";
 export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } {
   if (!isFacilityKind(kind)) return { ok: false, reason: "Unknown facility.", cost: 0 };
   const f = FACILITIES[kind];
-  if (!sim.isUnlocked(kind)) return { ok: false, reason: `${f.name} unlocks at ${f.minStar}★.`, cost: f.cost };
+  if (!sim.isUnlocked(kind)) {
+    // A Modern-only kind refused in Classic is not a star gate; say why honestly.
+    const reason = f.modernOnly && sim.mode !== "modern" ? `${f.name} is a Modern-only facility.` : `${f.name} unlocks at ${f.minStar}★.`;
+    return { ok: false, reason, cost: f.cost };
+  }
 
   if (!sim.isRoomKind(kind)) {
     // Manual structure (Modern option): no auto-bridge. A structural tile that
