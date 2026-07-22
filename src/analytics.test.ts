@@ -2,10 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { track } from "@vercel/analytics";
 import { gameplaySession, startGameplaySession } from "./analytics";
 
-// The custom-event channel is host-gated and best-effort; stub `track` so the
-// gate, the dedup, and the never-throw guarantee can be asserted without
-// touching the real Vercel endpoint.
-vi.mock("@vercel/analytics", () => ({ track: vi.fn() }));
+// The custom-event channel is host-gated and best-effort; stub the whole vendor
+// surface so the gate, the dedup, and the never-throw guarantee can be asserted
+// without touching the real Vercel endpoints. The adapter imports both vendor
+// symbols (`track` and `inject`) plus Speed Insights from one module, so every
+// telemetry test mocks all of them: a partial mock would leave the sibling
+// symbol `undefined`, and a later test driving that path would throw into the
+// best-effort catch and silently drop the event.
+vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
+vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 
 const prod = "https://verticopolis.com/";
 const localhost = "http://localhost:3000/";

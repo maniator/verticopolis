@@ -1,12 +1,12 @@
-import { injectSpeedInsights } from "@vercel/speed-insights";
-import { inject as injectWebAnalytics } from "@vercel/analytics";
+import { analyticsAdapter } from "./analyticsAdapter";
 
 /**
- * Vercel Speed Insights + Web Analytics inject, shared by every deployed page:
- * the game boot (`bootstrap.ts`), the sprite gallery (`gallery.ts`), and the
- * standalone `/help` page (`helpPage.ts`). It reports Core Web Vitals and page
- * views, but only where the Vercel endpoints (`/_vercel/speed-insights/*` and
- * `/_vercel/insights/*`) actually exist: the production domain and Vercel
+ * Shared page-view + Core Web Vitals inject for every deployed page: the game
+ * boot (`bootstrap.ts`), the sprite gallery (`gallery.ts`), and the standalone
+ * `/help` page (`helpPage.ts`). It reports Core Web Vitals and page views
+ * through the one analytics adapter (today Vercel Speed Insights + Web
+ * Analytics), but only where the Vercel endpoints (`/_vercel/speed-insights/*`
+ * and `/_vercel/insights/*`) actually exist: the production domain and Vercel
  * preview deployments.
  *
  * Gating on the host keeps the injected scripts' 404s (and the console errors
@@ -44,8 +44,7 @@ export function telemetryHostAllowed(): boolean {
 export function injectVercelTelemetry(): void {
   if (!telemetryHostAllowed()) return;
   try {
-    injectSpeedInsights();
-    injectWebAnalytics();
+    analyticsAdapter().injectPageTelemetry();
   } catch {
     /* best-effort telemetry; never block the caller on it */
   }
