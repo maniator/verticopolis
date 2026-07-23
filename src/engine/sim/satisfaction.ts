@@ -103,9 +103,17 @@ export function updateSatisfaction(sim: Simulation): void {
   // Pure (no RNG). Classic holds no nightclub, so this stays empty and the
   // penalty seam returns 0, leaving Classic satisfaction byte-identical.
   const nightclubFloors: number[] = [];
+  // Modern-only Spa serenity halo (POSITIVE, hotels): the floors of every
+  // operational spa, so a nearby hotel room can read its distance to the closest.
+  // Gated on `isOperational` (a built, operating spa is the wellness amenity, like
+  // the nightclub's building-level effect but positive), not `isTenanted` like the
+  // fitness lease. Pure (no RNG). Classic holds no spa, so this stays empty and the
+  // bonus seam returns 0, leaving Classic satisfaction byte-identical.
+  const spaFloors: number[] = [];
   for (const c of sim.tower.units) {
     if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
     else if (c.kind === "nightclub" && isOperational(c) && servedSet.has(c.floor)) nightclubFloors.push(c.floor);
+    else if (c.kind === "spa" && isOperational(c) && servedSet.has(c.floor)) spaFloors.push(c.floor);
   }
   // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
   // income loop) rather than through the hour-memoized accessor, so an occupancy
@@ -176,6 +184,20 @@ export function updateSatisfaction(sim: Simulation): void {
       }
       const penalty = sim.rules.nightclubNoisePenalty(nearest);
       if (penalty > 0) u.satisfaction = Math.max(0, u.satisfaction - penalty);
+    }
+    // Modern Spa serenity halo (the positive mirror for hotels): a served hotel
+    // room near an operational Spa rests a little easier. Only the NEAREST spa
+    // counts (no compounding), capped and distance-decayed by the rule-set (0 in
+    // Classic, so Classic is untouched). Applied on top of served recovery,
+    // clamped to 1.
+    if (isHotelKind(u.kind) && served && spaFloors.length > 0) {
+      let nearest = Infinity;
+      for (const sf of spaFloors) {
+        const d = Math.abs(sf - u.floor);
+        if (d < nearest) nearest = d;
+      }
+      const bonus = sim.rules.spaSerenityBonus(nearest);
+      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
     }
     // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
     // away"): a served room is worn down in two phases, an immediate annoyance

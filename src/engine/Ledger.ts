@@ -55,6 +55,7 @@ export function ledgerCatFor(kind: FacilityKind): LedgerCat | null {
     case "amusements":
     case "fitnessClub":
     case "nightclub":
+    case "spa":
       return "entertainment";
     default:
       return null;

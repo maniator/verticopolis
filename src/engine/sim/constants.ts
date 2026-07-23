@@ -143,6 +143,15 @@ export const FITNESS_HALO_MAX = 0.03;
 export const NIGHTCLUB_NOISE_FLOORS = 4;
 export const NIGHTCLUB_NOISE_MAX = 0.08;
 
+/** Modern-only Spa serenity halo (gdd-modern-expansion): the positive mirror of
+ *  the fitness halo, but for HOTEL guests. A hotel room within `SPA_SERENITY_FLOORS`
+ *  floors of an operational Spa gets a small per-hour satisfaction bonus,
+ *  `SPA_SERENITY_MAX` on the spa's own floor and fading linearly to 0 at the edge
+ *  of the range. Deliberately below `SERVED_RECOVERY` (a garnish on recovery, not
+ *  a substitute), and only the nearest spa counts, so spa spam can't compound. */
+export const SPA_SERENITY_FLOORS = 5;
+export const SPA_SERENITY_MAX = 0.03;
+
 /**
  * Unmet local-demand thresholds (leave-tower-unmet-demand, #395). A tenant's
  * retail demand-coverage sits in [0, 1] (1 = the reachable shops and eateries

@@ -107,6 +107,7 @@ describe("helpTemplate structure and a11y", () => {
     lobbyDistanceDrain: null, // subtle band-vs-continuous shape of the lobby-distance pressure
     fitnessHaloBonus: null, // Modern amenity halo; a subtle satisfaction nudge, no dedicated Help copy
     nightclubNoisePenalty: null, // Modern nightclub negative halo; covered by the "new places" copy, no dedicated seam line
+    spaSerenityBonus: null, // Modern spa positive halo for hotels; covered by the "new places" copy, no dedicated seam line
   };
 
   it("classifies every MODERN_RULES member for Help copy (test-path backstop only)", () => {
