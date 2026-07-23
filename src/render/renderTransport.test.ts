@@ -60,6 +60,10 @@ function transport(kind: Transport["kind"], bottom: number, top: number): Transp
 describe("transport sprite geometry", () => {
   const TOP_Y = 100;
   const FLOOR_H = 34;
+  /** The handrail rises past the arrival deck by railH (9) minus the 2px yTop
+   *  inset, as in the original where a flight breaks the floor line it lands on.
+   *  Band assertions allow for it; the flight body still stays in its own band. */
+  const RAIL_OVERHANG = 7;
 
   it("a two-floor stairway draws exactly one flight, in the bottom band", () => {
     const { ctx, rects } = recordingCtx();
@@ -67,16 +71,18 @@ describe("transport sprite geometry", () => {
     expect(rects.length).toBeGreaterThan(0); // treads were drawn
     // Every tread sits in the BOTTOM band: the top band is the arrival
     // landing. Two stacked flights would put treads above this line.
-    expect(rects.every((r) => r.y >= TOP_Y + FLOOR_H)).toBe(true);
-  });
+    expect(rects.every((r) => r.y >= TOP_Y + FLOOR_H - RAIL_OVERHANG)).toBe(true);  });
 
   it("a tall stairway draws one flight per floor PAIR (span flights, not span+1)", () => {
     const { ctx, rects } = recordingCtx();
     drawTransport(ctx, transport("stairs", 1, 4), 0, TOP_Y, 40, FLOOR_H);
-    // Group treads by the band they were drawn in.
-    const bands = new Set(rects.map((r) => Math.floor((r.y - TOP_Y) / FLOOR_H)));
+    // Group by band, ignoring the handrail rows that overhang into the band above.
+    const bands = new Set(
+        rects.filter((r) => r.y >= TOP_Y + FLOOR_H).map((r) => Math.floor((r.y - TOP_Y) / FLOOR_H)),
+    );
     expect(bands.size).toBe(3); // 3 flights for floors 1→2→3→4
-    expect(bands.has(0)).toBe(false); // top band (arrival landing) stays empty
+    // Nothing rises above the top band beyond the handrail overhang.
+    expect(rects.filter((r) => r.y < TOP_Y + FLOOR_H).every((r) => r.y >= TOP_Y + FLOOR_H - RAIL_OVERHANG)).toBe(true);
   });
 
   it("the escalator run rises through the bottom band, not the arrival landing", () => {
