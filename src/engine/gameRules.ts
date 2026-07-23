@@ -252,6 +252,17 @@ export interface GameRules {
    */
   nightclubNoisePenalty(floorDistance: number): number;
   /**
+   * Modern-only Spa serenity halo (gdd-modern-expansion): the positive mirror of
+   * {@link fitnessHaloBonus}, but for HOTEL guests. The per-hour satisfaction
+   * BONUS an operational Spa grants a nearby hotel room, keyed on the FLOOR
+   * distance to the nearest operational spa (largest on the spa's own floor,
+   * reaching 0 past `SPA_SERENITY_FLOORS`). Only the nearest spa counts, so
+   * stacking spas never compounds the bonus. Classic returns 0 (no such facility
+   * exists there), so Classic satisfaction stays byte-identical. Pure and
+   * deterministic (no RNG). Applies to hotels; the caller gates on `served` and kind.
+   */
+  spaSerenityBonus(floorDistance: number): number;
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food

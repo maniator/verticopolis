@@ -223,6 +223,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a nightclub that fills after dark, earning when the office crowd is gone. Pays a monthly DJ booking, and its noise makes nearby homes unhappy: keep it away from condos.",
   },
+  spa: {
+    kind: "spa",
+    category: "entertainment",
+    name: "Spa",
+    width: 14,
+    cost: 200000,
+    minStar: 3,
+    population: 18,
+    color: "#5cc0a0",
+    modernOnly: true,
+    description: "Modern: a wellness spa (massage, sauna, hot tubs). Earns from foot traffic, busier on weekends, and hotel rooms on nearby floors rest better for it (a capped bonus that fades with distance).",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",

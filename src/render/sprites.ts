@@ -52,6 +52,7 @@ const ROOM_KINDS = new Set<FacilityKind>([
   "fitnessClub",
   "clinic",
   "nightclub",
+  "spa",
   "shop",
   "cinema",
 ]);

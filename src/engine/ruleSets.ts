@@ -14,6 +14,8 @@ import {
   FITNESS_HALO_MAX,
   NIGHTCLUB_NOISE_FLOORS,
   NIGHTCLUB_NOISE_MAX,
+  SPA_SERENITY_FLOORS,
+  SPA_SERENITY_MAX,
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS } from "./pricing";
 import {
@@ -161,6 +163,11 @@ export const CLASSIC_RULES: GameRules = {
   },
   nightclubNoisePenalty() {
     // No nightclub exists in a Classic tower, so it never disturbs anyone. A flat
+    // 0 keeps Classic satisfaction (and its golden-master hash) untouched.
+    return 0;
+  },
+  spaSerenityBonus() {
+    // No Spa exists in a Classic tower, so it never grants a serenity halo. A flat
     // 0 keeps Classic satisfaction (and its golden-master hash) untouched.
     return 0;
   },
@@ -329,6 +336,14 @@ export const MODERN_RULES: GameRules = {
     // distance is passed, so it can't stack.
     if (floorDistance < 0 || floorDistance >= NIGHTCLUB_NOISE_FLOORS) return 0;
     return NIGHTCLUB_NOISE_MAX * (1 - floorDistance / NIGHTCLUB_NOISE_FLOORS);
+  },
+  spaSerenityBonus(floorDistance) {
+    // The positive mirror of the fitness halo, but for hotel guests:
+    // SPA_SERENITY_MAX on the spa's own floor, easing to 0 at the edge of the
+    // range and beyond. The caller passes only the nearest spa's distance, so
+    // more spas never compound the bonus.
+    if (floorDistance < 0 || floorDistance >= SPA_SERENITY_FLOORS) return 0;
+    return SPA_SERENITY_MAX * (1 - floorDistance / SPA_SERENITY_FLOORS);
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday

@@ -8,6 +8,7 @@ import { boutiqueBay } from "./pixelSprites/boutique";
 import { fitnessClub } from "./pixelSprites/fitness";
 import { clinic } from "./pixelSprites/clinic";
 import { nightclub } from "./pixelSprites/nightclub";
+import { spa } from "./pixelSprites/spa";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -94,6 +95,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // A Modern nightclub: one dark room with colored beams, a DJ booth, a
       // glowing dance floor, and a crowd that fills in with occupancy.
       nightclub(d, u, x, y, w, h);
+      break;
+    case "spa":
+      // A Modern wellness spa: one calm room with a steaming hot tub, massage
+      // tables, and greenery, with guests that fill in with occupancy.
+      spa(d, u, x, y, w, h);
       break;
     case "shop":
       shop(d, u, x, y, w, h);
