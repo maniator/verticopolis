@@ -4,7 +4,7 @@ import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
-import { gameplaySession } from "../analytics";
+import { gameplaySession, trackEmergencyChoice } from "../analytics";
 
 /**
  * The per-frame simulation + throttled UI/audio refresh, split out of the
@@ -86,6 +86,15 @@ export function runFrame(app: GameApp, dtMs: number): void {
     app.ui.update(app.sim);
     updateTraffic(app);
     app.onboarding.tick(); // advance the first-run checklist on real progress (no-op when inactive)
+    // Sample the tower's cumulative emergency counters for the session_emergencies
+    // summary (#611). The engine (EventSystem) owns the counts as plain integers
+    // and imports no analytics; the shell reads them off the public getter here
+    // (Simulation stays at its line ceiling, so no delegator is added), and the
+    // session accumulator banks a departing tower's tallies across a new game.
+    // Cheap: three ints on the throttled (~6Hz) path, so a fire's occurrence is
+    // captured without the engine ever reporting it.
+    const ec = app.sim.events.counts;
+    gameplaySession.noteEmergencyCounts(ec.fires, ec.firesGutRooms, ec.bombs);
     // Keep the open editor's live stats fresh. Refresh now patches only the
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild
@@ -115,6 +124,12 @@ export function runFrame(app: GameApp, dtMs: number): void {
       app.shownChoice = true;
       app.audio.sfx("error");
       app.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {
+        // The player answered (accept/decline). Only this click path reaches the
+        // telemetry; a timed-out auto-decline resolves in the sim without the
+        // modal callback, so it never emits (the absence of a choice, not a
+        // decline). `pc.kind` is stable while the modal is up (the freeze guard
+        // stops the sim ticking the choice away).
+        trackEmergencyChoice(pc.kind, opt);
         app.sim.resolveChoice(opt);
         app.shownChoice = false;
       });

@@ -13,6 +13,16 @@ import { RNG } from "./rng";
 export class EventSystem {
   /** Ids of units currently ablaze (a fire emergency in progress). */
   private active = new Set<number>();
+  /** Cumulative emergency tallies for this tower instance, for the shell's
+   *  session analytics ONLY: fire outbreaks ignited, rooms gutted BY FIRE
+   *  (not by a bomb), and bomb detonations. Plain integers the shell reads;
+   *  the engine never reports them itself (it imports no analytics). Not part
+   *  of save state, so a loaded tower restarts them at zero (the shell's
+   *  session accumulator banks a departing tower's tallies, so a session that
+   *  changes towers still sums every tower it played). */
+  private firesStartedCount = 0;
+  private firesGutRoomsCount = 0;
+  private bombsDetonatedCount = 0;
   /** Dedicated RNG for the seasonal/visitor events, so adding them never
    * disturbs the gameplay RNG stream the rest of the sim depends on. */
   private extra: RNG;
@@ -184,9 +194,18 @@ export class EventSystem {
   private extinguishAll(): void {
     for (const id of [...this.active]) {
       const u = this.sim.tower.getUnit(id);
-      if (u && u.state === "fire") this.gut(u);
+      if (u && u.state === "fire") {
+        this.gut(u);
+        this.firesGutRoomsCount++; // a room lost to fire (the paid-rescue outcome)
+      }
     }
     this.active.clear();
+  }
+
+  /** Cumulative emergency tallies for this tower instance (analytics only, read
+   *  by the shell; see the counter fields). */
+  get counts(): { fires: number; firesGutRooms: number; bombs: number } {
+    return { fires: this.firesStartedCount, firesGutRooms: this.firesGutRoomsCount, bombs: this.bombsDetonatedCount };
   }
 
   /**
@@ -240,6 +259,9 @@ export class EventSystem {
     u.state = "fire";
     u.occupants = 0;
     this.active.add(u.id);
+    // A new fire outbreak. A blaze SPREADING to neighbors (spreadFireTo) is the
+    // same fire, not a new one, so only the initial ignition is tallied.
+    this.firesStartedCount++;
     this.sim.emit(`🔥 Fire broke out in ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)}!`, "bad");
   }
 
@@ -321,6 +343,7 @@ export class EventSystem {
         // Contained: the blaze stops spreading, but the room is destroyed — a
         // gutted shell the player must bulldoze and rebuild (canon; no repair).
         this.gut(u);
+        this.firesGutRoomsCount++; // a room lost to fire (the contained-burndown outcome)
         this.active.delete(id);
         this.sim.emit(
           `🔥 The ${FACILITIES[u.kind].name} on ${this.sim.floorLabel(u.floor)} burned down. Only a gutted shell remains. Bulldoze the rubble and rebuild.`,
@@ -414,6 +437,10 @@ export class EventSystem {
     }
     const fine = 15_000 + this.sim.rng.int(0, 15_000);
     this.sim.money -= fine;
+    // A bomb actually went off (no Security to stop it). The gut() calls below
+    // destroy rooms, but those are BOMB losses, so they are deliberately not
+    // added to firesGutRoomsCount (which is fire-only).
+    this.bombsDetonatedCount++;
     // Canon: an undetected bomb levels roughly five floors. Pick an epicenter and
     // destroy every room within ±2 floors of it — a genuine catastrophe, not the
     // loss of a single room — so leaving the tower unguarded is dangerous.

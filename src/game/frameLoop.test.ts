@@ -3,6 +3,7 @@ import type { GameApp } from "../main";
 import { SPEEDS, runFrame, emitMealRushes } from "./frameLoop";
 import { decideMealRush } from "./mealRush";
 import { gameplaySession } from "../analytics";
+import * as analytics from "../analytics";
 
 /**
  * These pin the per-frame simulation + throttled UI/audio refresh (`runFrame`)
@@ -27,11 +28,12 @@ interface FakeSim {
   clock: { minuteOfDay: number; minutes: number; calendar: { weekDays: number; weekendDays: number } };
   tick: ReturnType<typeof vi.fn>;
   star: number;
-  pendingChoice: { message: string; cost: number } | null;
+  pendingChoice: { kind?: "fireRescue" | "bombThreat"; message: string; cost: number } | null;
   evaluatedTower: boolean;
   resolveChoice: ReturnType<typeof vi.fn>;
   emit: ReturnType<typeof vi.fn>;
   tower: { totalPopulation: ReturnType<typeof vi.fn> };
+  events: { counts: { fires: number; firesGutRooms: number; bombs: number } };
 }
 
 function makeSim(over: Partial<FakeSim> = {}): FakeSim {
@@ -44,6 +46,7 @@ function makeSim(over: Partial<FakeSim> = {}): FakeSim {
     resolveChoice: vi.fn(),
     emit: vi.fn(),
     tower: { totalPopulation: vi.fn(() => 0) },
+    events: { counts: { fires: 0, firesGutRooms: 0, bombs: 0 } },
     ...over,
   };
 }
@@ -238,6 +241,22 @@ describe("runFrame auto-surfaced emergency choice", () => {
     (cb as (opt: unknown) => void)("pay");
     expect(sim.resolveChoice).toHaveBeenCalledWith("pay");
     expect(raw.shownChoice).toBe(false);
+  });
+
+  it("logs emergency_choice only on the player's click, carrying the kind and decision", () => {
+    const spy = vi.spyOn(analytics, "trackEmergencyChoice").mockImplementation(() => {});
+    const pc = { kind: "fireRescue" as const, message: "Fire on floor 30!", cost: 5000 };
+    const sim = makeSim({ pendingChoice: pc });
+    const { app, raw } = makeApp({ speed: 0, sim });
+    runFrame(app, 16);
+    // Opening the modal alone must not log: a choice not yet made (and a timed-out
+    // auto-decline, which resolves in the sim without ever reaching this callback)
+    // emits nothing.
+    expect(spy).not.toHaveBeenCalled();
+    const cb = raw.ui.showEventChoice.mock.calls[0][2] as (opt: unknown) => void;
+    cb("decline");
+    expect(spy).toHaveBeenCalledExactlyOnceWith("fireRescue", "decline");
+    spy.mockRestore();
   });
 
   it("does not open the choice behind the boot/return splash", () => {

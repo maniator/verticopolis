@@ -47,15 +47,27 @@ function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimi
     trendsFilter: { display },
   };
   if (breakdown) {
-    source.breakdownFilter = { breakdowns: [{ property: breakdown, type: "event" }] };
+    // A single property name, or an array for a multi-dimensional breakdown
+    // (e.g. emergency_choice by kind x decision as a 2x2 table).
+    const props = Array.isArray(breakdown) ? breakdown : [breakdown];
+    source.breakdownFilter = { breakdowns: props.map((property) => ({ property, type: "event" })) };
     if (breakdownLimit) source.breakdownFilter.breakdown_limit = breakdownLimit;
   }
   return { kind: "InsightVizNode", source };
 }
 
-/** An event-property filter for a `where` clause (a subset of `action` values). */
+/** An event-property filter for a `where` clause (a subset of `action` values).
+ *  Works for any event carrying an `action` property (app_action and the #611
+ *  economy_action alike). */
 function inAction(values) {
   return { key: "action", operator: "exact", type: "event", value: values };
+}
+
+/** A `where` clause keeping only events whose numeric `prop` exceeds `n`
+ *  (e.g. session_emergencies with at least one fire, for the "% of sessions with
+ *  a fire" numerator). */
+function whereGt(prop, n) {
+  return { key: prop, operator: "gt", type: "event", value: n };
 }
 
 /** One event series node. `math` may be a count math ("total"/"dau") or a
@@ -261,6 +273,47 @@ const INSIGHTS = [
     name: "Mute toggles by state",
     description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
     query: trends([series("app_action", "Mute toggles")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["mute"])] }),
+  },
+  // Gameplay economy + emergencies (#611: economy_action, emergency_choice,
+  // session_emergencies). COOKIELESS: every tile is per-session and cohort,
+  // never per-person. "12% of sessions demolished something" is answerable;
+  // "which player bulldozed" is NOT. No currency amounts are ever collected.
+  {
+    name: "Economy actions by type",
+    description: "economy_action broken down by action: demolish (per action) vs the latched price_tune / capacity_tune bits, production, 30d. COOKIELESS session counts.",
+    query: trends([series("economy_action", "Economy actions")], { breakdown: "action", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    name: "Demolitions: sell vs bulldoze",
+    description: "economy_action demolish split by method (sell / bulldoze), production. Does removal happen via the editor Sell or the bulldozer.",
+    query: trends([series("economy_action", "Demolitions")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["demolish"])] }),
+  },
+  {
+    name: "Emergency choices (kind x decision)",
+    description: "emergency_choice as a 2x2 of kind (fireRescue / bombThreat) by decision (accept / decline), production. Do players pay for fire rescue but decline bomb threats. Only real clicks count; a timed-out auto-decline reports nothing.",
+    query: trends([series("emergency_choice", "Choices")], { breakdown: ["kind", "decision"], display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    name: "Per-session emergency severity (avg)",
+    description: "session_emergencies averaged per session: mean fire outbreaks, rooms gutted by fire, and bomb detonations, production. Emitted every session (zeros included), so this is a true per-session mean.",
+    query: trends(
+      [
+        series("session_emergencies", "Avg fires", "avg", "fires"),
+        series("session_emergencies", "Avg rooms gutted", "avg", "firesGutRooms"),
+        series("session_emergencies", "Avg bombs", "avg", "bombs"),
+      ],
+      { display: "ActionsBar" },
+    ),
+  },
+  {
+    name: "Sessions with a fire (30d)",
+    description: "session_emergencies with at least one fire, production, 30d. The numerator for 'fraction of sessions that had a fire' (divide by total session_emergencies, which is emitted once per played session).",
+    query: trends([series("session_emergencies", "Sessions with a fire")], { display: "BoldNumber", where: [whereGt("fires", 0)] }),
+  },
+  {
+    name: "Sessions reporting emergencies (30d)",
+    description: "Total session_emergencies, production, 30d. Emitted once per played session (zeros included), so it is the denominator for the fire / bomb rates.",
+    query: trends([series("session_emergencies", "Sessions")], { display: "BoldNumber" }),
   },
 ];
 

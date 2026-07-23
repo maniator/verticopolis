@@ -105,7 +105,7 @@ describe("BuildActions (the money boundary)", () => {
 
   it("removeTransportWithRefund pays the one shared shaft resale", () => {
     const before = sim.money;
-    build.removeTransportWithRefund(lift);
+    build.removeTransportWithRefund(lift, "sell");
     expect(sim.money - before).toBe(resaleRefund("elevatorStandard"));
     expect(sim.tower.transports.some((t) => t.id === lift.id)).toBe(false);
   });

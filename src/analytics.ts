@@ -1,217 +1,40 @@
-import { analyticsAdapter, type EventProps } from "./analyticsAdapter";
 import { telemetryHostAllowed } from "./telemetry";
+import { trackEvent, setCommonProps, type GameplayEvents } from "./analyticsCore";
+import { clearActionLatches } from "./analyticsActions";
 
 /**
- * Gameplay analytics: a small, typed vocabulary of custom events reported
- * through the SAME transport the page-view telemetry uses, reached via the one
- * analytics adapter (`analyticsAdapter`, today Vercel Web Analytics `track`).
+ * Gameplay analytics: the per-tab {@link GameplaySession} that tracks the funnel
+ * and engagement events, plus the boot wiring. The event vocabulary and the send
+ * choke point live in `analyticsCore.ts`; the free per-action trackers in
+ * `analyticsActions.ts`. This module re-exports both so callers keep importing
+ * from `./analytics`.
+ *
  * Page views and Core Web Vitals answer "who showed up and was it fast"; these
  * answer the questions the raw feed can't: a first-tower funnel (`game_started`
  * then `first_build`), which tools players reach for, how far they climb the
- * star ladder, and how long a session runs.
- *
- * Every event goes through the SAME host gate as the page-view inject
- * (`telemetryHostAllowed`) and is best-effort: nothing fires on localhost, the
- * e2e preview server, or the native shell, and a transport hiccup can never
- * throw past the caller into the game loop.
- *
- * The vocabulary is deliberately low-volume so a busy session stays well inside
- * the provider's event budget instead of streaming a row per click: `tool_used` is
- * deduped to one fire per distinct tool, `first_build` to one per session, and
- * `star_reached` (at most a handful of promotions) and `session_end` (one per
- * tab) are naturally bounded.
+ * star ladder, and how long a session runs. The vocabulary is deliberately
+ * low-volume: `tool_used` dedupes to one fire per distinct tool, `first_build`
+ * to one per tower, and the session-summary events fire once per tab.
  */
 
-/**
- * The event vocabulary and each event's props. Declaring it as a map makes a
- * typo'd event name or a stray prop a compile error and keeps the whole surface
- * legible in one place. Props stay to primitives Vercel accepts.
- */
-interface GameplayEvents {
-  /** A fresh tower was founded (the funnel's entry point). `mode` is the
-   *  rule-set: "classic" or "modern". */
-  game_started: { mode: string };
-  /** The first facility placed in the current tower (the funnel's "did they
-   *  build anything" step). Fires once per tower: for a founded tower it follows
-   *  that tower's `game_started` (the latch re-opens in `noteNewGame`); for the
-   *  boot tower that a continued save opens on, it fires with no preceding
-   *  `game_started`. `tool` is the facility/transport kind that broke the ice. */
-  first_build: { tool: string };
-  /** A tool was selected, reported once per distinct tool so the event captures
-   *  the session's tool mix without a row per click. */
-  tool_used: { tool: string };
-  /** The tower crossed into a new star rating (2 through 6): progression depth,
-   *  the clearest "how far do players get" signal. */
-  star_reached: { star: number };
-  /** The tab was hidden or unloaded: session length in whole seconds. */
-  session_end: { seconds: number };
-  /** One snapshot per boot: why the session started (`reason`), the build it
-   *  runs (`version`), and the standing state of the tower it opened. Unlike the
-   *  delta events, this captures a returning player's established tower even when
-   *  they trigger nothing else, and pins every session to a build version.
-   *  `reason` is one of "update", "recovery" (a WebGL-loss auto-reload),
-   *  "corrupt", "continue" (readable save resumed), or "fresh" (no save). */
-  boot: {
-    reason: string;
-    version: string;
-    mode: string;
-    star: number;
-    floors: number;
-    population: number;
-  };
-  /** The game hit a crash screen (today only a lost WebGL context). Carries the
-   *  crash description flattened to primitives so a reliability read has the
-   *  detail without opening a report: whether it repeated within 90s, whether an
-   *  in-place recovery was tried and failed, whether the tower was flushed first,
-   *  and whether it happened behind the boot splash. Fired at crash time, so it
-   *  lands even when the player never reloads. */
-  crash: {
-    kind: string;
-    repeat: boolean;
-    recoveryFailed: boolean;
-    saveFlushed: boolean;
-    behindSplash: boolean;
-    version: string;
-    star: number;
-    population: number;
-  };
-  /** The player applied a waiting build ("Update now"). `from` is the build they
-   *  were on, `to` the incoming build's version (or "unknown" if its
-   *  `version.json` couldn't be read), so update adoption is visible build over
-   *  build. Fired just before the activating reload. */
-  update: { from: string; to: string };
-  /** Usage depth of one tool in a session (one event per tool the session used):
-   *  `uses` is how many placements that tool made. A floor/lobby brush stamps a
-   *  strip of 1-wide tiles in one action, each counted as a placement, so those
-   *  paint tools read heavier per action than a single-room tool; read per-tool
-   *  depth with that in mind. Emitted once per session. */
-  tool_session_uses: { tool: string; uses: number };
-  /** Total placements in a session (build volume). Emitted once per session. */
-  session_builds: { builds: number };
-  /** Highest floor built on during a session. Can be negative: the ground floor
-   *  is 1 and basements run 0 down to -9, so a basement-heavy session reports a
-   *  low or negative peak. Emitted once per session. */
-  session_peak_floors: { floors: number };
-  /** Render frame-rate for the session, sampled off the frame loop and emitted
-   *  once per session as a per-session summary (not histogram-bucketed, unlike
-   *  the old Vercel report): `p50` is the median frame's fps, `low` the
-   *  5th-percentile fps (the worst frames, the hitch signal), and `samples` how
-   *  many foreground frames fed the estimate. The two fps numbers are computed
-   *  over a bounded per-session reservoir, so they are session ESTIMATES; PostHog
-   *  computes the exact CROSS-session fps percentiles from them (issue #538).
-   *  Emitted once per session, above a minimum sample count. */
-  session_fps: { p50: number; low: number; samples: number };
-  /** A discrete app-chrome action the player took OUTSIDE the core build loop:
-   *  a save/export/import, a settings or dialog open, a preference toggle, a
-   *  toolbar affordance, or a landing on the standalone help/gallery page. One
-   *  parametrized event (keyed by `action`) rather than dozens of names, so the
-   *  vocabulary stays small and a dashboard breaks the surface down by `action`.
-   *  `detail` carries the small extra dimension an action needs (the new mute
-   *  or accessibility-toggle state). Cookieless: these are aggregate counts and
-   *  per-session behavior, never an identity. */
-  app_action: { action: AppActionName; detail?: string };
-}
-
-/** The closed set of app-chrome actions {@link trackAppAction} reports. A union
- *  (not a bare string) so every call site is checked and the dashboard's action
- *  list is discoverable from one place. */
-export type AppActionName =
-  // Persistence. The FACT only, never tower contents or the fidelity report.
-  | "quick_save"
-  | "save_slot"
-  | "load_slot"
-  | "delete_save"
-  | "export_save"
-  | "import_save"
-  | "export_tdt"
-  | "import_tdt"
-  // Dialogs / navigation.
-  | "settings_open"
-  | "help_open"
-  | "compare_open"
-  | "saves_open"
-  | "stats_open"
-  | "replay_onboarding"
-  | "page_help"
-  | "page_gallery"
-  // Preference toggles (detail carries the new on/off state).
-  | "mute"
-  | "reduced_motion"
-  | "steady_clock"
-  // Coarse engagement bit, latched once per session via `trackAppActionOnce`:
-  // `volume` = the player touched the audio sliders (latched so the pointer-move
-  // slider cannot flood; no value, just the fact). (Deliberately NOT tracked, per
-  // the design party: undo, redo, overlay, and rename, the last because the tower
-  // name is player-authored. `speed` is deferred: its only clean user-only site,
-  // the speed button handler, sits in a file at the line-size ceiling, and the
-  // command callback it would otherwise hook is also the dialog pause path.)
-  | "volume";
-
-/**
- * Cross-cutting props merged into EVERY event: the platform dimension plus the
- * anonymous on-device returning / tenure / recency buckets (S4). Populated once
- * at boot via {@link setCommonProps}; empty until then, so the merge is a no-op
- * before boot and every existing per-event assertion is unaffected. These are
- * coarse, cookieless buckets, never an identifier (see `analyticsEnrichment.ts`).
- */
-let commonProps: EventProps = {};
-
-/** Install the boot-computed common props (see `analyticsEnrichment.ts`). Called
- *  once from the boot flow BEFORE the first event so `boot` already carries them.
- *  A later call replaces the whole set. Copied so a caller that later mutates the
- *  object it passed cannot rewrite what every event carries. */
-export function setCommonProps(props: EventProps): void {
-  commonProps = { ...props };
-}
-
-/** A copy of the boot-computed common props (platform / version / returning /
- *  tenure / recency), for a surface that sends OUTSIDE the typed gameplay
- *  vocabulary and so does not flow through `trackEvent`'s merge, namely the
- *  cookieless error reporter (`analyticsErrors.ts`): a `$exception` should carry
- *  the same platform and build context every gameplay event does. Copied so a
- *  caller cannot mutate the shared set. */
-export function getCommonProps(): EventProps {
-  return { ...commonProps };
-}
-
-/** Host-gated, best-effort custom-event send. The single choke point every
- *  gameplay event flows through, so the gate and the never-throw guarantee live
- *  in one place. The common props are spread FIRST so a per-event prop always
- *  wins on a key collision (the typed vocabulary is never shadowed by an
- *  enrichment key). */
-function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEvents[K]): void {
-  if (!telemetryHostAllowed()) return;
-  try {
-    analyticsAdapter().send(name, { ...commonProps, ...props });
-  } catch {
-    /* best-effort telemetry; never block gameplay on it */
-  }
-}
-
-/** Report one discrete app-chrome action (see the `app_action` event). A thin,
- *  free function (not a `GameplaySession` method) so it can be called from the
- *  UI, the save/persistence layer, and the standalone help/gallery pages alike.
- *  Host-gated and never-throw like every other event; `detail` is omitted when
- *  absent so the payload stays minimal. */
-export function trackAppAction(action: AppActionName, detail?: string): void {
-  trackEvent("app_action", detail === undefined ? { action } : { action, detail });
-}
-
-/** Actions already emitted this session by {@link trackAppActionOnce}, so a
- *  repeatable trigger (a dragged volume slider) reports at most once. It lives
- *  for the tab's lifetime, matching the per-tab analytics session (`reset` is a
- *  test-only helper, not called on a new game), so "once" means once per tab
- *  session. */
-const appActionOnce = new Set<AppActionName>();
-
-/** Report an app action AT MOST ONCE per session. For a coarse engagement bit
- *  (today `volume`) whose trigger can fire many times, so the count is "sessions
- *  that ever did X," not a firehose of every repeat. */
-export function trackAppActionOnce(action: AppActionName, detail?: string): void {
-  if (appActionOnce.has(action)) return;
-  appActionOnce.add(action);
-  trackAppAction(action, detail);
-}
+// Re-export the vocabulary, common props, and the free trackers so `./analytics`
+// stays the one import site every caller already uses.
+export {
+  setCommonProps,
+  getCommonProps,
+  type GameplayEvents,
+  type AppActionName,
+  type EconomyActionName,
+  type EmergencyKind,
+  type EmergencyDecision,
+} from "./analyticsCore";
+export {
+  trackAppAction,
+  trackAppActionOnce,
+  trackEconomyAction,
+  trackEconomyActionOnce,
+  trackEmergencyChoice,
+} from "./analyticsActions";
 
 /** Fixed cap on the per-session fps sample reservoir: bounded memory no matter
  *  how long a session runs, large enough for a stable p50/p5. */
@@ -271,6 +94,21 @@ class GameplaySession {
    *  null between segments so the first frame after a resume re-anchors instead
    *  of charging the whole background gap as one slow frame. */
   private lastFrameAt: number | null = null;
+  /** Emergency tallies banked from towers this tab already left behind. A new
+   *  game or a loaded save builds a fresh EventSystem whose counters restart at
+   *  zero, so the current tower's live counts alone would undercount (report a
+   *  clean zero for) a session that had a fire in an earlier tower. */
+  private emergBanked = { fires: 0, gutRooms: 0, bombs: 0 };
+  /** The last sampled CURRENT-tower cumulative emergency counts. A counter going
+   *  backwards between samples means the tower was replaced, so the prior peak is
+   *  banked into {@link emergBanked} before the new tower's counts take over. */
+  private emergLast = { fires: 0, gutRooms: 0, bombs: 0 };
+  /** True once the emergency sampler has run at least once, i.e. the game frame
+   *  loop actually ticked. Gates `session_emergencies` so a no-play prerender/hide
+   *  (frame loop never ran) does not emit a spurious zero into the denominator. */
+  private emergSampled = false;
+  /** `session_emergencies` fires at most once per session (like the depth events). */
+  private emergReported = false;
 
   /** Start or resume timing foreground play. Idempotent while already running,
    *  so a redundant `begin` (a defensive double boot, a visible event with no
@@ -380,6 +218,26 @@ class GameplaySession {
     if (j < FPS_RESERVOIR) this.fpsSamples[j] = fps;
   }
 
+  /** Sample the live tower's cumulative emergency counters, called from the frame
+   *  loop. The engine (EventSystem) owns the counters as plain integers and never
+   *  imports analytics; the shell reads them here, mirroring how `noteBuild` is
+   *  shell-called after a build, not engine-called. A counter that dropped since
+   *  the last sample means the tower was replaced (a fresh EventSystem restarts at
+   *  zero), so the departing tower's last-seen peak is banked before the new
+   *  tower's counts take over. Pure arithmetic, no allocation: cheap on the
+   *  throttled UI-update path it rides. */
+  noteEmergencyCounts(fires: number, firesGutRooms: number, bombs: number): void {
+    this.emergSampled = true;
+    if (fires < this.emergLast.fires || firesGutRooms < this.emergLast.gutRooms || bombs < this.emergLast.bombs) {
+      this.emergBanked.fires += this.emergLast.fires;
+      this.emergBanked.gutRooms += this.emergLast.gutRooms;
+      this.emergBanked.bombs += this.emergLast.bombs;
+    }
+    this.emergLast.fires = fires;
+    this.emergLast.gutRooms = firesGutRooms;
+    this.emergLast.bombs = bombs;
+  }
+
   /** Bank the current foreground segment and report cumulative play seconds.
    *  Called when the tab is hidden or the page unloads. The clock re-arms on the
    *  next `begin` (tab visible again), so tabbing away and back keeps ONE growing
@@ -388,7 +246,7 @@ class GameplaySession {
    *  number is foreground play, not wall clock. Deduped on the whole-second value
    *  (seeded at 0) so a zero-length end or a `pagehide` right after a
    *  `visibilitychange` doesn't emit a duplicate. */
-  end(): void {
+  end(isFinal = false): void {
     if (this.resumedAt !== null) {
       this.activeMs += Date.now() - this.resumedAt;
       this.resumedAt = null;
@@ -422,6 +280,30 @@ class GameplaySession {
       const at = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
       trackEvent("session_fps", { p50: Math.round(at(0.5)), low: Math.round(at(0.05)), samples: this.fpsSeen });
     }
+    // Per-session emergency summary, emitted once per session that actually
+    // played (the sampler ran). Unlike the depth/fps events it is NOT gated on
+    // any count being nonzero: "fraction of sessions with a fire" needs the
+    // zero-emergency sessions in the denominator. The total sums every tower the
+    // tab played (banked departed towers plus the current one's latest sample).
+    //
+    // Gated on `isFinal` (the terminal `pagehide`), NOT every tab-hide. The depth
+    // and fps summaries can latch at the first `visibilitychange:hidden` because
+    // they only emit once their signal exists (builds > 0, an fps floor) and that
+    // signal accrues early. Fires are the opposite: they are rare and ignite LATE,
+    // so latching at the first hide (a mid-session tab switch, which fires
+    // `visibilitychange:hidden` but NOT `pagehide`) would lock in a zero before the
+    // first fire and bias "% of sessions with a fire" toward zero. Waiting for
+    // `pagehide` (tab close / navigation / bfcache) captures the whole session. A
+    // session whose `pagehide` never fires (a hard mobile kill) simply drops from
+    // both the numerator and the denominator, so the RATE stays unbiased.
+    if (isFinal && this.emergSampled && !this.emergReported) {
+      this.emergReported = true;
+      trackEvent("session_emergencies", {
+        fires: this.emergBanked.fires + this.emergLast.fires,
+        firesGutRooms: this.emergBanked.gutRooms + this.emergLast.gutRooms,
+        bombs: this.emergBanked.bombs + this.emergLast.bombs,
+      });
+    }
     const seconds = Math.round(this.activeMs / 1000);
     if (seconds === this.lastReportedSec) return;
     this.lastReportedSec = seconds;
@@ -437,8 +319,9 @@ class GameplaySession {
     return true;
   }
 
-  /** Test hook: forget all session state, including the boot-set common props
-   *  (module-level, so cleared here to keep tests isolated). */
+  /** Test hook: forget all session state, including the boot-set common props and
+   *  the once-per-session action latches (both module-level, so cleared here to
+   *  keep tests isolated). */
   reset(): void {
     this.activeMs = 0;
     this.resumedAt = null;
@@ -454,8 +337,12 @@ class GameplaySession {
     this.lastFrameAt = null;
     this.toolsSeen.clear();
     this.toolUses.clear();
-    appActionOnce.clear(); // test-only reset path: keep test sessions independent
-    commonProps = {};
+    this.emergBanked = { fires: 0, gutRooms: 0, bombs: 0 };
+    this.emergLast = { fires: 0, gutRooms: 0, bombs: 0 };
+    this.emergSampled = false;
+    this.emergReported = false;
+    clearActionLatches(); // test-only reset path: keep test sessions independent
+    setCommonProps({});
   }
 }
 
@@ -486,10 +373,14 @@ export function startGameplaySession(): void {
   // prerender open begins hidden; timing then starts when it first becomes
   // visible below, so hidden time is never counted as foreground play.
   if (document.visibilityState === "visible") gameplaySession.begin();
-  window.addEventListener("pagehide", () => gameplaySession.end());
+  // `pagehide` is the terminal signal (tab close / navigation / bfcache), so it
+  // ends the session as FINAL: this is where session_emergencies emits, having
+  // waited past mid-session tab switches (see GameplaySession.end).
+  window.addEventListener("pagehide", () => gameplaySession.end(true));
   document.addEventListener("visibilitychange", () => {
     // Bank on hidden, (re)start on visible, ignore other states (e.g. prerender).
-    if (document.visibilityState === "hidden") gameplaySession.end();
+    // A hide is NOT final (the player may tab back), so session_emergencies waits.
+    if (document.visibilityState === "hidden") gameplaySession.end(false);
     else if (document.visibilityState === "visible") gameplaySession.begin();
   });
 }
