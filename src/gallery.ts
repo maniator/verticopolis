@@ -209,6 +209,10 @@ const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
     label: "Spa",
     entries: [roomEntry("Spa", "spa")],
   },
+  {
+    label: "Sky Bar",
+    entries: [roomEntry("Sky Bar", "skyBar")],
+  },
 ];
 
 /** A full-width section title (`header`) or a lighter per-kind label

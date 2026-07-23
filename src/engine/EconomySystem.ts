@@ -209,20 +209,17 @@ export class EconomySystem {
       if (attends) syncAttendanceOccupants(u);
       else u.occupants = FACILITIES[u.kind].population;
       // This venue's demand share (0..1), the per-venue replacement for the old
-      // tower-wide appeal. Retail venues read the connected-census demand pool.
-      // Attendance venues (cinema / party hall) read their own live-attendance
-      // fill instead (#424): their take tracks how full the house is, clamped to
-      // [0, 1], rather than diluting, or being diluted by, the retail pool they are
-      // no longer part of. The clamp guards both ends: `max(0, ...)` so a forged
-      // negative counter cannot pay negative income, and `min(1, ...)` so an
+      // tower-wide appeal. Retail reads the connected-census demand pool; an
+      // attendance venue (cinema / party hall) reads its own live-attendance fill
+      // instead (#424), clamped to [0, 1]. The clamp guards both ends: `max(0, ...)`
+      // so a forged negative counter cannot pay negative income, `min(1, ...)` so an
       // over-full house never beats a sold-out one. The `> 0` cap guard mirrors the
       // retail `spend > 0` guard below, so a forged 0 cap cannot divide. A booked
-      // blockbuster raises this fill (its bigger drawn crowd) AND the `filmMult`
-      // below, so the premium compounds in an under-filled house, but the `min(1,
-      // ...)` cap holds a sold-out blockbuster to exactly `filmMult` times the
-      // advertised figure, so income can never run away. The retail `?? 0` is a
-      // guard, not an expected path (a reachable, open retail venue always has a
-      // map entry).
+      // blockbuster raises this fill AND the `filmMult` below (compounding in an
+      // under-filled house), but the `min(1, ...)` cap holds a sold-out blockbuster
+      // to exactly `filmMult` times the advertised figure, so income can never run
+      // away. The retail `?? 0` is a guard (a reachable, open retail venue always
+      // has a map entry).
       const frac =
         attendanceCapV !== undefined
           ? attendanceCapV > 0
@@ -250,14 +247,14 @@ export class EconomySystem {
       // +70% bump never could, since appeal is capped at 1), so a blockbuster is
       // a genuine upside in a busy tower and a gamble in a quiet one.
       const filmMult = u.kind === "cinema" && this.blockbusters.has(u.id) ? 2.2 : 1;
-      // W3 commercial-near-lobby: a canon commercial venue (fast food, restaurant,
-      // shop, cinema — NOT partyHall, which is outside the canon set) more than two
-      // floors from any (sky) lobby draws far fewer shoppers — poor placement
-      // starves its traffic without evicting it (commercial has no lease). Ground
-      // (floor 1) always anchors as a lobby, so floors 1–3 are always fine; deeper
-      // commercial needs a sky lobby.
+      // W3 commercial-near-lobby: a commercial venue (fast food, restaurant, shop,
+      // cinema — NOT partyHall) more than two floors from any (sky) lobby draws far
+      // fewer shoppers — poor placement starves traffic without evicting it. Ground
+      // (floor 1) anchors a lobby, so floors 1–3 are fine; deeper commercial needs a
+      // sky lobby. The Sky Bar is EXEMPT: a rooftop destination sought out for the
+      // view (rewarded by the view premium), so this penalty would only fight it.
       const lobbyMult =
-        isCommercialKind(u.kind) &&
+        isCommercialKind(u.kind) && u.kind !== "skyBar" &&
         this.sim.tower.nearestLobbyFloorDistance(u.floor) > COMMERCIAL_LOBBY_FLOORS
           ? COMMERCIAL_LOBBY_FAR_MULT
           : 1;
@@ -273,6 +270,8 @@ export class EconomySystem {
       // double-count the weekend.
       const weekendMult =
         attendanceCapV !== undefined ? 1 : rules.weekendMultiplier(u.kind, isWeekend);
+      // Modern Sky Bar view premium: earns more the higher it sits. Gated on the kind, so no other venue's income and no golden hash is touched.
+      const viewMult = u.kind === "skyBar" ? rules.viewPremium(u.floor) : 1;
       const trafficFactor = TRAFFIC_FACTOR_MIN + this.sim.rng.next() * TRAFFIC_FACTOR_SPAN;
       const openH = openHoursPerDay(u.kind);
       const hourly =
@@ -282,6 +281,7 @@ export class EconomySystem {
         filmMult *
         lobbyMult *
         weekendMult *
+        viewMult *
         trafficFactor;
       u.pendingIncome += hourly;
       // Retail-only "today's patronage" for the inspector card. The one RNG

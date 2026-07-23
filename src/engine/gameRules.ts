@@ -263,6 +263,16 @@ export interface GameRules {
    */
   spaSerenityBonus(floorDistance: number): number;
   /**
+   * Modern-only Sky Bar view premium (gdd-modern-expansion): the income
+   * multiplier a rooftop bar earns for its height, keyed on its absolute FLOOR
+   * (the skyline view is the draw, so higher pours more). 1 at or below the base
+   * floor, climbing per floor above it to a capped ceiling (see `ECON.skyBarView*`).
+   * The caller multiplies it into the Sky Bar's hourly take and applies it to no
+   * other kind. Classic returns 1 (no such facility exists there), so Classic
+   * income stays byte-identical. Pure and deterministic (no RNG).
+   */
+  viewPremium(floor: number): number;
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food

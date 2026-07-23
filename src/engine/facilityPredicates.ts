@@ -45,6 +45,9 @@ export function isOpenAt(kind: FacilityKind, hour: number): boolean {
     case "spa":
       // A wellness spa keeps long daytime-into-evening hours.
       return hour >= 9 && hour < 21;
+    case "skyBar":
+      // A rooftop bar opens late afternoon and runs to midnight.
+      return hour >= 16 && hour < 24;
     case "cinema":
       return hour >= 12 && hour < 24;
     case "partyHall":
@@ -79,6 +82,7 @@ export function isCommercialKind(kind: FacilityKind): boolean {
     kind === "boutiqueBay" ||
     kind === "nightclub" ||
     kind === "spa" ||
+    kind === "skyBar" ||
     kind === "shop" ||
     kind === "cinema"
   );
@@ -94,6 +98,7 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
     kind === "boutiqueBay" ||
     kind === "nightclub" ||
     kind === "spa" ||
+    kind === "skyBar" ||
     kind === "shop" ||
     kind === "cinema" ||
     kind === "partyHall"

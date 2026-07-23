@@ -235,6 +235,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a wellness spa (massage, sauna, hot tubs). Earns from foot traffic, busier on weekends, and hotel rooms on nearby floors rest better for it (a capped bonus that fades with distance).",
   },
+  skyBar: {
+    kind: "skyBar",
+    category: "entertainment",
+    name: "Sky Bar",
+    width: 12,
+    cost: 260000,
+    minStar: 3,
+    population: 22,
+    color: "#d89050",
+    modernOnly: true,
+    description: "Modern: a rooftop cocktail bar that fills in the evening. Earns from foot traffic, and the higher you place it the more it earns: the skyline view is the draw, so a bar up top pours far more than one down low.",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",
