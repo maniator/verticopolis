@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import { paceFactor } from "../engine/timePacing";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
+import { tickInstallAffordance } from "./installAffordance";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession, trackEmergencyChoice } from "../analytics";
@@ -95,6 +96,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // captured without the engine ever reporting it.
     const ec = app.sim.events.counts;
     gameplaySession.noteEmergencyCounts(ec.fires, ec.firesGutRooms, ec.bombs);
+    tickInstallAffordance(app); // surface the install chip once the play-gate trips (self-terminating)
     // Keep the open editor's live stats fresh. Refresh now patches only the
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild

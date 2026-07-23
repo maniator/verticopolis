@@ -14,6 +14,8 @@ import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow"
 import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
+import { isStandalone } from "../pwaInstall";
+import { initInstallAffordance } from "./installAffordance";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -168,6 +170,10 @@ export function wireControllers(app: GameApp): void {
  *  is the loaded tower's write time (from `SaveGame.loadResult`), passed in for
  *  the S4 return-recency bucket; undefined with no readable save. */
 export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
+  // Wire the install affordance early: the browser can fire beforeinstallprompt
+  // during initial load, so its capture must be in place before then. The chip
+  // stays hidden until the play-gate trips (see tickInstallAffordance).
+  initInstallAffordance(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -228,6 +234,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         onboarded: isOnboarded(),
         tenureDay: app.sim?.clock?.day,
         savedAt: savedAtBoot,
+        standalone: isStandalone(),
         now: Date.now(),
       }),
     );

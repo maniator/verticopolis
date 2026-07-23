@@ -1,5 +1,5 @@
 import type { UI } from "./UI";
-import { confirmTemplate } from "./templates/confirm";
+import { confirmTemplate, installHelpTemplate } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
@@ -78,6 +78,13 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
       openImport(ui);
     },
   });
+}
+
+/** Open the iOS Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3). The install
+ *  controller calls this directly (keeping UI.ts under its size ceiling); it is
+ *  only ever reached from a deliberate tap on the install affordance. */
+export function showInstallHelp(ui: UI): void {
+  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal()));
 }
 
 export function confirmModal(

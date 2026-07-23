@@ -171,7 +171,11 @@ export type AppActionName =
   // name is player-authored. `speed` is deferred: its only clean user-only site,
   // the speed button handler, sits in a file at the line-size ceiling, and the
   // command callback it would otherwise hook is also the dialog pause path.)
-  | "volume";
+  | "volume"
+  // The app was installed (the `appinstalled` event, however it was triggered:
+  // our in-game offer or the browser's own menu). Latched once per session; the
+  // `display` common prop already carries standalone-vs-browser reach.
+  | "install_app";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform dimension plus the
