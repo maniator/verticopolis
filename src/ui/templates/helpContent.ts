@@ -25,11 +25,12 @@ export interface HelpSection {
   body: () => TemplateResult;
 }
 
-/** The lead paragraphs under the "How to play" heading (premise + mouse line). */
+/** The lead paragraphs under the "How to play" heading (premise + mouse/touch lines). */
 export function helpLede(): TemplateResult {
   return html`
     <p>Build a thriving high-rise and earn your way to a coveted <b>TOWER</b> rating.</p>
     <p style="color:var(--muted)">Mouse: drag to pan with the Inspect tool; with a build tool, hold <b>Shift</b> (or Space) and drag to pan, and a middle or right button drag pans too. Scroll to zoom, click to build, Inspect tool to edit a room. Made a mistake? <b>Undo with Ctrl+Z</b> (or the ↩ button). Redo with Ctrl+Shift+Z. Music changes with whatever part of the tower you're viewing. Try scrolling around!</p>
+    <p style="color:var(--muted)">Touch: press and drag on the tower to build (a ghost shows where the room lands), two fingers to pan, pinch to zoom, tap a room with Inspect to edit it. Full guide under <b>Playing on a phone</b> below.</p>
   `;
 }
 
@@ -68,6 +69,21 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
     id: "classic-vs-modern",
     title: "Classic vs Modern",
     body: () => compareTemplate(),
+  },
+  {
+    id: "touch",
+    title: "Playing on a phone",
+    body: () => html`
+      <p style="color:var(--muted)">Everything works by touch. With a build tool chosen from the bottom menu:</p>
+      <ul>
+        <li><b>Place a room.</b> Press the tower and drag: a ghost floats just above your finger so you can see where it lands, gold where it fits, red where it will not. Lift to place, or slide to a valid spot first. A quick tap drops one too.</li>
+        <li><b>Lay a run.</b> Drag with <b>Floor</b>, <b>Lobby</b>, or a <b>Parking</b> space to lay a whole strip at once.</li>
+        <li><b>Size an elevator.</b> Drag up or down to set a shaft's height. Stairs and escalators place with a single tap.</li>
+        <li><b>Move around.</b> Drag with <b>two fingers</b> to pan (or one finger with <b>Inspect</b> selected), and <b>pinch</b> to zoom.</li>
+        <li><b>Edit or remove.</b> Tap a room with <b>Inspect</b> to open its panel; tap with <b>Bulldoze</b> to demolish it.</li>
+        <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>☰</b> button opens stats and the game menu, and <b>↩</b> undoes.</li>
+      </ul>
+    `,
   },
   {
     id: "keyboard",

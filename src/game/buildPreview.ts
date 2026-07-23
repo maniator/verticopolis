@@ -5,6 +5,22 @@ import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
 import { brushTiles, snapX, type PlaceOutcome } from "../ui/placement";
 import { buildRefusalTemplate } from "../ui/templates/inspector";
 import { isPaintKind } from "./gesture";
+import { FLOOR } from "../render/scale";
+
+/**
+ * How far above the touch point a room's placement ghost floats, in SCREEN pixels
+ * (about a fingertip). Touch has no hover, so a build used to drop blind under the
+ * thumb; the offset lifts the ghost (and the placed room) to where the finger is
+ * not covering it. Screen-space, converted to floors through the live zoom by
+ * {@link touchBuildLiftFloors}, so the lift feels the same at any zoom.
+ */
+const TOUCH_BUILD_LIFT_PX = 46;
+
+/** The room-placement lift in FLOORS at the current zoom (at least one floor, so
+ *  the ghost always clears the fingertip). Touch build only; mouse hover is exact. */
+export function touchBuildLiftFloors(app: GameApp): number {
+  return Math.max(1, Math.round(TOUCH_BUILD_LIFT_PX / (FLOOR * app.engine.cam.zoom)));
+}
 
 /**
  * Build-preview, placement, and pick resolution, split out of the `GameApp`
@@ -59,7 +75,7 @@ export function isPaintTool(app: GameApp): boolean {
   return app.tool.type === "build" && isPaintKind(app.tool.kind);
 }
 
-export function updateBuildPreview(app: GameApp, tile: number, floor: number): void {
+export function updateBuildPreview(app: GameApp, tile: number, floor: number, showReasonCard = true): void {
   if (app.tool.type !== "build") {
     app.engine.preview = null;
     app.engine.transportPreview = null;
@@ -90,7 +106,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number): v
     const reason = !can.ok && app.sim.rules.showsPreviewReason ? can.reason : undefined;
     app.engine.preview = { kind, floor, x: left, span, valid: can.ok, reason };
     app.engine.transportPreview = null;
-    updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
+    if (showReasonCard) updateBuildRefusal(app, reason, floor, left + Math.floor(span / 2));
+    else clearBuildRefusal(app);
   } else {
     const x = snapX(kind, tile);
     // Rooms auto-lay their own floor, so validity comes from canBuild (which
@@ -101,7 +118,8 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number): v
     const reason = !can.ok && app.sim.rules.showsPreviewReason ? can.reason : undefined;
     app.engine.preview = { kind, floor, x, valid: can.ok, reason };
     app.engine.transportPreview = null;
-    updateBuildRefusal(app, reason, floor, x + Math.floor(FACILITIES[kind].width / 2));
+    if (showReasonCard) updateBuildRefusal(app, reason, floor, x + Math.floor(FACILITIES[kind].width / 2));
+    else clearBuildRefusal(app);
   }
 }
 

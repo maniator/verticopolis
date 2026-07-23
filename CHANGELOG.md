@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.99.0
+
+- Building on a phone is no longer a blind tap under your thumb: press and drag on the tower and a ghost of the room floats just above your finger so you can see exactly where it lands, gold where it fits and red where it will not. Lift to place, or slide off to a valid spot first. A quick tap still drops a room the fast way. (Pan with two fingers while a build tool is armed.)
+
 ## 1.98.0
 
 - The build menu is easier to get around on a phone: instead of one long sideways scroll past every tool, there is now a row of category tabs (Structure, Transport, Commercial, and so on). Tap a category to see just its tools, and your choice sticks so laying a row of the same room never reopens a menu. Inspect and Bulldoze stay put, a dot marks a category that just gained new tools, and the Modern venues sit in their own labeled section. On desktop the tool list keeps its category headers pinned as you scroll.

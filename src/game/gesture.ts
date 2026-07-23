@@ -28,11 +28,14 @@ export function isPaintKind(kind: FacilityKind): boolean {
  *   release), the path drag-sized transports and paint runs use.
  *
  * On touch, one finger pans EXCEPT for gestures that OWN the drag: drag-sized
- * transports (elevators) size with it, and paint tools (floor/lobby/parking) lay
- * a run with it. On mouse, everything but inspect acts; pan is a non-left button
- * or a held pan key (Space or Shift). The pan key deliberately beats BOTH
- * drag-owning gestures: it is the escape hatch that lets a mouse pan while a
- * paint tool or drag-sized shaft is armed.
+ * transports (elevators) size with it, paint tools (floor/lobby/parking) lay a run
+ * with it, and a ROOM build shows an offset placement ghost that follows the
+ * finger and commits on release (so touch is no longer a blind tap under the
+ * thumb). What still pans on one finger: inspect, bulldoze, and the fixed-span
+ * flights (stairs/escalator), which place on a tap. On mouse, everything but
+ * inspect acts; pan is a non-left button or a held pan key (Space or Shift). The
+ * pan key deliberately beats every drag-owning gesture: it is the escape hatch
+ * that lets a mouse pan while any build tool is armed.
  */
 export function classifyGesture(
   tool: Tool,
@@ -48,6 +51,10 @@ export function classifyGesture(
   const dragSized =
     tool.type === "build" && !!FACILITIES[tool.kind].transport && !isFixedSpanTransport(tool.kind);
   const paint = tool.type === "build" && isPaintKind(tool.kind);
-  if (touch && !dragSized && !paint) return "pan";
+  // A room build (anything buildable that isn't transport or a paint strip) owns
+  // the one-finger touch drag too, so it can preview an offset ghost and place on
+  // release. A fixed-span flight (transport, but not drag-sized) still pans + taps.
+  const room = tool.type === "build" && !FACILITIES[tool.kind].transport && !isPaintKind(tool.kind);
+  if (touch && !dragSized && !paint && !room) return "pan";
   return "action";
 }
