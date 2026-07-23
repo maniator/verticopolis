@@ -16,6 +16,8 @@ import {
   NIGHTCLUB_NOISE_MAX,
   SPA_SERENITY_FLOORS,
   SPA_SERENITY_MAX,
+  DAYCARE_HALO_FLOORS,
+  DAYCARE_HALO_MAX,
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS } from "./pricing";
 import {
@@ -175,6 +177,11 @@ export const CLASSIC_RULES: GameRules = {
     // No Sky Bar exists in a Classic tower, so it never earns a view premium. A
     // flat 1 keeps Classic income (and its golden-master hash) untouched.
     return 1;
+  },
+  daycareFamilyBonus() {
+    // No daycare exists in a Classic tower, so it never grants a halo. A flat 0
+    // keeps Classic satisfaction (and its golden-master hash) untouched.
+    return 0;
   },
   weekendMultiplier(kind, isWeekend) {
     // Canon: every commercial kind is busier on the weekend (the literal 1994
@@ -356,6 +363,17 @@ export const MODERN_RULES: GameRules = {
     // far above it pours up to (1 + skyBarViewMax) times as much.
     const above = Math.max(0, floor - ECON.skyBarViewBaseFloor);
     return 1 + Math.min(ECON.skyBarViewMax, above * ECON.skyBarViewPerFloor);
+  },
+  daycareFamilyBonus(floorDistance, familySize) {
+    // The fitness halo scaled by household size: DAYCARE_HALO_MAX on the daycare's
+    // own floor for the biggest family, fading with distance and with a smaller
+    // family. A family of one (or none) gets nothing; a family of five gets the
+    // full bonus. Only the nearest daycare's distance is passed, so it can't stack.
+    if (floorDistance < 0 || floorDistance >= DAYCARE_HALO_FLOORS) return 0;
+    // Households run 2..5 in Modern; map size onto [0, 1] so a lone occupant reads 0.
+    const familyFactor = Math.max(0, Math.min(1, (familySize - 1) / 4));
+    if (familyFactor === 0) return 0;
+    return DAYCARE_HALO_MAX * (1 - floorDistance / DAYCARE_HALO_FLOORS) * familyFactor;
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday

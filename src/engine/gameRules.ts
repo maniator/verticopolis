@@ -273,6 +273,17 @@ export interface GameRules {
    */
   viewPremium(floor: number): number;
   /**
+   * Modern-only Daycare family halo (gdd-modern-expansion): the per-hour
+   * satisfaction BONUS an operational daycare grants a nearby condo, keyed on the
+   * FLOOR distance to the nearest daycare AND the condo's household size (a bigger
+   * family, which leans on childcare more, benefits more). Largest on the
+   * daycare's own floor for the biggest family, reaching 0 past `DAYCARE_HALO_FLOORS`
+   * or for a family of one. Only the nearest daycare counts. Classic returns 0 (no
+   * such facility exists there), so Classic satisfaction stays byte-identical. Pure
+   * and deterministic (no RNG). Applies to condos; the caller gates on `served` and kind.
+   */
+  daycareFamilyBonus(floorDistance: number, familySize: number): number;
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food

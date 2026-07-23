@@ -80,6 +80,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["spa", { kind: "spa" }],
     ["sky bar", { kind: "skyBar" }],
     ["aquatic center", { kind: "aquaticCenter" }],
+    ["daycare", { kind: "daycare" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -229,8 +230,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
   it("a Nightclub reads empty when empty (no DJ or dancers) and lively when full", () => {
     const empty = spyCtx();
     const full = spyCtx();
-    // A nightclub is open at hour 20 (the default), so the club draws rather than
-    // the closed shutter; the DJ and dancers gate on occupancy.
+    // Open at hour 20 (the default), so the club draws, not the shutter; the DJ and dancers gate on occupancy.
     drawUnit(draw({}, empty.ctx), unit({ kind: "nightclub", occupants: 0 }), 0, 0, 220, 44);
     drawUnit(draw({}, full.ctx), unit({ kind: "nightclub", occupants: 12 }), 0, 0, 220, 44);
     const occupant = "fillStyle=rgba(0,0,0,0.24)";

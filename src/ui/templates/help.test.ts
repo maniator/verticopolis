@@ -109,6 +109,7 @@ describe("helpTemplate structure and a11y", () => {
     nightclubNoisePenalty: null, // Modern nightclub negative halo; covered by the "new places" copy, no dedicated seam line
     spaSerenityBonus: null, // Modern spa positive halo for hotels; covered by the "new places" copy, no dedicated seam line
     viewPremium: null, // Modern sky bar height-scaled income; covered by the "new places" copy, no dedicated seam line
+    daycareFamilyBonus: null, // Modern daycare family-scaled condo halo; covered by the "new places" copy, no dedicated seam line
   };
 
   it("classifies every MODERN_RULES member for Help copy (test-path backstop only)", () => {

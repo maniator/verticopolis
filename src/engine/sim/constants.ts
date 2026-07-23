@@ -152,6 +152,16 @@ export const NIGHTCLUB_NOISE_MAX = 0.08;
 export const SPA_SERENITY_FLOORS = 5;
 export const SPA_SERENITY_MAX = 0.03;
 
+/** Modern-only Daycare family halo (gdd-modern-expansion): a positive condo halo
+ *  like the Fitness Club's, but SCALED BY FAMILY SIZE. A condo within
+ *  `DAYCARE_HALO_FLOORS` floors of an operational daycare gets a per-hour
+ *  satisfaction bonus up to `DAYCARE_HALO_MAX` on the daycare's own floor, fading
+ *  linearly with distance AND scaled by the household size (a bigger family, which
+ *  leans on childcare more, benefits more; a one-person condo gets nothing extra).
+ *  Below `SERVED_RECOVERY` at full scale, and only the nearest daycare counts. */
+export const DAYCARE_HALO_FLOORS = 4;
+export const DAYCARE_HALO_MAX = 0.035;
+
 /**
  * Unmet local-demand thresholds (leave-tower-unmet-demand, #395). A tenant's
  * retail demand-coverage sits in [0, 1] (1 = the reachable shops and eateries

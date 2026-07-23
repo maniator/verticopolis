@@ -10,6 +10,7 @@ import { clinic } from "./pixelSprites/clinic";
 import { nightclub } from "./pixelSprites/nightclub";
 import { spa } from "./pixelSprites/spa";
 import { skyBar } from "./pixelSprites/skyBar";
+import { daycare } from "./pixelSprites/daycare";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -106,6 +107,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // A Modern rooftop bar: a dusk lounge with a lit-skyline window, a bar of
       // glowing bottles, and patrons that fill in with occupancy.
       skyBar(d, u, x, y, w, h);
+      break;
+    case "daycare":
+      // A Modern daycare: a bright playroom with a soft play mat, toy shelf, a
+      // caregiver, and small children that fill in with occupancy.
+      daycare(d, u, x, y, w, h);
       break;
     case "shop":
       shop(d, u, x, y, w, h);

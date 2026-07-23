@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.96.0
+
+- Modern towers can build a new Daycare: it earns from parents dropping off and collecting kids (busiest on weekdays, not weekends), and condos on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size and fades over the next few floors). Unlocks at 3 stars. Modern only.
+
 ## 1.95.0
 
 - Modern towers can build a new Aquatic Center: a two-story swimming pool that, like a cinema, draws a real crowd who travel in to swim and lounge. It earns from how full it is and leans on your elevators to move everyone, and the pool fills and empties with the day. Unlocks at 3 stars. Modern only.
