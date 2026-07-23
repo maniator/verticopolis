@@ -12,6 +12,7 @@ import { hideBootCover } from "../bootstrap";
 import { rebuildEngine } from "./engineWiring";
 import { RESUME_AFTER_UPDATE_KEY, RESUME_RELOAD_MAX_AGE_MS } from "./updateFlow";
 import { gameplaySession, setCommonProps } from "../analytics";
+import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 
 /**
@@ -115,6 +116,11 @@ export function wireControllers(app: GameApp): void {
         star: app.sim?.star ?? 0,
         population: app.sim?.population ?? 0,
       });
+      // Additionally surface the crash in PostHog Error Tracking as a synthetic
+      // $exception (the crash event above is analytics; this is the Error
+      // Tracking lens on the same incident). Relay-only, host-gated, never-throw
+      // inside, so it can never break crash recovery.
+      reportCrashException(info.crash);
     },
     attemptGraphicsRecovery: (done) =>
       attemptContextRecovery(
