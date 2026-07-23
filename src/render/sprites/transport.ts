@@ -172,43 +172,55 @@ function drawStairFlight(ctx: CanvasRenderingContext2D, sx: number, w: number, b
     ctx.fillStyle = "#241E14";
     ctx.fillRect(r, nty, 1, Math.max(1, ty - nty));
   }
-  // Walnut handrail on balusters, riding parallel above the flight. The rail is
-  // clamped so it never rises above the arrival deck (bandTop): near the top it
-  // levels onto the landing and ends in a short newel post, so the flight reads
-  // as meeting the second floor rather than a rail floating past it.
-  const railY = (x: number) => Math.max(bandTop, Math.round(line(x)) - railH);
+  // Walnut handrail on balusters, riding parallel above the flight. It follows
+  // the incline to x1 (the front of the top stair), then runs flat across that
+  // stair to a newel at its right end, so the rail terminates in a post rather
+  // than in mid-air. Rising past bandTop is intended: as in the original, a
+  // flight breaks the floor line it arrives at.
+  const railEnd = sx + w - 3; // last column of the top stair
+  const railY = (x: number) => Math.round(line(Math.min(x, x1))) - railH;
   ctx.fillStyle = "#5A3E28";
-  for (let i = 1; i < n; i++) {
+  for (let i = 1; i <= n; i++) {
+    // i = n lands on x1, the joint between the top stair and the one below it.
     const bx = Math.round(x0 + i * treadW);
     const ry = railY(bx);
     ctx.fillRect(bx, ry, 1, Math.max(1, Math.round(line(bx)) - ry));
   }
-  for (let x = x0; x <= x1; x++) {
+  for (let x = x0; x <= railEnd; x++) {
     const ry = railY(x);
     ctx.fillStyle = "#6B4A2B";
     ctx.fillRect(x, ry, 1, 2);
     ctx.fillStyle = "#8A6440";
     ctx.fillRect(x, ry, 1, 1);
   }
-  // Bottom landing (lower deck) on the left, top landing (upper deck) on the
-  // right, both inside [sx, sx + w]. The top landing's top edge sits on bandTop
-  // (the arrival deck), so the flight lands flush on the second floor.
-  ctx.fillStyle = "#9A8666";
-  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 4);
-  ctx.fillStyle = "#B49E7A";
-  ctx.fillRect(sx + 2, yBot - 2, x0 - sx - 2, 1);
+  // The top stair: the tread the flight arrives on, sitting on bandTop so it
+  // lands flush with the second floor. Drawn in the same colors as every other
+  // step (cap, lit nosing, stringer body, shaded underside) so it reads as the
+  // last stair rather than a differently shaded landing. The departure end gets
+  // nothing: a stub poking out to the left of the bottom step reads as a broken
+  // tread, and the deck it would sit on is already drawn by the floor behind it.
   const rlx = x1;
   const rlw = sx + w - 2 - x1;
-  ctx.fillStyle = "#9A8666";
+  ctx.fillStyle = "#8A7454"; // stringer body
   ctx.fillRect(rlx, bandTop, rlw, 4);
-  ctx.fillStyle = "#B49E7A";
+  ctx.fillStyle = "#EDE6D2"; // tread cap
+  ctx.fillRect(rlx, bandTop, rlw, 2);
+  ctx.fillStyle = "#F8F2E0"; // lit nosing
   ctx.fillRect(rlx, bandTop, rlw, 1);
-  ctx.fillStyle = "#2A2018";
+  ctx.fillStyle = "#2A2018"; // shaded stringer underside edge
   ctx.fillRect(rlx, bandTop + 4, rlw, 1);
-  // Newel post where the rail meets the top landing, drawn AFTER the landing so
-  // it stands proud of it rather than being overpainted.
-  ctx.fillStyle = "#5A3E28";
-  ctx.fillRect(x1 - 1, bandTop, 2, Math.min(8, yBot - bandTop));
+  // Newel posts at both ends, drawn after the stair so they stand proud of it.
+  // The baluster loop now covers i = 1..n, so the only bare ends left are the
+  // foot of the rail and the far end of the top stair. Each newel runs from the
+  // handrail's height at that end down into the deck it is planted in.
+  const newel = (px: number, top: number, bottom: number): void => {
+    ctx.fillStyle = "#5A3E28";
+    ctx.fillRect(px - 1, top, 2, Math.max(1, bottom - top));
+    ctx.fillStyle = "#8A6440"; // lit cap, matches the handrail highlight
+    ctx.fillRect(px - 1, top, 2, 1);
+  };
+  newel(railEnd, railY(railEnd), bandTop + 4);
+  newel(x0, railY(x0), Math.round(line(x0)) + depth);
 }
 
 /** One escalator run: a clean inclined belt of metallic warm-gray steps with
