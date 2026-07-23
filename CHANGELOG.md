@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.95.0
+
+- Modern towers can build a new Aquatic Center: a two-story swimming pool that, like a cinema, draws a real crowd who travel in to swim and lounge. It earns from how full it is and leans on your elevators to move everyone, and the pool fills and empties with the day. Unlocks at 3 stars. Modern only.
+
 ## 1.94.0
 
 - Modern towers can build a new Sky Bar: a rooftop cocktail lounge with a lit-skyline window that fills in the evening. It earns from foot traffic, and the higher you place it the more it earns, because the skyline view is the draw: a bar up top pours far more than one down low. Unlocks at 3 stars. Modern only.

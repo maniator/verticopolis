@@ -52,6 +52,9 @@ export function isOpenAt(kind: FacilityKind, hour: number): boolean {
       return hour >= 12 && hour < 24;
     case "partyHall":
       return hour >= 17 && hour < 24;
+    case "aquaticCenter":
+      // A public pool keeps long daytime-into-evening hours.
+      return hour >= 8 && hour < 22;
     default:
       return true;
   }
@@ -101,7 +104,8 @@ export function hasBusinessHours(kind: FacilityKind): boolean {
     kind === "skyBar" ||
     kind === "shop" ||
     kind === "cinema" ||
-    kind === "partyHall"
+    kind === "partyHall" ||
+    kind === "aquaticCenter"
   );
 }
 

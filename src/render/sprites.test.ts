@@ -79,6 +79,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["nightclub", { kind: "nightclub" }],
     ["spa", { kind: "spa" }],
     ["sky bar", { kind: "skyBar" }],
+    ["aquatic center", { kind: "aquaticCenter" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -241,8 +242,7 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
   it("a Spa reads unattended when empty and shows a guest when full", () => {
     const empty = spyCtx();
     const full = spyCtx();
-    // A spa is open at hour 20 (the default draw hour), so the room draws rather
-    // than the closed shutter; the soaking guest gates on occupancy.
+    // Open at hour 20 (the default), so the room draws, not the shutter; the soaking guest gates on occupancy.
     drawUnit(draw({}, empty.ctx), unit({ kind: "spa", occupants: 0 }), 0, 0, 220, 44);
     drawUnit(draw({}, full.ctx), unit({ kind: "spa", occupants: 8 }), 0, 0, 220, 44);
     const occupant = "fillStyle=rgba(0,0,0,0.24)";

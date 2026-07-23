@@ -102,6 +102,7 @@ describe("attendance ledger is census-inert", () => {
     expect(dwellSecondsRange("cinema")).toEqual({ min: 90 * m, max: 120 * m });
     expect(dwellSecondsRange("partyHall")).toEqual({ min: 60 * m, max: 120 * m });
     expect(dwellSecondsRange("weddingHall")).toEqual({ min: 120 * m, max: 180 * m });
+    expect(dwellSecondsRange("aquaticCenter")).toEqual({ min: 60 * m, max: 120 * m });
     expect(dwellSecondsRange("fastFood")).toEqual({ min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX });
     expect(dwellSecondsRange(undefined)).toEqual({ min: EAT_SECONDS_MIN, max: EAT_SECONDS_MAX });
   });
@@ -117,10 +118,11 @@ describe("attendance ledger is census-inert", () => {
     expect(hall.occupants).toBe(0); // no audience art on a ruin
   });
 
-  it("catalog attendance caps exist exactly for the three entertainment venues", () => {
+  it("catalog attendance caps exist exactly for the entertainment attendance venues", () => {
     expect(attendanceCap("cinema")).toBe(30);
     expect(attendanceCap("partyHall")).toBe(20);
     expect(attendanceCap("weddingHall")).toBe(12);
+    expect(attendanceCap("aquaticCenter")).toBe(24); // Modern-only two-story pool
     expect(attendanceCap("fastFood")).toBeUndefined();
     expect(attendanceCap("office")).toBeUndefined();
   });

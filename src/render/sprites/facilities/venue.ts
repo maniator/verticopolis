@@ -93,6 +93,62 @@ export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   for (let sx = tx + 2; sx + 6 < tx + tw; sx += 13) { f(sx, fy - 14, 4, 5, "#5A3A5A"); seated(sx, fy); }
 }
 
+/**
+ * The two-story Aquatic Center (catalog `floors: 2`, an 88px rect): a bright,
+ * tiled pool hall lit by a row of skylights, with an upper diving platform and a
+ * big lane pool below. Swimmers (standing build, waist-deep once the water layer
+ * is drawn over them) and deck-chair loungers (seated build) fill in seed order
+ * up to the venue's live attendee count (`u.occupants`, the attendance mirror),
+ * so an empty pool draws none and a busy one fills. Static fills only, no `d.anim`
+ * read; the seed is geography so a TDT id renumber does not reshuffle the crowd.
+ */
+export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+  const ctx = d.ctx;
+  const f = (bx: number, by: number, bw: number, bh: number, c: string, o = 1) => {
+    ctx.fillStyle = c;
+    if (o !== 1) ctx.globalAlpha = o;
+    ctx.fillRect(Math.round(x + bx), Math.round(y + by), Math.max(1, Math.round(bw)), Math.max(1, Math.round(bh)));
+    if (o !== 1) ctx.globalAlpha = 1;
+  };
+  const n = Math.max(0, u.occupants | 0);
+  const geoSeed = (u.floor * 131 + u.x * 17) | 0;
+  let filled = 0;
+  const swim = (px: number, footY: number) => { if (filled < n) personStanding(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };
+  const lounge = (px: number, footY: number) => { if (filled < n) personSeated(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };
+
+  const WALL = "#2A5A66", WATER = "#2FA8C8", WATERLT = "#6FD6E4", DECK = "#D8E4E0";
+  const fy = h - 6;
+  // Aqua-tiled back wall with a faint tile grid.
+  f(0, 0, w, fy, WALL); f(0, 0, w, 2, shade(WALL, 18));
+  for (let ty = 7; ty < fy; ty += 7) f(0, ty, w, 1, shade(WALL, -12), 0.5);
+  for (let tx = 8; tx < w; tx += 8) f(tx, 0, 1, fy, shade(WALL, -12), 0.4);
+  // A row of skylights along the top.
+  for (let wx = 6; wx + 14 < w; wx += 20) {
+    f(wx, 4, 14, 11, "#BFE0EA"); f(wx, 4, 14, 1, "#FFFFFF", 0.6);
+    for (let i = 1; i < 3; i++) f(wx + Math.round((i * 14) / 3), 4, 1, 11, shade("#BFE0EA", -16));
+  }
+  // The floor slab between the two stories, and a diving tower on the right.
+  const midY = Math.round(h * 0.42);
+  f(0, midY, w, 2, DECK); f(0, midY, w, 1, "#FFFFFF", 0.5);
+  const dvX = w - 9;
+  f(dvX, midY - 16, 2, 16, "#9AA6AA"); f(dvX - 9, midY - 16, 11, 2, "#EEF3F5"); // ladder + board
+  swim(dvX - 6, midY - 16); // a diver waiting on the board
+  // Poolside deck band, then the lane pool sunk into the lower story.
+  f(0, midY + 2, w, 5, DECK);
+  const poolTop = midY + 7, poolBot = fy - 1;
+  f(3, poolTop, w - 6, poolBot - poolTop, WATER); f(3, poolTop, w - 6, 1, WATERLT);
+  // Swimmers standing on the pool floor, drawn BEFORE the water overlay so it
+  // covers their legs and they read as waist-deep.
+  for (let sx = 7; sx + 3 < w - 6; sx += 7) swim(sx, poolBot - 1);
+  // A translucent water layer over the lower pool: tints the submerged bodies.
+  f(3, poolTop + 3, w - 6, poolBot - poolTop - 3, WATER, 0.55);
+  // Lane ropes (dashed) and surface ripples on top.
+  for (let ly = poolTop + 2; ly < poolBot - 1; ly += 4) for (let lx = 5; lx < w - 6; lx += 4) f(lx, ly, 2, 1, "#EAF6F8", 0.45);
+  for (let rx = 6; rx < w - 6; rx += 5) f(rx, poolTop + 1 + ((rx >> 1) & 3), 3, 1, WATERLT, 0.5);
+  // Deck-chair loungers along the poolside band.
+  for (let lx = 5; lx + 5 < w - 4; lx += 11) { f(lx, midY + 3, 7, 2, "#E0A85A"); lounge(lx + 1, midY + 5); }
+}
+
 /** One 3x3 pixel flower for the arch garland and topiary, ported from the
  *  board's `bloom` helper: a colored bloom with a lighter top row and a white
  *  center highlight. Integer coordinates. */

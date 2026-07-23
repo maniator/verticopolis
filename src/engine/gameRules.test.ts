@@ -135,14 +135,14 @@ describe("CLASSIC_RULES", () => {
     }
     // The Modern-only footfall venues earn in Modern only and do not exist in the
     // Classic 1994 table at all.
-    for (const kind of ["foodHall", "amusements", "boutiqueBay", "nightclub", "spa", "skyBar"]) {
+    for (const kind of ["foodHall", "amusements", "boutiqueBay", "nightclub", "spa", "skyBar", "aquaticCenter"]) {
       expect(MODERN_RULES.commercialDailyIncome(kind)).toBe(ECON.dailyTrafficIncome[kind]);
       expect(ECON.dailyTrafficIncome[kind]).toBeGreaterThan(0);
       expect(ECON.classicDailyTrafficIncome[kind]).toBeUndefined();
     }
     // Kind classification is shared for every CANON venue; Modern additionally
     // carries its Modern-only venues (Food Hall, Amusements, Boutique Bay).
-    const MODERN_ONLY_VENUES = ["foodHall", "amusements", "boutiqueBay", "nightclub", "spa", "skyBar"];
+    const MODERN_ONLY_VENUES = ["foodHall", "amusements", "boutiqueBay", "nightclub", "spa", "skyBar", "aquaticCenter"];
     expect(Object.keys(ECON.classicDailyTrafficIncome).sort()).toEqual(
       Object.keys(ECON.dailyTrafficIncome)
         .filter((k) => !MODERN_ONLY_VENUES.includes(k))

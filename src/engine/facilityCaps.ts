@@ -54,6 +54,7 @@ export const BUILD_CAPS: Partial<Record<FacilityKind, number>> = {
   medical: 10,
   cinema: 16,
   partyHall: 16,
+  aquaticCenter: 8,
 };
 
 /** Pooled caps shared across several kinds (elevators, walkways). */

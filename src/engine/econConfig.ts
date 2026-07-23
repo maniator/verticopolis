@@ -13,6 +13,7 @@ export const ECON = {
     nightclub: 10_000,
     spa: 5_000,
     skyBar: 4_000,
+    aquaticCenter: 7_000,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
