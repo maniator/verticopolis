@@ -201,6 +201,10 @@ const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
     label: "Clinic",
     entries: [roomEntry("Clinic", "clinic"), ...retailEntries("clinic", CLINIC_SUBTYPES)],
   },
+  {
+    label: "Nightclub",
+    entries: [roomEntry("Nightclub", "nightclub")],
+  },
 ];
 
 /** A full-width section title (`header`) or a lighter per-kind label

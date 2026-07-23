@@ -1,8 +1,9 @@
 import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
+import { isOperational } from "../types";
 import type { Unit, VacateReason } from "../types";
-import { GRIPE_WARN, TRANSPORT_FAR_TILES } from "./constants";
+import { GRIPE_WARN, NIGHTCLUB_NOISE_FLOORS, TRANSPORT_FAR_TILES } from "./constants";
 import type { DemandMap } from "./demand";
 
 /**
@@ -143,8 +144,23 @@ export function dominantGripe(
   // demand, the last sink.
   if (veryFar) return "lobbyFar";
   if (noisy ?? sim.noiseAfflicted(u)) return "noise";
+  // A Modern nightclub within its noise range disturbs this sleeping tenant (the
+  // negative-halo cross-floor version of the noise cause), so name it "noise" too.
+  if (nearNightclub(sim, u)) return "noise";
   if (unmetActive()) return "unmetDemand";
   return null;
+}
+
+/** True when an operational, served nightclub sits within its noise range of `u`
+ *  (the same floor-distance the negative halo in `updateSatisfaction` penalizes).
+ *  Read-only, no RNG. */
+function nearNightclub(sim: Simulation, u: Pick<Unit, "floor">): boolean {
+  for (const c of sim.tower.units) {
+    if (c.kind === "nightclub" && isOperational(c) && sim.tower.isFloorServed(c.floor) && Math.abs(c.floor - u.floor) < NIGHTCLUB_NOISE_FLOORS) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /**

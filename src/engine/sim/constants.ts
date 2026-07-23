@@ -133,6 +133,16 @@ export const SERVED_RECOVERY = 0.05;
 export const FITNESS_HALO_FLOORS = 5;
 export const FITNESS_HALO_MAX = 0.03;
 
+/** Modern-only Nightclub NEGATIVE halo (gdd-modern-expansion): a condo or hotel
+ *  within `NIGHTCLUB_NOISE_FLOORS` floors of an operational nightclub loses
+ *  per-hour satisfaction to its noise, `NIGHTCLUB_NOISE_MAX` on the club's own
+ *  floor and fading linearly to 0 at the edge of the range. The max deliberately
+ *  exceeds `SERVED_RECOVERY`, so a home right by a nightclub net-declines and can
+ *  eventually give notice: the placement tension is real (keep clubs off
+ *  residential floors). Only the nearest club counts, so it can't stack. */
+export const NIGHTCLUB_NOISE_FLOORS = 4;
+export const NIGHTCLUB_NOISE_MAX = 0.08;
+
 /**
  * Unmet local-demand thresholds (leave-tower-unmet-demand, #395). A tenant's
  * retail demand-coverage sits in [0, 1] (1 = the reachable shops and eateries

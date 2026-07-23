@@ -10,6 +10,7 @@ export const ECON = {
     foodHall: 6_500,
     amusements: 4_500,
     boutiqueBay: 3_500,
+    nightclub: 10_000,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -61,6 +62,7 @@ export const ECON = {
     foodHall: 25,
     amusements: 15,
     boutiqueBay: 20,
+    nightclub: 30,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -86,6 +88,7 @@ export const ECON = {
     foodHall: 1.25,
     amusements: 1.4,
     boutiqueBay: 1.3,
+    nightclub: 1.5,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**
@@ -175,6 +178,10 @@ export const ECON = {
    *  blockbuster). A blockbuster costs more but draws bigger crowds. */
   cinemaBookingMonthly: 150_000,
   cinemaBookingBlockbuster: 300_000,
+  /** Monthly DJ booking a Modern nightclub pays, its cinema-style carrying cost
+   *  (a flat fee, no policy/RNG). Charged in `payMaintenance` on top of the
+   *  operating overhead, so a poorly-attended club runs at a loss. */
+  nightclubDjMonthly: 40_000,
   /** Cost to extend an elevator shaft by one floor (click or drag handle). */
   transportFloorCost: 5_000,
   /** Monthly property tax on an UNSOLD condo, as a fraction of its asking

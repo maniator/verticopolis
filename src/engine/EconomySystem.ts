@@ -475,10 +475,8 @@ export class EconomySystem {
       if (overhead > 0 && operational && isOverheadKind(u.kind) && !(u.kind === "condo" && u.everOccupied)) {
         charge(ledgerCatFor(u.kind) ?? "upkeep", overhead);
       }
-      // A cinema books a film each month (canon: 150k average / 300k
-      // blockbuster). The player sets a per-cinema policy; only "auto" consumes
-      // RNG (in the same order as before), so default cinemas are stream-identical.
-      // On fire / under construction it books nothing (flag cleared above).
+      // A cinema books a film each month (canon 150k / 300k blockbuster); only the
+      // "auto" policy draws RNG (same order), so default cinemas are stream-identical.
       if (u.kind === "cinema" && operational) {
         const policy = u.filmPolicy ?? "auto";
         const blockbuster =
@@ -487,6 +485,8 @@ export class EconomySystem {
         if (blockbuster) this.blockbusters.add(u.id);
         charge("entertainment", booking);
       }
+      // A Modern nightclub books a DJ monthly, a flat cinema-style carrying cost.
+      if (u.kind === "nightclub" && operational) charge("entertainment", ECON.nightclubDjMonthly);
     }
     if (cost > 0) {
       this.sim.money -= cost;

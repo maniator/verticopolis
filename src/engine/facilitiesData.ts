@@ -211,6 +211,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a small health clinic (dental, urgent care, optometry, pharmacy, physio). Pays a lease like an office: a quiet, steady tenant.",
   },
+  nightclub: {
+    kind: "nightclub",
+    category: "entertainment",
+    name: "Nightclub",
+    width: 20,
+    cost: 350000,
+    minStar: 3,
+    population: 30,
+    color: "#a24ad0",
+    modernOnly: true,
+    description: "Modern: a nightclub that fills after dark, earning when the office crowd is gone. Pays a monthly DJ booking, and its noise makes nearby homes unhappy: keep it away from condos.",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",
