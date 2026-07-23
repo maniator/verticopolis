@@ -57,7 +57,8 @@ guess.
 | S3 | Cookieless client transport: `sendBeacon` to `/api/ingest`, in-memory session id, dual-write to both Vercel and PostHog. Measure the mobile bundle delta and record it. | CAP-2 | `/gds-code-review` | none (no player-facing surface) | done (PR #582) |
 | S4 | Event enrichment: `platform` prop (resolves AUD-036), on-device returning and tenure buckets, the first-tower funnel. | CAP-3 | `/gds-code-review` | none (analytics-only, no player-facing surface) | done (PR #597) |
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | minor (`session_fps` emission) | done (PR #604) |
-| S5b | Cookieless JS error tracking: `$exception` through the relay (follow-up feature, not a CAP story). | CAP-2 posture | `/bmad-code-review` | minor (new emission) | in review |
+| S5b | Cookieless JS error tracking: `$exception` through the relay (follow-up feature, not a CAP story). | CAP-2 posture | `/bmad-code-review` | minor (new emission) | done (PR #608) |
+| S5c | Error-tracking enhancements + app-chrome telemetry: WebGL crashes to Error Tracking (synthetic `$exception`), top-level `$exception_type`, and one `app_action` event for the save/export/import/TDT/dialog/toggle/page surface (design-partied). Spec: `spec-posthog-error-tracking`. | see spec CAP-1..4 | `/bmad-code-review` | minor (new emissions) | in review |
 | S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
 
 ## S1 seam (as built)
@@ -439,3 +440,15 @@ game has none of today, rather than duplicating the WebGL-crash reporting.
   running client. Under the epic's own codified rule ("a new emission from the
   running game" bumps minor, even when nothing on screen changes), this matches
   S5, not S4, so it takes a minor bump (1.86.0 to 1.87.0), lockfile in lockstep.
+
+## S5c error-tracking enhancements + app-chrome telemetry (as built)
+
+Specced in `_bmad-output/specs/spec-posthog-error-tracking` (CAP-1..4) and design-partied before implementation. One combined PR at the user's request.
+
+- **WebGL crashes reach Error Tracking (CAP-1).** `analyticsErrors.reportCrashException` emits a synthetic `$exception` (type `WebGLContextLost`, mechanism handled+synthetic, stable fingerprint so all WebGL losses group into one issue, crash flags as context) through the same `report()` machinery, wired at the crash site after `noteCrash`. The typed `crash` event still fires: two lenses on one incident, documented so they are not summed as a double-count. Fixes the earlier gap where the #538 crash was invisible in the Error Tracking product.
+- **Exceptions are breakdownable by type (CAP-2).** Every `$exception` now carries a top-level `$exception_type`, so a dashboard trend splits errors by kind without reaching into the nested `$exception_list`.
+- **One `app_action` event for the whole app chrome (CAP-4).** A single parametrized `app_action { action: AppActionName; detail? }` keyed by a closed union covers save/quick-save, slot save/load/delete, export/import, TDT export/import, the settings/help/compare/saves/stats/replay-onboarding opens, the mute/reduced-motion/steady-clock toggles (detail on/off), and the standalone help/gallery landings. `speed` and `volume` are coarse, session-latched (`trackAppActionOnce`) so the pointer-move slider and repeated speed taps cannot flood; `speed` is wired at the user controls, not the `setSpeed` choke, because the game auto-runs at Slow after the splash. Wired at clean choke points (`uiCallbacks`, `audioPrefs`, `appModals`, `uiDialogs`); the persistence + replay calls live in `uiCallbacks` so `saveLoad.ts` and `main.ts` (both at the 500-line ceiling) stay untouched.
+- **Design-party rulings (recorded in the spec memlog).** CUT the low-signal micro-actions (undo/redo/overlay, and a rename VALUE, the tower name is player-authored and never sent). The deep editor economy actions (rent/cars/schedule) are a separate gameplay-analytics story with its own `/gds-code-review` (#611). The cookieless "who" caveat is stated in words on the dashboard: answers are per-session and cohort, never per-person; the vocabulary does not answer "who are my power users."
+- **Dashboard as code.** The provisioning script gains an error-tracking section (errors over time, by type, top issues by fingerprint, by platform/version, WebGL crashes by recovery outcome) and an app-chrome section (actions by type, over time, persistence by action and by platform cohort, help/gallery landings, mute by state), each carrying the cookieless caveat.
+- **Bundle delta: negligible (main chunk flat within build noise vs origin/main).** The wiring is a few dozen one-line, host-gated, off-render-path calls. Well under the 5 KB ceiling.
+- **Version bump: minor.** New client-emitted event categories (`app_action`, the synthetic crash `$exception`), the same rule that bumped `session_fps` and the base error tracking.

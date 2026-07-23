@@ -1,5 +1,6 @@
 import type { GameApp } from "../main";
 import { savePrefs, reducedMotionActive } from "../storage/Prefs";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 
 /**
  * Audio, accessibility, and steady-clock preference commands, split out of the
@@ -20,6 +21,7 @@ export function toggleMute(app: GameApp): boolean {
   // there would contradict the muted game after dismissal (SPEC-splash-mute
   // CAP-2, one source of truth includes its visible views).
   app.ui.setAudioGlyph(app.audio.muted);
+  trackAppAction("mute", app.audio.muted ? "on" : "off"); // new muted state
   return app.audio.muted;
 }
 
@@ -31,6 +33,9 @@ export function setVolume(app: GameApp, kind: "music" | "ambience" | "sfx", valu
   // events arrive at pointer-move rate and each start() would allocate
   // a fresh resume() promise for nothing.
   if (!app.audio.started) app.audio.start();
+  // Session-latched: this fires at pointer-move rate, so count only the first
+  // touch ("did the player adjust audio levels at all"), never the value.
+  trackAppActionOnce("volume");
   app.audio.setVolumes(
     kind === "music" ? value : app.audio.musicVolume,
     kind === "ambience" ? value : app.audio.ambienceVolume,
@@ -48,13 +53,16 @@ export function toggleReducedMotion(app: GameApp): boolean {
   app.prefs.reducedMotion = !app.prefs.reducedMotion;
   savePrefs(app.prefs);
   applyReducedMotion(app);
-  return reducedMotionActive(app.prefs, app.reduceMq.matches);
+  const on = reducedMotionActive(app.prefs, app.reduceMq.matches);
+  trackAppAction("reduced_motion", on ? "on" : "off"); // new effective state
+  return on;
 }
 
 /** Toggle the steady-clock pref and return the new steady state. */
 export function toggleSteadyClock(app: GameApp): boolean {
   app.prefs.steadyClock = !app.prefs.steadyClock;
   savePrefs(app.prefs);
+  trackAppAction("steady_clock", app.prefs.steadyClock ? "on" : "off"); // new steady state
   return app.prefs.steadyClock;
 }
 

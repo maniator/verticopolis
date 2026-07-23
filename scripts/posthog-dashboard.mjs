@@ -34,14 +34,16 @@ const TAG = "analytics-migration";
 const PROD_ONLY = [{ key: "environment", operator: "exact", type: "event", value: ["production"] }];
 const LAST_30D = { date_from: "-30d" };
 
-/** A trends insight source (event counts / breakdowns / percentiles over time). */
-function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimit } = {}) {
+/** A trends insight source (event counts / breakdowns / percentiles over time).
+ *  `where` adds event-property filters on top of the production filter, e.g.
+ *  restricting `app_action` to a subset of action names. */
+function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimit, where } = {}) {
   const source = {
     kind: "TrendsQuery",
     series,
     dateRange: LAST_30D,
     interval: "day",
-    properties: PROD_ONLY,
+    properties: where ? [...PROD_ONLY, ...where] : PROD_ONLY,
     trendsFilter: { display },
   };
   if (breakdown) {
@@ -49,6 +51,11 @@ function trends(series, { breakdown, display = "ActionsLineGraph", breakdownLimi
     if (breakdownLimit) source.breakdownFilter.breakdown_limit = breakdownLimit;
   }
   return { kind: "InsightVizNode", source };
+}
+
+/** An event-property filter for a `where` clause (a subset of `action` values). */
+function inAction(values) {
+  return { key: "action", operator: "exact", type: "event", value: values };
 }
 
 /** One event series node. `math` may be a count math ("total"/"dau") or a
@@ -178,6 +185,83 @@ const INSIGHTS = [
   { name: "Platform table", description: "Boots by platform as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }) },
   { name: "Tool usage table", description: "tool_used by tool as a table, production, 30d.", query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsTable", breakdownLimit: 25 }) },
   { name: "Boot reason table", description: "Boots by reason as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }) },
+  // Reliability / error tracking. $exception is the cookieless error signal
+  // (uncaught JS errors + unhandled rejections + synthetic WebGL-crash events);
+  // the typed `crash` event keeps the structured crash-recovery detail.
+  {
+    name: "JavaScript errors over time",
+    description: "Daily $exception count (uncaught errors, rejections, and WebGL crashes), production.",
+    query: trends([series("$exception", "Errors")]),
+  },
+  {
+    name: "Errors by type",
+    description: "$exception by top-level $exception_type (TypeError / WebGLContextLost / ...), production.",
+    query: trends([series("$exception", "Errors")], { breakdown: "$exception_type", display: "ActionsBar", breakdownLimit: 25 }),
+  },
+  {
+    name: "Top error issues",
+    description: "$exception grouped by $exception_fingerprint (the distinct issues), production.",
+    query: trends([series("$exception", "Errors")], { breakdown: "$exception_fingerprint", display: "ActionsTable", breakdownLimit: 50 }),
+  },
+  {
+    name: "Errors by platform",
+    description: "$exception by platform (web / twa / ios), production.",
+    query: trends([series("$exception", "Errors")], { breakdown: "platform", display: "ActionsPie" }),
+  },
+  {
+    name: "Errors by build version",
+    description: "$exception by build version, so a regression in a new build is visible, production.",
+    query: trends([series("$exception", "Errors")], { breakdown: "version", display: "ActionsTable" }),
+  },
+  { name: "Errors (30d)", description: "Total $exception events, production, 30d.", query: trends([series("$exception", "Errors")], { display: "BoldNumber" }) },
+  {
+    name: "WebGL crashes by recovery outcome",
+    description: "The typed crash event split by whether in-place recovery failed (structured crash detail), production.",
+    query: trends([series("crash", "Crashes")], { breakdown: "recoveryFailed", display: "ActionsBar" }),
+  },
+  // App-chrome actions (the app_action event). COOKIELESS: every tile here is
+  // per-session and cohort, never per-person. "8% of sessions exported, more
+  // among returning desktop players" is answerable; "who are my power users" is
+  // NOT, there is no cross-session identity to thread. Do not read these as
+  // individuals.
+  {
+    name: "App actions by type",
+    description: "Every app_action broken down by action (save / export / import / TDT / dialog opens / toggles / page landings), production, 30d. COOKIELESS: session counts, never individuals.",
+    query: trends([series("app_action", "Actions")], { breakdown: "action", display: "ActionsTable", breakdownLimit: 40 }),
+  },
+  {
+    name: "App actions over time",
+    description: "Daily total app_action volume (app-chrome engagement), production. Cookieless session counts.",
+    query: trends([series("app_action", "Actions")]),
+  },
+  {
+    name: "Persistence actions (save / export / import / TDT)",
+    description: "app_action restricted to the persistence surface, by action, production. Who saves/exports/uses the TDT round-trip, in aggregate.",
+    query: trends([series("app_action", "Actions")], {
+      breakdown: "action",
+      display: "ActionsBar",
+      where: [inAction(["quick_save", "save_slot", "load_slot", "delete_save", "export_save", "import_save", "export_tdt", "import_tdt"])],
+    }),
+  },
+  {
+    name: "Persistence actions by platform (cohort)",
+    description: "The persistence surface split by platform, so 'who exports' reads as a cohort (web / twa / ios), production. Never a person.",
+    query: trends([series("app_action", "Actions")], {
+      breakdown: "platform",
+      display: "ActionsTable",
+      where: [inAction(["quick_save", "save_slot", "export_save", "import_save", "export_tdt", "import_tdt"])],
+    }),
+  },
+  {
+    name: "Standalone page landings (help & gallery)",
+    description: "Landings on the /help and /gallery pages (app_action page_help / page_gallery), production. These pages report nowhere else in PostHog.",
+    query: trends([series("app_action", "Landings")], { breakdown: "action", display: "ActionsBar", where: [inAction(["page_help", "page_gallery"])] }),
+  },
+  {
+    name: "Mute toggles by state",
+    description: "app_action mute split by the new state (on / off), so the share of sessions that play muted is visible, production.",
+    query: trends([series("app_action", "Mute toggles")], { breakdown: "detail", display: "ActionsPie", where: [inAction(["mute"])] }),
+  },
 ];
 
 const api = (path) => `${HOST}/api/projects/${PROJECT_ID}${path}`;

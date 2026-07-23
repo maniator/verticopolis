@@ -3,6 +3,7 @@ import { pageShell } from "./ui/templates/pageShell";
 import { HELP_SECTIONS, helpLede, helpAboutBody, helpReportBlock } from "./ui/templates/helpContent";
 import { compareFigures } from "./ui/templates/compareFigures";
 import { injectVercelTelemetry } from "./telemetry";
+import { trackAppAction } from "./analytics";
 
 /**
  * Entry for the standalone `/help` page: the shareable, canonical How-to-play
@@ -53,6 +54,7 @@ export function helpPageTemplate(): TemplateResult {
 
 function main(): void {
   injectVercelTelemetry();
+  trackAppAction("page_help"); // landing on the standalone /help page (host-gated inside)
   const root = document.getElementById("app");
   if (!root) return;
   // The build prerenders this page's markup into #app (scripts/prerender-help.ts)

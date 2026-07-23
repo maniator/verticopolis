@@ -21,6 +21,7 @@ import type { UpdateInfo } from "../pwa";
 import { routeExternalInWrapper } from "./externalLink";
 import { isInstalledStandalone } from "./standalone";
 import { getPlatform } from "../platform";
+import { trackAppAction } from "../analytics";
 
 /**
  * Dialog and modal controllers for {@link UI}, as friend functions taking the
@@ -239,6 +240,7 @@ export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload:
 }
 
 export function showHelp(ui: UI): void {
+  trackAppAction("help_open");
   // Replaying the intro is meaningless while the title screen is still up, so
   // disable that button there.
   const onSplash = !!document.getElementById("splash");
@@ -281,6 +283,7 @@ export function showHelp(ui: UI): void {
  * path, so a double dismissal can't over-restore or leave the tower stuck paused.
  */
 export function showCompare(ui: UI): void {
+  trackAppAction("compare_open");
   const dialog = ui.el.modal as HTMLDialogElement;
   // Open the modal FIRST, then pause. If the render/open ever threw, pausing
   // first would leave the tower stuck at speed 0 with no modal to dismiss and no
@@ -309,6 +312,7 @@ export function showCompare(ui: UI): void {
 
 /** The Settings dialog: sound levels plus the presentation toggles. */
 export function showSettings(ui: UI): void {
+  trackAppAction("settings_open");
   // Same build constant the splash and Help's About line show; masked to a fixed
   // placeholder in screenshots (see pgMaskVersion, which keys on `.app-version`).
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
