@@ -135,3 +135,44 @@ describe("Fire aftermath — gutted shells (canon), not auto-repair", () => {
     expect(isOperational({ state: "construction" })).toBe(false);
   });
 });
+
+describe("Emergency counters — the analytics-only tallies the shell reads (#611)", () => {
+  it("a fresh tower starts every emergency counter at zero", () => {
+    const { sim } = firePrep(7, 1);
+    expect(sim.events.counts).toEqual({ fires: 0, firesGutRooms: 0, bombs: 0 });
+  });
+
+  it("counts a fire OUTBREAK on ignition (a spread is the same fire, not a new one)", () => {
+    const { sim } = firePrep(7, 1);
+    sim.startFire();
+    expect(sim.events.counts.fires).toBe(1);
+  });
+
+  it("counts a room gutted BY FIRE when a blaze is contained", () => {
+    const { sim, x0 } = firePrep(11, 1);
+    sim.startFire();
+    defend(sim, x0);
+    let g = 0;
+    while (sim.fires > 0 && g++ < 20) sim.tick(60 * 24); // burns down to a gutted shell
+    expect(sim.events.counts.firesGutRooms).toBe(1);
+  });
+
+  it("counts a bomb detonation only when it actually detonates (no Security on duty)", () => {
+    const { sim } = firePrep(5, 2);
+    sim.bombThreat(); // nothing to defuse it → it detonates
+    expect(sim.events.counts.bombs).toBe(1);
+    // The rooms the bomb gutted are BOMB losses, deliberately not tallied as fire.
+    expect(sim.events.counts.firesGutRooms).toBe(0);
+  });
+
+  it("a bomb sweep with Security on duty is not counted as a detonation", () => {
+    const { sim, x0 } = firePrep(5, 2);
+    const guard = sim.tower.place("security", 2, x0 + 30);
+    if (guard) {
+      const u = sim.tower.units.find((unit) => unit.kind === "security");
+      if (u) u.state = "occupied";
+    }
+    sim.bombThreat(); // Security sweeps: no detonation
+    expect(sim.events.counts.bombs).toBe(0);
+  });
+});

@@ -6,7 +6,7 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
-import { gameplaySession } from "../analytics";
+import { gameplaySession, trackEconomyAction } from "../analytics";
 
 /**
  * The money boundary of the game shell: every gesture that buys, paints, or
@@ -206,15 +206,21 @@ export class BuildActions {
     sim.tower.removeUnit(u.id);
     // A gutted shell has no salvage value; everything else refunds half.
     sim.money += u.state === "gutted" ? 0 : resaleRefund(u.kind);
+    // A real player removal (the sole choke point for the bulldoze tool and the
+    // editor Sell); `verb` is the sell-vs-bulldoze detail. Per-action: a drag
+    // sweep is many genuine removals, each its own demolish.
+    trackEconomyAction("demolish", verb);
     return true;
   }
 
   /** Tear out a shaft and pay its resale — the ONE refund path shared by the
-   *  editor's Sell and the bulldozer, so the payout can't drift. */
-  removeTransportWithRefund(t: Transport): void {
+   *  editor's Sell and the bulldozer, so the payout can't drift. `verb` is the
+   *  sell-vs-bulldoze telemetry detail (the caller's gesture). */
+  removeTransportWithRefund(t: Transport, verb: "sell" | "bulldoze"): void {
     const sim = this.deps.getSim();
     sim.tower.removeTransport(t.id);
     sim.money += resaleRefund(t.kind);
+    trackEconomyAction("demolish", verb);
   }
 
   /** Charge guard for editor actions: false (with error sfx + toast) if the
@@ -239,7 +245,7 @@ export class BuildActions {
     } else {
       const t = sim.tower.getTransport(p.id);
       if (!t) return;
-      this.removeTransportWithRefund(t);
+      this.removeTransportWithRefund(t, "bulldoze");
     }
     this.deps.audio.sfx("sell");
     if (this.deps.selectedId() === p.id) this.deps.clearSelection();
