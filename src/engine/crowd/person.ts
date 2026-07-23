@@ -229,6 +229,7 @@ const ATTEND_MINUTES: Partial<Record<FacilityKind, { min: number; max: number }>
   cinema: { min: 90, max: 120 },
   partyHall: { min: 60, max: 120 },
   weddingHall: { min: 120, max: 180 },
+  aquaticCenter: { min: 60, max: 120 }, // a swim session, like a party
 };
 
 /** The stationary-dwell window (in crowd-seconds) for a round-tripper at a

@@ -50,10 +50,13 @@ export type VisitOrigin = "outside" | "condo" | "office" | "hotel";
  *  with up to one outer step of lag at the boundary: spawning reads the
  *  bins before the hourly presence pass, the same staleness every spawn bin
  *  has). Wedding guests are invited from outside only. */
-const VISIT_ORIGINS: Record<"cinema" | "partyHall" | "weddingHall", VisitOrigin[]> = {
+const VISIT_ORIGINS: Record<"cinema" | "partyHall" | "weddingHall" | "aquaticCenter", VisitOrigin[]> = {
   cinema: ["outside", "condo", "office", "hotel"],
   partyHall: ["outside", "condo", "hotel"],
   weddingHall: ["outside"],
+  // A public pool draws the street, residents, and hotel guests (the office
+  // crowd is at work); the same leisure mix as the party hall.
+  aquaticCenter: ["outside", "condo", "hotel"],
 };
 
 /** The spawn-floor bin a room-origin draws from (see {@link spawnVenueVisit}). */
@@ -110,6 +113,8 @@ export function pushVenueVisitOptions(
   }
   const halls = floors.venuesByKind.partyHall;
   if (halls?.length) pushVisits("partyHall", halls);
+  const pools = floors.venuesByKind.aquaticCenter;
+  if (pools?.length) pushVisits("aquaticCenter", pools);
   const weddings = floors.venuesByKind.weddingHall;
   if (
     weddings?.length &&

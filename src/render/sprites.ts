@@ -3,6 +3,7 @@ import type { FacilityKind, Unit } from "../engine/types";
 import { drawRoom } from "./pixelSprites";
 import type { DrawCtx } from "./sprites/common";
 import {
+  drawAquaticCenter,
   drawHousekeeping,
   drawMedical,
   drawMetro,
@@ -100,6 +101,8 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
   switch (u.kind) {
     case "partyHall":
       return drawPartyHall(d, u, x, y, w, h);
+    case "aquaticCenter":
+      return drawAquaticCenter(d, u, x, y, w, h);
     case "parking":
       return drawParking(d, u, x, y, w, h);
     case "parkingRamp":

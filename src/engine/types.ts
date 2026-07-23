@@ -68,6 +68,7 @@ export type FacilityKind =
   | "nightclub"
   | "spa"
   | "skyBar"
+  | "aquaticCenter"
   | "stairs"
   | "escalator"
   | "elevatorStandard"

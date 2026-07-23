@@ -16,4 +16,4 @@
 export { drawHousekeeping, drawMedical, drawMetro, drawRecycling, drawSecurity } from "./facilities/service";
 export { drawParking, drawParkingRamp } from "./facilities/garage";
 export { drawGarbageTruck, drawMetroTrain, drawStreetCar } from "./facilities/vehicles";
-export { drawPartyHall, drawWeddingHall } from "./facilities/venue";
+export { drawAquaticCenter, drawPartyHall, drawWeddingHall } from "./facilities/venue";
