@@ -120,6 +120,17 @@ function buildBreakdownQuery(event, prop, days, limit = 100) {
   );
 }
 
+/** HogQL count of one event narrowed by an extra boolean expression, returning
+ *  events and distinct sessions like the totals query. `where` is a TRUSTED,
+ *  hardcoded HogQL fragment (never user input), e.g. `toFloat(properties.fires)
+ *  > 0` to count the session_emergencies rows that saw at least one fire. */
+function buildFilteredCountQuery(event, where, days) {
+  return (
+    `SELECT count() AS events, count(DISTINCT distinct_id) AS sessions ` +
+    `FROM events WHERE ${SCOPE(days)} AND event = ${lit(event)} AND (${where})`
+  );
+}
+
 /** POST a HogQL query. Never throws: returns a tagged result so a caller can
  *  render a skipped section instead of aborting the whole report. */
 async function runQuery(query) {
@@ -213,6 +224,14 @@ function breakdownRows(res) {
       sessions: Number(r.sessions) || 0,
     }))
     .sort((a, b) => b.events - a.events);
+}
+
+/** Pull the single `{ events, sessions }` row from a filtered-count query, zeroed
+ *  when the query was skipped or the window is empty. */
+function countRow(res) {
+  if (!res.ok) return { events: 0, sessions: 0, skipped: true, hint: res.hint };
+  const r = rowsToObjects(res.json)[0];
+  return { events: Number(r?.events) || 0, sessions: Number(r?.sessions) || 0 };
 }
 
 const fmt = (n) => (n == null || Number.isNaN(n) ? "n/a" : Number(n).toLocaleString("en-US"));
@@ -400,11 +419,16 @@ function demoModel() {
       ["Boots", 5400],
       ["Play sessions", 2600],
       ["Crashes", 37],
+      ["App actions", 1830],
+      ["Economy actions", 640],
+      ["Emergency choices", 210],
+      ["Errors", 54],
     ],
     highlights: [
       ["Founded to first build", "81.6%"],
       ["Crash to boot ratio", "0.7%"],
       ["Typical session fps (p50)", "58"],
+      ["Sessions with a fire", "6.2%"],
     ],
     depth: [
       { label: "Session length (seconds)", row: depth(3120, 92, 640, 1180, 4200) },
@@ -420,6 +444,22 @@ function demoModel() {
         tables: [
           { ok: true, caption: "By platform", header: "Platform", ...rows([["web", 4200, 2000], ["twa", 900, 500], ["ios", 300, 100]]) },
           { ok: true, caption: "By reason", header: "Reason", ...rows([["continue", 2600, 1500], ["fresh", 2100, 900], ["update", 480, 360]]) },
+        ],
+      },
+      {
+        title: "App-chrome actions",
+        tables: [{ ok: true, caption: "app_action by action", header: "Action", ...rows([["quick_save", 720, 480], ["settings_open", 410, 300], ["export_save", 160, 140]]) }],
+      },
+      {
+        title: "Economy actions",
+        tables: [{ ok: true, caption: "economy_action by action", header: "Action", ...rows([["demolish", 380, 260], ["price_tune", 180, 170], ["capacity_tune", 80, 78]]) }],
+      },
+      {
+        title: "Emergencies",
+        tables: [
+          { ok: true, caption: "Emergency choices by kind", header: "Kind", ...rows([["fireRescue", 150, 130], ["bombThreat", 60, 55]]) },
+          { ok: true, caption: "Emergency choices by decision", header: "Decision", ...rows([["accept", 120, 108], ["decline", 90, 84]]) },
+          { ok: true, caption: "Fire occurrence", header: "Metric", ...rows([["Sessions with a fire", 170, 162], ["Sessions reporting (all played)", 2580, 2580]]) },
         ],
       },
     ],
@@ -440,7 +480,12 @@ async function main() {
     return writeAll(model, { demo: "sample data (no API calls)" });
   }
 
-  const TOTAL_EVENTS = ["boot", "session_end", "game_started", "first_build", "star_reached", "crash", "update"];
+  const TOTAL_EVENTS = [
+    "boot", "session_end", "game_started", "first_build", "star_reached", "crash", "update",
+    // App-chrome (#614), error tracking, and the gameplay economy / emergency
+    // surfaces (#611). Each only has history from when its build went live.
+    "app_action", "economy_action", "emergency_choice", "session_emergencies", "$exception",
+  ];
   const raw = {};
   const q = async (label, query) => {
     const r = await runQuery(query);
@@ -479,6 +524,17 @@ async function main() {
   const bootByRecency = await bd("boot_by_recency", "boot", "recency");
   const crashByRecovery = await bd("crash_by_recoveryFailed", "crash", "recoveryFailed");
   const updateByTo = await bd("update_by_to", "update", "to");
+  // App-chrome (#614), error tracking, and gameplay economy / emergencies (#611).
+  const appActionByAction = await bd("app_action_by_action", "app_action", "action");
+  const exceptionByType = await bd("exception_by_type", "$exception", "$exception_type");
+  const economyByAction = await bd("economy_action_by_action", "economy_action", "action");
+  const emergencyByKind = await bd("emergency_choice_by_kind", "emergency_choice", "kind");
+  const emergencyByDecision = await bd("emergency_choice_by_decision", "emergency_choice", "decision");
+  // Fire rate: the session_emergencies rows with at least one fire, over all
+  // session_emergencies (emitted once per played session), gives "% of sessions
+  // with a fire". `fires` is a server-trusted integer prop, not user input.
+  const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", DAYS));
+  const firesWithFire = countRow(firesRes);
 
   const fpsP50 = depth.find((d) => d.label === "Session fps (p50)")?.row;
   const model = {
@@ -492,11 +548,18 @@ async function main() {
       ["Boots", totals.boot.events],
       ["Play sessions", totals.boot.sessions],
       ["Crashes", totals.crash.events],
+      ["App actions", totals.app_action.events],
+      ["Economy actions", totals.economy_action.events],
+      ["Emergency choices", totals.emergency_choice.events],
+      ["Errors", totals["$exception"].events],
     ],
     highlights: [
       ["Founded to first build", pct(totals.first_build.events, totals.game_started.events)],
       ["Crash to boot ratio", pct(totals.crash.events, totals.boot.events)],
       ["Typical session fps (p50)", fpsP50 && !fpsP50.skipped && !fpsP50.empty ? fmt(rnd(fpsP50.p50)) : "n/a"],
+      // Fire rate: sessions with >=1 fire over all played sessions that reported.
+      // "n/a" (not a false 0.0%) when that one query was skipped while totals succeeded.
+      ["Sessions with a fire", firesWithFire.skipped ? "n/a" : pct(firesWithFire.sessions, totals.session_emergencies.sessions)],
     ],
     depth,
     sections: [
@@ -520,6 +583,38 @@ async function main() {
         tables: [
           { ...crashByRecovery, caption: "Crashes by failed in-place recovery", header: "Recovery failed" },
           { ...updateByTo, caption: "Updates by target version", header: "To version" },
+          { ...exceptionByType, caption: "Errors ($exception) by type", header: "Exception type" },
+        ],
+      },
+      {
+        title: "App-chrome actions",
+        tables: [
+          { ...appActionByAction, caption: "app_action by action (save / export / TDT / dialog opens / toggles / page landings)", header: "Action" },
+        ],
+      },
+      {
+        title: "Economy actions",
+        tables: [
+          { ...economyByAction, caption: "economy_action by action (demolish / price_tune / capacity_tune)", header: "Action" },
+        ],
+      },
+      {
+        title: "Emergencies",
+        tables: [
+          { ...emergencyByKind, caption: "Emergency choices by kind (fireRescue / bombThreat)", header: "Kind" },
+          { ...emergencyByDecision, caption: "Emergency choices by decision (accept / decline)", header: "Decision" },
+          {
+            // Skip the whole table (not a false zero numerator) if the fires
+            // query failed while totals succeeded; carries the hint like the rest.
+            ok: firesRes.ok,
+            hint: firesRes.hint,
+            caption: "Fire occurrence (session_emergencies emits once per played session)",
+            header: "Metric",
+            rows: [
+              { key: "Sessions with a fire", events: firesWithFire.events, sessions: firesWithFire.sessions },
+              { key: "Sessions reporting (all played)", events: totals.session_emergencies.events, sessions: totals.session_emergencies.sessions },
+            ],
+          },
         ],
       },
     ],
@@ -555,4 +650,4 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests; the script itself uses them directly above.
-export { clampDays, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows };
+export { clampDays, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
