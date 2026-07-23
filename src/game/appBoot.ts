@@ -293,7 +293,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       // any not-standalone session, routed through the SAME activation the in-game
       // surfaces use (native prompt where captured, else an honest how-to).
       installOffered: () => splashInstallOffered(),
-      onInstall: () => void activateInstall(app).catch(() => {}),
+      onInstall: () => void activateInstall(app, "splash").catch(() => {}),
       onContinue: () => {
         // Only rendered when `hasSave`. teardownSplash() resumes the engine to
         // play speed, so re-pause: a returning player lands back in their tower

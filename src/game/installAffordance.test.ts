@@ -194,7 +194,7 @@ describe("splash front door (CAP-5)", () => {
     e.preventDefault = vi.fn();
     window.dispatchEvent(e);
 
-    await activateInstall(app);
+    await activateInstall(app, "splash");
     expect(promptSpy).toHaveBeenCalledTimes(1);
     expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
   });
@@ -203,7 +203,7 @@ describe("splash front door (CAP-5)", () => {
     const app = makeApp(); // default UA is Linux Chrome, not iOS
     initInstallAffordance(app);
     expect(canPromptInstall()).toBe(false);
-    await activateInstall(app);
+    await activateInstall(app, "splash");
     // No native prompt possible, so the honest browser-menu how-to opens: it must
     // be the browser variant (mentions the browser menu), NOT the iOS Safari steps.
     expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
@@ -217,7 +217,7 @@ describe("splash front door (CAP-5)", () => {
     const app = makeApp();
     initInstallAffordance(app);
     expect(canPromptInstall()).toBe(false); // iOS never fires beforeinstallprompt
-    await activateInstall(app);
+    await activateInstall(app, "splash");
     expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
     // The iOS variant names the Safari Share sheet; the browser-menu copy must not leak in.
     expect(openedModalText(app)).toMatch(/Safari/);
@@ -238,8 +238,8 @@ describe("splash front door (CAP-5)", () => {
     e.preventDefault = vi.fn();
     window.dispatchEvent(e);
 
-    const first = activateInstall(app); // enters the prompt branch, awaits userChoice
-    await activateInstall(app); // concurrent tap: must be a no-op, NOT a how-to
+    const first = activateInstall(app, "splash"); // enters the prompt branch, awaits userChoice
+    await activateInstall(app, "splash"); // concurrent tap: must be a no-op, NOT a how-to
     expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
     release();
     await first;
@@ -250,8 +250,45 @@ describe("splash front door (CAP-5)", () => {
     window.matchMedia = vi.fn((q: string) => ({ matches: q.includes("standalone") }) as MediaQueryList);
     const app = makeApp();
     initInstallAffordance(app);
-    await activateInstall(app);
+    await activateInstall(app, "splash");
     expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe("per-surface tap tracking (CAP-4 install_offer)", () => {
+  it("reports the tapped surface: the topbar chip as 'chip'", () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    initInstallAffordance(makeApp());
+    makeInstallable();
+    chip().click();
+    expect(track).toHaveBeenCalledWith("install_offer", "chip");
+  });
+
+  it("reports the Game-panel entry as 'menu'", () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    initInstallAffordance(makeApp());
+    makeInstallable();
+    menu().click();
+    expect(track).toHaveBeenCalledWith("install_offer", "menu");
+  });
+
+  it("reports the splash front door as 'splash' via activateInstall", async () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    const app = makeApp();
+    initInstallAffordance(app);
+    await activateInstall(app, "splash");
+    expect(track).toHaveBeenCalledWith("install_offer", "splash");
+  });
+
+  it("records the tap even when no offer is available (the engagement half of the funnel)", async () => {
+    // No captured event, not iOS, not standalone: the how-to fallback path. The tap
+    // must still be counted, so the offer's reach is measured independent of outcome.
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    const app = makeApp();
+    initInstallAffordance(app);
+    expect(canPromptInstall()).toBe(false);
+    await activateInstall(app, "splash");
+    expect(track).toHaveBeenCalledWith("install_offer", "splash");
   });
 });
 

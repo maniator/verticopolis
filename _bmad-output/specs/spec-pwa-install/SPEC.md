@@ -28,8 +28,8 @@ sources: []
   - **success:** On iOS-Safari-not-standalone the same affordance is present, and tapping it (chip or Game-panel entry) opens a short, honest "Add to Home Screen" how-to; the how-to is never auto-shown and the control is never dressed as one-tap. A test pins that iOS routes to the how-to, not to a `prompt()` path.
 
 - **CAP-4**
-  - **intent:** The team learns how many players install, and how the affordance performs, without interrupting anyone.
-  - **success:** The `appinstalled` event and a boot-time display-mode bucket (standalone vs browser) flow into the existing cookieless analytics enrichment; no player-facing telemetry surface is added. A test pins the display-mode bucket value and that `appinstalled` emits through the existing analytics path.
+  - **intent:** The team learns how many players install, which affordance they reach for, and how the offer performs, without interrupting anyone.
+  - **success:** The `appinstalled` event (completion) and a boot-time display-mode bucket (standalone vs browser) flow into the existing cookieless analytics enrichment; additionally each deliberate tap on an install affordance emits an `install_offer` action carrying which surface was used (`splash`, `chip`, or `menu`), the engagement half of the funnel the OS `appinstalled` event cannot attribute. All counts are coarse and cookieless; no player-facing telemetry surface is added. Tests pin the display-mode bucket value, that `appinstalled` emits through the existing analytics path, and that each surface's tap reports its own `install_offer` detail.
 
 - **CAP-5**
   - **intent:** A player on the splash/title screen who could install is offered it there too. The splash is the "is this a real app?" moment, so the offer is a persistent front door there, not a gated nudge.

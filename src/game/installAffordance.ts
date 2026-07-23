@@ -1,6 +1,6 @@
 import type { GameApp } from "../main";
 import { initPwaInstall, installAvailability, promptInstall, isStandalone, isIos, canPromptInstall } from "../pwaInstall";
-import { trackAppActionOnce } from "../analytics";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 
 /**
@@ -25,6 +25,11 @@ import { showInstallHelp } from "../ui/uiDialogs";
  * steps, or Chrome/Edge browser-menu steps). Standalone / TWA sessions are
  * offered nothing on any surface.
  */
+
+/** Which affordance a player tapped to reach for the install, for the CAP-4
+ *  engagement signal: the splash front door, the topbar chip, or the Game-panel
+ *  entry. Flows to analytics as the `install_offer` action's `detail`. */
+export type InstallSurface = "splash" | "chip" | "menu";
 
 const CHIP_SHOWN_FLAG = "vc-install-chip-shown"; // once-ever: the chip surfaces at most one time
 
@@ -101,8 +106,15 @@ let promptInFlight = false;
  *  Exported for the splash button (CAP-5): the in-game chip/menu only ever call
  *  it when availability is "prompt" or "ios-howto", but the splash button is a
  *  persistent front door (shown for any not-standalone session), so it can reach
- *  the browser-menu how-to fallback the in-game surfaces never do. */
-export async function activateInstall(app: GameApp): Promise<void> {
+ *  the browser-menu how-to fallback the in-game surfaces never do.
+ *
+ *  `surface` names which affordance was tapped, for the CAP-4 engagement signal. */
+export async function activateInstall(app: GameApp, surface: InstallSurface): Promise<void> {
+  // Record the tap per surface BEFORE the offer resolves (a re-entrancy bail or a
+  // rejected prompt must not swallow it): a deliberate, low-volume, cookieless
+  // count of which affordance players reach for. The `install_app` completion
+  // cannot attribute this (the OS `appinstalled` event names no surface).
+  trackAppAction("install_offer", surface);
   if (canPromptInstall()) {
     if (promptInFlight) return; // a prompt is already showing; don't stack a how-to behind it
     promptInFlight = true;
@@ -147,12 +159,12 @@ export function initInstallAffordance(app: GameApp): void {
   // Catch on the click, not just inside activateInstall: it is async, so ANY
   // synchronous throw in its body (a modal-open hiccup, say) would otherwise
   // surface as an unhandledrejection and the installed error tracking would
-  // promote it to crash telemetry. The offer is best-effort chrome.
-  const onClick = () => void activateInstall(app).catch(() => {});
+  // promote it to crash telemetry. The offer is best-effort chrome. Each surface
+  // passes its own name so the CAP-4 tap signal is attributed.
   const chip = document.getElementById("btn-install");
   const menu = document.getElementById("btn-install-menu");
-  if (chip) chip.addEventListener("click", onClick);
-  if (menu) menu.addEventListener("click", onClick);
+  if (chip) chip.addEventListener("click", () => void activateInstall(app, "chip").catch(() => {}));
+  if (menu) menu.addEventListener("click", () => void activateInstall(app, "menu").catch(() => {}));
   refreshMenu();
 }
 
