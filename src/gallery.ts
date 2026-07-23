@@ -5,6 +5,7 @@ import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
 import { injectVercelTelemetry } from "./telemetry";
+import { trackAppAction } from "./analytics";
 
 /** A catalog entry to render in the gallery grid. */
 interface Entry {
@@ -249,6 +250,7 @@ function layoutItems(items: GalleryItem[]): { placed: Array<{ item: GalleryItem;
 // report the same host-gated telemetry the game and /help report, then draw the
 // catalog into the shell's canvas.
 injectVercelTelemetry();
+trackAppAction("page_gallery"); // landing on the standalone /gallery page (host-gated inside)
 render(
   pageShell({
     title: "Verticopolis: Sprite Gallery",

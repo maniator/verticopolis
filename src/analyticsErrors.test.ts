@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installErrorTracking, resetErrorTrackingForTest } from "./analyticsErrors";
+import { installErrorTracking, reportCrashException, resetErrorTrackingForTest } from "./analyticsErrors";
 import { sendException } from "./analyticsRelay";
 import { telemetryHostAllowed } from "./telemetry";
 import { getCommonProps } from "./analytics";
@@ -65,6 +65,13 @@ describe("cookieless error tracking", () => {
     });
     expect(props.$exception_stack_trace_raw).toContain("at boom (app.js:5:9)");
     expect(props).toMatchObject({ source: "app.js", lineno: 5, colno: 9 });
+  });
+
+  it("carries a top-level $exception_type for dashboard breakdowns", () => {
+    fireError({ error: new TypeError("nope"), message: "nope" });
+    // A top-level copy of the type, so a trends breakdown need not reach into
+    // the nested $exception_list.
+    expect(sentProps().$exception_type).toBe("TypeError");
   });
 
   it("does not send when the host gate is closed", () => {
@@ -180,6 +187,50 @@ describe("cookieless error tracking", () => {
       fireError({ error: make(), message: "x" });
     }).not.toThrow();
     expect(sendException).toHaveBeenCalledTimes(1);
+  });
+
+  describe("reportCrashException (WebGL crash to Error Tracking)", () => {
+    it("emits a synthetic $exception for a WebGL context loss with crash flags", () => {
+      reportCrashException({ kind: "webgl-context-lost", repeat: false, recoveryFailed: true, saveFlushed: true, behindSplash: false });
+      expect(sendException).toHaveBeenCalledTimes(1);
+      const props = sentProps();
+      expect(sentException()).toMatchObject({
+        type: "WebGLContextLost",
+        value: "WebGL context lost (recovery failed)",
+        mechanism: { handled: true, synthetic: true },
+      });
+      // Top-level type + stable fingerprint (one issue for all WebGL losses),
+      // empty raw stack (synthetic), and the crash flags as context.
+      expect(props).toMatchObject({
+        $exception_type: "WebGLContextLost",
+        $exception_fingerprint: "WebGLContextLost",
+        $exception_stack_trace_raw: "",
+        handled: true,
+        crash_kind: "webgl-context-lost",
+        recoveryFailed: true,
+        saveFlushed: true,
+        repeat: false,
+        behindSplash: false,
+      });
+      // Common props ride along, like every event.
+      expect(props).toMatchObject({ platform: "web", version: "9.9.9" });
+    });
+
+    it("groups repeated WebGL losses into one issue (dedup on the stable fingerprint)", () => {
+      reportCrashException({ kind: "webgl-context-lost" });
+      reportCrashException({ kind: "webgl-context-lost", repeat: true });
+      expect(sendException).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not report a crash exception on a dark host", () => {
+      vi.mocked(telemetryHostAllowed).mockReturnValue(false);
+      reportCrashException({ kind: "webgl-context-lost" });
+      expect(sendException).not.toHaveBeenCalled();
+    });
+
+    it("never throws on malformed crash info", () => {
+      expect(() => reportCrashException({} as unknown as { kind: string })).not.toThrow();
+    });
   });
 
   it("registers its listeners only once across repeated install calls", () => {

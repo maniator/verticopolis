@@ -113,26 +113,53 @@ function safeString(value: unknown): string {
   }
 }
 
+/** Per-report options. The defaults reproduce the uncaught-error path exactly;
+ *  the crash path (see {@link reportCrashException}) overrides them to mark the
+ *  event handled + synthetic, pin a stable fingerprint, and attach crash flags. */
+interface ReportOpts {
+  /** Was the error caught by the app? Default false (a genuinely uncaught error). */
+  handled?: boolean;
+  /** Is this a manufactured exception rather than a real thrown one? Default false.
+   *  A synthetic report drops the raw stack (it would be the reporter's own stack,
+   *  not the incident's). */
+  synthetic?: boolean;
+  /** Override the computed fingerprint, so a synthetic incident groups by a stable
+   *  key rather than a stack it does not have. */
+  fingerprint?: string;
+  /** Extra top-level props (e.g. the crash flags) merged into the payload. */
+  extraProps?: Record<string, unknown>;
+}
+
 /**
  * Build and send one `$exception`. Guarded on the host gate, the re-entrancy
  * latch, the per-session cap, and per-fingerprint dedup, in that order, then
  * emits the canonical `$exception_list` plus a bounded raw stack. Never throws.
  */
-function report(value: unknown, extra?: { source?: string; lineno?: number; colno?: number }): void {
+function report(
+  value: unknown,
+  extra?: { source?: string; lineno?: number; colno?: number },
+  opts: ReportOpts = {},
+): void {
   if (reporting) return; // a report is already in flight: do not recurse
   if (!telemetryHostAllowed()) return;
   reporting = true;
   try {
     if (reported >= MAX_ERRORS_PER_SESSION) return;
     const { type, message, stack } = describe(value);
+    const handled = opts.handled ?? false;
+    const synthetic = opts.synthetic ?? false;
+    // A synthetic report has no meaningful stack (it would be the reporter's own),
+    // so drop it and rely on the explicit fingerprint below.
+    const rawStack = synthetic ? "" : stack;
     // Fingerprint on type + message + the first stack line, so the same crash
     // (repeated every frame) collapses to one report while two different errors
     // stay distinct. The first stack line pins the throw site. Each PART is
     // bounded separately (not the joined whole) so the throw-site frame always
     // survives: clamping the join could cut the frame off for a long message and
-    // merge two genuinely distinct crashes that share that message.
+    // merge two genuinely distinct crashes that share that message. A synthetic
+    // incident overrides this with a stable key (it has no throw site to pin).
     const firstFrame = stack.split("\n", 2)[1]?.trim() ?? "";
-    const fingerprint = `${type}|${clamp(message, 180)}|${clamp(firstFrame, 100)}`;
+    const fingerprint = opts.fingerprint ?? `${type}|${clamp(message, 180)}|${clamp(firstFrame, 100)}`;
     if (seen.has(fingerprint)) return;
     seen.add(fingerprint);
     reported++;
@@ -145,13 +172,17 @@ function report(value: unknown, extra?: { source?: string; lineno?: number; coln
         {
           type,
           value: message,
-          mechanism: { handled: false, synthetic: false },
+          mechanism: { handled, synthetic },
           stacktrace: { type: "raw", frames: [] },
         },
       ],
+      // Also a top-level copy so a dashboard trend can break errors down by type
+      // without reaching into the nested `$exception_list`.
+      $exception_type: type,
       $exception_fingerprint: fingerprint,
-      $exception_stack_trace_raw: stack,
-      handled: false,
+      $exception_stack_trace_raw: rawStack,
+      handled,
+      ...opts.extraProps,
     };
     // Location from the ErrorEvent, when the browser supplied it. Omitted for a
     // rejection (no location) and for a cross-origin "Script error." with none.
@@ -184,6 +215,72 @@ function onError(event: ErrorEvent): void {
     // else: a resource-load error with no script detail; not a JS exception.
   } catch {
     /* never-throw */
+  }
+}
+
+/** A PascalCase exception type for a crash kind (`"webgl-context-lost"` becomes
+ *  `"WebGLContextLost"`). WebGL is special-cased for the right capitalization;
+ *  any other kind title-cases its hyphen segments. */
+function crashType(kind: string): string {
+  if (kind === "webgl-context-lost") return "WebGLContextLost";
+  const joined = kind
+    .split("-")
+    .filter(Boolean)
+    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+    .join("");
+  return joined || "Crash";
+}
+
+/** The flattened crash description this reporter reads (a subset of the typed
+ *  `crash` event; the analytics event carries the rest). */
+export interface CrashExceptionInfo {
+  kind: string;
+  repeat?: boolean;
+  recoveryFailed?: boolean;
+  saveFlushed?: boolean;
+  behindSplash?: boolean;
+}
+
+/**
+ * Report a game crash (today only a lost WebGL context) into PostHog Error
+ * Tracking as a SYNTHETIC `$exception`, so the crash that matters most (the
+ * #538 GPU death) shows up as a grouped issue alongside the uncaught JS errors.
+ * This is ADDITIVE: the typed `crash` analytics event still fires from the same
+ * call site and keeps the structured fields; the `$exception` is the Error
+ * Tracking lens on the same incident, not a second count of a different thing.
+ *
+ * It routes through the same {@link report} machinery (host gate, re-entrancy
+ * latch, per-session cap, dedup, common props, never-throw) as the uncaught
+ * path, marked `handled` + `synthetic` with a stable fingerprint so every WebGL
+ * loss groups into one issue. The crash flags ride along as top-level context.
+ */
+export function reportCrashException(info: CrashExceptionInfo): void {
+  try {
+    const kind = String(info?.kind ?? "");
+    const type = crashType(kind);
+    const notes: string[] = [];
+    if (info?.recoveryFailed) notes.push("recovery failed");
+    if (info?.repeat) notes.push("repeat within 90s");
+    if (info?.behindSplash) notes.push("at boot");
+    const value = notes.length ? `WebGL context lost (${notes.join(", ")})` : "WebGL context lost";
+    // A plain Error carries the message and type cleanly through `describe`; its
+    // stack is the reporter's own and is dropped by the synthetic flag.
+    const synthetic = new Error(value);
+    synthetic.name = type;
+    report(synthetic, undefined, {
+      handled: true, // the game catches the context loss and shows the crash screen
+      synthetic: true,
+      fingerprint: type, // one Error Tracking issue for all WebGL losses
+      extraProps: {
+        crash_kind: kind,
+        repeat: !!info?.repeat,
+        recoveryFailed: !!info?.recoveryFailed,
+        saveFlushed: !!info?.saveFlushed,
+        behindSplash: !!info?.behindSplash,
+      },
+    });
+  } catch {
+    /* never-throw: crash reporting must never break crash recovery */
   }
 }
 

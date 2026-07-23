@@ -101,7 +101,51 @@ interface GameplayEvents {
    *  computes the exact CROSS-session fps percentiles from them (issue #538).
    *  Emitted once per session, above a minimum sample count. */
   session_fps: { p50: number; low: number; samples: number };
+  /** A discrete app-chrome action the player took OUTSIDE the core build loop:
+   *  a save/export/import, a settings or dialog open, a preference toggle, a
+   *  toolbar affordance, or a landing on the standalone help/gallery page. One
+   *  parametrized event (keyed by `action`) rather than dozens of names, so the
+   *  vocabulary stays small and a dashboard breaks the surface down by `action`.
+   *  `detail` carries the small extra dimension an action needs (the new mute
+   *  or accessibility-toggle state). Cookieless: these are aggregate counts and
+   *  per-session behavior, never an identity. */
+  app_action: { action: AppActionName; detail?: string };
 }
+
+/** The closed set of app-chrome actions {@link trackAppAction} reports. A union
+ *  (not a bare string) so every call site is checked and the dashboard's action
+ *  list is discoverable from one place. */
+export type AppActionName =
+  // Persistence. The FACT only, never tower contents or the fidelity report.
+  | "quick_save"
+  | "save_slot"
+  | "load_slot"
+  | "delete_save"
+  | "export_save"
+  | "import_save"
+  | "export_tdt"
+  | "import_tdt"
+  // Dialogs / navigation.
+  | "settings_open"
+  | "help_open"
+  | "compare_open"
+  | "saves_open"
+  | "stats_open"
+  | "replay_onboarding"
+  | "page_help"
+  | "page_gallery"
+  // Preference toggles (detail carries the new on/off state).
+  | "mute"
+  | "reduced_motion"
+  | "steady_clock"
+  // Coarse engagement bit, latched once per session via `trackAppActionOnce`:
+  // `volume` = the player touched the audio sliders (latched so the pointer-move
+  // slider cannot flood; no value, just the fact). (Deliberately NOT tracked, per
+  // the design party: undo, redo, overlay, and rename, the last because the tower
+  // name is player-authored. `speed` is deferred: its only clean user-only site,
+  // the speed button handler, sits in a file at the line-size ceiling, and the
+  // command callback it would otherwise hook is also the dialog pause path.)
+  | "volume";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform dimension plus the
@@ -142,6 +186,31 @@ function trackEvent<K extends keyof GameplayEvents>(name: K, props: GameplayEven
   } catch {
     /* best-effort telemetry; never block gameplay on it */
   }
+}
+
+/** Report one discrete app-chrome action (see the `app_action` event). A thin,
+ *  free function (not a `GameplaySession` method) so it can be called from the
+ *  UI, the save/persistence layer, and the standalone help/gallery pages alike.
+ *  Host-gated and never-throw like every other event; `detail` is omitted when
+ *  absent so the payload stays minimal. */
+export function trackAppAction(action: AppActionName, detail?: string): void {
+  trackEvent("app_action", detail === undefined ? { action } : { action, detail });
+}
+
+/** Actions already emitted this session by {@link trackAppActionOnce}, so a
+ *  repeatable trigger (a dragged volume slider) reports at most once. It lives
+ *  for the tab's lifetime, matching the per-tab analytics session (`reset` is a
+ *  test-only helper, not called on a new game), so "once" means once per tab
+ *  session. */
+const appActionOnce = new Set<AppActionName>();
+
+/** Report an app action AT MOST ONCE per session. For a coarse engagement bit
+ *  (today `volume`) whose trigger can fire many times, so the count is "sessions
+ *  that ever did X," not a firehose of every repeat. */
+export function trackAppActionOnce(action: AppActionName, detail?: string): void {
+  if (appActionOnce.has(action)) return;
+  appActionOnce.add(action);
+  trackAppAction(action, detail);
 }
 
 /** Fixed cap on the per-session fps sample reservoir: bounded memory no matter
@@ -385,6 +454,7 @@ class GameplaySession {
     this.lastFrameAt = null;
     this.toolsSeen.clear();
     this.toolUses.clear();
+    appActionOnce.clear(); // test-only reset path: keep test sessions independent
     commonProps = {};
   }
 }

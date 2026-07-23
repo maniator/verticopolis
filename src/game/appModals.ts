@@ -1,6 +1,7 @@
 import type { GameApp } from "../main";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
+import { trackAppAction } from "../analytics";
 
 /**
  * The tower-statistics modal, its exterminator action, and the manual save-slot
@@ -11,6 +12,9 @@ import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
  */
 
 export function showStats(app: GameApp): void {
+  // NOTE: no `stats_open` here. `confirmExterminate` re-invokes `showStats` to
+  // refresh the modal, so instrumenting this shared function would double-count.
+  // The user-open telemetry lives on the `onShowStats` callback (uiCallbacks).
   // The "Call exterminator" button only exists in the modal when it's offerable
   // (Modern, infested rooms, none already en route). Gate the handler on the
   // same predicate the template uses, since wireActions throws if it binds to a
@@ -65,6 +69,7 @@ function confirmExterminate(app: GameApp): void {
 }
 
 export function showSaves(app: GameApp): void {
+  trackAppAction("saves_open"); // saves manager modal opening
   app.ui.showSaves(SaveGame.listSlots());
 }
 
@@ -84,6 +89,7 @@ export function saveToSlot(app: GameApp, slot: number): void {
     app.ui.toast(saveFailureMessage(err), "bad");
     return;
   }
+  trackAppAction("save_slot"); // manual slot write succeeded
   app.ui.toast(`Saved to slot ${slot}.`, "good");
 }
 
@@ -92,6 +98,7 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
   if (loaded) {
     app.adoptSim(loaded);
+    trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
     app.ui.toast("Tower loaded.", "good");
   } else {
     app.ui.toast("That slot is empty or corrupt.", "bad");
@@ -100,5 +107,6 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
 
 export function deleteSlot(app: GameApp, slot: number): void {
   SaveGame.deleteSlot(slot);
+  trackAppAction("delete_save"); // slot cleared
   app.ui.toast(`Deleted slot ${slot}.`, "info");
 }

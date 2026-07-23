@@ -1,3 +1,4 @@
+import { trackAppAction } from "../analytics";
 import type { UICallbacks, Tool } from "../ui/UI";
 import type { Simulation } from "../engine/Simulation";
 import type { AudioEngine } from "../audio/Audio";
@@ -74,12 +75,27 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onSelectTool: (tool) => app.handleSelectTool(tool),
     onSpeed: (speed) => app.setSpeed(speed),
     getSpeed: () => app.getSpeed(),
-    onSave: () => app.saveLoad.save(),
+    onSave: () => {
+      trackAppAction("quick_save");
+      app.saveLoad.save();
+    },
     onLoad: () => app.saveLoad.load(),
-    onExport: () => void app.saveLoad.exportGame(),
-    onImport: (data) => void app.saveLoad.importGame(data),
-    onImportLegacy: (buffer, filename) => app.saveLoad.importLegacy(buffer, filename),
-    onExportLegacy: () => app.saveLoad.exportLegacy(),
+    onExport: () => {
+      trackAppAction("export_save");
+      void app.saveLoad.exportGame();
+    },
+    onImport: (data) => {
+      trackAppAction("import_save");
+      void app.saveLoad.importGame(data);
+    },
+    onImportLegacy: (buffer, filename) => {
+      trackAppAction("import_tdt");
+      app.saveLoad.importLegacy(buffer, filename);
+    },
+    onExportLegacy: () => {
+      trackAppAction("export_tdt");
+      app.saveLoad.exportLegacy();
+    },
     getMode: () => app.getSim().mode,
     onNew: (mode, modernCalendar, manualStructure) => app.saveLoad.newGame(mode, modernCalendar, manualStructure),
     onToggleAudio: () => app.toggleMute(),
@@ -96,9 +112,15 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),
     isSteadyClock: () => app.isSteadyClock(),
-    onReplayOnboarding: () => app.replayOnboarding(),
+    onReplayOnboarding: () => {
+      trackAppAction("replay_onboarding");
+      app.replayOnboarding();
+    },
     onRenameTower: (name) => app.renameTower(name),
-    onShowStats: () => app.showStats(),
+    onShowStats: () => {
+      trackAppAction("stats_open"); // the user open; the exterminator refresh reopens showStats directly
+      app.showStats();
+    },
     onSetOverlay: (mode) => app.setOverlay(mode),
     // dismiss() latches the ✕ so the next hover pick over the same facility
     // does not instantly re-open the card the player just closed. The ✕ may
