@@ -3,7 +3,7 @@ import { TowerEngine } from "../render/excalibur/TowerEngine";
 import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview } from "./buildPreview";
+import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 
@@ -60,6 +60,7 @@ export function wireEngine(app: GameApp): void {
     // pinch-cancel path skips onActionUp (which clears these), so without this
     // a resumed paint drag would extend from the abandoned anchor across the gap.
     app.paintAnchor = null;
+    app.buildAnchor = null;
     app.build.clearPaint();
     if (app.tool.type === "bulldoze" || app.tool.type === "build") {
       app.captureUndo(app.tool.type === "bulldoze" ? "Bulldoze" : `Build ${FACILITIES[app.tool.kind].name}`);
@@ -73,6 +74,12 @@ export function wireEngine(app: GameApp): void {
       // two-finger pan/zoom never drops a paid-for strip on its first finger.
       if (touch && isPaintTool(app)) {
         app.paintAnchor = { tile, floor };
+      } else if (touch && !isTransportTool(app)) {
+        // Touch ROOM build: defer to the release. Preview at the FINGER on the
+        // press so a precise tap places exactly there; the lift only engages once
+        // you drag (onActionMove), floating the ghost above the thumb to aim.
+        app.buildAnchor = { tile, floor, oTile: tile, oFloor: floor, lifting: false };
+        updateBuildPreview(app, tile, floor, false); // false: red ghost carries validity, no DOM reason card on touch
       } else if (placeSimpleBuild(app, app.tool.kind, tile, floor) === null) {
         app.transportStart = { x: snapX(app.tool.kind, tile), floor };
       }
@@ -103,6 +110,16 @@ export function wireEngine(app: GameApp): void {
       // For a wide unit (parking) each tile-step re-attempts a build; overlaps
       // fail silently, so successful placements land flush → a contiguous chain.
       app.build.paintFloorRun(kind, tile, floor);
+    } else if (app.buildAnchor) {
+      // Touch room-build drag. The lift latches once this is a deliberate drag
+      // (moved to a different floor, or a couple of tiles across), not a tap's
+      // jitter; once lifted, the ghost floats above the finger to aim. Nothing
+      // places until release.
+      const a = app.buildAnchor;
+      const lifting = a.lifting || floor !== a.oFloor || Math.abs(tile - a.oTile) >= 2;
+      const target = lifting ? floor + touchBuildLiftFloors(app) : floor;
+      app.buildAnchor = { tile, floor: target, oTile: a.oTile, oFloor: a.oFloor, lifting };
+      updateBuildPreview(app, tile, target, false);
     }
   };
 
@@ -113,6 +130,16 @@ export function wireEngine(app: GameApp): void {
     if (app.paintAnchor) {
       if (app.tool.type === "build") app.build.seedPaint(app.tool.kind, app.paintAnchor.tile, app.paintAnchor.floor);
       app.paintAnchor = null;
+    }
+    // Touch room-build release: commit the room where the ghost sits (the lifted
+    // anchor), only if the preview was valid: releasing over a red spot cancels,
+    // the ghost was the warning, so no failure toast. Then clear the ghost.
+    if (app.buildAnchor) {
+      const a = app.buildAnchor;
+      const valid = app.engine.preview?.valid ?? false;
+      app.buildAnchor = null;
+      app.engine.preview = null;
+      if (valid && app.tool.type === "build") placeSimpleBuild(app, app.tool.kind, a.tile, a.floor);
     }
     app.build.clearPaint();
     // Only drag-sized transports (elevators) commit on release. Stairs and
@@ -242,6 +269,7 @@ export function rebuildEngine(app: GameApp): Promise<void> {
   // stale transportStart suppresses the update prompt session-long, and a
   // stale paint anchor would extend the next touch drag across the gap.
   app.paintAnchor = null;
+  app.buildAnchor = null;
   app.transportStart = null;
   app.build.clearPaint();
   app.commitUndo(); // close the severed gesture's pending capture (no-op when clean)

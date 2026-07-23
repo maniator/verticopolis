@@ -118,13 +118,13 @@ class GameApp implements GameAppPorts {
   lastStar = 1;
   /** In-progress transport drag (anchor tile/floor). @internal */
   transportStart: { x: number; floor: number } | null = null;
-  /** Deferred touch paint-tool press (tile/floor). On touch, a paint strip is
-   *  NOT laid on the press: the second finger of a two-finger pan/zoom lands as
-   *  its own pointerdown, and a strip committed here would be a paid-for tile the
-   *  pinch path never rolls back. The strip is laid on the first move (drag) or
-   *  the release (tap), by which point a two-finger gesture has already cancelled.
-   *  @internal */
+  /** Deferred touch paint-tool press (tile/floor). On touch a strip is NOT laid on
+   *  the press (a two-finger pan's second finger would land as a paid tile the pinch
+   *  never rolls back); it is laid on the first move or the release. @internal */
   paintAnchor: { tile: number; floor: number } | null = null;
+  /** In-progress touch room-build gesture: `tile`/`floor` is the deferred room's
+   *  target (finger for a tap, lifted on a drag); `o*`/`lifting` gate the latch. @internal */
+  buildAnchor: { tile: number; floor: number; oTile: number; oFloor: number; lifting: boolean } | null = null;
   /** Currently selected facility for the edit panel. @internal */
   selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
@@ -280,10 +280,10 @@ class GameApp implements GameAppPorts {
     if (label !== prevLabel) gameplaySession.noteToolUsed(label);
     this.tool = tool;
     this.keyboard.resetAnchor(); // don't carry a pending transport anchor across tools
-    // Drop any in-flight paint gesture too: onActionUp/onActionMove read the
-    // LIVE tool, so a press-then-switch-then-release would stamp the new
-    // kind's strip at the old press point.
+    // Drop any in-flight paint gesture too: onActionUp/onActionMove read the LIVE
+    // tool, so a press-then-switch-then-release would stamp at the old press point.
     this.paintAnchor = null;
+    this.buildAnchor = null; // and any in-flight touch room-build gesture
     this.build.clearPaint();
     // A transport anchor abandoned by a pinch (the pinch paths never fire
     // onActionUp) must not linger either: updateCoastClear() treats it as a

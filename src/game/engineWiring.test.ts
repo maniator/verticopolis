@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { GameApp } from "../main";
 import { wireEngine } from "./engineWiring";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview } from "./buildPreview";
+import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
 import { runFrame } from "./frameLoop";
 
 /**
@@ -18,6 +18,7 @@ vi.mock("./buildPreview", () => ({
   isTransportTool: vi.fn(() => false),
   isPaintTool: vi.fn(() => false),
   updateBuildPreview: vi.fn(),
+  touchBuildLiftFloors: vi.fn(() => 2),
 }));
 
 vi.mock("./frameLoop", () => ({
@@ -29,6 +30,7 @@ const mockPlaceSimpleBuild = vi.mocked(placeSimpleBuild);
 const mockIsTransportTool = vi.mocked(isTransportTool);
 const mockIsPaintTool = vi.mocked(isPaintTool);
 const mockUpdateBuildPreview = vi.mocked(updateBuildPreview);
+const mockLift = vi.mocked(touchBuildLiftFloors);
 const mockRunFrame = vi.mocked(runFrame);
 
 interface FakeEngine {
@@ -75,6 +77,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     commitUndo: vi.fn(),
     mobileMq: { matches: false },
     paintAnchor: null as unknown,
+    buildAnchor: null as unknown,
     transportStart: null as unknown,
     lastTickErrorLog: -1e9,
     frameErrors: [] as Array<{ at: string; message: string }>,
@@ -251,5 +254,74 @@ describe("onContextLost + contextmenu", () => {
     const evt = new Event("contextmenu", { cancelable: true });
     app.canvas.dispatchEvent(evt);
     expect(evt.defaultPrevented).toBe(true);
+  });
+});
+
+describe("touch room-build offset-ghost flow", () => {
+  it("defers a touch room, previews at the finger on press, lifts on a deliberate drag, commits on lift", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    // Press (touch): does NOT place; previews at the FINGER (no lift yet), reason card off.
+    app.engine.onActionDown!(10, 5, true, null);
+    expect(mockPlaceSimpleBuild).not.toHaveBeenCalled();
+    expect(app.buildAnchor).toMatchObject({ tile: 10, floor: 5, lifting: false });
+    expect(mockUpdateBuildPreview).toHaveBeenLastCalledWith(app, 10, 5, false);
+    // Drag to a different floor: the lift latches, ghost floats above the finger (lift is 2 in the mock).
+    app.engine.onActionMove!(12, 8, null);
+    expect(app.buildAnchor).toMatchObject({ tile: 12, floor: 10, lifting: true });
+    expect(mockUpdateBuildPreview).toHaveBeenLastCalledWith(app, 12, 10, false);
+    expect(mockLift).toHaveBeenCalled();
+    expect(mockPlaceSimpleBuild).not.toHaveBeenCalled();
+    // Release over a VALID spot: commit at the lifted anchor, clear the ghost.
+    app.engine.preview = { kind: "office", floor: 10, x: 12, valid: true };
+    app.engine.onActionUp!();
+    expect(mockPlaceSimpleBuild).toHaveBeenCalledWith(app, "office", 12, 10);
+    expect(app.buildAnchor).toBeNull();
+    expect(app.engine.preview).toBeNull();
+  });
+
+  it("a quick touch tap (no drag) places a room at the FINGER, not lifted", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    app.engine.onActionDown!(10, 5, true, null); // press, no move
+    app.engine.preview = { kind: "office", floor: 5, x: 10, valid: true };
+    app.engine.onActionUp!();
+    expect(mockPlaceSimpleBuild).toHaveBeenCalledWith(app, "office", 10, 5); // at the finger, no lift
+  });
+
+  it("a tap's small jitter (same floor, under two tiles) does NOT engage the lift", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    app.engine.onActionDown!(10, 5, true, null);
+    app.engine.onActionMove!(11, 5, null); // one tile over, same floor
+    expect(app.buildAnchor).toMatchObject({ tile: 11, floor: 5, lifting: false });
+    expect(mockUpdateBuildPreview).toHaveBeenLastCalledWith(app, 11, 5, false);
+  });
+
+  it("cancels on release over an invalid (red) spot: no placement, no toast", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    app.engine.onActionDown!(10, 5, true, null);
+    app.engine.preview = { kind: "office", floor: 7, x: 10, valid: false };
+    app.engine.onActionUp!();
+    expect(mockPlaceSimpleBuild).not.toHaveBeenCalled();
+    expect(app.ui.toast).not.toHaveBeenCalled();
+    expect(app.buildAnchor).toBeNull();
+  });
+
+  it("a MOUSE room build still places on the press (no deferral, no anchor)", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    app.engine.onActionDown!(10, 5, false, null);
+    expect(mockPlaceSimpleBuild).toHaveBeenCalledWith(app, "office", 10, 5);
+    expect(app.buildAnchor).toBeNull();
+  });
+
+  it("a fresh press drops a buildAnchor a cancelled pinch left behind", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    app.buildAnchor = { tile: 3, floor: 9, oTile: 3, oFloor: 9, lifting: true };
+    wireEngine(app);
+    app.engine.onActionDown!(10, 5, true, null);
+    expect(app.buildAnchor).toMatchObject({ tile: 10, floor: 5, lifting: false }); // stale anchor replaced by the fresh gesture
   });
 });

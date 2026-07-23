@@ -28,9 +28,9 @@ describe("classifyGesture — the pan-vs-act routing matrix", () => {
     }
   });
 
-  it("non-paint rooms tap-place on touch, drag on mouse", () => {
+  it("non-paint rooms own the one-finger touch drag now (offset ghost, place on release), still act on mouse", () => {
     for (const k of ["office", "shop", "parkingRamp"] as const) {
-      expect(classifyGesture(build(k), 0, TOUCH, false)).toBe("pan");
+      expect(classifyGesture(build(k), 0, TOUCH, false)).toBe("action");
       expect(classifyGesture(build(k), 0, MOUSE, false)).toBe("action");
     }
   });
