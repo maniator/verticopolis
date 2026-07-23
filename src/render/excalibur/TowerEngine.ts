@@ -11,6 +11,7 @@ import * as scene from "./towerScene";
 import * as reconcile from "./towerReconcile";
 import * as crowd from "./towerCrowd";
 import * as camera from "./towerInputCamera";
+import { clearLongPress } from "./longPress";
 import * as overlayFx from "./towerOverlay";
 import { displayLit, drainSceneSync, runSceneSync } from "./towerSyncSchedule";
 import { drainRegions, type RegionRec } from "./towerRegions";
@@ -34,12 +35,10 @@ export type { ViewFocus, Picked } from "./towerInputCamera";
  * hooks below.
  *
  * The bulk of the renderer lives in friend-modules taking this instance,
- * mirroring `Tower`/`UI`: `towerScene` (construction, baking, sky, lifecycle),
- * `towerReconcile` (retained-scene reconciliation), `towerCrowd` (cars, train,
- * walkers), `towerInputCamera` (input, picking, camera, coords, focus) and
- * `towerOverlay` (2D overlay painters, event visuals). Members those modules
- * read are public and marked `@internal friend-module access`; the class keeps
- * thin delegations and the shared coordinate math.
+ * mirroring `Tower`/`UI`: `towerScene`, `towerReconcile`, `towerCrowd`,
+ * `towerInputCamera` (input, picking, camera, focus) and `towerOverlay`.
+ * Members those modules read are public and marked `@internal friend-module
+ * access`; the class keeps thin delegations and the shared coordinate math.
  */
 export class TowerEngine {
   engine: ex.Engine;
@@ -67,8 +66,8 @@ export class TowerEngine {
   lastVipSeq = 0;
 
   // Set by the controller each frame; rendered by the overlay. `reason` is the
-  // refusal string (populated only when `valid` is false AND
-  // `sim.rules.showsPreviewReason` is true; presentation-only, no engine change).
+  // refusal string (only when `valid` is false AND `sim.rules.showsPreviewReason`;
+  // presentation-only, no engine change).
   preview: { kind: FacilityKind; floor: number; x: number; valid: boolean; span?: number; reason?: string } | null = null;
   transportPreview: { kind: FacilityKind; x: number; bottom: number; top: number; valid: boolean } | null = null;
   selectedId: number | null = null;
@@ -77,16 +76,14 @@ export class TowerEngine {
   onUpdate: ((ms: number) => void) | null = null;
 
   /** The GPU dropped the WebGL context (mobile browsers reset it under memory
-   *  pressure or after backgrounding). Excalibur can't rebuild its textures and
-   *  shaders in place, so the controller must recover — its default handler
-   *  would otherwise paint a dead-end "please refresh the page" overlay. The
-   *  render clock is already stopped when this fires. */
+   *  pressure or after backgrounding). Excalibur can't rebuild its textures in
+   *  place, so the controller must recover, else its default handler paints a
+   *  dead-end "please refresh the page" overlay. The clock is already stopped. */
   onContextLost: (() => void) | null = null;
 
   /** The browser restored the GPU context (we `preventDefault()` the loss, so
-   *  it retries). This engine's own textures and shaders are still gone; the
-   *  signal means a FRESH engine can be built now. The controller listens
-   *  during in-place recovery and rebuilds on it. */
+   *  it retries). This engine's own textures are still gone; the signal means a
+   *  FRESH engine can be built now, which the recovery path listens for. */
   onContextRestored: (() => void) | null = null;
 
   // Controller-supplied input hooks (the controller owns tool semantics). `picked` is the
@@ -97,6 +94,10 @@ export class TowerEngine {
   onActionMove: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
   onActionUp: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
   onHover: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
+  /** Touch long-press "peek" (the touch equivalent of a desktop hover): fires
+   *  at the hold knee with the pressed cell/entity; onLongPressEnd on release. */
+  onLongPress: ((tile: number, floor: number, picked: Picked | null) => void) | null = null;
+  onLongPressEnd: (() => void) | null = null;
   /** Right-click: inspect whatever is under the cursor, regardless of tool. */
   onSecondary: ((picked: Picked | null) => void) | null = null;
   /** Drag/click an in-world extend arrow on the selected elevator (#12).
@@ -112,17 +113,25 @@ export class TowerEngine {
 
   // Excalibur pointer gesture state. Contacts are tracked by their NATIVE
   // pointer id (stablePointerId), never Excalibur's public id: Excalibur 0.32
-  // renumbers its ids when a contact lifts mid-gesture, which used to strand a
-  // phantom entry that turned every later one-finger press into a bogus pinch
-  // (stuck zoom, taps swallowed before placement). The two-finger pinch pans
-  // by the finger midpoint AND zooms by the finger-distance ratio, so mobile
-  // keeps a pan path while a paint tool owns the one-finger drag.
+  // renumbers its ids when a contact lifts mid-gesture, which stranded a
+  // phantom entry that turned every later one-finger press into a bogus pinch.
+  // The two-finger pinch pans by the finger midpoint AND zooms by their
+  // distance ratio, so mobile keeps a pan path while a paint tool owns the drag.
   tracker = new PinchTracker();
   gesture: "pan" | "action" | null = null;
   moved = 0;
   downTouch = false;
   lastSx = 0;
   lastSy = 0;
+  // Long-press ("peek") state (see ./longPress). downSx/downSy is the press
+  // origin, kept stable while lastSx/lastSy drift with a pan, so the hold's slop
+  // check measures travel from where the finger landed. longPressTimer is the
+  // pending hold; longPressFired latches once a peek fired so the release
+  // dismisses it and swallows the tap/action instead of placing.
+  downSx = 0;
+  downSy = 0;
+  longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  longPressFired = false;
 
   // Retained scene graph, reconciled by stable id.
   /** Static floor/lobby tiles live in ONE TileMap entity, not per-tile
@@ -155,19 +164,18 @@ export class TowerEngine {
   }[] = [];
   trainActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
   /** The pre-dawn garbage truck: one per recycling center, visible only during
-   *  the collection hour (drives in, loads, drives off — like the metro train). */
+   *  the collection hour (drives in, loads, drives off, like the metro train). */
   truckActors: { actor: ex.Actor; u: Unit; w: number }[] = [];
   /** Commute cars cruising the garage decks at rush hours: one per basement
-   *  floor that carries parking, ping-ponging along that floor's parking run. */
+   *  parking floor, ping-ponging along that floor's parking run. */
   garageCars: { actor: ex.Actor; floor: number; x0w: number; x1w: number; seed: number }[] = [];
   walkers: Walker[] = [];
   crowdCulled = false; // zoom-cull latch: crowd per-frame work skipped (crowdCull.ts)
   /** Active colored stats overlay (congestion / occupancy / satisfaction), or
-   *  null for off. Set by the controller from a UI toggle; drawn over the tower
-   *  as a semi-transparent per-floor heatmap with a legend. */
+   *  null for off. Set from a UI toggle; drawn as a per-floor heatmap + legend. */
   overlayMode: HeatmapMode | null = null;
   /** Cached heatmap for the active overlay, refreshed on the hour, on a layout
-   *  change, or when the mode flips — never per frame (it scans the unit list).
+   *  change, or when the mode flips, never per frame (it scans the unit list).
    *  @internal friend-module access (towerOverlay). */
   heatmap: HeatCell[] = [];
   heatmapHour = -1;
@@ -175,20 +183,18 @@ export class TowerEngine {
   heatmapMealRev = -1;
   heatmapMode: HeatmapMode | null = null;
   /** The busiest floor's raw congestion ratio when the congestion overlay was
-   *  last (re)built — surfaced in the legend so an all-green map still reports
-   *  its headroom. 0 for the non-congestion overlays. Refreshed with the cache,
-   *  never per frame. */
+   *  last (re)built, surfaced in the legend so an all-green map still reports
+   *  its headroom. 0 for the other overlays. Refreshed with the cache. */
   heatmapPeakCongestion = 0;
   /** Garage/waste display fractions (parking-in-use, recycling-fill), computed
-   *  once per syncScene — reusing the parking flood-fill that sync already does
-   *  for the dead-bit — so they're exactly as fresh as the sprites that consume
-   *  them and never run on the per-frame path (updateMotion reads them too).
+   *  once per syncScene (reusing sync's parking flood-fill), so they are as
+   *  fresh as the sprites that consume them and never run per frame.
    *  @internal friend-module access (towerScene / towerCrowd). */
   displayParkingUse = 0;
   displayRecycleFill = 0;
   /** Per-floor live occupancy in 0..1 (people on the floor, capped), so corridor
-   *  loiterers only appear where tenants actually are. Cached and recomputed on
-   *  the hour or when the layout changes — not scanned every frame.
+   *  loiterers only appear where tenants are. Cached and recomputed on the hour
+   *  or when the layout changes, not per frame.
    *  @internal friend-module access (towerCrowd / towerScene). */
   floorLive = new Map<number, number>();
   floorLiveHour = -1;
@@ -204,12 +210,10 @@ export class TowerEngine {
   /** Set by the controller from the game speed: when paused, the decorative
    *  animation clock stops so on-screen people freeze with everything else. */
   paused = false;
-  /** When true, the decorative animation clock is frozen (accessibility). Every
-   *  `d.anim`-driven decoration stops — the ambient bed (clouds, rain streaks,
-   *  pacing walkers, metro train) and the smaller flourishes in the sprite code
-   *  (construction crane hook, flame flicker, cinema marquee). All of it is purely
-   *  cosmetic: elevator cars and the routed crowd move from sim state (not
-   *  `d.anim`), so functional motion keeps running while the animation stops. */
+  /** When true, the decorative animation clock is frozen (accessibility): every
+   *  `d.anim`-driven decoration stops (ambient bed, sprite flourishes). It is
+   *  all cosmetic: elevator cars and the routed crowd move from sim state, not
+   *  `d.anim`, so functional motion keeps running while the animation stops. */
   reducedMotion = false;
   setReducedMotion(on: boolean): void {
     overlayFx.setReducedMotion(this, on);
@@ -225,7 +229,7 @@ export class TowerEngine {
 
   // Individually-routed commuters (SimTower's signature) are owned and advanced
   // by the engine; the renderer only draws each person and removes them as they
-  // despawn — it never mutates the simulation.
+  // despawn, never mutating the simulation.
   crowdActors = new Map<number, { actor: ex.Actor; gfx: ex.Canvas; red: boolean }>();
 
   // Shared graphics so thousands of tiles/people cost almost nothing.
@@ -233,27 +237,22 @@ export class TowerEngine {
   /** Lobby tile variants, baked per [lit][ground][variant] so the concourse
    *  pattern (columns, chandeliers/planters) repeats and lights up at night. */
   lobbyGfx!: ex.Canvas[][][];
-  /** The two slices of the wide grand entrance storefront, baked per [lit].
-   *  The left slice is the display window with the chandelier visible through
-   *  the glass; the right slice carries the double doors and the swaying
-   *  doorman. Both are `cache: false` because the right slice's doorman reads
-   *  `d.anim`, and keeping both on the same path is simpler than mixing
-   *  cache-true / cache-false through the same predicate. */
+  /** The two slices of the wide grand entrance storefront, baked per [lit]. Left
+   *  is the display window (chandelier through the glass); right carries the
+   *  doors and swaying doorman. Both `cache: false` because the right doorman
+   *  reads `d.anim`, and one path for both beats mixing cache-true/false. */
   entranceGrandLeftGfx!: ex.Canvas[];
   entranceGrandRightGfx!: ex.Canvas[];
   /** The compact 1-tile grand entrance, used only when the lobby is too narrow
-   *  to fit the wide storefront (a 1-tile toy lobby). `cache: false` for the
-   *  doorman sway. */
+   *  to fit the wide storefront. `cache: false` for the doorman sway. */
   entranceGrandSoloGfx!: ex.Canvas[];
   /** The floor-1 service entrance tile, baked per [lit]. Static (`cache: true`)
    *  because it has no motion of its own. */
   entranceServiceGfx!: ex.Canvas[];
-  /** Per-tile entrance kind for the floor-1 lobby, refreshed at the top of
-   *  every {@link reconcile.syncScene} sweep. Keyed by grid x; absent x means the
-   *  tile takes its slot from the normal 4-variant cycle. Recomputed from the
-   *  tower's floor-1 lobby tiles by walking their CONTIGUOUS runs so a gap in
-   *  the middle of the lobby (mid-remodel bulldoze) can't orphan a grand-left
-   *  half-facade with no grand-right neighbor. */
+  /** Per-tile entrance kind for the floor-1 lobby, refreshed at the top of every
+   *  {@link reconcile.syncScene} sweep. Keyed by grid x; absent x takes the
+   *  normal 4-variant cycle. Recomputed by walking the lobby's CONTIGUOUS runs so
+   *  a mid-lobby gap can't orphan a grand-left half-facade from its right half. */
   floor1EntranceMap: Map<number, "grand-left" | "grand-right" | "grand-solo" | "service"> = new Map();
   /** Fire-escape segments, baked per [side][floor parity] (shared by all floors). */
   escGfx!: { left: ex.Canvas[]; right: ex.Canvas[] };
@@ -495,6 +494,7 @@ export class TowerEngine {
 
   /** Full teardown, used by in-place context-loss recovery before a rebuild. */
   dispose(): void {
+    clearLongPress(this); // no pending peek callback into a torn-down engine
     scene.dispose(this);
   }
 }

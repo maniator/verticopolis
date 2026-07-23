@@ -50,13 +50,13 @@ function makeApp(parts: FakeParts = {}) {
 }
 
 describe("positionPanels", () => {
-  it("on mobile, clears anchors once when panels were anchored, then stops", () => {
+  it("on mobile with nothing open, clears anchors once when panels were anchored, then stops", () => {
     const { app, ui } = makeApp({ matches: true, panelsAnchored: true });
     positionPanels(app);
 
     expect(ui.clearPanelAnchors).toHaveBeenCalledTimes(1);
     expect(app.panelsAnchored).toBe(false);
-    // Mobile returns early: no editor/inspector anchoring is attempted.
+    // Nothing open, so no editor/inspector anchoring is attempted.
     expect(ui.anchorEditor).not.toHaveBeenCalled();
     expect(ui.anchorInspector).not.toHaveBeenCalled();
   });
@@ -67,6 +67,30 @@ describe("positionPanels", () => {
 
     expect(ui.clearPanelAnchors).not.toHaveBeenCalled();
     expect(app.panelsAnchored).toBe(false);
+  });
+
+  it("on mobile, anchors the inspector peek card to its facility (tracks the room like a hover)", () => {
+    const { app, ui } = makeApp({
+      matches: true,
+      inspectAnchor: { x: 20, floor: 9 },
+      isInspectorOpen: true,
+    });
+    positionPanels(app);
+
+    expect(ui.anchorInspector).toHaveBeenCalledWith(worldToScreenX(20), worldToScreenY(9), 800, 600);
+    expect(app.panelsAnchored).toBe(true);
+  });
+
+  it("on mobile, keeps the editor docked (never anchors it) even when open with a selection", () => {
+    const { app, ui } = makeApp({
+      matches: true,
+      selected: { type: "unit" } as GameApp["selected"],
+      isEditorOpen: true,
+      unit: { x: 1, width: 2, floor: 3, kind: "office" },
+    });
+    positionPanels(app);
+
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
   });
 
   it("on desktop, anchors the editor beside the selected unit when the editor is open", () => {

@@ -3,7 +3,7 @@ import { TowerEngine } from "../render/excalibur/TowerEngine";
 import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
+import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 
@@ -175,6 +175,35 @@ export function wireEngine(app: GameApp): void {
     }
   };
 
+  // Touch long-press: peek the facility under the finger, the touch equivalent
+  // of desktop hover-inspect. A held finger raises the same inspector card a
+  // mouse hover does; lifting dismisses it, while a quick tap still opens the
+  // editor. The card anchors to its facility on every tier (panelAnchoring pins
+  // the inspector card on mobile too), so the peek tracks the room like a hover.
+  app.engine.onLongPress = (_tile, _floor, picked) => {
+    // A peek is a glance, never a placement: drop any pending touch build/paint
+    // gesture so the release commits nothing, and close the undo capture
+    // onActionDown may have opened (commit discards it, nothing changed).
+    app.paintAnchor = null;
+    app.buildAnchor = null;
+    app.transportStart = null;
+    app.engine.preview = null;
+    app.engine.transportPreview = null;
+    app.build.clearPaint();
+    app.commitUndo();
+    // Release the build-refusal card's ownership of the shared inspector surface
+    // before the peek borrows it, so a hover-tier refusal card (hybrid touch +
+    // mouse device) can't leave buildRefusalShowing stale. No-op on pure touch.
+    clearBuildRefusal(app);
+    // Reuse the hover inspector card (unit or transport). armLongPress only fires
+    // over a real facility, so picked is always a peekable unit/transport here.
+    // Mark it a peek so the card is exactly the desktop hover tooltip (no manual
+    // ✕: lifting the finger dismisses it, like mouse-away on desktop).
+    app.inspector.inspectPicked(picked);
+    app.ui.setInspectorPeek(true);
+  };
+  app.engine.onLongPressEnd = () => app.inspector.hide();
+
   // Right-click inspects whatever's under the cursor, whatever tool is held.
   app.engine.onSecondary = (picked) => app.selectPicked(picked);
   // In-world extend arrows on the selected elevator: drag an end to grow or
@@ -272,6 +301,7 @@ export function rebuildEngine(app: GameApp): Promise<void> {
   app.buildAnchor = null;
   app.transportStart = null;
   app.build.clearPaint();
+  app.inspector.hide(); // drop a peek card the severed touch can no longer dismiss
   app.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
   app.canvas = fresh;
   app.engine = new TowerEngine(fresh, app.sim);

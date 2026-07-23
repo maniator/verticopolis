@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.100.0
+
+- Press and hold a room on a phone to peek at its card without opening it, the way a mouse hover does on desktop. Lift your finger to close it. A quick tap still opens the full panel, and the peek works with any tool selected.
+
 ## 1.99.1
 
 - The build placement ghost on a phone now sits a consistent step above your finger at any zoom, instead of drifting far up the tower when you are zoomed out.

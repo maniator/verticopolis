@@ -19,6 +19,7 @@ vi.mock("./buildPreview", () => ({
   isPaintTool: vi.fn(() => false),
   updateBuildPreview: vi.fn(),
   touchBuildLiftFloors: vi.fn(() => 2),
+  clearBuildRefusal: vi.fn(),
 }));
 
 vi.mock("./frameLoop", () => ({
@@ -40,6 +41,8 @@ interface FakeEngine {
   onActionMove?: (tile: number, floor: number, picked: unknown) => void;
   onActionUp?: () => void;
   onHover?: (tile: number, floor: number, picked: unknown) => void;
+  onLongPress?: (tile: number, floor: number, picked: unknown) => void;
+  onLongPressEnd?: () => void;
   onSecondary?: (picked: unknown) => void;
   onExtendTo?: (end: unknown, target: unknown) => void;
   onExtendEnd?: () => void;
@@ -68,9 +71,9 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
       tower: { placeTransportDryRun: vi.fn(() => true) },
       isUnlocked: vi.fn(() => true),
     },
-    ui: { toast: vi.fn() },
+    ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
     editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn() },
-    inspector: { inspectPicked: vi.fn() },
+    inspector: { inspectPicked: vi.fn(), hide: vi.fn() },
     saveLoad: { recoverFromContextLoss: vi.fn() },
     selectPicked: vi.fn(),
     captureUndo: vi.fn(),
@@ -109,6 +112,8 @@ describe("wireEngine installs all engine callbacks", () => {
       "onActionMove",
       "onActionUp",
       "onHover",
+      "onLongPress",
+      "onLongPressEnd",
       "onSecondary",
       "onExtendTo",
       "onExtendEnd",
@@ -194,6 +199,49 @@ describe("onHover", () => {
     app.engine.onHover!(1, 2, picked);
     expect(app.engine.preview).toBeNull();
     expect(app.inspector.inspectPicked).toHaveBeenCalledWith(picked);
+  });
+});
+
+describe("onLongPress (touch peek)", () => {
+  it("raises the inspector card for the pressed facility and marks it a peek (drops the ✕)", () => {
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    const picked = { id: "u5" };
+    app.engine.onLongPress!(3, 4, picked);
+    expect(app.inspector.inspectPicked).toHaveBeenCalledWith(picked);
+    expect(app.ui.setInspectorPeek).toHaveBeenCalledWith(true);
+    expect(app.selectPicked).not.toHaveBeenCalled(); // a peek never opens the editor
+  });
+
+  it("empty space raises nothing beyond a null pick (no card)", () => {
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    app.engine.onLongPress!(3, 4, null);
+    expect(app.inspector.inspectPicked).toHaveBeenCalledWith(null);
+  });
+
+  it("cancels a pending touch build so the release places nothing, and closes the capture", () => {
+    const app = makeApp({ type: "build", kind: "office" });
+    wireEngine(app);
+    // Simulate the state onActionDown left: an anchored touch room build.
+    app.buildAnchor = { tile: 3, floor: 4, oTile: 3, oFloor: 4, lifting: false };
+    app.engine.preview = { kind: "office", floor: 4, x: 3, valid: true };
+    app.engine.onLongPress!(3, 4, { id: "u1" });
+    expect(app.buildAnchor).toBeNull();
+    expect(app.transportStart).toBeNull();
+    expect(app.engine.preview).toBeNull();
+    expect(app.build.clearPaint).toHaveBeenCalled();
+    expect(app.commitUndo).toHaveBeenCalled();
+    // The now-inert release commits no room.
+    app.engine.onActionUp!();
+    expect(mockPlaceSimpleBuild).not.toHaveBeenCalled();
+  });
+
+  it("onLongPressEnd hides the peek card", () => {
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    app.engine.onLongPressEnd!();
+    expect(app.inspector.hide).toHaveBeenCalled();
   });
 });
 

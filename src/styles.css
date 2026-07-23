@@ -398,6 +398,12 @@ html.reduce-motion *::after {
   display: none;
   pointer-events: auto;
 }
+/* A touch long-press "peek" is the desktop hover card: lifting the finger
+   dismisses it, so it never wants the coarse-pointer ✕ that docked cards get.
+   Higher specificity than the coarse-tier reveal below, so it wins on touch. */
+#inspector.peek .insp-close {
+  display: none;
+}
 /* The build-refusal card's hover-tier translucency lives with the other
    capability/tier rules in section 5 MEDIA (the block after the coarse-pointer
    rules), because its gate is the complement of the phone block's query. */

@@ -6,15 +6,15 @@ import { VIEW_ZOOM_MAX, VIEW_ZOOM_MIN } from "../../engine/types";
 import { clampCameraY, fitZoom } from "../cameraBounds";
 import { stablePointerId } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
+import { armLongPress, cancelLongPressOnMove, clearLongPress, finishLongPress } from "./longPress";
 import type { TowerEngine } from "./TowerEngine";
 
 /**
  * Pointer input, entity picking, camera control and the audio view-focus for
  * {@link TowerEngine}, as friend functions taking the engine instance.
  * Extracted from `TowerEngine.ts`; the class keeps thin delegations and the
- * coordinate transforms these read (worldX, the worldToScreen and screenTo
- * helpers, the cam getter and viewport getters). Pure code move: no gesture,
- * camera or picking math changed.
+ * coordinate transforms these read (worldX, the worldToScreen/screenTo helpers,
+ * the cam getter and viewport getters).
  */
 
 /** Camera zoom range (screen pixels per world pixel). The values live in
@@ -26,9 +26,8 @@ export const MAX_ZOOM = VIEW_ZOOM_MAX;
 const clampZoom = (z: number): number =>
   Number.isFinite(z) ? Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z)) : MIN_ZOOM;
 
-/** Accumulated-movement value far above every tap-slop threshold. Assigned to
- *  `moved` when a pinch hands off to a single surviving finger, so releasing
- *  that finger can never register as a tap (and accidentally place). */
+/** Movement value far above every tap-slop threshold. Assigned to `moved` when
+ *  a pinch hands off to one surviving finger, so its release can't tap-place. */
 const TAP_SLOP_POISON = 1e6;
 
 export interface ViewFocus {
@@ -37,10 +36,9 @@ export interface ViewFocus {
   night: boolean;
   /**
    * Current camera zoom (world pixels multiplier). Low values are zoomed out
-   * (the whole tower in frame; the tower-aware fit floor lets a tall tower reach
-   * ~0.15 or lower) and 3 is a tight close-up. Audio uses this to pull back to a
-   * wide "tower overview" bed when zoomed out and to fade in area-specific detail
-   * (crowd, kitchen clatter, elevator dings) up close.
+   * (whole tower in frame, down to ~0.15 on a tall one), 3 is a tight close-up.
+   * Audio pulls back to a wide "tower overview" bed when zoomed out and fades in
+   * area detail (crowd, kitchen clatter, elevator dings) up close.
    */
   zoom: number;
   /** Today's sky weather; drives an outdoor rain layer in the ambient bed. */
@@ -48,10 +46,9 @@ export interface ViewFocus {
   /** Sim clock hour as a float in [0, 24); the ambience layer's workday and
    *  evening gates read it (offices type at 10:00, sleep at 03:00). */
   hour: number;
-  /** 0..1 live fill of the dominant kind's units in view (occupants against
-   *  capacity), falling back to visible crowd density where the kind tracks no
-   *  occupants (lobbies, the street). Drives honest ambience loudness: an
-   *  empty venue is near-silent, a packed one murmurs. */
+  /** 0..1 live fill of the dominant kind's units in view (occupants vs capacity),
+   *  falling back to visible crowd density for kinds that track no occupants
+   *  (lobbies, the street). Drives ambience loudness: empty is near-silent. */
   crowd: number;
 }
 
@@ -82,8 +79,8 @@ function tf(ev: ex.PointerEvent): { tile: number; floor: number } {
   return worldToCell(ev.worldPos);
 }
 
-/** World point → grid cell, the single inverse of worldX/worldYTop. Shared
- *  by pointer handling and the pick fallback so the two can't drift. */
+/** World point → grid cell, the single inverse of worldX/worldYTop, shared by
+ *  pointer handling and the pick fallback so the two can't drift. */
 function worldToCell(world: ex.Vector): { tile: number; floor: number } {
   return { tile: Math.floor(world.x / TILE), floor: Math.ceil(-world.y / FLOOR) };
 }
@@ -96,10 +93,9 @@ export function bindInput(engine: TowerEngine): void {
   ptr.on("cancel", (ev) => pointerUp(engine, ev as ex.PointerEvent));
   ptr.on("wheel", (ev) => {
     const w = ev as ex.WheelEvent;
-    // Browsers remap Shift+wheel to horizontal scroll (deltaY 0, motion in
-    // deltaX), so under the Shift pan key the fallback axis carries the zoom
-    // intent. Gated on Shift (w.ev is the native DOM event): an unmodified
-    // sideways trackpad swipe is a scroll, not a zoom, and dead events drop.
+    // Browsers remap Shift+wheel to horizontal scroll (deltaY 0, motion in deltaX),
+    // so under the Shift pan key the fallback axis carries the zoom. Gated on Shift
+    // so an unmodified sideways trackpad swipe stays a scroll.
     const d = w.deltaY !== 0 ? w.deltaY : (w.ev as { shiftKey?: boolean } | undefined)?.shiftKey ? w.deltaX : 0;
     if (d === 0) return;
     zoomAt(engine, d < 0 ? 1.12 : 0.89, w.x, w.y);
@@ -120,13 +116,10 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
       }
     }
   }
-  // Every unit kind resolves by grid lookup now, the way floor/lobby tiles
-  // (which never had per-tile actors) already did. The tower's tile index is
-  // footprint-complete (Tower.register claims every story of a multi-floor
-  // unit), units never overlap, and rooms always sat below transports, so
-  // one O(1) unitAt matches what the O(rooms) actor scan returned while
-  // freeing the pick from the render's actor model entirely, which the
-  // region-composition story (rooms stop owning per-unit actors) needs.
+  // Every unit kind resolves by grid lookup, the way floor/lobby tiles always
+  // did. The tile index is footprint-complete, units never overlap, and rooms
+  // sit below transports, so one O(1) unitAt matches the old O(rooms) actor scan
+  // and frees the pick from the render's actor model (region composition needs it).
   if (!best) {
     const { tile, floor } = worldToCell(world);
     const u = engine.sim.tower.unitAt(floor, tile);
@@ -138,12 +131,20 @@ export function pickEntityAt(engine: TowerEngine, world: ex.Vector): Picked | nu
 function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
   const contact = engine.tracker.down(stablePointerId(ev.pointerId, ev.nativeEvent), ev.screenPos.x, ev.screenPos.y);
   if (contact === "pinch-start") {
-    // A live extend-arrow drag must end here: pointerMove checks arrowDrag
-    // right after the pinch branch, so a stale one would resume (with a
-    // positional jump) the moment the pinch hands off to a pan.
+    // A live extend-arrow drag must end here, else pointerMove's arrowDrag
+    // branch resumes it (with a positional jump) after the pinch hands to a pan.
     if (engine.arrowDrag) {
       engine.onExtendEnd?.();
       engine.arrowDrag = null;
+    }
+    // A second finger is a camera gesture, never a peek: cancel a pending hold,
+    // and dismiss a peek already showing (resetting the latch) so the pinch takes
+    // over and a later single-finger release still seeds the survivor pan rather
+    // than being swallowed by finishLongPress.
+    clearLongPress(engine);
+    if (engine.longPressFired) {
+      engine.longPressFired = false;
+      engine.onLongPressEnd?.();
     }
     engine.gesture = null;
     engine.preview = null;
@@ -151,43 +152,47 @@ function pointerDown(engine: TowerEngine, ev: ex.PointerEvent): void {
     return;
   }
   if (contact === "pinch-extra") return;
-  engine.lastSx = ev.screenPos.x;
-  engine.lastSy = ev.screenPos.y;
+  // lastSx/lastSy advance with a pan; downSx/downSy stay at the press origin.
+  engine.lastSx = engine.downSx = ev.screenPos.x;
+  engine.lastSy = engine.downSy = ev.screenPos.y;
   engine.moved = 0;
+  engine.longPressFired = false;
   const touch = ev.pointerType === "Touch";
   engine.downTouch = touch;
-  // Pan key: Space (Excalibur keyboard) or Shift off the native pointer event
-  // (the press carries the modifier). Down-only, like Space: release mid-drag keeps the pan.
+  // Pan key: Space (Excalibur keyboard) or Shift off the native pointer event.
+  // Down-only, like Space: releasing it mid-drag keeps the pan.
   const native = ev.nativeEvent as { shiftKey?: boolean } | undefined;
   const panKey = engine.engine.input.keyboard.isHeld(ex.Keys.Space) || native?.shiftKey === true;
-  // Left-click on a selected elevator's extend arrow grows the shaft. A held
-  // pan key skips the arrow: the modifier promises the drag only pans, and a
-  // shaft resize is exactly the paid mutation it exists to escape.
+  // Left-click on a selected elevator's extend arrow grows the shaft. A held pan
+  // key skips the arrow: the modifier promises the drag only pans, and a shaft
+  // resize is exactly the paid mutation it exists to escape.
   if (buttonNum(ev) === 0 && !panKey && engine.onExtendTo) {
     const ps = ev.screenPos;
     const inRect = (r?: ScreenRect) =>
       !!r && ps.x >= r.x && ps.x <= r.x + r.w && ps.y >= r.y && ps.y <= r.y + r.h;
     const end = inRect(engine.arrowHit.up) ? "up" : inRect(engine.arrowHit.down) ? "down" : null;
     if (end) {
-      // Begin a drag: a plain click extends one floor (on pointer-up), while
-      // dragging up/down grows or shrinks the shaft floor-by-floor.
+      // Begin a drag: a plain click extends one floor (on pointer-up); dragging
+      // up/down grows or shrinks the shaft floor-by-floor.
       engine.arrowDrag = { end };
       engine.gesture = null;
       return;
     }
   }
-  // Right-click always inspects what's under the cursor, whatever tool is
-  // active, it never pans or builds.
+  // Right-click always inspects under the cursor; it never pans or builds.
   if (buttonNum(ev) === 2 && engine.onSecondary) {
     engine.onSecondary(pickEntityAt(engine, ev.worldPos));
     engine.gesture = null;
     return;
   }
   engine.gesture = engine.classifyDown ? engine.classifyDown(buttonNum(ev), touch, panKey) : "pan";
-  if (engine.gesture === "action") {
-    const { tile, floor } = tf(ev);
-    engine.onActionDown?.(tile, floor, touch, pickEntityAt(engine, ev.worldPos));
-  }
+  const { tile, floor } = tf(ev);
+  const picked = pickEntityAt(engine, ev.worldPos);
+  if (engine.gesture === "action") engine.onActionDown?.(tile, floor, touch, picked);
+  // A held touch peeks the facility under the finger with any tool armed: the
+  // hold fires only in the pre-movement window no tool's one-finger drag uses,
+  // so the first move past slop hands the gesture back to the tool.
+  armLongPress(engine, tile, floor, picked, touch);
 }
 
 function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
@@ -207,6 +212,15 @@ function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
     engine.onExtendTo?.(engine.arrowDrag.end, engine.screenToFloor(ev.screenPos.y));
     return;
   }
+  // A fired peek is an absorbing state: it owns the gesture to release, so a
+  // move neither pans nor re-drives the tool (that would strand a re-armed ghost
+  // or paint tiles with no undo capture open).
+  if (engine.longPressFired) return;
+  // While a peek is still PENDING, a within-slop jitter must not drive the tool
+  // (TILE 11 < slop 14, so a jitter can cross a tile and a paint tool would seed
+  // a stray strip). A past-slop move clears the timer first, then drives normally.
+  cancelLongPressOnMove(engine, ev.screenPos.x, ev.screenPos.y);
+  if (engine.longPressTimer !== null) return;
   const { tile, floor } = tf(ev);
   if (engine.gesture === "pan") {
     const dx = ev.screenPos.x - engine.lastSx;
@@ -218,16 +232,17 @@ function pointerMove(engine: TowerEngine, ev: ex.PointerEvent): void {
   } else if (engine.gesture === "action") {
     engine.onActionMove?.(tile, floor, pickEntityAt(engine, ev.worldPos));
   } else if (ev.pointerType !== "Touch") {
-    // Hover is a mouse/pen concept. A touch move can only reach this branch
-    // in odd gestureless states (e.g. a finger held across a setSim input
-    // reset); letting it hover would strand a build-preview ghost that no
-    // later touch event clears.
+    // Hover is a mouse/pen concept. A touch move reaches here only in odd
+    // gestureless states; letting it hover would strand a build-preview ghost
+    // that no later touch event clears.
     engine.onHover?.(tile, floor, pickEntityAt(engine, ev.worldPos));
   }
 }
 
 function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
   const r = engine.tracker.up(stablePointerId(ev.pointerId, ev.nativeEvent));
+  // A release that ends a fired peek dismisses it and swallows the tap/action.
+  if (finishLongPress(engine)) return;
   if (r.pinch === "continues") {
     engine.gesture = null;
     return;
@@ -235,9 +250,7 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
   if (r.pinch === "ended") {
     if (r.survivor) {
       // Hand the surviving finger a pan continuation: seed the pan from its
-      // tracked position and poison the tap slop so its release can neither
-      // tap-place nor fall into the mouse hover path (which used to strand a
-      // gold "valid" ghost on touch that nothing could commit or clear).
+      // tracked position and poison the tap slop so its release can't tap-place.
       engine.gesture = "pan";
       engine.lastSx = r.survivor.x;
       engine.lastSy = r.survivor.y;
@@ -273,10 +286,9 @@ function pointerUp(engine: TowerEngine, ev: ex.PointerEvent): void {
   engine.gesture = null;
 }
 
-/** Camera policy for a swapped-in (or boot-loaded) tower: an undo/redo
- *  restore keeps the camera where the player is looking (keepCamera); a
- *  genuine tower swap (new game / load / import) restores the save's own
- *  view when it carries one, else centers as always. */
+/** Camera policy for a swapped-in (or boot-loaded) tower: an undo/redo restore
+ *  keeps the camera where the player is looking (keepCamera); a genuine tower
+ *  swap restores the save's own view when it carries one, else centers. */
 export function adoptCamera(engine: TowerEngine, view: SerializedView | null, keepCamera?: boolean): void {
   if (keepCamera) return;
   if (view) engine.applyView(view);
@@ -298,11 +310,10 @@ export function zoomAt(engine: TowerEngine, factor: number, sx: number, sy: numb
 }
 
 /** The tower-aware zoom-out floor for the CURRENT tower and viewport: a pinch
- *  or wheel can pull back until the whole built tower plus a breath of sky
- *  fits, then stops, rather than drifting into empty void. Recomputed per
- *  gesture because it moves as the tower grows and as the viewport resizes.
- *  Basements count: the span runs from the highest built floor to the lowest,
- *  so a deep tower frames its cellars too. See {@link fitZoom}. */
+ *  or wheel can pull back until the whole built tower plus a breath of sky fits,
+ *  then stops, rather than drifting into empty void. Recomputed per gesture as
+ *  the tower grows and the viewport resizes. Basements count (highest floor to
+ *  lowest), so a deep tower frames its cellars too. See {@link fitZoom}. */
 export function dynamicMinZoom(engine: TowerEngine): number {
   const span = engine.sim.tower.highestFloor - engine.sim.tower.lowestFloor + 1;
   return fitZoom(engine.viewHeight, span, FLOOR, MIN_ZOOM);
@@ -314,14 +325,11 @@ export function dynamicMinZoom(engine: TowerEngine): number {
  *  pinch/wheel/keyboard zoom so the player can't zoom out past their tower.
  *
  *  The floor only ever stops further zoom-OUT; it must never FORCE a zoom-in.
- *  The camera can legitimately sit below the current floor after a rotation
- *  that grew the viewport (a taller screen raises the floor) or a cross-device
- *  save whose zoom was set on a different viewport. Snapping such a view inward
- *  on the player's next pinch, especially a pinch-OUT, reads as the camera
- *  fighting them. So the effective floor drops to the current zoom when the
- *  camera is already below `lo`: the player still cannot zoom out any further,
- *  can zoom in freely, and the normal tower-aware floor re-engages the moment
- *  they climb back above it. */
+ *  The camera can legitimately sit below the current floor after a rotation or a
+ *  cross-device save set on another viewport, and snapping it inward on the next
+ *  pinch reads as the camera fighting the player. So the effective floor drops to
+ *  the current zoom when the camera is already below `lo`: no further zoom-out,
+ *  free zoom-in, and the tower-aware floor re-engages once back above it. */
 export function clampGestureZoom(engine: TowerEngine, z: number): number {
   const lo = dynamicMinZoom(engine);
   const cur = engine.cam.zoom;
@@ -341,17 +349,16 @@ export function center(engine: TowerEngine): void {
   engine.cam.pos = ex.vec((GRID.width / 2) * TILE, -(Math.max(6, hi) / 2) * FLOOR);
 }
 
-/** The live camera as save-file cargo: center in grid units plus zoom (the
- *  exact inverse of {@link applyView}, so a same-device round trip is
- *  lossless). Stamped onto the sim by the UI layer right before a save. */
+/** The live camera as save-file cargo: center in grid units plus zoom (the exact
+ *  inverse of {@link applyView}, so a same-device round trip is lossless).
+ *  Stamped onto the sim by the UI layer right before a save. */
 export function viewState(engine: TowerEngine): SerializedView {
   return { tile: engine.cam.pos.x / TILE, floor: -engine.cam.pos.y / FLOOR, zoom: engine.cam.zoom };
 }
 
-/** Restore a saved view. Zoom is optional (a TDT import has none): absent,
- *  the session's current zoom stays. Everything funnels through setCamera's
- *  clampZoom and the standard clamp() so a view saved on another device (or
- *  forged in a file) is re-bounded for THIS viewport before it can render. */
+/** Restore a saved view. Zoom is optional (a TDT import has none): absent, the
+ *  session's current zoom stays. Everything funnels through setCamera's clampZoom
+ *  and clamp() so a view from another device (or forged) is re-bounded here. */
 export function applyView(engine: TowerEngine, v: SerializedView): void {
   engine.setCamera(v.tile, v.floor, v.zoom ?? engine.cam.zoom);
   clamp(engine);
@@ -382,24 +389,23 @@ export function ensureVisible(engine: TowerEngine, tile: number, floor: number):
   clamp(engine); // bound both axes, same as pointer pan
 }
 export function setCamera(engine: TowerEngine, tileX: number, floor: number, zoom: number): void {
-  // Validate zoom to the supported range: the vertical clamp divides by zoom,
-  // so a zero/negative/NaN value here would poison later pan/zoom math.
+  // Validate zoom: the vertical clamp divides by zoom, so a zero/negative/NaN
+  // here would poison later pan/zoom math.
   engine.cam.zoom = clampZoom(zoom);
   engine.cam.pos = ex.vec(tileX * TILE, -floor * FLOOR);
 }
 
 // ---- Audio focus --------------------------------------------------------
 
-/** Census cache per engine: the occupancy tally refreshes at most once per
- *  second (the GDD's cap), while the cheap dominant/zoom/clock reads stay per
- *  call. Keyed weakly so a torn-down engine drops its entry. */
+/** Census cache per engine: the occupancy tally refreshes at most once per second
+ *  (the GDD's cap), while the cheap dominant/zoom/clock reads stay per call. Keyed
+ *  weakly so a torn-down engine drops its entry. */
 const censusCache = new WeakMap<TowerEngine, { at: number; dominant: string; crowd: number }>();
 const CENSUS_REFRESH_MS = 1000;
 
-/** The occupancy walk behind {@link ViewFocus.crowd}: fill of the dominant
- *  kind's units in view, with a drawn-crowd fallback for kinds that track no
- *  occupants (lobbies, the street). 24 visible people count as a full house
- *  for the fallback. */
+/** The occupancy walk behind {@link ViewFocus.crowd}: fill of the dominant kind's
+ *  units in view, with a drawn-crowd fallback for kinds that track no occupants
+ *  (lobbies, the street). 24 visible people count as a full house for it. */
 function censusCrowd(
   engine: TowerEngine,
   dominant: ViewFocus["dominant"],
@@ -416,16 +422,14 @@ function censusCrowd(
       if (!def) continue; // a kind the catalog no longer knows: skip, never throw
       const unitCap = def.population > 0 ? def.population : (def.attendance ?? 0);
       if (unitCap > 0) {
-        // Population>0 commercial venues (restaurant, fast food, shop) get
-        // their `occupants` stamped to the full catalog population while open
-        // (EconomySystem's open-hour pass), so the live fill is `customersIn`,
-        // the routed-customer tally. Attendance venues (cinema, party hall)
-        // already mirror `customersIn` into `occupants`, and every other kind
-        // owns `occupants` via updatePresence, so both read `occupants`.
-        // (`customersIn` is not persisted: right after a save load a busy
-        // venue reads empty and quiet for the seconds it takes the crowd
-        // system to re-route diners in. That is honest, the sim really has
-        // nobody seated yet, and it self-heals; see the ambience backlog.)
+        // Population>0 commercial venues (restaurant, fast food, shop) stamp
+        // `occupants` to the full catalog population while open, so their live
+        // fill is `customersIn` (the routed-customer tally). Attendance venues
+        // (cinema, party hall) mirror `customersIn` into `occupants`, and every
+        // other kind owns `occupants` via updatePresence, so both read it.
+        // (`customersIn` is not persisted: just after a save load a busy venue
+        // reads empty for the seconds the crowd system takes to re-route diners
+        // in. That is honest and self-heals; see the ambience backlog.)
         occ +=
           isCommercialKind(u.kind) && def.population > 0
             ? (u.customersIn ?? 0)
@@ -467,14 +471,10 @@ export function focus(engine: TowerEngine): ViewFocus {
     }
   }
   if (dominant === "empty" && centerFloor <= 0) dominant = "outside";
-  // The occupancy walk refreshes at most once per second (or when the
-  // dominant kind changes, so a pan onto a new venue reads it immediately);
-  // ambience level changes are slow ramps, so a 1 s census is plenty.
-  // A real, monotonically advancing clock: `performance.now()` where it exists,
-  // else `Date.now()`. A constant 0 fallback would freeze `now - cached.at` at
-  // 0 forever, so the 1 s refresh window would never elapse and the census
-  // would stay stale for the life of the engine in any environment without
-  // `performance`.
+  // The occupancy walk refreshes at most once per second (or when the dominant
+  // kind changes, so a pan onto a new venue reads immediately); ambience ramps
+  // slowly, so a 1 s census is plenty. Use a monotonic clock (`performance.now()`,
+  // else `Date.now()`): a constant 0 would freeze `now - cached.at` forever.
   const now =
     typeof performance !== "undefined" && typeof performance.now === "function"
       ? performance.now()

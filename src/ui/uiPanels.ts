@@ -107,11 +107,21 @@ function placePanel(el: HTMLElement, left: number, top: number): void {
   el.style.bottom = "auto";
 }
 
+/** Mark the inspector card as a touch "peek" (long-press) so its manual ✕ close
+ *  is hidden: a peek dismisses when the finger lifts, exactly like a desktop
+ *  hover card dismisses on mouse-away, so the coarse-pointer close button (there
+ *  for the docked, no-hover-away cards) would only confuse. */
+export function setInspectorPeek(ui: UI, on: boolean): void {
+  ui.el.inspector.classList.toggle("peek", on);
+}
+
 export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   if (!tpl) {
     // Hide only; the stale card stays in the container (as it always did) and
-    // the next show renders over it through lit.
+    // the next show renders over it through lit. Drop any peek marker so a later
+    // non-peek card gets its ✕ back.
     ui.el.inspector.classList.add("hidden");
+    ui.el.inspector.classList.remove("peek");
     return;
   }
   ui.el.inspector.classList.remove("hidden");

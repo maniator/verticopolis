@@ -229,15 +229,13 @@ export class UI {
   // ---- Modal primitives (friend-modules build their dialogs on these) -----
 
   /** Renders a lit `TemplateResult` into the shared modal with the window
-   *  grammar (see {@link finishModal}). The template renders into a box that is
-   *  FRESH per open and discarded by closeModal(), so lit's part-cache never
-   *  shares a container across opens: one container, one renderer. render() only
-   *  ever touches this child box; the dialog itself is only ever cleared, via
-   *  replaceChildren (here and in closeModal), never written as HTML. It renders
-   *  once per open (no re-render), so
-   *  the ✕ that finishModal appends into the rendered h2 is safe; any initial
-   *  focus is the dialog controller's own explicit side effect, not this mount's
-   *  job.
+   *  grammar (see {@link finishModal}). The template renders into a box FRESH
+   *  per open and discarded by closeModal(), so lit's part-cache never shares a
+   *  container across opens: one container, one renderer. render() only touches
+   *  this child box; the dialog itself is only ever cleared via replaceChildren
+   *  (here and in closeModal), never written as HTML. It renders once per open,
+   *  so the ✕ finishModal appends into the rendered h2 is safe; any initial
+   *  focus is the dialog controller's explicit side effect, not this mount's job.
    *  @internal friend-module access (uiDialogs). */
   openModalTemplate(result: TemplateResult): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
@@ -253,16 +251,14 @@ export class UI {
    *  top-level h2 as the title bar (`:scope > h2` so a nested h2 is never
    *  skinned), wrap its title text alone in a span carrying the shared
    *  {@link MODAL_TITLE_ID} and point the dialog's `aria-labelledby` at that SPAN
-   *  (never at the h2 itself, since the h2 also ends up holding the ✕ below;
-   *  labeling the h2 would fold the ✕'s own accessible name, "Close", into the
-   *  announced title), show the dialog, then append the win-style ✕ into the h2
-   *  as a sibling of the span so it stays excluded from the accessible name.
+   *  (never the h2, which also holds the ✕ below; labeling the h2 would fold the
+   *  ✕'s own "Close" into the announced title), show the dialog, then append the
+   *  win-style ✕ into the h2 as a sibling of the span, excluded from the name.
    *  Cleared when a modal renders no top-level h2, so the reference is never
-   *  left dangling. The ✕ routes through the dialog's cancel path (same as Esc)
-   *  rather than closeModal() directly, so modals that override oncancel to
-   *  resolve a pending choice still resolve. It is appended AFTER showModal() so
-   *  it is not the first focusable element (keyboard users land on the primary
-   *  action, not the ✕). Backdrop click and Esc/cancel close. */
+   *  left dangling. The ✕ routes through the dialog's cancel path (same as Esc),
+   *  not closeModal(), so modals overriding oncancel still resolve. It is
+   *  appended AFTER showModal() so it is not the first focusable element
+   *  (keyboard users land on the primary action). Backdrop/Esc/cancel close. */
   private finishModal(dialog: HTMLDialogElement, box: HTMLElement): HTMLElement {
     const h2 = box.querySelector(":scope > h2");
     h2?.classList.add("win-title");
@@ -417,6 +413,10 @@ export class UI {
 
   showInspector(tpl: TemplateResult | null): void {
     panels.showInspector(this, tpl);
+  }
+
+  setInspectorPeek(on: boolean): void {
+    panels.setInspectorPeek(this, on);
   }
 
   showStats(body: TemplateResult, handlers: Record<string, () => void> = {}): void {

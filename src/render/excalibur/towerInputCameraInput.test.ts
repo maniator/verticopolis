@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import * as ex from "excalibur";
 import { PinchTracker } from "../pinchTracker";
 import { FLOOR, TILE } from "../scale";
@@ -31,6 +31,10 @@ function inputEng(over: Record<string, unknown> = {}) {
     downTouch: false,
     lastSx: 0,
     lastSy: 0,
+    downSx: 0,
+    downSy: 0,
+    longPressTimer: null,
+    longPressFired: false,
     arrowDrag: null,
     arrowHit: {},
     selectedId: null,
@@ -42,6 +46,8 @@ function inputEng(over: Record<string, unknown> = {}) {
     onActionMove: vi.fn(),
     onActionUp: vi.fn(),
     onHover: vi.fn(),
+    onLongPress: vi.fn(),
+    onLongPressEnd: vi.fn(),
     onSecondary: vi.fn(),
     onExtendTo: vi.fn(),
     onExtendEnd: vi.fn(),
@@ -313,5 +319,135 @@ describe("pointer up routing", () => {
     handlers.up(ptr({ pointerId: 3, sx: 500, sy: 300 }));
     expect(e.gesture).toBeNull();
     expect(e.tracker.pinching).toBe(true);
+  });
+});
+
+describe("long-press to peek (touch hold)", () => {
+  beforeEach(() => vi.useFakeTimers());
+  afterEach(() => vi.useRealTimers());
+
+  // A press only peeks over a real facility (armLongPress skips null/floor/lobby),
+  // so tests that expect a peek to fire put an inspectable unit under the finger.
+  const OVER_ROOM = { sim: { tower: { getTransport: () => undefined, unitAt: () => ({ id: 1, kind: "office" }) } } };
+
+  it("a stationary touch hold fires onLongPress at the knee with the pressed cell and pick", () => {
+    const unit = { id: 7, kind: "office" };
+    const { e, handlers } = inputEng({
+      sim: { tower: { getTransport: () => undefined, unitAt: () => unit } },
+    });
+    handlers.down(ptr({ touch: true, tile: 8, floor: 3, sx: 400, sy: 300 }));
+    expect(e.onLongPress).not.toHaveBeenCalled(); // not yet at the knee
+    vi.advanceTimersByTime(500);
+    expect(e.onLongPress).toHaveBeenCalledWith(8, 3, { type: "unit", id: 7, kind: "office" });
+    expect(e.longPressFired).toBe(true);
+  });
+
+  it("a mouse press never arms the hold", () => {
+    const { e, handlers } = inputEng({ classifyDown: () => "action" });
+    handlers.down(ptr({ touch: false, tile: 8, floor: 3 }));
+    vi.advanceTimersByTime(1000);
+    expect(e.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it("moving past the tap slop before the knee cancels the peek (it becomes a drag)", () => {
+    const { e, handlers } = inputEng();
+    handlers.down(ptr({ touch: true, sx: 400, sy: 300 }));
+    handlers.move(ptr({ touch: true, sx: 420, sy: 300 })); // 20 px > slop
+    vi.advanceTimersByTime(1000);
+    expect(e.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it("a tiny jitter within slop still peeks", () => {
+    const { e, handlers } = inputEng(OVER_ROOM);
+    handlers.down(ptr({ touch: true, sx: 400, sy: 300 }));
+    handlers.move(ptr({ touch: true, sx: 405, sy: 302 })); // 7 px < slop
+    vi.advanceTimersByTime(500);
+    expect(e.onLongPress).toHaveBeenCalledTimes(1);
+  });
+
+  it("releasing before the knee cancels the peek and taps as usual", () => {
+    const { e, handlers } = inputEng();
+    handlers.down(ptr({ touch: true, tile: 4, floor: 6, sx: 400, sy: 300 }));
+    handlers.up(ptr({ touch: true, tile: 4, floor: 6, sx: 401, sy: 300 }));
+    vi.advanceTimersByTime(1000);
+    expect(e.onLongPress).not.toHaveBeenCalled();
+    expect(e.onTap).toHaveBeenCalledWith(4, 6, true, null); // still a tap
+  });
+
+  it("releasing after a peek dismisses it and swallows the tap", () => {
+    const { e, handlers } = inputEng(OVER_ROOM);
+    handlers.down(ptr({ touch: true, tile: 4, floor: 6, sx: 400, sy: 300 }));
+    vi.advanceTimersByTime(500); // peek fires
+    handlers.up(ptr({ touch: true, tile: 4, floor: 6, sx: 400, sy: 300 }));
+    expect(e.onLongPressEnd).toHaveBeenCalledTimes(1);
+    expect(e.onTap).not.toHaveBeenCalled(); // the glance never opens the editor
+    expect(e.longPressFired).toBe(false);
+    expect(e.gesture).toBeNull();
+  });
+
+  it("a second finger cancels a pending peek", () => {
+    const { e, handlers } = inputEng();
+    handlers.down(ptr({ touch: true, pointerId: 1, sx: 200, sy: 300 }));
+    handlers.down(ptr({ touch: true, pointerId: 2, sx: 400, sy: 300 })); // pinch-start
+    vi.advanceTimersByTime(1000);
+    expect(e.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it("does not arm over empty space or a floor/lobby tile (a slow tap/build still lands)", () => {
+    // Empty: unitAt returns undefined, pickEntityAt is null.
+    const empty = inputEng();
+    empty.handlers.down(ptr({ touch: true, tile: 8, floor: 3 }));
+    vi.advanceTimersByTime(1000);
+    expect(empty.e.onLongPress).not.toHaveBeenCalled();
+    // Floor tile: a non-inspectable unit, so no peek arms.
+    const floor = inputEng({
+      sim: { tower: { getTransport: () => undefined, unitAt: () => ({ id: 1, kind: "floor" }) } },
+    });
+    floor.handlers.down(ptr({ touch: true, tile: 8, floor: 3 }));
+    vi.advanceTimersByTime(1000);
+    expect(floor.e.onLongPress).not.toHaveBeenCalled();
+  });
+
+  it("while a peek is PENDING, a within-slop jitter does not drive the tool (no stray paint)", () => {
+    const unit = { id: 9, kind: "office" };
+    const { e, handlers } = inputEng({
+      classifyDown: () => "action",
+      sim: { tower: { getTransport: () => undefined, unitAt: () => unit } },
+    });
+    handlers.down(ptr({ touch: true, tile: 5, floor: 5, sx: 400, sy: 300 }));
+    handlers.move(ptr({ touch: true, tile: 5, floor: 5, sx: 405, sy: 302 })); // 7px jitter, timer still pending
+    expect(e.onActionMove).not.toHaveBeenCalled(); // pending hold is inert
+    vi.advanceTimersByTime(500);
+    expect(e.onLongPress).toHaveBeenCalledTimes(1); // and the peek still fires
+  });
+
+  it("a fired peek owns the gesture: a later move neither pans nor drives the tool", () => {
+    const unit = { id: 2, kind: "office" };
+    const { e, handlers } = inputEng({
+      classifyDown: () => "action",
+      sim: { tower: { getTransport: () => undefined, unitAt: () => unit } },
+    });
+    handlers.down(ptr({ touch: true, tile: 5, floor: 5, sx: 400, sy: 300 }));
+    vi.advanceTimersByTime(500); // peek fires
+    expect(e.gesture).toBeNull(); // gesture surrendered on fire
+    const x0 = e.cam.pos.x;
+    handlers.move(ptr({ touch: true, tile: 9, floor: 9, sx: 300, sy: 300 })); // big move
+    expect(e.onActionMove).not.toHaveBeenCalled(); // tool not re-driven
+    expect(e.cam.pos.x).toBe(x0); // camera did not pan
+  });
+
+  it("a second finger AFTER the peek dismisses it and leaves the survivor able to pan", () => {
+    const unit = { id: 3, kind: "office" };
+    const { e, handlers } = inputEng({
+      sim: { tower: { getTransport: () => undefined, unitAt: () => unit } },
+    });
+    handlers.down(ptr({ touch: true, pointerId: 1, sx: 200, sy: 300 }));
+    vi.advanceTimersByTime(500); // peek fires
+    handlers.down(ptr({ touch: true, pointerId: 2, sx: 400, sy: 300 })); // pinch-start
+    expect(e.onLongPressEnd).toHaveBeenCalledTimes(1); // dismissed by the second finger
+    expect(e.longPressFired).toBe(false); // latch reset
+    handlers.up(ptr({ touch: true, pointerId: 1, sx: 200, sy: 300 })); // one finger left
+    expect(e.gesture).toBe("pan"); // survivor seeded a pan, not swallowed
+    expect(e.moved).toBeGreaterThan(1000);
   });
 });
