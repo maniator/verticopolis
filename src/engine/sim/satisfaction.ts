@@ -93,8 +93,19 @@ export function updateSatisfaction(sim: Simulation): void {
   // Pure (no RNG). A Classic tower holds no club, so this stays empty and the
   // halo seam returns 0, leaving Classic satisfaction byte-identical.
   const clubFloors: number[] = [];
+  // Modern-only Nightclub NEGATIVE halo: the floors of every operational
+  // nightclub, gathered once so a nearby sleeping tenant can read its distance to
+  // the closest. Gated on `isOperational`, not `isTenanted` like the positive
+  // fitness halo above, on purpose: a built club is a persistent nuisance around
+  // the clock (its building is the nuisance, not tonight's crowd), and the
+  // placement tension needs the penalty to apply all day, not only its open
+  // hours (6h of penalty vs 18h of recovery would net positive and erase it).
+  // Pure (no RNG). Classic holds no nightclub, so this stays empty and the
+  // penalty seam returns 0, leaving Classic satisfaction byte-identical.
+  const nightclubFloors: number[] = [];
   for (const c of sim.tower.units) {
     if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
+    else if (c.kind === "nightclub" && isOperational(c) && servedSet.has(c.floor)) nightclubFloors.push(c.floor);
   }
   // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
   // income loop) rather than through the hour-memoized accessor, so an occupancy
@@ -150,6 +161,21 @@ export function updateSatisfaction(sim: Simulation): void {
       }
       const bonus = sim.rules.fitnessHaloBonus(nearest);
       if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
+    }
+    // Modern Nightclub noise (the negative halo): a served sleeping tenant (condo
+    // or hotel) near an operational nightclub loses satisfaction to it, capped and
+    // distance-decayed, 0 in Classic. Only the NEAREST club counts. The max
+    // exceeds served recovery, so a home right by a club net-declines and can give
+    // notice, the placement tension. (An office is empty at the club's late hours,
+    // so it is spared.)
+    if ((u.kind === "condo" || isHotelKind(u.kind)) && served && nightclubFloors.length > 0) {
+      let nearest = Infinity;
+      for (const nf of nightclubFloors) {
+        const d = Math.abs(nf - u.floor);
+        if (d < nearest) nearest = d;
+      }
+      const penalty = sim.rules.nightclubNoisePenalty(nearest);
+      if (penalty > 0) u.satisfaction = Math.max(0, u.satisfaction - penalty);
     }
     // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
     // away"): a served room is worn down in two phases, an immediate annoyance

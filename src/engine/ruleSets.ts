@@ -12,6 +12,8 @@ import {
   UNMET_DEMAND_EVICT_FLOOR,
   FITNESS_HALO_FLOORS,
   FITNESS_HALO_MAX,
+  NIGHTCLUB_NOISE_FLOORS,
+  NIGHTCLUB_NOISE_MAX,
 } from "./sim/constants";
 import { CLASSIC_PRICE_OPTIONS, MODERN_PRICE_OPTIONS } from "./pricing";
 import {
@@ -155,6 +157,11 @@ export const CLASSIC_RULES: GameRules = {
   fitnessHaloBonus() {
     // No Fitness Club exists in a Classic tower, so it never grants a halo. A
     // flat 0 keeps Classic satisfaction (and its golden-master hash) untouched.
+    return 0;
+  },
+  nightclubNoisePenalty() {
+    // No nightclub exists in a Classic tower, so it never disturbs anyone. A flat
+    // 0 keeps Classic satisfaction (and its golden-master hash) untouched.
     return 0;
   },
   weekendMultiplier(kind, isWeekend) {
@@ -315,6 +322,13 @@ export const MODERN_RULES: GameRules = {
     // so more gyms never compound the bonus.
     if (floorDistance < 0 || floorDistance >= FITNESS_HALO_FLOORS) return 0;
     return FITNESS_HALO_MAX * (1 - floorDistance / FITNESS_HALO_FLOORS);
+  },
+  nightclubNoisePenalty(floorDistance) {
+    // The negative mirror of the fitness halo: NIGHTCLUB_NOISE_MAX on the club's
+    // own floor, fading to 0 at the edge of the range. Only the nearest club's
+    // distance is passed, so it can't stack.
+    if (floorDistance < 0 || floorDistance >= NIGHTCLUB_NOISE_FLOORS) return 0;
+    return NIGHTCLUB_NOISE_MAX * (1 - floorDistance / NIGHTCLUB_NOISE_FLOORS);
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday

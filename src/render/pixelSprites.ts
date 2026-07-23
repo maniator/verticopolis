@@ -7,6 +7,7 @@ import { amusements } from "./pixelSprites/amusements";
 import { boutiqueBay } from "./pixelSprites/boutique";
 import { fitnessClub } from "./pixelSprites/fitness";
 import { clinic } from "./pixelSprites/clinic";
+import { nightclub } from "./pixelSprites/nightclub";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -88,6 +89,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // A Modern health clinic; each practice subtype (dental, urgent care,
       // optometry, pharmacy, physio) draws its own room under a clinical trim band.
       clinic(d, u, x, y, w, h);
+      break;
+    case "nightclub":
+      // A Modern nightclub: one dark room with colored beams, a DJ booth, a
+      // glowing dance floor, and a crowd that fills in with occupancy.
+      nightclub(d, u, x, y, w, h);
       break;
     case "shop":
       shop(d, u, x, y, w, h);

@@ -241,6 +241,17 @@ export interface GameRules {
    */
   fitnessHaloBonus(floorDistance: number): number;
   /**
+   * Modern-only Nightclub NEGATIVE halo (gdd-modern-expansion): the per-hour
+   * satisfaction PENALTY a nightclub's noise imposes on a nearby sleeping tenant
+   * (condo or hotel), keyed on the FLOOR distance to the nearest operational club
+   * (largest on the club's own floor, reaching 0 past `NIGHTCLUB_NOISE_FLOORS`).
+   * Returns a non-negative magnitude the caller SUBTRACTS. Only the nearest club
+   * counts. Classic returns 0 (no such facility exists there), so Classic
+   * satisfaction stays byte-identical. Pure and deterministic (no RNG). Applies
+   * to condos/hotels; the caller gates on `served` and kind.
+   */
+  nightclubNoisePenalty(floorDistance: number): number;
+  /**
    * Per-kind weekday/weekend traffic multiplier for the demand-pool retail venues
    * (#398), 1.0 on a weekday. Classic matches the literal 1994 visitor targets
    * (retail busier on weekends); Modern reads a realistic daily rhythm (fast food

@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.91.0
+
+- Modern towers can build a new Nightclub: a venue that fills after dark, earning when the office crowd has gone home, drawn with colored lights, a DJ booth, and a dance floor. It pays a monthly DJ booking, and its noise makes nearby condos and hotel rooms unhappy, so keep it away from where people sleep. Unlocks at 3 stars. Modern only.
+- The Classic vs Modern guide now spells out when the new Modern buildings become available: all of them unlock once your Modern tower reaches 3 stars.
+
 ## 1.90.0
 
 - Modern towers can build a new Clinic: a small health practice that comes as a dental office, urgent care, optometry, pharmacy, or physio, each with its own art. Like the Fitness Club it pays a lease you can price like an office (rather than earning from foot traffic), and it is a quiet, steady tenant. Unlocks at 3 stars. Modern only; Classic keeps the 1994 catalog.
