@@ -131,6 +131,7 @@
           <button class="btn" id="audio-toggle" title="Toggle sound">🔊</button>
           <button class="btn" id="panel-toggle" title="Show/hide panels">☰</button>
           <button class="btn" id="btn-update" title="An update is ready. Tap to review." aria-label="An update is ready. Tap to review." hidden>↻ Update</button>
+          <button class="btn" id="btn-install" title="Install Verticopolis: play offline, fullscreen, from your home screen." aria-label="Install Verticopolis" hidden>⤓ Install</button>
         </div>
       </header>
 
@@ -190,6 +191,10 @@
               <button class="btn" id="btn-new">New Tower</button>
               <button class="btn" id="btn-help">Help</button>
             </div>
+            <!-- The permanent, passive home of the install offer: present only
+                 when the app can be installed and is not already installed
+                 (the controller toggles hidden). -->
+            <button class="btn wide-btn" id="btn-install-menu" hidden>⤓ Install app</button>
           </div>
         </aside>
       </main>

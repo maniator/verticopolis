@@ -3,6 +3,7 @@ import {
   bootCommonProps,
   platformLabel,
   recencyBucket,
+  displayModeBucket,
   resolvePlatformLabel,
   tenureBucket,
 } from "./analyticsEnrichment";
@@ -101,15 +102,15 @@ describe("bootCommonProps", () => {
   it("maps each live signal to its bucket and passes platform + returning through", () => {
     const now = 1_000 * DAY;
     expect(
-      bootCommonProps({ platform: "twa", onboarded: true, tenureDay: 12, savedAt: now - 3 * DAY, now }),
-    ).toEqual({ platform: "twa", returning: true, tenure: "d7-29", recency: "7d" });
+      bootCommonProps({ platform: "twa", onboarded: true, tenureDay: 12, savedAt: now - 3 * DAY, standalone: false, now }),
+    ).toEqual({ platform: "twa", returning: true, tenure: "d7-29", recency: "7d", display: "browser" });
   });
 
-  it("reports unknown buckets for a fresh visit with no tower and no save", () => {
-    // A brand-new player: no in-game age passed, no autosave time.
+  it("reports unknown buckets for a fresh visit with no tower and no save, and the standalone display bucket", () => {
+    // A brand-new player: no in-game age passed, no autosave time; running installed.
     expect(
-      bootCommonProps({ platform: "web", onboarded: false, tenureDay: undefined, savedAt: undefined, now: DAY }),
-    ).toEqual({ platform: "web", returning: false, tenure: "unknown", recency: "unknown" });
+      bootCommonProps({ platform: "web", onboarded: false, tenureDay: undefined, savedAt: undefined, standalone: true, now: DAY }),
+    ).toEqual({ platform: "web", returning: false, tenure: "unknown", recency: "unknown", display: "standalone" });
   });
 
   it("reads a forged non-positive savedAt as unknown recency, never a confident bucket", () => {
@@ -117,10 +118,10 @@ describe("bootCommonProps", () => {
     // savedAt is a forgery. It must read as "unknown", not turn `now - savedAt`
     // into an inflated positive delta that lands in "30d+".
     const now = 1_000 * DAY;
-    expect(bootCommonProps({ platform: "web", onboarded: false, tenureDay: 3, savedAt: -5, now }).recency).toBe(
+    expect(bootCommonProps({ platform: "web", onboarded: false, tenureDay: 3, savedAt: -5, standalone: false, now }).recency).toBe(
       "unknown",
     );
-    expect(bootCommonProps({ platform: "web", onboarded: false, tenureDay: 3, savedAt: 0, now }).recency).toBe(
+    expect(bootCommonProps({ platform: "web", onboarded: false, tenureDay: 3, savedAt: 0, standalone: false, now }).recency).toBe(
       "unknown",
     );
   });
@@ -130,7 +131,14 @@ describe("bootCommonProps", () => {
     // last saved 10 days ago must read d0 tenure but 30d recency.
     const now = 100 * DAY;
     expect(
-      bootCommonProps({ platform: "ios", onboarded: true, tenureDay: 0, savedAt: now - 10 * DAY, now }),
-    ).toEqual({ platform: "ios", returning: true, tenure: "d0", recency: "30d" });
+      bootCommonProps({ platform: "ios", onboarded: true, tenureDay: 0, savedAt: now - 10 * DAY, standalone: false, now }),
+    ).toEqual({ platform: "ios", returning: true, tenure: "d0", recency: "30d", display: "browser" });
+  });
+});
+
+describe("displayModeBucket", () => {
+  it("maps the standalone boolean to its coarse bucket", () => {
+    expect(displayModeBucket(true)).toBe("standalone");
+    expect(displayModeBucket(false)).toBe("browser");
   });
 });

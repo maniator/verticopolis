@@ -39,3 +39,17 @@ export function confirmTemplate(
   return html`<h2>${title}</h2><p>${body}</p>
        <div class="modal-actions"><button class="btn" data-act="no" @click=${actions.onCancel}>Cancel</button><button class="btn primary" data-act="yes" @click=${actions.onYes}>${yesLabel}</button></div>`;
 }
+
+/**
+ * The iOS "Add to Home Screen" how-to (SPEC-pwa-install CAP-3). iOS fires no
+ * beforeinstallprompt and has no programmatic install, so this is the honest
+ * fallback, opened only when the player deliberately taps the install
+ * affordance, never auto-shown. Copy leads with the outcome, not the mechanism;
+ * the word "PWA" never appears.
+ */
+export function installHelpTemplate(onClose: () => void): TemplateResult {
+  return html`<h2>Add Verticopolis to your Home Screen</h2>
+       <p>Play offline and fullscreen, and open it straight from your home screen with no browser bar.</p>
+       <p>In Safari, tap the <b>Share</b> button (the square with an arrow pointing up), then choose <b>Add to Home Screen</b>.</p>
+       <div class="modal-actions"><button class="btn primary" data-act="close" @click=${onClose}>Got it</button></div>`;
+}

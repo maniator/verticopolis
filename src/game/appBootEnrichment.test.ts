@@ -88,7 +88,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
     // clock.day 12 -> tenure "d7-29"; saved just now -> recency "1d"; onboarded true.
     runBootFlow(makeApp(), Date.now());
 
-    expect(setSpy).toHaveBeenCalledWith({ platform: "twa", returning: true, tenure: "d7-29", recency: "1d" });
+    expect(setSpy).toHaveBeenCalledWith({ platform: "twa", returning: true, tenure: "d7-29", recency: "1d", display: "browser" });
     // The enrichment is set BEFORE the boot snapshot fires, so `boot` carries it.
     expect(setSpy.mock.invocationCallOrder[0]).toBeLessThan(bootSpy.mock.invocationCallOrder[0]);
     setSpy.mockRestore();
@@ -105,7 +105,7 @@ describe("runBootFlow analytics enrichment wiring (S4)", () => {
 
     runBootFlow(app, Date.now() - 10 * DAY);
 
-    expect(setSpy).toHaveBeenCalledWith({ platform: "web", returning: true, tenure: "d0", recency: "30d" });
+    expect(setSpy).toHaveBeenCalledWith({ platform: "web", returning: true, tenure: "d0", recency: "30d", display: "browser" });
     setSpy.mockRestore();
   });
 

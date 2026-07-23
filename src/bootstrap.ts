@@ -1,8 +1,9 @@
 import { html, nothing, render, type TemplateResult } from "lit-html";
 import { registerPWA, type UpdateInfo } from "./pwa";
 import { injectVercelTelemetry } from "./telemetry";
-import { startGameplaySession } from "./analytics";
+import { startGameplaySession, trackAppActionOnce } from "./analytics";
 import { installErrorTracking } from "./analyticsErrors";
+import { initPwaInstall } from "./pwaInstall";
 
 /**
  * Boot entry split out of `main.ts` (the `GameApp` composition root). Keeps the
@@ -108,6 +109,15 @@ export function bootGame(create: () => BootApp): void {
     // dark host), never-throw, and only two passive listeners, so it is safe to
     // run before anything else.
     installErrorTracking();
+    // Bind the PWA install capture as early as boot runs: `beforeinstallprompt`
+    // can fire during initial load, before the game constructs and the install
+    // affordance controller wires its callbacks, so catch an early event into
+    // the module now. The install analytics latch rides here too, so an
+    // `appinstalled` on ANY page (including the no-WebGL fallback, which returns
+    // before the game constructs) still records the fact once; the controller
+    // re-inits with its UI callbacks later and the listeners bind once.
+    // (SPEC-pwa-install CAP-2 / CAP-4.)
+    initPwaInstall({ onInstalled: () => trackAppActionOnce("install_app") });
     // Report Core Web Vitals and page views through the shared, host-gated
     // helper (the same inject the gallery and the /help page use), so a
     // telemetry hiccup can never throw past this line and suppress the WebGL

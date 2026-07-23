@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.93.0
+
+- You can now install Verticopolis as an app: once you have started building, a small Install button offers to add it to your home screen so it opens fullscreen and plays offline. It is a quiet, one-time offer that then waits in the Game panel, and on iPhone it shows the Add to Home Screen steps.
+
 ## 1.92.0
 
 - Modern towers can build a new Spa: a calm wellness venue with a steaming hot tub, massage tables, and greenery that earns from foot traffic and is busier on weekends. Where the nightclub disturbs nearby homes, the spa does the opposite for hotels: its calm makes hotel rooms on nearby floors rest a little easier (a bonus that fades with distance). Unlocks at 3 stars. Modern only.

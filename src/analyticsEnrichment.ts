@@ -87,18 +87,32 @@ export function recencyBucket(msSinceSave: number | undefined): string {
 }
 
 /**
+ * Coarse display-mode bucket: whether the app is running installed
+ * (`standalone`) or in a browser tab (`browser`). An anonymous on-device
+ * signal that lets the install-affordance's reach be read without any
+ * player-facing telemetry (SPEC-pwa-install CAP-4). The impure standalone
+ * probe (matchMedia / navigator.standalone) lives in `pwaInstall.ts`; this
+ * takes the resolved boolean so it stays a pure, unit-testable mapping.
+ */
+export function displayModeBucket(standalone: boolean): string {
+  return standalone ? "standalone" : "browser";
+}
+
+/**
  * Assemble the boot-time common props merged into every event. Pure: the boot
  * flow reads the live signals (`platform` and `onboarded` from the device,
- * `tenureDay` off the loaded tower, `savedAt` off the autosave, `now` the boot
- * clock) and passes them in, so the field mapping and the recency delta are
- * unit-testable without the boot harness. `returning` is derived off the
- * onboarding-seen flag (the cookieless on-device returning signal, per the SPEC).
+ * `tenureDay` off the loaded tower, `savedAt` off the autosave, `standalone`
+ * off the display mode, `now` the boot clock) and passes them in, so the field
+ * mapping and the recency delta are unit-testable without the boot harness.
+ * `returning` is derived off the onboarding-seen flag (the cookieless on-device
+ * returning signal, per the SPEC).
  */
 export function bootCommonProps(input: {
   platform: PlatformLabel;
   onboarded: boolean;
   tenureDay: number | undefined;
   savedAt: number | undefined;
+  standalone: boolean;
   now: number;
 }): EventProps {
   // A real save time is a positive epoch-ms stamp. A non-positive savedAt is a
@@ -113,5 +127,6 @@ export function bootCommonProps(input: {
     returning: input.onboarded,
     tenure: tenureBucket(input.tenureDay),
     recency: recencyBucket(msSinceSave),
+    display: displayModeBucket(input.standalone),
   };
 }
