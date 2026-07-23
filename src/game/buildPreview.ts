@@ -11,15 +11,23 @@ import { FLOOR } from "../render/scale";
  * How far above the touch point a room's placement ghost floats, in SCREEN pixels
  * (about a fingertip). Touch has no hover, so a build used to drop blind under the
  * thumb; the offset lifts the ghost (and the placed room) to where the finger is
- * not covering it. Screen-space, converted to floors through the live zoom by
- * {@link touchBuildLiftFloors}, so the lift feels the same at any zoom.
+ * not covering it. See {@link touchBuildLiftFloors} for how it converts to floors.
  */
 const TOUCH_BUILD_LIFT_PX = 46;
 
-/** The room-placement lift in FLOORS at the current zoom (at least one floor, so
- *  the ghost always clears the fingertip). Touch build only; mouse hover is exact. */
+/** The MOST floors the ghost is lifted above the finger. The lift is a fixed screen
+ *  distance, but when zoomed out a fingertip spans many floors, so an uncapped lift
+ *  drifts the ghost far up the tower (reads as "too far"). Capping the FLOOR count
+ *  keeps the ghost close to the finger in the world at any zoom. */
+const TOUCH_BUILD_LIFT_MAX_FLOORS = 2;
+
+/** The room-placement lift in FLOORS at the current zoom: a fingertip of screen
+ *  distance, at least one floor so it always clears the thumb, and at most
+ *  {@link TOUCH_BUILD_LIFT_MAX_FLOORS} so it never drifts far up when zoomed out.
+ *  Touch build only; mouse hover is exact. */
 export function touchBuildLiftFloors(app: GameApp): number {
-  return Math.max(1, Math.round(TOUCH_BUILD_LIFT_PX / (FLOOR * app.engine.cam.zoom)));
+  const floors = Math.round(TOUCH_BUILD_LIFT_PX / (FLOOR * app.engine.cam.zoom));
+  return Math.max(1, Math.min(TOUCH_BUILD_LIFT_MAX_FLOORS, floors));
 }
 
 /**

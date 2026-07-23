@@ -12,6 +12,7 @@ import {
   updateBuildPreview,
   updateBuildRefusal,
   clearBuildRefusal,
+  touchBuildLiftFloors,
 } from "./buildPreview";
 
 /**
@@ -288,5 +289,29 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
     expect(showing.showInspector).toHaveBeenCalledWith(null);
     expect(showing.raw.inspectAnchor).toBeNull();
     expect(showing.raw.buildRefusalShowing).toBe(false);
+  });
+});
+
+describe("touchBuildLiftFloors — a capped, zoom-aware lift", () => {
+  const liftAt = (zoom: number) =>
+    touchBuildLiftFloors({ engine: { cam: { zoom } } } as unknown as GameApp);
+
+  it("lifts at least one floor when zoomed in (a fingertip is under a floor tall there)", () => {
+    expect(liftAt(5)).toBe(1);
+    expect(liftAt(1)).toBe(1);
+  });
+
+  it("caps the lift when zoomed out, so the ghost never drifts far up the tower", () => {
+    // Uncapped, a fingertip of screen distance is many floors at whole-tower zoom.
+    expect(liftAt(0.06)).toBe(2);
+    expect(liftAt(0.1)).toBe(2);
+  });
+
+  it("stays within [1, 2] floors across the whole zoom range", () => {
+    for (const z of [0.06, 0.1, 0.3, 0.5, 1, 2, 3]) {
+      const n = liftAt(z);
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(2);
+    }
   });
 });
