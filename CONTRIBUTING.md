@@ -77,6 +77,99 @@ Verticopolis has **two test tiers**:
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
   `PW_VISUAL=1`).
 
+### Regenerating screenshot drift and visual baselines locally
+
+Canonical screenshots may be regenerated locally, but only inside the same
+Playwright Docker image CI uses. The image tag is derived from the exact
+Playwright version in `package-lock.json`, so local output uses the same Chromium
+and system fonts as the drift and visual-baseline workflows.
+
+Docker is required. Start from the repository root and resolve the pinned image:
+
+```bash
+PW_VERSION="$(
+  node -e "
+    const lock = require('./package-lock.json');
+    const pkg = require('./package.json');
+    const installed = lock.packages && lock.packages['node_modules/playwright'];
+    process.stdout.write(
+      (installed && installed.version) ||
+      pkg.devDependencies.playwright.replace(/[^0-9.]/g, '')
+    );
+  "
+)"
+PW_IMAGE="mcr.microsoft.com/playwright:v${PW_VERSION}-jammy"
+```
+
+The Playwright image ships an older Node than the repository requires, so each
+command below installs the version from `.nvmrc` inside the disposable container.
+`node_modules` stays in a Docker volume, `dist/` stays in a temporary filesystem,
+and only the regenerated PNGs are written back to the working tree.
+
+To regenerate the committed `docs/screenshots/**` gallery and review its drift:
+
+```bash
+docker run --rm --ipc=host \
+  -e CI=1 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+  -v "$PWD:/work" -w /work \
+  --mount type=volume,src=verticopolis-node-modules,dst=/work/node_modules \
+  --tmpfs /work/dist:exec \
+  "$PW_IMAGE" bash -lc '
+    set -euo pipefail
+    npm install --global n >/dev/null
+    n "$(cat .nvmrc)" >/dev/null
+    hash -r
+    export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    PW_CHROME="$(
+      ls -d /ms-playwright/chromium-*/chrome-linux*/chrome 2>/dev/null | head -1
+    )"
+    export PW_CHROME
+    test -x "$PW_CHROME" || { echo "Pinned Chromium was not found."; exit 1; }
+    npm ci
+    npm run screenshots
+    chown -R "$HOST_UID:$HOST_GID" docs/screenshots 2>/dev/null || true
+  '
+git status --short -- docs/screenshots
+git diff --stat -- docs/screenshots
+```
+
+For the exact twice-render determinism check used by the drift workflow, replace
+`npm run screenshots` in that container command with:
+
+```bash
+node scripts/screenshot-determinism-check.ts --all
+```
+
+To regenerate `e2e/visual.spec.ts-snapshots` in the same pinned image:
+
+```bash
+docker run --rm --ipc=host \
+  -e CI=1 -e HOST_UID="$(id -u)" -e HOST_GID="$(id -g)" \
+  -v "$PWD:/work" -w /work \
+  --mount type=volume,src=verticopolis-node-modules,dst=/work/node_modules \
+  --tmpfs /work/dist:exec \
+  "$PW_IMAGE" bash -lc '
+    set -euo pipefail
+    npm install --global n >/dev/null
+    n "$(cat .nvmrc)" >/dev/null
+    hash -r
+    export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+    npm ci
+    npm run build
+    npx playwright test e2e/visual.spec.ts --update-snapshots
+    chown -R "$HOST_UID:$HOST_GID" e2e/visual.spec.ts-snapshots 2>/dev/null || true
+  '
+git status --short -- e2e/visual.spec.ts-snapshots
+git diff --stat -- e2e/visual.spec.ts-snapshots
+```
+
+Review every changed image before committing it. The CI routes remain available:
+approve `pr-drift-check`'s `commit-on-approval` job for the docs gallery, or push
+a head commit containing `[update-baselines]` for the Playwright baselines.
+A plain host `npm run screenshots` is still preview-only because host Chromium
+and font rasterization may differ from the pinned image. See
+[`docs/screenshots.md`](./docs/screenshots.md) for the workflow details.
+
 ### Coverage floors
 
 Coverage is enforced as a **ratchet**, not a vanity number. It can't rot below
@@ -317,13 +410,11 @@ alone.
 - **Show visual/gameplay changes with real screenshots** in the PR's
   *Screenshots / recordings* section: committed images, not prose descriptions.
   See [docs/screenshots.md](./docs/screenshots.md) for how to capture, commit,
-  and embed them. Regenerate `docs/screenshots/**` only through CI, in the pinned
-  Playwright Docker image: open a PR and approve its `pr-drift-check` run's
-  `commit-on-approval` job, which renders the gallery and commits the refreshed
-  pixels to the PR branch. For the `e2e/visual.spec.ts-snapshots` baselines, push
-  with `[update-baselines]` in the head commit (`update-visual-baselines.yml`). The
-  local `npm run screenshots` is a host-Chromium preview whose antialiasing
-  differs, so its output must not be committed as the final set.
+  and embed them. Canonical `docs/screenshots/**` and
+  `e2e/visual.spec.ts-snapshots` pixels must come from the pinned Playwright
+  Docker image. Use the local container commands under Testing & coverage, or
+  use the CI refresh routes documented there. A plain host
+  `npm run screenshots` remains preview-only and its output must not be committed.
 - **Merge to `main` with a merge commit. Never squash-merge.** A standard
   merge commit keeps the branch's individual commits in history and lets the
   branch keep building cleanly afterward; squash-merging rewrites the branch into
