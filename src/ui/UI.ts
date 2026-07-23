@@ -114,6 +114,7 @@ export class UI {
     time: document.getElementById("stat-time")!,
     date: document.getElementById("stat-date")!,
     palette: document.getElementById("palette-scroll")!,
+    paletteTabs: document.getElementById("palette-tabs")!,
     toolInfo: document.getElementById("tool-info")!,
     towerStats: document.getElementById("tower-stats")!,
     log: document.getElementById("log")!,
@@ -134,10 +135,9 @@ export class UI {
   editorSize = { w: 0, h: 0 };
   /** @internal friend-module access (uiPanels). */
   inspectorSize = { w: 0, h: 0 };
-  /** Dirty-gate key for the palette lock/afford scan: the star plus the
-   *  per-kind affordability bitmask last applied to the DOM. The ~6 Hz pump
-   *  rescans only when this changes (a star or affordability crossing).
-   *  @internal friend-module access (uiStatus). */
+  /** Dirty-gate key for the palette lock/afford scan: the star plus the per-kind
+   *  affordability bitmask last applied to the DOM. The ~6 Hz pump rescans only
+   *  when this changes. @internal friend-module access (uiStatus). */
   paletteScanKey: string | null = null;
 
   constructor(cb: UICallbacks) {

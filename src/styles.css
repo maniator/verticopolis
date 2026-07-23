@@ -263,6 +263,10 @@ html.reduce-motion *::after {
 .palette-scroll {
   padding: 6px;
 }
+/* Category tabs are a phone-only affordance; desktop shows every group stacked. */
+#palette-tabs {
+  display: none;
+}
 .pal-group-title {
   font-size: 10px;
   text-transform: uppercase;
@@ -270,6 +274,26 @@ html.reduce-motion *::after {
   margin: 10px 4px 4px;
   color: var(--r-title);
   font-weight: 700;
+  /* Sticky so the band you are scrolling through stays labeled. */
+  position: sticky;
+  top: 0;
+  background: var(--r-face);
+  z-index: 1;
+}
+/* Modern venues sit under their own lighter sub-header inside a category. It
+ * scrolls with the content (only the category header pins), so it never stacks
+ * on top of the sticky category title. */
+.pal-sub {
+  color: #6a5a2a;
+  font-size: 9px;
+  margin: 6px 4px 3px;
+  position: static;
+}
+/* A category with no unlocked members (its section, its tab), and a Modern
+ * sub-band with none unlocked yet, drop out of layout entirely. */
+.pal-group[hidden],
+.pal-tab[hidden] {
+  display: none;
 }
 .pal-item {
   display: flex;
@@ -1649,7 +1673,8 @@ dialog.crash-card::backdrop {
     text-align: left;
   }
 
-  /* Palette becomes a horizontal strip along the bottom. */
+  /* Palette becomes a bottom bar: a category tab row over a content row, so
+     reaching a far venue is a tab tap, not a long sideways scroll of everything. */
   #main {
     flex-direction: column;
   }
@@ -1660,31 +1685,124 @@ dialog.crash-card::backdrop {
     margin: 0;
     box-shadow: none;
     border-top: 2px solid var(--r-shadow);
-    overflow-x: auto;
-    overflow-y: hidden;
-  }
-  .palette-scroll {
     display: flex;
-    flex-wrap: nowrap;
-    height: 100%;
-    align-items: stretch;
-    gap: 2px;
+    flex-direction: column;
+    overflow: hidden;
   }
   #palette > .win-title {
     display: none; /* no floating "Tools" title bar in the bottom strip */
   }
+  /* Category tab row (phone only). Scrolls a little if the chips overflow, but the
+     chips are short; the tiles no longer scroll across every group. */
+  #palette-tabs {
+    display: flex;
+    flex: none;
+    gap: 3px;
+    padding: 4px 5px 3px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-bottom: 1px solid var(--r-shadow);
+    scrollbar-width: none;
+  }
+  #palette-tabs::-webkit-scrollbar {
+    display: none;
+  }
+  .pal-tab {
+    flex: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 3px 9px;
+    cursor: pointer;
+    white-space: nowrap;
+    position: relative;
+    color: #1a1a1a;
+    background: #b7b7b7;
+    border: 1px solid #fff;
+    box-shadow: 1px 1px 0 var(--r-shadow);
+  }
+  .pal-tab[aria-selected="true"] {
+    background: var(--r-title);
+    color: var(--r-title-fg);
+    box-shadow: inset 0 -2px #ffd23f;
+  }
+  /* The "new tools unlocked here" pip. */
+  .pal-tab.has-new::after {
+    content: "";
+    position: absolute;
+    top: -3px;
+    right: -3px;
+    width: 8px;
+    height: 8px;
+    background: #ff5b4a;
+    border: 1px solid #fff;
+    border-radius: 50%;
+  }
+  /* Content row: pinned tools (always visible) beside the active group (scrolls). */
+  .palette-scroll {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    align-items: stretch;
+    overflow: hidden;
+    padding: 0;
+  }
+  .pal-pinned {
+    display: flex;
+    flex: none;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px;
+    border-right: 1px solid var(--r-shadow);
+  }
+  .pal-pinned .pal-group-title {
+    display: none; /* the pinned Inspect/Bulldoze cluster needs no label here */
+  }
+  .pal-groups {
+    display: flex;
+    flex: 1;
+    min-width: 0;
+    align-items: stretch;
+    gap: 2px;
+    padding: 4px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+  /* Only the selected category shows on a phone. */
+  .pal-groups .pal-group {
+    display: none;
+  }
+  .pal-groups .pal-group.tab-active {
+    display: flex;
+    align-items: stretch;
+    gap: 2px;
+  }
+  .pal-groups .pal-group[hidden] {
+    display: none; /* an emptied group never shows even if it were still marked active */
+  }
+  /* The category name lives on its tab; drop the in-strip title, keep the Modern
+     sub-band as a slim vertical divider between classic and Modern tiles. */
   .pal-group-title {
+    position: static;
+    background: none;
+    margin: 0 2px;
+  }
+  .pal-group.tab-active > .pal-group-title:not(.pal-sub) {
+    display: none;
+  }
+  .pal-group.tab-active > .pal-sub {
     writing-mode: vertical-rl;
     transform: rotate(180deg);
-    margin: 0 2px;
     align-self: center;
+    font-size: 8px;
+    padding: 0;
   }
   .pal-item {
     flex-direction: column;
-    width: 80px;
+    width: 72px;
     flex: none;
     gap: 3px;
-    padding: 6px 4px;
+    padding: 5px 3px;
     text-align: center;
     align-items: center;
     justify-content: flex-start;
