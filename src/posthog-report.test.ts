@@ -9,10 +9,12 @@ import {
   buildTotalsQuery,
   buildDepthQuery,
   buildBreakdownQuery,
+  buildFilteredCountQuery,
   rowsToObjects,
   totalsByEvent,
   depthRow,
   breakdownRows,
+  countRow,
 } from "../scripts/posthog-report.mjs";
 
 describe("clampDays (look-back guard)", () => {
@@ -61,6 +63,15 @@ describe("HogQL query builders", () => {
     expect(q).toContain("count(DISTINCT distinct_id) AS sessions");
     expect(q).toContain("GROUP BY k ORDER BY events DESC LIMIT 100");
     expect(q).toContain("event = 'boot'");
+  });
+
+  it("filtered-count query narrows the event by a trusted boolean expression", () => {
+    const q = buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", 7);
+    expect(q).toContain("properties.environment = 'production'");
+    expect(q).toContain("INTERVAL 7 DAY");
+    expect(q).toContain("event = 'session_emergencies'");
+    expect(q).toContain("AND (toFloat(properties.fires) > 0)");
+    expect(q).toContain("count(DISTINCT distinct_id) AS sessions");
   });
 });
 
@@ -136,5 +147,20 @@ describe("breakdownRows (grouped result normalizer)", () => {
 
   it("returns null when the query was skipped", () => {
     expect(breakdownRows({ ok: false, hint: "network error" })).toBeNull();
+  });
+});
+
+describe("countRow (filtered-count row)", () => {
+  it("reads the single events/sessions row", () => {
+    const res = { ok: true, json: { columns: ["events", "sessions"], results: [[42, 30]] } };
+    expect(countRow(res)).toEqual({ events: 42, sessions: 30 });
+  });
+
+  it("zeroes an empty window (no rows)", () => {
+    expect(countRow({ ok: true, json: { columns: ["events", "sessions"], results: [] } })).toEqual({ events: 0, sessions: 0 });
+  });
+
+  it("zeroes and flags a skipped query with its hint", () => {
+    expect(countRow({ ok: false, hint: "rate limited" })).toEqual({ events: 0, sessions: 0, skipped: true, hint: "rate limited" });
   });
 });
