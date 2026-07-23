@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { Unit } from "../engine/types";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../engine/retailSubtypes";
 import {
   drawUnit,
   craneAnchorTile,
@@ -75,6 +75,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["amusements", { kind: "amusements" }],
     ["boutique bay", { kind: "boutiqueBay" }],
     ["fitness club", { kind: "fitnessClub" }],
+    ["clinic", { kind: "clinic" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -219,6 +220,22 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     const occupant = "fillStyle=rgba(0,0,0,0.24)";
     expect(empty.log).not.toContain(occupant);
     expect(full.log).toContain(occupant);
+  });
+
+  it("each Clinic practice draws its own distinct room, empty when empty", () => {
+    const sigs = new Set<string>();
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    for (const name of CLINIC_SUBTYPES) {
+      const busy = spyCtx();
+      const empty = spyCtx();
+      expect(() => drawUnit(draw({}, busy.ctx), unit({ kind: "clinic", subtype: name, occupants: 2 }), 0, 0, 88, 44)).not.toThrow();
+      drawUnit(draw({}, empty.ctx), unit({ kind: "clinic", subtype: name, occupants: 0 }), 0, 0, 88, 44);
+      expect(busy.painted()).toBe(true);
+      expect(busy.log, `${name} drew no patient while occupied`).toContain(occupant);
+      expect(empty.log, `${name} drew a patient while empty`).not.toContain(occupant);
+      sigs.add(busy.sig());
+    }
+    expect(sigs.size, "two practices drew identically").toBe(CLINIC_SUBTYPES.length);
   });
 
   it("a Boutique Bay's browsers are bounded and gated on occupancy", () => {

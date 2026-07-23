@@ -233,6 +233,9 @@ export const ECON = {
     // cadence like an office (a smaller lease than a full office floor). Modern
     // never charges a Classic tower this: the kind is modernOnly.
     fitnessClub: { default: 6_000, min: 2_000, max: 12_000, step: 1_000 },
+    // Modern-only Clinic lease, the same quarterly cadence, smaller still (an
+    // 8-wide quiet tenant).
+    clinic: { default: 4_000, min: 1_500, max: 8_000, step: 500 },
   } as Record<string, { default: number; min: number; max: number; step: number }>,
   serviceMaintenanceMonthly: {
     security: 2_000,
@@ -244,7 +247,7 @@ export const ECON = {
 } as const;
 
 /** Unit kinds whose price the player sets (and can batch-edit). */
-export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub"] as const;
+export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub", "clinic"] as const;
 
 /** The price band for a unit kind, or null if its price isn't player-set. */
 export function rentConfig(kind: string): { default: number; min: number; max: number; step: number } | null {

@@ -128,13 +128,13 @@ export function dominantGripe(
     if (unmetActive()) return "unmetDemand";
     return null;
   }
-  if (u.kind === "fitnessClub") {
-    // A Modern Fitness Club's only self-inflicted souring is gouged membership
-    // dues; it feels none of the noise, lobby-distance, or unmet-demand drains
-    // (those gate on office/condo/hotel), so "rent" is the one cause to name. A
-    // non-gouged club that sours can only be unserved, left to the "access"
+  if (u.kind === "fitnessClub" || u.kind === "clinic") {
+    // A Modern lease amenity's only self-inflicted souring is gouged dues/lease;
+    // it feels none of the noise, lobby-distance, or unmet-demand drains (those
+    // gate on office/condo/hotel), so "rent" is the one cause to name. A
+    // non-gouged one that sours can only be unserved, left to the "access"
     // catch-all, so it never falls through to the hotel/condo causes below.
-    const cfg = rentConfig("fitnessClub");
+    const cfg = rentConfig(u.kind);
     if (cfg && rentOf(u) > cfg.default) return "rent";
     return null;
   }

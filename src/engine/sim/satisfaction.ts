@@ -133,7 +133,7 @@ export function updateSatisfaction(sim: Simulation): void {
     // the same discipline: gouge past the going rate and the club sours and
     // eventually gives up its lease. Classic never has one, so this stays office-
     // only there.
-    if ((u.kind === "office" || u.kind === "fitnessClub") && served) {
+    if ((u.kind === "office" || u.kind === "fitnessClub" || u.kind === "clinic") && served) {
       const cfg = rentConfig(u.kind)!;
       const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
       u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
@@ -256,7 +256,7 @@ export function updateSatisfaction(sim: Simulation): void {
     // miserable room simply fails to hold its guest right away (review F25).
     // Commercial venues aren't here: their income already requires a served
     // floor, so poor access starves them directly rather than via move-out.
-    const leaseTenant = u.kind === "office" || u.kind === "condo" || u.kind === "fitnessClub";
+    const leaseTenant = u.kind === "office" || u.kind === "condo" || u.kind === "fitnessClub" || u.kind === "clinic";
     if (leaseTenant && u.state === "vacating") {
       // A relocation is a life event, not a complaint: nothing the player does
       // (not even a fully satisfied tenant) rescinds it, and it is never

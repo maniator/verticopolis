@@ -1,6 +1,6 @@
 import { html, render } from "lit-html";
 import { FACILITIES, GRID } from "./engine/facilities";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
+import { CLINIC_SUBTYPES, AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "./engine/retailSubtypes";
 import type { FacilityKind, Transport, Unit, UnitState } from "./engine/types";
 import { drawCar, drawTransport, drawUnit, type DrawCtx } from "./render/sprites";
 import { pageShell } from "./ui/templates/pageShell";
@@ -195,6 +195,10 @@ const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
   {
     label: "Fitness Club",
     entries: [roomEntry("Fitness Club", "fitnessClub"), ...retailEntries("fitnessClub", FITNESS_SUBTYPES)],
+  },
+  {
+    label: "Clinic",
+    entries: [roomEntry("Clinic", "clinic"), ...retailEntries("clinic", CLINIC_SUBTYPES)],
   },
 ];
 

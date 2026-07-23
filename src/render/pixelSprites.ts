@@ -6,6 +6,7 @@ import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
 import { amusements } from "./pixelSprites/amusements";
 import { boutiqueBay } from "./pixelSprites/boutique";
 import { fitnessClub } from "./pixelSprites/fitness";
+import { clinic } from "./pixelSprites/clinic";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -83,6 +84,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // climbing) draws its own equipment under a shared mirror strip.
       fitnessClub(d, u, x, y, w, h);
       break;
+    case "clinic":
+      // A Modern health clinic; each practice subtype (dental, urgent care,
+      // optometry, pharmacy, physio) draws its own room under a clinical trim band.
+      clinic(d, u, x, y, w, h);
+      break;
     case "shop":
       shop(d, u, x, y, w, h);
       break;
@@ -120,4 +126,5 @@ export { FASTFOOD_LOOKS, RESTAURANT_LOOKS, FOODHALL_LOOKS, type FastFoodLook, ty
 export { AMUSEMENTS_LOOKS, type AmusementsLook } from "./pixelSprites/amusements";
 export { BOUTIQUE_LOOKS, type BoutiqueLook } from "./pixelSprites/boutique";
 export { FITNESS_LOOKS, type FitnessLook } from "./pixelSprites/fitness";
+export { CLINIC_LOOKS, type ClinicLook } from "./pixelSprites/clinic";
 export { SHOP_LOOKS, type ShopLook } from "./pixelSprites/shop";

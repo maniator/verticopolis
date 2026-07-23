@@ -64,6 +64,7 @@ export type FacilityKind =
   | "amusements"
   | "boutiqueBay"
   | "fitnessClub"
+  | "clinic"
   | "stairs"
   | "escalator"
   | "elevatorStandard"

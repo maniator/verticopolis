@@ -98,6 +98,20 @@ export const FITNESS_SUBTYPES = [
 ] as const;
 
 /**
+ * The practices a Modern Clinic can present. Like the other Modern container
+ * rosters, these are Modern-only and carry NO ordinal: a Modern tower is never
+ * exported to the 1994 `.TDT` format, and the native save persists the practice
+ * by NAME, not by index, so order carries no meaning.
+ */
+export const CLINIC_SUBTYPES = [
+  "Dental",
+  "Urgent Care",
+  "Optometry",
+  "Pharmacy",
+  "Physio",
+] as const;
+
+/**
  * The subtype (stall/variant) name list for `kind`, or null when the kind
  * carries none. The canon retail kinds (shop / fastFood / restaurant) return
  * their 1994 lists; the Modern-only Food Hall returns its (non-canon) stall
@@ -122,6 +136,8 @@ export function subtypeListFor(kind: FacilityKind): readonly string[] | null {
       return BOUTIQUE_SUBTYPES;
     case "fitnessClub":
       return FITNESS_SUBTYPES;
+    case "clinic":
+      return CLINIC_SUBTYPES;
     default:
       return null;
   }
