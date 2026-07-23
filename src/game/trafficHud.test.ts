@@ -62,6 +62,30 @@ describe("updateTraffic", () => {
     expect(wrap().classList.contains("traffic-warn")).toBe(true);
   });
 
+  it("names the ground lobby as 1F (the boarding-jam case the fix targets)", () => {
+    const app = fakeApp(0.9, 1, 0);
+    updateTraffic(app);
+
+    expect(label()).toBe("Backed up");
+    expect(floor()).toBe(" · 1F");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor 1");
+  });
+
+  it("formats a basement hotspot with the B-grammar, never 0F/-1F", () => {
+    // A jammed basement food hall: floor 0 is B1, floor -1 is B2. The visible tag
+    // and the spoken aria both use the basement grammar, matching the ruler.
+    const b1 = fakeApp(0.9, 0, 0);
+    updateTraffic(b1);
+    expect(floor()).toBe(" · B1");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor B1");
+
+    document.getElementById("traffic-floor")!.textContent = "";
+    const b2 = fakeApp(0.9, -1, 2);
+    updateTraffic(b2);
+    expect(floor()).toBe(" · B2");
+    expect(wrap().getAttribute("aria-label")).toBe("Traffic: Backed up, worst on floor B2");
+  });
+
   it("shows the floor at tier 1 (Busy) but does NOT set the warn class (tier < 2)", () => {
     // 0.5 -> raw 1, and 0.5 >= B[0] + 0.03 = 0.43, so it flips to Busy.
     const app = fakeApp(0.5, 7, 0);

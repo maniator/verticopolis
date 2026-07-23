@@ -1,5 +1,6 @@
 import type { GameApp } from "../main";
 import { trafficTier, TRAFFIC_BOUNDS, TRAFFIC_LABELS, trafficGlyph } from "../engine/traffic";
+import { floorLabel } from "../ui/floorLabel";
 
 /**
  * The color-blind-safe traffic HUD, split out of the `GameApp` class. Reads the
@@ -26,15 +27,22 @@ export function updateTraffic(app: GameApp): void {
   const word = TRAFFIC_LABELS[tier];
   // Above Smooth, surface the hotspot floor (something the 1994 original could
   // never do). The engine hands us the floor number (null = no hotspot); we
-  // format the label. Populated floors are always above ground, so `NF` is the
-  // right form for every reachable case.
+  // format the label below. The hotspot can be the ground lobby (floor 1) or a
+  // basement venue, so the label handles every floor sign, not just above ground.
   const floor = tier > 0 ? hotspot : null;
   // The floor rides its own span (styled as a de-emphasized footnote) so a long
   // "Backed up · 100F" never competes with the tier word or wraps the fixed HUD
   // cell to a second line. The separator lives inside the suffix so Smooth shows
   // no orphan "· ". The full sentence still goes to aria-label for readers.
-  const floorText = floor !== null ? ` · ${floor}F` : "";
-  const aria = floor !== null ? `Traffic: ${word}, worst on floor ${floor}` : `Traffic: ${word}`;
+  // Above ground the HUD keeps its own "NF" footnote form (the lobby is "1F").
+  // A basement hotspot uses the game's "B1"/"B2" grammar (never "0F"/"-1F"), the
+  // same basement labels the ruler and `floorLabel` use.
+  const tag = floor === null ? "" : floor >= 1 ? `${floor}F` : floorLabel(floor);
+  const floorText = floor !== null ? ` · ${tag}` : "";
+  // aria keeps the spoken "worst on floor N" phrasing (no trailing "F"), and the
+  // "B1"/"B2" grammar for a basement, so a screen reader announces the same
+  // floor identity the visible tag shows.
+  const aria = floor !== null ? `Traffic: ${word}, worst on floor ${floorLabel(floor)}` : `Traffic: ${word}`;
   const glyphEl = document.getElementById("traffic-glyph");
   const labelEl = document.getElementById("traffic-label");
   const floorEl = document.getElementById("traffic-floor");

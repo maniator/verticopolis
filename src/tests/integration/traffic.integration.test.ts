@@ -80,6 +80,26 @@ describe("Traffic signal is peak-driven and points at the hotspot", () => {
     expect(sim.congestionAt(floor!)).toBeCloseTo(sim.peakCongestion(), 5);
   });
 
+  it("names the ground lobby (1F) when a lobby-served bank is the bottleneck", () => {
+    // The off-by-one report: a single weak shaft carries a whole office stack up
+    // from the lobby. Every floor it serves shares that one bottleneck, so they
+    // all tie, and the lobby is where riders board it. The hotspot must be floor
+    // 1 (the "1F" the player sees backed up), not the first office floor above.
+    const sim = Simulation.newGame(7);
+    sim.simModel = "v2";
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 10; f++) lay(sim, "floor", f);
+    expect(sim.buildTransport("elevatorStandard", W - 6, 1, 10).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[0].id, 1); // one weak shaft, lobby-served
+    for (let f = 2; f <= 10; f++) fillFloor(sim, f, 30); // a heavy office stack
+    expect(sim.peakCongestionFloor()).toBe(1); // the lobby, not 2F
+    // The lobby's reading is the true per-floor max, and it carries the boarding
+    // pressure the office floors above share, not a signal of its own residents.
+    expect(sim.congestionAt(1)).toBeCloseTo(sim.peakCongestion(), 10);
+    expect(trafficTier(sim.peakCongestion())).toBeGreaterThanOrEqual(2);
+  });
+
   it("a well-built tower stays Smooth and names no floor (peak below the first boundary)", () => {
     const sim = Simulation.newGame(2);
     sim.simModel = "v2";

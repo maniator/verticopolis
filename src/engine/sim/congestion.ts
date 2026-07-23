@@ -21,11 +21,16 @@ export function congestion(sim: Simulation): number {
   if (sim.simModel === "v2") {
     // The mean of the per-floor spatial congestion (an unweighted average over
     // occupied floors), a single HUD-friendly summary of a model that is really
-    // per-floor.
+    // per-floor. The ground lobby (floor 1) is left OUT of this average: it now
+    // carries a per-floor reading for the hotspot/max, but it is a pass-through,
+    // not an occupied floor, so folding it into the mean would drag this "typical
+    // populated floor" summary (and the render stress it feeds) toward the
+    // always-busy lobby. The max/hotspot still surfaces a lobby jam; the mean
+    // stays what it was before the lobby became reportable.
     const map = sim.spatialCongestionByFloor();
     if (map.size === 0) return 0;
     let sum = 0, n = 0;
-    for (const c of map.values()) { sum += c; n++; }
+    for (const [f, c] of map) { if (f === 1) continue; sum += c; n++; }
     return n > 0 ? sum / n : 0;
   }
   let capacity = 0;
@@ -86,7 +91,15 @@ export function peakCongestionHotspot(sim: Simulation): { ratio: number; floor: 
   if (sim.simModel !== "v2") return { ratio: sim.congestion(), floor: null };
   let ratio = 0;
   let floor: number | null = null;
-  for (const [f, c] of sim.spatialCongestionByFloor()) if (c > ratio) { ratio = c; floor = f; }
+  // On a tie, name the LOWEST floor. A shared bottleneck (one overloaded shaft)
+  // gives every floor it serves the same ratio; the lowest is closest to where
+  // riders board it, so it points the player at the boarding jam (the lobby when
+  // a lobby-served bank is the bottleneck) rather than an arbitrary floor in the
+  // band. Deterministic, so the report never depends on transport build order.
+  for (const [f, c] of sim.spatialCongestionByFloor()) {
+    if (c > ratio) { ratio = c; floor = f; }
+    else if (c === ratio && floor !== null && f < floor) floor = f;
+  }
   return { ratio, floor };
 }
 
@@ -103,11 +116,11 @@ export function peakCongestion(sim: Simulation): number {
  *  `null` when no floor is congested (empty tower, all floors stranded, or the
  *  v1 scalar model, which has no per-floor worst floor). `null`, never `0`, is
  *  the "no floor" signal: `0` is a real floor (B1), so a sentinel of `0` would
- *  be ambiguous. In practice only the populated kinds (offices, condos, hotels)
- *  feed the map and those are daylight-only, never basements, so a real worst
- *  floor is always above ground; the `null` guard keeps that an invariant we
- *  document rather than one we rely on by luck. Lets the HUD name *where* the
- *  pressure is without the engine formatting any label. */
+ *  be ambiguous. The worst floor can be the ground lobby (floor 1, when a
+ *  lobby-served bank is the bottleneck) or, less often, a basement commercial
+ *  venue (a jammed food hall on B1/B2); the HUD therefore formats the label with
+ *  the basement grammar rather than assuming an above-ground `NF`. Lets the HUD
+ *  name *where* the pressure is without the engine formatting any label. */
 export function peakCongestionFloor(sim: Simulation): number | null {
   return sim.peakCongestionHotspot().floor;
 }
@@ -136,6 +149,10 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
       // value, or every occupied fast food would fake 25 riders around the
       // clock (review P2 on the commercial census change).
       const p = censusCount(u);
+      // The ground lobby (floor 1) generates no riding demand OF ITS OWN, it is
+      // a pass-through, so it never seeds popByFloor. It still gets a congestion
+      // reading below from the boarding pressure of the floors its shafts serve
+      // (the morning-rush queue a player watches back up at the main lobby).
       if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
     }
   }
@@ -156,7 +173,11 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
     if (!active) continue;
     const cap = sim.transportCapacity(t);
     for (let f = t.bottom; f <= t.top; f++) {
-      if (f === 1) continue;
+      // Floor 1 (the ground lobby) IS recorded here: every rider on a
+      // lobby-boarding shaft passes through it, so the lobby carries that
+      // shaft's boarding pressure. Excluding it used to displace a lobby jam's
+      // report up to the first office floor (the "backed up on 2F" the player
+      // reads as off by one when the queue they see is at the main lobby, 1F).
       if (sim.tower.stopsAt(t, f) && served.has(f)) {
         const arr = shaftsByFloor.get(f) ?? [];
         arr.push({ id: t.id, cap });
@@ -186,7 +207,10 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
 
   // Each floor's congestion is its worst serving shaft (loads ~balanced by the split).
   for (const [f, shafts] of shaftsByFloor) {
-    if (!popByFloor.has(f)) continue;
+    // The lobby (floor 1) is kept even with no residents of its own: its reading
+    // is the boarding pressure of the floors its shafts serve. Every other floor
+    // needs population to have a congestion signal.
+    if (f !== 1 && !popByFloor.has(f)) continue;
     let c = 0;
     for (const s of shafts) {
       const cong = s.cap > 0 ? ((loadByShaft.get(s.id) ?? 0) * rush) / (s.cap * HEADROOM) : 99;
