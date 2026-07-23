@@ -26,6 +26,7 @@ import { SCHEDULE_SCENES } from "./scenes/schedule.ts";
 import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
 import { MILESTONE_SCENES } from "./scenes/milestones.ts";
 import { BOOT_FALLBACK_SCENES } from "./scenes/boot-fallback.ts";
+import { INSTALL_SCENES } from "./scenes/install.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -35,4 +36,5 @@ export const SCENES: Scene[] = [
   ...CLASSIC_VS_MODERN_SCENES,
   ...MILESTONE_SCENES,
   ...BOOT_FALLBACK_SCENES,
+  ...INSTALL_SCENES,
 ];

@@ -15,7 +15,7 @@ import { gameplaySession, setCommonProps } from "../analytics";
 import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
-import { initInstallAffordance } from "./installAffordance";
+import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -289,6 +289,11 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       // splash dismisses into the game.
       muted: () => app.audio.muted,
       onToggleMute: () => app.toggleMute(),
+      // The persistent splash install button (SPEC-pwa-install CAP-5): offered to
+      // any not-standalone session, routed through the SAME activation the in-game
+      // surfaces use (native prompt where captured, else an honest how-to).
+      installOffered: () => splashInstallOffered(),
+      onInstall: () => void activateInstall(app).catch(() => {}),
       onContinue: () => {
         // Only rendered when `hasSave`. teardownSplash() resumes the engine to
         // play speed, so re-pause: a returning player lands back in their tower

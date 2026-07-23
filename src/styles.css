@@ -1463,6 +1463,42 @@ dialog.crash-card::backdrop {
 .splash-mute:hover { background: rgba(13, 13, 16, 0.55); }
 .splash-mute:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
 
+/* The persistent splash install button (SPEC-pwa-install CAP-5): the quiet
+   front door for getting Verticopolis onto the device. A labeled pill (download
+   glyph + "Install"), NOT a bare glyph: alone on the wide splash a lone icon read
+   as nothing. It shares the splash's un-unified box-art chrome with the mute and
+   is pinned just to its left, so the two utilities read as one small cluster in
+   the top-right without competing with the action stack. The 48px min-height
+   keeps a comfortable touch target; width follows the label. Shown only for a
+   not-standalone session, so a player already inside the installed app never
+   sees it. */
+.splash-install {
+  position: absolute;
+  top: 14px;
+  right: 72px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 44px;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  line-height: 1;
+  color: #e6dcc0;
+  background: rgba(13, 13, 16, 0.35);
+  border: 2px solid rgba(230, 220, 192, 0.55);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.splash-install-glyph {
+  font-size: 20px;
+  line-height: 1;
+}
+.splash-install:hover { background: rgba(13, 13, 16, 0.55); }
+.splash-install:focus-visible { outline: 2px solid #ffc94a; outline-offset: 2px; }
+
 .splash-btn {
   font-family: var(--r-font);
   font-size: 15px;
@@ -1585,6 +1621,18 @@ dialog.crash-card::backdrop {
   }
   #panel-toggle {
     display: inline-block;
+  }
+  /* The control row is crowded on a phone: 9 fixed buttons plus the conditional
+     Update / Install chips. Let it wrap instead of overflowing off-screen, and
+     drop the two chips' text labels so they read as compact icons like every
+     other topbar button (the title / aria-label still name them; the splash
+     button and the Game-panel entry carry the full "Install" wording). Together
+     these keep the bar tidy at 390px instead of squished and clipped. */
+  #speed {
+    flex-wrap: wrap;
+  }
+  #speed .btn-label {
+    display: none;
   }
 
   /* Stats/milestones: stack the two columns into one so each row gets the full

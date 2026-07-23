@@ -1,5 +1,5 @@
 import type { UI } from "./UI";
-import { confirmTemplate, installHelpTemplate } from "./templates/confirm";
+import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
@@ -80,11 +80,12 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
   });
 }
 
-/** Open the iOS Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3). The install
- *  controller calls this directly (keeping UI.ts under its size ceiling); it is
- *  only ever reached from a deliberate tap on the install affordance. */
-export function showInstallHelp(ui: UI): void {
-  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal()));
+/** Open the Add-to-Home-Screen how-to (SPEC-pwa-install CAP-3 / CAP-5). The
+ *  install controller calls this directly (keeping UI.ts under its size ceiling);
+ *  it is only ever reached from a deliberate tap on an install affordance. The
+ *  `variant` picks the iOS Safari steps or the Chrome/Edge browser-menu steps. */
+export function showInstallHelp(ui: UI, variant: InstallHelpVariant = "ios"): void {
+  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal(), variant));
 }
 
 export function confirmModal(
