@@ -2,8 +2,8 @@ import { describe, it, expect } from "vitest";
 import { newSeededGame } from "../fixtures/towerFixtures";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
-import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
-import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
+import { AMUSEMENTS_SUBTYPES, BOUTIQUE_SUBTYPES, CLINIC_SUBTYPES, FASTFOOD_SUBTYPES, FITNESS_SUBTYPES, FOODHALL_SUBTYPES, RESTAURANT_SUBTYPES, SHOP_SUBTYPES } from "../../engine/retailSubtypes";
+import { AMUSEMENTS_LOOKS, BOUTIQUE_LOOKS, CLINIC_LOOKS, FASTFOOD_LOOKS, FITNESS_LOOKS, FOODHALL_LOOKS, RESTAURANT_LOOKS, SHOP_LOOKS } from "../../render/pixelSprites";
 import { buildTDT } from "../../storage/tdtExport";
 import { parseTDT } from "../../storage/tdtImport";
 import type { FacilityKind } from "../../engine/types";
@@ -156,6 +156,33 @@ describe("Modern Fitness Club format looks", () => {
     // not a recolor, so all five render unmistakably differently.
     expect(walls.size, "two formats share a wall color").toBe(FITNESS_SUBTYPES.length);
     expect(formats.size, "two formats share an interior").toBe(FITNESS_SUBTYPES.length);
+  });
+});
+
+// The Modern Clinic practices carry the same "every variant is visually distinct"
+// guarantee, and like the other Modern containers they are Modern-only and so are
+// deliberately NOT in the TDT round-trip loop below: a Modern tower is never
+// exported to the 1994 .TDT format, so these practices have no ordinal.
+describe("Modern Clinic practice looks", () => {
+  it("every practice has a look, and no look is orphaned", () => {
+    expect(Object.keys(CLINIC_LOOKS).sort()).toEqual([...CLINIC_SUBTYPES].sort());
+  });
+
+  it("every practice look is visually distinct", () => {
+    const seen = new Map<string, string>();
+    const walls = new Set<string>();
+    const practices = new Set<string>();
+    for (const name of CLINIC_SUBTYPES) {
+      const look = CLINIC_LOOKS[name];
+      const key = JSON.stringify(look);
+      const clash = seen.get(key);
+      expect(clash, `${name} and ${clash ?? "?"} share an identical look`).toBeUndefined();
+      seen.set(key, name);
+      walls.add(look.wall);
+      practices.add(look.practice);
+    }
+    expect(walls.size, "two practices share a wall color").toBe(CLINIC_SUBTYPES.length);
+    expect(practices.size, "two practices share an interior").toBe(CLINIC_SUBTYPES.length);
   });
 });
 

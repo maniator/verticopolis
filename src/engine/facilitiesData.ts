@@ -199,6 +199,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a members' gym (weight floor, yoga, spin, boxing, climbing). Pays a membership lease like an office, and nearby condos are happier for having it close (a capped bonus that fades with distance).",
   },
+  clinic: {
+    kind: "clinic",
+    category: "retail",
+    name: "Clinic",
+    width: 8,
+    cost: 120000,
+    minStar: 3,
+    population: 12,
+    color: "#5ab0c8",
+    modernOnly: true,
+    description: "Modern: a small health clinic (dental, urgent care, optometry, pharmacy, physio). Pays a lease like an office: a quiet, steady tenant.",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",

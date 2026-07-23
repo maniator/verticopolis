@@ -2,12 +2,22 @@ import type { SimContext } from "./SimContext";
 import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
+import type { FacilityKind } from "./types";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { FACILITIES, attendanceCap, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
 import { computeDemandMap } from "./sim/demand";
+
+/** The lease kinds `collectRent` collects quarterly, and the money-log line each
+ *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
+ *  no lease. Office is canon; the Fitness Club and Clinic are Modern-only. */
+const LEASE_MESSAGE: Partial<Record<FacilityKind, (amt: number, n: number) => string>> = {
+  office: (a, n) => `Quarterly office rent collected: $${a.toLocaleString()} (${n} offices).`,
+  fitnessClub: (a, n) => `Fitness Club membership dues collected: $${a.toLocaleString()} (${n} club${n > 1 ? "s" : ""}).`,
+  clinic: (a, n) => `Clinic lease collected: $${a.toLocaleString()} (${n} clinic${n > 1 ? "s" : ""}).`,
+};
 
 /** Canon "commercial must be near a lobby": a shop/food venue more than this many
  *  floors from the nearest (sky) lobby draws far fewer shoppers (W3). Exported so
@@ -102,35 +112,25 @@ export class EconomySystem {
     );
   }
 
-  /** Quarterly office rent plus Modern Fitness Club membership dues, from occupied,
-   *  served units (fitness banks to its own category; 0 in a Classic tower). */
+  /** Quarterly lease income from occupied, served units: office rent plus the
+   *  Modern lease amenities (Fitness Club dues, Clinic lease), each banked to its
+   *  own ledger line via `ledgerCatFor` (so income and overhead net together). */
   collectRent(): void {
-    let total = 0;
-    let count = 0;
-    let fitTotal = 0;
-    let fitCount = 0;
+    const sums = new Map<FacilityKind, { sum: number; n: number }>();
     for (const u of this.sim.tower.units) {
-      if (!isTenanted(u) || !this.sim.tower.isFloorServed(u.floor)) continue;
-      if (u.kind === "office") {
-        total += rentOf(u);
-        count++;
-      } else if (u.kind === "fitnessClub") {
-        fitTotal += rentOf(u);
-        fitCount++;
-      }
+      if (!LEASE_MESSAGE[u.kind] || !isTenanted(u) || !this.sim.tower.isFloorServed(u.floor)) continue;
+      const b = sums.get(u.kind) ?? { sum: 0, n: 0 };
+      b.sum += rentOf(u);
+      b.n += 1;
+      sums.set(u.kind, b);
     }
     const scale = (this.sim.rules ?? MODERN_RULES).quarterlyRentScale(this.sim.clock.calendar.quarterDays);
-    const collected = Math.round(total * scale); // round each total once so per-unit rounding can't accumulate
-    if (collected > 0) {
-      this.sim.money += collected;
-      this.sim.recordMoney?.("offices", collected);
-      this.sim.emit(`Quarterly office rent collected: $${collected.toLocaleString()} (${count} offices).`, "money");
-    }
-    const fitness = Math.round(fitTotal * scale);
-    if (fitness > 0) {
-      this.sim.money += fitness;
-      this.sim.recordMoney?.("entertainment", fitness);
-      this.sim.emit(`Fitness Club membership dues collected: $${fitness.toLocaleString()} (${fitCount} club${fitCount > 1 ? "s" : ""}).`, "money");
+    for (const [kind, b] of sums) {
+      const amt = Math.round(b.sum * scale); // round each total once so per-unit rounding can't accumulate
+      if (amt <= 0) continue;
+      this.sim.money += amt;
+      this.sim.recordMoney?.(ledgerCatFor(kind) ?? "upkeep", amt);
+      this.sim.emit(LEASE_MESSAGE[kind]!(amt, b.n), "money");
     }
   }
 
