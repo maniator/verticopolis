@@ -28,8 +28,12 @@ sources: []
   - **success:** On iOS-Safari-not-standalone the same affordance is present, and tapping it (chip or Game-panel entry) opens a short, honest "Add to Home Screen" how-to; the how-to is never auto-shown and the control is never dressed as one-tap. A test pins that iOS routes to the how-to, not to a `prompt()` path.
 
 - **CAP-4**
-  - **intent:** The team learns how many players install, and how the affordance performs, without interrupting anyone.
-  - **success:** The `appinstalled` event and a boot-time display-mode bucket (standalone vs browser) flow into the existing cookieless analytics enrichment; no player-facing telemetry surface is added. A test pins the display-mode bucket value and that `appinstalled` emits through the existing analytics path.
+  - **intent:** The team learns how many players install, which affordance they reach for, and how the offer performs, without interrupting anyone.
+  - **success:** The `appinstalled` event (completion) and a boot-time display-mode bucket (standalone vs browser) flow into the existing cookieless analytics enrichment; additionally each deliberate tap on an install affordance emits an `install_offer` action carrying which surface was used (`splash`, `chip`, or `menu`), the engagement half of the funnel the OS `appinstalled` event cannot attribute. All counts are coarse and cookieless; no player-facing telemetry surface is added. Tests pin the display-mode bucket value, that `appinstalled` emits through the existing analytics path, and that each surface's tap reports its own `install_offer` detail.
+
+- **CAP-5**
+  - **intent:** A player on the splash/title screen who could install is offered it there too. The splash is the "is this a real app?" moment, so the offer is a persistent front door there, not a gated nudge.
+  - **success:** A quiet install button sits on the splash near the mute (un-unified box-art styling), shown whenever the session is NOT already installed (not standalone, not TWA), independent of whether `beforeinstallprompt` has fired. Its visibility is decided at mount by the not-standalone check alone, so there is no live reveal race. Tapping it always does something honest: the native prompt when the deferred event has been captured, otherwise a short platform-appropriate "add to your device" how-to (iOS always; Chrome/Edge before the event lands). It is absent for standalone/TWA sessions. The copy promises an outcome (offline, fullscreen, from your home screen), never "one-tap." A test pins that it shows for a not-standalone session and hides for standalone, and that a tap with no captured event routes to the how-to while a tap with one drives `prompt()`.
 
 ## Constraints
 
@@ -37,13 +41,14 @@ sources: []
 - Already-installed sessions (`display-mode: standalone` / `navigator.standalone`) and Android TWA sessions see the affordance in no surface.
 - `beforeinstallprompt` is consumed only through deliberate UI (the one-shot is guarded); the iOS how-to is never auto-shown.
 - Reuse the update-chip (`#btn-update`) appear/disappear plumbing; introduce no new timed pop-up or toast region.
-- Show once, then go passive: no re-nagging, no dark patterns.
+- Show once, then go passive on the in-game chip: no re-nagging, no dark patterns.
+- One offer, three surfaces (splash button, topbar chip, Game-panel entry) all drive the SAME activation path; a single captured `beforeinstallprompt` (no second capture, no duplicate prompt event). The topbar chip and Game-panel entry gate their visibility on `installAvailability`; the splash button gates its visibility only on not-being-standalone (the persistent front door), and its tap still routes through the shared activation, degrading to the how-to when no event is captured.
+- The Add-to-Home-Screen how-to has an iOS variant and a Chrome/Edge (browser-menu) variant, since a not-standalone Chrome/Edge player can reach the splash button before `beforeinstallprompt` fires; neither is ever auto-shown.
 - No em-dashes in new player-facing copy or comments; American English.
 
 ## Non-goals
 
-- Any install offer on the splash/title screen (the splash mute stays the splash's only new control; install is in-game only).
-- Timed or auto-appearing pop-ups or toasts of any kind.
+- Timed or auto-appearing pop-ups or toasts of any kind (the splash button and the in-game surfaces are quiet, conditional controls, never a pop).
 - Win-moment or star-gated triggering of the offer. This is an explicit phase-2 lever, taken only if the plain play-gated chip underperforms.
 - The word "PWA" in any user-visible surface.
 - Any change to the first-visitor autoplay gating or the existing update-prompt flow.
@@ -54,7 +59,7 @@ A player who has been building on Android or desktop Chrome sees a quiet "⤓ In
 
 ## Assumptions
 
-- "Installable" means the `beforeinstallprompt` event has been captured this session; if a browser never fires it (install criteria unmet), the chip simply stays hidden there, which is acceptable.
+- "Installable" (for the in-game chip and Game-panel entry) means the `beforeinstallprompt` event has been captured this session; if a browser never fires it (install criteria unmet), the chip simply stays hidden there, which is acceptable. The splash button does not use this gate: it shows for any not-standalone session and falls back to the how-to when no event is captured.
 - `matchMedia('(display-mode: standalone)')` plus `navigator.standalone` (iOS) reliably identify an already-installed session for the not-standalone gate.
 
 ## Open questions

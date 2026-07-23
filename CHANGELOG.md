@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.97.0
+
+- The install offer now also sits on the title screen: a small Install button next to the mute button gets Verticopolis onto your home screen straight from the splash, so it opens fullscreen and plays offline. It only shows when you are not already running the installed app.
+
 ## 1.96.0
 
 - Modern towers can build a new Daycare: it earns from parents dropping off and collecting kids (busiest on weekdays, not weekends), and condos on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size and fades over the next few floors). Unlocks at 3 stars. Modern only.

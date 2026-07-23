@@ -71,11 +71,12 @@ export const SHARDS: Record<string, string[]> = {
   // by the same ~71s pole.
   showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
-  // + onboarding.
-  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms"],
+  // + onboarding + the desktop install-affordance shot (a live engine tower with
+  // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).
+  engine: ["engine", "metro", "first-run", "first-run-mobile", "preview-rooms", "install-affordance"],
   // ~71s: anchored by the tablet shots (the heaviest drawSettle scene) plus the
-  // small scenes.
-  misc: ["tablet", "mobile", "construction", "crowd", "fire"],
+  // small scenes + the mobile install-affordance shot (its engine-tower sibling).
+  misc: ["tablet", "mobile", "construction", "crowd", "fire", "install-affordance-mobile"],
 };
 
 function allSceneIds(): string[] {

@@ -3,10 +3,23 @@ import type { GameApp } from "../main";
 import {
   initInstallAffordance,
   tickInstallAffordance,
+  splashInstallOffered,
+  activateInstall,
   __resetInstallAffordanceForTest,
 } from "./installAffordance";
 import { __resetPwaInstallForTest, canPromptInstall } from "../pwaInstall";
 import * as analytics from "../analytics";
+import { renderToFragment } from "../ui/testing/litTestUtils";
+import type { TemplateResult } from "lit-html";
+
+/** The text of the how-to modal the controller opened, for asserting WHICH
+ *  variant (iOS Safari steps vs the generic browser-menu steps) it selected. */
+function openedModalText(app: GameApp): string {
+  const mock = app.ui.openModalTemplate as unknown as { mock: { calls: [TemplateResult][] } };
+  const calls = mock.mock.calls;
+  if (calls.length === 0) throw new Error("openModalTemplate was never called");
+  return renderToFragment(calls[calls.length - 1][0]).textContent ?? "";
+}
 
 /**
  * The install-affordance controller (SPEC-pwa-install CAP-1..4): the passive
@@ -161,9 +174,131 @@ describe("iOS activation (CAP-3)", () => {
   });
 });
 
+describe("splash front door (CAP-5)", () => {
+  it("splashInstallOffered is true for a not-standalone session and false for standalone", () => {
+    expect(splashInstallOffered()).toBe(true);
+    window.matchMedia = vi.fn((q: string) => ({ matches: q.includes("standalone") }) as MediaQueryList);
+    expect(splashInstallOffered()).toBe(false);
+  });
+
+  it("activateInstall drives the native prompt when an event is captured, never the how-to", async () => {
+    const app = makeApp();
+    initInstallAffordance(app);
+    const e = new Event("beforeinstallprompt") as Event & {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: string }>;
+    };
+    const promptSpy = vi.fn(() => Promise.resolve());
+    e.prompt = promptSpy;
+    e.userChoice = Promise.resolve({ outcome: "accepted" });
+    e.preventDefault = vi.fn();
+    window.dispatchEvent(e);
+
+    await activateInstall(app, "splash");
+    expect(promptSpy).toHaveBeenCalledTimes(1);
+    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+  });
+
+  it("activateInstall falls back to the BROWSER how-to on a non-iOS session with no captured event (a splash tap before the browser fires)", async () => {
+    const app = makeApp(); // default UA is Linux Chrome, not iOS
+    initInstallAffordance(app);
+    expect(canPromptInstall()).toBe(false);
+    await activateInstall(app, "splash");
+    // No native prompt possible, so the honest browser-menu how-to opens: it must
+    // be the browser variant (mentions the browser menu), NOT the iOS Safari steps.
+    expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    const text = openedModalText(app);
+    expect(text).toMatch(/menu/i);
+    expect(text).not.toMatch(/Safari/);
+  });
+
+  it("activateInstall routes an iOS session to the iOS how-to variant, not the browser one", async () => {
+    Object.defineProperty(navigator, "userAgent", { value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17)", configurable: true });
+    const app = makeApp();
+    initInstallAffordance(app);
+    expect(canPromptInstall()).toBe(false); // iOS never fires beforeinstallprompt
+    await activateInstall(app, "splash");
+    expect(app.ui.openModalTemplate).toHaveBeenCalledTimes(1);
+    // The iOS variant names the Safari Share sheet; the browser-menu copy must not leak in.
+    expect(openedModalText(app)).toMatch(/Safari/);
+  });
+
+  it("does not stack a how-to behind an in-flight native prompt (re-entrancy guard)", async () => {
+    const app = makeApp();
+    initInstallAffordance(app);
+    // A prompt whose sheet never resolves this tick: promptInstall clears the
+    // one-shot up front, so a concurrent second tap sees canPromptInstall() false.
+    let release!: () => void;
+    const e = new Event("beforeinstallprompt") as Event & {
+      prompt: () => Promise<void>;
+      userChoice: Promise<{ outcome: string }>;
+    };
+    e.prompt = () => Promise.resolve();
+    e.userChoice = new Promise<{ outcome: string }>((r) => (release = () => r({ outcome: "dismissed" })));
+    e.preventDefault = vi.fn();
+    window.dispatchEvent(e);
+
+    const first = activateInstall(app, "splash"); // enters the prompt branch, awaits userChoice
+    await activateInstall(app, "splash"); // concurrent tap: must be a no-op, NOT a how-to
+    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+    release();
+    await first;
+    expect(app.ui.openModalTemplate).not.toHaveBeenCalled(); // still the prompt path, never a modal
+  });
+
+  it("activateInstall offers nothing to a standalone session (defensive: no surface should call it)", async () => {
+    window.matchMedia = vi.fn((q: string) => ({ matches: q.includes("standalone") }) as MediaQueryList);
+    const app = makeApp();
+    initInstallAffordance(app);
+    await activateInstall(app, "splash");
+    expect(app.ui.openModalTemplate).not.toHaveBeenCalled();
+  });
+});
+
+describe("per-surface tap tracking (CAP-4 install_offer)", () => {
+  it("reports the tapped surface: the topbar chip as 'chip'", () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    initInstallAffordance(makeApp());
+    makeInstallable();
+    chip().click();
+    expect(track).toHaveBeenCalledWith("install_offer", "chip");
+  });
+
+  it("reports the Game-panel entry as 'menu'", () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    initInstallAffordance(makeApp());
+    makeInstallable();
+    menu().click();
+    expect(track).toHaveBeenCalledWith("install_offer", "menu");
+  });
+
+  it("reports the splash front door as 'splash' via activateInstall", async () => {
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    const app = makeApp();
+    initInstallAffordance(app);
+    await activateInstall(app, "splash");
+    expect(track).toHaveBeenCalledWith("install_offer", "splash");
+  });
+
+  it("records the tap even when no offer is available (the engagement half of the funnel)", async () => {
+    // No captured event, not iOS, not standalone: the how-to fallback path. The tap
+    // must still be counted, so the offer's reach is measured independent of outcome.
+    const track = vi.spyOn(analytics, "trackAppAction").mockImplementation(() => {});
+    const app = makeApp();
+    initInstallAffordance(app);
+    expect(canPromptInstall()).toBe(false);
+    await activateInstall(app, "splash");
+    expect(track).toHaveBeenCalledWith("install_offer", "splash");
+  });
+});
+
 describe("appinstalled (CAP-4 + hide)", () => {
-  it("latches the analytics fact once and hides both surfaces", () => {
+  it("latches the analytics fact once and hides all surfaces, including the splash front door", () => {
     const trackOnce = vi.spyOn(analytics, "trackAppActionOnce").mockImplementation(() => {});
+    // A splash front-door button is up (install accepted while the splash is still
+    // mounted): appinstalled must retire it too, or it lingers as a dead control.
+    document.body.insertAdjacentHTML("beforeend", '<button data-splash="install"></button>');
+    const splashInstall = () => document.querySelector('[data-splash="install"]') as HTMLButtonElement;
     initInstallAffordance(makeApp());
     makeInstallable();
     expect(menu().hidden).toBe(false);
@@ -171,5 +306,6 @@ describe("appinstalled (CAP-4 + hide)", () => {
     expect(trackOnce).toHaveBeenCalledWith("install_app");
     expect(menu().hidden).toBe(true);
     expect(chip().hidden).toBe(true);
+    expect(splashInstall().hidden).toBe(true);
   });
 });

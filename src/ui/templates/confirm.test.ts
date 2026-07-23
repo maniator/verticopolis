@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { confirmTemplate } from "./confirm";
+import { confirmTemplate, installHelpTemplate } from "./confirm";
 import { renderToFragment, click } from "../testing/litTestUtils";
 
 /**
@@ -55,6 +55,34 @@ describe("confirmTemplate inline actions", () => {
     click(frag.querySelector('[data-act="no"]')!);
     expect(onCancel).toHaveBeenCalledTimes(1);
     expect(onYes).not.toHaveBeenCalled();
+  });
+});
+
+describe("installHelpTemplate variants (SPEC-pwa-install CAP-3 / CAP-5)", () => {
+  it("defaults to the iOS Safari Share-sheet steps", () => {
+    const frag = renderToFragment(installHelpTemplate(() => {}));
+    const text = frag.textContent ?? "";
+    expect(text).toMatch(/Safari/);
+    expect(text).toMatch(/Add to Home Screen/i);
+    // Never the tech term, never a "one-tap" promise.
+    expect(text).not.toMatch(/pwa/i);
+    expect(text).not.toMatch(/one[- ]tap/i);
+  });
+
+  it("renders the Chrome/Edge browser-menu steps for the browser variant", () => {
+    const frag = renderToFragment(installHelpTemplate(() => {}, "browser"));
+    const text = frag.textContent ?? "";
+    expect(text).toMatch(/menu/i);
+    expect(text).toMatch(/Install|Add to Home screen/i);
+    expect(text).not.toMatch(/Safari/); // the iOS-only step must not leak in
+    expect(text).not.toMatch(/pwa/i);
+  });
+
+  it("dispatches onClose from the single Got it action", () => {
+    const onClose = vi.fn();
+    const frag = renderToFragment(installHelpTemplate(onClose, "browser"));
+    click(frag.querySelector('[data-act="close"]')!);
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });
 

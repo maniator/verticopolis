@@ -1,11 +1,11 @@
 import type { GameApp } from "../main";
-import { initPwaInstall, installAvailability, promptInstall, isStandalone } from "../pwaInstall";
-import { trackAppActionOnce } from "../analytics";
+import { initPwaInstall, installAvailability, promptInstall, isStandalone, isIos, canPromptInstall } from "../pwaInstall";
+import { trackAppAction, trackAppActionOnce } from "../analytics";
 import { showInstallHelp } from "../ui/uiDialogs";
 
 /**
  * The install-affordance controller (SPEC-pwa-install). Ties the browser install
- * seam ({@link initPwaInstall}) to two surfaces:
+ * seam ({@link initPwaInstall}) to three surfaces:
  *
  *  - the Game-panel "Install app" entry (`#btn-install-menu`): the passive home,
  *    shown whenever the app is installable and not installed. The browser's own
@@ -14,12 +14,22 @@ import { showInstallHelp } from "../ui/uiDialogs";
  *    again; on iOS (a how-to, no one-shot) it stays put;
  *  - the topbar "Install" chip (`#btn-install`): a ONE-TIME gentle surfacing,
  *    gated on real play, at most once ever (a persisted flag), after which the
- *    menu entry alone carries it. No re-nagging.
+ *    menu entry alone carries it. No re-nagging;
+ *  - the splash install button (`#splash-install`, CAP-5): the persistent front
+ *    door, shown for ANY not-standalone session (its visibility is NOT gated on
+ *    a captured event, unlike the two in-game surfaces), owned by the splash
+ *    template. It routes taps through {@link activateInstall} like the others.
  *
- * On iOS the same surfaces are present but activation opens an Add-to-Home-Screen
- * how-to instead of a native prompt. Standalone / TWA sessions are offered
- * nothing (installAvailability() returns "none").
+ * Activation ({@link activateInstall}) is shared by all three: a native prompt
+ * where a `beforeinstallprompt` is captured, else an honest how-to (iOS Safari
+ * steps, or Chrome/Edge browser-menu steps). Standalone / TWA sessions are
+ * offered nothing on any surface.
  */
+
+/** Which affordance a player tapped to reach for the install, for the CAP-4
+ *  engagement signal: the splash front door, the topbar chip, or the Game-panel
+ *  entry. Flows to analytics as the `install_offer` action's `detail`. */
+export type InstallSurface = "splash" | "chip" | "menu";
 
 const CHIP_SHOWN_FLAG = "vc-install-chip-shown"; // once-ever: the chip surfaces at most one time
 
@@ -41,6 +51,14 @@ function markChipShownEver(): void {
   }
 }
 
+/** Whether the splash shows its persistent install button (CAP-5): any session
+ *  that is not already installed. Deliberately NOT gated on a captured event, so
+ *  it never depends on Chrome's engagement heuristic or a reveal race; a tap with
+ *  no event degrades to the browser-menu how-to inside {@link activateInstall}. */
+export function splashInstallOffered(): boolean {
+  return !isStandalone();
+}
+
 /** Real play, the chip's gate: past the splash and with at least one unit in the
  *  tower (a placed lobby / any build). A brand-new empty lot is not yet "playing". */
 function hasReallyPlayed(app: GameApp): boolean {
@@ -60,26 +78,66 @@ function hideChip(): void {
   if (chip) chip.hidden = true;
 }
 
-/** Activate the offer from either surface: native prompt where available, the
- *  iOS how-to otherwise. Never throws or rejects past the click handler: a
- *  native prompt() that rejects (called outside a trusted gesture, sheet
- *  failure) must not become an unhandled rejection, and the post-prompt refresh
- *  must still run. */
-async function activate(app: GameApp): Promise<void> {
-  const avail = installAvailability();
-  if (avail === "ios-howto") {
-    showInstallHelp(app.ui);
-    return;
-  }
-  if (avail === "prompt") {
+/** Hide the splash front-door button. Its visibility is otherwise decided once at
+ *  mount (CAP-5: no live reveal race), but a definite install completing while the
+ *  splash is still up must retire it: a `#splash-install` left visible to an
+ *  already-installed session is a dead control (a re-tap reaches nothing). Only
+ *  ever HIDES, never shows, so it introduces no reveal race. */
+function hideSplashInstall(): void {
+  const btn = document.querySelector('[data-splash="install"]') as HTMLButtonElement | null;
+  if (btn) btn.hidden = true;
+}
+
+// Re-entrancy guard for activateInstall's native-prompt branch. `promptInstall`
+// clears the one-shot BEFORE awaiting the sheet, so a second tap during that
+// await sees canPromptInstall() === false and would otherwise fall through to the
+// how-to, stacking a redundant modal behind the live native sheet. This latch
+// makes a concurrent activation a no-op until the in-flight prompt resolves.
+let promptInFlight = false;
+
+/** Activate the offer from any surface: native prompt where a `beforeinstallprompt`
+ *  is captured, the iOS Safari how-to on iOS, and the Chrome/Edge browser-menu
+ *  how-to for a not-standalone session that reaches the splash button before the
+ *  browser has fired its install event. Never throws or rejects past the click
+ *  handler: a native prompt() that rejects (called outside a trusted gesture,
+ *  sheet failure) must not become an unhandled rejection, and the post-prompt
+ *  refresh must still run.
+ *
+ *  Exported for the splash button (CAP-5): the in-game chip/menu only ever call
+ *  it when availability is "prompt" or "ios-howto", but the splash button is a
+ *  persistent front door (shown for any not-standalone session), so it can reach
+ *  the browser-menu how-to fallback the in-game surfaces never do.
+ *
+ *  `surface` names which affordance was tapped, for the CAP-4 engagement signal. */
+export async function activateInstall(app: GameApp, surface: InstallSurface): Promise<void> {
+  // Record the tap per surface BEFORE the offer resolves (a re-entrancy bail or a
+  // rejected prompt must not swallow it): a deliberate, low-volume, cookieless
+  // count of which affordance players reach for. The `install_app` completion
+  // cannot attribute this (the OS `appinstalled` event names no surface).
+  trackAppAction("install_offer", surface);
+  if (canPromptInstall()) {
+    if (promptInFlight) return; // a prompt is already showing; don't stack a how-to behind it
+    promptInFlight = true;
     try {
-      await promptInstall(); // one-shot; appinstalled (on accept) hides both surfaces
+      await promptInstall(); // one-shot; appinstalled (on accept) hides the surfaces
     } catch {
       /* the browser rejected the prompt; the one-shot is spent either way */
+    } finally {
+      promptInFlight = false;
     }
     refreshMenu();
     hideChip(); // the offer was taken up (or declined); don't keep the chip lingering
+    return;
   }
+  // A prompt is mid-flight but its one-shot is already cleared: a concurrent tap
+  // must not open the how-to behind the live native sheet. Bail until it resolves.
+  if (promptInFlight) return;
+  // No captured event: fall back to an honest, deliberate-tap-only how-to. iOS
+  // gets the Share-sheet steps; a not-standalone desktop/Android session (no
+  // event yet) gets the browser-menu steps. A standalone/TWA session never gets
+  // here: no surface offers activation to it.
+  if (isStandalone()) return;
+  showInstallHelp(app.ui, isIos() ? "ios" : "browser");
 }
 
 /** Wire the affordance: capture the browser event as early as this runs, bind
@@ -94,18 +152,19 @@ export function initInstallAffordance(app: GameApp): void {
       trackAppActionOnce("install_app");
       refreshMenu();
       hideChip();
+      hideSplashInstall(); // a completed install retires the splash front door too
       chipResolved = true;
     },
   });
-  // Catch on the click, not just inside activate: activate is async, so ANY
+  // Catch on the click, not just inside activateInstall: it is async, so ANY
   // synchronous throw in its body (a modal-open hiccup, say) would otherwise
   // surface as an unhandledrejection and the installed error tracking would
-  // promote it to crash telemetry. The offer is best-effort chrome.
-  const onClick = () => void activate(app).catch(() => {});
+  // promote it to crash telemetry. The offer is best-effort chrome. Each surface
+  // passes its own name so the CAP-4 tap signal is attributed.
   const chip = document.getElementById("btn-install");
   const menu = document.getElementById("btn-install-menu");
-  if (chip) chip.addEventListener("click", onClick);
-  if (menu) menu.addEventListener("click", onClick);
+  if (chip) chip.addEventListener("click", () => void activateInstall(app, "chip").catch(() => {}));
+  if (menu) menu.addEventListener("click", () => void activateInstall(app, "menu").catch(() => {}));
   refreshMenu();
 }
 
@@ -139,7 +198,8 @@ export function tickInstallAffordance(app: GameApp): void {
   chipResolved = true;
 }
 
-/** Test-only reset of the session guard. */
+/** Test-only reset of the session guards. */
 export function __resetInstallAffordanceForTest(): void {
   chipResolved = false;
+  promptInFlight = false;
 }

@@ -26,7 +26,13 @@ function makeController() {
   return { ctl: new OnboardingController(opts), opts };
 }
 
-function mountSplash(o: { hasSave?: boolean; muted?: boolean; onToggleMute?: () => boolean }) {
+function mountSplash(o: {
+  hasSave?: boolean;
+  muted?: boolean;
+  onToggleMute?: () => boolean;
+  installOffered?: boolean;
+  onInstall?: () => void;
+}) {
   const { ctl } = makeController();
   ctl.showSplash({
     hasSave: o.hasSave ?? false,
@@ -34,6 +40,8 @@ function mountSplash(o: { hasSave?: boolean; muted?: boolean; onToggleMute?: () 
     onNewTower: vi.fn(),
     muted: () => o.muted ?? false,
     onToggleMute: o.onToggleMute,
+    installOffered: o.installOffered === undefined ? undefined : () => o.installOffered!,
+    onInstall: o.onInstall,
   });
   return document.getElementById("splash")!;
 }
@@ -128,5 +136,53 @@ describe("splash mute binding (CAP-2)", () => {
     btn.click();
     expect(btn.textContent).toBe("🔇"); // unchanged: never lied
     expect(btn.getAttribute("aria-pressed")).toBe("true");
+  });
+});
+
+describe("splash install button (SPEC-pwa-install CAP-5)", () => {
+  it("renders the persistent install button when offered, with outcome copy and a stable name", () => {
+    const el = mountSplash({ installOffered: true, onInstall: vi.fn() });
+    const btn = el.querySelector<HTMLButtonElement>('button.splash-install[data-splash="install"]');
+    expect(btn).not.toBeNull();
+    expect(btn!.getAttribute("aria-label")).toBe("Install Verticopolis");
+    // A visible "Install" label, not a lone glyph: recognizable on the wide splash.
+    expect(btn!.textContent).toMatch(/Install/);
+    // Copy promises an outcome, never "one-tap" or the word PWA (CAP-5 constraint).
+    const title = btn!.getAttribute("title") ?? "";
+    expect(title).toMatch(/offline/i);
+    expect(title).not.toMatch(/one[- ]tap|pwa/i);
+  });
+
+  it("omits the install button for a standalone session (not offered)", () => {
+    const el = mountSplash({ installOffered: false, onInstall: vi.fn() });
+    expect(el.querySelector('[data-splash="install"]')).toBeNull();
+  });
+
+  it("omits the install button when no handler is bound, even if offered (never an inert button)", () => {
+    const el = mountSplash({ installOffered: true }); // onInstall omitted
+    expect(el.querySelector('[data-splash="install"]')).toBeNull();
+  });
+
+  it("clicking drives the shared activation and keeps the splash mounted", () => {
+    const onInstall = vi.fn();
+    const el = mountSplash({ installOffered: true, onInstall });
+    el.querySelector<HTMLButtonElement>('[data-splash="install"]')!.click();
+    expect(onInstall).toHaveBeenCalledTimes(1);
+    expect(document.getElementById("splash")).not.toBeNull(); // stacks over, never dismisses
+  });
+
+  it("renders after the mute so the utility cluster sits at the tail of the Tab order", () => {
+    const el = mountSplash({ hasSave: true, installOffered: true, onInstall: vi.fn() });
+    const items = Array.from(el.querySelectorAll<HTMLElement>("button:not([disabled])"));
+    expect(items[items.length - 1].getAttribute("data-splash")).toBe("install");
+    expect(items[items.length - 2].getAttribute("data-splash")).toBe("mute");
+  });
+
+  it("carries a comfortable touch target: the .splash-install rule floors both dimensions at >= 44px", () => {
+    const css = readFileSync(STYLES_CSS, "utf8");
+    const rule = css.match(/\.splash-install\s*\{([^}]*)\}/)?.[1] ?? "";
+    const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
+    expect(px("min-width")).toBeGreaterThanOrEqual(44);
+    expect(px("min-height")).toBeGreaterThanOrEqual(44);
   });
 });

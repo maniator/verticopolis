@@ -175,7 +175,13 @@ export type AppActionName =
   // The app was installed (the `appinstalled` event, however it was triggered:
   // our in-game offer or the browser's own menu). Latched once per session; the
   // `display` common prop already carries standalone-vs-browser reach.
-  | "install_app";
+  | "install_app"
+  // The player tapped an install affordance (SPEC-pwa-install CAP-4). `detail`
+  // carries which surface: `splash`, `chip`, or `menu`. NOT latched: an install
+  // tap is a deliberate, low-volume action, so the raw per-surface count is the
+  // signal, and it is the engagement half of the funnel that `install_app` (the
+  // completion) cannot attribute (the OS `appinstalled` event names no surface).
+  | "install_offer";
 
 /**
  * Cross-cutting props merged into EVERY event: the platform dimension plus the

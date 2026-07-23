@@ -1,5 +1,6 @@
-import { html, nothing, render as litRender, type TemplateResult } from "lit-html";
+import { html, nothing, render as litRender } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
+import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -14,83 +15,6 @@ import type { Simulation } from "../engine/Simulation";
  */
 
 const FLAG = "tt.onboarded";
-const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-
-/** Click handlers the splash template binds through lit `@click`. `onToggleMute`
- *  is optional: when a caller can't toggle (no audio port), it is undefined, lit
- *  binds no listener, and the mute button can't flip its glyph while the real
- *  audio state stays put (SPEC-splash-mute CAP-2). */
-interface SplashHandlers {
-  onContinue: () => void;
-  onNewTower: () => void;
-  onHelp: () => void;
-  onToggleMute?: (e: Event) => void;
-}
-
-/** "Metropolis Dusk" title screen body: an art-deco skyline + setting sun under
- *  an indigo->coral dusk sky, with the Verticopolis wordmark. The wordmark and
- *  tagline are SVG `<text>` with `textLength` so they always fit any screen (no
- *  clipping, no web-font download, offline-safe for the PWA). The skyline and
- *  lighting layers are decorative (`aria-hidden`); the two lettering SVGs carry
- *  `role="img"` + `aria-label` so a screen reader hears the name and tagline.
- *
- *  Whitespace note: this template's indentation adds inter-element whitespace
- *  text nodes the old innerHTML string did not have. That is harmless only
- *  because `#splash` and `.splash-actions` are flex (anonymous whitespace items
- *  are not laid out) and the two lettering SVGs plus the premise are block. Keep
- *  those display rules, or collapse the whitespace here, if either becomes
- *  inline/inline-block. No whitespace is added inside any `<text>`/`<tspan>` (it
- *  would shift the `textLength`-fitted glyphs). */
-function splashTemplate(hasSave: boolean, premise: string, muted: boolean, h: SplashHandlers): TemplateResult {
-  return html`<div class="splash-stars" aria-hidden="true"></div>
-    <div class="splash-sun" aria-hidden="true"></div>
-    <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
-      <g fill="#201643" stroke="#0d0d10" stroke-width="1">
-        <path d="M-5 200 V120 h34 V98 h16 V120 h40 V200 z" />
-        <path d="M95 200 V80 h26 V56 h12 V80 h26 V200 z" />
-        <path d="M200 200 V54 h20 V30 h9 V10 h9 V30 h9 V54 h20 V200 z" />
-        <path d="M310 200 V92 h30 V68 h15 V92 h30 V200 z" />
-        <path d="M410 200 V60 h20 V36 h11 V60 h34 V200 z" />
-      </g>
-      <g fill="#ffdca0">
-        <rect x="8" y="130" width="3" height="4" /><rect x="8" y="146" width="3" height="4" />
-        <rect x="104" y="92" width="3" height="4" /><rect x="104" y="112" width="3" height="4" />
-        <rect x="214" y="66" width="3" height="4" /><rect x="214" y="90" width="3" height="4" />
-        <rect x="320" y="100" width="3" height="4" /><rect x="424" y="72" width="3" height="4" />
-      </g>
-    </svg>
-    <div class="splash-brand">
-      <svg class="splash-word" viewBox="0 0 400 66" role="img" aria-label="Verticopolis">
-        <text x="200" y="52" text-anchor="middle" textLength="392" lengthAdjust="spacingAndGlyphs"><tspan class="a">VERTICO</tspan><tspan class="b">POLIS</tspan></text>
-      </svg>
-      <svg class="splash-tag" viewBox="0 0 360 20" role="img" aria-label="the vertical metropolis">
-        <text x="180" y="15" text-anchor="middle" textLength="330" lengthAdjust="spacingAndGlyphs">THE VERTICAL METROPOLIS</text>
-      </svg>
-      <p class="splash-premise">${premise}</p>
-    </div>
-    <div class="splash-actions">
-      ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>▶ Continue</button>` : nothing}
-      <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>＋ New Tower</button>
-      <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>？ How to Play</button>
-    </div>
-    <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
-    <p class="splash-version">v${APP_VERSION}</p>
-    <!-- The mute toggle renders LAST so the reading and Tab order run
-         title -> premise -> actions -> utility; it is pinned visually to the
-         top-right corner by .splash-mute (absolute), un-unified per the design
-         system. Following the WAI-ARIA toggle-button pattern, the accessible
-         name is STABLE ("Mute sound") and aria-pressed carries the on/off
-         state; the glyph flips for sighted users. An absent onToggleMute binds
-         no @click, so a caller that can't toggle gets an inert, truthful
-         button. SPEC-splash-mute CAP-1. -->
-    <button
-      class="splash-mute"
-      data-splash="mute"
-      aria-pressed=${muted ? "true" : "false"}
-      aria-label="Mute sound"
-      @click=${h.onToggleMute}
-    >${muted ? "🔇" : "🔊"}</button>`;
-}
 
 export function isOnboarded(): boolean {
   try {
@@ -250,6 +174,12 @@ export class OnboardingController {
     /** Toggle the ONE master mute (the same state the topbar toggle drives);
      *  returns the new muted state so the splash button can mirror it. */
     onToggleMute?: () => boolean;
+    /** Whether to render the splash install button, read once at mount
+     *  (SPEC-pwa-install CAP-5): true for any not-standalone session. */
+    installOffered?: () => boolean;
+    /** Tap the splash install button: routes through the shared activation
+     *  (native prompt, or an honest how-to). Absent when not offered. */
+    onInstall?: () => void;
   }): void {
     this.opts.pauseForSplash(true);
     // The start screen has its own looping theme; the tower gets the calm bed.
@@ -292,8 +222,14 @@ export class OnboardingController {
             btn.setAttribute("aria-pressed", String(muted));
           }
         : undefined,
+      // The install tap keeps the splash mounted and the engine paused: the native
+      // prompt or how-to stacks over the title screen (like Help).
+      onInstall: o.onInstall,
     };
-    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, handlers), el);
+    // Read offerability ONCE at mount (CAP-5: not gated on a live event, so no
+    // reveal race), and only when a handler is present.
+    const installOffered = (o.installOffered?.() ?? false) && !!o.onInstall;
+    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, handlers), el);
     document.body.appendChild(el);
     this.splashEl = el;
 
