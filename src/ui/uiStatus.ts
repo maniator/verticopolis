@@ -3,6 +3,7 @@ import { FACILITIES } from "../engine/facilities";
 import type { FacilityKind, GameMode } from "../engine/types";
 import type { UI } from "./UI";
 import { render } from "lit-html";
+import { syncPaletteTabs } from "./uiPalette";
 import { towerStatsTemplate } from "./templates/towerStats";
 
 /**
@@ -61,22 +62,20 @@ export function update(ui: UI, sim: Simulation): void {
     // Palette unlock state. Parity with the original: a locked facility is HIDDEN
     // (`.locked` -> display:none, out of layout and tab order), not shown dimmed ,
     // the palette grows as stars are earned. Only affordability dims
-    // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible. We note
-    // which groups have at least one unlocked member in the same pass so a group
-    // header can be hidden when everything beneath it is still locked (e.g.
-    // Leisure/Services/Special at 1★), no dangling section titles.
-    const groupsWithUnlocked = new Set<string>();
+    // (`.unaffordable`); an unlocked-but-unaffordable tool stays visible.
     ui.el.palette.querySelectorAll<HTMLElement>(".pal-item[data-kind]").forEach((item) => {
       const kind = item.dataset.kind as FacilityKind;
       const locked = !sim.isUnlocked(kind);
       const affordable = sim.money >= FACILITIES[kind].cost;
       item.classList.toggle("locked", locked);
       item.classList.toggle("unaffordable", !locked && !affordable);
-      if (!locked && item.dataset.group) groupsWithUnlocked.add(item.dataset.group);
     });
-    ui.el.palette.querySelectorAll<HTMLElement>(".pal-group-title[data-group]").forEach((title) => {
-      title.hidden = !groupsWithUnlocked.has(title.dataset.group ?? "");
-    });
+    // Reads the `.locked` classes just written: hides a category section and its
+    // tab when everything beneath is still locked (e.g. Leisure below 3★, no
+    // dangling section title), hides the Modern sub-band until a Modern venue
+    // unlocks, pips a tab whose tools just grew, and keeps a valid mobile tab
+    // selected.
+    syncPaletteTabs(ui);
     // If the active build tool just became locked, loading, founding, or undoing
     // into a lower-star tower while a higher-star tool was selected, its palette
     // button is now hidden, leaving no visible active tool while canvas clicks

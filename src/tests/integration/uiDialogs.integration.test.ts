@@ -83,6 +83,7 @@ function mountAppDom(): void {
     <button id="panel-toggle"></button><button id="panel-close"></button><div id="scrim"></div>
     <select id="overlay-mode"><option value=""></option><option value="congestion">c</option></select>
     <div id="a11y-live"></div>
+    <div id="palette-tabs"></div>
     <div id="palette-scroll"></div>
     <div id="tool-info"></div>
     <input id="tower-name" />
@@ -1457,8 +1458,10 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
   const palette = (): HTMLElement => document.getElementById("palette-scroll")!;
   const item = (kind: string): HTMLElement =>
     palette().querySelector<HTMLElement>(`.pal-item[data-kind="${kind}"]`)!;
-  const header = (group: string): HTMLElement =>
-    palette().querySelector<HTMLElement>(`.pal-group-title[data-group="${group}"]`)!;
+  // A group's visibility now lives on its section (which wraps the title + items),
+  // hidden as a unit when everything beneath is locked, so no dangling header.
+  const section = (group: string): HTMLElement =>
+    palette().querySelector<HTMLElement>(`.pal-group[data-group="${group}"]`)!;
 
   it("hides locked facilities and empty group headers at 1★, reveals them at 3★", () => {
     const { ui } = makeUI();
@@ -1473,24 +1476,24 @@ describe("build palette — locked-tier visibility (SimTower parity)", () => {
     expect(item("restaurant").classList.contains("locked")).toBe(true); // 3★
     expect(item("cinema").classList.contains("locked")).toBe(true); // 3★
     expect(item("metro").classList.contains("locked")).toBe(true); // 4★
-    // Groups with no unlocked member hide their header; populated ones stay.
-    expect(header("Structure").hidden).toBe(false);
-    expect(header("Commercial").hidden).toBe(false);
-    expect(header("Leisure").hidden).toBe(true);
-    expect(header("Services").hidden).toBe(true);
-    expect(header("Special").hidden).toBe(true);
+    // Groups with no unlocked member hide their whole section; populated ones stay.
+    expect(section("Structure").hidden).toBe(false);
+    expect(section("Commercial").hidden).toBe(false);
+    expect(section("Leisure").hidden).toBe(true);
+    expect(section("Services").hidden).toBe(true);
+    expect(section("Special").hidden).toBe(true);
 
     sim.star = 3;
     ui.update(sim);
-    // 2★/3★ kinds now reveal; their group headers appear.
+    // 2★/3★ kinds now reveal; their group sections appear.
     expect(item("hotelSingle").classList.contains("locked")).toBe(false);
     expect(item("restaurant").classList.contains("locked")).toBe(false);
     expect(item("cinema").classList.contains("locked")).toBe(false);
-    expect(header("Leisure").hidden).toBe(false);
-    expect(header("Services").hidden).toBe(false);
+    expect(section("Leisure").hidden).toBe(false);
+    expect(section("Services").hidden).toBe(false);
     // 4★/5★ kinds stay hidden until their tier.
     expect(item("metro").classList.contains("locked")).toBe(true);
-    expect(header("Special").hidden).toBe(true);
+    expect(section("Special").hidden).toBe(true);
   });
 
   it("dirty-gates the lock/afford scan: rescans only on a star or affordability crossing", () => {

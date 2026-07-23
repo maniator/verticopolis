@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.98.0
+
+- The build menu is easier to get around on a phone: instead of one long sideways scroll past every tool, there is now a row of category tabs (Structure, Transport, Commercial, and so on). Tap a category to see just its tools, and your choice sticks so laying a row of the same room never reopens a menu. Inspect and Bulldoze stay put, a dot marks a category that just gained new tools, and the Modern venues sit in their own labeled section. On desktop the tool list keeps its category headers pinned as you scroll.
+
 ## 1.97.0
 
 - The install offer now also sits on the title screen: a small Install button next to the mute button gets Verticopolis onto your home screen straight from the splash, so it opens fullscreen and plays offline. It only shows when you are not already running the installed app.

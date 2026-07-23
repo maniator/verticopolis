@@ -377,7 +377,16 @@ export class OnboardingController {
     if (!st) return;
     if (this.hintEl) this.hintEl.textContent = this.opts.mq.matches ? st.hintMobile : st.hintDesktop;
     document.querySelectorAll(".tt-pulse").forEach((n) => n.classList.remove("tt-pulse"));
-    document.querySelectorAll(st.pulse).forEach((n) => n.classList.add("tt-pulse"));
+    document.querySelectorAll<HTMLElement>(st.pulse).forEach((n) => {
+      // On a phone the palette shows one category at a time, so a highlighted tool
+      // can sit behind another tab. Open the category that holds it (its tab's own
+      // click handler switches the strip) before pulsing, so the glow is visible.
+      if (this.opts.mq.matches) {
+        const group = n.closest<HTMLElement>(".pal-group")?.dataset.group;
+        if (group) document.querySelector<HTMLElement>(`.pal-tab[data-group="${group}"]`)?.click();
+      }
+      n.classList.add("tt-pulse");
+    });
   }
 
   private finish(): void {
