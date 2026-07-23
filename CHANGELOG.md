@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.94.0
+
+- Modern towers can build a new Sky Bar: a rooftop cocktail lounge with a lit-skyline window that fills in the evening. It earns from foot traffic, and the higher you place it the more it earns, because the skyline view is the draw: a bar up top pours far more than one down low. Unlocks at 3 stars. Modern only.
+
 ## 1.93.0
 
 - You can now install Verticopolis as an app: once you have started building, a small Install button offers to add it to your home screen so it opens fullscreen and plays offline. It is a quiet, one-time offer that then waits in the Game panel, and on iPhone it shows the Add to Home Screen steps.

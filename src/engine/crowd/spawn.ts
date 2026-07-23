@@ -51,7 +51,7 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   // despawn at the venue. The Modern footfall venues (Amusements, Boutique Bay)
   // join it so people travel to them (foot traffic + transport demand) like a
   // shop instead of being dead destinations. Cinema stays out (attendance flow).
-  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "amusements" || k === "boutiqueBay" || k === "nightclub" || k === "spa";
+  const isVenue = (k: FacilityKind) => k === "shop" || k === "restaurant" || k === "fastFood" || k === "amusements" || k === "boutiqueBay" || k === "nightclub" || k === "spa" || k === "skyBar";
   const isStaffKind = (k: FacilityKind): k is StaffKind =>
     k === "security" || k === "medical" || k === "housekeeping" || k === "recycling";
   const leased = new Set<number>();

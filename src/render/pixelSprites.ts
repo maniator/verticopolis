@@ -9,6 +9,7 @@ import { fitnessClub } from "./pixelSprites/fitness";
 import { clinic } from "./pixelSprites/clinic";
 import { nightclub } from "./pixelSprites/nightclub";
 import { spa } from "./pixelSprites/spa";
+import { skyBar } from "./pixelSprites/skyBar";
 import { shop } from "./pixelSprites/shop";
 
 /**
@@ -100,6 +101,11 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       // A Modern wellness spa: one calm room with a steaming hot tub, massage
       // tables, and greenery, with guests that fill in with occupancy.
       spa(d, u, x, y, w, h);
+      break;
+    case "skyBar":
+      // A Modern rooftop bar: a dusk lounge with a lit-skyline window, a bar of
+      // glowing bottles, and patrons that fill in with occupancy.
+      skyBar(d, u, x, y, w, h);
       break;
     case "shop":
       shop(d, u, x, y, w, h);

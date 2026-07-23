@@ -78,6 +78,7 @@ describe("drawUnit — every facility/state paints without throwing", () => {
     ["clinic", { kind: "clinic" }],
     ["nightclub", { kind: "nightclub" }],
     ["spa", { kind: "spa" }],
+    ["sky bar", { kind: "skyBar" }],
     ["shop", { kind: "shop" }],
     ["cinema", { kind: "cinema" }],
     ["security", { kind: "security" }],
@@ -247,6 +248,18 @@ describe("drawUnit — state actually changes the drawing (behavioral, not just 
     const occupant = "fillStyle=rgba(0,0,0,0.24)";
     expect(empty.log).not.toContain(occupant);
     expect(full.log).toContain(occupant);
+  });
+
+  it("a Sky Bar reads quiet when empty and lively (bartender plus patrons) when full", () => {
+    const empty = spyCtx();
+    const full = spyCtx();
+    // Open at hour 20 (the default), so the lounge draws, not the shutter; bartender and patrons gate on occupancy.
+    drawUnit(draw({}, empty.ctx), unit({ kind: "skyBar", occupants: 0 }), 0, 0, 220, 44);
+    drawUnit(draw({}, full.ctx), unit({ kind: "skyBar", occupants: 10 }), 0, 0, 220, 44);
+    const occupant = "fillStyle=rgba(0,0,0,0.24)";
+    expect(empty.log).not.toContain(occupant);
+    expect(full.log).toContain(occupant);
+    expect(full.log.filter((l) => l === occupant).length).toBeGreaterThan(1); // bartender plus patrons
   });
 
   it("each Clinic practice draws its own distinct room, empty when empty", () => {

@@ -171,6 +171,11 @@ export const CLASSIC_RULES: GameRules = {
     // 0 keeps Classic satisfaction (and its golden-master hash) untouched.
     return 0;
   },
+  viewPremium() {
+    // No Sky Bar exists in a Classic tower, so it never earns a view premium. A
+    // flat 1 keeps Classic income (and its golden-master hash) untouched.
+    return 1;
+  },
   weekendMultiplier(kind, isWeekend) {
     // Canon: every commercial kind is busier on the weekend (the literal 1994
     // visitor targets), quiet on weekdays.
@@ -344,6 +349,13 @@ export const MODERN_RULES: GameRules = {
     // more spas never compound the bonus.
     if (floorDistance < 0 || floorDistance >= SPA_SERENITY_FLOORS) return 0;
     return SPA_SERENITY_MAX * (1 - floorDistance / SPA_SERENITY_FLOORS);
+  },
+  viewPremium(floor) {
+    // 1 at or below the base floor, then +skyBarViewPerFloor per floor above it,
+    // capped at 1 + skyBarViewMax. So a rooftop bar down low pours at par and one
+    // far above it pours up to (1 + skyBarViewMax) times as much.
+    const above = Math.max(0, floor - ECON.skyBarViewBaseFloor);
+    return 1 + Math.min(ECON.skyBarViewMax, above * ECON.skyBarViewPerFloor);
   },
   weekendMultiplier(kind, isWeekend) {
     // Realistic daily rhythm: fast food quiets on the weekend (its weekday

@@ -12,6 +12,7 @@ export const ECON = {
     boutiqueBay: 3_500,
     nightclub: 10_000,
     spa: 5_000,
+    skyBar: 4_000,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -65,6 +66,7 @@ export const ECON = {
     boutiqueBay: 20,
     nightclub: 30,
     spa: 40,
+    skyBar: 35,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -92,6 +94,7 @@ export const ECON = {
     boutiqueBay: 1.3,
     nightclub: 1.5,
     spa: 1.4,
+    skyBar: 1.45,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**
@@ -185,6 +188,17 @@ export const ECON = {
    *  (a flat fee, no policy/RNG). Charged in `payMaintenance` on top of the
    *  operating overhead, so a poorly-attended club runs at a loss. */
   nightclubDjMonthly: 40_000,
+  /** Modern-only Sky Bar "view premium" (gdd-modern-expansion): the higher a
+   *  rooftop bar sits, the more it earns, because the skyline view is the draw.
+   *  Its income multiplier is 1 at or below `skyBarViewBaseFloor`, then climbs
+   *  `skyBarViewPerFloor` per floor above it, capped at `1 + skyBarViewMax`. So a
+   *  bar on the base floor pours at par and one far above it pours up to
+   *  `1 + skyBarViewMax` times as much. Resolved through `GameRules.viewPremium`
+   *  (Classic returns a flat 1: it has no Sky Bar). Only the Sky Bar reads it, so
+   *  no other venue's income and no golden-master hash is touched. */
+  skyBarViewBaseFloor: 10,
+  skyBarViewPerFloor: 0.02,
+  skyBarViewMax: 1.0,
   /** Cost to extend an elevator shaft by one floor (click or drag handle). */
   transportFloorCost: 5_000,
   /** Monthly property tax on an UNSOLD condo, as a fraction of its asking
