@@ -45,6 +45,7 @@ export function ledgerCatFor(kind: FacilityKind): LedgerCat | null {
     case "shop":
     case "boutiqueBay":
     case "clinic":
+    case "daycare":
       return "retail";
     case "fastFood":
     case "restaurant":

@@ -14,6 +14,7 @@ export const ECON = {
     spa: 5_000,
     skyBar: 4_000,
     aquaticCenter: 7_000,
+    daycare: 3_500,
     shop: 2_500,
     cinema: 8_000,
     partyHall: 3_000,
@@ -68,6 +69,7 @@ export const ECON = {
     nightclub: 30,
     spa: 40,
     skyBar: 35,
+    daycare: 25,
     shop: 20,
   } as Partial<Record<string, number>>,
   /**
@@ -96,6 +98,7 @@ export const ECON = {
     nightclub: 1.5,
     spa: 1.4,
     skyBar: 1.45,
+    daycare: 0.6,
     shop: 1.2,
   } as Partial<Record<string, number>>,
   /**

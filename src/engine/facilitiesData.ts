@@ -261,6 +261,18 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     modernOnly: true,
     description: "Modern: a two-story swimming pool complex. Like a cinema it earns from the crowd that comes to swim and lounge, filling with real visitors through the day, so it needs the transport to move them.",
   },
+  daycare: {
+    kind: "daycare",
+    category: "retail",
+    name: "Daycare",
+    width: 12,
+    cost: 160000,
+    minStar: 3,
+    population: 14,
+    color: "#eeb63c",
+    modernOnly: true,
+    description: "Modern: a children's daycare. Earns from parents dropping off and collecting kids, busiest on weekdays when they are at work, and condos on nearby floors are happier for it, most of all the biggest families who lean on childcare the most (a bonus that grows with family size and fades over the next few floors).",
+  },
   stairs: {
     kind: "stairs",
     category: "transport",

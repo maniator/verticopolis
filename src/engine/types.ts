@@ -69,6 +69,7 @@ export type FacilityKind =
   | "spa"
   | "skyBar"
   | "aquaticCenter"
+  | "daycare"
   | "stairs"
   | "escalator"
   | "elevatorStandard"

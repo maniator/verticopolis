@@ -70,6 +70,17 @@ export function updatePresence(sim: Simulation): void {
   }
 }
 
+/** The floor distance from `floor` to the nearest floor in `floors`, or Infinity
+ *  if empty. Used by the Modern amenity halos so only the nearest source counts. */
+function nearestFloorDist(floors: number[], floor: number): number {
+  let nearest = Infinity;
+  for (const f of floors) {
+    const d = Math.abs(f - floor);
+    if (d < nearest) nearest = d;
+  }
+  return nearest;
+}
+
 export function updateSatisfaction(sim: Simulation): void {
   // v2 (review F3): congestion is SPATIAL, each floor is stressed only by the
   // shafts that actually serve it, so layout/zoning/parallel shafts matter.
@@ -110,10 +121,17 @@ export function updateSatisfaction(sim: Simulation): void {
   // fitness lease. Pure (no RNG). Classic holds no spa, so this stays empty and the
   // bonus seam returns 0, leaving Classic satisfaction byte-identical.
   const spaFloors: number[] = [];
+  // Modern-only Daycare family halo (POSITIVE, condos): the floors of every
+  // operational daycare, so a nearby condo can read its distance to the closest.
+  // Gated on `isOperational` (a built, operating daycare is the amenity). Pure (no
+  // RNG). Classic holds none, so this stays empty and the seam returns 0, leaving
+  // Classic satisfaction byte-identical.
+  const daycareFloors: number[] = [];
   for (const c of sim.tower.units) {
     if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
     else if (c.kind === "nightclub" && isOperational(c) && servedSet.has(c.floor)) nightclubFloors.push(c.floor);
     else if (c.kind === "spa" && isOperational(c) && servedSet.has(c.floor)) spaFloors.push(c.floor);
+    else if (c.kind === "daycare" && isOperational(c) && servedSet.has(c.floor)) daycareFloors.push(c.floor);
   }
   // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
   // income loop) rather than through the hour-memoized accessor, so an occupancy
@@ -157,46 +175,30 @@ export function updateSatisfaction(sim: Simulation): void {
       const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
       u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
     }
-    // Modern amenity halo: a condo near an operational Fitness Club is a little
-    // happier. Only the NEAREST club counts (no compounding), capped and
-    // distance-decayed by the rule-set (0 in Classic, so Classic is untouched).
-    // Applied on top of the served recovery and clamped to 1.
+    // Modern amenity halos, applied on top of served recovery and clamped. Each
+    // counts only the NEAREST source (no compounding), is capped and distance-
+    // decayed by the rule-set, and returns 0 in Classic (so Classic stays
+    // byte-identical). Fitness lifts condos; the Spa lifts hotels; the Daycare
+    // lifts condos scaled by household size; the Nightclub is the negative
+    // one, souring condos and hotels near it (its max exceeds served recovery, the
+    // placement tension, and an office is empty at its late hours so it is spared).
     if (u.kind === "condo" && served && clubFloors.length > 0) {
-      let nearest = Infinity;
-      for (const cf of clubFloors) {
-        const d = Math.abs(cf - u.floor);
-        if (d < nearest) nearest = d;
-      }
-      const bonus = sim.rules.fitnessHaloBonus(nearest);
+      const bonus = sim.rules.fitnessHaloBonus(nearestFloorDist(clubFloors, u.floor));
       if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
     }
-    // Modern Nightclub noise (the negative halo): a served sleeping tenant (condo
-    // or hotel) near an operational nightclub loses satisfaction to it, capped and
-    // distance-decayed, 0 in Classic. Only the NEAREST club counts. The max
-    // exceeds served recovery, so a home right by a club net-declines and can give
-    // notice, the placement tension. (An office is empty at the club's late hours,
-    // so it is spared.)
     if ((u.kind === "condo" || isHotelKind(u.kind)) && served && nightclubFloors.length > 0) {
-      let nearest = Infinity;
-      for (const nf of nightclubFloors) {
-        const d = Math.abs(nf - u.floor);
-        if (d < nearest) nearest = d;
-      }
-      const penalty = sim.rules.nightclubNoisePenalty(nearest);
+      const penalty = sim.rules.nightclubNoisePenalty(nearestFloorDist(nightclubFloors, u.floor));
       if (penalty > 0) u.satisfaction = Math.max(0, u.satisfaction - penalty);
     }
-    // Modern Spa serenity halo (the positive mirror for hotels): a served hotel
-    // room near an operational Spa rests a little easier. Only the NEAREST spa
-    // counts (no compounding), capped and distance-decayed by the rule-set (0 in
-    // Classic, so Classic is untouched). Applied on top of served recovery,
-    // clamped to 1.
     if (isHotelKind(u.kind) && served && spaFloors.length > 0) {
-      let nearest = Infinity;
-      for (const sf of spaFloors) {
-        const d = Math.abs(sf - u.floor);
-        if (d < nearest) nearest = d;
-      }
-      const bonus = sim.rules.spaSerenityBonus(nearest);
+      const bonus = sim.rules.spaSerenityBonus(nearestFloorDist(spaFloors, u.floor));
+      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
+    }
+    if (u.kind === "condo" && served && daycareFloors.length > 0) {
+      // Family size is the scale: `daycareFamilyBonus` reads 0 for a household of
+      // one or none, so an empty/unsold condo (residents 0 or unset) gets nothing
+      // without a separate occupancy gate, matching the fitness halo above.
+      const bonus = sim.rules.daycareFamilyBonus(nearestFloorDist(daycareFloors, u.floor), u.residents ?? 0);
       if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
     }
     // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
