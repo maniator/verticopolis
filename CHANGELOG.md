@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.104.0
+
+- People no longer wander a sky lobby nobody can actually reach. Build a lobby with no elevator or stair serving it and it now reads as empty as it is; connect it and the crowd appears.
+- Empty rooms look empty. A wedding hall with no wedding, a shop with no customers, and the front desk of a tower with nobody in it no longer show figures who were never there.
+
 ## 1.101.0
 
 - A home or office in a spot nobody will stay in (too noisy, too far from a lobby, or a long walk from any elevator) now stays empty until you fix what is wrong, instead of quietly selling and emptying over and over. Hover a stubborn vacancy to see why it will not lease.
