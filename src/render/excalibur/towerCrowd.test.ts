@@ -28,7 +28,7 @@ const carKey = (ind: CarIndicator) => `${ind.riders}:${ind.arrow ?? "x"}:${ind.f
 
 /** The fake `sim` the render helpers read, with `over` merged on top. Tests that
  *  need their own units or clock go through this instead of writing a whole `sim`
- *  literal, so a new engine call read by the render layer (`floorReachable`, say)
+ *  literal, so a new engine call read by the render layer (`positionReachable`, say)
  *  only has to be defaulted in one place. */
 function simFixture(over: Record<string, any> = {}): any {
   return {
@@ -38,7 +38,7 @@ function simFixture(over: Record<string, any> = {}): any {
     tower: { revision: 1, units: [] },
     // Everything is reachable unless a test says otherwise, so the cases that
     // are not about reachability keep asserting exactly what they always did.
-    floorReachable: () => true,
+    positionReachable: () => true,
     ...over,
   };
 }
@@ -317,7 +317,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     const climber = mkWalker({ floor: 16, rank: 0.04 }); // stairs: lowest rank of all
     const e = eng({
       walkers: [mainLobby, skyLobby, climber],
-      sim: simFixture({ floorReachable: (f: number) => f === 1 }),
+      sim: simFixture({ positionReachable: (f: number) => f === 1 }),
     });
     updateMotion(e);
     expect(mainLobby.actor.graphics.visible).toBe(true);
@@ -333,12 +333,29 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     const climber = mkWalker({ floor: 16, rank: 0.04 });
     const e = eng({
       walkers: [skyLobby, climber],
-      sim: simFixture({ floorReachable: (f: number) => f === 1 || f === 15 }),
+      sim: simFixture({ positionReachable: (f: number) => f === 1 || f === 15 }),
     });
     updateMotion(e);
     expect(skyLobby.actor.graphics.visible).toBe(true);
     // Floor 16 is still cut off, so the gate is per floor and not a global flag.
     expect(climber.actor.graphics.visible).toBe(false);
+  });
+
+  it("hides only the stranded run of a gap-split floor (#647 segments)", () => {
+    // The case a floor-level probe gets wrong. After #647 the routing node is a
+    // contiguous SEGMENT, so a Modern floor built with a gap can have one wing
+    // routing to the lobby and the other stranded. Ambient figures are spawned
+    // per run, so the two wings must gate independently even though they share
+    // a floor number.
+    const westWing = mkWalker({ floor: 15, tileX: 2 });
+    const strandedEast = mkWalker({ floor: 15, tileX: 40 });
+    const e = eng({
+      walkers: [westWing, strandedEast],
+      sim: simFixture({ positionReachable: (f: number, x: number) => f === 1 || (f === 15 && x < 10) }),
+    });
+    updateMotion(e);
+    expect(westWing.actor.graphics.visible).toBe(true);
+    expect(strandedEast.actor.graphics.visible).toBe(false);
   });
 
   it("leaves corridor loiterers on their existing occupancy gate", () => {
@@ -348,7 +365,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     const e = eng({
       walkers: [loiterer],
       sim: simFixture({
-        floorReachable: () => false, // would hide it if the gate applied
+        positionReachable: () => false, // would hide it if the gate applied
         tower: { revision: 1, units: [{ floor: 7, occupants: 16 }] },
       }),
     });

@@ -69,6 +69,11 @@ export const CLASSIC_RULES: GameRules = {
     // the 1994 game via the Wine harness.
     return true;
   },
+  bridgingToggleable() {
+    // Classic always bridges (byte-identical to the original); the toggle never
+    // appears and can't be flipped.
+    return false;
+  },
   elevatorScheduleUX() {
     // 1994 fidelity: raw grid only. Classic withholds advice, never information.
     return { presets: false, autoTune: false, rawGridDefault: true, advice: false };
@@ -222,6 +227,11 @@ export const MODERN_RULES: GameRules = {
     // tenant is unhappy and eventually leaves), the deferred #502 track with its
     // own owner-tuned curve. So the plain uncapped BFS here, no walk budget.
     return false;
+  },
+  bridgingToggleable() {
+    // Modern surfaces the "bridge floors between rooms" toggle (default on, set
+    // at founding, changeable any time in Settings).
+    return true;
   },
   elevatorScheduleUX() {
     // Modern assistance: presets, auto-tune, advice; the raw grid behind Advanced.

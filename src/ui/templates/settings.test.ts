@@ -44,6 +44,16 @@ describe("settingsTemplate structure and a11y", () => {
     }
   });
 
+  it("omits the Building section by default (Classic), renders it as a switch when shown (Modern)", () => {
+    expect(renderToFragment(settingsTemplate("1.2.3")).querySelector("#set-auto-bridge")).toBeNull();
+    const frag = renderToFragment(settingsTemplate("1.2.3", true));
+    const sw = frag.querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    expect(sw.getAttribute("type")).toBe("checkbox");
+    expect(sw.getAttribute("role")).toBe("switch");
+    expect(sw.getAttribute("aria-describedby")).toBe("note-auto-bridge");
+    expect(frag.querySelector("#note-auto-bridge")).not.toBeNull();
+  });
+
   it("renders the primary Close action with autofocus", () => {
     const frag = renderToFragment(settingsTemplate("1.2.3"));
     const close = frag.querySelector<HTMLButtonElement>('[data-act="close"]')!;

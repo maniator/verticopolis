@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Tower } from "../../engine/Tower";
 import { Crowd } from "../../engine/Crowd";
 import { adjacency, bfsRoute } from "../../engine/crowd/routing";
+import { segAt } from "../../engine/tower/segments";
 
 /**
  * Elevator dispatch shaft fairness (issue #303).
@@ -112,8 +113,11 @@ describe("Elevator dispatch: shaft fairness across an equivalent bank", () => {
     const { tower } = towerWithBank(2);
     const crowd = new Crowd(1234);
     const graph = adjacency(crowd, tower);
+    // The routing graph nodes are contiguous floor SEGMENTS now (#647), so the
+    // raw BFS is seeded with the segment ids for floors 1 and 8 (this tower is
+    // gap-free, so each floor is a single segment).
     const raw = new Set<number>();
-    for (let i = 0; i < 50; i++) raw.add(bfsRoute(graph, 1, 8)!.shafts[0]);
+    for (let i = 0; i < 50; i++) raw.add(bfsRoute(graph, segAt(tower, 1), segAt(tower, 8))!.shafts[0]);
     expect(raw.size).toBe(1);
   });
 });

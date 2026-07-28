@@ -74,6 +74,14 @@ export interface GameRules {
    * what the builder accepts.
    */
   walkwayWillingnessApplies(): boolean;
+  /** True when the player may toggle floor auto-bridging (the Modern "bridge
+   *  floors between rooms" option). Classic returns false: it always bridges,
+   *  byte-identical to the original, and never surfaces or honors the toggle.
+   *  Rooms auto-lay the floor beneath them in BOTH modes regardless; this gates
+   *  only the between-placements bridge. The single source of truth for both
+   *  the mid-game toggle and its founding default, so mode-specific bridging
+   *  behavior stays in the rule-set, not smeared across the engine. */
+  bridgingToggleable(): boolean;
   /** The Classic/Modern authoring-affordance split for the per-shaft schedule
    *  dialog (#305 Phase 3). UI-only; the sim never reads it. The flag semantics
    *  live on {@link ElevatorScheduleUX} in `elevatorSchedule.ts`. */

@@ -386,11 +386,9 @@ export function spawnMealOutbound(
   );
   if (venueCandidates.length === 0) return;
   const venue = crowd.rng.pick(venueCandidates);
-  // The route is computed by `add`, which may fail (route unreachable
-  // from origin to venue). If it fails, no person exists and we must not
-  // increment outForMeal. Order: add first, THEN increment on the returned
-  // person object.
-  const spawned = add(crowd, tower, originFloor, venueFloor);
+  // Route from the origin unit's tile to the venue's OWN tile so the rider alights
+  // on the venue's run, never across a gap (#647); add fails closed, so count after.
+  const spawned = add(crowd, tower, originFloor, venueFloor, origin.x, venue.x);
   if (!spawned) return;
   spawned.destX = crowd.rng.int(venue.x, venue.x + venue.width - 1);
   spawned.mealVenueId = venue.id;
@@ -420,7 +418,9 @@ export function spawnStaff(
   fromX?: number,
 ): "sent" | "full" | "no-route" {
   if (crowd.staffCount >= maxStaffFor(tower)) return "full";
-  const r = crowd.staffRoute(tower, from, to); // handles from === to (walk only)
+  // Route from the crew's tile (fromX) to the room's tile (destX) so the maid
+  // alights on the room's run, never crossing a gap (#647); handles from === to.
+  const r = crowd.staffRoute(tower, from, to, fromX, destX);
   if (!r) return "no-route";
   const p = makePerson(crowd, tower, r, destX);
   // Staff step out of their own station, not a random corridor tile: pin the

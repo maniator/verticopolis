@@ -208,4 +208,28 @@ describe("UndoHistory + Simulation — round-trip", () => {
     expect(sim.serialize()).toEqual(before); // restored exactly
     expect(notes[notes.length - 1]).toBe("Undid: Build");
   });
+
+  it("undo of a build preserves a bridging toggle changed afterward (a setting, not a build step)", () => {
+    // Mirrors GameApp.adoptSim's preserveHistory path: the restore carries the
+    // live autoBridge across, so undoing a BUILD never silently flips a Settings
+    // toggle the player changed after that build (Codex P2).
+    let sim = Simulation.newGame(3, "modern", "realWorld");
+    const hist = new UndoHistory({
+      snapshot: () => JSON.stringify(sim.serialize()),
+      restore: (s) => {
+        const autoBridge = sim.autoBridge;
+        sim = Simulation.deserialize(JSON.parse(s));
+        sim.autoBridge = autoBridge;
+      },
+      signature: () => towerStateSig(sim.tower, sim.money),
+      notify: () => {},
+    });
+    const cx = Math.floor(GRID.width / 2);
+    hist.capture("Build"); // snapshot taken while bridging is on
+    expect(sim.tower.place("lobby", 1, cx).ok).toBe(true); // ground lobby: the first valid placement
+    hist.commit();
+    sim.autoBridge = false; // player turns bridging off AFTER the build
+    hist.undo();
+    expect(sim.autoBridge).toBe(false); // preserved, not reverted to the snapshot's on
+  });
 });

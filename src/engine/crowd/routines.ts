@@ -100,7 +100,9 @@ export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFl
   );
   if (candidates.length === 0) return;
   const origin = crowd.rng.pick(candidates);
-  const spawned = add(crowd, tower, floor, GROUND_LOBBY);
+  // Route from the condo's own tile (#647): a child never sets out from a stranded
+  // run, and on a split floor the sprite spawns on the origin's run, not a sibling.
+  const spawned = add(crowd, tower, floor, GROUND_LOBBY, origin.x);
   if (!spawned) return;
   spawned.routine = "schoolRun";
   spawned.originUnitId = origin.id;
@@ -138,7 +140,9 @@ export function spawnSalesCall(crowd: Crowd, tower: Tower, floors: SpawnFloors):
   );
   if (candidates.length === 0) return;
   const origin = crowd.rng.pick(candidates);
-  const spawned = add(crowd, tower, floor, GROUND_LOBBY);
+  // Route from the office's own tile (#647): a stranded office never sends a rep,
+  // and on a split floor the sprite leaves from the office's run, not a sibling.
+  const spawned = add(crowd, tower, floor, GROUND_LOBBY, origin.x);
   if (!spawned) return;
   spawned.routine = "salesCall";
   spawned.originUnitId = origin.id;

@@ -45,13 +45,11 @@ export interface UICallbacks {
   onImportLegacy(buffer: ArrayBuffer, filename: string): void;
   /** Export the live tower as an original 1994 SimTower save (.TDT). */
   onExportLegacy(): void;
-  /** The live tower's rules mode, so the export dialog can gate the 1994 path
-   *  (Classic only) without serializing the whole tower. */
+  /** The live tower's rules mode, so the export dialog can gate the 1994 path (Classic only) without serializing the whole tower. */
   getMode(): GameMode;
-  onNew(mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean): void;
+  onNew(mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean): void;
   onToggleAudio(): boolean; // returns new muted state
-  /** The live muted state, so the toggle's glyph can be initialized at boot
-   *  (persisted mute must show 🔇 without a click). */
+  /** The live muted state, so the toggle's glyph can be initialized at boot (persisted mute must show 🔇 without a click). */
   isMuted(): boolean;
   /** A volume slider moved: set that channel's level (0..1) and persist it. */
   onSetVolume(kind: "music" | "ambience" | "sfx", value: number): void;
@@ -62,12 +60,13 @@ export interface UICallbacks {
   onEditAction(action: string, root: HTMLElement): void;
   /** Toggle reduced motion; returns the new effective state. */
   onToggleReducedMotion(): boolean;
-  /** Toggle the "steady clock" pref (disables the 1994 breathing-clock pacing);
-   *  returns the new steady state (true = steady, breathing off). */
+  /** Toggle the "steady clock" pref (disables the 1994 breathing-clock pacing); returns the new steady state (true = steady, breathing off). */
   onToggleSteadyClock(): boolean;
-  /** The live steady-clock state, read from the same in-memory prefs the game
-   *  loop consults (never a second localStorage read, which could disagree). */
+  /** The live steady-clock state, read from the same in-memory prefs the game loop consults (never a second localStorage read, which could disagree). */
   isSteadyClock(): boolean;
+  /** Modern bridging toggle for the Settings switch: flip (no-op in Classic) and read the live state. */
+  onToggleAutoBridge(): boolean;
+  isAutoBridge(): boolean;
   onReplayOnboarding(): void;
   onRenameTower(name: string): void;
   onShowStats(): void;
@@ -439,7 +438,7 @@ export class UI {
     dialogs.confirmModal(this, title, body, onYes, yesLabel);
   }
 
-  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean) => void }): void {
+  newTowerModal(opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean) => void }): void {
     dialogs.newTowerModal(this, opts);
   }
 

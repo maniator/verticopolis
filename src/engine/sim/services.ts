@@ -3,6 +3,7 @@ import type { Simulation } from "../Simulation";
 import { METRO_PLATFORM_CUTOFF_MSG } from "./constants";
 import { isTenantFloorUnit } from "../milestones";
 import { isMetroPlatformServed } from "../tower/routing";
+import { segmentsOf } from "../tower/segments";
 
 import { FACILITIES, GARBAGE_COLLECT_HOUR, PARKING_WORKERS_PER_SPACE, RECYCLING_POP_PER_CENTER, isHotelKind } from "../facilities";
 import type { FacilityKind, Unit } from "../types";
@@ -379,11 +380,28 @@ export function floorReachable(sim: Simulation, floor: number): boolean {
     // floor is routable, so it must NOT draw the crowd rng that route()'s
     // shaft-balancing consumes (this runs on the ~6 Hz editor repaint pump; a
     // draw here would let UI timing perturb the seeded crowd stream on a banked
-    // tower).
-    hit = sim.crowd.reachable(sim.tower, 1, floor);
+    // tower). "Reachable" is now segment-aware: true when ANY contiguous segment
+    // on the floor routes to the lobby (a gap-free floor is one segment, so this
+    // equals the old whole-floor probe). Per-UNIT reachability (a stranded
+    // segment on an otherwise-reachable floor) is {@link positionReachable}.
+    hit = sim.crowd.floorReachable(sim.tower, floor);
     memo.verdicts.set(floor, hit);
   }
   return hit;
+}
+
+/**
+ * True when a commuter can reach the SEGMENT the position `(floor, x)` sits on,
+ * not merely the floor. On a gap-free floor this equals {@link floorReachable}
+ * (one segment), so it stays on the memoized floor fast path; only a genuinely
+ * gap-split floor pays a per-position routing probe. The tenant move-in gate
+ * reads this so a unit stranded on a disconnected half of a split floor never
+ * populates, even when a sibling segment of the same floor is reachable.
+ */
+export function positionReachable(sim: Simulation, floor: number, x: number): boolean {
+  if (floor === 1) return true;
+  if (segmentsOf(sim.tower, floor).length <= 1) return sim.floorReachable(floor);
+  return sim.crowd.positionReachable(sim.tower, floor, x);
 }
 
 /** Like {@link hasAny} but only counts a facility that is finished and intact

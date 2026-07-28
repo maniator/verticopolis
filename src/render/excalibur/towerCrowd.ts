@@ -52,10 +52,10 @@ export interface Walker {
   /** Floor this figure belongs to (for per-floor occupancy gating). */
   floor: number;
   /** Origin tile of the run this figure paces (the transport's tile for a stair
-   *  or escalator climber). Carried but NOT yet read: `walkerReachable` asks per
-   *  floor today, and switches to the per-position probe once #647's segment
-   *  routing lands, where a gap-split floor can strand one run while a sibling
-   *  run of the same floor still routes to the lobby. */
+   *  or escalator climber). Reachability is asked per POSITION, not per floor
+   *  (#647): a gap-split Modern floor can strand one contiguous run while a
+   *  sibling run of the same floor still routes to the lobby, and a floor-level
+   *  probe cannot tell them apart. */
   tileX: number;
   /** True for corridor loiterers gated on their floor's live occupancy; false
    *  for lobby/stair figures gated on the whole tower's busyness. */
@@ -272,6 +272,12 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  untouched. The verdict is memoized there per `tower.revision` in a per-sim
  *  WeakMap, so this is an O(1) lookup that cannot go stale across a load.
  *
+ *  Asked per position (#647): on a gap-split Modern floor one contiguous run can
+ *  be stranded while a sibling run of the same floor still routes to the lobby,
+ *  and ambient figures are spawned per run, so a floor-level probe would leave
+ *  ghosts on the stranded wing. A gap-free floor is exactly one segment, so this
+ *  is identical to the floor-level answer on every Classic tower.
+ *
  *  Known gap, and it fails safe: a climber carries its transport's BOTTOM floor,
  *  so a stair whose bottom is reachable but whose top is not still shows
  *  climbers. Reaching that needs Classic's walk budget to cut the flight one way
@@ -279,7 +285,7 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  reachable top), and it errs toward showing rather than hiding. Backlog row
  *  `walker-reachability-refinements`. */
 function walkerReachable(engine: TowerEngine, w: Walker): boolean {
-  return engine.sim.floorReachable(w.floor);
+  return engine.sim.positionReachable(w.floor, w.tileX);
 }
 
 /** Repositions every moving actor each frame (the engine then draws them). */

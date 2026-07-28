@@ -255,7 +255,12 @@ export function spawnVenueVisit(
     originRoom = crowd.rng.pick(rooms);
     originFloor = roomFloor;
   }
-  const spawned = add(crowd, tower, originFloor, venueFloor);
+  // Route to the venue's OWN tile (and from the origin room's tile when this is a
+  // resident visit), so the visitor alights on the venue's segment rather than the
+  // floor's leftmost run and then sliding destX across a gap to reach it (review
+  // #647). An outside/metro visitor has no origin room, so its origin x stays the
+  // representative tile as before. Byte-identical on a gap-free floor (one segment).
+  const spawned = add(crowd, tower, originFloor, venueFloor, originRoom?.x, venue.x);
   if (!spawned) return;
   spawned.destX = crowd.rng.int(venue.x, venue.x + venue.width - 1);
   spawned.mealVenueId = venue.id;
