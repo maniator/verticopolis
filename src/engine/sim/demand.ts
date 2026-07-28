@@ -6,6 +6,7 @@ import { RECYCLING_POP_PER_CENTER } from "../facilities";
 import { isHotelKind, attendanceCap } from "../facilities";
 import { residentCount } from "../census";
 import { isOperational, isTenanted } from "../types";
+import type { Unit } from "../types";
 
 /**
  * The commercial demand model (gdd/arch-commercial-demand-pools-2026-07-15).
@@ -62,6 +63,15 @@ export interface DemandMap {
    *  (coverage 0), while a tower with no retail at all stays the exempt baseline.
    *  Attendance venues (cinema, party hall) are excluded, matching `fractionByUnit`. */
   retailVenueCount: number;
+  /** The connected demand POOL (post tower-bonus dollars) and the reachable retail
+   *  CAPACITY it is spread over, the two numbers behind `share` (= pool/totalCap).
+   *  Exposed so the move-in gate can judge a candidate against the share the tower
+   *  WOULD carry once the candidate (and the vacancies filling alongside it) are
+   *  occupied: it adds each would-be tenant's {@link originDemand} to `pool` and
+   *  re-derives the share, folding fresh-fill demand into the coverage the gate
+   *  reads. `share === totalCap > 0 ? pool / totalCap : 0` holds at construction. */
+  pool: number;
+  totalCap: number;
 }
 
 /** The demand weight of an origin kind, reusing the meal-cadence origin weights
@@ -197,7 +207,23 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     fractionByUnit.set(v.id, frac);
     deliveredByUnit.set(v.id, frac * v.cap);
   }
-  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share, retailVenueCount };
+  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share, retailVenueCount, pool, totalCap };
+}
+
+/**
+ * The demand a single would-be origin contributes to the pool: its statistical
+ * head count times the kind weight, the per-capita budget, and the tower bonus,
+ * matching the pool term {@link computeDemandMap} sums over occupied origins. The
+ * move-in gate adds this for a fresh (or filling) tenant so a candidate is judged
+ * against the demand it would itself create, not just the pre-move census. Returns
+ * 0 for a non-origin kind. `residentCount` reads the catalog population for an
+ * empty unit, so a vacancy contributes its would-be household. Draws no RNG.
+ */
+export function originDemand(sim: SimContext, u: Pick<Unit, "kind" | "residents">): number {
+  const w = originWeight(u.kind);
+  if (w === undefined) return 0;
+  const rules = sim.rules ?? MODERN_RULES;
+  return residentCount(u) * w * rules.demandModel().perCapita * towerDemandBonus(sim);
 }
 
 /**

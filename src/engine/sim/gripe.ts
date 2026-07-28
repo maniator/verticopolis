@@ -154,7 +154,7 @@ export function dominantGripe(
 /** True when an operational, served nightclub sits within its noise range of `u`
  *  (the same floor-distance the negative halo in `updateSatisfaction` penalizes).
  *  Read-only, no RNG. */
-function nearNightclub(sim: Simulation, u: Pick<Unit, "floor">): boolean {
+export function nearNightclub(sim: Simulation, u: Pick<Unit, "floor">): boolean {
   for (const c of sim.tower.units) {
     if (c.kind === "nightclub" && isOperational(c) && sim.tower.isFloorServed(c.floor) && Math.abs(c.floor - u.floor) < NIGHTCLUB_NOISE_FLOORS) {
       return true;

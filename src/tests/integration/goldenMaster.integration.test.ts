@@ -211,11 +211,19 @@ const PINNED_STATE_HASH = "8dd8445a0f36c9f7662f4a845eac775ecdd37e00b5937d70dc391
  * before any rng use), which is why the Classic hash above is UNCHANGED in that
  * PR: the unchanged value is the proof of the zero-draw gate.
  */
-// Re-pinned for Modern empty-lot founding (gdd-modern-expansion): newGame no
-// longer seeds the Modern center lobby, so the fixture's ensureStarterLobby now
-// LAYS those 40 tiles itself (different unit ids and revision history than the
-// founding seed produced, hence the new fingerprint). The Classic hash above is
-// UNCHANGED in this change, since Classic already founded empty. The prior
-// re-pin was the additive `initialSeed` save field (the fixture's founding seed,
-// written verbatim, read by nothing in the sim).
-const PINNED_MODERN_STATE_HASH = "65d6b4c06ad309f849c81ac7f76d2b9f1c9396b51f3543a12689365297ec30d9";
+// Re-pinned for the move-in sustainability gate
+// (spec-move-in-sustainability-gate-2026-07-23): a condo/office no longer sells
+// or leases into a spot whose own placement would just erode a fresh tenant back
+// below the leave bar and evict them. In this fixture the four offices on floors
+// 2-3 sit against the fast-food noise, and in MODERN (noiseErosionScale = 1)
+// their steady-state satisfaction craters to 0.0, so the gate now keeps them
+// VACANT instead of re-leasing and churning forever; money, population, and the
+// per-unit fields all shift. The CLASSIC hash above is UNCHANGED in this same
+// change (noiseErosionScale = 0, so those offices cap at 0.60, comfortably above
+// the 0.40 bar, and still fill), which is the proof the gate blocks only
+// genuinely-unsustainable spots and never over-blocks a livable one. The prior
+// re-pin was Modern empty-lot founding (gdd-modern-expansion): newGame no longer
+// seeds the Modern center lobby, so the fixture's ensureStarterLobby lays those
+// 40 tiles itself (different unit ids and revision history than the founding seed
+// produced).
+const PINNED_MODERN_STATE_HASH = "f70e83b7e230a95bba5ca05bd39b57aaa82709f6e0b5fab780ee139f86778e5b";

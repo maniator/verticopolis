@@ -5,7 +5,7 @@ import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
-import { gripeLineText } from "./gripeCopy";
+import { gripeLineText, wontLeaseText } from "./gripeCopy";
 import { ECON } from "../engine/econConfig";
 import { subtypeListFor } from "../engine/retailSubtypes";
 import { isOperational, isPresent, VACATE_REASON_TEXT } from "../engine/types";
@@ -398,6 +398,12 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
     if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
   }
+  // "Won't lease": the empty-unit mirror of "Main gripe". An on-market, reachable
+  // condo/office the move-in sustainability gate holds vacant names WHY no one
+  // leases it (the logic and copy live in {@link wontLeaseText}, gated on the same
+  // predicate the engine uses so the card and the move-in decision can't disagree).
+  const wontLease = wontLeaseText(sim, u);
+  if (wontLease) lines.push(html`<div style="color:var(--bad)">${wontLease}</div>`);
   // A tenant on notice: spell out that they're leaving, why, how long is left,
   // and the exact recovery bar they must clear, the "inform before you hurt
   // them" contract, so the eviction is never a surprise. The countdown and the
@@ -422,7 +428,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     if (isRelocation) {
       lines.push(
         html`<div style="color:var(--bad)">${VACATE_REASON_TEXT[u.vacateReason]}. Leaves ${left}.</div>`,
-        html`<div>A life event, so you cannot keep them. You buy the unit back to re-sell.</div>`,
+        html`<div>A life event, so you cannot keep them. You buy the unit back and re-list it (it re-sells once it is well placed).</div>`,
       );
     } else {
       const now = Math.round(u.satisfaction * 100);

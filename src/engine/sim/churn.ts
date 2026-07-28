@@ -14,6 +14,9 @@ import { VACATE_REASON_TEXT } from "../types";
 
 import { VACATE_NOTICE_MINUTES } from "./constants";
 
+import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
+import { originDemand } from "./demand";
+
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
 
@@ -71,11 +74,36 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   u.label = FACILITIES[u.kind].name;
   u.vacateReason = undefined;
   u.vacateAt = undefined;
-  // One toast per departure. A bought-back owner's line carries the cost and
-  // the cause together; every other tenant just gets the plain "left" notice.
+  // One toast per departure. A bought-back owner's line carries the cost and the
+  // cause together; every other tenant just gets the plain "left" notice. The
+  // trailing note tells the player what becomes of the repurchased unit, and it
+  // asks the move-in gate DIRECTLY rather than inferring from the recorded reason,
+  // so it can never promise a re-sale the gate then refuses (nor claim a spot
+  // stays empty that the gate will re-fill). The unit is empty and back on the
+  // market at this point, so `wouldEvictFreshTenant` gives the exact re-sale
+  // verdict: if the gate still holds it (a live structural drain: noise, far walk,
+  // lobby distance, rent, unmet demand, possibly alongside the congestion that
+  // triggered this eviction), it stays empty until that is fixed; otherwise it
+  // re-sells, and only then does a congestion-caused eviction warrant the "the
+  // crowding will keep wearing owners down" note (congestion is deliberately not
+  // gated, so an under-elevatored tower keeps turning the unit over until cars are
+  // added). A well-placed relocation just re-lists silently. A No Rate unit (an
+  // imported off-market owned condo) is skipped by `attemptMoveIns` regardless of
+  // the gate, so it stays empty until a rate is set, which is what the note must
+  // say (not "fix the cause" or "a new owner will buy in").
+  let buybackNote = "";
+  if (buyback > 0) {
+    buybackNote = u.noRate
+      ? " It is off the market (No Rate); set a rate to sell it again."
+      : wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
+        ? " It stays empty until you fix the cause."
+        : reason === "congestion"
+          ? " A new owner will buy in, but the crowded elevators will wear them down too until you add cars."
+          : "";
+  }
   sim.emit(
     buyback > 0
-      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString()}.`
+      ? `The owner left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}). You bought it back for $${buyback.toLocaleString()}.${buybackNote}`
       : `A tenant left ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} (${VACATE_REASON_TEXT[reason]}).`,
     "bad",
   );
@@ -102,6 +130,21 @@ export function attemptMoveIns(sim: Simulation): void {
   // One set read per pass instead of a per-unit delegation chain; the set is
   // already revision-memoized (tower/routing.ts servedFloors).
   const servedSet = sim.tower.servedFloors();
+  // The move-in sustainability gate's context (halo floor-sets, congestion,
+  // coverage), built ONCE and only if a condo/office candidate actually reaches
+  // the gate, so a tower with none pays nothing. Same source of truth the
+  // per-tick satisfaction update reads (spec-move-in-sustainability-gate).
+  let satCtx: SatisfactionContext | null = null;
+  // A condo/office actually moving in this pass adds its demand to the gate
+  // context's running pool, so a LATER candidate in the same pass is judged
+  // against the demand the earlier fills already created (the intra-pass half of
+  // the batch-aware unmet-demand share; a candidate's own demand is folded in
+  // inside wouldEvictFreshTenant). satCtx.demandMap is built the moment the first
+  // condo/office reaches the gate, before any fill, so it is present here.
+  const filled = (unit: Unit): void => {
+    sim.moveIn(unit);
+    if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, unit);
+  };
   for (const u of sim.tower.units) {
     if (u.state !== "empty") continue;
     // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
@@ -123,11 +166,25 @@ export function attemptMoveIns(sim: Simulation): void {
     // grandfather for tenants already in place.)
     if (!reachable(u.floor)) continue;
 
+    // Move-in sustainability gate (both modes): don't sell/lease a condo or
+    // office into a spot whose own placement would just erode a fresh tenant
+    // back below the leave bar, evict them, and re-list, an endless churn that
+    // nets zero money but reads as a bug. If the spot can't hold a livable
+    // tenant, it stays VACANT until the player fixes what's wrong (better
+    // access, quieter neighbors, closer lobby), matching the 1994 original where
+    // a badly placed office simply "rimangono vuoti". Consults the same
+    // satisfactionStep the per-tick update runs, drawing no RNG, so a gated
+    // candidate only skips its own move-in roll.
+    if (u.kind === "condo" || u.kind === "office") {
+      satCtx ??= buildSatisfactionContext(sim, true); // gate judges placement, not transient congestion
+      if (wouldEvictFreshTenant(sim, u, satCtx)) continue;
+    }
+
     const demand = sim.demandFactor(u);
     if (u.kind === "office") {
-      if (!weekend && sim.rng.chance(0.25 * demand * parkingPenalty)) sim.moveIn(u);
+      if (!weekend && sim.rng.chance(0.25 * demand * parkingPenalty)) filled(u);
     } else if (u.kind === "condo") {
-      if (sim.rng.chance(0.18 * demand)) sim.moveIn(u);
+      if (sim.rng.chance(0.18 * demand)) filled(u);
     } else if (u.kind === "fitnessClub" || u.kind === "clinic") {
       // Modern-only lease amenities, filled like an office (any day of the week).
       // Classic never reaches here: it holds neither kind, so no rng is drawn and
@@ -139,6 +196,10 @@ export function attemptMoveIns(sim: Simulation): void {
         u.state = "asleep";
         u.everOccupied = true;
         sim.moveInsToday.rooms++;
+        // A guest checking in mid-pass becomes a demand origin (computeDemandMap
+        // counts asleep rooms), so raise the running pool too, or a condo/office
+        // evaluated later in the same pass would be judged against stale coverage.
+        if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, u);
       }
     }
   }
@@ -174,7 +235,7 @@ export function rollCondoRelocations(sim: Simulation): void {
     u.vacateReason = "relocation";
     u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
     sim.emit(
-      `A household in ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} is relocating. They leave in under ${days} day(s); you buy the unit back to re-sell.`,
+      `A household in ${FACILITIES[u.kind].name} on ${sim.floorLabel(u.floor)} is relocating. They leave in under ${days} day(s); you buy the unit back and re-list it.`,
       // "bad" so the advance warning actually TOASTS: the UI toasts only
       // good/bad log entries; "info" is bulletin-only, which would swallow the
       // heads-up. The non-blaming framing lives in the wording, not the color,
