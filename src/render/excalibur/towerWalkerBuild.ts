@@ -10,10 +10,10 @@ import type { TowerEngine } from "./TowerEngine";
  * separately readable (and so neither file sits on the size ceiling).
  *
  * This runs once per rebuild, not per frame: it reads the tower's layout and
- * hands each figure a share of the already-baked `engine.personGfx` canvases. It
- * is covered on the Playwright tier rather than by unit tests (it needs a live
- * engine to add actors to); the gating that decides who is actually SHOWN lives
- * in `updateMotion` next door, which IS unit-tested.
+ * hands each figure a share of the already-baked `engine.personGfx` canvases.
+ * Baking none of its own means it runs under happy-dom, so it is unit-tested in
+ * `towerWalkerBuild.test.ts`; the gating that decides who is actually SHOWN
+ * lives in `updateMotion` next door, tested in `towerCrowd.test.ts`.
  */
 
 interface Run {
@@ -21,6 +21,20 @@ interface Run {
   floor: number;
   x0: number;
   x1: number;
+}
+
+/** Where a figure counts as standing for the reachability gate. A climber spans
+ *  two landings and carries both; everyone else repeats the one they pace. */
+interface WalkerSpot {
+  floor: number;
+  tileX: number;
+  altFloor: number;
+  altTileX: number;
+}
+
+/** A figure that stands in exactly one place: both ends are the same spot. */
+function oneSpot(floor: number, tileX: number): WalkerSpot {
+  return { floor, tileX, altFloor: floor, altTileX: tileX };
 }
 
 
@@ -56,7 +70,7 @@ export function buildWalkers(engine: TowerEngine): void {
           // from piling everyone at the ping-pong turnaround ends (the old
           // full-width sweep bunched them up there).
           const [segX0, segX1] = lobbyLaneSpan(i, count, x0w, x1w);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, run.x0, false);
+          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, oneSpot(floor, run.x0), false);
         } else {
           // Corridor: loiter in a short stretch around a spread-out anchor, so a
           // lone figure shuffles in place instead of sprinting the whole floor,
@@ -67,25 +81,51 @@ export function buildWalkers(engine: TowerEngine): void {
           // corridor ends, robust even if the count/density constants change.
           const segX0 = Math.max(x0w, anchor - half);
           const segX1 = Math.min(x1w, anchor + half);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, run.x0, true);
+          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, oneSpot(floor, run.x0), true);
         }
       }
     }
   }
-  for (const t of engine.sim.tower.transports) {
+  const tower = engine.sim.tower;
+  for (const t of tower.transports) {
     if (t.kind !== "stairs" && t.kind !== "escalator") continue;
     const x0w = engine.worldX(t.x) + 2;
     const x1w = engine.worldX(t.x + t.width) - 3;
     const yb = engine.worldYTop(t.bottom) + FLOOR - 2;
     const yt = yb - (FLOOR - 4);
     const n = t.kind === "escalator" ? 3 : 2;
+    // Both landings, so the gate can require both ends of the flight rather
+    // than assuming the bottom stands for the whole climb (#665).
+    const spot: WalkerSpot = {
+      floor: t.bottom,
+      tileX: landingTile(tower, t, t.bottom),
+      altFloor: t.top,
+      altTileX: landingTile(tower, t, t.top),
+    };
     for (let i = 0; i < n; i++) {
       const seed = (t.id * 17 + i * 29) | 0;
       // Low ranks so stairs/escalators show climbers even in a modest tower,
       // otherwise the routed crowd (elevators only) makes stairs look unused.
-      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, t.bottom, t.x, false);
+      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, spot, false);
     }
   }
+}
+
+/**
+ * The tile a flight actually lands on at `floor`: the first structural tile
+ * under its footprint, mirroring the router's own `landingSeg`.
+ *
+ * Not `t.x`: a transport only needs SOME tile under its footprint to be
+ * structural, so on a gap-split floor a stair may legally sit with its leftmost
+ * column over the void. Probing `t.x` there finds no run, and the climbers on a
+ * perfectly usable flight would be hidden (#665). Falls back to `t.x` when the
+ * whole footprint is unstructured, which is the same fallback the router takes.
+ */
+function landingTile(tower: TowerEngine["sim"]["tower"], t: { x: number; width: number }, floor: number): number {
+  for (let i = 0; i < t.width; i++) {
+    if (tower.hasStructure(floor, t.x + i)) return t.x + i;
+  }
+  return t.x;
 }
 
 function spawnWalker(
@@ -97,8 +137,7 @@ function spawnWalker(
   seed: number,
   speed: number,
   rank: number,
-  floor: number,
-  tileX: number,
+  spot: WalkerSpot,
   perFloor: boolean,
 ): void {
   const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
@@ -119,8 +158,7 @@ function spawnWalker(
     impatient: (((seed >>> 8) & 0xff) / 255) < 0.5,
     red: false,
     rank,
-    floor,
-    tileX,
+    ...spot,
     perFloor,
   });
 }
