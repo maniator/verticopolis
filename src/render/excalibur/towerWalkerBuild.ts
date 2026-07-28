@@ -9,9 +9,11 @@ import type { TowerEngine } from "./TowerEngine";
  * of `towerCrowd.ts` so the per-frame motion path and this build-once path stay
  * separately readable (and so neither file sits on the size ceiling).
  *
- * This path BAKES `ex.Canvas` graphics, so it cannot run under happy-dom and is
- * covered on the Playwright tier; the gating that decides who is actually shown
- * lives in `updateMotion` next door, which IS unit-tested.
+ * This runs once per rebuild, not per frame: it reads the tower's layout and
+ * hands each figure a share of the already-baked `engine.personGfx` canvases. It
+ * is covered on the Playwright tier rather than by unit tests (it needs a live
+ * engine to add actors to); the gating that decides who is actually SHOWN lives
+ * in `updateMotion` next door, which IS unit-tested.
  */
 
 interface Run {

@@ -28,7 +28,9 @@ export interface ShopGeom {
   floorY: number;
   railY: number;
   awningBottom: number;
-  /** The single browsing-customer gate: real occupant, or the hash stand-in. */
+  /** The single browsing-customer gate: a real occupant, and nothing else. The
+ *  seeded `hash(u.id)` stand-in that used to fill in for one was retired (#552);
+ *  do not bring it back, an empty shop draws no shopper. */
   busy: boolean;
   /** Live occupant count, for trades that seat more than one client. */
   occupants: number;

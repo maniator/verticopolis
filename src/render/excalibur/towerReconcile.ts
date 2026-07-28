@@ -69,8 +69,16 @@ export function syncScene(engine: TowerEngine): void {
   // `state` at `occupied` around the clock (`updatePresence` cycles `occupants`,
   // never `state`), so this is stable for offices, condos and shops alike.
   // Structural tiles never qualify: floors and lobbies are placed `empty` and
-  // stay there. A hotel-only tower does go unstaffed between checkout and the
-  // evening check-ins, which is the honest read (there is nobody in it).
+  // stay there.
+  //
+  // The rule this lands on is "somebody holds space in this building right now."
+  // A shop or office keeps its lease overnight, so its tower stays staffed at
+  // 4 a.m. with the shutters down. A hotel room is sold by the night, so a
+  // hotel-ONLY tower does go unstaffed between the housekeeping sweep and the
+  // evening check-ins. That reads inconsistent side by side, but it follows the
+  // leases rather than second-guessing them, and the alternative (latching on
+  // `everOccupied`) would keep staff in a tower everyone has left. Revisit if
+  // the daily flip reads badly on a real hotel tower.
   // Set here rather than in the per-frame tick because the scan walks every unit.
   engine.d.staffed = tower.units.some((u) => isPresent(u));
   const seenS = new Set<number>();

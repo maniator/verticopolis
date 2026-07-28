@@ -63,10 +63,18 @@ describe("venue figures are gated on real occupancy (#552)", () => {
     expect(s.log.some((l) => l.startsWith("fillRect"))).toBe(true);
   });
 
-  it("a wedding hall with attendees seats them", () => {
-    const s = spyCtx();
-    drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants: 8 }), 0, 0, 176, 88);
-    expect(s.log).toContain(FIGURE);
+  it("a wedding hall seats more guests as attendance rises", () => {
+    // Counting, not just presence: asserting one figure exists would be
+    // satisfied by the groom alone, who always draws first, so both guest rows
+    // could stop gating (or stop drawing) with the test still green.
+    const seated = (occupants: number) => {
+      const s = spyCtx();
+      drawUnit(draw({}, s.ctx), unit({ kind: "weddingHall", occupants }), 0, 0, 176, 88);
+      return s.log.filter((l) => l === FIGURE).length;
+    };
+    expect(seated(8)).toBeGreaterThan(seated(2));
+    expect(seated(2)).toBeGreaterThan(seated(0));
+    expect(seated(0)).toBe(0);
   });
 
   it("seats the couple before the guest rows, so one attendee reads as a wedding", () => {

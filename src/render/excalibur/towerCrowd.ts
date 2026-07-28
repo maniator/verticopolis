@@ -34,6 +34,7 @@ export function reap<K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V,
   }
 }
 
+/** A single engine-driven walking figure (lobby/corridor walker or climber). */
 export interface Walker {
   actor: ex.Actor;
   gfx: ex.Canvas;
