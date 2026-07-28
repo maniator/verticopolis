@@ -1,6 +1,8 @@
 import type { Tower } from "../Tower";
 import type { Transport } from "../types";
 import { isStaffOnlyTransport, isStaffTransportKind, isElevatorKind, WALKWAY_WILLINGNESS } from "../facilities";
+import { floorOfSeg, segAt, landingSeg } from "../tower/segments";
+import { balanceShafts } from "./shaftBanks";
 import type { Crowd } from "../Crowd";
 import { STRESS_WAIT } from "./person";
 import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./person";
@@ -16,9 +18,15 @@ import type { Route, ElevatorCalls, ElevatorQueueView, QueueLanding } from "./pe
 type AdjGraph = Map<number, { f: number; shaft: number; walkKind?: "stairs" | "escalator" }[]>;
 
 /**
- * The floor → one-ride-reachable-floors graph, built from elevator stops.
- * It only changes when the tower's transports change, so we cache it by
- * {@link Tower.revision} and rebuild lazily instead of on every spawn.
+ * The segment -> one-ride-reachable-segments graph, built from elevator stops.
+ * A node is a contiguous floor SEGMENT (see `tower/segments.ts`), not a whole
+ * floor, so a shaft only links the segment it physically lands on: two runs of
+ * the same floor separated by a gap are separate nodes and never connect just
+ * because a shaft stops "on that floor". On a gap-free tower every floor is one
+ * segment, so the graph is isomorphic to the old floor graph (the byte-identical
+ * safety property). It only changes when the tower's transports/structure
+ * change, so we cache it by {@link Tower.revision} and rebuild lazily instead of
+ * on every spawn.
  */
 export function adjacency(crowd: Crowd, tower: Tower): AdjGraph {
   if (crowd.adj && crowd.adjRev === tower.revision) return crowd.adj;
@@ -64,10 +72,14 @@ export function buildAdjacency(
     // budget (WALKWAY_WILLINGNESS), not a ride. Tag the edge so the BFS
     // classifies it without a per-hop transport lookup.
     const walkKind = t.kind === "stairs" || t.kind === "escalator" ? t.kind : undefined;
-    for (const a of stops) {
-      let list = adj.get(a);
-      if (!list) adj.set(a, (list = []));
-      for (const b of stops) if (b !== a) list.push({ f: b, shaft: t.id, walkKind });
+    // The SEGMENT this shaft attaches to on each stop floor (its physical
+    // landing), so a stop over a gap-split floor links only its own half.
+    const segs = stops.map((fl) => landingSeg(tower, t, fl));
+    for (let ai = 0; ai < stops.length; ai++) {
+      const aSeg = segs[ai];
+      let list = adj.get(aSeg);
+      if (!list) adj.set(aSeg, (list = []));
+      for (let bi = 0; bi < stops.length; bi++) if (bi !== ai) list.push({ f: segs[bi], shaft: t.id, walkKind });
     }
   }
   return adj;
@@ -90,96 +102,37 @@ export function buildAdjacency(
  * {@link reachable} (which only asks whether a path exists, no rng), so the two
  * can never diverge on which router applies.
  */
-function passengerPath(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
+export function passengerPath(crowd: Crowd, tower: Tower, fromSeg: number, toSeg: number): Route | null {
   const adj = adjacency(crowd, tower);
   return tower.rules.walkwayWillingnessApplies()
-    ? bfsRouteWalkBudget(adj, from, to)
-    : bfsRoute(adj, from, to);
+    ? bfsRouteWalkBudget(adj, fromSeg, toSeg)
+    : bfsRoute(adj, fromSeg, toSeg);
 }
 
-export function route(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  // The chosen PATH is fixed; balanceShafts only re-picks WHICH physical shaft
-  // of an equivalent bank carries each leg, so the route itself is untouched.
-  const r = passengerPath(crowd, tower, from, to);
-  return r && balanceShafts(crowd, tower, r);
+/** Rewrite a route's node ids (segment ids) back into the real FLOOR numbers the
+ *  motion state machine consumes, in place. Every leg is intra-segment by
+ *  construction, so the floors alone still describe the whole ride. */
+function toRealFloors(r: Route): void {
+  for (let i = 0; i < r.floors.length; i++) r.floors[i] = floorOfSeg(r.floors[i]);
 }
 
-/**
- * Spread each ride leg across its bank of equivalent parallel shafts.
- *
- * {@link bfsRoute} finds the fewest-transfer PATH, but its edge-order tie-break
- * names the SAME shaft every time a floor pair is served by several equivalent
- * shafts, so identical trips funnel onto one shaft of a bank while its siblings
- * sit idle (the landing queue there piles up and the drawn crowd makes it
- * obvious). This keeps the path bfsRoute chose and only re-picks WHICH physical
- * shaft of an equivalent bank carries each leg, drawing from the seeded crowd
- * rng so the spread is deterministic and reproducible, never build-order
- * biased. A leg with no sibling shaft draws nothing, so a tower without a bank
- * keeps its exact rng stream (the zero-draw gate).
- *
- * "Equivalent" is the SAME transport kind stopping at both the leg's boarding
- * and alighting floors. Matching on kind means this never swaps a rider's
- * transport MODE: an elevator leg stays an elevator, a service-elevator leg
- * stays a service elevator, a stair leg stays a stair. So the staff service-first
- * routing preference bfsRoute expresses (service elevators win route ties over
- * stairs) survives intact, and pool spans/caps are untouched: this only decides
- * which shaft within a bank of equals answers the trip.
- *
- * The banks are precomputed once per {@link Tower.revision} by {@link shaftBanks}
- * and looked up in O(1) here, so a routed leg costs a Map lookup plus (only when
- * a real bank exists) one rng draw, never a per-trip rescan of every transport.
- */
-function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
-  const banks = shaftBanks(crowd, tower);
-  for (let i = 0; i < r.shafts.length; i++) {
-    const chosen = tower.getTransport(r.shafts[i]);
-    if (!chosen) continue;
-    const bank = banks.get(bankKey(chosen.kind, r.floors[i], r.floors[i + 1]));
-    // No bank, or a lone shaft: nothing to balance, so draw nothing and keep the
-    // exact rng stream. The chosen shaft is always a member when a bank exists.
-    if (!bank || bank.length <= 1) continue;
-    r.shafts[i] = bank[crowd.rng.int(0, bank.length - 1)];
-  }
-  return r;
-}
-
-/** The bank key for one directed leg: the transport kind plus the boarding and
- *  alighting floors, so equivalent shafts (same kind, both floors) collide. */
-function bankKey(kind: Transport["kind"], from: number, to: number): string {
-  return `${kind}:${from}:${to}`;
-}
-
-/**
- * The equivalent-shaft banks, keyed "kind:from:to" → shaft ids in STABLE
- * ascending order (so a given rng draw maps to the same shaft run-to-run).
- *
- * Built once per {@link Tower.revision} and cached on the crowd, the way
- * {@link adjacency} caches the stop-graph: it only changes when the tower's
- * transports change. Every directed stop pair of every transport contributes
- * its id to that pair's bank, so {@link balanceShafts} answers each leg with a
- * single Map lookup. Keeping the key kind-partitioned means one shared cache
- * serves both the passenger and the staff route paths without ever mixing a
- * service elevator into a passenger bank (or a stair into an elevator one).
- */
-export function shaftBanks(crowd: Crowd, tower: Tower): Map<string, number[]> {
-  if (crowd.shaftBanks && crowd.shaftBanksRev === tower.revision) return crowd.shaftBanks;
-  const banks = new Map<string, number[]>();
-  for (const t of tower.transports) {
-    const stops = tower.stopsOf(t);
-    for (const from of stops) {
-      for (const to of stops) {
-        if (to === from) continue;
-        const key = bankKey(t.kind, from, to);
-        let bank = banks.get(key);
-        if (!bank) banks.set(key, (bank = []));
-        bank.push(t.id);
-      }
-    }
-  }
-  for (const bank of banks.values()) bank.sort((a, b) => a - b);
-  crowd.shaftBanks = banks;
-  crowd.shaftBanksRev = tower.revision;
-  return banks;
+export function route(
+  crowd: Crowd,
+  tower: Tower,
+  fromFloor: number,
+  fromX: number | undefined,
+  toFloor: number,
+  toX: number | undefined,
+): Route | null {
+  // Route between the two positions' SEGMENTS, then translate the node path back
+  // to floor numbers. The chosen PATH is fixed; balanceShafts only re-picks WHICH
+  // physical shaft of an equivalent bank carries each leg, so the route is
+  // untouched. The bank key reads the real floors, so it is byte-identical on a
+  // gap-free tower.
+  const r = passengerPath(crowd, tower, segAt(tower, fromFloor, fromX), segAt(tower, toFloor, toX));
+  if (!r) return null;
+  toRealFloors(r);
+  return balanceShafts(crowd, tower, r);
 }
 
 /** Pure reachability probe: does a fewest-transfer passenger route exist at
@@ -191,8 +144,15 @@ export function shaftBanks(crowd: Crowd, tower: Tower): Map<string, number[]> {
  *  so a probe that never rides must never draw. It runs the SAME
  *  {@link passengerPath} route() does (the same per-mode router), so a floor
  *  route() would refuse never reads as reachable here. */
-export function reachable(crowd: Crowd, tower: Tower, from: number, to: number): boolean {
-  return passengerPath(crowd, tower, from, to) !== null;
+export function reachable(
+  crowd: Crowd,
+  tower: Tower,
+  fromFloor: number,
+  fromX: number | undefined,
+  toFloor: number,
+  toX: number | undefined,
+): boolean {
+  return passengerPath(crowd, tower, segAt(tower, fromFloor, fromX), segAt(tower, toFloor, toX)) !== null;
 }
 
 /** Route over the STAFF network (service elevators / stairs).
@@ -203,9 +163,18 @@ export function reachable(crowd: Crowd, tower: Tower, from: number, to: number):
  *  isStaffTransportKind/stopsOf graph. (Parallel implementations: if they
  *  ever drift, spawnStaff reports "no-route" so dispatch can surface it
  *  instead of retrying silently.) */
-export function staffRoute(crowd: Crowd, tower: Tower, from: number, to: number): Route | null {
-  const r = bfsRoute(staffAdjacency(crowd, tower), from, to);
-  return r && balanceShafts(crowd, tower, r);
+export function staffRoute(
+  crowd: Crowd,
+  tower: Tower,
+  fromFloor: number,
+  fromX: number | undefined,
+  toFloor: number,
+  toX: number | undefined,
+): Route | null {
+  const r = bfsRoute(staffAdjacency(crowd, tower), segAt(tower, fromFloor, fromX), segAt(tower, toFloor, toX));
+  if (!r) return null;
+  toRealFloors(r);
+  return balanceShafts(crowd, tower, r);
 }
 
 /** NOTE: edge ORDER is a contract: within a BFS level the first-listed

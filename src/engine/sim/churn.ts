@@ -8,6 +8,7 @@ import { householdPrice, snapToLadder } from "../gameRules";
 
 import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isHotelKind } from "../facilities";
+import { segAt } from "../tower/segments";
 import type { FacilityKind, Unit, VacateReason } from "../types";
 
 import { VACATE_REASON_TEXT } from "../types";
@@ -115,21 +116,24 @@ export function attemptMoveIns(sim: Simulation): void {
   // parking, fewer firms will move in, demand pressure, not eviction, so it
   // never destabilizes a built-out tower.
   const parkingPenalty = sim.officeParkingShort() ? 0.5 : 1;
-  // Per-pass memo for the reachability BFS in floorReachable: many empty units
-  // share a floor, and the verdict can't change mid-pass. Lives only for
-  // this call; Crowd's adjacency graph is the layer cached by revision.
-  const reachMemo = new Map<number, boolean>();
-  const reachable = (floor: number): boolean => {
-    let hit = reachMemo.get(floor);
-    if (hit === undefined) {
-      hit = sim.floorReachable(floor);
-      reachMemo.set(floor, hit);
-    }
-    return hit;
-  };
   // One set read per pass instead of a per-unit delegation chain; the set is
   // already revision-memoized (tower/routing.ts servedFloors).
   const servedSet = sim.tower.servedFloors();
+  // Per-pass memo for the segment-aware reachability probe: many empty units share
+  // a segment, and the verdict can't change mid-pass. Keyed on the segment id (not
+  // the floor), so a gap-split floor's runs memoize apart while a gap-free floor
+  // is one key per floor, exactly the old per-floor memo. Lives only for this call;
+  // the routing adjacency it consults is the layer cached by revision.
+  const reachMemo = new Map<number, boolean>();
+  const reachable = (floor: number, x: number): boolean => {
+    const key = segAt(sim.tower, floor, x);
+    let hit = reachMemo.get(key);
+    if (hit === undefined) {
+      hit = sim.positionReachable(floor, x);
+      reachMemo.set(key, hit);
+    }
+    return hit;
+  };
   // The move-in sustainability gate's context (halo floor-sets, congestion,
   // coverage), built ONCE and only if a condo/office candidate actually reaches
   // the gate, so a tower with none pays nothing. Same source of truth the
@@ -163,8 +167,11 @@ export function attemptMoveIns(sim: Simulation): void {
     // Same gate for every tenant kind; commercial visitor income already honors
     // it (EconomySystem.collectTrafficIncome), this makes move-ins agree.
     // (Quarterly office rent still gates on isFloorServed only, a deliberate
-    // grandfather for tenants already in place.)
-    if (!reachable(u.floor)) continue;
+    // grandfather for tenants already in place.) Segment-aware (#647): a unit on
+    // a disconnected half of a gap-split floor never populates, even when a
+    // sibling segment of the same floor is reachable. On a gap-free floor this is
+    // exactly the old floorReachable gate, so a contiguous tower is unchanged.
+    if (!reachable(u.floor, u.x)) continue;
 
     // Move-in sustainability gate (both modes): don't sell/lease a condo or
     // office into a spot whose own placement would just erode a fresh tenant

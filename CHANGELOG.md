@@ -15,6 +15,7 @@ notes, never a past version's.
 
 ## 1.103.0
 
+- People now respect the gaps between separated sections. If a floor is split into two parts with an empty gap between them, tenants and visitors no longer walk across the void or use stairs and elevators they have no path to reach. A room stranded on a section with no way down to the lobby stays empty (or its tenant leaves), and the inspector says why: "no way to transportation from here." Connect the section with a floor, stair, or elevator and it comes back to life.
 - Modern towers can now leave gaps between sections. A new Settings switch, "Bridge floors between rooms," turns off the automatic walkway that fills the space between a new room and the tower. With it off, each room still lays its own floor beneath it, but the game never bridges the gap to a neighbor, so you can build genuinely separate wings. It stays on by default, can be flipped any time, and can be preset at founding with the New Tower "don't bridge floors between rooms" option. (Classic always bridges; the switch does not appear there.)
 - Rooms and modules always lay the floor beneath them now, in every tower. The old Modern "manual structure" option (which made you place every floor tile by hand) is retired: an existing manual-structure tower loads with auto-bridging turned off, keeping its separate sections, but rooms you place will now bring their own floor.
 

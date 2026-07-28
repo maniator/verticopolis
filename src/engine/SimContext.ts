@@ -44,6 +44,15 @@ export interface SimContext {
    *  hand-rolled test context can omit it; callers fall back to
    *  `tower.isFloorServed` when it's absent. */
   floorReachable?(floor: number): boolean;
+  /** True when a commuter can reach the SEGMENT the position `(floor, x)` sits on,
+   *  not merely the floor. On a gap-free floor this equals {@link floorReachable}
+   *  (a floor is one segment); only a genuinely gap-split floor differs, where a
+   *  unit on a stranded run reads false while a sibling run of the same floor is
+   *  reachable. The commercial income and demand-pool loops read this so a
+   *  stranded venue earns nothing and adds no capacity. Optional so a minimal
+   *  hand-rolled test context can omit it; callers fall back to
+   *  {@link floorReachable} (then `tower.isFloorServed`) when it's absent. */
+  positionReachable?(floor: number, x: number): boolean;
   /** True if the tower contains at least one unit of this kind. */
   hasAny(kind: FacilityKind): boolean;
   /** True if at least one operational (finished, not-on-fire) unit of this kind

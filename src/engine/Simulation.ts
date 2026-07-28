@@ -436,6 +436,7 @@ export class Simulation implements SimContext {
 
   floorReachable(floor: number): boolean { return services.floorReachable(this, floor); }
 
+  positionReachable(floor: number, x: number): boolean { return services.positionReachable(this, floor, x); }
 
   strandedFloors(scope: "leased" | "rentable" = "leased"): number[] { return services.strandedFloors(this, scope); }
 

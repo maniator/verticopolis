@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
+import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
 import type { Unit, VacateReason } from "../types";
 import { GRIPE_WARN, NIGHTCLUB_NOISE_FLOORS, TRANSPORT_FAR_TILES } from "./constants";
@@ -71,6 +72,21 @@ export function unmetCoverage(dm: DemandMap, u: Unit): number | null {
  * erosion), so a merely-capped tenant still reads an actionable gripe, matching the
  * cap-only noise case.
  */
+/**
+ * True when the tenant's own contiguous floor SEGMENT reaches the ground lobby.
+ * The satisfaction-side "served" signal (#647): stricter than
+ * {@link Tower.isFloorServed} on a gap-split floor, where one half can reach the
+ * lobby while the other is walled off by a gap. Gates on `isFloorServed` first,
+ * so on a gap-free floor (one segment) it is exactly the old floor-level answer,
+ * keeping a contiguous tower byte-identical. The connectivity ignores the walk
+ * budget, mirroring `isFloorServed` itself.
+ */
+export function reachesLobby(sim: Simulation, u: Unit): boolean {
+  if (!sim.tower.isFloorServed(u.floor)) return false;
+  if (segmentsOf(sim.tower, u.floor).length <= 1) return true;
+  return sim.crowd.segmentConnected(sim.tower, u.floor, u.x);
+}
+
 export function dominantGripe(
   sim: Simulation,
   u: Unit,
@@ -81,8 +97,14 @@ export function dominantGripe(
   lobbyFar?: boolean,
   unmetDemand?: boolean,
 ): VacateReason | null {
-  const isServed = served ?? sim.tower.isFloorServed(u.floor);
-  if (!isServed) return "access";
+  const isServed = served ?? reachesLobby(sim, u);
+  if (!isServed) {
+    // `served` is segment-aware (#647): false can mean the whole floor is off the
+    // network OR just this unit's own segment is (a gap-split floor whose other
+    // half still reaches the lobby). Name the transport-stranded case distinctly
+    // so the toast and inspector teach the real cause, not a generic "no access".
+    return sim.tower.isFloorServed(u.floor) ? "noTransport" : "access";
+  }
   if (u.floor !== 1 && (cong ?? sim.congestionAt(u.floor)) > 1) return "congestion";
   const isDemandTenant = u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo";
   // Very-far from the nearest (sky)lobby (the tier whose ceiling sits at or below

@@ -2,13 +2,14 @@ import type { SimContext } from "./SimContext";
 import { REAL_WORLD } from "./calendar";
 import { MODERN_RULES } from "./gameRules";
 import { isOperational, isTenanted } from "./types";
-import type { FacilityKind } from "./types";
+import type { FacilityKind, Unit } from "./types";
+import { segmentStartX } from "./tower/segments";
 import { ECON, rentOf, isOverheadKind } from "./econConfig";
 import { FACILITIES, attendanceCap, isCommercialKind, isElevatorKind, isHotelKind, isOpenAt, openHoursPerDay, syncAttendanceOccupants } from "./facilities";
 import { ledgerCatFor, type LedgerCat } from "./Ledger";
 import { subtypeListFor } from "./retailSubtypes";
 import { Housekeeping } from "./economy/housekeeping";
-import { computeDemandMap } from "./sim/demand";
+import { computeDemandMap, unitReachable } from "./sim/demand";
 
 /** The lease kinds `collectRent` collects quarterly, and the money-log line each
  *  emits (its ledger category comes from `ledgerCatFor`). A kind absent here pays
@@ -140,21 +141,16 @@ export class EconomySystem {
     // earns a share of its daily figure from the connected census split across
     // reachable venues. Pure/deterministic, so it adds no draw to the RNG stream.
     const demandMap = computeDemandMap(this.sim);
-    // Visitor income obeys reachability: a floor the router can't reach from the
-    // lobby draws no patrons and earns nothing. Reachability is uncapped now
-    // (#503), so this is stricter than connectivity (`isFloorServed`) only in
-    // Classic (a floor reachable solely up a past-budget stair climb is served
-    // but unreachable). Memoized per call: the route BFS isn't free, rooms share floors.
-    const reachCache = new Map<number, boolean>();
-    const drawsVisitors = (floor: number): boolean => {
-      const cached = reachCache.get(floor);
-      if (cached !== undefined) return cached;
-      // Full reachability when the context provides it (the real sim); minimal
-      // test contexts without a crowd fall back to plain connectivity.
-      const hit = this.sim.floorReachable
-        ? this.sim.floorReachable(floor)
-        : this.sim.tower.isFloorServed(floor);
-      reachCache.set(floor, hit);
+    // Visitor income obeys reachability PER UNIT (#647): a venue on a stranded run
+    // of a partially-reachable split floor earns nothing even though a sibling run
+    // of its floor is reachable. Byte-identical on a gap-free floor (one segment),
+    // and stricter than connectivity only in Classic (#503). Memoized per call by
+    // segment: the route BFS isn't free, venues share runs.
+    const reachCache = new Map<string, boolean>();
+    const drawsVisitors = (u: Unit): boolean => {
+      const key = `${u.floor}:${segmentStartX(this.sim.tower, u.floor, u.x)}`;
+      let hit = reachCache.get(key);
+      if (hit === undefined) reachCache.set(key, (hit = unitReachable(this.sim, u.floor, u.x)));
       return hit;
     };
     // Whether a metro softens rain's hit to traffic is a tower-wide fact, so
@@ -181,10 +177,10 @@ export class EconomySystem {
       // the pool on one side yet read a pool fraction on the other.
       const attendanceCapV = attendanceCap(u.kind);
       const attends = attendanceCapV !== undefined;
-      if (!drawsVisitors(u.floor)) {
-        // Unreachable (stranded up a long climb, or not connected at all) → no
-        // patrons. Clear any lingering occupancy so a newly-stranded venue reads
-        // empty instead of frozen at its last busy state.
+      if (!drawsVisitors(u)) {
+        // Unreachable (stranded up a long climb, on a stranded run, or not
+        // connected at all) → no patrons. Clear any lingering occupancy so a
+        // newly-stranded venue reads empty instead of frozen at its last busy state.
         if (u.state === "occupied") {
           if (attends) syncAttendanceOccupants(u);
           else u.occupants = 0;

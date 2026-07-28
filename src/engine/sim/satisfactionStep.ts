@@ -4,7 +4,7 @@ import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
 import { isTenanted, isOperational } from "../types";
 import { computeDemandMap, originDemand, type DemandMap } from "./demand";
-import { unmetCoverage } from "./gripe";
+import { reachesLobby, unmetCoverage } from "./gripe";
 import {
   NOISE_CAP,
   NOISE_EROSION,
@@ -111,7 +111,11 @@ export function satisfactionStep(
   current: number,
   ctx: SatisfactionContext,
 ): SatisfactionStepResult {
-  const served = ctx.servedSet.has(u.floor);
+  // Served is floor-level (the batch-shared, injectable ctx gate) AND segment-aware
+  // (#647): a unit on a disconnected half of a gap-split floor reads unserved even
+  // though the floor does. On a gap-free floor the segment IS the floor, so
+  // `reachesLobby` collapses to the floor gate and this equals `ctx.servedSet.has`.
+  const served = ctx.servedSet.has(u.floor) && reachesLobby(sim, u);
   const cong = ctx.congMap ? (ctx.congMap.get(u.floor) ?? 0) : ctx.globalCong;
   const churn = sim.rules.churnMultiplier(u.residents);
   let s = current;
