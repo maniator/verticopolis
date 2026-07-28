@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
-import { buildWalkers } from "./towerWalkerBuild";
+import { Tower } from "../../engine/Tower";
+import { landingSeg, segAt } from "../../engine/tower/segments";
+import { buildWalkers, landingTile } from "./towerWalkerBuild";
 
 /**
  * Construction of the ambient walker population. This path allocates `ex.Actor`s
@@ -93,6 +95,88 @@ describe("climbers report the tile their flight actually lands on (#665)", () =>
     });
     buildWalkers(e);
     expect(e.walkers).toEqual([]);
+  });
+});
+
+describe("landingTile agrees with the router's landingSeg (#674)", () => {
+  // `landingTile` is a second copy of the router's rule living in the render
+  // layer. The fixtures above check it against hand-written tile sets, which
+  // cannot catch the two drifting apart. These run BOTH against a real `Tower`
+  // and assert they resolve to the same segment, so a change to either one is a
+  // red test rather than a visual regression nobody notices.
+  //
+  // This matters for #662: if `landingSeg` starts returning every run an
+  // overlapping footprint straddles so the router can link the reachable one,
+  // `landingTile` returning the first structural column would silently put the
+  // climbers back on the stranded run, undoing #665.
+
+  /** Lobby across floor 1, floor tiles on 2 only from `gapEnd`, stair at x=10. */
+  function splitTower(gapEnd: number): Tower {
+    const tower = new Tower();
+    for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
+    for (let x = gapEnd; x < 26; x++) tower.place("floor", 2, x);
+    tower.placeTransport("stairs", 10, 1, 2);
+    return tower;
+  }
+
+  const parity = (tower: Tower) => {
+    const t = tower.transports[0];
+    expect(t, "the fixture must actually place a stair").toBeTruthy();
+    for (const floor of [t.bottom, t.top]) {
+      expect(
+        segAt(tower, floor, landingTile(tower, t, floor)),
+        `landingTile disagrees with landingSeg on floor ${floor}`,
+      ).toBe(landingSeg(tower, t, floor));
+    }
+    return t;
+  };
+
+  it("agrees when the flight overhangs a gap", () => {
+    // The stair's footprint is 10..17 but floor 2 only exists from 15, which
+    // placement allows (only SOME tile under the footprint must be structural).
+    const tower = splitTower(15);
+    expect(tower.hasStructure(2, 10)).toBe(false);
+    expect(tower.hasStructure(2, 15)).toBe(true);
+    const t = parity(tower);
+    // And prove the naive probe really would have differed, so this test cannot
+    // pass by the scenario quietly ceasing to be a divergence.
+    expect(segAt(tower, 2, t.x)).not.toBe(landingSeg(tower, t, 2));
+    expect(landingTile(tower, t, 2)).toBe(15);
+  });
+
+  it("agrees when the whole footprint is structural", () => {
+    const tower = splitTower(10);
+    parity(tower);
+    expect(landingTile(tower, tower.transports[0], 2)).toBe(10);
+  });
+
+  it("agrees when the footprint straddles TWO runs, which is the #662 shape", () => {
+    // This is the case that makes the parity assertion earn its place. Within a
+    // single run any column resolves to the same segment, so picking a different
+    // tile there is not a divergence. Two runs under one footprint is where the
+    // choice of column becomes a choice of SEGMENT, and it is exactly the shape
+    // #662 is about: today `landingSeg` links the first run, and if it is changed
+    // to link the reachable one instead, `landingTile` must move with it.
+    const tower = new Tower();
+    for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
+    for (let x = 10; x < 12; x++) tower.place("floor", 2, x); // run A, under the footprint
+    for (let x = 15; x < 26; x++) tower.place("floor", 2, x); // run B, also under it
+    tower.placeTransport("stairs", 10, 1, 2);
+    // Two genuinely distinct segments sit under the 10..17 span.
+    expect(segAt(tower, 2, 10)).not.toBe(segAt(tower, 2, 15));
+    parity(tower);
+  });
+
+  it("cannot be asked about a flight with no structural column, because placement refuses one", () => {
+    // Both sides carry a `t.x` fallback for a fully unstructured footprint, and
+    // both are unreachable in a real tower: `validateTransport` requires SOME
+    // tile under the span. Pinning the refusal says why the fallback stays
+    // defensive, so nobody reads the fake-fixture case above as a live path.
+    const tower = new Tower();
+    for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
+    for (let x = 20; x < 26; x++) tower.place("floor", 2, x); // clear of the 10..17 span
+    expect(tower.placeTransport("stairs", 10, 1, 2).ok).toBe(false);
+    expect(tower.transports).toEqual([]);
   });
 });
 

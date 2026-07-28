@@ -120,8 +120,13 @@ export function buildWalkers(engine: TowerEngine): void {
  * column over the void. Probing `t.x` there finds no run, and the climbers on a
  * perfectly usable flight would be hidden (#665). Falls back to `t.x` when the
  * whole footprint is unstructured, which is the same fallback the router takes.
+ *
+ * This is a second copy of the router's rule living in the render layer, so the
+ * two agreeing is load-bearing rather than incidental: `towerWalkerBuild.test.ts`
+ * asserts `segAt(floor, landingTile(...)) === landingSeg(...)` on a real tower so
+ * a change to one cannot silently drift from the other (#674).
  */
-function landingTile(tower: TowerEngine["sim"]["tower"], t: { x: number; width: number }, floor: number): number {
+export function landingTile(tower: TowerEngine["sim"]["tower"], t: { x: number; width: number }, floor: number): number {
   for (let i = 0; i < t.width; i++) {
     if (tower.hasStructure(floor, t.x + i)) return t.x + i;
   }
