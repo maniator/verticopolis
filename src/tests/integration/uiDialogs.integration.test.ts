@@ -122,6 +122,8 @@ function makeUI(overrides: Partial<UICallbacks> = {}): { ui: UI; cb: UICallbacks
     onToggleReducedMotion: vi.fn(() => true),
     onToggleSteadyClock: vi.fn(() => true),
     isSteadyClock: vi.fn(() => false),
+    onToggleAutoBridge: vi.fn(() => true),
+    isAutoBridge: vi.fn(() => true),
     isMuted: vi.fn(() => false),
     getVolumes: vi.fn(() => ({ music: 1, ambience: 1, sfx: 1 })),
     onSetVolume: vi.fn(),
@@ -1301,23 +1303,23 @@ describe("newTowerModal — the rule-set picker", () => {
     expect(onFound).toHaveBeenCalledWith("modern", "canon", false);
   });
 
-  it("passes Modern manual-structure when the checkbox is ticked", () => {
+  it("passes Modern start-unbridged when the no-bridging checkbox is ticked", () => {
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
     dialog().querySelector<HTMLInputElement>('input[value="modern"]')!.checked = true;
-    dialog().querySelector<HTMLInputElement>('input[name="nt-manual"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-unbridged"]')!.checked = true;
     click('[data-act="found"]');
     expect(onFound).toHaveBeenCalledWith("modern", "realWorld", true);
   });
 
-  it("ignores the manual-structure checkbox when founding Classic", () => {
-    // Manual structure is Modern-only; a Classic founding pins false even if the
-    // (Modern-only) checkbox was somehow ticked.
+  it("ignores the no-bridging checkbox when founding Classic", () => {
+    // The no-bridging option is Modern-only; a Classic founding pins false even
+    // if the (Modern-only) checkbox was somehow ticked.
     const onFound = vi.fn();
     const { ui } = makeUI();
     ui.newTowerModal({ hasSave: false, onFound });
-    dialog().querySelector<HTMLInputElement>('input[name="nt-manual"]')!.checked = true;
+    dialog().querySelector<HTMLInputElement>('input[name="nt-unbridged"]')!.checked = true;
     click('[data-act="found"]');
     expect(onFound).toHaveBeenCalledWith("classic", "realWorld", false);
   });
@@ -1782,6 +1784,30 @@ describe("showSettings: the Settings dialog", () => {
     expect(sw.checked).toBe(false);
     sw.click();
     expect(cb.onToggleReducedMotion).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(true);
+  });
+
+  it("omits the Modern bridging switch in a Classic tower", () => {
+    const { ui } = makeUI({ getMode: () => "classic" as const });
+    ui.showSettings();
+    expect(dialog().querySelector("#set-auto-bridge")).toBeNull();
+  });
+
+  it("follows the callback across toggles for the Modern bridging switch", () => {
+    let on = true;
+    const toggle = vi.fn(() => (on = !on));
+    const { ui, cb } = makeUI({
+      getMode: () => "modern" as const,
+      isAutoBridge: vi.fn(() => on),
+      onToggleAutoBridge: toggle,
+    });
+    ui.showSettings();
+    const sw = dialog().querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    expect(sw.checked).toBe(true); // initial live state
+    sw.click();
+    expect(cb.onToggleAutoBridge).toHaveBeenCalledTimes(1);
+    expect(sw.checked).toBe(false);
+    sw.click();
     expect(sw.checked).toBe(true);
   });
 

@@ -82,11 +82,8 @@ export class Simulation implements SimContext {
    *  without it coerce to `realWorld`, the shipped 7/90/360 behavior. */
   readonly modernCalendar: CalendarKind;
 
-  /** Modern "manual structure" build option, chosen at New Tower and persisted.
-   *  When true the game never auto-lays or bills the floor/lobby substrate: a
-   *  room over a missing floor refuses rather than laying that floor for you.
-   *  Default false; Modern-only (Classic false), so Classic building is unchanged. */
-  readonly manualStructure: boolean;
+  /** "Bridge floors between placements" toggle. Default true (the shipped behavior): a placement auto-fills the walkway to its nearest same-substrate neighbor. Off leaves the gap BETWEEN things open; a room still ALWAYS auto-lays the floor UNDER its footprint (never forced on the player). Classic is forced true and can't toggle it ({@link GameRules.bridgingToggleable}); Modern starts from the New Tower "no bridging" choice and can flip it any time in Settings. Mutable, so an undo past a toggle reverts it. */
+  autoBridge: boolean;
 
   /**
    * The mode's behavior, resolved once from {@link mode}. Every place Classic and
@@ -202,24 +199,23 @@ export class Simulation implements SimContext {
   exterminationDueDay?: number;
   exterminationRoomIds?: number[];
 
-  constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false) {
+  constructor(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false) {
     this.rng = new RNG(seed);
     this.mode = mode;
     this.rules = makeRules(mode);
-    // Modern-only: a Classic tower always stores false (byte-identical building).
-    this.manualStructure = mode === "modern" && manualStructure;
-    // Hand the tower the same strategy object, so mode-dependent placement
-    // checks (the Classic-only escalator/office rule) agree with the sim.
+    // Bridging starts on unless a Modern tower was founded with the "no bridging"
+    // option; Classic can't toggle it, so it's always on there. deserialize
+    // restores a mid-game-toggled or legacy-manual value.
+    this.autoBridge = this.rules.bridgingToggleable() ? !startUnbridged : true;
+    // Same strategy object to the tower, so mode-dependent placement checks
+    // (the Classic-only escalator/office rule) agree with the sim.
     this.tower.rules = this.rules;
-    // Classic ALWAYS runs canon, so the modernCalendar field is meaningless
-    // for it. Clamp the persisted value to the harmless default so a
-    // hand-edited or UI-drifted "canon" hint can never survive on disk in a
-    // Classic save and quietly contradict the "Classic stores the harmless
-    // default" contract. Modern honors the player's choice as passed.
+    // Classic ALWAYS runs canon, so its modernCalendar is meaningless: clamp to
+    // the harmless default so a hand-edited "canon" hint can't survive on disk
+    // in a Classic save. Modern honors the player's choice as passed.
     this.modernCalendar = mode === "classic" ? "realWorld" : modernCalendar;
-    // Resolve the calendar once and hand it to the clock (Classic = canon,
-    // Modern = the player's choice). The field-initialized real-world clock is
-    // replaced here before any tick reads a date.
+    // Resolve the calendar once and hand it to the clock, replacing the
+    // field-initialized real-world clock before any tick reads a date.
     this.clock = new Clock(0, resolveCalendar(mode, this.modernCalendar));
     this.crowd = new Crowd(seed);
     this.events = new EventSystem(this, seed);
@@ -238,6 +234,8 @@ export class Simulation implements SimContext {
   isUnlocked(kind: FacilityKind): boolean { return build.isUnlocked(this, kind); }
 
   isRoomKind(kind: FacilityKind): boolean { return build.isRoomKind(this, kind); }
+
+  toggleAutoBridge(): boolean { return build.toggleAutoBridge(this); }
 
   canBuild(kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } { return build.canBuild(this, kind, floor, x); }
 
@@ -438,6 +436,7 @@ export class Simulation implements SimContext {
 
   floorReachable(floor: number): boolean { return services.floorReachable(this, floor); }
 
+
   strandedFloors(scope: "leased" | "rentable" = "leased"): number[] { return services.strandedFloors(this, scope); }
 
   isStrandedCandidate(u: Unit, scope: "leased" | "rentable"): boolean { return services.isStrandedCandidate(this, u, scope); }
@@ -496,5 +495,5 @@ export class Simulation implements SimContext {
 
   static deserialize(raw: SerializedGame): Simulation { return serialization.deserialize(raw); }
 
-  static newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false): Simulation { return serialization.newGame(seed, mode, modernCalendar, manualStructure); }
+  static newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): Simulation { return serialization.newGame(seed, mode, modernCalendar, startUnbridged); }
 }

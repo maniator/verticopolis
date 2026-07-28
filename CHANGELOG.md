@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.103.0
+
+- Modern towers can now leave gaps between sections. A new Settings switch, "Bridge floors between rooms," turns off the automatic walkway that fills the space between a new room and the tower. With it off, each room still lays its own floor beneath it, but the game never bridges the gap to a neighbor, so you can build genuinely separate wings. It stays on by default, can be flipped any time, and can be preset at founding with the New Tower "don't bridge floors between rooms" option. (Classic always bridges; the switch does not appear there.)
+- Rooms and modules always lay the floor beneath them now, in every tower. The old Modern "manual structure" option (which made you place every floor tile by hand) is retired: an existing manual-structure tower loads with auto-bridging turned off, keeping its separate sections, but rooms you place will now bring their own floor.
+
 ## 1.101.0
 
 - A home or office in a spot nobody will stay in (too noisy, too far from a lobby, or a long walk from any elevator) now stays empty until you fix what is wrong, instead of quietly selling and emptying over and over. Hover a stubborn vacancy to see why it will not lease.

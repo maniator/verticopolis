@@ -66,14 +66,16 @@ export const SHARDS: Record<string, string[]> = {
   // in the set; it barely moves the shard's budget).
   features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
-  // twice, four DOM panel/dialog shots total; issue #443's Modern fork),
+  // twice, four DOM panel/dialog shots total; issue #443's Modern fork) + the
+  // settings-modern dialog shot (one frozen Modern tower, one modal still),
   // placed here because this was the lightest shard, keeping the gate bounded
   // by the same ~71s pole.
-  // ...plus the two returning-player title-screen scenes (~5s together: no tower
-  // is built, they re-mount the splash and open one DOM dialog). They go here
-  // rather than beside their first-run siblings in `engine` precisely because
-  // this is the lightest shard, so the gate stays bounded by the same ~71s pole.
-  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "returning-player", "returning-player-mobile"],
+  // ...plus the settings-modern dialog shot (above) and the two returning-player
+  // title-screen scenes (~5s together: no tower is built, they re-mount the splash
+  // and open one DOM dialog). They go here rather than beside their first-run
+  // siblings in `engine` precisely because this is the lightest shard, so the gate
+  // stays bounded by the same ~71s pole.
+  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "settings-modern", "returning-player", "returning-player-mobile"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).

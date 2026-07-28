@@ -473,12 +473,12 @@ export class SaveLoad {
   }
 
   /** Found a fresh tower under the chosen rule-set. The mode, and for Modern the
-   *  calendar choice and the manual-structure option, are baked into the new
+   *  calendar choice and the no-bridging option, are baked into the new
    *  Simulation at creation and immutable for that tower's life. Classic always
    *  runs the canon calendar and auto structure, so `modernCalendar` and
-   *  `manualStructure` are only consulted for Modern. */
-  newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false): void {
-    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, manualStructure));
+   *  `startUnbridged` is only consulted for Modern. */
+  newGame(mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): void {
+    this.deps.adoptSim(Simulation.newGame(Date.now() & 0x7fffffff, mode, modernCalendar, startUnbridged));
     gameplaySession.noteNewGame(mode); // funnel entry: a fresh tower was founded
     // Both rule-sets found an empty lot now, so the toast is the actionable
     // first-lobby cue (the engine's welcome log entry is rebased past by the UI
