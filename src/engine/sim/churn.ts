@@ -196,6 +196,10 @@ export function attemptMoveIns(sim: Simulation): void {
         u.state = "asleep";
         u.everOccupied = true;
         sim.moveInsToday.rooms++;
+        // A guest checking in mid-pass becomes a demand origin (computeDemandMap
+        // counts asleep rooms), so raise the running pool too, or a condo/office
+        // evaluated later in the same pass would be judged against stale coverage.
+        if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, u);
       }
     }
   }
