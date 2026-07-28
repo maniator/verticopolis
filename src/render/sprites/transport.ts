@@ -114,8 +114,10 @@ export function drawTransport(
 }
 
 /** One warm-tan stair flight: even treads over dark risers on a solid diagonal
- *  stringer, a walnut handrail on balusters, and top and bottom landings, all
- *  sitting on the floor line and confined to the band `[bandTop, bandBottom)`
+ *  stringer, a walnut handrail on balusters ending in a newel post at each end,
+ *  and a top arrival stair the flight lands on, all sitting on the floor line
+ *  (the departure deck below is drawn by the floor behind the flight), confined
+ *  to the band `[bandTop, bandBottom)`
  *  (the departure floor's band) so the arrival band above stays the landing,
  *  never a second stacked flight. The flight is drawn strictly inside
  *  `[sx, sx + w]` so it never overpaints a neighbor. Structure only, NO baked
