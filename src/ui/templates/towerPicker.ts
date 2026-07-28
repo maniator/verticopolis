@@ -43,20 +43,35 @@ export function towerPickerTemplate(
   slots: SlotInfo[],
   error: string | null,
   h: TowerPickerHandlers,
+  storageBlocked = false,
 ): TemplateResult {
   // "Anything on this device" is raw presence, so a storage full of corrupt
   // slots still renders those rows (and the recovery route beneath them)
   // rather than collapsing to the nothing-saved line.
   const anyPresent = slots.some((s) => s.present);
+  // Absent slots are listed only when at least one tower is actually loadable,
+  // where they read as the familiar four-row manager. When nothing loads, they
+  // are just dead rows between the player and the file row that is their
+  // recovery, so the all-unreadable state shows the unreadable rows alone.
+  const anyLoadable = slots.some((s) => s.exists);
+  const rows = anyLoadable ? slots : slots.filter((s) => s.present);
+  // Blocked storage is NOT "nothing saved". The player may have four towers on
+  // this device that the browser simply will not hand over, and telling them
+  // their towers are gone is the same lie this template refuses to tell about
+  // an unreadable slot. Say what is actually true, and leave the file row as
+  // the way in.
+  const emptyLine = storageBlocked
+    ? "This browser is blocking saved data, so towers on this device can't be listed."
+    : "No towers saved on this device.";
   return html`
       <h2>Load a Tower</h2>
-      ${error ? html`<p class="picker-error" role="alert">${error}</p>` : nothing}
-      <div class="slots well">
+      ${error ? html`<p class="picker-error" role="alert" tabindex="-1">${error}</p>` : nothing}
+      <ul class="slots well" aria-label="Towers you can load">
         ${anyPresent
-          ? slots.map((s) => pickerRow(s, h))
-          : html`<p class="picker-none">No towers saved on this device.</p>`}
-        ${fileRow(h)}
-      </div>
+          ? rows.map((s) => pickerRow(s, h))
+          : html`<li class="picker-none">${emptyLine}</li>`}
+        ${fileRow(h, !anyPresent)}
+      </ul>
       <div class="modal-actions">
         <button class="btn primary" data-picker="back" @click=${h.onBack}>Back</button>
       </div>`;
@@ -66,22 +81,24 @@ function pickerRow(s: SlotInfo, h: TowerPickerHandlers): TemplateResult {
   const name = slotName(s);
   // Absent: nothing was ever written here.
   if (!s.present) {
-    return html`<div class="slot"><div class="slot-head"><b>${name}</b><div class="slot-detail slot-empty">empty</div></div></div>`;
+    return html`<li class="slot" aria-label="${name}, empty"><div class="slot-head"><b>${name}</b><div class="slot-detail slot-empty">empty</div></div></li>`;
   }
   // Present but unreadable. The copy says "this version" rather than
   // "corrupt" on purpose: a save written by a NEWER build is unreadable here
   // and may load fine later, which is exactly why the bytes are kept.
   if (!s.exists) {
-    return html`<div class="slot"><div class="slot-head"><b>${name}</b><div class="slot-detail slot-unreadable">Couldn't be read by this version.</div></div></div>`;
+    return html`<li class="slot" aria-label="${name}, couldn't be read by this version"><div class="slot-head"><b>${name}</b><div class="slot-detail slot-unreadable">Couldn't be read by this version.</div></div></li>`;
   }
-  return html`<div class="slot"><div class="slot-head"><b>${name}</b>${slotDetail(s)}</div><div class="slot-actions"><button class="btn" data-picker="load" data-slot="${s.slot}" @click=${() => h.onLoad(s.slot)}>Load</button></div></div>`;
+  return html`<li class="slot"><div class="slot-head"><b>${name}</b>${slotDetail(s)}</div><div class="slot-actions"><button class="btn" data-picker="load" data-slot="${s.slot}" aria-label="Load ${name}, ${s.towerName ?? "Tower"}" @click=${() => h.onLoad(s.slot)}>Load</button></div></li>`;
 }
 
 /** Always present, always last, in every state including the empty one: a
  *  player on a fresh install or a new device has nothing in storage and a
  *  `.vctower` in their downloads, and this row is their only way in. The
  *  accepted formats are named in TEXT because the OS picker's own filter is
- *  unreliable on Android, where an unknown extension can be greyed out. */
-function fileRow(h: TowerPickerHandlers): TemplateResult {
-  return html`<div class="slot slot-file"><div class="slot-head"><b>Load from a file...</b><div class="slot-detail">A .vctower export, or an original SimTower .TDT save.</div></div><div class="slot-actions"><button class="btn" data-picker="file" @click=${h.onFile}>Choose file</button></div></div>`;
+ *  unreliable on Android, where an unknown extension can be greyed out.
+ *  `alone` drops the divider: with no slot rows above it, the heavier rule
+ *  would be dividing the row from nothing. */
+function fileRow(h: TowerPickerHandlers, alone: boolean): TemplateResult {
+  return html`<li class="slot slot-file ${alone ? "slot-file--alone" : ""}"><div class="slot-head"><b>Load from a file...</b><div class="slot-detail">A .vctower export, or an original SimTower .TDT save.</div></div><div class="slot-actions"><button class="btn" data-picker="file" aria-label="Load a tower from a file" @click=${h.onFile}>Choose file</button></div></li>`;
 }

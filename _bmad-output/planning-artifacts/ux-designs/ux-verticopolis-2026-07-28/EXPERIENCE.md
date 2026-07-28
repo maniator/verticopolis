@@ -91,8 +91,10 @@ Plain, specific, and never falsely reassuring. American English, no em-dashes.
 | Empty slot | `empty` |
 | Unreadable slot | `Couldn't be read by this version.` |
 | Nothing on device | `No towers saved on this device.` |
+| Storage blocked | `This browser is blocking saved data, so towers on this device can't be listed.` |
 | Load succeeded | `Welcome back. Press ▶ to resume.` |
-| Load failed | `That slot is empty or corrupt.` |
+| Load failed (in the picker) | `That tower couldn't be read. It may have been saved by a newer version.` |
+| Load failed (in game) | `That slot is empty or corrupt.` |
 | File unreadable | Existing importer copy, unchanged |
 
 Two words are load-bearing. The action says **Tower**, not Save, because the
@@ -141,16 +143,28 @@ nobody trusts.
 
 | State | Condition | Body |
 | --- | --- | --- |
-| Populated | At least one slot present | Slot rows, then the file row |
-| Empty | No slot present | `No towers saved on this device.`, then the file row |
-| All unreadable | Slots present, none parse | Unreadable rows, then the file row |
+| Populated | At least one slot loadable | Every slot row, empty ones included, then the file row |
+| Empty | No slot present | One honest line, then the file row |
+| All unreadable | Slots present, none parse | The unreadable rows **only**, then the file row |
+| Storage blocked | The slot read threw | One honest line saying so, then the file row |
+
+Empty rows appear only in the populated state. With a real tower on screen they
+read as the familiar manager and say where a save would go; with nothing
+loadable they are dead rows between the player and the file row that is their
+recovery, so they drop out.
 
 The empty state does not render four rows reading "empty". On a phone that is a
 wall of nothing where one honest line does the job.
 
 The **all unreadable** state is the one worth designing for rather than
 tolerating: it is the player whose storage went bad, and the file row is their
-recovery path. It must never be reached by scrolling past dead rows.
+recovery path. It must never be reached by scrolling past dead rows, which is
+why the never-used slots drop out of that state.
+
+**Blocked storage is not an empty device.** When the slot read throws outright,
+the player may have four towers here that the browser will not hand over.
+Saying "no towers saved" would be the same lie this surface refuses to tell
+about an unreadable slot.
 
 # Interaction Primitives
 
@@ -214,6 +228,9 @@ adds it to that cycle in place; the utility cluster stays at the tail.
   input is not knowledge held only by the OS picker's filter.
 - Focus returns to the invoking plate on close, so a keyboard user is never
   dropped at the top of the screen.
+- A failed load re-renders the surface, which destroys the control that had
+  focus. Focus moves to the inline alert, so a keyboard user is never left with
+  nothing focused inside an open dialog.
 - Nothing in this change animates, so there is no reduced-motion surface.
 
 # Responsive & Platform

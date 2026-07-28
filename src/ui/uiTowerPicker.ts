@@ -1,5 +1,5 @@
 import type { UI } from "./UI";
-import { openImport } from "./uiDialogs";
+import { openImport } from "./uiImport";
 import { towerPickerTemplate } from "./templates/towerPicker";
 import type { SlotInfo } from "../storage/SaveGame";
 
@@ -15,7 +15,7 @@ export interface TowerPickerCtx {
    *  load must reflect storage as it is now, not as it was when the picker
    *  opened. The caller owns the read, including guarding a storage backend
    *  that throws outright. */
-  getSlots: () => SlotInfo[];
+  getSlots: () => { slots: SlotInfo[]; storageBlocked: boolean };
   /** Adopt a slot, returning whether a tower actually arrived. False re-renders
    *  the picker with the reason in it. */
   onLoad: (slot: number | "auto") => boolean;
@@ -28,8 +28,9 @@ export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
   // through. So Back, Esc, an OS-picker cancel, and a failed load all leave the
   // player exactly where they were.
   const open = (error: string | null): void => {
-    ui.openModalTemplate(
-      towerPickerTemplate(ctx.getSlots(), error, {
+    const { slots, storageBlocked } = ctx.getSlots();
+    const box = ui.openModalTemplate(
+      towerPickerTemplate(slots, error, {
         // A failed load re-renders the picker with the reason IN it. It
         // deliberately does not toast: the title screen sits above the toast
         // rail's stacking position for most of its own life, and a dialog's top
@@ -38,8 +39,18 @@ export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
         // the same move the saves manager makes after a slot write.
         onLoad: (slot) => {
           const ok = ctx.onLoad(slot);
-          if (!ok) open("That tower couldn't be read. It may have been saved by a newer version.");
-          return ok;
+          if (!ok) {
+            open("That tower couldn't be read. It may have been saved by a newer version.");
+            return false;
+          }
+          // The dialog must be closed EXPLICITLY on success. Adoption takes the
+          // title screen down, but the shared <dialog> is a separate surface in
+          // the browser's top layer: leaving it open would drop the player onto
+          // their tower behind a live modal that also paints over the
+          // "Press play to resume" toast. Same order the saves manager's own
+          // Load uses (dispatch, then close).
+          ui.closeModal();
+          return true;
         },
         // Close first: the OS file picker replaces this dialog rather than
         // stacking on it, and the .TDT fidelity report refuses to open while
@@ -48,9 +59,20 @@ export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
           ui.closeModal();
           openImport(ui);
         },
-        onBack: () => ui.closeModal(),
-      }),
+        // Hand focus back to the plate that opened the picker, so a keyboard or
+        // screen-reader user is not dropped on document.body with the splash's
+        // focus trap still armed.
+        onBack: () => {
+          ui.closeModal();
+          document.querySelector<HTMLElement>('#splash [data-splash="load"]')?.focus();
+        },
+      },
+      storageBlocked),
     );
+    // Re-rendering replaces the dialog's DOM, so the Load button that had focus
+    // is gone. Move focus onto the alert rather than leaving a keyboard user
+    // with nothing focused inside an open modal.
+    if (error) box.querySelector<HTMLElement>(".picker-error")?.focus();
   };
   open(null);
 }

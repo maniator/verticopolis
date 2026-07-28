@@ -311,6 +311,19 @@ describe("loadFromSplash", () => {
     expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
   });
 
+  it("reports failure rather than throwing when storage is blocked outright", () => {
+    // The slot list is built from parsed metadata, but the load re-reads
+    // localStorage, which throws when storage is blocked. An escaping throw
+    // would leave the picker looking frozen with no error shown.
+    vi.mocked(SaveGame.loadSlot).mockImplementationOnce(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    const { app, ui, adoptSim } = makeApp(makeSim());
+    expect(loadFromSplash(app, 1)).toBe(false);
+    expect(adoptSim).not.toHaveBeenCalled();
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
   it("reports failure WITHOUT adopting or toasting, so the title screen survives", () => {
     // The picker renders the reason inline instead. Adopting nothing is what
     // keeps the splash up: adoptSim is the only thing that takes it down.
@@ -326,26 +339,27 @@ describe("showTowerPicker", () => {
   it("passes a thunk that re-reads storage per call, not a captured snapshot", () => {
     const { app, ui } = makeApp(makeSim());
     showTowerPicker(app);
-    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as { getSlots: () => unknown[] };
+    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as { getSlots: () => { slots: unknown[]; storageBlocked: boolean } };
     expect(SaveGame.listSlots).not.toHaveBeenCalled(); // nothing read until rendered
     getSlots();
     getSlots();
     expect(SaveGame.listSlots).toHaveBeenCalledTimes(2);
   });
 
-  it("degrades to an empty list when storage is disabled outright", () => {
+  it("reports blocked storage as its own state, not as an empty list", () => {
     // listSlots reads localStorage, which THROWS a SecurityError rather than
     // returning null when storage is blocked. The title screen must not die on
-    // that, and an empty list is the right answer anyway: the player gets the
-    // nothing-saved line plus the file row, which is their only way in on a
-    // browser that will not keep their towers.
+    // that, and it must not tell the player nothing is saved either: they may
+    // have four towers on this device that the browser will not hand over.
     vi.mocked(SaveGame.listSlots).mockImplementationOnce(() => {
       throw new DOMException("denied", "SecurityError");
     });
     const { app, ui } = makeApp(makeSim());
     showTowerPicker(app);
-    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as { getSlots: () => unknown[] };
-    expect(getSlots()).toEqual([]);
+    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as {
+      getSlots: () => { slots: unknown[]; storageBlocked: boolean };
+    };
+    expect(getSlots()).toEqual({ slots: [], storageBlocked: true });
   });
 
   it("routes a picked slot through loadFromSplash", () => {

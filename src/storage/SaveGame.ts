@@ -1,7 +1,13 @@
 import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
-import type { GameMode, SerializedGame } from "../engine/types";
+import type { SerializedGame } from "../engine/types";
 import { isGameMode } from "../engine/types";
+import type { SlotInfo } from "./slotInfo";
+
+// The slot-metadata shape lives in its own module (pure types, no runtime), and
+// is re-exported here so every existing `from "../storage/SaveGame"` import of
+// it keeps working.
+export type { SlotInfo } from "./slotInfo";
 import {
   compressionDecodeSupported,
   compressionEncodeSupported,
@@ -70,40 +76,6 @@ let latestAsyncSave: object | null = null;
 export const TOWER_FILE_EXT = ".vctower";
 const TOWER_FILE_MAGIC = "VCTOWER1";
 
-export interface SlotInfo {
-  slot: number | "auto";
-  exists: boolean;
-  /**
-   * RAW presence: the key is in storage, whether or not it parses. Distinct
-   * from {@link exists}, which is parse-based and false for a corrupt slot.
-   *
-   * The title screen's load-only picker needs the difference
-   * (SPEC-splash-load-tower CAP-2): a slot that is present but unreadable is
-   * SHOWN and labeled rather than hidden, because a save written by a newer
-   * build is unreadable *here* and may still be recovered later. That is the
-   * same reasoning `preserveUnreadable` already applies to the autosave, and
-   * hiding the row would tell the player their tower is gone while the bytes
-   * are still on disk. Anything picking a "free" slot to WRITE must keep
-   * using {@link SaveGame.hasSlot} directly.
-   */
-  present: boolean;
-  towerName?: string;
-  star?: number;
-  population?: number;
-  funds?: number;
-  savedAt?: number;
-  /** Rule-set the tower was founded under. Optional only because an empty
-   *  slot has no tower; infoFrom sets it on every EXISTING slot (a save
-   *  without the field, pre-fork, or with a forged value reads as classic).
-   *  The UI renders a missing mode as Classic, which is only correct for
-   *  producers that coerce like infoFrom does. */
-  mode?: GameMode;
-  /** In-game day (1-indexed, from the save's minutes), so the Saves dialog
-   *  can show a tower's age. Absent when the save's minutes are malformed:
-   *  wrong type, non-finite, negative, or past the ~1,000-year ceiling. */
-  day?: number;
-}
-
 function readSlot(key: string): SerializedGame | null {
   const raw = localStorage.getItem(key);
   if (!raw) return null;
@@ -142,50 +114,68 @@ function parseSavedAt(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && Math.abs(value) <= MAX_DATE_MS ? value : undefined;
 }
 
-function infoFrom(slot: number | "auto", key: string): SlotInfo {
-  // Read presence BEFORE parsing: readSlot returns null for an absent key and
-  // for a present-but-undecodable one alike, so the raw check is the only way
-  // to tell "empty" from "unreadable" (see SlotInfo.present).
-  const present = localStorage.getItem(key) !== null;
-  const data = readSlot(key);
-  if (!data) return { slot, exists: false, present };
-  let population = 0;
-  try {
-    population = Simulation.deserialize(data).population;
-  } catch {
-    /* ignore corrupt slot */
+/**
+ * Slot metadata for the saves manager and the title screen's picker.
+ *
+ * Takes the key LIST that slot's loader would walk, so the row describes what
+ * loading would actually do. The autosave passes both keys, mirroring
+ * {@link SaveGame.loadResult}'s fallback: a partial migration or multi-tab
+ * divergence can leave `verticopolis-save` undecodable beside a healthy legacy
+ * save, and reading only the first would call that row unreadable while
+ * `load()` opens it fine and the splash offers Continue for it.
+ *
+ * `exists` means LOADABLE by construction: it is claimed only once
+ * `Simulation.deserialize` has accepted the payload, the same bar `loadSlot`
+ * clears, so a row can never offer a Load that is certain to fail. Defensive
+ * today (deserialize coerces rather than throws, and readSlot already catches a
+ * null payload); it keeps the guarantee free if that ever changes.
+ */
+function infoFrom(slot: number | "auto", ...keys: string[]): SlotInfo {
+  // From the RAW keys, before any parse: readSlot returns null for an absent
+  // key and an undecodable one alike (see SlotInfo.present).
+  const present = keys.some((k) => localStorage.getItem(k) !== null);
+  for (const key of keys) {
+    const data = readSlot(key);
+    if (!data) continue;
+    let population: number;
+    try {
+      population = Simulation.deserialize(data).population;
+    } catch {
+      continue; // decoded, but the schema will not load: try the next key
+    }
+    return {
+      slot,
+      exists: true,
+      present: true,
+      towerName: data.towerName,
+      star: data.star,
+      population,
+      funds: data.money,
+      // Same trust posture as every other save field: a forged savedAt reads as
+      // absent (see parseSavedAt), so the dialog shows an empty timestamp
+      // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
+      // display a confidently wrong date.
+      savedAt: parseSavedAt(data.savedAt),
+      // Founded mode, run through the same isGameMode coercion deserialize
+      // uses (absent/forged = classic), so the chip can never carry a raw file
+      // string.
+      mode: isGameMode(data.mode) ? data.mode : "classic",
+      // 1-indexed in-game day, matching the TDT import report's convention. A
+      // day is 1440 minutes in EVERY calendar (see src/engine/calendar.ts), so
+      // this cannot disagree with the in-game date for either mode. Same
+      // absent-not-clamped posture as savedAt: negative or absurdly large
+      // minutes (past ~1,000 in-game years, the TDT importer's own ceiling)
+      // read as absent rather than as a confidently wrong day.
+      day:
+        typeof data.minutes === "number" &&
+        Number.isFinite(data.minutes) &&
+        data.minutes >= 0 &&
+        data.minutes / 1440 <= MAX_SLOT_DAY
+          ? Math.floor(data.minutes / 1440) + 1
+          : undefined,
+    };
   }
-  return {
-    slot,
-    exists: true,
-    present: true,
-    towerName: data.towerName,
-    star: data.star,
-    population,
-    funds: data.money,
-    // Same trust posture as every other save field: a forged savedAt reads as
-    // absent (see parseSavedAt), so the Saves dialog shows an empty timestamp
-    // instead of "Invalid Date". Absent, not clamped: a clamped forgery would
-    // display a confidently wrong date.
-    savedAt: parseSavedAt(data.savedAt),
-    // Founded mode, run through the same isGameMode coercion deserialize
-    // uses (absent/forged = classic), so the dialog's chip can never carry a
-    // raw file string.
-    mode: isGameMode(data.mode) ? data.mode : "classic",
-    // 1-indexed in-game day, matching the TDT import report's convention. A
-    // day is 1440 minutes in EVERY calendar (see src/engine/calendar.ts), so
-    // this cannot disagree with the in-game date for either mode. Same
-    // absent-not-clamped posture as savedAt: negative or absurdly large
-    // minutes (past ~1,000 in-game years, the TDT importer's own ceiling)
-    // read as absent rather than as a confidently wrong day.
-    day:
-      typeof data.minutes === "number" &&
-      Number.isFinite(data.minutes) &&
-      data.minutes >= 0 &&
-      data.minutes / 1440 <= MAX_SLOT_DAY
-        ? Math.floor(data.minutes / 1440) + 1
-        : undefined,
-  };
+  return { slot, exists: false, present };
 }
 
 /** Ceiling on the save's day COUNTER (minutes / 1440, zero-indexed), mirroring
@@ -289,7 +279,7 @@ export const SaveGame = {
 
   /** Metadata for every slot, for the saves manager UI. */
   listSlots(): SlotInfo[] {
-    const slots: SlotInfo[] = [infoFrom("auto", autosaveKey())];
+    const slots: SlotInfo[] = [infoFrom("auto", AUTO_KEY, LEGACY_AUTO_KEY)];
     for (let n = 1; n <= SLOT_COUNT; n++) slots.push(infoFrom(n, SLOT_KEY(n)));
     return slots;
   },

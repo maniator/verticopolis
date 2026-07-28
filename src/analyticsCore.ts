@@ -156,6 +156,11 @@ export type AppActionName =
   | "help_open"
   | "compare_open"
   | "saves_open"
+  // The TITLE SCREEN's load-only tower picker. Deliberately its own action, not
+  // saves_open: a first-run player reaches this from the splash, and folding it
+  // into the in-game manager's funnel would dilute that funnel with
+  // title-screen browsing and leave the two impossible to separate later.
+  | "splash_load_open"
   | "stats_open"
   | "replay_onboarding"
   | "page_help"

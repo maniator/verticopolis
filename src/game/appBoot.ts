@@ -182,12 +182,10 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     pauseForSplash: (paused) => app.setSpeed(paused ? 0 : 1),
     chime: () => app.audio.sfx("promote"),
     // A tower arrived over the title screen (SPEC-splash-load-tower CAP-6):
-    // a loaded slot, a .vctower, or a 1994 .TDT. Land paused with the same
-    // greeting Continue gives, the ▶ Play control being the single resume.
-    onEnterTower: () => {
-      app.setSpeed(0);
-      app.ui.toast("Welcome back. Press ▶ to resume.", "info");
-    },
+    // a loaded slot, a .vctower, or a 1994 .TDT. dismissSplash has already
+    // re-paused through pauseForSplash, so this is only the greeting that says
+    // why the tower is sitting still, matching Continue's.
+    onEnterTower: () => app.ui.toast("Welcome back. Press ▶ to resume.", "info"),
     // Splash theme on the start screen, calm bed in the tower. Audio is
     // autoplay-gated (it only sounds after a gesture), so the splash theme is
     // heard on the New Tower path, where the splash stays up through the

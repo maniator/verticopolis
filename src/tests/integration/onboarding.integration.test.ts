@@ -251,7 +251,9 @@ describe("Onboarding — splash / title screen", () => {
     expect(c.dismissSplash()).toBe(false);
     c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
     expect(c.dismissSplash()).toBe(true);
-    expect(opts.pauseForSplash).toHaveBeenLastCalledWith(false);
+    // Teardown resumes to play speed, then dismissSplash re-pauses through the
+    // same required port, so the last word is always "paused".
+    expect(opts.pauseForSplash).toHaveBeenLastCalledWith(true);
     expect(c.dismissSplash()).toBe(false); // idempotent
   });
 
@@ -264,6 +266,31 @@ describe("Onboarding — splash / title screen", () => {
     c.adoptSim(newSeededGame(9));
     expect(document.getElementById("splash")).toBeNull();
     expect(opts.onEnterTower).toHaveBeenCalledOnce();
+    // The re-pause runs through the REQUIRED pauseForSplash port, not the
+    // optional greeting, so a host that omits onEnterTower cannot silently
+    // leave a just-loaded tower running at play speed.
+    expect(opts.pauseForSplash).toHaveBeenLastCalledWith(true);
+    expect(document.body.classList.contains("splash-up")).toBe(false);
+  });
+
+  it("survives every way OUT of the picker that is not a loaded tower (CAP-5)", () => {
+    // The three quiet paths. An OS file-picker cancel is the quietest of all:
+    // openImport binds onchange only, so a cancel fires no event whatsoever and
+    // there is no callback that could have torn the splash down by mistake.
+    const { c, opts } = makeSpyController();
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
+
+    // 1. The picker is opened and closed again (Back, Esc, or the title-bar X).
+    document.querySelector<HTMLElement>('[data-splash="load"]')!.click();
+    expect(document.getElementById("splash")).not.toBeNull();
+
+    // 2. A failed load: nothing is adopted, so nothing calls adoptSim.
+    expect(document.getElementById("splash")).not.toBeNull();
+
+    // 3. A failed import: same, the importer never reaches adoptSim.
+    expect(document.getElementById("splash")).not.toBeNull();
+    expect(opts.onEnterTower).not.toHaveBeenCalled();
+    expect(document.body.classList.contains("splash-up")).toBe(true);
   });
 
   it("a mid-game tower swap does not claim a splash that was never up", () => {

@@ -4,6 +4,7 @@
  * `screenshot-scenes.ts`. Each `build`/`setup` that runs in the page references
  * an injected builder by identity. Keep ERASABLE.
  */
+import { type Page } from "playwright";
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import {
   buildCanonTower,
@@ -12,6 +13,53 @@ import {
   buildFireTower,
   pgDismissSplash,
 } from "../screenshot-builders.ts";
+
+/**
+ * Re-mount the title screen in its RETURNING-player state: Continue is only
+ * rendered when boot found a readable autosave, and the gallery always boots
+ * fresh, so the state is staged rather than saved into. Tearing the first-run
+ * splash down first keeps exactly one `#splash` in the DOM.
+ */
+async function pgShowReturningSplash(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const g = (window as unknown as { game?: any }).game;
+    g.onboarding.dismissSplash();
+    g.onboarding.showSplash({
+      hasSave: true,
+      onContinue: () => {},
+      onLoadTower: () => {},
+      onNewTower: () => {},
+    });
+  });
+  // Fail the shot (keeping the committed image) if the returning stack never
+  // mounts, rather than commit a first-run splash under a returning name.
+  await page.waitForSelector('#splash [data-splash="continue"]', { timeout: 4000 });
+}
+
+/**
+ * Open the load-only tower picker over the title screen with one row of every
+ * variant. The slot metadata is synthetic and fixed (a pinned `savedAt`, so the
+ * rendered timestamp cannot drift between runs); nothing here writes storage.
+ */
+async function pgShowTowerPicker(page: Page): Promise<void> {
+  await page.evaluate(() => {
+    const g = (window as unknown as { game?: any }).game;
+    const AT = 1_700_000_000_000;
+    g.ui.showTowerPicker({
+      getSlots: () => ({
+        storageBlocked: false,
+        slots: [
+          { slot: "auto", exists: true, present: true, towerName: "Verticopolis", star: 3, population: 1840, funds: 2_450_000, savedAt: AT, mode: "classic", day: 96 },
+          { slot: 1, exists: true, present: true, towerName: "Harbour Point", star: 2, population: 620, funds: 810_000, savedAt: AT, mode: "modern", day: 41 },
+          { slot: 2, exists: false, present: true },
+          { slot: 3, exists: false, present: false },
+        ],
+      }),
+      onLoad: () => true,
+    });
+  });
+  await page.waitForSelector("#modal .slots", { timeout: 4000 });
+}
 
 export const SHOWCASE_SCENES: Scene[] = [
   // --- Showcase: first-run splash / onboarding (fresh, splash kept) ----------
@@ -110,6 +158,47 @@ export const SHOWCASE_SCENES: Scene[] = [
     viewport: PHONE,
     keepSplash: true,
     shots: [{ name: "00-splash-mobile", wait: 400 }],
+  },
+  // --- The RETURNING player's title screen + the load picker -------------------
+  // The two scenes above boot fresh, so every committed splash shot has shown
+  // the first-run stack and the gallery has never carried ▶ Continue at all.
+  // These stage the returning-player state instead, which is the fuller stack
+  // (Continue / Load Tower / New Tower) and the one the load picker opens from.
+  // Their own scenes on purpose: re-mounting the splash inside `first-run`
+  // would put Continue behind that scene's later modal shots and churn pixels
+  // this has no business touching.
+  {
+    id: "returning-player",
+    outDir: "screenshots",
+    keepSplash: true,
+    shots: [
+      {
+        name: "00a-splash-returning",
+        setup: pgShowReturningSplash,
+        wait: 400,
+      },
+      {
+        // The load-only tower picker (SPEC-splash-load-tower). Staged with
+        // synthetic slot metadata rather than real saves so every row variant
+        // is on screen at once (loadable, present-but-unreadable, empty) and
+        // the pixels do not depend on what a previous shot happened to write.
+        name: "00c-load-tower",
+        keepDialogs: true,
+        setup: pgShowTowerPicker,
+        wait: 300,
+      },
+    ],
+  },
+  {
+    id: "returning-player-mobile",
+    outDir: "screenshots",
+    viewport: PHONE,
+    keepSplash: true,
+    // The phone stack is the tight one: four full-width controls plus the
+    // wordmark, premise and attribution. SPEC-splash-load-tower carries an
+    // assumption that the fourth plate still clears the attribution block, and
+    // this shot is what settles it.
+    shots: [{ name: "00a-splash-returning-mobile", setup: pgShowReturningSplash, wait: 400 }],
   },
   // --- The hero tower: the fully-built showcase --------------------------------
   {

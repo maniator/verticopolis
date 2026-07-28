@@ -1887,12 +1887,49 @@ describe("showTowerPicker — the title-screen load picker", () => {
     { slot: 1, exists: false, present: false },
   ];
 
-  it("loads a slot and closes nothing itself: adoption owns the teardown", () => {
+  it("loads a slot AND closes the dialog: adoption only takes the splash down", () => {
+    // Adoption dismisses the title screen, but the shared <dialog> is a
+    // separate surface in the top layer. Leaving it open would drop the player
+    // onto their tower behind a live modal that also paints over the
+    // "Press play to resume" toast.
     const { ui } = makeUI();
     const onLoad = vi.fn(() => true);
-    ui.showTowerPicker({ getSlots: () => present, onLoad });
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
     dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
     expect(onLoad).toHaveBeenCalledWith("auto");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("re-renders in place on repeated failures, never stacking a second picker", () => {
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
+    for (let i = 0; i < 3; i++) dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(dialog().querySelectorAll(".modal-box")).toHaveLength(1);
+    expect(dialog().querySelectorAll('[data-picker="back"]')).toHaveLength(1);
+  });
+
+  it("says storage is BLOCKED rather than claiming nothing is saved", () => {
+    // The player may have four towers on this device that the browser will not
+    // hand over. Claiming they are gone is the same lie the unreadable-slot row
+    // exists to avoid.
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => ({ slots: [], storageBlocked: true }), onLoad: () => true });
+    const line = dialog().querySelector(".picker-none")!.textContent!;
+    expect(line).toContain("blocking saved data");
+    expect(line).not.toContain("No towers saved");
+    expect(dialog().querySelector('[data-picker="file"]')).not.toBeNull(); // still the way in
+  });
+
+  it("returns focus to the Load Tower plate when Back closes the picker", () => {
+    const { ui } = makeUI();
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="splash"><button data-splash="load">Load Tower</button></div>',
+    );
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
+    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
+    expect(document.activeElement?.getAttribute("data-splash")).toBe("load");
+    document.getElementById("splash")!.remove();
   });
 
   it("re-renders with an inline error, staying open, when a load fails", () => {
@@ -1900,7 +1937,7 @@ describe("showTowerPicker — the title-screen load picker", () => {
     // reason renders IN the dialog rather than as a toast, because the title
     // screen paints over the toast rail.
     const { ui } = makeUI();
-    ui.showTowerPicker({ getSlots: () => present, onLoad: () => false });
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
     dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
     expect(dialog().open).toBe(true);
     expect(dialog().querySelector(".picker-error")!.textContent).toContain("couldn't be read");
@@ -1908,7 +1945,7 @@ describe("showTowerPicker — the title-screen load picker", () => {
 
   it("re-reads storage on every render, so a re-render is never stale", () => {
     const { ui } = makeUI();
-    const getSlots = vi.fn(() => present);
+    const getSlots = vi.fn(() => ({ slots: present, storageBlocked: false }));
     ui.showTowerPicker({ getSlots, onLoad: () => false });
     expect(getSlots).toHaveBeenCalledOnce();
     dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
@@ -1917,8 +1954,10 @@ describe("showTowerPicker — the title-screen load picker", () => {
 
   it("the file row closes the dialog and hands off to the OS picker", async () => {
     const { ui, cb } = makeUI();
-    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
-    ui.showTowerPicker({ getSlots: () => present, onLoad: () => true });
+    // Restored explicitly: this file has no global restoreMocks, so a leaked
+    // no-op click() on the prototype would silently break later tests.
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
     dialog().querySelector<HTMLElement>('[data-picker="file"]')!.click();
     // Same reason the saves manager yields: the .TDT fidelity report refuses to
     // open while another modal is live.
@@ -1929,12 +1968,13 @@ describe("showTowerPicker — the title-screen load picker", () => {
     Object.defineProperty(input, "files", { value: [file], configurable: true });
     input.onchange!(new Event("change"));
     await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+    clickSpy.mockRestore();
   });
 
   it("Back closes the picker and nothing else", () => {
     const { ui } = makeUI();
     const onLoad = vi.fn(() => true);
-    ui.showTowerPicker({ getSlots: () => present, onLoad });
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
     dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
     expect(dialog().open).toBe(false);
     expect(onLoad).not.toHaveBeenCalled();

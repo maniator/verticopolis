@@ -781,6 +781,31 @@ describe("SaveGame", () => {
     expect(at(3)).toMatchObject({ exists: false, present: false }); // empty
   });
 
+  it("the autosave row describes what load() would actually do across BOTH keys", () => {
+    // Partial migration / multi-tab divergence: the current key is present but
+    // undecodable while the legacy key holds a healthy tower. loadResult falls
+    // back and opens it, so the picker's Auto-save row must offer it too.
+    // Reading only the key autosaveKey() picks would label the row unreadable
+    // and give it no Load control, while Continue one row above opens that same
+    // tower fine.
+    const sim = sampleGame();
+    sim.tower.towerName = "Legacy Rescue";
+    SaveGame.save(sim); // writes the current key
+    localStorage.setItem("simtower-clone-save", localStorage.getItem("verticopolis-save")!);
+    localStorage.setItem("verticopolis-save", "VCZ1:not-actually-base64-deflate");
+
+    expect(SaveGame.load()!.tower.towerName).toBe("Legacy Rescue"); // the fallback works
+    const auto = SaveGame.listSlots().find((s) => s.slot === "auto")!;
+    expect(auto).toMatchObject({ exists: true, present: true, towerName: "Legacy Rescue" });
+  });
+
+  it("the autosave row reads unreadable when BOTH keys are present and neither parses", () => {
+    localStorage.setItem("verticopolis-save", "VCZ1:garbage");
+    localStorage.setItem("simtower-clone-save", "VCZ1:also-garbage");
+    const auto = SaveGame.listSlots().find((s) => s.slot === "auto")!;
+    expect(auto).toMatchObject({ exists: false, present: true });
+  });
+
   it("exports a .vctower container (magic line + packed payload, not raw JSON) and imports it back", async () => {
     const sim = sampleGame();
     const file = await SaveGame.export(sim);

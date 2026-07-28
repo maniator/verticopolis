@@ -405,15 +405,6 @@ html.reduce-motion *::after {
 /* ---- Toasts ---- */
 #toast-wrap {
   position: absolute;
-  /* Above the title screen (#splash is z 40) and below the boot cover (z 50,
-     which is gone before any toast can fire). Without this the splash paints
-     over the rail, and every toast raised while the title screen is up is
-     feedback the player never sees. That became load-bearing once the title
-     screen could reach the importer (SPEC-splash-load-tower CAP-3): a rejected
-     .vctower or .TDT reports through a toast. No ancestor of the rail creates
-     a stacking context (#stage is position:relative with z-index auto), so
-     this value competes with #splash directly. */
-  z-index: 45;
   top: 10px;
   right: 10px;
   display: flex;
@@ -1031,6 +1022,16 @@ dialog.crash-card::backdrop {
   gap: 10px;
   padding: 7px 8px;
 }
+/* The title-screen picker renders .slots as a <ul> so screen readers hear a
+   list with a named row each (the in-game manager is still a <div>; both share
+   this chrome). Strip the list affordances the retro panel never had. */
+ul.slots {
+  list-style: none;
+  margin: 0;
+}
+ul.slots > li {
+  list-style: none;
+}
 .slot + .slot {
   border-top: 1px solid var(--panel-light);
 }
@@ -1045,14 +1046,12 @@ dialog.crash-card::backdrop {
 .slot-when {
   color: var(--muted);
 }
-.slot-empty {
-  color: var(--muted);
-  font-style: italic;
-}
-/* Title-screen picker only (SPEC-splash-load-tower): a slot present in storage
-   that this build cannot parse. Reads as the same family of non-actionable row
-   as .slot-empty, with its own copy carrying the difference. The row renders
-   NO control at all, so there is nothing here to disable. */
+/* .slot-unreadable is the title-screen picker's row for a slot present in
+   storage that this build cannot parse (SPEC-splash-load-tower). It shares
+   .slot-empty's treatment on purpose: both are non-actionable rows, and their
+   copy carries the difference between "nothing here" and "here but unreadable".
+   Such a row renders NO control at all, so there is nothing to disable. */
+.slot-empty,
 .slot-unreadable {
   color: var(--muted);
   font-style: italic;
@@ -1070,9 +1069,14 @@ dialog.crash-card::backdrop {
   color: var(--bad);
 }
 /* The file row crosses from device storage to the file system, so it gets a
-   heavier rule than the hairline dividing the slots above it. */
+   heavier rule than the hairline dividing the slots above it. With no slot rows
+   above it (nothing saved, or storage blocked) there is nothing to divide from,
+   so the rule goes away. */
 .slot-file {
   border-top: 2px solid var(--line);
+}
+.slot-file--alone {
+  border-top: 0;
 }
 .slot-actions {
   display: flex;
@@ -1597,6 +1601,19 @@ dialog.crash-card::backdrop {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
 }
+/* While the title screen is mounted, lift the toast rail above it (#splash is
+   z 40) and below the boot cover (z 50, which is gone before any toast can
+   fire). Without this the splash paints over the rail, and every toast raised
+   while the title screen is up is feedback the player never sees. That became
+   load-bearing once the title screen could reach the importer
+   (SPEC-splash-load-tower CAP-3): a rejected .vctower or .TDT reports through a
+   toast. Scoped to the splash-up class rather than applied unconditionally, so
+   the rail's stacking against the mobile drawer (#sidebar, z 40) and its scrim
+   is left exactly as it was. No ancestor of the rail creates a stacking context
+   (#stage is position:relative with z-index auto), so this competes with
+   #splash directly. */
+body.splash-up #toast-wrap { z-index: 45; }
+
 #splash.splash--mobile .splash-actions { flex-direction: column; width: min(86vw, 320px); }
 #splash.splash--mobile .splash-btn { width: 100%; min-height: 48px; }
 

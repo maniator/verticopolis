@@ -36,8 +36,8 @@ const loadable = (slot: number | "auto"): SlotInfo => ({
 const unreadable = (slot: number | "auto"): SlotInfo => ({ slot, exists: false, present: true });
 const absent = (slot: number | "auto"): SlotInfo => ({ slot, exists: false, present: false });
 
-const render = (slots: SlotInfo[], h = handlers(), error: string | null = null) =>
-  renderToFragment(towerPickerTemplate(slots, error, h));
+const render = (slots: SlotInfo[], h = handlers(), error: string | null = null, storageBlocked = false) =>
+  renderToFragment(towerPickerTemplate(slots, error, h, storageBlocked));
 
 describe("towerPickerTemplate row variants (CAP-2)", () => {
   it("gives a readable slot a Load control and the shared tower summary", () => {
@@ -68,10 +68,13 @@ describe("towerPickerTemplate row variants (CAP-2)", () => {
     // Both rows carry exists:false; only `present` tells them apart. Reading
     // `exists` alone would collapse the unreadable row into "empty" and hide a
     // recoverable tower.
-    const frag = render([unreadable(1), absent(2)]);
+    // A loadable slot leads so the empty row is listed at all (see the
+    // all-unreadable case below); the point here is that the other two rows do
+    // not collapse into each other.
+    const frag = render([loadable("auto"), unreadable(1), absent(2)]);
     const rows = frag.querySelectorAll(".slot");
-    expect(rows[0].textContent).toContain("Couldn't be read");
-    expect(rows[1].textContent).toContain("empty");
+    expect(rows[1].textContent).toContain("Couldn't be read");
+    expect(rows[2].textContent).toContain("empty");
   });
 });
 
@@ -128,28 +131,76 @@ describe("towerPickerTemplate empty and error states (CAP-4)", () => {
   it("collapses to one honest line when NOTHING is present, not a wall of empty rows", () => {
     const frag = render([absent("auto"), absent(1), absent(2), absent(3)]);
     expect(frag.querySelector(".picker-none")!.textContent).toBe("No towers saved on this device.");
-    // The file row is the only .slot left.
+    // The file row is the only .slot left, and it drops its divider: with no
+    // rows above it there is nothing to divide from.
     expect(frag.querySelectorAll(".slot")).toHaveLength(1);
-    expect(frag.querySelector(".slot-file")).not.toBeNull();
+    expect(frag.querySelector(".slot-file--alone")).not.toBeNull();
   });
 
-  it("still lists rows when slots are present but none parse", () => {
-    // This player's storage went bad. The rows are their evidence and the file
-    // row underneath is their recovery, so neither may be collapsed away.
-    const frag = render([unreadable("auto"), absent(1)]);
+  it("says storage is BLOCKED rather than claiming nothing is saved", () => {
+    const frag = render([], handlers(), null, true);
+    const line = frag.querySelector(".picker-none")!.textContent!;
+    expect(line).toContain("blocking saved data");
+    expect(line).not.toContain("No towers saved");
+    expect(frag.querySelector('[data-picker="file"]')).not.toBeNull();
+  });
+
+  it("lists the unreadable rows ALONE when nothing parses, with no dead empty rows", () => {
+    // This player's storage went bad. The unreadable rows are their evidence
+    // and the file row is their recovery, so neither may be collapsed away.
+    // The never-used slots are neither, and on a phone they are just dead rows
+    // between the two, so they drop out.
+    const frag = render([unreadable("auto"), absent(1), absent(2), absent(3)]);
     expect(frag.querySelector(".picker-none")).toBeNull();
-    expect(frag.querySelectorAll(".slot")).toHaveLength(3); // 2 slots + file row
+    expect(frag.querySelector(".slot-empty")).toBeNull();
+    expect(frag.querySelectorAll(".slot")).toHaveLength(2); // 1 unreadable + file row
   });
 
-  it("renders an inline error as an alert when one is passed", () => {
+  it("keeps the empty rows once at least one tower is loadable", () => {
+    // With a real tower on screen the full four-row list reads as the familiar
+    // manager, and the empty rows say where a save would go.
+    const frag = render([loadable("auto"), absent(1), unreadable(2)]);
+    expect(frag.querySelectorAll(".slot")).toHaveLength(4); // 3 slots + file row
+    expect(frag.querySelector(".slot-empty")).not.toBeNull();
+  });
+
+  it("renders an inline error as a focusable alert when one is passed", () => {
     const frag = render([loadable(1)], handlers(), "That tower couldn't be read.");
     const err = frag.querySelector(".picker-error")!;
     expect(err.getAttribute("role")).toBe("alert");
+    // Focusable so the controller can move focus here after a re-render wipes
+    // the Load button that had it.
+    expect(err.getAttribute("tabindex")).toBe("-1");
     expect(err.textContent).toContain("couldn't be read");
   });
 
   it("renders no error element by default", () => {
     expect(render([loadable(1)]).querySelector(".picker-error")).toBeNull();
+  });
+});
+
+describe("towerPickerTemplate accessibility", () => {
+  it("renders the rows as a named list, each row carrying its own name", () => {
+    // A screen reader should hear a list of towers, not an unstructured run of
+    // text and buttons (EXPERIENCE.md, Accessibility Floor).
+    const frag = render([loadable("auto"), unreadable(1), absent(2)]);
+    const list = frag.querySelector("ul.slots")!;
+    expect(list.getAttribute("aria-label")).toBe("Towers you can load");
+    expect(list.querySelectorAll(":scope > li")).toHaveLength(4); // 3 slots + file row
+    expect(frag.querySelector(".slot-unreadable")!.closest("li")!.getAttribute("aria-label")).toContain(
+      "couldn't be read",
+    );
+    expect(frag.querySelector(".slot-empty")!.closest("li")!.getAttribute("aria-label")).toContain("empty");
+  });
+
+  it("names each action button by the tower it acts on", () => {
+    // "Load" alone is meaningless out of context, and a screen reader reading
+    // the button list hears exactly that.
+    const frag = render([loadable(1)]);
+    expect(frag.querySelector('[data-picker="load"]')!.getAttribute("aria-label")).toBe("Load Slot 1, Sixseven");
+    expect(frag.querySelector('[data-picker="file"]')!.getAttribute("aria-label")).toBe(
+      "Load a tower from a file",
+    );
   });
 });
 

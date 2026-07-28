@@ -127,10 +127,10 @@ export interface OnboardingOpts {
   /** A small chime on step advance (optional flourish). */
   chime: () => void;
   /** A tower arrived while the title screen was up, so the splash just came
-   *  down (SPEC-splash-load-tower CAP-6). The host re-pauses and greets:
-   *  teardown resumes the engine to play speed, and a tower the player has not
-   *  opened in weeks must not start running while they reacquire their view.
-   *  Optional so tests can omit it. */
+   *  down (SPEC-splash-load-tower CAP-6). The re-pause is NOT this callback's
+   *  job (dismissSplash does it through pauseForSplash, so it cannot go
+   *  missing); this is only the greeting that tells the player why the tower
+   *  is sitting still. Optional so tests can omit it. */
   onEnterTower?: () => void;
   /** Switch the music: `true` for the splash theme while the start screen is up,
    *  `false` for the in-game bed once the player enters the tower. Optional so
@@ -249,6 +249,11 @@ export class OnboardingController {
     const installOffered = (o.installOffered?.() ?? false) && !!o.onInstall;
     litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, handlers), el);
     document.body.appendChild(el);
+    // Marks the title screen as mounted for CSS that must react to it: the
+    // toast rail lifts above the splash only while this class is set, so a
+    // toast raised here is visible without changing the rail's stacking
+    // anywhere else in the app.
+    document.body.classList.add("splash-up");
     this.splashEl = el;
 
     const q = (sel: string) => el.querySelector<HTMLElement>(sel);
@@ -317,6 +322,15 @@ export class OnboardingController {
   dismissSplash(): boolean {
     if (!this.splashEl) return false;
     this.teardownSplash();
+    // Re-pause HERE, not in the host. teardownSplash resumes the engine to play
+    // speed, and a tower the player has not opened in weeks must not start
+    // running while they reacquire their view (the play control is the single
+    // resume, as onContinue already honors). Doing it through the required
+    // pauseForSplash port rather than the optional onEnterTower means a host
+    // that omits the greeting cannot silently lose the pause with it. Both
+    // calls are synchronous with no await between them, so no tick can land in
+    // the window where speed is briefly 1.
+    this.opts.pauseForSplash(true);
     return true;
   }
 
@@ -325,6 +339,7 @@ export class OnboardingController {
     this.splashKey = null;
     this.splashEl?.remove();
     this.splashEl = null;
+    document.body.classList.remove("splash-up");
     this.opts.pauseForSplash(false);
     // Entering the tower: hand off from the splash theme to the in-game bed.
     this.opts.setMusicProgram?.(false);

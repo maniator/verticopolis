@@ -1,4 +1,5 @@
 import type { GameApp } from "../main";
+import type { Simulation } from "../engine/Simulation";
 import { SaveGame, saveFailureMessage } from "../storage/SaveGame";
 import { canCallExterminator, statsTemplate } from "../ui/templates/stats";
 import { trackAppAction } from "../analytics";
@@ -113,18 +114,19 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
  * failed load re-reads storage. It is guarded because `listSlots` reads
  * localStorage, which THROWS rather than returning null when storage is
  * disabled outright (a SecurityError), and the title screen must not die on
- * that. Degrading to an empty list is also the right answer for the player:
- * they get the nothing-saved line and the file row, which is exactly the
- * recovery route for a browser that will not keep their towers.
+ * that. The failure is reported as `storageBlocked` rather than folded into an
+ * empty list: "no towers saved" would be a claim we cannot make, since the
+ * player may have four towers on this device that the browser simply will not
+ * hand over. The file row stays either way, which is the actual way in.
  */
 export function showTowerPicker(app: GameApp): void {
-  trackAppAction("saves_open"); // same funnel event as the in-game manager
+  trackAppAction("splash_load_open"); // distinct from the in-game manager's saves_open
   app.ui.showTowerPicker({
     getSlots: () => {
       try {
-        return SaveGame.listSlots();
+        return { slots: SaveGame.listSlots(), storageBlocked: false };
       } catch {
-        return [];
+        return { slots: [], storageBlocked: true };
       }
     },
     onLoad: (slot) => loadFromSplash(app, slot),
@@ -136,15 +138,26 @@ export function showTowerPicker(app: GameApp): void {
  * actually adopted (SPEC-splash-load-tower CAP-5).
  *
  * Distinct from {@link loadFromSlot}, which runs mid-game: this one must NOT
- * toast its failure. The title screen paints over the toast rail, so a toast
- * here is feedback the player never sees; the picker renders the reason inline
- * instead, which is why the outcome comes back as a boolean.
+ * toast its failure. It is raised from inside the picker, and the shared
+ * <dialog>'s top layer paints over the toast rail, so a toast here is feedback
+ * the player never sees. The picker renders the reason inline instead, which is
+ * why the outcome comes back as a boolean.
+ *
+ * The read is guarded: the slot list is built from parsed metadata, but the
+ * load itself re-reads localStorage, which throws outright when storage is
+ * blocked. A throw here must read as "could not load", not escape the click
+ * handler and leave the picker looking frozen.
  *
  * On success nothing here tears the splash down or re-pauses. `adoptSim` owns
  * both, so every arrival route behaves identically.
  */
 export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
-  const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
+  let loaded: Simulation | null = null;
+  try {
+    loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
+  } catch {
+    return false;
+  }
   if (!loaded) return false;
   app.adoptSim(loaded);
   trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
