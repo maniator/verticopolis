@@ -29,8 +29,22 @@ export function savesTemplate(slots: SlotInfo[]): TemplateResult {
 const fmtWhen = (ms?: number): string =>
   ms ? new Date(ms).toLocaleString([], { dateStyle: "short", timeStyle: "short" }) : "";
 
-function slotRow(s: SlotInfo): TemplateResult {
-  const name = s.slot === "auto" ? "Auto-save" : `Slot ${s.slot}`;
+/** Human name for a slot, shared with the title screen's picker. */
+export function slotName(s: SlotInfo): string {
+  return s.slot === "auto" ? "Auto-save" : `Slot ${s.slot}`;
+}
+
+/**
+ * The one-line tower summary for an EXISTING slot: name, rule-set chip, star,
+ * population, funds, then the day and write time.
+ *
+ * Exported because the title screen's load-only picker
+ * (`./towerPicker.ts`, SPEC-splash-load-tower) shows the same summary. Sharing
+ * the renderer is the point: two copies would let the manager and the picker
+ * drift into describing the same tower differently. Callers must check
+ * `s.exists` first; this assumes a parsed slot.
+ */
+export function slotDetail(s: SlotInfo): TemplateResult {
   // The rule-set chip reuses the New Tower dialog's badge language (muted
   // Classic, green Modern). SlotInfo's mode is already coerced, so the
   // chip text is one of two literals, never raw file content.
@@ -44,14 +58,29 @@ function slotRow(s: SlotInfo): TemplateResult {
   const when = [Number.isFinite(s.day) ? `Day ${Math.floor(s.day!)}` : "", fmtWhen(s.savedAt)]
     .filter(Boolean)
     .join(" · ");
+  return html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br /><span class="slot-when">${when}</span></div>`;
+}
+
+function slotRow(s: SlotInfo): TemplateResult {
+  const name = slotName(s);
+  // Present in storage but unparseable HERE. This is not an empty slot, and
+  // saying so would invite the player to overwrite bytes a later build may
+  // still recover (the reasoning `preserveUnreadable` applies to the autosave,
+  // and the same wording the title screen's picker uses). So the row is
+  // labeled, and it loses its Save button: overwriting is the one action that
+  // destroys the evidence. Delete stays, because clearing a slot you have been
+  // told is unreadable is a deliberate choice rather than a silent loss.
+  const unreadable = s.present && !s.exists;
   const detail = s.exists
-    ? html`<div class="slot-detail">${s.towerName ?? "Tower"} ${modeChip} · ${s.star === 6 ? "TOWER" : (s.star ?? 1) + "★"} · pop ${(s.population ?? 0).toLocaleString()} · $${Math.round(s.funds ?? 0).toLocaleString()}<br /><span class="slot-when">${when}</span></div>`
-    : html`<div class="slot-detail slot-empty">empty</div>`;
+    ? slotDetail(s)
+    : unreadable
+      ? html`<div class="slot-detail slot-unreadable">Couldn't be read by this version.</div>`
+      : html`<div class="slot-detail slot-empty">empty</div>`;
   const saveBtn =
-    s.slot === "auto" ? nothing : html`<button class="btn" data-save="${s.slot}">Save</button>`;
+    s.slot === "auto" || unreadable ? nothing : html`<button class="btn" data-save="${s.slot}">Save</button>`;
   const loadBtn = s.exists ? html`<button class="btn" data-load="${s.slot}">Load</button>` : nothing;
   const delBtn =
-    s.exists && s.slot !== "auto"
+    (s.exists || unreadable) && s.slot !== "auto"
       ? html`<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
       : nothing;
   return html`<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;

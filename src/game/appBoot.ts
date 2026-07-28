@@ -16,6 +16,7 @@ import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
+import { showTowerPicker } from "./appModals";
 
 /**
  * Constructor collaborators for `GameApp`, split out to keep the class body a
@@ -180,6 +181,11 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     showHelp: () => app.ui.showHelp(),
     pauseForSplash: (paused) => app.setSpeed(paused ? 0 : 1),
     chime: () => app.audio.sfx("promote"),
+    // A tower arrived over the title screen (SPEC-splash-load-tower CAP-6):
+    // a loaded slot, a .vctower, or a 1994 .TDT. dismissSplash has already
+    // re-paused through pauseForSplash, so this is only the greeting that says
+    // why the tower is sitting still, matching Continue's.
+    onEnterTower: () => app.ui.toast("Welcome back. Press ▶ to resume.", "info"),
     // Splash theme on the start screen, calm bed in the tower. Audio is
     // autoplay-gated (it only sounds after a gesture), so the splash theme is
     // heard on the New Tower path, where the splash stays up through the
@@ -302,6 +308,11 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         app.setSpeed(0);
         app.ui.toast("Welcome back. Press ▶ to resume.", "info");
       },
+      // The load-only tower picker (SPEC-splash-load-tower). Offered on every
+      // boot, not just when `hasSave`: the manual slots are invisible to
+      // `hasSave` (it reads the autosave keys alone), and the picker's file row
+      // is the only way a fresh install or a new device gets its towers back.
+      onLoadTower: () => showTowerPicker(app),
       onNewTower: (dismiss) => {
         // The rule-set picker (Classic vs Modern) warns that New Tower abandons
         // the current tower only when one is continuable (`hasSave`); on a

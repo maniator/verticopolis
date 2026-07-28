@@ -1,16 +1,9 @@
 import { FACILITIES, isCommercialKind } from "../engine/facilities";
-import type {
-  Simulation,
-  LogEntry,
-  BatchTarget,
-  BatchRentOptions,
-  BatchRentResult,
-} from "../engine/Simulation";
+import type { Simulation, LogEntry } from "../engine/Simulation";
 import type { SlotInfo } from "../storage/SaveGame";
 import type { ExportReport } from "../storage/tdtExport";
 import type { ImportReport } from "../storage/tdtImport";
 import type { FacilityKind, GameMode } from "../engine/types";
-import type { PriceOptions } from "../engine/gameRules";
 import type { ElevatorSchedule } from "../engine/elevatorSchedule";
 import type { CalendarKind } from "../engine/calendar";
 import type { UpdateInfo } from "../pwa";
@@ -427,14 +420,11 @@ export class UI {
     dialogs.showSaves(this, slots);
   }
 
-  showBatchPricingDialog(
-    ctx: { kind: FacilityKind; kindLabel: string; options: PriceOptions },
-    cb: {
-      preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-      apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-      onApplied: (summary: string) => void;
-    },
-  ): void {
+  showTowerPicker(ctx: dialogs.TowerPickerCtx): void {
+    dialogs.showTowerPicker(this, ctx);
+  }
+
+  showBatchPricingDialog(ctx: dialogs.BatchPricingDialogCtx, cb: dialogs.BatchPricingDialogCb): void {
     dialogs.showBatchPricingDialog(this, ctx, cb);
   }
 

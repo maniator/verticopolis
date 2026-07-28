@@ -30,19 +30,23 @@ import type { FacilityKind } from "../engine/types";
  *  chosen off the SHAPE of the mode's price options (never the mode string):
  *  a ladder gets the Classic rung-picker variant, a band keeps today's range
  *  editor byte-for-byte. */
-export function showBatchPricingDialog(
-  ui: UI,
-  ctx: {
-    kind: FacilityKind;
-    kindLabel: string;
-    options: PriceOptions;
-  },
-  cb: {
-    preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-    apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
-    onApplied: (summary: string) => void;
-  },
-): void {
+/** What the batch-pricing dialog is being opened FOR. Named (like
+ *  {@link ScheduleDialogCtx}) so `UI`'s delegation can reference it by name
+ *  rather than restate the shape, which kept that class over its size ceiling. */
+export interface BatchPricingDialogCtx {
+  kind: FacilityKind;
+  kindLabel: string;
+  options: PriceOptions;
+}
+
+/** The engine operations the dialog drives. */
+export interface BatchPricingDialogCb {
+  preview: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+  apply: (target: BatchTarget, opts: BatchRentOptions) => BatchRentResult;
+  onApplied: (summary: string) => void;
+}
+
+export function showBatchPricingDialog(ui: UI, ctx: BatchPricingDialogCtx, cb: BatchPricingDialogCb): void {
   const { kind } = ctx;
   const noun = ctx.kindLabel.toLowerCase() + "s";
   if (ctx.options.shape === "ladder") {

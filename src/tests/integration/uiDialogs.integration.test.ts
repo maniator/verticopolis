@@ -1822,9 +1822,9 @@ describe("showSettings: the Settings dialog", () => {
 
 describe("showSaves — the save-slot manager", () => {
   const slots = [
-    { slot: "auto" as const, exists: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
-    { slot: 1, exists: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
-    { slot: 2, exists: false },
+    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
+    { slot: 1, exists: true, present: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
+    { slot: 2, exists: false, present: false },
   ];
 
   it("renders one row per slot with the right actions (auto: no Save/Delete; empty: Save only)", () => {
@@ -1872,6 +1872,112 @@ describe("showSaves — the save-slot manager", () => {
     ui.showSaves(slots);
     dialog().querySelector<HTMLElement>('[data-load="auto"]')!.click();
     expect(cb.onLoadSlot).toHaveBeenCalledWith("auto");
+  });
+});
+
+/**
+ * The title screen's load-only tower picker controller
+ * (SPEC-splash-load-tower CAP-3 / CAP-5). Row rendering is pinned in
+ * `src/ui/templates/towerPicker.test.ts`; this covers the wiring the
+ * controller owns.
+ */
+describe("showTowerPicker — the title-screen load picker", () => {
+  const present = [
+    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
+    { slot: 1, exists: false, present: false },
+  ];
+
+  it("loads a slot AND closes the dialog: adoption only takes the splash down", () => {
+    // Adoption dismisses the title screen, but the shared <dialog> is a
+    // separate surface in the top layer. Leaving it open would drop the player
+    // onto their tower behind a live modal that also paints over the
+    // "Press play to resume" toast.
+    const { ui } = makeUI();
+    const onLoad = vi.fn(() => true);
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(onLoad).toHaveBeenCalledWith("auto");
+    expect(dialog().open).toBe(false);
+  });
+
+  it("re-renders in place on repeated failures, never stacking a second picker", () => {
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
+    for (let i = 0; i < 3; i++) dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(dialog().querySelectorAll(".modal-box")).toHaveLength(1);
+    expect(dialog().querySelectorAll('[data-picker="back"]')).toHaveLength(1);
+  });
+
+  it("says storage is BLOCKED rather than claiming nothing is saved", () => {
+    // The player may have four towers on this device that the browser will not
+    // hand over. Claiming they are gone is the same lie the unreadable-slot row
+    // exists to avoid.
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => ({ slots: [], storageBlocked: true }), onLoad: () => true });
+    const line = dialog().querySelector(".picker-none")!.textContent!;
+    expect(line).toContain("blocking saved data");
+    expect(line).not.toContain("No towers saved");
+    expect(dialog().querySelector('[data-picker="file"]')).not.toBeNull(); // still the way in
+  });
+
+  it("returns focus to the Load Tower plate when Back closes the picker", () => {
+    const { ui } = makeUI();
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      '<div id="splash"><button data-splash="load">Load Tower</button></div>',
+    );
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
+    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
+    expect(document.activeElement?.getAttribute("data-splash")).toBe("load");
+    document.getElementById("splash")!.remove();
+  });
+
+  it("re-renders with an inline error, staying open, when a load fails", () => {
+    // CAP-5: a failed load must not cost the player the title screen. The
+    // reason renders IN the dialog rather than as a toast, because the title
+    // screen paints over the toast rail.
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => false });
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(dialog().open).toBe(true);
+    expect(dialog().querySelector(".picker-error")!.textContent).toContain("couldn't be read");
+  });
+
+  it("re-reads storage on every render, so a re-render is never stale", () => {
+    const { ui } = makeUI();
+    const getSlots = vi.fn(() => ({ slots: present, storageBlocked: false }));
+    ui.showTowerPicker({ getSlots, onLoad: () => false });
+    expect(getSlots).toHaveBeenCalledOnce();
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(getSlots).toHaveBeenCalledTimes(2);
+  });
+
+  it("the file row closes the dialog and hands off to the OS picker", async () => {
+    const { ui, cb } = makeUI();
+    // Restored explicitly: this file has no global restoreMocks, so a leaked
+    // no-op click() on the prototype would silently break later tests.
+    const clickSpy = vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad: () => true });
+    dialog().querySelector<HTMLElement>('[data-picker="file"]')!.click();
+    // Same reason the saves manager yields: the .TDT fidelity report refuses to
+    // open while another modal is live.
+    expect(dialog().open).toBe(false);
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    expect(input.accept.startsWith(".vctower")).toBe(true);
+    const file = new File(["VCTOWER1\npayload"], "tower.vctower");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+    clickSpy.mockRestore();
+  });
+
+  it("Back closes the picker and nothing else", () => {
+    const { ui } = makeUI();
+    const onLoad = vi.fn(() => true);
+    ui.showTowerPicker({ getSlots: () => ({ slots: present, storageBlocked: false }), onLoad });
+    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
+    expect(dialog().open).toBe(false);
+    expect(onLoad).not.toHaveBeenCalled();
   });
 });
 
@@ -2776,9 +2882,9 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
   it("shows a coerced rule-set chip and the day on every existing slot; empty slots get neither", () => {
     const { ui } = makeUI();
     ui.showSaves([
-      { slot: "auto", exists: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
-      { slot: 1, exists: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
-      { slot: 2, exists: false },
+      { slot: "auto", exists: true, present: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
+      { slot: 1, exists: true, present: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
+      { slot: 2, exists: false, present: false },
     ]);
     const rows = Array.from(dialog().querySelectorAll(".slot"));
     expect(rows[0].querySelector(".nt-badge")!.textContent).toBe("Classic");
@@ -2794,7 +2900,7 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
   it("omits the day when the save's minutes were malformed, keeping the timestamp", () => {
     const { ui } = makeUI();
     ui.showSaves([
-      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
+      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
     ]);
     const when = dialog().querySelector(".slot-when")!.textContent!;
     expect(when).not.toMatch(/\bDay\b/);
@@ -2806,7 +2912,7 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
     ui.showSaves([
       // A hostile producer bypassing SlotInfo's types (the storage layer
       // already bounds day; this pins the render-side finiteness guard).
-      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
+      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
     ]);
     const when = dialog().querySelector(".slot-when")!.textContent!;
     expect(when).not.toContain("<img>");
