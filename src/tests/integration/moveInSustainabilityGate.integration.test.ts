@@ -246,6 +246,24 @@ describe("move-in sustainability gate: inspector 'Won't lease' legibility", () =
     expect(line).toContain("noisy neighbor"); // the dominant gripe, surfaced for an empty unit
   });
 
+  it("gives a nightclub-gated vacancy the cross-floor remedy, not the lobby-tile advice", () => {
+    const sim = servedTower(40, "modern", 4);
+    // A nightclub one floor below the condo: its halo noise carries BETWEEN floors
+    // and a lobby tile does not shield it. There is no same-floor source, so the
+    // condo is not noiseAfflicted, and the generic "put a lobby tile" advice would
+    // be a fix that never restores leasing.
+    const clubR = sim.tower.place("nightclub", 2, C);
+    expect(clubR.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === clubR.unitId)!.state = "occupied";
+    const condo = place(sim, "condo", 3, C);
+    expect(sim.noiseAfflicted(condo)).toBe(false); // cross-floor, not an adjacent source
+    const line = wontLeaseText(sim, condo);
+    expect(line).not.toBeNull();
+    expect(line).toContain("nightclub");
+    expect(line).toContain("carries between floors");
+    expect(line).not.toContain("shields it"); // never the same-floor lobby-tile remedy
+  });
+
   it("is silent on a spot that would fill", () => {
     const sim = servedTower(9, "modern");
     const condo = place(sim, "condo", 2, C);

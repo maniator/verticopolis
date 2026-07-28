@@ -16,8 +16,21 @@ import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/s
 const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
   rent: "the rent is above the going rate. Lower it to keep them.",
-  noise: "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.",
+  // "noise" is resolved by noiseGripeText (the remedy differs by source); it stays
+  // out of this table so a bare lookup can never return the wrong advice.
 };
+
+/** The "noise" gripe names the RIGHT remedy per source. `dominantGripe` attributes
+ *  an adjacent office/commercial source (`noiseAfflicted`) BEFORE the cross-floor
+ *  nightclub halo, so when the unit is not noise-afflicted the "noise" cause is the
+ *  nightclub thump, which is keyed on floor distance and a lobby tile does NOT
+ *  shield. Naming the lobby-tile fix there would send the player on a fix that
+ *  never restores leasing. */
+function noiseGripeText(sim: Simulation, u: Unit): string {
+  return sim.noiseAfflicted(u)
+    ? "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it."
+    : "a nightclub too close by. Its noise carries between floors, so a lobby tile will not block it; move the nightclub or the home to put more floors between them.";
+}
 
 /** The unmet-demand gripe (#395) names which of its causes actually holds,
  *  because the demand model is lobby-anchored and tower-uniform: a tenant that
@@ -49,6 +62,7 @@ function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
  *  so each case reads on its own (review nit on the former nested ternary). */
 export function gripeLineText(sim: Simulation, u: Unit, gripe: VacateReason): string | undefined {
   if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u);
+  if (gripe === "noise") return noiseGripeText(sim, u);
   return GRIPE_TEXT[gripe];
 }
 
