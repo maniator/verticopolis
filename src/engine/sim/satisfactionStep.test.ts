@@ -3,7 +3,8 @@ import { Simulation } from "../Simulation";
 import type { GameMode, Unit } from "../types";
 import { GRID } from "../facilities";
 import { buildSatisfactionContext, satisfactionStep, wouldEvictFreshTenant } from "./satisfactionStep";
-import { NOISE_CAP, NOISE_EROSION, SERVED_RECOVERY, VACATE_RESCIND } from "./constants";
+import { computeDemandMap } from "./demand";
+import { NOISE_CAP, NOISE_EROSION, SERVED_RECOVERY, VACATE_RESCIND, LOBBY_FAR_CAP, UNMET_DEMAND_CAP } from "./constants";
 import { rentConfig } from "../econConfig";
 
 /**
@@ -27,6 +28,13 @@ function tinyTower(mode: GameMode, top = 4): Simulation {
   for (let f = 2; f <= top; f++) for (let x = 0; x < W; x++) sim.tower.place("floor", f, x);
   expect(sim.buildTransport("elevatorStandard", C, 1, Math.min(top, 30)).ok).toBe(true);
   sim.tower.setCars(sim.tower.transports[0].id, 8);
+  // Assert the topology every case relies on rather than trusting the loops: a
+  // grid/cap/catalog change that dropped a placement would otherwise turn a
+  // satisfaction-sink case into a silent access-drain case.
+  expect(sim.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1).length).toBe(W);
+  expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === top).length).toBe(W);
+  expect(sim.tower.isFloorServed(2)).toBe(true);
+  expect(sim.floorReachable(2)).toBe(true);
   return sim;
 }
 
@@ -80,6 +88,70 @@ describe("satisfactionStep: per-sink math", () => {
     expect(satisfactionStep(sim, office, 0.5, ctx).next).toBeCloseTo(0.55 - 0.07, 6);
     office.rent = cfg.default * 0.5; // over = -0.5 -> +0.035 (cheap rent is a perk)
     expect(satisfactionStep(sim, office, 0.5, ctx).next).toBeCloseTo(0.55 + 0.035, 6);
+  });
+});
+
+describe("satisfactionStep: the remaining drains and caps", () => {
+  it("an unserved floor drains hard by 0.15 x churn (no recovery)", () => {
+    const sim = tinyTower("modern");
+    const condo = place(sim, "condo", 2, C);
+    condo.residents = 3;
+    // Force the served-floor set empty so the unserved branch runs on a real unit.
+    const ctx = { ...buildSatisfactionContext(sim), servedSet: new Set<number>() };
+    const churn = sim.rules.churnMultiplier(3);
+    const r = satisfactionStep(sim, condo, 0.8, ctx);
+    expect(r.served).toBe(false);
+    expect(r.next).toBeCloseTo(Math.max(0, 0.8 - 0.15 * churn), 6);
+  });
+
+  it("elevator congestion above 1 erodes by 0.04 x min(3, cong-1) x churn", () => {
+    const sim = tinyTower("modern");
+    const condo = place(sim, "condo", 2, C);
+    condo.residents = 3;
+    const ctx = { ...buildSatisfactionContext(sim), congMap: null, globalCong: 2 };
+    const churn = sim.rules.churnMultiplier(3);
+    const r = satisfactionStep(sim, condo, 0.8, ctx);
+    expect(r.cong).toBe(2);
+    expect(r.next).toBeCloseTo(Math.max(0, 0.8 - 0.04 * Math.min(3, 1) * churn), 6);
+  });
+
+  it("the Classic FAR lobby band caps at LOBBY_FAR_CAP with no erosion (stabilizes above the bar)", () => {
+    // Classic uses the banded cap; Modern ramps continuously, so pin the band here.
+    const sim = tinyTower("classic", 12);
+    const condo = place(sim, "condo", 9, C); // 8 floors above the only lobby: the FAR band
+    const ctx = buildSatisfactionContext(sim);
+    expect(satisfactionStep(sim, condo, 1, ctx).next).toBeCloseTo(LOBBY_FAR_CAP, 6);
+    expect(satisfactionStep(sim, condo, LOBBY_FAR_CAP, ctx).next).toBeCloseTo(LOBBY_FAR_CAP, 6); // stable
+    expect(LOBBY_FAR_CAP).toBeGreaterThan(VACATE_RESCIND);
+  });
+
+  it("unmet retail demand caps at UNMET_DEMAND_CAP and flags the drain", () => {
+    const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 30); // reachable retail, far enough to add no noise
+    const condo = place(sim, "condo", 3, C);
+    const ctx = buildSatisfactionContext(sim);
+    // Retail exists but this tenant reaches none of it (coverage 0), the deepest
+    // shortfall, which caps exactly at UNMET_DEMAND_CAP.
+    ctx.demandMap = computeDemandMap(sim);
+    ctx.demandMap.reachableVenuesByOrigin.set(condo.id, 0);
+    const r = satisfactionStep(sim, condo, 1, ctx);
+    expect(r.unmetDemand).toBe(true);
+    expect(r.next).toBeCloseTo(UNMET_DEMAND_CAP, 6); // capped by the shortage
+  });
+
+  it("a Modern amenity halo lifts a condo above its no-halo baseline (offsetting case)", () => {
+    const sim = tinyTower("modern");
+    const condo = place(sim, "condo", 2, C);
+    const baseline = satisfactionStep(sim, condo, 0.8, buildSatisfactionContext(sim)).next;
+    // A tenanted fitness club two floors up: its halo bonus lifts a nearby condo,
+    // the offset a noisy spot can lean on.
+    const club = sim.tower.place("fitnessClub", 4, C);
+    expect(club.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === club.unitId)!.state = "occupied";
+    const ctx = buildSatisfactionContext(sim);
+    expect(ctx.clubFloors).toContain(4); // the gather picked up the tenanted, served club
+    const lifted = satisfactionStep(sim, condo, 0.8, ctx).next;
+    expect(lifted).toBeGreaterThan(baseline);
   });
 });
 

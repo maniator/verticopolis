@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage, dominantGripe } from "../engine/sim/gripe";
+import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
 
@@ -21,16 +21,18 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   // out of this table so a bare lookup can never return the wrong advice.
 };
 
-/** The "noise" gripe names the RIGHT remedy per source. `dominantGripe` attributes
- *  an adjacent office/commercial source (`noiseAfflicted`) BEFORE the cross-floor
- *  nightclub halo, so when the unit is not noise-afflicted the "noise" cause is the
- *  nightclub thump, which is keyed on floor distance and a lobby tile does NOT
- *  shield. Naming the lobby-tile fix there would send the player on a fix that
- *  never restores leasing. */
+/** The "noise" gripe names the RIGHT remedy per source. A nightclub's halo is
+ *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
+ *  so its relocation remedy holds whenever a nightclub is in range, even when the
+ *  club also sits within same-floor noise range and makes the unit noiseAfflicted
+ *  (naming only the lobby-tile fix there would send the player on a fix that leaves
+ *  the unit gated). Only an adjacent NON-nightclub source (office or commercial,
+ *  with no club in halo range) gets the lobby-tile advice. */
 function noiseGripeText(sim: Simulation, u: Unit): string {
-  return sim.noiseAfflicted(u)
-    ? "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it."
-    : "a nightclub too close by. Its noise carries between floors, so a lobby tile will not block it; move the nightclub or the home to put more floors between them.";
+  if (nearNightclub(sim, u)) {
+    return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors, so move the nightclub or the home to put more floors between them.";
+  }
+  return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
 }
 
 /** The unmet-demand gripe (#395) names which of its causes actually holds,
@@ -88,17 +90,28 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
     u.state !== "empty" ||
     u.noRate ||
     !sim.tower.isFloorServed(u.floor) ||
-    !sim.floorReachable(u.floor) ||
-    !wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
+    !sim.floorReachable(u.floor)
   ) {
     return null;
   }
+  // One shared gate context so the verdict AND the cause read the same
+  // candidate-aware demand: wouldEvictFreshTenant registers this empty unit as a
+  // demand origin and sets the candidate-aware share on ctx.demandMap.
+  const ctx = buildSatisfactionContext(sim, true);
+  if (!wouldEvictFreshTenant(sim, u, ctx)) return null;
   // Name the cause the GATE actually held the spot for, which excludes congestion
   // (the gate context neutralizes it). Passing cong = 0 to dominantGripe skips the
   // congestion tier so the line never tells the player to "add cars" when adding
   // cars would not fill the spot; the structural cause the neutralized gate caught
-  // (noise, far walk, lobby distance, rent, unmet demand) wins instead.
-  const gripe = dominantGripe(sim, u, undefined, 0);
+  // (noise, far walk, lobby distance, rent, unmet demand) wins instead. The
+  // unmet-demand flag is computed from the SAME candidate-aware demand the gate
+  // used (the empty unit is now a registered origin), so a spot gated only by a
+  // retail shortage attributes "too few shops" instead of falling to the generic
+  // line, where dominantGripe would otherwise read the real map that omits it.
+  const cov = ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
+  const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
+  const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
+  const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);
   const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
   const lead = text
     ? `Won't lease: ${text}`

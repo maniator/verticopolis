@@ -200,11 +200,23 @@ describe("move-in sustainability gate: repair path (a fixed cause lets the spot 
     // Fix the cause: a shaft right beside it. The gate now allows it and it fills,
     // proving the vacancy auto-heals the moment the placement problem is fixed.
     expect(sim.buildTransport("elevatorStandard", 0, 1, 6).ok).toBe(true);
-    sim.tower.setCars(sim.tower.transports[1].id, 8);
+    const nearShaft = sim.tower.transports[1].id;
+    sim.tower.setCars(nearShaft, 8);
     expect(wouldEvictFreshTenant(sim, office, buildSatisfactionContext(sim, true))).toBe(false);
     guard = 0;
     while (!office.everOccupied && guard++ < 2000) sim.tick(60);
     expect(office.everOccupied).toBe(true);
+
+    // Relapse: tear the near shaft back out. Access is poor again (the office is
+    // far-walk from the lone central shaft), so a fresh tenant would be gated once
+    // more AND the seated office erodes back out and stays vacant. This catches a
+    // stale or one-way gate/satisfaction state that a fix-only test would miss.
+    sim.tower.removeTransport(nearShaft);
+    expect(sim.tower.isFloorServed(2)).toBe(true); // still served by the central shaft
+    expect(wouldEvictFreshTenant(sim, office, buildSatisfactionContext(sim, true))).toBe(true);
+    guard = 0;
+    while (office.everOccupied && guard++ < 4000) sim.tick(60);
+    expect(office.everOccupied).toBe(false); // the tenant left and the gate holds it vacant
   });
 });
 
@@ -292,6 +304,26 @@ describe("move-in sustainability gate: inspector 'Won't lease' legibility", () =
     expect(line).toContain("nightclub");
     expect(line).toContain("carries between floors");
     expect(line).not.toContain("shields it"); // never the same-floor lobby-tile remedy
+  });
+
+  it("names the retail shortage on a spot gated only by unmet demand (candidate-aware cause)", () => {
+    // Retail exists but stranded (floor 10 has no shaft), so a fresh tenant on the
+    // reachable floor 2 reaches none of it. dominantGripe reads the real demand map
+    // where the empty unit is not an origin, so without the candidate-aware cause
+    // this would fall to the generic line; it must name the retail shortage.
+    const sim = Simulation.newGame(42, "modern");
+    sim.money = 1e12;
+    sim.star = 1;
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 10; f++) for (let x = 0; x < W; x++) sim.tower.place("floor", f, x);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 6).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[0].id, 8);
+    place(sim, "fastFood", 10, C); // stranded retail
+    const condo = place(sim, "condo", 2, C);
+    const line = wontLeaseText(sim, condo);
+    expect(line).not.toBeNull();
+    expect(line).toContain("shops"); // the retail cause, not the generic fallback
+    expect(line).not.toContain("Fix the flagged problem"); // the generic fallback string
   });
 
   it("is silent on a spot that would fill", () => {
