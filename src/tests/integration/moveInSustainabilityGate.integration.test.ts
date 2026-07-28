@@ -326,6 +326,20 @@ describe("move-in sustainability gate: inspector 'Won't lease' legibility", () =
     expect(line).not.toContain("Fix the flagged problem"); // the generic fallback string
   });
 
+  it("presents both remedies when a condo has an adjacent source AND a nearby nightclub", () => {
+    const sim = servedTower(43, "modern", 6);
+    const club = sim.tower.place("nightclub", 2, C - 40); // 2 floors below: within the halo
+    expect(club.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === club.unitId)!.state = "occupied";
+    place(sim, "fastFood", 4, C - 20); // an adjacent same-floor source (the binding cause)
+    const condo = place(sim, "condo", 4, C);
+    expect(sim.noiseAfflicted(condo)).toBe(true);
+    const line = wontLeaseText(sim, condo);
+    expect(line).not.toBeNull();
+    expect(line).toContain("lobby tile"); // the same-floor remedy (moving only the club would not help)
+    expect(line).toContain("nightclub"); // and the cross-floor remedy
+  });
+
   it("is silent on a spot that would fill", () => {
     const sim = servedTower(9, "modern");
     const condo = place(sim, "condo", 2, C);

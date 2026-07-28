@@ -31,8 +31,15 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
  *  hotel with a club in halo range the club's relocation remedy holds even when the
  *  club also sits within same-floor range and makes the unit noiseAfflicted. */
 function noiseGripeText(sim: Simulation, u: Unit): string {
-  const feelsHalo = u.kind === "condo" || isHotelKind(u.kind);
-  if (feelsHalo && nearNightclub(sim, u)) {
+  const adjacent = sim.noiseAfflicted(u); // a same-floor office/commercial source, lobby-shieldable
+  const club = (u.kind === "condo" || isHotelKind(u.kind)) && nearNightclub(sim, u); // cross-floor halo, not shieldable
+  if (adjacent && club) {
+    // Both channels can be at work and either can be the binding cause, so present
+    // both remedies rather than blaming one: a lobby tile shields the same-floor
+    // source, and moving the nightclub (or the unit) addresses the cross-floor beat.
+    return "a noisy neighbor and a nearby nightclub. A lobby tile between the same-floor source and this unit shields the neighbor; the nightclub's beat also carries between floors, so put more floors between it and this unit too.";
+  }
+  if (club) {
     return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors; put more floors between this unit and the nightclub (move either one).";
   }
   return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
