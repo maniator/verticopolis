@@ -119,7 +119,7 @@ function drawInterior(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: n
     case "metro":
       return drawMetro(d, x, y, w, h);
     case "weddingHall":
-      return drawWeddingHall(ctx, x, y, w, h);
+      return drawWeddingHall(d, u, x, y, w, h);
     default:
       ctx.fillStyle = FACILITIES[u.kind].color;
       ctx.fillRect(x + 1, y + 1, w - 2, h - 2);

@@ -4,7 +4,7 @@ import type { FacilityKind } from "../../engine/types";
 import { isOperational } from "../../engine/types";
 import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../sprites";
 import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
-import { coveredUpperStories, lotCovered, lobbyLaneSpan } from "./towerCrowdLayout";
+import { buildWalkers } from "./towerWalkerBuild";
 import { carIndicator, type CarIndicator } from "../carIndicator";
 import type { Person } from "../../engine/Crowd";
 import { FLOOR, TILE } from "../scale";
@@ -22,6 +22,10 @@ import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
 
+/** Per-sim walker reachability verdicts, keyed `floor * 1024 + tileX` and valid
+ *  for one `tower.revision`. See {@link walkerReachable}. */
+const walkReachMemos = new WeakMap<object, { revision: number; verdicts: Map<number, boolean> }>();
+
 /** Retained-actor reconciliation tail: kill and forget every entry the
  *  current pass didn't mark as seen. Each reconciler supplies its own
  *  disposal (kill one actor, kill a pair, drop a parallel sig entry). Shared
@@ -32,13 +36,6 @@ export function reap<K, V>(map: Map<K, V>, seen: ReadonlySet<K>, dispose: (v: V,
     dispose(v, k);
     map.delete(k);
   }
-}
-
-interface Run {
-  kind: "floor" | "lobby";
-  floor: number;
-  x0: number;
-  x1: number;
 }
 
 /** A single engine-driven walking figure (lobby/corridor walker or climber). */
@@ -58,6 +55,12 @@ export interface Walker {
   rank: number;
   /** Floor this figure belongs to (for per-floor occupancy gating). */
   floor: number;
+  /** Origin tile of the run this figure paces (the transport's tile for a stair
+   *  or escalator climber). Reachability is asked per POSITION, not per floor
+   *  (#647): a gap-split Modern floor can strand one contiguous run while a
+   *  sibling run of the same floor still routes to the lobby, and a floor-level
+   *  probe cannot tell them apart. */
+  tileX: number;
   /** True for corridor loiterers gated on their floor's live occupancy; false
    *  for lobby/stair figures gated on the whole tower's busyness. */
   perFloor: boolean;
@@ -243,104 +246,6 @@ export function syncMotion(engine: TowerEngine): void {
   reassertCrowdCull(engine);
 }
 
-function buildWalkers(engine: TowerEngine): void {
-  const coveredRows = coveredUpperStories(engine.sim.tower.units);
-  const byFloor = new Map<number, Map<number, "floor" | "lobby">>();
-  for (const u of engine.sim.tower.units) {
-    if (u.kind === "floor" || u.kind === "lobby") {
-      if (lotCovered(coveredRows, u.floor, u.x)) continue; // upper story of a multi-floor facility
-      let row = byFloor.get(u.floor);
-      if (!row) byFloor.set(u.floor, (row = new Map()));
-      row.set(u.x, u.kind);
-    }
-  }
-  let budget = 400;
-  for (const [floor, row] of byFloor) {
-    for (const run of mergeRuns(floor, row)) {
-      if (budget <= 0) break;
-      const wTiles = run.x1 - run.x0 + 1;
-      const density = run.kind === "lobby" ? 0.5 : 0.14;
-      const count = Math.min(run.kind === "lobby" ? 20 : 8, Math.floor(wTiles * density));
-      const foot = engine.worldYTop(floor) + FLOOR - 3;
-      const x0w = engine.worldX(run.x0) + 3;
-      const x1w = engine.worldX(run.x1 + 1) - 3;
-      const runW = x1w - x0w;
-      for (let i = 0; i < count && budget > 0; i++, budget--) {
-        const seed = (floor * 131 + run.x0 * 7 + i * 53) | 0;
-        const rank = (i + 0.5) / count; // only the first few show until it fills
-        const speed = 7 + (Math.abs(seed) % 6);
-        if (run.kind === "lobby") {
-          // Concourse: each figure paces its own evenly spaced lane, gated on
-          // tower busyness. Confining every figure to a lane keeps a busy lobby
-          // from piling everyone at the ping-pong turnaround ends (the old
-          // full-width sweep bunched them up there).
-          const [segX0, segX1] = lobbyLaneSpan(i, count, x0w, x1w);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, false);
-        } else {
-          // Corridor: loiter in a short stretch around a spread-out anchor, so a
-          // lone figure shuffles in place instead of sprinting the whole floor,
-          // and only appears when this floor actually has occupants.
-          const anchor = x0w + rank * runW;
-          const half = Math.min(14, runW / 2);
-          // Clamp the loiter span to the run so a figure never paces past the
-          // corridor ends, robust even if the count/density constants change.
-          const segX0 = Math.max(x0w, anchor - half);
-          const segX1 = Math.min(x1w, anchor + half);
-          spawnWalker(engine, segX0, segX1, foot, foot, seed, speed, rank, floor, true);
-        }
-      }
-    }
-  }
-  for (const t of engine.sim.tower.transports) {
-    if (t.kind !== "stairs" && t.kind !== "escalator") continue;
-    const x0w = engine.worldX(t.x) + 2;
-    const x1w = engine.worldX(t.x + t.width) - 3;
-    const yb = engine.worldYTop(t.bottom) + FLOOR - 2;
-    const yt = yb - (FLOOR - 4);
-    const n = t.kind === "escalator" ? 3 : 2;
-    for (let i = 0; i < n; i++) {
-      const seed = (t.id * 17 + i * 29) | 0;
-      // Low ranks so stairs/escalators show climbers even in a modest tower,
-      // otherwise the routed crowd (elevators only) makes stairs look unused.
-      spawnWalker(engine, x0w, x1w, yb, yt, seed, t.kind === "escalator" ? 12 : 7, 0.04 + i * 0.18, t.bottom, false);
-    }
-  }
-}
-
-function spawnWalker(
-  engine: TowerEngine,
-  x0w: number,
-  x1w: number,
-  y0w: number,
-  y1w: number,
-  seed: number,
-  speed: number,
-  rank: number,
-  floor: number,
-  perFloor: boolean,
-): void {
-  const gfx = engine.personGfx[Math.abs(seed) % engine.personGfx.length];
-  // Actor bounds track the baked canvas footprint (see reconcileCrowd).
-  const a = new ex.Actor({ pos: ex.vec(x0w, y0w), width: gfx.width, height: gfx.height, anchor: ex.vec(0.5, 1), z: 0.4 });
-  a.graphics.use(gfx);
-  engine.engine.add(a);
-  engine.walkers.push({
-    actor: a,
-    gfx,
-    x0w,
-    x1w,
-    y0w,
-    y1w,
-    speed,
-    dir: seed % 2 === 0 ? 1 : -1,
-    phase: (Math.abs(seed) % 100) / 100,
-    impatient: (((seed >>> 8) & 0xff) / 255) < 0.5,
-    red: false,
-    rank,
-    floor,
-    perFloor,
-  });
-}
 
 /** Refresh the per-floor occupancy map (0..1) when the hour or layout changes,
  *  so corridor loiterers appear only where tenants actually are. */
@@ -360,6 +265,55 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
   // floor shows none. (How many the fraction reveals scales with the floor's
   // width, since a corridor's walker count comes from its tile span.)
   for (const [f, n] of people) engine.floorLive.set(f, Math.min(1, n / 16));
+}
+
+/** True when a commuter could reach the spot this figure paces (#639): a sky
+ *  lobby nobody can get to must draw nobody. Reachability and not
+ *  `isFloorServed`, because it runs the passenger router, so Classic's walk
+ *  budget hides a lobby reachable only by a too-long stair climb (no commuter
+ *  spawns for it either) while Modern's served-equals-reachable needs no era
+ *  branch. Floor 1 short-circuits to true in the engine, so the main lobby is
+ *  untouched.
+ *
+ *  Asked per POSITION (#647): on a gap-split Modern floor one contiguous run can
+ *  be stranded while a sibling run of the same floor still routes to the lobby,
+ *  and ambient figures are spawned per run, so a floor-level probe would leave
+ *  ghosts on the stranded wing. A gap-free floor is exactly one segment, so this
+ *  is identical to the floor-level answer on every Classic tower.
+ *
+ *  The engine memo only covers the whole-floor probe: `positionReachable` takes
+ *  that fast path when a floor has one segment, but runs a fresh passenger BFS
+ *  per call once a floor is split. So the verdicts are memoized here too, in a
+ *  WeakMap keyed by the sim exactly the way the engine does it, so the per-frame
+ *  cost stays a Map lookup however the tower is laid out and a swapped-in sim
+ *  gets a fresh entry rather than inheriting the old tower's answers.
+ *
+ *  Known gap, and it fails safe: a climber carries its transport's BOTTOM floor,
+ *  so a stair whose bottom is reachable but whose top is not still shows
+ *  climbers. Reaching that needs Classic's walk budget to cut the flight one way
+ *  (the router itself walks stairs, so a reachable bottom normally implies a
+ *  reachable top), and it errs toward showing rather than hiding. A climber also
+ *  probes its transport's own tile, which a stair may legally place over a gap
+ *  (only SOME tile under the footprint has to be structural), so such a flight
+ *  hides its climbers even though routing links it by its landing tile. Both
+ *  err toward hiding. Backlog row `walker-reachability-refinements` (#665). */
+function walkerReachable(engine: TowerEngine, w: Walker): boolean {
+  const sim = engine.sim;
+  const rev = sim.tower.revision;
+  let memo = walkReachMemos.get(sim);
+  if (!memo || memo.revision !== rev) {
+    memo = { revision: rev, verdicts: new Map() };
+    walkReachMemos.set(sim, memo);
+  }
+  // Tile x is bounded by the lot width (375), so 1024 keeps floor and tile in
+  // their own lanes without a string key on the per-frame path.
+  const key = w.floor * 1024 + w.tileX;
+  let hit = memo.verdicts.get(key);
+  if (hit === undefined) {
+    hit = sim.positionReachable(w.floor, w.tileX);
+    memo.verdicts.set(key, hit);
+  }
+  return hit;
 }
 
 /** Repositions every moving actor each frame (the engine then draws them). */
@@ -435,7 +389,12 @@ export function updateMotion(engine: TowerEngine): void {
     // Corridor loiterers gate on their own floor's live occupancy (so an empty
     // floor stays empty); lobby/stair figures gate on the whole tower's crowd.
     const threshold = w.perFloor ? (engine.floorLive.get(w.floor) ?? 0) : crowd;
-    const visible = w.rank <= threshold;
+    // Lobby and stair figures gate on tower-wide busyness, which says nothing
+    // about whether anyone can get to that floor, so they also need the
+    // reachability check (#639). Corridor loiterers do not: their floor has live
+    // occupants, and stranded tenants are real people who are genuinely there
+    // (a floor can lose its access and keep its leases until they churn out).
+    const visible = w.rank <= threshold && (w.perFloor || walkerReachable(engine, w));
     if (w.actor.graphics.visible !== visible) w.actor.graphics.visible = visible;
     if (!visible) continue;
     let p = w.phase + (w.dir > 0 ? 0 : 0.5) + anim * w.speed * 0.03;
@@ -454,24 +413,3 @@ export function updateMotion(engine: TowerEngine): void {
   }
 }
 
-function mergeRuns(floor: number, row: Map<number, "floor" | "lobby">): Run[] {
-  const xs = [...row.keys()].sort((a, b) => a - b);
-  const runs: Run[] = [];
-  if (xs.length === 0) return runs;
-  let start = xs[0];
-  let prev = xs[0];
-  let kind = row.get(xs[0])!;
-  for (let i = 1; i < xs.length; i++) {
-    const x = xs[i];
-    const k = row.get(x)!;
-    if (x === prev + 1 && k === kind) {
-      prev = x;
-    } else {
-      runs.push({ kind, floor, x0: start, x1: prev });
-      start = prev = x;
-      kind = k;
-    }
-  }
-  runs.push({ kind, floor, x0: start, x1: prev });
-  return runs;
-}

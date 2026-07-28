@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.104.0
+
+- People no longer wander a sky lobby nobody can actually reach. Build a lobby with no elevator or stair serving it and it now reads as empty as it is; connect it and the crowd appears.
+- Empty rooms look empty. A wedding hall with no wedding, a shop with no customers, and the front desk of a tower with nobody in it no longer show figures who were never there.
+
 ## 1.103.0
 
 - People now respect the gaps between separated sections. If a floor is split into two parts with an empty gap between them, tenants and visitors no longer walk across the void or use stairs and elevators they have no path to reach. A room stranded on a section with no way down to the lobby stays empty (or its tenant leaves), and the inspector says why: "no way to transportation from here." Connect the section with a floor, stair, or elevator and it comes back to life.

@@ -1,4 +1,5 @@
 import type { Unit } from "../../../engine/types";
+import { visibleOccupants } from "../../../engine/Crowd";
 import { shade, type DrawCtx } from "../common";
 import { personFigure, personSeated, personStanding } from "../../pixelSprites/common";
 
@@ -15,8 +16,8 @@ import { personFigure, personSeated, personStanding } from "../../pixelSprites/c
  * floor, and a long banquet table. Ported one rectangle at a time from the
  * committed reference draw code (page-03 `party`). The dancers (standing build),
  * the DJ and banquet guests (seated build) fill in seed order up to the hall's
- * occupant count, so an empty hall draws none and a full one fills; this retires
- * the old `scatterPeople` ghost crowd. Static fills only, no `d.anim` read; the
+ * occupant count, so an empty hall draws none and a full one fills; the seeded
+ * ghost crowd this replaced is gone for good. Static fills only, no `d.anim` read; the
  * seed is geography so a TDT id renumber does not reshuffle the guests.
  */
 export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
@@ -46,8 +47,12 @@ export function drawPartyHall(d: DrawCtx, u: Unit, x: number, y: number, w: numb
   };
   // Honest occupancy: dancers (standing), the DJ and banquet guests (seated)
   // fill in seed order up to the hall's occupant count; an empty hall draws
-  // none.
-  const n = Math.max(0, u.occupants | 0);
+  // none. `visibleOccupants` is the people-system's canonical figure count; for
+  // an attendance venue it equals `u.occupants` (only a meal trip's ORIGIN room
+  // carries `outForMeal`, and these are destinations), so this matches the
+  // spec's Always-rule without changing what draws. Both its inputs are already
+  // bake-signature inputs, so no new signature input is needed.
+  const n = visibleOccupants(u);
   const geoSeed = (u.floor * 131 + u.x * 17) | 0;
   let filled = 0;
   const seated = (px: number, footY: number) => { if (filled < n) personSeated(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };
@@ -110,7 +115,7 @@ export function drawAquaticCenter(d: DrawCtx, u: Unit, x: number, y: number, w: 
     ctx.fillRect(Math.round(x + bx), Math.round(y + by), Math.max(1, Math.round(bw)), Math.max(1, Math.round(bh)));
     if (o !== 1) ctx.globalAlpha = 1;
   };
-  const n = Math.max(0, u.occupants | 0);
+  const n = visibleOccupants(u);
   const geoSeed = (u.floor * 131 + u.x * 17) | 0;
   let filled = 0;
   const swim = (px: number, footY: number) => { if (filled < n) personStanding(ctx, Math.round(x + px), Math.round(y + footY), geoSeed + filled++); };
@@ -172,8 +177,20 @@ function bloom(ctx: CanvasRenderingContext2D, x: number, y: number, c: string): 
  * (the 15px `seated` build); the bride is a hand-drawn gowned figure. Drawn
  * into the full `w x h` rect the caller gives, so it fills whatever the venue's
  * footprint is. Integer coordinates throughout.
+ *
+ * Honest occupancy, the same contract the party hall keeps: figures fill in
+ * order up to `visibleOccupants(u)`, so a hall with no wedding in it draws its
+ * chairs, arch and candelabra with nobody in them (#552). The couple fills
+ * first, because one attendee at a wedding reads as the couple rather than as a
+ * lone guest in an empty hall. The room's live attendance arrives through the
+ * `customersIn` -> `occupants` mirror, which is already a bake-signature input.
  */
-export function drawWeddingHall(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+export function drawWeddingHall(d: DrawCtx, u: Unit, x: number, y: number, w: number, h: number) {
+  const ctx = d.ctx;
+  const n = visibleOccupants(u);
+  let filled = 0;
+  /** Draws the next figure only while the hall still has attendees to seat. */
+  const takeSeat = (): boolean => (filled < n ? (filled++, true) : false);
   const x0 = Math.round(x);
   const y0 = Math.round(y);
   const ww = Math.max(1, Math.round(w));
@@ -280,33 +297,37 @@ export function drawWeddingHall(ctx: CanvasRenderingContext2D, x: number, y: num
   ctx.fillRect(acx - 6, fy - 10, 12, 4);
 
   // The couple at the altar: a dark-suited figure and a white-gowned figure.
-  personFigure(ctx, acx - 7, fy, "seated", "#2A2E38");
-  ctx.fillStyle = "#F4F0EC"; // gown
-  ctx.fillRect(acx + 2, fy - 9, 5, 9);
-  ctx.fillStyle = "#FFFFFF";
-  ctx.fillRect(acx + 2, fy - 9, 5, 1);
-  ctx.fillStyle = "#E8C9A0"; // head
-  ctx.fillRect(acx + 2, fy - 14, 4, 5);
-  ctx.fillStyle = "#5A4A3A";
-  ctx.fillRect(acx + 2, fy - 14, 4, 1);
-  ctx.fillStyle = "#F0F0F0"; // veil
-  ctx.fillRect(acx + 1, fy - 15, 6, 2);
+  // They seat first, so the smallest real wedding still reads as a wedding.
+  if (takeSeat()) personFigure(ctx, acx - 7, fy, "seated", "#2A2E38");
+  if (takeSeat()) {
+    ctx.fillStyle = "#F4F0EC"; // gown
+    ctx.fillRect(acx + 2, fy - 9, 5, 9);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(acx + 2, fy - 9, 5, 1);
+    ctx.fillStyle = "#E8C9A0"; // head
+    ctx.fillRect(acx + 2, fy - 14, 4, 5);
+    ctx.fillStyle = "#5A4A3A";
+    ctx.fillRect(acx + 2, fy - 14, 4, 1);
+    ctx.fillStyle = "#F0F0F0"; // veil
+    ctx.fillRect(acx + 1, fy - 15, 6, 2);
+  }
 
-  // Ribboned guest chairs seating guests, either side of the aisle. Guest
-  // shirt colors come from the seated build's seed, so a row reads varied.
+  // Ribboned guest chairs, either side of the aisle. The chairs always draw
+  // (they are furniture); only the guests in them are gated. Guest shirt colors
+  // come from the seated build's seed, so a row reads varied.
   for (let sx = x0 + 8, i = 0; sx < acx - 20; sx += 12, i++) {
     ctx.fillStyle = "#F4F0EC";
     ctx.fillRect(sx, fy - 9, 6, 9);
     ctx.fillStyle = "#E88AB0"; // pink chair ribbon
     ctx.fillRect(sx, fy - 9, 6, 1);
-    personSeated(ctx, sx, fy - 2, i * 5 + 1);
+    if (takeSeat()) personSeated(ctx, sx, fy - 2, i * 5 + 1);
   }
   for (let sx = acx + 22, i = 0; sx < x0 + ww - 8; sx += 12, i++) {
     ctx.fillStyle = "#F4F0EC";
     ctx.fillRect(sx, fy - 9, 6, 9);
     ctx.fillStyle = "#E88AB0";
     ctx.fillRect(sx, fy - 9, 6, 1);
-    personSeated(ctx, sx, fy - 2, i * 5 + 4);
+    if (takeSeat()) personSeated(ctx, sx, fy - 2, i * 5 + 4);
   }
 
   // Topiary planters flanking the altar, with blooms.

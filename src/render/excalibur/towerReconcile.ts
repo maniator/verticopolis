@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import { GRID, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
-import type { Transport, Unit } from "../../engine/types";
+import { isPresent, type Transport, type Unit } from "../../engine/types";
 import {
   CRANE_H,
   CRANE_W,
@@ -61,6 +61,26 @@ export function syncScene(engine: TowerEngine): void {
   engine.displayRecycleFill = engine.sim.recyclingFill();
   engine.d.parkingUse = engine.displayParkingUse;
   engine.d.recycleFill = engine.displayRecycleFill;
+  // Entrance staff read as ghosts in a tower nobody lives or works in, so they
+  // are gated on the tower holding anyone (#552). `isPresent` and not a
+  // population count: `totalPopulation` counts live bodies, which for a
+  // commercial unit is its customer tally, so a retail-only tower would read 0
+  // and lose its doorman every hour outside the meal windows. A lease keeps
+  // `state` at `occupied` around the clock (`updatePresence` cycles `occupants`,
+  // never `state`), so this is stable for offices, condos and shops alike.
+  // Structural tiles never qualify: floors and lobbies are placed `empty` and
+  // stay there.
+  //
+  // The rule this lands on is "somebody holds space in this building right now."
+  // A shop or office keeps its lease overnight, so its tower stays staffed at
+  // 4 a.m. with the shutters down. A hotel room is sold by the night, so a
+  // hotel-ONLY tower does go unstaffed between the housekeeping sweep and the
+  // evening check-ins. That reads inconsistent side by side, but it follows the
+  // leases rather than second-guessing them, and the alternative (latching on
+  // `everOccupied`) would keep staff in a tower everyone has left. Revisit if
+  // the daily flip reads badly on a real hotel tower.
+  // Set here rather than in the per-frame tick because the scan walks every unit.
+  engine.d.staffed = tower.units.some((u) => isPresent(u));
   const seenS = new Set<number>();
   const seenR = new Set<number>();
   // Rebuilt fresh each sync from the one flood-fill read above; the region

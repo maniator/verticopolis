@@ -161,7 +161,16 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
       width: TILE,
       height: FLOOR,
       cache: false,
-      draw: (ctx) => drawLobbyEntrance({ ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12 }, kind, 0, 0, TILE, FLOOR),
+      // `staffed` is read live off `engine.d` the same way `anim` is, so this
+      // cache:false canvas never holds a stale baked figure. Unlike `anim` the
+      // VALUE only changes at scene-sync cadence (`syncScene` writes it), which
+      // is the right cadence: tenancy moves on the hour tick, and that tick is
+      // itself a sync trigger, so the entrance follows a frame later.
+      draw: (ctx) =>
+        drawLobbyEntrance(
+          { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: engine.d.staffed },
+          kind, 0, 0, TILE, FLOOR,
+        ),
     });
   const bakeService = (lit: boolean): ex.Canvas =>
     new ex.Canvas({

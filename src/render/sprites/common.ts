@@ -1,4 +1,3 @@
-import { person } from "../pixelSprites";
 import type { ElevatorQueueView } from "../../engine/Crowd";
 
 export function shade(hex: string, amt: number): string {
@@ -42,6 +41,12 @@ export interface DrawCtx {
   hour: number;
   /** 0..1 transport overcrowding; tints walking crowds "angry" when high. */
   stress?: number;
+  /** False when the tower holds nobody at all, which hides the entrance staff so
+   *  a brand-new tower reads as empty as it is. Undefined means staffed, so the
+   *  sprite gallery and any caller that does not thread it keep their current
+   *  output. Set once per scene sync, never per frame: the population read
+   *  behind it walks every unit. */
+  staffed?: boolean;
   /** 0..1 fraction of working parking spaces holding a car right now (office
    *  cars by day, suite guests' cars overnight) — drives the garage visuals. */
   parkingUse?: number;
@@ -65,14 +70,6 @@ export function serviceLabel(ctx: CanvasRenderingContext2D, text: string, sx: nu
   ctx.fillStyle = color;
   ctx.font = "7px system-ui, sans-serif";
   if (w > minW) ctx.fillText(text, sx, y + 11);
-}
-
-/** Scatter standing people along a strip — the crowd idiom shared by the
- *  party hall and the metro platform (same seeded density gate). */
-export function scatterPeople(ctx: CanvasRenderingContext2D, startX: number, endX: number, step: number, footY: number, scale: number) {
-  for (let px = startX; px < endX; px += step) {
-    if (rand(px | 0) > 0.4) person(ctx, px, footY, scale, px | 0);
-  }
 }
 
 export function serviceBack(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, color: string) {

@@ -1,5 +1,5 @@
 import type { Unit } from "../../engine/types";
-import { SHIRTS, closedShutter, hash, person, shell, type RoomCtx } from "./common";
+import { SHIRTS, closedShutter, person, shell, type RoomCtx } from "./common";
 import { SHOP_LOOKS } from "./shop.looks";
 import { drawShopInterior, drawShopSignage, type ShopGeom } from "./shop.interiors";
 
@@ -48,7 +48,10 @@ export function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: nu
         ctx.fillRect(gx, ry, 4, 4);
       }
     }
-    if (u.occupants > 0 || hash(u.id) > 0.4) person(ctx, x + w - 9, floorY, 1.5, (u.id * 11) | 0);
+    // Honest occupancy: a shop with no one in it draws no one. The old
+    // `hash(u.id) > 0.4` fallback painted a permanent shopper into roughly
+    // three of every five empty shops, a population-independent ghost (#552).
+    if (u.occupants > 0) person(ctx, x + w - 9, floorY, 1.5, (u.id * 11) | 0);
     return;
   }
   // Subtyped shop: the enriched awning trim and lit sign, then the trade's own
@@ -64,7 +67,11 @@ export function shop(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: nu
     floorY,
     awningBottom,
     railY: awningBottom + 8,
-    busy: u.occupants > 0 || hash(u.id) > 0.4,
+    // Honest occupancy on the subtyped path too: this is the branch every shop
+    // the player builds actually takes (`build.ts` rolls a subtype on
+    // placement), so the retired `hash(u.id) > 0.4` fallback lived on here after
+    // the legacy branch was cleaned, browsing customers and all (#552).
+    busy: u.occupants > 0,
     occupants: u.occupants,
     seed: (u.id * 11) | 0,
     lit: d.lit,
