@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.104.1
+
+- Stairs and escalators now show climbers based on the whole flight, not just its lower landing: a flight that ends on a floor nobody can reach stops showing people walking up to it, and one built beside a gap in a split floor shows its climbers again.
+
 ## 1.104.0
 
 - People no longer wander a sky lobby nobody can actually reach. Build a lobby with no elevator or stair serving it and it now reads as empty as it is; connect it and the crowd appears.
