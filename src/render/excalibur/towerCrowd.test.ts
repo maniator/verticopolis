@@ -358,6 +358,28 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     expect(strandedEast.actor.graphics.visible).toBe(false);
   });
 
+  it("asks the engine once per position per revision, and re-asks after a layout change", () => {
+    // `positionReachable` runs a fresh passenger BFS per call once a floor is
+    // split, so the per-frame loop must not call it per walker per frame.
+    const calls: Array<[number, number]> = [];
+    const probe = (f: number, x: number) => (calls.push([f, x]), f !== 15);
+    const e = eng({
+      // Two walkers share a position; a third sits elsewhere on the same floor.
+      walkers: [mkWalker({ floor: 15, tileX: 2 }), mkWalker({ floor: 15, tileX: 2 }), mkWalker({ floor: 15, tileX: 40 })],
+      sim: simFixture({ positionReachable: probe }),
+    });
+    updateMotion(e);
+    updateMotion(e);
+    expect(calls).toEqual([[15, 2], [15, 40]]); // deduped, and not re-asked next frame
+
+    // A transport add/remove bumps the revision, which is exactly when
+    // reachability can change, so the verdicts must be re-asked.
+    calls.length = 0;
+    e.sim.tower.revision = 2;
+    updateMotion(e);
+    expect(calls).toEqual([[15, 2], [15, 40]]);
+  });
+
   it("leaves corridor loiterers on their existing occupancy gate", () => {
     // perFloor walkers already gate on floorLive, and a floor with live
     // occupants is reachable by definition, so they must not pay a second gate.

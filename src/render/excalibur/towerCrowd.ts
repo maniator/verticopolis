@@ -22,6 +22,10 @@ import { applyCrowdCull, reassertCrowdCull } from "./crowdCull";
 /** The empty, idle cab state used to seed a fresh car's graphic. */
 const IDLE_CAR: CarIndicator = { riders: 0, arrow: null, full: false };
 
+/** Per-sim walker reachability verdicts, keyed `floor * 1024 + tileX` and valid
+ *  for one `tower.revision`. See {@link walkerReachable}. */
+const walkReachMemos = new WeakMap<object, { revision: number; verdicts: Map<number, boolean> }>();
+
 /** Retained-actor reconciliation tail: kill and forget every entry the
  *  current pass didn't mark as seen. Each reconciler supplies its own
  *  disposal (kill one actor, kill a pair, drop a parallel sig entry). Shared
@@ -272,11 +276,18 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  untouched. The verdict is memoized there per `tower.revision` in a per-sim
  *  WeakMap, so this is an O(1) lookup that cannot go stale across a load.
  *
- *  Asked per position (#647): on a gap-split Modern floor one contiguous run can
+ *  Asked per POSITION (#647): on a gap-split Modern floor one contiguous run can
  *  be stranded while a sibling run of the same floor still routes to the lobby,
  *  and ambient figures are spawned per run, so a floor-level probe would leave
  *  ghosts on the stranded wing. A gap-free floor is exactly one segment, so this
  *  is identical to the floor-level answer on every Classic tower.
+ *
+ *  The engine memo only covers the whole-floor probe: `positionReachable` takes
+ *  that fast path when a floor has one segment, but runs a fresh passenger BFS
+ *  per call once a floor is split. So the verdicts are memoized here too, in a
+ *  WeakMap keyed by the sim exactly the way the engine does it, so the per-frame
+ *  cost stays a Map lookup however the tower is laid out and a swapped-in sim
+ *  gets a fresh entry rather than inheriting the old tower's answers.
  *
  *  Known gap, and it fails safe: a climber carries its transport's BOTTOM floor,
  *  so a stair whose bottom is reachable but whose top is not still shows
@@ -285,7 +296,22 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  reachable top), and it errs toward showing rather than hiding. Backlog row
  *  `walker-reachability-refinements`. */
 function walkerReachable(engine: TowerEngine, w: Walker): boolean {
-  return engine.sim.positionReachable(w.floor, w.tileX);
+  const sim = engine.sim;
+  const rev = sim.tower.revision;
+  let memo = walkReachMemos.get(sim);
+  if (!memo || memo.revision !== rev) {
+    memo = { revision: rev, verdicts: new Map() };
+    walkReachMemos.set(sim, memo);
+  }
+  // Tile x is bounded by the lot width (375), so 1024 keeps floor and tile in
+  // their own lanes without a string key on the per-frame path.
+  const key = w.floor * 1024 + w.tileX;
+  let hit = memo.verdicts.get(key);
+  if (hit === undefined) {
+    hit = sim.positionReachable(w.floor, w.tileX);
+    memo.verdicts.set(key, hit);
+  }
+  return hit;
 }
 
 /** Repositions every moving actor each frame (the engine then draws them). */
