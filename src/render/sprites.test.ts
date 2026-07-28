@@ -328,8 +328,8 @@ describe("service facilities — reserved colors, integer pixels, and state cues
   });
 
   it("the metro platform draws empty — no baked crowd, legacy or finalized (no ghost people)", () => {
-    // scatterPeople paints via legacy person(), whose hair overlay is a unique
-    // literal; its absence proves no legacy crowd rides the station. The skin
+    // The retired seeded scatter painted via legacy person(), whose hair overlay
+    // is a unique literal; its absence proves no legacy crowd rides the station. The skin
     // tones prove the point for the finalized person() family too: a station
     // that bakes no figure of either idiom paints no skin, so an empty tower
     // reads empty and the real commuters ride the traffic overlay instead.

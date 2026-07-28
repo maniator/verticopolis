@@ -161,7 +161,14 @@ export function bakeSharedGraphics(engine: TowerEngine): void {
       width: TILE,
       height: FLOOR,
       cache: false,
-      draw: (ctx) => drawLobbyEntrance({ ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12 }, kind, 0, 0, TILE, FLOOR),
+      // `staffed` rides the same live read as `anim`: this canvas is cache:false,
+      // so the entrance picks up the tower's first tenant (and its last leaving)
+      // on the very next frame rather than holding a stale baked figure.
+      draw: (ctx) =>
+        drawLobbyEntrance(
+          { ctx, lit, anim: engine.d.anim, hour: lit ? 20 : 12, staffed: engine.d.staffed },
+          kind, 0, 0, TILE, FLOOR,
+        ),
     });
   const bakeService = (lit: boolean): ex.Canvas =>
     new ex.Canvas({

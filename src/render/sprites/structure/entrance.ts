@@ -129,7 +129,9 @@ export function drawGrandFacadeLeft(d: DrawCtx, x: number, y: number, w: number,
   const deskW = 6;
   const deskH = 8;
   const deskTop = y + fy - deskH; // desk base sits on the floor top
-  personSeated(ctx, x, deskTop + deskH - 1, 4);
+  // The desk always stands; only the person behind it is gated, so a tower with
+  // nobody in it shows an unstaffed reception rather than a phantom clerk.
+  if (d.staffed !== false) personSeated(ctx, x, deskTop + deskH - 1, 4);
   ctx.fillStyle = "#6B4A2B"; // walnut counter
   ctx.fillRect(deskL, deskTop, deskW, deskH);
   ctx.fillStyle = "#8A6440"; // lit top rail
@@ -155,7 +157,7 @@ export function drawGrandFacadeRight(d: DrawCtx, x: number, y: number, w: number
   // The doorman stands on the carpet at the doors. Composite dcx = w; placing him
   // at composite dcx + 3 (local x = 3, since off = w) keeps both feet on the red
   // carpet and clear of the right palm's pot at composite 16.
-  drawDoorman(ctx, Math.round(x + 3), y + h - 4, anim);
+  if (d.staffed !== false) drawDoorman(ctx, Math.round(x + 3), y + h - 4, anim);
 }
 
 /** The green-and-gold doorman as a small pixel figure with a two-frame idle
@@ -243,7 +245,7 @@ export function drawGrandCompact(d: DrawCtx, x: number, y: number, w: number, h:
   R(1, fy - 14, 1, 2, "#4E7A3E"); // top frond
   // Doorman on the carpet just right of the doors. lc + 3 keeps his 2px sway
   // frame inside the 11px tile (lc + 4 would clip his rightmost column at x=11).
-  drawDoorman(ctx, Math.round(x + lc + 3), y + h - 4, anim);
+  if (d.staffed !== false) drawDoorman(ctx, Math.round(x + lc + 3), y + h - 4, anim);
 }
 
 /**

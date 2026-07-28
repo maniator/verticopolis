@@ -1,6 +1,6 @@
 import * as ex from "excalibur";
 import { GRID, facilityFloors, hasBusinessHours, isOpenAt } from "../../engine/facilities";
-import type { Transport, Unit } from "../../engine/types";
+import { isPresent, type Transport, type Unit } from "../../engine/types";
 import {
   CRANE_H,
   CRANE_W,
@@ -61,6 +61,18 @@ export function syncScene(engine: TowerEngine): void {
   engine.displayRecycleFill = engine.sim.recyclingFill();
   engine.d.parkingUse = engine.displayParkingUse;
   engine.d.recycleFill = engine.displayRecycleFill;
+  // Entrance staff read as ghosts in a tower nobody lives or works in, so they
+  // are gated on the tower holding anyone (#552). `isPresent` and not a
+  // population count: `totalPopulation` counts live bodies, which for a
+  // commercial unit is its customer tally, so a retail-only tower would read 0
+  // and lose its doorman every hour outside the meal windows. A lease keeps
+  // `state` at `occupied` around the clock (`updatePresence` cycles `occupants`,
+  // never `state`), so this is stable for offices, condos and shops alike.
+  // Structural tiles never qualify: floors and lobbies are placed `empty` and
+  // stay there. A hotel-only tower does go unstaffed between checkout and the
+  // evening check-ins, which is the honest read (there is nobody in it).
+  // Set here rather than in the per-frame tick because the scan walks every unit.
+  engine.d.staffed = tower.units.some((u) => isPresent(u));
   const seenS = new Set<number>();
   const seenR = new Set<number>();
   // Rebuilt fresh each sync from the one flood-fill read above; the region
