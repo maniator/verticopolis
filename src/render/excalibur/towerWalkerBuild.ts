@@ -113,7 +113,8 @@ export function buildWalkers(engine: TowerEngine): void {
 
 /**
  * The tile a flight actually lands on at `floor`: the first structural tile
- * under its footprint, mirroring the router's own `landingSeg`.
+ * under its footprint, mirroring the leftmost run the router's own `landingSegs`
+ * reports.
  *
  * Not `t.x`: a transport only needs SOME tile under its footprint to be
  * structural, so on a gap-split floor a stair may legally sit with its leftmost
@@ -123,8 +124,8 @@ export function buildWalkers(engine: TowerEngine): void {
  *
  * This is a second copy of the router's rule living in the render layer, so the
  * two agreeing is load-bearing rather than incidental: `towerWalkerBuild.test.ts`
- * asserts `segAt(floor, landingTile(...)) === landingSeg(...)` on a real tower so
- * a change to one cannot silently drift from the other (#674).
+ * asserts `segAt(floor, landingTile(...)) === landingSegs(...)[0]` on a real tower
+ * so a change to one cannot silently drift from the other (#674).
  */
 export function landingTile(tower: TowerEngine["sim"]["tower"], t: { x: number; width: number }, floor: number): number {
   for (let i = 0; i < t.width; i++) {

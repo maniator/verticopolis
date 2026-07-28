@@ -1,7 +1,7 @@
 import type { Tower } from "../Tower";
 import type { Transport } from "../types";
 import { isStaffOnlyTransport, isStaffTransportKind, isElevatorKind, WALKWAY_WILLINGNESS } from "../facilities";
-import { floorOfSeg, segAt, landingSeg } from "../tower/segments";
+import { floorOfSeg, segAt, landingSegs } from "../tower/segments";
 import { balanceShafts } from "./shaftBanks";
 import type { Crowd } from "../Crowd";
 import { STRESS_WAIT } from "./person";
@@ -72,14 +72,21 @@ export function buildAdjacency(
     // budget (WALKWAY_WILLINGNESS), not a ride. Tag the edge so the BFS
     // classifies it without a per-hop transport lookup.
     const walkKind = t.kind === "stairs" || t.kind === "escalator" ? t.kind : undefined;
-    // The SEGMENT this shaft attaches to on each stop floor (its physical
-    // landing), so a stop over a gap-split floor links only its own half.
-    const segs = stops.map((fl) => landingSeg(tower, t, fl));
+    // The SEGMENT(s) this shaft attaches to on each stop floor (its physical
+    // landing). A stop over a gap-split floor links only its own half, EXCEPT a
+    // wide shaft whose footprint straddles the gap lands on both runs, so both are
+    // linked (#662). Every landing run of each stop connects to every landing run
+    // of every other stop.
+    const segLists = stops.map((fl) => landingSegs(tower, t, fl));
     for (let ai = 0; ai < stops.length; ai++) {
-      const aSeg = segs[ai];
-      let list = adj.get(aSeg);
-      if (!list) adj.set(aSeg, (list = []));
-      for (let bi = 0; bi < stops.length; bi++) if (bi !== ai) list.push({ f: segs[bi], shaft: t.id, walkKind });
+      for (const aSeg of segLists[ai]) {
+        let list = adj.get(aSeg);
+        if (!list) adj.set(aSeg, (list = []));
+        for (let bi = 0; bi < stops.length; bi++) {
+          if (bi === ai) continue;
+          for (const bSeg of segLists[bi]) list.push({ f: bSeg, shaft: t.id, walkKind });
+        }
+      }
     }
   }
   return adj;

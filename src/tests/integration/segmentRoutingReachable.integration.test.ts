@@ -306,3 +306,108 @@ describe("split floor: shaft balancing never re-picks a rider onto an unreachabl
     }
   });
 });
+
+describe("gap-straddling shaft links both overlapped runs (#662)", () => {
+  it("a wide elevator straddling a gap connects BOTH runs to the lobby", () => {
+    // Floor 2 is split into run A [0..10] and run B [13..25] with an open gap at
+    // [11..12]. A standard elevator is 4 wide, so one placed at x=10 covers columns
+    // 10..13: structure under 10 (run A) and 13 (run B), empty over the gap, so its
+    // single footprint straddles the gap and lands on BOTH runs. The one shaft must
+    // connect each run to the ground lobby; before the fix only the leftmost run
+    // (A) was linked and run B read stranded even though the elevator reaches it.
+    const sim = new Simulation(1, "modern", "realWorld");
+    sim.money = 5_000_000;
+    sim.star = 1;
+    for (let x = 0; x <= 59; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 0; x <= 10; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // run A
+    for (let x = 13; x <= 25; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // run B
+    expect(sim.tower.placeTransport("elevatorStandard", 10, 1, 2).ok, "straddling elevator placed").toBe(true);
+    const ev = sim.tower.transports.find((t) => t.x === 10)!.id;
+    // There is a real gap under the footprint (not a contiguous floor).
+    expect(sim.tower.hasStructure(2, 11) || sim.tower.hasStructure(2, 12), "open gap under the shaft").toBe(false);
+
+    // Both runs reach the lobby through the single straddling shaft.
+    expect(sim.positionReachable(2, 2), "run A reaches the lobby").toBe(true);
+    expect(sim.positionReachable(2, 18), "run B (far side of the gap) reaches the lobby").toBe(true);
+
+    // A rider bound for either run routes via that elevator (the only shaft), so the
+    // far-run tenant is genuinely served, not just marked reachable.
+    const toA = sim.crowd.route(sim.tower, 1, 2, 25, 2);
+    const toB = sim.crowd.route(sim.tower, 1, 2, 25, 18);
+    expect(toA, "route to run A exists").not.toBeNull();
+    expect(toB, "route to run B exists").not.toBeNull();
+    expect(toA!.shafts).toEqual([ev]);
+    expect(toB!.shafts).toEqual([ev]);
+  });
+});
+
+describe("wide gap-straddling shaft: a rider alights on the destination run (#662)", () => {
+  it("a maid routed to a room across the gap from a wide stair's center reaches it", () => {
+    // A stair is 8 wide, so its center can sit on the NEAR run while the far run
+    // also lies under the footprint. Stair at x=10 (footprint 10..17), center 14:
+    // run A [0..14] holds the center, gap [15], run B [16..30] is the far side. The
+    // straddling stair links both runs to the lobby, so a maid dispatched from the
+    // run-A crew to the run-B room rides down and back up and must step off onto run
+    // B. Before the alight fix she stepped off at the center (run A), the walk guard
+    // pinned her at the run-A edge, and she never reached the room.
+    const sim = new Simulation(31, "modern", "realWorld");
+    sim.money = 5_000_000;
+    sim.star = 1;
+    for (let x = 0; x <= 40; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 0; x <= 14; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // run A
+    for (let x = 16; x <= 30; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // run B, gap 15
+    expect(sim.tower.placeTransport("stairs", 10, 1, 2).ok, "wide straddling stair placed").toBe(true);
+    expect(sim.tower.hasStructure(2, 15), "the shaft's center sits over a real gap edge").toBe(false);
+    const crewRes = sim.tower.place("housekeeping", 2, 2); // run A
+    const roomRes = sim.tower.place("hotelSingle", 2, 20); // run B (far side)
+    expect(crewRes.ok && roomRes.ok).toBe(true);
+    const crew = sim.tower.units.find((u) => u.id === crewRes.unitId)!;
+    const room = sim.tower.units.find((u) => u.id === roomRes.unitId)!;
+
+    const sent = sim.crowd.spawnStaff(
+      sim.tower,
+      crew.floor,
+      room.floor,
+      room.x + room.width / 2,
+      room.id,
+      1,
+      crew.x + crew.width / 2,
+    );
+    expect(sent, "the maid was dispatched").toBe("sent");
+
+    let sawMaidOnRunB = false;
+    let done: { unitId: number; ok: boolean } | undefined;
+    for (let i = 0; i < 600 && !done; i++) {
+      sim.crowd.advance(3, sim.tower);
+      for (const p of sim.crowd.people) {
+        if (p.staff && p.floor === 2 && Math.round(p.x) >= 16) sawMaidOnRunB = true;
+      }
+      done = sim.crowd.takeStaffResults().find((r) => r.unitId === room.id);
+    }
+    expect(sawMaidOnRunB, "the maid reached the room's own run (did not strand at the stair center)").toBe(true);
+    expect(done?.ok, "the cleaning job completed").toBe(true);
+  });
+});
+
+describe("bank separation: a straddling shaft never co-banks with a single-run shaft (#662)", () => {
+  it("a rider to the far run always boards the straddling shaft, never a single-run sibling", () => {
+    // Floor 2: run A [0..14], gap [15], run B [16..30]. A wide stair at x=10 straddles
+    // the gap (serves both runs); a standard elevator at x=2 serves run A ONLY. Both
+    // reach floor 2 from the lobby, but only the stair reaches run B. If the two
+    // shared a bank, balanceShafts could re-pick a run-B rider onto the run-A-only
+    // elevator it cannot reach; the run-SET bank key keeps them apart.
+    const tower = new Tower();
+    for (let x = 0; x <= 40; x++) expect(tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 0; x <= 14; x++) expect(tower.place("floor", 2, x).ok).toBe(true); // run A
+    for (let x = 16; x <= 30; x++) expect(tower.place("floor", 2, x).ok).toBe(true); // run B
+    expect(tower.placeTransport("stairs", 10, 1, 2).ok).toBe(true); // straddles {A,B}
+    expect(tower.placeTransport("elevatorStandard", 2, 1, 2).ok).toBe(true); // run A only
+    const straddle = tower.transports.find((t) => t.kind === "stairs")!.id;
+    const crowd = new Crowd();
+    for (let i = 0; i < 60; i++) {
+      const toB = crowd.route(tower, 1, 2, 25, 20); // lobby -> run B
+      expect(toB, "route to run B exists").not.toBeNull();
+      expect(toB!.shafts, "run-B rider always boards the straddling shaft").toEqual([straddle]);
+    }
+  });
+});

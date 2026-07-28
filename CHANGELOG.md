@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.104.2
+
+- An elevator or stair wide enough to straddle a gap now connects the floor on both sides of it, so a room across a narrow gap from the shaft is no longer wrongly reported as having no way to transportation.
+
 ## 1.104.1
 
 - Stairs and escalators now show climbers based on the whole flight, not just its lower landing: a flight that ends on a floor nobody can reach stops showing people walking up to it, and one built beside a gap in a split floor shows its climbers again.
