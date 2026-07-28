@@ -13,12 +13,14 @@ import {
   LOBBY_NO_DRAIN,
   SERVED_RECOVERY,
   GRIPE_WARN,
+  VACATE_RESCIND,
 } from "./constants";
+import { CLASSIC_HOUSEHOLD } from "../households";
 
 /**
  * The PURE per-unit satisfaction step, extracted verbatim from
  * `updateSatisfaction` so that BOTH the authoritative per-tick update AND the
- * move-in sustainability gate ({@link import("./satisfaction").wouldEvictFreshTenant})
+ * move-in sustainability gate ({@link wouldEvictFreshTenant})
  * read ONE source of truth (spec-move-in-sustainability-gate-2026-07-23). The
  * operation order and every `Math.min`/`Math.max` clamp are preserved exactly, so
  * `u.satisfaction = satisfactionStep(sim, u, u.satisfaction, ctx).next` is
@@ -70,10 +72,19 @@ function nearestFloorDist(floors: number[], floor: number): number {
 
 /** Build the once-per-sweep context: congestion (spatial v2 or the v1 scalar),
  *  the served-floor set, the four Modern amenity floor-sets (each gated exactly
- *  as the old inline gather), and a null demand-map to be filled lazily. Pure. */
-export function buildSatisfactionContext(sim: Simulation): SatisfactionContext {
-  const congMap = sim.simModel === "v2" ? sim.spatialCongestionByFloor() : null;
-  const globalCong = congMap ? Math.max(0, ...[0, ...congMap.values()]) : sim.congestion();
+ *  as the old inline gather), and a null demand-map to be filled lazily. Pure.
+ *
+ *  `neutralizeCongestion` zeroes the congestion channel. The move-in gate passes
+ *  it: the gate judges a spot's STATIC placement (noise, distance, rent, retail
+ *  coverage), and congestion is the one time-varying input (rush-hour peaks that
+ *  recover off-peak). Freezing a single snapshot and replaying it across the
+ *  forward horizon would model a permanent rush and refuse a well-placed condo or
+ *  office in a momentarily busy tower, even in Classic. A congestion problem is
+ *  operational (add cars), surfaced by its own gripe, not a reason to hold a spot
+ *  vacant. The per-tick update keeps the live congestion (default false). */
+export function buildSatisfactionContext(sim: Simulation, neutralizeCongestion = false): SatisfactionContext {
+  const congMap = !neutralizeCongestion && sim.simModel === "v2" ? sim.spatialCongestionByFloor() : null;
+  const globalCong = neutralizeCongestion ? 0 : congMap ? Math.max(0, ...[0, ...congMap.values()]) : sim.congestion();
   const servedSet = sim.tower.servedFloors();
   const clubFloors: number[] = [];
   const nightclubFloors: number[] = [];
@@ -158,4 +169,57 @@ export function satisfactionStep(
   const lobbyFar = lobbyDrain.cap <= GRIPE_WARN;
   const unmetDemand = unmetDrain.erosion > 0;
   return { next: s, served, cong, farWalk, noisy, lobbyFar, unmetDemand };
+}
+
+/** How many hourly steps the gate simulates forward before reading the trend: two
+ *  in-game days, long enough for a spot's trajectory to settle past the one-time
+ *  drop to any annoyance ceiling while staying cheap (each step is memoized-lookup
+ *  bound, and the loop early-exits the moment the verdict is decided). The horizon
+ *  is a trend window, NOT a "must evict within N hours" deadline: a spot still
+ *  eroding at the end is gated even if it has not yet crossed the bar, since the
+ *  erosion is a constant per-hour subtraction and will cross it in time. */
+const GATE_HORIZON_HOURS = 48;
+
+/**
+ * The move-in sustainability gate's predicate (spec-move-in-sustainability-gate-2026-07-23):
+ * would a fresh tenant seated into this currently-empty condo/office just be
+ * eroded below the leave bar ({@link VACATE_RESCIND}) and evicted again, so the
+ * spot should stay VACANT instead of selling/leasing and churning forever?
+ *
+ * It runs the SAME authoritative {@link satisfactionStep} the per-tick update
+ * runs, against the tenant the move-in WOULD produce, from a fresh satisfaction
+ * of 1:
+ *  - A condo is probed as a mean {@link CLASSIC_HOUSEHOLD} at the SOLD-condo
+ *    erosion rate (`everOccupied: true` selects `CONDO_NOISE_EROSION`), NOT the
+ *    steeper unsold rate, so a spot a real family would hold via a daycare or
+ *    fitness halo is not over-blocked. An office keeps its own residents.
+ *  - The clone is shallow, keeping `id`/`floor`/`x`/`width`, so every spatial
+ *    lookup (noise, transport, lobby, coverage) resolves to the real spot.
+ *
+ * Early-exits as soon as the verdict is decided: block the moment satisfaction
+ * crosses below the bar, allow the moment it stabilizes or recovers at/above the
+ * bar. If it is STILL eroding at the end of the horizon (it dropped on every
+ * step, never stabilizing), it is gated too: the per-hour erosion is a constant
+ * subtraction, so a tenant on that downward line crosses the bar in time and
+ * would just churn, which is exactly the slow condo/office slide this fixes.
+ * Draws no RNG and mutates nothing, so gating a candidate only skips that
+ * candidate's own move-in draw (the seeded stream is otherwise untouched).
+ */
+export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: SatisfactionContext): boolean {
+  const probe: Unit = {
+    ...u,
+    everOccupied: true,
+    residents: u.kind === "condo" ? CLASSIC_HOUSEHOLD : u.residents,
+  };
+  let s = 1;
+  for (let i = 0; i < GATE_HORIZON_HOURS; i++) {
+    const prev = s;
+    s = satisfactionStep(sim, probe, s, ctx).next;
+    if (s < VACATE_RESCIND) return true; // a fresh tenant here erodes out; keep it vacant
+    if (s >= prev) return false; // stabilized or recovering above the bar; livable
+  }
+  // Ran the whole horizon still above the bar but decreasing on every step: a
+  // sustained net erosion that crosses the bar in time (any step that held or
+  // rose would have returned false above). Keep the spot vacant.
+  return true;
 }

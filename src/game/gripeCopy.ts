@@ -1,6 +1,7 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage } from "../engine/sim/gripe";
+import { unmetCoverage, dominantGripe } from "../engine/sim/gripe";
+import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
@@ -49,4 +50,40 @@ function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
 export function gripeLineText(sim: Simulation, u: Unit, gripe: VacateReason): string | undefined {
   if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u);
   return GRIPE_TEXT[gripe];
+}
+
+/**
+ * The inspector's "Won't lease" line for an EMPTY, on-market, reachable
+ * condo/office the move-in sustainability gate holds vacant (a fresh tenant here
+ * would erode below the leave bar and give notice again), or null when the unit
+ * would fill. The empty-unit mirror of the "Main gripe" line: it names WHY no one
+ * leases the spot so a perpetual vacancy reads as an actionable placement problem
+ * instead of a mystery. Like "Main gripe" it spells out only the causes WITHOUT a
+ * dedicated diagnostic line (congestion, over-market rent, noise, unmet demand);
+ * access, the office long-walk, and very-far lobby distance keep their own
+ * actionable lines on the card, so for those the line just says a tenant would
+ * give notice and points to the flagged problem. Gated on the SAME predicate
+ * `attemptMoveIns` uses, so the card and the move-in decision can never disagree;
+ * unreachable and off-market units are excluded (their own lines tell that
+ * story), matching the engine, which never reaches the gate for them.
+ */
+export function wontLeaseText(sim: Simulation, u: Unit): string | null {
+  if (
+    !(u.kind === "office" || u.kind === "condo") ||
+    u.state !== "empty" ||
+    u.noRate ||
+    !sim.tower.isFloorServed(u.floor) ||
+    !sim.floorReachable(u.floor) ||
+    !wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
+  ) {
+    return null;
+  }
+  // Name the cause the GATE actually held the spot for, which excludes congestion
+  // (the gate context neutralizes it). Passing cong = 0 to dominantGripe skips the
+  // congestion tier so the line never tells the player to "add cars" when adding
+  // cars would not fill the spot; the structural cause the neutralized gate caught
+  // (noise, far walk, lobby distance, rent, unmet demand) wins instead.
+  const gripe = dominantGripe(sim, u, undefined, 0);
+  const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
+  return text ? `Won't lease: ${text}` : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
 }
