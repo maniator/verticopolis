@@ -1032,6 +1032,15 @@ ul.slots {
 ul.slots > li {
   list-style: none;
 }
+/* The title-screen picker's row actions are its PRIMARY controls, so they meet
+   the contract's target floor (42px, 48px on touch) rather than inheriting the
+   in-game manager's compact 5px-padding chip. Scoped to the picker's <ul> so
+   the manager's own rows are untouched. */
+ul.slots .slot-actions .btn {
+  min-height: 42px;
+  padding: 8px 14px;
+  font-size: 12px;
+}
 .slot + .slot {
   border-top: 1px solid var(--panel-light);
 }
@@ -1988,6 +1997,9 @@ body.splash-up #toast-wrap { z-index: 45; }
    (.xs) are exempt — 36px squares inflate every navy bar (the production
    "giant close button" bug); Esc/backdrop/hover-away still dismiss. */
 @media (pointer: coarse) {
+  ul.slots .slot-actions .btn {
+    min-height: 48px;
+  }
   .modal-actions .btn,
   .modal-box .btn:not(.xs),
   #editor .ed-row .btn,

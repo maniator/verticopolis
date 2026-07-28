@@ -63,12 +63,24 @@ export function slotDetail(s: SlotInfo): TemplateResult {
 
 function slotRow(s: SlotInfo): TemplateResult {
   const name = slotName(s);
-  const detail = s.exists ? slotDetail(s) : html`<div class="slot-detail slot-empty">empty</div>`;
+  // Present in storage but unparseable HERE. This is not an empty slot, and
+  // saying so would invite the player to overwrite bytes a later build may
+  // still recover (the reasoning `preserveUnreadable` applies to the autosave,
+  // and the same wording the title screen's picker uses). So the row is
+  // labeled, and it loses its Save button: overwriting is the one action that
+  // destroys the evidence. Delete stays, because clearing a slot you have been
+  // told is unreadable is a deliberate choice rather than a silent loss.
+  const unreadable = s.present && !s.exists;
+  const detail = s.exists
+    ? slotDetail(s)
+    : unreadable
+      ? html`<div class="slot-detail slot-unreadable">Couldn't be read by this version.</div>`
+      : html`<div class="slot-detail slot-empty">empty</div>`;
   const saveBtn =
-    s.slot === "auto" ? nothing : html`<button class="btn" data-save="${s.slot}">Save</button>`;
+    s.slot === "auto" || unreadable ? nothing : html`<button class="btn" data-save="${s.slot}">Save</button>`;
   const loadBtn = s.exists ? html`<button class="btn" data-load="${s.slot}">Load</button>` : nothing;
   const delBtn =
-    s.exists && s.slot !== "auto"
+    (s.exists || unreadable) && s.slot !== "auto"
       ? html`<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
       : nothing;
   return html`<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;

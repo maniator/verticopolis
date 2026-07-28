@@ -93,3 +93,27 @@ describe("savesTemplate escapes the tower name as text", () => {
     expect(frag.querySelector(".slot-detail")!.textContent).toContain(hostile);
   });
 });
+
+describe("savesTemplate protects a present-but-unreadable slot", () => {
+  it("labels it, drops Save, and keeps Delete", () => {
+    // Not "empty": overwriting would destroy bytes a later build may still
+    // recover, which is what preserveUnreadable exists to prevent for the
+    // autosave. Delete stays, because clearing a slot you have been TOLD is
+    // unreadable is a deliberate choice rather than a silent loss.
+    const slots: SlotInfo[] = [{ slot: 1, exists: false, present: true }];
+    const row = renderToFragment(savesTemplate(slots)).querySelector(".slot")!;
+    expect(row.textContent).toContain("Couldn't be read by this version.");
+    expect(row.querySelector(".slot-empty")).toBeNull();
+    expect(row.querySelector("[data-save]")).toBeNull();
+    expect(row.querySelector("[data-load]")).toBeNull();
+    expect(row.querySelector("[data-del]")).not.toBeNull();
+  });
+
+  it("still offers Save on a genuinely absent slot", () => {
+    const slots: SlotInfo[] = [{ slot: 2, exists: false, present: false }];
+    const row = renderToFragment(savesTemplate(slots)).querySelector(".slot")!;
+    expect(row.querySelector(".slot-empty")).not.toBeNull();
+    expect(row.querySelector("[data-save]")).not.toBeNull();
+    expect(row.querySelector("[data-del]")).toBeNull();
+  });
+});
