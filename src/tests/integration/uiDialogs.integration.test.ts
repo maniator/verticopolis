@@ -1822,9 +1822,9 @@ describe("showSettings: the Settings dialog", () => {
 
 describe("showSaves — the save-slot manager", () => {
   const slots = [
-    { slot: "auto" as const, exists: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
-    { slot: 1, exists: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
-    { slot: 2, exists: false },
+    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
+    { slot: 1, exists: true, present: true, towerName: "One", star: 6, population: 15000, funds: 1_000_000, savedAt: 1_700_000_000_000 },
+    { slot: 2, exists: false, present: false },
   ];
 
   it("renders one row per slot with the right actions (auto: no Save/Delete; empty: Save only)", () => {
@@ -1872,6 +1872,72 @@ describe("showSaves — the save-slot manager", () => {
     ui.showSaves(slots);
     dialog().querySelector<HTMLElement>('[data-load="auto"]')!.click();
     expect(cb.onLoadSlot).toHaveBeenCalledWith("auto");
+  });
+});
+
+/**
+ * The title screen's load-only tower picker controller
+ * (SPEC-splash-load-tower CAP-3 / CAP-5). Row rendering is pinned in
+ * `src/ui/templates/towerPicker.test.ts`; this covers the wiring the
+ * controller owns.
+ */
+describe("showTowerPicker — the title-screen load picker", () => {
+  const present = [
+    { slot: "auto" as const, exists: true, present: true, towerName: "Auto Twr", star: 2, population: 300, funds: 50000, savedAt: 1_700_000_000_000 },
+    { slot: 1, exists: false, present: false },
+  ];
+
+  it("loads a slot and closes nothing itself: adoption owns the teardown", () => {
+    const { ui } = makeUI();
+    const onLoad = vi.fn(() => true);
+    ui.showTowerPicker({ getSlots: () => present, onLoad });
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(onLoad).toHaveBeenCalledWith("auto");
+  });
+
+  it("re-renders with an inline error, staying open, when a load fails", () => {
+    // CAP-5: a failed load must not cost the player the title screen. The
+    // reason renders IN the dialog rather than as a toast, because the title
+    // screen paints over the toast rail.
+    const { ui } = makeUI();
+    ui.showTowerPicker({ getSlots: () => present, onLoad: () => false });
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(dialog().open).toBe(true);
+    expect(dialog().querySelector(".picker-error")!.textContent).toContain("couldn't be read");
+  });
+
+  it("re-reads storage on every render, so a re-render is never stale", () => {
+    const { ui } = makeUI();
+    const getSlots = vi.fn(() => present);
+    ui.showTowerPicker({ getSlots, onLoad: () => false });
+    expect(getSlots).toHaveBeenCalledOnce();
+    dialog().querySelector<HTMLElement>('[data-picker="load"]')!.click();
+    expect(getSlots).toHaveBeenCalledTimes(2);
+  });
+
+  it("the file row closes the dialog and hands off to the OS picker", async () => {
+    const { ui, cb } = makeUI();
+    vi.spyOn(HTMLInputElement.prototype, "click").mockImplementation(() => {});
+    ui.showTowerPicker({ getSlots: () => present, onLoad: () => true });
+    dialog().querySelector<HTMLElement>('[data-picker="file"]')!.click();
+    // Same reason the saves manager yields: the .TDT fidelity report refuses to
+    // open while another modal is live.
+    expect(dialog().open).toBe(false);
+    const input = document.getElementById("import-file") as HTMLInputElement;
+    expect(input.accept.startsWith(".vctower")).toBe(true);
+    const file = new File(["VCTOWER1\npayload"], "tower.vctower");
+    Object.defineProperty(input, "files", { value: [file], configurable: true });
+    input.onchange!(new Event("change"));
+    await vi.waitFor(() => expect(cb.onImport).toHaveBeenCalledExactlyOnceWith("VCTOWER1\npayload"));
+  });
+
+  it("Back closes the picker and nothing else", () => {
+    const { ui } = makeUI();
+    const onLoad = vi.fn(() => true);
+    ui.showTowerPicker({ getSlots: () => present, onLoad });
+    dialog().querySelector<HTMLElement>('[data-picker="back"]')!.click();
+    expect(dialog().open).toBe(false);
+    expect(onLoad).not.toHaveBeenCalled();
   });
 });
 
@@ -2776,9 +2842,9 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
   it("shows a coerced rule-set chip and the day on every existing slot; empty slots get neither", () => {
     const { ui } = makeUI();
     ui.showSaves([
-      { slot: "auto", exists: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
-      { slot: 1, exists: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
-      { slot: 2, exists: false },
+      { slot: "auto", exists: true, present: true, towerName: "Old Faithful", star: 3, population: 900, funds: 1000, savedAt: 1, mode: "classic", day: 42 },
+      { slot: 1, exists: true, present: true, towerName: "New Ways", star: 2, population: 400, funds: 500, savedAt: 1, mode: "modern", day: 7 },
+      { slot: 2, exists: false, present: false },
     ]);
     const rows = Array.from(dialog().querySelectorAll(".slot"));
     expect(rows[0].querySelector(".nt-badge")!.textContent).toBe("Classic");
@@ -2794,7 +2860,7 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
   it("omits the day when the save's minutes were malformed, keeping the timestamp", () => {
     const { ui } = makeUI();
     ui.showSaves([
-      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
+      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1700000000000, mode: "classic" },
     ]);
     const when = dialog().querySelector(".slot-when")!.textContent!;
     expect(when).not.toMatch(/\bDay\b/);
@@ -2806,7 +2872,7 @@ describe("Saved Towers rows (mode chip + in-game day)", () => {
     ui.showSaves([
       // A hostile producer bypassing SlotInfo's types (the storage layer
       // already bounds day; this pins the render-side finiteness guard).
-      { slot: 1, exists: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
+      { slot: 1, exists: true, present: true, towerName: "T", star: 1, population: 0, funds: 0, savedAt: 1, mode: "classic", day: "<img>" as unknown as number },
     ]);
     const when = dialog().querySelector(".slot-when")!.textContent!;
     expect(when).not.toContain("<img>");

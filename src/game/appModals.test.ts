@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { GameApp } from "../main";
 import type { Simulation } from "../engine/Simulation";
-import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot } from "./appModals";
+import { showStats, showSaves, saveToSlot, loadFromSlot, deleteSlot, showTowerPicker, loadFromSplash } from "./appModals";
 import { SaveGame } from "../storage/SaveGame";
 
 /**
@@ -68,6 +68,7 @@ function makeApp(sim: SimShape) {
     showStats: vi.fn(),
     confirmModal: vi.fn(),
     showSaves: vi.fn(),
+    showTowerPicker: vi.fn(),
     toast: vi.fn(),
   };
   const engine = { viewState: vi.fn(() => ({ camera: "VIEW" })) };
@@ -281,5 +282,79 @@ describe("deleteSlot", () => {
     deleteSlot(app, 3);
     expect(SaveGame.deleteSlot).toHaveBeenCalledExactlyOnceWith(3);
     expect(ui.toast).toHaveBeenCalledExactlyOnceWith("Deleted slot 3.", "info");
+  });
+});
+
+/**
+ * The title-screen load commands (SPEC-splash-load-tower). They are separate
+ * from {@link loadFromSlot} because the splash changes two contracts: failures
+ * must not toast (the title screen paints over the toast rail), and the
+ * teardown plus re-pause belong to `adoptSim`, not here.
+ */
+describe("loadFromSplash", () => {
+  it("adopts the tower and reports success, without toasting or re-pausing", () => {
+    const loaded = { tag: "TOWER" } as unknown as Simulation;
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(loaded);
+    const { app, ui, adoptSim } = makeApp(makeSim());
+    expect(loadFromSplash(app, 2)).toBe(true);
+    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+    // adoptSim owns the "Welcome back" toast and the speed-0 re-pause, so that
+    // every arrival route (slot, .vctower, .TDT) behaves identically.
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+
+  it("reads the autosave via load() for the 'auto' slot", () => {
+    const loaded = { tag: "AUTO" } as unknown as Simulation;
+    vi.mocked(SaveGame.load).mockReturnValueOnce(loaded);
+    const { app, adoptSim } = makeApp(makeSim());
+    expect(loadFromSplash(app, "auto")).toBe(true);
+    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
+  });
+
+  it("reports failure WITHOUT adopting or toasting, so the title screen survives", () => {
+    // The picker renders the reason inline instead. Adopting nothing is what
+    // keeps the splash up: adoptSim is the only thing that takes it down.
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(null);
+    const { app, ui, adoptSim } = makeApp(makeSim());
+    expect(loadFromSplash(app, 1)).toBe(false);
+    expect(adoptSim).not.toHaveBeenCalled();
+    expect(ui.toast).not.toHaveBeenCalled();
+  });
+});
+
+describe("showTowerPicker", () => {
+  it("passes a thunk that re-reads storage per call, not a captured snapshot", () => {
+    const { app, ui } = makeApp(makeSim());
+    showTowerPicker(app);
+    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as { getSlots: () => unknown[] };
+    expect(SaveGame.listSlots).not.toHaveBeenCalled(); // nothing read until rendered
+    getSlots();
+    getSlots();
+    expect(SaveGame.listSlots).toHaveBeenCalledTimes(2);
+  });
+
+  it("degrades to an empty list when storage is disabled outright", () => {
+    // listSlots reads localStorage, which THROWS a SecurityError rather than
+    // returning null when storage is blocked. The title screen must not die on
+    // that, and an empty list is the right answer anyway: the player gets the
+    // nothing-saved line plus the file row, which is their only way in on a
+    // browser that will not keep their towers.
+    vi.mocked(SaveGame.listSlots).mockImplementationOnce(() => {
+      throw new DOMException("denied", "SecurityError");
+    });
+    const { app, ui } = makeApp(makeSim());
+    showTowerPicker(app);
+    const { getSlots } = ui.showTowerPicker.mock.calls[0][0] as { getSlots: () => unknown[] };
+    expect(getSlots()).toEqual([]);
+  });
+
+  it("routes a picked slot through loadFromSplash", () => {
+    const loaded = { tag: "TOWER" } as unknown as Simulation;
+    vi.mocked(SaveGame.loadSlot).mockReturnValueOnce(loaded);
+    const { app, ui, adoptSim } = makeApp(makeSim());
+    showTowerPicker(app);
+    const cb = ui.showTowerPicker.mock.calls[0][0] as { onLoad: (s: number | "auto") => boolean };
+    expect(cb.onLoad(3)).toBe(true);
+    expect(adoptSim).toHaveBeenCalledExactlyOnceWith(loaded);
   });
 });

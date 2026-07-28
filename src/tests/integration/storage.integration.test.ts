@@ -764,6 +764,23 @@ describe("SaveGame", () => {
     expect(info.savedAt).toBeGreaterThan(0);
   });
 
+  it("listSlots tells an EMPTY slot from a present-but-unreadable one", () => {
+    // SPEC-splash-load-tower CAP-2. `exists` is parse-based and reads false for
+    // both, so only the raw `present` flag separates "nothing was ever here"
+    // from "a tower is here that this build cannot read". The title screen's
+    // picker keys its rows on that difference: hiding an unreadable slot would
+    // claim the tower is gone while the bytes are still on disk, which is the
+    // very thing preserveUnreadable exists to prevent.
+    SaveGame.saveSlot(1, sampleGame());
+    localStorage.setItem("simtower-clone-slot-2", "VCZ1:not-actually-base64-deflate");
+    const slots = SaveGame.listSlots();
+    const at = (n: number | "auto") => slots.find((s) => s.slot === n)!;
+
+    expect(at(1)).toMatchObject({ exists: true, present: true }); // readable
+    expect(at(2)).toMatchObject({ exists: false, present: true }); // unreadable
+    expect(at(3)).toMatchObject({ exists: false, present: false }); // empty
+  });
+
   it("exports a .vctower container (magic line + packed payload, not raw JSON) and imports it back", async () => {
     const sim = sampleGame();
     const file = await SaveGame.export(sim);

@@ -24,6 +24,11 @@ const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "
  *  audio state stays put (SPEC-splash-mute CAP-2). */
 export interface SplashHandlers {
   onContinue: () => void;
+  /** Open the load-only tower picker (SPEC-splash-load-tower CAP-1). Always
+   *  bound: the picker is the only route to a manual slot or a `.vctower`
+   *  file from the title screen, and it stays useful when nothing is saved
+   *  yet (its file row is how a new device gets its towers back). */
+  onLoadTower: () => void;
   onNewTower: () => void;
   onHelp: () => void;
   onToggleMute?: (e: Event) => void;
@@ -74,8 +79,19 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
       </svg>
       <p class="splash-premise">${premise}</p>
     </div>
+    <!-- Continue, Load Tower, New Tower, then How to Play
+         (SPEC-splash-load-tower CAP-1). New Tower comes AFTER Load Tower
+         because it is the only action here that can cost the player
+         something, so it sits furthest from the default focus and from the
+         Esc/backdrop safe dismiss (both of which resolve toward Continue).
+         Load Tower never takes the primary class: exactly one amber plate is
+         on screen at a time, Continue when a save exists and New Tower when
+         none does, so the eye always has a single default.
+         NOTE: no backticks in this comment. It sits inside a tagged template
+         literal, so one would end the template. -->
     <div class="splash-actions">
       ${hasSave ? html`<button class="splash-btn primary" data-splash="continue" @click=${h.onContinue}>▶ Continue</button>` : nothing}
+      <button class="splash-btn" data-splash="load" @click=${h.onLoadTower}>▤ Load Tower</button>
       <button class="splash-btn ${hasSave ? "" : "primary"}" data-splash="new" @click=${h.onNewTower}>＋ New Tower</button>
       <button class="splash-btn ghost" data-splash="help" @click=${h.onHelp}>？ How to Play</button>
     </div>

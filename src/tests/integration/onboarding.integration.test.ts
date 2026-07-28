@@ -173,7 +173,7 @@ function makeSpyController(mobile = false) {
     },
     removeEventListener() {},
   } as unknown as MediaQueryList;
-  const opts = { mq, showHelp: vi.fn(), pauseForSplash: vi.fn(), chime: vi.fn() };
+  const opts = { mq, showHelp: vi.fn(), pauseForSplash: vi.fn(), chime: vi.fn(), onEnterTower: vi.fn() };
   const c = new OnboardingController(opts);
   return { c, opts, fireMq: () => mqHandler?.() };
 }
@@ -190,7 +190,7 @@ describe("Onboarding — splash / title screen", () => {
 
   it("mounts a modal splash, pauses the engine, and offers Continue only with a save", () => {
     const { c, opts } = makeSpyController();
-    c.showSplash({ hasSave: true, onContinue: vi.fn(), onNewTower: vi.fn() });
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
     const splash = document.getElementById("splash")!;
     expect(splash.getAttribute("aria-modal")).toBe("true");
     expect(opts.pauseForSplash).toHaveBeenCalledWith(true);
@@ -200,13 +200,13 @@ describe("Onboarding — splash / title screen", () => {
 
   it("hides Continue when there is no save", () => {
     const { c } = makeSpyController();
-    c.showSplash({ hasSave: false, onContinue: vi.fn(), onNewTower: vi.fn() });
+    c.showSplash({ hasSave: false, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
     expect(document.querySelector('[data-splash="continue"]')).toBeNull();
   });
 
   it("keeps the lettering SVGs labeled and the decorative layers hidden from a screen reader", () => {
     const { c } = makeSpyController();
-    c.showSplash({ hasSave: true, onContinue: vi.fn(), onNewTower: vi.fn() });
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
     const splash = document.getElementById("splash")!;
     // The wordmark and tagline are the accessible name of the title screen.
     expect(splash.querySelector(".splash-word")!.getAttribute("aria-label")).toBe("Verticopolis");
@@ -221,17 +221,64 @@ describe("Onboarding — splash / title screen", () => {
   it("Continue tears down the splash, resumes the engine, and calls onContinue", () => {
     const { c, opts } = makeSpyController();
     const onContinue = vi.fn();
-    c.showSplash({ hasSave: true, onContinue, onNewTower: vi.fn() });
+    c.showSplash({ hasSave: true, onContinue, onLoadTower: vi.fn(), onNewTower: vi.fn() });
     document.querySelector<HTMLElement>('[data-splash="continue"]')!.click();
     expect(document.getElementById("splash")).toBeNull();
     expect(opts.pauseForSplash).toHaveBeenLastCalledWith(false);
     expect(onContinue).toHaveBeenCalledOnce();
   });
 
+  it("Load Tower keeps the splash up and hands the host NO dismiss callback", () => {
+    // SPEC-splash-load-tower CAP-5: the title screen is dismissed by a tower
+    // arriving, never by a dialog opening. Handing out a dismiss callback here
+    // is exactly how a cancelled picker, or a failed load, would end up
+    // stranding the player inside the throwaway boot sim.
+    const { c } = makeSpyController();
+    const onLoadTower = vi.fn();
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower, onNewTower: vi.fn() });
+    document.querySelector<HTMLElement>('[data-splash="load"]')!.click();
+    expect(onLoadTower).toHaveBeenCalledOnce();
+    expect(onLoadTower.mock.calls[0]).toHaveLength(0);
+    expect(document.getElementById("splash")).not.toBeNull();
+    expect(c.dismissSplash()).toBe(true); // only an arriving tower takes it down
+    expect(document.getElementById("splash")).toBeNull();
+  });
+
+  it("dismissSplash reports whether it tore anything down", () => {
+    // adoptSim keys the re-pause and the welcome toast off this return, so a
+    // mid-game tower swap (no splash) must not claim one.
+    const { c, opts } = makeSpyController();
+    expect(c.dismissSplash()).toBe(false);
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
+    expect(c.dismissSplash()).toBe(true);
+    expect(opts.pauseForSplash).toHaveBeenLastCalledWith(false);
+    expect(c.dismissSplash()).toBe(false); // idempotent
+  });
+
+  it("a tower ARRIVING dismisses the splash and hands the host the re-pause (CAP-5/CAP-6)", () => {
+    // adoptSim is the one junction every arrival passes through: a loaded slot,
+    // a .vctower, a 1994 .TDT. The host re-pauses there, so a tower the player
+    // has not opened in weeks never starts running under them.
+    const { c, opts } = makeSpyController();
+    c.showSplash({ hasSave: true, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
+    c.adoptSim(newSeededGame(9));
+    expect(document.getElementById("splash")).toBeNull();
+    expect(opts.onEnterTower).toHaveBeenCalledOnce();
+  });
+
+  it("a mid-game tower swap does not claim a splash that was never up", () => {
+    // The New Tower path dismisses before founding, and Load from inside a
+    // running game has no splash at all. Neither may fire the welcome-back
+    // re-pause, which would silently stop the clock on a playing tower.
+    const { c, opts } = makeSpyController();
+    c.adoptSim(newSeededGame(9));
+    expect(opts.onEnterTower).not.toHaveBeenCalled();
+  });
+
   it("New Tower keeps the splash up and hands the host a dismiss callback", () => {
     const { c } = makeSpyController();
     const onNewTower = vi.fn();
-    c.showSplash({ hasSave: false, onContinue: vi.fn(), onNewTower });
+    c.showSplash({ hasSave: false, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower });
     document.querySelector<HTMLElement>('[data-splash="new"]')!.click();
     expect(onNewTower).toHaveBeenCalledOnce();
     expect(document.getElementById("splash")).not.toBeNull(); // stays until host dismisses
@@ -241,7 +288,7 @@ describe("Onboarding — splash / title screen", () => {
 
   it("Help opens help over the splash without dismissing it", () => {
     const { c, opts } = makeSpyController();
-    c.showSplash({ hasSave: false, onContinue: vi.fn(), onNewTower: vi.fn() });
+    c.showSplash({ hasSave: false, onContinue: vi.fn(), onLoadTower: vi.fn(), onNewTower: vi.fn() });
     document.querySelector<HTMLElement>('[data-splash="help"]')!.click();
     expect(opts.showHelp).toHaveBeenCalledOnce();
     expect(document.getElementById("splash")).not.toBeNull();
@@ -250,14 +297,14 @@ describe("Onboarding — splash / title screen", () => {
   it("Esc resolves to the safe default: Continue with a save, no-op without one", () => {
     const withSave = makeSpyController();
     const onContinue = vi.fn();
-    withSave.c.showSplash({ hasSave: true, onContinue, onNewTower: vi.fn() });
+    withSave.c.showSplash({ hasSave: true, onContinue, onLoadTower: vi.fn(), onNewTower: vi.fn() });
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(onContinue).toHaveBeenCalledOnce();
     expect(document.getElementById("splash")).toBeNull();
 
     const noSave = makeSpyController();
     const onContinue2 = vi.fn();
-    noSave.c.showSplash({ hasSave: false, onContinue: onContinue2, onNewTower: vi.fn() });
+    noSave.c.showSplash({ hasSave: false, onContinue: onContinue2, onLoadTower: vi.fn(), onNewTower: vi.fn() });
     document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     expect(onContinue2).not.toHaveBeenCalled(); // New Tower must be explicit
     expect(document.getElementById("splash")).not.toBeNull();
@@ -266,7 +313,7 @@ describe("Onboarding — splash / title screen", () => {
   it("Esc is ignored while a modal is stacked over the splash (so canceling Help/New Tower doesn't dismiss the title screen)", () => {
     const { c } = makeSpyController();
     const onContinue = vi.fn();
-    c.showSplash({ hasSave: true, onContinue, onNewTower: vi.fn() });
+    c.showSplash({ hasSave: true, onContinue, onLoadTower: vi.fn(), onNewTower: vi.fn() });
     // A returning player with a save now sees the splash on any boot that isn't a
     // post-update resume, and can open a modal over it. That modal owns Esc; the
     // splash's safeDismiss must not also fire and drop them into Continue.

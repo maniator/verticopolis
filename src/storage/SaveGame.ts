@@ -73,6 +73,20 @@ const TOWER_FILE_MAGIC = "VCTOWER1";
 export interface SlotInfo {
   slot: number | "auto";
   exists: boolean;
+  /**
+   * RAW presence: the key is in storage, whether or not it parses. Distinct
+   * from {@link exists}, which is parse-based and false for a corrupt slot.
+   *
+   * The title screen's load-only picker needs the difference
+   * (SPEC-splash-load-tower CAP-2): a slot that is present but unreadable is
+   * SHOWN and labeled rather than hidden, because a save written by a newer
+   * build is unreadable *here* and may still be recovered later. That is the
+   * same reasoning `preserveUnreadable` already applies to the autosave, and
+   * hiding the row would tell the player their tower is gone while the bytes
+   * are still on disk. Anything picking a "free" slot to WRITE must keep
+   * using {@link SaveGame.hasSlot} directly.
+   */
+  present: boolean;
   towerName?: string;
   star?: number;
   population?: number;
@@ -129,8 +143,12 @@ function parseSavedAt(value: unknown): number | undefined {
 }
 
 function infoFrom(slot: number | "auto", key: string): SlotInfo {
+  // Read presence BEFORE parsing: readSlot returns null for an absent key and
+  // for a present-but-undecodable one alike, so the raw check is the only way
+  // to tell "empty" from "unreadable" (see SlotInfo.present).
+  const present = localStorage.getItem(key) !== null;
   const data = readSlot(key);
-  if (!data) return { slot, exists: false };
+  if (!data) return { slot, exists: false, present };
   let population = 0;
   try {
     population = Simulation.deserialize(data).population;
@@ -140,6 +158,7 @@ function infoFrom(slot: number | "auto", key: string): SlotInfo {
   return {
     slot,
     exists: true,
+    present: true,
     towerName: data.towerName,
     star: data.star,
     population,

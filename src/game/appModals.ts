@@ -105,6 +105,52 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
   }
 }
 
+/**
+ * Open the title screen's load-only tower picker
+ * (SPEC-splash-load-tower CAP-2 to CAP-5).
+ *
+ * `listSlots` is passed as a thunk, not a snapshot, so a re-render after a
+ * failed load re-reads storage. It is guarded because `listSlots` reads
+ * localStorage, which THROWS rather than returning null when storage is
+ * disabled outright (a SecurityError), and the title screen must not die on
+ * that. Degrading to an empty list is also the right answer for the player:
+ * they get the nothing-saved line and the file row, which is exactly the
+ * recovery route for a browser that will not keep their towers.
+ */
+export function showTowerPicker(app: GameApp): void {
+  trackAppAction("saves_open"); // same funnel event as the in-game manager
+  app.ui.showTowerPicker({
+    getSlots: () => {
+      try {
+        return SaveGame.listSlots();
+      } catch {
+        return [];
+      }
+    },
+    onLoad: (slot) => loadFromSplash(app, slot),
+  });
+}
+
+/**
+ * Load a device slot from the TITLE SCREEN, reporting whether a tower was
+ * actually adopted (SPEC-splash-load-tower CAP-5).
+ *
+ * Distinct from {@link loadFromSlot}, which runs mid-game: this one must NOT
+ * toast its failure. The title screen paints over the toast rail, so a toast
+ * here is feedback the player never sees; the picker renders the reason inline
+ * instead, which is why the outcome comes back as a boolean.
+ *
+ * On success nothing here tears the splash down or re-pauses. `adoptSim` owns
+ * both, so every arrival route behaves identically.
+ */
+export function loadFromSplash(app: GameApp, slot: number | "auto"): boolean {
+  const loaded = slot === "auto" ? SaveGame.load() : SaveGame.loadSlot(slot);
+  if (!loaded) return false;
+  app.adoptSim(loaded);
+  trackAppAction("load_slot"); // slot (or autosave) adopted as the live tower
+  return true;
+}
+
 export function deleteSlot(app: GameApp, slot: number): void {
   SaveGame.deleteSlot(slot);
   trackAppAction("delete_save"); // slot cleared

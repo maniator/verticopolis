@@ -37,7 +37,7 @@ function mountSplash(o: {
   ctl.showSplash({
     hasSave: o.hasSave ?? false,
     onContinue: vi.fn(),
-    onNewTower: vi.fn(),
+    onLoadTower: vi.fn(), onNewTower: vi.fn(),
     muted: () => o.muted ?? false,
     onToggleMute: o.onToggleMute,
     installOffered: o.installOffered === undefined ? undefined : () => o.installOffered!,
@@ -49,6 +49,49 @@ function mountSplash(o: {
 afterEach(() => {
   document.getElementById("splash")?.remove();
   document.body.innerHTML = "";
+});
+
+/**
+ * The Load Tower action (SPEC-splash-load-tower CAP-1). The picker it opens is
+ * pinned in `./templates/towerPicker.test.ts`; the dismissal contract lives in
+ * the onboarding integration tests.
+ */
+describe("splash Load Tower action (SPEC-splash-load-tower CAP-1)", () => {
+  const order = (el: HTMLElement) =>
+    Array.from(el.querySelectorAll<HTMLElement>(".splash-actions button")).map((b) =>
+      b.getAttribute("data-splash"),
+    );
+
+  it("renders for a returning player, between Continue and New Tower", () => {
+    // New Tower sits AFTER it because New Tower is the only action here that
+    // can cost the player something, so it stays furthest from the default
+    // focus and from the Esc/backdrop safe dismiss.
+    expect(order(mountSplash({ hasSave: true }))).toEqual(["continue", "load", "new", "help"]);
+  });
+
+  it("renders on a first run too, when there is nothing saved yet", () => {
+    // Not gated on hasSave: hasSave reads the autosave keys alone, so it says
+    // nothing about the manual slots, and the picker's file row is how a fresh
+    // install or a new device gets its towers back.
+    expect(order(mountSplash({ hasSave: false }))).toEqual(["load", "new", "help"]);
+  });
+
+  it("never takes the primary plate, in either state", () => {
+    // Exactly one amber plate is on screen at a time: Continue when a save
+    // exists, New Tower when none does. Two would leave no default.
+    for (const hasSave of [true, false]) {
+      const el = mountSplash({ hasSave });
+      expect(el.querySelector('[data-splash="load"]')!.classList.contains("primary")).toBe(false);
+      expect(el.querySelectorAll(".splash-actions .primary")).toHaveLength(1);
+      el.remove();
+    }
+  });
+
+  it("does not steal the trap's initial focus from Continue or New Tower", () => {
+    expect(document.activeElement?.getAttribute("data-splash")).not.toBe("load");
+    mountSplash({ hasSave: true });
+    expect(document.activeElement?.getAttribute("data-splash")).toBe("continue");
+  });
 });
 
 describe("splash mute toggle (CAP-1)", () => {

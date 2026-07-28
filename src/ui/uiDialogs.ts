@@ -33,10 +33,13 @@ import { trackAppAction } from "../analytics";
 
 // The batch-pricing controllers live in their own module; re-exported so
 // `dialogs.showBatchPricingDialog` callers (UI.ts) are unchanged.
-export { showBatchPricingDialog } from "./uiBatchPricing";
+export { showBatchPricingDialog, type BatchPricingDialogCtx, type BatchPricingDialogCb } from "./uiBatchPricing";
 
 // The elevator Schedule dialog controller likewise lives in its own module.
 export { showElevatorScheduleDialog, type ScheduleDialogCtx } from "./uiElevatorSchedule";
+
+// The title-screen tower picker likewise lives in its own module.
+export { showTowerPicker, type TowerPickerCtx } from "./uiTowerPicker";
 
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
   const box = ui.openModalTemplate(statsModalTemplate(body));
