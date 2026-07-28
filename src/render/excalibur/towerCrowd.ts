@@ -303,7 +303,8 @@ function walkerReachable(engine: TowerEngine, w: Walker): boolean {
   if (!spotReachable(engine, w.floor, w.tileX)) return false;
   // A climber is only in traffic when BOTH its landings are reachable: nobody
   // completes a climb toward a floor no route ends at. Everyone else repeats one
-  // spot, and the equality check keeps them to a single probe.
+  // spot; the equality check skips a redundant memo lookup for them (the memo
+  // would answer it anyway, so this is a shortcut, not what avoids a real BFS).
   if (w.altFloor === w.floor && w.altTileX === w.tileX) return true;
   return spotReachable(engine, w.altFloor, w.altTileX);
 }

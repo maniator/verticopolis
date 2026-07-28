@@ -276,11 +276,20 @@ describe("updateMotion repositions the moving actors", () => {
   });
 
   it("gates ambient walkers on busyness and reddens impatient ones under stress", () => {
-    const mkWalker = (over: Record<string, unknown>) => ({
-      actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
-      speed: 8, dir: 1, phase: 0.2, impatient: true, red: false, rank: 0.1, floor: 4,
-      tileX: 0, altFloor: 4, altTileX: 0, perFloor: false, ...over,
-    });
+    const mkWalker = (over: Record<string, unknown>) => {
+      // `...over` lands last, so a hardcoded altFloor here would survive a
+      // `floor` override and quietly probe the wrong storey. Follow the primary
+      // spot unless a case says otherwise, the same way production builds every
+      // figure that is not a climber.
+      const w: Record<string, unknown> = {
+        actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
+        speed: 8, dir: 1, phase: 0.2, impatient: true, red: false, rank: 0.1,
+        floor: 4, tileX: 0, perFloor: false, ...over,
+      };
+      w.altFloor ??= w.floor;
+      w.altTileX ??= w.tileX;
+      return w as any;
+    };
     const lobbyWalker = mkWalker({});
     const hiddenWalker = mkWalker({ rank: 5 }); // rank above any threshold -> hidden
     const floorWalker = mkWalker({ perFloor: true, floor: 7, rank: 0.5 });
@@ -388,9 +397,12 @@ describe("ambient walkers are gated on reachability (#639)", () => {
   });
 
   it("hides a climber whose flight is cut off at the bottom", () => {
-    // The mirror case, which the bottom-only gate also got wrong in the other
-    // direction: it showed nothing useful either way, since no route ends at a
-    // landing nobody can reach.
+    // The mirror case. This one does NOT pin AND against the old bottom-only
+    // gate (that gate hid this too, for its own reason); what it pins is AND
+    // against an either-endpoint OR, which would call this flight reachable
+    // through its top and put the climbers back. That is worth a test because
+    // OR is the plausible misreading: the deferral that raised #665 described
+    // the fix that way before the direction was worked through.
     const cutOffBelow = mkWalker({ floor: 5, tileX: 3, altFloor: 6, altTileX: 3, rank: 0.04 });
     const e = eng({
       walkers: [cutOffBelow],

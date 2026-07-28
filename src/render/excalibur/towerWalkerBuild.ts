@@ -96,7 +96,7 @@ export function buildWalkers(engine: TowerEngine): void {
     const n = t.kind === "escalator" ? 3 : 2;
     // Both landings, so the gate can require both ends of the flight rather
     // than assuming the bottom stands for the whole climb (#665).
-    const spot = {
+    const spot: WalkerSpot = {
       floor: t.bottom,
       tileX: landingTile(tower, t, t.bottom),
       altFloor: t.top,
