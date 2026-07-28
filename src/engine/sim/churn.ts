@@ -15,6 +15,7 @@ import { VACATE_REASON_TEXT } from "../types";
 import { VACATE_NOTICE_MINUTES } from "./constants";
 
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
+import { originDemand } from "./demand";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -134,6 +135,16 @@ export function attemptMoveIns(sim: Simulation): void {
   // the gate, so a tower with none pays nothing. Same source of truth the
   // per-tick satisfaction update reads (spec-move-in-sustainability-gate).
   let satCtx: SatisfactionContext | null = null;
+  // A condo/office actually moving in this pass adds its demand to the gate
+  // context's running pool, so a LATER candidate in the same pass is judged
+  // against the demand the earlier fills already created (the intra-pass half of
+  // the batch-aware unmet-demand share; a candidate's own demand is folded in
+  // inside wouldEvictFreshTenant). satCtx.demandMap is built the moment the first
+  // condo/office reaches the gate, before any fill, so it is present here.
+  const filled = (unit: Unit): void => {
+    sim.moveIn(unit);
+    if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, unit);
+  };
   for (const u of sim.tower.units) {
     if (u.state !== "empty") continue;
     // Off-market ("No Rate"): the unit is deliberately not for rent/sale, so it
@@ -171,9 +182,9 @@ export function attemptMoveIns(sim: Simulation): void {
 
     const demand = sim.demandFactor(u);
     if (u.kind === "office") {
-      if (!weekend && sim.rng.chance(0.25 * demand * parkingPenalty)) sim.moveIn(u);
+      if (!weekend && sim.rng.chance(0.25 * demand * parkingPenalty)) filled(u);
     } else if (u.kind === "condo") {
-      if (sim.rng.chance(0.18 * demand)) sim.moveIn(u);
+      if (sim.rng.chance(0.18 * demand)) filled(u);
     } else if (u.kind === "fitnessClub" || u.kind === "clinic") {
       // Modern-only lease amenities, filled like an office (any day of the week).
       // Classic never reaches here: it holds neither kind, so no rng is drawn and

@@ -3,7 +3,7 @@ import type { Unit } from "../types";
 import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
 import { isTenanted, isOperational } from "../types";
-import { computeDemandMap, type DemandMap } from "./demand";
+import { computeDemandMap, originDemand, type DemandMap } from "./demand";
 import { unmetCoverage } from "./gripe";
 import {
   NOISE_CAP,
@@ -220,9 +220,13 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   // when its floor draws (the lobby-anchored model gives every reachable origin the
   // same reachable-venue set), else 0 (retail exists but this floor reaches none).
   const dm = (ctx.demandMap ??= computeDemandMap(sim));
-  if (!dm.reachableVenuesByOrigin.has(u.id)) {
-    dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
-  }
+  dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
+  // Judge unmet demand at the share the tower WOULD carry with this tenant added:
+  // fold the candidate's OWN demand into the pool (attemptMoveIns further raises
+  // dm.pool as vacancies actually fill earlier in the same pass), so the gate never
+  // seats a fresh tenant who then over-subscribes the retail and churns, and fills
+  // only up to the number the retail supports (a batch-aware, tower-uniform share).
+  dm.share = dm.totalCap > 0 ? (dm.pool + originDemand(sim, u)) / dm.totalCap : 0;
   let s = 1;
   for (let i = 0; i < GATE_HORIZON_HOURS; i++) {
     const prev = s;

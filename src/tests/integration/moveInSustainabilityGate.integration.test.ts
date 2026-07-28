@@ -3,6 +3,7 @@ import { Simulation } from "../../engine/Simulation";
 import type { GameMode, Unit, VacateReason } from "../../engine/types";
 import { GRID } from "../../engine/facilities";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
+import { computeDemandMap } from "../../engine/sim/demand";
 import { vacate } from "../../engine/sim/churn";
 import { wontLeaseText } from "../../game/gripeCopy";
 
@@ -166,6 +167,22 @@ describe("move-in sustainability gate: unmet-demand doom (retail-starved spot)",
     sim.tower.setCars(sim.tower.transports[1].id, 8);
     expect(sim.floorReachable(10)).toBe(true);
     expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(false);
+  });
+
+  it("is batch-aware: a spot that is fine alone is gated once fills saturate the retail", () => {
+    const sim = servedTower(50, "modern", 4);
+    place(sim, "fastFood", 2, C - 30); // reachable retail, far enough to add no noise
+    const condo = place(sim, "condo", 3, C); // well placed: only unmet demand can gate it
+    const ctx = buildSatisfactionContext(sim, true);
+    // Reachable retail covers a lone fresh tenant (its own demand alone is light),
+    // so the gate allows it.
+    expect(wouldEvictFreshTenant(sim, condo, ctx)).toBe(false);
+    // Now raise the running pool the way attemptMoveIns does as earlier vacancies
+    // fill in the same pass, past the retail capacity. The SAME spot is gated: a
+    // fresh tenant here would over-subscribe the retail and churn (the batch case).
+    const dm = (ctx.demandMap ??= computeDemandMap(sim));
+    dm.pool += dm.totalCap * 100;
+    expect(wouldEvictFreshTenant(sim, condo, ctx)).toBe(true);
   });
 });
 
