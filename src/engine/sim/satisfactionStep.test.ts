@@ -139,19 +139,23 @@ describe("satisfactionStep: the remaining drains and caps", () => {
     expect(r.next).toBeCloseTo(UNMET_DEMAND_CAP, 6); // capped by the shortage
   });
 
-  it("a Modern amenity halo lifts a condo above its no-halo baseline (offsetting case)", () => {
+  it("a Modern amenity halo offsets neighbor noise so the gate allows the tenant", () => {
     const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 20); // a commercial noise source next to the condo
     const condo = place(sim, "condo", 2, C);
-    const baseline = satisfactionStep(sim, condo, 0.8, buildSatisfactionContext(sim)).next;
-    // A tenanted fitness club two floors up: its halo bonus lifts a nearby condo,
-    // the offset a noisy spot can lean on.
-    const club = sim.tower.place("fitnessClub", 4, C);
+    expect(sim.noiseAfflicted(condo)).toBe(true);
+    // Noise alone net-erodes the condo, so the gate holds the spot vacant.
+    expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(true);
+    // A tenanted fitness club on the same served floor: its per-hour halo bonus
+    // (0.03) outweighs the noise erosion, so the spot stabilizes at the noise cap
+    // (above the leave bar) and the gate now allows the tenant. This is the
+    // offsetting case a purely-additive lift check would miss.
+    const club = sim.tower.place("fitnessClub", 2, C + 20);
     expect(club.ok).toBe(true);
     sim.tower.units.find((u) => u.id === club.unitId)!.state = "occupied";
-    const ctx = buildSatisfactionContext(sim);
-    expect(ctx.clubFloors).toContain(4); // the gather picked up the tenanted, served club
-    const lifted = satisfactionStep(sim, condo, 0.8, ctx).next;
-    expect(lifted).toBeGreaterThan(baseline);
+    const ctx = buildSatisfactionContext(sim, true);
+    expect(ctx.clubFloors).toContain(2); // the gather picked up the tenanted, served club
+    expect(wouldEvictFreshTenant(sim, condo, ctx)).toBe(false);
   });
 });
 

@@ -3,6 +3,7 @@ import type { Unit, VacateReason } from "../engine/types";
 import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
+import { isHotelKind } from "../engine/facilities";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
@@ -21,16 +22,18 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   // out of this table so a bare lookup can never return the wrong advice.
 };
 
-/** The "noise" gripe names the RIGHT remedy per source. A nightclub's halo is
+/** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is
  *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
- *  so its relocation remedy holds whenever a nightclub is in range, even when the
- *  club also sits within same-floor noise range and makes the unit noiseAfflicted
- *  (naming only the lobby-tile fix there would send the player on a fix that leaves
- *  the unit gated). Only an adjacent NON-nightclub source (office or commercial,
- *  with no club in halo range) gets the lobby-tile advice. */
+ *  but it penalizes ONLY condos and hotels: an office feels no nightclub halo, so
+ *  its "noise" is always an adjacent same-floor source and it takes the lobby-tile
+ *  remedy regardless of any nearby club (recommending the player move an unrelated
+ *  nightclub, and calling the office a "home", would both be wrong). For a condo or
+ *  hotel with a club in halo range the club's relocation remedy holds even when the
+ *  club also sits within same-floor range and makes the unit noiseAfflicted. */
 function noiseGripeText(sim: Simulation, u: Unit): string {
-  if (nearNightclub(sim, u)) {
-    return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors, so move the nightclub or the home to put more floors between them.";
+  const feelsHalo = u.kind === "condo" || isHotelKind(u.kind);
+  if (feelsHalo && nearNightclub(sim, u)) {
+    return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors; put more floors between this unit and the nightclub (move either one).";
   }
   return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
 }
@@ -44,8 +47,14 @@ function noiseGripeText(sim: Simulation, u: Unit): string {
  *  locality the model does not carry). Both gripe reads share one synchronous
  *  render, so `sim.demandMap()` here is a guaranteed memo hit on the same map
  *  `dominantGripe` just read, never a rescan. */
-function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
-  if (unmetCoverage(sim.demandMap(), u) === 0) {
+function unmetDemandGripeText(sim: Simulation, u: Unit, coverage?: number | null): string | undefined {
+  // For an empty gate candidate the caller passes the CANDIDATE-aware coverage (the
+  // unit is not an origin in the real memoized map, where this would read null and
+  // mis-prescribe "add venues" for stranded retail). The occupied "Main gripe"
+  // caller passes nothing and reads the shared memoized map, where the tenant IS an
+  // origin.
+  const cov = coverage !== undefined ? coverage : unmetCoverage(sim.demandMap(), u);
+  if (cov === 0) {
     // Coverage 0 also covers a tenant whose OWN floor is unreachable: its people
     // can reach nothing however well the shops are wired, and that cause already
     // has the dedicated red "Access: no route" line, so the gripe
@@ -63,8 +72,13 @@ function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
 /** The "Main gripe" line's text for an attributed cause, or undefined when the
  *  cause defers to a dedicated diagnostic line on the card. An explicit ladder
  *  so each case reads on its own (review nit on the former nested ternary). */
-export function gripeLineText(sim: Simulation, u: Unit, gripe: VacateReason): string | undefined {
-  if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u);
+export function gripeLineText(
+  sim: Simulation,
+  u: Unit,
+  gripe: VacateReason,
+  unmetCov?: number | null,
+): string | undefined {
+  if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u, unmetCov);
   if (gripe === "noise") return noiseGripeText(sim, u);
   return GRIPE_TEXT[gripe];
 }
@@ -112,7 +126,7 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
   const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);
-  const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
+  const text = gripe ? gripeLineText(sim, u, gripe, cov) : undefined;
   const lead = text
     ? `Won't lease: ${text}`
     : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
