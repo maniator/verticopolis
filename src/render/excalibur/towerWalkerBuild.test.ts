@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
 import { Tower } from "../../engine/Tower";
 import { landingSeg, segAt, segmentsOf } from "../../engine/tower/segments";
+import { NEEDS_FLOORS } from "../../engine/tower/towerTopology";
 import { buildWalkers, landingTile } from "./towerWalkerBuild";
 
 /**
@@ -193,7 +194,7 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     expect(tower.hasStructure(2, 17)).toBe(false);
     const res = tower.placeTransport("stairs", 10, 1, 2);
     expect(res.ok).toBe(false);
-    expect(res.reason).toContain("built floors");
+    expect(res.reason).toBe(NEEDS_FLOORS); // the constant, not prose that could be reworded
     expect(tower.transports).toEqual([]);
   });
 });
