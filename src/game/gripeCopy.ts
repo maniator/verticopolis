@@ -2,6 +2,7 @@ import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
 import { unmetCoverage, dominantGripe } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
+import { rentOf } from "../engine/econConfig";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
@@ -99,5 +100,22 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   // (noise, far walk, lobby distance, rent, unmet demand) wins instead.
   const gripe = dominantGripe(sim, u, undefined, 0);
   const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
-  return text ? `Won't lease: ${text}` : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
+  const lead = text
+    ? `Won't lease: ${text}`
+    : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
+  return `${lead}${carryingCostNote(sim, u)}`;
+}
+
+/** The spec's "fix it or raze it" carrying-cost telegraph: while a gated spot sits
+ *  empty it still bleeds its holding cost, so name it and the bulldoze escape, not
+ *  just the placement problem. Modern operating overhead falls on any held office or
+ *  unsold condo, and an unsold condo also pays hold tax scaled to its asking price
+ *  (`EconomySystem.payMaintenance`). Classic has neither sink (both rates 0), so an
+ *  empty spot there costs nothing to hold and the note is omitted. */
+function carryingCostNote(sim: Simulation, u: Unit): string {
+  const overhead = sim.rules.operatingOverheadPerUnit();
+  const holdTax = u.kind === "condo" ? Math.ceil(rentOf(u) * sim.rules.condoHoldTaxRate()) : 0;
+  const carry = overhead + holdTax;
+  if (carry <= 0) return "";
+  return ` It still costs about $${carry.toLocaleString()} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`;
 }

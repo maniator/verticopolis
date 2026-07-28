@@ -236,7 +236,7 @@ describe("move-in sustainability gate: predicate agrees with the real simulation
 });
 
 describe("move-in sustainability gate: inspector 'Won't lease' legibility", () => {
-  it("names the noise cause on a gated empty Modern condo", () => {
+  it("names the noise cause on a gated empty Modern condo, and telegraphs the carrying cost", () => {
     const sim = servedTower(8, "modern");
     place(sim, "office", 2, C - 9);
     const condo = place(sim, "condo", 2, C);
@@ -244,6 +244,19 @@ describe("move-in sustainability gate: inspector 'Won't lease' legibility", () =
     expect(line).not.toBeNull();
     expect(line).toContain("Won't lease");
     expect(line).toContain("noisy neighbor"); // the dominant gripe, surfaced for an empty unit
+    // The spec's "fix it or raze it": a held Modern unit keeps bleeding overhead
+    // (and hold tax for a condo), so the note names the cost and the bulldoze escape.
+    expect(line).toContain("to hold empty");
+    expect(line).toContain("bulldoze it");
+  });
+
+  it("omits the carrying-cost note in Classic (no overhead or hold tax)", () => {
+    const sim = servedTower(41, "classic");
+    // A far-walk office is gated in Classic too, but Classic has no holding sink.
+    const office = place(sim, "office", 2, 0);
+    const line = wontLeaseText(sim, office);
+    expect(line).not.toBeNull();
+    expect(line).not.toContain("to hold empty");
   });
 
   it("gives a nightclub-gated vacancy the cross-floor remedy, not the lobby-tile advice", () => {
