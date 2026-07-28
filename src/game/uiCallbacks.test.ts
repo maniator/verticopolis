@@ -14,7 +14,7 @@ import type { Simulation } from "../engine/Simulation";
  */
 
 function makePorts() {
-  const sim = { mode: "classic", tower: {} } as unknown as Simulation;
+  const sim = { mode: "classic", tower: {}, autoBridge: true } as unknown as Simulation;
   const ports: GameAppPorts = {
     getSim: vi.fn(() => sim),
     audio: { muted: true, musicVolume: 0.4, ambienceVolume: 0.7, sfxVolume: 0.6 },

@@ -320,9 +320,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         // warning.
         app.ui.newTowerModal({
           hasSave,
-          onFound: (mode, modernCalendar, manualStructure) => {
+          onFound: (mode, modernCalendar, startUnbridged) => {
             dismiss();
-            app.saveLoad.newGame(mode, modernCalendar, manualStructure);
+            app.saveLoad.newGame(mode, modernCalendar, startUnbridged);
           },
         });
       },

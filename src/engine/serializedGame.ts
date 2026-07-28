@@ -28,11 +28,16 @@ export interface SerializedGame {
    *  written before the calendar toggle, and on all legacy Modern saves, so a
    *  missing value loads as `realWorld` — the shipped 7/90/360 behavior. */
   modernCalendar?: CalendarKind;
-  /** Modern "manual structure" build option, chosen at New Tower. When true the
-   *  game never auto-lays/bills the floor and lobby substrate under a placement.
-   *  Ignored for Classic (always false). Absent on saves written before the
-   *  option, so a missing value loads as false, the shipped auto-bridge behavior. */
+  /** LEGACY: the former Modern "manual structure" option. No longer written; read
+   *  only for migration, where a `true` loads the tower with bridging off (that
+   *  option became the founding "no bridging" default). Rooms auto-lay their floor
+   *  in every tower now, so the old "rooms won't auto-floor" behavior is retired. */
   manualStructure?: boolean;
+  /** "Bridge floors between placements" toggle, flipped mid-game. Written only
+   *  when turned OFF (default on), so an absent value loads as on, the shipped
+   *  behavior that fills the walkway to a neighbor. Ignored for Classic (always
+   *  on): a forged `false` on a Classic save is clamped back to on. */
+  autoBridge?: boolean;
   /** Balance entering the current quarter (snapshotted at each quarter rollover
    *  before rent is collected), so the TDT exporter can write the header's
    *  `lastQuarterMoney` (0x10). `serialize()` always writes it (0 on a fresh

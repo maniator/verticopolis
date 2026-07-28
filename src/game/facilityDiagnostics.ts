@@ -5,6 +5,7 @@ import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
+import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
 import { ECON } from "../engine/econConfig";
 import { subtypeListFor } from "../engine/retailSubtypes";
@@ -211,12 +212,19 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // yet not reachably-close, and no commuter ever comes. (In Modern, served
   // always equals reachable, so this middle state is Classic-only.)
   if (hasAccessDiagnostic(u)) {
+    // Segment-aware (#647): a unit can sit on a section of its floor walled off
+    // from every stair and elevator by an open gap, while another section of the
+    // SAME floor still reaches the lobby. `reachesLobby` is the unit's own
+    // segment reaching the lobby; a gap-free floor has one segment, so the older
+    // whole-floor line is unchanged there.
     lines.push(
       !sim.tower.isFloorServed(u.floor)
         ? html`<div style="color:var(--bad)">Access: not connected. No elevator or stair reaches this floor.</div>`
-        : sim.floorReachable(u.floor)
-          ? html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`
-          : html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`,
+        : !reachesLobby(sim, u)
+          ? html`<div style="color:var(--bad)">Access: no way to transportation from here. A gap cuts this section of the floor off from the elevators and stairs. Bridge the gap, or add a stair or elevator that reaches this section.</div>`
+          : sim.positionReachable(u.floor, u.x)
+            ? html`<div style="color:var(--good)">Access: reachable from the lobby.</div>`
+            : html`<div style="color:var(--bad)">Access: no route. The only way to this floor is a stairway or escalator climb longer than anyone will make, so no one travels here. Add an elevator that reaches it.</div>`,
     );
   }
   // No Rate (off-market) legibility: a chosen setting, so plain ink, neither

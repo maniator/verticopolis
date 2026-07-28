@@ -97,7 +97,7 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
       app.saveLoad.exportLegacy();
     },
     getMode: () => app.getSim().mode,
-    onNew: (mode, modernCalendar, manualStructure) => app.saveLoad.newGame(mode, modernCalendar, manualStructure),
+    onNew: (mode, modernCalendar, startUnbridged) => app.saveLoad.newGame(mode, modernCalendar, startUnbridged),
     onToggleAudio: () => app.toggleMute(),
     isMuted: () => app.audio.muted,
     onSetVolume: (kind, value) => app.setVolume(kind, value),
@@ -112,6 +112,8 @@ export function createUICallbacks(app: GameAppPorts): UICallbacks {
     onToggleReducedMotion: () => app.toggleReducedMotion(),
     onToggleSteadyClock: () => app.toggleSteadyClock(),
     isSteadyClock: () => app.isSteadyClock(),
+    onToggleAutoBridge: () => app.getSim().toggleAutoBridge(),
+    isAutoBridge: () => app.getSim().autoBridge,
     onReplayOnboarding: () => {
       trackAppAction("replay_onboarding");
       app.replayOnboarding();

@@ -4,62 +4,16 @@
  * `screenshot-scenes.ts`. Each `build`/`setup` that runs in the page references
  * an injected builder by identity. Keep ERASABLE.
  */
-import { type Page } from "playwright";
 import { type Scene, PHONE } from "../screenshot-env.ts";
 import {
   buildCanonTower,
   buildCrowdTower,
   buildEngineTower,
   buildFireTower,
+  buildModernPricingTower,
   pgDismissSplash,
 } from "../screenshot-builders.ts";
-
-/**
- * Re-mount the title screen in its RETURNING-player state: Continue is only
- * rendered when boot found a readable autosave, and the gallery always boots
- * fresh, so the state is staged rather than saved into. Tearing the first-run
- * splash down first keeps exactly one `#splash` in the DOM.
- */
-async function pgShowReturningSplash(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const g = (window as unknown as { game?: any }).game;
-    g.onboarding.dismissSplash();
-    g.onboarding.showSplash({
-      hasSave: true,
-      onContinue: () => {},
-      onLoadTower: () => {},
-      onNewTower: () => {},
-    });
-  });
-  // Fail the shot (keeping the committed image) if the returning stack never
-  // mounts, rather than commit a first-run splash under a returning name.
-  await page.waitForSelector('#splash [data-splash="continue"]', { timeout: 4000 });
-}
-
-/**
- * Open the load-only tower picker over the title screen with one row of every
- * variant. The slot metadata is synthetic and fixed (a pinned `savedAt`, so the
- * rendered timestamp cannot drift between runs); nothing here writes storage.
- */
-async function pgShowTowerPicker(page: Page): Promise<void> {
-  await page.evaluate(() => {
-    const g = (window as unknown as { game?: any }).game;
-    const AT = 1_700_000_000_000;
-    g.ui.showTowerPicker({
-      getSlots: () => ({
-        storageBlocked: false,
-        slots: [
-          { slot: "auto", exists: true, present: true, towerName: "Verticopolis", star: 3, population: 1840, funds: 2_450_000, savedAt: AT, mode: "classic", day: 96 },
-          { slot: 1, exists: true, present: true, towerName: "Harbour Point", star: 2, population: 620, funds: 810_000, savedAt: AT, mode: "modern", day: 41 },
-          { slot: 2, exists: false, present: true },
-          { slot: 3, exists: false, present: false },
-        ],
-      }),
-      onLoad: () => true,
-    });
-  });
-  await page.waitForSelector("#modal .slots", { timeout: 4000 });
-}
+import { pgShowReturningSplash, pgShowTowerPicker } from "./returningPlayerPage.ts";
 
 export const SHOWCASE_SCENES: Scene[] = [
   // --- Showcase: first-run splash / onboarding (fresh, splash kept) ----------
@@ -146,6 +100,31 @@ export const SHOWCASE_SCENES: Scene[] = [
             document.getElementById("btn-load")?.click();
           });
           await page.waitForSelector("#modal .slots", { timeout: 4000 });
+        },
+        wait: 300,
+      },
+    ],
+  },
+  // --- Settings, Modern variant (the Modern-only Building toggle) --------------
+  {
+    // The 02b-settings shot above boots the default Classic game, so its
+    // Settings dialog has no Building section. This sibling founds a Modern
+    // tower so the gallery also shows the Modern-only "Bridge floors between
+    // rooms" toggle. Same dialog, same framing as the Classic shot; only the
+    // extra Building section differs (mirrors the mode-fork onboarding pair).
+    id: "settings-modern",
+    outDir: "screenshots",
+    build: buildModernPricingTower,
+    shots: [
+      {
+        name: "02b-settings-modern",
+        keepDialogs: true,
+        frame: { floor: 3, zoom: 1.2 },
+        setup: async (page) => {
+          await page.evaluate(() => document.getElementById("btn-settings")?.click());
+          // Wait on the Modern-only Building toggle, not a bare #modal: it
+          // proves the Modern Settings variant (with its extra section) mounted.
+          await page.waitForSelector("#modal #set-auto-bridge", { timeout: 4000 });
         },
         wait: 300,
       },

@@ -39,9 +39,10 @@ export function serialize(sim: Simulation): SerializedGame {
     minutes: sim.clock.minutes,
     mode: sim.mode,
     modernCalendar: sim.modernCalendar,
-    // Only the opt-in true is written (absent loads as false), so a default
-    // auto tower's save is byte-identical to before this option existed.
-    ...(sim.manualStructure ? { manualStructure: true as const } : {}),
+    // Only the turned-off state is written (absent loads as on), so a tower that
+    // never touched the toggle stays byte-identical. The legacy manualStructure
+    // field is no longer written (it is read only for migration on load).
+    ...(sim.autoBridge ? {} : { autoBridge: false as const }),
     lastQuarterMoney: sim.lastQuarterMoney,
     units: sim.tower.units.map(serializeUnit),
     transports: sim.tower.transports.map(serializeTransport),
@@ -79,8 +80,12 @@ export function deserialize(raw: SerializedGame): Simulation {
     data.seed,
     isGameMode(data.mode) ? data.mode : "classic",
     coerceCalendarKind(data.modernCalendar),
-    data.manualStructure === true,
+    false, // startUnbridged: the autoBridge restore below is authoritative
   );
+  // Bridging is on by default (absent loads as on, byte-identical). Off when the
+  // save turned it off OR it is a legacy "manual structure" tower (that option
+  // became the founding "no bridging" default). Classic clamps a forged value on.
+  sim.autoBridge = sim.rules.bridgingToggleable() ? data.autoBridge !== false && data.manualStructure !== true : true;
   if (typeof data.initialSeed === "number" && Number.isFinite(data.initialSeed)) sim.rng.initialSeed = data.initialSeed >>> 0; // else: the constructor's data.seed fallback (see RNG.initialSeed)
   // Coerce money to a finite number (untrusted save): a forged NaN/Infinity or
   // non-number poisons the ledger; a broken value keeps the start balance, not NaN.
@@ -486,8 +491,8 @@ export function deserialize(raw: SerializedGame): Simulation {
  *  an empty lot, and where to lay the lobby that opens the tower is the
  *  player's first decision. The `mode` chosen at the New Tower screen is baked
  *  in here, at creation, and is immutable for the tower's life. */
-export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", manualStructure = false): Simulation {
-  const sim = new Simulation(seed, mode, modernCalendar, manualStructure);
+export function newGame(seed = 12345, mode: GameMode = "classic", modernCalendar: CalendarKind = "realWorld", startUnbridged = false): Simulation {
+  const sim = new Simulation(seed, mode, modernCalendar, startUnbridged);
   sim.emit("Welcome! Lay a lobby on the ground line to open your tower.", "info");
   return sim;
 }

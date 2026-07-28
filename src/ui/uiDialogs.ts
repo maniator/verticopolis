@@ -124,7 +124,7 @@ export function confirmModal(
  */
 export function newTowerModal(
   ui: UI,
-  opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, manualStructure: boolean) => void },
+  opts: { hasSave: boolean; onFound: (mode: GameMode, modernCalendar: CalendarKind, startUnbridged: boolean) => void },
 ): void {
   const box = ui.openModalTemplate(newTowerTemplate(opts.hasSave));
   ui.wireActions(
@@ -134,18 +134,18 @@ export function newTowerModal(
       found: () => {
         const picked = box.querySelector<HTMLInputElement>('input[name="nt-mode"]:checked')?.value;
         const mode: GameMode = picked === "modern" ? "modern" : "classic";
-        // The calendar choice and manual-structure option only apply to Modern;
-        // Classic is always canon and always auto-structure, so a Classic
-        // founding pins the harmless defaults regardless of the Modern sub-picker.
+        // The calendar choice and the "no bridging" option only apply to Modern;
+        // Classic is always canon and always bridges, so a Classic founding pins
+        // the harmless defaults regardless of the Modern sub-picker.
         let modernCalendar: CalendarKind = "realWorld";
-        let manualStructure = false;
+        let startUnbridged = false;
         if (mode === "modern") {
           const pickedCal = box.querySelector<HTMLInputElement>('input[name="nt-cal"]:checked')?.value;
           if (pickedCal === "canon") modernCalendar = "canon";
-          manualStructure = box.querySelector<HTMLInputElement>('input[name="nt-manual"]')?.checked === true;
+          startUnbridged = box.querySelector<HTMLInputElement>('input[name="nt-unbridged"]')?.checked === true;
         }
         ui.closeModal();
-        opts.onFound(mode, modernCalendar, manualStructure);
+        opts.onFound(mode, modernCalendar, startUnbridged);
       },
     },
     { close: false },
@@ -294,7 +294,10 @@ export function showSettings(ui: UI): void {
   // Same build constant the splash and Help's About line show; masked to a fixed
   // placeholder in screenshots (see pgMaskVersion, which keys on `.app-version`).
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
-  const box = ui.openModalTemplate(settingsTemplate(version));
+  // The Building section (the bridging toggle) is Modern-only; Classic never
+  // renders it (bridging is forced on and can't be toggled there).
+  const modern = ui.cb.getMode() === "modern";
+  const box = ui.openModalTemplate(settingsTemplate(version, modern));
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -327,6 +330,15 @@ export function showSettings(ui: UI): void {
   rm.disabled = osForced;
   if (osForced) rm.closest("label")!.querySelector("span")!.textContent = "Reduced motion (system)";
   rm.addEventListener("change", () => (rm.checked = ui.cb.onToggleReducedMotion()));
+  // Modern-only bridging toggle: it shows the live state and re-reads the
+  // callback's return after every toggle. Always available in Modern (rooms
+  // auto-lay their floor regardless; this only controls the between-things
+  // bridge), whatever was chosen at founding.
+  if (modern) {
+    const ab = box.querySelector<HTMLInputElement>("#set-auto-bridge")!;
+    ab.checked = ui.cb.isAutoBridge();
+    ab.addEventListener("change", () => (ab.checked = ui.cb.onToggleAutoBridge()));
+  }
   // The controller wires every stateful control above; the plain Close action is
   // the one [data-act] button, so wireActions binds it (its loud lookup throws at
   // open if the button is ever dropped).

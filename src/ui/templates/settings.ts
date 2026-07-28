@@ -1,4 +1,4 @@
-import { html, type TemplateResult } from "lit-html";
+import { html, nothing, type TemplateResult } from "lit-html";
 
 /**
  * The Settings dialog body: sound levels plus the presentation toggles. Authored
@@ -18,8 +18,23 @@ import { html, type TemplateResult } from "lit-html";
  * the interpolated app `version` (auto-escaped by lit), a read-only label rather
  * than a control, sourced from the same `__APP_VERSION__` the About line uses;
  * never make it look editable or read it from anywhere else.
+ *
+ * The Building section is Modern-only: `showBuilding` is true only for a Modern
+ * tower, so a Classic tower never renders the "Bridge floors between rooms"
+ * switch (bridging is forced on in Classic and can't be toggled). The switch
+ * itself is a STATIC structure like the others; `showSettings` reads the live
+ * tower state, sets the initial checked value, and disables it when Manual
+ * Structure was chosen at founding (which already places every tile by hand).
  */
-export function settingsTemplate(version: string): TemplateResult {
+export function settingsTemplate(version: string, showBuilding = false): TemplateResult {
+  const building = showBuilding
+    ? html`
+      <h3>Building</h3>
+      <div class="set-row">
+        <label class="set-switch"><input type="checkbox" id="set-auto-bridge" role="switch" aria-describedby="note-auto-bridge"><span>Bridge floors between rooms</span></label>
+        <p class="set-note" id="note-auto-bridge">When on, dropping a room or floor near existing structure fills the walkway between them. Turn off and floors still appear under each room, just never across the gap, so separate sections stay disconnected.</p>
+      </div>`
+    : nothing;
   return html`
       <h2>Settings</h2>
       <h3>Sound</h3>
@@ -36,6 +51,7 @@ export function settingsTemplate(version: string): TemplateResult {
         <label class="set-switch"><input type="checkbox" id="set-steady-clock" role="switch" aria-describedby="note-steady-clock"><span>Steady clock</span></label>
         <p class="set-note" id="note-steady-clock">As in 1994, the clock normally runs slow through the lunch rush and fast overnight (a full day takes the same real time either way). Turn on for an even pace all day.</p>
       </div>
+      ${building}
       <div class="modal-actions"><button class="btn primary" data-act="close" autofocus>Close</button></div>
       <p class="set-version">Verticopolis <span class="app-version">v${version}</span></p>
     `;

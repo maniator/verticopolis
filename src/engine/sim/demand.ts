@@ -5,6 +5,7 @@ import { ECON } from "../econConfig";
 import { RECYCLING_POP_PER_CENTER } from "../facilities";
 import { isHotelKind, attendanceCap } from "../facilities";
 import { residentCount } from "../census";
+import { segmentStartX } from "../tower/segments";
 import { isOperational, isTenanted } from "../types";
 import type { Unit } from "../types";
 
@@ -74,6 +75,20 @@ export interface DemandMap {
   totalCap: number;
 }
 
+/** Per-unit reachability decision shared by the demand pool and the traffic-income
+ *  loop: prefer the segment-granular {@link SimContext.positionReachable} (the real
+ *  sim), so a unit on a stranded run of a split floor reads false while a sibling
+ *  run is reachable; fall back to floor-level, then plain connectivity, for a
+ *  minimal hand-rolled context that omits the crowd BFS. On a gap-free floor a
+ *  floor is one segment, so all three agree (byte-identical). */
+export function unitReachable(sim: SimContext, floor: number, x: number): boolean {
+  return sim.positionReachable
+    ? sim.positionReachable(floor, x)
+    : sim.floorReachable
+      ? sim.floorReachable(floor)
+      : sim.tower.isFloorServed(floor);
+}
+
 /** The demand weight of an origin kind, reusing the meal-cadence origin weights
  *  (office 1.0, condo 0.3, hotel 1.0). Returns undefined for a kind that is not
  *  a demand origin (commercial, service, transport, structure). */
@@ -123,15 +138,16 @@ export function computeDemandMap(sim: SimContext): DemandMap {
   const deliveredByUnit = new Map<number, number>();
   const reachableVenuesByOrigin = new Map<number, number>();
 
-  // The same lobby-anchored reachability the income loop uses: a floor draws
-  // visitors when the router can reach it (or merely served in
-  // a minimal test context that omits the crowd BFS).
-  const reachCache = new Map<number, boolean>();
-  const draws = (floor: number): boolean => {
-    const cached = reachCache.get(floor);
-    if (cached !== undefined) return cached;
-    const hit = sim.floorReachable ? sim.floorReachable(floor) : sim.tower.isFloorServed(floor);
-    reachCache.set(floor, hit);
+  // Per-UNIT reachability, matching the income loop: a unit draws (a venue earns,
+  // an origin's residents can reach venues) when the router reaches the SEGMENT it
+  // sits on, so a venue or origin on a stranded run of a split floor contributes
+  // nothing and never dilutes the pool (#647). Byte-identical on a gap-free floor.
+  // Memoized per segment: the route BFS isn't free, units share runs.
+  const reachCache = new Map<string, boolean>();
+  const draws = (u: { floor: number; x: number }): boolean => {
+    const key = `${u.floor}:${segmentStartX(sim.tower, u.floor, u.x)}`;
+    let hit = reachCache.get(key);
+    if (hit === undefined) reachCache.set(key, (hit = unitReachable(sim, u.floor, u.x)));
     return hit;
   };
 
@@ -156,7 +172,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     if (attendanceCap(u.kind) !== undefined) continue; // attendance venue: earns from live fill, not the retail pool (#424)
     if (!isOperational(u)) continue; // gutted / burning / under construction earns nothing
     retailVenueCount++; // a built, operational retail venue (reachable or not): the #395 exemption reads this
-    if (!draws(u.floor)) continue; // stranded: no patrons, contributes no capacity
+    if (!draws(u)) continue; // stranded run or floor: no patrons, contributes no capacity
     venues.push({ id: u.id, cap });
     totalCap += cap;
   }
@@ -175,8 +191,8 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     // hotel origin and starve a hotel-heavy tower's commerce (the milestones
     // census includes the same "asleep" clause).
     if (!isTenanted(u) && u.state !== "asleep") continue; // empty space spends nothing
-    if (!draws(u.floor)) {
-      reachableVenuesByOrigin.set(u.id, 0); // stranded origin: reaches nothing
+    if (!draws(u)) {
+      reachableVenuesByOrigin.set(u.id, 0); // stranded origin run or floor: reaches nothing
       continue;
     }
     reachableVenuesByOrigin.set(u.id, reachableVenueCount);

@@ -24,10 +24,10 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
   }
 
   if (!sim.isRoomKind(kind)) {
-    // Manual structure (Modern option): no auto-bridge. A structural tile that
-    // is not already connected refuses with its own reason; the player lays the
-    // connecting run themselves. Cost is just the tile, never a bridge run.
-    if (sim.manualStructure) {
+    // Bridging off (the Modern autoBridge toggle): no auto-bridge. A structural
+    // tile that is not already connected refuses with its own reason; the
+    // player lays the connecting run themselves. Cost is just the tile.
+    if (!sim.autoBridge) {
       const c = sim.tower.canPlace(kind, floor, x);
       if (!c.ok) return { ok: false, reason: c.reason, cost: f.cost };
       const afford = sim.money >= f.cost;
@@ -65,14 +65,9 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
   if (!pre.ok) return { ok: false, reason: pre.reason, cost: f.cost };
   const hgt = facilityFloors(kind);
   const missing = sim.tower.missingFloorCount(floor, x, f.width, hgt);
-  // Manual structure (Modern option): a room never auto-lays its own floor. If
-  // the floor its footprint rests on isn't fully laid (missingFloorCount scans
-  // the footprint's own story span), refuse; cost is just the room, no substrate.
-  if (sim.manualStructure) {
-    if (missing > 0) return { ok: false, reason: "Lay the floor under it first (manual structure is on).", cost: f.cost };
-    const afford = sim.money >= f.cost;
-    return { ok: afford, reason: afford ? undefined : "Not enough money.", cost: f.cost };
-  }
+  // A room ALWAYS auto-lays the floor under its own footprint (never forced on
+  // the player), so a missing floor is fine as long as the footprint is
+  // supported; only a genuinely unsupportable span refuses.
   if (missing > 0 && !sim.tower.spanConnects(floor, x, f.width, hgt)) {
     const reason =
       floor >= 2
@@ -82,8 +77,11 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
   }
   // Beyond its own floor, a room auto-fills the gap to a neighboring module
   // with plain floor, so the total charge covers those bridge tiles too and
-  // placement is blocked when the player can't afford the whole run.
-  const bridge = sim.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length;
+  // placement is blocked when the player can't afford the whole run. With
+  // bridging off (the Modern autoBridge toggle), the room still auto-lays the
+  // floor UNDER its own footprint (the `missing` tiles above), but the gap
+  // BETWEEN it and a neighbor is left open, so no bridge tiles are quoted.
+  const bridge = sim.autoBridge ? sim.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length : 0;
   const cost = f.cost + (missing + bridge) * FACILITIES.floor.cost;
   const afford = sim.money >= cost;
   return { ok: afford, reason: afford ? undefined : "Not enough money.", cost };
@@ -97,13 +95,12 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   // The bridge tiles baked into can.cost, read from the same pre-placement
   // state canBuild saw (the scan ignores the footprint columns, so laying the
   // footprint below can't change this count).
-  // Manual structure lays no auto-substrate at all (canBuild already refused a
-  // placement that would need any), so there is no bridge to quote or fill.
-  const quotedBridge = sim.manualStructure ? 0 : sim.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length;
-  // A room lays its own floor where missing (so you never pre-build bare
-  // floors for an office or condo, just drop it next to the tower), UNLESS
-  // manual structure is on, where the player has already laid it.
-  if (sim.isRoomKind(kind) && !sim.manualStructure) {
+  // With bridging off (the Modern autoBridge toggle) there is no bridge to
+  // quote or fill: the room laid only its own floor, never a gap run.
+  const quotedBridge = sim.autoBridge ? sim.tower.bridgeFillPlan(kind, floor, x, f.width, hgt).length : 0;
+  // A room ALWAYS lays its own floor where missing (so you never pre-build bare
+  // floors for an office or condo, just drop it next to the tower).
+  if (sim.isRoomKind(kind)) {
     const ef = sim.tower.ensureFloorUnder(floor, x, f.width, hgt);
     if (!ef.ok) return { ok: false, reason: ef.reason };
   }
@@ -113,7 +110,7 @@ export function build(sim: Simulation, kind: FacilityKind, floor: number, x: num
   // for them). The fill builds outward from the existing neighbor. If the
   // primary still fails after the bridge, roll the bridge tiles back so a
   // rejected build never orphans structure (nothing was charged for them yet).
-  const laidBridge = sim.manualStructure ? [] : sim.tower.fillBridge(kind, floor, x, f.width, hgt);
+  const laidBridge = sim.autoBridge ? sim.tower.fillBridge(kind, floor, x, f.width, hgt) : [];
   const res = sim.tower.place(kind, floor, x);
   if (!res.ok) {
     for (const id of laidBridge) sim.tower.removeUnit(id);
@@ -249,6 +246,14 @@ export function sellAt(sim: Simulation, floor: number, x: number): boolean {
 /** True for kinds that ride on a floor (and so can auto-lay one). */
 export function isRoomKind(_sim: Simulation, kind: FacilityKind): boolean {
   return kind !== "floor" && kind !== "lobby" && !FACILITIES[kind].transport;
+}
+
+/** Flip the bridging toggle and return the new value. Eligibility is a rule-set
+ *  decision ({@link GameRules.bridgingToggleable}): Classic can never turn it
+ *  off (byte-identical building), so the request is ignored there. */
+export function toggleAutoBridge(sim: Simulation): boolean {
+  if (sim.rules.bridgingToggleable()) sim.autoBridge = !sim.autoBridge;
+  return sim.autoBridge;
 }
 
 /** Whether a facility kind is buildable now: gated by the tower's star rating,

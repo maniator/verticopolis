@@ -124,9 +124,13 @@ export function isUnitState(v: unknown): v is UnitState {
  *  sits past the walking tolerance (79 tiles) on its floor (W1). `lobbyFar`: a
  *  tenant deep in the very-far band from the nearest (sky)lobby (fix: a sky
  *  lobby, not a nearer stair/elevator). `unmetDemand`: a served office/hotel/condo
- *  whose reachable shops/eateries can't cover demand (Modern evicts, Classic caps). */
+ *  whose reachable shops/eateries can't cover demand (Modern evicts, Classic caps).
+ *  `noTransport`: the unit's own contiguous floor segment cannot reach the ground
+ *  lobby through any chain of transports, even though another part of the floor
+ *  can (a gap-split floor whose transport sits on the far half); distinct from
+ *  `access`, which is the whole floor being off the network (#647). */
 export type VacateReason =
-  | "access" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation";
+  | "access" | "noTransport" | "congestion" | "rent" | "noise" | "transportFar" | "lobbyFar" | "unmetDemand" | "relocation";
 
 /** Player-facing phrase for each departure cause (toasts + inspector). Kept
  *  transport-neutral: a floor is "served" by any route to the lobby (elevator,
@@ -134,6 +138,7 @@ export type VacateReason =
  *  must not single out elevators. */
 export const VACATE_REASON_TEXT: Record<VacateReason, string> = {
   access: "no route to the lobby",
+  noTransport: "no way to transportation from here",
   congestion: "overcrowded vertical transport",
   rent: "rent set too high",
   noise: "a noisy neighbor nearby",

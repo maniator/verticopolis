@@ -5,6 +5,7 @@ import { RNG } from "./rng";
 import type { Person, Route, ElevatorCalls, ElevatorQueueView } from "./crowd/person";
 import { COMMUTE_STRESS_ALPHA } from "./crowd/person";
 import * as routing from "./crowd/routing";
+import * as segmentGraph from "./crowd/segmentGraph";
 import * as motion from "./crowd/motion";
 import * as crowdSpawn from "./crowd/spawn";
 
@@ -54,6 +55,12 @@ export class Crowd {
    *  transport per trip. See routing.shaftBanks. */
   shaftBanks: Map<string, number[]> | null = null;
   /** @internal */ shaftBanksRev = -1;
+  /** @internal Cached set of routing-graph SEGMENTS transport-connected to the
+   *  ground lobby (walk budget ignored), rebuilt when the tower changes. Lets a
+   *  per-unit "is this segment stranded?" check be an O(1) lookup. See
+   *  segmentGraph.segmentConnected. */
+  segServed: Set<number> | null = null;
+  /** @internal */ segServedRev = -1;
   /** @internal Cinema unit ids showing a blockbuster this month, primed once
    *  per outer step by the sim loop from the EconomySystem's bookings (the
    *  crowd never sees the economy directly). Read by the venue-visit spawn
@@ -97,6 +104,8 @@ export class Crowd {
     this.staffAdjRev = -1;
     this.shaftBanks = null;
     this.shaftBanksRev = -1;
+    this.segServed = null;
+    this.segServedRev = -1;
     this.staffDone = [];
     this.staffCount = 0;
     this.blockbusters = new Set();
@@ -190,22 +199,44 @@ export class Crowd {
     return view;
   }
 
-  /** Fewest-transfer passenger route (uncapped reachability), delegated to routing. */
-  route(tower: Tower, from: number, to: number): Route | null {
-    return routing.route(this, tower, from, to);
+  /** Fewest-transfer passenger route (uncapped reachability), delegated to
+   *  routing. Routes between the two positions' contiguous floor SEGMENTS: an
+   *  optional origin/destination x picks which segment of a gap-split floor the
+   *  trip starts and ends on; omitting it uses the floor's leftmost segment (the
+   *  one segment on a gap-free floor). */
+  route(tower: Tower, from: number, to: number, fromX?: number, toX?: number): Route | null {
+    return routing.route(this, tower, from, fromX, to, toX);
   }
 
-  /** Uncapped staff-network route (service elevators / stairs). */
-  staffRoute(tower: Tower, from: number, to: number): Route | null {
-    return routing.staffRoute(this, tower, from, to);
+  /** Uncapped staff-network route (service elevators / stairs). Segment-aware
+   *  like {@link route}. */
+  staffRoute(tower: Tower, from: number, to: number, fromX?: number, toX?: number): Route | null {
+    return routing.staffRoute(this, tower, from, fromX, to, toX);
   }
 
   /** Pure passenger reachability probe (no rng draw), for callers that only
-   *  need "is this floor routable at all?" and discard the route. Kept
+   *  need "is this position routable at all?" and discard the route. Kept
    *  separate from {@link route} so reachability checks never consume the
    *  seeded crowd rng the shaft-balancing path draws from. See routing.reachable. */
-  reachable(tower: Tower, from: number, to: number): boolean {
-    return routing.reachable(this, tower, from, to);
+  reachable(tower: Tower, from: number, to: number, fromX?: number, toX?: number): boolean {
+    return routing.reachable(this, tower, from, fromX, to, toX);
+  }
+
+  /** Does ANY segment on `floor` route to the ground lobby (floor-level)? */
+  floorReachable(tower: Tower, floor: number): boolean {
+    return segmentGraph.floorReachableFromLobby(this, tower, floor);
+  }
+
+  /** Does the SEGMENT at `(floor, x)` route to the ground lobby? The per-unit
+   *  version {@link floorReachable} widens to the whole floor. */
+  positionReachable(tower: Tower, floor: number, x: number): boolean {
+    return segmentGraph.positionReachable(this, tower, floor, x);
+  }
+
+  /** Is the segment at `(floor, x)` transport-connected to the lobby, ignoring
+   *  the walk budget (the segment-granular `isFloorServed`)? */
+  segmentConnected(tower: Tower, floor: number, x: number): boolean {
+    return segmentGraph.segmentConnected(this, tower, floor, x);
   }
 
   /** Spawn new trips for a span of time (delegated to the spawn module). Split

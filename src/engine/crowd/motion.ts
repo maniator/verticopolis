@@ -5,14 +5,15 @@ import { isElevatorKind, syncAttendanceOccupants } from "../facilities";
 import type { Crowd } from "../Crowd";
 import type { Person } from "./person";
 import {
-  WALK_SPEED,
   CAR_CAPACITY,
   STRESS_WAIT,
   GIVE_UP,
   STAFF_GIVE_UP,
   RIDE_SECONDS_PER_FLOOR,
 } from "./person";
-import { pickX, insideX, metroStationForPlatform } from "./trips";
+import { pickX, pickXInSegment, insideX, metroStationForPlatform } from "./trips";
+import { walkTo } from "./walk";
+import { landingSlots } from "./landing";
 import { beginDwell } from "./visits";
 
 /**
@@ -99,109 +100,6 @@ function tripFloors(p: Person): number {
   return n;
 }
 
-// Elevator-landing queue geometry, in tiles: the front stands QUEUE_GAP off the
-// shaft face and each waiter behind is QUEUE_SPACING further out. A rendered
-// figure is a bit under one tile wide, so a spacing above that clears it and the
-// row reads as distinct people rather than a solid mass.
-const QUEUE_GAP = 0.8;
-const QUEUE_SPACING = 1.1;
-
-// Max tiles a landing line spreads across, from the shaft face. Bounds the
-// contiguous-structure scan below (a floor can be hundreds of tiles wide) and
-// caps the line so a congested landing (waiters accumulate to MAX_PEOPLE) forms
-// a long readable row before it compresses, rather than trailing on forever.
-const QUEUE_REACH = 30;
-
-/** Length of the contiguous built (floor/lobby) run starting at `startX` and
- *  stepping by `dir`, capped at {@link QUEUE_REACH}. Used to pick the roomier
- *  side of a shaft and to keep the line on solid ground: unlike a floor-wide
- *  min/max, this stops at the first gap, so a floor with disjoint segments never
- *  seats a waiter over an unbuilt hole. `hasStructure` is an O(1) tile lookup,
- *  and the run is bounded, so no per-tower-units scan runs on the hot path. */
-function builtRun(tower: Tower, floor: number, startX: number, dir: number): number {
-  let n = 0;
-  for (let x = startX; n < QUEUE_REACH && tower.hasStructure(floor, x); x += dir) n++;
-  return n;
-}
-
-/** The tile x each person waiting at an elevator landing should stand at, keyed
- *  by person id, so waiters fan into a line at the doors instead of stacking on
- *  the shaft center. The longest-waiting person holds the front, so the order
- *  reflects arrival, not spawn, and a fresh arrival (wait 0) joins the back
- *  rather than shoving those ahead outward. The line extends onto whichever side
- *  of the shaft has the longer contiguous run of built floor and compresses its
- *  spacing to fit that run, so it never trails into unbuilt space (shaft x is a
- *  lot coordinate, not tower-relative, so the side must come from the real
- *  layout, not a fixed threshold). Only `waiting` people are placed; people still walking in
- *  (`toShaft`) head to the shaft face and fan out once they arrive, so this
- *  never changes the toShaft -> waiting timing the sim depends on. Stairs and
- *  escalators are walked, not queued. */
-function landingSlots(crowd: Crowd, tower: Tower): Map<number, number> {
-  const slots = new Map<number, number>();
-  // Resolve each shaft to an elevator (or not) once per slice, so a busy
-  // landing does not repeat the lookup and kind-check per waiter.
-  const elevatorOf = new Map<number, Transport | null>();
-  const resolve = (id: number): Transport | null => {
-    const cached = elevatorOf.get(id);
-    if (cached !== undefined) return cached;
-    const shaft = shaftOf(tower, id);
-    const ok = shaft && isElevatorKind(shaft.kind) ? shaft : null;
-    elevatorOf.set(id, ok);
-    return ok;
-  };
-  // Group waiting people per (shaft, floor) landing. Nested numeric maps keep
-  // the grouping allocation-light on the per-slice hot path.
-  const byShaft = new Map<number, Map<number, { shaft: Transport; people: Person[] }>>();
-  for (const p of crowd.people) {
-    if (p.state !== "waiting" || p.shaftId == null) continue;
-    const shaft = resolve(p.shaftId);
-    if (!shaft) continue;
-    let byFloor = byShaft.get(p.shaftId);
-    if (!byFloor) byShaft.set(p.shaftId, (byFloor = new Map()));
-    let g = byFloor.get(p.floor);
-    if (!g) byFloor.set(p.floor, (g = { shaft, people: [] }));
-    g.people.push(p);
-  }
-  if (byShaft.size === 0) return slots;
-  for (const [, byFloor] of byShaft) {
-    for (const [floor, g] of byFloor) {
-      // Longest-waiting at the front; break ties by id so equal waits (several
-      // riders arriving in one slice) never reorder or flicker across runtimes.
-      g.people.sort((a, b) => b.wait - a.wait || a.id - b.id);
-      const leftFace = g.shaft.x;
-      const rightFace = g.shaft.x + g.shaft.width;
-      // Contiguous built run just outside each shaft face (the right run starts
-      // at rightFace, the left one tile further out at leftFace - 1). The line
-      // lays out on whichever side has the longer run and stays within it; the
-      // distribution below compresses the spacing to fit that run rather than
-      // trailing off the built floor or bunching the tail on one tile.
-      const leftRun = builtRun(tower, floor, leftFace - 1, -1);
-      const rightRun = builtRun(tower, floor, rightFace, 1);
-      const side = rightRun >= leftRun ? 1 : -1;
-      const run = side > 0 ? rightRun : leftRun;
-      const face = side > 0 ? rightFace : leftFace;
-      // Lay the line from the shaft face outward. It wants QUEUE_GAP for the
-      // front rider then QUEUE_SPACING per waiter behind, but if that overruns
-      // the built run the step compresses so the WHOLE line still fits on solid
-      // floor: a jammed landing packs its waiters tighter (down to shoulder to
-      // shoulder) rather than piling the overflow on the last tile. This is what
-      // "runs out of space" does on a narrow floor, not a stack at the wall.
-      const n = g.people.length;
-      // The front rider stands QUEUE_GAP off the face, but never past the built
-      // run: a degenerate shaft with no floor beside it (run 0) keeps everyone on
-      // the face rather than one gap out over unbuilt space.
-      const front = Math.min(QUEUE_GAP, run);
-      const naturalDepth = front + Math.max(0, n - 1) * QUEUE_SPACING;
-      const maxDepth = Math.min(naturalDepth, run);
-      const step = n > 1 ? (maxDepth - front) / (n - 1) : 0;
-      g.people.forEach((p, rank) => {
-        slots.set(p.id, face + side * (front + rank * step));
-      });
-    }
-  }
-  return slots;
-}
-
 function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<number, number>): void {
   switch (p.state) {
     case "toShaft": {
@@ -213,7 +111,7 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       // which feeds the frustration/satisfaction the sim serializes; the queue
       // must stay a purely visual placement, so the spread happens in `waiting`.
       const targetX = shaft.x + shaft.width / 2;
-      if (walkTo(p, targetX, dt)) {
+      if (walkTo(p, targetX, dt, tower)) {
         // Elevators are boarded (wait for a car); stairs/escalators are
         // simply climbed on foot.
         if (isElevatorKind(shaft.kind)) {
@@ -256,7 +154,7 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       // ahead boards, this waiter's slot moves toward the doors, so they step up
       // rather than teleport. Position never gates boarding (that is purely
       // car-at-floor plus capacity), so drifting here is safe.
-      walkTo(p, slots.get(p.id) ?? shaft.x + shaft.width / 2, dt);
+      walkTo(p, slots.get(p.id) ?? shaft.x + shaft.width / 2, dt, tower);
       // Board a car of this shaft that's stopped at our floor with room.
       for (let i = 0; i < shaft.cars; i++) {
         if (Math.abs(shaft.carPositions[i] - p.floor) > 0.25) continue;
@@ -316,7 +214,7 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
       // Stroll to a spot on the destination floor, linger, then leave. The
       // give-up valve exempts `toDest`, so a held arrival (a dwell, or a
       // venue stay entered below) is never culled mid-stay.
-      if (walkTo(p, p.destX, dt)) {
+      if (walkTo(p, p.destX, dt, tower)) {
         p.linger += dt;
         // A person with `lingerFor` (a metro commuter waiting for their
         // train) holds the arrived pose past the default beat; venue
@@ -374,7 +272,14 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   // floor they spawned on (`floors[0]` still holds the outbound route here)
   // and despawns there, leaving the tower the way they entered it.
   const originFloor = origin ? origin.floor : p.floors[0];
-  const r = crowd.route(tower, venueFloor, originFloor);
+  // Route FROM the venue tile the person is standing on (p.x) TO the origin
+  // unit's own segment, so the return leg boards from the run they dwelled on and
+  // alights on the run their home sits in, never interpolating across a gap. An
+  // outside visitor (no origin unit) has no target x, so it routes to the floor's
+  // representative segment as before. A gap-free floor is one segment, so both
+  // x's resolve to the same node route() used before and the rng stream stays
+  // byte-identical.
+  const r = crowd.route(tower, venueFloor, originFloor, p.x, origin?.x);
   if (!r) {
     // Return route unreachable (transport degraded while dwelling). The person
     // "went home some other way"; the accounting must still balance, so
@@ -405,20 +310,18 @@ function transitionToReturn(crowd: Crowd, tower: Tower, p: Person): void {
   // rng draw, and insideX only draws when a metro is present, so a metro-less
   // tower's motion stream is byte-identical to before.
   const station = origin ? undefined : metroStationForPlatform(tower, originFloor);
-  p.destX = station ? insideX(crowd, station, 2) : pickX(tower, originFloor, p.seed);
+  // Land destX inside the segment the return leg actually reaches: a meal
+  // round-tripper on its home unit's own run (never a floor-wide pickX tile that
+  // could sit across a gap from the alighting run), an outside metro visitor on
+  // the station deck, and a lobby-origin visitor on the ground concourse (one
+  // contiguous run, so pickX already stays on it). On a gap-free floor
+  // pickXInSegment returns exactly what pickX would, keeping the stream identical.
+  p.destX = station
+    ? insideX(crowd, station, 2)
+    : origin
+      ? pickXInSegment(tower, originFloor, p.seed, origin.x)
+      : pickX(tower, originFloor, p.seed);
   p.returning = true;
-}
-
-/** Walk toward a tile x on the current floor; returns true once arrived. */
-function walkTo(p: Person, targetX: number, dt: number): boolean {
-  const dx = targetX - p.x;
-  const step = WALK_SPEED * dt;
-  if (Math.abs(dx) <= step) {
-    p.x = targetX;
-    return true;
-  }
-  p.x += Math.sign(dx) * step;
-  return false;
 }
 
 /** The room a meal round-tripper originated from, if it still exists. */

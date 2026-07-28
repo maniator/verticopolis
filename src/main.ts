@@ -447,6 +447,8 @@ class GameApp implements GameAppPorts {
   /** Swap in a freshly loaded/created simulation and point the engine at it.
    *  @internal */
   adoptSim(sim: Simulation, preserveHistory = false): void {
+    // Undo/redo restore (the only preserveHistory path) keeps the live bridging toggle: it's a SETTING, not a build step, so undoing a BUILD must not flip it.
+    if (preserveHistory) sim.autoBridge = this.sim.autoBridge;
     this.sim = sim;
     this.clearSelection();
     // Facility ids restart in a fresh tower. A stale ✕-latch (or anchor)
@@ -460,12 +462,10 @@ class GameApp implements GameAppPorts {
     this.lastStar = sim.star;
     this.accMinutes = 0;
     this.lastMealRushDay = { breakfast: -1, lunch: -1, dinner: -1 };
-    // A crash report pairs the CURRENT tower's save with these entries; errors
-    // recorded against a previous tower would point triage at the wrong state.
+    // A crash report pairs the CURRENT tower's save with these entries, so drop a previous tower's.
     this.frameErrors.length = 0;
-    // An undo/redo restore keeps the camera under the player (preserveHistory
-    // is only ever true on that path); a real tower swap lets the engine
-    // restore the save's own view or center a fresh one.
+    // An undo/redo restore keeps the camera under the player (preserveHistory is
+    // only ever true on that path); a real tower swap restores the save's view.
     this.engine.setSim(sim, { keepCamera: preserveHistory });
     // Rebase the UI log cursor onto the new tower's log so its old entries don't
     // replay as toasts and its next entry isn't skipped against a stale cursor.
