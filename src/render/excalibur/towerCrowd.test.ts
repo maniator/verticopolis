@@ -278,7 +278,8 @@ describe("updateMotion repositions the moving actors", () => {
   it("gates ambient walkers on busyness and reddens impatient ones under stress", () => {
     const mkWalker = (over: Record<string, unknown>) => ({
       actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
-      speed: 8, dir: 1, phase: 0.2, impatient: true, red: false, rank: 0.1, floor: 4, perFloor: false, ...over,
+      speed: 8, dir: 1, phase: 0.2, impatient: true, red: false, rank: 0.1, floor: 4,
+      tileX: 0, altFloor: 4, altTileX: 0, perFloor: false, ...over,
     });
     const lobbyWalker = mkWalker({});
     const hiddenWalker = mkWalker({ rank: 5 }); // rank above any threshold -> hidden
@@ -305,16 +306,26 @@ describe("ambient walkers are gated on reachability (#639)", () => {
   // because lobby and stair figures gate only on tower-wide busyness. These run
   // at population 400, so `crowd` saturates at 1 and busyness alone would show
   // every one of them; reachability is the only thing that can hide them.
-  const mkWalker = (over: Record<string, unknown>) => ({
-    actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
-    speed: 8, dir: 1, phase: 0.2, impatient: false, red: false, rank: 0.1,
-    floor: 1, tileX: 0, perFloor: false, ...over,
-  });
+  /** A walker whose second endpoint defaults to its first, the way production
+   *  builds every non-climber. A climber test sets `altFloor`/`altTileX`
+   *  explicitly; leaving them to follow `floor`/`tileX` here is what keeps the
+   *  single-spot cases honest (a stale default of floor 1 would make every
+   *  walker reachable through the always-reachable ground floor). */
+  const mkWalker = (over: Record<string, unknown> = {}) => {
+    const w: Record<string, unknown> = {
+      actor: actor(), gfx: gfx(), x0w: 100, x1w: 200, y0w: -100, y1w: -100,
+      speed: 8, dir: 1, phase: 0.2, impatient: false, red: false, rank: 0.1,
+      floor: 1, tileX: 0, perFloor: false, ...over,
+    };
+    w.altFloor ??= w.floor;
+    w.altTileX ??= w.tileX;
+    return w as any;
+  };
 
   it("hides an unreachable sky lobby's walkers and its stair climbers, keeping floor 1", () => {
     const mainLobby = mkWalker({ floor: 1 });
     const skyLobby = mkWalker({ floor: 15 });
-    const climber = mkWalker({ floor: 16, rank: 0.04 }); // stairs: lowest rank of all
+    const climber = mkWalker({ floor: 16, altFloor: 17, rank: 0.04 }); // a real 16-to-17 flight
     const e = eng({
       walkers: [mainLobby, skyLobby, climber],
       sim: simFixture({ positionReachable: (f: number) => f === 1 }),
@@ -330,7 +341,7 @@ describe("ambient walkers are gated on reachability (#639)", () => {
   it("shows the sky lobby once it becomes reachable, per floor not globally", () => {
     // The acceptance from the issue: "add an elevator to it and walkers appear."
     const skyLobby = mkWalker({ floor: 15 });
-    const climber = mkWalker({ floor: 16, rank: 0.04 });
+    const climber = mkWalker({ floor: 16, altFloor: 17, rank: 0.04 });
     const e = eng({
       walkers: [skyLobby, climber],
       sim: simFixture({ positionReachable: (f: number) => f === 1 || f === 15 }),
@@ -356,6 +367,37 @@ describe("ambient walkers are gated on reachability (#639)", () => {
     updateMotion(e);
     expect(westWing.actor.graphics.visible).toBe(true);
     expect(strandedEast.actor.graphics.visible).toBe(false);
+  });
+
+  it("hides a climber whose flight is cut off at the top (#665)", () => {
+    // The gate used to ask only about a flight's bottom landing, so a stair from
+    // a reachable floor to one nobody can get to still showed figures trudging
+    // up toward it. Classic's walk budget is what makes the two ends disagree:
+    // the probe routes THROUGH stairs, so a reachable bottom otherwise implies a
+    // reachable top.
+    const cutOffAbove = mkWalker({ floor: 5, tileX: 3, altFloor: 6, altTileX: 3, rank: 0.04 });
+    const usable = mkWalker({ floor: 4, tileX: 3, altFloor: 5, altTileX: 3, rank: 0.04 });
+    const e = eng({
+      walkers: [cutOffAbove, usable],
+      sim: simFixture({ positionReachable: (f: number) => f <= 5 }),
+    });
+    updateMotion(e);
+    expect(cutOffAbove.actor.graphics.visible).toBe(false);
+    // A flight with both landings reachable still carries its climbers.
+    expect(usable.actor.graphics.visible).toBe(true);
+  });
+
+  it("hides a climber whose flight is cut off at the bottom", () => {
+    // The mirror case, which the bottom-only gate also got wrong in the other
+    // direction: it showed nothing useful either way, since no route ends at a
+    // landing nobody can reach.
+    const cutOffBelow = mkWalker({ floor: 5, tileX: 3, altFloor: 6, altTileX: 3, rank: 0.04 });
+    const e = eng({
+      walkers: [cutOffBelow],
+      sim: simFixture({ positionReachable: (f: number) => f >= 6 }),
+    });
+    updateMotion(e);
+    expect(cutOffBelow.actor.graphics.visible).toBe(false);
   });
 
   it("asks the engine once per position per revision, and re-asks after a layout change", () => {

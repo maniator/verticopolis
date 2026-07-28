@@ -55,12 +55,18 @@ export interface Walker {
   rank: number;
   /** Floor this figure belongs to (for per-floor occupancy gating). */
   floor: number;
-  /** Origin tile of the run this figure paces (the transport's tile for a stair
+  /** A structural tile of the run this figure paces (a landing tile for a stair
    *  or escalator climber). Reachability is asked per POSITION, not per floor
    *  (#647): a gap-split Modern floor can strand one contiguous run while a
    *  sibling run of the same floor still routes to the lobby, and a floor-level
    *  probe cannot tell them apart. */
   tileX: number;
+  /** A climber's OTHER landing (the far end of its flight); every other figure
+   *  repeats `floor`/`tileX`. Both ends have to be reachable for the flight to
+   *  carry traffic, so gating on the bottom alone left climbers walking toward a
+   *  top no route ends at (#665). */
+  altFloor: number;
+  altTileX: number;
   /** True for corridor loiterers gated on their floor's live occupancy; false
    *  for lobby/stair figures gated on the whole tower's busyness. */
   perFloor: boolean;
@@ -288,16 +294,22 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  cost stays a Map lookup however the tower is laid out and a swapped-in sim
  *  gets a fresh entry rather than inheriting the old tower's answers.
  *
- *  Known gap, and it fails safe: a climber carries its transport's BOTTOM floor,
- *  so a stair whose bottom is reachable but whose top is not still shows
- *  climbers. Reaching that needs Classic's walk budget to cut the flight one way
- *  (the router itself walks stairs, so a reachable bottom normally implies a
- *  reachable top), and it errs toward showing rather than hiding. A climber also
- *  probes its transport's own tile, which a stair may legally place over a gap
- *  (only SOME tile under the footprint has to be structural), so such a flight
- *  hides its climbers even though routing links it by its landing tile. Both
- *  err toward hiding. Backlog row `walker-reachability-refinements` (#665). */
+ *  A climber is asked about BOTH its landings, and needs both (#665). The probe
+ *  already routes THROUGH stairs, so a reachable bottom normally implies a
+ *  reachable top; the two only disagree when Classic's walk budget cuts the
+ *  flight, and then nobody completes that climb from either side. Gating on the
+ *  bottom alone left figures trudging up toward a floor no route ends at. */
 function walkerReachable(engine: TowerEngine, w: Walker): boolean {
+  if (!spotReachable(engine, w.floor, w.tileX)) return false;
+  // A climber is only in traffic when BOTH its landings are reachable: nobody
+  // completes a climb toward a floor no route ends at. Everyone else repeats one
+  // spot, and the equality check keeps them to a single probe.
+  if (w.altFloor === w.floor && w.altTileX === w.tileX) return true;
+  return spotReachable(engine, w.altFloor, w.altTileX);
+}
+
+/** One memoized reachability verdict for a `(floor, tileX)` spot. */
+function spotReachable(engine: TowerEngine, floor: number, tileX: number): boolean {
   const sim = engine.sim;
   const rev = sim.tower.revision;
   let memo = walkReachMemos.get(sim);
@@ -307,10 +319,10 @@ function walkerReachable(engine: TowerEngine, w: Walker): boolean {
   }
   // Tile x is bounded by the lot width (375), so 1024 keeps floor and tile in
   // their own lanes without a string key on the per-frame path.
-  const key = w.floor * 1024 + w.tileX;
+  const key = floor * 1024 + tileX;
   let hit = memo.verdicts.get(key);
   if (hit === undefined) {
-    hit = sim.positionReachable(w.floor, w.tileX);
+    hit = sim.positionReachable(floor, tileX);
     memo.verdicts.set(key, hit);
   }
   return hit;
