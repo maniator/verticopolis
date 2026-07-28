@@ -39,8 +39,17 @@ function servedTower(seed: number, mode: GameMode, top = 6): Simulation {
   sim.star = 1; // 1-star: no random fire/bomb events to perturb the run
   for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
   for (let f = 2; f <= top; f++) for (let x = 0; x < W; x++) sim.tower.place("floor", f, x);
-  sim.buildTransport("elevatorStandard", C, 1, Math.min(top, 30));
+  expect(sim.buildTransport("elevatorStandard", C, 1, Math.min(top, 30)).ok).toBe(true);
   sim.tower.setCars(sim.tower.transports[0].id, 8);
+  // Assert the topology every case relies on rather than trusting the loops: a
+  // full lobby row and floor slabs were laid, the shaft stands, and floor 2 (where
+  // most candidates sit) is genuinely served AND reachable. A grid, catalog, or
+  // cap change that silently dropped a placement would trip this here instead of
+  // quietly turning a satisfaction-drain case into an access-failure case.
+  expect(sim.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1).length).toBe(W);
+  expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === top).length).toBe(W);
+  expect(sim.tower.isFloorServed(2)).toBe(true);
+  expect(sim.floorReachable(2)).toBe(true);
   return sim;
 }
 
@@ -128,6 +137,57 @@ describe("move-in sustainability gate: Classic parity (caps but never evicts)", 
       const condo = place(sim, "condo", 20, C);
       expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim)), mode).toBe(true);
     }
+  });
+});
+
+describe("move-in sustainability gate: unmet-demand doom (retail-starved spot)", () => {
+  it("gates a Modern spot that reaches no retail, and fills it once the retail is reachable", () => {
+    // Floors 2..10 exist but the shaft only serves 1..6, so floor 10 is stranded.
+    const sim = Simulation.newGame(30, "modern");
+    sim.money = 1e12;
+    sim.star = 1;
+    for (let x = 0; x < W; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let f = 2; f <= 10; f++) for (let x = 0; x < W; x++) expect(sim.tower.place("floor", f, x).ok).toBe(true);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 6).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[0].id, 8);
+    // Retail EXISTS but only on the stranded floor 10, so a tenant on the reachable
+    // floor 2 reaches ZERO shops: coverage 0, the Modern unmet-demand erosion that
+    // actually evicts. Without registering the empty candidate as a demand origin,
+    // the gate would miss this and let the spot lease and then churn.
+    place(sim, "fastFood", 10, C);
+    const condo = place(sim, "condo", 2, C); // reachable, quiet, near the lobby
+    expect(sim.floorReachable(2)).toBe(true);
+    expect(sim.floorReachable(10)).toBe(false);
+    expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(true);
+
+    // Make the retail reachable: a second shaft up to floor 10. Coverage rises and
+    // the spot becomes livable, so the gate lets it fill (auto-heal).
+    expect(sim.buildTransport("elevatorStandard", C + 20, 1, 10).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[1].id, 8);
+    expect(sim.floorReachable(10)).toBe(true);
+    expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(false);
+  });
+});
+
+describe("move-in sustainability gate: repair path (a fixed cause lets the spot fill)", () => {
+  it("Classic: a poor-access office stays vacant, then fills once a shaft reaches it (auto-heal)", () => {
+    const sim = servedTower(31, "classic", 6);
+    // An office at the far edge, past the far-walk tolerance from the central shaft:
+    // the gate holds it vacant (Classic office far-walk erodes in both modes).
+    const office = place(sim, "office", 2, 0);
+    expect(wouldEvictFreshTenant(sim, office, buildSatisfactionContext(sim, true))).toBe(true);
+    let guard = 0;
+    while (!office.everOccupied && guard++ < 300) sim.tick(60);
+    expect(office.everOccupied).toBe(false); // stays empty while access is poor
+
+    // Fix the cause: a shaft right beside it. The gate now allows it and it fills,
+    // proving the vacancy auto-heals the moment the placement problem is fixed.
+    expect(sim.buildTransport("elevatorStandard", 0, 1, 6).ok).toBe(true);
+    sim.tower.setCars(sim.tower.transports[1].id, 8);
+    expect(wouldEvictFreshTenant(sim, office, buildSatisfactionContext(sim, true))).toBe(false);
+    guard = 0;
+    while (!office.everOccupied && guard++ < 2000) sim.tick(60);
+    expect(office.everOccupied).toBe(true);
   });
 });
 
@@ -260,6 +320,20 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     expect(cleanReloc).not.toContain("stays empty");
     expect(cleanReloc).not.toContain("add cars");
     expect(departToast(24, "relocation", true)).toContain("It stays empty until you fix the cause");
+
+    // A No Rate owned condo is off-market, so attemptMoveIns skips it regardless of
+    // the gate: the note must point to setting a rate, not the placement.
+    const sim = servedTower(25, "modern");
+    const condo = place(sim, "condo", 2, C);
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.residents = 3;
+    condo.rent = 160_000;
+    condo.noRate = true;
+    vacate(sim, condo, "noise");
+    const noRateToast = sim.log[sim.log.length - 1].text;
+    expect(noRateToast).toContain("off the market (No Rate)");
+    expect(noRateToast).not.toContain("stays empty until you fix");
   });
 
   it("evicts a doomed spot exactly once and never re-sells (the churn is truly stopped)", () => {

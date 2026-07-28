@@ -86,14 +86,19 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // re-sells, and only then does a congestion-caused eviction warrant the "the
   // crowding will keep wearing owners down" note (congestion is deliberately not
   // gated, so an under-elevatored tower keeps turning the unit over until cars are
-  // added). A well-placed relocation just re-lists silently.
+  // added). A well-placed relocation just re-lists silently. A No Rate unit (an
+  // imported off-market owned condo) is skipped by `attemptMoveIns` regardless of
+  // the gate, so it stays empty until a rate is set, which is what the note must
+  // say (not "fix the cause" or "a new owner will buy in").
   let buybackNote = "";
   if (buyback > 0) {
-    buybackNote = wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
-      ? " It stays empty until you fix the cause."
-      : reason === "congestion"
-        ? " A new owner will buy in, but the crowded elevators will wear them down too until you add cars."
-        : "";
+    buybackNote = u.noRate
+      ? " It is off the market (No Rate); set a rate to sell it again."
+      : wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
+        ? " It stays empty until you fix the cause."
+        : reason === "congestion"
+          ? " A new owner will buy in, but the crowded elevators will wear them down too until you add cars."
+          : "";
   }
   sim.emit(
     buyback > 0

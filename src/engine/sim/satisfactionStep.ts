@@ -211,6 +211,18 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
     everOccupied: true,
     residents: u.kind === "condo" ? CLASSIC_HOUSEHOLD : u.residents,
   };
+  // The would-be tenant is not yet a census origin, so computeDemandMap omits it
+  // from reachableVenuesByOrigin and unmetCoverage would return null, silently
+  // skipping the unmet-demand drain: a retail-starved Modern spot would lease,
+  // become an origin on the next sweep, erode out, and churn, the exact loop this
+  // gate stops. Register the probe as a demand origin on its own floor, mirroring
+  // exactly how computeDemandMap registers a real origin: the reachable-venue count
+  // when its floor draws (the lobby-anchored model gives every reachable origin the
+  // same reachable-venue set), else 0 (retail exists but this floor reaches none).
+  const dm = (ctx.demandMap ??= computeDemandMap(sim));
+  if (!dm.reachableVenuesByOrigin.has(u.id)) {
+    dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
+  }
   let s = 1;
   for (let i = 0; i < GATE_HORIZON_HOURS; i++) {
     const prev = s;
