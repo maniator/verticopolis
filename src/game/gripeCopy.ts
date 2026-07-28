@@ -4,6 +4,7 @@ import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
 import { isHotelKind } from "../engine/facilities";
+import { SERVED_RECOVERY } from "../engine/sim/constants";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
@@ -134,8 +135,20 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
   const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);
   const text = gripe ? gripeLineText(sim, u, gripe, cov) : undefined;
-  const lead = text
-    ? `Won't lease: ${text}`
+  const parts = text ? [text] : [];
+  // Unmet demand is the LAST-ranked cause, so a spot also starved of reachable
+  // retail hides that remedy behind a higher-priority one (noise, lobby, rent) and
+  // fixing only the named cause leaves it gated. When the retail shortfall is
+  // independently binding (its erosion alone outruns recovery, i.e. the tenant
+  // reaches near-zero retail) and it is not already the named cause, append its
+  // remedy too so every binding fix is shown. The weaker "cap only" shortfall is
+  // not appended: it lowers renewal but cannot gate on its own.
+  if (gripe !== "unmetDemand" && unmetDrain !== null && unmetDrain.erosion > SERVED_RECOVERY) {
+    const retail = unmetDemandGripeText(sim, u, cov);
+    if (retail) parts.push(retail);
+  }
+  const lead = parts.length
+    ? `Won't lease: ${parts.join(" Also, ")}`
     : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
   return `${lead}${carryingCostNote(sim, u)}`;
 }

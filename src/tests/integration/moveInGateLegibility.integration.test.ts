@@ -95,6 +95,27 @@ describe("move-in sustainability gate: inspector 'Won't lease' legibility", () =
     expect(line).toContain("nightclub"); // and the cross-floor remedy
   });
 
+  it("names BOTH remedies when a spot is gated by noise AND unmet demand independently", () => {
+    // Unmet demand is the last-ranked cause, so it would hide behind the noise cause
+    // and fixing only the noise would leave the retail drain gating the unit.
+    const sim = Simulation.newGame(50, "modern");
+    sim.money = 1e12;
+    sim.star = 1;
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let f = 2; f <= 10; f++) for (let x = 0; x < W; x++) sim.tower.place("floor", f, x);
+    expect(sim.buildTransport("elevatorStandard", C, 1, 6).ok).toBe(true); // floor 10 stranded
+    sim.tower.setCars(sim.tower.transports[0].id, 8);
+    place(sim, "fastFood", 10, C); // stranded retail: the condo reaches none (coverage 0, binding)
+    place(sim, "office", 2, C - 9); // an adjacent noise source (the dominant cause)
+    const condo = place(sim, "condo", 2, C);
+    expect(sim.noiseAfflicted(condo)).toBe(true);
+    const line = wontLeaseText(sim, condo);
+    expect(line).not.toBeNull();
+    expect(line).toContain("noisy neighbor"); // the dominant (noise) remedy
+    expect(line).toContain("shops"); // AND the retail remedy it would otherwise hide
+    expect(line).toContain("Also,"); // both are joined, not one dropped
+  });
+
   it("is silent on a spot that would fill", () => {
     const sim = servedTower(9, "modern");
     const condo = place(sim, "condo", 2, C);
