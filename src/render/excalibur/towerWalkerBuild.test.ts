@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
 import { Tower } from "../../engine/Tower";
-import { landingSeg, segAt } from "../../engine/tower/segments";
+import { landingSeg, segAt, segmentsOf } from "../../engine/tower/segments";
 import { buildWalkers, landingTile } from "./towerWalkerBuild";
 
 /**
@@ -162,8 +162,19 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     for (let x = 10; x < 12; x++) tower.place("floor", 2, x); // run A, under the footprint
     for (let x = 15; x < 26; x++) tower.place("floor", 2, x); // run B, also under it
     tower.placeTransport("stairs", 10, 1, 2);
-    // Two genuinely distinct segments sit under the 10..17 span.
-    expect(segAt(tower, 2, 10)).not.toBe(segAt(tower, 2, 15));
+    // Prove the geometry, do not infer it. `segAt` answers with a LONE-TILE
+    // segment for a column over the void (`segmentStartX` returns x when no run
+    // contains it), so comparing two `segAt` calls would pass even if run A had
+    // never been placed, quietly turning this into a copy of the overhang case.
+    // Assert the structure itself, and the gap between the two runs.
+    expect(tower.hasStructure(2, 10), "run A must exist under the footprint").toBe(true);
+    expect(tower.hasStructure(2, 11)).toBe(true);
+    expect(tower.hasStructure(2, 12), "the runs must be separated by a real gap").toBe(false);
+    expect(tower.hasStructure(2, 15), "run B must also sit under the footprint").toBe(true);
+    expect(segmentsOf(tower, 2)).toEqual([[10, 11], [15, 25]]);
+    // The router links the FIRST run today, so the render side must land there
+    // too. This is the assertion that moves when #662 changes which run wins.
+    expect(landingTile(tower, tower.transports[0], 2)).toBe(10);
     parity(tower);
   });
 
@@ -175,7 +186,14 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     const tower = new Tower();
     for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
     for (let x = 20; x < 26; x++) tower.place("floor", 2, x); // clear of the 10..17 span
-    expect(tower.placeTransport("stairs", 10, 1, 2).ok).toBe(false);
+    // Floor 2 HAS structure, just none under the span, so the refusal can only
+    // be about the span. Assert the reason too: without it this passes for any
+    // refusal (a cap, an overlap) while its name claims a specific cause.
+    expect(tower.hasStructure(2, 20)).toBe(true);
+    expect(tower.hasStructure(2, 17)).toBe(false);
+    const res = tower.placeTransport("stairs", 10, 1, 2);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toContain("built floors");
     expect(tower.transports).toEqual([]);
   });
 });
