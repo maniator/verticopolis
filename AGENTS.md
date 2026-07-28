@@ -147,6 +147,30 @@ These rules sit on top of the two test tiers in
   tower shipped for months with no sky lobbies and no express elevators
   because nothing checked `ok`, and it kept passing for the wrong reason.
 
+## Docker housekeeping: clean up after yourself
+
+Agent runs that spin up Docker (most often the pinned Playwright screenshot
+container, see [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**) leave
+cruft that never shrinks on its own: a stopped container per run, dangling image
+layers, and build cache. Left unattended it balloons the WSL data disk
+(`docker_data.vhdx`), which has already filled a contributor's system drive once
+(308 GB of leftovers). So clean up after any run that used Docker:
+
+- **Run throwaway containers with `docker run --rm ...`** so they delete
+  themselves when they exit. For the pinned Playwright container this is the
+  common case.
+- **After a Docker-using run, prune what it created:** `docker container prune
+  -f`, `docker image prune -f` (dangling only), and `docker builder prune -f`.
+- **Keep the pinned images and any named volumes.** Do not blanket-remove tagged
+  images (re-pulling the Playwright image every run is slow and wasteful), and
+  do not pass `--volumes` (named volumes can hold data). Plain `prune` without
+  `-a` or `--volumes` already leaves both alone.
+- **Never leave a stopped screenshot container behind.** If the CLI is
+  unresponsive (a wedged Docker hangs for a minute or more when its disk is
+  overstuffed), the filesystem-level reset is: stop Docker Desktop, `wsl
+  --shutdown`, delete `docker_data.vhdx`; Docker recreates an empty one on the
+  next launch.
+
 ## Gameplay model notes
 
 - Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in
