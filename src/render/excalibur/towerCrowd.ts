@@ -273,8 +273,7 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  budget hides a lobby reachable only by a too-long stair climb (no commuter
  *  spawns for it either) while Modern's served-equals-reachable needs no era
  *  branch. Floor 1 short-circuits to true in the engine, so the main lobby is
- *  untouched. The verdict is memoized there per `tower.revision` in a per-sim
- *  WeakMap, so this is an O(1) lookup that cannot go stale across a load.
+ *  untouched.
  *
  *  Asked per POSITION (#647): on a gap-split Modern floor one contiguous run can
  *  be stranded while a sibling run of the same floor still routes to the lobby,
@@ -293,8 +292,11 @@ function refreshFloorLiveliness(engine: TowerEngine): void {
  *  so a stair whose bottom is reachable but whose top is not still shows
  *  climbers. Reaching that needs Classic's walk budget to cut the flight one way
  *  (the router itself walks stairs, so a reachable bottom normally implies a
- *  reachable top), and it errs toward showing rather than hiding. Backlog row
- *  `walker-reachability-refinements`. */
+ *  reachable top), and it errs toward showing rather than hiding. A climber also
+ *  probes its transport's own tile, which a stair may legally place over a gap
+ *  (only SOME tile under the footprint has to be structural), so such a flight
+ *  hides its climbers even though routing links it by its landing tile. Both
+ *  err toward hiding. Backlog row `walker-reachability-refinements` (#665). */
 function walkerReachable(engine: TowerEngine, w: Walker): boolean {
   const sim = engine.sim;
   const rev = sim.tower.revision;
