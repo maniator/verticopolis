@@ -53,11 +53,21 @@ function servedTower(seed: number, top: number, money = 100_000_000): Simulation
 
 describe("F1 — Security is buildable at 2★ (the unwinnable deadlock is gone)", () => {
   it("organically reaches 3★ through build() + tick() with no forced star/occupancy", () => {
-    const sim = servedTower(1, 11);
-    // Offices on floors 2..10 (right edge left clear for the elevator), built
-    // through the real build path — construction + occupancy happen in the sim.
+    const sim = structuredTower(1, 11);
+    // Three standard shafts spread across the width so every office row sits
+    // within the far-walk limit of a shaft. A single edge shaft (the old
+    // servedTower setup) would strand the far offices, and the move-in
+    // sustainability gate would then rightly refuse to seat a tenant who'd just
+    // churn out, a placement effect that would mask the organic growth this test
+    // measures.
+    for (const x of [70, 200, 330]) {
+      expect(sim.buildTransport("elevatorStandard", x, 1, 11).ok).toBe(true);
+    }
+    for (const t of sim.tower.transports) sim.tower.setCars(t.id, 8);
+    // Offices on floors 2..10 across the full width, built through the real build
+    // path: construction and occupancy happen in the sim.
     for (let f = 2; f <= 10; f++) {
-      for (let x = 0; x + FACILITIES.office.width <= W - 8; x += FACILITIES.office.width) {
+      for (let x = 0; x + FACILITIES.office.width <= W; x += FACILITIES.office.width) {
         sim.build("office", f, x);
       }
     }

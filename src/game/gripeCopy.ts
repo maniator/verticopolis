@@ -1,6 +1,9 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage } from "../engine/sim/gripe";
+import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe";
+import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
+import { rentOf } from "../engine/econConfig";
+import { isHotelKind } from "../engine/facilities";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
@@ -15,8 +18,32 @@ import { unmetCoverage } from "../engine/sim/gripe";
 const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
   rent: "the rent is above the going rate. Lower it to keep them.",
-  noise: "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.",
+  // "noise" is resolved by noiseGripeText (the remedy differs by source); it stays
+  // out of this table so a bare lookup can never return the wrong advice.
 };
+
+/** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is
+ *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
+ *  but it penalizes ONLY condos and hotels: an office feels no nightclub halo, so
+ *  its "noise" is always an adjacent same-floor source and it takes the lobby-tile
+ *  remedy regardless of any nearby club (recommending the player move an unrelated
+ *  nightclub, and calling the office a "home", would both be wrong). For a condo or
+ *  hotel with a club in halo range the club's relocation remedy holds even when the
+ *  club also sits within same-floor range and makes the unit noiseAfflicted. */
+function noiseGripeText(sim: Simulation, u: Unit): string {
+  const adjacent = sim.noiseAfflicted(u); // a same-floor office/commercial source, lobby-shieldable
+  const club = (u.kind === "condo" || isHotelKind(u.kind)) && nearNightclub(sim, u); // cross-floor halo, not shieldable
+  if (adjacent && club) {
+    // Both channels can be at work and either can be the binding cause, so present
+    // both remedies rather than blaming one: a lobby tile shields the same-floor
+    // source, and moving the nightclub (or the unit) addresses the cross-floor beat.
+    return "a noisy neighbor and a nearby nightclub. A lobby tile between the same-floor source and this unit shields the neighbor; the nightclub's beat also carries between floors, so put more floors between it and this unit too.";
+  }
+  if (club) {
+    return "a nightclub too close by. A lobby tile shields same-floor noise, but its beat also carries between floors; put more floors between this unit and the nightclub (move either one).";
+  }
+  return "a noisy neighbor. An office or commercial venue sits too close; a lobby tile between them shields it.";
+}
 
 /** The unmet-demand gripe (#395) names which of its causes actually holds,
  *  because the demand model is lobby-anchored and tower-uniform: a tenant that
@@ -27,8 +54,14 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
  *  locality the model does not carry). Both gripe reads share one synchronous
  *  render, so `sim.demandMap()` here is a guaranteed memo hit on the same map
  *  `dominantGripe` just read, never a rescan. */
-function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
-  if (unmetCoverage(sim.demandMap(), u) === 0) {
+function unmetDemandGripeText(sim: Simulation, u: Unit, coverage?: number | null): string | undefined {
+  // For an empty gate candidate the caller passes the CANDIDATE-aware coverage (the
+  // unit is not an origin in the real memoized map, where this would read null and
+  // mis-prescribe "add venues" for stranded retail). The occupied "Main gripe"
+  // caller passes nothing and reads the shared memoized map, where the tenant IS an
+  // origin.
+  const cov = coverage !== undefined ? coverage : unmetCoverage(sim.demandMap(), u);
+  if (cov === 0) {
     // Coverage 0 also covers a tenant whose OWN floor is unreachable: its people
     // can reach nothing however well the shops are wired, and that cause already
     // has the dedicated red "Access: no route" line, so the gripe
@@ -46,7 +79,77 @@ function unmetDemandGripeText(sim: Simulation, u: Unit): string | undefined {
 /** The "Main gripe" line's text for an attributed cause, or undefined when the
  *  cause defers to a dedicated diagnostic line on the card. An explicit ladder
  *  so each case reads on its own (review nit on the former nested ternary). */
-export function gripeLineText(sim: Simulation, u: Unit, gripe: VacateReason): string | undefined {
-  if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u);
+export function gripeLineText(
+  sim: Simulation,
+  u: Unit,
+  gripe: VacateReason,
+  unmetCov?: number | null,
+): string | undefined {
+  if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u, unmetCov);
+  if (gripe === "noise") return noiseGripeText(sim, u);
   return GRIPE_TEXT[gripe];
+}
+
+/**
+ * The inspector's "Won't lease" line for an EMPTY, on-market, reachable
+ * condo/office the move-in sustainability gate holds vacant (a fresh tenant here
+ * would erode below the leave bar and give notice again), or null when the unit
+ * would fill. The empty-unit mirror of the "Main gripe" line: it names WHY no one
+ * leases the spot so a perpetual vacancy reads as an actionable placement problem
+ * instead of a mystery. Like "Main gripe" it spells out only the causes WITHOUT a
+ * dedicated diagnostic line (congestion, over-market rent, noise, unmet demand);
+ * access, the office long-walk, and very-far lobby distance keep their own
+ * actionable lines on the card, so for those the line just says a tenant would
+ * give notice and points to the flagged problem. Gated on the SAME predicate
+ * `attemptMoveIns` uses, so the card and the move-in decision can never disagree;
+ * unreachable and off-market units are excluded (their own lines tell that
+ * story), matching the engine, which never reaches the gate for them.
+ */
+export function wontLeaseText(sim: Simulation, u: Unit): string | null {
+  if (
+    !(u.kind === "office" || u.kind === "condo") ||
+    u.state !== "empty" ||
+    u.noRate ||
+    !sim.tower.isFloorServed(u.floor) ||
+    !sim.floorReachable(u.floor)
+  ) {
+    return null;
+  }
+  // One shared gate context so the verdict AND the cause read the same
+  // candidate-aware demand: wouldEvictFreshTenant registers this empty unit as a
+  // demand origin and sets the candidate-aware share on ctx.demandMap.
+  const ctx = buildSatisfactionContext(sim, true);
+  if (!wouldEvictFreshTenant(sim, u, ctx)) return null;
+  // Name the cause the GATE actually held the spot for, which excludes congestion
+  // (the gate context neutralizes it). Passing cong = 0 to dominantGripe skips the
+  // congestion tier so the line never tells the player to "add cars" when adding
+  // cars would not fill the spot; the structural cause the neutralized gate caught
+  // (noise, far walk, lobby distance, rent, unmet demand) wins instead. The
+  // unmet-demand flag is computed from the SAME candidate-aware demand the gate
+  // used (the empty unit is now a registered origin), so a spot gated only by a
+  // retail shortage attributes "too few shops" instead of falling to the generic
+  // line, where dominantGripe would otherwise read the real map that omits it.
+  const cov = ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
+  const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
+  const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
+  const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);
+  const text = gripe ? gripeLineText(sim, u, gripe, cov) : undefined;
+  const lead = text
+    ? `Won't lease: ${text}`
+    : "Won't lease: a new tenant here would soon give notice. Fix the flagged problem to fill it.";
+  return `${lead}${carryingCostNote(sim, u)}`;
+}
+
+/** The spec's "fix it or raze it" carrying-cost telegraph: while a gated spot sits
+ *  empty it still bleeds its holding cost, so name it and the bulldoze escape, not
+ *  just the placement problem. Modern operating overhead falls on any held office or
+ *  unsold condo, and an unsold condo also pays hold tax scaled to its asking price
+ *  (`EconomySystem.payMaintenance`). Classic has neither sink (both rates 0), so an
+ *  empty spot there costs nothing to hold and the note is omitted. */
+function carryingCostNote(sim: Simulation, u: Unit): string {
+  const overhead = sim.rules.operatingOverheadPerUnit();
+  const holdTax = u.kind === "condo" ? Math.ceil(rentOf(u) * sim.rules.condoHoldTaxRate()) : 0;
+  const carry = overhead + holdTax;
+  if (carry <= 0) return "";
+  return ` It still costs about $${carry.toLocaleString()} a month to hold empty, so fix the cause or bulldoze it to stop the loss.`;
 }

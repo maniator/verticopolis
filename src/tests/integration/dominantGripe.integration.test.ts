@@ -302,6 +302,10 @@ function fakeDemand(
     reachableVenuesByOrigin: new Map(entries),
     share,
     retailVenueCount,
+    // Back the share out into a pool/cap pair (the gate reads these; this hand-built
+    // map only exercises unmetCoverage, which reads share, so any consistent pair works).
+    pool: share,
+    totalCap: 1,
   };
 }
 

@@ -101,16 +101,24 @@ describe("Legibility — reachability & stranded floors (Simulation)", () => {
 describe("Legibility — reachability gates move-ins (Simulation)", () => {
   /** Like strandedTower, but with empty rentable units instead of a tenant:
    *  condo/office/hotel on floor 40 (served, but reachable only up a too-long
-   *  stair climb) and a control condo on floor 14 (one ride up the elevator). */
+   *  stair climb) and a control condo on floor 8 (one ride up the elevator). */
   function strandedMoveInTower(seed: number): {
     sim: Simulation;
     unit: (id: number) => { state: string; everOccupied: boolean };
-    ids: { condo40: number; office40: number; hotel40: number; condo14: number };
+    ids: { condo40: number; office40: number; hotel40: number; condoNear: number };
   } {
     const sim = Simulation.newGame(seed);
     sim.money = 1e12;
     layFull(sim, "lobby", 1);
-    for (let f = 2; f <= 45; f++) layFull(sim, "floor", f);
+    // A sky lobby at the elevator top (floor 30) anchors satisfaction for the
+    // high stranded floor: floor 40 then sits 10 floors above a lobby (the FAR
+    // band, a renewal ceiling but no erosion), so ONCE it is reachable a tenant
+    // is sustainable and the move-in gate lets it fill. Without it, floor 40
+    // would be 39 floors above the only lobby (VERY FAR), and the sustainability
+    // gate would rightly keep it empty even after a bridge restored reachability,
+    // confounding this reachability test. The sky lobby lays no transport, so
+    // floor 40 stays a 10-flight climb away (unreachable) until the shortcut.
+    for (let f = 2; f <= 45; f++) layFull(sim, f === 30 ? "lobby" : "floor", f);
     // Floor 40 is served (an elevator + a 15-flight stair chain connect it) but
     // reachably-close only past Classic's walk budget, so no commuter climbs it.
     stairStrand(sim);
@@ -123,7 +131,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
       condo40: room("condo", 40, 20),
       office40: room("office", 40, 60),
       hotel40: room("hotelSingle", 40, 100),
-      condo14: room("condo", 14, 20),
+      condoNear: room("condo", 8, 20),
     };
     const unit = (id: number) => sim.tower.units.find((u) => u.id === id)!;
     return { sim, unit, ids };
@@ -137,7 +145,7 @@ describe("Legibility — reachability gates move-ins (Simulation)", () => {
     expect(unit(ids.condo40).everOccupied).toBe(false); // no sale banked
     expect(unit(ids.office40).state).toBe("empty");
     expect(unit(ids.hotel40).everOccupied).toBe(false); // never filled, even in the evenings
-    expect(unit(ids.condo14).everOccupied).toBe(true); // control: demand itself is alive
+    expect(unit(ids.condoNear).everOccupied).toBe(true); // control: demand itself is alive
   });
 
   it("move-ins resume once a bridge connects the floor to the lobby", () => {

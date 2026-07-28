@@ -147,6 +147,41 @@ These rules sit on top of the two test tiers in
   tower shipped for months with no sky lobbies and no express elevators
   because nothing checked `ok`, and it kept passing for the wrong reason.
 
+## Docker housekeeping: clean up after yourself
+
+Agent runs that spin up Docker (most often the pinned Playwright screenshot
+container, see [CONTRIBUTING.md](./CONTRIBUTING.md) → **Screenshots**) leave
+cruft that never shrinks on its own: a stopped container per run, dangling image
+layers, and build cache. Left unattended it balloons the WSL data disk
+(`docker_data.vhdx`), which has already filled a contributor's system drive once
+(308 GB of leftovers). So clean up after any run that used Docker:
+
+- **Prefer self-cleaning containers: `docker run --rm ...`** so the container
+  deletes itself when it exits, and give it a known `--name` so you can find it
+  if it does not. For the pinned Playwright container this is the common case
+  and the whole cleanup, no pruning needed.
+- **Remove your run's own artifacts by name or ID**, not with a blanket prune:
+  `docker rm -f <name>` for a container the run left behind, `docker rmi
+  <image>` for an image the run built. The daemon is shared with the rest of
+  your machine, so target what this run created rather than everything unused.
+- **Blanket `prune` is daemon-wide: only run it on a dedicated dev box, and
+  never in CI or on a shared host.** `docker container prune`, `image prune`,
+  and `builder prune` remove *all* stopped containers, *all* dangling images,
+  and *all* unused build cache, which can wipe another project's stopped
+  container or still-useful cache. Where that is acceptable (a personal machine
+  used only for this repo) it is the quickest way to reclaim space; a guarded,
+  personal-settings hook is a better home for it than a repo-wide default. Even
+  then keep it to plain `prune`: no `-a` (spares tagged images, so the pinned
+  Playwright image is not re-pulled) and no `--volumes` (spares named volumes,
+  which can hold data).
+- **A wedged Docker CLI (hangs a minute or more when its disk is overstuffed)
+  is a human-confirmed recovery, not an automatic step.** The filesystem-level
+  reset (stop Docker Desktop, `wsl --shutdown`, delete `docker_data.vhdx` so
+  Docker recreates an empty one) destroys **every** image, container, and named
+  volume on the machine, so treat it as a last resort: back up anything you need
+  first (Docker's backup-and-restore guidance covers exporting volumes) and get
+  a human to confirm before deleting the disk.
+
 ## Gameplay model notes
 
 - Facilities are defined in `src/engine/facilities.ts`. Each has a `width` (in

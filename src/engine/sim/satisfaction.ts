@@ -6,11 +6,10 @@ import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isCommercialKind, isOpenAt, isHotelKind, residentCount, syncAttendanceOccupants } from "../facilities";
 import type { FacilityKind, Unit, VacateReason } from "../types";
 
-import { isDormant, isOperational, isTenanted, VACATE_REASON_TEXT } from "../types";
+import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 
-import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, GRIPE_WARN, NOISE_EROSION, CONDO_NOISE_EROSION, TRANSPORT_FAR_TILES, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES, LOBBY_NO_DRAIN, SERVED_RECOVERY } from "./constants";
-import { computeDemandMap, type DemandMap } from "./demand";
-import { unmetCoverage } from "./gripe";
+import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
+import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
 
 /** Presence, satisfaction, noise notices for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
@@ -70,228 +69,29 @@ export function updatePresence(sim: Simulation): void {
   }
 }
 
-/** The floor distance from `floor` to the nearest floor in `floors`, or Infinity
- *  if empty. Used by the Modern amenity halos so only the nearest source counts. */
-function nearestFloorDist(floors: number[], floor: number): number {
-  let nearest = Infinity;
-  for (const f of floors) {
-    const d = Math.abs(f - floor);
-    if (d < nearest) nearest = d;
-  }
-  return nearest;
-}
-
 export function updateSatisfaction(sim: Simulation): void {
-  // v2 (review F3): congestion is SPATIAL, each floor is stressed only by the
-  // shafts that actually serve it, so layout/zoning/parallel shafts matter.
-  // v1: one tower-wide scalar applied to everyone (the shipped behavior).
-  const congMap = sim.simModel === "v2" ? sim.spatialCongestionByFloor() : null;
-  const globalCong = congMap
-    ? Math.max(0, ...[0, ...congMap.values()])
-    : sim.congestion();
+  // The per-unit satisfaction math and its once-per-sweep context (congestion,
+  // the served set, the four Modern amenity floor-sets, the lazy demand map) live
+  // in ./satisfactionStep as a PURE step, so the move-in sustainability gate reads
+  // the same source of truth (spec-move-in-sustainability-gate-2026-07-23). The
+  // RNG congestion toast and the notice/vacate state machine stay here.
+  const ctx = buildSatisfactionContext(sim);
   // Warn the player when their elevators can't keep up.
-  if (globalCong > 1.4 && sim.clock.hour === 9 && sim.rng.chance(0.5)) {
+  if (ctx.globalCong > 1.4 && sim.clock.hour === 9 && sim.rng.chance(0.5)) {
     sim.emit("Tenants are complaining of long elevator waits. Add cars or shafts.", "bad");
   }
   // New notices this tick are batched into one toast (like move-ins) so a
   // tower-wide problem raises a single alarm, not one per unit.
   const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
-  // One set read per sweep instead of a 4-deep delegation per unit: the set
-  // itself is already revision-memoized (tower/routing.ts servedFloors).
-  const servedSet = sim.tower.servedFloors();
-  // Modern-only Fitness Club amenity halo: the floors of every operational club,
-  // gathered once so a nearby condo can read its floor-distance to the closest.
-  // Pure (no RNG). A Classic tower holds no club, so this stays empty and the
-  // halo seam returns 0, leaving Classic satisfaction byte-identical.
-  const clubFloors: number[] = [];
-  // Modern-only Nightclub NEGATIVE halo: the floors of every operational
-  // nightclub, gathered once so a nearby sleeping tenant can read its distance to
-  // the closest. Gated on `isOperational`, not `isTenanted` like the positive
-  // fitness halo above, on purpose: a built club is a persistent nuisance around
-  // the clock (its building is the nuisance, not tonight's crowd), and the
-  // placement tension needs the penalty to apply all day, not only its open
-  // hours (6h of penalty vs 18h of recovery would net positive and erase it).
-  // Pure (no RNG). Classic holds no nightclub, so this stays empty and the
-  // penalty seam returns 0, leaving Classic satisfaction byte-identical.
-  const nightclubFloors: number[] = [];
-  // Modern-only Spa serenity halo (POSITIVE, hotels): the floors of every
-  // operational spa, so a nearby hotel room can read its distance to the closest.
-  // Gated on `isOperational` (a built, operating spa is the wellness amenity, like
-  // the nightclub's building-level effect but positive), not `isTenanted` like the
-  // fitness lease. Pure (no RNG). Classic holds no spa, so this stays empty and the
-  // bonus seam returns 0, leaving Classic satisfaction byte-identical.
-  const spaFloors: number[] = [];
-  // Modern-only Daycare family halo (POSITIVE, condos): the floors of every
-  // operational daycare, so a nearby condo can read its distance to the closest.
-  // Gated on `isOperational` (a built, operating daycare is the amenity). Pure (no
-  // RNG). Classic holds none, so this stays empty and the seam returns 0, leaving
-  // Classic satisfaction byte-identical.
-  const daycareFloors: number[] = [];
-  for (const c of sim.tower.units) {
-    if (c.kind === "fitnessClub" && isTenanted(c) && servedSet.has(c.floor)) clubFloors.push(c.floor);
-    else if (c.kind === "nightclub" && isOperational(c) && servedSet.has(c.floor)) nightclubFloors.push(c.floor);
-    else if (c.kind === "spa" && isOperational(c) && servedSet.has(c.floor)) spaFloors.push(c.floor);
-    else if (c.kind === "daycare" && isOperational(c) && servedSet.has(c.floor)) daycareFloors.push(c.floor);
-  }
-  // Unmet local-demand coverage (#395): the demand map is computed fresh (like the
-  // income loop) rather than through the hour-memoized accessor, so an occupancy
-  // change is reflected the same tick and the inspector memo is not perturbed. It
-  // draws no RNG and mutates nothing, so it never touches the seeded stream. Built
-  // LAZILY on the first served office/condo/hotel that reads coverage, so a tower
-  // with no such tenant (all-commercial, still-empty, or early game) pays nothing.
-  let demandMap: DemandMap | null = null;
   for (const u of sim.tower.units) {
     if (isDormant(u)) continue;
-    const served = servedSet.has(u.floor);
-    const cong = congMap ? (congMap.get(u.floor) ?? 0) : globalCong;
-    // A bigger Modern household leans harder on the tower: scale only the
-    // NEGATIVE access/congestion pressures, never the recovery, so a well-served
-    // big family is just as happy as a small one, the size only bites when the
-    // tower is failing them. The rule-set returns 1 in Classic (and for
-    // flat/unsold condos), so those towers are untouched.
-    const churn = sim.rules.churnMultiplier(u.residents);
-    if (!served) {
-      u.satisfaction = Math.max(0, u.satisfaction - 0.15 * churn);
-    } else if (u.floor !== 1 && cong > 1) {
-      // Overcrowded vertical transport stresses everyone, more so the worse it
-      // is, but tenants on the ground floor (floor 1) never ride an elevator,
-      // so elevator congestion can't possibly bother them.
-      u.satisfaction = Math.max(0, u.satisfaction - 0.04 * Math.min(3, cong - 1) * churn);
-    } else {
-      u.satisfaction = Math.min(1, u.satisfaction + SERVED_RECOVERY);
-    }
-    // Rent pressure: charging an office above the going rate erodes
-    // satisfaction (and so retention); undercutting it keeps tenants happy.
-    // The coefficient is tuned to exceed the +0.05 served-recovery near the
-    // top of the band, so a gouged office trends to a net-negative drift and
-    // eventually vacates, otherwise rent would be free money (fill cheap,
-    // then crank to max with no downside).
-    // The Modern Fitness Club is a lease tenant too, so its membership dues carry
-    // the same discipline: gouge past the going rate and the club sours and
-    // eventually gives up its lease. Classic never has one, so this stays office-
-    // only there.
-    if ((u.kind === "office" || u.kind === "fitnessClub" || u.kind === "clinic") && served) {
-      const cfg = rentConfig(u.kind)!;
-      const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
-      u.satisfaction = Math.max(0, Math.min(1, u.satisfaction - over * 0.07));
-    }
-    // Modern amenity halos, applied on top of served recovery and clamped. Each
-    // counts only the NEAREST source (no compounding), is capped and distance-
-    // decayed by the rule-set, and returns 0 in Classic (so Classic stays
-    // byte-identical). Fitness lifts condos; the Spa lifts hotels; the Daycare
-    // lifts condos scaled by household size; the Nightclub is the negative
-    // one, souring condos and hotels near it (its max exceeds served recovery, the
-    // placement tension, and an office is empty at its late hours so it is spared).
-    if (u.kind === "condo" && served && clubFloors.length > 0) {
-      const bonus = sim.rules.fitnessHaloBonus(nearestFloorDist(clubFloors, u.floor));
-      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
-    }
-    if ((u.kind === "condo" || isHotelKind(u.kind)) && served && nightclubFloors.length > 0) {
-      const penalty = sim.rules.nightclubNoisePenalty(nearestFloorDist(nightclubFloors, u.floor));
-      if (penalty > 0) u.satisfaction = Math.max(0, u.satisfaction - penalty);
-    }
-    if (isHotelKind(u.kind) && served && spaFloors.length > 0) {
-      const bonus = sim.rules.spaSerenityBonus(nearestFloorDist(spaFloors, u.floor));
-      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
-    }
-    if (u.kind === "condo" && served && daycareFloors.length > 0) {
-      // Family size is the scale: `daycareFamilyBonus` reads 0 for a household of
-      // one or none, so an empty/unsold condo (residents 0 or unset) gets nothing
-      // without a separate occupancy gate, matching the fitness halo above.
-      const bonus = sim.rules.daycareFamilyBonus(nearestFloorDist(daycareFloors, u.floor), u.residents ?? 0);
-      if (bonus > 0) u.satisfaction = Math.min(1, u.satisfaction + bonus);
-    }
-    // Placement pressure (canon "…is too noisy" / "the stairs/elevators are far
-    // away"): a served room is worn down in two phases, an immediate annoyance
-    // CEILING (NOISE_CAP), then, if the cause is never dealt with, a slow EROSION
-    // past it (NOISE_EROSION outpaces the +0.05 served recovery). Sustained,
-    // unaddressed exposure drives the tenant below the rescind bar and out;
-    // fixing the cause lets satisfaction recover normally. Two causes feed this
-    // one drain:
-    //   • W1 transport-too-far, a served office whose nearest reachable shaft on
-    //     its floor sits beyond the walking tolerance (ground-floor offices walk
-    //     to the lobby, not a shaft, so they're exempt; offices can't be founded
-    //     on floor 1 anyway, so this guard is belt-and-suspenders).
-    //   • W2 noise, a noise-sensitive room within its canon buffer of a source
-    //     (office↔commercial 11, hotel/condo↔office-or-commercial 21; see
-    //     {@link noiseAfflicted}), widening the old 1-tile office→hotel rule.
-    // They share ONE erosion step per tick (not one each): a doubly-afflicted
-    // office still erodes at the telegraphed ≈ −0.02/hr and lands on the 0.6 cap,
-    // rather than eroding twice and cratering at ~2× the documented rate. The
-    // cause is attributed in vacateCause (transport-far before noise). Erode THEN
-    // clamp to the cap so a freshly-exposed unit lands exactly on 0.6.
-    const farWalk =
-      u.kind === "office" &&
-      served &&
-      u.floor !== 1 &&
-      sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES;
-    const noisy =
-      (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo") &&
-      served &&
-      sim.noiseAfflicted(u);
-    // W-new lobby-distance pressure (#394): the graduated far/very-far penalty on
-    // the same office/condo/hotel set, keyed on floors from the nearest (sky)lobby.
-    // It joins THIS shared step rather than adding a second compounding drain, so a
-    // multiply-afflicted tenant still erodes once per tick. `cap < 1` marks the far
-    // or very-far band; only the very-far band carries erosion (the far band is a
-    // ceiling only, never evicts). Motivates the sky lobby: a deep floor with no
-    // lobby above the ground anchor sits far from any lobby and caps low.
-    const lobbyDrain =
-      served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
-        ? sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(u.floor))
-        : LOBBY_NO_DRAIN;
-    const lobbyCapped = lobbyDrain.cap < 1;
-    // W-new unmet local-demand pressure (#395): the same office/condo/hotel set,
-    // keyed on the tenant's reachable retail coverage. It joins THIS shared step
-    // too, so a tenant also hit by noise or lobby distance still erodes once per
-    // tick. Classic caps only (never evicts for it); Modern additionally erodes
-    // once coverage falls deep enough, so a chronically under-served tenant gives
-    // notice. A fully-covered tower (coverage 1) returns the neutral drain, so
-    // this is a no-op there. Couples venue mix to population and the star gates.
-    const coverage =
-      served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
-        ? unmetCoverage((demandMap ??= computeDemandMap(sim)), u)
-        : null;
-    const unmetDrain = coverage === null ? LOBBY_NO_DRAIN : sim.rules.unmetDemandDrain(coverage);
-    const unmetCapped = unmetDrain.cap < 1;
-    if (farWalk || noisy || lobbyCapped || unmetCapped) {
-      // A *sold* condo (everOccupied) is an owner, not a nightly guest, so it
-      // erodes at the gentler condo rate, sticky against a transient neighbor
-      // the player removes in time, worn out only by sustained, unaddressed
-      // adjacency. Hotels, offices, and any not-yet-sold condo keep the steeper
-      // rate; gating on everOccupied matches the "sold" predicate the rest of the
-      // condo logic uses (priceUnit, overhead) and is robust to a corrupt save
-      // with an occupied-but-unsold condo. The annoyance cap is shared, so all
-      // still redden on the stats overlay from the moment of exposure.
-      const baseErosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
-      // W1 transport-too-far is canon parity and erodes in EVERY tower. W2
-      // office-noise is the Modern-only mechanic: when noise is the ONLY cause,
-      // Classic scales the erosion to 0 so noise merely CAPS satisfaction at
-      // NOISE_CAP and never erodes/evicts (canon "noise caps but never evicts");
-      // Modern keeps eroding. A far-walk office always erodes regardless of mode.
-      const scale = farWalk ? 1 : sim.rules.noiseErosionScale();
-      const placementErosion = farWalk || noisy ? baseErosion * scale : 0;
-      // One erosion step, steepest cause wins (max, never the sum), so a tenant
-      // hit by several placement problems still lands on its cap at the telegraphed
-      // pace instead of cratering N times as fast.
-      const erosion = Math.max(placementErosion, lobbyDrain.erosion, unmetDrain.erosion);
-      // The ceiling is the tightest among the active afflictions (noise 0.6, the
-      // lobby-distance cap, and/or the unmet-demand cap). Erode THEN clamp so a
-      // freshly-exposed unit lands exactly on the cap.
-      const cap = Math.min(farWalk || noisy ? NOISE_CAP : 1, lobbyDrain.cap, unmetDrain.cap);
-      u.satisfaction = Math.max(0, Math.min(u.satisfaction - erosion, cap));
-    }
-    // The very-far tier (ceiling at or below the gripe bar) is the tier that also
-    // erodes and can evict; it is the attributable `lobbyFar` cause below. The far
-    // band (a higher ceiling, no erosion) never bottoms a tenant out on its own, so
-    // it is deliberately not a nameable gripe.
-    const lobbyFar = lobbyDrain.cap <= GRIPE_WARN;
-    // Unmet demand only NAMES the departure (and can evict) where it actually
-    // erodes: that is Modern past the evict floor. Classic caps but never erodes,
-    // so `unmetDrain.erosion > 0` is false there and unmet demand never becomes a
-    // Classic vacate cause, exactly like noise. The gentlest sink, so it sits last
-    // in the gripe ladder below.
-    const unmetDemand = unmetDrain.erosion > 0;
+    const { next, served, cong, farWalk, noisy, lobbyFar, unmetDemand } = satisfactionStep(
+      sim,
+      u,
+      u.satisfaction,
+      ctx,
+    );
+    u.satisfaction = next;
     // NOTE: the individually-routed crowd's frustration is exposed read-only via
     // {@link crowdStress} for the HUD, but is deliberately NOT written back into
     // satisfaction, its value depends on frame/step cadence, so feeding it into

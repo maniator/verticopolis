@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.101.0
+
+- A home or office in a spot nobody will stay in (too noisy, too far from a lobby, or a long walk from any elevator) now stays empty until you fix what is wrong, instead of quietly selling and emptying over and over. Hover a stubborn vacancy to see why it will not lease.
+
 ## 1.99.1
 
 - The build placement ghost on a phone now sits a consistent step above your finger at any zoom, instead of drifting far up the tower when you are zoomed out.

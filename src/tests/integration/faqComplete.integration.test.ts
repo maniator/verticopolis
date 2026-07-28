@@ -337,20 +337,27 @@ describe("Events & amounts (FAQ Cluster B)", () => {
 });
 
 describe("Office parking demand (FAQ): offices want parking from 3★", () => {
+  // Offices flank a central elevator (a 6-wide gap at x=81), so every office is
+  // within the far-walk limit of a shaft. A solid 180-wide wall with one shaft at
+  // the far edge would leave the far offices past that limit, and the move-in
+  // sustainability gate would rightly refuse to seat a tenant who'd just churn
+  // out, which is a placement effect, not the parking demand this test measures.
+  const OFFICE_XS: number[] = [];
+  for (let x = 0; x + 9 <= 162; x += 9) if (x !== 81) OFFICE_XS.push(x);
   function occupiedFill(withParking: boolean): number {
     const sim = newSeededGame(123);
     sim.money = 1e12;
     lay(sim, "lobby", 1);
     for (let f = 2; f <= 4; f++) lay(sim, "floor", f);
-    sim.buildTransport("elevatorStandard", W - 6, 1, 4);
+    sim.buildTransport("elevatorStandard", 81, 1, 4);
     sim.tower.setCars(sim.tower.transports[0].id, 8);
     // Pre-occupy a block of offices on floor 2 to create real parking demand.
-    for (let x = 0; x + 9 <= 180; x += 9) {
+    for (const x of OFFICE_XS) {
       const r = sim.tower.place("office", 2, x);
       if (r.ok) sim.tower.units.find((u) => u.id === r.unitId)!.state = "occupied";
     }
     // Empty offices on floors 3–4 are the ones that will (or won't) fill.
-    for (let f = 3; f <= 4; f++) for (let x = 0; x + 9 <= 180; x += 9) sim.tower.place("office", f, x);
+    for (let f = 3; f <= 4; f++) for (const x of OFFICE_XS) sim.tower.place("office", f, x);
     sim.star = 3;
     if (withParking) {
       lay(sim, "floor", 0);
