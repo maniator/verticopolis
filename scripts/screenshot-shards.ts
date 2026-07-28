@@ -69,7 +69,11 @@ export const SHARDS: Record<string, string[]> = {
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork),
   // placed here because this was the lightest shard, keeping the gate bounded
   // by the same ~71s pole.
-  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch"],
+  // ...plus the two returning-player title-screen scenes (~5s together: no tower
+  // is built, they re-mount the splash and open one DOM dialog). They go here
+  // rather than beside their first-run siblings in `engine` precisely because
+  // this is the lightest shard, so the gate stays bounded by the same ~71s pole.
+  showcase: ["showcase", "milestones", "sprite-gallery", "pricing-modern", "pricing-modern-batch", "returning-player", "returning-player-mobile"],
   // ~67s: the live-engine scene (its demo shot is drawSettle) + the now-cheap metro
   // + onboarding + the desktop install-affordance shot (a live engine tower with
   // the topbar Install chip surfaced, drawSettle; SPEC-pwa-install).
