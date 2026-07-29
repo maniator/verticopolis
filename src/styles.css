@@ -1723,6 +1723,30 @@ ul.slots .slot-actions .btn {
   font-size: 12px;
   color: rgba(255, 255, 255, 0.8);
 }
+
+/* The 2.0 "Ground floor" badge: a small gold "medal" pinned bottom-left (opposite
+   the version), shown only to a player whose tower predates 2.0. Status, not a
+   nag: it just sits there as a quiet, permanent thank-you. */
+.splash-founder {
+  position: absolute;
+  left: 12px;
+  bottom: 8px;
+  z-index: 3;
+  /* Decorative status only: never intercept a tap meant for a splash button that
+     a short/landscape layout might push into the bottom-left corner. */
+  pointer-events: none;
+  margin: 0;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  color: #3a2e12;
+  background: linear-gradient(#ffe08a, #f0c24a);
+  border: 1px solid rgba(120, 90, 20, 0.6);
+  border-radius: 999px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
 /* While the title screen is mounted, lift the toast rail above it (#splash is
    z 40) and below the boot cover (z 50, which is gone before any toast can
    fire). Without this the splash paints over the rail, and every toast raised

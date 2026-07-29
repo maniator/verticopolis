@@ -182,6 +182,10 @@ const SUBHEADER_H = 34;
  *  block) as the other containers (Boutique, Fitness, Clinic, Amusements) land. */
 const MODERN_GROUPS: { label: string; entries: Entry[] }[] = [
   {
+    label: "Rental Living",
+    entries: [roomEntry("Studio", "rentalStudio"), roomEntry("Apartment", "rentalApartment")],
+  },
+  {
     label: "Food Hall",
     entries: [roomEntry("Food Hall", "foodHall"), ...retailEntries("foodHall", FOODHALL_SUBTYPES)],
   },

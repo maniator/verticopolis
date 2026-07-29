@@ -13,6 +13,12 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.0.0
+
+- Modern towers can now rent homes as well as sell them: the cheap, easygoing Studio and the pricier Apartment, which minds noise, a long walk, and a high rent. Hover a stubborn vacancy to see why.
+- Building before 2.0? Your tower now wears a small gold "Ground floor" badge on the title screen, and you get a one-time welcome when you come back. Recognition, no catch.
+- Help now has a Privacy section, on the help page and in the in-game Help dialog, spelling out what the game counts: anonymous totals, with no cookies, no accounts, and no ads.
+
 ## 1.105.0
 
 - Dialog buttons now stay pinned to the bottom of the window, so Save and Cancel
