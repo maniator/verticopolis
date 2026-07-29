@@ -2,6 +2,7 @@ import type { Simulation } from "../Simulation";
 import type { Unit } from "../types";
 import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
+import { isRentalKind } from "../residentialRentals";
 import { isTenanted, isOperational } from "../types";
 import { computeDemandMap, originDemand, type DemandMap } from "./demand";
 import { reachesLobby, unmetCoverage } from "./gripe";
@@ -9,6 +10,7 @@ import {
   NOISE_CAP,
   NOISE_EROSION,
   CONDO_NOISE_EROSION,
+  RENTAL_STUDIO_NOISE_EROSION,
   TRANSPORT_FAR_TILES,
   LOBBY_NO_DRAIN,
   SERVED_RECOVERY,
@@ -126,16 +128,23 @@ export function satisfactionStep(
   } else {
     s = Math.min(1, s + SERVED_RECOVERY);
   }
-  if ((u.kind === "office" || u.kind === "fitnessClub" || u.kind === "clinic") && served) {
+  // Rent pressure: gouging past the going rate erodes satisfaction. Rentals are
+  // lease tenants too (the GDD's "rent too high"), so they carry the same discipline.
+  if ((u.kind === "office" || u.kind === "fitnessClub" || u.kind === "clinic" || isRentalKind(u.kind)) && served) {
     const cfg = rentConfig(u.kind)!;
     const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
     s = Math.max(0, Math.min(1, s - over * 0.07));
   }
-  if (u.kind === "condo" && served && ctx.clubFloors.length > 0) {
+  // The Apartment joins the condo for every residential halo: it is the demanding
+  // tier, so it must feel the nightclub above it AND get the amenity offsets that
+  // steady a lively spot. Without both it was strictly LESS demanding than the
+  // condo it is meant to out-demand, and the gate held it vacant where a condo
+  // would have leased. The Studio stays out: it is the forgiving tier.
+  if ((u.kind === "condo" || u.kind === "rentalApartment") && served && ctx.clubFloors.length > 0) {
     const bonus = sim.rules.fitnessHaloBonus(nearestFloorDist(ctx.clubFloors, u.floor));
     if (bonus > 0) s = Math.min(1, s + bonus);
   }
-  if ((u.kind === "condo" || isHotelKind(u.kind)) && served && ctx.nightclubFloors.length > 0) {
+  if ((u.kind === "condo" || isHotelKind(u.kind) || u.kind === "rentalApartment") && served && ctx.nightclubFloors.length > 0) {
     const penalty = sim.rules.nightclubNoisePenalty(nearestFloorDist(ctx.nightclubFloors, u.floor));
     if (penalty > 0) s = Math.max(0, s - penalty);
   }
@@ -143,19 +152,32 @@ export function satisfactionStep(
     const bonus = sim.rules.spaSerenityBonus(nearestFloorDist(ctx.spaFloors, u.floor));
     if (bonus > 0) s = Math.min(1, s + bonus);
   }
-  if (u.kind === "condo" && served && ctx.daycareFloors.length > 0) {
+  if ((u.kind === "condo" || u.kind === "rentalApartment") && served && ctx.daycareFloors.length > 0) {
     const bonus = sim.rules.daycareFamilyBonus(nearestFloorDist(ctx.daycareFloors, u.floor), u.residents ?? 0);
     if (bonus > 0) s = Math.min(1, s + bonus);
   }
+  // Far-walk (#502): the demanding rental Apartment also erodes when its nearest
+  // reachable shaft is beyond the walking tolerance (the forgiving Studio does not).
   const farWalk =
-    u.kind === "office" && served && u.floor !== 1 && sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES;
+    (u.kind === "office" || u.kind === "rentalApartment") &&
+    served &&
+    u.floor !== 1 &&
+    sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES;
   const noisy =
-    (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo") && served && sim.noiseAfflicted(u);
+    (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo" || isRentalKind(u.kind)) && served && sim.noiseAfflicted(u);
   const lobbyDrain =
-    served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
+    served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo" || u.kind === "rentalApartment")
       ? sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(u.floor))
       : LOBBY_NO_DRAIN;
   const lobbyCapped = lobbyDrain.cap < 1;
+  // Rentals are NOT demand origins (originWeight in demand.ts returns undefined for
+  // them), so a live rental's id is never in reachableVenuesByOrigin and unmetCoverage
+  // returns null: the unmet-demand drain never fires for a rental in the live sim.
+  // The gate (wouldEvictFreshTenant), which DOES register its probe as an origin,
+  // must therefore not apply it either, or it would over-block an Apartment out of a
+  // spot a real Apartment would hold happily. So rentals are excluded here; the
+  // Apartment still churns on noise / far-walk / lobby / rent. Realizing the GDD's
+  // "unmet local demand" churn needs rentals to become real demand origins (#661).
   const coverage =
     served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
       ? unmetCoverage((ctx.demandMap ??= computeDemandMap(sim)), u)
@@ -163,7 +185,15 @@ export function satisfactionStep(
   const unmetDrain = coverage === null ? LOBBY_NO_DRAIN : sim.rules.unmetDemandDrain(coverage);
   const unmetCapped = unmetDrain.cap < 1;
   if (farWalk || noisy || lobbyCapped || unmetCapped) {
-    const baseErosion = u.kind === "condo" && u.everOccupied ? CONDO_NOISE_EROSION : NOISE_EROSION;
+    // Three tiers, not two: the Studio erodes BELOW the served recovery so noise
+    // caps it and never evicts it (the forgiving tier), a sold condo just above,
+    // and everyone else at the steep office rate.
+    const baseErosion =
+      u.kind === "rentalStudio"
+        ? RENTAL_STUDIO_NOISE_EROSION
+        : u.kind === "condo" && u.everOccupied
+          ? CONDO_NOISE_EROSION
+          : NOISE_EROSION;
     const scale = farWalk ? 1 : sim.rules.noiseErosionScale();
     const placementErosion = farWalk || noisy ? baseErosion * scale : 0;
     const erosion = Math.max(placementErosion, lobbyDrain.erosion, unmetDrain.erosion);
@@ -213,7 +243,12 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   const probe: Unit = {
     ...u,
     everOccupied: true,
-    residents: u.kind === "condo" ? CLASSIC_HOUSEHOLD : u.residents,
+    // Probe a condo OR a rental Apartment as a mean household, so a spot a real
+    // family would churn out of is gated (a vacant Apartment has no residents yet,
+    // so it would otherwise probe as a single and pass). The single-occupant
+    // Studio keeps its undefined residents (churnMultiplier reads that as 1); an
+    // office keeps its own.
+    residents: u.kind === "condo" || u.kind === "rentalApartment" ? CLASSIC_HOUSEHOLD : u.residents,
   };
   // The would-be tenant is not yet a census origin, so computeDemandMap omits it
   // from reachableVenuesByOrigin and unmetCoverage would return null, silently
@@ -223,14 +258,21 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   // exactly how computeDemandMap registers a real origin: the reachable-venue count
   // when its floor draws (the lobby-anchored model gives every reachable origin the
   // same reachable-venue set), else 0 (retail exists but this floor reaches none).
-  const dm = (ctx.demandMap ??= computeDemandMap(sim));
-  dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
+  // Skipped entirely for a rental: it is excluded from the coverage drain on both
+  // paths (#661), so registering it would build a full-tower demand map to compute a
+  // value the step never reads. That map is rebuilt per inspector repaint through
+  // `wontLeaseText`, so this is the difference between a hover over an empty rental
+  // costing a tower scan and costing nothing.
+  const dm = isRentalKind(u.kind) ? null : (ctx.demandMap ??= computeDemandMap(sim));
+  if (dm) {
+    dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
+  }
   // Judge unmet demand at the share the tower WOULD carry with this tenant added:
   // fold the candidate's OWN demand into the pool (attemptMoveIns further raises
   // dm.pool as vacancies actually fill earlier in the same pass), so the gate never
   // seats a fresh tenant who then over-subscribes the retail and churns, and fills
   // only up to the number the retail supports (a batch-aware, tower-uniform share).
-  dm.share = dm.totalCap > 0 ? (dm.pool + originDemand(sim, u)) / dm.totalCap : 0;
+  if (dm) dm.share = dm.totalCap > 0 ? (dm.pool + originDemand(sim, u)) / dm.totalCap : 0;
   let s = 1;
   for (let i = 0; i < GATE_HORIZON_HOURS; i++) {
     const prev = s;

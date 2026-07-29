@@ -342,7 +342,7 @@ export function wallItem(ctx: CanvasRenderingContext2D, x: number, y: number, w:
 }
 
 /** Rooms whose lights track whether anyone is actually inside. */
-export const POPULATED = new Set<FacilityKind>(["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite"]);
+export const POPULATED = new Set<FacilityKind>(["office", "condo", "rentalStudio", "rentalApartment", "hotelSingle", "hotelDouble", "hotelSuite"]);
 
 /** Amber corner ribbon marking a `vacating` (on-notice) lease. */
 export function noticeBadge(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number): void {

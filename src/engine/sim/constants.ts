@@ -56,6 +56,37 @@ export const NOISE_EROSION = 0.07;
  *  (move the office or the neighbor) recovers well before. */
 export const CONDO_NOISE_EROSION = 0.054;
 
+/** Office-noise erosion for the rental STUDIO, the forgiving tier. Deliberately
+ *  BELOW the +0.05/hr served recovery, which is the opposite of the condo rate
+ *  above: net drift is non-negative, so a noisy neighbor caps the Studio at the
+ *  annoyance ceiling and holds it there without ever wearing it out. That is the
+ *  GDD's "cheap, easygoing tenant that stays through a scrappy tower".
+ *
+ *  Three limits on that guarantee, all deliberate. Rent pressure is SEPARATE and
+ *  ADDITIVE: the over-market term is subtracted before this block rather than
+ *  max'd with it, so a Studio at the top of its band (-0.035/hr) beside a noisy
+ *  neighbor nets -0.025/hr and gives notice sooner than any other residential
+ *  kind. That is the rent tier doing its job, not the noise tier failing, and
+ *  `dominantGripe` reads "rent" first so the cause is named honestly. Only the
+ *  claim "noise alone never wears a Studio out" is what this rate guarantees.
+ *  It is also the NOISE channel only:
+ *  `satisfactionStep` takes the max of this and the lobby/unmet drains, so a
+ *  Studio stranded far from a lobby still erodes at the steeper lobby rate and
+ *  can still leave. And it holds only while the unit is SERVED, since the +0.05
+ *  is the served recovery: cut a Studio off from all transport and it drains
+ *  like any other kind, which is the intended read of an unreachable room.
+ *  Modern scales noise erosion by 1 and Classic by 0 (`noiseErosionScale`), so
+ *  the comparison against the recovery is the live one in Modern, and Classic
+ *  never erodes on noise at all.
+ *
+ *  It matters beyond the occupied tenant: the move-in sustainability gate refuses
+ *  to lease a spot whose fresh tenant would erode back out, so at the condo's
+ *  rate a Studio anywhere near an office was not merely unhappy, it was
+ *  permanently unleasable, which contradicts strip-placing Studios along the low
+ *  floors where the offices and shops live. The Apartment keeps the steeper
+ *  office rate: being evictable is what makes it the demanding tier. */
+export const RENTAL_STUDIO_NOISE_EROSION = 0.04;
+
 /** Canon "the stairs/elevators are far away" tolerance, in tiles. An office whose
  *  nearest reachable shaft on its own floor sits farther than this wears its
  *  tenant down (W1), matching the 1994 original's 79-segment walking limit. At

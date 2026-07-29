@@ -52,6 +52,8 @@ export type FacilityKind =
   | "floor"
   | "office"
   | "condo"
+  | "rentalStudio"
+  | "rentalApartment"
   | "hotelSingle"
   | "hotelDouble"
   | "hotelSuite"

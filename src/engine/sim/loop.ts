@@ -2,6 +2,7 @@ import { Simulation } from "../Simulation";
 
 import { CROWD_SECONDS_PER_MINUTE } from "../Crowd";
 import { HK_CHECKOUT_HOUR, HK_LATE_CHECKOUT_HOUR, HK_LATE_CHECKOUT_END } from "../EconomySystem";
+import { collectMonthlyRent } from "../economy/rentalIncome";
 
 import { FACILITIES } from "../facilities";
 
@@ -158,6 +159,7 @@ export function onDay(sim: Simulation): void {
   const period = Math.floor(sim.clock.day / sim.clock.calendar.maintPeriodDays);
   if (period !== sim.lastMonth) {
     sim.lastMonth = period;
+    collectMonthlyRent(sim); // Modern rental income (Studio & Apartment)
     sim.economy.payMaintenance();
     sim.rollCondoRelocations();
   }

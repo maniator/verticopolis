@@ -56,7 +56,7 @@ export function pushRoutineOptions(
   // any RNG use so the seeded stream is untouched (golden-master invariant).
   if (weights.schoolRun <= 0 && weights.salesCall <= 0) return;
   const hour = clock.hour;
-  if (weights.schoolRun > 0 && !clock.isWeekend && floors.condoFloors.length > 0) {
+  if (weights.schoolRun > 0 && !clock.isWeekend && floors.householdFloors.length > 0) {
     if (hour >= SCHOOL_RUN_DEPART_START && hour < SCHOOL_RUN_DEPART_END && passes(crowd, weights.schoolRun)) {
       options.push(() => spawnSchoolDeparture(crowd, tower, floors));
     }
@@ -94,9 +94,9 @@ function passes(crowd: Crowd, weight: number): boolean {
  * despawn path settles the accounting.
  */
 export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFloors): void {
-  const floor = crowd.rng.pick(floors.condoFloors);
+  const floor = crowd.rng.pick(floors.householdFloors);
   const candidates = (floors.unitsByFloor.get(floor) ?? []).filter(
-    (u) => u.kind === "condo" && visibleOccupants(u) > 0,
+    (u) => (u.kind === "condo" || u.kind === "rentalApartment") && visibleOccupants(u) > 0,
   );
   if (candidates.length === 0) return;
   const origin = crowd.rng.pick(candidates);
@@ -117,7 +117,7 @@ export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFl
  *  there is no visible occupancy to thin). `condoFloors` bins only occupied
  *  condos, so an empty or unsold condo never draws a returning child. */
 export function spawnSchoolReturn(crowd: Crowd, tower: Tower, floors: SpawnFloors): void {
-  const floor = crowd.rng.pick(floors.condoFloors);
+  const floor = crowd.rng.pick(floors.householdFloors);
   const spawned = add(crowd, tower, GROUND_LOBBY, floor);
   if (spawned) spawned.routine = "schoolRun";
 }

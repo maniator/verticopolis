@@ -37,6 +37,8 @@ export function ledgerCatFor(kind: FacilityKind): LedgerCat | null {
     case "office":
       return "offices";
     case "condo":
+    case "rentalStudio":
+    case "rentalApartment":
       return "condos";
     case "hotelSingle":
     case "hotelDouble":

@@ -1,4 +1,5 @@
 import type { FacilityKind } from "../types";
+import { isRentalKind } from "../residentialRentals";
 import { isHotelKind } from "../facilities";
 import { HK_SHIFT_END, HK_SHIFT_START } from "../EconomySystem";
 import type { StaffKind } from "./person";
@@ -69,7 +70,10 @@ export function matchesMealOriginKind(u: { kind: FacilityKind }, bucket: MealOri
     case "office":
       return u.kind === "office";
     case "condo":
-      return u.kind === "condo";
+      // Rentals bin into `condoFloors` (spawn.ts), so this bucket must match them or
+      // a uniformly-picked rental floor yields no candidate and the trip option is
+      // consumed without spawning, deleting the condos' share too (#683).
+      return u.kind === "condo" || isRentalKind(u.kind);
     case "hotel":
       return isHotelKind(u.kind);
     case "staff":

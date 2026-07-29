@@ -4,6 +4,7 @@ import type { FacilityKind, Unit, WeatherKind } from "../types";
 import { isOperational, isTenanted } from "../types";
 import { attendanceCap, isHotelKind, isOpenAt } from "../facilities";
 import { ECON } from "../econConfig";
+import { isRentalKind } from "../residentialRentals";
 import type { Crowd } from "../Crowd";
 import type { SpawnFloors, StaffKind } from "./person";
 import { MAX_PEOPLE, visibleOccupants, CROWD_SECONDS_PER_MINUTE } from "./person";
@@ -61,6 +62,7 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
   const metroStations: Unit[] = [];
   // Meal-cadence bins: condos and hotels tracked separately (arch §2).
   const condoFloors = new Set<number>();
+  const householdFloors = new Set<number>();
   const hotelFloors = new Set<number>();
   const staffFloors: { kind: StaffKind; floor: number }[] = [];
   const seenStaff = new Set<string>(); // dedupe kind:floor pairs.
@@ -110,13 +112,15 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     if (u.kind === "office") {
       // Offices are leased year-round but only staffed on weekdays, so inbound
       // workers only head to weekday offices; outbound trips need workers
-      // actually present right now (presence zeroes occupants after 18:00 /
-      // at weekends).
+      // actually present right now (presence zeroes occupants after 18:00 / at weekends).
       if (!weekend) leased.add(u.floor);
       if (u.occupants > 0) staffed.add(u.floor);
-    } else if (u.kind === "condo") {
+    } else if (u.kind === "condo" || isRentalKind(u.kind)) {
+      // Rentals bin like the condo (ambient pool + condo meal cadence); the school
+      // run needs a HOUSEHOLD, which the single-occupant Studio never has (#683).
       homes.add(u.floor);
       condoFloors.add(u.floor);
+      if (u.kind !== "rentalStudio") householdFloors.add(u.floor);
     } else if (isHotelKind(u.kind)) {
       homes.add(u.floor);
       hotelFloors.add(u.floor);
@@ -131,8 +135,8 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
       addVenueByKind(u.kind, u.floor);
     }
   }
-  // Materialize the Sets into insertion-order arrays for the returned bin,
-  // preserving the deterministic `rng.pick` behavior the pool relies on.
+  // Materialize the Sets into insertion-order arrays, preserving the deterministic
+  // `rng.pick` behavior the pool relies on.
   const venuesByKind: Partial<Record<FacilityKind, number[]>> = {};
   for (const [kind, set] of Object.entries(venuesByKindSet) as [FacilityKind, Set<number>][]) {
     if (set) venuesByKind[kind] = [...set];
@@ -143,6 +147,7 @@ export function spawnFloors(tower: Tower, clock: Clock): SpawnFloors {
     homes: [...homes],
     openVenues: [...venues],
     condoFloors: [...condoFloors],
+    householdFloors: [...householdFloors],
     hotelFloors: [...hotelFloors],
     staffFloors,
     venuesByKind,
@@ -171,19 +176,15 @@ export function spawnTrips(crowd: Crowd, tower: Tower, clock: Clock, floors: Spa
   const reachableMetros = metroStations.filter((s) => isMetroPlatformServed(tower, s));
 
   const trip = (from: number, to: number) => add(crowd, tower, from, to);
-  // Each call makes one trip, chosen at random from whatever movements fit
-  // the hour, so the evening rush is a genuine mix of workers leaving,
-  // residents/guests arriving home and diners heading out, rather than only
-  // ever emptying the offices (the old if/else chain starved the others).
-  //
-  // A reachable operational metro joins each window's mix as a second street
-  // door: arrivals step off the train onto the platform and ride up into the
-  // tower, departures ride down and wait at the platform edge for theirs. Every
-  // metro option is gated on `reachableMetros` being non-empty, so a tower with
-  // no metro (or only an unreachable one) pushes the exact option list it always
-  // did and the shared rng stream is untouched (the golden master fixture has
-  // none). Party hall, cinema, and wedding guests ride the attendance-visit flow
-  // (pushVenueVisitOptions), not this branch tree.
+  // Each call makes one trip, chosen at random from whatever movements fit the hour, so the
+  // evening rush mixes workers leaving, residents and guests arriving home and diners heading
+  // out, rather than only ever emptying the offices.
+  // A reachable operational metro joins each window's mix as a second street door:
+  // arrivals step off the train and ride up, departures ride down and wait at the
+  // platform edge. Every metro option is gated on `reachableMetros` being non-empty,
+  // so a tower with no metro (or only an unreachable one) pushes the exact option list
+  // it always did and the shared rng stream is untouched (the golden master fixture has
+  // none). Party hall, cinema and wedding guests ride the attendance-visit flow.
   const options: Array<() => void> = [];
   if (morning) {
     if (leasedOffices.length) options.push(() => trip(1, crowd.rng.pick(leasedOffices)));
@@ -475,16 +476,15 @@ export function spawnStep(
   // spawn identically. The MAX_PEOPLE cap in spawnTrips still bounds the total.
   const timeRate = clock.isNight() ? 0.3 : clock.isWeekend ? 1.2 : 2.2;
   const popFactor = Math.min(3, 0.4 + tower.totalPopulation() / 2000);
-  // Rain thins the people out and about (weather-shapes-crowd, #430): fewer
-  // spawns on a rainy day, so the visible crowd empties and attendance houses
-  // fill less. Read the SAME authoritative `sim.weather` the economy's rain
-  // channel reads (the loop passes it in), so the crowd and the income loop can
-  // never disagree about whether it is raining within a tick; fall back to the
-  // pure per-day `weatherFor` hash (the value `sim.weather` is itself set from)
-  // for the crowd-only paths that have no Simulation to hand (motion.update and
-  // the crowd-driven tests). Either source is off the gameplay RNG, and it scales
-  // the accumulator like the time and population factors above, so it perturbs no
-  // seeded draw; a clear or cloudy sky multiplies by exactly 1.
+  // Rain thins the people out and about (weather-shapes-crowd, #430): fewer spawns on
+  // a rainy day, so the visible crowd empties and attendance houses fill less. Reads
+  // the SAME authoritative `sim.weather` the economy's rain channel reads (the loop
+  // passes it in), so the crowd and the income loop can never disagree within a tick;
+  // falls back to the pure per-day `weatherFor` hash (what `sim.weather` is itself set
+  // from) for crowd-only paths with no Simulation to hand (motion.update and the
+  // crowd-driven tests). Either source is off the gameplay RNG, and it scales the
+  // accumulator like the factors above, so it perturbs no seeded draw; a clear or
+  // cloudy sky multiplies by exactly 1.
   const sky = weather ?? weatherFor(clock.day);
   const weatherFactor = sky === "rain" ? tower.rules.rainCrowdFactor() : 1;
   crowd.spawnAcc += dtSec * timeRate * popFactor * weatherFactor;
