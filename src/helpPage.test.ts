@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { helpPageTemplate } from "./helpPage";
 import { renderToFragment } from "./ui/testing/litTestUtils";
-import { HELP_SECTIONS } from "./ui/templates/helpContent";
+import { HELP_SECTIONS, helpPrivacyBody } from "./ui/templates/helpContent";
 
 /**
  * The standalone `/help` page body: the full how-to-play guide. It renders the
@@ -25,6 +25,25 @@ describe("helpPageTemplate", () => {
     }
     // The About section is on the page too.
     expect(frag.querySelector("section#about h2")?.textContent).toBe("About");
+  });
+
+  it("carries a deep-linkable Privacy section rendered from the one shared body", () => {
+    const frag = renderToFragment(helpPageTemplate());
+    const privacy = frag.querySelector("section#privacy");
+    expect(privacy, "the privacy note must be its own #privacy section").not.toBeNull();
+    expect(privacy!.querySelector("h2")?.textContent).toBe("Privacy");
+    // Whitespace-normalized containment of the SHARED body's own rendered text:
+    // this surface cannot fork the promise, because any wording change must
+    // arrive through helpPrivacyBody or this containment fails.
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+    const shared = norm(renderToFragment(helpPrivacyBody()).textContent ?? "");
+    expect(shared.length).toBeGreaterThan(100);
+    expect(norm(privacy!.textContent ?? "")).toContain(shared);
+    // And the shared body itself still makes the promise (guards against it
+    // being hollowed out while both containments keep passing).
+    expect(shared).toContain("anonymous gameplay totals");
+    expect(shared).toContain("no cookies, no accounts, and no ads");
+    expect(shared).toContain("leave your device only when you export them");
   });
 
   it("carries the Classic vs Modern comparison as a deep-linkable section", () => {

@@ -193,6 +193,9 @@ export class OnboardingController {
     /** Tap the splash install button: routes through the shared activation
      *  (native prompt, or an honest how-to). Absent when not offered. */
     onInstall?: () => void;
+    /** Whether to show the 2.0 "Ground floor" badge (a player whose tower
+     *  predates 2.0). Read once at mount. */
+    founder?: () => boolean;
   }): void {
     this.opts.pauseForSplash(true);
     // The start screen has its own looping theme; the tower gets the calm bed.
@@ -247,7 +250,7 @@ export class OnboardingController {
     // Read offerability ONCE at mount (CAP-5: not gated on a live event, so no
     // reveal race), and only when a handler is present.
     const installOffered = (o.installOffered?.() ?? false) && !!o.onInstall;
-    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, handlers), el);
+    litRender(splashTemplate(o.hasSave, premise, o.muted?.() ?? false, installOffered, o.founder?.() ?? false, handlers), el);
     document.body.appendChild(el);
     // Marks the title screen as mounted for CSS that must react to it: the
     // toast rail lifts above the splash only while this class is set, so a

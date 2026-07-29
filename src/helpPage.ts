@@ -1,6 +1,6 @@
 import { html, render, nothing, type TemplateResult } from "lit-html";
 import { pageShell } from "./ui/templates/pageShell";
-import { HELP_SECTIONS, helpLede, helpAboutBody, helpReportBlock } from "./ui/templates/helpContent";
+import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBlock } from "./ui/templates/helpContent";
 import { compareFigures } from "./ui/templates/compareFigures";
 import { injectVercelTelemetry } from "./telemetry";
 import { trackAppAction } from "./analytics";
@@ -42,6 +42,7 @@ export function helpPageTemplate(): TemplateResult {
       </section>`,
     )}
     <section id="about" class="help-section"><h2>About</h2>${helpAboutBody(APP_VERSION)}</section>
+    <section id="privacy" class="help-section"><h2>Privacy</h2>${helpPrivacyBody()}</section>
     <section class="help-section">${helpReportBlock("h2")}</section>
   `;
   return pageShell({
