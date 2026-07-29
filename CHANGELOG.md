@@ -13,9 +13,17 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.2.0
+## 2.3.0
 
 - Elevator cars glide now: they accelerate away from a stop, cruise, and settle onto their floor, instead of freezing and jumping as the clock ticks. Only the drawing changed; timing is untouched.
+
+## 2.2.0
+
+- A SimTower import or export that cannot be shown now always says why, in the
+  window you are looking at. That covers the cases it used to lose in silence:
+  a file that fails to read, a tower the 1994 format cannot hold, a report
+  pushed aside by another window, and one left waiting when you start a
+  different tower.
 
 ## 2.1.1
 

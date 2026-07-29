@@ -28,7 +28,7 @@ export function openImport(ui: UI): void {
     const reader = new FileReader();
     // A file that vanishes or errors mid-read must not fail silently: the
     // launching dialog is already gone by the time the read runs.
-    reader.onerror = () => ui.toast("Couldn't read that file. Please try again.", "bad");
+    reader.onerror = () => ui.sayVisibly("Couldn't read that file. Please try again.");
     // Every pick is read as bytes and routed through ONE heuristic
     // (looksLikeLegacyTower): extension first, then the header-magic sniff, so a
     // renamed original save still lands on the legacy importer. Everything else

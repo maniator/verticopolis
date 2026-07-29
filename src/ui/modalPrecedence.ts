@@ -33,11 +33,20 @@ export interface ModalOpts {
   /** This dialog owns no pending decision and no unsaved work, so a report
    *  arriving behind it may replace it outright. Informational dialogs only. */
   displaceable?: boolean;
+  /** Run if this dialog is replaced rather than closed on its own terms.
+   *
+   *  A dialog that holds something the player would miss uses this to say so
+   *  before it goes. It is NOT a veto and NOT a stacking rule: the replacement
+   *  happens either way, which keeps this short of the general precedence
+   *  system the spec rules out. It exists because a fidelity report that is
+   *  already on screen holds a fully parsed tower, and losing that in silence
+   *  is the same defect as losing it while it waits. */
+  onDisplaced?: () => void;
 }
 
 /** A wait for one specific dialog to resolve. */
 /** Why a wait ended without the dialog it was tied to resolving. */
-export type BrokenReason = "displaced" | "superseded";
+export type BrokenReason = "displaced" | "superseded" | "tower-swapped";
 
 interface Leash {
   onResolve: () => void;
@@ -55,11 +64,22 @@ export class ModalPrecedence {
   /** A line to mount into the next dialog, set when something must be said
    *  while the shared dialog is mid-replace and has no body to write into. */
   private pendingNotice: string | null = null;
+  /** The incumbent dialog's goodbye, if it registered one. */
+  private onDisplaced: (() => void) | null = null;
 
   /** A dialog is mounting. `displacing` is whether one was already on screen. */
   opening(displacing: boolean, opts: ModalOpts): void {
-    if (displacing) this.breakLeash("displaced");
+    if (displacing) {
+      this.breakLeash("displaced");
+      // The incumbent is being replaced, not closed, so anything it owed the
+      // player has to be said now. Cleared first: a goodbye that itself opens
+      // a dialog must not re-enter this method through its own hook.
+      const goodbye = this.onDisplaced;
+      this.onDisplaced = null;
+      goodbye?.();
+    }
     this.displaceable = opts.displaceable === true;
+    this.onDisplaced = opts.onDisplaced ?? null;
   }
 
   /** A dialog closed. `wasOpen` is whether one actually was: `closeModal()` is
@@ -73,6 +93,7 @@ export class ModalPrecedence {
    *  into an unrelated window opened later. */
   closed(wasOpen: boolean): void {
     this.displaceable = false;
+    this.onDisplaced = null;
     this.pendingNotice = null;
     if (!wasOpen) return;
     const leash = this.leash;
@@ -90,6 +111,18 @@ export class ModalPrecedence {
   wait(onResolve: () => void, onBroken: (reason: BrokenReason) => void): void {
     this.breakLeash("superseded");
     this.leash = { onResolve, onBroken };
+  }
+
+  /** The tower was swapped out from under whatever is waiting.
+   *
+   *  A report closes over a fully parsed Simulation, so a wait that survives a
+   *  swap would open over a tower it was never parsed against and "Open tower"
+   *  would adopt a state that no longer exists. The spec names this as one of
+   *  the three things that must BREAK a leash, not resolve it, and it cannot be
+   *  inferred from dialog lifecycle alone: the New Tower dialog closes normally
+   *  and swaps the tower afterwards, which reads as a clean resolution. */
+  towerSwapped(): void {
+    this.breakLeash("tower-swapped");
   }
 
   /** Hold a line for the next dialog to mount. */

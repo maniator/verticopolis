@@ -22,12 +22,12 @@ export interface DepthRow {
   max?: number;
 }
 
-export function clampDays(v: unknown): number;
+export function parseWindow(v: unknown): { hours: number; label: string };
 export function lit(s: unknown): string;
-export function buildTotalsQuery(events: string[], days: number): string;
-export function buildDepthQuery(event: string, prop: string, days: number): string;
-export function buildBreakdownQuery(event: string, prop: string, days: number, limit?: number): string;
-export function buildFilteredCountQuery(event: string, where: string, days: number): string;
+export function buildTotalsQuery(events: string[], hours: number): string;
+export function buildDepthQuery(event: string, prop: string, hours: number): string;
+export function buildBreakdownQuery(event: string, prop: string, hours: number, limit?: number): string;
+export function buildFilteredCountQuery(event: string, where: string, hours: number): string;
 export function rowsToObjects(json: unknown): Array<Record<string, unknown>>;
 export function totalsByEvent(res: QueryResult, events: string[]): Record<string, { events: number; sessions: number }>;
 export function depthRow(res: QueryResult): DepthRow;

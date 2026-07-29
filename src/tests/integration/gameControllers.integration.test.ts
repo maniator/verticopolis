@@ -50,6 +50,7 @@ function fakes() {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
+      sayVisibly: vi.fn(),
       downloadFile: () => {},
       showImportReport: () => {},
       showExportReport: () => {},
@@ -344,12 +345,15 @@ describe("SaveLoad (tower-swap contracts)", () => {
     expect(f.toasts).toEqual([{ text: "New tower founded. Lay a lobby on the ground line to open it.", kind: "good" }]);
   });
 
-  it("importGame rejects garbage JSON with a toast and never touches the sim", async () => {
+  it("importGame rejects garbage JSON where the player can read it, and never touches the sim", async () => {
+    // Says it through `sayVisibly`, not a toast: the OS file picker is not a
+    // modal, so this failure can land after the player has opened a dialog,
+    // and a dialog paints over the toast rail at any z-index (GH #658). The
+    // routing picks the toast itself when nothing is on screen.
     await saveLoad.importGame("{ this is not a tower");
     expect(adopted).toHaveLength(0);
-    expect(f.toasts).toHaveLength(1);
-    expect(f.toasts[0].kind).toBe("bad");
-    expect(f.toasts[0].text).toMatch(/^Import failed: /);
+    expect(f.ui.sayVisibly).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(f.ui.sayVisibly).mock.calls[0][0]).toMatch(/^Import failed: /);
   });
 
   it("Quick Save surfaces a quota failure honestly: failure toast, no success toast, no escaped throw (AUD-010)", () => {

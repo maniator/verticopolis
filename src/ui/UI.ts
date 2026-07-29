@@ -14,7 +14,7 @@ import * as dialogs from "./uiDialogs";
 import * as panels from "./uiPanels";
 import * as status from "./uiStatus";
 import { buildPalette } from "./uiPalette";
-import { ModalPrecedence, type ModalOpts } from "./modalPrecedence";
+import { ModalPrecedence, routeNotice, type ModalOpts } from "./modalPrecedence";
 import { finishModal } from "./uiModal";
 
 export type Tool = { type: "build"; kind: FacilityKind } | { type: "bulldoze" } | { type: "inspect" };
@@ -286,6 +286,19 @@ export class UI {
   /** Who may take the shared dialog; rules in `./modalPrecedence`.
    *  @internal friend-module access (uiDialogs). */
   precedence = new ModalPrecedence();
+
+  /** Say something that must reach the player even when a dialog is up.
+   *
+   *  The asynchronous import and export paths all share one hazard: the OS file
+   *  picker is not a modal, so by the time a read finishes or a parse fails the
+   *  player may have opened a dialog, and a `<dialog>` paints over the toast
+   *  rail at any z-index. A failure announced with a toast from there is
+   *  announced to nobody (GH #658). This routes the line into the dialog in the
+   *  way, and uses a toast only when there is no dialog to be behind.
+   *  @internal friend-module access (uiDialogs / saveLoad / uiImport). */
+  sayVisibly(text: string, kind: "bad" | "info" = "bad"): void {
+    routeNotice(this.el.modal as HTMLDialogElement, this.precedence, text, (t) => this.toast(t, kind));
+  }
 
   /** True while any modal is on screen (the shared `<dialog>` is open). Callers
    *  use this to avoid opening a second modal, which would wipe the first's DOM

@@ -90,9 +90,17 @@ export function wireControllers(app: GameApp): void {
   app.saveLoad = new SaveLoad({
     getSim: () => app.sim,
     getView: () => app.engine.viewState(),
-    adoptSim: (sim) => app.adoptSim(sim),
+    // A report parsed against the OLD tower is stale the moment one is adopted,
+    // and dialog lifecycle cannot see it: New Tower closes perfectly normally
+    // and swaps afterwards. Breaking the leash here covers every swap SaveLoad
+    // drives (found, load, import). See SPEC-modal-precedence-reports CAP-5.
+    adoptSim: (sim) => {
+      app.ui.precedence.towerSwapped();
+      app.adoptSim(sim);
+    },
     ui: {
       toast: (text, kind) => app.ui.toast(text, kind),
+      sayVisibly: (text, kind) => app.ui.sayVisibly(text, kind),
       downloadFile: (filename, contents) => app.ui.downloadFile(filename, contents),
       showImportReport: (report, cb) => app.ui.showImportReport(report, cb),
       showExportReport: (report, cb) => app.ui.showExportReport(report, cb),
