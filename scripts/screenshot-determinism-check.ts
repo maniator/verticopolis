@@ -172,7 +172,12 @@ async function runLeg(
   const buildStart = Date.now();
   const buildRc = await runTagged(tag, process.execPath, [VITE_BIN, "build", "--outDir", outDir], {
     cwd: ROOT,
-    env: process.env,
+    // Always a tooling build: the scene builders drive the app through
+    // `window.game`, and only VC_TOOLING=1 builds publish that handle
+    // (production builds compile it away; see vite.config.ts `define`).
+    // Set here rather than in each caller so a local pinned-image run gets
+    // it too.
+    env: { ...process.env, VC_TOOLING: "1" },
   });
   const buildMs = Date.now() - buildStart;
   if (buildRc !== 0) {

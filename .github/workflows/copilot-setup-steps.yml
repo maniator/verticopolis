@@ -42,5 +42,10 @@ jobs:
       - name: Install JavaScript dependencies
         run: npm ci
 
+      # A tooling build, so an agent that runs `npm run e2e` against this dist
+      # gets the `window.game` handle the specs depend on (production builds
+      # compile it away).
       - name: Build TypeScript project
         run: npm run build
+        env:
+          VC_TOOLING: "1"

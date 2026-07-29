@@ -156,6 +156,11 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   console.log(`  ✓ ${outDir}/${shot.name} (${Date.now() - shotStart} ms)`);
 }
 
+/** The dist ships no `window.game` handle (built without VC_TOOLING=1), a
+ *  condition no scene can recover from: the scene loop rethrows this one
+ *  instead of skipping to the next scene and re-waiting the full timeout. */
+class MissingHandleError extends Error {}
+
 async function runScene(browser: Browser, scene: Scene): Promise<void> {
   const sceneStart = Date.now();
   console.log(`\n▶ scene: ${scene.id}`);
@@ -236,7 +241,20 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       }
       await settle(page, 800, true);
     } else {
-      await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
+      try {
+        await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
+      } catch (err) {
+        // The likeliest cause is a dist built WITHOUT the tooling flag:
+        // production builds compile the `window.game` publish away, so the
+        // wait can never succeed, on this scene or any other. Name the fix
+        // and abort the whole run (MissingHandleError, rethrown by the scene
+        // loop) instead of burning READY_TIMEOUT_MS per remaining scene.
+        throw new MissingHandleError(
+          `window.game never appeared on ${scene.id}. If the app booted, this dist was probably ` +
+            `built without VC_TOOLING=1 (production builds ship no window.game handle); rebuild with ` +
+            `VC_TOOLING=1 npm run build. Original: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
       // From here on, frames advance only when settle()/pgStep drives them:
       // wall time (rAF jitter, CI load, staging latency) can no longer leak
       // into what the sim and the decorations look like at capture. A failed
@@ -341,6 +359,10 @@ async function main(): Promise<void> {
       try {
         await runScene(browser, scene);
       } catch (e) {
+        // A missing window.game handle is a property of the DIST, so every
+        // later scene would fail the same way after its own full timeout:
+        // abort the run with the diagnostic instead (main's catch exits 1).
+        if (e instanceof MissingHandleError) throw e;
         const msg = e instanceof Error ? e.message : String(e);
         for (const shot of scene.shots) failures.push(`${scene.id}/${shot.name}: scene setup failed (${msg})`);
         console.error(`  ✗ scene ${scene.id} aborted: ${msg}`);

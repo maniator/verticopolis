@@ -284,6 +284,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `bmad-code-review` of the window.game tooling gate (2026-07-29)
+
+- The e2e specs and the perf harness still fail as a mute Playwright `waitForFunction` timeout when run against a dist built without `VC_TOOLING=1` (a stale local `dist/`, or a Copilot sandbox whose pre-baked tooling dist was overwritten by the plain quality-gate `npm run build`). `scripts/screenshots.ts` names the fix in its error; e2e has no equivalent fail-fast diagnostic. Add one central check (a shared boot helper or Playwright global setup) that detects a booted page with no `window.game` and names the flag.
+
 ### Deferred from: `gds-code-review` of Modern rental living (2026-07-23)
 
 - **[TRIAGED 2026-07-28 -> absorbed into #324 (finance-1010).]** Rental rent income banks to the "condos" ledger line (Blind + Edge + Acceptance, minor, by-design). `collectMonthlyRent` (`src/engine/economy/rentalIncome.ts`) and the rental operating overhead both record against the `"condos"` financial-breakdown category (`ledgerCatFor` maps both rental kinds there), so recurring rental cashflow is commingled with one-time condo-sale proceeds in the finance readout. This honors the GDD constraint "residential ledger line, like the condo" (no new ledger category), so it is intended, not a defect. Legibility polish if picked up: add a dedicated `"rentals"` `LedgerCat` (a new line + `LEDGER_CATS` entry + `ledgerCatFor` rental cases) so a player can separate rent income from condo sales. Deferred because it widens the ledger vocabulary beyond this feature's "reuse the existing ledger" scope. **Absorbed** rather than given its own row: #324 already plans exactly this additive `LedgerCat` extension for the finance taxonomy, so a separate rentals line would compete with it. The income loop now sums per category off each unit's own kind, so the split needs only the new cat, not a rewrite.

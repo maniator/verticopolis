@@ -1,6 +1,6 @@
 {
   "name": "verticopolis",
-  "version": "2.4.0",
+  "version": "2.4.1",
   "description": "Verticopolis: a browser-native SimTower clone in TypeScript",
   "license": "MIT",
   "type": "module",
@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts",
+    "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json",
     "watch": "tsc --watch",
@@ -25,7 +25,7 @@
     "perf:capture": "PERF_CAPTURE=1 playwright test --grep @perf",
     "lint": "eslint src api --ext .ts,.tsx",
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
-    "screenshots": "vite build && RUN_SERVER=1 node scripts/screenshots.ts",
+    "screenshots": "VC_TOOLING=1 vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs"
   },

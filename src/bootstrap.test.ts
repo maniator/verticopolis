@@ -182,6 +182,7 @@ describe("hideBootCover", () => {
 describe("bootGame", () => {
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     document.body.innerHTML = "";
     delete (window as unknown as { game?: unknown }).game;
   });
@@ -203,7 +204,30 @@ describe("bootGame", () => {
     bootGame(create);
 
     expect(create).toHaveBeenCalledTimes(1);
+    // Vitest runs with `import.meta.env.DEV` true, so this is the dev-serve
+    // side of the tooling gate: the handle publishes.
     expect((window as unknown as { game: unknown }).game).toBe(app);
+  });
+
+  // `runIf`: `__TOOLING_BUILD__` compiles from the live VC_TOOLING env var at
+  // config load (vite.config.ts `define`). A shell that still has VC_TOOLING=1
+  // exported (say after a local tooling build) would inline `true` and fail
+  // this test for a reason that has nothing to do with the code, so skip it
+  // there instead of baffling the developer; CI never sets the var for `npm
+  // test`, so the assertion always runs where it matters.
+  it.runIf(!__TOOLING_BUILD__)("publishes no window.game in a player session (DEV off, no tooling build)", () => {
+    // With `__TOOLING_BUILD__` false, stubbing DEV off leaves exactly what a
+    // deployed player session sees: the game boots, the update wiring still
+    // lands, and no console handle into the sim is handed out.
+    vi.stubEnv("DEV", false);
+    stubWebGL();
+    const app = { onUpdateAvailable: vi.fn() };
+    const create = vi.fn(() => app);
+
+    bootGame(create);
+
+    expect(create).toHaveBeenCalledTimes(1);
+    expect((window as unknown as { game?: unknown }).game).toBeUndefined();
   });
 
   it("shows the no-WebGL message and never calls create when WebGL is missing", () => {
