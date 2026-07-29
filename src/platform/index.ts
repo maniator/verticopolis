@@ -5,17 +5,26 @@ import { browserPlatform } from "./browser";
  *  full port surface, so a shell bug degrades to the browser path instead of
  *  crashing export or the help dialog. The flag must be literally `true`; an
  *  injected port that claims not to be a wrapper is a contract violation
- *  (types.ts), not a third mode. */
+ *  (types.ts), not a third mode.
+ *
+ *  The command members are checked as OPTIONAL on purpose. Shells built against
+ *  the three-member revision of this contract (the iOS Capacitor shell) must
+ *  keep validating: demanding a fourth would demote them here, silently, and
+ *  take their native file save with them. Present-but-not-callable is still a
+ *  malformed injection, since the game would throw on it at boot. */
 function isPlatformPort(value: unknown): value is PlatformPort {
   if (typeof value !== "object" || value === null) return false;
   // Even the property reads are untrusted: a throwing getter or revoked Proxy
   // must degrade like any other malformed injection, not throw out of boot.
   try {
     const port = value as Record<string, unknown>;
+    const optionalFn = (v: unknown) => v === undefined || typeof v === "function";
     return (
       port.isNativeWrapper === true &&
       typeof port.saveFile === "function" &&
-      typeof port.openExternal === "function"
+      typeof port.openExternal === "function" &&
+      optionalFn(port.onHostCommand) &&
+      optionalFn(port.setCommandsAvailable)
     );
   } catch {
     return false;
@@ -32,6 +41,23 @@ function isPlatformPort(value: unknown): value is PlatformPort {
 export function isWrappedMode(mode: string): boolean {
   return mode === "native" || mode === "desktop";
 }
+
+/**
+ * The same question answered at BUILD time, so wrapper-only code can be dropped
+ * from a browser bundle entirely rather than shipped and skipped.
+ *
+ * Written as literal comparisons on purpose. Vite statically replaces
+ * `import.meta.env.MODE`, so this folds to `false` in a browser build and
+ * Rollup eliminates every `if (IS_WRAPPED_BUILD)` branch, which in turn leaves
+ * `src/game/hostCommands.ts` unreferenced and drops it from the graph.
+ * `isWrappedMode(import.meta.env.MODE)` would NOT fold: Rollup does not inline
+ * a cross-module call to decide a branch is dead, so the module would ship to
+ * every browser player and merely do nothing.
+ *
+ * The duplicated literals are pinned against the predicate in
+ * `platform.test.ts`, so the two cannot drift.
+ */
+export const IS_WRAPPED_BUILD = import.meta.env.MODE === "native" || import.meta.env.MODE === "desktop";
 
 /** Resolution order: only a wrapped bundle may bind a wrapper port, and only
  *  through a well-formed `__VC_PLATFORM__` global; everything else gets the

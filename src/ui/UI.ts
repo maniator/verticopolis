@@ -147,6 +147,16 @@ export class UI {
     return this.editorBusy;
   }
 
+  /** Open the New Tower picker over a live tower. The toolbar always has one to
+   *  abandon, so the picker shows its fold-in abandon warning and the mode
+   *  choice and the confirm are one step. Named rather than inlined in the
+   *  button handler because a native shell menu reaches the same command
+   *  through `src/game/hostCommands.ts`, and both callers must land on one code
+   *  path (a second copy of these options is how the two would drift). */
+  promptNewTower(): void {
+    this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
+  }
+
   private wireControls(): void {
     document.querySelectorAll<HTMLButtonElement>("#speed button[data-speed]").forEach((b) => {
       b.addEventListener("click", () => {
@@ -170,11 +180,7 @@ export class UI {
     // Quick Save is the top-bar 💾 (index.html); null-safe so a trimmed DOM that omits it does not throw.
     document.getElementById("btn-save-top")?.addEventListener("click", () => this.cb.onSave());
     document.getElementById("btn-load")!.addEventListener("click", () => this.cb.onShowSaves());
-    document.getElementById("btn-new")!.addEventListener("click", () => {
-      // The toolbar always has a live tower to abandon, so the picker shows its
-      // fold-in abandon warning; the mode choice and the confirm are one step.
-      this.newTowerModal({ hasSave: true, onFound: (mode, cal, manual) => this.cb.onNew(mode, cal, manual) });
-    });
+    document.getElementById("btn-new")!.addEventListener("click", () => this.promptNewTower());
     document.getElementById("btn-settings")!.addEventListener("click", () => this.showSettings());
     document.getElementById("btn-help")!.addEventListener("click", () => this.showHelp());
     this.el.modeBadge.addEventListener("click", () => this.showCompare()); // "tell me more"

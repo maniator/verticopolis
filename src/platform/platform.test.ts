@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { resolvePlatform, getPlatform, isWrappedMode } from "./index";
+import { resolvePlatform, getPlatform, isWrappedMode, IS_WRAPPED_BUILD } from "./index";
 import { browserPlatform } from "./browser";
 import type { PlatformPort } from "./types";
 
@@ -156,6 +156,70 @@ describe("isWrappedMode: the one predicate every wrapper gate shares", () => {
     // Exact match only: no prefix or casing creep.
     expect(isWrappedMode("Native")).toBe(false);
     expect(isWrappedMode("desktop-extra")).toBe(false);
+  });
+});
+
+describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
+  it("agrees with isWrappedMode for the mode this build actually is", () => {
+    // The constant duplicates the mode literals so Vite can fold it and Rollup
+    // can drop the wrapper-only modules from a browser bundle. That duplication
+    // is only safe while the two answers match, which is what this pins.
+    expect(IS_WRAPPED_BUILD).toBe(isWrappedMode(import.meta.env.MODE));
+  });
+
+  it("is false under the test runner, the same answer a browser build gets", () => {
+    expect(IS_WRAPPED_BUILD).toBe(false);
+  });
+});
+
+describe("isPlatformPort: onHostCommand is optional on purpose", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a port that omits it, so a three-member shell keeps validating", () => {
+    // The iOS Capacitor shell was built against the contract before the command
+    // channel existed. Demanding a fourth member would demote it to the browser
+    // port silently and take its native file save with it.
+    const legacy = fakePort();
+    expect("onHostCommand" in legacy).toBe(false);
+    expect(resolvePlatform("native", legacy)).toBe(legacy);
+    expect(resolvePlatform("desktop", legacy)).toBe(legacy);
+  });
+
+  it("accepts a port that provides it", () => {
+    const withCommands = { ...fakePort(), onHostCommand: vi.fn() };
+    expect(resolvePlatform("desktop", withCommands)).toBe(withCommands);
+  });
+
+  it("rejects a port whose onHostCommand is present but not callable", () => {
+    // Optional means absent-or-function. A non-function would throw at the
+    // binding call site during boot, so it is a malformed injection like any
+    // other and must degrade instead.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: "yes" })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: null })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: {} })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects a port whose setCommandsAvailable is present but not callable", () => {
+    // Same rule as onHostCommand: optional means absent-or-function, because the
+    // game calls it during bind and a non-function would throw out of boot.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: 1 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: {} })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts a port that provides both command members", () => {
+    const full = { ...fakePort(), onHostCommand: vi.fn(), setCommandsAvailable: vi.fn() };
+    expect(resolvePlatform("desktop", full)).toBe(full);
+  });
+
+  it("the browser default defines neither, so the browser binds nothing", () => {
+    expect(browserPlatform.onHostCommand).toBeUndefined();
+    expect(browserPlatform.setCommandsAvailable).toBeUndefined();
   });
 });
 

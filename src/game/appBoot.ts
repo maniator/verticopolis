@@ -16,6 +16,8 @@ import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
+import { bindHostCommands } from "./hostCommands";
+import { IS_WRAPPED_BUILD } from "../platform";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 
@@ -184,6 +186,12 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
   initInstallAffordance(app);
+  // Commands from a wrapper shell's native menu (Electron's File menu today),
+  // routed to the same calls the in-game controls make. A browser session binds
+  // nothing: the port member is optional and only a wrapper defines it. Safe
+  // here rather than earlier, because a command can only arrive once the shell
+  // has a window to send one from.
+  if (IS_WRAPPED_BUILD) bindHostCommands(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,

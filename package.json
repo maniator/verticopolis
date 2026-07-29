@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts",
+    "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-wrapper-seam.ts browser",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json",
     "watch": "tsc --watch",
@@ -27,7 +27,8 @@
     "lint:fix": "eslint src api --ext .ts,.tsx --fix",
     "screenshots": "vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
-    "og-image": "node scripts/gen-og-image.mjs"
+    "og-image": "node scripts/gen-og-image.mjs",
+    "build:desktop": "vite build --mode desktop && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-wrapper-seam.ts desktop"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
