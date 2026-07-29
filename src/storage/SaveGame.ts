@@ -1,5 +1,6 @@
 import { deflateSync } from "fflate";
 import { Simulation } from "../engine/Simulation";
+import { markFounderFromLoadedFile } from "../engine/sim/founderStatus";
 import type { SerializedGame } from "../engine/types";
 import { isGameMode } from "../engine/types";
 import type { SlotInfo } from "./slotInfo";
@@ -220,6 +221,7 @@ export const SaveGame = {
       if (data) {
         try {
           const sim = Simulation.deserialize(data);
+          markFounderFromLoadedFile(sim, data); // an unstamped stored tower predates the appVersion stamp (pre-2.0)
           // Surface the loaded tower's write time from the SAME decoded data and
           // the SAME key that actually loaded (legacy fallback included), so the
           // boot return-recency bucket needs no second decode of the slot. A
@@ -268,7 +270,9 @@ export const SaveGame = {
     const data = readSlot(SLOT_KEY(n));
     if (!data) return null;
     try {
-      return Simulation.deserialize(data);
+      const sim = Simulation.deserialize(data);
+      markFounderFromLoadedFile(sim, data); // an unstamped slot save predates the appVersion stamp (pre-2.0)
+      return sim;
     } catch {
       return null;
     }
@@ -380,7 +384,9 @@ export const SaveGame = {
     if (typeof data.minutes !== "number" || !Array.isArray(data.units)) {
       throw new Error("Not a valid tower save file.");
     }
-    return Simulation.deserialize(data);
+    const sim = Simulation.deserialize(data);
+    markFounderFromLoadedFile(sim, data); // an unstamped imported tower predates the appVersion stamp (pre-2.0)
+    return sim;
   },
 };
 
