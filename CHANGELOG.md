@@ -13,10 +13,22 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.0.1
+
+- The Studio no longer quietly starves your restaurants. A floor of them was taking meal trips out of the pool and sending nobody, so the food court went hungry on a tower that had done nothing wrong.
+- The Classic vs Modern comparison now covers rental living, and no longer claims every Modern building needs 3 stars: the Studio arrives at 2.
+
 ## 2.0.0
 
-- Modern towers can now rent homes as well as sell them: the cheap, easygoing Studio and the pricier Apartment, which minds noise, a long walk, and a high rent. Hover a stubborn vacancy to see why.
+- Modern towers can now rent homes as well as sell them. The Studio is cheap and easygoing; the Apartment pays more but minds noise, a long walk, and a high rent. An empty rental earns nothing.
+- A rental that will not fill now tells you why: hover it and the card names the cause, and an unhappy tenant gets that warning before they give notice, in time to fix it.
 - Building before 2.0? Your tower now wears a small gold "Ground floor" badge on the title screen, and you get a one-time welcome when you come back. Recognition, no catch.
+<!-- The update prompt shows at most MAX_NOTES (3) lines and parseUpdateInfo TRUNCATES
+     silently rather than failing, so a fourth note here is DELIBERATE and ships as
+     documentation only. Keep the three player-facing gameplay lines above in the
+     prompt; the privacy disclosure is live in Help itself and is linked from the
+     release announcement. Do not "fix" the count by condensing the lines above:
+     that was tried in 2.0.0 and inverted the Apartment's value proposition. -->
 - Help now has a Privacy section, on the help page and in the in-game Help dialog, spelling out what the game counts: anonymous totals, with no cookies, no accounts, and no ads.
 
 ## 1.105.0

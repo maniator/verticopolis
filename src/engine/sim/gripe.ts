@@ -184,8 +184,8 @@ export function dominantGripe(
     // D18 put the Apartment in the nightclub's negative halo, so it really does
     // erode from a club floors away. Without this tier that erosion had no cause:
     // dominantGripe returned null, vacateCause fell through to the "access"
-    // catch-all, and a fully served tenant was told "no route to the lobby". Not a
-    // missing message, a false one (#684). The Studio is out of the halo, so
+    // catch-all, and a fully served tenant was told "no route to the lobby", a false
+    // cause rather than merely a missing one (#684). The Studio is out of the halo, so
     // nearNightclub is only asked for the kind that feels it.
     if (u.kind === "rentalApartment" && nearNightclub(sim, u)) return "noise";
     // No unmetDemand tier here: rentals are excluded from the coverage drain on

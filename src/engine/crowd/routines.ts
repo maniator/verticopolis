@@ -2,6 +2,7 @@ import type { Clock } from "../Clock";
 import type { Tower } from "../Tower";
 import type { Crowd } from "../Crowd";
 import type { SpawnFloors } from "./person";
+import { hasHousehold } from "../residentialRentals";
 import { visibleOccupants } from "./person";
 import { add } from "./trips";
 import {
@@ -96,7 +97,7 @@ function passes(crowd: Crowd, weight: number): boolean {
 export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFloors): void {
   const floor = crowd.rng.pick(floors.householdFloors);
   const candidates = (floors.unitsByFloor.get(floor) ?? []).filter(
-    (u) => (u.kind === "condo" || u.kind === "rentalApartment") && visibleOccupants(u) > 0,
+    (u) => hasHousehold(u.kind) && visibleOccupants(u) > 0,
   );
   if (candidates.length === 0) return;
   const origin = crowd.rng.pick(candidates);
@@ -114,8 +115,9 @@ export function spawnSchoolDeparture(crowd: Crowd, tower: Tower, floors: SpawnFl
 /** One school-run return: a child walks in the ground lobby and rides up to a
  *  condo floor. The statistical mirror of the morning wave; a plain one-way
  *  trip with no origin accounting (the child is arriving INTO the room, so
- *  there is no visible occupancy to thin). `condoFloors` bins only occupied
- *  condos, so an empty or unsold condo never draws a returning child. */
+ *  there is no visible occupancy to thin). `householdFloors` bins only tenanted
+ *  homes that carry a household, so an empty or unsold one never draws a returning
+ *  child, and a single-occupant Studio never does either. */
 export function spawnSchoolReturn(crowd: Crowd, tower: Tower, floors: SpawnFloors): void {
   const floor = crowd.rng.pick(floors.householdFloors);
   const spawned = add(crowd, tower, GROUND_LOBBY, floor);
