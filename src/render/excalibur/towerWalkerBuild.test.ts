@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
 import { Tower } from "../../engine/Tower";
-import { landingSegs, segAt } from "../../engine/tower/segments";
+import { landingSegs, segAt, segmentsOf } from "../../engine/tower/segments";
+import { NEEDS_FLOORS } from "../../engine/tower/towerTopology";
 import { buildWalkers, landingTile } from "./towerWalkerBuild";
 
 /**
@@ -81,7 +82,7 @@ describe("climbers report the tile their flight actually lands on (#665)", () =>
   });
 
   it("falls back to the flight's tile when no column is structural", () => {
-    // Same fallback the router's `landingSeg` takes, so the two never disagree.
+    // Same fallback the router's `landingSegs` takes, so the two never disagree.
     const e = eng({ tiles: [], transports: [stairs()] });
     buildWalkers(e);
     expect(e.walkers[0].tileX).toBe(10);
@@ -166,9 +167,32 @@ describe("landingTile agrees with the router's landingSegs (#674)", () => {
     for (let x = 10; x < 12; x++) tower.place("floor", 2, x); // run A, under the footprint
     for (let x = 15; x < 26; x++) tower.place("floor", 2, x); // run B, also under it
     tower.placeTransport("stairs", 10, 1, 2);
-    // Two genuinely distinct segments sit under the 10..17 span.
-    expect(segAt(tower, 2, 10)).not.toBe(segAt(tower, 2, 15));
-    parity(tower);
+    // Prove the geometry, do not infer it. `segAt` answers with a LONE-TILE
+    // segment for a column over the void (`segmentStartX` returns x when no run
+    // contains it), so comparing two `segAt` calls would pass even if run A had
+    // never been placed, quietly turning this into a copy of the overhang case.
+    // Assert the structure itself, and the gap between the two runs.
+    expect(tower.hasStructure(2, 10), "run A must exist").toBe(true);
+    expect(tower.hasStructure(2, 11)).toBe(true);
+    expect(tower.hasStructure(2, 12), "the runs must be separated by a real gap").toBe(false);
+    expect(tower.hasStructure(2, 15), "run B must exist").toBe(true);
+    expect(segmentsOf(tower, 2)).toEqual([[10, 11], [15, 25]]);
+
+    const t = parity(tower);
+    // The runs existing is not the premise; the FOOTPRINT covering both is, and
+    // that rides on the stair's width. Count the distinct segments the flight
+    // actually spans, over structural columns only so a void column's lone-tile
+    // segment cannot pad the total. Narrow the flight and this drops to 1, which
+    // is the degeneration the whole fixture exists to prevent.
+    const spanned = new Set<number>();
+    for (let i = 0; i < t.width; i++) {
+      if (tower.hasStructure(2, t.x + i)) spanned.add(segAt(tower, 2, t.x + i));
+    }
+    expect(spanned.size, "the footprint must straddle two structural runs").toBe(2);
+    // #662 has landed: the router links every straddled run, and `landingSegs[0]`
+    // is the leftmost of them. `landingTile` must keep picking that same run, so
+    // this is the assertion that moves if either side reorders its choice.
+    expect(landingTile(tower, t, 2)).toBe(10);
   });
 
   it("cannot be asked about a flight with no structural column, because placement refuses one", () => {
@@ -179,7 +203,14 @@ describe("landingTile agrees with the router's landingSegs (#674)", () => {
     const tower = new Tower();
     for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
     for (let x = 20; x < 26; x++) tower.place("floor", 2, x); // clear of the 10..17 span
-    expect(tower.placeTransport("stairs", 10, 1, 2).ok).toBe(false);
+    // Floor 2 HAS structure, just none under the span, so the refusal can only
+    // be about the span. Assert the reason too: without it this passes for any
+    // refusal (a cap, an overlap) while its name claims a specific cause.
+    expect(tower.hasStructure(2, 20)).toBe(true);
+    expect(tower.hasStructure(2, 17)).toBe(false);
+    const res = tower.placeTransport("stairs", 10, 1, 2);
+    expect(res.ok).toBe(false);
+    expect(res.reason).toBe(NEEDS_FLOORS); // assert the constant so a copy edit cannot redden this
     expect(tower.transports).toEqual([]);
   });
 });
