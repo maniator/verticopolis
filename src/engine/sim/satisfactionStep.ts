@@ -1,7 +1,7 @@
 import type { Simulation } from "../Simulation";
 import type { Unit } from "../types";
 import { rentOf, rentConfig } from "../econConfig";
-import { isHotelKind } from "../facilities";
+import { isHotelKind, isLeaseAmenityKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { isTenanted, isOperational } from "../types";
 import { computeDemandMap, originDemand, type DemandMap } from "./demand";
@@ -262,8 +262,10 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   // paths (#661), so registering it would build a full-tower demand map to compute a
   // value the step never reads. That map is rebuilt per inspector repaint through
   // `wontLeaseText`, so this is the difference between a hover over an empty rental
-  // costing a tower scan and costing nothing.
-  const dm = isRentalKind(u.kind) ? null : (ctx.demandMap ??= computeDemandMap(sim));
+  // costing a tower scan and costing nothing. The lease amenities (#667) skip it
+  // for the same reason: the coverage drain's kind guard below never reads it for
+  // them (they erode only on unserved placement, congestion, and rent).
+  const dm = isRentalKind(u.kind) || isLeaseAmenityKind(u.kind) ? null : (ctx.demandMap ??= computeDemandMap(sim));
   if (dm) {
     dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
   }

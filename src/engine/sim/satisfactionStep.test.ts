@@ -168,6 +168,30 @@ describe("satisfactionStep: the remaining drains and caps", () => {
   });
 });
 
+describe("wouldEvictFreshTenant: lease amenities (#667)", () => {
+  it("allows a going-rate amenity and gates a max-rent one (rent erosion outruns recovery)", () => {
+    const sim = tinyTower("modern");
+    sim.star = 5; // clear any star gate on the Modern amenity kinds
+    const r = sim.tower.place("fitnessClub", 2, C);
+    expect(r.ok, r.reason).toBe(true);
+    const r2 = sim.tower.place("clinic", 3, C);
+    expect(r2.ok, r2.reason).toBe(true);
+    sim.star = 1;
+    const club = sim.tower.units.find((u) => u.id === r.unitId)!;
+    const clinic = sim.tower.units.find((u) => u.id === r2.unitId)!;
+    // At the going rate a served, quiet spot recovers, so the gate allows it.
+    expect(wouldEvictFreshTenant(sim, club, buildSatisfactionContext(sim, true))).toBe(false);
+    // Gouged to the band max (over = 1.0): the 0.07 rent drain outruns
+    // SERVED_RECOVERY (0.05) every hour, a sustained erosion. Ungated, this
+    // spot would lease, erode out, and re-list forever; the gate holds it.
+    club.rent = rentConfig("fitnessClub")!.max;
+    expect(wouldEvictFreshTenant(sim, club, buildSatisfactionContext(sim, true))).toBe(true);
+    // The clinic shares the guard.
+    clinic.rent = rentConfig("clinic")!.max;
+    expect(wouldEvictFreshTenant(sim, clinic, buildSatisfactionContext(sim, true))).toBe(true);
+  });
+});
+
 describe("wouldEvictFreshTenant: boundaries", () => {
   it("allows a quiet spot and gates a net-eroding one", () => {
     const modern = tinyTower("modern");

@@ -492,3 +492,4 @@ describe("unmetCoverage (#395 retail-coverage read)", () => {
     expect(unmetCoverage(fakeDemand(4, [[1, 3]]), u)).toBe(0.25);
   });
 });
+

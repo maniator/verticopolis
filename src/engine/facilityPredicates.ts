@@ -5,6 +5,15 @@ export function isHotelKind(kind: FacilityKind): boolean {
   return kind === "hotelSingle" || kind === "hotelDouble" || kind === "hotelSuite";
 }
 
+/** The Modern lease amenities: office-like lease tenants that erode on unserved
+ *  placement and on an over-market rent, so they are gated by the move-in
+ *  sustainability gate and surfaced by the Main-gripe line like offices (#667).
+ *  One predicate so the gate, the gripe guard, and the satisfaction step can
+ *  never drift on which kinds count. */
+export function isLeaseAmenityKind(kind: FacilityKind): boolean {
+  return kind === "fitnessClub" || kind === "clinic";
+}
+
 /** Height of a facility in floors (1 for ordinary single-story rooms). */
 export function facilityFloors(kind: FacilityKind): number {
   return FACILITIES[kind].floors ?? 1;

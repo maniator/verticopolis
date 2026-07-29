@@ -17,6 +17,7 @@
 export { LOT_WIDTH, FACILITIES, ALL_KINDS, isFacilityKind, GRID } from "./facilitiesData";
 export {
   isHotelKind,
+  isLeaseAmenityKind,
   facilityFloors,
   buildMinutes,
   isOpenAt,
