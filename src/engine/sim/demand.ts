@@ -4,6 +4,7 @@ import { MODERN_RULES } from "../gameRules";
 import { ECON } from "../econConfig";
 import { RECYCLING_POP_PER_CENTER } from "../facilities";
 import { isHotelKind, attendanceCap } from "../facilities";
+import { isRentalKind } from "../residentialRentals";
 import { residentCount } from "../census";
 import { segmentStartX } from "../tower/segments";
 import { isOperational, isTenanted } from "../types";
@@ -73,6 +74,16 @@ export interface DemandMap {
    *  reads. `share === totalCap > 0 ? pool / totalCap : 0` holds at construction. */
   pool: number;
   totalCap: number;
+  /** The tower-wide demand multiplier (metro/recycling, {@link towerDemandBonus})
+   *  captured when the map was built. Every mid-pass pool fold passes this to
+   *  {@link originDemand} so the fold carries the SAME multiplier as the pool it
+   *  joins: recomputing the bonus live would both rescan the tower per fill (the
+   *  bonus reads every unit, and total population when recycling exists) and mix
+   *  multipliers, since each fill's population bump nudges the recycling ratio
+   *  while the pool's existing terms keep the build-time value. One snapshot
+   *  multiplier per map keeps the share arithmetic coherent; the next map build
+   *  refreshes everything together. */
+  bonus: number;
 }
 
 /** Per-unit reachability decision shared by the demand pool and the traffic-income
@@ -96,6 +107,13 @@ function originWeight(kind: string): number | undefined {
   if (kind === "office") return ECON.mealPopulationWeights.office;
   if (kind === "condo") return ECON.mealPopulationWeights.condo;
   if (isHotelKind(kind as never)) return ECON.mealPopulationWeights.hotel;
+  // Rental residents shop like condo residents (#661): the same per-resident
+  // weight, so a Studio's single tenant naturally draws less than an Apartment
+  // household. Making rentals real origins is what lets the Apartment's
+  // GDD-intended unmet-local-demand churn actually fire (unmetCoverage reads
+  // the origin registry this weight admits them to). Modern-only kinds, so
+  // Classic's demand pool and the goldens are untouched.
+  if (isRentalKind(kind as never)) return ECON.mealPopulationWeights.condo;
   return undefined;
 }
 
@@ -198,7 +216,8 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     reachableVenuesByOrigin.set(u.id, reachableVenueCount);
     pool += residentCount(u) * w * perCapita;
   }
-  pool *= towerDemandBonus(sim);
+  const bonus = towerDemandBonus(sim);
+  pool *= bonus;
 
   // Capacity-proportional distribution reduces to a uniform share under
   // lobby-anchored reachability (see the module note): D_v = pool * cap_v /
@@ -223,7 +242,7 @@ export function computeDemandMap(sim: SimContext): DemandMap {
     fractionByUnit.set(v.id, frac);
     deliveredByUnit.set(v.id, frac * v.cap);
   }
-  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share, retailVenueCount, pool, totalCap };
+  return { fractionByUnit, deliveredByUnit, reachableVenuesByOrigin, share, retailVenueCount, pool, totalCap, bonus };
 }
 
 /**
@@ -234,12 +253,26 @@ export function computeDemandMap(sim: SimContext): DemandMap {
  * against the demand it would itself create, not just the pre-move census. Returns
  * 0 for a non-origin kind. `residentCount` reads the catalog population for an
  * empty unit, so a vacancy contributes its would-be household. Draws no RNG.
+ *
+ * Pass `bonus` (the map's snapshot, {@link DemandMap.bonus}) when folding into an
+ * existing pool: it keeps the fold on the pool's own multiplier AND skips the
+ * tower scan `towerDemandBonus` costs, so a mass-fill pass stays linear. Omitting
+ * it recomputes the bonus live, for a fresh standalone read only.
  */
-export function originDemand(sim: SimContext, u: Pick<Unit, "kind" | "residents">): number {
+export function originDemand(sim: SimContext, u: Pick<Unit, "kind" | "residents">, bonus?: number): number {
   const w = originWeight(u.kind);
   if (w === undefined) return 0;
   const rules = sim.rules ?? MODERN_RULES;
-  return residentCount(u) * w * rules.demandModel().perCapita * towerDemandBonus(sim);
+  return residentCount(u) * w * rules.demandModel().perCapita * (bonus ?? towerDemandBonus(sim));
+}
+
+/** Fold a mid-pass fill into a map's running pool, at the map's own snapshot
+ *  bonus. The ONE home for the pool-mutation invariant (see {@link DemandMap.bonus}):
+ *  every fill that joins an existing pool goes through here, so no call site can
+ *  quietly fold at a live-recomputed multiplier (mixing ratios with the pool's
+ *  build-time terms) or pay the tower scan per fill. A non-origin kind folds 0. */
+export function foldOriginDemand(dm: DemandMap, sim: SimContext, u: Pick<Unit, "kind" | "residents">): void {
+  dm.pool += originDemand(sim, u, dm.bonus);
 }
 
 /**

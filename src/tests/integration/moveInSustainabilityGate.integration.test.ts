@@ -216,6 +216,10 @@ describe("move-in sustainability gate: predicate agrees with the real simulation
     },
   ];
   for (const c of cases) {
+    // 60s budget: the very-far classic case simulates 30 days in a 22-floor
+    // tower, ~5s on a warm dev machine and measured past the default timeout
+    // on a loaded CI runner. The budget is a hang guard, not a target; the
+    // other cases finish in well under a second.
     it(`${c.name}: predicate matches the 30-day outcome`, () => {
       const sim = servedTower(7, c.mode, c.top);
       const u = c.build(sim);
@@ -227,7 +231,7 @@ describe("move-in sustainability gate: predicate agrees with the real simulation
       for (let d = 0; d < 30; d++) sim.tick(DAY);
       const evicted = u.state === "empty" && !u.everOccupied;
       expect(evicted, `${c.name}: gated=${gated} but evicted=${evicted}`).toBe(gated);
-    });
+    }, 60_000);
   }
 });
 

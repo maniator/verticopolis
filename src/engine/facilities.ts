@@ -18,6 +18,7 @@ export { LOT_WIDTH, FACILITIES, ALL_KINDS, isFacilityKind, GRID } from "./facili
 export {
   isHotelKind,
   isLeaseAmenityKind,
+  isUnmetDemandKind,
   facilityFloors,
   buildMinutes,
   isOpenAt,
