@@ -1,21 +1,21 @@
 name: Analytics Report
 
-# Twice-weekly rollup of the Verticopolis custom events (see src/analytics.ts).
-# Two reports run side by side through the PostHog migration:
-#   - scripts/posthog-report.mjs  (PostHog / HogQL, exact percentiles + per-session
-#     and per-tool splits) is the report going forward.
-#   - scripts/analytics-report.mjs  (Vercel Web Analytics) stays until S6 retires
-#     the Vercel path, so the two can be compared during the cutover.
-# Each renders its report inline into the run's job summary (viewable with no
-# download) and uploads the styled HTML as a downloadable artifact; the raw
-# responses print to the run log. Both are read-only and write nothing to the repo.
+# Twice-weekly rollup of the Verticopolis custom events (see src/analytics.ts),
+# rendered by scripts/posthog-report.mjs (PostHog / HogQL: exact percentiles
+# plus per-session and per-tool splits). The report renders inline into the
+# run's job summary (viewable with no download) and uploads the styled HTML as
+# a downloadable artifact; the raw responses print to the run log. Read-only,
+# writes nothing to the repo.
+#
+# The Vercel Web Analytics report that used to run alongside this one was
+# retired in PR #692 (owner ruling, ahead of the S6 story that planned it);
+# the client-side dual-write and the Speed Insights keep-or-drop call remain
+# with S6 in the analytics migration epic.
 #
 # Secrets / vars:
 #   POSTHOG_PERSONAL_API_KEY  (secret)  a phx_... personal API key with query:read.
 #   POSTHOG_PROJECT_ID        (var, optional)  defaults to 524085.
 #   POSTHOG_HOST              (var, optional)  defaults to https://us.posthog.com.
-#   VERCEL_TOKEN              (secret)  Vercel > Account Settings > Tokens (team).
-# The Vercel project and team IDs are not secrets.
 
 on:
   schedule:
@@ -23,8 +23,8 @@ on:
     - cron: "0 13 * * 2,5"
   workflow_dispatch:
     inputs:
-      days:
-        description: "Look-back window in days"
+      window:
+        description: "Look-back window: days by default (30, 0.5), or with a unit (12h, 3d). Minimum 1 hour, maximum 365 days; an invalid value fails the run."
         required: false
         default: "30"
 
@@ -44,23 +44,13 @@ jobs:
 
       - name: Generate PostHog report
         # The dispatch input goes through env, never interpolated into the shell
-        # command, so a crafted "days" value can't inject into the run step.
+        # command, so a crafted "window" value can't inject into the run step.
         env:
           POSTHOG_PERSONAL_API_KEY: ${{ secrets.POSTHOG_PERSONAL_API_KEY }}
           POSTHOG_PROJECT_ID: ${{ vars.POSTHOG_PROJECT_ID || '524085' }}
           POSTHOG_HOST: ${{ vars.POSTHOG_HOST || 'https://us.posthog.com' }}
-          DAYS_INPUT: ${{ github.event.inputs.days || '30' }}
-        run: node scripts/posthog-report.mjs --days "$DAYS_INPUT" --out reports
-
-      - name: Generate Vercel report (retires at S6)
-        # Kept alongside the PostHog report until S6 removes the Vercel path, so the
-        # two can be compared during the cutover. Same env-not-shell rule as above.
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          VERCEL_PROJECT_ID: prj_06eFZFQdFZ49EiEWmXkkphKAOSSF
-          VERCEL_TEAM_ID: team_ArE8nhexpkACNIlDHVKU80Pj
-          DAYS_INPUT: ${{ github.event.inputs.days || '30' }}
-        run: node scripts/analytics-report.mjs --days "$DAYS_INPUT" --out reports
+          WINDOW_INPUT: ${{ github.event.inputs.window || '30' }}
+        run: node scripts/posthog-report.mjs --window "$WINDOW_INPUT" --out reports
 
       - name: Upload report artifact
         if: always()

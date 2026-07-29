@@ -10,11 +10,10 @@
  * GitHub Actions job summary when run in CI (`$GITHUB_STEP_SUMMARY`), and the
  * raw query results printed to stdout so a run is never a total loss.
  *
- * Why a second report script rather than editing scripts/analytics-report.mjs:
- * the Vercel Web Analytics path stays live until S6 retires it, so the two run
- * side by side through the migration. This one supersedes it on precision. HogQL
+ * This report superseded the retired Vercel Web Analytics report
+ * (scripts/analytics-report.mjs, removed in PR #692) on precision: HogQL
  * computes EXACT percentiles (`quantile(0.5)(...)`) instead of reconstructing
- * them from a capped value histogram, and because every event now carries a
+ * them from a capped value histogram, and because every event carries a
  * per-tab session id (distinct_id), it can do the per-session and per-tool
  * splits the Vercel path could not (Vercel Web Analytics has no session
  * correlation). All numbers are production only (`properties.environment`);
@@ -22,7 +21,9 @@
  *
  * Runs on plain Node (18+, global fetch), no dependencies. Driven by the
  * scheduled GitHub Actions workflow (.github/workflows/analytics-report.yml) or
- * locally: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/posthog-report.mjs --days 30`.
+ * locally: `POSTHOG_PERSONAL_API_KEY=phx_... node scripts/posthog-report.mjs --window 30`.
+ * The window is days by default ("30", "0.5") or takes a unit suffix ("12h",
+ * "3d"); `--days` is kept as an alias for the old flag name.
  *   POSTHOG_PERSONAL_API_KEY  (required)  a personal API key with query:read (a
  *                                         phx_... key, NOT the phc_... ingest key).
  *   POSTHOG_PROJECT_ID        (default 524085)  the verticopolis project.
@@ -45,15 +46,48 @@ function arg(name, fallback) {
   return inline ? inline.slice(name.length + 3) : fallback;
 }
 
-// Clamp the look-back to a sane, finite integer. A stray value (0, negative,
-// non-numeric, or Infinity from something like 1e309) must never reach a HogQL
-// INTERVAL clause; the report reads DAYS as a bare integer, so guard it here.
-// Defaults to 30, caps at 365.
-function clampDays(v) {
-  const n = Math.floor(Number(v));
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, 365) : 30;
+const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+
+// Parse the look-back window. A plain number is days ("30", "0.5"); a unit
+// suffix picks the unit ("12h", "3d"). Normalized to whole hours, so a
+// half-day request really queries 12 hours instead of being discarded.
+// Bounds: at least 1 hour, at most 365 days, checked on the exact value
+// BEFORE rounding so "0.5h" cannot sneak under the stated minimum by rounding
+// up to it. Anything the regex rejects (or a value outside the bounds) throws
+// so a bad dispatch input fails the run loudly; the old guard silently
+// swapped bad values for the 30-day default, which turned a "0.5" request
+// into a month of data with no warning. Only the interpolated INTERVAL count
+// must stay a guarded integer, and Math.round keeps it one.
+function parseWindow(v) {
+  const bad = (why) =>
+    new Error(
+      `Invalid look-back window "${v}": ${why}. Use days ("30", "0.5") or a unit suffix ("12h", "3d"); minimum 1 hour, maximum 365 days.`,
+    );
+  const m = /^\s*(\d+(?:\.\d+)?|\.\d+)\s*(d|day|days|h|hr|hrs|hour|hours)?\s*$/i.exec(String(v));
+  if (!m) throw bad("not a number with an optional d/h unit");
+  const unit = (m[2] || "d")[0].toLowerCase();
+  const exactHours = unit === "h" ? Number(m[1]) : Number(m[1]) * 24;
+  if (exactHours < 1) throw bad("shorter than 1 hour");
+  if (exactHours > 365 * 24) throw bad("longer than 365 days");
+  const hours = Math.round(exactHours);
+  return { hours, label: hours % 24 === 0 ? plural(hours / 24, "day") : plural(hours, "hour") };
 }
-const DAYS = clampDays(arg("days", "30"));
+
+// Resolve the window from argv, failing loudly on a dangling flag: a bare
+// trailing `--window` (no value) must error like any other bad input, not
+// slide back to the 30-day default the way a missing-flag fallback would.
+// Called from main(), never at module load, so importing the pure helpers
+// (as the unit tests do) can never parse the host process's argv or exit it.
+function resolveWindow() {
+  const flagged = (name) => process.argv.some((a) => a === `--${name}` || a.startsWith(`--${name}=`));
+  const raw = flagged("window") ? arg("window", "") : flagged("days") ? arg("days", "") : "30";
+  try {
+    return parseWindow(raw);
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}
 const OUT_DIR = arg("out", "reports");
 // --demo renders the report from built-in sample data with no API calls, so the
 // layout and styling can be previewed without a key or any real traffic.
@@ -83,39 +117,40 @@ function requireEnv() {
   }
 }
 
-// The production + window guard every query shares. `days` is a clamped integer,
-// so interpolating it into the INTERVAL is safe.
-const SCOPE = (days) => `properties.environment = 'production' AND timestamp >= now() - INTERVAL ${days} DAY`;
+// The production + window guard every query shares. `hours` is a parseWindow
+// integer, so interpolating it into the INTERVAL is safe. Hour granularity so
+// sub-day windows ("12h", "0.5") query exactly what was asked for.
+const SCOPE = (hours) => `properties.environment = 'production' AND timestamp >= now() - INTERVAL ${hours} HOUR`;
 
 /** HogQL for the top-line event totals: one row per event with its count and the
  *  number of distinct play sessions (distinct_id) that fired it. */
-function buildTotalsQuery(events, days) {
+function buildTotalsQuery(events, hours) {
   const list = events.map(lit).join(", ");
   return (
     `SELECT event, count() AS events, count(DISTINCT distinct_id) AS sessions ` +
-    `FROM events WHERE ${SCOPE(days)} AND event IN (${list}) GROUP BY event`
+    `FROM events WHERE ${SCOPE(hours)} AND event IN (${list}) GROUP BY event`
   );
 }
 
 /** HogQL for one numeric property's exact percentiles over a session-scoped
  *  event. `prop` is a hardcoded property name (seconds / builds / floors / p50 /
  *  low). Rows with a null or non-numeric property are excluded by the cast. */
-function buildDepthQuery(event, prop, days) {
+function buildDepthQuery(event, prop, hours) {
   const val = `toFloat(properties.${prop})`;
   return (
     `SELECT count() AS n, quantile(0.5)(${val}) AS p50, quantile(0.9)(${val}) AS p90, ` +
     `quantile(0.95)(${val}) AS p95, max(${val}) AS mx ` +
-    `FROM events WHERE ${SCOPE(days)} AND event = ${lit(event)} AND ${val} IS NOT NULL`
+    `FROM events WHERE ${SCOPE(hours)} AND event = ${lit(event)} AND ${val} IS NOT NULL`
   );
 }
 
 /** HogQL for one event grouped by a property: events and distinct sessions per
  *  group, most frequent first. The per-session column is the payoff over the
  *  Vercel path, which had no session id to count. */
-function buildBreakdownQuery(event, prop, days, limit = 100) {
+function buildBreakdownQuery(event, prop, hours, limit = 100) {
   return (
     `SELECT properties.${prop} AS k, count() AS events, count(DISTINCT distinct_id) AS sessions ` +
-    `FROM events WHERE ${SCOPE(days)} AND event = ${lit(event)} ` +
+    `FROM events WHERE ${SCOPE(hours)} AND event = ${lit(event)} ` +
     `GROUP BY k ORDER BY events DESC LIMIT ${limit}`
   );
 }
@@ -124,10 +159,10 @@ function buildBreakdownQuery(event, prop, days, limit = 100) {
  *  events and distinct sessions like the totals query. `where` is a TRUSTED,
  *  hardcoded HogQL fragment (never user input), e.g. `toFloat(properties.fires)
  *  > 0` to count the session_emergencies rows that saw at least one fire. */
-function buildFilteredCountQuery(event, where, days) {
+function buildFilteredCountQuery(event, where, hours) {
   return (
     `SELECT count() AS events, count(DISTINCT distinct_id) AS sessions ` +
-    `FROM events WHERE ${SCOPE(days)} AND event = ${lit(event)} AND (${where})`
+    `FROM events WHERE ${SCOPE(hours)} AND event = ${lit(event)} AND (${where})`
   );
 }
 
@@ -337,7 +372,7 @@ function renderHtml(m) {
 <title>Verticopolis analytics (PostHog)</title><style>${HTML_STYLE}</style></head>
 <body><div class="wrap">
 <div class="titlebar"><h1>Verticopolis analytics</h1>
-<span class="sub">${escapeHtml(m.window.since)} to ${escapeHtml(m.window.until)} &middot; ${m.window.days} days &middot; production &middot; PostHog</span></div>
+<span class="sub">${escapeHtml(m.window.since)} to ${escapeHtml(m.window.until)} &middot; ${escapeHtml(m.window.label)} &middot; production &middot; PostHog</span></div>
 <div class="body">
 <div class="kpis">${kpis}</div>
 <ul class="highlights">${highlights}</ul>
@@ -381,7 +416,7 @@ function renderMarkdown(m) {
   const lines = [
     `# Verticopolis analytics report (PostHog)`,
     ``,
-    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only. Generated ${m.generated}.`,
+    `Window: **${m.window.since} to ${m.window.until}** (${m.window.label}), production only. Generated ${m.generated}.`,
     ``,
     `## Totals`,
     ``,
@@ -409,7 +444,7 @@ function demoModel() {
   const rows = (pairs) => ({ ok: true, rows: pairs.map(([key, events, sessions]) => ({ key: String(key), events, sessions })) });
   const depth = (n, p50, p90, p95, max) => ({ skipped: false, empty: false, n, p50, p90, p95, max });
   return {
-    window: { since: "sample", until: "sample", days: DAYS },
+    window: { since: "sample", until: "sample", label: "sample" },
     generated: "sample",
     kpis: [
       ["Towers founded", 1240],
@@ -467,15 +502,18 @@ function demoModel() {
 }
 
 async function main() {
+  const WINDOW = resolveWindow();
   requireEnv();
   mkdirSync(OUT_DIR, { recursive: true });
 
   const stamp = new Date().toISOString().slice(0, 10);
-  const since = new Date(Date.now() - (DAYS - 1) * 86_400_000).toISOString().slice(0, 10);
+  // The queries use a rolling `now() - INTERVAL h HOUR` window, so the shown
+  // start is exactly that far back (dates only; the label carries precision).
+  const since = new Date(Date.now() - WINDOW.hours * 3_600_000).toISOString().slice(0, 10);
 
   if (DEMO) {
     const model = demoModel();
-    model.window = { since, until: stamp, days: DAYS };
+    model.window = { since, until: stamp, label: WINDOW.label };
     model.generated = new Date().toISOString();
     return writeAll(model, { demo: "sample data (no API calls)" });
   }
@@ -493,7 +531,7 @@ async function main() {
     return r;
   };
 
-  const totalsRes = await q("totals", buildTotalsQuery(TOTAL_EVENTS, DAYS));
+  const totalsRes = await q("totals", buildTotalsQuery(TOTAL_EVENTS, WINDOW.hours));
   const totals = totalsByEvent(totalsRes, TOTAL_EVENTS);
 
   // Depth: exact percentiles per session-scoped numeric property.
@@ -506,13 +544,13 @@ async function main() {
   ];
   const depth = [];
   for (const d of depthSpecs) {
-    const r = await q(`depth_${d.event}_${d.prop}`, buildDepthQuery(d.event, d.prop, DAYS));
+    const r = await q(`depth_${d.event}_${d.prop}`, buildDepthQuery(d.event, d.prop, WINDOW.hours));
     depth.push({ label: d.label, row: depthRow(r) });
   }
 
   // Breakdowns: each returns events + distinct sessions per group.
   const bd = async (label, event, prop) => {
-    const r = await q(label, buildBreakdownQuery(event, prop, DAYS));
+    const r = await q(label, buildBreakdownQuery(event, prop, WINDOW.hours));
     return { ok: r.ok, hint: r.hint, rows: breakdownRows(r) };
   };
   const toolMix = await bd("tool_used_by_tool", "tool_used", "tool");
@@ -533,12 +571,12 @@ async function main() {
   // Fire rate: the session_emergencies rows with at least one fire, over all
   // session_emergencies (emitted once per played session), gives "% of sessions
   // with a fire". `fires` is a server-trusted integer prop, not user input.
-  const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", DAYS));
+  const firesRes = await q("session_emergencies_with_fire", buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", WINDOW.hours));
   const firesWithFire = countRow(firesRes);
 
   const fpsP50 = depth.find((d) => d.label === "Session fps (p50)")?.row;
   const model = {
-    window: { since, until: stamp, days: DAYS },
+    window: { since, until: stamp, label: WINDOW.label },
     generated: new Date().toISOString(),
     kpis: [
       ["Towers founded", totals.game_started.events],
@@ -650,4 +688,4 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests; the script itself uses them directly above.
-export { clampDays, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
+export { parseWindow, lit, buildTotalsQuery, buildDepthQuery, buildBreakdownQuery, buildFilteredCountQuery, rowsToObjects, totalsByEvent, depthRow, breakdownRows, countRow };
