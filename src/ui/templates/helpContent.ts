@@ -80,6 +80,7 @@ export const HELP_SECTIONS: readonly HelpSection[] = [
         <li><b>Lay a run.</b> Drag with <b>Floor</b>, <b>Lobby</b>, or a <b>Parking</b> space to lay a whole strip at once.</li>
         <li><b>Size an elevator.</b> Drag up or down to set a shaft's height. Stairs and escalators place with a single tap.</li>
         <li><b>Move around.</b> Drag with <b>two fingers</b> to pan (or one finger with <b>Inspect</b> selected), and <b>pinch</b> to zoom.</li>
+        <li><b>Peek at a room.</b> Press and hold a room (any tool) to read its card without opening it, the way a mouse hover does. Lift to close. A quick tap still does the armed tool's action: with <b>Inspect</b> it opens the full panel.</li>
         <li><b>Edit or remove.</b> Tap a room with <b>Inspect</b> to open its panel; tap with <b>Bulldoze</b> to demolish it.</li>
         <li><b>Menus.</b> The build menu groups tools under category tabs, and a tab with a dot just gained new tools. The <b>☰</b> button opens stats and the game menu, and <b>↩</b> undoes.</li>
       </ul>

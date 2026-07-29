@@ -92,6 +92,15 @@ export class UndoHistory {
     this.pending = { snap: this.ports.snapshot(), sig: this.ports.signature(), label };
   }
 
+  /** Drop a pending capture without committing it. For a gesture that was
+   *  CANCELED into pure inspection (a touch hold becoming a peek): commit()'s
+   *  no-op check compares signatures, and the signature includes money, so a
+   *  sim income tick during the canceled gesture's window would otherwise mint
+   *  a misleading entry whose restore rewinds sim-only state. */
+  discard(): void {
+    this.pending = null;
+  }
+
   /** Finalize the captured snapshot — but only if something actually changed. */
   commit(): void {
     const p = this.pending;

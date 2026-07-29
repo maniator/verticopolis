@@ -139,7 +139,9 @@ export function updateBuildPreview(app: GameApp, tile: number, floor: number, sh
  *  tool doesn't stomp a fresh card. */
 export function updateBuildRefusal(app: GameApp, reason: string | undefined, floor: number, anchorX: number): void {
   if (reason) {
-    app.inspectAnchor = { x: anchorX, floor };
+    // A zero-width anchor at the strip's midpoint: the card prefers its right,
+    // flipping to its left at the viewport edge like the facility cards do.
+    app.inspectAnchor = { x: anchorX, left: anchorX, floor };
     // The template wraps the tooltip in the standard <h4 class="win-title">
     // so UI.showInspector attaches its mobile-only ✕ close. On desktop the
     // tooltip clears as soon as the pointer moves off an invalid cell, but

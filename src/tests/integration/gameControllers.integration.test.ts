@@ -450,7 +450,7 @@ describe("InspectorController (✕-dismissal latch)", () => {
   it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", () => {
     inspector.inspectPicked(officePick);
     expect(last(shown)).toContain(FACILITIES.office.name);
-    expect(anchor).toEqual({ x: office.x + office.width, floor: office.floor });
+    expect(anchor).toEqual({ x: office.x + office.width, left: office.x, floor: office.floor });
     inspector.dismiss();
     expect(last(shown)).toBeNull();
     const calls = shown.length;

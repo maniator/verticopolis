@@ -83,21 +83,26 @@ export function anchorEditor(
   placePanel(ui.el.editor, left, top);
 }
 
-/** Anchor the inspector tooltip just off a facility's corner, clamped. */
-export function anchorInspector(ui: UI, x: number, y: number, viewW: number, viewH: number): void {
+/** Anchor the inspector tooltip just off a facility's screen rect: prefer the
+ *  right side, flip to the facility's left when the viewport edge would clamp
+ *  the card back over the room (and the finger holding a touch peek), then
+ *  clamp so it always stays on screen. */
+export function anchorInspector(ui: UI, rect: { x: number; y: number; w: number }, viewW: number, viewH: number): void {
   const { w, h } = ui.inspectorSize;
   const gap = 8;
-  const left = Math.max(gap, Math.min(x + 12, viewW - w - gap));
-  const top = Math.max(gap, Math.min(y, viewH - h - gap));
-  placePanel(ui.el.inspector, left, top);
+  let left = rect.x + rect.w + 12; // prefer the facility's right
+  if (left + w > viewW - gap) left = rect.x - w - 12; // no room -> flip left
+  const top = Math.max(gap, Math.min(rect.y, viewH - h - gap));
+  placePanel(ui.el.inspector, Math.max(gap, Math.min(left, viewW - w - gap)), top);
 }
 
-/** Drop the inline anchor so the panels fall back to their CSS-docked layout
- *  (used on mobile, where floating would fight the bottom palette strip). */
-export function clearPanelAnchors(ui: UI): void {
-  for (const el of [ui.el.editor, ui.el.inspector]) {
-    el.style.left = el.style.top = el.style.right = el.style.bottom = "";
-  }
+/** Drop one panel's inline anchor so it falls back to its CSS-docked layout.
+ *  No-op when the panel carries no anchor, so per-frame calls cost nothing.
+ *  Panels release independently: the mobile editor must fall back to its
+ *  docked layout even while the peek card stays anchored beside its room. */
+export function clearPanelAnchor(el: HTMLElement): void {
+  if (!el.style.left && !el.style.top) return;
+  el.style.left = el.style.top = el.style.right = el.style.bottom = "";
 }
 
 function placePanel(el: HTMLElement, left: number, top: number): void {
@@ -107,11 +112,21 @@ function placePanel(el: HTMLElement, left: number, top: number): void {
   el.style.bottom = "auto";
 }
 
+/** Mark the inspector card as a touch "peek" (long-press) so its manual ✕ close
+ *  is hidden: a peek dismisses when the finger lifts, exactly like a desktop
+ *  hover card dismisses on mouse-away, so the coarse-pointer close button (there
+ *  for the docked, no-hover-away cards) would only confuse. */
+export function setInspectorPeek(ui: UI, on: boolean): void {
+  ui.el.inspector.classList.toggle("peek", on);
+}
+
 export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   if (!tpl) {
     // Hide only; the stale card stays in the container (as it always did) and
-    // the next show renders over it through lit.
+    // the next show renders over it through lit. Drop any peek marker so a later
+    // non-peek card gets its ✕ back.
     ui.el.inspector.classList.add("hidden");
+    ui.el.inspector.classList.remove("peek");
     return;
   }
   ui.el.inspector.classList.remove("hidden");
@@ -120,7 +135,9 @@ export function showInspector(ui: UI, tpl: TemplateResult | null): void {
   // text in place.
   render(tpl, ui.el.inspector);
   // ✕ in the title strip (shown on mobile only, via CSS): the docked card has
-  // no hover-away to dismiss it there. The card itself stays click-through.
+  // no hover-away to dismiss it there. On that coarse tier the non-peek card
+  // also takes pointer input (so a height-capped card can scroll by touch);
+  // the peek card and the desktop hover card stay click-through.
   // Routed through the app so it can latch the dismissal, otherwise the very
   // next hover pick over the same facility re-opens the card. Appended from
   // the one shared recipe AFTER the h4's lit-managed content (the finishModal

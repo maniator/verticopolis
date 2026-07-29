@@ -25,7 +25,7 @@ export interface InspectorDeps {
   getSim(): Simulation;
   ui: Pick<UI, "showInspector">;
   /** World cell the card describes (GameApp anchors the panel to it each frame). */
-  setAnchor(anchor: { x: number; floor: number } | null): void;
+  setAnchor(anchor: { x: number; left: number; floor: number } | null): void;
 }
 
 export class InspectorController {
@@ -61,7 +61,7 @@ export class InspectorController {
         this.hide();
         return;
       }
-      this.deps.setAnchor({ x: u.x + u.width, floor: u.floor + facilityFloors(u.kind) - 1 });
+      this.deps.setAnchor({ x: u.x + u.width, left: u.x, floor: u.floor + facilityFloors(u.kind) - 1 });
       this.inspectTarget = { type: p.type, id: p.id };
       // The card body (title/label/status/census/diagnostics/satisfaction) is
       // the lit template in ui/templates/inspector.ts (E6-S2); the access
@@ -76,7 +76,7 @@ export class InspectorController {
         this.hide();
         return;
       }
-      this.deps.setAnchor({ x: t.x + t.width, floor: t.top });
+      this.deps.setAnchor({ x: t.x + t.width, left: t.x, floor: t.top });
       this.inspectTarget = { type: p.type, id: p.id };
       this.deps.ui.showInspector(transportInspectorTemplate(sim, t));
     }

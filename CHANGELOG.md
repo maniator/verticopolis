@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.6.0
+
+- Press and hold a room on a phone to peek at its card without opening it, the way a mouse hover does on desktop. Lift your finger to close it. The peek works with any tool selected; a quick tap still does what the tool always did, so with Inspect it opens the full panel.
+
 ## 2.5.0
 
 - Apartments now insist the tower's shops be reachable: a spot cut off from existing retail is refused up front, and a settled Apartment says so before giving notice. Studios stay easygoing.

@@ -17,9 +17,8 @@ const worldToScreenY = (f: number): number => f * 3;
 
 interface FakeParts {
   matches?: boolean;
-  panelsAnchored?: boolean;
   selected?: GameApp["selected"];
-  inspectAnchor?: { x: number; floor: number } | null;
+  inspectAnchor?: { x: number; left: number; floor: number } | null;
   isEditorOpen?: boolean;
   isInspectorOpen?: boolean;
   buildRefusalShowing?: boolean;
@@ -29,7 +28,8 @@ interface FakeParts {
 
 function makeApp(parts: FakeParts = {}) {
   const ui = {
-    clearPanelAnchors: vi.fn(),
+    clearEditorAnchor: vi.fn(),
+    clearInspectorAnchor: vi.fn(),
     anchorEditor: vi.fn(),
     anchorInspector: vi.fn(),
     isEditorOpen: vi.fn(() => parts.isEditorOpen ?? false),
@@ -37,7 +37,6 @@ function makeApp(parts: FakeParts = {}) {
   };
   const app = {
     mobileMq: { matches: parts.matches ?? false },
-    panelsAnchored: parts.panelsAnchored ?? false,
     ui,
     engine: { viewWidth: 800, viewHeight: 600, worldToScreenX, worldToScreenY },
     selected: parts.selected ?? null,
@@ -50,23 +49,65 @@ function makeApp(parts: FakeParts = {}) {
 }
 
 describe("positionPanels", () => {
-  it("on mobile, clears anchors once when panels were anchored, then stops", () => {
-    const { app, ui } = makeApp({ matches: true, panelsAnchored: true });
+  it("on mobile with nothing open, releases both panels' anchors", () => {
+    const { app, ui } = makeApp({ matches: true });
     positionPanels(app);
 
-    expect(ui.clearPanelAnchors).toHaveBeenCalledTimes(1);
-    expect(app.panelsAnchored).toBe(false);
-    // Mobile returns early: no editor/inspector anchoring is attempted.
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+    expect(ui.clearInspectorAnchor).toHaveBeenCalledTimes(1);
+    // Nothing open, so no editor/inspector anchoring is attempted.
     expect(ui.anchorEditor).not.toHaveBeenCalled();
     expect(ui.anchorInspector).not.toHaveBeenCalled();
   });
 
-  it("on mobile with nothing anchored, does not touch clearPanelAnchors", () => {
-    const { app, ui } = makeApp({ matches: true, panelsAnchored: false });
+  it("on mobile, anchors the inspector peek card to its facility (tracks the room like a hover)", () => {
+    const { app, ui } = makeApp({
+      matches: true,
+      inspectAnchor: { x: 20, left: 16, floor: 9 },
+      isInspectorOpen: true,
+    });
     positionPanels(app);
 
-    expect(ui.clearPanelAnchors).not.toHaveBeenCalled();
-    expect(app.panelsAnchored).toBe(false);
+    expect(ui.anchorInspector).toHaveBeenCalledWith(
+      { x: worldToScreenX(16), y: worldToScreenY(9), w: worldToScreenX(20) - worldToScreenX(16) },
+      800,
+      600,
+    );
+    expect(ui.clearInspectorAnchor).not.toHaveBeenCalled();
+  });
+
+  it("on mobile, keeps the editor docked (never anchors it) even when open with a selection", () => {
+    const { app, ui } = makeApp({
+      matches: true,
+      selected: { type: "unit" } as GameApp["selected"],
+      isEditorOpen: true,
+      unit: { x: 1, width: 2, floor: 3, kind: "office" },
+    });
+    positionPanels(app);
+
+    expect(ui.anchorEditor).not.toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+  });
+
+  it("on mobile, releases the editor's anchor even while the peek card stays anchored", () => {
+    // The regression this pins: a desktop-anchored editor crossing into the
+    // mobile layout while a peek/hover card is up. A shared released-flag
+    // would see "something is still anchored" and leave the editor's stale
+    // inline coords fighting the docked CSS layout; per-panel release frees
+    // the editor on the same frame the card keeps tracking its room.
+    const { app, ui } = makeApp({
+      matches: true,
+      selected: { type: "unit" } as GameApp["selected"],
+      isEditorOpen: true,
+      unit: { x: 1, width: 2, floor: 3, kind: "office" },
+      inspectAnchor: { x: 20, left: 16, floor: 9 },
+      isInspectorOpen: true,
+    });
+    positionPanels(app);
+
+    expect(ui.anchorInspector).toHaveBeenCalled();
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
+    expect(ui.clearInspectorAnchor).not.toHaveBeenCalled();
   });
 
   it("on desktop, anchors the editor beside the selected unit when the editor is open", () => {
@@ -85,7 +126,7 @@ describe("positionPanels", () => {
       w: worldToScreenX(unit.x + unit.width) - worldToScreenX(unit.x),
     };
     expect(ui.anchorEditor).toHaveBeenCalledWith(expectedRect, 800, 600);
-    expect(app.panelsAnchored).toBe(true);
+    expect(ui.clearEditorAnchor).not.toHaveBeenCalled();
     expect(ui.anchorInspector).not.toHaveBeenCalled();
   });
 
@@ -98,7 +139,7 @@ describe("positionPanels", () => {
     positionPanels(app);
 
     expect(ui.anchorEditor).not.toHaveBeenCalled();
-    expect(app.panelsAnchored).toBe(false);
+    expect(ui.clearEditorAnchor).toHaveBeenCalledTimes(1);
   });
 
   it("on desktop, does NOT anchor the editor when it is closed even with a selection", () => {
@@ -114,19 +155,23 @@ describe("positionPanels", () => {
 
   it("on desktop, anchors the inspector at the projected anchor when the inspector is open", () => {
     const { app, ui } = makeApp({
-      inspectAnchor: { x: 20, floor: 9 },
+      inspectAnchor: { x: 20, left: 16, floor: 9 },
       isInspectorOpen: true,
     });
     positionPanels(app);
 
-    expect(ui.anchorInspector).toHaveBeenCalledWith(worldToScreenX(20), worldToScreenY(9), 800, 600);
-    expect(app.panelsAnchored).toBe(true);
+    expect(ui.anchorInspector).toHaveBeenCalledWith(
+      { x: worldToScreenX(16), y: worldToScreenY(9), w: worldToScreenX(20) - worldToScreenX(16) },
+      800,
+      600,
+    );
+    expect(ui.clearInspectorAnchor).not.toHaveBeenCalled();
     expect(ui.anchorEditor).not.toHaveBeenCalled();
   });
 
   it("anchors the build-refusal card one floor BELOW its cell so the invalid preview strip stays visible", () => {
     const { app, ui } = makeApp({
-      inspectAnchor: { x: 20, floor: 9 },
+      inspectAnchor: { x: 20, left: 16, floor: 9 },
       isInspectorOpen: true,
       buildRefusalShowing: true,
     });
@@ -134,18 +179,22 @@ describe("positionPanels", () => {
 
     // worldToScreenY(floor) is a row's TOP edge, so floor - 1's top is the
     // anchored row's bottom edge: the card hangs under the strip as a caption.
-    expect(ui.anchorInspector).toHaveBeenCalledWith(worldToScreenX(20), worldToScreenY(8), 800, 600);
-    expect(app.panelsAnchored).toBe(true);
+    expect(ui.anchorInspector).toHaveBeenCalledWith(
+      { x: worldToScreenX(16), y: worldToScreenY(8), w: worldToScreenX(20) - worldToScreenX(16) },
+      800,
+      600,
+    );
   });
 
   it("on desktop, does NOT anchor the inspector when it is closed", () => {
     const { app, ui } = makeApp({
-      inspectAnchor: { x: 20, floor: 9 },
+      inspectAnchor: { x: 20, left: 16, floor: 9 },
       isInspectorOpen: false,
     });
     positionPanels(app);
 
     expect(ui.anchorInspector).not.toHaveBeenCalled();
+    expect(ui.clearInspectorAnchor).toHaveBeenCalledTimes(1);
   });
 });
 

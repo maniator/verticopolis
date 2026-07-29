@@ -236,6 +236,7 @@ describe("updateBuildPreview", () => {
     expect(raw.buildRefusalShowing).toBe(true);
     expect(raw.inspectAnchor).toEqual({
       x: snapX("office", 21) + Math.floor(FACILITIES.office.width / 2),
+      left: snapX("office", 21) + Math.floor(FACILITIES.office.width / 2),
       floor: 6,
     });
     expect(showInspector).toHaveBeenCalledWith(expect.anything());
@@ -258,7 +259,7 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
     const { sim } = fixture();
     const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
     updateBuildRefusal(app, "Not enough money.", 4, 17);
-    expect(raw.inspectAnchor).toEqual({ x: 17, floor: 4 });
+    expect(raw.inspectAnchor).toEqual({ x: 17, left: 17, floor: 4 });
     expect(raw.buildRefusalShowing).toBe(true);
     expect(showInspector).toHaveBeenCalledWith(expect.anything());
   });
@@ -266,7 +267,7 @@ describe("updateBuildRefusal / clearBuildRefusal", () => {
   it("updateBuildRefusal with no reason falls through to clearBuildRefusal", () => {
     const { sim } = fixture();
     const { app, raw, showInspector } = makeApp(sim, buildTool("office"), { buildRefusalShowing: true });
-    raw.inspectAnchor = { x: 1, floor: 1 };
+    raw.inspectAnchor = { x: 1, left: 1, floor: 1 };
     updateBuildRefusal(app, undefined, 4, 17);
     expect(raw.buildRefusalShowing).toBe(false);
     expect(raw.inspectAnchor).toBeNull();
