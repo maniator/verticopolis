@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
+import { vacateCause } from "../../engine/sim/gripe";
 import { W, C, servedTower, place, placeRental } from "./moveInGateHelpers";
 import { FACILITIES } from "../../engine/facilities";
 import { Simulation } from "../../engine/Simulation";
@@ -16,8 +17,10 @@ import { Simulation } from "../../engine/Simulation";
  * Apartment feels the far-walk and lobby drains and so is gated out of a
  * bad-access spot, while the forgiving Studio (which feels neither, only noise)
  * leases into the very same spot. No new gate logic per kind: the per-kind drains
- * in satisfactionStep do the discriminating. Unmet demand is not among them for
- * either rental kind (excluded on both the live and gate paths, see #661).
+ * in satisfactionStep do the discriminating. Unmet demand belongs to the
+ * demanding Apartment only (#661: rentals are real demand origins now, and the
+ * coverage drain reads the Apartment like a condo; the forgiving Studio stays
+ * out of it on both the live and gate paths).
  */
 
 describe("move-in gate covers rentals: a bad spot stays vacant", () => {
@@ -65,13 +68,13 @@ describe("move-in gate covers rentals: no over-block of a good spot", () => {
   });
 });
 
-describe("move-in gate: rentals are exempt from unmet-demand (they are not demand origins)", () => {
-  it("an Apartment leases a spot with unreachable retail where a condo is gated (#661 over-block fix)", () => {
-    // The same stranded-retail setup that gates a condo/office by unmet demand:
+describe("move-in gate: the Apartment carries unmet-demand, the Studio stays exempt (#661)", () => {
+  it("an Apartment is gated beside a condo on a spot with unreachable retail; a Studio is not", () => {
+    // The stranded-retail setup that gates a condo/office by unmet demand:
     // retail exists only on an unreachable floor, so a reachable tenant reaches
-    // ZERO shops (coverage 0). Rentals are not demand origins, so a live Apartment
-    // never feels this drain; the gate must agree, or it would refuse an Apartment
-    // a real one would hold happily forever (Edge Case Hunter, medium).
+    // ZERO shops (coverage 0). Rentals are demand origins now, so the live
+    // Apartment feels this drain exactly like a condo and the gate agrees; the
+    // forgiving Studio still reads no coverage and leases.
     const sim = Simulation.newGame(31, "modern");
     sim.money = 1e12;
     sim.star = 3; // rentals unlocked for placement
@@ -90,8 +93,26 @@ describe("move-in gate: rentals are exempt from unmet-demand (they are not deman
     const ctx = buildSatisfactionContext(sim, true);
     // The condo (a demand origin) is gated by the unmet-demand doom...
     expect(wouldEvictFreshTenant(sim, condo, ctx)).toBe(true);
-    // ...but the Apartment on an equally good spot is NOT: it never feels unmet demand.
-    expect(wouldEvictFreshTenant(sim, apt, ctx)).toBe(false);
+    // ...and the Apartment now shares that fate: it is a demand origin whose
+    // coverage reads zero here, the GDD's unmet-local-demand churn made real.
+    expect(wouldEvictFreshTenant(sim, apt, ctx)).toBe(true);
+    // The forgiving Studio still ignores coverage and would lease the spot.
+    sim.star = 3;
+    const stR = sim.tower.place("rentalStudio", 2, C + 16);
+    expect(stR.ok, "place studio f2").toBe(true);
+    sim.star = 1;
+    const studio = sim.tower.units.find((u) => u.id === stR.unitId)!;
+    expect(wouldEvictFreshTenant(sim, studio, ctx)).toBe(false);
+    // The revived live branch (#661): an occupied Apartment in this retail
+    // desert now names unmet local demand as its dominant gripe, the branch
+    // that was dead while rentals were not demand origins.
+    apt.state = "occupied";
+    apt.residents = 3;
+    apt.everOccupied = true;
+    expect(sim.dominantGripe(apt)).toBe("unmetDemand");
+    // vacateCause shares the ladder (dominantGripe ?? "access"), so the
+    // departure at notice time names the same cause, not the access catch-all.
+    expect(vacateCause(sim, apt, true, 0)).toBe("unmetDemand");
   });
 });
 

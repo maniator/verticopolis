@@ -230,12 +230,11 @@ describe("the Main gripe inspector line", () => {
     expect(diagText(sim, studio)).not.toContain("Long walk to transport");
   });
 
-  it("never blames a rental vacancy on unmet demand, even handed a true flag", () => {
-    // The unmet-demand tier is dead for rentals on the live path (they are not
-    // demand origins, #661), but it reads a caller-supplied flag, and the move-in
-    // gate registers every probe as an origin. So `wontLeaseText` really can compute
-    // a true flag off the gate's map. It excludes rentals for that reason; this pins
-    // the ladder's half of the contract by handing it the flag directly.
+  it("the Apartment accepts an honest unmet-demand flag; the Studio never does", () => {
+    // Post-#661 rentals are demand origins and the Apartment carries the
+    // coverage drain, so its tier answers a caller-supplied flag honestly. The
+    // Studio stays out of the drain, so its ladder must refuse the same flag;
+    // this pins both halves of that contract by handing the flag directly.
     const sim = Simulation.newGame(1, "modern");
     sim.money = 1e9;
     servedOffice(sim);
@@ -246,9 +245,10 @@ describe("the Main gripe inspector line", () => {
     for (const u of [apt, studio]) u.state = "occupied";
     // served, uncongested, at the going rate, near the shaft and the lobby, quiet:
     // every higher tier is inactive, so the flag is the only thing that could speak.
-    for (const u of [apt, studio]) {
-      expect(dominantGripe(sim, u, true, 0, false, false, false, true)).not.toBe("unmetDemand");
-    }
+    // Post-#661 the Apartment is a coverage kind, so a true flag is honest for
+    // it, exactly as for the condo below; only the Studio still refuses it.
+    expect(dominantGripe(sim, apt, true, 0, false, false, false, true)).toBe("unmetDemand");
+    expect(dominantGripe(sim, studio, true, 0, false, false, false, true)).not.toBe("unmetDemand");
     // A condo in the same spot IS a coverage kind, so the flag is honest for it:
     // this is the shift out of the failing condition, not just into it.
     const condo = placeUnit(sim, "condo", 2, C + 60);
@@ -445,9 +445,11 @@ function fakeDemand(
     share,
     retailVenueCount,
     // Back the share out into a pool/cap pair (the gate reads these; this hand-built
-    // map only exercises unmetCoverage, which reads share, so any consistent pair works).
+    // map only exercises unmetCoverage, which reads share, so any consistent pair
+    // works), with a neutral snapshot bonus to match.
     pool: share,
     totalCap: 1,
+    bonus: 1,
   };
 }
 

@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.5.0
+
+- Apartments now insist the tower's shops be reachable: a spot cut off from existing retail is refused up front, and a settled Apartment says so before giving notice. Studios stay easygoing.
+- Rental residents (Studios included) now count toward local shop demand, so a rental-heavy tower may need another shop or two to keep everyone covered.
+
 ## 2.4.0
 
 - Fitness Clubs and Clinics now refuse to lease a spot they would soon abandon (no access, or rent far above the going rate), and the inspector names the fix for empty and unhappy spots alike.

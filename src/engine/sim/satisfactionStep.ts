@@ -1,7 +1,7 @@
 import type { Simulation } from "../Simulation";
 import type { Unit } from "../types";
 import { rentOf, rentConfig } from "../econConfig";
-import { isHotelKind, isLeaseAmenityKind } from "../facilities";
+import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { isTenanted, isOperational } from "../types";
 import { computeDemandMap, originDemand, type DemandMap } from "./demand";
@@ -170,16 +170,14 @@ export function satisfactionStep(
       ? sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(u.floor))
       : LOBBY_NO_DRAIN;
   const lobbyCapped = lobbyDrain.cap < 1;
-  // Rentals are NOT demand origins (originWeight in demand.ts returns undefined for
-  // them), so a live rental's id is never in reachableVenuesByOrigin and unmetCoverage
-  // returns null: the unmet-demand drain never fires for a rental in the live sim.
-  // The gate (wouldEvictFreshTenant), which DOES register its probe as an origin,
-  // must therefore not apply it either, or it would over-block an Apartment out of a
-  // spot a real Apartment would hold happily. So rentals are excluded here; the
-  // Apartment still churns on noise / far-walk / lobby / rent. Realizing the GDD's
-  // "unmet local demand" churn needs rentals to become real demand origins (#661).
+  // Rentals are demand origins now (#661: originWeight admits them at the
+  // condo's per-resident weight, so a tenanted rental's id is in the origin
+  // registry), and the Apartment carries the unmet-demand drain the GDD
+  // intended, live and in the gate alike. The Studio stays out: it is the
+  // forgiving tier, so its coverage read stays null and the drain never fires
+  // for it even though its residents still feed the demand pool.
   const coverage =
-    served && (u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo")
+    served && isUnmetDemandKind(u.kind)
       ? unmetCoverage((ctx.demandMap ??= computeDemandMap(sim)), u)
       : null;
   const unmetDrain = coverage === null ? LOBBY_NO_DRAIN : sim.rules.unmetDemandDrain(coverage);
@@ -258,14 +256,15 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   // exactly how computeDemandMap registers a real origin: the reachable-venue count
   // when its floor draws (the lobby-anchored model gives every reachable origin the
   // same reachable-venue set), else 0 (retail exists but this floor reaches none).
-  // Skipped entirely for a rental: it is excluded from the coverage drain on both
-  // paths (#661), so registering it would build a full-tower demand map to compute a
-  // value the step never reads. That map is rebuilt per inspector repaint through
-  // `wontLeaseText`, so this is the difference between a hover over an empty rental
-  // costing a tower scan and costing nothing. The lease amenities (#667) skip it
-  // for the same reason: the coverage drain's kind guard below never reads it for
-  // them (they erode only on unserved placement, congestion, and rent).
-  const dm = isRentalKind(u.kind) || isLeaseAmenityKind(u.kind) ? null : (ctx.demandMap ??= computeDemandMap(sim));
+  // Skipped for the kinds the coverage drain never reads (the guard below):
+  // the forgiving Studio and the lease amenities (#667). For them, registering
+  // the probe would build a full-tower demand map to compute a value the step
+  // never reads; that map is rebuilt per inspector repaint through
+  // `wontLeaseText`, so this is the difference between a hover over an empty
+  // spot costing a tower scan and costing nothing. The Apartment now registers
+  // like a condo (#661: rentals are real demand origins), so the gate judges
+  // its unmet-demand drain against the same candidate-aware share.
+  const dm = isUnmetDemandKind(u.kind) ? (ctx.demandMap ??= computeDemandMap(sim)) : null;
   if (dm) {
     dm.reachableVenuesByOrigin.set(u.id, sim.floorReachable(u.floor) ? dm.fractionByUnit.size : 0);
   }
@@ -274,7 +273,13 @@ export function wouldEvictFreshTenant(sim: Simulation, u: Unit, ctx: Satisfactio
   // dm.pool as vacancies actually fill earlier in the same pass), so the gate never
   // seats a fresh tenant who then over-subscribes the retail and churns, and fills
   // only up to the number the retail supports (a batch-aware, tower-uniform share).
-  if (dm) dm.share = dm.totalCap > 0 ? (dm.pool + originDemand(sim, u)) / dm.totalCap : 0;
+  // Fold the PROBE's demand, not the vacant unit's: the probe models the mean
+  // household a lease would seat (a vacant Apartment's catalog population reads
+  // a third low), so the gate judges the share the tenant would actually add.
+  // For every other gated kind this is a no-op: the probe overrides residents
+  // only for condo (where CLASSIC_HOUSEHOLD equals the catalog population) and
+  // the Apartment, and keeps the unit's own residents for the rest.
+  if (dm) dm.share = dm.totalCap > 0 ? (dm.pool + originDemand(sim, probe, dm.bonus)) / dm.totalCap : 0;
   let s = 1;
   for (let i = 0; i < GATE_HORIZON_HOURS; i++) {
     const prev = s;

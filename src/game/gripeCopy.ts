@@ -3,7 +3,7 @@ import type { Unit, VacateReason } from "../engine/types";
 import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
-import { isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
+import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
 
 /**
@@ -163,14 +163,13 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   // used (the empty unit is now a registered origin), so a spot gated only by a
   // retail shortage attributes "too few shops" instead of falling to the generic
   // line, where dominantGripe would otherwise read the real map that omits it.
-  // EXCEPT for rentals, which the engine excludes from the coverage drain on both
-  // the live and gate paths (#661). The gate registers every probe as an origin,
-  // rentals included, so computing the flag here would manufacture a true one for a
-  // kind the sim never drains that way and blame a rental vacancy on "too few
-  // shops". Mirroring the engine's coverage guard keeps the two in step. The
-  // lease amenities (#667) are excluded the same way: the gate skips the demand
-  // map for them because the coverage drain never reads it for an amenity.
-  const coverageKind = !isRentalKind(u.kind) && !isLeaseAmenityKind(u.kind);
+  // EXCEPT for the forgiving Studio and the lease amenities (#667), which the
+  // coverage drain never reads, so computing the flag here would manufacture a
+  // cause the sim never applies and blame a vacancy on "too few shops". The
+  // Apartment is a real demand origin now (#661) and carries the drain on both
+  // the live and gate paths, so it reads coverage like a condo. Mirroring the
+  // engine's coverage guard keeps the two in step.
+  const coverageKind = isUnmetDemandKind(u.kind);
   const cov = coverageKind && ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
   const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);

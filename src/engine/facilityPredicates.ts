@@ -5,6 +5,16 @@ export function isHotelKind(kind: FacilityKind): boolean {
   return kind === "hotelSingle" || kind === "hotelDouble" || kind === "hotelSuite";
 }
 
+/** The kinds the unmet-local-demand coverage drain reads (#661): the demand
+ *  tenants whose coverage `unmetCoverage` computes. One predicate for every
+ *  site that asks the question (the live drain guard, the gate's demand-map
+ *  skip, the gripe ladder and its coverage recompute, the inspector's coverage
+ *  mirror), so a future kind lands on the same side of all of them. The
+ *  forgiving Studio and the lease amenities are deliberately outside it. */
+export function isUnmetDemandKind(kind: FacilityKind): boolean {
+  return kind === "office" || kind === "condo" || kind === "rentalApartment" || isHotelKind(kind);
+}
+
 /** The Modern lease amenities: office-like lease tenants that erode on unserved
  *  placement and on an over-market rent, so they are gated by the move-in
  *  sustainability gate and surfaced by the Main-gripe line like offices (#667).

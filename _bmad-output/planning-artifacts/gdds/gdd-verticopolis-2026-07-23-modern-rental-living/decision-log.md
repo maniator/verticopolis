@@ -122,3 +122,18 @@ The build surfaced three facts against the real engine, resolved as follows:
   the distribution is what makes the Apartment's `churnMultiplier` behave like a
   condo's, which is the point of the tier. The catalog `population: 2` stays as
   the pre-lease fallback `residentCount` reads before a household is rolled.
+- **D20. Rentals are real demand origins and the Apartment's unmet-demand churn
+  is live (supersedes D16, restoring the unmet half of D12 and D15).** D16 cut
+  unmet demand from the Apartment's cause set because the drain could never fire
+  (rentals were not demand origins) and the gate modeled a drain the live sim
+  never applied. #661 removed that root cause: `originWeight` now gives every
+  rental resident the condo per-resident weight, so occupied Studios and
+  Apartments feed the commercial demand pool and register in the coverage
+  origin map. With the origin support real, the Apartment's unmet-demand drain
+  is restored on all three paths D16 aligned: the live tick (the
+  `isUnmetDemandKind` coverage guard includes `rentalApartment`), the move-in
+  gate (the probe registers and the share folds the probe household's demand),
+  and the gripe copy (`dominantGripe` names `unmetDemand`; `wontLeaseText`
+  mirrors the same predicate). D16's carve-outs are obsolete and must not be
+  restored. The Studio stays the forgiving tier: its residents feed the pool,
+  but `isUnmetDemandKind` excludes it, so it never feels the drain on any path.

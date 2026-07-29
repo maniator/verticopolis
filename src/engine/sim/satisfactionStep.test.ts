@@ -3,7 +3,8 @@ import { Simulation } from "../Simulation";
 import type { GameMode, Unit } from "../types";
 import { GRID } from "../facilities";
 import { buildSatisfactionContext, satisfactionStep, wouldEvictFreshTenant } from "./satisfactionStep";
-import { computeDemandMap } from "./demand";
+import { computeDemandMap, foldOriginDemand, originDemand } from "./demand";
+import { CLASSIC_HOUSEHOLD } from "../households";
 import { NOISE_CAP, NOISE_EROSION, CONDO_NOISE_EROSION, RENTAL_STUDIO_NOISE_EROSION, SERVED_RECOVERY, VACATE_RESCIND, LOBBY_FAR_CAP, UNMET_DEMAND_CAP } from "./constants";
 import { rentConfig } from "../econConfig";
 
@@ -148,6 +149,48 @@ describe("satisfactionStep: the remaining drains and caps", () => {
     expect(r.next).toBeCloseTo(UNMET_DEMAND_CAP, 6); // capped by the shortage
   });
 
+  it("a settled Apartment rides the unmet-demand transition: drain, recovery, relapse (#661)", () => {
+    const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 30); // reachable retail, far enough to add no noise
+    const apt = placeRental(sim, "rentalApartment", 3, C);
+    apt.state = "occupied";
+    apt.residents = 3;
+    const ctx = buildSatisfactionContext(sim);
+    ctx.demandMap = computeDemandMap(sim);
+    // An occupied rental is a registered demand origin (#661), so its coverage
+    // read is live, non-null, and healthy while the retail is reachable.
+    const reachable = ctx.demandMap.reachableVenuesByOrigin.get(apt.id);
+    expect(reachable).toBeGreaterThan(0);
+    const healthy = satisfactionStep(sim, apt, 0.5, ctx);
+    expect(healthy.unmetDemand).toBe(false);
+    expect(healthy.next).toBeCloseTo(0.5 + SERVED_RECOVERY, 6);
+    // The condition appears (coverage collapses to 0): the drain fires live,
+    // capping from full at UNMET_DEMAND_CAP and net-eroding below the cap.
+    ctx.demandMap.reachableVenuesByOrigin.set(apt.id, 0);
+    const drained = satisfactionStep(sim, apt, 1, ctx);
+    expect(drained.unmetDemand).toBe(true);
+    expect(drained.next).toBeCloseTo(UNMET_DEMAND_CAP, 6);
+    expect(satisfactionStep(sim, apt, 0.5, ctx).next).toBeLessThan(0.5);
+    // The condition clears (a shop becomes reachable again): the drain stops
+    // and the spot recovers from where the shortage left it.
+    ctx.demandMap.reachableVenuesByOrigin.set(apt.id, reachable!);
+    const recovered = satisfactionStep(sim, apt, drained.next, ctx);
+    expect(recovered.unmetDemand).toBe(false);
+    expect(recovered.next).toBeCloseTo(drained.next + SERVED_RECOVERY, 6);
+    // Relapse: coverage collapses again and the drain returns.
+    ctx.demandMap.reachableVenuesByOrigin.set(apt.id, 0);
+    expect(satisfactionStep(sim, apt, recovered.next, ctx).unmetDemand).toBe(true);
+    // The forgiving Studio never joins the tier: even doctored to zero coverage
+    // its read stays null (isUnmetDemandKind excludes it) and no drain fires.
+    const studio = placeRental(sim, "rentalStudio", 4, C);
+    studio.state = "occupied";
+    ctx.demandMap = computeDemandMap(sim);
+    ctx.demandMap.reachableVenuesByOrigin.set(studio.id, 0);
+    const s = satisfactionStep(sim, studio, 0.5, ctx);
+    expect(s.unmetDemand).toBe(false);
+    expect(s.next).toBeCloseTo(0.5 + SERVED_RECOVERY, 6);
+  });
+
   it("a Modern amenity halo offsets neighbor noise so the gate allows the tenant", () => {
     const sim = tinyTower("modern");
     place(sim, "fastFood", 2, C - 20); // a commercial noise source next to the condo
@@ -165,6 +208,65 @@ describe("satisfactionStep: the remaining drains and caps", () => {
     const ctx = buildSatisfactionContext(sim, true);
     expect(ctx.clubFloors).toContain(2); // the gather picked up the tenanted, served club
     expect(wouldEvictFreshTenant(sim, condo, ctx)).toBe(false);
+  });
+});
+
+describe("wouldEvictFreshTenant: candidate demand fold (#661)", () => {
+  it("folds the probe household's demand into the share, not the vacant catalog population", () => {
+    const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 30); // reachable retail so the tower has a real capacity
+    const apt = placeRental(sim, "rentalApartment", 3, C);
+    const ctx = buildSatisfactionContext(sim, true);
+    wouldEvictFreshTenant(sim, apt, ctx);
+    const dm = ctx.demandMap!;
+    expect(dm).toBeTruthy();
+    // The gate probes a vacant Apartment as the mean household, and the share it
+    // judges against must fold THAT demand. A vacancy's catalog population reads
+    // lower (2 vs the household 3), so folding the raw unit would understate the
+    // share by a third and the gate could seat a family the retail cannot carry.
+    const probeDemand = originDemand(sim, { kind: apt.kind, residents: CLASSIC_HOUSEHOLD });
+    const catalogDemand = originDemand(sim, apt);
+    expect(probeDemand).toBeGreaterThan(catalogDemand); // the two really differ, so the pin bites
+    expect(dm.share).toBeCloseTo((dm.pool + probeDemand) / dm.totalCap, 9);
+  });
+
+  it("the share fold carries the map's snapshot bonus, not a live recompute", () => {
+    const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 30);
+    const apt = placeRental(sim, "rentalApartment", 3, C);
+    const ctx = buildSatisfactionContext(sim, true);
+    wouldEvictFreshTenant(sim, apt, ctx);
+    const dm = ctx.demandMap!;
+    // Doctor the snapshot to a value the live bonus cannot be (no metro or
+    // recycling here, so a live recompute reads 1.0). A fold that recomputed
+    // the bonus live would ignore the doctored snapshot and miss below.
+    dm.bonus = 2;
+    wouldEvictFreshTenant(sim, apt, ctx);
+    const probeDemand = originDemand(sim, { kind: apt.kind, residents: CLASSIC_HOUSEHOLD }, 2);
+    expect(dm.share).toBeCloseTo((dm.pool + probeDemand) / dm.totalCap, 9);
+    // The parameterized read scales by exactly the passed bonus, so every pool
+    // fold stays on the pool's own multiplier and skips the tower scan.
+    expect(originDemand(sim, apt, 2)).toBeCloseTo(2 * originDemand(sim, apt, 1), 9);
+  });
+
+  it("foldOriginDemand folds at the map's snapshot bonus (the churn fill path)", () => {
+    // The one pool-mutation helper the mid-pass fills (condo/office/rental via
+    // filled(), hotel check-ins) go through. Doctoring the snapshot to a value
+    // the live bonus cannot be (no metro or recycling here, so live is 1.0)
+    // pins that the fold honors the snapshot; a live-recompute revert misses.
+    const sim = tinyTower("modern");
+    place(sim, "fastFood", 2, C - 30);
+    const apt = placeRental(sim, "rentalApartment", 3, C);
+    apt.state = "occupied";
+    apt.residents = 3;
+    const dm = computeDemandMap(sim);
+    dm.bonus = 2;
+    const before = dm.pool;
+    foldOriginDemand(dm, sim, apt);
+    expect(dm.pool).toBeCloseTo(before + originDemand(sim, apt, 2), 9);
+    // A non-origin kind folds 0, so filled() stays safe for any unit.
+    foldOriginDemand(dm, sim, { kind: "floor", residents: undefined });
+    expect(dm.pool).toBeCloseTo(before + originDemand(sim, apt, 2), 9);
   });
 });
 

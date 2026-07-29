@@ -18,7 +18,7 @@ import { VACATE_REASON_TEXT } from "../types";
 import { VACATE_NOTICE_MINUTES } from "./constants";
 
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
-import { originDemand } from "./demand";
+import { foldOriginDemand } from "./demand";
 import { servingTransportKindsAt } from "./gripe";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
@@ -163,15 +163,19 @@ export function attemptMoveIns(sim: Simulation): void {
   // the gate, so a tower with none pays nothing. Same source of truth the
   // per-tick satisfaction update reads (spec-move-in-sustainability-gate).
   let satCtx: SatisfactionContext | null = null;
-  // A condo/office actually moving in this pass adds its demand to the gate
-  // context's running pool, so a LATER candidate in the same pass is judged
+  // A condo/office/rental actually moving in this pass adds its demand to the
+  // gate context's running pool (a hotel check-in folds inline at its own
+  // branch below, which never calls moveIn), so a LATER candidate is judged
   // against the demand the earlier fills already created (the intra-pass half of
   // the batch-aware unmet-demand share; a candidate's own demand is folded in
-  // inside wouldEvictFreshTenant). satCtx.demandMap is built the moment the first
-  // condo/office reaches the gate, before any fill, so it is present here.
+  // inside wouldEvictFreshTenant). satCtx.demandMap exists once the first
+  // coverage-kind candidate (isUnmetDemandKind) reaches the gate; a Studio or
+  // lease amenity is gated without building it, so a fill before that point
+  // skips the fold here, and the later map build counts the already-occupied
+  // unit in its census instead. Either ordering counts each fill exactly once.
   const filled = (unit: Unit): void => {
     sim.moveIn(unit);
-    if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, unit);
+    if (satCtx?.demandMap) foldOriginDemand(satCtx.demandMap, sim, unit);
   };
   for (const u of sim.tower.units) {
     if (u.state !== "empty") continue;
@@ -209,8 +213,8 @@ export function attemptMoveIns(sim: Simulation): void {
     // Rentals are lease tenants that erode on placement too (the Apartment on
     // noise/far-walk/lobby, the Studio gently on noise, and both on an over-market
     // rent), so a bad spot would just lease, churn out, and re-list forever without
-    // this gate. Unmet demand is NOT in that list: rentals are excluded from it on
-    // both paths (see #661). The lease amenities (fitnessClub/clinic) are gated
+    // this gate. The Apartment also carries the unmet-demand drain (#661:
+    // rentals are demand origins); the forgiving Studio stays out of it. The lease amenities (fitnessClub/clinic) are gated
     // for the same reason (#667): they erode on unserved placement and on an
     // over-market rent (over * 0.07 outruns SERVED_RECOVERY past ~71% over), so
     // an ungated one at max rent would lease, erode out, and re-list forever.
@@ -242,8 +246,10 @@ export function attemptMoveIns(sim: Simulation): void {
       // never reaches here (the kinds are modernOnly), so its seeded stream is
       // untouched. The Studio fills readily (cheap, forgiving); the Apartment a
       // touch slower (pickier), so a demanding tenant is meaningfully harder to keep.
+      // Rentals are demand origins (#661), so a signed lease goes through
+      // `filled` and its running-pool bookkeeping like a condo/office fill.
       const fillRate = u.kind === "rentalStudio" ? 0.22 : 0.16;
-      if (sim.rng.chance(fillRate * demand)) sim.moveIn(u);
+      if (sim.rng.chance(fillRate * demand)) filled(u);
     } else if (isHotelKind(u.kind)) {
       // Hotel rooms fill in the evening only and must be clean.
       if (sim.clock.isEvening() && sim.rng.chance(0.5 * demand)) {
@@ -253,7 +259,7 @@ export function attemptMoveIns(sim: Simulation): void {
         // A guest checking in mid-pass becomes a demand origin (computeDemandMap
         // counts asleep rooms), so raise the running pool too, or a condo/office
         // evaluated later in the same pass would be judged against stale coverage.
-        if (satCtx?.demandMap) satCtx.demandMap.pool += originDemand(sim, u);
+        if (satCtx?.demandMap) foldOriginDemand(satCtx.demandMap, sim, u);
       }
     }
   }
