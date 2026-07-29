@@ -5,7 +5,7 @@ import { isRentalKind } from "../residentialRentals";
 import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
 import type { Unit, VacateReason } from "../types";
-import { GRIPE_WARN, NIGHTCLUB_NOISE_FLOORS, TRANSPORT_FAR_TILES } from "./constants";
+import { CONDO_NOISE_EROSION, GRIPE_WARN, NIGHTCLUB_NOISE_FLOORS, NOISE_EROSION, RENTAL_STUDIO_NOISE_EROSION, TRANSPORT_FAR_TILES } from "./constants";
 import { spatialCongestionAttributionByFloor } from "./congestion";
 import type { DemandMap } from "./demand";
 
@@ -55,8 +55,11 @@ export function unmetCoverage(dm: DemandMap, u: Unit): number | null {
  * nothing is dragging it down. The order mirrors the drains in
  * `updateSatisfaction`: an unreachable floor is harshest, then elevator crowding,
  * then an over-market office rent, then a far-walk office (W1), then very-far
- * lobby distance (#394), then office/commercial noise (W2), and finally unmet
- * local demand (#395, the gentlest sink). A Modern Fitness Club is handled on its
+ * lobby distance (#394), then office/commercial noise (W2), then unmet local
+ * demand (#395). Since the #548 calibration the unmet erosion can exceed a
+ * kind's noise erosion, so when both erode the steeper one takes the tier
+ * (`unmetOutranksNoise` below); in the cap-only Classic world the order never
+ * changes. A Modern Fitness Club is handled on its
  * own: over-market dues report "rent", and it feels no other placement drain.
  * Where {@link vacateCause} falls back to
  * "access" as the bottom-out catch-all, this returns null so the "Main gripe"
@@ -186,6 +189,7 @@ export function dominantGripe(
   noisy?: boolean,
   lobbyFar?: boolean,
   unmetDemand?: boolean,
+  unmetCov?: number | null,
 ): VacateReason | null {
   const isServed = served ?? reachesLobby(sim, u);
   if (!isServed) {
@@ -224,14 +228,46 @@ export function dominantGripe(
   // the cap in silence. The explicit flag stays erosion-only (a cap alone cannot
   // push a tenant out), so a departure is never blamed on unmet demand where it
   // only capped.
+  // One coverage read shared by the activity gate and the harshest-drain
+  // comparison below: the caller's `unmetCov` when supplied (the eviction
+  // sweep passes the step's own read, the won't-lease card its candidate-aware
+  // one), else the hour-memoized map (the inspector's per-hover recompute).
+  // Sharing the read is load-bearing: activity and magnitude judged from two
+  // different maps could disagree across an occupancy change.
+  const readCov = (): number | null => (unmetCov !== undefined ? unmetCov : unmetCoverage(sim.demandMap(), u));
   const unmetActive = (): boolean => {
     if (unmetDemand !== undefined) return unmetDemand;
     if (!isServed || !isUnmetDemandKind(u.kind)) return false;
-    const cov = unmetCoverage(sim.demandMap(), u);
+    const cov = readCov();
     if (cov === null) return false;
     const drain = sim.rules.unmetDemandDrain(cov);
     return drain.erosion > 0 || drain.cap < 1;
   };
+  // #548: the calibrated unmet-demand erosion (0.12 at full depth) can exceed a
+  // noise-tier erosion, and this ladder's contract is harshest drain first, so
+  // when both erode the steeper one takes the tier; without this a noisy tenant
+  // in a starved tower reads "noise" and the player soundproofs a building that
+  // is dying of no shops. Applied to every tier that names "noise": the W2 band
+  // (against the kind's placement rate) and the nightclub halo (against the
+  // actual penalty the nearest club inflicts). Coverage comes from the caller's
+  // `unmetCov` when supplied (the eviction sweep and the won't-lease card both
+  // read maps the memo does not: the fresh sweep map and the candidate-aware
+  // gate map, where an EMPTY spot is not an origin at all and a memo read would
+  // silently disable the comparison), else from the hour-memoized map (the
+  // inspector's per-hover recompute). On the ladder the read is lazy: it runs
+  // only when a noise tier would otherwise fire and the drain is active (the
+  // sweep hands over the coverage its step already computed, paying nothing
+  // extra). On the Classic scale
+  // every competing erosion and the unmet erosion are 0, so the order never
+  // changes there.
+  const unmetOutranks = (competingErosion: number): boolean => {
+    if (!unmetActive()) return false;
+    if (!isServed || !isUnmetDemandKind(u.kind)) return false;
+    const cov = readCov();
+    if (cov === null) return false;
+    return sim.rules.unmetDemandDrain(cov).erosion > competingErosion;
+  };
+  const unmetOutranksNoise = (): boolean => unmetOutranks(noiseBaseErosionFor(u) * sim.rules.noiseErosionScale());
   if (u.kind === "office") {
     const cfg = rentConfig("office");
     if (cfg && rentOf(u) > cfg.default) return "rent";
@@ -242,9 +278,9 @@ export function dominantGripe(
       return "transportFar";
     }
     if (veryFar) return "lobbyFar";
-    // …or the W2 commercial-noise band next door.
-    if (noisy ?? sim.noiseAfflicted(u)) return "noise";
-    // Unmet local demand is the gentlest sink, named last.
+    // …or the W2 commercial-noise band next door, unless the unmet-demand drain
+    // is the steeper active erosion (#548), in which case its tier below names it.
+    if ((noisy ?? sim.noiseAfflicted(u)) && !unmetOutranksNoise()) return "noise";
     if (unmetActive()) return "unmetDemand";
     return null;
   }
@@ -271,14 +307,19 @@ export function dominantGripe(
       return "transportFar";
     }
     if (veryFar) return "lobbyFar";
-    if (noisy ?? sim.noiseAfflicted(u)) return "noise";
+    // W2 noise yields to a steeper active unmet-demand erosion (#548), which
+    // only the Apartment can have (the Studio's coverage read stays null).
+    if ((noisy ?? sim.noiseAfflicted(u)) && !unmetOutranksNoise()) return "noise";
     // D18 put the Apartment in the nightclub's negative halo, so it really does
     // erode from a club floors away. Without this tier that erosion had no cause:
     // dominantGripe returned null, vacateCause fell through to the "access"
     // catch-all, and a fully served tenant was told "no route to the lobby", a false
     // cause rather than merely a missing one (#684). The Studio is out of the halo, so
-    // nearNightclub is only asked for the kind that feels it.
-    if (u.kind === "rentalApartment" && nearNightclub(sim, u)) return "noise";
+    // nearNightclub is only asked for the kind that feels it. Like the W2 tier
+    // above, the halo yields when the unmet erosion is steeper than the actual
+    // penalty the nearest club inflicts (#548), or the fix would leak back in
+    // through this tier one line later.
+    if (u.kind === "rentalApartment" && nearNightclub(sim, u) && !unmetOutranks(nightclubPenaltyAt(sim, u))) return "noise";
     // The origin work (#661) landed: rentals are real demand origins, so the
     // Apartment carries the unmet-demand tier as its last sink, after every
     // higher-priority cause, exactly like the condo below. The outer predicate
@@ -291,14 +332,30 @@ export function dominantGripe(
   }
   // A served, uncongested hotel/condo is drained by lobby distance, then by
   // sustained noise (office or commercial within its band), then by unmet local
-  // demand, the last sink.
+  // demand; when the unmet erosion is the steeper active drain it takes the
+  // tier from BOTH noise namings, the W2 band and the nightclub halo (#548).
   if (veryFar) return "lobbyFar";
-  if (noisy ?? sim.noiseAfflicted(u)) return "noise";
+  if ((noisy ?? sim.noiseAfflicted(u)) && !unmetOutranksNoise()) return "noise";
   // A Modern nightclub within its noise range disturbs this sleeping tenant (the
-  // negative-halo cross-floor version of the noise cause), so name it "noise" too.
-  if (nearNightclub(sim, u)) return "noise";
+  // negative-halo cross-floor version of the noise cause), so name it "noise" too,
+  // judged against the club's actual penalty at this distance.
+  if (nearNightclub(sim, u) && !unmetOutranks(nightclubPenaltyAt(sim, u))) return "noise";
   if (unmetActive()) return "unmetDemand";
   return null;
+}
+
+/** The per-kind BASE noise/far-walk erosion tier (the mode scale is applied by
+ *  the caller): the forgiving Studio below the served recovery, a sold condo
+ *  just above it, everyone else at the steep office rate. The single source of
+ *  truth for the tier selection, shared by the satisfaction step's placement
+ *  erosion and the gripe ladder's harshest-drain comparison (#548) so the two
+ *  can never disagree about how hard noise actually bites a kind. */
+export function noiseBaseErosionFor(u: Pick<Unit, "kind" | "everOccupied">): number {
+  return u.kind === "rentalStudio"
+    ? RENTAL_STUDIO_NOISE_EROSION
+    : u.kind === "condo" && u.everOccupied
+      ? CONDO_NOISE_EROSION
+      : NOISE_EROSION;
 }
 
 /** True when an operational, served nightclub sits within its noise range of `u`
@@ -311,6 +368,23 @@ export function nearNightclub(sim: Simulation, u: Pick<Unit, "floor">): boolean 
     }
   }
   return false;
+}
+
+/** The magnitude side of {@link nearNightclub}: the per-hour penalty the
+ *  NEAREST operational, served club inflicts on `u` through the mode's rules
+ *  curve, which itself returns 0 beyond the halo range and is flat 0 in
+ *  Classic (this function passes the raw nearest distance through). The
+ *  gripe ladder's harshest-drain comparison (#548) judges the halo's "noise"
+ *  naming against this, the penalty actually applied, rather than the W2 rate. */
+export function nightclubPenaltyAt(sim: Simulation, u: Pick<Unit, "floor">): number {
+  let nearest = Infinity;
+  for (const c of sim.tower.units) {
+    if (c.kind === "nightclub" && isOperational(c) && sim.tower.isFloorServed(c.floor)) {
+      const d = Math.abs(c.floor - u.floor);
+      if (d < nearest) nearest = d;
+    }
+  }
+  return nearest === Infinity ? 0 : sim.rules.nightclubNoisePenalty(nearest);
 }
 
 /**
@@ -330,6 +404,7 @@ export function vacateCause(
   noisy?: boolean,
   lobbyFar?: boolean,
   unmetDemand?: boolean,
+  unmetCov?: number | null,
 ): VacateReason {
-  return dominantGripe(sim, u, served, cong, farWalk, noisy, lobbyFar, unmetDemand) ?? "access";
+  return dominantGripe(sim, u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov) ?? "access";
 }

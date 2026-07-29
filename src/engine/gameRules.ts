@@ -232,9 +232,10 @@ export interface GameRules {
    * the neutral drain. Below it, Classic caps at {@link UNMET_DEMAND_CAP} but never
    * erodes (canon: too few amenities lowers renewal, never evicts), while Modern
    * tightens the ceiling with the shortfall and, past {@link UNMET_DEMAND_EVICT_FLOOR},
-   * erodes gently so a chronically under-served tenant eventually gives notice
-   * (cause `unmetDemand`). Applies to office/condo/hotel; the caller gates on
-   * `served` and kind. Pure and deterministic (no RNG).
+   * erodes so a chronically under-served tenant eventually gives notice
+   * (cause `unmetDemand`). Applies to the `isUnmetDemandKind` set (office, condo,
+   * rental Apartment, hotels); the caller gates on `served` and kind. Pure and
+   * deterministic (no RNG).
    */
   unmetDemandDrain(coverage: number): { cap: number; erosion: number };
   /**

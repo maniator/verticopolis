@@ -35,13 +35,19 @@ export function updateSatisfaction(sim: Simulation): void {
   const notices: { floor: number; kind: FacilityKind; reason: VacateReason }[] = [];
   for (const u of sim.tower.units) {
     if (isDormant(u)) continue;
-    const { next, served, cong, farWalk, noisy, lobbyFar, unmetDemand } = satisfactionStep(
+    const { next, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov } = satisfactionStep(
       sim,
       u,
       u.satisfaction,
       ctx,
     );
     u.satisfaction = next;
+    // #548: cause attribution judges the harshest drain against `unmetCov`, the
+    // coverage the step itself just read from this sweep's demand map, never
+    // the hour-memoized one (which lags the occupancy changes a shed cascade
+    // makes mid-sweep and would let the comparison flip attribution on stale
+    // data). Null for kinds outside the drain, which the comparison treats as
+    // inert.
     // NOTE: the individually-routed crowd's frustration is exposed read-only via
     // {@link crowdStress} for the HUD, but is deliberately NOT written back into
     // satisfaction, its value depends on frame/step cadence, so feeding it into
@@ -88,7 +94,7 @@ export function updateSatisfaction(sim: Simulation): void {
       const overMarketRent = !!priceCfg && rentOf(u) > priceCfg.default;
       const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk || lobbyFar;
       if (noiseCannotEvict && nonNoiseProblem) {
-        u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand);
+        u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov);
       }
       const rescindNoise = noiseCannotEvict && !nonNoiseProblem;
       if (!isRelocation && (u.satisfaction >= VACATE_RESCIND || rescindNoise)) {
@@ -110,11 +116,11 @@ export function updateSatisfaction(sim: Simulation): void {
     } else if (leaseTenant && u.satisfaction <= 0) {
       // Give notice: enter the grace period with the attributed cause.
       u.state = "vacating";
-      u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand);
+      u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov);
       u.vacateAt = sim.clock.minutes + VACATE_NOTICE_MINUTES;
       notices.push({ floor: u.floor, kind: u.kind, reason: u.vacateReason });
     } else if (u.satisfaction <= 0 && isHotelKind(u.kind)) {
-      sim.vacate(u, sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand));
+      sim.vacate(u, sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov));
     }
   }
   sim.emitNotices(notices);

@@ -5,12 +5,9 @@ import { isHotelKind, isLeaseAmenityKind, isUnmetDemandKind } from "../facilitie
 import { isRentalKind } from "../residentialRentals";
 import { isTenanted, isOperational } from "../types";
 import { computeDemandMap, originDemand, type DemandMap } from "./demand";
-import { reachesLobby, unmetCoverage } from "./gripe";
+import { noiseBaseErosionFor, reachesLobby, unmetCoverage } from "./gripe";
 import {
   NOISE_CAP,
-  NOISE_EROSION,
-  CONDO_NOISE_EROSION,
-  RENTAL_STUDIO_NOISE_EROSION,
   TRANSPORT_FAR_TILES,
   LOBBY_NO_DRAIN,
   SERVED_RECOVERY,
@@ -59,6 +56,10 @@ export interface SatisfactionStepResult {
   noisy: boolean;
   lobbyFar: boolean;
   unmetDemand: boolean;
+  /** The coverage the step read for the unmet-demand drain (null for kinds
+   *  outside it), returned so the vacate attribution can judge the
+   *  harshest-drain comparison on the SAME read instead of recomputing. */
+  unmetCov: number | null;
 }
 
 /** The floor distance from `floor` to the nearest floor in `floors`, or Infinity
@@ -183,15 +184,9 @@ export function satisfactionStep(
   const unmetDrain = coverage === null ? LOBBY_NO_DRAIN : sim.rules.unmetDemandDrain(coverage);
   const unmetCapped = unmetDrain.cap < 1;
   if (farWalk || noisy || lobbyCapped || unmetCapped) {
-    // Three tiers, not two: the Studio erodes BELOW the served recovery so noise
-    // caps it and never evicts it (the forgiving tier), a sold condo just above,
-    // and everyone else at the steep office rate.
-    const baseErosion =
-      u.kind === "rentalStudio"
-        ? RENTAL_STUDIO_NOISE_EROSION
-        : u.kind === "condo" && u.everOccupied
-          ? CONDO_NOISE_EROSION
-          : NOISE_EROSION;
+    // The per-kind tier selection lives in noiseBaseErosionFor (gripe.ts), one
+    // source shared with the gripe ladder's harshest-drain comparison (#548).
+    const baseErosion = noiseBaseErosionFor(u);
     const scale = farWalk ? 1 : sim.rules.noiseErosionScale();
     const placementErosion = farWalk || noisy ? baseErosion * scale : 0;
     const erosion = Math.max(placementErosion, lobbyDrain.erosion, unmetDrain.erosion);
@@ -200,7 +195,7 @@ export function satisfactionStep(
   }
   const lobbyFar = lobbyDrain.cap <= GRIPE_WARN;
   const unmetDemand = unmetDrain.erosion > 0;
-  return { next: s, served, cong, farWalk, noisy, lobbyFar, unmetDemand };
+  return { next: s, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov: coverage };
 }
 
 /** How many hourly steps the gate simulates forward before reading the trend: two

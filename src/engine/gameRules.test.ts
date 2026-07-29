@@ -291,6 +291,22 @@ describe("MODERN_RULES", () => {
     // clears the served recovery, so a chronically stranded Modern tenant nets a
     // negative drift and eventually gives notice.
     expect(MODERN_RULES.unmetDemandDrain(0).erosion).toBeGreaterThan(SERVED_RECOVERY);
+    // #548 calibration boundaries, derived from the constants so a retune moves
+    // the pins with it. Just inside the evict floor the drain erodes but stays
+    // below the served recovery: that band caps and slows, it does not shed.
+    const inside = MODERN_RULES.unmetDemandDrain(UNMET_DEMAND_EVICT_FLOOR - 0.02);
+    expect(inside.erosion).toBeGreaterThan(0);
+    expect(inside.erosion).toBeLessThan(SERVED_RECOVERY);
+    // The genuine net-shed region opens only below the break-even coverage
+    // (erosion equals recovery), which the ramp puts at evictFloor x
+    // (1 - recovery/erosionMax): ~0.20 today, demand ~5x the reachable retail.
+    // A tower must be heavily oversubscribed before anyone packs; an ordinary
+    // mid-fill share sits nowhere near it.
+    const breakEven = UNMET_DEMAND_EVICT_FLOOR * (1 - SERVED_RECOVERY / ECON.unmetDemandErosion);
+    expect(breakEven).toBeGreaterThan(0.15);
+    expect(breakEven).toBeLessThan(0.3);
+    expect(MODERN_RULES.unmetDemandDrain(breakEven + 0.01).erosion).toBeLessThan(SERVED_RECOVERY);
+    expect(MODERN_RULES.unmetDemandDrain(breakEven - 0.01).erosion).toBeGreaterThan(SERVED_RECOVERY);
   });
 
   it("reads a realistic weekend rhythm: fast food quiets, restaurants and shops pick up", () => {
