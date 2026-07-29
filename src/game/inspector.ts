@@ -12,9 +12,9 @@ export { retailStatsLines } from "./facilityDiagnostics";
  * The hover inspector card: what it shows for a picked facility and the
  * ✕-dismissal latch that keeps a closed card closed while hover picks keep
  * landing on the same facility. Split out of the GameApp class so the latch
- * contract (survives transient null picks, spent by a different pick or an
- * explicit tap, dropped on a tower swap) can be unit-tested without a DOM
- * game shell. The anchor cell stays in GameApp — its per-frame panel
+ * contract (survives transient null picks, spent by a different pick or by
+ * explicit fresh intent such as a tap or long-press, dropped on a tower
+ * swap) can be unit-tested without a DOM game shell. The anchor cell stays in GameApp — its per-frame panel
  * positioning reads it — and is written through `deps.setAnchor`.
  *
  * Never stores a Simulation — adoptSim() swaps the live instance, so every
@@ -34,9 +34,10 @@ export class InspectorController {
   /** ✕-dismissed target: stays hidden while hover picks keep landing on the
    *  same facility (otherwise the next hover event would instantly re-open
    *  the card), and survives transient null/floor picks (pointer jitter).
-   *  Spent by picking a DIFFERENT facility, by an explicit tap/click
-   *  (fresh intent — the only re-arm available on touch), or by a tower
-   *  swap (ids restart, so a stale latch would mute an unrelated card). */
+   *  Spent by picking a DIFFERENT facility, by explicit fresh intent (a
+   *  tap/click via selectPicked or a touch long-press via onLongPress), or
+   *  by a tower swap (ids restart, so a stale latch would mute an unrelated
+   *  card). */
   private inspectDismissed: { type: "unit" | "transport"; id: number } | null = null;
 
   constructor(private readonly deps: InspectorDeps) {}
@@ -47,7 +48,8 @@ export class InspectorController {
       // Hide, but keep any ✕-dismissal latch: a transient empty/floor pick
       // (pointer jitter crossing a gap) must not re-arm the card the user
       // just closed. The latch is spent only by picking a different facility
-      // or by an explicit tap/click (selectPicked).
+      // or by explicit fresh intent: a tap/click (selectPicked) or a touch
+      // long-press (onLongPress), both through resetLatch.
       this.hide();
       return;
     }

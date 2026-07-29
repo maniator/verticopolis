@@ -73,7 +73,7 @@ function makeApp(toolOver: Record<string, unknown> = {}) {
     },
     ui: { toast: vi.fn(), setInspectorPeek: vi.fn() },
     editor: { extendSelectedTo: vi.fn(), endExtend: vi.fn() },
-    inspector: { inspectPicked: vi.fn(), hide: vi.fn() },
+    inspector: { inspectPicked: vi.fn(), hide: vi.fn(), resetLatch: vi.fn() },
     saveLoad: { recoverFromContextLoss: vi.fn() },
     selectPicked: vi.fn(),
     captureUndo: vi.fn(),
@@ -212,6 +212,23 @@ describe("onLongPress (touch peek)", () => {
     expect(app.inspector.inspectPicked).toHaveBeenCalledWith(picked);
     expect(app.ui.setInspectorPeek).toHaveBeenCalledWith(true);
     expect(app.selectPicked).not.toHaveBeenCalled(); // a peek never opens the editor
+  });
+
+  it("spends the ✕-dismissal latch: a hold is fresh intent, like a tap (#696)", () => {
+    // Hybrid device: the hover card's ✕ latched inspectDismissed for this
+    // facility. Without the reset, inspectPicked early-returns and the peek
+    // shows nothing while the release is still swallowed.
+    const app = makeApp({ type: "inspect" });
+    wireEngine(app);
+    app.engine.onLongPress!(3, 4, { id: "u5" });
+    expect(app.inspector.resetLatch).toHaveBeenCalled();
+    expect(app.inspector.inspectPicked).toHaveBeenCalledWith({ id: "u5" });
+    // Order is load-bearing: inspectPicked re-checks the latch internally, so
+    // reset AFTER the pick would reintroduce the eaten-peek bug with both
+    // calls still made. Pin reset-before-pick.
+    expect(app.inspector.resetLatch.mock.invocationCallOrder[0]).toBeLessThan(
+      app.inspector.inspectPicked.mock.invocationCallOrder[0],
+    );
   });
 
   it("empty space raises nothing beyond a null pick (no card)", () => {

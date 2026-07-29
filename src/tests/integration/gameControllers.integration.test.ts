@@ -447,6 +447,23 @@ describe("InspectorController (✕-dismissal latch)", () => {
     liftPick = { type: "transport", id: lift.id, kind: "elevatorStandard" };
   });
 
+  it("resetLatch spends the dismissal: the peek path's fresh-intent seam re-raises the card (#696)", () => {
+    inspector.inspectPicked(officePick);
+    inspector.dismiss();
+    const calls = shown.length;
+    // A hover pick alone stays closed (the latch is doing its hover-jitter job)...
+    inspector.inspectPicked(officePick);
+    expect(shown.length).toBe(calls);
+    // ...but spending the latch first (what onLongPress and selectPicked both
+    // do: an explicit hold or tap is fresh intent) re-raises the card. The
+    // count check keeps this non-vacuous: last(shown) already held the office
+    // card from the opening pick, so only a NEW show may pass the test.
+    inspector.resetLatch();
+    inspector.inspectPicked(officePick);
+    expect(shown.length).toBe(calls + 1);
+    expect(last(shown)).toContain(FACILITIES.office.name);
+  });
+
   it("dismiss latches the target: same-facility hover picks stay closed, null picks don't spend it", () => {
     inspector.inspectPicked(officePick);
     expect(last(shown)).toContain(FACILITIES.office.name);
