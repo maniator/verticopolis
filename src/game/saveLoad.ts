@@ -35,7 +35,7 @@ export interface SaveLoadDeps {
    *  could resurrect an unrelated old tower. Only GameApp's own undo/redo
    *  restore may preserve history, and it doesn't go through this module. */
   adoptSim(sim: Simulation): void;
-  ui: Pick<UI, "toast" | "downloadFile" | "showImportReport" | "showExportReport">;
+  ui: Pick<UI, "toast" | "sayVisibly" | "downloadFile" | "showImportReport" | "showExportReport">;
   /** Full-screen crash card (src/ui/crashScreen.ts, wired by main.ts with the
    *  app-side context: version, live sim, frame-error buffer). SaveLoad hands
    *  it only what it owns: the crash shape, the save outcome, and the reload
@@ -365,7 +365,7 @@ export class SaveLoad {
         err instanceof LegacyExportError
           ? err.message
           : "Export failed: " + (err instanceof Error ? err.message : String(err));
-      this.deps.ui.toast(msg, "bad");
+      this.deps.ui.sayVisibly(msg); // not a toast: a dialog may be up (GH #658)
       return;
     }
     this.deps.ui.showExportReport(built.report, {
@@ -378,7 +378,7 @@ export class SaveLoad {
       this.deps.adoptSim(await SaveGame.import(data));
       this.deps.ui.toast("Tower imported.", "good");
     } catch (err) {
-      this.deps.ui.toast("Import failed: " + (err as Error).message, "bad");
+      this.deps.ui.sayVisibly("Import failed: " + (err as Error).message);
     }
   }
 

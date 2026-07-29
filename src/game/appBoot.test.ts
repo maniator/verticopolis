@@ -115,7 +115,7 @@ describe("wireControllers", () => {
       selected: { id: 7 },
       inspectAnchor: null,
       ui: {
-        toast: vi.fn(),
+        toast: vi.fn(), sayVisibly: vi.fn(), precedence: { towerSwapped: vi.fn() },
         showInspector: vi.fn(),
         showBatchPricingDialog: vi.fn(),
         showElevatorScheduleDialog: vi.fn(),

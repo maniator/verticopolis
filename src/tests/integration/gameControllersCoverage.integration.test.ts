@@ -61,6 +61,7 @@ function fakes() {
       toast: (text: string, kind?: "info" | "good" | "bad" | "money") => {
         toasts.push({ text, kind });
       },
+      sayVisibly: vi.fn(),
       downloadFile: (filename: string, contents: string | Uint8Array) => {
         downloads.push({ filename, contents });
       },
@@ -957,9 +958,11 @@ describe("SaveLoad (persistence, update flush, GPU-loss recovery)", () => {
     saveLoad.exportLegacy();
     expect(f.exportReports).toHaveLength(0);
     expect(f.downloads).toHaveLength(0);
-    expect(f.toasts).toEqual([
-      { text: "This tower uses Modern rules. SimTower (1994) can only load Classic towers.", kind: "bad" },
-    ]);
+    // Through `sayVisibly`, so the refusal reaches the player even if a dialog
+    // went up while the export was being built (GH #658).
+    expect(f.ui.sayVisibly).toHaveBeenCalledWith(
+      "This tower uses Modern rules. SimTower (1994) can only load Classic towers.",
+    );
   });
 
   it("importLegacy: a garbage buffer toasts a typed message and never reaches the sim", () => {

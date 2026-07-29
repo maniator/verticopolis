@@ -1070,6 +1070,41 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     expect(cb.onSpeed).toHaveBeenLastCalledWith(1);
   });
 
+  it("drops a waiting report when the tower it was parsed against is swapped", () => {
+    // CAP-5 names a tower swap as a leash BREAK, not a resolution, and it is
+    // the case dialog lifecycle cannot see: the dialog in the way closes
+    // perfectly normally and the swap happens after. Without this the stale
+    // report opens over a brand-new tower and "Open tower" adopts a state that
+    // no longer exists.
+    const { ui } = makeUI();
+    ui.showEventChoice("A fire has broken out!", "$20,000", vi.fn());
+    const onOpen = vi.fn();
+    ui.showImportReport(report("OLD"), { onOpen });
+    ui.precedence.towerSwapped();
+    const notice = dialog().querySelector(".modal-notice");
+    expect(notice!.textContent).toContain("you started a different tower");
+    // And it stays dropped: resolving the dialog it was waiting on does not
+    // resurrect a report parsed against a tower that is gone.
+    click('[data-act="decline"]');
+    expect(dialog().textContent).not.toContain("OLD");
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it("says so when a report already on screen is taken by another dialog", () => {
+    // A waiting report fails loudly; one that is already OPEN holds the same
+    // fully parsed tower, and losing that in silence is the same defect one
+    // step later. The report registers a goodbye, so whatever replaces it
+    // carries the message. This is not a veto: the replacement still happens.
+    const { ui } = makeUI();
+    ui.showImportReport(report(), { onOpen: vi.fn() });
+    expect(dialog().textContent).toContain("Open tower"); // it opened
+    ui.showEventChoice("A fire has broken out!", "$20,000", vi.fn()); // takes it
+    expect(dialog().textContent).toContain("A fire has broken out!");
+    const notice = dialog().querySelector(".modal-notice");
+    expect(notice, "losing a parsed tower must never be silent").not.toBeNull();
+    expect(notice!.textContent).toContain("The import was dropped");
+  });
+
   it("drops a waiting report visibly when a second one takes its place", () => {
     // The wait is tied to ONE dialog resolving and only one report may hold it,
     // because a report closes over a fully parsed Simulation: two waiting at

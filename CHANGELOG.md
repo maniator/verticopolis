@@ -13,6 +13,14 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.2.0
+
+- A SimTower import or export that cannot be shown now always says why, in the
+  window you are looking at. That covers the cases it used to lose in silence:
+  a file that fails to read, a tower the 1994 format cannot hold, a report
+  pushed aside by another window, and one left waiting when you start a
+  different tower.
+
 ## 2.1.1
 
 - The Studio no longer quietly starves your restaurants. A floor of them was taking meal trips out of the pool and sending nobody, so the food court went hungry on a tower that had done nothing wrong.

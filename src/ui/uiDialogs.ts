@@ -1,4 +1,3 @@
-import { routeNotice } from "./modalPrecedence";
 import type { UI } from "./UI";
 import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
@@ -174,6 +173,10 @@ export function confirmExport(ui: UI): void {
 }
 
 
+/** What the player is told when a report's tower is lost, wherever it is lost. */
+const DROPPED = (kind: "import" | "export") =>
+  `The ${kind} was dropped: another window took over before it could open. Try again.`;
+
 /**
  * Hold a report until the dialog in the way resolves, then re-run it.
  *
@@ -186,13 +189,11 @@ export function confirmExport(ui: UI): void {
  * over every z-index, and this path is only reachable while a dialog is up.
  */
 function waitForDialog(ui: UI, reopen: () => void, kind: "import" | "export"): void {
-  // Both halves, in one place. `#a11y-live` is `visually-hidden`, so announcing
-  // there alone would leave a sighted player staring at an unchanged dialog
-  // with no sign their file was even read: CAP-1 asks for somewhere they can
-  // ACTUALLY see it, and the dialog in the way is that somewhere.
+  // Both halves: `#a11y-live` is visually hidden, so announcing only there
+  // leaves a sighted player with no sign their file was even read.
   const waiting = `The SimTower ${kind} will open when you finish here.`;
   announce(waiting);
-  routeNotice(ui.el.modal as HTMLDialogElement, ui.precedence, waiting, (t) => ui.toast(t, "info"));
+  ui.sayVisibly(waiting, "info");
   ui.precedence.wait(reopen, (reason) => {
     // Name what actually happened. "Another window took over" is a lie when the
     // truth is that a second file was picked, and a player who is told the
@@ -201,9 +202,12 @@ function waitForDialog(ui: UI, reopen: () => void, kind: "import" | "export"): v
     // writing the same sentence to the polite region as well would either be
     // read out twice or be swallowed as a duplicate.
     const because =
-      reason === "superseded" ? "another file was picked" : "another window took over";
-    const line = `The ${kind} was dropped: ${because} before it could open. Try again.`;
-    routeNotice(ui.el.modal as HTMLDialogElement, ui.precedence, line, (t) => ui.toast(t, "bad"));
+      reason === "superseded"
+        ? "another file was picked"
+        : reason === "tower-swapped"
+          ? "you started a different tower"
+          : "another window took over";
+    ui.sayVisibly(`The ${kind} was dropped: ${because} before it could open. Try again.`);
   });
 }
 
@@ -219,18 +223,19 @@ function announce(text: string): void {
  * adopted. `onOpen` fires only when the player commits via "Open tower".
  */
 export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () => void }): void {
-  // The OS file picker is not a modal, so a dialog can open in the shared
-  // <dialog> while the file is still being read. What matters is not whether
-  // one is open but whether replacing it would destroy something: a dialog that
-  // owns nothing is displaced, one that owns a pending decision is waited for.
-  // The old guard refused on "open at all" and reported that refusal with a
-  // toast, which a <dialog> paints over by construction, so the message could
-  // only ever appear where nobody could read it (GH #658).
+  // Not "is a dialog open" but "would replacing it destroy something": one that
+  // owns nothing is displaced, one that owns a decision is waited for. The old
+  // guard refused on "open at all" and said so with a toast, which a <dialog>
+  // paints over by construction (GH #658). See ./modalPrecedence.
   if (ui.precedence.ownsPendingWork(ui.isModalOpen())) {
     waitForDialog(ui, () => showImportReport(ui, report, cb), "import");
     return;
   }
-  const box = ui.openModalTemplate(importReportTemplate(report));
+  const box = ui.openModalTemplate(importReportTemplate(report), {
+    // An open report holds a parsed tower; losing it silently is the same
+    // defect one step later (GH #685).
+    onDisplaced: () => ui.sayVisibly(DROPPED("import")),
+  });
   // Announce for screen readers (the modal takes focus, but the polite region
   // tells them WHY a dialog appeared).
   const live = document.getElementById("a11y-live");
@@ -253,7 +258,9 @@ export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload:
     waitForDialog(ui, () => showExportReport(ui, report, cb), "export");
     return;
   }
-  const box = ui.openModalTemplate(exportReportTemplate(report));
+  const box = ui.openModalTemplate(exportReportTemplate(report), {
+    onDisplaced: () => ui.sayVisibly(DROPPED("export")),
+  });
   const live = document.getElementById("a11y-live");
   if (live) live.textContent = "SimTower export summary ready.";
   ui.wireActions(box, {
