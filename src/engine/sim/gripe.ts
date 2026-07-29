@@ -1,6 +1,6 @@
 import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
-import { isHotelKind } from "../facilities";
+import { isElevatorKind, isHotelKind, isStaffOnlyTransport } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
@@ -86,6 +86,33 @@ export function reachesLobby(sim: Simulation, u: Unit): boolean {
   if (!sim.tower.isFloorServed(u.floor)) return false;
   if (segmentsOf(sim.tower, u.floor).length <= 1) return true;
   return sim.crowd.segmentConnected(sim.tower, u.floor, u.x);
+}
+
+/**
+ * Which passenger transport kinds actually STOP at a floor, for congestion copy
+ * (#699). Congestion capacity counts every passenger kind (the transport-neutral
+ * rule on {@link VACATE_REASON_TEXT}), so the "crowded elevators" advice is wrong
+ * on a floor served only by stairs; the copy sites branch on this instead.
+ * Routed through `Tower.stopsAt`, never the bottom/top span, because a shaft can
+ * span a floor while its skip list drops it (the #699 save skips floors 2-5):
+ * such a shaft serves the floor no more than no shaft at all. Staff-only service
+ * elevators carry no tenants and must not flip the wording to "elevators".
+ * A read-only single pass over the transports, called from the inspector hover
+ * and the (rare) buy-back toast, never per tick.
+ */
+export function servingTransportKindsAt(
+  sim: Simulation,
+  floor: number,
+): { elevator: boolean; stairs: boolean; escalator: boolean } {
+  const kinds = { elevator: false, stairs: false, escalator: false };
+  for (const t of sim.tower.transports) {
+    if (isStaffOnlyTransport(t.kind)) continue;
+    if (!sim.tower.stopsAt(t, floor)) continue;
+    if (isElevatorKind(t.kind)) kinds.elevator = true;
+    else if (t.kind === "stairs") kinds.stairs = true;
+    else if (t.kind === "escalator") kinds.escalator = true;
+  }
+  return kinds;
 }
 
 export function dominantGripe(

@@ -186,6 +186,30 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     expect(noRateToast).not.toContain("stays empty until you fix");
   });
 
+  it("names the stairs on a stairs-only congestion churn, never 'add cars' (#699)", () => {
+    // A stairs-served tower: the congestion churn warning must name the stairs
+    // and a remedy that applies (capacity), because there are no cars to add on
+    // a floor no elevator stops at.
+    const sim = Simulation.newGame(26, "modern");
+    sim.money = 1e12;
+    sim.star = 1;
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < W; x++) sim.tower.place("floor", 2, x);
+    expect(sim.buildTransport("stairs", C, 1, 2).ok).toBe(true);
+    expect(sim.tower.isFloorServed(2)).toBe(true);
+    const condo = place(sim, "condo", 2, C);
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.residents = 3;
+    condo.rent = 160_000;
+    vacate(sim, condo, "congestion");
+    const toast = sim.log[sim.log.length - 1].text;
+    expect(toast).toContain("bought it back");
+    expect(toast).toContain("crowded stairs");
+    expect(toast).toContain("until you add capacity");
+    expect(toast).not.toContain("add cars");
+  });
+
   it("evicts a doomed spot exactly once and never re-sells (the churn is truly stopped)", () => {
     const sim = servedTower(14, "modern");
     place(sim, "office", 2, C - 9);

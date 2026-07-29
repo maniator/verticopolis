@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe";
+import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
 import { isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
@@ -18,11 +18,29 @@ import { isRentalKind } from "../engine/residentialRentals";
  * Each string names the lever the player can pull.
  */
 const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
-  congestion: "crowded elevators. Add cars or a parallel shaft to this block.",
   rent: "the rent is above the going rate. Lower it to keep them.",
-  // "noise" is resolved by noiseGripeText (the remedy differs by source); it stays
-  // out of this table so a bare lookup can never return the wrong advice.
+  // "noise" is resolved by noiseGripeText and "congestion" by congestionGripeText
+  // (the remedy differs by source / by serving transport); they stay out of this
+  // table so a bare lookup can never return the wrong advice.
 };
+
+/** The congestion gripe names the transport that is actually crowded (#699).
+ *  Congestion capacity counts every passenger transport kind, so a stairs-only
+ *  floor crowds for real; telling that player to "add cars" prescribes a fix
+ *  the floor cannot take (the #699 save: both elevators skip floors 2-5, so
+ *  floor 4 boards only stairs). Branch on what actually stops at the floor
+ *  (skip lists honored, staff-only service shafts excluded) and name a remedy
+ *  that applies there. The empty classification cannot occur for a fired
+ *  congestion gripe (it needs a served floor, which needs a stopping passenger
+ *  transport), but a transport-neutral line covers it rather than a lie. */
+function congestionGripeText(sim: Simulation, u: Unit): string {
+  const serving = servingTransportKindsAt(sim, u.floor);
+  if (serving.elevator) return "crowded elevators. Add cars or a parallel shaft to this block.";
+  if (serving.stairs && serving.escalator) return "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.";
+  if (serving.stairs) return "crowded stairs. Add another stair column, or give this floor an elevator stop.";
+  if (serving.escalator) return "crowded escalators. Add another escalator, or give this floor an elevator stop.";
+  return "overcrowded vertical transport. Add capacity to this block.";
+}
 
 /** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is
  *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
@@ -93,6 +111,7 @@ export function gripeLineText(
 ): string | undefined {
   if (gripe === "unmetDemand") return unmetDemandGripeText(sim, u, unmetCov);
   if (gripe === "noise") return noiseGripeText(sim, u);
+  if (gripe === "congestion") return congestionGripeText(sim, u);
   return GRIPE_TEXT[gripe];
 }
 
