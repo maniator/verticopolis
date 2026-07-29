@@ -206,9 +206,22 @@ const INSIGHTS = [
     query: trends([series("boot", "Boots")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
   },
   {
-    name: "Updates by target version",
-    description: "Applied updates broken down by the version updated to, production, 30d.",
-    query: trends([series("update", "Updates")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
+    // The update event fires before the activating reload and survives a failed
+    // activation (see updateFlow.ts), so it counts attempts. The authoritative
+    // applied count is the post-reload boot with reason=update, next tile.
+    name: "Update attempts by target version",
+    description: "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
+    query: trends([series("update", "Update attempts")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    name: "Applied updates by version",
+    description: "Boots with reason=update (the authoritative applied count) by the build version booted into, production, 30d.",
+    query: trends([series("boot", "Applied updates")], {
+      breakdown: "version",
+      display: "ActionsTable",
+      breakdownLimit: 10,
+      where: [{ key: "reason", operator: "exact", type: "event", value: ["update"] }],
+    }),
   },
   {
     name: "Crashes over time (by repeat)",
