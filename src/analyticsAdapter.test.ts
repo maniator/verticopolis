@@ -1,9 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { track, inject as injectWebAnalytics } from "@vercel/analytics";
+import { inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import {
   analyticsAdapter,
-  dualWriteAdapter,
+  relayAdapter,
   setAnalyticsAdapter,
   type AnalyticsAdapter,
   type EventProps,
@@ -12,12 +12,10 @@ import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 import { injectVercelTelemetry } from "./telemetry";
 
-// Keep the real Vercel SDK inert so this file can assert that a swapped-in stub
-// takes over the whole surface: under the stub, none of these vendor calls fire.
-vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
+// Keep the real transports inert so this file can assert that a swapped-in stub
+// takes over the whole surface: under the stub, none of these wire calls fires.
+vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
-// The default adapter dual-writes to the PostHog relay too (S3); stub it so the
-// relay side is observable without a real beacon.
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
 const prod = "https://verticopolis.com/";
@@ -48,7 +46,6 @@ describe("analytics adapter seam", () => {
   beforeEach(() => {
     window.location.href = prod;
     gameplaySession.reset();
-    vi.mocked(track).mockReset();
     vi.mocked(injectWebAnalytics).mockReset();
     vi.mocked(injectSpeedInsights).mockReset();
     vi.mocked(sendToRelay).mockReset();
@@ -61,10 +58,10 @@ describe("analytics adapter seam", () => {
     window.location.href = localhost;
   });
 
-  it("defaults to the dual-write adapter until one is swapped in", () => {
+  it("defaults to the relay adapter until one is swapped in", () => {
     // The swap in the outer beforeEach handed back the adapter that was active
-    // before it, which is the module's production default (S3 dual-write).
-    expect(restore).toBe(dualWriteAdapter);
+    // before it, which is the module's production default (post-cutover relay).
+    expect(restore).toBe(relayAdapter);
   });
 
   it("routes the active adapter through the accessor", () => {
@@ -137,11 +134,11 @@ describe("analytics adapter seam", () => {
     expect(byName.get("session_peak_floors")).toEqual({ floors: 5 });
     expect(byName.get("tool_session_uses")).toEqual({ tool: "office", uses: 2 });
     expect(byName.get("session_end")).toEqual({ seconds: 5 });
-    // The whole point of the seam: swapping the adapter took the vendor out.
-    expect(track).not.toHaveBeenCalled();
+    // The whole point of the seam: swapping the adapter took the transport out.
+    expect(sendToRelay).not.toHaveBeenCalled();
   });
 
-  it("routes the page-view inject through the active adapter, not the vendor", () => {
+  it("routes the page inject through the active adapter, not the vendor", () => {
     injectVercelTelemetry();
     expect(stub.injects).toBe(1);
     expect(injectSpeedInsights).not.toHaveBeenCalled();
@@ -149,37 +146,19 @@ describe("analytics adapter seam", () => {
   });
 
   it("restores the default adapter cleanly, re-reaching the real transports", () => {
-    setAnalyticsAdapter(restore); // put the production (dual-write) adapter back
+    setAnalyticsAdapter(restore); // put the production (relay) adapter back
     gameplaySession.noteStar(5);
     injectVercelTelemetry();
     // With the default adapter active again, the real transports are reached and
-    // the stub sees nothing more.
-    expect(track).toHaveBeenCalledWith("star_reached", { star: 5 });
+    // the stub sees nothing more: custom events go relay-only, and the page
+    // inject carries the kept page-level pair (Speed Insights, then the
+    // page-view inject, same order as pre-seam).
+    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5 });
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
     expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
-    // Byte-identical to the pre-seam call: Speed Insights injects before Web
-    // Analytics. Locking the order guards against a future reorder in the adapter.
     expect(vi.mocked(injectSpeedInsights).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(injectWebAnalytics).mock.invocationCallOrder[0],
     );
     expect(stub.events.some(([name]) => name === "star_reached")).toBe(false);
-  });
-
-  it("dual-writes each event to both Vercel and the PostHog relay", () => {
-    setAnalyticsAdapter(restore); // the default dual-write adapter
-    gameplaySession.noteStar(5);
-    expect(track).toHaveBeenCalledWith("star_reached", { star: 5 });
-    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5 });
-  });
-
-  it("still writes to the relay when the Vercel transport throws", () => {
-    setAnalyticsAdapter(restore);
-    vi.mocked(track).mockImplementationOnce(() => {
-      throw new Error("vercel down");
-    });
-    expect(() => gameplaySession.noteStar(6)).not.toThrow();
-    // The Vercel throw is swallowed inside the adapter, so the relay write still
-    // happens: the two feeds are independent during the dual-write window.
-    expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 6 });
   });
 });

@@ -19,7 +19,7 @@ import { telemetryHostAllowed } from "./telemetry";
 /**
  * The event vocabulary and each event's props. Declaring it as a map makes a
  * typo'd event name or a stray prop a compile error and keeps the whole surface
- * legible in one place. Props stay to primitives Vercel accepts.
+ * legible in one place. Props stay to primitives the relay transport accepts.
  */
 export interface GameplayEvents {
   /** A fresh tower was founded (the funnel's entry point). `mode` is the

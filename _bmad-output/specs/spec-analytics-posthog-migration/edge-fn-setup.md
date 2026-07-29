@@ -120,7 +120,7 @@ That makes a proxy change safe to validate before it ships:
 
 ```ts
 // Inside the single analytics adapter (CAP-1). No PostHog import.
-const SESSION = crypto.randomUUID(); // in-memory, never persisted
+const SESSION = crypto.randomUUID(); // session-scoped; as built, cached in sessionStorage (see reverse-proxy.md), never persisted across sessions
 
 export function sendEvent(event: string, properties: Record<string, unknown>): void {
   if (!telemetryHostAllowed()) return; // the one gate, unchanged

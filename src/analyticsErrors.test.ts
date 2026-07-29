@@ -5,7 +5,7 @@ import { telemetryHostAllowed } from "./telemetry";
 import { getCommonProps } from "./analytics";
 
 // The error reporter posts $exception straight through the relay's sendException
-// (relay-only, never the dual-write adapter), gated on the shared host predicate,
+// (relay-only, off the adapter seam), gated on the shared host predicate,
 // and enriched with the boot common props. Stub all three so these tests assert
 // the reporter's own logic (dedup, cap, shape, never-throw) without a real beacon,
 // a real host, or the enrichment pipeline.

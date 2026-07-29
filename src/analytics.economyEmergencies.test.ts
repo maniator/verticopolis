@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { track } from "@vercel/analytics";
+import { sendToRelay } from "./analyticsRelay";
 import {
   gameplaySession,
   trackEconomyAction,
@@ -12,7 +12,6 @@ import {
 // once-per-session session_emergencies summary. Stub the vendor surface like the
 // sibling analytics suites so the host gate, the latches, and the multi-tower
 // accumulator can be asserted without a real beacon.
-vi.mock("@vercel/analytics", () => ({ track: vi.fn(), inject: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
@@ -22,7 +21,7 @@ const localhost = "http://localhost:3000/";
 /** The props of every emitted event with the given name, in call order. */
 function propsFor(name: string): Record<string, unknown>[] {
   return vi
-    .mocked(track)
+    .mocked(sendToRelay)
     .mock.calls.filter(([n]) => n === name)
     .map(([, props]) => props as Record<string, unknown>);
 }
@@ -31,7 +30,7 @@ describe("economy_action telemetry", () => {
   beforeEach(() => {
     window.location.href = prod;
     gameplaySession.reset(); // clears both the economy latch and the emergency accumulator
-    vi.mocked(track).mockReset();
+    vi.mocked(sendToRelay).mockReset();
   });
 
   afterEach(() => {
@@ -60,7 +59,7 @@ describe("economy_action telemetry", () => {
     trackEconomyAction("demolish", "sell");
     trackEconomyActionOnce("price_tune");
     trackEmergencyChoice("fireRescue", "accept");
-    expect(track).not.toHaveBeenCalled();
+    expect(sendToRelay).not.toHaveBeenCalled();
   });
 
   it("clears BOTH economy latches on reset (test isolation)", () => {
@@ -79,7 +78,7 @@ describe("emergency_choice telemetry", () => {
   beforeEach(() => {
     window.location.href = prod;
     gameplaySession.reset();
-    vi.mocked(track).mockReset();
+    vi.mocked(sendToRelay).mockReset();
   });
 
   afterEach(() => {
@@ -100,7 +99,7 @@ describe("session_emergencies telemetry", () => {
   beforeEach(() => {
     window.location.href = prod;
     gameplaySession.reset();
-    vi.mocked(track).mockReset();
+    vi.mocked(sendToRelay).mockReset();
   });
 
   afterEach(() => {
@@ -153,6 +152,6 @@ describe("session_emergencies telemetry", () => {
     window.location.href = localhost;
     gameplaySession.noteEmergencyCounts(3, 2, 1);
     gameplaySession.end(true);
-    expect(track).not.toHaveBeenCalled();
+    expect(sendToRelay).not.toHaveBeenCalled();
   });
 });

@@ -3,11 +3,12 @@ import { analyticsAdapter } from "./analyticsAdapter";
 /**
  * Shared page-view + Core Web Vitals inject for every deployed page: the game
  * boot (`bootstrap.ts`), the sprite gallery (`gallery.ts`), and the standalone
- * `/help` page (`helpPage.ts`). It reports Core Web Vitals and page views
- * through the one analytics adapter (today Vercel Speed Insights + Web
- * Analytics), but only where the Vercel endpoints (`/_vercel/speed-insights/*`
- * and `/_vercel/insights/*`) actually exist: the production domain and Vercel
- * preview deployments.
+ * `/help` page (`helpPage.ts`). It reports page performance and page views
+ * through the one analytics adapter (the page-level pair kept at the D-1
+ * cutover: Vercel Speed Insights plus the Web Analytics page-view inject; the
+ * custom-event side of Web Analytics is retired), but only where the Vercel
+ * endpoints (`/_vercel/speed-insights/*` and `/_vercel/insights/*`) actually
+ * exist: the production domain and Vercel preview deployments.
  *
  * Gating on the host keeps the injected scripts' 404s (and the console errors
  * they raise) out of localhost, the `vite preview` server the e2e console-error

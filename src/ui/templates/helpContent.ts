@@ -115,12 +115,16 @@ export function helpAboutBody(version: string): TemplateResult {
  *  posture changes, this copy must change in the same PR. */
 export function helpPrivacyBody(): TemplateResult {
   return html`<p style="color:var(--muted)">
-    Verticopolis counts anonymous gameplay totals, like "a tower was founded" or "a 3-star rating was reached", plus
-    anonymous page and performance metrics, so development can follow what players actually run into. There are no
-    cookies, no accounts, and no ads: the game never asks for your name or email, keeps no profile, and nothing
-    recognizes you from one day to the next. Crash reports carry the technical details of the error and the same kind
-    of anonymous totals, though an error message can occasionally quote a bit of game text, such as a tower's name.
-    Saves live in your own browser's storage and leave your device only when you export them.
+    Verticopolis keeps a small, anonymous read on how the game is going: whether new players place their first
+    facility, how far towers climb the star ladder, which tools get used, and whether returning players get further
+    than first-timers. Those signals are worked out on your own device and sent as coarse, anonymous counts through
+    our own site, with no cookie and nothing that could point back to you across visits, plus anonymous page-visit
+    counts and page performance metrics. There are no accounts and no ads: the game never asks for your name or email, keeps no
+    profile, and nothing recognizes you from one day to the next, so there is no consent banner because there is
+    nothing here to consent to. Crash reports carry the technical details of the error and the same kind of anonymous
+    totals, though an error message can occasionally quote a bit of game text, such as a tower's name. Saves live in
+    your own browser's storage and leave your device only when you export them. The counts help decide what to
+    improve; they are never sold or shared.
   </p>`;
 }
 
