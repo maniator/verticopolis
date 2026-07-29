@@ -3,7 +3,7 @@ import type { Unit, VacateReason } from "../engine/types";
 import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
-import { isHotelKind } from "../engine/facilities";
+import { isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
 
 /**
@@ -122,7 +122,7 @@ export function gripeLineText(
  */
 export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   if (
-    !(u.kind === "office" || u.kind === "condo" || isRentalKind(u.kind)) ||
+    !(u.kind === "office" || u.kind === "condo" || isLeaseAmenityKind(u.kind) || isRentalKind(u.kind)) ||
     u.state !== "empty" ||
     u.noRate ||
     !sim.tower.isFloorServed(u.floor) ||
@@ -148,8 +148,10 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   // the live and gate paths (#661). The gate registers every probe as an origin,
   // rentals included, so computing the flag here would manufacture a true one for a
   // kind the sim never drains that way and blame a rental vacancy on "too few
-  // shops". Mirroring the engine's coverage guard keeps the two in step.
-  const coverageKind = !isRentalKind(u.kind);
+  // shops". Mirroring the engine's coverage guard keeps the two in step. The
+  // lease amenities (#667) are excluded the same way: the gate skips the demand
+  // map for them because the coverage drain never reads it for an amenity.
+  const coverageKind = !isRentalKind(u.kind) && !isLeaseAmenityKind(u.kind);
   const cov = coverageKind && ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
   const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);

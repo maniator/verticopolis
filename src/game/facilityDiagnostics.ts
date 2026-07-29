@@ -3,7 +3,7 @@ import type { Simulation } from "../engine/Simulation";
 import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simulation";
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
-import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
+import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
 import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
@@ -393,7 +393,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // tower has outgrown its centers (the canon 4★ gate).
   if (u.kind === "recycling" && isOperational(u)) lines.push(...recyclingLines(sim));
   // "Main gripe": before an eviction notice ever fires, name the dominant drain
-  // on an unhappy tenant (office / condo / hotel / rental) that isn't already called
+  // on an unhappy tenant (office / condo / hotel / rental / lease amenity, #667) that isn't already called
   // out by a dedicated line above, so a dropping satisfaction number reads as an
   // actionable cause instead of a mystery. Access, the long-walk line (office and
   // Apartment), and very-far lobby distance keep their own (GRIPE_TEXT skips those);
@@ -404,14 +404,14 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     isPresent(u) &&
     u.state !== "vacating" &&
     u.satisfaction <= GRIPE_WARN &&
-    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind) || isRentalKind(u.kind))
+    (u.kind === "office" || u.kind === "condo" || isLeaseAmenityKind(u.kind) || isHotelKind(u.kind) || isRentalKind(u.kind))
   ) {
     const gripe = sim.dominantGripe(u);
     const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
     if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
   }
   // "Won't lease": the empty-unit mirror of "Main gripe". An on-market, reachable
-  // condo/office/rental the move-in sustainability gate holds vacant names WHY no one
+  // condo/office/rental/lease-amenity the move-in gate holds vacant names WHY no one
   // leases it (the logic and copy live in {@link wontLeaseText}, gated on the same
   // predicate the engine uses so the card and the move-in decision can't disagree).
   const wontLease = wontLeaseText(sim, u);

@@ -7,7 +7,7 @@ import { rentOf, rentConfig } from "../econConfig";
 import { householdPrice, snapToLadder } from "../gameRules";
 
 import { subtypeListFor } from "../retailSubtypes";
-import { FACILITIES, isHotelKind } from "../facilities";
+import { FACILITIES, isHotelKind, isLeaseAmenityKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { rollHousehold } from "../households";
 import { segAt } from "../tower/segments";
@@ -188,8 +188,11 @@ export function attemptMoveIns(sim: Simulation): void {
     // noise/far-walk/lobby, the Studio gently on noise, and both on an over-market
     // rent), so a bad spot would just lease, churn out, and re-list forever without
     // this gate. Unmet demand is NOT in that list: rentals are excluded from it on
-    // both paths (see #661).
-    if (u.kind === "condo" || u.kind === "office" || isRentalKind(u.kind)) {
+    // both paths (see #661). The lease amenities (fitnessClub/clinic) are gated
+    // for the same reason (#667): they erode on unserved placement and on an
+    // over-market rent (over * 0.07 outruns SERVED_RECOVERY past ~71% over), so
+    // an ungated one at max rent would lease, erode out, and re-list forever.
+    if (u.kind === "condo" || u.kind === "office" || isLeaseAmenityKind(u.kind) || isRentalKind(u.kind)) {
       satCtx ??= buildSatisfactionContext(sim, true); // gate judges placement, not transient congestion
       if (wouldEvictFreshTenant(sim, u, satCtx)) continue;
     }
@@ -203,7 +206,14 @@ export function attemptMoveIns(sim: Simulation): void {
       // Modern-only lease amenities, filled like an office (any day of the week).
       // Classic never reaches here: it holds neither kind, so no rng is drawn and
       // the Classic seeded stream is untouched.
-      if (sim.rng.chance(0.22 * demand)) sim.moveIn(u);
+      if (sim.rng.chance(0.22 * demand)) {
+        sim.moveIn(u);
+        // A club leasing mid-pass is a fitness-halo source immediately, so later
+        // gated candidates in this same pass judge against the live halo instead
+        // of the stale gather (the same running-context patch the hotel branch
+        // applies to the demand pool below).
+        if (u.kind === "fitnessClub" && satCtx && servedSet.has(u.floor)) satCtx.clubFloors.push(u.floor);
+      }
     } else if (isRentalKind(u.kind)) {
       // Modern-only rental living: a vacant Studio/Apartment re-leases like an
       // office/condo, at a speed the player's rent sets (demandFactor). Classic
