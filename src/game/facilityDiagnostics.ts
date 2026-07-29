@@ -4,6 +4,7 @@ import { TRANSPORT_FAR_TILES, VACATE_RESCIND, GRIPE_WARN } from "../engine/Simul
 import { SERVED_RECOVERY } from "../engine/sim/constants";
 import { COMMERCIAL_LOBBY_FLOORS, TRAFFIC_FACTOR_MEAN } from "../engine/EconomySystem";
 import { FACILITIES, isCommercialKind, isElevatorKind, isHotelKind } from "../engine/facilities";
+import { isRentalKind } from "../engine/residentialRentals";
 import { hotelInfestationLines, housekeepingCoverageLines } from "./housekeepingDiagnostics";
 import { reachesLobby } from "../engine/sim/gripe";
 import { gripeLineText, wontLeaseText } from "./gripeCopy";
@@ -133,13 +134,12 @@ export function retailStatsLines(
   // The venue's share of local demand (commercial demand pools): what fraction of
   // its capacity the reachable population fills. Surfaced so a low customer count
   // reads as "thin local demand here" (add population, or spread venues out)
-  // rather than a mystery, and so a venue pinned at 100% reads as fully
-  // subscribed. Plain information, shown in both modes; in Modern the under-served
-  // / over-built advice rides on top of this number (added just below).
-  // Only shown when the fraction is KNOWN (the venue is in the current demand
-  // map: reachable and operational). An absent venue, e.g. one that just finished
-  // construction and is not yet in this hour's memo, passes `undefined` and omits
-  // the line rather than fabricating a misleading "0% of capacity".
+  // rather than a mystery, and so a venue pinned at 100% reads as fully subscribed.
+  // Plain information in both modes; in Modern the under-served / over-built advice
+  // rides on top of it (just below). Shown only when the fraction is KNOWN (the venue
+  // is in the current demand map: reachable and operational); an absent one, e.g. just
+  // out of construction, passes `undefined` and omits the line rather than fabricating
+  // a misleading "0% of capacity".
   if (demandFraction !== undefined) {
     const demandPct = Math.round(Math.max(0, Math.min(1, demandFraction)) * 100);
     lines.push(html`<div>Local demand: ${demandPct}% of capacity.</div>`);
@@ -276,13 +276,17 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
       );
     }
   }
-  // W1: a served office whose nearest stairs/elevator is beyond the walking
-  // tolerance is silently eroding, so surface it always (like the W3 line below),
-  // not only once the tenant is already on notice, and name the concrete fix.
+  // W1: a served office (or rental Apartment) whose nearest stairs/elevator is
+  // beyond the walking tolerance is silently eroding, so surface it always (like
+  // the W3 line below), not only once the tenant is already on notice, and name
+  // the concrete fix. Mirrors the engine's farWalk guard kind for kind: the
+  // Apartment feels this drain (#502), the Studio never minds the hike. Gated on
+  // `reachesLobby` (segment-aware since #647), so a unit stranded on a disconnected
+  // run keeps its access line instead of a hike it carries no drain for.
   if (
-    u.kind === "office" &&
+    (u.kind === "office" || u.kind === "rentalApartment") &&
     u.floor !== 1 &&
-    sim.tower.isFloorServed(u.floor) &&
+    reachesLobby(sim, u) &&
     sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES
   ) {
     lines.push(
@@ -298,18 +302,19 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
       html`<div style="color:var(--bad)">Shoppers: too far from a lobby. Traffic is halved. Keep it within 2 floors of the ground or a sky lobby (every 15th floor).</div>`,
     );
   }
-  // W-new (#394): a served office/condo/hotel far from the nearest (sky)lobby caps
-  // low, and deep in the very-far band also erodes toward a move-out. Name the
-  // structural fix (a sky lobby, not a local shaft). Always-on, like W1/W3. Modern
-  // shows the live distance (advice-with-numbers); Classic names the band only.
-  // HONESTY GATE: the advice may only prescribe a lobby the placement rules
-  // would accept, so it names the exact buildable slot; when no legal nearer
-  // slot exists (the short block above the highest buildable slot, e.g. floors
-  // 91+ over a floor-90 lobby), the line goes neutral and uncolored instead of
-  // flagging unavoidable geometry as a player mistake.
+  // W-new (#394): a served office/condo/hotel/Apartment far from the nearest
+  // (sky)lobby caps low, and deep in the very-far band also erodes toward a move-out
+  // (the Apartment carries the drain, the Studio does not). Name the structural fix
+  // (a sky lobby, not a local shaft). Always-on like W1/W3; Modern shows the live
+  // distance, Classic the band only. Same `reachesLobby` gate
+  // as W1: the drain rides on the segment-aware `served`, so a stranded unit feels
+  // none of it. HONESTY GATE: the advice may only prescribe a lobby the placement
+  // rules would accept, so it names the exact buildable slot; when no legal nearer
+  // slot exists (the short block above the highest buildable slot, e.g. floors 91+
+  // over a floor-90 lobby), it goes neutral rather than flag unavoidable geometry.
   if (
-    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind)) &&
-    sim.tower.isFloorServed(u.floor)
+    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind) || u.kind === "rentalApartment") &&
+    reachesLobby(sim, u)
   ) {
     const lobbyDist = sim.tower.nearestLobbyFloorDistance(u.floor);
     const drain = sim.rules.lobbyDistanceDrain(lobbyDist);
@@ -388,26 +393,25 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
   // tower has outgrown its centers (the canon 4★ gate).
   if (u.kind === "recycling" && isOperational(u)) lines.push(...recyclingLines(sim));
   // "Main gripe": before an eviction notice ever fires, name the dominant drain
-  // on an unhappy tenant (office / condo / hotel) that isn't already called out
-  // by a dedicated line above, so a dropping satisfaction number reads as an
-  // actionable cause instead of a mystery. Access, the office long-walk, and
-  // very-far lobby distance keep their own lines (GRIPE_TEXT skips those causes);
-  // this surfaces congestion, over-market rent, noise, and unmet local retail
-  // demand, which were otherwise invisible until the notice.
-  // Gated at GRIPE_WARN (the noise annoyance ceiling) so a content tenant is left
-  // unbothered while a noise-capped one, which sits exactly at the ceiling, is caught.
+  // on an unhappy tenant (office / condo / hotel / rental) that isn't already called
+  // out by a dedicated line above, so a dropping satisfaction number reads as an
+  // actionable cause instead of a mystery. Access, the long-walk line (office and
+  // Apartment), and very-far lobby distance keep their own (GRIPE_TEXT skips those);
+  // this surfaces congestion, over-market rent, noise, and unmet local retail demand,
+  // invisible until the notice otherwise. Gated at GRIPE_WARN (the noise annoyance
+  // ceiling), so a content tenant is left alone while a noise-capped one is caught.
   if (
     isPresent(u) &&
     u.state !== "vacating" &&
     u.satisfaction <= GRIPE_WARN &&
-    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind))
+    (u.kind === "office" || u.kind === "condo" || isHotelKind(u.kind) || isRentalKind(u.kind))
   ) {
     const gripe = sim.dominantGripe(u);
     const text = gripe ? gripeLineText(sim, u, gripe) : undefined;
     if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
   }
   // "Won't lease": the empty-unit mirror of "Main gripe". An on-market, reachable
-  // condo/office the move-in sustainability gate holds vacant names WHY no one
+  // condo/office/rental the move-in sustainability gate holds vacant names WHY no one
   // leases it (the logic and copy live in {@link wontLeaseText}, gated on the same
   // predicate the engine uses so the card and the move-in decision can't disagree).
   const wontLease = wontLeaseText(sim, u);
