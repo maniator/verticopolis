@@ -172,6 +172,17 @@ function carGfx(entry: { seed: number; w: number; kind: FacilityKind; gfx: Map<s
 }
 
 export function syncMotion(engine: TowerEngine): void {
+  // Carry each car's eased draw state across the rebuild, keyed by shaft id +
+  // car index: structural edits run syncMotion on every revision bump, and
+  // without the carry-over an unrelated place/demolish would snap every
+  // mid-travel car to its sim position (GH #688). A shaft that vanished simply
+  // has no new entry to claim its old state; a genuinely new car seeds lazily
+  // at its sim position in updateMotion (the CAP-3 rebuild snap).
+  const carried = new Map<string, CarDrawState>();
+  for (const c of engine.carActors) {
+    const s = carDrawStates.get(c);
+    if (s) carried.set(`${c.t.id}:${c.i}`, s);
+  }
   clearMotion(engine);
   for (const t of engine.sim.tower.transports) {
     if (!isElevatorKind(t.kind)) continue;
@@ -184,7 +195,10 @@ export function syncMotion(engine: TowerEngine): void {
       const a = new ex.Actor({ pos: ex.vec(engine.worldX(t.x), -t.carPositions[i] * FLOOR), width: w, height: FLOOR, anchor: ex.vec(0, 0), z: 2 });
       a.graphics.use(carGfx({ seed, w, kind: t.kind, gfx }, IDLE_CAR));
       engine.engine.add(a);
-      engine.carActors.push({ actor: a, t, i, seed, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) });
+      const entry = { actor: a, t, i, seed, w, kind: t.kind, gfx, shown: carKey(IDLE_CAR) };
+      const prev = carried.get(`${t.id}:${i}`);
+      if (prev) carDrawStates.set(entry, prev);
+      engine.carActors.push(entry);
     }
   }
   for (const u of engine.sim.tower.units) {
@@ -359,6 +373,10 @@ export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
     // The drawn position chases the sim position with the accel/decel ease
     // (carMotion.ts) instead of teleporting on each whole-game-minute sim tick.
     stepCarPursuit(drawn, target, dtSeconds);
+    // A reversed target can carry the drawn car past the turn-around point on
+    // momentum; physical inside the shaft, but never draw beyond its span.
+    if (typeof c.t.bottom === "number" && drawn.pos < c.t.bottom) drawn.pos = c.t.bottom;
+    if (typeof c.t.top === "number" && drawn.pos > c.t.top) drawn.pos = c.t.top;
     c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
     // Indicator state (riders bucket scaled to capacity, direction lantern,
     // FULL) is derived by the tested carIndicator helper; the cab graphic is

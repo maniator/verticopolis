@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.2.0
 
-- Elevator cars glide now. They accelerate away from a stop, cruise, and settle onto their floor in one continuous motion, instead of freezing and jumping as the clock ticks. The elevators themselves run exactly as before; only the drawing changed.
+- Elevator cars glide now: they accelerate away from a stop, cruise, and settle onto their floor, instead of freezing and jumping as the clock ticks. Only the drawing changed; timing is untouched.
 
 ## 2.1.1
 
