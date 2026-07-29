@@ -105,5 +105,13 @@ describe("the lease-amenity Main gripe line (#667)", () => {
     }
     // At the going rate the gate allows the spot and the seeded stream fills it.
     expect(leased).toBe(true);
+    // Relapse: relist the leased clinic and gouge it again; the gate must hold
+    // the re-listed spot vacant just like the fresh one.
+    clinic.state = "empty";
+    clinic.everOccupied = false;
+    clinic.occupants = 0;
+    clinic.rent = rentConfig("clinic")!.max;
+    for (let i = 0; i < 60; i++) attemptMoveIns(sim);
+    expect(clinic.state).toBe("empty");
   });
 });
