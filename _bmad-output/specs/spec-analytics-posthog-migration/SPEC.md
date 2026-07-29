@@ -31,8 +31,8 @@ The full-repository-audit (2026-07-21) opened D-1 (issue #542): stay on Vercel W
   - **success:** PostHog shows a platform breakdown, the three-step funnel with real drop rates, returning-versus-new by depth, and per-tool per-session distributions.
 
 - **CAP-4: Report re-target and tooling retirement**
-  - **intent:** retarget the analytics report to PostHog queries and retire the percentile-reconstruction machinery in `analytics-report.mjs` once cutover is confirmed; `session_fps` (issue #538) emits raw values into the surviving stack.
-  - **success:** exact percentiles and per-session correlation come from PostHog queries, not histogram reconstruction; the `analytics-report.mjs` percentile code is deleted on cutover; the AUD-034 truncation caveat is gone.
+  - **intent:** retarget the analytics report to PostHog queries and retire the percentile-reconstruction machinery in `analytics-report.mjs` once cutover is confirmed; `session_fps` (issue #538) emits raw values into the surviving stack; then stop the client dual-write so the relay is the only event transport.
+  - **success:** exact percentiles and per-session correlation come from PostHog queries, not histogram reconstruction; the `analytics-report.mjs` percentile code is deleted (done, PR #692); the AUD-034 truncation caveat is gone; grep finds no `@vercel/analytics` import anywhere (the seam keeps only `@vercel/speed-insights`); the transparency note copy is live in the shipped game.
 
 ## Constraints
 
@@ -40,7 +40,7 @@ The full-repository-audit (2026-07-21) opened D-1 (issue #542): stay on Vercel W
 - **No project key in the public bundle.** A same-origin serverless relay forwards events to PostHog server-side; the write key lives in the deployment environment (`POSTHOG_KEY`), never in the shipped bundle; the relay is rate-limited against abuse. See `reverse-proxy.md`.
 - **Near-zero mobile bundle, verified.** Because `posthog-js` is not shipped (events flow through the thin same-origin relay), the client delta is a small `fetch` or `sendBeacon` adapter, not a ~50 KB SDK. The gzipped delta and any cold-start cost are still measured on a mid-tier phone against the render-perf error budget and must stay under a concrete ceiling: a net delta of at most 5 KB gzipped with no measurable cold-start regression, and the implementation PR records the actual measured number. Render performance is the audit's number-one risk, so this is a hard gate.
 - **One gate for every surface.** `telemetryHostAllowed` stays the single predicate every telemetry call obeys; the native Capacitor shell, localhost, and the e2e `vite preview` server stay dark by it (Vercel preview deployments on `*.vercel.app` do emit, tagged `environment=preview`, so a preview can validate the pipeline); no second divergent gate. The typed vocabulary and the never-throw best-effort guarantee are preserved across the swap.
-- **Dual-write validation window.** For a short window both Vercel and PostHog receive events in parallel; Vercel is retired only after the two agree on the headline counts (founded, first build, boots, sessions). Speed Insights (Core Web Vitals) is a separate keep-or-drop decision recorded at swap time.
+- **Dual-write validation window (closed 2026-07-29).** Both Vercel and PostHog received events in parallel from S3 (PR #582), with both reports rendered side by side from S5 (PR #604). The owner ruled the retirement on 2026-07-29 (report path in PR #692, client path in this story), superseding a formal headline-count write-up. Speed Insights (Core Web Vitals) is KEPT: it has no replacement in the cookieless setup, so `@vercel/speed-insights` stays in the adapter seam.
 - **Preview and production are separated server-side.** The relay stamps an `environment` property from Vercel's `VERCEL_ENV` (`production` / `preview` / `development`), read server-side and not client-overridable; PostHog dashboards default to `environment = production` so preview and local traffic is captured for pipeline validation but never blended into production numbers. See `edge-fn-setup.md`.
 - **Process.** Spec-first. The decision is ruled; the work sequences as seam, reverse proxy, cookieless transport swap, event enrichment, report re-target, dual-write, retire. Each PR passes four quality gates and `/gds-code-review` in-session (analytics correctness is gameplay-progression semantics, per the TDT-is-storage-but-gds-reviewed precedent); the player-facing transparency note is updated; a version bump applies only where a player-facing surface changes.
 
@@ -54,7 +54,7 @@ The full-repository-audit (2026-07-21) opened D-1 (issue #542): stay on Vercel W
 
 ## Success signal
 
-After cutover, PostHog answers what Vercel only approximated: exact percentiles, per-tool and per-session splits, a real first-tower funnel, and a platform breakdown, at a measured mobile bundle cost under the stated budget, cookieless and banner-free, with dual-write parity confirmed before Vercel is retired and the `analytics-report.mjs` percentile machinery deleted.
+After cutover, PostHog answers what Vercel only approximated: exact percentiles, per-tool and per-session splits, a real first-tower funnel, and a platform breakdown, at a measured mobile bundle cost under the stated budget, cookieless and banner-free. Cutover complete means: the `analytics-report.mjs` percentile machinery deleted (PR #692), no `@vercel/analytics` import in the codebase, Speed Insights retained by recorded decision, and the transparency note live in the shipped game.
 
 ## Assumptions
 

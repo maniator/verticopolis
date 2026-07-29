@@ -40,9 +40,11 @@ describe("helpPageTemplate", () => {
     expect(shared.length).toBeGreaterThan(100);
     expect(norm(privacy!.textContent ?? "")).toContain(shared);
     // And the shared body itself still makes the promise (guards against it
-    // being hollowed out while both containments keep passing).
-    expect(shared).toContain("anonymous gameplay totals");
-    expect(shared).toContain("no cookies, no accounts, and no ads");
+    // being hollowed out while both containments keep passing). These phrases
+    // are the transparency note's load-bearing claims: same-origin transport,
+    // no cookie, no cross-visit identity, saves stay local.
+    expect(shared).toContain("anonymous counts through our own site");
+    expect(shared).toContain("with no cookie and nothing that could point back to you across visits");
     expect(shared).toContain("leave your device only when you export them");
   });
 

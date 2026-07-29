@@ -1,4 +1,3 @@
-import { track, inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { sendToRelay } from "./analyticsRelay";
 
@@ -9,13 +8,14 @@ import { sendToRelay } from "./analyticsRelay";
  * (`telemetryHostAllowed`), and the never-throw best-effort guarantee all stay
  * with the callers in `analytics.ts` and `telemetry.ts`; this layer answers only
  * two vendor questions: "how does a typed custom event reach the provider" and
- * "how does the shared page-view plus Core Web Vitals inject reach the provider".
+ * "how does the page-performance inject reach the provider".
  *
- * Keeping both here is what makes the planned D-1 migration (Vercel Web Analytics
- * to a cookieless PostHog relay) a one-file change: no other module imports a
- * `@vercel/*` telemetry SDK, so swapping the provider is a new {@link
- * AnalyticsAdapter} plus one binding, with every call site untouched. A grep for
- * the vendor package outside this file should come back empty.
+ * The D-1 migration (Vercel Web Analytics to the cookieless PostHog relay) is
+ * complete: custom events go relay-only, and `@vercel/analytics` is gone from
+ * the codebase. `@vercel/speed-insights` (Core Web Vitals) is KEPT by the
+ * recorded swap-time decision in the migration spec: the cookieless setup ships
+ * no posthog-js, so nothing else measures page performance. A grep for either
+ * vendor package outside this file should come back empty.
  */
 
 /**
@@ -40,52 +40,28 @@ export interface AnalyticsAdapter {
 }
 
 /**
- * The production adapter: Vercel Web Analytics (`track`, page-view `inject`) plus
- * Speed Insights, calling exactly what the pre-seam code called in the same
- * order, so behavior is byte-identical. This is the only place a `@vercel/*`
- * telemetry SDK is imported.
+ * The production adapter after cutover (S6): custom events post to the
+ * same-origin PostHog relay (`sendToRelay`, itself never-throw), and the page
+ * inject is Speed Insights only, since Vercel Web Analytics is retired. The
+ * dual-write adapter that ran through the S3-S6 validation window is gone with
+ * it.
  */
-export const vercelAdapter: AnalyticsAdapter = {
+export const relayAdapter: AnalyticsAdapter = {
   send(event, props) {
-    track(event, props);
-  },
-  injectPageTelemetry() {
-    injectSpeedInsights();
-    injectWebAnalytics();
-  },
-};
-
-/**
- * The dual-write adapter for the migration's validation window (S3): every custom
- * event goes to BOTH the existing Vercel `track` and the new same-origin PostHog
- * relay (`sendToRelay`), so the two feeds can be compared before Vercel is retired
- * (S6). The two writes are independent: a throw in the Vercel path cannot suppress
- * the relay write (`sendToRelay` is itself never-throw). Page-view and Core Web
- * Vitals telemetry stays Vercel-only until that keep-or-drop call at cutover.
- */
-export const dualWriteAdapter: AnalyticsAdapter = {
-  send(event, props) {
-    try {
-      track(event, props);
-    } catch {
-      /* Vercel best-effort; keep the relay write independent of a Vercel hiccup */
-    }
     sendToRelay(event, props);
   },
   injectPageTelemetry() {
     injectSpeedInsights();
-    injectWebAnalytics();
   },
 };
 
 /**
- * The active adapter. Defaults to {@link dualWriteAdapter} for the S3 validation
- * window (both Vercel and the PostHog relay receive each event). A module-level
- * indirection so cutover (S6) is this one binding plus a relay-only adapter, and
- * so a test can drive the whole vocabulary through a stub (see {@link
- * setAnalyticsAdapter}) with no transport involved.
+ * The active adapter. Defaults to {@link relayAdapter} (the post-cutover
+ * production transport). A module-level indirection so a future provider swap is
+ * one binding, and so a test can drive the whole vocabulary through a stub (see
+ * {@link setAnalyticsAdapter}) with no transport involved.
  */
-let activeAdapter: AnalyticsAdapter = dualWriteAdapter;
+let activeAdapter: AnalyticsAdapter = relayAdapter;
 
 /** The adapter every caller reaches telemetry through. */
 export function analyticsAdapter(): AnalyticsAdapter {
@@ -95,8 +71,8 @@ export function analyticsAdapter(): AnalyticsAdapter {
 /**
  * Swap the active adapter, returning the previous one so a caller can restore it.
  * The only intended non-test use is a future provider swap that sets its adapter
- * once at module load; tests use it to install a stub and put `vercelAdapter`
- * back afterward.
+ * once at module load; tests use it to install a stub and put the default
+ * adapter back afterward.
  */
 export function setAnalyticsAdapter(adapter: AnalyticsAdapter): AnalyticsAdapter {
   // Wiring guard, not an emission path: a misconfigured swap (a null or a stub
