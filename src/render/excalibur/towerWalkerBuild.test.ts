@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import * as ex from "excalibur";
 import { Tower } from "../../engine/Tower";
-import { landingSeg, segAt } from "../../engine/tower/segments";
+import { landingSegs, segAt } from "../../engine/tower/segments";
 import { buildWalkers, landingTile } from "./towerWalkerBuild";
 
 /**
@@ -98,17 +98,20 @@ describe("climbers report the tile their flight actually lands on (#665)", () =>
   });
 });
 
-describe("landingTile agrees with the router's landingSeg (#674)", () => {
+describe("landingTile agrees with the router's landingSegs (#674)", () => {
   // `landingTile` is a second copy of the router's rule living in the render
   // layer. The fixtures above check it against hand-written tile sets, which
   // cannot catch the two drifting apart. These run BOTH against a real `Tower`
   // and assert they resolve to the same segment, so a change to either one is a
   // red test rather than a visual regression nobody notices.
   //
-  // This matters for #662: if `landingSeg` starts returning every run an
-  // overlapping footprint straddles so the router can link the reachable one,
-  // `landingTile` returning the first structural column would silently put the
-  // climbers back on the stranded run, undoing #665.
+  // This matters for #662, now fixed: the router's rule became `landingSegs`,
+  // returning EVERY run an overlapping footprint straddles (not just the first).
+  // `landingTile` still reports the first structural column, and that stays
+  // correct because the fix links all straddled runs into one connected component
+  // (all reachable or all stranded together), so the leftmost run `landingTile`
+  // picks is `landingSegs[0]` and is reachable exactly when the flight is usable.
+  // The parity below pins `segAt(landingTile) === landingSegs[0]`.
 
   /** Lobby across floor 1, floor tiles on 2 only from `gapEnd`, stair at x=10. */
   function splitTower(gapEnd: number): Tower {
@@ -125,8 +128,8 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     for (const floor of [t.bottom, t.top]) {
       expect(
         segAt(tower, floor, landingTile(tower, t, floor)),
-        `landingTile disagrees with landingSeg on floor ${floor}`,
-      ).toBe(landingSeg(tower, t, floor));
+        `landingTile disagrees with landingSegs[0] on floor ${floor}`,
+      ).toBe(landingSegs(tower, t, floor)[0]);
     }
     return t;
   };
@@ -140,7 +143,7 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     const t = parity(tower);
     // And prove the naive probe really would have differed, so this test cannot
     // pass by the scenario quietly ceasing to be a divergence.
-    expect(segAt(tower, 2, t.x)).not.toBe(landingSeg(tower, t, 2));
+    expect(segAt(tower, 2, t.x)).not.toBe(landingSegs(tower, t, 2)[0]);
     expect(landingTile(tower, t, 2)).toBe(15);
   });
 
@@ -155,8 +158,9 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     // single run any column resolves to the same segment, so picking a different
     // tile there is not a divergence. Two runs under one footprint is where the
     // choice of column becomes a choice of SEGMENT, and it is exactly the shape
-    // #662 is about: today `landingSeg` links the first run, and if it is changed
-    // to link the reachable one instead, `landingTile` must move with it.
+    // #662 is about: `landingSegs` now links every straddled run, and `landingTile`
+    // stays pinned to the leftmost one (`landingSegs[0]`), which the fix keeps
+    // reachable exactly when the flight is usable.
     const tower = new Tower();
     for (let x = 6; x < 30; x++) tower.place("lobby", 1, x);
     for (let x = 10; x < 12; x++) tower.place("floor", 2, x); // run A, under the footprint

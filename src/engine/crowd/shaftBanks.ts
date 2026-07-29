@@ -1,6 +1,6 @@
 import type { Tower } from "../Tower";
 import type { Transport } from "../types";
-import { landingSeg } from "../tower/segments";
+import { landingSegs } from "../tower/segments";
 import type { Crowd } from "../Crowd";
 import type { Route } from "./person";
 
@@ -41,11 +41,13 @@ export function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
   for (let i = 0; i < r.shafts.length; i++) {
     const chosen = tower.getTransport(r.shafts[i]);
     if (!chosen) continue;
-    // `chosen`'s landing segments ARE the rider's current and target runs, so
+    // `chosen`'s landing run-sets ARE the rider's current and target runs, so
     // every sibling in this bank shares both. Byte-identical on a gap-free floor,
-    // where a landing segment is a bijection with the floor (bank == floor bank).
-    const from = landingSeg(tower, chosen, r.floors[i]);
-    const to = landingSeg(tower, chosen, r.floors[i + 1]);
+    // where a landing run-set is a single segment bijective with the floor (bank
+    // == floor bank). A shaft straddling a gap has a two-run set, so it only banks
+    // with an identically-straddling sibling, never a single-run shaft (#662).
+    const from = landingSegs(tower, chosen, r.floors[i]);
+    const to = landingSegs(tower, chosen, r.floors[i + 1]);
     const bank = banks.get(bankKey(chosen.kind, from, to));
     // No bank, or a lone shaft: nothing to balance, so draw nothing and keep the
     // exact rng stream. The chosen shaft is always a member when a bank exists.
@@ -56,10 +58,14 @@ export function balanceShafts(crowd: Crowd, tower: Tower, r: Route): Route {
 }
 
 /** The bank key for one directed leg: the transport kind plus the boarding and
- *  alighting LANDING SEGMENTS, so equivalent shafts (same kind, same two runs)
- *  collide while two wings serving one floor pair from disjoint runs do not. */
-function bankKey(kind: Transport["kind"], fromSeg: number, toSeg: number): string {
-  return `${kind}:${fromSeg}:${toSeg}`;
+ *  alighting LANDING RUN-SETS, so equivalent shafts (same kind, same run-sets)
+ *  collide while two wings serving one floor pair from disjoint runs do not, and a
+ *  gap-straddling shaft (a two-run set) never banks with a single-run shaft. The
+ *  run ids are pre-sorted by {@link landingSegs}, so the joined key is canonical.
+ *  On a gap-free floor each set is one id, so the key equals the old floor-keyed
+ *  string (byte-identical banks). */
+function bankKey(kind: Transport["kind"], fromSegs: number[], toSegs: number[]): string {
+  return `${kind}:${fromSegs.join(",")}:${toSegs.join(",")}`;
 }
 
 /**
@@ -82,10 +88,11 @@ export function shaftBanks(crowd: Crowd, tower: Tower): Map<string, number[]> {
     for (const from of stops) {
       for (const to of stops) {
         if (to === from) continue;
-        // Bank by the LANDING SEGMENTS the shaft attaches to on each stop floor,
-        // so two wings of a split floor never share a bank (byte-identical on a
-        // gap-free floor, where every shaft lands on the floor's one segment).
-        const key = bankKey(t.kind, landingSeg(tower, t, from), landingSeg(tower, t, to));
+        // Bank by the LANDING RUN-SETS the shaft attaches to on each stop floor,
+        // so two wings of a split floor never share a bank and a gap-straddling
+        // shaft banks only with an identical straddler (byte-identical on a gap-free
+        // floor, where every shaft lands on the floor's one segment).
+        const key = bankKey(t.kind, landingSegs(tower, t, from), landingSegs(tower, t, to));
         let bank = banks.get(key);
         if (!bank) banks.set(key, (bank = []));
         bank.push(t.id);
