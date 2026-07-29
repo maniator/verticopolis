@@ -207,16 +207,21 @@ const INSIGHTS = [
   },
   {
     // The update event fires before the activating reload and survives a failed
-    // activation (see updateFlow.ts), so it counts attempts. The authoritative
-    // applied count is the post-reload boot with reason=update, next tile.
+    // activation (see updateFlow.ts), so it counts attempts. The confirmed
+    // (lower-bound) applied count is the post-reload boot with reason=update,
+    // next tile.
     name: "Update attempts by target version",
     description: "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
     query: trends([series("update", "Update attempts")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
   },
   {
-    name: "Applied updates by version",
-    description: "Boots with reason=update (the authoritative applied count) by the build version booted into, production, 30d.",
-    query: trends([series("boot", "Applied updates")], {
+    // A lower bound, not the exact applied count: a successful activation can
+    // still boot as continue/fresh (private-mode sessionStorage failure) or
+    // corrupt (save precedence), bypassing reason=update (see updateFlow.ts
+    // and appBoot.ts).
+    name: "Confirmed update boots by version",
+    description: "Boots with reason=update, a lower bound on applied updates (a storage failure or corrupt-save precedence reclassifies the boot), by the build version booted into, production, 30d.",
+    query: trends([series("boot", "Update boots")], {
       breakdown: "version",
       display: "ActionsTable",
       breakdownLimit: 10,
@@ -227,6 +232,14 @@ const INSIGHTS = [
     name: "Crashes over time (by repeat)",
     description: "Daily crash events split by the repeat-within-90s flag, production.",
     query: trends([series("crash", "Crashes")], { breakdown: "repeat" }),
+  },
+  {
+    // Typed crash events, not the $exception mirror: the synthetic crash
+    // reporter dedups its fingerprint once per session, so "Errors by build
+    // version" undercounts; this tile counts every typed crash.
+    name: "Crashes by build version",
+    description: "Typed crash events by build version (each crash counts, unlike the per-session-deduped $exception mirror), production, 30d.",
+    query: trends([series("crash", "Crashes")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
   },
   // Reliability / error tracking. $exception is the cookieless error signal
   // (uncaught JS errors + unhandled rejections + synthetic WebGL-crash events);
