@@ -15,7 +15,7 @@ notes, never a past version's.
 
 ## 2.4.0
 
-- Fitness Clubs and Clinics now refuse to lease a spot they would soon abandon (no access, or rent set far above the going rate), and the inspector says what to fix, both while the spot sits empty and once a tenant turns unhappy.
+- Fitness Clubs and Clinics now refuse to lease a spot they would soon abandon (no access, or rent far above the going rate), and the inspector names the fix for empty and unhappy spots alike.
 
 ## 2.3.0
 

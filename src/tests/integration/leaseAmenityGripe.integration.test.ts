@@ -114,4 +114,30 @@ describe("the lease-amenity Main gripe line (#667)", () => {
     for (let i = 0; i < 60; i++) attemptMoveIns(sim);
     expect(clinic.state).toBe("empty");
   });
+
+  it("a club leasing mid-pass lifts a later noise-gated condo in the same pass", () => {
+    // Pins the live-halo push: the club is EMPTY when the pass builds the gate
+    // context, leases first (units order), and its floor must join clubFloors
+    // immediately so the noise-afflicted condo evaluated later in the SAME pass
+    // is judged against the live halo. Forcing every fill roll true makes the
+    // single pass deterministic: both units must lease in one call. Without the
+    // push the condo sees the stale gather (no club) and stays gated.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    sim.star = 5;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+    expectOk(sim.tower.place("fastFood", 2, C - 20)); // the noise source
+    const club = placeUnit(sim, "fitnessClub", 2, C + 20); // evaluated before the condo
+    const condo = placeUnit(sim, "condo", 2, C);
+    sim.star = 1;
+    club.state = "empty";
+    condo.state = "empty";
+    expect(sim.noiseAfflicted(condo)).toBe(true);
+    sim.rng.chance = () => true;
+    attemptMoveIns(sim);
+    expect(club.state).toBe("occupied");
+    expect(condo.state).toBe("occupied");
+  });
 });
