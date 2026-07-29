@@ -13,10 +13,18 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
-## 2.0.1
+## 2.1.1
 
 - The Studio no longer quietly starves your restaurants. A floor of them was taking meal trips out of the pool and sending nobody, so the food court went hungry on a tower that had done nothing wrong.
 - The Classic vs Modern comparison now covers rental living, and no longer claims every Modern building needs 3 stars: the Studio arrives at 2.
+
+## 2.1.0
+
+- Importing or exporting a SimTower file no longer gives up because a window was
+  open. If what is on screen is just information, the fidelity report opens over
+  it; if it is a real decision, the report waits and opens by itself once you
+  have answered. In the rare case it cannot be shown at all, it says so in the
+  window you are looking at instead of failing quietly.
 
 ## 2.0.0
 

@@ -766,6 +766,21 @@ html.reduce-motion *::after {
   margin-top: 12px;
   justify-content: flex-end;
 }
+/* A line the app has to say from inside a dialog, because saying it anywhere
+   else would be saying it where nobody can read it. The `<dialog>` top layer
+   paints over the toast rail at any z-index, so a message raised while a dialog
+   is up has exactly one honest home: the dialog in front of the player. Sits
+   directly under the title bar, where the eye lands first. */
+.modal-notice {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  background: var(--r-hi);
+  box-shadow: var(--bevel-in);
+  color: var(--bad-ink);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* The unsaved-work warning, shown in the pinned strip itself rather than by
    renaming a button. Esc leaves the player looking at the dialog, not at the
    action row, so the state has to announce itself as text where their eyes
