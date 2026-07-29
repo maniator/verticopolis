@@ -175,6 +175,11 @@ describe("iOS activation (CAP-3)", () => {
 });
 
 describe("splash front door (CAP-5)", () => {
+  it("splashInstallOffered is false in wrapped builds even when not standalone", () => {
+    expect(splashInstallOffered("native")).toBe(false);
+    expect(splashInstallOffered("desktop")).toBe(false);
+  });
+
   it("splashInstallOffered is true for a not-standalone session and false for standalone", () => {
     expect(splashInstallOffered()).toBe(true);
     window.matchMedia = vi.fn((q: string) => ({ matches: q.includes("standalone") }) as MediaQueryList);

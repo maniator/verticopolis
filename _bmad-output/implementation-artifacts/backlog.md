@@ -287,6 +287,10 @@ How items flow:
 
 ## Deferral inbox
 
+### Deferred from: `bmad-code-review` of the desktop build mode (2026-07-29)
+
+- The analytics platform label derives from the platform port: `resolvePlatformLabel` in `src/analyticsEnrichment.ts` maps `isNativeWrapper` to `"ios"`, which the mobile-distribution PRD (F8) and architecture doc bind as the rule. The desktop build mode now lets an Electron wrapper bind a port with the same flag, so a desktop session would report `platform: "ios"` if analytics ever opened for it. Latent today: wrapped builds keep the telemetry host gate closed, so nothing reports at all. Before any desktop wrapper binds a port with analytics enabled, update the label derivation and the PRD/arch mode enumeration (both predate the desktop mode and mention neither desktop nor Electron).
+
 ### Deferred from: `bmad-code-review` of the window.game tooling gate (2026-07-29)
 
 - The e2e specs and the perf harness still fail as a mute Playwright `waitForFunction` timeout when run against a dist built without `VC_TOOLING=1` (a stale local `dist/`, or a Copilot sandbox whose pre-baked tooling dist was overwritten by the plain quality-gate `npm run build`). `scripts/screenshots.ts` names the fix in its error; e2e has no equivalent fail-fast diagnostic. Add one central check (a shared boot helper or Playwright global setup) that detects a booted page with no `window.game` and names the flag.

@@ -169,6 +169,6 @@ describe("resolvePlatform: desktop mode binds like native", () => {
     expect(resolvePlatform("desktop", port)).toBe(port);
   });
   it("still degrades to the browser platform for malformed desktop injections", () => {
-    expect(resolvePlatform("desktop", { isNativeWrapper: true })).not.toBe(port);
+    expect(resolvePlatform("desktop", { isNativeWrapper: true })).toBe(browserPlatform);
   });
 });

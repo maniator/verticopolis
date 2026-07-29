@@ -97,13 +97,14 @@ describe("telemetryHostAllowed: wrapped builds are closed regardless of host", (
     expect(telemetryHostAllowed("native")).toBe(false);
     expect(telemetryHostAllowed("desktop")).toBe(false);
   });
-  it("a wrapper serving from an allowed-looking hostname cannot open the gate", () => {
-    // The hazard from the distribution plan: an app-protocol host named after
-    // the production domain would pass the host check alone.
+  it("the mode gate decides before the host check, so no hostname choice can open it", () => {
+    // The hazard from the distribution plan is a wrapper serving its bundle
+    // from a host the list allows. The gate closes on mode alone, so the
+    // host set here is the strongest case the list would otherwise pass.
     window.location.href = "https://verticopolis.com/";
     expect(telemetryHostAllowed("desktop")).toBe(false);
-    // Browser modes on the same host stay allowed, so the gate change is
-    // scoped to wrapped builds only.
+    // Browser modes on the same host stay allowed: the change is scoped to
+    // wrapped builds only.
     expect(telemetryHostAllowed("production")).toBe(true);
   });
 });
