@@ -202,13 +202,23 @@ export const DAYCARE_HALO_MAX = 0.035;
  * additionally erodes once coverage falls below {@link UNMET_DEMAND_EVICT_FLOOR},
  * so a chronically under-served tenant eventually gives notice. Classic caps but
  * never erodes (it returns {@link LOBBY_NO_DRAIN} above the floor and a
- * ceiling-only drain below it). Provisional, shared by both rule-sets; the Modern
- * erosion magnitude lives in `ECON.unmetDemandErosion`. Kept strictly below 1 so
- * a fully-served tower (coverage 1) is a no-op and the golden master is unchanged.
+ * ceiling-only drain below it). Shared by both rule-sets; the Modern erosion
+ * magnitude lives in `ECON.unmetDemandErosion`. Kept strictly below 1 so a
+ * fully-served tower (coverage 1) is a no-op and the golden master is unchanged.
+ *
+ * Calibrated with #548 (the #661 rentals-as-origins work made the drain reach
+ * real towers): with erosion 0.12 easing in linearly below the 0.35 evict floor,
+ * the net-shed point (where erosion outruns the 0.05/hr served recovery) sits at
+ * coverage ~0.20, demand ~4.9x the reachable retail capacity. Between 0.35 and
+ * ~0.20 the drain caps and slows but the tenant still net-recovers; below ~0.20
+ * they drift toward notice, about one game day of visible decline at 9x before
+ * satisfaction reaches zero, then the normal vacate grace. The v1 constants
+ * (0.055 / 0.25) only netted negative below coverage ~0.02, so in practice no
+ * tenant ever shed; that narrowness was the flagged provisional part.
  */
 export const UNMET_DEMAND_FLOOR = 0.5;
 export const UNMET_DEMAND_CAP = 0.6;
-export const UNMET_DEMAND_EVICT_FLOOR = 0.25;
+export const UNMET_DEMAND_EVICT_FLOOR = 0.35;
 
 /** Canon same-floor noise buffers, in tiles (the gap a source may sit within
  *  before it bothers the sensitive room). Only these two are documented numbers;

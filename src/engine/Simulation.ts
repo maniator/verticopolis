@@ -334,7 +334,7 @@ export class Simulation implements SimContext {
 
   emitNotices(notices: { floor: number; kind: FacilityKind; reason: VacateReason }[]): void { satisfaction.emitNotices(this, notices); }
 
-  vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean, lobbyFar?: boolean, unmetDemand?: boolean): VacateReason { return gripe.vacateCause(this, u, served, cong, farWalk, noisy, lobbyFar, unmetDemand); }
+  vacateCause(u: Unit, served: boolean, cong: number, farWalk?: boolean, noisy?: boolean, lobbyFar?: boolean, unmetDemand?: boolean, unmetCov?: number | null): VacateReason { return gripe.vacateCause(this, u, served, cong, farWalk, noisy, lobbyFar, unmetDemand, unmetCov); }
 
   /** The dominant active satisfaction drain on a tenant right now (or null when
    *  content), for the inspector's pre-notice "Main gripe" line. */

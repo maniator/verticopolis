@@ -194,7 +194,12 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   const cov = coverageKind && ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
   const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
-  const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);
+  // The coverage rides along too (#548): the empty candidate is not an origin
+  // in the real memoized map, so without it the harshest-drain comparison would
+  // read null coverage and silently hand the tier back to noise, and this card
+  // would blame a noisy neighbor for a spot the gate held over a retail
+  // shortage while the occupied unit next door names the shortage.
+  const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive, cov);
   const text = gripe ? gripeLineText(sim, u, gripe, cov) : undefined;
   const lead = text
     ? `Won't lease: ${text}`

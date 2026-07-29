@@ -176,12 +176,20 @@ export const ECON = {
   /**
    * Modern-only per-hour satisfaction erosion for a tenant whose reachable retail
    * coverage has fallen below `UNMET_DEMAND_EVICT_FLOOR` (leave-tower-unmet-demand,
-   * #395). Strictly above `SERVED_RECOVERY` (0.05) so a chronically under-served
-   * Modern tenant nets a slow negative drift and eventually gives notice, gentle
-   * enough that adding a shop or restaurant within reach lets them recover. Classic
-   * never erodes for unmet demand (it caps only). PROVISIONAL, wants a tuning pass.
+   * #395; calibrated in #548). The full rate applies at coverage 0 and eases in
+   * linearly from the evict floor, so it outruns `SERVED_RECOVERY` (0.05) only
+   * below coverage ~0.20 (demand ~4.9x reachable retail). Pacing: a tenant at
+   * 9x oversubscription drifts from its cap to notice over about a game day; a
+   * fully starved coverage-0 tenant in about a third of one. Adding a reachable
+   * shop lets either recover. At 0.12 this is the steepest slow drain in the
+   * game (above NOISE_EROSION 0.07), which is why `dominantGripe` hands the
+   * NOISE tiers (the W2 band and the nightclub halo) to unmet demand when it is
+   * the steeper active erosion (#548). The transport-far and lobby-far tiers
+   * still rank above it unconditionally; that wider reattribution question
+   * belongs to the vacate-cause-reattribution row (#550). Classic never erodes
+   * for unmet demand (it caps only).
    */
-  unmetDemandErosion: 0.055,
+  unmetDemandErosion: 0.12,
   /** Cost to add one elevator car to a shaft. */
   addCarCost: 40_000,
   /** Monthly film-booking cost per cinema (canon: 150k average / 300k

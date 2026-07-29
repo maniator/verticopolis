@@ -329,15 +329,18 @@ export const MODERN_RULES: GameRules = {
   unmetDemandDrain(coverage) {
     // Modern smooths: the deeper the shortfall below the floor, the tighter the
     // ceiling (from 1.0 at the floor down to UNMET_DEMAND_CAP at coverage 0), and
-    // past a lower evict floor a gentle erosion eases in. Adding a reachable shop
-    // or restaurant raises coverage and lets tenants recover. NOTE (PROVISIONAL):
-    // the erosion only *outpaces* the +0.05/hr served recovery near coverage 0, so
-    // in practice only a fully-stranded tenant (coverage ~0, reaches no retail)
-    // actually drifts to a notice; between the evict floor and there it caps but
-    // net-recovers. The evict floor and `unmetDemandErosion` want a calibration
-    // pass to widen the region that can genuinely shed tenants (see the backlog
-    // Deferral inbox); v1 is deliberately conservative so it cannot rage-evict a
-    // mid-fill tower before a playtest tuning pass.
+    // past a lower evict floor an erosion eases in. Adding a reachable shop or
+    // restaurant raises coverage and lets tenants recover. Calibrated (#548,
+    // after #661 made rentals real demand origins): the erosion outpaces the
+    // +0.05/hr served recovery below coverage ~0.20 (demand ~4.9x the reachable
+    // retail capacity): a tenant at 9x oversubscription drifts to notice over
+    // about a game day, a fully starved coverage-0 one in about a third of one,
+    // and everything between the evict floor and the break-even caps but
+    // net-recovers. The decline self-limits: departures shrink the pool,
+    // coverage rises, and the survivors recover through the same number. The
+    // shed region deliberately stops well short of ordinary mid-fill shares
+    // (a tower must run ~5x oversubscribed before anyone packs), so a loaded
+    // save cannot rage-evict on the constants alone.
     if (coverage >= UNMET_DEMAND_FLOOR) return LOBBY_NO_DRAIN;
     const capT = Math.min(1, (UNMET_DEMAND_FLOOR - coverage) / UNMET_DEMAND_FLOOR);
     const cap = 1 - capT * (1 - UNMET_DEMAND_CAP);

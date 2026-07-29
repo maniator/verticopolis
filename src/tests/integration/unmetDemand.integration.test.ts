@@ -5,6 +5,9 @@ import type { FacilityKind } from "../../engine/types";
 import { UNMET_DEMAND_CAP, UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
 import { computeDemandMap } from "../../engine/sim/demand";
 import { unmetCoverage, dominantGripe } from "../../engine/sim/gripe";
+import { serialize, deserialize } from "../../engine/sim/serialization";
+import { VACATE_REASON_TEXT } from "../../engine/types";
+import { wontLeaseText } from "../../game/gripeCopy";
 
 /**
  * Unmet local-demand satisfaction pressure (#395): a served office/condo/hotel
@@ -110,6 +113,9 @@ describe("W-new: unmet local demand (#395)", () => {
     // the office pinned at the ceiling in silence (the cap-only noise case reports
     // the same way).
     expect(dominantGripe(sim, office)).toBe("unmetDemand");
+    // Classic ordering is untouched by the #548 comparison: with zero erosion on
+    // both sides (cap-only world) a noisy capped tenant still reads "noise" first.
+    expect(dominantGripe(sim, office, true, 0, false, true)).toBe("noise");
   }, 30000);
 
   it("leaves a tower with no reachable retail untouched (baseline: no shops is not a problem)", () => {
@@ -160,4 +166,160 @@ describe("W-new: unmet local demand (#395)", () => {
     const cong = sim.simModel === "v2" ? (sim.spatialCongestionByFloor().get(2) ?? 0) : sim.congestion();
     expect(dominantGripe(sim, tenant, true, cong, false, false, false)).toBe("unmetDemand");
   }, 30000);
+
+  it("names unmet demand over noise when it is the steeper drain, and noise again once coverage recovers (#548)", () => {
+    // A noisy tenant in a starved tower: without the harshest-drain comparison
+    // the ladder said "noise" and the player soundproofed a building dying of
+    // no shops. The cinema is the noise source on purpose: it is commercial
+    // (noiseAfflicted reads it) but an attendance venue, so it adds nothing to
+    // the retail pool and coverage genuinely stays 0.
+    const sim = Simulation.newGame(22, "modern");
+    sim.money = 1e12;
+    sim.star = 5;
+    const X0 = MID - 15;
+    const X1 = MID + 45;
+    const strip = (kind: "floor" | "lobby", f: number) => {
+      for (let x = X0; x <= X1; x++) placeStructure(sim, kind, f, x);
+    };
+    strip("lobby", 1);
+    for (let f = 2; f <= 40; f++) strip("floor", f);
+    expect(sim.tower.placeTransport("elevatorStandard", MID, 1, 30).ok).toBe(true);
+    // The disconnected retail island (35..40 only), exactly as the test above.
+    expect(sim.tower.placeTransport("elevatorStandard", MID + 12, 35, 40).ok).toBe(true);
+    const tenant = placeUnit(sim, "office", 2, X0);
+    tenant.state = "occupied";
+    placeUnit(sim, "cinema", 2, X0 + 9).state = "occupied"; // adjacent: inside the office noise band
+    placeUnit(sim, "fastFood", 40, MID + 30).state = "occupied"; // the only retail, stranded
+    expect(sim.noiseAfflicted(tenant)).toBe(true);
+    expect(unmetCoverage(computeDemandMap(sim), tenant)).toBe(0);
+    // Both drains active; unmet demand erodes at full depth (0.12) versus the
+    // office noise rate (0.07), so the ladder names the drain that is actually
+    // pushing the tenant out.
+    expect(dominantGripe(sim, tenant, true, 0, false, true, false)).toBe("unmetDemand");
+    // Bridge the island: the fast food becomes reachable, coverage recovers to
+    // full, and the same noisy tenant reads plain "noise" again.
+    expect(sim.tower.placeTransport("elevatorStandard", MID + 24, 30, 35).ok).toBe(true);
+    expect(sim.floorReachable(40)).toBe(true);
+    expect(unmetCoverage(computeDemandMap(sim), tenant)).toBe(1);
+    expect(dominantGripe(sim, tenant, true, 0, false, true, false)).toBe("noise");
+  }, 30000);
+
+  it("the won't-lease card names the retail shortage for an empty noisy spot, matching the occupied unit beside it (#548)", () => {
+    // The empty candidate is not an origin in the real memoized map, so without
+    // the candidate-aware coverage riding into the harshest-drain comparison the
+    // card would blame the noisy neighbor while the occupied office next door
+    // names the shortage, telling the player to soundproof a building that is
+    // dying of no shops on the one surface that explains an empty spot.
+    const sim = Simulation.newGame(23, "modern");
+    sim.money = 1e12;
+    sim.star = 5;
+    const X0 = MID - 15;
+    const X1 = MID + 45;
+    const strip = (kind: "floor" | "lobby", f: number) => {
+      for (let x = X0; x <= X1; x++) placeStructure(sim, kind, f, x);
+    };
+    strip("lobby", 1);
+    for (let f = 2; f <= 40; f++) strip("floor", f);
+    expect(sim.tower.placeTransport("elevatorStandard", MID, 1, 30).ok).toBe(true);
+    expect(sim.tower.placeTransport("elevatorStandard", MID + 12, 35, 40).ok).toBe(true);
+    // An OCCUPIED office feeds the pool so the candidate's coverage really is 0
+    // (a lone empty candidate would fold only its own probe demand).
+    placeUnit(sim, "office", 3, X0).state = "occupied";
+    const spot = placeUnit(sim, "office", 2, X0); // the empty candidate under test
+    placeUnit(sim, "cinema", 2, X0 + 9).state = "occupied"; // adjacent noise, pool-inert
+    placeUnit(sim, "fastFood", 40, MID + 30).state = "occupied"; // the only retail, stranded
+    expect(sim.noiseAfflicted(spot)).toBe(true);
+    const text = wontLeaseText(sim, spot);
+    expect(text).not.toBeNull();
+    expect(text!).toContain("shops");
+    expect(text!).not.toContain("noisy neighbor");
+  }, 30000);
+
+  it("the nightclub halo also yields the noise tier to a steeper unmet-demand drain (#548)", () => {
+    // The halo names "noise" through its own tier AFTER the guarded W2 line, so
+    // an unguarded club tier would hand the misattribution right back: a condo
+    // in a starved tower would read "noise", the player would move the club,
+    // and the tenant would keep dying at the unmet rate. A club is itself a
+    // demand-pool venue (its capacity feeds coverage), so a naturally starved
+    // club tower is enormous; the guard is pinned here through the eviction
+    // path's own flag-and-coverage arguments instead, at exact magnitudes.
+    const sim = Simulation.newGame(24, "modern");
+    sim.money = 1e12;
+    sim.star = 5;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 4; f++) lay(sim, "floor", f);
+    expect(sim.buildTransport("elevatorStandard", MID, 1, 4).ok).toBe(true);
+    const condo = placeUnit(sim, "condo", 2, MID + 12);
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.residents = 3;
+    // The club one floor up: inside the negative halo, but on a different floor
+    // so the same-floor W2 band never fires and the club tier is the one under test.
+    placeUnit(sim, "nightclub", 3, MID + 12).state = "occupied";
+    expect(sim.noiseAfflicted(condo)).toBe(false); // W2 quiet: cross-floor halo only
+    // Starved (coverage 0): the full-depth 0.12 unmet erosion beats the halo
+    // penalty at distance 1, so the steeper drain takes the tier.
+    expect(dominantGripe(sim, condo, true, 0, false, false, false, true, 0)).toBe("unmetDemand");
+    // Barely inside the evict floor (coverage 0.34): the unmet erosion is a few
+    // thousandths, the club's penalty binds, and the honest name is "noise".
+    expect(dominantGripe(sim, condo, true, 0, false, false, false, true, 0.34)).toBe("noise");
+    // No unmet drain at all: the halo names "noise" exactly as before #548.
+    expect(dominantGripe(sim, condo, true, 0, false, false, false, false, 1)).toBe("noise");
+  }, 30000);
+
+  it("a loaded, heavily oversubscribed tower sheds with every departure blamed on unmet demand, then self-limits (#548)", () => {
+    // Grumbal's regression: "the room says it's fair" is not a number. Build a
+    // share ~13 tower (past the share-12 bar the party set), round-trip it
+    // through serialize/deserialize to model a loaded save meeting the new
+    // constants, run five game days, and MEASURE: the vacate-cause histogram,
+    // the condo buy-back total, and the self-limiting recovery.
+    const sim = Simulation.newGame(30, "modern");
+    sim.money = 1e12;
+    sim.star = 5;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 7; f++) lay(sim, "floor", f);
+    for (let sx = 10; sx < W - 10; sx += 40) expect(sim.buildTransport("elevatorStandard", sx, 1, 7).ok).toBe(true);
+    placeUnit(sim, "fastFood", 2, W - 30).state = "occupied";
+    // Three sold condos on floor 2: the buy-back half of the measurement.
+    for (const cx of [14, 32, 50]) {
+      const condo = placeUnit(sim, "condo", 2, cx);
+      condo.state = "occupied";
+      condo.everOccupied = true;
+      condo.residents = 3;
+      condo.satisfaction = 1;
+    }
+    // Offices on floors 3..7 push the pool far past the shed boundary.
+    for (let f = 3; f <= 7; f++) {
+      for (let x = 14; x + 9 <= W - 40; x += 11) {
+        const r = sim.tower.place("office", f, x);
+        if (!r.ok) continue;
+        const o = unit(sim, r.unitId);
+        o.state = "occupied";
+        o.satisfaction = 1;
+      }
+    }
+    const dm0 = computeDemandMap(sim);
+    expect(dm0.share).toBeGreaterThan(10); // precondition: deep in the shed region
+    const office0 = sim.tower.units.find((u) => u.kind === "office")!;
+    const coverage0 = unmetCoverage(dm0, office0)!;
+    const sim2 = deserialize(serialize(sim));
+    for (let i = 0; i < 5 * 24; i++) sim2.tick(60);
+    // Every departure in the run names the real cause: too few shops within
+    // reach. No departure is blamed on noise, access, or lobby distance.
+    const vacates = sim2.log.filter((e) => e.text.startsWith("A tenant left ") || e.text.startsWith("The owner left "));
+    expect(vacates.length).toBeGreaterThan(20);
+    for (const e of vacates) expect(e.text).toContain(VACATE_REASON_TEXT.unmetDemand);
+    // The sold condos churned and were bought back for real money.
+    const buybacks = sim2.log.filter((e) => e.text.includes("You bought it back for $"));
+    expect(buybacks.length).toBeGreaterThan(0);
+    const total = buybacks.reduce((sum, e) => sum + Number(/\$([\d,]+)/.exec(e.text)![1].replace(/,/g, "")), 0);
+    expect(total).toBeGreaterThan(0);
+    // Self-limiting: departures shrink the pool, coverage rises through the same
+    // number, and the survivors stabilize instead of the tower wiping.
+    const dmEnd = computeDemandMap(sim2);
+    const officeEnd = sim2.tower.units.find((u) => u.kind === "office" && u.state === "occupied");
+    expect(officeEnd, "the shed did not self-limit: no occupied office survived").toBeDefined();
+    expect(unmetCoverage(dmEnd, officeEnd!)!).toBeGreaterThan(coverage0);
+    expect(sim2.tower.units.filter((u) => u.kind === "office" && u.state === "occupied").length).toBeGreaterThan(10);
+  }, 60000);
 });

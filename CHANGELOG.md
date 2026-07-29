@@ -13,6 +13,11 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.7.0
+
+- Modern towers that badly outgrow their shops now really lose tenants: past heavy oversubscription they sour within a day or two, then move out after the notice window. Classic still only caps.
+- When a shortage of nearby shops is what sours a tenant most, the gripe now says so instead of blaming a noisy neighbor, so the fix you reach for is the one that works.
+
 ## 2.6.0
 
 - Press and hold a room on a phone to peek at its card without opening it, the way a mouse hover does on desktop. Lift your finger to close it. The peek works with any tool selected; a quick tap still does what the tool always did, so with Inspect it opens the full panel.
