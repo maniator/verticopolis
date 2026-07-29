@@ -11,7 +11,12 @@ twice a week (Tuesday and Friday) and uploads the result as a workflow artifact
 named `analytics-report` (a single styled HTML report, 90-day retention). The
 raw JSON API responses are printed to the run log rather than saved as a file.
 You can also run it on demand from the Actions tab with **Run workflow** and an
-optional look-back in days.
+optional look-back window: days by default (`30`, `0.5`), or with a unit suffix
+(`12h`, `3d`). The window must be between 1 hour and 365 days; an invalid value
+fails the run instead of silently falling back to 30 days. The PostHog report
+honors sub-day windows exactly; the Vercel Web Analytics API only accepts whole
+calendar dates, so this report rounds a sub-day window up to 1 day and notes
+that in the report header.
 
 It also writes a plain-markdown version to the run's **job summary**, so you can
 read the report inline on the workflow run page with no download. GitHub
@@ -42,7 +47,7 @@ The project and team IDs are set as plain `env` in the workflow (not secrets).
 VERCEL_TOKEN=xxx \
 VERCEL_PROJECT_ID=prj_06eFZFQdFZ49EiEWmXkkphKAOSSF \
 VERCEL_TEAM_ID=team_ArE8nhexpkACNIlDHVKU80Pj \
-node scripts/analytics-report.mjs --days 30 --out reports
+node scripts/analytics-report.mjs --window 30 --out reports
 ```
 
 Output is `reports/analytics-report-<date>.html`; the raw JSON (every API

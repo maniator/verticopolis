@@ -12,7 +12,11 @@
  *
  * Runs on plain Node (18+, uses global fetch), no dependencies. Driven by the
  * scheduled GitHub Actions workflow (.github/workflows/analytics-report.yml) or
- * locally: `VERCEL_TOKEN=... node scripts/analytics-report.mjs --days 30`.
+ * locally: `VERCEL_TOKEN=... node scripts/analytics-report.mjs --window 30`.
+ * The window is days by default ("30", "0.5") or takes a unit suffix ("12h",
+ * "3d"); `--days` is kept as an alias for the old flag name. The Web Analytics
+ * API is day-granular (plain YYYY-MM-DD dates), so a sub-day window rounds up
+ * to 1 whole day here and the report says so.
  *
  * Plan note: grouping by custom event PROPERTIES (the `eventData/<prop>`
  * breakdowns) is a paid-plan (Vercel Pro) feature. Top-line event counts work
@@ -37,15 +41,47 @@ function arg(name, fallback) {
   return inline ? inline.slice(name.length + 3) : fallback;
 }
 
-// Clamp the look-back to a sane, finite integer. A stray value (0, negative,
-// non-numeric, or Infinity from something like 1e309) must never push `since`
-// to an invalid Date and make day() throw, which would break the never-throw
-// promise. Defaults to 30, caps at 365.
-function clampDays(v) {
-  const n = Math.floor(Number(v));
-  return Number.isFinite(n) && n >= 1 ? Math.min(n, 365) : 30;
+const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+
+// Parse the look-back window. A plain number is days ("30", "0.5"); a unit
+// suffix picks the unit ("12h", "3d"). Normalized to whole hours. Bounds: at
+// least 1 hour, at most 365 days. Anything the regex rejects (or a value
+// outside the bounds) throws so a bad dispatch input fails the run loudly;
+// the old guard silently swapped bad values for the 30-day default, which
+// turned a "0.5" request into a month of data with no warning. The bounded
+// integer also keeps `since` a valid Date, which day() relies on. Kept in
+// sync with the same helper in scripts/posthog-report.mjs (both scripts stay
+// dependency-free and standalone until S6 retires this one).
+function parseWindow(v) {
+  const bad = (why) =>
+    new Error(
+      `Invalid look-back window "${v}": ${why}. Use days ("30", "0.5") or a unit suffix ("12h", "3d"); minimum 1 hour, maximum 365 days.`,
+    );
+  const m = /^\s*(\d+(?:\.\d+)?|\.\d+)\s*(d|day|days|h|hr|hrs|hour|hours)?\s*$/i.exec(String(v));
+  if (!m) throw bad("not a number with an optional d/h unit");
+  const unit = (m[2] || "d")[0].toLowerCase();
+  const hours = Math.round(unit === "h" ? Number(m[1]) : Number(m[1]) * 24);
+  if (hours < 1) throw bad("shorter than 1 hour");
+  if (hours > 365 * 24) throw bad("longer than 365 days");
+  return { hours, label: hours % 24 === 0 ? plural(hours / 24, "day") : plural(hours, "hour") };
 }
-const DAYS = clampDays(arg("days", "30"));
+const WINDOW = (() => {
+  try {
+    return parseWindow(arg("window", null) ?? arg("days", "30"));
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+})();
+// The Web Analytics API takes plain YYYY-MM-DD dates, so the fetched window is
+// whole calendar days; a sub-day request rounds up to 1 day and the window
+// label carries the difference so the report never claims a window it did not
+// fetch.
+const DAYS = Math.max(1, Math.ceil(WINDOW.hours / 24));
+const WINDOW_LABEL =
+  DAYS * 24 === WINDOW.hours
+    ? WINDOW.label
+    : `${plural(DAYS, "day")} (requested ${WINDOW.label}; Vercel Web Analytics is day-granular)`;
 const OUT_DIR = arg("out", "reports");
 // Max groups an aggregate query returns. 100 is the API's hard cap (a larger
 // value is a 400). Low-cardinality breakdowns (mode, reason, version, tool,
@@ -354,7 +390,7 @@ function renderHtml(m) {
 <title>Verticopolis analytics</title><style>${HTML_STYLE}</style></head>
 <body><div class="wrap">
 <div class="titlebar"><h1>Verticopolis analytics</h1>
-<span class="sub">${escapeHtml(m.window.since)} to ${escapeHtml(m.window.until)} &middot; ${m.window.days} days &middot; production</span></div>
+<span class="sub">${escapeHtml(m.window.since)} to ${escapeHtml(m.window.until)} &middot; ${escapeHtml(m.window.label)} &middot; production</span></div>
 <div class="body">
 <div class="kpis">${kpis}</div>
 <ul class="highlights">${highlights}</ul>
@@ -406,7 +442,7 @@ function renderMarkdown(m) {
   const lines = [
     `# Verticopolis analytics report`,
     ``,
-    `Window: **${m.window.since} to ${m.window.until}** (${m.window.days} days), production only. Generated ${m.generated}.`,
+    `Window: **${m.window.since} to ${m.window.until}** (${m.window.label}), production only. Generated ${m.generated}.`,
     ``,
     `## Totals`,
     ``,
@@ -530,7 +566,7 @@ async function main() {
 
   // One model feeds both the markdown and the HTML, so they never drift.
   const model = {
-    window: { since: day(since), until: day(until), days: DAYS },
+    window: { since: day(since), until: day(until), label: WINDOW_LABEL },
     generated: until.toISOString(),
     kpis: [
       ["Towers founded", gameStarted.total],
@@ -613,4 +649,4 @@ if (process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url) 
 }
 
 // Exported for unit tests; the script itself uses them directly above.
-export { percentiles, bucketSeconds, clampDays, extractRows, extractCount };
+export { percentiles, bucketSeconds, parseWindow, extractRows, extractCount };

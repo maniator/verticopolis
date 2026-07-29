@@ -20,6 +20,6 @@ export interface Percentiles {
 
 export function percentiles(res: AggResult, ps: number[]): Percentiles | null;
 export function bucketSeconds(res: AggResult): Record<string, number> | null;
-export function clampDays(v: unknown): number;
+export function parseWindow(v: unknown): { hours: number; label: string };
 export function extractRows(json: unknown): Array<{ key: string; count: number; visitors: number }> | null;
 export function extractCount(json: unknown): number | null;

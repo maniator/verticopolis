@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 // The report generator is a dependency-free Node script (see
 // scripts/analytics-report.mjs). Its pure helpers are exported so the depth
 // math the HTML/summary lean on can be pinned here without a live Vercel query.
-import { percentiles, bucketSeconds, clampDays } from "../scripts/analytics-report.mjs";
+import { percentiles, bucketSeconds, parseWindow } from "../scripts/analytics-report.mjs";
 
 /** Shape an aggregate result the way the Vercel query normalizes it: rows of
  *  { key: value, count } sorted however, since percentiles re-sorts by value. */
@@ -67,13 +67,21 @@ describe("bucketSeconds (session-length buckets)", () => {
   });
 });
 
-describe("clampDays (look-back guard)", () => {
-  it("defaults, floors, and caps the window", () => {
-    expect(clampDays("30")).toBe(30);
-    expect(clampDays("0")).toBe(30); // below the floor -> default
-    expect(clampDays("-5")).toBe(30);
-    expect(clampDays("nonsense")).toBe(30);
-    expect(clampDays("1000")).toBe(365); // capped
-    expect(clampDays("45.9")).toBe(45); // floored to an integer
+describe("parseWindow (look-back parser)", () => {
+  // The full parser behavior is pinned in src/posthog-report.test.ts; this
+  // copy pins that the Vercel script's duplicate stays in sync on the cases
+  // that used to differ (silent 30-day default vs loud failure).
+  it("reads plain day counts and unit suffixes", () => {
+    expect(parseWindow("30")).toEqual({ hours: 720, label: "30 days" });
+    expect(parseWindow("0.5")).toEqual({ hours: 12, label: "12 hours" });
+    expect(parseWindow("12h")).toEqual({ hours: 12, label: "12 hours" });
+    expect(parseWindow("3d")).toEqual({ hours: 72, label: "3 days" });
+  });
+
+  it("throws on invalid or out-of-bounds values instead of silently defaulting", () => {
+    expect(() => parseWindow("nonsense")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("0")).toThrow(/shorter than 1 hour/);
+    expect(() => parseWindow("-5")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("1000")).toThrow(/longer than 365 days/);
   });
 });

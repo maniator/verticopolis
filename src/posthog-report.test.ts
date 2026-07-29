@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 // the response normalizers) are exported so they can be pinned here without a
 // live PostHog query.
 import {
-  clampDays,
+  parseWindow,
   lit,
   buildTotalsQuery,
   buildDepthQuery,
@@ -17,14 +17,40 @@ import {
   countRow,
 } from "../scripts/posthog-report.mjs";
 
-describe("clampDays (look-back guard)", () => {
-  it("defaults, floors, and caps the window", () => {
-    expect(clampDays("30")).toBe(30);
-    expect(clampDays("0")).toBe(30); // below the floor -> default
-    expect(clampDays("-5")).toBe(30);
-    expect(clampDays("nonsense")).toBe(30);
-    expect(clampDays("1000")).toBe(365); // capped
-    expect(clampDays("45.9")).toBe(45); // floored to an integer
+describe("parseWindow (look-back parser)", () => {
+  it("reads plain numbers as days", () => {
+    expect(parseWindow("30")).toEqual({ hours: 720, label: "30 days" });
+    expect(parseWindow("1")).toEqual({ hours: 24, label: "1 day" });
+    expect(parseWindow("0.5")).toEqual({ hours: 12, label: "12 hours" }); // the half-day case that used to become 30 days
+    expect(parseWindow(".25")).toEqual({ hours: 6, label: "6 hours" });
+  });
+
+  it("accepts day and hour unit suffixes", () => {
+    expect(parseWindow("3d")).toEqual({ hours: 72, label: "3 days" });
+    expect(parseWindow("12h")).toEqual({ hours: 12, label: "12 hours" });
+    expect(parseWindow("1 hour")).toEqual({ hours: 1, label: "1 hour" });
+    expect(parseWindow("36 hours")).toEqual({ hours: 36, label: "36 hours" });
+    expect(parseWindow("48H")).toEqual({ hours: 48, label: "2 days" }); // whole days label as days
+  });
+
+  it("rounds to whole hours", () => {
+    expect(parseWindow("1.5h").hours).toBe(2);
+    expect(parseWindow("45.9").hours).toBe(1102); // 45.9 days, kept instead of floored to 45
+  });
+
+  it("throws on anything invalid or out of bounds instead of silently defaulting", () => {
+    expect(() => parseWindow("nonsense")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("-5")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("1e309")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("")).toThrow(/Invalid look-back window/);
+    expect(() => parseWindow("0")).toThrow(/shorter than 1 hour/);
+    expect(() => parseWindow("0.4h")).toThrow(/shorter than 1 hour/); // rounds to 0 hours
+    expect(() => parseWindow("1000")).toThrow(/longer than 365 days/);
+  });
+
+  it("keeps the bounds inclusive", () => {
+    expect(parseWindow("1h").hours).toBe(1);
+    expect(parseWindow("365").hours).toBe(365 * 24);
   });
 });
 
@@ -40,25 +66,25 @@ describe("lit (HogQL string-literal escaper)", () => {
 
 describe("HogQL query builders", () => {
   it("totals query filters to production, the window, and the event set", () => {
-    const q = buildTotalsQuery(["boot", "session_end"], 30);
+    const q = buildTotalsQuery(["boot", "session_end"], 720);
     expect(q).toContain("properties.environment = 'production'");
-    expect(q).toContain("INTERVAL 30 DAY");
+    expect(q).toContain("INTERVAL 720 HOUR");
     expect(q).toContain("event IN ('boot', 'session_end')");
     expect(q).toContain("count(DISTINCT distinct_id) AS sessions");
   });
 
   it("depth query computes exact quantiles and guards nulls with the cast", () => {
-    const q = buildDepthQuery("session_end", "seconds", 14);
+    const q = buildDepthQuery("session_end", "seconds", 336);
     expect(q).toContain("quantile(0.5)(toFloat(properties.seconds))");
     expect(q).toContain("quantile(0.9)(toFloat(properties.seconds))");
     expect(q).toContain("quantile(0.95)(toFloat(properties.seconds))");
     expect(q).toContain("event = 'session_end'");
     expect(q).toContain("toFloat(properties.seconds) IS NOT NULL");
-    expect(q).toContain("INTERVAL 14 DAY");
+    expect(q).toContain("INTERVAL 336 HOUR");
   });
 
   it("breakdown query groups by the property and counts sessions per group", () => {
-    const q = buildBreakdownQuery("boot", "platform", 30);
+    const q = buildBreakdownQuery("boot", "platform", 720);
     expect(q).toContain("properties.platform AS k");
     expect(q).toContain("count(DISTINCT distinct_id) AS sessions");
     expect(q).toContain("GROUP BY k ORDER BY events DESC LIMIT 100");
@@ -66,9 +92,9 @@ describe("HogQL query builders", () => {
   });
 
   it("filtered-count query narrows the event by a trusted boolean expression", () => {
-    const q = buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", 7);
+    const q = buildFilteredCountQuery("session_emergencies", "toFloat(properties.fires) > 0", 168);
     expect(q).toContain("properties.environment = 'production'");
-    expect(q).toContain("INTERVAL 7 DAY");
+    expect(q).toContain("INTERVAL 168 HOUR");
     expect(q).toContain("event = 'session_emergencies'");
     expect(q).toContain("AND (toFloat(properties.fires) > 0)");
     expect(q).toContain("count(DISTINCT distinct_id) AS sessions");
