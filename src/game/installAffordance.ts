@@ -17,14 +17,17 @@ import { isWrappedMode } from "../platform";
  *    gated on real play, at most once ever (a persisted flag), after which the
  *    menu entry alone carries it. No re-nagging;
  *  - the splash install button (`#splash-install`, CAP-5): the persistent front
- *    door, shown for ANY not-standalone session (its visibility is NOT gated on
- *    a captured event, unlike the two in-game surfaces), owned by the splash
- *    template. It routes taps through {@link activateInstall} like the others.
+ *    door, shown for a not-standalone browser session (its visibility is NOT
+ *    gated on a captured event, unlike the two in-game surfaces), owned by the
+ *    splash template. It routes taps through {@link activateInstall} like the
+ *    others.
  *
  * Activation ({@link activateInstall}) is shared by all three: a native prompt
  * where a `beforeinstallprompt` is captured, else an honest how-to (iOS Safari
  * steps, or Chrome/Edge browser-menu steps). Standalone / TWA sessions are
- * offered nothing on any surface.
+ * offered nothing on any surface, and neither are wrapped builds (Capacitor,
+ * Electron): they are not installable web apps, and they are not standalone
+ * either, so every surface gates on the build mode as well.
  */
 
 /** Which affordance a player tapped to reach for the install, for the CAP-4
@@ -58,9 +61,9 @@ function markChipShownEver(): void {
  *  no event degrades to the browser-menu how-to inside {@link activateInstall}.
  *  Wrapped builds (Capacitor, Electron) are the exception: they are not
  *  installable web apps and are not standalone either, so without the mode gate
- *  this button was the one install surface that leaked into a wrapper window
- *  (observed in the desktop S0 evidence) and its tap led to browser install
- *  steps for a menu that does not exist there. */
+ *  this button was the one install surface that leaked into a wrapper window,
+ *  where its tap led to browser install steps for a menu that does not exist
+ *  there. */
 export function splashInstallOffered(mode: string = import.meta.env.MODE): boolean {
   return !isWrappedMode(mode) && !isStandalone();
 }
@@ -111,8 +114,8 @@ let promptInFlight = false;
  *
  *  Exported for the splash button (CAP-5): the in-game chip/menu only ever call
  *  it when availability is "prompt" or "ios-howto", but the splash button is a
- *  persistent front door (shown for any not-standalone session), so it can reach
- *  the browser-menu how-to fallback the in-game surfaces never do.
+ *  persistent front door (shown for a not-standalone browser session), so it
+ *  can reach the browser-menu how-to fallback the in-game surfaces never do.
  *
  *  `surface` names which affordance was tapped, for the CAP-4 engagement signal. */
 export async function activateInstall(app: GameApp, surface: InstallSurface): Promise<void> {
