@@ -8,8 +8,9 @@
  * for real (a synthetic `beforeinstallprompt` through the same seam the app
  * listens on) and reveal the chip, so a render-affecting change to the affordance
  * shows up as a gallery diff. The SPLASH install button (CAP-5) needs no scene of
- * its own: it shows for any not-standalone session, so the existing `00-splash` /
- * `00-splash-mobile` shots already carry it.
+ * its own: it shows in a not-standalone browser session, which is what the
+ * gallery renders, so the existing `00-splash` / `00-splash-mobile` shots already
+ * carry it.
  *
  * Backdrop is a STATIC canon tower at a frozen clock, NOT the live `buildEngineTower`
  * demo: the chip is the subject, and a live-motion draw (crowds/elevators) plus the

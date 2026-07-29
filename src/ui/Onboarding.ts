@@ -188,7 +188,8 @@ export class OnboardingController {
      *  returns the new muted state so the splash button can mirror it. */
     onToggleMute?: () => boolean;
     /** Whether to render the splash install button, read once at mount
-     *  (SPEC-pwa-install CAP-5): true for any not-standalone session. */
+     *  (SPEC-pwa-install CAP-5): true for a not-standalone browser session,
+     *  false in wrapped builds. */
     installOffered?: () => boolean;
     /** Tap the splash install button: routes through the shared activation
      *  (native prompt, or an honest how-to). Absent when not offered. */

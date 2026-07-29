@@ -37,7 +37,7 @@ export function isWrappedMode(mode: string): boolean {
  *  through a well-formed `__VC_PLATFORM__` global; everything else gets the
  *  browser default. The rule extends the mobile-distribution arch §2 pattern
  *  (written for `--mode native`) to the desktop mode; the arch doc's mode
- *  enumeration predates desktop and is tracked for an update in the backlog.
+ *  enumeration predates desktop and is tracked in issue #710.
  *  Pure so the order is unit-testable without faking the build mode. */
 export function resolvePlatform(mode: string, injected: unknown): PlatformPort {
   if (!isWrappedMode(mode)) return browserPlatform;

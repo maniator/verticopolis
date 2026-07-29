@@ -317,8 +317,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       muted: () => app.audio.muted,
       onToggleMute: () => app.toggleMute(),
       // The persistent splash install button (SPEC-pwa-install CAP-5): offered to
-      // any not-standalone session, routed through the SAME activation the in-game
-      // surfaces use (native prompt where captured, else an honest how-to).
+      // a not-standalone browser session, routed through the SAME activation the
+      // in-game surfaces use (native prompt where captured, else an honest
+      // how-to). Wrapped builds are excluded inside splashInstallOffered.
       installOffered: () => splashInstallOffered(),
       onInstall: () => void activateInstall(app, "splash").catch(() => {}),
       // The 2.0 "Ground floor" badge (party 2026-07-23): a small, quiet mark by the
