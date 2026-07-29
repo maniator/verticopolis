@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import type { FacilityKind, Unit } from "../../engine/types";
+import { spatialCongestionAttributionByFloor } from "../../engine/sim/congestion";
 import { gripeLineText } from "../../game/gripeCopy";
 
 /**
@@ -134,7 +135,7 @@ describe("the congestion gripe names the transport that is actually crowded (#69
 
 /**
  * #701 follow-up: the copy names the BINDING shaft, the model's own worst
- * serving shaft for the floor, not merely any kind that stops there. A stair
+ * serving shaft for the floor, however many other kinds stop there. A stair
  * link cross-loaded by a stairs-only neighbor floor can bind a floor that a
  * healthy elevator also serves; "add cars" cannot clear that reading, so the
  * copy must name the stairs. Ties (the default for shafts serving identical
@@ -170,12 +171,17 @@ describe("the congestion gripe names the binding shaft (#701)", () => {
   it("names the stairs when a cross-loaded stair link binds an elevator-served floor", () => {
     const sim = Simulation.newGame(7);
     const office = crossLoadedFloor(sim, true);
-    // The seam the copy depends on: the 2-3 stair link carries floor 3's whole
-    // demand, so it reads strictly worse than the elevator at floor 2.
-    expect(sim.congestionAt(3)).toBeGreaterThan(sim.congestionAt(2) * 0.999);
+    // The seam the copy depends on, read from the model's own attribution: the
+    // 2-3 stair link carries floor 3's whole demand, so the stairs beat the
+    // elevator by a MACROSCOPIC margin, far outside the 1e-9 tie band (a flip
+    // that only cleared the band by rounding would be the tie bug, not the
+    // scenario).
+    const att = spatialCongestionAttributionByFloor(sim).get(2)!;
+    expect(att).toBeDefined();
+    expect(att.stairs).toBeGreaterThan(att.elevator + 1e-3);
     const text = gripeLineText(sim, office, "congestion");
     expect(text).toContain("crowded stairs");
-    expect(text).toContain("floors no elevator stops at");
+    expect(text).toContain("jammed by the other floors they serve");
     expect(text).not.toContain("crowded elevators");
     expect(text).not.toContain("Add cars");
   });
@@ -184,7 +190,14 @@ describe("the congestion gripe names the binding shaft (#701)", () => {
     const sim = Simulation.newGame(8);
     const office = crossLoadedFloor(sim, false);
     // Every shaft serving floor 2 carries only floor 2's split, so the ratios
-    // tie and the flip must not fire.
+    // tie and the flip must not fire. Pin that this case really exercises the
+    // tie band (attribution present, walkway within 1e-9 of the elevator):
+    // without these asserts the elevator wording could also come from the
+    // missing-entry fallback and the tie rule would go untested.
+    const att = spatialCongestionAttributionByFloor(sim).get(2)!;
+    expect(att).toBeDefined();
+    expect(att.elevator).toBeGreaterThan(0);
+    expect(Math.abs(Math.max(att.stairs, att.escalator) - att.elevator)).toBeLessThanOrEqual(1e-9);
     const text = gripeLineText(sim, office, "congestion");
     expect(text).toContain("crowded elevators");
     expect(text).toContain("Add cars or a parallel shaft");
@@ -209,7 +222,36 @@ describe("the congestion gripe names the binding shaft (#701)", () => {
     }
     const text = gripeLineText(sim, office, "congestion");
     expect(text).toContain("crowded escalators");
-    expect(text).toContain("floors no elevator stops at");
+    expect(text).toContain("jammed by the other floors they serve");
+    expect(text).not.toContain("crowded elevators");
+  });
+
+  it("keeps the combined wording when both walkway kinds tie as the binder beside an elevator", () => {
+    // Modern, because Classic refuses escalators on office floors (canon). A
+    // stair chain AND an escalator chain both run 1-3 while the elevator stops
+    // only at 1-2: the two walkway chains serve identical floor sets, so their
+    // ratios tie with each other while both strictly beat the elevator, the
+    // "walkways" binding class with an elevator present.
+    const sim = Simulation.newGame(10, "modern");
+    sim.money = 1e9;
+    sim.star = 3; // escalators unlock at 3 stars; no ticks run, so no event risk
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    lay(sim, "floor", 3);
+    expectOk(sim.buildTransport("elevatorStandard", C + 30, 1, 2));
+    expectOk(sim.buildTransport("escalator", C, 1, 2));
+    expectOk(sim.buildTransport("escalator", C, 2, 3));
+    expectOk(sim.buildTransport("stairs", C - 20, 1, 2));
+    expectOk(sim.buildTransport("stairs", C - 20, 2, 3));
+    const office = placeUnit(sim, "office", 2, C - 40);
+    office.state = "occupied";
+    for (const x of [C - 40, C - 31, C - 12]) {
+      const up = placeUnit(sim, "office", 3, x);
+      up.state = "occupied";
+    }
+    const text = gripeLineText(sim, office, "congestion");
+    expect(text).toContain("crowded stairs and escalators");
+    expect(text).toContain("jammed by the other floors they serve");
     expect(text).not.toContain("crowded elevators");
   });
 });

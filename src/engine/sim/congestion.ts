@@ -235,8 +235,11 @@ function buildSpatialCongestion(sim: Simulation): {
     for (const s of shafts) {
       const cong = s.cap > 0 ? ((loadByShaft.get(s.id) ?? 0) * rush) / (s.cap * HEADROOM) : 99;
       if (cong > c) c = cong;
-      // Fold the same reading into its class max: the ratio map's max over
-      // shafts equals the max over these three class maxes by construction.
+      // Fold the same reading into its class max. The ratio map's max over
+      // shafts equals the max over these three class maxes for every kind the
+      // staff filter admits today (elevators, stairs, escalators); a new
+      // passenger transport kind must be added to this chain or its readings
+      // would vanish from the attribution while still setting the ratio.
       if (isElevatorKind(s.kind)) { if (cong > att.elevator) att.elevator = cong; }
       else if (s.kind === "stairs") { if (cong > att.stairs) att.stairs = cong; }
       else if (s.kind === "escalator") { if (cong > att.escalator) att.escalator = cong; }

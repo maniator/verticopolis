@@ -151,7 +151,15 @@ export function bindingTransportClassAt(sim: Simulation, floor: number): Congest
     if (att) {
       const walkMax = Math.max(att.stairs, att.escalator);
       if (walkMax > att.elevator + BINDING_TIE_EPS) {
-        if (att.stairs > 0 && att.escalator > 0 && Math.abs(att.stairs - att.escalator) <= BINDING_TIE_EPS) {
+        // The combined class needs BOTH walkway kinds to clear the elevator
+        // band on their own: near the boundary the weaker kind can tie the
+        // stronger one while still sitting inside the elevator tie band, and
+        // naming it as a binder there would flip on float noise (#703 Codex
+        // review). A kind that does not clear the band leaves the other one
+        // binding alone.
+        const stairsBind = att.stairs > att.elevator + BINDING_TIE_EPS;
+        const escalatorBind = att.escalator > att.elevator + BINDING_TIE_EPS;
+        if (stairsBind && escalatorBind && Math.abs(att.stairs - att.escalator) <= BINDING_TIE_EPS) {
           return "walkways";
         }
         return att.stairs >= att.escalator ? "stairs" : "escalator";

@@ -50,8 +50,15 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // the departing tenant's own load is part of what bound the floor's reading
   // (and on a floor they were the last tenant of, emptying first would drop
   // the floor from the attribution map entirely and fall back to the
-  // kinds-only wording, the exact wrong-lever line #701 removes).
-  const congNote = reason === "congestion" ? congestionChurnNote(sim, u.floor) : "";
+  // kinds-only wording, the exact wrong-lever line #701 removes). Gated on
+  // the entry-knowable conditions the emit below requires (only a bought-back
+  // sold condo that is on the market ever carries the note), so an office or
+  // hotel eviction wave never pays the spatial-map rebuild for a string that
+  // would be thrown away.
+  const congNote =
+    reason === "congestion" && u.kind === "condo" && u.everOccupied && !u.noRate
+      ? congestionChurnNote(sim, u.floor)
+      : "";
   // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
   // lose a tenant, you repurchase the unit at what it sold for and hold it as
   // empty inventory to sell again. (A never-sold condo just goes back on the

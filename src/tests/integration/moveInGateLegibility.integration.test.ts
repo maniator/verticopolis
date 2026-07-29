@@ -229,7 +229,11 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
     for (let x = 0; x < W; x++) sim.tower.place("floor", 2, x);
     for (let x = 0; x < W; x++) sim.tower.place("floor", 3, x);
+    // Count every laid slab, floor 2 included: it is the mixed elevator+stairs
+    // floor the binding scenario hinges on (per-place asserts would trip on
+    // the new-game seed tiles, so count like servedTower does).
     expect(sim.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1).length).toBe(W);
+    expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === 2).length).toBe(W);
     expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === 3).length).toBe(W);
     expect(sim.buildTransport("elevatorStandard", C + 20, 1, 2).ok).toBe(true);
     expect(sim.buildTransport("stairs", C, 1, 2).ok).toBe(true);

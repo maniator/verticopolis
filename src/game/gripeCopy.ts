@@ -42,18 +42,24 @@ function congestionGripeText(sim: Simulation, u: Unit): string {
   if (binding === "elevator") return "crowded elevators. Add cars or a parallel shaft to this block.";
   if (binding === "none") return "overcrowded vertical transport. Add capacity to this block.";
   const elevatorHere = servingTransportKindsAt(sim, u.floor).elevator;
+  // When an elevator already stops here, a walkway can only bind by pooling
+  // load from the OTHER floors it serves; those floors may well have elevator
+  // service of their own (the walkway still takes their proportional share),
+  // so the line blames the shared load and prescribes better service there,
+  // never a stop this floor already has and never a claim about stops the
+  // review showed can be false (#703 review, both hunters).
   if (binding === "walkways") {
     return elevatorHere
-      ? "crowded stairs and escalators. They also carry floors no elevator stops at; give those floors an elevator stop, or add more of them."
+      ? "crowded stairs and escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add more stairs and escalators."
       : "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.";
   }
   if (binding === "stairs") {
     return elevatorHere
-      ? "crowded stairs. They also carry floors no elevator stops at; give those floors an elevator stop, or add another stair column."
+      ? "crowded stairs. They are jammed by the other floors they serve; give those floors better elevator service, or add another stair column."
       : "crowded stairs. Add another stair column, or give this floor an elevator stop.";
   }
   return elevatorHere
-    ? "crowded escalators. They also carry floors no elevator stops at; give those floors an elevator stop, or add another escalator."
+    ? "crowded escalators. They are jammed by the other floors they serve; give those floors better elevator service, or add another escalator."
     : "crowded escalators. Add another escalator, or give this floor an elevator stop.";
 }
 

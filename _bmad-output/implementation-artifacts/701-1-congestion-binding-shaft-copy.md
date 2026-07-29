@@ -4,7 +4,7 @@ baseline_commit: fff6370d24ea7e5874a85b445dff10cf6d7c499a
 
 # Story 701.1: Congestion copy names the binding shaft
 
-Status: review
+Status: done
 
 <!-- Story keyed to GitHub issue #701 (follow-up to #699/#700); party-ratified 2026-07-29. -->
 
@@ -119,6 +119,38 @@ Technical facts the design leans on:
 - [x] Task 4: Churn note (AC: 4)
 - [x] Task 5: Tests (AC: 5)
 - [x] Task 6: Version bump + backlog row + gates + review (AC: 7, 8)
+
+### Review Findings (gds-code-review + Codex, 2026-07-29)
+
+Layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor; Codex reviewed the
+first pushed snapshot in parallel and converged on the same top findings.
+
+- [x] [Review][Patch] Mixed-floor lines claimed the cross-loading floors have
+  no elevator stop, which can be false (a differently-shafted floor still
+  cross-loads the walkway) [src/game/gripeCopy.ts] - reworded to "jammed by
+  the other floors they serve; give those floors better elevator service",
+  which also fixed the ambiguous "add more of them" antecedent.
+- [x] [Review][Patch] Combined-walkways class could include a kind still
+  inside the elevator tie band near the boundary (Codex P2) -
+  [src/engine/sim/gripe.ts] both kinds must now clear the band on their own.
+- [x] [Review][Patch] Eager congNote paid a full spatial-map rebuild on every
+  congestion vacate (offices/hotels included) though only a bought-back sold
+  condo emits it [src/engine/sim/churn.ts] - gated on the entry-knowable
+  conditions (condo, everOccupied, market-listed).
+- [x] [Review][Patch] Tie test could pass vacuously and the repro's seam
+  assert was decorative [congestionGripeCopy.integration.test.ts] - both now
+  assert against the attribution map (tie within 1e-9 with attribution
+  present; repro gap macroscopic beyond 1e-3).
+- [x] [Review][Patch] The walkways+elevator branch was untested - added the
+  tied stairs+escalator beside-an-elevator case.
+- [x] [Review][Patch] "By construction" comment overclaimed for unclassified
+  kinds [src/engine/sim/congestion.ts] - reworded to name the whitelist
+  obligation.
+- [x] [Review][Patch] "X, not Y" docblock pattern and the churn fixture's
+  unasserted floor-2 slab [both test files] - reworded; slab count asserted.
+
+Dismissed (1): missing-import concern (refuted: symbols already imported;
+typecheck green). Deferred: none.
 
 ## Dev Notes
 
