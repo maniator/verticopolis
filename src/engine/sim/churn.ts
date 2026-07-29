@@ -19,9 +19,31 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { originDemand } from "./demand";
+import { servingTransportKindsAt } from "./gripe";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
+
+/** The congestion churn warning names the transport that is actually crowded
+ *  (#699), through the same classifier as the inspector's gripe line so the
+ *  toast and the card can never disagree. "Add cars" holds only where a
+ *  passenger elevator stops at the floor; a walkway-only floor gets the honest
+ *  lever (capacity), because there are no cars to add on a floor no elevator
+ *  stops at. */
+function congestionChurnNote(sim: Simulation, floor: number): string {
+  const serving = servingTransportKindsAt(sim, floor);
+  const noun = serving.elevator
+    ? "elevators"
+    : serving.stairs && serving.escalator
+      ? "stairs and escalators"
+      : serving.stairs
+        ? "stairs"
+        : serving.escalator
+          ? "escalators"
+          : "vertical transport";
+  const lever = serving.elevator ? "add cars" : "add capacity";
+  return ` A new owner will buy in, but the crowded ${noun} will wear them down too until you ${lever}.`;
+}
 
 export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
   // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
@@ -101,7 +123,7 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
       : wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
         ? " It stays empty until you fix the cause."
         : reason === "congestion"
-          ? " A new owner will buy in, but the crowded elevators will wear them down too until you add cars."
+          ? congestionChurnNote(sim, u.floor)
           : "";
   }
   sim.emit(
