@@ -51,9 +51,10 @@ review skill. The BMAD agent rules live in `_bmad-output/project-context.md`.
   pinned image and commits the refreshed gallery straight to the PR branch) OR
   locally inside that **same pinned image** (the exact
   `mcr.microsoft.com/playwright:v<lockfile-playwright-version>-jammy` the workflow
-  resolves), running `npm ci && npm run build && RUN_SERVER=1 node
-  scripts/screenshots.ts` in it. Output from the pinned image is equivalent to
-  CI's and may be committed. There is no `[update-screenshots]` marker workflow
+  resolves), running `npm ci && VC_TOOLING=1 npm run build && RUN_SERVER=1 node
+  scripts/screenshots.ts` in it (`VC_TOOLING=1` publishes the `window.game`
+  handle the scenes drive; a plain production build compiles it away). Output
+  from the pinned image is equivalent to CI's and may be committed. There is no `[update-screenshots]` marker workflow
   anymore (retired once drift became a hard gate on the PR); every gallery refresh
   flows through a PR. Mint `e2e/visual.spec.ts-snapshots` only via
   `update-visual-baselines.yml` (`[update-baselines]`) or that same pinned image.

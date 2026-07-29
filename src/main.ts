@@ -48,12 +48,12 @@ import { gameplaySession } from "./analytics";
  * API, so do not reach them from outside `src/game/`.
  *
  * `window.game` surface: e2e/ and the screenshot scenes (scripts/scenes/*,
- * scripts/screenshot-page-ops.ts) reach this instance at runtime: the public
- * fields (sim, engine, speed, grid) plus, via any-cast, `selectPicked`,
- * `selected`, `refreshEditor`, `onUpdateAvailable`, `setSpeed` and
- * `updateTraffic` (the tooling calls the last to pin the traffic chip before a
- * capture). Renaming or moving those requires updating every consumer;
- * TypeScript won't catch it (they are any-cast).
+ * scripts/screenshot-page-ops.ts) reach this instance at runtime, in dev serves
+ * and VC_TOOLING=1 builds only (bootstrap.ts gates the publish; production
+ * bundles carry none): the public fields (sim, engine, speed, grid) plus, via
+ * any-cast, `selectPicked`, `selected`, `refreshEditor`, `onUpdateAvailable`,
+ * `setSpeed` and `updateTraffic` (the last pins the traffic chip before a
+ * capture); renaming any needs every consumer updated (TypeScript won't catch it).
  */
 class GameApp implements GameAppPorts {
   sim: Simulation;

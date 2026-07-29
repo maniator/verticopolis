@@ -94,8 +94,12 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # A tooling build: e2e drives the app through `window.game`, which only
+      # VC_TOOLING=1 builds publish (production builds compile it away).
       - name: Build
         run: npm run build
+        env:
+          VC_TOOLING: "1"
 
       - name: Run end-to-end tests
         run: npm run e2e
