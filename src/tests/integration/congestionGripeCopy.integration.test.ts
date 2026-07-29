@@ -131,3 +131,85 @@ describe("the congestion gripe names the transport that is actually crowded (#69
     expect(gripeLineText(sim, office, "congestion")).toContain("crowded stairs and escalators");
   });
 });
+
+/**
+ * #701 follow-up: the copy names the BINDING shaft, the model's own worst
+ * serving shaft for the floor, not merely any kind that stops there. A stair
+ * link cross-loaded by a stairs-only neighbor floor can bind a floor that a
+ * healthy elevator also serves; "add cars" cannot clear that reading, so the
+ * copy must name the stairs. Ties (the default for shafts serving identical
+ * floor sets, by the capacity-proportional split) keep the elevator wording,
+ * so the flip needs a STRICTLY worse walkway and can never ride float noise
+ * or build order.
+ */
+describe("the congestion gripe names the binding shaft (#701)", () => {
+  /** Floor 2 served by an elevator (floors 1-2 only) plus a stair chain that
+   *  continues to floor 3; floor 3 is stairs-only. With floor 3 populated the
+   *  2-3 stair link carries floor 3's whole demand and strictly binds floor 2. */
+  function crossLoadedFloor(sim: Simulation, populateUpstairs: boolean): Unit {
+    sim.money = 1e9;
+    sim.star = 1;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    lay(sim, "floor", 3);
+    expectOk(sim.buildTransport("elevatorStandard", C + 20, 1, 2));
+    expectOk(sim.buildTransport("stairs", C, 1, 2));
+    expectOk(sim.buildTransport("stairs", C, 2, 3));
+    const office = placeUnit(sim, "office", 2, C - 30);
+    office.state = "occupied";
+    office.satisfaction = 1;
+    if (populateUpstairs) {
+      for (const x of [C - 30, C - 21, C - 12]) {
+        const up = placeUnit(sim, "office", 3, x);
+        up.state = "occupied";
+      }
+    }
+    return office;
+  }
+
+  it("names the stairs when a cross-loaded stair link binds an elevator-served floor", () => {
+    const sim = Simulation.newGame(7);
+    const office = crossLoadedFloor(sim, true);
+    // The seam the copy depends on: the 2-3 stair link carries floor 3's whole
+    // demand, so it reads strictly worse than the elevator at floor 2.
+    expect(sim.congestionAt(3)).toBeGreaterThan(sim.congestionAt(2) * 0.999);
+    const text = gripeLineText(sim, office, "congestion");
+    expect(text).toContain("crowded stairs");
+    expect(text).toContain("floors no elevator stops at");
+    expect(text).not.toContain("crowded elevators");
+    expect(text).not.toContain("Add cars");
+  });
+
+  it("keeps the elevator wording on a tie (same topology, upstairs empty)", () => {
+    const sim = Simulation.newGame(8);
+    const office = crossLoadedFloor(sim, false);
+    // Every shaft serving floor 2 carries only floor 2's split, so the ratios
+    // tie and the flip must not fire.
+    const text = gripeLineText(sim, office, "congestion");
+    expect(text).toContain("crowded elevators");
+    expect(text).toContain("Add cars or a parallel shaft");
+  });
+
+  it("names escalators the same way when they are the cross-loaded binder", () => {
+    // Modern, because Classic refuses escalators on office floors (canon).
+    const sim = Simulation.newGame(9, "modern");
+    sim.money = 1e9;
+    sim.star = 3; // escalators unlock at 3 stars; no ticks run, so no event risk
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    lay(sim, "floor", 3);
+    expectOk(sim.buildTransport("elevatorStandard", C + 20, 1, 2));
+    expectOk(sim.buildTransport("escalator", C, 1, 2));
+    expectOk(sim.buildTransport("escalator", C, 2, 3));
+    const office = placeUnit(sim, "office", 2, C - 30);
+    office.state = "occupied";
+    for (const x of [C - 30, C - 21, C - 12]) {
+      const up = placeUnit(sim, "office", 3, x);
+      up.state = "occupied";
+    }
+    const text = gripeLineText(sim, office, "congestion");
+    expect(text).toContain("crowded escalators");
+    expect(text).toContain("floors no elevator stops at");
+    expect(text).not.toContain("crowded elevators");
+  });
+});

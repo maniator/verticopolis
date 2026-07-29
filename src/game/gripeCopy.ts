@@ -1,6 +1,6 @@
 import type { Simulation } from "../engine/Simulation";
 import type { Unit, VacateReason } from "../engine/types";
-import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt } from "../engine/sim/gripe";
+import { unmetCoverage, dominantGripe, nearNightclub, servingTransportKindsAt, bindingTransportClassAt } from "../engine/sim/gripe";
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
 import { isHotelKind, isLeaseAmenityKind } from "../engine/facilities";
@@ -24,22 +24,37 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
   // table so a bare lookup can never return the wrong advice.
 };
 
-/** The congestion gripe names the transport that is actually crowded (#699).
+/** The congestion gripe names the transport that is actually crowded (#699),
+ *  and specifically the shaft class that BINDS the floor's reading (#701).
  *  Congestion capacity counts every passenger transport kind, so a stairs-only
- *  floor crowds for real; telling that player to "add cars" prescribes a fix
- *  the floor cannot take (the #699 save: both elevators skip floors 2-5, so
- *  floor 4 boards only stairs). Branch on what actually stops at the floor
- *  (skip lists honored, staff-only service shafts excluded) and name a remedy
- *  that applies there. The empty classification cannot occur for a fired
- *  congestion gripe (it needs a served floor, which needs a stopping passenger
- *  transport), but a transport-neutral line covers it rather than a lie. */
+ *  floor crowds for real, and a stair link cross-loaded by a stairs-only
+ *  neighbor can bind a floor a healthy elevator also stops at; in both cases
+ *  "add cars" prescribes a fix that cannot clear the reading. The binding
+ *  class comes from the model's own attribution (ties keep the elevator
+ *  wording, see bindingTransportClassAt), and the remedy adapts to whether an
+ *  elevator already stops at the floor: when one does, the jam is the floors
+ *  only the walkway serves, so the line points there instead of repeating
+ *  "give this floor an elevator stop" about a floor that has one. The empty
+ *  classification cannot occur for a fired congestion gripe (it needs a
+ *  served floor), but a transport-neutral line covers it rather than a lie. */
 function congestionGripeText(sim: Simulation, u: Unit): string {
-  const serving = servingTransportKindsAt(sim, u.floor);
-  if (serving.elevator) return "crowded elevators. Add cars or a parallel shaft to this block.";
-  if (serving.stairs && serving.escalator) return "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.";
-  if (serving.stairs) return "crowded stairs. Add another stair column, or give this floor an elevator stop.";
-  if (serving.escalator) return "crowded escalators. Add another escalator, or give this floor an elevator stop.";
-  return "overcrowded vertical transport. Add capacity to this block.";
+  const binding = bindingTransportClassAt(sim, u.floor);
+  if (binding === "elevator") return "crowded elevators. Add cars or a parallel shaft to this block.";
+  if (binding === "none") return "overcrowded vertical transport. Add capacity to this block.";
+  const elevatorHere = servingTransportKindsAt(sim, u.floor).elevator;
+  if (binding === "walkways") {
+    return elevatorHere
+      ? "crowded stairs and escalators. They also carry floors no elevator stops at; give those floors an elevator stop, or add more of them."
+      : "crowded stairs and escalators. Add more of them, or give this floor an elevator stop.";
+  }
+  if (binding === "stairs") {
+    return elevatorHere
+      ? "crowded stairs. They also carry floors no elevator stops at; give those floors an elevator stop, or add another stair column."
+      : "crowded stairs. Add another stair column, or give this floor an elevator stop.";
+  }
+  return elevatorHere
+    ? "crowded escalators. They also carry floors no elevator stops at; give those floors an elevator stop, or add another escalator."
+    : "crowded escalators. Add another escalator, or give this floor an elevator stop.";
 }
 
 /** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is

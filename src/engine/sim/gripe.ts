@@ -6,6 +6,7 @@ import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
 import type { Unit, VacateReason } from "../types";
 import { GRIPE_WARN, NIGHTCLUB_NOISE_FLOORS, TRANSPORT_FAR_TILES } from "./constants";
+import { spatialCongestionAttributionByFloor } from "./congestion";
 import type { DemandMap } from "./demand";
 
 /**
@@ -114,6 +115,58 @@ export function servingTransportKindsAt(
     else if (t.kind === "escalator") kinds.escalator = true;
   }
   return kinds;
+}
+
+/** The transport class whose shaft BINDS a floor's congestion reading (#701):
+ *  "walkways" is the stairs-and-escalators tie, "none" the transportless
+ *  defensive case. */
+export type CongestionBindingClass = "elevator" | "stairs" | "escalator" | "walkways" | "none";
+
+/** Two ratios within this band count as tied. The capacity-proportional load
+ *  split makes shafts serving identical floor sets land on mathematically
+ *  equal ratios, so near-ties are the DEFAULT, differing only by float
+ *  rounding; without the band the wording would ride noise and build order. */
+const BINDING_TIE_EPS = 1e-9;
+
+/**
+ * The transport class that BINDS a floor's congestion reading, for the
+ * congestion copy (#701). In the v2 spatial model a floor's reading is its
+ * worst serving shaft, with load accumulated across every floor that shaft
+ * serves, so a stair link cross-loaded by a stairs-only neighbor can bind a
+ * floor a healthy elevator also stops at; "add cars" cannot clear that
+ * reading, and the copy must name the stairs. Reads the model's own
+ * attribution ({@link spatialCongestionAttributionByFloor}), so the copy
+ * relays what the model measured rather than re-deriving it.
+ *
+ * Tie rule (party ruling 2026-07-29): a walkway flips the wording only when
+ * STRICTLY worse than every serving elevator beyond {@link BINDING_TIE_EPS};
+ * ties keep the elevator wording, and two tied walkway kinds keep the
+ * combined "stairs and escalators" class. The v1 scalar model and floors
+ * without an attribution entry (unpopulated, or any defensive gap) fall back
+ * to the serving-kinds classification, which is exactly the pre-#701 rule.
+ */
+export function bindingTransportClassAt(sim: Simulation, floor: number): CongestionBindingClass {
+  if (sim.simModel === "v2") {
+    const att = spatialCongestionAttributionByFloor(sim).get(floor);
+    if (att) {
+      const walkMax = Math.max(att.stairs, att.escalator);
+      if (walkMax > att.elevator + BINDING_TIE_EPS) {
+        if (att.stairs > 0 && att.escalator > 0 && Math.abs(att.stairs - att.escalator) <= BINDING_TIE_EPS) {
+          return "walkways";
+        }
+        return att.stairs >= att.escalator ? "stairs" : "escalator";
+      }
+      if (att.elevator > 0) return "elevator";
+      // All classes at 0 (a lobby entry with no boarding load yet): fall
+      // through to the serving-kinds fallback below.
+    }
+  }
+  const kinds = servingTransportKindsAt(sim, floor);
+  if (kinds.elevator) return "elevator";
+  if (kinds.stairs && kinds.escalator) return "walkways";
+  if (kinds.stairs) return "stairs";
+  if (kinds.escalator) return "escalator";
+  return "none";
 }
 
 export function dominantGripe(

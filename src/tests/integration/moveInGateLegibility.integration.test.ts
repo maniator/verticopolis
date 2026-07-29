@@ -218,6 +218,40 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     expect(toast).not.toContain("add cars");
   });
 
+  it("names the binding stairs on a mixed floor's congestion churn (#701)", () => {
+    // Floor 2 has a healthy elevator AND a stair chain that continues to a
+    // populated stairs-only floor 3: the 2-3 stair link binds floor 2's
+    // reading, so the churn warning must name the stairs and the capacity
+    // lever, never "add cars" on an elevator with room to spare.
+    const sim = Simulation.newGame(27, "modern");
+    sim.money = 1e12;
+    sim.star = 1;
+    for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < W; x++) sim.tower.place("floor", 2, x);
+    for (let x = 0; x < W; x++) sim.tower.place("floor", 3, x);
+    expect(sim.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1).length).toBe(W);
+    expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === 3).length).toBe(W);
+    expect(sim.buildTransport("elevatorStandard", C + 20, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("stairs", C, 1, 2).ok).toBe(true);
+    expect(sim.buildTransport("stairs", C, 2, 3).ok).toBe(true);
+    for (const x of [C - 30, C - 21, C - 12]) {
+      const up = place(sim, "office", 3, x);
+      up.state = "occupied";
+    }
+    const condo = place(sim, "condo", 2, C + 40);
+    condo.state = "occupied";
+    condo.everOccupied = true;
+    condo.residents = 3;
+    condo.rent = 160_000;
+    expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(false);
+    vacate(sim, condo, "congestion");
+    const toast = sim.log[sim.log.length - 1].text;
+    expect(toast).toContain("bought it back");
+    expect(toast).toContain("crowded stairs");
+    expect(toast).toContain("until you add capacity");
+    expect(toast).not.toContain("add cars");
+  });
+
   it("evicts a doomed spot exactly once and never re-sells (the churn is truly stopped)", () => {
     const sim = servedTower(14, "modern");
     place(sim, "office", 2, C - 9);
