@@ -197,6 +197,24 @@ const INSIGHTS = [
   { name: "Platform table", description: "Boots by platform as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }) },
   { name: "Tool usage table", description: "tool_used by tool as a table, production, 30d.", query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsTable", breakdownLimit: 25 }) },
   { name: "Boot reason table", description: "Boots by reason as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }) },
+  // Version adoption and crash reliability: the last two sections the retired
+  // Vercel report carried that had no dashboard tile, added at the D-1 cutover
+  // so nothing the report answered went dark.
+  {
+    name: "Version adoption (boots by build version)",
+    description: "Boots broken down by the build version prop, production, 30d.",
+    query: trends([series("boot", "Boots")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    name: "Updates by target version",
+    description: "Applied updates broken down by the version updated to, production, 30d.",
+    query: trends([series("update", "Updates")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    name: "Crashes over time (by repeat)",
+    description: "Daily crash events split by the repeat-within-90s flag, production.",
+    query: trends([series("crash", "Crashes")], { breakdown: "repeat" }),
+  },
   // Reliability / error tracking. $exception is the cookieless error signal
   // (uncaught JS errors + unhandled rejections + synthetic WebGL-crash events);
   // the typed `crash` event keeps the structured crash-recovery detail.
