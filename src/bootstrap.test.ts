@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { hasWebGL, showBootMessage, bootGame, hideBootCover } from "./bootstrap";
 import { injectSpeedInsights } from "@vercel/speed-insights";
+import { inject as injectWebAnalytics } from "@vercel/analytics";
 
 // The telemetry SDKs are gated on the host and best-effort; stub them so the
 // gate and its catch can be asserted without touching the real endpoints.
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
+vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));
 
@@ -254,6 +256,7 @@ describe("bootGame telemetry gate", () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.mocked(injectSpeedInsights).mockReset();
+    vi.mocked(injectWebAnalytics).mockReset();
     window.location.href = localhost; // restore host for the rest of the suite
     document.body.innerHTML = "";
     delete (window as unknown as { game?: unknown }).game;
@@ -265,6 +268,7 @@ describe("bootGame telemetry gate", () => {
     bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
 
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("injects telemetry on a Vercel preview host too", () => {
@@ -273,6 +277,7 @@ describe("bootGame telemetry gate", () => {
     bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
 
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
   });
 
   it("skips telemetry on any other host", () => {
@@ -281,6 +286,7 @@ describe("bootGame telemetry gate", () => {
     bootGame(vi.fn(() => ({ onUpdateAvailable: vi.fn() })));
 
     expect(injectSpeedInsights).not.toHaveBeenCalled();
+    expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
 
   it("never lets a telemetry failure block boot", () => {

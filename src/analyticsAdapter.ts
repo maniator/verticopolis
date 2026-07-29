@@ -1,3 +1,4 @@
+import { inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { sendToRelay } from "./analyticsRelay";
 
@@ -10,12 +11,16 @@ import { sendToRelay } from "./analyticsRelay";
  * two vendor questions: "how does a typed custom event reach the provider" and
  * "how does the page-performance inject reach the provider".
  *
- * The D-1 migration (Vercel Web Analytics to the cookieless PostHog relay) is
- * complete: custom events go relay-only, and `@vercel/analytics` is gone from
- * the codebase. `@vercel/speed-insights` (Core Web Vitals) is KEPT by the
- * recorded swap-time decision in the migration spec: the cookieless setup ships
- * no posthog-js, so nothing else measures page performance. A grep for either
- * vendor package outside this file should come back empty.
+ * The D-1 migration (Vercel Web Analytics custom events to the cookieless
+ * PostHog relay) is complete: the whole typed event vocabulary goes relay-only
+ * and `track` is gone from the codebase. Vercel keeps the PAGE-LEVEL plumbing
+ * by recorded swap-time decisions in the migration spec: `@vercel/speed-insights`
+ * (Core Web Vitals; nothing else measures page performance in a setup that
+ * ships no posthog-js) and the `@vercel/analytics` page-view `inject` (visits,
+ * paths, referrers; cookieless and same-origin like the rest). The boundary is
+ * events-versus-pages, not vendor-versus-vendor, and the pre-agreed exit if
+ * Vercel ever gates the page-view side is a relay `$pageview`. A grep for
+ * either vendor package outside this file should come back empty.
  */
 
 /**
@@ -42,9 +47,10 @@ export interface AnalyticsAdapter {
 /**
  * The production adapter after cutover (S6): custom events post to the
  * same-origin PostHog relay (`sendToRelay`, itself never-throw), and the page
- * inject is Speed Insights only, since Vercel Web Analytics is retired. The
- * dual-write adapter that ran through the S3-S6 validation window is gone with
- * it.
+ * inject carries the kept page-level pair, Speed Insights plus the Web
+ * Analytics page-view inject (same order as pre-seam). The dual-write adapter
+ * that ran through the S3-S6 validation window is gone; `track` is never
+ * called.
  */
 export const relayAdapter: AnalyticsAdapter = {
   send(event, props) {
@@ -52,6 +58,7 @@ export const relayAdapter: AnalyticsAdapter = {
   },
   injectPageTelemetry() {
     injectSpeedInsights();
+    injectWebAnalytics();
   },
 };
 

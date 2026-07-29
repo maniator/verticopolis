@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { inject as injectWebAnalytics } from "@vercel/analytics";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import {
   analyticsAdapter,
@@ -12,7 +13,8 @@ import { gameplaySession } from "./analytics";
 import { injectVercelTelemetry } from "./telemetry";
 
 // Keep the real transports inert so this file can assert that a swapped-in stub
-// takes over the whole surface: under the stub, neither of these wire calls fires.
+// takes over the whole surface: under the stub, none of these wire calls fires.
+vi.mock("@vercel/analytics", () => ({ inject: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
@@ -44,6 +46,7 @@ describe("analytics adapter seam", () => {
   beforeEach(() => {
     window.location.href = prod;
     gameplaySession.reset();
+    vi.mocked(injectWebAnalytics).mockReset();
     vi.mocked(injectSpeedInsights).mockReset();
     vi.mocked(sendToRelay).mockReset();
     stub = makeStub();
@@ -139,6 +142,7 @@ describe("analytics adapter seam", () => {
     injectVercelTelemetry();
     expect(stub.injects).toBe(1);
     expect(injectSpeedInsights).not.toHaveBeenCalled();
+    expect(injectWebAnalytics).not.toHaveBeenCalled();
   });
 
   it("restores the default adapter cleanly, re-reaching the real transports", () => {
@@ -146,10 +150,15 @@ describe("analytics adapter seam", () => {
     gameplaySession.noteStar(5);
     injectVercelTelemetry();
     // With the default adapter active again, the real transports are reached and
-    // the stub sees nothing more: custom events go relay-only and the page
-    // inject is Speed Insights only (Web Analytics retired at the D-1 cutover).
+    // the stub sees nothing more: custom events go relay-only, and the page
+    // inject carries the kept page-level pair (Speed Insights, then the
+    // page-view inject, same order as pre-seam).
     expect(vi.mocked(sendToRelay)).toHaveBeenCalledWith("star_reached", { star: 5 });
     expect(injectSpeedInsights).toHaveBeenCalledTimes(1);
+    expect(injectWebAnalytics).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(injectSpeedInsights).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(injectWebAnalytics).mock.invocationCallOrder[0],
+    );
     expect(stub.events.some(([name]) => name === "star_reached")).toBe(false);
   });
 });
