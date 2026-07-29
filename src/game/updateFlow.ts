@@ -91,8 +91,9 @@ export function showUpdatePrompt(app: GameApp): void {
       // Report the update the player just initiated (from this build to the
       // incoming one) before the activating reload navigates away. This counts
       // the apply action: a rare failed activation (below) still sends one, so
-      // the post-reload boot usually lands with reason "update" (a lower bound
-      // on applies: a storage failure or corrupt-save precedence reclassifies it).
+      // the post-reload boot usually lands with reason "update", an approximate
+      // applied signal: reclassification (storage failure, corrupt save) drops
+      // it, and a manual reload in the resume window can carry it on the old build.
       // Best-effort and host-gated inside; sendToRelay prefers
       // navigator.sendBeacon (fetch keepalive fallback), surviving the reload.
       gameplaySession.noteUpdate(

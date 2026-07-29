@@ -207,20 +207,21 @@ const INSIGHTS = [
   },
   {
     // The update event fires before the activating reload and survives a failed
-    // activation (see updateFlow.ts), so it counts attempts. The confirmed
-    // (lower-bound) applied count is the post-reload boot with reason=update,
-    // next tile.
+    // activation (see updateFlow.ts), so it counts attempts. The closest
+    // applied-count signal is the post-reload boot with reason=update, next
+    // tile (approximate in both directions; see its comment).
     name: "Update attempts by target version",
     description: "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
     query: trends([series("update", "Update attempts")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
   },
   {
-    // A lower bound, not the exact applied count: a successful activation can
-    // still boot as continue/fresh (private-mode sessionStorage failure) or
-    // corrupt (save precedence), bypassing reason=update (see updateFlow.ts
-    // and appBoot.ts).
-    name: "Confirmed update boots by version",
-    description: "Boots with reason=update, a lower bound on applied updates (a storage failure or corrupt-save precedence reclassifies the boot), by the build version booted into, production, 30d.",
+    // An approximate applied-updates signal, bounded in neither direction: a
+    // successful activation can boot as continue/fresh (private-mode storage
+    // failure) or corrupt (save precedence), undercounting, and a manual
+    // reload inside the 30s resume window can boot the OLD build with
+    // reason=update, overcounting (see updateFlow.ts and appBoot.ts).
+    name: "Update-reason boots by version",
+    description: "Boots with reason=update by the build version booted into, production, 30d. Approximate applied-updates signal: reclassification undercounts, and a manual reload in the resume window can count the old build.",
     query: trends([series("boot", "Update boots")], {
       breakdown: "version",
       display: "ActionsTable",
