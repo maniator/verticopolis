@@ -8,7 +8,7 @@ PostHog's documented setup ships `posthog-js` (~50 KB gzipped) initialized with 
 
 ## Do we need posthog-js to send events? No
 
-Sending an event to PostHog is a plain HTTPS JSON POST to its capture API; `posthog-js` is a convenience SDK, not a transport requirement. In this design the frontend never talks to PostHog at all: it POSTs our own minimal payload to our same-origin `/api/ingest` using the browser's native `fetch`/`sendBeacon`. The relay function then makes one server-side `fetch` to PostHog's capture endpoint. Neither end imports `posthog-js`. What the SDK would add (client-side batching and retries, cookie-based identity, autocapture, session replay) is either unwanted here (cookies, autocapture, replay) or handled directly (an in-memory session id; best-effort no-retry, matching today's Vercel path). This is exactly why the client bundle stays near-zero and no key ships.
+Sending an event to PostHog is a plain HTTPS JSON POST to its capture API; `posthog-js` is a convenience SDK, not a transport requirement. In this design the frontend never talks to PostHog at all: it POSTs our own minimal payload to our same-origin `/api/ingest` using the browser's native `fetch`/`sendBeacon`. The relay function then makes one server-side `fetch` to PostHog's capture endpoint. Neither end imports `posthog-js`. What the SDK would add (client-side batching and retries, cookie-based identity, autocapture, session replay) is either unwanted here (cookies, autocapture, replay) or handled directly (a session-scoped id, see the client-side section; best-effort no-retry, matching the retired Vercel path's posture). This is exactly why the client bundle stays near-zero and no key ships.
 
 ## The mechanism
 
@@ -79,7 +79,7 @@ Both sides are effectively free at current and near-term traffic.
 
 ## What this deliberately does not do
 
-- No `posthog-js`, so no autocapture, no session replay, no client-side session stitching beyond the in-memory id, and no pageview autotracking. All intended: those are the surfaces the privacy posture rules out.
+- No `posthog-js`, so no autocapture, no session replay, no client-side session stitching beyond the session-scoped id, and no pageview autotracking. All intended: those are the surfaces the privacy posture rules out.
 - No cross-session or cross-device identity. The `session` id dies with the tab. Returning-player signal stays the on-device `returning` boolean (SPEC CAP-3), an anonymous bucket, not an identifier.
 
 ## Copy/behavior rules
