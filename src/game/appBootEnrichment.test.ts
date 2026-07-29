@@ -45,8 +45,8 @@ vi.mock("../ui/Onboarding", () => ({
   // runBootFlow reads this for the `returning` enrichment bucket.
   isOnboarded: vi.fn(() => true),
 }));
-// The dual-write adapter would fire a real beacon / vendor call on a deployed
-// host; stub both transports so these tests stay offline.
+// The relay adapter would fire a real beacon on a deployed host; stub it (and
+// the page-level Speed Insights inject it sits beside) so these tests stay offline.
 vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 

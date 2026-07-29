@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession, setCommonProps, startGameplaySession } from "./analytics";
 
-// The custom-event channel is host-gated and best-effort; stub both transports
-// the adapter reaches so the gate, the dedup, and the never-throw guarantee can
-// be asserted without a real beacon or vendor endpoint. Events go relay-only
+// The custom-event channel is host-gated and best-effort; events go relay-only
 // after the D-1 cutover, so `sendToRelay` is the wire contract these tests pin.
+// Stub it (and the page-level Speed Insights inject) so the gate, the dedup, and
+// the never-throw guarantee can be asserted without a real beacon. The page-view
+// inject is not driven by this suite and stays unmocked.
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 
@@ -125,7 +126,7 @@ describe("gameplay analytics events", () => {
     expect(sendToRelay).toHaveBeenCalledTimes(2);
   });
 
-  it("never lets a track failure throw past the caller", () => {
+  it("never lets a relay-send failure throw past the caller", () => {
     vi.mocked(sendToRelay).mockImplementationOnce(() => {
       throw new Error("analytics down");
     });

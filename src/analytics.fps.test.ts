@@ -3,11 +3,10 @@ import { sendToRelay } from "./analyticsRelay";
 import { gameplaySession } from "./analytics";
 
 // The session_fps sampler split out of analytics.test.ts (that file hit the
-// file-size ceiling). Same vendor stubs as the parent suite: the custom-event
-// channel is host-gated and best-effort, so stub the whole vendor surface to
-// assert the fps contract without touching real endpoints. A partial mock would
-// leave a sibling symbol undefined and a later test would throw into the
-// best-effort catch and silently drop the event.
+// file-size ceiling). Same transport stubs as the parent suite: the custom-event
+// channel is host-gated and best-effort, so stub the relay (and the page-level
+// Speed Insights inject) to assert the fps contract without touching real
+// endpoints.
 vi.mock("@vercel/speed-insights", () => ({ injectSpeedInsights: vi.fn() }));
 vi.mock("./analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 

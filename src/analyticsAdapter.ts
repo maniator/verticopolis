@@ -18,9 +18,11 @@ import { sendToRelay } from "./analyticsRelay";
  * (Core Web Vitals; nothing else measures page performance in a setup that
  * ships no posthog-js) and the `@vercel/analytics` page-view `inject` (visits,
  * paths, referrers; cookieless and same-origin like the rest). The boundary is
- * events-versus-pages, not vendor-versus-vendor, and the pre-agreed exit if
- * Vercel ever gates the page-view side is a relay `$pageview`. A grep for
- * either vendor package outside this file should come back empty.
+ * events-versus-pages: PostHog owns every custom event, and Vercel keeps only
+ * this page-level plumbing, with a relay `$pageview` as the pre-agreed exit if
+ * Vercel ever gates the page-view side. A grep for either vendor package in
+ * non-test source outside this file should come back empty (test suites mock
+ * them by name, which is expected).
  */
 
 /**

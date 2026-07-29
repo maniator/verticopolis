@@ -6,8 +6,8 @@ import type { EventProps } from "./analyticsAdapter";
  * to PostHog with the project key server-side), so neither `posthog-js` nor the
  * project key ships in the client. Sending prefers `navigator.sendBeacon` (it
  * survives page-hide, which matters for `session_end`) and falls back to `fetch`
- * with `keepalive`. Best-effort and never-throw, exactly like the Vercel `track`
- * path it runs alongside during the dual-write window.
+ * with `keepalive`. Best-effort and never-throw; since the D-1 cutover this is
+ * the only custom-event transport (the dual-write window is closed).
  *
  * Within-session correlation comes from the per-session id (see {@link
  * sessionId}), created lazily on the first send and cached in `sessionStorage` so
@@ -164,9 +164,9 @@ export function sendToRelay(event: string, props: EventProps): void {
 
 /**
  * Post a `$exception` event for cookieless error tracking (see
- * `analyticsErrors.ts`). Kept relay-only (never through the dual-write adapter):
- * `$exception` is a PostHog Error Tracking event with a nested `$exception_list`
- * that has no Vercel Web Analytics equivalent, so it must not be sent to Vercel.
+ * `analyticsErrors.ts`). Kept off the adapter seam by design: `$exception` is a
+ * PostHog Error Tracking event with a nested `$exception_list` that only the
+ * relay understands, so it goes straight through here.
  * Same never-throw transport, same per-tab session id as every other event, so an
  * error report correlates with the play session it came from.
  */

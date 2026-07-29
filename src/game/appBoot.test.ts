@@ -8,9 +8,9 @@ import { attemptContextRecovery } from "./contextRecovery";
 import { rebuildEngine } from "./engineWiring";
 import { gameplaySession } from "../analytics";
 
-// The default adapter dual-writes to the PostHog relay (S3). This suite drives
-// gameplaySession on a deployed host in places, so stub the relay to keep a real
-// beacon from firing (the note methods are also spied, but this is belt-and-braces).
+// The default adapter sends every custom event to the PostHog relay. This suite
+// drives gameplaySession on a deployed host in places, so stub the relay to keep a
+// real beacon from firing (the note methods are also spied; belt-and-braces).
 vi.mock("../analyticsRelay", () => ({ sendToRelay: vi.fn() }));
 // Mock `virtual:pwa-register` (Vite virtual module via bootstrap.ts/pwa.ts) so the import resolves on Windows too (as pwa.test.ts does).
 vi.mock("virtual:pwa-register", () => ({ registerSW: () => () => {} }));

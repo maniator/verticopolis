@@ -92,8 +92,8 @@ export function showUpdatePrompt(app: GameApp): void {
       // incoming one) before the activating reload navigates away. This counts
       // the apply action: a rare failed activation (below) still sends one, so
       // the boot event's reason "update" is the authoritative applied count.
-      // Best-effort and host-gated inside; track() queues synchronously and the
-      // already-injected Vercel script delivers by beacon, surviving the reload.
+      // Best-effort and host-gated inside; sendToRelay prefers
+      // navigator.sendBeacon (fetch keepalive fallback), surviving the reload.
       gameplaySession.noteUpdate(
         typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev",
         app.pendingUpdateInfo?.version ?? "unknown",

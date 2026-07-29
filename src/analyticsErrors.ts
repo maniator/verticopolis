@@ -32,9 +32,8 @@ import { getCommonProps } from "./analytics";
  *   every frame (the exact shape of a render-loop crash) sends once, not a flood.
  * - Message and stack are length-bounded before they leave the page.
  *
- * Relay-only (not the dual-write adapter): `$exception` is a PostHog-only event
- * shape with no Vercel Web Analytics equivalent, so it is sent straight through
- * `sendException`, never to Vercel.
+ * Relay-only, off the adapter seam: `$exception` is a PostHog-only event shape,
+ * so it is sent straight through `sendException`.
  *
  * Privacy note: an exception `value` is the thrown message, which the game builds
  * from its own strings and could occasionally interpolate a player-authored tower

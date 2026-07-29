@@ -25,7 +25,7 @@ flowchart LR
 
 - Send with `navigator.sendBeacon("/api/ingest", body)` when available (survives page-hide, which matters for `session_end`), else `fetch("/api/ingest", { method: "POST", body, keepalive: true })`.
 - Body is JSON: `{ event, properties, session, ts }`. No API key. No cookie. `properties` is the existing typed prop set plus the CAP-3 `platform` field.
-- `session` is a per-session id generated once in memory at boot (`crypto.randomUUID()`), held in a module variable, and **never** written to storage. It gives within-session correlation (all events from one play session share it) with no cross-session identity: a new tab is a new session. This is the cookieless/memory-persistence posture.
+- `session` is a per-session id (`crypto.randomUUID()`) created lazily on the first send and cached in `sessionStorage` (session-scoped: it survives a mid-play reload such as "Update now" or WebGL recovery, and it is cleared when the tab closes; it is not a cookie and not a `localStorage` identifier, and it is never persisted across sessions). It gives within-session correlation (all events from one play session share it) with no cross-session identity: a new tab is a new session. This is the cookieless posture as built in S3; the original sketch here said "in-memory module variable", and the sessionStorage refinement (so a reload does not fragment a session) is the as-built form CAP-2 records.
 - Best-effort and never-throw: a failed relay call is swallowed, exactly like the current Vercel path.
 
 ### Server side (the relay function)
