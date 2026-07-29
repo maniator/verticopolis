@@ -22,12 +22,23 @@ function isPlatformPort(value: unknown): value is PlatformPort {
   }
 }
 
-/** Resolution order (mobile-distribution arch §2): only the native bundle may
+/** True for builds meant to run inside a wrapper shell rather than a browser
+ *  tab: `--mode native` (the iOS Capacitor shell) and `--mode desktop` (the
+ *  Electron shell). Wrapped builds skip service-worker registration and the
+ *  update poll (updates come from the store or the wrapper's own channel),
+ *  offer no PWA install affordance, keep the telemetry host gate closed, and
+ *  may bind an injected platform port. Pure so every gate that consults it is
+ *  unit-testable without faking the build mode. */
+export function isWrappedMode(mode: string): boolean {
+  return mode === "native" || mode === "desktop";
+}
+
+/** Resolution order (mobile-distribution arch §2): only a wrapped bundle may
  *  bind a wrapper port, and only through a well-formed `__VC_PLATFORM__`
  *  global; everything else gets the browser default. Pure so the order is
  *  unit-testable without faking the build mode. */
 export function resolvePlatform(mode: string, injected: unknown): PlatformPort {
-  if (mode !== "native") return browserPlatform;
+  if (!isWrappedMode(mode)) return browserPlatform;
   if (!isPlatformPort(injected)) {
     // A native bundle that carries a broken injection is a wrapper-shell bug;
     // say so where the shell author will look (a bare native bundle with no
