@@ -130,7 +130,7 @@ export function satisfactionStep(
   }
   // Rent pressure: gouging past the going rate erodes satisfaction. Rentals are
   // lease tenants too (the GDD's "rent too high"), so they carry the same discipline.
-  if ((u.kind === "office" || u.kind === "fitnessClub" || u.kind === "clinic" || isRentalKind(u.kind)) && served) {
+  if ((u.kind === "office" || isLeaseAmenityKind(u.kind) || isRentalKind(u.kind)) && served) {
     const cfg = rentConfig(u.kind)!;
     const over = (rentOf(u) - cfg.default) / cfg.default; // <0 cheap, >0 pricey
     s = Math.max(0, Math.min(1, s - over * 0.07));

@@ -185,7 +185,12 @@ describe("wouldEvictFreshTenant: lease amenities (#667)", () => {
     // SERVED_RECOVERY (0.05) every hour, a sustained erosion. Ungated, this
     // spot would lease, erode out, and re-list forever; the gate holds it.
     club.rent = rentConfig("fitnessClub")!.max;
-    expect(wouldEvictFreshTenant(sim, club, buildSatisfactionContext(sim, true))).toBe(true);
+    const gateCtx = buildSatisfactionContext(sim, true);
+    expect(wouldEvictFreshTenant(sim, club, gateCtx)).toBe(true);
+    // The amenity probe skips the demand map entirely (the coverage drain's
+    // kind guard never reads it for these kinds), so the gate consult must not
+    // have built one.
+    expect(gateCtx.demandMap).toBeNull();
     // The clinic shares the guard.
     clinic.rent = rentConfig("clinic")!.max;
     expect(wouldEvictFreshTenant(sim, clinic, buildSatisfactionContext(sim, true))).toBe(true);
