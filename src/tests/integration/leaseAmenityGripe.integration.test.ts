@@ -5,6 +5,7 @@ import { GRID } from "../../engine/facilities";
 import { rentConfig } from "../../engine/econConfig";
 import type { FacilityKind, Unit } from "../../engine/types";
 import { facilityDiagnostics } from "../../game/facilityDiagnostics";
+import { attemptMoveIns } from "../../engine/sim/churn";
 import { renderToFragment } from "../../ui/testing/litTestUtils";
 
 /**
@@ -77,5 +78,32 @@ describe("the lease-amenity Main gripe line (#667)", () => {
     const text = diagText(sim, clinic);
     expect(text).toContain("Won't lease:");
     expect(text).toContain("rent is above the going rate");
+  });
+
+  it("attemptMoveIns itself refuses a max-rent amenity and leases it at the going rate", () => {
+    // The wiring regression (Codex P1): the predicate tests alone stay green if
+    // isLeaseAmenityKind is dropped from the attemptMoveIns gate condition, so
+    // drive the real pass. Seeded sim, so the run is deterministic.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    sim.star = 5;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+    const clinic = placeUnit(sim, "clinic", 2, C + 4);
+    sim.star = 1;
+    clinic.state = "empty";
+    clinic.rent = rentConfig("clinic")!.max;
+    for (let i = 0; i < 60; i++) attemptMoveIns(sim);
+    // Gated every pass: the gate's continue skips the fill roll entirely.
+    expect(clinic.state).toBe("empty");
+    clinic.rent = rentConfig("clinic")!.default;
+    let leased = false;
+    for (let i = 0; i < 400 && !leased; i++) {
+      attemptMoveIns(sim);
+      leased = clinic.state !== "empty";
+    }
+    // At the going rate the gate allows the spot and the seeded stream fills it.
+    expect(leased).toBe(true);
   });
 });
