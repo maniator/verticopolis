@@ -50,6 +50,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@vercel/analytics": "^2.0.1",
     "@vercel/functions": "^3.7.5",
     "@vercel/speed-insights": "^2.0.0",
     "excalibur": "^0.32.0",
