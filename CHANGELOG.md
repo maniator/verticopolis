@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.2.0
+
+- Elevator cars glide now. They accelerate away from a stop, cruise, and settle onto their floor in one continuous motion, instead of freezing and jumping as the clock ticks. The elevators themselves run exactly as before; only the drawing changed.
+
 ## 2.1.1
 
 - The Studio no longer quietly starves your restaurants. A floor of them was taking meal trips out of the pool and sending nobody, so the food court went hungry on a tower that had done nothing wrong.

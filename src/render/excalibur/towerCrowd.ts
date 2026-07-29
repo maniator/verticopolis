@@ -6,6 +6,7 @@ import { drawCar, drawGarbageTruck, drawMetroTrain, drawStreetCar } from "../spr
 import { METRO_TRAIN_H, GARBAGE_TRUCK_H } from "../sprites/facilities/vehicles";
 import { buildWalkers } from "./towerWalkerBuild";
 import { carIndicator, type CarIndicator } from "../carIndicator";
+import { stepCarPursuit, type CarDrawState } from "../carMotion";
 import type { Person } from "../../engine/Crowd";
 import { FLOOR, TILE } from "../scale";
 import type { TowerEngine } from "./TowerEngine";
@@ -329,15 +330,36 @@ function spotReachable(engine: TowerEngine, floor: number, tileX: number): boole
   return hit;
 }
 
-/** Repositions every moving actor each frame (the engine then draws them). */
-export function updateMotion(engine: TowerEngine): void {
+/** Per-entry eased draw state for the elevator cars (GH #688). Keyed off the
+ *  carActors entry object so syncMotion's full rebuild naturally forgets old
+ *  cars, and a fresh entry lazily seeds AT its sim position (its first frame
+ *  snaps, exactly the old behavior, which also keeps fake-entry tests exact).
+ *  Deliberately not gated on `d.anim`: car motion is functional, so it keeps
+ *  gliding under reduced motion, the same rule the routed crowd follows. */
+const carDrawStates = new WeakMap<object, CarDrawState>();
+
+/** Repositions every moving actor each frame (the engine then draws them).
+ *  `elapsedMs` is the engine update's frame delta (stepped by the screenshot
+ *  TestClock, so the eased pursuit below stays deterministic); the default
+ *  keeps legacy callers and tests on a plain 60fps frame. */
+export function updateMotion(engine: TowerEngine, elapsedMs = 1000 / 60): void {
   // Zoom cull (CAP-1): owns the hysteresis step for the frame. While culled,
   // every per-frame position/graphic loop below is skipped along with the
   // sibling reconcileCrowd pass.
   if (applyCrowdCull(engine)) return;
   const anim = engine.d.anim;
+  const dtSeconds = elapsedMs / 1000;
   for (const c of engine.carActors) {
-    c.actor.pos = ex.vec(engine.worldX(c.t.x), -c.t.carPositions[c.i] * FLOOR);
+    const target = c.t.carPositions[c.i];
+    let drawn = carDrawStates.get(c);
+    if (!drawn) {
+      drawn = { pos: target, vel: 0 };
+      carDrawStates.set(c, drawn);
+    }
+    // The drawn position chases the sim position with the accel/decel ease
+    // (carMotion.ts) instead of teleporting on each whole-game-minute sim tick.
+    stepCarPursuit(drawn, target, dtSeconds);
+    c.actor.pos = ex.vec(engine.worldX(c.t.x), -drawn.pos * FLOOR);
     // Indicator state (riders bucket scaled to capacity, direction lantern,
     // FULL) is derived by the tested carIndicator helper; the cab graphic is
     // cached per state so we only redraw when the state actually changes.
