@@ -179,3 +179,27 @@ PR #636 sat held for the on-device test while `main` moved from 1.99.1 to 2.3.1 
 - **doc (fixed):** AC9, the section 5 code-touch map, and the section 8 placement question described the abandoned docked-card and `mobileMq`/`peekShowing` design; all now state the shipped anchored, pointer-type-gated, input-layer-owned mechanism.
 - **defer (backlog, hybrid-only):** on a hybrid touch+mouse device, a long-press on a facility whose hover card was ✕-dismissed shows nothing (the `inspectDismissed` latch early-returns) while still swallowing the release. Pure-touch flows never set the latch. Recorded in the backlog with its own issue.
 - **dismissed:** a parking exclusion in `armLongPress` (refuted: parking units render a real inspector card, so the peek behaves exactly like desktop hover); the `.peek` class surviving a non-null re-render (unreachable: `pointerMove` is suppressed while a peek is fired, and every hide path clears the marker); the captured pick going stale during the 450ms hold (bounded, and any sim-mutating gesture cancels the hold).
+
+## 13. Follow-ups ruling (party, 2026-07-29)
+
+Both deferred rows were ruled in a follow-ups party under the owner's
+pre-authorized "please" (memlog 2026-07-29) and closed by story 696-1 (v2.6.1):
+
+- **#634 holding affordance (AC7): WON'T-SHIP.** The defer condition,
+  "implement if the hold reads as lag on device," resolved negative on the
+  owner's device test. Platform long-press convention (iOS and Android alike)
+  fires a cue AT the knee rather than during the hold, and the card appearing
+  at the knee is that cue; a filling ring would be non-idiomatic, would demand
+  a `reduce-motion` second path, and would add engine state (press position,
+  start time) that buys nothing the test showed was missing. Pillar 3's fear
+  never materializes because the only way to experience the delay is a
+  deliberate hold, and that story always ends with a card. If playtesting ever
+  surfaces a discoverability gap ("didn't know I could hold"), the remedy is
+  teaching copy rather than a ring. AC7 is retired with this note.
+- **#696 dismissal latch: SPEND IT.** A long-press is explicit fresh intent,
+  the same as a tap: `onLongPress` now spends the ✕-dismissal latch through the
+  identical `resetLatch()` seam `selectPicked` uses, so the two intent gates
+  cannot diverge and a hybrid device's dismissed hover card can no longer eat a
+  peek. Hover picks alone still respect the latch (its hover-jitter job is
+  untouched), and pure touch is unaffected (the latch is never armed there).
+  Story: `_bmad-output/implementation-artifacts/696-1-longpress-peek-dismiss-latch.md`.

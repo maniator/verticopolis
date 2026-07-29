@@ -206,6 +206,10 @@ export function wireEngine(app: GameApp): void {
     // hides the card (inspectPicked's own guard, pinned by the wiring test).
     // Mark it a peek so the card is exactly the desktop hover tooltip (no manual
     // ✕: lifting the finger dismisses it, like mouse-away on desktop).
+    // A deliberate hold is fresh intent, same as a tap: spend the ✕-dismissal
+    // latch through the seam selectPicked uses, so a hybrid device's dismissed
+    // hover card cannot eat the peek (#696). Hover picks alone never spend it.
+    app.inspector.resetLatch();
     app.inspector.inspectPicked(picked);
     app.ui.setInspectorPeek(true);
   };
