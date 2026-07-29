@@ -657,6 +657,105 @@ html.reduce-motion *::after {
   font-size: 11px;
   padding: 6px;
 }
+/* The dialog's action row is pinned to the bottom of the scrolling box,
+   mirroring the sticky title bar above it. `.modal-box` scrolls at 82vh, so on
+   a tall dialog (the elevator schedule's 24-hour grid) the actions used to sit
+   below the fold: the player could not see Save, pressed Esc instead, and on
+   the schedule dialog the dirty guard's whole response was renaming a Cancel
+   button they were not looking at. Two Esc presses then discarded the edits
+   with the warning off-screen at every step.
+
+   The selector is load-bearing twice over. `.modal-box >` excludes the action
+   rows that are not a dialog footer at all: Tower Statistics renders one
+   mid-body for the exterminator, and pinning that would park a button on an
+   opaque band over the sections the player is scrolling through. The
+   `:nth-last-child(2)` arm is for Settings, which renders its version line
+   AFTER the actions, so a bare `:last-child` would skip the one dialog most
+   likely to scroll on a phone.
+
+   DELIBERATELY MINIMAL. Only `position`, `bottom`, `z-index` and paint, all of
+   which are inert on a box that is not overflowing. Three earlier cuts added
+   box, and each one moved dialogs that have nothing to do with this fix: plain
+   padding shifted every dialog in the app (23 gallery shots and the visual
+   baselines caught it), full-bleed negative margins then pushed this strip's
+   background out over `.modal-box`'s own inset bevel, flattening the Win3.1
+   edge on every dialog, and trading the row's margin for equal padding added
+   6px to eight of them (see the collapsing note below). The strip must stay
+   INSIDE the padding box and must not grow. It
+   does not need to full-bleed: `.modal-box`'s horizontal padding is empty
+   gutter that content never renders into, so there is nothing to leak through
+   beside the strip.
+
+   The 12px gap above the buttons is the row's own `margin-top`, and margin is
+   transparent: scrolled content used to show through it, cut mid-glyph. It is
+   covered by an offset box-shadow rather than by padding. Swapping the margin
+   for equal padding LOOKS neutral and is not, because margins collapse and
+   padding does not: `margin-top: 12px` collapses with the preceding sibling's
+   `margin-bottom` (12px wins over a paragraph's 6px), while `padding-top: 12px`
+   stacks on top of that 6px and pushes every such dialog 6px taller. A shadow
+   cannot move anything at all, which is the property this rule wants. It is
+   offset up by exactly the collapsed gap; every element that can precede a
+   dialog footer here has a bottom margin of 12px or less, so the cover is exact
+   and can never reach past the gap onto the content above. The color must be
+   opaque and match the box face; `--panel` aliases `--r-face`, which is exactly
+   that, so the band is invisible unstuck.
+
+   The SECOND shadow covers the same kind of gap below. A sticky `bottom: 0`
+   stops at the scroll container's bottom PADDING, not at its visible edge, so
+   the strip parks 18px up and that 18px is a live window onto whatever has not
+   scrolled past yet: on a phone the schedule dialog showed two lines of the
+   Simulate readout under the buttons, sliced through the middle.
+
+   That band ends at the dialog's bevel, and the bevel is why the downward
+   cover is four values rather than one. `.win`'s bevel is an INSET shadow
+   living in the innermost 2px of the padding box, and a descendant paints over
+   a parent's inset shadow, so the two obvious cuts are both wrong: a cover
+   reaching the padding edge flattens the Win3.1 bottom edge on every dialog (a
+   shadow paints whether or not the strip is stuck, so this is not limited to
+   scrolling ones), and a cover stopping 2px short leaves scrolled text sliced
+   in the gap the bevel occupies, which is the reported defect at 2px instead of
+   18px. So the cover runs the full 18px and then REDRAWS the bevel's bottom
+   edge on top of itself. Earlier shadows paint over later ones, so they read
+   outward: panel to 16px, then the bevel's two colors in the 1px each they
+   occupy, outermost last. The result is pixel-identical to the bevel the box
+   draws for itself, which is the point: the strip is invisible until it has
+   something to hide.
+
+   The downward cover belongs ONLY to the `:last-child` arm, and that split is
+   load-bearing. It assumes the space below the strip is the container's
+   padding, which is true only when the strip really is the last child. Under
+   the `:nth-last-child(2)` arm that space is the dialog's own trailing content:
+   applying it to Settings painted the redrawn bevel across the dialog, as a
+   heavy double rule above the build-id line, on a dialog that does not even
+   scroll. Giving that trailing element a higher z-index does not save it, since
+   the element's own box is transparent and the lines show around its text. So
+   the second arm pins and covers upward only, and the band below it shows what
+   the dialog itself put there.
+
+   Every offset is a literal. An unresolved custom property invalidates the
+   whole declaration and would silently take the covers with it, which is why
+   `--pad-y` is not read here even though it would resolve.
+   `stickyDialogActions.guard.test.ts` ties these numbers to `--pad-y` and to
+   the bevel's width and colors in the token file, so they cannot drift apart
+   unnoticed. */
+.modal-box > .modal-actions:last-child,
+.modal-box > .modal-actions:nth-last-child(2) {
+  position: sticky;
+  bottom: 0;
+  /* Under the title bar's z-index 2 so the two stuck strips layer cleanly. */
+  z-index: 1;
+  background: var(--panel);
+  box-shadow: 0 -12px 0 var(--panel);
+}
+/* Only a true last child sits over the container's padding, so only it may
+   paint downward. See the note above for what this cost Settings. */
+.modal-box > .modal-actions:last-child {
+  box-shadow:
+    0 -12px 0 var(--panel),
+    0 16px 0 var(--panel),
+    0 17px 0 var(--r-shadow),
+    0 18px 0 var(--r-dark);
+}
 .modal-actions {
   display: flex;
   /* Wrap the action row when it holds more buttons than fit (e.g. the Help
@@ -666,6 +765,20 @@ html.reduce-motion *::after {
   gap: 8px;
   margin-top: 12px;
   justify-content: flex-end;
+}
+/* The unsaved-work warning, shown in the pinned strip itself rather than by
+   renaming a button. Esc leaves the player looking at the dialog, not at the
+   action row, so the state has to announce itself as text where their eyes
+   already are. `margin-right: auto` pushes it to the strip's left edge so it
+   reads as a sentence about the dialog rather than as another control.
+   `align-self` is set HERE rather than `align-items` on the strip, so every
+   other dialog's button alignment is left exactly as it was. */
+.modal-warn {
+  margin-right: auto;
+  align-self: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--bad-ink);
 }
 .modal-actions .btn {
   padding: 7px 14px;

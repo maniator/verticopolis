@@ -14,6 +14,7 @@ import {
   pgDismissSplash,
 } from "../screenshot-builders.ts";
 import { pgShowReturningSplash, pgShowTowerPicker } from "./returningPlayerPage.ts";
+import { DIALOG_PIN_SHOTS } from "./dialogPinShots.ts";
 
 export const SHOWCASE_SCENES: Scene[] = [
   // --- Showcase: first-run splash / onboarding (fresh, splash kept) ----------
@@ -103,6 +104,9 @@ export const SHOWCASE_SCENES: Scene[] = [
         },
         wait: 300,
       },
+      // The pinned-footer proof shots (Help + Settings on a short viewport).
+      // Kept in a sibling module so this file stays under the file-size guard.
+      ...DIALOG_PIN_SHOTS,
     ],
   },
   // --- Settings, Modern variant (the Modern-only Building toggle) --------------

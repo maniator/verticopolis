@@ -64,7 +64,7 @@ export const SHARDS: Record<string, string[]> = {
   // two CAP-8 escalator-on-office stills (small frozen towers, one shot each)
   // + the boot-no-webgl fallback screen (no tower at all, ~2s, cheapest scene
   // in the set; it barely moves the shard's budget).
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl"],
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork) + the
   // settings-modern dialog shot (one frozen Modern tower, one modal still),

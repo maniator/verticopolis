@@ -51,6 +51,68 @@ test.describe("dialog chrome", () => {
     await expect(page.locator("#modal .modal-box")).toHaveScreenshot("stats-dialog.png");
   });
 
+  test("pinned dialog footer covers the bands around it, at phone width", async ({ page }) => {
+    // The one gate that can see this fix. Everything else guarding the pinned
+    // footer reads geometry or the stylesheet, and both covers around the strip
+    // are box-shadows: delete either one and not a single rect moves, so every
+    // other assertion stays green while scrolled text shows through, sliced.
+    // Both leaks that shipped were found by a human on a phone, not by CI.
+    //
+    // Narrow on purpose. The bands are `--pad-y` below the strip and its 12px
+    // margin above, so what fills them is body text mid-scroll, and the phone
+    // is where the schedule dialog's readout wraps far enough to reach them.
+    // 700 tall, not the nominal 844: a phone showing browser chrome, which is
+    // the state the leak was reported from. At the full 844 this dialog clears
+    // its 82vh cap by only 18px, and a baseline taken there would be thin
+    // evidence for a pin. Here it overflows by ~136px.
+    await page.setViewportSize({ width: 390, height: 700 });
+    // The 1-star fixture builds no transports and stops at floor 3, so the
+    // schedule dialog would neither open nor be long enough to scroll. Raise
+    // the structure and give it one tall shaft: the dialog's height comes from
+    // its per-floor grid, and a 30-floor span is what makes it overflow.
+    await page.evaluate(() => {
+      const g = (window as any).game;
+      const t = g.sim.tower;
+      const W = g.grid.width;
+      for (let f = 4; f <= 30; f++) for (let x = 4; x < W - 4; x++) t.place("floor", f, x);
+      const r = g.sim.buildTransport("elevatorStandard", 10, 1, 30);
+      if (!r.ok) throw new Error(`could not place the shaft this shot needs: ${JSON.stringify(r)}`);
+      const shaft = t.transports.find((x: { kind: string }) => x.kind === "elevatorStandard");
+      g.selected = { type: "transport", id: shaft.id };
+      g.engine.selectedId = shaft.id;
+      g.refreshEditor();
+    });
+    await page.click('#editor [data-edit="schedule"]');
+    await page.waitForSelector("#modal .es-body");
+    // Park mid-scroll with real content in BOTH bands, so the baseline holds
+    // evidence about each cover rather than just the one below.
+    const staged = await page.evaluate(() => {
+      const box = document.querySelector("#modal .modal-box") as HTMLElement;
+      const strip = document.querySelector("#modal .modal-box > .modal-actions") as HTMLElement;
+      const leaves = [...box.querySelectorAll<HTMLElement>("*")].filter(
+        (el) => !el.closest(".modal-actions") && el.children.length === 0 && (el.textContent || "").trim(),
+      );
+      const max = box.scrollHeight - box.clientHeight;
+      // The pin only does work when more remains below the fold than the strip
+      // is tall; without this the shot could be of a dialog barely overflowing.
+      if (max <= strip.offsetHeight * 2) return false;
+      const fills = (top: number, bottom: number): boolean =>
+        leaves.some((el) => {
+          const r = el.getBoundingClientRect();
+          return r.height > 0 && Math.min(r.bottom, bottom) - Math.max(r.top, top) >= 4;
+        });
+      for (let t = Math.floor(max / 2); t >= 0; t -= 2) {
+        box.scrollTop = t;
+        const s = strip.getBoundingClientRect();
+        const b = box.getBoundingClientRect().bottom;
+        if (fills(s.bottom, b) && fills(s.top - 12, s.top)) return true;
+      }
+      return false;
+    });
+    expect(staged, "no offset put content in both bands; the baseline would prove nothing").toBe(true);
+    await expect(page.locator("#modal .modal-box")).toHaveScreenshot("dialog-footer-pinned-phone.png");
+  });
+
   test("editor card matches baseline", async ({ page }) => {
     // Select an office through the same path a canvas click takes.
     await page.evaluate(() => {

@@ -13,6 +13,13 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 1.105.0
+
+- Dialog buttons now stay pinned to the bottom of the window, so Save and Cancel
+  no longer scroll out of sight in a long dialog.
+- The elevator schedule window says when you have unsaved changes instead of
+  quietly waiting for a second press.
+
 ## 1.104.2
 
 - An elevator or stair wide enough to straddle a gap now connects the floor on both sides of it, so a room across a narrow gap from the shaft is no longer wrongly reported as having no way to transportation.

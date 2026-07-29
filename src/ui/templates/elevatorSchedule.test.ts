@@ -52,6 +52,7 @@ const ctx = (over: Partial<SchedCtx> = {}): SchedCtx => ({
 
 const state = (over: Partial<SchedState> = {}): SchedState => ({
   day: "weekday",
+  dirty: false,
   selectedHour: 17,
   rangeEnd: null,
   advancedOpen: false,

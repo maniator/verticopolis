@@ -2442,6 +2442,72 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     expect(dialog().open).toBe(false);
   });
 
+  it("the armed state states the problem in the pinned strip, not only on the button", () => {
+    // The player who needs this pressed Esc, so their eyes are on the dialog,
+    // not on a button that may be scrolled out of view. The strip has to SAY
+    // there are unsaved changes. Asserting the rendered text is the point:
+    // "we renamed a control" is not the same claim as "the player was told".
+    const { apply } = open();
+    expect(dialog().querySelector(".modal-warn")).toBeNull(); // silent until edited
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // an edit
+
+    // Esc, the path that used to look like nothing happened. Assert the guard
+    // CANCELLED the close request: a <dialog> closes on Esc unless the cancel
+    // event is prevented, and a dispatched event never enters that algorithm,
+    // so `dialog().open` staying true would prove nothing (nothing was ever
+    // going to close it). defaultPrevented is the claim that actually fails if
+    // the preventDefault is removed.
+    const esc = new Event("cancel", { cancelable: true });
+    dialog().dispatchEvent(esc);
+    expect(esc.defaultPrevented).toBe(true);
+    const warn = dialog().querySelector(".modal-warn")!;
+    expect(warn.textContent).toContain("unsaved changes");
+    expect(warn.getAttribute("role")).toBe("alert");
+    // It lives in the action strip, which is the part pinned to the viewport.
+    expect(warn.closest(".modal-actions")).not.toBeNull();
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("the warning PERSISTS through further edits; only the discard disarms", () => {
+    // The warning answers "is there unsaved work?", which stays true until the
+    // dialog is applied or discarded. The button answers "is a discard queued?",
+    // which any edit clears. Keying the warning off the button's question made
+    // it vanish mid-edit while the changes were still at risk.
+    const { apply } = open();
+    const edit = () => dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!;
+    const cancel = () => dialog().querySelector<HTMLButtonElement>('[data-act="close"]')!;
+    edit().click();
+    expect(dialog().querySelector(".modal-warn")).not.toBeNull(); // unsaved from the first edit
+
+    const armEsc = new Event("cancel", { cancelable: true });
+    dialog().dispatchEvent(armEsc);
+    expect(armEsc.defaultPrevented).toBe(true);
+    expect(cancel().textContent).toBe("Discard changes?");
+
+    edit().click(); // disarms the pending discard, but the work is still unsaved
+    expect(cancel().textContent).toBe("Cancel");
+    expect(dialog().querySelector(".modal-warn")).not.toBeNull();
+    expect(apply).not.toHaveBeenCalled();
+  });
+
+  it("a second Esc after arming lets the close through", () => {
+    // The arm is fire-once by design: the guard cancels the FIRST close request
+    // and must not cancel the second, or Esc could never dismiss a dirty dialog
+    // at all. (A reopen starts clean structurally: the controller builds its
+    // `state` fresh per open, so `cancelArmed` cannot survive a close.)
+    const { apply } = open();
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click();
+    const first = new Event("cancel", { cancelable: true });
+    dialog().dispatchEvent(first);
+    expect(first.defaultPrevented).toBe(true);
+
+    const second = new Event("cancel", { cancelable: true });
+    dialog().dispatchEvent(second);
+    expect(second.defaultPrevented).toBe(false); // the discard goes through
+    expect(dialog().open).toBe(false);
+    expect(apply).not.toHaveBeenCalled();
+  });
+
   it("a dirty Cancel arms Discard changes? and the second press discards", () => {
     const { apply } = open();
     dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // stage up-tower
