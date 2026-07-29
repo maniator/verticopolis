@@ -197,6 +197,51 @@ const INSIGHTS = [
   { name: "Platform table", description: "Boots by platform as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "platform", display: "ActionsTable" }) },
   { name: "Tool usage table", description: "tool_used by tool as a table, production, 30d.", query: trends([series("tool_used", "Tool used")], { breakdown: "tool", display: "ActionsTable", breakdownLimit: 25 }) },
   { name: "Boot reason table", description: "Boots by reason as a table, production, 30d.", query: trends([series("boot", "Boots")], { breakdown: "reason", display: "ActionsTable" }) },
+  // Version adoption and crash reliability: the last two sections the retired
+  // Vercel report carried that had no dashboard tile, added at the D-1 cutover
+  // so nothing the report answered went dark.
+  {
+    name: "Version adoption (boots by build version)",
+    description: "Boots broken down by the build version prop, production, 30d.",
+    query: trends([series("boot", "Boots")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    // The update event fires before the activating reload and survives a failed
+    // activation (see updateFlow.ts), so it counts attempts. The closest
+    // applied-count signal is the post-reload boot with reason=update, next
+    // tile (approximate in both directions; see its comment).
+    name: "Update attempts by target version",
+    description: "Update attempts (emitted before the activating reload; a failed activation still counts) by target version, production, 30d.",
+    query: trends([series("update", "Update attempts")], { breakdown: "to", display: "ActionsTable", breakdownLimit: 10 }),
+  },
+  {
+    // An approximate applied-updates signal, bounded in neither direction: a
+    // successful activation can boot as continue/fresh (private-mode storage
+    // failure) or corrupt (save precedence), undercounting, and a manual
+    // reload inside the 30s resume window can boot the OLD build with
+    // reason=update, overcounting (see updateFlow.ts and appBoot.ts).
+    name: "Update-reason boots by version",
+    description: "Boots with reason=update by the build version booted into, production, 30d. Approximate applied-updates signal: reclassification undercounts, and a manual reload in the resume window can count the old build.",
+    query: trends([series("boot", "Update boots")], {
+      breakdown: "version",
+      display: "ActionsTable",
+      breakdownLimit: 10,
+      where: [{ key: "reason", operator: "exact", type: "event", value: ["update"] }],
+    }),
+  },
+  {
+    name: "Crashes over time (by repeat)",
+    description: "Daily crash events split by the repeat-within-90s flag, production.",
+    query: trends([series("crash", "Crashes")], { breakdown: "repeat" }),
+  },
+  {
+    // Typed crash events, not the $exception mirror: the synthetic crash
+    // reporter dedups its fingerprint once per session, so "Errors by build
+    // version" undercounts; this tile counts every typed crash.
+    name: "Crashes by build version",
+    description: "Typed crash events by build version (each crash counts, unlike the per-session-deduped $exception mirror), production, 30d.",
+    query: trends([series("crash", "Crashes")], { breakdown: "version", display: "ActionsTable", breakdownLimit: 10 }),
+  },
   // Reliability / error tracking. $exception is the cookieless error signal
   // (uncaught JS errors + unhandled rejections + synthetic WebGL-crash events);
   // the typed `crash` event keeps the structured crash-recovery detail.
