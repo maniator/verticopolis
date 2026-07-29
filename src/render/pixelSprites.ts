@@ -2,6 +2,7 @@ import type { FacilityKind, Unit, UnitState } from "../engine/types";
 import { FACILITIES, hasBusinessHours, isOpenAt } from "../engine/facilities";
 import { POPULATED, closedShutter, noticeBadge, type RoomCtx } from "./pixelSprites/common";
 import { condo, hotel, office } from "./pixelSprites/residential";
+import { rentalApartment, rentalStudio } from "./pixelSprites/residentialRentalSprites";
 import { cinema, fastFood, foodHall, restaurant } from "./pixelSprites/food";
 import { amusements } from "./pixelSprites/amusements";
 import { boutiqueBay } from "./pixelSprites/boutique";
@@ -52,6 +53,12 @@ export function drawRoom(d: RoomCtx, u: Unit, x: number, y: number, w: number, h
       break;
     case "condo":
       condo(d, u, x, y, w, h);
+      break;
+    case "rentalStudio":
+      rentalStudio(d, u, x, y, w, h);
+      break;
+    case "rentalApartment":
+      rentalApartment(d, u, x, y, w, h);
       break;
     case "hotelSingle":
       hotel(d, u, x, y, w, h, 1);

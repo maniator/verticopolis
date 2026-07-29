@@ -2,8 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import type { VacateReason } from "../../engine/types";
 import { vacate } from "../../engine/sim/churn";
+import { buildSatisfactionContext, wouldEvictFreshTenant } from "../../engine/sim/satisfactionStep";
 import { wontLeaseText } from "../../game/gripeCopy";
-import { W, C, DAY, servedTower, place, seat } from "./moveInGateHelpers";
+import { W, C, DAY, servedTower, place, placeRental, seat } from "./moveInGateHelpers";
 
 /**
  * The inspector "Won't lease" line and the buy-back departure toast for the
@@ -197,5 +198,103 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     // sell -> evict -> buy-back -> resell loop is broken, not merely slowed.
     expect(sim.log.filter((e) => e.text.includes("bought it back")).length).toBe(1);
     expect(sim.log.some((e) => e.text.includes("Condominium") && e.text.includes("sold"))).toBe(false);
+  });
+});
+
+/**
+ * The rentals half of the same contract. The gate holds a badly placed Studio or
+ * Apartment vacant exactly like a condo, so the card owes that vacancy the same
+ * explanation: without the line, the tenant who never arrives is the silent
+ * mystery the gate was built to explain.
+ */
+describe("move-in gate legibility: rentals", () => {
+  it("names the noise cause on a gated empty Apartment, with the carrying cost", () => {
+    const sim = servedTower(61, "modern");
+    place(sim, "office", 2, C - 13); // the noisy neighbor
+    const apt = placeRental(sim, "rentalApartment", 2, C);
+    expect(sim.noiseAfflicted(apt)).toBe(true); // the drain really is present
+    const line = wontLeaseText(sim, apt);
+    expect(line).not.toBeNull();
+    expect(line).toContain("Won't lease");
+    expect(line).toContain("noisy neighbor");
+    // A vacant rental is an overhead kind, so the hold really does cost money.
+    expect(line).toContain("to hold empty");
+  });
+
+  it("gives a far-walk-gated Apartment the generic gate line (the walk has its own card line)", () => {
+    const sim = servedTower(62, "modern");
+    const apt = placeRental(sim, "rentalApartment", 2, 0); // past the walking tolerance
+    expect(wouldEvictFreshTenant(sim, apt, buildSatisfactionContext(sim, true))).toBe(true);
+    const line = wontLeaseText(sim, apt);
+    expect(line).not.toBeNull();
+    expect(line).toContain("would soon give notice"); // defers to the flagged access line
+  });
+
+  it("stays silent for the forgiving Studio in that same spot, which the gate lets lease", () => {
+    const sim = servedTower(63, "modern");
+    const studio = placeRental(sim, "rentalStudio", 2, 0); // identical bad-access spot
+    expect(wouldEvictFreshTenant(sim, studio, buildSatisfactionContext(sim, true))).toBe(false);
+    expect(wontLeaseText(sim, studio)).toBeNull(); // no line for a spot that will fill
+  });
+
+  it("never holds a noisy Studio vacant: the forgiving tier always leases", () => {
+    // The Studio's erosion sits BELOW the served recovery, so noise caps it and can
+    // never wear it out, which means the gate has nothing to hold it for. That is
+    // the whole promise of the cheap tier and of strip-placing Studios along the low
+    // floors where the offices live. Previously it shared the condo's rate, which is
+    // deliberately above recovery, so a Studio beside any office never leased at all.
+    const sim = servedTower(64, "modern");
+    place(sim, "office", 2, C - 13); // the noisy neighbor
+    const studio = placeRental(sim, "rentalStudio", 2, C);
+    expect(sim.noiseAfflicted(studio)).toBe(true); // the drain really is present
+    expect(wouldEvictFreshTenant(sim, studio, buildSatisfactionContext(sim, true))).toBe(false);
+    expect(wontLeaseText(sim, studio)).toBeNull(); // nothing to explain: it will fill
+    // And behaviorally it really does take a tenant and keep it.
+    let guard = 0;
+    while (!studio.everOccupied && guard++ < 4000) sim.tick(60);
+    expect(studio.everOccupied).toBe(true);
+    for (let d = 0; d < 30; d++) sim.tick(DAY); // a month beside the noise
+    expect(studio.state).toBe("occupied"); // capped and unhappy, never evicted
+  });
+});
+
+/**
+ * The card reads the SAME reachability predicate the engine does. Since #647 that
+ * is the segment-aware `positionReachable`, not `floorReachable`: on a gap-split
+ * floor whose OTHER run reaches the lobby, the floor-level read says "reachable"
+ * while the engine skips the unit before the gate ever runs. Reading the floor
+ * there would answer a question the engine never asked, and bury the real story
+ * ("no way to transportation from here") under a gate verdict.
+ */
+describe("move-in gate legibility: a stranded run defers to its own access line", () => {
+  it("returns null for an empty unit on the disconnected run of a split floor", () => {
+    const sim = new Simulation(4242, "modern", "realWorld");
+    sim.money = 5_000_000;
+    sim.star = 1;
+    for (let x = 0; x <= 59; x++) expect(sim.tower.place("lobby", 1, x).ok).toBe(true);
+    for (let x = 0; x <= 24; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // LEFT run
+    for (let x = 35; x <= 59; x++) expect(sim.tower.place("floor", 2, x).ok).toBe(true); // RIGHT run
+    // A shaft on the LEFT run only, so floor 2 is served and floor-level reachable
+    // while the RIGHT run is stranded across the open gap.
+    expect(sim.tower.placeTransport("elevatorStandard", 0, 1, 2).ok).toBe(true);
+    const res = sim.tower.place("condo", 2, 38); // on the stranded RIGHT run
+    expect(res.ok).toBe(true);
+    const condo = sim.tower.units.find((u) => u.id === res.unitId)!;
+    // A twin on the CONNECTED run, so the "never filled" assertion below is a real
+    // discrimination and not just a tower that could never fill anything.
+    const twinRes = sim.tower.place("condo", 2, 6);
+    expect(twinRes.ok).toBe(true);
+    const twin = sim.tower.units.find((u) => u.id === twinRes.unitId)!;
+    // The exact predicate split this guards against.
+    expect(sim.tower.isFloorServed(2)).toBe(true);
+    expect(sim.floorReachable(2)).toBe(true); // the LEFT run reaches the lobby
+    expect(sim.positionReachable(2, condo.x)).toBe(false); // this unit does not
+    expect(sim.positionReachable(2, twin.x)).toBe(true); // the twin does
+    expect(wontLeaseText(sim, condo)).toBeNull();
+    // And the engine agrees: it never leases the stranded unit, while the twin on
+    // the reachable run does fill, so the tower demonstrably CAN seat a condo.
+    for (let i = 0; i < 14 * 24; i++) sim.tick(60);
+    expect(condo.everOccupied).toBe(false);
+    expect(twin.everOccupied).toBe(true);
   });
 });
