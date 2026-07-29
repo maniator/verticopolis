@@ -375,7 +375,7 @@ export class TowerEngine {
     // hour-driven repaints defer to the next frame's drain above.
     runSceneSync(this);
     drainRegions(this); // budgeted region repaints (towerRegions, CAP-2)
-    this.updateMotion();
+    this.updateMotion(elapsedMs);
     this.reconcileCrowd();
   }
 
@@ -393,7 +393,7 @@ export class TowerEngine {
   private syncScene(): void { reconcile.syncScene(this); }
   private syncFacade(): void { reconcile.syncFacade(this); }
   private syncMotion(): void { crowd.syncMotion(this); }
-  private updateMotion(): void { crowd.updateMotion(this); }
+  private updateMotion(elapsedMs: number): void { crowd.updateMotion(this, elapsedMs); }
   private reconcileCrowd(): void { crowd.reconcileCrowd(this); }
 
   /** Camera policy for a swapped-in (or boot-loaded) tower (see towerInputCamera).
