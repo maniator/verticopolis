@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { html, type TemplateResult } from "lit-html";
+import { finishModal, MODAL_TITLE_ID } from "../../ui/uiModal";
 import { UI, type UICallbacks } from "../../ui/UI";
 import { setMode } from "../../ui/uiStatus";
 import { Simulation } from "../../engine/Simulation";
@@ -538,9 +539,14 @@ describe("openModalTemplate — the lit mount path shares the window grammar", (
 
     // Drive finishModal a second time over the SAME dialog/box DOM: no close,
     // no innerHTML wipe, the exact repeat-mount scenario the review flagged.
-    (ui as any).finishModal(dlg, box);
+    // Called through the extracted grammar, with the same wiring UI passes it.
+    finishModal(dlg, box, {
+      titleBarClose: (cls, onClick) => ui.titleBarClose(cls, onClick),
+      closeModal: () => ui.closeModal(),
+      drainNotice: () => {},
+    });
 
-    const titleId = "verticopolis-modal-title"; // the shared MODAL_TITLE_ID (private to UI.ts)
+    const titleId = MODAL_TITLE_ID;
     const spans = box.querySelectorAll(`#${titleId}`);
     expect(spans.length).toBe(1); // exactly one title span, never nested
     const titleSpan = spans[0] as HTMLElement;
@@ -941,8 +947,8 @@ describe("export/import — file downloads and the file picker, no copy-paste pa
 });
 
 describe("import fidelity report: nothing adopted until the player opens it", () => {
-  const report = () => ({
-    towerName: "GRAND",
+  const report = (towerName = "GRAND") => ({
+    towerName,
     star: 3,
     money: 1_500_000,
     day: 3,
@@ -988,21 +994,111 @@ describe("import fidelity report: nothing adopted until the player opens it", ()
     expect(dialog().textContent).toContain("<img src=x onerror=alert(1)>");
   });
 
-  it("never clobbers a live blocking modal: the report yields with a toast instead", () => {
+  it("waits behind a modal that owns a decision, then opens once it resolves", () => {
     // An emergency choice can open while the OS file picker is up (the picker
-    // isn't a modal); replacing its DOM would strand its resolve and freeze
-    // the sim, so the report must refuse to open over it.
+    // isn't a modal). Replacing its DOM would strand its resolve and freeze the
+    // sim on `shownChoice`, so the report waits rather than clobbering. It used
+    // to refuse outright and say so with a toast, which a <dialog> paints over
+    // by construction (GH #658): the report is now held and opens by itself.
     const { ui } = makeUI();
     const onResolve = vi.fn();
     ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
     const onOpen = vi.fn();
     ui.showImportReport(report(), { onOpen });
-    // The emergency modal survives untouched and can still resolve.
+    // The emergency modal survives untouched and is still what the player sees.
     expect(dialog().textContent).toContain("A fire has broken out!");
-    expect(document.getElementById("toast-wrap")!.textContent).toContain("Close the open dialog first");
+    expect(dialog().textContent).not.toContain("Open tower");
+    click('[data-act="decline"]');
+    // Its own resolution still fires exactly once, and the report follows it.
+    expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(dialog().textContent).toContain("Open tower");
+    expect(onOpen).not.toHaveBeenCalled(); // still nothing adopted
+  });
+
+  it("takes the dialog from a modal that owns nothing", () => {
+    // Help owns no decision and no unsaved work, so making the player close it
+    // and re-pick the file bought nothing. The report replaces it outright.
+    const { ui } = makeUI();
+    ui.showHelp();
+    expect(dialog().textContent).toContain("Getting Started");
+    ui.showImportReport(report(), { onOpen: vi.fn() });
+    expect(dialog().textContent).toContain("Open tower");
+    expect(dialog().textContent).not.toContain("Getting Started");
+  });
+
+  it("tells the player, visibly, that the report is waiting", () => {
+    // CAP-1: a deferral that only writes to `#a11y-live` informs nobody who can
+    // see, and that region is `visually-hidden`. The line has to be in the
+    // dialog the player is looking at.
+    const { ui } = makeUI();
+    ui.showEventChoice("A fire has broken out!", "$20,000", vi.fn());
+    ui.showImportReport(report(), { onOpen: vi.fn() });
+    const notice = dialog().querySelector(".modal-notice");
+    expect(notice, "a waiting report must say so where it can be seen").not.toBeNull();
+    expect(notice!.textContent).toContain("will open when you finish here");
+    expect(document.getElementById("a11y-live")!.textContent).toContain("will open when you finish here");
+  });
+
+  it("treats the update prompt as protected", () => {
+    // CAP-2. Never classified, so this pins the fail-safe default rather than
+    // an opt-in: adding `displaceable` here later would fail this test.
+    const { ui } = makeUI();
+    ui.showUpdatePrompt({ version: "9.9.9", notes: [] } as never, vi.fn());
+    ui.showImportReport(report(), { onOpen: vi.fn() });
+    // The prompt itself survives and the report did not take the dialog; the
+    // only thing added is the line telling the player the report is waiting.
+    expect(dialog().textContent).toContain("Update available");
+    expect(dialog().textContent).not.toContain("Open tower");
+    expect(dialog().querySelector(".modal-notice")!.textContent).toContain("will open when you finish here");
+  });
+
+
+  it("does not displace a dialog that owes a restore on close", () => {
+    // CAP-3's second clause, the one that matters: "the displaced dialog leaves
+    // no pending handler behind". Compare pauses the tower and restores the
+    // prior speed through handlers wired to every close path, so displacing it
+    // would strand the sim at speed 0 with no dialog and no way back. It reads
+    // as protected for exactly that reason, despite looking informational.
+    const { ui, cb } = makeUI();
+    ui.showCompare();
+    expect(cb.onSpeed).toHaveBeenCalledWith(0);
+    ui.showImportReport(report(), { onOpen: vi.fn() });
+    expect(dialog().textContent).toContain("Classic vs Modern"); // still there
+    click('[data-act="close"]');
+    // The restore ran, so the tower is not left frozen.
+    // The restore ran with the prior speed, so the tower is not left frozen.
+    expect(cb.onSpeed).toHaveBeenLastCalledWith(1);
+  });
+
+  it("drops a waiting report visibly when a second one takes its place", () => {
+    // The wait is tied to ONE dialog resolving and only one report may hold it,
+    // because a report closes over a fully parsed Simulation: two waiting at
+    // once would eventually adopt the wrong tower. When the first is displaced
+    // its tower is dropped and the player is TOLD, inside the dialog they are
+    // looking at. A toast could not carry this, being raised from behind a
+    // dialog that paints over it, which is the defect this seam exists to fix.
+    const { ui } = makeUI();
+    const onResolve = vi.fn();
+    ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
+    ui.showImportReport(report("FIRST"), { onOpen: vi.fn() });
+    ui.showImportReport(report("SECOND"), { onOpen: vi.fn() });
+
+    // Told, in the emergency dialog that is still on screen, in full: what
+    // happened and what to do about it, not merely that something occurred.
+    const notice = dialog().querySelector(".modal-notice");
+    expect(notice, "the player must be told where they are looking").not.toBeNull();
+    expect(notice!.getAttribute("role")).toBe("alert");
+    expect(notice!.textContent).toContain("The import was dropped");
+    // The reason must be the one that actually happened.
+    expect(notice!.textContent).toContain("another file was picked");
+    expect(notice!.textContent).toContain("Try again");
+    // The emergency is untouched by any of it and still resolves once.
+    expect(dialog().textContent).toContain("A fire has broken out!");
     click('[data-act="decline"]');
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
-    expect(onOpen).not.toHaveBeenCalled();
+    // The SECOND tower is the one that opens; the dropped one never returns.
+    expect(dialog().textContent).toContain("SECOND");
+    expect(dialog().textContent).not.toContain("FIRST");
   });
 });
 
@@ -1050,17 +1146,40 @@ describe("export fidelity report: nothing downloads until the player confirms", 
     expect(dialog().open).toBe(false);
   });
 
-  it("never clobbers a live blocking modal: yields with a toast instead", () => {
+  it("waits behind a modal that owns a decision, then opens once it resolves", () => {
+    // Export follows the same precedence as import (CAP-6).
     const { ui } = makeUI();
     const onResolve = vi.fn();
     ui.showEventChoice("A fire has broken out!", "$20,000", onResolve);
     const onDownload = vi.fn();
     ui.showExportReport(exportReport(), { onDownload });
     expect(dialog().textContent).toContain("A fire has broken out!");
-    expect(document.getElementById("toast-wrap")!.textContent).toContain("Close the open dialog first");
     click('[data-act="decline"]');
     expect(onResolve).toHaveBeenCalledExactlyOnceWith("decline");
+    expect(dialog().textContent).toContain("GRAND.TDT");
     expect(onDownload).not.toHaveBeenCalled();
+  });
+
+  it("drops a waiting export visibly, naming the export", () => {
+    // CAP-6 asks for the export path to be covered for CAP-1 too. Without this
+    // the export wording was never rendered by any test, which is how a no-op
+    // `kind === "import" ? "import" : "export"` survived review.
+    const { ui } = makeUI();
+    ui.showEventChoice("A fire has broken out!", "$20,000", vi.fn());
+    ui.showExportReport(exportReport(), { onDownload: vi.fn() });
+    ui.showExportReport(exportReport(), { onDownload: vi.fn() });
+    const notice = dialog().querySelector(".modal-notice");
+    expect(notice, "the player must be told where they are looking").not.toBeNull();
+    expect(notice!.textContent).toContain("The export was dropped");
+    expect(notice!.textContent).toContain("Try again");
+  });
+
+  it("takes the dialog from a modal that owns nothing", () => {
+    const { ui } = makeUI();
+    ui.showHelp();
+    ui.showExportReport(exportReport(), { onDownload: vi.fn() });
+    expect(dialog().textContent).toContain("GRAND.TDT");
+    expect(dialog().textContent).not.toContain("Getting Started");
   });
 });
 
@@ -2395,6 +2514,32 @@ describe("showElevatorScheduleDialog — the per-shaft Schedule dialog", () => {
     ui.showElevatorScheduleDialog(baseCtx(over), { apply });
     return { ui, apply };
   }
+  it("reads as protected while it holds unsaved edits, so a report waits", () => {
+    // CAP-2's hardest case: the schedule owns real work without owning a
+    // pending resolution, so a hand-kept list of "dialogs that ask a question"
+    // would have missed it. Fail-safe classification covers it by default, and
+    // this pins that a report cannot take the dialog out from under an edit.
+    const { ui } = open();
+    dialog().querySelector<HTMLButtonElement>(".es-quick .btn:last-child")!.click(); // an edit
+    expect(dialog().querySelector(".modal-warn"), "the dialog must be dirty").not.toBeNull();
+    ui.showImportReport(
+      {
+        towerName: "GRAND",
+        star: 3,
+        money: 1_500_000,
+        day: 3,
+        floors: 5,
+        basements: 1,
+        unitsImported: 9,
+        broughtOver: [],
+        couldNotBring: [],
+      },
+      { onOpen: vi.fn() },
+    );
+    expect(dialog().querySelector(".es-body"), "unsaved edits must not be displaced").not.toBeNull();
+    expect(dialog().textContent).not.toContain("Open tower");
+  });
+
   /** The car chip for `car` (1-based) on the grid row for `floor`. */
   const chipAt = (floor: number, car: number) => {
     const row = Array.from(dialog().querySelectorAll<HTMLElement>(".es-grid-row:not(.es-grid-head)"))

@@ -1,3 +1,4 @@
+import { routeNotice } from "./modalPrecedence";
 import type { UI } from "./UI";
 import { confirmTemplate, installHelpTemplate, type InstallHelpVariant } from "./templates/confirm";
 import { eventChoiceTemplate } from "./templates/eventChoice";
@@ -47,13 +48,13 @@ export { openImport } from "./uiImport";
 import { openImport } from "./uiImport";
 
 export function showStats(ui: UI, body: TemplateResult, handlers: Record<string, () => void> = {}): void {
-  const box = ui.openModalTemplate(statsModalTemplate(body));
+  const box = ui.openModalTemplate(statsModalTemplate(body), { displaceable: true });
   ui.wireActions(box, handlers);
 }
 
 /** Saves manager: auto-save + numbered slots, plus export/import. */
 export function showSaves(ui: UI, slots: SlotInfo[]): void {
-  const box = ui.openModalTemplate(savesTemplate(slots));
+  const box = ui.openModalTemplate(savesTemplate(slots), { displaceable: true });
   box.querySelectorAll<HTMLElement>("[data-save]").forEach((b) =>
     b.addEventListener("click", () => {
       ui.cb.onSaveSlot(Number(b.dataset.save));
@@ -93,7 +94,7 @@ export function showSaves(ui: UI, slots: SlotInfo[]): void {
  *  it is only ever reached from a deliberate tap on an install affordance. The
  *  `variant` picks the iOS Safari steps or the Chrome/Edge browser-menu steps. */
 export function showInstallHelp(ui: UI, variant: InstallHelpVariant = "ios"): void {
-  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal(), variant));
+  ui.openModalTemplate(installHelpTemplate(() => ui.closeModal(), variant), { displaceable: true });
 }
 
 export function confirmModal(
@@ -172,16 +173,61 @@ export function confirmExport(ui: UI): void {
   });
 }
 
+
+/**
+ * Hold a report until the dialog in the way resolves, then re-run it.
+ *
+ * The wait is leashed to THAT dialog rather than left open ended: a report
+ * closes over a fully parsed tower, and a wait held across a tower swap or a
+ * second import would eventually adopt the wrong one. When the leash breaks the
+ * parsed tower is dropped, and the player is told so in the place they are
+ * actually looking, which is inside whatever dialog is now on screen when there
+ * is one. A toast cannot carry this message: the `<dialog>` top layer paints
+ * over every z-index, and this path is only reachable while a dialog is up.
+ */
+function waitForDialog(ui: UI, reopen: () => void, kind: "import" | "export"): void {
+  // Both halves, in one place. `#a11y-live` is `visually-hidden`, so announcing
+  // there alone would leave a sighted player staring at an unchanged dialog
+  // with no sign their file was even read: CAP-1 asks for somewhere they can
+  // ACTUALLY see it, and the dialog in the way is that somewhere.
+  const waiting = `The SimTower ${kind} will open when you finish here.`;
+  announce(waiting);
+  routeNotice(ui.el.modal as HTMLDialogElement, ui.precedence, waiting, (t) => ui.toast(t, "info"));
+  ui.precedence.wait(reopen, (reason) => {
+    // Name what actually happened. "Another window took over" is a lie when the
+    // truth is that a second file was picked, and a player who is told the
+    // wrong reason cannot act on it.
+    // One announcement, not two: `mountNotice` carries `role="alert"`, so
+    // writing the same sentence to the polite region as well would either be
+    // read out twice or be swallowed as a duplicate.
+    const because =
+      reason === "superseded" ? "another file was picked" : "another window took over";
+    const line = `The ${kind} was dropped: ${because} before it could open. Try again.`;
+    routeNotice(ui.el.modal as HTMLDialogElement, ui.precedence, line, (t) => ui.toast(t, "bad"));
+  });
+}
+
+/** Put a line in the polite live region, for the screen-reader half of "the
+ *  player was told". The visible half is the caller's job. */
+function announce(text: string): void {
+  const live = document.getElementById("a11y-live");
+  if (live) live.textContent = text;
+}
+
 /**
  * Fidelity report for a parsed legacy (.TDT) import, shown BEFORE anything is
  * adopted. `onOpen` fires only when the player commits via "Open tower".
  */
 export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () => void }): void {
-  // Never clobber a live dialog: the OS file picker isn't a modal, so a
-  // blocking choice (emergency, update prompt) can open in the shared <dialog>
-  // before the file finishes reading. openModalTemplate would wipe its DOM and handlers.
-  if (ui.isModalOpen()) {
-    ui.toast("Close the open dialog first, then import again.", "info");
+  // The OS file picker is not a modal, so a dialog can open in the shared
+  // <dialog> while the file is still being read. What matters is not whether
+  // one is open but whether replacing it would destroy something: a dialog that
+  // owns nothing is displaced, one that owns a pending decision is waited for.
+  // The old guard refused on "open at all" and reported that refusal with a
+  // toast, which a <dialog> paints over by construction, so the message could
+  // only ever appear where nobody could read it (GH #658).
+  if (ui.precedence.ownsPendingWork(ui.isModalOpen())) {
+    waitForDialog(ui, () => showImportReport(ui, report, cb), "import");
     return;
   }
   const box = ui.openModalTemplate(importReportTemplate(report));
@@ -202,8 +248,9 @@ export function showImportReport(ui: UI, report: ImportReport, cb: { onOpen: () 
  * downloads. `onDownload` fires only on the primary; Cancel downloads nothing.
  */
 export function showExportReport(ui: UI, report: ExportReport, cb: { onDownload: () => void }): void {
-  if (ui.isModalOpen()) {
-    ui.toast("Close the open dialog first, then export again.", "info");
+  // Same precedence as the import report; see the note there.
+  if (ui.precedence.ownsPendingWork(ui.isModalOpen())) {
+    waitForDialog(ui, () => showExportReport(ui, report, cb), "export");
     return;
   }
   const box = ui.openModalTemplate(exportReportTemplate(report));
@@ -226,7 +273,7 @@ export function showHelp(ui: UI): void {
   // Replay binds inline via @click. While the splash is up the button is
   // disabled, so a real browser suppresses the click, and onReplayOnboarding
   // also no-ops behind #splash; both make a splash-time trigger a no-op.
-  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }));
+  const box = ui.openModalTemplate(helpTemplate(onSplash, version, { onReplay: () => ui.cb.onReplayOnboarding() }), { displaceable: true });
   // Inside a native wrapper the report link routes to the system browser
   // through the platform port (see routeExternalInWrapper).
   routeExternalInWrapper(box.querySelector<HTMLAnchorElement>(".help-report a")!);
@@ -297,7 +344,7 @@ export function showSettings(ui: UI): void {
   // The Building section (the bridging toggle) is Modern-only; Classic never
   // renders it (bridging is forced on and can't be toggled there).
   const modern = ui.cb.getMode() === "modern";
-  const box = ui.openModalTemplate(settingsTemplate(version, modern));
+  const box = ui.openModalTemplate(settingsTemplate(version, modern), { displaceable: true });
   // Volume sliders: initialize from the live levels, apply on every input tick
   // (persistence is debounced by the onSetVolume handler in main.ts), and keep
   // the percent readout in step. Mute is independent; sliders never touch it.
@@ -440,5 +487,5 @@ export function showUpdateChip(_ui: UI, onClick: () => void): void {
 }
 
 export function congratsTower(ui: UI): void {
-  ui.openModalTemplate(congratsTemplate(() => ui.closeModal()));
+  ui.openModalTemplate(congratsTemplate(() => ui.closeModal()), { displaceable: true });
 }

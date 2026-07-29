@@ -83,4 +83,51 @@ export const DIALOG_PIN_SHOTS: Shot[] = [
     },
     wait: 300,
   },
+  {
+    // The dropped-report notice, which is the whole point of the modal
+    // precedence work: a message raised while a dialog is up has exactly one
+    // honest home, and it is inside the dialog the player is looking at. A
+    // toast cannot carry it, because the `<dialog>` top layer paints over the
+    // rail at any z-index, and this path is only ever reachable while a dialog
+    // is on screen.
+    //
+    // Staged through the real seam rather than by poking the notice into the
+    // DOM, so the shot fails if the routing stops working. The leash is broken
+    // by a SECOND import arriving, which is the in-scope way to break it: the
+    // alternative (another dialog displacing the blocked one) would have the
+    // shot depict an emergency whose resolve is stranded, which is a separate
+    // pre-existing wart and not something the gallery should bless.
+    name: "02f-dropped-report-notice",
+    crop: "#modal .modal-box",
+    keepDialogs: true,
+    setup: async (page) => {
+      await page.evaluate(() => {
+        const ui = (window as any).game.ui;
+        const report = (towerName: string) => ({
+          towerName,
+          star: 3,
+          money: 1_500_000,
+          day: 3,
+          floors: 5,
+          basements: 1,
+          unitsImported: 9,
+          broughtOver: ["$1,500,000 in funds and your 3-star rating."],
+          couldNotBring: ["Elevators were rebuilt from your floor layout."],
+        });
+        ui.showEventChoice("A fire has broken out!", "$20,000", () => {});
+        ui.showImportReport(report("FIRST"), { onOpen: () => {} });
+        ui.showImportReport(report("SECOND"), { onOpen: () => {} });
+      });
+      await page.waitForSelector("#modal .modal-notice", { timeout: 4000 });
+      // Exactly one notice, carrying the RIGHT words. A bare selector wait
+      // would rebaseline a duplicated or mis-worded notice without complaint.
+      await page.evaluate(() => {
+        const found = document.querySelectorAll("#modal .modal-notice");
+        if (found.length !== 1) throw new Error(`expected one notice, found ${found.length}`);
+        const text = found[0].textContent || "";
+        if (!text.includes("dropped") || !text.includes("Try again")) throw new Error(`the notice lost its message: ${text}`);
+      });
+    },
+    wait: 300,
+  },
 ];

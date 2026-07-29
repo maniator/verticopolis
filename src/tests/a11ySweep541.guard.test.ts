@@ -18,7 +18,8 @@ const read = (rel: string): string => readFileSync(resolve(srcRoot, rel), "utf8"
 const indexHtml = read("index.html");
 const stylesCss = read("styles.css");
 const tokensCss = read("styles/retro-tokens.css");
-const uiTs = read("ui/UI.ts");
+/** The shared window grammar, including the modal ✕, lives beside UI.ts. */
+const uiModalTs = read("ui/uiModal.ts");
 const uiPanelsTs = read("ui/uiPanels.ts");
 
 // --- WCAG relative-luminance contrast ---------------------------------------
@@ -81,7 +82,7 @@ describe("#541 a11y sweep: markup + CSS", () => {
     const SMALLEST_VISIBLE = 18;
     expect(SMALLEST_VISIBLE + 2 * Number(inset)).toBeGreaterThanOrEqual(24);
     // ...and both close ✕ buttons carry .btn.xs so they actually get the halo.
-    expect(uiTs).toContain("modal-x btn xs");
+    expect(uiModalTs).toContain("modal-x btn xs");
     expect(uiPanelsTs).toContain("insp-close btn xs");
   });
 });

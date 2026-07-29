@@ -68,6 +68,10 @@ export function showTowerPicker(ui: UI, ctx: TowerPickerCtx): void {
         },
       },
       storageBlocked),
+      // Load-only and read-only: nothing here is unsaved and nothing is a
+      // pending decision, so a fidelity report arriving behind it may take the
+      // dialog rather than wait for it.
+      { displaceable: true },
     );
     // Re-rendering replaces the dialog's DOM, so the Load button that had focus
     // is gone. Move focus onto the alert rather than leaving a keyboard user
