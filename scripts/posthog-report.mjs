@@ -10,11 +10,10 @@
  * GitHub Actions job summary when run in CI (`$GITHUB_STEP_SUMMARY`), and the
  * raw query results printed to stdout so a run is never a total loss.
  *
- * Why a second report script rather than editing scripts/analytics-report.mjs:
- * the Vercel Web Analytics path stays live until S6 retires it, so the two run
- * side by side through the migration. This one supersedes it on precision. HogQL
+ * This report superseded the retired Vercel Web Analytics report
+ * (scripts/analytics-report.mjs, removed in PR #692) on precision: HogQL
  * computes EXACT percentiles (`quantile(0.5)(...)`) instead of reconstructing
- * them from a capped value histogram, and because every event now carries a
+ * them from a capped value histogram, and because every event carries a
  * per-tab session id (distinct_id), it can do the per-session and per-tool
  * splits the Vercel path could not (Vercel Web Analytics has no session
  * correlation). All numbers are production only (`properties.environment`);
@@ -52,12 +51,13 @@ const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
 // Parse the look-back window. A plain number is days ("30", "0.5"); a unit
 // suffix picks the unit ("12h", "3d"). Normalized to whole hours, so a
 // half-day request really queries 12 hours instead of being discarded.
-// Bounds: at least 1 hour, at most 365 days. Anything the regex rejects (or a
-// value outside the bounds) throws so a bad dispatch input fails the run
-// loudly; the old guard silently swapped bad values for the 30-day default,
-// which turned a "0.5" request into a month of data with no warning. Only the
-// interpolated INTERVAL count must stay a guarded integer, and Math.round
-// keeps it one.
+// Bounds: at least 1 hour, at most 365 days, checked on the exact value
+// BEFORE rounding so "0.5h" cannot sneak under the stated minimum by rounding
+// up to it. Anything the regex rejects (or a value outside the bounds) throws
+// so a bad dispatch input fails the run loudly; the old guard silently
+// swapped bad values for the 30-day default, which turned a "0.5" request
+// into a month of data with no warning. Only the interpolated INTERVAL count
+// must stay a guarded integer, and Math.round keeps it one.
 function parseWindow(v) {
   const bad = (why) =>
     new Error(
@@ -66,19 +66,28 @@ function parseWindow(v) {
   const m = /^\s*(\d+(?:\.\d+)?|\.\d+)\s*(d|day|days|h|hr|hrs|hour|hours)?\s*$/i.exec(String(v));
   if (!m) throw bad("not a number with an optional d/h unit");
   const unit = (m[2] || "d")[0].toLowerCase();
-  const hours = Math.round(unit === "h" ? Number(m[1]) : Number(m[1]) * 24);
-  if (hours < 1) throw bad("shorter than 1 hour");
-  if (hours > 365 * 24) throw bad("longer than 365 days");
+  const exactHours = unit === "h" ? Number(m[1]) : Number(m[1]) * 24;
+  if (exactHours < 1) throw bad("shorter than 1 hour");
+  if (exactHours > 365 * 24) throw bad("longer than 365 days");
+  const hours = Math.round(exactHours);
   return { hours, label: hours % 24 === 0 ? plural(hours / 24, "day") : plural(hours, "hour") };
 }
-const WINDOW = (() => {
+
+// Resolve the window from argv, failing loudly on a dangling flag: a bare
+// trailing `--window` (no value) must error like any other bad input, not
+// slide back to the 30-day default the way a missing-flag fallback would.
+// Called from main(), never at module load, so importing the pure helpers
+// (as the unit tests do) can never parse the host process's argv or exit it.
+function resolveWindow() {
+  const flagged = (name) => process.argv.some((a) => a === `--${name}` || a.startsWith(`--${name}=`));
+  const raw = flagged("window") ? arg("window", "") : flagged("days") ? arg("days", "") : "30";
   try {
-    return parseWindow(arg("window", null) ?? arg("days", "30"));
+    return parseWindow(raw);
   } catch (err) {
     console.error(err.message);
     process.exit(1);
   }
-})();
+}
 const OUT_DIR = arg("out", "reports");
 // --demo renders the report from built-in sample data with no API calls, so the
 // layout and styling can be previewed without a key or any real traffic.
@@ -435,7 +444,7 @@ function demoModel() {
   const rows = (pairs) => ({ ok: true, rows: pairs.map(([key, events, sessions]) => ({ key: String(key), events, sessions })) });
   const depth = (n, p50, p90, p95, max) => ({ skipped: false, empty: false, n, p50, p90, p95, max });
   return {
-    window: { since: "sample", until: "sample", label: WINDOW.label },
+    window: { since: "sample", until: "sample", label: "sample" },
     generated: "sample",
     kpis: [
       ["Towers founded", 1240],
@@ -493,6 +502,7 @@ function demoModel() {
 }
 
 async function main() {
+  const WINDOW = resolveWindow();
   requireEnv();
   mkdirSync(OUT_DIR, { recursive: true });
 

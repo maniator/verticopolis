@@ -33,7 +33,7 @@ describe("parseWindow (look-back parser)", () => {
     expect(parseWindow("48H")).toEqual({ hours: 48, label: "2 days" }); // whole days label as days
   });
 
-  it("rounds to whole hours", () => {
+  it("rounds to whole hours after the bounds check", () => {
     expect(parseWindow("1.5h").hours).toBe(2);
     expect(parseWindow("45.9").hours).toBe(1102); // 45.9 days, kept instead of floored to 45
   });
@@ -44,7 +44,12 @@ describe("parseWindow (look-back parser)", () => {
     expect(() => parseWindow("1e309")).toThrow(/Invalid look-back window/);
     expect(() => parseWindow("")).toThrow(/Invalid look-back window/);
     expect(() => parseWindow("0")).toThrow(/shorter than 1 hour/);
-    expect(() => parseWindow("0.4h")).toThrow(/shorter than 1 hour/); // rounds to 0 hours
+    // Bounds are checked on the exact value BEFORE rounding, so a sub-minimum
+    // window cannot round up to 1 hour, and an over-maximum one cannot round
+    // down to 365 days.
+    expect(() => parseWindow("0.4h")).toThrow(/shorter than 1 hour/);
+    expect(() => parseWindow("0.5h")).toThrow(/shorter than 1 hour/);
+    expect(() => parseWindow("365.01")).toThrow(/longer than 365 days/);
     expect(() => parseWindow("1000")).toThrow(/longer than 365 days/);
   });
 

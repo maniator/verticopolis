@@ -59,7 +59,7 @@ guess.
 | S5 | Re-target the report to PostHog queries; `session_fps` (#538) emits raw values into the surviving stack. | CAP-4 | `/gds-code-review` | minor (`session_fps` emission) | done (PR #604) |
 | S5b | Cookieless JS error tracking: `$exception` through the relay (follow-up feature, not a CAP story). | CAP-2 posture | `/bmad-code-review` | minor (new emission) | done (PR #608) |
 | S5c | Error-tracking enhancements + app-chrome telemetry: WebGL crashes to Error Tracking (synthetic `$exception`), top-level `$exception_type`, and one `app_action` event for the save/export/import/TDT/dialog/toggle/page surface (design-partied). Spec: `spec-posthog-error-tracking`. | see spec CAP-1..4 | `/bmad-code-review` | minor (new emissions) | in review |
-| S6 | Confirm dual-write parity, then retire Vercel: delete the `analytics-report.mjs` percentile machinery, ship the transparency note. Speed Insights keep-or-drop recorded here. | CAP-4 | `/gds-code-review` | patch | todo |
+| S6 | Confirm dual-write parity, then retire Vercel: stop the client dual-write (drop the `@vercel/analytics` import from the adapter), ship the transparency note. Speed Insights keep-or-drop recorded here. The report half (delete `scripts/analytics-report.mjs`, its tests, docs, and workflow step) landed early in PR #692 by owner ruling on 2026-07-29. | CAP-4 | `/gds-code-review` | patch | todo (report half done in PR #692) |
 
 ## S1 seam (as built)
 
