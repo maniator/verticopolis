@@ -177,6 +177,7 @@ export function showElevatorScheduleDialog(
     rangeEnd: null,
     advancedOpen: false,
     cancelArmed: false,
+    dirty: false,
     floors: initialFloors,
     base: base0,
     schedule: {
@@ -196,7 +197,6 @@ export function showElevatorScheduleDialog(
   // Whether ANY schedule edit has landed since open: arms the Cancel discard guard.
   // Stop edits (Serve toggles) do NOT arm it: they applied live and Cancel cannot
   // take them back (each has its own undo step instead).
-  let dirty = false;
 
   // The template's `hourly`/`hasMeasured` are DAY-SCOPED (#466): the ghost and
   // the "line up" fallback follow the day tab, so an unmeasured weekend shows no
@@ -276,7 +276,7 @@ export function showElevatorScheduleDialog(
   };
   /** A schedule edit landed: mark dirty, disarm a pending discard, recompute, repaint. */
   const after = (): void => {
-    dirty = true;
+    state.dirty = true;
     state.cancelArmed = false;
     recompute();
     unfoldOnAdvice();
@@ -470,7 +470,7 @@ export function showElevatorScheduleDialog(
     onCancel: () => {
       // A dirty working copy takes two presses: the first arms "Discard changes?",
       // any edit disarms (spec §8). Every dismissal path funnels here (see below).
-      if (dirty && !state.cancelArmed) {
+      if (state.dirty && !state.cancelArmed) {
         state.cancelArmed = true;
         rerender();
         return;
@@ -490,7 +490,7 @@ export function showElevatorScheduleDialog(
   const dlg = box.closest("dialog");
   if (dlg instanceof HTMLDialogElement) {
     dlg.oncancel = (e) => {
-      if (dirty && !state.cancelArmed) e.preventDefault();
+      if (state.dirty && !state.cancelArmed) e.preventDefault();
       handlers.onCancel();
     };
     dlg.onclick = (e) => {

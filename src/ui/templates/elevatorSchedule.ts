@@ -60,8 +60,19 @@ export interface SchedState {
   rangeEnd: number | null;
   /** Modern only: the raw count grid is folded behind Advanced until opened. */
   advancedOpen: boolean;
-  /** Dirty-cancel arm: the Cancel button reads "Discard changes?" until re-pressed. */
+  /** Dirty-cancel arm: the pinned action strip carries an unsaved-changes
+   *  warning and the Cancel button reads "Discard changes?" until re-pressed.
+   *  The warning is the load-bearing half. Esc routes to the same handler and
+   *  preventDefaults the close, so a player who dismissed with the keyboard is
+   *  looking at the dialog rather than at a button, and a renamed control
+   *  they could not see told them nothing. */
   cancelArmed: boolean;
+  /** Whether the working copy holds unsaved edits. Drives the strip's warning,
+   *  which must persist for as long as the work is at risk. `cancelArmed` is a
+   *  different question (is a discard queued?) and is cleared by any edit, so
+   *  keying the warning off it made the warning vanish mid-edit while the
+   *  changes were still unsaved. */
+  dirty: boolean;
   /** Live span floors, DESCENDING (top first, like the tower), refreshed from the
    *  engine after every Serve toggle. */
   floors: FloorRow[];
@@ -363,6 +374,9 @@ export function elevatorScheduleTemplate(ctx: SchedCtx, state: SchedState, h: Sc
         <div class="es-sim" aria-live="polite">${state.simMsg}</div>
       </div>
       <div class="modal-actions">
+        ${state.dirty
+          ? html`<span class="modal-warn" role=${state.cancelArmed ? "alert" : "status"}>You have unsaved changes.</span>`
+          : nothing}
         <button class="btn primary" data-act="apply" @click=${h.onOk}>OK</button>
         <button class="btn" data-act="close" @click=${h.onCancel}>${state.cancelArmed ? "Discard changes?" : "Cancel"}</button>
       </div>`;

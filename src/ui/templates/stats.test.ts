@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "../../engine/Simulation";
 import { GRID } from "../../engine/facilities";
 import { nothing } from "lit-html";
-import { statsTemplate, incomeSection } from "./stats";
+import { statsTemplate, incomeSection, statsModalTemplate, canCallExterminator } from "./stats";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -286,5 +286,36 @@ describe("Tenancy vacancies split off-market (No Rate) counts out", () => {
     expect(vacantRow()).toBe("2"); // two vacant, none off-market: unchanged
     sim.tower.units.find((u) => u.id === c.unitId)!.noRate = true;
     expect(vacantRow()).toBe("2 (1 off-market)"); // the honest split
+  });
+});
+
+describe("the exterminator row is never a dialog footer", () => {
+  it("renders nested, so the sticky-footer rule cannot reach it", () => {
+    // `.modal-box > .modal-actions:last-child` pins the DIALOG FOOTER. Tower
+    // Statistics also renders a `.modal-actions` mid-body for the exterminator,
+    // and pinning that would park a button on an opaque band over the sections
+    // the player is scrolling through. The CSS guard
+    // (src/tests/stickyDialogActions.guard.test.ts) proves the selector keeps
+    // its child combinator; this proves the other half, that the exterminator
+    // row really is nested. `openModalTemplate` makes the modal template's
+    // TOP-LEVEL nodes the children of `.modal-box`, so "not a top-level node"
+    // is exactly "not reachable by that selector".
+    const sim = Simulation.newGame(3, "modern");
+    for (let x = 0; x < GRID.width; x++) sim.tower.place("lobby", 1, x);
+    for (let x = 0; x < GRID.width; x++) sim.tower.place("floor", 2, x);
+    const r = sim.tower.place("hotelSingle", 2, Math.floor(GRID.width / 2));
+    expect(r.ok).toBe(true);
+    sim.tower.units.find((u) => u.id === r.unitId)!.state = "infested";
+    // Fixture premise: without an offerable extermination there is no row to
+    // place, and this test would pass by rendering nothing.
+    expect(canCallExterminator(sim)).toBe(true);
+
+    const frag = renderToFragment(statsModalTemplate(statsTemplate(sim)));
+    const footers = [...frag.children].filter((el) => el.classList.contains("modal-actions"));
+    expect(footers).toHaveLength(1);
+    expect(footers[0].querySelector('[data-act="close"]')).not.toBeNull();
+    const exterm = frag.querySelector('[data-act="exterminate"]');
+    expect(exterm).not.toBeNull();
+    expect(footers[0].contains(exterm)).toBe(false);
   });
 });
