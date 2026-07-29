@@ -63,8 +63,12 @@ export const SHARDS: Record<string, string[]> = {
   // scenes (#305 Phase 3: small frozen towers, DOM dialog shots, cheap) + the
   // two CAP-8 escalator-on-office stills (small frozen towers, one shot each)
   // + the boot-no-webgl fallback screen (no tower at all, ~2s, cheapest scene
-  // in the set; it barely moves the shard's budget).
-  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl"],
+  // in the set; it barely moves the shard's budget)
+  // + the four rental-living / founder-badge shots (desktop and phone). Both towers
+  // are placed-and-frozen with the sim stopped, so neither needs a drawSettle, and
+  // the founder pair captures a splash over no tower at all; ~4s for the set, which
+  // keeps this shard inside the same ~71s pole as the rest.
+  features: ["overlays", "cleanliness-overlay", "stats", "crash-screen", "basement", "traffic", "lobby-awnings", "update-prompt", "schedule-dialog", "schedule-dialog-express", "schedule-dialog-classic", "schedule-dialog-classic-phone", "compare-escalator-office-modern", "compare-escalator-office-classic", "boot-no-webgl", "rental-living", "founder-badge", "rental-living-mobile", "founder-badge-mobile"],
   // ~57s + the two light pricing-modern scenes (one small frozen tower built
   // twice, four DOM panel/dialog shots total; issue #443's Modern fork) + the
   // settings-modern dialog shot (one frozen Modern tower, one modal still),

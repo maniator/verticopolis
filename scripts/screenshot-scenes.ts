@@ -27,6 +27,8 @@ import { CLASSIC_VS_MODERN_SCENES } from "./scenes/classic-vs-modern.ts";
 import { MILESTONE_SCENES } from "./scenes/milestones.ts";
 import { BOOT_FALLBACK_SCENES } from "./scenes/boot-fallback.ts";
 import { INSTALL_SCENES } from "./scenes/install.ts";
+import { RENTAL_SCENES } from "./scenes/rental.ts";
+import { FOUNDER_SCENES } from "./scenes/founder.ts";
 
 export const SCENES: Scene[] = [
   ...SHOWCASE_SCENES,
@@ -37,4 +39,6 @@ export const SCENES: Scene[] = [
   ...MILESTONE_SCENES,
   ...BOOT_FALLBACK_SCENES,
   ...INSTALL_SCENES,
+  ...RENTAL_SCENES,
+  ...FOUNDER_SCENES,
 ];
