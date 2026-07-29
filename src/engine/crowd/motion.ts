@@ -14,6 +14,7 @@ import {
 import { pickX, pickXInSegment, insideX, metroStationForPlatform } from "./trips";
 import { walkTo } from "./walk";
 import { landingSlots } from "./landing";
+import { alightX } from "../tower/segments";
 import { beginDwell } from "./visits";
 
 /**
@@ -139,8 +140,11 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
         p.leg++;
         if (p.leg >= p.shafts.length) {
           p.state = "toDest";
+          p.x = alightX(tower, shaft, dest, p.destX);
         } else {
           p.shaftId = p.shafts[p.leg];
+          const next = shaftOf(tower, p.shaftId);
+          p.x = alightX(tower, shaft, dest, next ? next.x + next.width / 2 : p.destX);
           p.state = "toShaft";
         }
       }
@@ -203,8 +207,11 @@ function step(crowd: Crowd, p: Person, dt: number, tower: Tower, slots: Map<numb
         p.leg++;
         if (p.leg >= p.shafts.length) {
           p.state = "toDest";
+          p.x = alightX(tower, shaft, dest, p.destX);
         } else {
           p.shaftId = p.shafts[p.leg];
+          const next = shaftOf(tower, p.shaftId);
+          p.x = alightX(tower, shaft, dest, next ? next.x + next.width / 2 : p.destX);
           p.state = "toShaft";
         }
       }

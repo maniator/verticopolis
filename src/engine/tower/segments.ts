@@ -109,22 +109,57 @@ export function segAt(tower: Tower, floor: number, x?: number): number {
   return segId(floor, runs.length > 0 ? runs[0][0] : 0);
 }
 
-/** The segment id a transport attaches to on `floor`: the run containing the
- *  first structural tile under its footprint (scanned left to right for a
- *  deterministic choice), or its own leftmost column when the floor has no
- *  structure under the shaft. Every validly built shaft has structure at each
- *  stop (validateTransport requires it), so the fallback is only reached by a
- *  hand-edited save.
+/**
+ * Every DISTINCT segment id the transport's footprint attaches to on `floor`,
+ * ascending. A wide shaft (elevators are 4 wide, express 6, stairs/escalators 8)
+ * whose footprint straddles a gap sits over TWO runs at once, and a rider on
+ * either can board it, so BOTH must be linked or the far run reads stranded
+ * though the shaft physically reaches it (#662). Scanned left to right, deduped,
+ * and sorted so the list is a canonical, deterministic bank key. Falls back to
+ * the shaft's own leftmost column when the floor has no structure under it at all
+ * (only reachable by a hand-edited save; validateTransport requires structure at
+ * each stop).
  *
- *  Known limitation (tracked follow-up): if a shaft footprint straddles a gap and
- *  overlaps TWO runs on one floor (a gap narrower than the shaft, structure on
- *  both sides), only the first run is linked, so a tenant on the far overlapped
- *  run reads stranded though the shaft physically reaches them. This fails safe
- *  (it under-connects, never letting anyone cross a gap) and cannot occur on a
- *  gap-free floor, so it does not affect the byte-identical golden property. */
-export function landingSeg(tower: Tower, t: Transport, floor: number): number {
+ * On a gap-free floor the footprint touches the floor's single segment, so this
+ * returns exactly one id, and the routing graph and shaft banks built from it are
+ * byte-identical to the old floor-keyed behavior (the golden-master invariant).
+ */
+export function landingSegs(tower: Tower, t: Transport, floor: number): number[] {
+  const segs: number[] = [];
   for (let i = 0; i < t.width; i++) {
-    if (tower.hasStructure(floor, t.x + i)) return segAt(tower, floor, t.x + i);
+    if (tower.hasStructure(floor, t.x + i)) {
+      const s = segAt(tower, floor, t.x + i);
+      if (!segs.includes(s)) segs.push(s);
+    }
   }
-  return segId(floor, t.x);
+  if (segs.length === 0) return [segId(floor, t.x)];
+  return segs.sort((a, b) => a - b);
+}
+
+/**
+ * The x a rider steps off `t` onto at `floor`, heading toward `towardX` (their
+ * next shaft or final unit). Normally the shaft center, but a shaft whose
+ * footprint straddles a gap lands on TWO runs (#662): stepping off at the center
+ * can drop the rider on the WRONG run (a wide express/stair center can sit on the
+ * near run while the destination is the far one), where the walk guard then pins
+ * them at that run's edge and they never reach their unit. So when the footprint
+ * covers more than one run, alight on the structural column NEAREST `towardX`,
+ * i.e. the run that leads onward. On a single-run footprint (every gap-free
+ * floor) this returns the plain center, byte-identical to before.
+ */
+export function alightX(tower: Tower, t: Transport, floor: number, towardX: number): number {
+  const center = t.x + t.width / 2;
+  if (landingSegs(tower, t, floor).length <= 1) return center;
+  let best = center;
+  let bestDist = Infinity;
+  for (let i = 0; i < t.width; i++) {
+    const c = t.x + i;
+    if (!tower.hasStructure(floor, c)) continue;
+    const d = Math.abs(c - towardX);
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+  return best;
 }
