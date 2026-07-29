@@ -135,9 +135,28 @@ export function peakCongestionFloor(sim: Simulation): number | null {
  * (a global demand relief). Returns floor -> congestion ratio (>1 == stressed).
  */
 export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
+  return buildSpatialCongestion(sim).ratios;
+}
+
+/** Per-floor worst-shaft congestion split by transport class, the attribution
+ *  behind {@link spatialCongestionByFloor}'s max. The congestion copy (#701)
+ *  reads this to name the BINDING shaft's kind instead of any kind that stops
+ *  at the floor. A class absent from a floor's serving set reads 0. Built by
+ *  the same single pass as the ratio map, so the two can never disagree. */
+export function spatialCongestionAttributionByFloor(
+  sim: Simulation,
+): Map<number, { elevator: number; stairs: number; escalator: number }> {
+  return buildSpatialCongestion(sim).attribution;
+}
+
+function buildSpatialCongestion(sim: Simulation): {
+  ratios: Map<number, number>;
+  attribution: Map<number, { elevator: number; stairs: number; escalator: number }>;
+} {
   const HEADROOM = 12;
   const rush = sim.rushFactor();
   const result = new Map<number, number>();
+  const attribution = new Map<number, { elevator: number; stairs: number; escalator: number }>();
 
   const popByFloor = new Map<number, number>();
   let metro = 0;
@@ -156,13 +175,13 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
       if (p > 0 && u.floor !== 1) popByFloor.set(u.floor, (popByFloor.get(u.floor) ?? 0) + p);
     }
   }
-  if (popByFloor.size === 0) return result;
+  if (popByFloor.size === 0) return { ratios: result, attribution };
   const parking = sim.tower.functionalParkingSpots(); // only ramp-chained spaces relieve demand
   const relief = Math.max(0.4, 1 - metro * 0.25 - parking * 0.02);
 
   const served = sim.tower.servedFloorSet();
   // Ground-connected shafts and the served floors each one stops at.
-  const shaftsByFloor = new Map<number, { id: number; cap: number }[]>();
+  const shaftsByFloor = new Map<number, { id: number; cap: number; kind: FacilityKind }[]>();
   for (const t of sim.tower.transports) {
     // Staff-only service elevators carry no passenger load.
     if (isStaffOnlyTransport(t.kind)) continue;
@@ -180,7 +199,7 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
       // reads as off by one when the queue they see is at the main lobby, 1F).
       if (sim.tower.stopsAt(t, f) && served.has(f)) {
         const arr = shaftsByFloor.get(f) ?? [];
-        arr.push({ id: t.id, cap });
+        arr.push({ id: t.id, cap, kind: t.kind });
         shaftsByFloor.set(f, arr);
       }
     }
@@ -212,13 +231,23 @@ export function spatialCongestionByFloor(sim: Simulation): Map<number, number> {
     // needs population to have a congestion signal.
     if (f !== 1 && !popByFloor.has(f)) continue;
     let c = 0;
+    const att = { elevator: 0, stairs: 0, escalator: 0 };
     for (const s of shafts) {
       const cong = s.cap > 0 ? ((loadByShaft.get(s.id) ?? 0) * rush) / (s.cap * HEADROOM) : 99;
       if (cong > c) c = cong;
+      // Fold the same reading into its class max. The ratio map's max over
+      // shafts equals the max over these three class maxes for every kind the
+      // staff filter admits today (elevators, stairs, escalators); a new
+      // passenger transport kind must be added to this chain or its readings
+      // would vanish from the attribution while still setting the ratio.
+      if (isElevatorKind(s.kind)) { if (cong > att.elevator) att.elevator = cong; }
+      else if (s.kind === "stairs") { if (cong > att.stairs) att.stairs = cong; }
+      else if (s.kind === "escalator") { if (cong > att.escalator) att.escalator = cong; }
     }
     result.set(f, c);
+    attribution.set(f, att);
   }
-  return result;
+  return { ratios: result, attribution };
 }
 
 /**

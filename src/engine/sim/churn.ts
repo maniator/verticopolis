@@ -19,33 +19,46 @@ import { VACATE_NOTICE_MINUTES } from "./constants";
 
 import { buildSatisfactionContext, wouldEvictFreshTenant, type SatisfactionContext } from "./satisfactionStep";
 import { foldOriginDemand } from "./demand";
-import { servingTransportKindsAt } from "./gripe";
+import { bindingTransportClassAt } from "./gripe";
 
 /** Vacate, move-in, subtype churn for the Simulation, as friend functions taking the
  * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
 
-/** The congestion churn warning names the transport that is actually crowded
- *  (#699), through the same classifier as the inspector's gripe line so the
- *  toast and the card can never disagree. "Add cars" holds only where a
- *  passenger elevator stops at the floor; a walkway-only floor gets the honest
- *  lever (capacity), because there are no cars to add on a floor no elevator
- *  stops at. */
+/** The congestion churn warning names the transport that actually BINDS the
+ *  floor's reading (#699/#701), through the same classifier as the inspector's
+ *  gripe line so the toast and the card can never disagree. "Add cars" holds
+ *  only when elevators bind; a walkway-bound floor gets the honest lever
+ *  (capacity), because cars cannot clear a reading a stair link owns. */
 function congestionChurnNote(sim: Simulation, floor: number): string {
-  const serving = servingTransportKindsAt(sim, floor);
-  const noun = serving.elevator
-    ? "elevators"
-    : serving.stairs && serving.escalator
-      ? "stairs and escalators"
-      : serving.stairs
-        ? "stairs"
-        : serving.escalator
-          ? "escalators"
-          : "vertical transport";
-  const lever = serving.elevator ? "add cars" : "add capacity";
+  const binding = bindingTransportClassAt(sim, floor);
+  const noun =
+    binding === "elevator"
+      ? "elevators"
+      : binding === "walkways"
+        ? "stairs and escalators"
+        : binding === "stairs"
+          ? "stairs"
+          : binding === "escalator"
+            ? "escalators"
+            : "vertical transport";
+  const lever = binding === "elevator" ? "add cars" : "add capacity";
   return ` A new owner will buy in, but the crowded ${noun} will wear them down too until you ${lever}.`;
 }
 
 export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
+  // Read the congestion note's binding class BEFORE the unit empties below:
+  // the departing tenant's own load is part of what bound the floor's reading
+  // (and on a floor they were the last tenant of, emptying first would drop
+  // the floor from the attribution map entirely and fall back to the
+  // kinds-only wording, the exact wrong-lever line #701 removes). Gated on
+  // the entry-knowable conditions the emit below requires (only a bought-back
+  // sold condo that is on the market ever carries the note), so an office or
+  // hotel eviction wave never pays the spatial-map rebuild for a string that
+  // would be thrown away.
+  const congNote =
+    reason === "congestion" && u.kind === "condo" && u.everOccupied && !u.noRate
+      ? congestionChurnNote(sim, u.floor)
+      : "";
   // The 1994 buy-back sting: when an OWNER leaves a sold condo, you don't just
   // lose a tenant, you repurchase the unit at what it sold for and hold it as
   // empty inventory to sell again. (A never-sold condo just goes back on the
@@ -122,9 +135,7 @@ export function vacate(sim: Simulation, u: Unit, reason: VacateReason): void {
       ? " It is off the market (No Rate); set a rate to sell it again."
       : wouldEvictFreshTenant(sim, u, buildSatisfactionContext(sim, true))
         ? " It stays empty until you fix the cause."
-        : reason === "congestion"
-          ? congestionChurnNote(sim, u.floor)
-          : "";
+        : congNote;
   }
   sim.emit(
     buyback > 0
