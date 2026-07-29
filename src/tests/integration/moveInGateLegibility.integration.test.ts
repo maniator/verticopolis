@@ -195,6 +195,10 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     sim.star = 1;
     for (let x = 0; x < W; x++) sim.tower.place("lobby", 1, x);
     for (let x = 0; x < W; x++) sim.tower.place("floor", 2, x);
+    // Assert the laid topology (per-place asserts would trip on the new-game
+    // seed tiles, so count the slabs like servedTower does).
+    expect(sim.tower.units.filter((u) => u.kind === "lobby" && u.floor === 1).length).toBe(W);
+    expect(sim.tower.units.filter((u) => u.kind === "floor" && u.floor === 2).length).toBe(W);
     expect(sim.buildTransport("stairs", C, 1, 2).ok).toBe(true);
     expect(sim.tower.isFloorServed(2)).toBe(true);
     const condo = place(sim, "condo", 2, C);
@@ -202,6 +206,10 @@ describe("move-in sustainability gate: honest buy-back toast", () => {
     condo.everOccupied = true;
     condo.residents = 3;
     condo.rent = 160_000;
+    // The case depends on the gate RE-SELLING this spot (the note's "a new owner
+    // will buy in" branch); pin that seam so an economy tweak that gate-holds it
+    // fails here, not on an unrelated string assert.
+    expect(wouldEvictFreshTenant(sim, condo, buildSatisfactionContext(sim, true))).toBe(false);
     vacate(sim, condo, "congestion");
     const toast = sim.log[sim.log.length - 1].text;
     expect(toast).toContain("bought it back");

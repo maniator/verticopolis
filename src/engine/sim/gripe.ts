@@ -98,7 +98,8 @@ export function reachesLobby(sim: Simulation, u: Unit): boolean {
  * such a shaft serves the floor no more than no shaft at all. Staff-only service
  * elevators carry no tenants and must not flip the wording to "elevators".
  * A read-only single pass over the transports, called from the inspector hover
- * and the (rare) buy-back toast, never per tick.
+ * and the occasional buy-back vacate; cheap, and never inside a per-tick
+ * per-unit loop.
  */
 export function servingTransportKindsAt(
   sim: Simulation,

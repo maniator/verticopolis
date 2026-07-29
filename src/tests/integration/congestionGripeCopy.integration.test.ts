@@ -110,9 +110,18 @@ describe("the congestion gripe names the transport that is actually crowded (#69
     expect(text).not.toContain("crowded elevators");
   });
 
+  it("falls back to transport-neutral wording when nothing serves the floor (defensive)", () => {
+    // Unreachable through dominantGripe today (a fired congestion gripe needs a
+    // served floor, which needs a stopping passenger transport), but the
+    // resolver must stay honest if that serving invariant ever weakens.
+    const sim = Simulation.newGame(6);
+    const office = bareOffice(sim); // no transports built at all
+    expect(gripeLineText(sim, office, "congestion")).toContain("overcrowded vertical transport");
+  });
+
   it("names escalators, and both kinds together, when they are what serves the floor", () => {
-    // Modern: Classic refuses escalators on office floors (canon), and this case
-    // is about the copy, not the placement rule.
+    // Modern mode, because Classic refuses escalators on office floors (canon)
+    // and this case exercises the copy branch rather than the placement rule.
     const sim = Simulation.newGame(5, "modern");
     const office = bareOffice(sim);
     sim.star = 3; // escalators unlock at 3 stars; no ticks run, so no event risk

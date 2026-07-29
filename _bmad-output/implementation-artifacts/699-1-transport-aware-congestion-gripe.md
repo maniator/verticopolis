@@ -4,7 +4,7 @@ baseline_commit: 8a86a8b9c9d39b16288075c396f1e748bfd3d0e1
 
 # Story 699.1: Transport-aware congestion gripe copy
 
-Status: review
+Status: done
 
 <!-- Story keyed to GitHub issue #699; no epic (issue-driven fix, party-ratified 2026-07-29). -->
 
@@ -104,6 +104,39 @@ engine classifier; stair crowding stays in the model (the balance lever until
       existing fixture patterns live here) plus a churn-toast case where the
       existing churn/moveIn tests live.
 - [x] Task 6: Version bump + gates + review (AC: 7, 8)
+
+### Review Findings (gds-code-review, 2026-07-29)
+
+Layers: Blind Hunter, Edge Case Hunter, Acceptance Auditor (all completed; the
+Auditor verified every AC's strings word for word).
+
+- [x] [Review][Patch] Doc comment overclaimed "never per tick" for the classifier
+  (buy-back vacates run during ticks) [src/engine/sim/gripe.ts] - reworded to
+  "never inside a per-tick per-unit loop".
+- [x] [Review][Patch] Transport-neutral fallback string was untested dead code
+  [src/game/gripeCopy.ts] - added a defensive test hitting the fallback via a
+  transportless floor.
+- [x] [Review][Patch] Churn-toast test lacked the re-sell-branch precondition
+  (magic rent 160,000 with nothing pinning the gate verdict)
+  [src/tests/integration/moveInGateLegibility.integration.test.ts] - added an
+  explicit wouldEvictFreshTenant(...) === false assert.
+- [x] [Review][Patch] Churn-toast fixture laid lobby/floor slabs unasserted
+  [src/tests/integration/moveInGateLegibility.integration.test.ts] - added
+  slab-count asserts (servedTower style; per-place asserts would trip on seed
+  tiles).
+- [x] [Review][Patch] One "X, not Y" construction in a new test comment
+  [src/tests/integration/congestionGripeCopy.integration.test.ts] - reworded.
+- [x] [Review][Defer] Classifier names kinds stopping at the floor, not the
+  BINDING shaft: elevator wording can prescribe a partially wrong lever when a
+  cross-loaded stair link binds the floor's reading, and gap-split floors count
+  shafts the tenant's segment cannot reach [src/engine/sim/gripe.ts] - deferred,
+  scope-capped by the party ruling; curated backlog row
+  congestion-gripe-binding-shaft, mirror issue #701.
+
+Dismissed (3): classifier-ignores-operational-state (refuted: Transport has no
+build state; transports are instant-built), v1-scalar noun looseness (never
+worse than the pre-fix always-elevators copy; folded into the #701 notes), test
+location deviation (file-size guard split, already recorded above).
 
 ## Dev Notes
 
