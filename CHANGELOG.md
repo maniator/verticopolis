@@ -13,6 +13,14 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.1.0
+
+- Importing or exporting a SimTower file no longer gives up because a window was
+  open. If what is on screen is just information, the fidelity report opens over
+  it; if it is a real decision, the report waits and opens by itself once you
+  have answered. In the rare case it cannot be shown at all, it says so in the
+  window you are looking at instead of failing quietly.
+
 ## 2.0.0
 
 - Modern towers can now rent homes as well as sell them: the cheap, easygoing Studio and the pricier Apartment, which minds noise, a long walk, and a high rent. Hover a stubborn vacancy to see why.
