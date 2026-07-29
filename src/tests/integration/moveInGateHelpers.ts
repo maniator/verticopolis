@@ -43,6 +43,24 @@ export function place(sim: Simulation, kind: "office" | "condo" | "fastFood", fl
   return sim.tower.units.find((u) => u.id === r.unitId)!;
 }
 
+/** Place a rental, lifting the star rating over the Apartment's 3-star gate just
+ *  long enough to place it. RESTORES whatever the caller had rather than pinning 1:
+ *  a test that deliberately built a 4-star tower must not be silently demoted here,
+ *  since the star drives demand and event rolls for the rest of the run. */
+export function placeRental(
+  sim: Simulation,
+  kind: "rentalStudio" | "rentalApartment",
+  floor: number,
+  x: number,
+): Unit {
+  const priorStar = sim.star;
+  sim.star = Math.max(priorStar, 3);
+  const r = sim.tower.place(kind, floor, x);
+  expect(r.ok, `place ${kind} f${floor} x${x}`).toBe(true);
+  sim.star = priorStar;
+  return sim.tower.units.find((u) => u.id === r.unitId)!;
+}
+
 /** Force-seat a real, happy owner/tenant so a long run reveals whether the spot
  *  SUSTAINS it or erodes it out. A condo is seated as a sold 3-person household. */
 export function seat(u: Unit): void {

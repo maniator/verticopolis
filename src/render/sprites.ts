@@ -42,6 +42,8 @@ export { drawCar, drawTransport } from "./sprites/transport";
 const ROOM_KINDS = new Set<FacilityKind>([
   "office",
   "condo",
+  "rentalStudio",
+  "rentalApartment",
   "hotelSingle",
   "hotelDouble",
   "hotelSuite",

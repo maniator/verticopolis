@@ -3,7 +3,8 @@ import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
 
 import { subtypeListFor } from "../retailSubtypes";
-import { FACILITIES, isCommercialKind, isOpenAt, isHotelKind, residentCount, syncAttendanceOccupants } from "../facilities";
+import { FACILITIES, isCommercialKind, isHotelKind } from "../facilities";
+import { isRentalKind } from "../residentialRentals";
 import type { FacilityKind, Unit, VacateReason } from "../types";
 
 import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
@@ -11,63 +12,12 @@ import { isDormant, isOperational, VACATE_REASON_TEXT } from "../types";
 import { VACATE_NOTICE_MINUTES, VACATE_RESCIND, NOISE_CAP, OFFICE_NOISE_TILES, HOTEL_NOISE_TILES } from "./constants";
 import { buildSatisfactionContext, satisfactionStep } from "./satisfactionStep";
 
-/** Presence, satisfaction, noise notices for the Simulation, as friend functions taking the
- * instance. Extracted from `Simulation.ts`; the class keeps thin delegations. */
-
-export function updatePresence(sim: Simulation): void {
-  const weekend = sim.clock.isWeekend;
-  for (const u of sim.tower.units) {
-    const f = FACILITIES[u.kind];
-    if (isDormant(u)) {
-      // The wedding hall is never tenanted, so its lifetime state is "empty"
-      // (dormant); mirror its live routed attendance rather than stamping 0
-      // over a mid-wedding house. Real dormancy (construction / fire /
-      // gutted) still zeroes: the spawn side gates on isOperational, so no
-      // new guest can be inside one.
-      if (u.state === "empty" && f.attendance !== undefined) syncAttendanceOccupants(u);
-      else u.occupants = 0;
-      continue;
-    }
-    switch (u.kind) {
-      case "office":
-        // Offices staffed on weekday working hours.
-        u.occupants =
-          !weekend && sim.clock.hour >= 8 && sim.clock.hour < 18 ? f.population : 0;
-        break;
-      case "condo":
-        // Residents home in evenings/night/weekends, the whole household
-        // (its real size in Modern, the flat 3 in Classic); one person stays
-        // home during the weekday workday.
-        u.occupants =
-          sim.clock.isNight() || sim.clock.isEvening() || weekend ? residentCount(u) : 1;
-        break;
-      case "hotelSingle":
-      case "hotelDouble":
-      case "hotelSuite":
-        u.occupants = u.state === "asleep" ? f.population : 0;
-        break;
-      default:
-        // Attendance venues (cinema / party hall / wedding hall): occupants
-        // mirrors the live routed attendance, never the catalog population
-        // (0). The mirror is also written at every tally change; this hourly
-        // write keeps presence from stamping 0 over a mid-show house.
-        if (f.attendance !== undefined) {
-          syncAttendanceOccupants(u);
-          break;
-        }
-        // Every kind without its own case above takes this open-hours gate.
-        // It only changes behavior for commercial venues (fastFood,
-        // restaurant, shop): they show their ambient crowd only while open,
-        // so a tenanted but closed venue reads zero and the heatmap and
-        // lit-window sprite go dark after closing time. Kinds without
-        // business hours pass isOpenAt unconditionally.
-        u.occupants =
-          u.state === "occupied" && isOpenAt(u.kind, sim.clock.hour)
-            ? f.population
-            : 0;
-    }
-  }
-}
+/** Satisfaction, noise notices, and the amenity halos for the Simulation, as
+ * friend functions taking the instance. Extracted from `Simulation.ts`; the
+ * class keeps thin delegations. Per-hour occupancy lives in `presence.ts`,
+ * re-exported here so `Simulation`'s existing `satisfaction.updatePresence`
+ * delegation keeps working without a second namespace import. */
+export { updatePresence } from "./presence";
 
 export function updateSatisfaction(sim: Simulation): void {
   // The per-unit satisfaction math and its once-per-sweep context (congestion,
@@ -106,7 +56,7 @@ export function updateSatisfaction(sim: Simulation): void {
     // miserable room simply fails to hold its guest right away (review F25).
     // Commercial venues aren't here: their income already requires a served
     // floor, so poor access starves them directly rather than via move-out.
-    const leaseTenant = u.kind === "office" || u.kind === "condo" || u.kind === "fitnessClub" || u.kind === "clinic";
+    const leaseTenant = u.kind === "office" || u.kind === "condo" || u.kind === "fitnessClub" || u.kind === "clinic" || isRentalKind(u.kind);
     if (leaseTenant && u.state === "vacating") {
       // A relocation is a life event, not a complaint: nothing the player does
       // (not even a fully satisfied tenant) rescinds it, and it is never
@@ -131,8 +81,11 @@ export function updateSatisfaction(sim: Simulation): void {
       // far-walk office (transportFar), or a very-far-from-lobby tenant (lobbyFar,
       // which erodes in both modes). Any of these is a real problem that must
       // still evict, so it blocks the noise rescind and re-attributes the stamp.
-      const officeCfg = u.kind === "office" ? rentConfig("office") : undefined;
-      const overMarketRent = !!officeCfg && rentOf(u) > officeCfg.default;
+      // Over-market rent erodes an office OR a rental tenant (the GDD's "rent too
+      // high"): a picky Apartment renter leaves when priced above the going rate,
+      // reusing the office path rather than a new vacate reason.
+      const priceCfg = u.kind === "office" || isRentalKind(u.kind) ? rentConfig(u.kind) : undefined;
+      const overMarketRent = !!priceCfg && rentOf(u) > priceCfg.default;
       const nonNoiseProblem = !served || (u.floor !== 1 && cong > 1) || overMarketRent || farWalk || lobbyFar;
       if (noiseCannotEvict && nonNoiseProblem) {
         u.vacateReason = sim.vacateCause(u, served, cong, farWalk, noisy, lobbyFar, unmetDemand);
@@ -251,8 +204,8 @@ export function noiseAfflictedFresh(sim: Simulation, u: Unit): boolean {
   if (u.kind === "office") {
     return sim.nearestKindWithin(u, isCommercialKind, OFFICE_NOISE_TILES);
   }
-  if (isHotelKind(u.kind) || u.kind === "condo") {
-    // Hotels/condos are bothered by a noisy office OR any commercial source.
+  if (isHotelKind(u.kind) || u.kind === "condo" || isRentalKind(u.kind)) {
+    // Hotels/condos/rentals are bothered by a noisy office OR any commercial source.
     return sim.nearestKindWithin(
       u,
       (k) => k === "office" || isCommercialKind(k),

@@ -32,6 +32,7 @@ function mountSplash(o: {
   onToggleMute?: () => boolean;
   installOffered?: boolean;
   onInstall?: () => void;
+  founder?: boolean;
 }) {
   const { ctl } = makeController();
   ctl.showSplash({
@@ -42,6 +43,7 @@ function mountSplash(o: {
     onToggleMute: o.onToggleMute,
     installOffered: o.installOffered === undefined ? undefined : () => o.installOffered!,
     onInstall: o.onInstall,
+    founder: o.founder === undefined ? undefined : () => o.founder!,
   });
   return document.getElementById("splash")!;
 }
@@ -227,5 +229,24 @@ describe("splash install button (SPEC-pwa-install CAP-5)", () => {
     const px = (prop: string) => Number(rule.match(new RegExp(`${prop}\\s*:\\s*(\\d+)px`))?.[1] ?? "0");
     expect(px("min-width")).toBeGreaterThanOrEqual(44);
     expect(px("min-height")).toBeGreaterThanOrEqual(44);
+  });
+});
+
+describe("splash Ground floor badge (2.0 upgrade recognition)", () => {
+  it("shows the badge for a Founder", () => {
+    const el = mountSplash({ founder: true });
+    const badge = el.querySelector(".splash-founder");
+    expect(badge).not.toBeNull();
+    expect(badge!.textContent).toMatch(/Ground floor/);
+  });
+
+  it("hides the badge for a non-founder (new user)", () => {
+    const el = mountSplash({ founder: false });
+    expect(el.querySelector(".splash-founder")).toBeNull();
+  });
+
+  it("hides the badge when no founder check is supplied (default off)", () => {
+    const el = mountSplash({});
+    expect(el.querySelector(".splash-founder")).toBeNull();
   });
 });

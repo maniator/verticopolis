@@ -32,3 +32,16 @@ export const CONDO_PICTURES = ["#7A5A44", "#7A5A44", "#5A6E7A", "#6E7A5A"];
  *  channel of each band's anchor. */
 export const HOTEL_WALLS = ["#D8C49A", "#D8C49A", "#DACA9E", "#DCC098"];
 export const SUITE_WALLS = ["#C8A86A", "#C8A86A", "#C4AC72", "#CCA462"];
+
+/** Modern rental Studio walls: a soft warm greige, cooler and lighter than the
+ *  condo's home plaster so a rented studio reads distinct from an owned condo.
+ *  Anchor double-weighted, variants within 10 per channel; warm, never blue-gray. */
+export const STUDIO_WALLS = ["#C6B6A0", "#C6B6A0", "#C2B6A2", "#CAB49A", "#C4B89E"];
+
+/** Modern rental Apartment walls: a warm taupe, a touch richer than the Studio and
+ *  distinct from the condo. Anchor double-weighted, variants within 10 per channel. */
+export const APARTMENT_WALLS = ["#CBAF95", "#CBAF95", "#C7AF99", "#CFAD91", "#C9B197"];
+
+/** Rental framed-picture subjects (Studio & Apartment): muted, hue-varied like the
+ *  condo pictures (a print, a photo, a plant poster), non-reserved. */
+export const RENTAL_PICTURES = ["#6E5A48", "#6E5A48", "#586A76", "#6A7658"];

@@ -33,6 +33,14 @@ export interface SerializedGame {
    *  option became the founding "no bridging" default). Rooms auto-lay their floor
    *  in every tower now, so the old "rooms won't auto-floor" behavior is retired. */
   manualStructure?: boolean;
+  /** True for a ground-floor tower: one that predates 2.0. Detected ONCE at load
+   *  from the pre-2.0 `appVersion` stamp (or, for pre-stamp saves, the absence of
+   *  one at the file-load boundary), then persisted here so it survives a re-save
+   *  (which restamps `appVersion` to the current build) and travels with the tower
+   *  (export/import, cross-device). Absent/false for towers started in 2.0 or
+   *  later. Drives the splash "Ground floor" badge. */
+  founder?: boolean;
+
   /** "Bridge floors between placements" toggle, flipped mid-game. Written only
    *  when turned OFF (default on), so an absent value loads as on, the shipped
    *  behavior that fills the walkway to a neighbor. Ignored for Classic (always
@@ -96,8 +104,10 @@ export interface SerializedGame {
    * does not carry it onto the sim (the next write re-stamps). */
   savedAt?: number;
   /** Which build wrote this save (the Vite-injected app version). Same
-   * write-time provenance contract as {@link savedAt}: stamped by the
-   * storage layer, inert on load, useful for debugging a moved file. */
+   * write-time provenance contract as {@link savedAt}: stamped by the storage
+   * layer. Read once on load (deserialize) to detect a pre-2.0 founding tower
+   * (major version below 2, which sets {@link founder}); not otherwise carried
+   * onto the sim, and the next write re-stamps it. */
   appVersion?: string;
   /** The tail of the bulletin log (newest last, capped at LOG_SAVE_CAP in
    * Simulation.ts), so a loaded tower keeps its message history instead of

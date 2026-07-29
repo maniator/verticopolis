@@ -52,7 +52,7 @@ export interface SplashHandlers {
  *  inline/inline-block. No whitespace is added inside any `<text>`/`<tspan>` (it
  *  would shift the `textLength`-fitted glyphs) or inside a glyph button (it would
  *  change its `textContent`). */
-export function splashTemplate(hasSave: boolean, premise: string, muted: boolean, installOffered: boolean, h: SplashHandlers): TemplateResult {
+export function splashTemplate(hasSave: boolean, premise: string, muted: boolean, installOffered: boolean, founder: boolean, h: SplashHandlers): TemplateResult {
   return html`<div class="splash-stars" aria-hidden="true"></div>
     <div class="splash-sun" aria-hidden="true"></div>
     <svg class="splash-skyline" aria-hidden="true" viewBox="0 0 460 200" preserveAspectRatio="xMidYMax slice">
@@ -97,6 +97,15 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
     </div>
     <p class="splash-attrib">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.</p>
     <p class="splash-version">v${APP_VERSION}</p>
+    <!-- The 2.0 "Ground floor" badge (SPEC/party 2026-07-23, label re-picked
+         2026-07-28): a quiet, permanent thank-you shown only when the loaded tower
+         predates 2.0 (you got in on the ground floor). A new user never sees it.
+         No title tooltip: .splash-founder is pointer-events:none so it never
+         hit-tests, and a tooltip that can never open is worse than none. The
+         one-time welcome toast carries the explanation instead. -->
+    ${founder
+      ? html`<p class="splash-founder">★ Ground floor</p>`
+      : nothing}
     <!-- The mute toggle renders LAST so the reading and Tab order run
          title -> premise -> actions -> utility; it is pinned visually to the
          top-right corner by .splash-mute (absolute), un-unified per the design

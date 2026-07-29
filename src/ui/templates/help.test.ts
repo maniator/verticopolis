@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { helpTemplate } from "./help";
+import { helpPrivacyBody } from "./helpContent";
 import { renderToFragment, click } from "../testing/litTestUtils";
 import { MODERN_RULES } from "../../engine/ruleSets";
 import type { GameRules } from "../../engine/gameRules";
@@ -52,11 +53,24 @@ describe("helpTemplate structure and a11y", () => {
     // play, Classic vs Modern, and About are all collapsed so Help opens short.
     const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
     expect(sectionBySummary(frag, "The basics")?.hasAttribute("open")).toBe(true);
-    for (const collapsed of ["Going further", "Keyboard play", "Classic vs Modern", "About"]) {
+    for (const collapsed of ["Going further", "Keyboard play", "Classic vs Modern", "About", "Privacy"]) {
       const sec = sectionBySummary(frag, collapsed);
       expect(sec, collapsed).not.toBeUndefined();
       expect(sec!.hasAttribute("open"), collapsed).toBe(false);
     }
+  });
+
+  it("carries the Privacy section rendered from the one shared body", () => {
+    const frag = renderToFragment(helpTemplate(false, "1.2.3", noop));
+    const privacy = sectionBySummary(frag, "Privacy");
+    expect(privacy, "the Privacy details section must exist").not.toBeUndefined();
+    // Whitespace-normalized containment of the SHARED body's own rendered text:
+    // this surface cannot fork the promise, because any wording change must
+    // arrive through helpPrivacyBody or this containment fails.
+    const norm = (s: string) => s.replace(/\s+/g, " ").trim();
+    const shared = norm(renderToFragment(helpPrivacyBody()).textContent ?? "");
+    expect(shared.length).toBeGreaterThan(100);
+    expect(norm(privacy!.textContent ?? "")).toContain(shared);
   });
 
   // Drift guard. Every member of the GameRules seam is mapped either to a DISTINCT

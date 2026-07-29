@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { html } from "lit-html";
-import { Simulation } from "../../engine/Simulation";
+import { Simulation, TRANSPORT_FAR_TILES } from "../../engine/Simulation";
 import { dominantGripe, vacateCause, unmetCoverage } from "../../engine/sim/gripe";
 import type { DemandMap } from "../../engine/sim/demand";
 import { UNMET_DEMAND_FLOOR } from "../../engine/sim/constants";
@@ -149,6 +149,44 @@ describe("the Main gripe inspector line", () => {
     expect(diagText(sim, office)).not.toContain("Main gripe:");
   });
 
+  it("names an unhappy rental tenant's drain too, before the notice fires", () => {
+    // The rentals are a retention game: the player is meant to fix the cause in
+    // time to keep the tenant. Without this line the Apartment's only feedback
+    // was the notice itself, by which point the early warning every other tenant
+    // kind gets had already been skipped.
+    const sim = Simulation.newGame(1, "modern");
+    servedOffice(sim); // lays the lobby, floor 2, and the center shaft
+    sim.star = 3; // the Apartment needs 3 stars to place
+    const apt = placeUnit(sim, "rentalApartment", 2, C + 6);
+    sim.star = 1;
+    apt.state = "occupied";
+    apt.rent = 20_000; // over the going rate, the cause dominantGripe names first
+    apt.satisfaction = 0.5; // unhappy but not yet on notice
+    const text = diagText(sim, apt);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("rent is above the going rate");
+  });
+
+  it("names the forgiving Studio's drains too (rent), not just the Apartment's", () => {
+    // The guard is `isRentalKind`, so the Studio half needs its own positive case:
+    // narrowing the guard to rentalApartment would otherwise leave the suite green
+    // while the Studio silently lost the card lines it really does earn. Over-market
+    // rent applies to every rental kind (satisfactionStep's rent pressure reads
+    // isRentalKind), so it is the Studio's cleanest positive.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    servedOffice(sim);
+    sim.star = 3;
+    const studio = placeUnit(sim, "rentalStudio", 2, C + 6);
+    sim.star = 1;
+    studio.state = "occupied";
+    studio.rent = 20_000;
+    studio.satisfaction = 0.5;
+    const text = diagText(sim, studio);
+    expect(text).toContain("Main gripe:");
+    expect(text).toContain("rent is above the going rate");
+  });
+
   it("defers to the dedicated long-walk line for transportFar (no duplicate Main gripe)", () => {
     const sim = Simulation.newGame(1);
     sim.money = 1e9;
@@ -166,6 +204,110 @@ describe("the Main gripe inspector line", () => {
     // The far walk has its own always-on line; the Main gripe line does not repeat it.
     expect(text).toContain("Long walk to transport");
     expect(text).not.toContain("Main gripe:");
+  });
+
+  it("gives the demanding Apartment that same long-walk line, and never the Studio", () => {
+    // The card's dedicated lines are what the "Main gripe" and "Won't lease" lines
+    // defer to for transportFar, so without this the Apartment's #502 drain had no
+    // line on any path. The Studio feels no far-walk drain, so a line there would
+    // name a hike it never minds: both guards mirror the engine kind for kind.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+    sim.star = 3; // the Apartment needs 3 stars to place
+    const apt = placeUnit(sim, "rentalApartment", 2, GRID.width - 12);
+    const studio = placeUnit(sim, "rentalStudio", 2, GRID.width - 20);
+    sim.star = 1;
+    for (const u of [apt, studio]) {
+      u.state = "occupied";
+      u.satisfaction = 0.5;
+    }
+    expect(sim.tower.nearestTransportDistance(apt)).toBeGreaterThan(TRANSPORT_FAR_TILES);
+    expect(sim.tower.nearestTransportDistance(studio)).toBeGreaterThan(TRANSPORT_FAR_TILES);
+    expect(diagText(sim, apt)).toContain("Long walk to transport");
+    expect(diagText(sim, studio)).not.toContain("Long walk to transport");
+  });
+
+  it("never blames a rental vacancy on unmet demand, even handed a true flag", () => {
+    // The unmet-demand tier is dead for rentals on the live path (they are not
+    // demand origins, #661), but it reads a caller-supplied flag, and the move-in
+    // gate registers every probe as an origin. So `wontLeaseText` really can compute
+    // a true flag off the gate's map. It excludes rentals for that reason; this pins
+    // the ladder's half of the contract by handing it the flag directly.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    servedOffice(sim);
+    sim.star = 3;
+    const apt = placeUnit(sim, "rentalApartment", 2, C + 20);
+    const studio = placeUnit(sim, "rentalStudio", 2, C + 40);
+    sim.star = 1;
+    for (const u of [apt, studio]) u.state = "occupied";
+    // served, uncongested, at the going rate, near the shaft and the lobby, quiet:
+    // every higher tier is inactive, so the flag is the only thing that could speak.
+    for (const u of [apt, studio]) {
+      expect(dominantGripe(sim, u, true, 0, false, false, false, true)).not.toBe("unmetDemand");
+    }
+    // A condo in the same spot IS a coverage kind, so the flag is honest for it:
+    // this is the shift out of the failing condition, not just into it.
+    const condo = placeUnit(sim, "condo", 2, C + 60);
+    condo.state = "occupied";
+    expect(dominantGripe(sim, condo, true, 0, false, false, false, true)).toBe("unmetDemand");
+  });
+
+  it("shows neither dedicated line for a unit stranded on a disconnected run", () => {
+    // Both lines ride on the engine's `served`, which is segment-aware since #647.
+    // A unit on a run with no way down feels NEITHER drain (only the unserved one),
+    // so gating these on the floor-level `isFloorServed` would pile two invented
+    // problems on top of the access line that is the actual story.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    // Floors 2..12 split into a LEFT run [0..99] and a RIGHT run [200..299]. The runs
+    // sit far apart so the stranded unit also clears the far-walk tolerance (79),
+    // which is what makes the W1 half of this test non-vacuous.
+    for (let f = 2; f <= 12; f++) {
+      for (let x = 0; x <= 99; x++) expectOk(sim.tower.place("floor", f, x));
+      for (let x = 200; x <= 299; x++) expectOk(sim.tower.place("floor", f, x));
+    }
+    // A shaft inside the LEFT run only, so the RIGHT run is stranded at every floor.
+    expectOk(sim.tower.placeTransport("elevatorStandard", 2, 1, 12));
+    sim.star = 3;
+    const stranded = placeUnit(sim, "rentalApartment", 12, 250); // RIGHT run, far up
+    sim.star = 1;
+    stranded.state = "occupied";
+    // The fixture really is the case under test: served floor, unreachable position,
+    // a hike to the nearest shaft, and a lobby 11 floors down (a live drain band).
+    expect(sim.tower.isFloorServed(12)).toBe(true);
+    expect(sim.positionReachable(12, stranded.x)).toBe(false);
+    expect(sim.tower.nearestTransportDistance(stranded)).toBeGreaterThan(TRANSPORT_FAR_TILES);
+    expect(sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(12)).cap).toBeLessThan(1);
+    const text = diagText(sim, stranded);
+    expect(text).not.toContain("Long walk to transport");
+    expect(text).not.toMatch(/Too far from any lobby|Far from the nearest lobby/);
+  });
+
+  it("gives the Apartment the far-from-a-lobby line, and never the Studio", () => {
+    // Same split for the lobby-distance drain (W-new): the engine caps the
+    // Apartment's satisfaction high above a lobby and leaves the Studio alone.
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e12;
+    lay(sim, "lobby", 1);
+    for (let f = 2; f <= 12; f++) lay(sim, "floor", f);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 12));
+    sim.star = 3;
+    const apt = placeUnit(sim, "rentalApartment", 12, C - 12);
+    const studio = placeUnit(sim, "rentalStudio", 12, C - 20);
+    sim.star = 1;
+    for (const u of [apt, studio]) u.state = "occupied";
+    // The drain really is present at this height, so the line is not vacuous.
+    expect(sim.rules.lobbyDistanceDrain(sim.tower.nearestLobbyFloorDistance(12)).cap).toBeLessThan(1);
+    // Both severities of the line lead with one of these two phrases; matching the
+    // bare word "lobby" would pass on the unrelated access line and pin nothing.
+    const LOBBY_LINE = /Too far from any lobby|Far from the nearest lobby/;
+    expect(diagText(sim, apt)).toMatch(LOBBY_LINE);
+    expect(diagText(sim, studio)).not.toMatch(LOBBY_LINE);
   });
 
   it("names the capacity shortfall for a tenant whose reachable retail is oversubscribed", () => {

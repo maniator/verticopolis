@@ -14,11 +14,12 @@ import { isCommercialKind } from "./facilityPredicates";
  * bare `{kind, residents}` without a full Unit.
  */
 export function residentCount(u: Pick<Unit, "kind"> & { residents?: number }): number {
-  // Gate the override on condos: `residents` is only ever a condo household, so
-  // a forged save that stamps it on an office can't inflate that office's head
-  // count. Everything else, and any condo without a household set, reads the
-  // flat catalog population.
-  if (u.kind === "condo" && u.residents !== undefined) return u.residents;
+  // Gate the override on the kinds that carry a real household: a condo, or a
+  // rental Apartment. `residents` is only ever set on those, so a forged save
+  // that stamps it on an office can't inflate that office's head count.
+  // Everything else, and any such unit without a household set, reads the flat
+  // catalog population.
+  if ((u.kind === "condo" || u.kind === "rentalApartment") && u.residents !== undefined) return u.residents;
   return FACILITIES[u.kind].population;
 }
 

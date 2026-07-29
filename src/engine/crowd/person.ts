@@ -138,6 +138,10 @@ export interface SpawnFloors {
   homes: number[];
   openVenues: number[];
   condoFloors: number[];
+  /** Floors holding a kind that carries a rolled HOUSEHOLD (condo, rental
+   *  Apartment). The school run draws from this rather than `condoFloors`,
+   *  because the single-occupant Studio has no children to send (#683). */
+  householdFloors: number[];
   hotelFloors: number[];
   staffFloors: { kind: StaffKind; floor: number }[];
   /** Per-kind venue floor lists for the meal-mix path (same info as

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { Unit } from "../../engine/types";
 import { drawRoom } from "../pixelSprites";
 import { geoVariant, RESERVED_COLORS, type RoomCtx } from "./common";
-import { CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, SUITE_WALLS } from "./residential.looks";
+import { APARTMENT_WALLS, CONDO_PICTURES, CONDO_WALLS, HOTEL_WALLS, OFFICE_WALLS, RENTAL_PICTURES, STUDIO_WALLS, SUITE_WALLS } from "./residential.looks";
 
 /**
  * Behavior coverage for the enriched tenant-room art (office, condo, and the
@@ -52,8 +52,73 @@ const hex = (h: string): [number, number, number] => [
   parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16),
 ];
 
+/** Every fillRect the log recorded, as [x, w] pairs. Enough to catch furniture
+ *  drawn past a room's own box, which the canvas clips into a truncated overlap
+ *  rather than a visible bleed, so only a check like this can see it. */
+function rectSpans(log: string[]): [number, number][] {
+  return log
+    .filter((l) => l.startsWith("fillRect:"))
+    .map((l) => JSON.parse(l.slice("fillRect:".length)) as number[])
+    .map(([x, , w]) => [x, w] as [number, number]);
+}
+
+describe("narrow rooms draw inside their own box", () => {
+  it("the 6-tile Studio never draws past its width, across every geo variant", () => {
+    // The dining and study layouts place furniture at absolute offsets (a dining
+    // table at x+46 whose chairs end at x+77), which overflows a 66px Studio. Those
+    // layouts are gated on width; the living layout is width-relative and fits.
+    const W = 66; // 6 tiles
+    // The right edge is strict: before the width gate the dining table's chairs
+    // reached 11px past it, drawing over the window. The left allows 1px, which is
+    // the curtain and console chrome every room kind draws and the canvas clips.
+    const LIP = 1;
+    // Render at a NON-ZERO room origin as well as at 0. Every clamp in here has to
+    // be room-relative, and one written as an absolute pixel is a no-op at origin 0,
+    // so an origin-0-only sweep cannot see it. The standing lamp's lower bound was
+    // exactly that: `Math.max(lxRaw, 3)` looked correct at 0 and let the 7px shade
+    // run into the neighboring unit everywhere else.
+    for (const x1 of [0, 300]) {
+      for (let x0 = 0; x0 < 40; x0++) {
+        const s = spyCtx();
+        drawRoom(room(s.ctx), unit({ x: x0, kind: "rentalStudio", width: 6, state: "occupied", occupants: 1 }), x1, 0, W, 44);
+        for (const [x, w] of rectSpans(s.log)) {
+          expect(x, `studio at x${x0} origin ${x1} drew from ${x}`).toBeGreaterThanOrEqual(x1 - LIP);
+          expect(x + w, `studio at x${x0} origin ${x1} drew to ${x + w}, past ${x1 + W}`).toBeLessThanOrEqual(x1 + W);
+        }
+      }
+    }
+  });
+
+  it("the wider Apartment still gets the full layout set", () => {
+    // The gate must not flatten variety for rooms that DO fit: an 11-tile Apartment
+    // clears the threshold, so its dining and study layouts stay reachable.
+    // geoVariant keys on the unit's PLACE (floor/x), not its id, so vary the slot.
+    //
+    // This drives drawRoom, NOT geoVariant directly: calling geoVariant(_, 3, 5) and
+    // counting its range proves only that it returns 0-4, which is true whatever the
+    // width gate does. The gate lives in condo(), so the only honest probe is to
+    // render and look for the two layouts it can withhold. Both are recognizable by
+    // their ABSOLUTE anchors (the dining table at x+46, the study desk at x+48),
+    // which is exactly why they needed gating in the first place.
+    const anchoredAt = (w: number): Set<number> => {
+      const hits = new Set<number>();
+      for (let x0 = 0; x0 < 60; x0++) {
+        const s = spyCtx();
+        drawRoom(room(s.ctx), unit({ x: x0, kind: "rentalApartment", width: 11, state: "occupied", occupants: 3 }), 0, 0, w, 44);
+        for (const [x] of rectSpans(s.log)) if (x === 46 || x === 48) hits.add(x);
+      }
+      return hits;
+    };
+    const WIDE = 121; // 11 tiles, the Apartment's real width
+    expect(anchoredAt(WIDE)).toEqual(new Set([46, 48])); // both gated layouts reachable
+    // And the same unit rendered narrow loses them, so this pins the gate itself:
+    // raise WIDE_LAYOUT_MIN_W above 121 and the first assertion fails.
+    expect(anchoredAt(66).size).toBe(0);
+  });
+});
+
 describe("residential look tables", () => {
-  const WALL_TABLES: Record<string, string[]> = { OFFICE_WALLS, CONDO_WALLS, HOTEL_WALLS, SUITE_WALLS };
+  const WALL_TABLES: Record<string, string[]> = { OFFICE_WALLS, CONDO_WALLS, HOTEL_WALLS, SUITE_WALLS, STUDIO_WALLS, APARTMENT_WALLS };
 
   it("every wall variant holds within 10 per RGB channel of its anchor", () => {
     for (const [name, table] of Object.entries(WALL_TABLES)) {
@@ -68,7 +133,7 @@ describe("residential look tables", () => {
   });
 
   it("no wall or picture look equals a reserved state color", () => {
-    const all = [...OFFICE_WALLS, ...CONDO_WALLS, ...HOTEL_WALLS, ...SUITE_WALLS, ...CONDO_PICTURES];
+    const all = [...OFFICE_WALLS, ...CONDO_WALLS, ...HOTEL_WALLS, ...SUITE_WALLS, ...CONDO_PICTURES, ...STUDIO_WALLS, ...APARTMENT_WALLS, ...RENTAL_PICTURES];
     for (const c of all) expect(RESERVED_COLORS as readonly string[]).not.toContain(c.toUpperCase());
   });
 });

@@ -8,6 +8,8 @@ import { householdPrice, snapToLadder } from "../gameRules";
 
 import { subtypeListFor } from "../retailSubtypes";
 import { FACILITIES, isHotelKind } from "../facilities";
+import { isRentalKind } from "../residentialRentals";
+import { rollHousehold } from "../households";
 import { segAt } from "../tower/segments";
 import type { FacilityKind, Unit, VacateReason } from "../types";
 
@@ -182,7 +184,12 @@ export function attemptMoveIns(sim: Simulation): void {
     // a badly placed office simply "rimangono vuoti". Consults the same
     // satisfactionStep the per-tick update runs, drawing no RNG, so a gated
     // candidate only skips its own move-in roll.
-    if (u.kind === "condo" || u.kind === "office") {
+    // Rentals are lease tenants that erode on placement too (the Apartment on
+    // noise/far-walk/lobby, the Studio gently on noise, and both on an over-market
+    // rent), so a bad spot would just lease, churn out, and re-list forever without
+    // this gate. Unmet demand is NOT in that list: rentals are excluded from it on
+    // both paths (see #661).
+    if (u.kind === "condo" || u.kind === "office" || isRentalKind(u.kind)) {
       satCtx ??= buildSatisfactionContext(sim, true); // gate judges placement, not transient congestion
       if (wouldEvictFreshTenant(sim, u, satCtx)) continue;
     }
@@ -197,6 +204,14 @@ export function attemptMoveIns(sim: Simulation): void {
       // Classic never reaches here: it holds neither kind, so no rng is drawn and
       // the Classic seeded stream is untouched.
       if (sim.rng.chance(0.22 * demand)) sim.moveIn(u);
+    } else if (isRentalKind(u.kind)) {
+      // Modern-only rental living: a vacant Studio/Apartment re-leases like an
+      // office/condo, at a speed the player's rent sets (demandFactor). Classic
+      // never reaches here (the kinds are modernOnly), so its seeded stream is
+      // untouched. The Studio fills readily (cheap, forgiving); the Apartment a
+      // touch slower (pickier), so a demanding tenant is meaningfully harder to keep.
+      const fillRate = u.kind === "rentalStudio" ? 0.22 : 0.16;
+      if (sim.rng.chance(fillRate * demand)) sim.moveIn(u);
     } else if (isHotelKind(u.kind)) {
       // Hotel rooms fill in the evening only and must be clean.
       if (sim.clock.isEvening() && sim.rng.chance(0.5 * demand)) {
@@ -346,6 +361,14 @@ export function moveIn(sim: Simulation, u: Unit): void {
     u.label = clinicName(sim);
     sim.moveInsToday.clinic++;
   }
+  if (isRentalKind(u.kind)) {
+    // A rental leases (no sale, unlike the condo). The Apartment houses a varied
+    // household (condo-style, so its population and churn scale with family size);
+    // the Studio is a fixed single occupant.
+    u.everOccupied = true;
+    if (u.kind === "rentalApartment") u.residents = rollHousehold(sim.rng);
+    sim.moveInsToday.rentals++;
+  }
 }
 
 export function gymName(sim: Simulation): string {
@@ -376,6 +399,7 @@ export function reportMoveIns(sim: Simulation): void {
   if (m.rooms) parts.push(`${m.rooms} hotel room${m.rooms > 1 ? "s" : ""} booked`);
   if (m.fitness) parts.push(`${m.fitness} fitness club${m.fitness > 1 ? "s" : ""} leased`);
   if (m.clinic) parts.push(`${m.clinic} clinic${m.clinic > 1 ? "s" : ""} leased`);
+  if (m.rentals) parts.push(`${m.rentals} rental${m.rentals > 1 ? "s" : ""} leased`);
   if (parts.length) sim.emit(`New tenants: ${parts.join(", ")}.`, "good");
-  sim.moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0, clinic: 0 };
+  sim.moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0, clinic: 0, rentals: 0 };
 }

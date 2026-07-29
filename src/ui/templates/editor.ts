@@ -14,6 +14,7 @@ import {
 } from "../../engine/facilities";
 import { householdPrice, ladderRungFor } from "../../engine/gameRules";
 import { rentConfig, rentOf, resaleRefund } from "../../engine/econConfig";
+import { isRentalKind } from "../../engine/residentialRentals";
 import { facilityDiagnostics, hasAccessDiagnostic, transportDiagnostics } from "../../game/facilityDiagnostics";
 import { rungPickerTemplate, type RungChoice } from "./rungPicker";
 import { floorTag } from "../format";
@@ -110,7 +111,7 @@ export function unitEditorTemplate(sim: Simulation, u: Unit, mobile = false): Te
     kv("Eval", html`<span class="evalbar"><span style="width:${evalPct}%"></span></span> ${evalPct}%`, "eval"),
   );
   if (rcfg) {
-    const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : "Quarterly rent";
+    const label = u.kind === "condo" ? "Sale price" : isHotelKind(u.kind) ? "Room rate" : isRentalKind(u.kind) ? "Monthly rent" : "Quarterly rent";
     // For a SOLD condo the "Sale price" is what it actually fetched, the
     // household-scaled amount (and exactly what the buy-back will reclaim), not
     // the base asking. householdPrice falls back to the base when there's no

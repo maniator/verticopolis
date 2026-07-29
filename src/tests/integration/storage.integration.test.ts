@@ -3,6 +3,7 @@ import { newSeededGame } from "../fixtures/towerFixtures";
 import { deflateSync } from "fflate";
 import { SAVE_VERSION, Simulation, ECON } from "../../engine/Simulation";
 import { SaveGame } from "../../storage/SaveGame";
+import { toBase64, deflate } from "../../storage/saveCompression";
 import { FACILITIES, GRID } from "../../engine/facilities";
 import { UNIT_CAP } from "../../engine/sim/deserializeGuards";
 
@@ -987,5 +988,103 @@ describe("SaveGame", () => {
     const loaded = Simulation.deserialize(data);
     expect(loaded.tower.units.length).toBe(before);
     expect(loaded.tower.units.some((u) => (u.kind as string) === "spaceport")).toBe(false);
+  });
+
+  describe("Ground-floor recognition (2.0)", () => {
+    // The file-layer provenance stamp SaveGame writes (`data.appVersion`); the
+    // serialize() kernel itself never carries it, so the tests set it directly.
+    function stamp(data: ReturnType<Simulation["serialize"]>, appVersion: string) {
+      (data as { appVersion?: string }).appVersion = appVersion;
+      return data;
+    }
+
+    it("marks a pre-2.0 save as a ground-floor tower from its appVersion", () => {
+      const sim = sampleGame();
+      expect(sim.founder).toBe(false);
+      const loaded = Simulation.deserialize(stamp(sim.serialize(), "1.99.0"));
+      expect(loaded.founder).toBe(true);
+    });
+
+    it("does NOT mark a tower first saved in 2.0+ as a Founder", () => {
+      const sim = sampleGame();
+      const loaded = Simulation.deserialize(stamp(sim.serialize(), "2.0.0"));
+      expect(loaded.founder).toBe(false);
+      const later = Simulation.deserialize(stamp(sim.serialize(), "2.4.1"));
+      expect(later.founder).toBe(false);
+    });
+
+    it("persists Founder status once set, even after appVersion restamps to 2.0+", () => {
+      // A pre-2.0 tower loaded in 2.0 becomes a Founder; re-saving stamps the
+      // current (2.0+) appVersion, but the explicit flag now carries the status.
+      const sim = sampleGame();
+      const founding = Simulation.deserialize(stamp(sim.serialize(), "1.98.0"));
+      expect(founding.founder).toBe(true);
+      const resaved = founding.serialize();
+      expect((resaved as { founder?: boolean }).founder).toBe(true);
+      const reloaded = Simulation.deserialize(stamp(resaved, "2.1.0"));
+      expect(reloaded.founder).toBe(true);
+    });
+
+    it("deserialize() alone does NOT found an unstamped save (undo-snapshot safety)", () => {
+      // deserialize() runs for BOTH file loads and in-session serialize() snapshots
+      // (undo/redo, crash report), which are stamp-free. So at THIS layer a missing
+      // appVersion must not grant Founder, or an undo on a brand-new 2.0 tower would
+      // flip it to Founder and persist that. The oldest-tower recognition lives at
+      // the file-load boundary instead (markFounderFromLoadedFile), tested below.
+      const sim = sampleGame();
+      const data = sim.serialize();
+      delete (data as { appVersion?: string }).appVersion;
+      expect(Simulation.deserialize(data).founder).toBe(false);
+    });
+
+    it("writes NO founder key for a non-founder, so the save stays byte-identical", () => {
+      // The `...(sim.founder ? { founder: true } : {})` spread must contribute
+      // nothing when false: a non-founder tower's serialized bytes are unchanged
+      // from before this feature existed (no phantom key, no reordering).
+      const sim = sampleGame();
+      expect(sim.founder).toBe(false);
+      expect("founder" in sim.serialize()).toBe(false);
+    });
+
+    it("a brand-new game is never a Founder (the badge is per-tower, not per-player)", () => {
+      // Starting a new tower must not inherit Founder from a prior loaded tower:
+      // newGame() builds a fresh Simulation (founder defaults false), and nothing
+      // copies the flag across. A pre-2.0 player's NEW towers are ordinary towers.
+      expect(Simulation.newGame(1, "classic").founder).toBe(false);
+      expect(Simulation.newGame(2, "modern").founder).toBe(false);
+    });
+  });
+
+  describe("Ground-floor recognition through the real file-load path", () => {
+    // Build a genuine .vctower container (magic + base64 of the async-deflated
+    // JSON, the exact shape SaveGame.import parses) with a chosen appVersion, so
+    // the provenance-stamp -> detection wiring is exercised end-to-end via the
+    // real import path (which calls markFounderFromLoadedFile), not a hand-stamped
+    // object handed straight to deserialize().
+    async function importWith(sim: Simulation, appVersion?: string): Promise<Simulation> {
+      const data = sim.serialize() as unknown as Record<string, unknown>;
+      if (appVersion === undefined) delete data.appVersion;
+      else data.appVersion = appVersion;
+      const text = "VCTOWER1\n" + toBase64(await deflate(new TextEncoder().encode(JSON.stringify(data)))) + "\n";
+      return SaveGame.import(text);
+    }
+
+    it("recognizes a genuine pre-stamp save (no appVersion) as a Founder on import", async () => {
+      expect((await importWith(sampleGame(), undefined)).founder).toBe(true);
+    });
+
+    it("recognizes a pre-2.0 stamped save (appVersion 1.x) as a Founder on import", async () => {
+      expect((await importWith(sampleGame(), "1.99.0")).founder).toBe(true);
+    });
+
+    it("does NOT stamp Founder onto an imported 2.0+ save that never earned it", async () => {
+      expect((await importWith(sampleGame(), "2.4.1")).founder).toBe(false);
+    });
+
+    it("keeps Founder on an imported 2.0+ save that carries the earned flag", async () => {
+      const sim = sampleGame();
+      sim.founder = true; // a pre-2.0 tower re-saved in 2.0: stamp is 2.x but the flag persists
+      expect((await importWith(sim, "2.4.1")).founder).toBe(true);
+    });
   });
 });

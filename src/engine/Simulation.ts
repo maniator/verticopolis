@@ -63,9 +63,9 @@ export class Simulation implements SimContext {
   money: number = ECON.startingMoney;
   /** Rolling per-category income/expense record for the stats breakdown. */
   ledger = new Ledger();
-  /** 1..5 stars, 6 == TOWER. */
-  star = 1;
+  star = 1; // 1..5 stars, 6 == TOWER
   evaluatedTower = false;
+  founder = false; // ground-floor tower (predates 2.0); set at load, drives the splash "Ground floor" badge
   /** Where the player was looking when the save was written: inert UI cargo
    *  (see {@link SerializedView}). The engine NEVER reads it; the UI stamps it
    *  before a save and the renderer restores it after a load. Null for fresh
@@ -177,7 +177,7 @@ export class Simulation implements SimContext {
   /** Move-ins since the last daily summary (offices leased, condos sold, hotel
    *  rooms booked), reported as one quiet log line per day rather than a toast
    *  per tenant, matching SimTower's readout-driven feel. */
-  moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0, clinic: 0 };
+  moveInsToday = { offices: 0, condos: 0, rooms: 0, fitness: 0, clinic: 0, rentals: 0 };
   /** Pending VIP inspection day (for the TOWER rating). */
   vipVisitDay = -1;
   /** Whether a VIP has given the tower a favorable suite review (a 4★ gate). */

@@ -4,12 +4,14 @@ import { unmetCoverage, dominantGripe, nearNightclub } from "../engine/sim/gripe
 import { buildSatisfactionContext, wouldEvictFreshTenant } from "../engine/sim/satisfactionStep";
 import { rentOf } from "../engine/econConfig";
 import { isHotelKind } from "../engine/facilities";
+import { isRentalKind } from "../engine/residentialRentals";
 
 /**
  * Plain-language phrasing for the pre-notice "Main gripe" inspector line. Only
  * the drains WITHOUT a dedicated diagnostic line on the card are named here:
- * access ("not connected" / "too far"), the office long-walk (W1), and very-far
- * lobby distance already have their own actionable lines, and a relocation is a
+ * access ("not connected" / "too far"), the long-walk line (W1, office and rental
+ * Apartment), and very-far lobby distance already have their own actionable
+ * lines, and a relocation is a
  * life event, so those causes map to nothing and the gripe line stays off
  * (deferring to the dedicated line). Congestion, over-market rent, noise, and
  * unmet local retail demand (#395) have no such line, so they surface here.
@@ -32,7 +34,11 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
  *  club also sits within same-floor range and makes the unit noiseAfflicted. */
 function noiseGripeText(sim: Simulation, u: Unit): string {
   const adjacent = sim.noiseAfflicted(u); // a same-floor office/commercial source, lobby-shieldable
-  const club = (u.kind === "condo" || isHotelKind(u.kind)) && nearNightclub(sim, u); // cross-floor halo, not shieldable
+  // The Apartment joined the club's negative halo in D18, so it needs the club's
+  // remedy too. Without it the copy printed the lobby-tile fix, which is the one
+  // remedy that cannot work on a cross-floor halo (#684). The Studio stays out:
+  // it is not in the halo, so a nearby club is not its cause.
+  const club = (u.kind === "condo" || isHotelKind(u.kind) || u.kind === "rentalApartment") && nearNightclub(sim, u); // cross-floor halo, not shieldable
   if (adjacent && club) {
     // Both channels can be at work and either can be the binding cause, so present
     // both remedies rather than blaming one: a lobby tile shields the same-floor
@@ -92,26 +98,35 @@ export function gripeLineText(
 
 /**
  * The inspector's "Won't lease" line for an EMPTY, on-market, reachable
- * condo/office the move-in sustainability gate holds vacant (a fresh tenant here
+ * condo/office/rental the move-in sustainability gate holds vacant (a fresh tenant here
  * would erode below the leave bar and give notice again), or null when the unit
  * would fill. The empty-unit mirror of the "Main gripe" line: it names WHY no one
  * leases the spot so a perpetual vacancy reads as an actionable placement problem
  * instead of a mystery. Like "Main gripe" it spells out only the causes WITHOUT a
  * dedicated diagnostic line (congestion, over-market rent, noise, unmet demand);
- * access, the office long-walk, and very-far lobby distance keep their own
+ * access, the long-walk line (office and rental Apartment), and very-far lobby
+ * distance keep their own
  * actionable lines on the card, so for those the line just says a tenant would
  * give notice and points to the flagged problem. Gated on the SAME predicate
  * `attemptMoveIns` uses, so the card and the move-in decision can never disagree;
  * unreachable and off-market units are excluded (their own lines tell that
  * story), matching the engine, which never reaches the gate for them.
+ *
+ * The rental kinds are here because the gate holds them too: an Apartment or
+ * Studio dropped in a bad spot stays vacant just like a condo, so without this
+ * line that vacancy is the silent mystery the gate exists to explain. Reads
+ * `positionReachable`, the segment-aware predicate `attemptMoveIns` switched to
+ * in #647, so a unit stranded on a disconnected run of a gap-split floor keeps
+ * its own "no way to transportation" line instead of a gate verdict the engine
+ * never actually reached.
  */
 export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   if (
-    !(u.kind === "office" || u.kind === "condo") ||
+    !(u.kind === "office" || u.kind === "condo" || isRentalKind(u.kind)) ||
     u.state !== "empty" ||
     u.noRate ||
     !sim.tower.isFloorServed(u.floor) ||
-    !sim.floorReachable(u.floor)
+    !sim.positionReachable(u.floor, u.x)
   ) {
     return null;
   }
@@ -129,7 +144,13 @@ export function wontLeaseText(sim: Simulation, u: Unit): string | null {
   // used (the empty unit is now a registered origin), so a spot gated only by a
   // retail shortage attributes "too few shops" instead of falling to the generic
   // line, where dominantGripe would otherwise read the real map that omits it.
-  const cov = ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
+  // EXCEPT for rentals, which the engine excludes from the coverage drain on both
+  // the live and gate paths (#661). The gate registers every probe as an origin,
+  // rentals included, so computing the flag here would manufacture a true one for a
+  // kind the sim never drains that way and blame a rental vacancy on "too few
+  // shops". Mirroring the engine's coverage guard keeps the two in step.
+  const coverageKind = !isRentalKind(u.kind);
+  const cov = coverageKind && ctx.demandMap ? unmetCoverage(ctx.demandMap, u) : null;
   const unmetDrain = cov === null ? null : sim.rules.unmetDemandDrain(cov);
   const unmetActive = unmetDrain !== null && (unmetDrain.erosion > 0 || unmetDrain.cap < 1);
   const gripe = dominantGripe(sim, u, undefined, 0, undefined, undefined, undefined, unmetActive);

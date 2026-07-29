@@ -4,7 +4,7 @@ import type { GameMode, Unit } from "../types";
 import { GRID } from "../facilities";
 import { buildSatisfactionContext, satisfactionStep, wouldEvictFreshTenant } from "./satisfactionStep";
 import { computeDemandMap } from "./demand";
-import { NOISE_CAP, NOISE_EROSION, SERVED_RECOVERY, VACATE_RESCIND, LOBBY_FAR_CAP, UNMET_DEMAND_CAP } from "./constants";
+import { NOISE_CAP, NOISE_EROSION, CONDO_NOISE_EROSION, RENTAL_STUDIO_NOISE_EROSION, SERVED_RECOVERY, VACATE_RESCIND, LOBBY_FAR_CAP, UNMET_DEMAND_CAP } from "./constants";
 import { rentConfig } from "../econConfig";
 
 /**
@@ -41,6 +41,15 @@ function tinyTower(mode: GameMode, top = 4): Simulation {
 function place(sim: Simulation, kind: "office" | "condo" | "fastFood", floor: number, x: number): Unit {
   const r = sim.tower.place(kind, floor, x);
   expect(r.ok, `place ${kind} f${floor} x${x}`).toBe(true);
+  return sim.tower.units.find((u) => u.id === r.unitId)!;
+}
+
+/** Place a rental (needs 3 stars for the Apartment), then drop back to 1 star. */
+function placeRental(sim: Simulation, kind: "rentalStudio" | "rentalApartment", floor: number, x: number): Unit {
+  sim.star = 3;
+  const r = sim.tower.place(kind, floor, x);
+  expect(r.ok, `place ${kind} f${floor} x${x}`).toBe(true);
+  sim.star = 1;
   return sim.tower.units.find((u) => u.id === r.unitId)!;
 }
 
@@ -177,5 +186,57 @@ describe("wouldEvictFreshTenant: boundaries", () => {
     // NOISE_CAP sits above VACATE_RESCIND, so a capped-but-not-eroding spot stabilizes.
     expect(NOISE_CAP).toBeGreaterThan(VACATE_RESCIND);
     expect(wouldEvictFreshTenant(classic, noisy, buildSatisfactionContext(classic, true))).toBe(false);
+  });
+});
+
+describe("satisfactionStep: rentals (the touchpoints ported onto #650's module)", () => {
+  it("over-market rent erodes a rental like an office (both Studio and Apartment)", () => {
+    const sim = tinyTower("modern");
+    const studio = placeRental(sim, "rentalStudio", 2, C + 12); // quiet, near shaft + lobby
+    const apt = placeRental(sim, "rentalApartment", 3, C + 8);
+    const ctx = buildSatisfactionContext(sim);
+    for (const u of [studio, apt]) {
+      const cfg = rentConfig(u.kind)!;
+      u.rent = cfg.default * 2; // +100% over the going rate -> -0.07
+      expect(satisfactionStep(sim, u, 0.5, ctx).next).toBeCloseTo(0.5 + SERVED_RECOVERY - 0.07, 6);
+    }
+  });
+
+  it("far-walk (#502): the demanding Apartment feels it, the forgiving Studio never does", () => {
+    const sim = tinyTower("modern");
+    const apt = placeRental(sim, "rentalApartment", 2, 0); // far from the center shaft
+    const studio = placeRental(sim, "rentalStudio", 3, 0); // same bad access, different kind
+    const ctx = buildSatisfactionContext(sim);
+    expect(satisfactionStep(sim, apt, 1, ctx).farWalk).toBe(true);
+    expect(satisfactionStep(sim, studio, 1, ctx).farWalk).toBe(false);
+  });
+
+  it("noise: both rentals feel it, but only the Apartment can be worn out by it", () => {
+    const sim = tinyTower("modern");
+    place(sim, "office", 2, C - 13); // noisy neighbor for the Apartment on floor 2
+    place(sim, "office", 3, C - 13); // noisy neighbor for the Studio on floor 3
+    const apt = placeRental(sim, "rentalApartment", 2, C);
+    const studio = placeRental(sim, "rentalStudio", 3, C);
+    const ctx = buildSatisfactionContext(sim);
+    expect(satisfactionStep(sim, apt, 0.5, ctx).noisy).toBe(true);
+    expect(satisfactionStep(sim, studio, 0.5, ctx).noisy).toBe(true);
+    // Modern noise erosion scale is 1, so the erosion equals the base rate per kind.
+    expect(satisfactionStep(sim, apt, 0.5, ctx).next).toBeCloseTo(0.5 + SERVED_RECOVERY - NOISE_EROSION, 6);
+    expect(satisfactionStep(sim, studio, 0.5, ctx).next).toBeCloseTo(0.5 + SERVED_RECOVERY - RENTAL_STUDIO_NOISE_EROSION, 6);
+    // The contract is not "gentler", it is SURVIVABLE: the Studio's rate sits below
+    // the served recovery, so a noisy neighbor caps it and never wears it out, while
+    // the Apartment's sits above and does. That difference is the forgiving tier.
+    // Pin the EFFECTIVE rate, not just the constant: satisfactionStep multiplies by
+    // noiseErosionScale(), so a rules tune could break the invariant while the raw
+    // constants still compared correctly.
+    const scale = sim.rules.noiseErosionScale();
+    expect(RENTAL_STUDIO_NOISE_EROSION * scale).toBeLessThan(SERVED_RECOVERY);
+    expect(NOISE_EROSION * scale).toBeGreaterThan(SERVED_RECOVERY);
+    // All three tiers, so collapsing the middle one into either neighbor fails here.
+    // The sold condo sits just ABOVE the recovery: gentler than an office, but still
+    // net-negative, so noise wears an owner out eventually where it never can a Studio.
+    expect(CONDO_NOISE_EROSION * scale).toBeGreaterThan(SERVED_RECOVERY);
+    expect(CONDO_NOISE_EROSION).toBeLessThan(NOISE_EROSION);
+    expect(RENTAL_STUDIO_NOISE_EROSION).toBeLessThan(CONDO_NOISE_EROSION);
   });
 });

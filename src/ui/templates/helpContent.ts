@@ -105,6 +105,25 @@ export function helpAboutBody(version: string): TemplateResult {
   return html`<p style="color:var(--muted)">An unofficial, from-scratch homage to SimTower (1994). Original code and art; no ripped assets. Not affiliated with or endorsed by Maxis / OPeNBooK / Vivarium.<br />Verticopolis <span class="app-version">v${version}</span></p>`;
 }
 
+/** The Privacy section body, shared by the in-game Help modal and the standalone
+ *  `/help` page (each surface supplies its own heading, like About). One home for
+ *  the promise so the two surfaces can never disagree about what is collected.
+ *  Keep this in step with reality: the gameplay counters (`analytics.ts`, relayed
+ *  same-origin by `analyticsIngest.ts`), the page/performance metrics
+ *  (`telemetry.ts`), and the error reporter (`analyticsErrors.ts`) are all
+ *  cookieless and carry no personal data or durable identifier; if any of that
+ *  posture changes, this copy must change in the same PR. */
+export function helpPrivacyBody(): TemplateResult {
+  return html`<p style="color:var(--muted)">
+    Verticopolis counts anonymous gameplay totals, like "a tower was founded" or "a 3-star rating was reached", plus
+    anonymous page and performance metrics, so development can follow what players actually run into. There are no
+    cookies, no accounts, and no ads: the game never asks for your name or email, keeps no profile, and nothing
+    recognizes you from one day to the next. Crash reports carry the technical details of the error and the same kind
+    of anonymous totals, though an error message can occasionally quote a bit of game text, such as a tower's name.
+    Saves live in your own browser's storage and leave your device only when you export them.
+  </p>`;
+}
+
 /** The "Found a bug?" report call to action (heading + blurb + external link).
  *  The wrapping `<p>` keeps `class="help-report"` so the modal controller's
  *  `.help-report a` selector finds the link and routes it through the platform

@@ -19,6 +19,7 @@ import { SAVE_VERSION, migrateSave } from "../saveMigration";
 import { UNIT_CAP, assertSaneUnitCount, dropOverlappingUnits, repairEntityIds } from "./deserializeGuards";
 
 import { SOLD_CONDO_MIN_PRICE, SOLD_CONDO_MAX_PRICE, LOG_SAVE_CAP } from "./constants";
+import { detectFounder } from "./founderStatus";
 
 /** Ceiling for the persisted VIP-visit counter. Visits accrue at most every
  *  few in-game days, so even a millennium-old tower sits orders of magnitude
@@ -43,6 +44,7 @@ export function serialize(sim: Simulation): SerializedGame {
     // never touched the toggle stays byte-identical. The legacy manualStructure
     // field is no longer written (it is read only for migration on load).
     ...(sim.autoBridge ? {} : { autoBridge: false as const }),
+    ...(sim.founder ? { founder: true as const } : {}), // ground-floor flag, persisted once earned (see detectFounder)
     lastQuarterMoney: sim.lastQuarterMoney,
     units: sim.tower.units.map(serializeUnit),
     transports: sim.tower.transports.map(serializeTransport),
@@ -163,20 +165,15 @@ export function deserialize(raw: SerializedGame): Simulation {
   // and coerce the numeric fields that drive the loop to finite values so a
   // hand-edited or foreign save can't poison the math with NaN/undefined.
   const num = (v: unknown, fallback: number) => (typeof v === "number" && Number.isFinite(v) ? v : fallback);
-  // Guard the container type too, not just null: a forged save can clobber
-  // `units` to a non-array scalar/object, and `.filter` on it throws, same
-  // hard-load-failure this hardening exists to prevent. Matches the
-  // Array.isArray guard the sibling arrays (excavated/milestones) already use.
-  // Collect the kind-valid entries with the forged-count ceiling applied AS
-  // WE GO, before the map below constructs any unit object: a crafted file
-  // could otherwise freeze the tab at load (see deserializeGuards). Counting
-  // only kind-valid entries means a salvageable partially-written save padded
-  // with junk is not hard-rejected for garbage this loop drops anyway, and
-  // bailing on the first entry past the cap keeps both the work and the kept
-  // array bounded by the cap even when the file holds millions of entries.
-  // The null check runs BEFORE reading `.kind`: a forged or partially-written
-  // save can hold a `null` in the array, and `u.kind` on it throws, aborting
-  // the whole load instead of dropping one entry.
+  // Guard the container type, not just null: a forged save can clobber `units`
+  // to a non-array, which throws when iterated, the same hard load failure this
+  // hardening prevents (matching the Array.isArray guard excavated/milestones
+  // already use). The null check runs BEFORE `.kind`, since a forged entry can
+  // be `null` and reading it throws, aborting the load instead of dropping one
+  // entry. The forged-count ceiling applies AS WE GO, before the map below
+  // builds any unit object, or a crafted file could freeze the tab at load (see
+  // deserializeGuards); counting only kind-valid entries spares a salvageable
+  // save padded with junk, and bailing past the cap bounds work and array alike.
   const rawUnits: SerializedGame["units"] = [];
   for (const u of Array.isArray(data.units) ? data.units : []) {
     if (u == null || !isFacilityKind(u.kind)) continue;
@@ -210,6 +207,10 @@ export function deserialize(raw: SerializedGame): Simulation {
       const notOwned = state === "empty" || state === "construction" || state === "gutted";
       const everOccupied = u.everOccupied === true && !(notOwned && !isHotelKind(u.kind));
       const soldCondo = u.kind === "condo" && everOccupied;
+      // Kinds that carry a real household to round-trip: a sold condo, or an
+      // occupied rental Apartment. (The Studio is a fixed single occupant, so it
+      // never stores `residents`.) The condo-sale reprice below stays condo-only.
+      const keepHousehold = everOccupied && (u.kind === "condo" || u.kind === "rentalApartment");
       // Player-set price. Ladder-priced kinds pass through raw (non-finite
       // included): the snap pass below owns their normalization, and both of
       // its rules would otherwise be broken here, since the ladder's Very Low
@@ -265,7 +266,7 @@ export function deserialize(raw: SerializedGame): Simulation {
         // unit, empty/gutted, or a hand-edited save) carries none, so a stale
         // household can't leak into the census or a per-unit occupancy readout;
         // the next sale draws fresh.
-        residents: soldCondo ? sim.rules.coerceResidents(u.residents) : undefined,
+        residents: keepHousehold ? sim.rules.coerceResidents(u.residents) : undefined,
         pendingIncome: num(u.pendingIncome, 0),
         rent,
         // Coerce the film policy so a hand-edited save can't inject a bad value
@@ -474,16 +475,15 @@ export function deserialize(raw: SerializedGame): Simulation {
   sim.weather = Simulation.weatherFor(sim.clock.day);
   sim.lastDay = sim.clock.day;
   sim.lastQuarter = sim.clock.quarter;
-  // Legacy saves predate this field, so a missing value restores as 0
-  // (no snapshot), matching a fresh tower.
+  // Legacy saves predate this field: a missing value restores as 0 (no snapshot).
   sim.lastQuarterMoney = num(data.lastQuarterMoney, 0); // sanitize like every other numeric field: a forged NaN/string must not persist back out
   sim.lastMonth = Math.floor(sim.clock.day / sim.clock.calendar.maintPeriodDays);
   sim.lastHour = sim.clock.hour;
-  // Silently adopt any milestone already satisfied at load time (e.g. a save
-  // that predates this feature) so the next day doesn't spam a burst of
-  // headlines for goals the player already earned. Runs last, after the tower,
-  // transports and clock are fully restored, so the predicates read real state.
+  // Silently adopt any milestone already satisfied at load time (e.g. a legacy
+  // save) so the next day doesn't spam headlines for goals already earned. Runs
+  // last, after tower/transports/clock are restored, so predicates read real state.
   for (const m of MILESTONES) if (!sim.achievedMilestones.has(m.id) && m.test(sim)) sim.achievedMilestones.add(m.id);
+  sim.founder = detectFounder(raw); // ground-floor recognition (2.0)
   return sim;
 }
 

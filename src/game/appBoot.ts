@@ -16,6 +16,7 @@ import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
+import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
 
 /**
@@ -268,6 +269,17 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
     population: app.sim?.population ?? 0,
   });
 
+  // The 2.0 "Ground floor" recognition (party 2026-07-23): the STATUS lives on
+  // the loaded tower (`sim.founder`, set at load from a pre-2.0 save and persisted),
+  // so it travels with the tower and a brand-new 2.0 tower never carries it. Here
+  // we only fire the one-time welcome, once per profile, when a ground-floor tower
+  // lands back on screen (on whichever boot path this turns out to be).
+  const welcomeFounder = (): void => {
+    if (app.sim?.founder && shouldWelcomeFounder()) {
+      app.ui.toast("Welcome back. You got in on the ground floor, before 2.0. Thanks for building with us.", "good");
+    }
+  };
+
   if (resolveBootScreen({ hadReadableSave: app.hadReadableSave, justUpdated, justRecovered }) === "resume") {
     // An app-initiated resume reload (update or GPU-crash recovery): drop the
     // player straight back into their tower, skipping the title screen. Land
@@ -281,6 +293,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       justUpdated ? `Updated to v${APP_VERSION}. Press ▶ to resume.` : "Welcome back. Press ▶ to resume.",
       "info",
     );
+    welcomeFounder();
   } else {
     // Every other boot (cold reopen, a manual reload, first run, or a
     // corrupt/unreadable save) shows the title screen. `hasSave` reflects
@@ -300,6 +313,9 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
       // surfaces use (native prompt where captured, else an honest how-to).
       installOffered: () => splashInstallOffered(),
       onInstall: () => void activateInstall(app, "splash").catch(() => {}),
+      // The 2.0 "Ground floor" badge (party 2026-07-23): a small, quiet mark by the
+      // version, shown only when the loaded tower predates 2.0 (`sim.founder`).
+      founder: () => app.sim?.founder ?? false,
       onContinue: () => {
         // Only rendered when `hasSave`. teardownSplash() resumes the engine to
         // play speed, so re-pause: a returning player lands back in their tower
@@ -307,12 +323,13 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
         // path above).
         app.setSpeed(0);
         app.ui.toast("Welcome back. Press ▶ to resume.", "info");
+        welcomeFounder(); // one-time thank-you once they land in the tower
       },
       // The load-only tower picker (SPEC-splash-load-tower). Offered on every
       // boot, not just when `hasSave`: the manual slots are invisible to
       // `hasSave` (it reads the autosave keys alone), and the picker's file row
       // is the only way a fresh install or a new device gets its towers back.
-      onLoadTower: () => showTowerPicker(app),
+      onLoadTower: () => showTowerPicker(app, welcomeFounder),
       onNewTower: (dismiss) => {
         // The rule-set picker (Classic vs Modern) warns that New Tower abandons
         // the current tower only when one is continuable (`hasSave`); on a

@@ -1,6 +1,7 @@
 import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
 import { isHotelKind } from "../facilities";
+import { isRentalKind } from "../residentialRentals";
 import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
 import type { Unit, VacateReason } from "../types";
@@ -106,10 +107,15 @@ export function dominantGripe(
     return sim.tower.isFloorServed(u.floor) ? "noTransport" : "access";
   }
   if (u.floor !== 1 && (cong ?? sim.congestionAt(u.floor)) > 1) return "congestion";
-  const isDemandTenant = u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo";
+  // The tenants that feel the lobby-distance drain, and (rentals aside, see the
+  // rental branch below) the unmet-demand one. The rental Apartment joins them for
+  // distance; the Studio does NOT, so its departure is never mis-attributed to a
+  // drain it can't feel. The Studio is not drain-free, though: it still sours on an
+  // over-market rent and on noise, and every kind feels congestion above.
+  const isDemandTenant = u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo" || u.kind === "rentalApartment";
   // Very-far from the nearest (sky)lobby (the tier whose ceiling sits at or below
   // the gripe bar). Recomputed through the same GameRules curve when the flag is
-  // absent. Only office/condo/hotel carry the distance penalty.
+  // absent. Only office/condo/hotel and the rental Apartment carry the penalty.
   const veryFar =
     lobbyFar ??
     (isServed &&
@@ -159,6 +165,36 @@ export function dominantGripe(
     // catch-all, so it never falls through to the hotel/condo causes below.
     const cfg = rentConfig(u.kind);
     if (cfg && rentOf(u) > cfg.default) return "rent";
+    return null;
+  }
+  if (isRentalKind(u.kind)) {
+    // A rental sours on an over-market rent first (the GDD's "rent too high",
+    // reusing the office cause), then the distance drains. The Studio is not a
+    // demand tenant, so veryFar is false for it and it falls straight to
+    // noise/access; the Apartment also feels the far walk (Epic 4, #502).
+    const cfg = rentConfig(u.kind);
+    if (cfg && rentOf(u) > cfg.default) return "rent";
+    // #502: a demanding Apartment left with a far walk to its shaft gives notice
+    // (the Studio does not feel this, so it is never named here).
+    if (u.kind === "rentalApartment" && u.floor !== 1 && (farWalk ?? sim.tower.nearestTransportDistance(u) > TRANSPORT_FAR_TILES)) {
+      return "transportFar";
+    }
+    if (veryFar) return "lobbyFar";
+    if (noisy ?? sim.noiseAfflicted(u)) return "noise";
+    // D18 put the Apartment in the nightclub's negative halo, so it really does
+    // erode from a club floors away. Without this tier that erosion had no cause:
+    // dominantGripe returned null, vacateCause fell through to the "access"
+    // catch-all, and a fully served tenant was told "no route to the lobby". Not a
+    // missing message, a false one (#684). The Studio is out of the halo, so
+    // nearNightclub is only asked for the kind that feels it.
+    if (u.kind === "rentalApartment" && nearNightclub(sim, u)) return "noise";
+    // No unmetDemand tier here: rentals are excluded from the coverage drain on
+    // BOTH the live and gate paths (#661), because they are not demand origins, so
+    // the branch could never be honest. Leaving it out also stops a caller-supplied
+    // `unmetDemand` flag from resurrecting it, since the move-in gate registers its
+    // probe as an origin. `wontLeaseText` declines to compute that flag for a rental
+    // too, so the two guards agree from both ends. Restore this tier with the origin
+    // work in #661, not before.
     return null;
   }
   // A served, uncongested hotel/condo is drained by lobby distance, then by

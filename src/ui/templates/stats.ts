@@ -237,9 +237,13 @@ function householdSection(sim: Simulation): TemplateResult {
   let households = 0;
   let residents = 0;
   for (const u of sim.tower.units) {
-    // Count every condo actually in residence (isPresent), sized through the
-    // SAME seam (residentCount) as the population census.
-    if (u.kind === "condo" && isPresent(u)) {
+    // Count every home actually in residence (isPresent), sized through the SAME
+    // seam (residentCount) as the population census. The rental Apartment houses a
+    // rolled household exactly like a condo, so leaving it out undercounted the
+    // people living in the tower and let an all-rental tower read as having none.
+    // The Studio is a single occupant with no household, so it stays out of the
+    // household size histogram, the same way it carries no `residents`.
+    if ((u.kind === "condo" || u.kind === "rentalApartment") && isPresent(u)) {
       const size = residentCount(u);
       counts.set(size, (counts.get(size) ?? 0) + 1);
       households++;
@@ -248,7 +252,7 @@ function householdSection(sim: Simulation): TemplateResult {
   }
   const head = html`<div class="stats-section win-title sm">Households</div>`;
   if (households === 0) {
-    return html`${head}<div class="col kv"><span class="k" style="color:var(--muted);grid-column:1/-1">No condos sold yet. Each sale draws a 2–5 person family.</span></div>`;
+    return html`${head}<div class="col kv"><span class="k" style="color:var(--muted);grid-column:1/-1">No households yet. Each condo sale or Apartment lease draws a 2–5 person family. (A leased Studio is a single occupant, counted in the population but not here.)</span></div>`;
   }
   const avg = (residents / households).toFixed(1);
   const mix = [...counts.keys()]

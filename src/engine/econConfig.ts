@@ -264,6 +264,20 @@ export const ECON = {
     // Modern-only Clinic lease, the same quarterly cadence, smaller still (an
     // 8-wide quiet tenant).
     clinic: { default: 4_000, min: 1_500, max: 8_000, step: 500 },
+    // Modern-only rental living, collected MONTHLY (not quarterly like the office)
+    // via EconomySystem.collectMonthlyRent. The Studio is the cheap forgiving
+    // on-ramp; the Apartment pays more but its picky tenant erodes on an over-high
+    // rent (the office's over-market erosion). Modern never charges Classic these.
+    rentalStudio: { default: 2_000, min: 1_000, max: 3_000, step: 250 },
+    // default:max = 1:2 like the office, so gouging the demanding Apartment to the
+    // top of the band nets negative against the served recovery and eventually
+    // evicts (the GDD's "rent too high"); the forgiving Studio's narrower ratio
+    // never nets negative ON ITS OWN, so a gouged Studio in an otherwise fine spot
+    // only sours. Rent is additive with the other drains rather than max'd with
+    // them, so a band-max Studio beside a noisy neighbor DOES leave, and sooner
+    // than a condo would. That is the rent tier working, and `dominantGripe`
+    // names rent first, so the cause reads honestly.
+    rentalApartment: { default: 4_000, min: 3_000, max: 8_000, step: 500 },
   } as Record<string, { default: number; min: number; max: number; step: number }>,
   serviceMaintenanceMonthly: {
     security: 2_000,
@@ -275,7 +289,7 @@ export const ECON = {
 } as const;
 
 /** Unit kinds whose price the player sets (and can batch-edit). */
-export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub", "clinic"] as const;
+export const PRICED_KINDS = ["office", "condo", "hotelSingle", "hotelDouble", "hotelSuite", "fitnessClub", "clinic", "rentalStudio", "rentalApartment"] as const;
 
 /** The price band for a unit kind, or null if its price isn't player-set. */
 export function rentConfig(kind: string): { default: number; min: number; max: number; step: number } | null {

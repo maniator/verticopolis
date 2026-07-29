@@ -119,7 +119,7 @@ export function loadFromSlot(app: GameApp, slot: number | "auto"): void {
  * player may have four towers on this device that the browser simply will not
  * hand over. The file row stays either way, which is the actual way in.
  */
-export function showTowerPicker(app: GameApp): void {
+export function showTowerPicker(app: GameApp, onAdopted?: () => void): void {
   trackAppAction("splash_load_open"); // distinct from the in-game manager's saves_open
   app.ui.showTowerPicker({
     getSlots: () => {
@@ -129,7 +129,16 @@ export function showTowerPicker(app: GameApp): void {
         return { slots: [], storageBlocked: true };
       }
     },
-    onLoad: (slot) => loadFromSplash(app, slot),
+    // `onAdopted` fires only when a tower actually arrives, never on a failed or
+    // cancelled pick. The Ground floor welcome rides it: this picker is the only
+    // route back for a fresh install or a new device, which is exactly the
+    // returning player the badge exists for, so without this they got the badge
+    // and never the thank-you.
+    onLoad: (slot) => {
+      const ok = loadFromSplash(app, slot);
+      if (ok) onAdopted?.();
+      return ok;
+    },
   });
 }
 

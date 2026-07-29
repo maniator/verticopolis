@@ -54,7 +54,7 @@ describe("Not-present households never ghost the readout (gutted/empty)", () => 
     expect(sim.tower.totalPopulation()).toBe(0);
     // … and the Households readout drops it too — no ghost family, back to the
     // empty-state placeholder rather than a stale "People housed".
-    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("No condos sold yet");
+    expect(renderToFragment(statsTemplate(sim)).textContent).toContain("No households yet");
   });
 });
 

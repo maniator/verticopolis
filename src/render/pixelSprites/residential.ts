@@ -156,16 +156,22 @@ export function office(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: 
 
 // ---- Condo --------------------------------------------------------------
 
-export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number): void {
+/** Min room width for the absolute-offset dining/study layouts (chairs end at x+77). */
+const WIDE_LAYOUT_MIN_W = 84;
+
+// prettier-ignore
+export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: number, walls: string[] = CONDO_WALLS, pics: string[] = CONDO_PICTURES, vacancyLabel = "SALE"): void {
   const { ctx } = d;
-  if (u.state === "empty") return vacancy(ctx, x, y, w, h, "SALE");
+  if (u.state === "empty") return vacancy(ctx, x, y, w, h, vacancyLabel);
   // Residents are "up" only when home and not asleep in the small hours.
   const home = visibleOccupants(u) > 0 && !(d.hour >= 23 || d.hour < 6);
-  // Geo-seeded variety, geometry first: three true layouts (living, dining with
-  // a kitchenette, a study), any of them mirrored, over warm plaster and maple.
-  // The standing lamp appears in every layout so the home-glow signal survives.
-  const wall = CONDO_WALLS[geoVariant(u, 0, CONDO_WALLS.length)];
-  const layout = geoVariant(u, 3, 5); // 0-2 living (anchor weight), 3 dining, 4 study
+  // Geo-seeded variety, geometry first: three true layouts (living, dining with a
+  // kitchenette, a study), any of them mirrored, over warm plaster and maple. The
+  // standing lamp appears in every layout so the home-glow signal survives.
+  const wall = walls[geoVariant(u, 0, walls.length)];
+  // Dining/study use absolute offsets so they need WIDE_LAYOUT_MIN_W: the 6-tile
+  // Studio drew furniture through its own wall. Narrow rooms take living instead.
+  const layout = w >= WIDE_LAYOUT_MIN_W ? geoVariant(u, 3, 5) : geoVariant(u, 3, 3);
   const flip = geoVariant(u, 4, 2) === 1;
   const { floorH, floorY } = floorMetrics(y, h);
   const railY = floorY - 14;
@@ -178,16 +184,17 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
   fill(ctx, x + Math.round(w * 0.28), floorY + 1, Math.round(w * 0.4), 1, "#8C3A32", 0.4); // area rug hint
   // The standing floor lamp: shade warms to glowLit when home, drops to glowDim
   // otherwise (empty, or late-night asleep). Drawn in every layout.
-  const lamp = (lx: number): void => {
+  const lamp = (lxRaw: number): void => {
+    const lx = Math.min(Math.max(lxRaw, x + 3), x + w - 4); // keep the 7px shade in the room
     fill(ctx, lx, floorY - 18, 1, 18, "#7A6A50"); // pole
     fill(ctx, lx - 3, floorY - 21, 7, 4, roomGlow(home)); // shade
     if (home) glow(ctx, lx, floorY - 19, PAL.glowLit);
   };
   maybeMirrored(ctx, flip, x, w, () => {
     // A framed art pair and a curtained skyline window (flip with the layout).
-    const picIx = geoVariant(u, 1, CONDO_PICTURES.length);
-    framedArt(ctx, x + 8, y + 8, 11, 8, CONDO_PICTURES[picIx]);
-    framedArt(ctx, x + 23, y + 9, 9, 6, CONDO_PICTURES[(picIx + 2) % CONDO_PICTURES.length]);
+    const picIx = geoVariant(u, 1, pics.length);
+    framedArt(ctx, x + 8, y + 8, 11, 8, pics[picIx]);
+    framedArt(ctx, x + 23, y + 9, 9, 6, pics[(picIx + 2) % pics.length]);
     const winTop = y + 7;
     const winH = railY - y - 11;
     const winW = Math.min(22, Math.max(9, Math.round(w * 0.24)));
@@ -225,8 +232,7 @@ export function condo(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
       bevelBox(ctx, x + 6, railY - 2, 30, floorY - railY + 2, "#6A5240"); // bookcase
       const spines = ["#8C3A32", "#3E5A8C", "#B08A3E", "#4A7A4A", "#5A4A6E"];
       // Rows anchored at railY - 1 so the four 3px spine rows fit within the
-      // bookcase (bottom row ends at floorY - 1) instead of spilling 1px onto
-      // the floor line.
+      // bookcase (bottom row ends at floorY - 1) instead of spilling 1px onto the floor line.
       for (let r = 0; r < 4; r++) for (let k = 0; k < 9; k++) fill(ctx, x + 9 + k * 3, railY - 1 + r * 4, 2, 3, spines[(k + r) % 5]);
       const dx = x + 48;
       fill(ctx, dx, floorY, 22, 1, "#000000", 0.16);
@@ -484,8 +490,7 @@ export function hotel(d: RoomCtx, u: Unit, x: number, y: number, w: number, h: n
     // position (mirrored text would render backward), floating over the first
     // occupied bed. Its baseline stays exactly where it shipped (floorY - 10),
     // so the asleep cue is pixel-identical regardless of the bed art. It is
-    // gated on a real sleeper, matching the sleeper figure, so an empty bed
-    // never broadcasts a "z".
+    // gated on a real sleeper, matching the sleeper figure, so an empty bed never broadcasts a "z".
     const zSrc = beds[0].bx + 8;
     const zx = flip ? 2 * x + w - zSrc - 5 : zSrc;
     ctx.fillStyle = "rgba(210,220,255,0.9)";

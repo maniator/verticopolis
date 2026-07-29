@@ -1,5 +1,5 @@
 import { html, nothing, type TemplateResult } from "lit-html";
-import { HELP_SECTIONS, helpLede, helpAboutBody, helpReportBlock } from "./helpContent";
+import { HELP_SECTIONS, helpLede, helpAboutBody, helpPrivacyBody, helpReportBlock } from "./helpContent";
 
 /**
  * The How-to-play / Help dialog. Organized so it opens SHORT: a lead and the
@@ -57,6 +57,10 @@ export function helpTemplate(onSplash: boolean, version: string, actions: HelpAc
       <details class="help-modes">
         <summary><span role="heading" aria-level="3">About</span></summary>
         ${helpAboutBody(version)}
+      </details>
+      <details class="help-modes">
+        <summary><span role="heading" aria-level="3">Privacy</span></summary>
+        ${helpPrivacyBody()}
       </details>
       <div class="modal-actions"><button class="btn" data-act="replay-onboard" ?disabled=${onSplash} title=${onSplash ? "Start a tower first, then you can replay the intro." : nothing} @click=${actions.onReplay}>Replay Getting Started</button><button class="btn primary" data-act="close" autofocus>Got it</button></div>
     `;

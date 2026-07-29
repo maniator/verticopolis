@@ -1,4 +1,5 @@
 import type { Facility, FacilityKind } from "./types";
+import { RENTAL_FACILITIES } from "./residentialRentals";
 
 /**
  * Facility catalog. Costs and sizes are tuned to mirror the scale and balance
@@ -447,6 +448,10 @@ export const FACILITIES: Record<FacilityKind, Facility> = {
     color: "#f3ecdc",
     description: "A grand wedding & events hall atop a 5-star tower (floor 100). Triggers the final TOWER evaluation.",
   },
+  // Modern rental living (Studio + Apartment): catalog entries live in their own
+  // module so this file stays under the size ceiling. The spread keeps the
+  // Record<FacilityKind, Facility> completeness check (a missing kind still errors).
+  ...RENTAL_FACILITIES,
 };
 
 export const ALL_KINDS: FacilityKind[] = Object.keys(FACILITIES) as FacilityKind[];
