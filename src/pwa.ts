@@ -94,9 +94,9 @@ export function registerPWA(handlers: PwaHandlers): void {
   // wrapper's own channel. Skip registration and the hourly `version.json`
   // poll entirely; the poll would only ever see the bundled snapshot the
   // wrapper shipped anyway. The Android TWA renders the live site with the
-  // plain build, so it deliberately keeps this flow; the gate is on the
-  // build's Vite mode (inlined in production builds), not on any runtime
-  // wrapper flag.
+  // plain build, so it deliberately keeps this flow; the gate reads the
+  // build's Vite mode (the literal is inlined at build time; the predicate
+  // call itself is runtime), not any runtime wrapper flag.
   if (isWrappedMode(import.meta.env.MODE)) {
     return;
   }

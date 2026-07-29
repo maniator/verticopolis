@@ -33,16 +33,19 @@ export function isWrappedMode(mode: string): boolean {
   return mode === "native" || mode === "desktop";
 }
 
-/** Resolution order (mobile-distribution arch §2): only a wrapped bundle may
- *  bind a wrapper port, and only through a well-formed `__VC_PLATFORM__`
- *  global; everything else gets the browser default. Pure so the order is
- *  unit-testable without faking the build mode. */
+/** Resolution order: only a wrapped bundle may bind a wrapper port, and only
+ *  through a well-formed `__VC_PLATFORM__` global; everything else gets the
+ *  browser default. The rule extends the mobile-distribution arch §2 pattern
+ *  (written for `--mode native`) to the desktop mode; the arch doc's mode
+ *  enumeration predates desktop and is tracked for an update in the backlog.
+ *  Pure so the order is unit-testable without faking the build mode. */
 export function resolvePlatform(mode: string, injected: unknown): PlatformPort {
   if (!isWrappedMode(mode)) return browserPlatform;
   if (!isPlatformPort(injected)) {
-    // A native bundle that carries a broken injection is a wrapper-shell bug;
-    // say so where the shell author will look (a bare native bundle with no
-    // injection at all is a legitimate preview, so stay quiet for undefined).
+    // A wrapped bundle (native or desktop) that carries a broken injection is
+    // a wrapper-shell bug; say so where the shell author will look (a bare
+    // wrapped bundle with no injection at all is a legitimate preview, so
+    // stay quiet for undefined).
     if (injected !== undefined) {
       console.warn("[platform] Ignoring malformed __VC_PLATFORM__ injection; using the browser platform.");
     }
