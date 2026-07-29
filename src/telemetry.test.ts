@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { injectVercelTelemetry } from "./telemetry";
+import { injectVercelTelemetry, telemetryHostAllowed } from "./telemetry";
 import { injectSpeedInsights } from "@vercel/speed-insights";
 import { inject as injectWebAnalytics } from "@vercel/analytics";
 
@@ -88,5 +88,22 @@ describe("injectVercelTelemetry host gate", () => {
       throw new Error("telemetry down");
     });
     expect(() => injectVercelTelemetry()).not.toThrow();
+  });
+});
+
+describe("telemetryHostAllowed: wrapped builds are closed regardless of host", () => {
+  it("returns false in native and desktop modes even on the production domain", () => {
+    window.location.href = "https://verticopolis.com/";
+    expect(telemetryHostAllowed("native")).toBe(false);
+    expect(telemetryHostAllowed("desktop")).toBe(false);
+  });
+  it("a wrapper serving from an allowed-looking hostname cannot open the gate", () => {
+    // The hazard from the distribution plan: an app-protocol host named after
+    // the production domain would pass the host check alone.
+    window.location.href = "https://verticopolis.com/";
+    expect(telemetryHostAllowed("desktop")).toBe(false);
+    // Browser modes on the same host stay allowed, so the gate change is
+    // scoped to wrapped builds only.
+    expect(telemetryHostAllowed("production")).toBe(true);
   });
 });

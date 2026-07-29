@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { resolvePlatform, getPlatform } from "./index";
+import { resolvePlatform, getPlatform, isWrappedMode } from "./index";
 import { browserPlatform } from "./browser";
 import type { PlatformPort } from "./types";
 
@@ -142,5 +142,33 @@ describe("browserPlatform: the pre-port export behavior, byte for byte", () => {
     browserPlatform.openExternal("not a url");
     expect(open).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("isWrappedMode: the one predicate every wrapper gate shares", () => {
+  it("is true for the two wrapper build modes and nothing else", () => {
+    expect(isWrappedMode("native")).toBe(true);
+    expect(isWrappedMode("desktop")).toBe(true);
+    expect(isWrappedMode("production")).toBe(false);
+    expect(isWrappedMode("development")).toBe(false);
+    expect(isWrappedMode("test")).toBe(false);
+    expect(isWrappedMode("")).toBe(false);
+    // Exact match only: no prefix or casing creep.
+    expect(isWrappedMode("Native")).toBe(false);
+    expect(isWrappedMode("desktop-extra")).toBe(false);
+  });
+});
+
+describe("resolvePlatform: desktop mode binds like native", () => {
+  const port = {
+    isNativeWrapper: true as const,
+    saveFile: () => Promise.resolve(),
+    openExternal: () => {},
+  };
+  it("binds a well-formed injection under desktop mode", () => {
+    expect(resolvePlatform("desktop", port)).toBe(port);
+  });
+  it("still degrades to the browser platform for malformed desktop injections", () => {
+    expect(resolvePlatform("desktop", { isNativeWrapper: true })).not.toBe(port);
   });
 });

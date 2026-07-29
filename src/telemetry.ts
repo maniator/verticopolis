@@ -1,4 +1,5 @@
 import { analyticsAdapter } from "./analyticsAdapter";
+import { isWrappedMode } from "./platform";
 
 /**
  * Shared page-view + Core Web Vitals inject for every deployed page: the game
@@ -45,7 +46,15 @@ import { analyticsAdapter } from "./analyticsAdapter";
  * boundary: a non-Vercel look-alike such as `verticopolis.com.evil.example` falls
  * outside it (it does not end with `.verticopolis.com`).
  */
-export function telemetryHostAllowed(): boolean {
+export function telemetryHostAllowed(mode: string = import.meta.env.MODE): boolean {
+  // Wrapped builds (Capacitor, Electron) never report telemetry, whatever host
+  // they are served from. The host check below already excludes every wrapper
+  // origin in practice, but a wrapper shell could serve its bundle from a
+  // hostname on this list (an app protocol host named after the production
+  // domain), and that must not silently open the gate. Structural, per the
+  // distribution plan: enabling desktop analytics is a reviewed change here,
+  // never a wrapper-side hostname choice.
+  if (isWrappedMode(mode)) return false;
   if (typeof window === "undefined") return false;
   // Strip a trailing dot so the canonical absolute FQDN (`verticopolis.com.`) is
   // matched like the usual form. Mirror this in `originAllowed`.
