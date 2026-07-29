@@ -168,15 +168,26 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     // contains it), so comparing two `segAt` calls would pass even if run A had
     // never been placed, quietly turning this into a copy of the overhang case.
     // Assert the structure itself, and the gap between the two runs.
-    expect(tower.hasStructure(2, 10), "run A must exist under the footprint").toBe(true);
+    expect(tower.hasStructure(2, 10), "run A must exist").toBe(true);
     expect(tower.hasStructure(2, 11)).toBe(true);
     expect(tower.hasStructure(2, 12), "the runs must be separated by a real gap").toBe(false);
-    expect(tower.hasStructure(2, 15), "run B must also sit under the footprint").toBe(true);
+    expect(tower.hasStructure(2, 15), "run B must exist").toBe(true);
     expect(segmentsOf(tower, 2)).toEqual([[10, 11], [15, 25]]);
+
+    const t = parity(tower);
+    // The runs existing is not the premise; the FOOTPRINT covering both is, and
+    // that rides on the stair's width. Count the distinct segments the flight
+    // actually spans, over structural columns only so a void column's lone-tile
+    // segment cannot pad the total. Narrow the flight and this drops to 1, which
+    // is the degeneration the whole fixture exists to prevent.
+    const spanned = new Set<number>();
+    for (let i = 0; i < t.width; i++) {
+      if (tower.hasStructure(2, t.x + i)) spanned.add(segAt(tower, 2, t.x + i));
+    }
+    expect(spanned.size, "the footprint must straddle two structural runs").toBe(2);
     // The router links the FIRST run today, so the render side must land there
     // too. This is the assertion that moves when #662 changes which run wins.
-    expect(landingTile(tower, tower.transports[0], 2)).toBe(10);
-    parity(tower);
+    expect(landingTile(tower, t, 2)).toBe(10);
   });
 
   it("cannot be asked about a flight with no structural column, because placement refuses one", () => {
@@ -194,7 +205,7 @@ describe("landingTile agrees with the router's landingSeg (#674)", () => {
     expect(tower.hasStructure(2, 17)).toBe(false);
     const res = tower.placeTransport("stairs", 10, 1, 2);
     expect(res.ok).toBe(false);
-    expect(res.reason).toBe(NEEDS_FLOORS); // the constant, not prose that could be reworded
+    expect(res.reason).toBe(NEEDS_FLOORS); // assert the constant so a copy edit cannot redden this
     expect(tower.transports).toEqual([]);
   });
 });
