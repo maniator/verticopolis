@@ -161,6 +161,34 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
  *  instead of skipping to the next scene and re-waiting the full timeout. */
 class MissingHandleError extends Error {}
 
+/** Whether the SERVED dist publishes the `window.game` handle (the tooling
+ *  gate, see bootstrap.ts). Fetched lazily on the first missing-handle
+ *  timeout, and only then, to tell the two look-alike failures apart: a
+ *  production dist (the handle can never appear, abort the run naming the
+ *  flag) versus a boot crash on a proper tooling dist (scene-local, record
+ *  and keep going; route and fallback scenes don't need the handle). The
+ *  same `.game=` pattern scripts/verify-game-handle.ts greps for. A fetch
+ *  or parse failure resolves true, keeping the scene-local path: aborting
+ *  the whole run needs positive proof the dist is wrong. */
+let distHasHandle: Promise<boolean> | undefined;
+function servedDistPublishesHandle(): Promise<boolean> {
+  distHasHandle ??= (async () => {
+    try {
+      const html = await (await fetch(BASE)).text();
+      const bundles = [...new Set(html.match(/assets\/[\w.-]+\.js/g) ?? [])];
+      for (const path of bundles) {
+        const js = await (await fetch(`${BASE}/${path}`)).text();
+        if (/\.game\s*=[^=]|window\.game/.test(js)) return true;
+      }
+      // No bundle carried it; only a non-empty scan proves absence.
+      return bundles.length === 0;
+    } catch {
+      return true;
+    }
+  })();
+  return distHasHandle;
+}
+
 async function runScene(browser: Browser, scene: Scene): Promise<void> {
   const sceneStart = Date.now();
   console.log(`\n▶ scene: ${scene.id}`);
@@ -244,15 +272,24 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       try {
         await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
       } catch (err) {
-        // The likeliest cause is a dist built WITHOUT the tooling flag:
-        // production builds compile the `window.game` publish away, so the
-        // wait can never succeed, on this scene or any other. Name the fix
-        // and abort the whole run (MissingHandleError, rethrown by the scene
-        // loop) instead of burning READY_TIMEOUT_MS per remaining scene.
+        const original = err instanceof Error ? err.message : String(err);
+        // Two look-alike causes: a boot crash on this page, or a dist built
+        // WITHOUT the tooling flag (production builds compile the
+        // `window.game` publish away, so the wait can never succeed on ANY
+        // game scene). Ask the served dist which one this is: a boot crash
+        // stays scene-local (recorded, run continues), a handle-less dist
+        // aborts the run naming the fix (MissingHandleError, rethrown by the
+        // scene loop) instead of burning READY_TIMEOUT_MS per remaining scene.
+        if (await servedDistPublishesHandle()) {
+          throw new Error(
+            `window.game never appeared on ${scene.id}, but the served dist does publish the handle: ` +
+              `a boot failure on this page, not a missing VC_TOOLING flag. Original: ${original}`,
+          );
+        }
         throw new MissingHandleError(
-          `window.game never appeared on ${scene.id}. If the app booted, this dist was probably ` +
-            `built without VC_TOOLING=1 (production builds ship no window.game handle); rebuild with ` +
-            `VC_TOOLING=1 npm run build. Original: ${err instanceof Error ? err.message : String(err)}`,
+          `window.game never appeared on ${scene.id}, and the served dist ships no window.game handle: ` +
+            `it was built without VC_TOOLING=1 (a production build). Rebuild with VC_TOOLING=1 npm run ` +
+            `build. Original: ${original}`,
         );
       }
       // From here on, frames advance only when settle()/pgStep drives them:
