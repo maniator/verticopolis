@@ -100,7 +100,7 @@ Technical facts the design leans on:
      traffic/congestion tests are the net; do not weaken them).
    - Fixtures assert every construction step (`expect(r.ok)`).
 6. No congestion math changes; `TRANSPORT_CAPACITY`, pooling, spans untouched.
-7. Version 2.4.1 -> 2.4.2 via `npm version patch` (lockfile in lockstep).
+7. Version bumped (2.4.2 pre-merge, re-resolved to 2.5.1 after main moved to 2.5.0) via `npm version patch` (lockfile in lockstep).
 8. Gates green (typecheck, lint, test, build), then `/gds-code-review` in the
    same session; every `patch` finding fixed, every `defer` recorded in the
    backlog. Backlog row `congestion-gripe-binding-shaft` flips to resolved with
@@ -216,7 +216,7 @@ claude-fable-5
   the departing tenant was its last occupant. The note now reads the binding
   class at vacate entry, while the tenant's own load still counts.
 - Backlog row congestion-gripe-binding-shaft flipped to resolved, GH cleared
-  (this PR closes #701). Version 2.4.1 -> 2.4.2.
+  (this PR closes #701). Version bumped (2.4.2 pre-merge, re-resolved to 2.5.1 after main moved to 2.5.0).
 
 ### File List
 

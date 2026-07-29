@@ -259,7 +259,9 @@ Two tiers: a fast **Vitest** unit suite (engine, game logic, UI, sprites, audio,
 storage: placement, reachability, economy, star gates, housekeeping, save/load
 round-trips) and a **Playwright** browser end-to-end smoke that proves the game
 stays winnable and renders. Run `npm test` and `npm run e2e` (after
-`npm run build`). The full testing strategy (the two tiers, the enforced
+`VC_TOOLING=1 npm run build`; the flag publishes the `window.game` handle the
+e2e specs drive, which production builds compile away). The full testing
+strategy (the two tiers, the enforced
 coverage floors, and what's unit-tested vs. integration-covered) lives in
 **[CONTRIBUTING.md](CONTRIBUTING.md)** → *Testing & coverage*.
 

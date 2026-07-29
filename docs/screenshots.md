@@ -7,8 +7,12 @@ for showing a change in a pull request.
 
 Every image under `docs/screenshots/**` is produced by **one** generator,
 [`scripts/screenshots.ts`](../scripts/screenshots.ts). It drives the **real,
-built app** headless with Playwright (through the public `window.game` API), so
-the shots can't drift from what actually ships. There are no per-feature scripts
+built app** headless with Playwright (through the `window.game` tooling API,
+published only by dev serves and `VC_TOOLING=1` builds; `npm run screenshots`
+and the determinism check set the flag themselves), so the shots can't drift
+from what actually ships: the tooling build differs from the deployed one only
+by publishing that handle (a guard on every `npm run build`,
+`scripts/verify-game-handle.ts`, holds both sides of that line). There are no per-feature scripts
 any more; one declarative `SCENES` manifest maps every shot to the state it
 needs, so a new shot is a new manifest row, not a new file.
 

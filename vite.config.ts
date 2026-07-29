@@ -19,6 +19,27 @@ function changelogNotes(): string[] {
   }
 }
 
+/** Whether this is a tooling build (VC_TOOLING=1): the only builds that
+ *  publish the `window.game` handle (see `define` below and bootstrap.ts).
+ *  Fails loudly on the two silent misconfigurations: a misspelled value
+ *  (`VC_TOOLING=true` would quietly produce a production build and time out
+ *  downstream), and the flag reaching a Vercel deploy (which would ship the
+ *  console handle to players). */
+function toolingBuild(): boolean {
+  const raw = process.env.VC_TOOLING;
+  if (raw !== undefined && raw !== "" && raw !== "1") {
+    throw new Error(`VC_TOOLING must be "1" or unset; got "${raw}". Use VC_TOOLING=1 for a tooling build.`);
+  }
+  const on = raw === "1";
+  if (on && process.env.VERCEL) {
+    throw new Error(
+      "VC_TOOLING=1 is set in a Vercel build. Deploys must never publish the window.game tooling handle; remove VC_TOOLING from the Vercel environment.",
+    );
+  }
+  if (on) console.warn("[build] VC_TOOLING=1: publishing the window.game tooling handle. Do not deploy this build.");
+  return on;
+}
+
 /** Short git SHA of the build, or "unknown" outside a checkout. */
 function gitShortSha(): string {
   try {
@@ -119,6 +140,15 @@ export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkgVersion),
     __APP_SHA__: JSON.stringify(gitShortSha()),
+    // `window.game` gate. Only the tooling pipelines (e2e, screenshots, perf)
+    // build with VC_TOOLING=1; every other build, the Vercel deploy and the
+    // mobile wrappers included, gets `false` here and the publish in
+    // bootstrap.ts is dead-code-eliminated out of the bundle, so a shipped
+    // session has no console handle into the sim. Dev serves don't need the
+    // variable: the gate also accepts `import.meta.env.DEV`. The value is
+    // validated by `toolingBuild()` above; scripts/verify-game-handle.ts
+    // asserts the resulting dist matches the mode on every `npm run build`.
+    __TOOLING_BUILD__: JSON.stringify(toolingBuild()),
   },
   plugins: [
     emitVersionJson(),

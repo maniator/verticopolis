@@ -71,7 +71,10 @@ Verticopolis has **two test tiers**:
   ones next to their source.
 - **Tier-2: Playwright end-to-end** (`e2e/*.spec.ts`). Drives the **real, built
   app** in a live browser (Chromium via `vite preview`), reaching into the game
-  through the public `window.game` API. Run it with `npm run e2e` after a build.
+  through the `window.game` tooling API. That handle exists only in dev serves
+  and `VC_TOOLING=1` builds; a production build compiles it away so shipped
+  sessions carry no console handle into the sim. Run it with `npm run e2e`
+  after a tooling build (`VC_TOOLING=1 npm run build`).
   Specs cover boot/integration, milestones, a full win, and visual baselines.
   See [`playwright.config.ts`](./playwright.config.ts) for how visual baselines
   are minted by CI (local runs smoke the flows but skip pixel comparison unless
@@ -155,7 +158,7 @@ docker run --rm --ipc=host \
     hash -r
     export PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
     npm ci
-    npm run build
+    VC_TOOLING=1 npm run build
     npx playwright test e2e/visual.spec.ts --update-snapshots
     chown -R "$HOST_UID:$HOST_GID" e2e/visual.spec.ts-snapshots 2>/dev/null || true
   '

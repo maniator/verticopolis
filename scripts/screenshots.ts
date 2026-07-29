@@ -156,6 +156,39 @@ async function takeShot(page: Page, scene: Scene, shot: Shot): Promise<void> {
   console.log(`  ✓ ${outDir}/${shot.name} (${Date.now() - shotStart} ms)`);
 }
 
+/** The dist ships no `window.game` handle (built without VC_TOOLING=1), a
+ *  condition no scene can recover from: the scene loop rethrows this one
+ *  instead of skipping to the next scene and re-waiting the full timeout. */
+class MissingHandleError extends Error {}
+
+/** Whether the SERVED dist publishes the `window.game` handle (the tooling
+ *  gate, see bootstrap.ts). Fetched lazily on the first missing-handle
+ *  timeout, and only then, to tell the two look-alike failures apart: a
+ *  production dist (the handle can never appear, abort the run naming the
+ *  flag) versus a boot crash on a proper tooling dist (scene-local, record
+ *  and keep going; route and fallback scenes don't need the handle). The
+ *  same `.game=` pattern scripts/verify-game-handle.ts greps for. A fetch
+ *  or parse failure resolves true, keeping the scene-local path: aborting
+ *  the whole run needs positive proof the dist is wrong. */
+let distHasHandle: Promise<boolean> | undefined;
+function servedDistPublishesHandle(): Promise<boolean> {
+  distHasHandle ??= (async () => {
+    try {
+      const html = await (await fetch(BASE)).text();
+      const bundles = [...new Set(html.match(/assets\/[\w.-]+\.js/g) ?? [])];
+      for (const path of bundles) {
+        const js = await (await fetch(`${BASE}/${path}`)).text();
+        if (/\.game\s*=[^=]|window\.game/.test(js)) return true;
+      }
+      // No bundle carried it; only a non-empty scan proves absence.
+      return bundles.length === 0;
+    } catch {
+      return true;
+    }
+  })();
+  return distHasHandle;
+}
+
 async function runScene(browser: Browser, scene: Scene): Promise<void> {
   const sceneStart = Date.now();
   console.log(`\n▶ scene: ${scene.id}`);
@@ -236,7 +269,29 @@ async function runScene(browser: Browser, scene: Scene): Promise<void> {
       }
       await settle(page, 800, true);
     } else {
-      await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
+      try {
+        await page.waitForFunction(() => !!(window as any).game, null, { timeout: READY_TIMEOUT_MS });
+      } catch (err) {
+        const original = err instanceof Error ? err.message : String(err);
+        // Two look-alike causes: a boot crash on this page, or a dist built
+        // WITHOUT the tooling flag (production builds compile the
+        // `window.game` publish away, so the wait can never succeed on ANY
+        // game scene). Ask the served dist which one this is: a boot crash
+        // stays scene-local (recorded, run continues), a handle-less dist
+        // aborts the run naming the fix (MissingHandleError, rethrown by the
+        // scene loop) instead of burning READY_TIMEOUT_MS per remaining scene.
+        if (await servedDistPublishesHandle()) {
+          throw new Error(
+            `window.game never appeared on ${scene.id}, but the served dist does publish the handle: ` +
+              `a boot failure on this page, not a missing VC_TOOLING flag. Original: ${original}`,
+          );
+        }
+        throw new MissingHandleError(
+          `window.game never appeared on ${scene.id}, and the served dist ships no window.game handle: ` +
+            `it was built without VC_TOOLING=1 (a production build). Rebuild with VC_TOOLING=1 npm run ` +
+            `build. Original: ${original}`,
+        );
+      }
       // From here on, frames advance only when settle()/pgStep drives them:
       // wall time (rAF jitter, CI load, staging latency) can no longer leak
       // into what the sim and the decorations look like at capture. A failed
@@ -341,6 +396,10 @@ async function main(): Promise<void> {
       try {
         await runScene(browser, scene);
       } catch (e) {
+        // A missing window.game handle is a property of the DIST, so every
+        // later scene would fail the same way after its own full timeout:
+        // abort the run with the diagnostic instead (main's catch exits 1).
+        if (e instanceof MissingHandleError) throw e;
         const msg = e instanceof Error ? e.message : String(e);
         for (const shot of scene.shots) failures.push(`${scene.id}/${shot.name}: scene setup failed (${msg})`);
         console.error(`  ✗ scene ${scene.id} aborted: ${msg}`);

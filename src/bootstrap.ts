@@ -146,8 +146,15 @@ export function bootGame(create: () => BootApp): void {
     startGameplaySession();
     try {
       const app = create();
-      // Expose for screenshot tooling / debugging.
-      (window as unknown as { game: BootApp }).game = app;
+      // Publish the tooling handle only where tooling runs: dev serves and
+      // VC_TOOLING=1 builds (the e2e, screenshot, and perf pipelines; see
+      // vite.config.ts `define`). A production build compiles this branch
+      // away, so a deployed session ships no `window.game` console handle
+      // into the sim (`game.sim.star = 5` was a one-line cheat). Devtools can
+      // still reach anything client-side; this closes the handed-out path.
+      if (import.meta.env.DEV || __TOOLING_BUILD__) {
+        (window as unknown as { game: BootApp }).game = app;
+      }
       // Register the service worker so the game is installable and offline-ready.
       // On a new build: prompt the player (never force a reload), see
       // GameApp.onUpdateAvailable.

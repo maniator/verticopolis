@@ -1,6 +1,6 @@
 import type { Simulation } from "../Simulation";
 import { rentOf, rentConfig } from "../econConfig";
-import { isElevatorKind, isHotelKind, isStaffOnlyTransport } from "../facilities";
+import { isElevatorKind, isHotelKind, isStaffOnlyTransport, isUnmetDemandKind } from "../facilities";
 import { isRentalKind } from "../residentialRentals";
 import { segmentsOf } from "../tower/segments";
 import { isOperational } from "../types";
@@ -196,11 +196,13 @@ export function dominantGripe(
     return sim.tower.isFloorServed(u.floor) ? "noTransport" : "access";
   }
   if (u.floor !== 1 && (cong ?? sim.congestionAt(u.floor)) > 1) return "congestion";
-  // The tenants that feel the lobby-distance drain, and (rentals aside, see the
-  // rental branch below) the unmet-demand one. The rental Apartment joins them for
-  // distance; the Studio does NOT, so its departure is never mis-attributed to a
-  // drain it can't feel. The Studio is not drain-free, though: it still sours on an
-  // over-market rent and on noise, and every kind feels congestion above.
+  // The tenants that feel the lobby-distance drain. Today this set coincides
+  // with `isUnmetDemandKind` (which guards the coverage read in `unmetActive`
+  // below), but distance and coverage are distinct concepts, so the lists stay
+  // separate. The rental Apartment joins for distance; the Studio does NOT, so
+  // its departure is never mis-attributed to a drain it can't feel. The Studio
+  // is not drain-free, though: it still sours on an over-market rent and on
+  // noise, and every kind feels congestion above.
   const isDemandTenant = u.kind === "office" || isHotelKind(u.kind) || u.kind === "condo" || u.kind === "rentalApartment";
   // Very-far from the nearest (sky)lobby (the tier whose ceiling sits at or below
   // the gripe bar). Recomputed through the same GameRules curve when the flag is
@@ -224,7 +226,7 @@ export function dominantGripe(
   // only capped.
   const unmetActive = (): boolean => {
     if (unmetDemand !== undefined) return unmetDemand;
-    if (!isServed || !isDemandTenant) return false;
+    if (!isServed || !isUnmetDemandKind(u.kind)) return false;
     const cov = unmetCoverage(sim.demandMap(), u);
     if (cov === null) return false;
     const drain = sim.rules.unmetDemandDrain(cov);
@@ -277,13 +279,14 @@ export function dominantGripe(
     // cause rather than merely a missing one (#684). The Studio is out of the halo, so
     // nearNightclub is only asked for the kind that feels it.
     if (u.kind === "rentalApartment" && nearNightclub(sim, u)) return "noise";
-    // No unmetDemand tier here: rentals are excluded from the coverage drain on
-    // BOTH the live and gate paths (#661), because they are not demand origins, so
-    // the branch could never be honest. Leaving it out also stops a caller-supplied
-    // `unmetDemand` flag from resurrecting it, since the move-in gate registers its
-    // probe as an origin. `wontLeaseText` declines to compute that flag for a rental
-    // too, so the two guards agree from both ends. Restore this tier with the origin
-    // work in #661, not before.
+    // The origin work (#661) landed: rentals are real demand origins, so the
+    // Apartment carries the unmet-demand tier as its last sink, after every
+    // higher-priority cause, exactly like the condo below. The outer predicate
+    // is load-bearing for the Studio: a caller-supplied `unmetDemand` flag
+    // returns from `unmetActive` BEFORE its kind guard runs, so only this
+    // check stops a flag from resurrecting the tier for the forgiving kind
+    // (the recompute path is additionally guarded inside `unmetActive`).
+    if (isUnmetDemandKind(u.kind) && unmetActive()) return "unmetDemand";
     return null;
   }
   // A served, uncongested hotel/condo is drained by lobby distance, then by
