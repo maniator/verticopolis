@@ -63,4 +63,19 @@ describe("the lease-amenity Main gripe line (#667)", () => {
     expect(text).toContain("Main gripe:");
     expect(text).toContain("rent is above the going rate");
   });
+
+  it("a gate-held vacant amenity explains itself with the Won't-lease line", () => {
+    const sim = Simulation.newGame(1, "modern");
+    sim.money = 1e9;
+    sim.star = 5;
+    lay(sim, "lobby", 1);
+    lay(sim, "floor", 2);
+    expectOk(sim.buildTransport("elevatorStandard", C, 1, 2));
+    const clinic = placeUnit(sim, "clinic", 2, C + 4);
+    sim.star = 1;
+    clinic.rent = rentConfig("clinic")!.max; // gated: rent erosion outruns recovery
+    const text = diagText(sim, clinic);
+    expect(text).toContain("Won't lease:");
+    expect(text).toContain("rent is above the going rate");
+  });
 });

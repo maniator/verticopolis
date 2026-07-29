@@ -206,7 +206,14 @@ export function attemptMoveIns(sim: Simulation): void {
       // Modern-only lease amenities, filled like an office (any day of the week).
       // Classic never reaches here: it holds neither kind, so no rng is drawn and
       // the Classic seeded stream is untouched.
-      if (sim.rng.chance(0.22 * demand)) sim.moveIn(u);
+      if (sim.rng.chance(0.22 * demand)) {
+        sim.moveIn(u);
+        // A club leasing mid-pass is a fitness-halo source immediately, so later
+        // gated candidates in this same pass judge against the live halo instead
+        // of the stale gather (the same running-context patch the hotel branch
+        // applies to the demand pool below).
+        if (u.kind === "fitnessClub" && satCtx && servedSet.has(u.floor)) satCtx.clubFloors.push(u.floor);
+      }
     } else if (isRentalKind(u.kind)) {
       // Modern-only rental living: a vacant Studio/Apartment re-leases like an
       // office/condo, at a speed the player's rent sets (demandFactor). Classic

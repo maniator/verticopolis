@@ -13,6 +13,10 @@ Entries below 1.51.1 were curated from the commit history after the fact, so the
 are documentation only: a client only ever fetches the currently deployed build's
 notes, never a past version's.
 
+## 2.4.0
+
+- Fitness Clubs and Clinics now refuse to lease a spot they would soon abandon (no access, or rent set far above the going rate), and the inspector says what to fix, both while the spot sits empty and once a tenant turns unhappy.
+
 ## 2.3.0
 
 - Elevator cars glide now: they accelerate away from a stop, cruise, and settle onto their floor, instead of freezing and jumping as the clock ticks. Only the drawing changed; timing is untouched.

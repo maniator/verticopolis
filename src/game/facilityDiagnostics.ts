@@ -411,7 +411,7 @@ export function facilityDiagnostics(sim: Simulation, u: Unit): TemplateResult[] 
     if (text) lines.push(html`<div style="color:var(--bad)">Main gripe: ${text}</div>`);
   }
   // "Won't lease": the empty-unit mirror of "Main gripe". An on-market, reachable
-  // condo/office/rental the move-in sustainability gate holds vacant names WHY no one
+  // condo/office/rental/lease-amenity the move-in gate holds vacant names WHY no one
   // leases it (the logic and copy live in {@link wontLeaseText}, gated on the same
   // predicate the engine uses so the card and the move-in decision can't disagree).
   const wontLease = wontLeaseText(sim, u);
