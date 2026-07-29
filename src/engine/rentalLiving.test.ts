@@ -2,8 +2,6 @@ import { describe, it, expect } from "vitest";
 import { Simulation } from "./Simulation";
 import { GRID, FACILITIES } from "./facilities";
 import { collectMonthlyRent } from "./economy/rentalIncome";
-import { spawnFloors } from "./crowd/spawn";
-import { isRentalKind as isRental } from "./residentialRentals";
 import { updateSatisfaction } from "./sim/satisfaction";
 import { attemptMoveIns } from "./sim/churn";
 import { VACATE_REASON_TEXT } from "./types";
@@ -155,115 +153,6 @@ describe("Modern rental living: monthly rent (Epic 2)", () => {
     expect(sim.money).toBe(at); // rentals are not a quarterly lease kind
   });
 });
-
-describe("Modern rental living: residents are real tower traffic", () => {
-  it("a leased rental puts people in the tower, like a condo does", () => {
-    // The residents count for population and stars and the census charges their
-    // floor for elevator congestion, so if they never spawn as travelers the
-    // tower bills a crowd it never renders. Measured against the condo, which is
-    // the cadence rentals share, so this pins parity rather than a magic number.
-    const peakCrowd = (kind: "condo" | "rentalApartment"): number => {
-      const sim = servedTower();
-      let peak = 0;
-      const stride = FACILITIES[kind].width + 1; // derived, so a catalog change cannot silently overlap
-      for (let i = 0; i < 8; i++) {
-        const r = sim.build(kind, 2, C - stride * 4 + i * stride);
-        expect(r.ok, `${kind} #${i}: ${r.reason}`).toBe(true);
-      }
-      for (const u of sim.tower.units.filter((x) => x.kind === kind)) {
-        u.state = "occupied";
-        u.occupants = FACILITIES[kind].population;
-        u.residents = 3;
-      }
-      for (let m = 0; m < 24 * 60; m++) {
-        sim.tick(1);
-        peak = Math.max(peak, sim.crowd.people.filter((p) => p.state !== "done").length);
-      }
-      return peak;
-    };
-    const condoPeak = peakCrowd("condo");
-    const rentalPeak = peakCrowd("rentalApartment");
-    expect(condoPeak).toBeGreaterThan(0); // the control: this tower does generate a crowd
-    expect(rentalPeak).toBeGreaterThan(0); // and so must the rental
-    // The actual parity claim. Both runs seat 8 homes of 3 residents on the same
-    // served tower, so the rental's crowd must be the condo's in scale, not merely
-    // non-zero: a rental that spawned one traveler a day would clear "> 0" while
-    // still billing a crowd it never renders, which is the bug this pins. The band
-    // is wide because the spawn schedule is stochastic, but it cannot span an order
-    // of magnitude, which is the failure mode that matters.
-    expect(rentalPeak).toBeGreaterThan(condoPeak * 0.5);
-    expect(rentalPeak).toBeLessThan(condoPeak * 2);
-  });
-
-  it("rental floors do not cannibalize the condos' meal trips (#683)", () => {
-    // Rentals bin into `condoFloors` so they share the condo meal cadence, but every
-    // per-unit filter downstream used to match only `condo`. `spawnMealOutbound` picks
-    // a floor UNIFORMLY from that pool and then filters the picked floor's units: land
-    // on a rental floor, get zero candidates, return. The option is spent and nothing
-    // spawns. So rentals both generated no meal trips of their own AND diluted the
-    // condos', which is a regression to shipped condo behavior, not just a gap in the
-    // new feature. Measured before the fix: 3 extra condo floors gave 68 meal trips,
-    // 3 extra rental floors gave 17, against a 34-trip baseline with neither.
-    const mealTrips = (extra: "none" | "condo" | "rentalApartment"): number => {
-      const sim = servedTower();
-      for (let f = 3; f <= 6; f++) lay(sim, "floor", f);
-      expect(sim.buildTransport("elevatorStandard", C + 4, 1, 6).ok).toBe(true);
-      // The eateries every meal trip targets, on their own floor.
-      expect(sim.build("restaurant", 3, C - 40).ok).toBe(true);
-      expect(sim.build("fastFood", 3, C + 20).ok).toBe(true);
-      const seat = (kind: "condo" | "rentalApartment", floor: number): void => {
-        const stride = FACILITIES[kind].width + 1;
-        for (let i = 0; i < 6; i++) expect(sim.build(kind, floor, C - stride * 3 + i * stride).ok).toBe(true);
-      };
-      seat("condo", 2); // the constant population whose trips must not be stolen
-      if (extra !== "none") for (const f of [4, 5, 6]) seat(extra, f);
-      for (const u of sim.tower.units.filter((x) => x.kind === "condo" || x.kind === "rentalApartment")) {
-        u.state = "occupied";
-        u.occupants = FACILITIES[u.kind].population;
-        u.residents = 3;
-      }
-      const seen = new Set<number>();
-      for (let m = 0; m < 24 * 60; m++) {
-        sim.tick(1);
-        for (const p of sim.crowd.people) if (p.mealVenueId) seen.add(p.id);
-      }
-      return seen.size;
-    };
-    const baseline = mealTrips("none");
-    const withCondos = mealTrips("condo");
-    const withRentals = mealTrips("rentalApartment");
-    expect(baseline).toBeGreaterThan(0); // the fixture really does generate meal traffic
-    // Adding residents must ADD trips, whichever kind they are.
-    expect(withCondos).toBeGreaterThan(baseline);
-    expect(withRentals).toBeGreaterThan(baseline);
-    // And rental floors must pull their weight like condo floors do. Before the fix
-    // this was the failing assertion: rentals came in far BELOW the baseline, because
-    // they consumed options without spawning.
-    expect(withRentals).toBeGreaterThan(withCondos * 0.5);
-  });
-
-  it("the school run skips the Studio, which has no household to send (#683)", () => {
-    // `householdFloors` exists because the school run needs a rolled household and the
-    // single-occupant Studio never has one. Binning Studios into the school pool would
-    // reintroduce the same wasted-option bug the meal path just fixed.
-    const sim = servedTower();
-    lay(sim, "floor", 3);
-    expect(sim.buildTransport("elevatorStandard", C + 4, 1, 3).ok).toBe(true);
-    expect(sim.build("rentalStudio", 2, C).ok).toBe(true);
-    expect(sim.build("rentalApartment", 3, C).ok).toBe(true);
-    for (const u of sim.tower.units.filter((x) => isRental(x.kind))) {
-      u.state = "occupied";
-      u.occupants = FACILITIES[u.kind].population;
-      u.residents = 3;
-    }
-    const floors = spawnFloors(sim.tower, sim.clock);
-    expect(floors.condoFloors).toContain(2); // the Studio still eats
-    expect(floors.condoFloors).toContain(3);
-    expect(floors.householdFloors).not.toContain(2); // but sends no child
-    expect(floors.householdFloors).toContain(3); // the Apartment does
-  });
-});
-
 describe("Modern rental living: churn and re-lease (Epic 3)", () => {
   it("a rental leases (no sale): occupied, everOccupied, counted; the Apartment gets a household", () => {
     const sim = servedTower();

@@ -64,7 +64,7 @@ describe("a nightclub's cross-floor beat is named for the Apartment too (#684)",
   it("the Apartment's gripe names noise, exactly as the condo's does", () => {
     // Before the fix the rental branch returned null here, so vacateCause fell
     // through to its "access" catch-all and the notice told a fully served tenant
-    // "no route to the lobby". A false cause, not a missing one.
+    // "no route to the lobby". The cause it named was false, not merely absent.
     const condo = clubTower("condo");
     const apt = clubTower("rentalApartment");
     expect(dominantGripe(condo.sim, condo.unit)).toBe("noise"); // the control

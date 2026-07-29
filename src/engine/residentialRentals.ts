@@ -1,4 +1,4 @@
-import type { Facility } from "./types";
+import type { Facility, FacilityKind } from "./types";
 
 /**
  * Modern rental-living catalog entries (Studio + Apartment), kept out of
@@ -49,3 +49,12 @@ export const RENTAL_FACILITIES: Record<RentalKind, Facility> = {
       "Modern: a rented apartment for a small household. Higher monthly rent you set, but noise, a bad commute, or over-high rent drives the tenant out. Modern only.",
   },
 };
+
+/** True for a residential kind whose tenant is a rolled HOUSEHOLD rather than a
+ *  single occupant. The school run draws on this: a Studio houses one person and
+ *  has no children to send. Exported so the spawn bin and the per-unit candidate
+ *  filter read the SAME predicate; encoding it twice (once as a deny-list, once as
+ *  an allow-list) is how a third rental kind would silently reintroduce #683. */
+export function hasHousehold(kind: FacilityKind): boolean {
+  return kind === "condo" || kind === "rentalApartment";
+}

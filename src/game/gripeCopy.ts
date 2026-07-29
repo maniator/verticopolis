@@ -26,7 +26,7 @@ const GRIPE_TEXT: Partial<Record<VacateReason, string>> = {
 
 /** The "noise" gripe names the RIGHT remedy per source. The nightclub halo is
  *  cross-floor and a lobby tile NEVER shields it (it is keyed on floor distance),
- *  but it penalizes ONLY condos and hotels: an office feels no nightclub halo, so
+ *  but it penalizes condos, hotels, and the rental Apartment: an office feels no nightclub halo, so
  *  its "noise" is always an adjacent same-floor source and it takes the lobby-tile
  *  remedy regardless of any nearby club (recommending the player move an unrelated
  *  nightclub, and calling the office a "home", would both be wrong). For a condo or
