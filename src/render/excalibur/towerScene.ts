@@ -13,6 +13,7 @@ import {
 } from "../sprites";
 import { drawSanta } from "../sprites/events";
 import { disposeRegions } from "./towerRegions";
+import { clearLongPress } from "./longPress";
 import { SHIRTS } from "../pixelSprites";
 import { personFigure } from "../pixelSprites/common";
 import { FLOOR, TILE } from "../scale";
@@ -361,6 +362,12 @@ export function setSim(engine: TowerEngine, sim: Simulation, opts?: { keepCamera
   engine.tracker.reset();
   engine.gesture = null;
   engine.arrowDrag = null;
+  // The long-press peek resets with the rest of the input state: a hold armed
+  // on the old tower must not fire its captured pick against the new sim, and
+  // a fired peek's latch must not outlive the contact the reset just dropped
+  // (a stale latch suppresses every pointerMove until the next press).
+  clearLongPress(engine);
+  engine.longPressFired = false;
   // Drop any in-flight event visuals and adopt the new sim's fx baselines, so
   // a tower swap neither leaves Santa mid-sky nor re-fires a stale flash.
   engine.santaStart = null;

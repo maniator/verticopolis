@@ -244,6 +244,19 @@ describe("titleBarClose — the one shared ✕ recipe", () => {
     expect(cb.onInspectorClose).toHaveBeenCalledTimes(1);
   });
 
+  it("a touch peek marks the card `.peek` (CSS hides its ✕) and hiding clears the marker", () => {
+    // The peek is the desktop hover card on touch: lift-to-dismiss, so the
+    // coarse-pointer ✕ reveal excludes it at the owning rule (`:not(.peek)`).
+    const { ui } = makeUI();
+    const insp = document.querySelector<HTMLElement>("#inspector")!;
+    ui.showInspector(html`<h4>Office 12F</h4><div>occupied</div>`);
+    ui.setInspectorPeek(true);
+    expect(insp.classList.contains("peek")).toBe(true);
+    // Hiding (finger lift) drops the marker so a later non-peek card keeps its ✕.
+    ui.showInspector(null);
+    expect(insp.classList.contains("peek")).toBe(false);
+  });
+
   it("the inspector ✕ survives a same-card lit re-render, is never duplicated, and STAYS LIVE", () => {
     // Hover picks re-render the card every move; the ✕ is a foreign node
     // appended after the h4's lit-managed content (the finishModal pattern),

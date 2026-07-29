@@ -3,7 +3,7 @@ import { TowerEngine } from "../render/excalibur/TowerEngine";
 import { FACILITIES, isFixedSpanTransport } from "../engine/facilities";
 import { snapX } from "../ui/placement";
 import { classifyGesture, isPaintKind } from "./gesture";
-import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors } from "./buildPreview";
+import { placeSimpleBuild, isTransportTool, isPaintTool, updateBuildPreview, touchBuildLiftFloors, clearBuildRefusal } from "./buildPreview";
 import { runFrame, SPEEDS } from "./frameLoop";
 import { applyReducedMotion } from "./audioPrefs";
 
@@ -175,6 +175,42 @@ export function wireEngine(app: GameApp): void {
     }
   };
 
+  // Touch long-press: peek the facility under the finger, the touch equivalent
+  // of desktop hover-inspect. A held finger raises the same inspector card a
+  // mouse hover does; lifting dismisses it, while a quick tap still opens the
+  // editor. The card anchors to its facility on every tier (panelAnchoring pins
+  // the inspector card on mobile too), so the peek tracks the room like a hover.
+  app.engine.onLongPress = (_tile, _floor, picked) => {
+    // A peek is a glance, never a placement: drop any pending touch build/paint
+    // gesture so the release commits nothing, and DISCARD any pending undo
+    // capture. Nothing legitimate can be pending here: on touch, only build
+    // tools capture at the press (onActionDown), and their mutations happen at
+    // the release the peek swallows; bulldoze and inspect are pan gestures that
+    // act on the tap, which the peek also swallows. A commit instead would mint
+    // a bogus entry whenever a sim income tick moved money during the 450ms
+    // hold (money is in the signature), or resurrect a stale capture a
+    // pinch-canceled gesture left behind (pinch-start skips onActionUp).
+    app.paintAnchor = null;
+    app.buildAnchor = null;
+    app.transportStart = null;
+    app.engine.preview = null;
+    app.engine.transportPreview = null;
+    app.build.clearPaint();
+    app.discardUndo();
+    // Release the build-refusal card's ownership of the shared inspector surface
+    // before the peek borrows it, so a hover-tier refusal card (hybrid touch +
+    // mouse device) can't leave buildRefusalShowing stale. No-op on pure touch.
+    clearBuildRefusal(app);
+    // Reuse the hover inspector card (unit or transport). armLongPress only fires
+    // over a real facility; a null/floor/lobby pick reaching here anyway just
+    // hides the card (inspectPicked's own guard, pinned by the wiring test).
+    // Mark it a peek so the card is exactly the desktop hover tooltip (no manual
+    // ✕: lifting the finger dismisses it, like mouse-away on desktop).
+    app.inspector.inspectPicked(picked);
+    app.ui.setInspectorPeek(true);
+  };
+  app.engine.onLongPressEnd = () => app.inspector.hide();
+
   // Right-click inspects whatever's under the cursor, whatever tool is held.
   app.engine.onSecondary = (picked) => app.selectPicked(picked);
   // In-world extend arrows on the selected elevator: drag an end to grow or
@@ -272,6 +308,11 @@ export function rebuildEngine(app: GameApp): Promise<void> {
   app.buildAnchor = null;
   app.transportStart = null;
   app.build.clearPaint();
+  // Release the refusal card's ownership latch BEFORE the blanket hide: hide()
+  // clears the shared card but not buildRefusalShowing, and a leaked latch
+  // offsets the next card's anchor a floor down (panelAnchoring reads it).
+  clearBuildRefusal(app);
+  app.inspector.hide(); // drop a peek card the severed touch can no longer dismiss
   app.commitUndo(); // close the severed gesture's pending capture (no-op when clean)
   app.canvas = fresh;
   app.engine = new TowerEngine(fresh, app.sim);

@@ -209,15 +209,13 @@ export class UI {
   // ---- Modal primitives (friend-modules build their dialogs on these) -----
 
   /** Renders a lit `TemplateResult` into the shared modal with the window
-   *  grammar (see {@link finishModal}). The template renders into a box that is
-   *  FRESH per open and discarded by closeModal(), so lit's part-cache never
-   *  shares a container across opens: one container, one renderer. render() only
-   *  ever touches this child box; the dialog itself is only ever cleared, via
-   *  replaceChildren (here and in closeModal), never written as HTML. It renders
-   *  once per open (no re-render), so
-   *  the ✕ that finishModal appends into the rendered h2 is safe; any initial
-   *  focus is the dialog controller's own explicit side effect, not this mount's
-   *  job.
+   *  grammar (see {@link finishModal}). The template renders into a box FRESH
+   *  per open and discarded by closeModal(), so lit's part-cache never shares a
+   *  container across opens: one container, one renderer. render() only touches
+   *  this child box; the dialog itself is only ever cleared via replaceChildren
+   *  (here and in closeModal), never written as HTML. It renders once per open,
+   *  so the ✕ finishModal appends into the rendered h2 is safe; any initial
+   *  focus is the dialog controller's explicit side effect, not this mount's job.
    *  @internal friend-module access (uiDialogs). */
   openModalTemplate(result: TemplateResult, opts: ModalOpts = {}): HTMLElement {
     const dialog = this.el.modal as HTMLDialogElement;
@@ -374,16 +372,24 @@ export class UI {
     panels.anchorEditor(this, rect, viewW, viewH);
   }
 
-  anchorInspector(x: number, y: number, viewW: number, viewH: number): void {
-    panels.anchorInspector(this, x, y, viewW, viewH);
+  anchorInspector(rect: { x: number; y: number; w: number }, viewW: number, viewH: number): void {
+    panels.anchorInspector(this, rect, viewW, viewH);
   }
 
-  clearPanelAnchors(): void {
-    panels.clearPanelAnchors(this);
+  clearEditorAnchor(): void {
+    panels.clearPanelAnchor(this.el.editor);
+  }
+
+  clearInspectorAnchor(): void {
+    panels.clearPanelAnchor(this.el.inspector);
   }
 
   showInspector(tpl: TemplateResult | null): void {
     panels.showInspector(this, tpl);
+  }
+
+  setInspectorPeek(on: boolean): void {
+    panels.setInspectorPeek(this, on);
   }
 
   showStats(body: TemplateResult, handlers: Record<string, () => void> = {}): void {

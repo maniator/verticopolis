@@ -82,6 +82,13 @@ export class PinchTracker {
     return this.pinch !== null;
   }
 
+  /** Whether this pointer is a live (pressed) contact. A hovering mouse on
+   *  hybrid hardware moves without ever pressing, so it is never tracked;
+   *  gesture handlers use this to ignore such moves while a contact is down. */
+  tracks(id: number): boolean {
+    return this.contacts.has(id);
+  }
+
   /** Register a press.
    *  - `"single"`: this is the only live contact; the caller classifies its
    *    own pan/action gesture as usual.

@@ -389,6 +389,13 @@ html.reduce-motion *::after {
   padding: var(--pad-y) var(--pad-x);
   font-size: 12px;
   max-width: 240px;
+  /* Containment for short (landscape-phone) viewports: the card is absolutely
+     positioned in #stage (overflow: hidden), so without a height cap a long
+     diagnostics card would be clipped invisibly at the stage's bottom edge.
+     Cap it to the stage minus the 8px anchor margins and let the body scroll,
+     so truncation is visible (scrollbar) instead of silent. */
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
   pointer-events: none;
 }
 /* The card is click-through, so only the ✕ is interactive. Hidden on
@@ -2248,9 +2255,21 @@ body.splash-up #toast-wrap { z-index: 45; }
   /* The inspector card is dismissed by hover-away on a mouse; a coarse (touch)
      pointer has no reliable hover-off, so reveal its explicit ✕ on every touch
      tier — phone, tablet, and touch-desktop alike. Gating this on the pointer,
-     not a width breakpoint, is why a new width tier can't silently lose it. */
-  #inspector .insp-close {
+     not a width breakpoint, is why a new width tier can't silently lose it.
+     The one exception is the long-press "peek" card (.peek): lifting the
+     finger dismisses it, so it never wants the ✕. The exception lives HERE,
+     on the owning rule, not as a later higher-specificity override. */
+  #inspector:not(.peek) .insp-close {
     display: inline-block;
+  }
+  /* The same non-peek card takes pointer input on the coarse tier: it already
+     carries the interactive ✕ above, and taking input lets a height-capped
+     card actually scroll by touch instead of only showing a scrollbar. The
+     transient peek stays click-through (the finger is on the tower and the
+     lift dismisses it), as does the desktop hover card (hover-away dismissal
+     needs the canvas to keep receiving the pointer). */
+  #inspector:not(.peek) {
+    pointer-events: auto;
   }
 }
 

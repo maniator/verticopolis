@@ -129,8 +129,10 @@ class GameApp implements GameAppPorts {
   selected: { type: "unit" | "transport"; id: number } | null = null;
   /** World cell the hover inspector tooltip is describing, so it can be
    *  anchored to that spot on screen and ride the tower when the camera moves.
+   *  `x` is the facility's right edge (the card's preferred side), `left` its
+   *  left edge so the card can flip to the other side at the viewport edge.
    *  @internal */
-  inspectAnchor: { x: number; floor: number } | null = null;
+  inspectAnchor: { x: number; left: number; floor: number } | null = null;
   /** True when the inspector card is currently being driven by the build-preview
    *  refusal path (Modern-only hover tip), rather than the InspectorController.
    *  Kept so `updateBuildPreview` can clear its own tip when the preview turns
@@ -150,9 +152,6 @@ class GameApp implements GameAppPorts {
   );
   /** First-run splash + onboarding (pure DOM chrome). @internal */
   onboarding!: OnboardingController;
-  /** Whether the panels currently carry an inline anchor (so the mobile branch
-   *  only resets them once, not every frame). @internal */
-  panelsAnchored = false;
   /** Per-device accessibility preferences (localStorage, off the save). @internal */
   prefs: Prefs = loadPrefs();
   /** Trailing debounce for volume-drag pref writes: slider input events fire
@@ -487,6 +486,7 @@ class GameApp implements GameAppPorts {
 
   /** @internal */ captureUndo(label: string): void { this.history.capture(label); }
   /** @internal */ commitUndo(): void { this.history.commit(); }
+  /** @internal */ discardUndo(): void { this.history.discard(); }
   undo(): void { this.history.undo(); }
   redo(): void { this.history.redo(); }
 }

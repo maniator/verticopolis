@@ -68,6 +68,14 @@ describe("helpPageTemplate", () => {
     expect(frag.querySelectorAll("section#keyboard kbd").length).toBeGreaterThan(0);
   });
 
+  it("documents the long-press peek in the phone guide (shared with the in-game Help)", () => {
+    const frag = renderToFragment(helpPageTemplate());
+    const touch = frag.querySelector("section#touch")?.textContent ?? "";
+    expect(touch).toContain("Peek at a room");
+    expect(touch).toContain("Press and hold a room");
+    expect(touch).toContain("Lift to close");
+  });
+
   it("carries a real 'Back to game' anchor to the game root", () => {
     const frag = renderToFragment(helpPageTemplate());
     const backs = [...frag.querySelectorAll<HTMLAnchorElement>('a[href="/"]')];
