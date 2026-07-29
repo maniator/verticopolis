@@ -32,8 +32,9 @@ export interface SplashHandlers {
   onNewTower: () => void;
   onHelp: () => void;
   onToggleMute?: (e: Event) => void;
-  /** Tap the persistent splash install button (SPEC-pwa-install CAP-5). Absent
-   *  when there is nothing to offer (standalone / TWA), so the button isn't rendered. */
+  /** Tap the persistent splash install button (SPEC-pwa-install CAP-5). The
+   *  button renders only when `installOffered` says so, which excludes
+   *  standalone / TWA sessions and wrapped builds. */
   onInstall?: () => void;
 }
 
@@ -116,7 +117,7 @@ export function splashTemplate(hasSave: boolean, premise: string, muted: boolean
          button. SPEC-splash-mute CAP-1. -->
     <button class="splash-mute" data-splash="mute" aria-pressed=${muted ? "true" : "false"} aria-label="Mute sound" @click=${h.onToggleMute}>${muted ? "🔇" : "🔊"}</button>
     <!-- The persistent install button (SPEC-pwa-install CAP-5): a quiet front door
-         shown for any not-standalone session, rendered after the mute so the utility
+         shown in a not-standalone browser session, rendered after the mute so the utility
          cluster sits at the tail of the Tab order. Rendered only when offered AND a
          handler is bound (never an inert button). It carries a visible "Install"
          label beside the download glyph (a lone glyph read as nothing on the wide,
