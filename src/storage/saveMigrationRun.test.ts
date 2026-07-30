@@ -342,3 +342,53 @@ describe("write verification distinguishes what actually happened", () => {
     expect(report.nothingToDo).toBe(true);
   });
 });
+
+describe("read-back tolerance is not looser than the reader it models", () => {
+  it("rejects a store that ate the separator, even when the payload starts with a digit", async () => {
+    // The reviewer's probe. `SaveGame.import` anchors on /^VCTOWER(\d+)/ BEFORE
+    // stripping whitespace, and `\d+` is greedy, so if the comparison strips
+    // across the magic boundary then "VCTOWER1\n7Zt..." and "VCTOWER17Zt..."
+    // look equal while the reader sees version 17 and refuses the file as too
+    // new. That would report `migrated` for a record the game cannot open, and
+    // the derived done-marker would make it permanent.
+    const { port } = fakeStore();
+    const realWrite = port.write.bind(port);
+    // A store that drops the newline entirely, which is what makes the two
+    // strings collide under a naive normalization.
+    port.write = (id, contents, scope, seq) => realWrite(id, contents.replace(/\n/g, ""), scope, seq);
+
+    const digitLeading = STORE_MAGIC + "7ZtLsuS6kAAAA";
+    const report = await migrateSavesToStore(
+      port,
+      SCOPE,
+      new Set(),
+      readerFor({ "simtower-clone-unreadable": digitLeading }),
+    );
+    expect(report.outcomes.get("unreadable")).toBe("write-failed");
+
+    // And the record really is one the production reader refuses, which is why
+    // calling it migrated would have been wrong.
+    await expect(SaveGame.import((await port.read("unreadable", SCOPE))!)).rejects.toThrow(/newer version/);
+  });
+
+  it("still accepts the normalizations a store is entitled to make", async () => {
+    // The tolerance has to survive the tightening, or every write on a store
+    // that rewrites line endings becomes a permanent failure.
+    for (const [name, mangle] of [
+      ["trailing newline removed", (s: string) => s.replace(/\n$/, "")],
+      ["CRLF", (s: string) => s.replace(/\n/g, "\r\n")],
+      ["BOM prepended", (s: string) => "﻿" + s],
+    ] as const) {
+      const { port } = fakeStore();
+      const realWrite = port.write.bind(port);
+      port.write = (id, contents, scope, seq) => realWrite(id, mangle(contents), scope, seq);
+      const report = await migrateSavesToStore(
+        port,
+        SCOPE,
+        new Set(),
+        readerFor({ "verticopolis-save": storeValue(PRE_2_0_SAVE) }),
+      );
+      expect(report.outcomes.get("auto"), name).toBe("migrated");
+    }
+  });
+});

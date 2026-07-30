@@ -237,7 +237,19 @@ export interface MigrationReport {
  * will actually see.
  */
 function sameTowerFile(a: string, b: string): boolean {
-  const normalize = (s: string) => s.trim().replace(/\s+/g, "");
+  // The two halves are normalized SEPARATELY, because `SaveGame.import` anchors
+  // on /^VCTOWER(\d+)/ first and only strips whitespace after that anchor.
+  // Stripping across the boundary erases it, and `\d+` is greedy, so a payload
+  // whose first base64 character is a digit gets swallowed into the version
+  // number: "VCTOWER1\n7Zt..." and "VCTOWER17Zt..." would compare equal while
+  // the reader sees version 17 and refuses the file as too new.
+  const normalize = (s: string) => {
+    const trimmed = s.trim();
+    const magic = /^VCTOWER(\d+)/.exec(trimmed);
+    return magic
+      ? `${magic[0]}|${trimmed.slice(magic[0].length).replace(/\s+/g, "")}`
+      : trimmed.replace(/\s+/g, "");
+  };
   return normalize(a) === normalize(b);
 }
 
@@ -366,7 +378,10 @@ export async function migrateSavesToStore(
     // still holds the original in either case, so nothing is lost by leaving
     // it alone, and something can be lost by not.
     outcomes.set(id, "write-failed");
-    failures.push({ id, ...(wrote ? {} : { code: saveStoreErrorCode(writeErr) }) });
+    // The code is OMITTED rather than set to undefined when there is none, so a
+    // consumer testing `"code" in failure` agrees with one testing the value.
+    const code = wrote ? undefined : saveStoreErrorCode(writeErr);
+    failures.push(code === undefined ? { id } : { id, code });
   }
 
   const values = [...outcomes.values()];

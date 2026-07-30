@@ -41,14 +41,17 @@ export interface SaveScopeCaption {
 const SAVES_CAPTION_ID = "saves-scope-caption";
 
 export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): TemplateResult {
+  // Read ONCE. Asking twice let a non-idempotent getter answer differently for
+  // the element and for the attribute that references it.
+  const caption = scopeText(scope);
   return html`
       <h2>Saved Towers</h2>
-      ${scopeCaption(scope, SAVES_CAPTION_ID)}
+      ${scopeCaption(caption, SAVES_CAPTION_ID)}
       <div
         class="slots well"
         role="list"
         aria-label="${scopeListLabel(scope, "Saved towers")}"
-        aria-describedby="${hasScopeCaption(scope) ? SAVES_CAPTION_ID : nothing}"
+        aria-describedby="${caption ? SAVES_CAPTION_ID : nothing}"
       >
         ${slots.map(slotRow)}
       </div>
@@ -75,27 +78,17 @@ export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): Temp
  * Exported so the title screen's picker renders the identical markup instead of
  * a second copy that can drift.
  */
-export function scopeCaption(scope: SaveScopeCaption | undefined, id: string): TemplateResult | typeof nothing {
-  const text = scopeText(scope);
-  // An all-whitespace caption would render an empty paragraph, taking its
-  // margin with it and describing the list as "".
+export function scopeCaption(text: string, id: string): TemplateResult | typeof nothing {
+  // Takes the resolved TEXT rather than the scope, so the caller reads the
+  // shell's string once and the element and the attribute referencing it can
+  // never be decided from two different answers. An empty caption would render
+  // an empty paragraph, taking its margin with it and describing the list as "".
   return text ? html`<p class="slots-scope" id="${id}">${text}</p>` : nothing;
 }
 
-/**
- * Whether a caption element will actually be rendered.
- *
- * The describedby attribute and the element itself MUST agree. Deciding the
- * attribute on `scope` while deciding the element on the text left a dangling
- * reference to a missing id whenever a shell sent a label but no text, which
- * is a worse accessible name than none at all. Both now ask this.
- */
-export function hasScopeCaption(scope: SaveScopeCaption | undefined): boolean {
-  return scopeText(scope) !== "";
-}
-
-/** The caption text, or "" when there is nothing usable to render. */
-function scopeText(scope: SaveScopeCaption | undefined): string {
+/** The caption text, or "" when there is nothing usable to render. Exported so
+ *  the picker resolves it the same way, once, before rendering. */
+export function scopeText(scope: SaveScopeCaption | undefined): string {
   return bridgeString(scope, "text");
 }
 
