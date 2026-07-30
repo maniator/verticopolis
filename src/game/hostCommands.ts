@@ -45,16 +45,22 @@ import { runSplashAction } from "../ui/splashActions";
 /** Every command the game will act on. The runtime check matters even though
  *  the type is a union: the value crosses a process boundary from a separate
  *  repository, so it arrives as an unvalidated string. */
-const HANDLED: ReadonlySet<string> = new Set<HostCommand>([
-  "new-game",
-  "save",
-  "open-saves",
-  "undo",
-  "redo",
-  "stats",
-  "help",
-  "settings",
-]);
+const HANDLED_RECORD = {
+  "new-game": true,
+  save: true,
+  "open-saves": true,
+  undo: true,
+  redo: true,
+  stats: true,
+  help: true,
+  settings: true,
+  // `satisfies` makes the compiler check this against the union both ways: a
+  // command added to `HostCommand` and forgotten here is a missing-key error, and
+  // a typo here is an excess-property error. A hand-written `new Set<HostCommand>`
+  // only caught the second, so the list could silently under-cover the contract.
+} satisfies Record<HostCommand, true>;
+
+const HANDLED: ReadonlySet<string> = new Set(Object.keys(HANDLED_RECORD));
 
 /**
  * Commands that run while the title screen is up.
@@ -152,7 +158,11 @@ export function runHostCommand(app: GameApp, command: string): void {
     console.warn(`[platform] Ignoring unknown host command: ${command}`);
     return;
   }
-  const refusal = refusalFor(app, command as HostCommand);
+  // Narrowed ONCE, here, where the runtime check just proved it. Everything below
+  // takes a real `HostCommand`, which is what makes the exhaustiveness guard in
+  // `dispatch` a guard rather than decoration.
+  const known = command as HostCommand;
+  const refusal = refusalFor(app, known);
   if (refusal) {
     // A menu item that appears to do nothing is the single worst outcome of an
     // always-enabled design, so a refusal has to be perceivable. `sayVisibly`
@@ -164,7 +174,23 @@ export function runHostCommand(app: GameApp, command: string): void {
     if (refusal.speakable) app.ui.sayVisibly(refusal.reason, "info");
     return;
   }
-  switch (command as HostCommand) {
+  dispatch(app, known);
+}
+
+/**
+ * Run a validated command. Split from {@link runHostCommand} so its parameter is
+ * a real `HostCommand` rather than a `string`.
+ *
+ * That split is the whole point. The switch used to read `switch (command as
+ * HostCommand)` with a `never` assignment in its default, which looked like an
+ * exhaustiveness guard and was not one: the subject was a cast EXPRESSION, so
+ * TypeScript narrowed nothing in the default branch, and `command as never`
+ * laundered whatever was left anyway. A ninth command with no `case` compiled
+ * clean, which is exactly the failure the comment claimed to prevent. With the
+ * parameter typed, the `never` assignment below is checked for real.
+ */
+function dispatch(app: GameApp, command: HostCommand): void {
+  switch (command) {
     case "new-game":
       // On the title screen, run the SPLASH's own New Tower, which keeps the
       // screen standing if the player backs out of the confirmation. Off it, the
@@ -203,11 +229,12 @@ export function runHostCommand(app: GameApp, command: string): void {
       app.ui.showSettings();
       return;
     default: {
-      // Exhaustiveness guard. Adding a value to HostCommand and to HANDLED while
-      // forgetting the case above would otherwise produce a menu item that is
-      // reported available, enabled by the shell, and silently does nothing,
-      // with typecheck, lint, and the whole suite still green.
-      const unreachable: never = command as never;
+      // Exhaustiveness guard, and a real one now: no cast, so a value added to
+      // `HostCommand` without a case above fails typecheck HERE. Without it, the
+      // new command would be reported available, enabled by the shell, and
+      // silently do nothing, with typecheck, lint, and the whole suite green.
+      const unreachable: never = command;
+      // Still reached at runtime if a cast is ever forced past the compiler.
       console.warn(`[platform] Host command "${String(unreachable)}" has no handler`);
       return;
     }
