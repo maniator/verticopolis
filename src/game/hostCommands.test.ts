@@ -435,3 +435,30 @@ describe("bindHostCommands: inert in the browser, live in a shell", () => {
     expect(warn).toHaveBeenCalledOnce();
   });
 });
+
+describe("the availability pump is independent of sim speed", () => {
+  it("still publishes while the tower is paused", () => {
+    // Non-obvious and worth pinning. The ~6 Hz UI pump in `runFrame` is
+    // wall-clock gated (`now - app.lastUiUpdate > 160`) and that gate sits
+    // OUTSIDE the `minutesPerSecond` sim-advance loop, so a paused tower
+    // (SPEEDS[0]) still reaches this call and the shell menu keeps updating.
+    //
+    // If the gate ever moved inside the advance loop, a paused game would freeze
+    // the desktop menu's enabled state, which is exactly the kind of regression
+    // nobody would notice until a player paused and wondered why New Game had
+    // gone gray. This asserts the property `tickHostCommands` depends on: it is
+    // driven purely by DOM state, never by the clock or the speed.
+    const setCommandsAvailable = vi.fn();
+    const { app } = makeApp();
+    document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
+    expect([...setCommandsAvailable.mock.calls[0][0]].sort()).toEqual(["help", "settings"]);
+
+    // Leave the splash with no clock advancing at all: no timers, no frames, no
+    // sim state touched. The next tick must still see the change and publish.
+    document.getElementById("splash")?.remove();
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+    expect([...setCommandsAvailable.mock.calls[1][0]].sort()).toEqual([...ALL_COMMANDS].sort());
+  });
+});

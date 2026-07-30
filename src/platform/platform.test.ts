@@ -226,9 +226,13 @@ describe("isPlatformPort: onHostCommand is optional on purpose", () => {
     // other and must degrade instead.
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: "yes" })).toBe(browserPlatform);
+    // A number specifically: a buggy shell is far likelier to inject a stray
+    // value like this than a string, so it is the case worth naming.
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: 42 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: 42 })).toBe(browserPlatform);
     expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: null })).toBe(browserPlatform);
     expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: {} })).toBe(browserPlatform);
-    expect(warn).toHaveBeenCalledTimes(3);
+    expect(warn).toHaveBeenCalledTimes(5);
   });
 
   it("rejects a port whose setCommandsAvailable is present but not callable", () => {

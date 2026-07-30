@@ -1,7 +1,8 @@
 /**
- * The seam between the game and a bundled native wrapper (the iOS Capacitor
- * shell built in the private distribution repo). The public repo takes
- * no wrapper dependency: a wrapper injects its implementation through the
+ * The seam between the game and a bundled wrapper shell built in the private
+ * distribution repo. Either wrapped build mode can bind it; epic E3b specifies
+ * the iOS Capacitor shell doing so, and no shell binds it yet. The public repo
+ * takes no wrapper dependency: a wrapper injects its implementation through the
  * `__VC_PLATFORM__` global, and the browser default in `./browser.ts` covers
  * everything else. The Android TWA renders the live site with the plain web
  * build, so it never sets the global and never sees `isNativeWrapper: true`.
@@ -9,8 +10,9 @@
  * Cross-repo contract (the wrapper shell implements against this file):
  *  - The shell script must set `globalThis.__VC_PLATFORM__` BEFORE the game's
  *    module scripts run (the wrapper's build patches index.html to load it
- *    first), and must consume the `--mode native` bundle. Injecting the global
- *    into a plain-mode bundle is unsupported; plain bundles ignore it.
+ *    first), and must consume a wrapped bundle: `--mode native` for iOS,
+ *    `--mode desktop` for the Electron shell. Injecting the global into a
+ *    plain-mode bundle is unsupported; plain bundles ignore it.
  *  - `isNativeWrapper` must be literally `true` on an injected port; the
  *    resolver treats anything else (including a truthy non-boolean) as a
  *    malformed injection and falls back to the browser port.

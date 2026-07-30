@@ -274,7 +274,12 @@ export function bindHostCommands(app: GameApp, platform = getPlatform()): void {
   if (setter) {
     pushAvailability = (commands) => setter.call(platform, commands);
     lastAvailabilityKey = null;
-    tickHostCommands(); // publish the opening state before the first frame
+    // Best effort, then retried. If a shell's setter throws on this very first
+    // call the opening state does not land, but `lastAvailabilityKey` stays null
+    // (it only advances after a successful push), so the next pump tick about
+    // 160 ms later publishes whatever the set is then. That recovery is the
+    // intended behavior; this call is not a guarantee.
+    tickHostCommands();
   }
 }
 

@@ -61,10 +61,9 @@ export const IS_WRAPPED_BUILD = import.meta.env.MODE === "native" || import.meta
 
 /** Resolution order: only a wrapped bundle may bind a wrapper port, and only
  *  through a well-formed `__VC_PLATFORM__` global; everything else gets the
- *  browser default. The rule extends the mobile-distribution arch §2 pattern
- *  (written for `--mode native`) to the desktop mode; the arch doc's mode
- *  enumeration predates desktop and is tracked in issue #710.
- *  Pure so the order is unit-testable without faking the build mode. */
+ *  browser default. Both wrapped modes bind through this one path, per the
+ *  mobile-distribution arch §2. Pure so the order is unit-testable without
+ *  faking the build mode. */
 export function resolvePlatform(mode: string, injected: unknown): PlatformPort {
   if (!isWrappedMode(mode)) return browserPlatform;
   if (!isPlatformPort(injected)) {
