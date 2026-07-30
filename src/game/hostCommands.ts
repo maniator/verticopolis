@@ -48,9 +48,11 @@ import { runSplashAction, hasLiveSplash } from "../ui/splashActions";
 /**
  * Build a policy set from a table that names EVERY command explicitly.
  *
- * The point is the `satisfies Record<HostCommand, boolean>` the callers apply: a
- * ninth command added to the union is a missing-key compile error in each policy
- * table, so no table can silently under-cover the contract.
+ * The enforcement is the PARAMETER TYPE, not the `satisfies` at the call sites: an
+ * object literal passed as `Record<HostCommand, boolean>` must name every key
+ * (a missing one is an error) and may not invent one (excess property check). The
+ * `satisfies` clauses are belt and braces, kept because they also pin the literal
+ * if anyone ever loosens this signature.
  *
  * The tables used to be `new Set<HostCommand>([...])`, which caught a typo and not
  * an omission. That mattered most for `OPENS_A_DIALOG`, where the default for a
@@ -59,8 +61,11 @@ import { runSplashAction, hasLiveSplash } from "../ui/splashActions";
  * failure that set exists to prevent. Listing the false entries is the price of
  * making the compiler check the list, and it also documents each decision.
  */
-function setFromFlags(flags: Record<HostCommand, boolean>): ReadonlySet<string> {
-  return new Set(Object.entries(flags).filter(([, on]) => on).map(([k]) => k));
+function setFromFlags(flags: Record<HostCommand, boolean>): ReadonlySet<HostCommand> {
+  // `ReadonlySet<HostCommand>`, not `<string>`: the looser type let
+  // `SPLASH_SAFE.has("new_game")` (underscore, not hyphen) typecheck and silently
+  // answer false forever.
+  return new Set(Object.entries(flags).filter(([, on]) => on).map(([k]) => k as HostCommand));
 }
 
 const HANDLED_RECORD = {
@@ -102,7 +107,7 @@ const HANDLED: ReadonlySet<string> = new Set(Object.keys(HANDLED_RECORD));
  * `redo` have no history to walk before a tower exists. `stats` would report on
  * a tower the player has not opened.
  */
-const SPLASH_SAFE: ReadonlySet<string> = setFromFlags({
+const SPLASH_SAFE: ReadonlySet<HostCommand> = setFromFlags({
   "new-game": true,
   save: false,
   "open-saves": true,
@@ -145,14 +150,36 @@ interface InteractionState {
   editorBusy: boolean;
 }
 
+/** The crash check on its own, because everything else can be skipped once it is
+ *  true and, more importantly, because it must not touch `app.ui`. See below. */
+function isCrashed(): boolean {
+  return !!document.getElementById(CRASH_SCREEN_ID);
+}
+
 function readInteractionState(app: GameApp): InteractionState {
   return {
-    crashed: !!document.getElementById(CRASH_SCREEN_ID),
+    crashed: isCrashed(),
     splashUp: hasLiveSplash(),
     blockingChoice: app.shownChoice || app.shownUpdate,
     dialogOpen: !!(document.getElementById("modal") as HTMLDialogElement | null)?.open,
-    editorBusy: app.ui.isEditorBusy(),
+    // Guarded, because this is the one source that runs GAME code rather than
+    // reading a flag or an element. Hoisting the reads made this eager, where the
+    // old guard short-circuited on `crashed` and never reached `app.ui` at all, and
+    // the crash path is exactly where that matters: a UI-layer fault is the most
+    // likely reason the crash handler is running, and the crash handler now ticks
+    // availability. An exception here would escape before the crash was reported.
+    // `app.ui` itself may also be unset if the fault happened during construction.
+    editorBusy: safeEditorBusy(app),
   };
+}
+
+function safeEditorBusy(app: GameApp): boolean {
+  try {
+    return app.ui?.isEditorBusy() ?? false;
+  } catch (err) {
+    console.warn("[platform] isEditorBusy threw; treating the editor as idle:", err);
+    return false;
+  }
 }
 
 /** Why a command was refused, or null when it may run. Pure, so the guard order is
@@ -205,12 +232,15 @@ function refusalForState(s: InteractionState, command: HostCommand): Refusal | n
  *  state once and calls `refusalForState` directly rather than going through this,
  *  which is the whole reason the state was hoisted. */
 function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
+  // Crash first, without reading anything else. The extraction made every source
+  // eager, and on the crash path the app is the least trustworthy thing to read.
+  if (isCrashed()) return { reason: "Not available right now", speakable: false };
   return refusalForState(readInteractionState(app), command);
 }
 
 /** Commands that put something new on screen, so an in-flight editor press
  *  matters. `save`, `undo`, and `redo` do not displace anything. */
-const OPENS_A_DIALOG: ReadonlySet<string> = setFromFlags({
+const OPENS_A_DIALOG: ReadonlySet<HostCommand> = setFromFlags({
   "new-game": true,
   save: false,
   "open-saves": true,
@@ -319,6 +349,10 @@ function dispatch(app: GameApp, command: HostCommand): void {
 /** Every command that would run right now, for a shell that grays out the rest.
  *  Derived from the same guard the dispatch uses, so the two cannot disagree. */
 export function availableCommands(app: GameApp): HostCommand[] {
+  // Same short-circuit as `refusalFor`: behind the crash screen nothing runs, and
+  // saying so without reading the app keeps the crash-path tick from depending on
+  // a UI layer that may be the thing that just failed.
+  if (isCrashed()) return [];
   const state = readInteractionState(app);
   return [...HANDLED].filter((c) => refusalForState(state, c as HostCommand) === null) as HostCommand[];
 }
@@ -347,27 +381,32 @@ let bound = false;
  * dialog is up) runs at FULL frame rate rather than at the 160 ms pump cadence.
  * That used to mean recomputing `refusalFor` per command, about 24 `getElementById`
  * calls plus 8 `isEditorBusy` calls per frame, while the comment claimed the dirty
- * gate made it "a no-op". It is now one `readInteractionState` per tick: three
- * element lookups, two property reads, one `isEditorBusy`, then eight pure
- * comparisons. The dirty gate still skips the cross-process call.
+ * gate made it "a no-op". It is now one `readInteractionState` per tick: two
+ * element lookups (the crash card and the modal), two flag reads, and one
+ * `isEditorBusy`, then eight pure comparisons. Two, not three: the splash source
+ * became `hasLiveSplash()`, a module-variable check with no DOM access, in the
+ * same round this note was written, and the note was not re-derived after it. The dirty gate still skips the cross-process call.
  */
 export function tickHostCommands(): void {
   if (!pushAvailability || !boundApp) return;
-  const commands = availableCommands(boundApp);
-  const key = commands.join(",");
-  if (key === lastAvailabilityKey) return;
   try {
+    const commands = availableCommands(boundApp);
+    const key = commands.join(",");
+    if (key === lastAvailabilityKey) return;
     pushAvailability(commands);
+    lastAvailabilityKey = key;
   } catch (err) {
     // A shell that throws on this must not take the frame loop with it. The key
     // is recorded only AFTER a successful push: marking it delivered first would
     // mean one transient throw (a frame mid-teardown, a contextBridge clone
     // failure) leaves the shell showing a stale set forever, because steady
     // in-game play never changes the set again to re-trigger a push.
+    // The RECOMPUTE is inside this try as well as the push. It was outside, which
+    // meant a throw from any state source escaped `tickHostCommands` into whichever
+    // caller was driving: the frame loop, or the crash handler, where it would have
+    // preempted the crash report entirely.
     console.warn("[platform] Command availability push failed:", err);
-    return;
   }
-  lastAvailabilityKey = key;
 }
 
 /**

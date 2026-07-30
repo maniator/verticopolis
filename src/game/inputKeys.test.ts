@@ -423,10 +423,20 @@ describe("the modified-key surface a wrapper shell must not take", () => {
     ["alt", { altKey: true }],
   ] as const;
 
+  // Generated rather than hand-listed, because a curated list is exactly how the
+  // one chord that mattered got missed: this omitted "," while the desktop shell
+  // registers Command+, and Control+, for Settings, so the guard whose whole job is
+  // "the game must never bind a chord the shell takes" was blind to it. It also
+  // omitted h, i, j, k, l, m, u, v, digits 4-9, ArrowRight, ArrowDown, and every
+  // function key but F11. Enumerating the space costs nothing here.
   const PROBE_KEYS = [
-    "a", "b", "c", "d", "e", "f", "g", "n", "o", "p", "q", "r", "s", "t", "w", "x",
-    "0", "1", "2", "3", "+", "-", "=", "Enter", " ", "Delete", "Backspace", "Escape",
-    "ArrowUp", "ArrowLeft", "F11",
+    ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)), // a-z
+    ...Array.from({ length: 10 }, (_, i) => String(i)), // 0-9
+    ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`), // F1-F12
+    ...",.;'[]\\/`-=".split(""),
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "Enter", " ", "Tab", "Delete", "Backspace", "Escape", "Home", "End", "PageUp", "PageDown",
+    "+",
   ];
 
   it("takes no modified chord other than undo and redo", () => {
@@ -438,9 +448,18 @@ describe("the modified-key surface a wrapper shell must not take", () => {
     press("Shift");
     expect(app.audio.start).toHaveBeenCalled();
 
+    // The chords the game DOES bind, listed rather than omitted from the probe.
+    // The old hand-written key list simply left out "z" and "y", so the exclusion
+    // was invisible and indistinguishable from the accidental omissions beside it
+    // (",", every arrow but two, most letters). Naming them here means the next
+    // person can see what is deliberately allowed, and the companion test below
+    // proves these four actually reach undo and redo.
+    const GAME_BOUND = new Set(["ctrl+z", "meta+z", "ctrl+y", "meta+y"]);
+
     const taken: string[] = [];
     for (const key of PROBE_KEYS) {
       for (const [name, mod] of MODIFIERS) {
+        if (GAME_BOUND.has(`${name}+${key}`)) continue;
         const before = allCalls(app);
         const event = new KeyboardEvent("keydown", { key, cancelable: true, ...mod });
         window.dispatchEvent(event);
