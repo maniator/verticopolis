@@ -25,6 +25,22 @@ export function isSkyLobbyFloor(floor: number): boolean {
 }
 
 /**
+ * The 1994 rule that the ground floor (level 1) is lobby-only, expressed as a
+ * placement COERCION: the Floor tool used on floor 1 lays a LOBBY, not a bare
+ * floor tile, so a player never leaves a non-lobby ground concourse (which the
+ * retail game never produces; docs/canon/tdt-format.md, Wine-harness confirmed).
+ * Floor 1 is UNCONDITIONALLY a lobby in the original, so it coerces here; the
+ * sky-lobby stories are only CONDITIONALLY lobby-only (a claimed sky lobby
+ * refuses plain floor via a separate rule in placement.ts) and are deliberately
+ * NOT coerced. Applied at the Simulation build boundary (sim/build.ts) so the
+ * player build path, its cost, and its preview agree; the low-level Tower
+ * primitive stays permissive so save-load and internal callers are untouched.
+ */
+export function groundFloorStructureKind(kind: FacilityKind, floor: number): FacilityKind {
+  return kind === "floor" && floor === 1 ? "lobby" : kind;
+}
+
+/**
  * Rooms that need daylight and can't sit in a windowless basement. Commercial
  * (shop/fast food/restaurant), entertainment, and service facilities may go
  * underground; people don't live or work down there.

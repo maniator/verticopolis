@@ -4,6 +4,7 @@ import { rentConfig, resaleRefund } from "../econConfig";
 import { storeRent } from "./constants";
 
 import { FACILITIES, buildMinutes, facilityFloors, isElevatorKind, isFacilityKind } from "../facilities";
+import { groundFloorStructureKind } from "../tower/towerTopology";
 import type { FacilityKind, WeatherKind } from "../types";
 
 /** Build / place / sell for the Simulation, as friend functions taking the
@@ -16,6 +17,10 @@ import type { FacilityKind, WeatherKind } from "../types";
  */
 export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string; cost: number } {
   if (!isFacilityKind(kind)) return { ok: false, reason: "Unknown facility.", cost: 0 };
+  // Ground floor is lobby-only (1994 canon): the Floor tool on floor 1 costs and
+  // validates as a lobby. One coercion at the build boundary keeps cost,
+  // validation, and the preview (which also calls canBuild) in agreement.
+  kind = groundFloorStructureKind(kind, floor);
   const f = FACILITIES[kind];
   if (!sim.isUnlocked(kind)) {
     // A Modern-only kind refused in Classic is not a star gate; say why honestly.
@@ -88,6 +93,11 @@ export function canBuild(sim: Simulation, kind: FacilityKind, floor: number, x: 
 }
 
 export function build(sim: Simulation, kind: FacilityKind, floor: number, x: number): { ok: boolean; reason?: string } {
+  // Ground floor is lobby-only: coerce BEFORE canBuild and placement so the
+  // charge (lobby cost), the placed unit (a lobby), and the founding gate
+  // (an empty tower's first placement must be a lobby) all see the lobby. See
+  // groundFloorStructureKind. The Floor tool on floor 1 therefore lays a lobby.
+  kind = groundFloorStructureKind(kind, floor);
   const can = sim.canBuild(kind, floor, x);
   if (!can.ok) return { ok: false, reason: can.reason };
   const f = FACILITIES[kind];
