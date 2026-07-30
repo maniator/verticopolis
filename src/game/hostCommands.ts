@@ -2,6 +2,7 @@ import type { GameApp } from "../main";
 import type { HostCommand } from "../platform/types";
 import { getPlatform } from "../platform";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { runSplashAction } from "../ui/splashActions";
 
 /**
  * The shell-to-game half of the platform seam (`src/platform/types.ts`).
@@ -56,22 +57,28 @@ const HANDLED: ReadonlySet<string> = new Set<HostCommand>([
 ]);
 
 /**
- * Commands that are safe while the title screen is up.
+ * Commands that run while the title screen is up.
  *
  * The splash is a real screen with its own controls (Continue, Load Tower, New
  * Tower, How to Play), so "the splash is up" is not by itself a reason to
- * refuse. These two open self-contained dialogs that touch no tower state, and
- * How to Play is already a splash button, so a player who opens Help from the
- * menu there gets exactly what the screen in front of them offers.
+ * refuse anything. These four all have a home there: How to Play is already a
+ * splash button, Settings is self-contained and touches no tower state, and New
+ * Tower and Load Tower are the two things a player most obviously wants from a
+ * title screen. Graying out New and Open on the very screen whose main job is
+ * starting or loading a tower is the wrong answer, and it was the first thing
+ * that looked broken when the packaged app was driven by hand.
  *
- * The other three stay refused, each for its own reason rather than a blanket
- * one. `save` would write the untouched boot tower over a real save. `new-game`
- * and `open-saves` have splash-specific variants (the picker's abandon warning
- * is suppressed when there is nothing to abandon, and Load Tower routes through
- * the founder welcome), and routing the in-game version from here would quietly
- * give the player the wrong one.
+ * New Tower and Load Tower route to the SPLASH's own buttons rather than the
+ * in-game paths (see `runHostCommand`), because the two differ: the splash's
+ * Load Tower opens the load-only picker, and its New Tower carries the dismiss
+ * callback that keeps the title screen standing if the player backs out.
+ *
+ * The four that stay refused are refused for their own reasons, not a blanket
+ * one. `save` would write the untouched boot tower over a real save. `undo` and
+ * `redo` have no history to walk before a tower exists. `stats` would report on
+ * a tower the player has not opened.
  */
-const SPLASH_SAFE: ReadonlySet<string> = new Set<HostCommand>(["help", "settings"]);
+const SPLASH_SAFE: ReadonlySet<string> = new Set<HostCommand>(["help", "settings", "new-game", "open-saves"]);
 
 /** A refusal: the reason, and whether the player can actually be told. */
 interface Refusal {
@@ -100,6 +107,17 @@ function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
   // they sit behind it. Opening a second dialog would displace the first, and a
   // New Tower accepted behind a choice-bearing dialog is the kind of thing a
   // player never sees coming.
+  //
+  // The two blocking-choice flags are read directly rather than trusted to imply
+  // `#modal.open`. They do imply it today, but that is an invariant held in two
+  // other modules (`appModals`, `updateFlow`), and if either ever renders its
+  // choice through a different element the shell would be told every command is
+  // available AND the dispatch would run New Tower out from under a live
+  // choice. Reading the flags costs two property loads and removes the
+  // dependency.
+  if (app.shownChoice || app.shownUpdate) {
+    return { reason: "Close the open window first", speakable: true };
+  }
   if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) {
     return { reason: "Close the open window first", speakable: true };
   }
@@ -148,15 +166,22 @@ export function runHostCommand(app: GameApp, command: string): void {
   }
   switch (command as HostCommand) {
     case "new-game":
-      // The same picker the toolbar's New Tower opens, including its fold-in
-      // abandon warning: a menu item must not be a shortcut past a confirmation
-      // the button shows.
+      // On the title screen, run the SPLASH's own New Tower, which keeps the
+      // screen standing if the player backs out of the confirmation. Off it, the
+      // same picker the toolbar's New Tower opens, including its fold-in abandon
+      // warning: a menu item must not be a shortcut past a confirmation the
+      // button shows. `splashAction` reports whether it took the command, so
+      // there is one decision point rather than a second splash check here.
+      if (runSplashAction("new")) return;
       app.ui.promptNewTower();
       return;
     case "save":
       app.ui.cb.onSave();
       return;
     case "open-saves":
+      // The splash's Load Tower opens the load-only picker and routes a founder
+      // through the welcome; the in-game one is a different dialog.
+      if (runSplashAction("load")) return;
       app.ui.cb.onShowSaves();
       return;
     case "undo":

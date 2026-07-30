@@ -1,0 +1,229 @@
+import { describe, it, expect, vi } from "vitest";
+import { runHostCommand, bindHostCommands, availableCommands, tickHostCommands } from "./hostCommands";
+import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import type { HostCommand } from "../platform/types";
+import { setLiveSplashActions } from "../ui/splashActions";
+import {
+  type Spies,
+  makeApp,
+  totalCalls,
+  totalDispatch,
+  ALL_COMMANDS,
+  mountDom,
+  mountSplash,
+  unmountSplash,
+  openModal,
+  basePort,
+  installSeamHooks,
+} from "./hostCommands.fixture";
+
+/**
+ * The shell-to-game command seam: AVAILABILITY, BINDING, and the PUMP.
+ *
+ * The invariant this file carries is that the availability set the shell is told
+ * can never disagree with what the dispatch would actually do, because the two
+ * derive from one guard. If they drift, the shell offers an enabled item that is
+ * then refused, which is the confusion the graying exists to remove. Dispatch and
+ * the guards themselves are in `hostCommands.test.ts`.
+ */
+
+installSeamHooks();
+
+describe("availability: the game tells the shell what to gray out", () => {
+  it("reports every command in a normal in-game state", () => {
+    const { app } = makeApp();
+    expect(availableCommands(app).sort()).toEqual([...ALL_COMMANDS].sort());
+  });
+
+  it("reports the splash-safe commands on the splash, New Tower and Load Tower included", () => {
+    const { app, spies } = makeApp();
+    mountSplash(spies);
+    expect(availableCommands(app).sort()).toEqual(["help", "new-game", "open-saves", "settings"]);
+  });
+
+  it("reports nothing behind an open dialog or the crash screen", () => {
+    const { app } = makeApp();
+    openModal();
+    expect(availableCommands(app)).toEqual([]);
+    document.body.innerHTML = `<dialog id="${CRASH_SCREEN_ID}"></dialog>`;
+    expect(availableCommands(app)).toEqual([]);
+  });
+
+  it("never reports a command the dispatch would refuse, in any guarded state", () => {
+    // The two must derive from one guard. If they drift, the shell offers an
+    // enabled item that is then refused, which is the exact confusion the graying
+    // exists to remove.
+    const states: Array<[string, (s: Spies) => void]> = [
+      ["splash", (s) => mountSplash(s)],
+      ["open dialog", () => openModal()],
+      ["crash screen", () => document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`)],
+    ];
+    for (const [label, enter] of states) {
+      mountDom();
+      setLiveSplashActions(null);
+      const { app, spies } = makeApp();
+      enter(spies);
+      for (const command of availableCommands(app)) {
+        spies.sayVisibly.mockClear();
+        const before = totalDispatch(spies);
+        runHostCommand(app, command);
+        expect(spies.sayVisibly, `${command} reported available but refused during ${label}`).not.toHaveBeenCalled();
+        // The wider count, because on the splash New Tower and Load Tower land on
+        // the title screen's own buttons rather than on an in-game target.
+        expect(totalDispatch(spies), `${command} reported available but did nothing during ${label}`).toBe(before + 1);
+      }
+    }
+  });
+
+  it("also reports correctly during a live editor press", () => {
+    const { app, spies } = makeApp();
+    spies.isEditorBusy.mockReturnValue(true);
+    expect(availableCommands(app).sort()).toEqual(["redo", "save", "undo"]);
+  });
+
+  it("pushes on bind and then only when the set actually changes", () => {
+    const setCommandsAvailable = vi.fn();
+    const { app, spies } = makeApp();
+    mountSplash(spies);
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
+    expect(setCommandsAvailable).toHaveBeenCalledOnce();
+    expect([...setCommandsAvailable.mock.calls[0][0]].sort()).toEqual(["help", "new-game", "open-saves", "settings"]);
+
+    // A tick with nothing changed must not cross the process boundary again:
+    // this runs on the ~6 Hz pump, so an unguarded push would be constant IPC.
+    tickHostCommands();
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledOnce();
+
+    unmountSplash();
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+    expect([...setCommandsAvailable.mock.calls[1][0]].sort()).toEqual([...ALL_COMMANDS].sort());
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+  });
+
+  it("a failed push is retried rather than recorded as delivered", () => {
+    // The dirty gate must not be poisoned by a transient throw. Marking the key
+    // delivered before the push meant one failure left the shell showing a stale
+    // set for the rest of the session, because steady play never changes the set
+    // again to re-trigger a push.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let failNext = true;
+    const setCommandsAvailable = vi.fn(() => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("ipc gone");
+      }
+    });
+    const { app } = makeApp();
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
+    expect(setCommandsAvailable).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+
+    // Same state, so a healthy dirty gate would skip. It must retry instead,
+    // because the previous push never landed.
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+    // Now it succeeded, so the gate closes.
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+  });
+
+  it("does nothing at all without a shell that can gray items out", () => {
+    const { app } = makeApp();
+    bindHostCommands(app, basePort());
+    expect(() => tickHostCommands()).not.toThrow();
+  });
+});
+
+describe("bindHostCommands: inert in the browser, live in a shell", () => {
+  it("binds nothing when the port has no command channel", () => {
+    const { app, spies } = makeApp();
+    expect(() => bindHostCommands(app, basePort())).not.toThrow();
+    expect(totalCalls(spies)).toBe(0);
+  });
+
+  it("subscribes exactly once and routes what it receives", () => {
+    const { app, spies } = makeApp();
+    let deliver: ((command: HostCommand) => void) | undefined;
+    const onHostCommand = vi.fn((handler: (command: HostCommand) => void) => {
+      deliver = handler;
+    });
+    bindHostCommands(app, { ...basePort(), onHostCommand });
+    expect(onHostCommand).toHaveBeenCalledOnce();
+    deliver?.("help");
+    expect(spies.showHelp).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a second bind, so no command can run twice", () => {
+    // The shell side registers an ipcRenderer listener per call with no removal
+    // path, so a second bind would mean two pickers, two saves, two undos.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { app } = makeApp();
+    const onHostCommand = vi.fn();
+    bindHostCommands(app, { ...basePort(), onHostCommand });
+    bindHostCommands(app, { ...basePort(), onHostCommand });
+    expect(onHostCommand).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("survives a port whose member throws on read, instead of dying in boot", () => {
+    // `isPlatformPort` guards its own reads for this reason; this is the
+    // consumption side, which runs inside runBootFlow.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { app } = makeApp();
+    const trapped = {
+      ...basePort(),
+      onHostCommand: () => {
+        throw new Error("revoked");
+      },
+    };
+    expect(() => bindHostCommands(app, trapped)).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+  });
+
+  it("keeps a failure inside the game rather than throwing into the shell's IPC callback", () => {
+    const { app, spies } = makeApp();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    spies.showHelp.mockImplementation(() => {
+      throw new Error("dialog exploded");
+    });
+    let deliver: ((command: HostCommand) => void) | undefined;
+    bindHostCommands(app, {
+      ...basePort(),
+      onHostCommand: (handler) => {
+        deliver = handler;
+      },
+    });
+    expect(() => deliver?.("help")).not.toThrow();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+});
+
+describe("the availability pump is independent of sim speed", () => {
+  it("still publishes while the tower is paused", () => {
+    // Non-obvious and worth pinning. The ~6 Hz UI pump in `runFrame` is
+    // wall-clock gated (`now - app.lastUiUpdate > 160`) and that gate sits
+    // OUTSIDE the `minutesPerSecond` sim-advance loop, so a paused tower
+    // (SPEEDS[0]) still reaches this call and the shell menu keeps updating.
+    //
+    // If the gate ever moved inside the advance loop, a paused game would freeze
+    // the desktop menu's enabled state, which is exactly the kind of regression
+    // nobody would notice until a player paused and wondered why New Game had
+    // gone gray. This asserts the property `tickHostCommands` depends on: it is
+    // driven purely by DOM state, never by the clock or the speed.
+    const setCommandsAvailable = vi.fn();
+    const { app, spies } = makeApp();
+    mountSplash(spies);
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
+    expect([...setCommandsAvailable.mock.calls[0][0]].sort()).toEqual(["help", "new-game", "open-saves", "settings"]);
+
+    // Leave the splash with no clock advancing at all: no timers, noframes, no
+    // sim state touched. The next tick must still see the change and publish.
+    unmountSplash();
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+    expect([...setCommandsAvailable.mock.calls[1][0]].sort()).toEqual([...ALL_COMMANDS].sort());
+  });
+});
