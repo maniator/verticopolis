@@ -3,6 +3,8 @@ import { paceFactor } from "../engine/timePacing";
 import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
+import { tickHostCommands } from "./hostCommands";
+import { IS_WRAPPED_BUILD } from "../platform";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
 import { gameplaySession, trackEmergencyChoice } from "../analytics";
@@ -43,6 +45,19 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player lose game-hours at high speed while it waits for their answer.
   if (app.shownChoice || app.shownUpdate) {
     app.accMinutes = 0;
+    // Push availability before bailing. A blocking dialog is the state in which
+    // EVERY host command is refused, so it is the state the shell most needs to
+    // hear about; returning first left the menu fully enabled exactly when
+    // nothing could run.
+    //
+    // NOT a no-op after the first frame, which an earlier version of this comment
+    // claimed. This branch runs at FULL frame rate rather than at the 160 ms pump
+    // cadence the other call site sits behind, and the dirty gate only skips the
+    // cross-process push, not the recomputation. What makes it acceptable is that
+    // the recomputation is now one `readInteractionState` (two element lookups,
+    // two flag reads, one `isEditorBusy`) rather than one per command. It does
+    // nothing at all without a wrapper shell.
+    if (IS_WRAPPED_BUILD) tickHostCommands();
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;
@@ -97,6 +112,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     const ec = app.sim.events.counts;
     gameplaySession.noteEmergencyCounts(ec.fires, ec.firesGutRooms, ec.bombs);
     tickInstallAffordance(app); // surface the install chip once the play-gate trips (self-terminating)
+    if (IS_WRAPPED_BUILD) tickHostCommands(); // gray out shell menu items the game would refuse
     // Keep the open editor's live stats fresh. Refresh now patches only the
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild

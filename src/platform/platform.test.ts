@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { resolvePlatform, getPlatform, isWrappedMode } from "./index";
+import { readFileSync } from "node:fs";
+import { resolvePlatform, getPlatform, isWrappedMode, IS_WRAPPED_BUILD } from "./index";
 import { browserPlatform } from "./browser";
 import type { PlatformPort } from "./types";
 
@@ -156,6 +157,101 @@ describe("isWrappedMode: the one predicate every wrapper gate shares", () => {
     // Exact match only: no prefix or casing creep.
     expect(isWrappedMode("Native")).toBe(false);
     expect(isWrappedMode("desktop-extra")).toBe(false);
+  });
+});
+
+describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
+  it("is false under the test runner, the same answer a browser build gets", () => {
+    expect(IS_WRAPPED_BUILD).toBe(false);
+    expect(IS_WRAPPED_BUILD).toBe(isWrappedMode(import.meta.env.MODE));
+  });
+
+  it("covers exactly the same modes as isWrappedMode, checked in the source", () => {
+    // Asserted against the SOURCE TEXT, and that is the whole point. Under vitest
+    // `import.meta.env.MODE` is "test", so comparing the constant to the
+    // predicate compares false to false and would stay green if someone dropped
+    // "native" from the literal expression, shipping a native bundle with the
+    // seam tree-shaken out and a menu that does nothing.
+    //
+    // The constant cannot call the predicate: Vite only folds a literal
+    // comparison, and Rollup will not inline a cross-module call to decide a
+    // branch is dead. So the duplication is forced, and this is what keeps it
+    // honest, the same technique the private shell uses on its sandboxed preload.
+    // A plain path from the repo root: under vitest `import.meta.url` is not a
+    // file: URL, so `new URL("./index.ts", import.meta.url)` cannot be read.
+    const source = readFileSync("src/platform/index.ts", "utf8");
+    expect(source, "the source file could not be read, so this test proves nothing").toContain("isWrappedMode");
+
+    const predicate = /export function isWrappedMode[^{]*\{\s*return ([^;]+);/.exec(source);
+    expect(predicate, "could not find isWrappedMode in the source").not.toBeNull();
+    const constant = /export const IS_WRAPPED_BUILD =([^;]+);/.exec(source);
+    expect(constant, "could not find IS_WRAPPED_BUILD in the source").not.toBeNull();
+
+    const modesIn = (text: string) => [...text.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]).sort();
+    const predicateModes = modesIn(predicate![1]);
+    const constantModes = modesIn(constant![1]);
+
+    expect(predicateModes.length, "expected isWrappedMode to compare mode literals").toBeGreaterThan(0);
+    expect(constantModes).toEqual(predicateModes);
+    // And the constant must still be written as literal comparisons on
+    // `import.meta.env.MODE`, or Vite cannot fold it and the tree-shake silently
+    // stops working while every other test stays green.
+    expect(constant![1]).toContain("import.meta.env.MODE");
+  });
+});
+
+describe("isPlatformPort: onHostCommand is optional on purpose", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("accepts a port that omits it, so a three-member shell keeps validating", () => {
+    // The iOS Capacitor shell was built against the contract before the command
+    // channel existed. Demanding a fourth member would demote it to the browser
+    // port silently and take its native file save with it.
+    const legacy = fakePort();
+    expect("onHostCommand" in legacy).toBe(false);
+    expect(resolvePlatform("native", legacy)).toBe(legacy);
+    expect(resolvePlatform("desktop", legacy)).toBe(legacy);
+  });
+
+  it("accepts a port that provides it", () => {
+    const withCommands = { ...fakePort(), onHostCommand: vi.fn() };
+    expect(resolvePlatform("desktop", withCommands)).toBe(withCommands);
+  });
+
+  it("rejects a port whose onHostCommand is present but not callable", () => {
+    // Optional means absent-or-function. A non-function would throw at the
+    // binding call site during boot, so it is a malformed injection like any
+    // other and must degrade instead.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: "yes" })).toBe(browserPlatform);
+    // A number specifically: a buggy shell is far likelier to inject a stray
+    // value like this than a string, so it is the case worth naming.
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: 42 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: 42 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: null })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), onHostCommand: {} })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(5);
+  });
+
+  it("rejects a port whose setCommandsAvailable is present but not callable", () => {
+    // Same rule as onHostCommand: optional means absent-or-function, because the
+    // game calls it during bind and a non-function would throw out of boot.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: 1 })).toBe(browserPlatform);
+    expect(resolvePlatform("desktop", { ...fakePort(), setCommandsAvailable: {} })).toBe(browserPlatform);
+    expect(warn).toHaveBeenCalledTimes(2);
+  });
+
+  it("accepts a port that provides both command members", () => {
+    const full = { ...fakePort(), onHostCommand: vi.fn(), setCommandsAvailable: vi.fn() };
+    expect(resolvePlatform("desktop", full)).toBe(full);
+  });
+
+  it("the browser default defines neither, so the browser binds nothing", () => {
+    expect(browserPlatform.onHostCommand).toBeUndefined();
+    expect(browserPlatform.setCommandsAvailable).toBeUndefined();
   });
 });
 

@@ -353,6 +353,12 @@ export default defineConfig({
         // custom exclude array REPLACES Vitest's defaults, so without it every
         // colocated test would be scored as uncovered source and sink the floors.
         "**/*.test.ts",
+        // Colocated test FIXTURES, same reasoning as the line above. A shared
+        // fixture is test-only code that happens not to match `*.test.ts`, so
+        // without this it would be scored as app source and move the floors for a
+        // file no player runs. `src/game/hostCommands.fixture.ts` is the first of
+        // these, created when its suite outgrew the 500-line ceiling and split.
+        "**/*.fixture.ts",
         // Fixtures and any non-`.test.ts` helpers under the integration tree.
         "src/tests/**",
         "src/gallery.ts",

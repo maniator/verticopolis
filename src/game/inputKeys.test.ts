@@ -389,3 +389,95 @@ describe("audio kick + pagehide", () => {
     expect(flushPrefsSave).toHaveBeenCalledWith(app);
   });
 });
+
+describe("the modified-key surface a wrapper shell must not take", () => {
+  // The private Electron shell's native menu registers accelerators, and a menu
+  // accelerator is consumed BEFORE the page sees the keydown. So every modified
+  // chord this game binds is a chord the shell must leave alone, and the shell's
+  // GAME_BOUND_ACCELERATORS list is a hand-transcription of exactly this.
+  //
+  // Nothing across the repo boundary can verify that transcription, so this pins
+  // the public side: adding a modified-key binding here fails this test, which
+  // makes it a visible, reviewable event rather than a silent divergence that
+  // breaks the packaged desktop build only.
+
+  /** Every mock function reachable on the fake app, so a new binding is caught
+   *  whatever it happens to call. Enumerating a few spies by hand was not
+   *  enough: the first draft of this test missed a binding calling
+   *  engine.center(), which is precisely the blind spot it exists to remove. */
+  function allCalls(node: unknown, seen = new Set<unknown>()): number {
+    if (!node || typeof node !== "object" || seen.has(node)) return 0;
+    seen.add(node);
+    let n = 0;
+    for (const value of Object.values(node as Record<string, unknown>)) {
+      const mock = (value as { mock?: { calls: unknown[] } } | null)?.mock;
+      if (mock && Array.isArray(mock.calls)) n += mock.calls.length;
+      else n += allCalls(value, seen);
+    }
+    return n;
+  }
+
+  const MODIFIERS = [
+    ["ctrl", { ctrlKey: true }],
+    ["meta", { metaKey: true }],
+    ["alt", { altKey: true }],
+  ] as const;
+
+  // Generated rather than hand-listed, because a curated list is exactly how the
+  // one chord that mattered got missed: this omitted "," while the desktop shell
+  // registers Command+, and Control+, for Settings, so the guard whose whole job is
+  // "the game must never bind a chord the shell takes" was blind to it. It also
+  // omitted h, i, j, k, l, m, u, v, digits 4-9, ArrowRight, ArrowDown, and every
+  // function key but F11. Enumerating the space costs nothing here.
+  const PROBE_KEYS = [
+    ...Array.from({ length: 26 }, (_, i) => String.fromCharCode(97 + i)), // a-z
+    ...Array.from({ length: 10 }, (_, i) => String(i)), // 0-9
+    ...Array.from({ length: 12 }, (_, i) => `F${i + 1}`), // F1-F12
+    ...",.;'[]\\/`-=".split(""),
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight",
+    "Enter", " ", "Tab", "Delete", "Backspace", "Escape", "Home", "End", "PageUp", "PageDown",
+    "+",
+  ];
+
+  it("takes no modified chord other than undo and redo", () => {
+    const app = makeApp();
+    // Spend the one-shot audio-unlock listener first. `bindKeys` starts audio on
+    // the FIRST keydown of any kind, so without this the first chord probed
+    // always looks like a binding (it was reported as ctrl+a purely because "a"
+    // led the list).
+    press("Shift");
+    expect(app.audio.start).toHaveBeenCalled();
+
+    // The chords the game DOES bind, listed rather than omitted from the probe.
+    // The old hand-written key list simply left out "z" and "y", so the exclusion
+    // was invisible and indistinguishable from the accidental omissions beside it
+    // (",", every arrow but two, most letters). Naming them here means the next
+    // person can see what is deliberately allowed, and the companion test below
+    // proves these four actually reach undo and redo.
+    const GAME_BOUND = new Set(["ctrl+z", "meta+z", "ctrl+y", "meta+y"]);
+
+    const taken: string[] = [];
+    for (const key of PROBE_KEYS) {
+      for (const [name, mod] of MODIFIERS) {
+        if (GAME_BOUND.has(`${name}+${key}`)) continue;
+        const before = allCalls(app);
+        const event = new KeyboardEvent("keydown", { key, cancelable: true, ...mod });
+        window.dispatchEvent(event);
+        if (allCalls(app) !== before || event.defaultPrevented) taken.push(`${name}+${key}`);
+      }
+    }
+    expect(
+      taken,
+      "the game took a modified chord the desktop shell may register as a menu accelerator. " +
+        "Update GAME_BOUND_ACCELERATORS in the private repo's desktop/shell/src/menu.ts in the same change.",
+    ).toEqual([]);
+  });
+
+  it("does bind the undo and redo chords, so the guard above is not vacuous", () => {
+    for (const key of ["z", "Z", "y", "Y"]) {
+      const app = makeApp();
+      press(key, { ctrlKey: true });
+      expect(app.undo.mock.calls.length + app.redo.mock.calls.length, `Ctrl+${key} should reach undo or redo`).toBe(1);
+    }
+  });
+});
