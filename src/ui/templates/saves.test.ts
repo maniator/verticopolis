@@ -150,9 +150,14 @@ describe("savesTemplate scope caption (injected, never detected)", () => {
     expect(h2.compareDocumentPosition(caption) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("names the list with the scope label", () => {
-    const frag = renderToFragment(savesTemplate(SLOTS, SCOPE));
-    expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toBe(SCOPE.listLabel);
+  it("adds the scope to the list name without replacing what the list IS", () => {
+    // Replacing it gave this list and the title screen's picker the identical
+    // accessible name, throwing away the one word that told a screen reader
+    // user which of the two they were in. The shell has no way to know which
+    // list it is naming, so the template keeps its own name and appends.
+    const label = renderToFragment(savesTemplate(SLOTS, SCOPE)).querySelector(".slots")!.getAttribute("aria-label")!;
+    expect(label).toContain("Saved towers");
+    expect(label).toContain(SCOPE.listLabel);
   });
 
   it("carries valid list semantics: role=list with listitem children", () => {
@@ -218,7 +223,27 @@ describe("savesTemplate scope caption: shell-supplied strings are not trusted to
       expect(frag.querySelector(".slots-scope")).toBeNull();
       expect(frag.querySelector(".slots")!.getAttribute("aria-describedby")).toBeFalsy();
       // The label it DID supply is still honored.
-      expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toBe("Here");
+      expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toContain("Here");
+    }
+  });
+
+  it("survives a shell that sends the wrong types, rather than taking the dialog down", () => {
+    // These cross a process bridge. The interface promises two strings and an
+    // injection is not obliged to keep that promise, so `undefined.trim()`
+    // inside the template would blank the whole saves dialog. This is the same
+    // posture `isPlatformPort` takes toward an injected port.
+    const hostile = [
+      { text: undefined, listLabel: "Here" },
+      { text: "Fine", listLabel: undefined },
+      { text: null, listLabel: null },
+      { text: 42, listLabel: {} },
+      {},
+    ] as unknown as SaveScopeCaption[];
+    for (const scope of hostile) {
+      expect(() => renderToFragment(savesTemplate(SLOTS, scope)), JSON.stringify(scope)).not.toThrow();
+      const frag = renderToFragment(savesTemplate(SLOTS, scope));
+      // The list keeps a usable accessible name in every case.
+      expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toContain("Saved towers");
     }
   });
 });

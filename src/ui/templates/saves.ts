@@ -76,9 +76,10 @@ export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): Temp
  * a second copy that can drift.
  */
 export function scopeCaption(scope: SaveScopeCaption | undefined, id: string): TemplateResult | typeof nothing {
+  const text = scopeText(scope);
   // An all-whitespace caption would render an empty paragraph, taking its
   // margin with it and describing the list as "".
-  return hasScopeCaption(scope) ? html`<p class="slots-scope" id="${id}">${scope!.text.trim()}</p>` : nothing;
+  return text ? html`<p class="slots-scope" id="${id}">${text}</p>` : nothing;
 }
 
 /**
@@ -87,17 +88,36 @@ export function scopeCaption(scope: SaveScopeCaption | undefined, id: string): T
  * The describedby attribute and the element itself MUST agree. Deciding the
  * attribute on `scope` while deciding the element on the text left a dangling
  * reference to a missing id whenever a shell sent a label but no text, which
- * is a worse accessible name than none at all.
+ * is a worse accessible name than none at all. Both now ask this.
  */
 export function hasScopeCaption(scope: SaveScopeCaption | undefined): boolean {
-  return (scope?.text.trim() ?? "") !== "";
+  return scopeText(scope) !== "";
 }
 
-/** The list's accessible name. `||` rather than `??` on purpose: a shell that
- *  supplies an empty string must fall back to the generic name, not strip the
- *  list of its name entirely. */
+/** The caption text, or "" for anything unusable. Type-checked rather than
+ *  trusted: these strings cross a process bridge from a wrapper shell, and
+ *  `undefined.trim()` inside a template takes the dialog down with it. */
+function scopeText(scope: SaveScopeCaption | undefined): string {
+  return typeof scope?.text === "string" ? scope.text.trim() : "";
+}
+
+/**
+ * The list's accessible name: what the list IS, then where it lives.
+ *
+ * The scope AUGMENTS the functional name rather than replacing it. Replacing it
+ * gave the saves manager and the load-only picker the identical accessible name
+ * (both became "Towers on this computer"), which threw away the one word
+ * telling a screen reader user which of the two they were in, and the shell has
+ * no way to know which list it is naming.
+ *
+ * Falls back on an empty or absent label rather than blanking the name, and
+ * type-checks the value because it crosses a process bridge: the interface
+ * promises a string, an injection is not obliged to keep that promise, and a
+ * throw here takes down the whole dialog.
+ */
 export function scopeListLabel(scope: SaveScopeCaption | undefined, fallback: string): string {
-  return scope?.listLabel.trim() || fallback;
+  const label = typeof scope?.listLabel === "string" ? scope.listLabel.trim() : "";
+  return label ? `${fallback}, ${label}` : fallback;
 }
 
 const fmtWhen = (ms?: number): string =>

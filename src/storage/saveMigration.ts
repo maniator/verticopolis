@@ -82,12 +82,19 @@ export type ConversionResult =
   | { readonly ok: false; readonly reason: "empty" | "unreadable" };
 
 /**
- * A lone surrogate: half of a pair, which `TextEncoder` silently replaces with
- * U+FFFD. Only the raw-JSON branch encodes text, and only there can that turn
- * a faithful copy into a quietly mangled one, so that branch refuses rather
- * than corrupts.
+ * True when the string holds half of a surrogate pair. `TextEncoder` replaces
+ * one with U+FFFD, so the branch that encodes text must refuse rather than
+ * quietly hand back a different string than it was given.
+ *
+ * Written as "delete every WELL-FORMED pair, then look for a survivor" instead
+ * of the obvious lookbehind. Lookbehind is a parse-time SyntaxError on Safari
+ * below 16.4, and the build targets `esnext` with no downleveling, so the
+ * regex would not fail on old Safari, it would fail to PARSE, taking the whole
+ * chunk with it. This formulation is ES5 and says the same thing.
  */
-const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+function hasLoneSurrogate(s: string): boolean {
+  return /[\uD800-\uDFFF]/.test(s.replace(/[\uD800-\uDBFF][\uDC00-\uDFFF]/g, ""));
+}
 
 /**
  * The shape `SaveGame.import` demands before it will accept a tower. Applied
@@ -115,11 +122,17 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
   if (trimmed === "") return { ok: false, reason: "empty" };
 
   if (trimmed.startsWith(STORE_MAGIC)) {
-    // Whitespace-stripped to match `SaveGame.import`'s own tolerance for files
-    // re-wrapped by an editor or a mailer. Stored values never contain any, so
-    // in practice this is the identity, but the output is defined as "the
-    // payload characters", not "the value's bytes".
-    const payload = trimmed.slice(STORE_MAGIC.length).replace(/\s+/g, "");
+    const body = trimmed.slice(STORE_MAGIC.length);
+    // In preserve mode the payload is passed through EXACTLY. Stripping
+    // internal whitespace is a normalization, and a value that reached the
+    // preserve destination is by definition one this build could not read, so
+    // it is the last place to assume the contents follow the usual rules.
+    // `SaveGame.import` strips whitespace itself when reading, so nothing is
+    // lost by leaving it in.
+    const payload = preserve ? body : body.replace(/\s+/g, "");
+    // A header with no payload is not a rescue, it is an empty file that will
+    // fail at import. There is nothing here to preserve.
+    if (payload.trim() === "") return { ok: false, reason: "empty" };
     const reheadered: ConversionResult = {
       ok: true,
       kind: "reheadered",
@@ -149,8 +162,15 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
   // The bytes fed to deflateSync are the trimmed string's own bytes, so no
   // field is added, removed, or restamped, and an absent appVersion stays
   // absent.
+  //
+  // The surrogate check applies in BOTH modes, and that is the whole point:
+  // preserve mode promises to keep bytes verbatim, and this is the one path
+  // where encoding can silently fail to. Refusing is honest; writing a tower
+  // whose name has been rewritten with U+FFFD while reporting it preserved is
+  // not. A preserved value only reaches here when it is not VCZ1-prefixed,
+  // which for the unreadable backup is exactly the arbitrary-bytes case.
+  if (hasLoneSurrogate(trimmed)) return { ok: false, reason: "unreadable" };
   if (!preserve) {
-    if (LONE_SURROGATE.test(trimmed)) return { ok: false, reason: "unreadable" };
     try {
       if (!looksLikeTower(JSON.parse(trimmed))) return { ok: false, reason: "unreadable" };
     } catch {
@@ -183,10 +203,16 @@ export interface MigrationReport {
    */
   readonly nothingToDo: boolean;
   /**
-   * True in the STEADY STATE: nothing left to move because everything is
-   * already there. This is the ordinary answer on every boot after the first,
-   * and it must be distinguishable from "six unreadable keys", which produces
-   * the same `migratedAny: false` and is worth telling someone about.
+   * True when nothing was left to move: every destination the sources map to is
+   * either occupied already or has no source. It must be distinguishable from
+   * "six unreadable keys", which produces the same `migratedAny: false` and is
+   * worth telling someone about.
+   *
+   * NOT the same as "a migration ran here before". `already-present` is derived
+   * from what the store holds, and the destination ids are the same ids the
+   * game saves under normally, so an install that never had a localStorage
+   * tower and simply autosaved once reports this too. It means "nothing to do",
+   * never "your towers were moved over".
    */
   readonly alreadyComplete: boolean;
 }
@@ -205,9 +231,12 @@ export function localStorageReader(key: string): string | null {
 }
 
 /**
- * Seq for a migration write. Every destination is verified absent first and the
- * write is read back afterwards, so this is the first write for that id and the
- * lowest seq is correct. A migration must never outrank a real save.
+ * Seq for a migration write, deliberately the lowest value there is.
+ *
+ * A migration must never outrank a real save. It cannot know what the shell has
+ * already committed for an id (it consults the caller's snapshot, which can be
+ * stale, and never probes the store first), so it claims the weakest possible
+ * position and lets the read-back afterwards establish what actually happened.
  */
 const MIGRATION_SEQ = 1;
 
@@ -256,7 +285,11 @@ export async function migrateSavesToStore(
     } catch {
       raw = null;
     }
-    if (raw === null) {
+    // Typed as `string | null`, but the default reader is localStorage and an
+    // injected one is just a function. A number or an object here would throw
+    // out of `toTowerFile` below, which is outside any try, and take boot with
+    // it. Anything that is not a string is nothing to migrate.
+    if (typeof raw !== "string") {
       outcomes.set(id, "absent");
       continue;
     }
@@ -265,23 +298,55 @@ export async function migrateSavesToStore(
       outcomes.set(id, converted.reason === "empty" ? "absent" : "unreadable");
       continue;
     }
+
+    // Write, then establish what is ACTUALLY there. The two are separate
+    // because they fail for different reasons and must not be confused: a
+    // read that rejects after a write that landed would otherwise be reported
+    // as a failed write, carrying the read's error code.
+    let wrote = false;
+    let writeErr: unknown;
     try {
       await store.write(id, converted.text, scope, MIGRATION_SEQ);
-      // The shell refuses an existing destination itself and rejects a stale
-      // write rather than resolving, but neither promise is worth trusting for
-      // a one-time move of the player's only copy. Six extra reads, once.
-      if ((await store.read(id, scope)) !== converted.text) {
-        outcomes.set(id, "write-failed");
-        failures.push({ id });
-        continue;
-      }
-      outcomes.set(id, "migrated");
+      wrote = true;
     } catch (err) {
-      // Still in localStorage, so the next boot retries. The code is kept so a
-      // caller can say something truer than "save failed".
-      outcomes.set(id, "write-failed");
-      failures.push({ id, code: saveStoreErrorCode(err) });
+      writeErr = err;
     }
+
+    let stored: string | null = null;
+    let verified = true;
+    try {
+      stored = await store.read(id, scope);
+    } catch {
+      verified = false;
+    }
+
+    if (verified && stored === converted.text) {
+      outcomes.set(id, "migrated");
+      continue;
+    }
+    if (verified && stored !== null && !wrote) {
+      // Something else holds this destination: the caller's snapshot was stale,
+      // or another process won the race. That is a SKIP, not a failure. The
+      // shell's own O_EXCL refusal lands here, and reporting it as an error
+      // would show the player a scary message about a save that is fine.
+      outcomes.set(id, "already-present");
+      continue;
+    }
+    if (wrote && verified && stored !== null) {
+      // Our write landed but produced something other than what we sent. Left
+      // alone this record becomes the derived done-marker and the source is
+      // never retried, so the debris has to go before we report the failure.
+      try {
+        await store.delete(id, scope);
+      } catch {
+        /* best effort: a destination we cannot clean up is still reported below */
+      }
+    }
+    // The source is untouched in localStorage either way, so the next boot
+    // retries. The code is kept so a caller can say something truer than
+    // "save failed"; it is only meaningful when the WRITE is what failed.
+    outcomes.set(id, "write-failed");
+    failures.push({ id, ...(wrote ? {} : { code: saveStoreErrorCode(writeErr) }) });
   }
 
   const values = [...outcomes.values()];

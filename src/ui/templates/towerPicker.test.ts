@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import type { SlotInfo } from "../../storage/SaveGame";
 import { towerPickerTemplate, type TowerPickerHandlers } from "./towerPicker";
-import type { SaveScopeCaption } from "./saves";
+import { savesTemplate, type SaveScopeCaption } from "./saves";
 import { renderToFragment } from "../testing/litTestUtils";
 
 /**
@@ -241,10 +241,25 @@ describe("towerPickerTemplate scope caption", () => {
     expect(frag.querySelector("ul.slots")!.getAttribute("aria-label")).toBe("Towers you can load");
   });
 
-  it("replaces the group label with the scope label and captions the list", () => {
+  it("adds the scope to the group label and captions the list", () => {
     const frag = renderToFragment(towerPickerTemplate(SLOTS, null, handlers(), false, SCOPE));
-    expect(frag.querySelector("ul.slots")!.getAttribute("aria-label")).toBe(SCOPE.listLabel);
+    const label = frag.querySelector("ul.slots")!.getAttribute("aria-label")!;
+    // Both halves: the picker must stay distinguishable from the saves manager,
+    // which the scope label alone cannot do since the shell sends both the same
+    // string.
+    expect(label).toContain("Towers you can load");
+    expect(label).toContain(SCOPE.listLabel);
     expect(frag.querySelector(".slots-scope")!.textContent).toBe(SCOPE.text);
+  });
+
+  it("stays distinguishable from the saves manager under the same scope", () => {
+    // The regression this guards: with the scope label REPLACING the fallback,
+    // both lists ended up with the byte-identical accessible name.
+    const picker = renderToFragment(towerPickerTemplate(SLOTS, null, handlers(), false, SCOPE))
+      .querySelector("ul.slots")!
+      .getAttribute("aria-label");
+    const manager = renderToFragment(savesTemplate(SLOTS, SCOPE)).querySelector(".slots")!.getAttribute("aria-label");
+    expect(picker).not.toBe(manager);
   });
 
   it("puts the caption before both the error and the list", () => {

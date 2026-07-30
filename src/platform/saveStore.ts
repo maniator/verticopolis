@@ -23,8 +23,15 @@ declare const SAVE_SCOPE_TOKEN: unique symbol;
 /**
  * Minted by the shell, per session. Opaque by contract AND by type: branded so
  * a `label`, an id, or a tower name cannot be passed where a token belongs.
- * Tokens arrive across the bridge as plain strings, so {@link asScopeToken} is
- * the single sanctioned place that assertion happens.
+ *
+ * The brand is a TYPE-LEVEL aid, not a runtime check, and it is one-directional.
+ * `SaveScopeToken` is still a `string`, so a token remains assignable to the
+ * `id` parameter of `read`, `write` and `delete`; the brand stops arbitrary
+ * strings becoming tokens, not tokens becoming ids. {@link asScopeToken} is the
+ * sanctioned assertion site for a string the game holds, but tokens reaching
+ * the game inside a {@link SaveStoreSnapshot} are branded by the declaration of
+ * `list()` alone, with nothing validating them. Treat a snapshot the way
+ * `isPlatformPort` treats an injection.
  *
  * Deliberately not a union of known values: the set of scopes is the shell's
  * business, and a public union would leak the shape of it.
@@ -86,7 +93,15 @@ const SAVE_STORE_ERROR_CODES: readonly SaveStoreErrorCode[] = [
  * decorative.
  */
 export function saveStoreErrorCode(err: unknown): SaveStoreErrorCode | undefined {
-  const code = (err as { code?: unknown } | null | undefined)?.code;
+  // The property read is guarded because this runs INSIDE a catch: a rejection
+  // carrying a throwing getter or a revoked Proxy would otherwise throw a
+  // second time from the handler, abandoning the remaining slots.
+  let code: unknown;
+  try {
+    code = (err as { code?: unknown } | null | undefined)?.code;
+  } catch {
+    return undefined;
+  }
   return SAVE_STORE_ERROR_CODES.includes(code as SaveStoreErrorCode) ? (code as SaveStoreErrorCode) : undefined;
 }
 
