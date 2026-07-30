@@ -62,6 +62,11 @@ export function isSaveSlotId(value: unknown): value is SaveSlotId {
  * gating it on decodability would make the migration refuse precisely the bytes
  * that key exists to protect. It is preserved verbatim instead, and the saves
  * UI already has wording for a slot that will not load here.
+ *
+ * Preserve relaxes the DECODE checks only. A value that cannot survive the trip
+ * intact (see the lone-surrogate guard in {@link toTowerFile}) is still
+ * refused, in both modes, because writing something different from what was
+ * read and calling it preserved would be the one outcome worse than declining.
  */
 export const MIGRATION_SOURCES: readonly {
   readonly key: string;
@@ -121,6 +126,16 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
   const trimmed = raw.trim();
   if (trimmed === "") return { ok: false, reason: "empty" };
 
+  // Checked ONCE, at the top, for every branch and both modes.
+  //
+  // It used to sit down in the raw-JSON branch, on the reasoning that only that
+  // branch encodes text. That was true of this module and false of the system:
+  // a re-headered payload is handed to the shell across a process bridge, which
+  // encodes it there instead, so the substitution just happened somewhere this
+  // file could not see. A well-formed VCZ1 value is base64 and therefore pure
+  // ASCII, so hoisting the check costs nothing and closes the hole.
+  if (hasLoneSurrogate(trimmed)) return { ok: false, reason: "unreadable" };
+
   if (trimmed.startsWith(STORE_MAGIC)) {
     const body = trimmed.slice(STORE_MAGIC.length);
     // In preserve mode the payload is passed through EXACTLY. Stripping
@@ -130,9 +145,12 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
     // `SaveGame.import` strips whitespace itself when reading, so nothing is
     // lost by leaving it in.
     const payload = preserve ? body : body.replace(/\s+/g, "");
-    // A header with no payload is not a rescue, it is an empty file that will
-    // fail at import. There is nothing here to preserve.
-    if (payload.trim() === "") return { ok: false, reason: "empty" };
+    // A header with no payload is not a rescue, it is an empty file that would
+    // fail at import. UNREADABLE rather than empty: the value is not nothing,
+    // it is a real save truncated down to its prefix, and reporting that as
+    // "there was nothing to migrate" would tell the player their tower never
+    // existed. Only a genuinely blank VALUE is empty, and that is caught above.
+    if (payload.trim() === "") return { ok: false, reason: "unreadable" };
     const reheadered: ConversionResult = {
       ok: true,
       kind: "reheadered",
@@ -162,14 +180,6 @@ export function toTowerFile(raw: string, preserve = false): ConversionResult {
   // The bytes fed to deflateSync are the trimmed string's own bytes, so no
   // field is added, removed, or restamped, and an absent appVersion stays
   // absent.
-  //
-  // The surrogate check applies in BOTH modes, and that is the whole point:
-  // preserve mode promises to keep bytes verbatim, and this is the one path
-  // where encoding can silently fail to. Refusing is honest; writing a tower
-  // whose name has been rewritten with U+FFFD while reporting it preserved is
-  // not. A preserved value only reaches here when it is not VCZ1-prefixed,
-  // which for the unreadable backup is exactly the arbitrary-bytes case.
-  if (hasLoneSurrogate(trimmed)) return { ok: false, reason: "unreadable" };
   if (!preserve) {
     try {
       if (!looksLikeTower(JSON.parse(trimmed))) return { ok: false, reason: "unreadable" };
@@ -215,6 +225,20 @@ export interface MigrationReport {
    * never "your towers were moved over".
    */
   readonly alreadyComplete: boolean;
+}
+
+/**
+ * Whether a read-back is the file we wrote.
+ *
+ * Compares the way `SaveGame.import` READS rather than byte for byte, because
+ * a store is entitled to normalize line endings or trailing whitespace on the
+ * way through, and a strict comparison would call every one of those a failed
+ * write, forever, on every boot. What has to match is the payload the reader
+ * will actually see.
+ */
+function sameTowerFile(a: string, b: string): boolean {
+  const normalize = (s: string) => s.trim().replace(/\s+/g, "");
+  return normalize(a) === normalize(b);
 }
 
 /** Reads one localStorage key. Injectable so the migration is testable without
@@ -320,7 +344,7 @@ export async function migrateSavesToStore(
       verified = false;
     }
 
-    if (verified && stored === converted.text) {
+    if (verified && stored !== null && sameTowerFile(stored, converted.text)) {
       outcomes.set(id, "migrated");
       continue;
     }
@@ -332,19 +356,15 @@ export async function migrateSavesToStore(
       outcomes.set(id, "already-present");
       continue;
     }
-    if (wrote && verified && stored !== null) {
-      // Our write landed but produced something other than what we sent. Left
-      // alone this record becomes the derived done-marker and the source is
-      // never retried, so the debris has to go before we report the failure.
-      try {
-        await store.delete(id, scope);
-      } catch {
-        /* best effort: a destination we cannot clean up is still reported below */
-      }
-    }
-    // The source is untouched in localStorage either way, so the next boot
-    // retries. The code is kept so a caller can say something truer than
-    // "save failed"; it is only meaningful when the WRITE is what failed.
+    // Deliberately NOT deleting a mismatched destination, though an earlier
+    // revision did. Two reasons, and both are worse than the debris it was
+    // meant to clear. `wrote` proves only that OUR write resolved, not that
+    // what sits there now is ours, so a writer who committed in between would
+    // have its record deleted by us. And clearing the destination means the
+    // next boot finds it empty and repeats the whole failure, where leaving it
+    // lets the next boot report `already-present` and converge. localStorage
+    // still holds the original in either case, so nothing is lost by leaving
+    // it alone, and something can be lost by not.
     outcomes.set(id, "write-failed");
     failures.push({ id, ...(wrote ? {} : { code: saveStoreErrorCode(writeErr) }) });
   }

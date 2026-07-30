@@ -94,11 +94,29 @@ export function hasScopeCaption(scope: SaveScopeCaption | undefined): boolean {
   return scopeText(scope) !== "";
 }
 
-/** The caption text, or "" for anything unusable. Type-checked rather than
- *  trusted: these strings cross a process bridge from a wrapper shell, and
- *  `undefined.trim()` inside a template takes the dialog down with it. */
+/** The caption text, or "" when there is nothing usable to render. */
 function scopeText(scope: SaveScopeCaption | undefined): string {
-  return typeof scope?.text === "string" ? scope.text.trim() : "";
+  return bridgeString(scope, "text");
+}
+
+/**
+ * Read one string off an object that came from a wrapper shell, or "" if it is
+ * not there, not a string, or hostile to read at all.
+ *
+ * The ACCESS is guarded, not just the type. `src/platform/` already takes this
+ * posture toward an injected port ("Even the property reads are untrusted: a
+ * throwing getter or revoked Proxy must degrade like any other malformed
+ * injection"), and a type check alone left this module holding a weaker
+ * definition of untrusted than the module it receives its data from. Here the
+ * cost of being wrong is the whole saves dialog failing to render.
+ */
+function bridgeString(source: SaveScopeCaption | undefined, key: "text" | "listLabel"): string {
+  try {
+    const value = source?.[key];
+    return typeof value === "string" ? value.trim() : "";
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -116,7 +134,7 @@ function scopeText(scope: SaveScopeCaption | undefined): string {
  * throw here takes down the whole dialog.
  */
 export function scopeListLabel(scope: SaveScopeCaption | undefined, fallback: string): string {
-  const label = typeof scope?.listLabel === "string" ? scope.listLabel.trim() : "";
+  const label = bridgeString(scope, "listLabel");
   return label ? `${fallback}, ${label}` : fallback;
 }
 

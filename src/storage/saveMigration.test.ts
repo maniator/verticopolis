@@ -193,3 +193,69 @@ describe("the two containers wrap the same bytes", () => {
     await expect(inflate(zlibSync(new TextEncoder().encode(JSON.stringify(PRE_2_0_SAVE))))).rejects.toThrow();
   });
 });
+describe("preserve mode, every combination", () => {
+  it("refuses a lone surrogate even in preserve mode, rather than mangling it", () => {
+    // The guard originally sat inside the `!preserve` block, so the one mode
+    // that promises byte fidelity was the one mode that could silently rewrite
+    // a character as U+FFFD. A preserved value only reaches the encoding branch
+    // when it is NOT VCZ1-prefixed, which for the unreadable backup is exactly
+    // the arbitrary-bytes case the mode exists for.
+    const raw = 'garbage\uD800bytes';
+    expect(toTowerFile(raw, true)).toEqual({ ok: false, reason: "unreadable" });
+    expect(toTowerFile(raw, false)).toEqual({ ok: false, reason: "unreadable" });
+  });
+
+  it("carries a non-VCZ1 preserved value through when it can be encoded faithfully", () => {
+    // Not JSON, not a tower, no magic prefix. Preserve mode still takes it.
+    const raw = "totally corrupt bytes, not json at all";
+    expect(toTowerFile(raw, false)).toEqual({ ok: false, reason: "unreadable" });
+    const preserved = toTowerFile(raw, true);
+    expect(preserved.ok).toBe(true);
+    if (!preserved.ok) return;
+    const payload = preserved.text.trim().slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, "");
+    expect(new TextDecoder().decode(inflateCapped(fromBase64(payload)))).toBe(raw);
+  });
+
+  it("refuses a header with no payload as UNREADABLE, not as absent", () => {
+    // A VCTOWER1 line and nothing after it is an empty file, not a rescue. The
+    // distinction matters downstream: `empty` maps to "absent", so calling this
+    // empty would tell the player there was nothing to migrate when what they
+    // actually have is a real save truncated to its prefix.
+    for (const preserve of [true, false]) {
+      expect(toTowerFile(STORE_MAGIC, preserve), `preserve=${preserve}`).toEqual({ ok: false, reason: "unreadable" });
+      expect(toTowerFile(STORE_MAGIC + "   ", preserve), `preserve=${preserve}`).toEqual({
+        ok: false,
+        reason: "unreadable",
+      });
+    }
+    // A genuinely blank VALUE is still empty, and still means absent.
+    expect(toTowerFile("", true)).toEqual({ ok: false, reason: "empty" });
+  });
+
+  it("refuses a lone surrogate on EVERY branch, including a preserved re-header", () => {
+    // The guard used to sit in the raw-JSON branch only, which was true of this
+    // module and false of the system: a re-headered payload is handed to the
+    // shell across a process bridge, which encodes it there instead, so the
+    // U+FFFD substitution simply happened somewhere this file could not see.
+    for (const preserve of [true, false]) {
+      expect(toTowerFile(STORE_MAGIC + "AAAA\uD800AAAA", preserve), `preserve=${preserve}`).toEqual({
+        ok: false,
+        reason: "unreadable",
+      });
+    }
+    // A well-formed VCZ1 value is base64 and therefore pure ASCII, so hoisting
+    // the check costs a real save nothing.
+    expect(toTowerFile(storeValue(PRE_2_0_SAVE)).ok).toBe(true);
+  });
+
+  it("passes a preserved payload through without normalizing its whitespace", () => {
+    // A value that reached the preserve destination is by definition one this
+    // build could not read, so it is the last place to assume the contents
+    // follow the usual rules. SaveGame.import strips whitespace when reading.
+    const spaced = "AAAA\nBBBB";
+    const preserved = toTowerFile(STORE_MAGIC + spaced, true);
+    expect(preserved.ok).toBe(true);
+    if (!preserved.ok) return;
+    expect(preserved.text).toBe(TOWER_FILE_MAGIC + "\n" + spaced + "\n");
+  });
+});

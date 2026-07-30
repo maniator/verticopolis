@@ -1,14 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { Simulation } from "../engine/Simulation";
 import { SaveGame } from "./SaveGame";
-import { fromBase64, inflateCapped, STORE_MAGIC, TOWER_FILE_MAGIC, toBase64 } from "./saveCompression";
+import { STORE_MAGIC, toBase64 } from "./saveCompression";
 import { migrateSavesToStore, toTowerFile } from "./saveMigration";
 import { PRE_2_0_SAVE, SCOPE, decodeTowerFile, fakeStore, readerFor, storeValue } from "./saveMigration.fixture";
 
 /**
- * Running the migration: ordering, idempotency, verification, and the
- * end-to-end load. The pure codec's own tests live in `saveMigration.test.ts`;
- * the two were split when the combined file crossed the 500-line guard.
+ * Running the migration: ordering, idempotency, write verification, and the
+ * end-to-end load through the production reader. Everything that is purely
+ * string-to-string, preserve mode included, lives in `saveMigration.test.ts`.
+ * The two were split when the combined file crossed the 500-line guard.
  */
 
 describe("migrateSavesToStore", () => {
@@ -210,52 +211,6 @@ describe("a migrated tower loads through SaveGame.import", () => {
     expect((await SaveGame.import(migrated.text)).founder).toBe(false);
   });
 });
-describe("preserve mode, every combination", () => {
-  it("refuses a lone surrogate even in preserve mode, rather than mangling it", () => {
-    // The guard originally sat inside the `!preserve` block, so the one mode
-    // that promises byte fidelity was the one mode that could silently rewrite
-    // a character as U+FFFD. A preserved value only reaches the encoding branch
-    // when it is NOT VCZ1-prefixed, which for the unreadable backup is exactly
-    // the arbitrary-bytes case the mode exists for.
-    const raw = 'garbage\uD800bytes';
-    expect(toTowerFile(raw, true)).toEqual({ ok: false, reason: "unreadable" });
-    expect(toTowerFile(raw, false)).toEqual({ ok: false, reason: "unreadable" });
-  });
-
-  it("carries a non-VCZ1 preserved value through when it can be encoded faithfully", () => {
-    // Not JSON, not a tower, no magic prefix. Preserve mode still takes it.
-    const raw = "totally corrupt bytes, not json at all";
-    expect(toTowerFile(raw, false)).toEqual({ ok: false, reason: "unreadable" });
-    const preserved = toTowerFile(raw, true);
-    expect(preserved.ok).toBe(true);
-    if (!preserved.ok) return;
-    const payload = preserved.text.trim().slice(TOWER_FILE_MAGIC.length).replace(/\s+/g, "");
-    expect(new TextDecoder().decode(inflateCapped(fromBase64(payload)))).toBe(raw);
-  });
-
-  it("refuses a header with no payload in either mode", () => {
-    // A VCTOWER1 line and nothing after it is an empty file, not a rescue.
-    for (const preserve of [true, false]) {
-      expect(toTowerFile(STORE_MAGIC, preserve), `preserve=${preserve}`).toEqual({ ok: false, reason: "empty" });
-      expect(toTowerFile(STORE_MAGIC + "   ", preserve), `preserve=${preserve}`).toEqual({
-        ok: false,
-        reason: "empty",
-      });
-    }
-  });
-
-  it("passes a preserved payload through without normalizing its whitespace", () => {
-    // A value that reached the preserve destination is by definition one this
-    // build could not read, so it is the last place to assume the contents
-    // follow the usual rules. SaveGame.import strips whitespace when reading.
-    const spaced = "AAAA\nBBBB";
-    const preserved = toTowerFile(STORE_MAGIC + spaced, true);
-    expect(preserved.ok).toBe(true);
-    if (!preserved.ok) return;
-    expect(preserved.text).toBe(TOWER_FILE_MAGIC + "\n" + spaced + "\n");
-  });
-});
-
 describe("write verification distinguishes what actually happened", () => {
   it("does not report a failed write when only the read-back failed", async () => {
     // Read and write fail for different reasons. Reporting a landed save as
@@ -293,12 +248,38 @@ describe("write verification distinguishes what actually happened", () => {
     expect(await port.read("auto", SCOPE)).toBe("SOMEONE ELSES TOWER");
   });
 
-  it("cleans up a landed write whose contents came back wrong", async () => {
-    // Otherwise that record becomes the derived done-marker and the source is
-    // never retried, so a half-written tower would be permanent.
+  it("reports a landed write whose contents came back wrong, and CONVERGES", async () => {
+    // The property, not the mechanism. An earlier revision deleted the
+    // mismatched record; that cleared the destination, so the next boot found
+    // it empty and repeated the identical failure forever. Leaving it lets the
+    // next boot see it and settle. localStorage still holds the original
+    // either way, so nothing is lost by leaving it and something can be lost
+    // by deleting a record we cannot prove is ours.
+    const values = { "verticopolis-save": storeValue(PRE_2_0_SAVE) };
     const { port } = fakeStore();
     const realWrite = port.write.bind(port);
     port.write = (id, contents, scope, seq) => realWrite(id, contents.slice(0, 10), scope, seq);
+
+    const first = await migrateSavesToStore(port, SCOPE, new Set(), readerFor(values));
+    expect(first.outcomes.get("auto")).toBe("write-failed");
+
+    // Boot two, with the snapshot the store would now report.
+    const ids = new Set((await port.read("auto", SCOPE)) === null ? [] : ["auto"]);
+    const second = await migrateSavesToStore(port, SCOPE, ids, readerFor(values));
+    expect(second.outcomes.get("auto")).toBe("already-present");
+    expect(second.failures).toEqual([]);
+  });
+
+  it("does not delete a record another writer committed during the attempt", async () => {
+    // `wrote` proves only that OUR write resolved, never that what sits there
+    // now is ours. Deleting on mismatch destroyed the other writer's data.
+    const { port } = fakeStore();
+    const realWrite = port.write.bind(port);
+    port.write = async (id, contents, scope, seq) => {
+      await realWrite(id, contents, scope, seq);
+      await port.delete(id, scope);
+      await realWrite(id, "ANOTHER WRITERS TOWER", scope, seq);
+    };
     const report = await migrateSavesToStore(
       port,
       SCOPE,
@@ -306,8 +287,24 @@ describe("write verification distinguishes what actually happened", () => {
       readerFor({ "verticopolis-save": storeValue(PRE_2_0_SAVE) }),
     );
     expect(report.outcomes.get("auto")).toBe("write-failed");
-    // The debris is gone, so the next boot sees an empty destination and retries.
-    expect(await port.read("auto", SCOPE)).toBeNull();
+    expect(await port.read("auto", SCOPE)).toBe("ANOTHER WRITERS TOWER");
+  });
+
+  it("accepts a read-back the store normalized rather than calling it a failure", async () => {
+    // A store may reasonably rewrite line endings or trim. Byte-strict
+    // comparison would call every such write a failure on every boot, forever.
+    // What has to match is the payload the reader will actually see.
+    const { port } = fakeStore();
+    const realWrite = port.write.bind(port);
+    port.write = (id, contents, scope, seq) => realWrite(id, contents.replace(/\n/g, "\r\n") + "\n", scope, seq);
+    const report = await migrateSavesToStore(
+      port,
+      SCOPE,
+      new Set(),
+      readerFor({ "verticopolis-save": storeValue(PRE_2_0_SAVE) }),
+    );
+    expect(report.outcomes.get("auto")).toBe("migrated");
+    expect(report.failures).toEqual([]);
   });
 
   it("survives a rejection whose code getter throws", async () => {

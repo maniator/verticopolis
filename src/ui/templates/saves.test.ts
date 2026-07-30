@@ -247,3 +247,28 @@ describe("savesTemplate scope caption: shell-supplied strings are not trusted to
     }
   });
 });
+
+describe("savesTemplate scope caption: a hostile property ACCESS, not just a wrong type", () => {
+  const SLOTS: SlotInfo[] = [{ slot: 1, exists: false, present: false }];
+
+  it("degrades when reading the shell's strings throws", () => {
+    // A type check handles a wrong value. It does not handle a throwing getter
+    // or a revoked Proxy, which is what src/platform/ already guards against
+    // for an injected port ("Even the property reads are untrusted"). Without
+    // this, two modules in the same seam hold different definitions of
+    // untrusted, and the weaker one blanks the entire saves dialog.
+    const hostile = {
+      get text(): string {
+        throw new Error("bridge revoked");
+      },
+      get listLabel(): string {
+        throw new Error("bridge revoked");
+      },
+    } as unknown as SaveScopeCaption;
+    expect(() => renderToFragment(savesTemplate(SLOTS, hostile))).not.toThrow();
+    const frag = renderToFragment(savesTemplate(SLOTS, hostile));
+    expect(frag.querySelector(".slots-scope")).toBeNull();
+    expect(frag.querySelector(".slots")!.getAttribute("aria-label")).toBe("Saved towers");
+    expect(frag.querySelector(".slots")!.getAttribute("aria-describedby")).toBeFalsy();
+  });
+});
