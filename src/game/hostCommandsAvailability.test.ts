@@ -53,17 +53,30 @@ describe("availability: the game tells the shell what to gray out", () => {
     // The two must derive from one guard. If they drift, the shell offers an
     // enabled item that is then refused, which is the exact confusion the graying
     // exists to remove.
-    const states: Array<[string, (s: Spies) => void]> = [
-      ["splash", (s) => mountSplash(s)],
-      ["open dialog", () => openModal()],
-      ["crash screen", () => document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`)],
+    // Each state carries how many commands it must still report, because the
+    // assertions below live inside `for (const command of availableCommands(app))`
+    // and an empty list silently contributes ZERO assertions. Two of these three
+    // states report nothing, so without the count this loop was vacuous for them
+    // and only the splash case did any work.
+    //
+    // "editor busy" is the important addition: it is the only state with
+    // PER-COMMAND asymmetry (`OPENS_A_DIALOG`), so it is the only one where
+    // availability and dispatch could realistically disagree about one command
+    // while agreeing about the rest.
+    const states: Array<[string, (s: Spies) => void, number]> = [
+      ["splash", (s) => mountSplash(s), 4],
+      ["editor busy", (s) => s.isEditorBusy.mockReturnValue(true), 3],
+      ["open dialog", () => openModal(), 0],
+      ["crash screen", () => document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`), 0],
     ];
-    for (const [label, enter] of states) {
+    for (const [label, enter, expectedCount] of states) {
       mountDom();
       setLiveSplashActions(null);
       const { app, spies } = makeApp();
       enter(spies);
-      for (const command of availableCommands(app)) {
+      const reported = availableCommands(app);
+      expect(reported.length, `${label} should report ${expectedCount} commands`).toBe(expectedCount);
+      for (const command of reported) {
         spies.sayVisibly.mockClear();
         const before = totalDispatch(spies);
         runHostCommand(app, command);

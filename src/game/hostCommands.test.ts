@@ -69,7 +69,7 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     const { app, spies } = makeApp();
     document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`);
     for (const command of ALL_COMMANDS) runHostCommand(app, command);
-    expect(totalCalls(spies)).toBe(0);
+    expect(totalDispatch(spies)).toBe(0);
     expect(spies.sayVisibly).not.toHaveBeenCalled();
   });
 
@@ -156,7 +156,7 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     const { app, spies } = makeApp();
     openModal();
     for (const command of ALL_COMMANDS) runHostCommand(app, command);
-    expect(totalCalls(spies)).toBe(0);
+    expect(totalDispatch(spies)).toBe(0);
     expect(spies.sayVisibly).toHaveBeenCalledTimes(ALL_COMMANDS.length);
     expect(spies.sayVisibly).toHaveBeenLastCalledWith("Close the open window first", "info");
   });
@@ -170,7 +170,7 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     for (const command of ["new-game", "open-saves", "stats", "help", "settings"] as const) {
       runHostCommand(app, command);
     }
-    expect(totalCalls(spies)).toBe(0);
+    expect(totalDispatch(spies)).toBe(0);
     expect(spies.sayVisibly).toHaveBeenCalledTimes(5);
     runHostCommand(app, "save");
     runHostCommand(app, "undo");
@@ -183,7 +183,7 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     const dialog = document.getElementById("modal") as HTMLDialogElement;
     openModal();
     runHostCommand(app, "save");
-    expect(totalCalls(spies)).toBe(0);
+    expect(totalDispatch(spies)).toBe(0);
     dialog.removeAttribute("open");
     expect(dialog.open).toBe(false);
     runHostCommand(app, "save");
@@ -196,7 +196,7 @@ describe("runHostCommand: input from another repository is untrusted", () => {
     const { app, spies } = makeApp();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     for (const bad of ["quit", "", "__proto__", "toString"]) runHostCommand(app, bad);
-    expect(totalCalls(spies)).toBe(0);
+    expect(totalDispatch(spies)).toBe(0);
     expect(spies.sayVisibly).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledTimes(4);
   });
@@ -217,7 +217,13 @@ describe("runHostCommand: input from another repository is untrusted", () => {
     // nothing, with typecheck and lint both green.
     const { app, spies } = makeApp();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    for (const command of availableCommands(app)) {
+    // ALL_COMMANDS, not availableCommands(app). Iterating the guard's output only
+    // visited commands the default in-game state leaves available, so a command
+    // refused there would be skipped with no assertion and no failure: green on
+    // exactly the hole this test exists to close. Cross-checked against the
+    // implementation's own set so the literal list cannot drift from the contract.
+    expect([...ALL_COMMANDS].sort()).toEqual([...availableCommands(app)].sort());
+    for (const command of ALL_COMMANDS) {
       const before = totalCalls(spies);
       runHostCommand(app, command);
       expect(totalCalls(spies), `${command} reached no handler`).toBe(before + 1);

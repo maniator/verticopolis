@@ -2,7 +2,7 @@ import type { GameApp } from "../main";
 import type { HostCommand } from "../platform/types";
 import { getPlatform } from "../platform";
 import { CRASH_SCREEN_ID } from "../ui/crashScreen";
-import { runSplashAction } from "../ui/splashActions";
+import { runSplashAction, hasLiveSplash } from "../ui/splashActions";
 
 /**
  * The shell-to-game half of the platform seam (`src/platform/types.ts`).
@@ -45,6 +45,24 @@ import { runSplashAction } from "../ui/splashActions";
 /** Every command the game will act on. The runtime check matters even though
  *  the type is a union: the value crosses a process boundary from a separate
  *  repository, so it arrives as an unvalidated string. */
+/**
+ * Build a policy set from a table that names EVERY command explicitly.
+ *
+ * The point is the `satisfies Record<HostCommand, boolean>` the callers apply: a
+ * ninth command added to the union is a missing-key compile error in each policy
+ * table, so no table can silently under-cover the contract.
+ *
+ * The tables used to be `new Set<HostCommand>([...])`, which caught a typo and not
+ * an omission. That mattered most for `OPENS_A_DIALOG`, where the default for a
+ * forgotten command is "does not open a dialog", so a new dialog-opening command
+ * would have been allowed to open out from under a live editor press: exactly the
+ * failure that set exists to prevent. Listing the false entries is the price of
+ * making the compiler check the list, and it also documents each decision.
+ */
+function setFromFlags(flags: Record<HostCommand, boolean>): ReadonlySet<string> {
+  return new Set(Object.entries(flags).filter(([, on]) => on).map(([k]) => k));
+}
+
 const HANDLED_RECORD = {
   "new-game": true,
   save: true,
@@ -84,7 +102,16 @@ const HANDLED: ReadonlySet<string> = new Set(Object.keys(HANDLED_RECORD));
  * `redo` have no history to walk before a tower exists. `stats` would report on
  * a tower the player has not opened.
  */
-const SPLASH_SAFE: ReadonlySet<string> = new Set<HostCommand>(["help", "settings", "new-game", "open-saves"]);
+const SPLASH_SAFE: ReadonlySet<string> = setFromFlags({
+  "new-game": true,
+  save: false,
+  "open-saves": true,
+  undo: false,
+  redo: false,
+  stats: false,
+  help: true,
+  settings: true,
+} satisfies Record<HostCommand, boolean>);
 
 /** A refusal: the reason, and whether the player can actually be told. */
 interface Refusal {
@@ -96,17 +123,58 @@ interface Refusal {
   speakable: boolean;
 }
 
-/** Why a command was refused, or null when it may run. Split out so the guard
- *  order is readable and testable on its own. */
-function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
+/**
+ * Everything the guard needs to know, read ONCE.
+ *
+ * Read once because `availableCommands` asks the guard about all eight commands,
+ * and asking the DOM inside the guard meant those reads happened eight times per
+ * tick. Hoisting them also makes the decision below a pure function of a plain
+ * object, which is what lets the guard be tested without a DOM at all.
+ *
+ * This is deliberately the same set of sources the interaction-state consolidation
+ * (issue #716) is going to own. When that module lands it should replace the body
+ * of `readInteractionState` and nothing else here needs to change.
+ */
+interface InteractionState {
+  crashed: boolean;
+  splashUp: boolean;
+  /** A choice-bearing modal, read from the flags rather than inferred from the
+   *  element, because the implication is held in two other modules. */
+  blockingChoice: boolean;
+  dialogOpen: boolean;
+  editorBusy: boolean;
+}
+
+function readInteractionState(app: GameApp): InteractionState {
+  return {
+    crashed: !!document.getElementById(CRASH_SCREEN_ID),
+    splashUp: hasLiveSplash(),
+    blockingChoice: app.shownChoice || app.shownUpdate,
+    dialogOpen: !!(document.getElementById("modal") as HTMLDialogElement | null)?.open,
+    editorBusy: app.ui.isEditorBusy(),
+  };
+}
+
+/** Why a command was refused, or null when it may run. Pure, so the guard order is
+ *  readable and testable on its own without touching a document. */
+function refusalForState(s: InteractionState, command: HostCommand): Refusal | null {
   // The crash screen owns everything while it is up: the renderer is dead and
   // the tower was already flushed, so a Save from the menu would be acting on a
   // session that has stopped. `bindKeys` guards keyboard input the same way and
   // for the same reason.
-  if (document.getElementById(CRASH_SCREEN_ID)) {
+  if (s.crashed) {
     return { reason: "Not available right now", speakable: false };
   }
-  if (document.getElementById("splash") && !SPLASH_SAFE.has(command)) {
+  // `splashUp` comes from `hasLiveSplash()`, NOT from `getElementById("splash")`.
+  // The dispatch routes New Tower and Load Tower through the title screen's
+  // published actions, so if the guard asked the DOM instead there would be two
+  // answers to "is the title screen up" and nothing keeping them equal. In the
+  // disagreeing states both behaviors are wrong: with the element present but no
+  // actions published, `new-game` is allowed and then falls through to the in-game
+  // picker, which warns about abandoning a tower that does not exist; with actions
+  // published but the element gone, availability reports the full set while the
+  // dispatch still drives a torn-down overlay's closures.
+  if (s.splashUp && !SPLASH_SAFE.has(command)) {
     return { reason: "Start or load a tower first", speakable: true };
   }
   // A menu can be reached while a dialog is open, which no in-game button can:
@@ -121,30 +189,37 @@ function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
   // available AND the dispatch would run New Tower out from under a live
   // choice. Reading the flags costs two property loads and removes the
   // dependency.
-  if (app.shownChoice || app.shownUpdate) {
-    return { reason: "Close the open window first", speakable: true };
-  }
-  if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) {
+  if (s.blockingChoice || s.dialogOpen) {
     return { reason: "Close the open window first", speakable: true };
   }
   // A live press inside the editor card. The frame loop declines even a stats
   // refresh in this state so the card cannot move under the pointer; opening a
   // dialog out from under the press is the louder version of the same problem.
-  if (app.ui.isEditorBusy() && OPENS_A_DIALOG.has(command)) {
+  if (s.editorBusy && OPENS_A_DIALOG.has(command)) {
     return { reason: "Finish what you are doing first", speakable: true };
   }
   return null;
 }
 
+/** The single-command form, for the dispatch path. `availableCommands` reads the
+ *  state once and calls `refusalForState` directly rather than going through this,
+ *  which is the whole reason the state was hoisted. */
+function refusalFor(app: GameApp, command: HostCommand): Refusal | null {
+  return refusalForState(readInteractionState(app), command);
+}
+
 /** Commands that put something new on screen, so an in-flight editor press
  *  matters. `save`, `undo`, and `redo` do not displace anything. */
-const OPENS_A_DIALOG: ReadonlySet<string> = new Set<HostCommand>([
-  "new-game",
-  "open-saves",
-  "stats",
-  "help",
-  "settings",
-]);
+const OPENS_A_DIALOG: ReadonlySet<string> = setFromFlags({
+  "new-game": true,
+  save: false,
+  "open-saves": true,
+  undo: false,
+  redo: false,
+  stats: true,
+  help: true,
+  settings: true,
+});
 
 /**
  * Run one command, or refuse it and say so. Exported for tests and for any
@@ -244,7 +319,8 @@ function dispatch(app: GameApp, command: HostCommand): void {
 /** Every command that would run right now, for a shell that grays out the rest.
  *  Derived from the same guard the dispatch uses, so the two cannot disagree. */
 export function availableCommands(app: GameApp): HostCommand[] {
-  return [...HANDLED].filter((c) => refusalFor(app, c as HostCommand) === null) as HostCommand[];
+  const state = readInteractionState(app);
+  return [...HANDLED].filter((c) => refusalForState(state, c as HostCommand) === null) as HostCommand[];
 }
 
 /** The availability set as a comparable key, so the tick below can skip the
@@ -260,11 +336,20 @@ let bound = false;
 
 /**
  * Push the availability set to the shell when, and only when, it changes.
- * Called from the ~6 Hz UI pump rather than hooked to every event that could
- * matter (splash mount and dismiss, dialog open and close, the crash screen),
- * because recomputing three DOM lookups is cheaper than keeping five
- * notification sites correct forever, and a missed hook would be an invisible
- * bug. No shell, or a shell without the optional member, means no work at all.
+ * Polled rather than hooked to every event that could matter (splash mount and
+ * dismiss, dialog open and close, the crash screen), because one cheap read of
+ * interaction state beats keeping five notification sites correct forever, and a
+ * missed hook would be an invisible bug. No shell, or a shell without the optional
+ * member, means no work at all.
+ *
+ * Cost, stated accurately because the previous note here was wrong: one of the
+ * three call sites (the frame loop's early return, taken while a choice or update
+ * dialog is up) runs at FULL frame rate rather than at the 160 ms pump cadence.
+ * That used to mean recomputing `refusalFor` per command, about 24 `getElementById`
+ * calls plus 8 `isEditorBusy` calls per frame, while the comment claimed the dirty
+ * gate made it "a no-op". It is now one `readInteractionState` per tick: three
+ * element lookups, two property reads, one `isEditorBusy`, then eight pure
+ * comparisons. The dirty gate still skips the cross-process call.
  */
 export function tickHostCommands(): void {
   if (!pushAvailability || !boundApp) return;

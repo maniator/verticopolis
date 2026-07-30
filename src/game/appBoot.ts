@@ -193,12 +193,6 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // during initial load, so its capture must be in place before then. The chip
   // stays hidden until the play-gate trips (see tickInstallAffordance).
   initInstallAffordance(app);
-  // Commands from a wrapper shell's native menu (Electron's File menu today),
-  // routed to the same calls the in-game controls make. A browser session binds
-  // nothing: the port member is optional and only a wrapper defines it. Safe
-  // here rather than earlier, because a command can only arrive once the shell
-  // has a window to send one from.
-  if (IS_WRAPPED_BUILD) bindHostCommands(app);
   // First-run splash + onboarding (chrome only; the engine is untouched).
   app.onboarding = new OnboardingController({
     mq: app.mobileMq,
@@ -396,4 +390,19 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   window.setInterval(() => {
     if (!document.getElementById("splash")) void app.saveLoad.autosave();
   }, 30000);
+
+  // Commands from a wrapper shell's native menu (Electron's File menu today),
+  // routed to the same calls the in-game controls make. A browser session binds
+  // nothing: the port member is optional and only a wrapper defines it.
+  //
+  // LAST, deliberately, and this ordering is load-bearing. `bindHostCommands`
+  // publishes the opening availability set as its final step, so binding before
+  // the title screen was decided meant the shell's first news was "all eight
+  // commands are available", computed with no splash up, immediately followed by
+  // a title screen where four of them are refused. The menu showed Save, Undo,
+  // Redo, and Statistics enabled until the next pump tick corrected it. Binding
+  // after every branch above has run means the first push already describes the
+  // screen the player is looking at. Inbound commands are unaffected: one cannot
+  // arrive until the shell has a window, which is later than any of this.
+  if (IS_WRAPPED_BUILD) bindHostCommands(app);
 }
