@@ -33,7 +33,7 @@ vi.mock("../platform", async (importOriginal) => ({
   }),
 }));
 
-const { prepareSaveStore, saveStoreSession, saveMigrationReport, resetSaveStoreForTests } = await import(
+const { prepareSaveStore, saveStoreSession, saveMigrationReport, resetSaveStoreForTests, writeTowerToStore, noteTowerOrigin, towerOrigin } = await import(
   "./desktopSaveStore"
 );
 
@@ -238,5 +238,115 @@ describe("prepareSaveStore", () => {
     // passing because nothing happened at all.
     expect(saveMigrationReport()?.outcomes.get("auto")).toBe("migrated");
     expect(saveMigrationReport()?.outcomes.get("slot-1")).toBe("migrated");
+  });
+});
+
+describe("writeTowerToStore honors the tower's origin", () => {
+  const SCOPES = [
+    { token: LOCAL, label: "This computer", shared: true },
+    { token: ACCOUNT, label: "Your towers" },
+  ];
+
+  it("sends a tower with no origin to the default scope", async () => {
+    const { port, calls } = fakeStore(SCOPES);
+    injectedStore = port;
+    await prepareSaveStore();
+
+    expect(await writeTowerToStore("auto", "VCTOWER1\nAAA\n")).toEqual({ ok: true });
+    expect(calls.writes).toEqual([{ id: "auto", scope: LOCAL }]);
+  });
+
+  it("writes a tower back to the scope it was opened from", async () => {
+    const { port, calls } = fakeStore(SCOPES);
+    injectedStore = port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "slot-1", scope: ACCOUNT });
+
+    expect(await writeTowerToStore("slot-1", "VCTOWER1\nAAA\n")).toEqual({ ok: true });
+    // NOT the default scope, which is what an origin-blind write would pick.
+    expect(calls.writes).toEqual([{ id: "slot-1", scope: ACCOUNT }]);
+  });
+
+  it("REGRESSION: refuses rather than falling back when the origin scope is gone", async () => {
+    // The account-isolation rule. Writing this tower into the shared scope
+    // because its account directory went away mid-session would put it where
+    // every account on the machine can read it. Losing an autosave tick is
+    // recoverable; that is not.
+    const { port, calls } = fakeStore([{ token: LOCAL, label: "This computer", shared: true }]);
+    injectedStore = port;
+    await prepareSaveStore();
+    noteTowerOrigin({ id: "slot-1", scope: ACCOUNT });
+
+    expect(await writeTowerToStore("slot-1", "VCTOWER1\nAAA\n")).toEqual({ ok: false, refusal: "origin-gone" });
+    expect(calls.writes).toEqual([]);
+  });
+
+  it("adopts the scope it landed in, so later autosaves do not re-decide", async () => {
+    // Without this, a shell that changed its default scope mid-session would
+    // scatter one tower's autosaves across two namespaces.
+    const { port, calls } = fakeStore(SCOPES);
+    injectedStore = port;
+    await prepareSaveStore();
+
+    await writeTowerToStore("auto", "one");
+    expect(towerOrigin()).toEqual({ id: "auto", scope: LOCAL });
+    await writeTowerToStore("auto", "two");
+    expect(calls.writes).toEqual([
+      { id: "auto", scope: LOCAL },
+      { id: "auto", scope: LOCAL },
+    ]);
+  });
+
+  it("increments seq per id, and never persists it", async () => {
+    // The port contract: the shell's high-water mark is session-scoped, because
+    // a persisted mark would drop every write of the next session once the
+    // game's counter started over.
+    const { port } = fakeStore(SCOPES);
+    const seqs: number[] = [];
+    port.write = (_id, _c, _s, seq) => {
+      seqs.push(seq);
+      return Promise.resolve();
+    };
+    injectedStore = port;
+    await prepareSaveStore();
+
+    await writeTowerToStore("auto", "a");
+    await writeTowerToStore("auto", "b");
+    await writeTowerToStore("slot-1", "c");
+    expect(seqs).toEqual([1, 2, 1]);
+
+    resetSaveStoreForTests();
+    injectedStore = port;
+    await prepareSaveStore();
+    await writeTowerToStore("auto", "d");
+    expect(seqs[3]).toBe(1);
+  });
+
+  it("reports a store failure with its code rather than throwing", async () => {
+    const { port } = fakeStore(SCOPES);
+    port.write = () => Promise.reject(Object.assign(new Error("full"), { code: "full" }));
+    injectedStore = port;
+    await prepareSaveStore();
+
+    expect(await writeTowerToStore("auto", "x")).toEqual({ ok: false, refusal: "failed", code: "full" });
+  });
+
+  it("refuses when there is no store at all", async () => {
+    await prepareSaveStore();
+    expect(await writeTowerToStore("auto", "x")).toEqual({ ok: false, refusal: "no-store" });
+  });
+
+  it("REGRESSION (AC5): writing a tower never touches localStorage", async () => {
+    const { port } = fakeStore(SCOPES);
+    injectedStore = port;
+    await prepareSaveStore();
+
+    const setItem = vi.spyOn(Storage.prototype, "setItem");
+    try {
+      expect(await writeTowerToStore("auto", "VCTOWER1\nAAA\n")).toEqual({ ok: true });
+      expect(setItem).not.toHaveBeenCalled();
+    } finally {
+      setItem.mockRestore();
+    }
   });
 });

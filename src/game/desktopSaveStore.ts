@@ -4,8 +4,12 @@ import {
   idsInScope,
   migrationTarget,
   openSaveStore,
+  resolveWriteTarget,
+  type SaveAddress,
   type SaveStoreSession,
+  type WriteRefusal,
 } from "../storage/saveStoreSession";
+import type { SaveSlotId } from "../storage/saveMigration";
 
 /**
  * The one entry point the boot path uses to bring up a wrapper shell's save
@@ -38,6 +42,31 @@ import {
 let session: SaveStoreSession | null = null;
 let migration: MigrationReport | null = null;
 let prepared = false;
+
+/**
+ * Where the LIVE tower was opened from, or undefined for one that has never
+ * been stored (a new game, or one imported from a file).
+ *
+ * This is the input to the origin rule. It is module state rather than
+ * something threaded through every call site because there is exactly one live
+ * tower, and a second source of truth for "which tower is loaded" is how the
+ * two get to disagree.
+ */
+let loadedFrom: SaveAddress | undefined;
+
+/**
+ * Per-id write counter. Session-scoped, and deliberately NOT persisted: the
+ * port contract states the shell's high-water mark must not survive a restart
+ * either, because a persisted mark would silently drop every write of the next
+ * session once the game's counter started over.
+ */
+const seqById = new Map<string, number>();
+
+function nextSeq(id: string): number {
+  const next = (seqById.get(id) ?? 0) + 1;
+  seqById.set(id, next);
+  return next;
+}
 
 /**
  * Resolve the shell's store and move any localStorage towers into it, once.
@@ -89,10 +118,65 @@ export function saveMigrationReport(): MigrationReport | null {
   return migration;
 }
 
+/**
+ * Record where the live tower came from, so autosave writes it back there.
+ *
+ * `undefined` means a tower with no origin: a new game, or one imported from a
+ * file. Those go to the default scope, which is what a first save is.
+ */
+export function noteTowerOrigin(address: SaveAddress | undefined): void {
+  loadedFrom = address;
+}
+
+/** Where the live tower came from, for the saves UI and for tests. */
+export function towerOrigin(): SaveAddress | undefined {
+  return loadedFrom;
+}
+
+export type StoreWriteResult =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly refusal: WriteRefusal }
+  | { readonly ok: false; readonly refusal: "failed"; readonly code?: string };
+
+/**
+ * Write a tower to the store, honoring the origin rule.
+ *
+ * The ONLY write path on desktop. It never falls back to localStorage and never
+ * falls back to a different scope: a refusal is returned, and the caller decides
+ * what to tell the player.
+ *
+ * That no-fallback posture is the whole point. Writing a tower opened from one
+ * account's directory into the shared namespace, because the account directory
+ * went away mid-session, would put it where every account on the machine can
+ * read it. Losing one autosave tick is recoverable; that is not.
+ */
+export async function writeTowerToStore(id: SaveSlotId, contents: string): Promise<StoreWriteResult> {
+  const store = getPlatform().saveStore;
+  if (!store || !session) return { ok: false, refusal: "no-store" };
+
+  const resolved = resolveWriteTarget(session, id, loadedFrom);
+  if (!resolved.ok) return { ok: false, refusal: resolved.refusal };
+
+  try {
+    await store.write(resolved.target.id, contents, resolved.target.scope, nextSeq(id));
+  } catch (err) {
+    const code = (err as { code?: unknown } | null | undefined)?.code;
+    return { ok: false, refusal: "failed", ...(typeof code === "string" ? { code } : {}) };
+  }
+  // A tower that had no origin has one now, so the NEXT autosave targets the
+  // scope this one landed in rather than re-deciding from the default. Without
+  // this, a shell that changed its default scope mid-session would scatter one
+  // tower's autosaves across two namespaces.
+  loadedFrom = resolved.target;
+  return { ok: true };
+}
+
 /** Test seam. Boot calls `prepareSaveStore` exactly once per page load, so the
  *  module-level latch is what makes a second call a no-op in production. */
 export function resetSaveStoreForTests(): void {
   session = null;
   migration = null;
   prepared = false;
+  loadedFrom = undefined;
+  seqById.clear();
 }
