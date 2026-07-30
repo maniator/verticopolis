@@ -15,15 +15,52 @@ import type { SlotInfo } from "../../storage/SaveGame";
  * by the controller (`showSaves`) after mount, unchanged by this migration, so the
  * re-render-on-save flow keeps routing exactly as before.
  */
-export function savesTemplate(slots: SlotInfo[]): TemplateResult {
+/**
+ * Where the listed towers live, as the player should be told.
+ *
+ * INJECTED, never detected. Nothing in `src/ui/` asks what platform it is on or
+ * imports the platform port; a caller that knows passes this, and every caller
+ * that does not simply omits it, which is exactly how `storageBlocked` already
+ * works one module over. That keeps the web, Android and iOS renders
+ * byte-identical to what they were.
+ *
+ * Both strings come from the side that knows what the storage area actually is.
+ * Composing them here would mean this module reasoning about namespaces, and it
+ * would put player-facing wording about shared storage somewhere no one would
+ * think to look for it.
+ */
+export interface SaveScopeCaption {
+  /** Visible sentence, rendered between the heading and the list. */
+  readonly text: string;
+  /** Accessible name for the list, naming the same scope in fewer words. */
+  readonly listLabel: string;
+}
+
+export function savesTemplate(slots: SlotInfo[], scope?: SaveScopeCaption): TemplateResult {
   return html`
       <h2>Saved Towers</h2>
-      <div class="slots well">${slots.map(slotRow)}</div>
+      ${scopeCaption(scope)}
+      <div class="slots well" role="list" aria-label="${scope?.listLabel ?? "Saved towers"}">
+        ${slots.map(slotRow)}
+      </div>
       <div class="modal-actions">
         <button class="btn" data-act="export">Export to file</button>
         <button class="btn" data-act="import">Import from file</button>
         <button class="btn primary" data-act="close">Close</button>
       </div>`;
+}
+
+/**
+ * The caption, in DOM order between the heading and the list.
+ *
+ * Before the list, not after it, because it is the context a player needs in
+ * order to read the list correctly, and a caption underneath is one a screen
+ * reader reaches only after every row. It is ordinary rendered text rather than
+ * a live region: this is a standing property of the storage, not an event, and
+ * announcing it as an event would interrupt whatever the player was doing.
+ */
+function scopeCaption(scope?: SaveScopeCaption): TemplateResult | typeof nothing {
+  return scope ? html`<p class="slots-scope">${scope.text}</p>` : nothing;
 }
 
 const fmtWhen = (ms?: number): string =>
@@ -83,5 +120,9 @@ function slotRow(s: SlotInfo): TemplateResult {
     (s.exists || unreadable) && s.slot !== "auto"
       ? html`<button class="btn danger" data-del="${s.slot}" aria-label="Delete save slot ${s.slot}">✕</button>`
       : nothing;
-  return html`<div class="slot"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
+  // `role="listitem"` is not decoration. The container now carries `role="list"`,
+  // and a list whose children are not listitems is invalid ARIA: the semantics
+  // are dropped, so the label and the item count a screen reader would announce
+  // go with them. The two roles ship together or neither does.
+  return html`<div class="slot" role="listitem"><div class="slot-head"><b>${name}</b>${detail}</div><div class="slot-actions">${saveBtn}${loadBtn}${delBtn}</div></div>`;
 }

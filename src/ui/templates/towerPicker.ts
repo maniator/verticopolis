@@ -1,6 +1,6 @@
 import { html, nothing, type TemplateResult } from "lit-html";
 import type { SlotInfo } from "../../storage/SaveGame";
-import { slotDetail, slotName } from "./saves";
+import { slotDetail, slotName, type SaveScopeCaption } from "./saves";
 
 /**
  * The title screen's LOAD-ONLY tower picker (SPEC-splash-load-tower CAP-2 to
@@ -44,6 +44,7 @@ export function towerPickerTemplate(
   error: string | null,
   h: TowerPickerHandlers,
   storageBlocked = false,
+  scope?: SaveScopeCaption,
 ): TemplateResult {
   // "Anything on this device" is raw presence, so a storage full of corrupt
   // slots still renders those rows (and the recovery route beneath them)
@@ -65,8 +66,9 @@ export function towerPickerTemplate(
     : "No towers saved on this device.";
   return html`
       <h2>Load a Tower</h2>
+      ${scope ? html`<p class="slots-scope">${scope.text}</p>` : nothing}
       ${error ? html`<p class="picker-error" role="alert" tabindex="-1">${error}</p>` : nothing}
-      <ul class="slots well" aria-label="Towers you can load">
+      <ul class="slots well" aria-label="${scope?.listLabel ?? "Towers you can load"}">
         ${anyPresent
           ? rows.map((s) => pickerRow(s, h))
           : html`<li class="picker-none">${emptyLine}</li>`}

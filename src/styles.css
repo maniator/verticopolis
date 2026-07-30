@@ -1212,6 +1212,14 @@ ul.slots .slot-actions .btn {
   margin: 0 0 8px;
   color: var(--bad);
 }
+/* Where the listed towers live. Muted because it is standing context rather
+   than a warning, and not colour-coded at all: it carries information a player
+   needs, so it must survive a colourblind or high-contrast render intact. */
+.slots-scope {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 0.9em;
+}
 /* The file row crosses from device storage to the file system, so it gets a
    heavier rule than the hairline dividing the slots above it. With no slot rows
    above it (nothing saved, or storage blocked) there is nothing to divide from,
