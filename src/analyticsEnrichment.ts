@@ -16,14 +16,16 @@ import type { EventProps } from "./analyticsAdapter";
  * parked at the E4 monetization gate (see the epic's S4 plan).
  */
 
-/** The three shipping surfaces, as a platform dimension on every event
- *  (resolves AUD-036): the iOS Capacitor shell, the Android TWA, and the plain
- *  web build. */
+/** The shipping surfaces this dimension names (resolves AUD-036): the iOS
+ *  Capacitor shell, the Android TWA, and the plain web build. A desktop
+ *  wrapper session that bound a port would report `ios`, a known gap held for
+ *  the analytics story (issue #710); wrapped builds report nothing today. */
 export type PlatformLabel = "web" | "twa" | "ios";
 
 /**
  * Resolve the platform label from the two runtime signals, in priority order:
- * the native wrapper flag wins (only the iOS shell injects a wrapper port), then
+ * the wrapper flag wins (iOS is the only wrapper specified to inject a port;
+ * see issue #710 for the desktop case), then
  * the TWA start-URL marker (`?src=twa`, set by the Android wrapper's manifest in
  * the private distribution repo), and everything else is `web`. Pure so the
  * order is unit-testable without faking the build mode or the launch URL.

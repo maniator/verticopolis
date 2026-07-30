@@ -60,7 +60,7 @@ Run 2026-07-08, three layers (Blind Hunter / Edge Case Hunter / Acceptance Audit
 ### References
 
 - [Source: _bmad-output/planning-artifacts/design/epics-mobile-distribution-2026-07-08.md, E1b entry]
-- [Source: _bmad-output/planning-artifacts/design/arch-mobile-distribution-2026-07-08.md §3 Native build mode]
+- [Source: _bmad-output/planning-artifacts/design/arch-mobile-distribution-2026-07-08.md §3 Wrapped build modes]
 - [Source: _bmad-output/planning-artifacts/prds/prd-mobile-distribution-2026-07-08/prd.md F2, N1, N5]
 - [Source: _bmad-output/planning-artifacts/prds/prd-mobile-distribution-2026-07-08/decision-log.md, entries 9-11 for the TWA vs native gating rationale]
 - [Source: _bmad-output/implementation-artifacts/backlog.md, E1a review deferral about vitest's blindness to native mode → owned by E1c, not E1b]
