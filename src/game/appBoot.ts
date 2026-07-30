@@ -5,6 +5,7 @@ import { SaveLoad, RESUME_AFTER_RECOVERY_KEY } from "./saveLoad";
 import { InspectorController } from "./inspector";
 import { KeyboardPlay } from "./keyboardPlay";
 import { attemptContextRecovery } from "./contextRecovery";
+import { isSplashUp } from "./interactionState";
 import { showCrashScreen } from "../ui/crashScreen";
 import { OnboardingController, isOnboarded } from "../ui/Onboarding";
 import { resolveBootScreen } from "../bootScreen";
@@ -388,7 +389,7 @@ export function runBootFlow(app: GameApp, savedAtBoot?: number): void {
   // idle first visit can't persist the throwaway boot sim (which would flip
   // hasSave() true for a tower the player never started).
   window.setInterval(() => {
-    if (!document.getElementById("splash")) void app.saveLoad.autosave();
+    if (!isSplashUp()) void app.saveLoad.autosave();
   }, 30000);
 
   // Commands from a wrapper shell's native menu (Electron's File menu today),

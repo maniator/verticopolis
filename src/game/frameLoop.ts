@@ -4,6 +4,7 @@ import { decideMealRush } from "./mealRush";
 import { updateTraffic } from "./trafficHud";
 import { tickInstallAffordance } from "./installAffordance";
 import { tickHostCommands } from "./hostCommands";
+import { hasBlockingModal, isEditorBusy, isSplashUp } from "./interactionState";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { positionPanels } from "./panelAnchoring";
 import { maybeSurfaceUpdatePrompt } from "./updateFlow";
@@ -43,7 +44,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // an emergency choice (canon: the modal pauses the game) must not auto-resolve
   // out from under the player, and the update prompt must not let a distracted
   // player lose game-hours at high speed while it waits for their answer.
-  if (app.shownChoice || app.shownUpdate) {
+  if (hasBlockingModal(app)) {
     app.accMinutes = 0;
     // Push availability before bailing. A blocking dialog is the state in which
     // EVERY host command is refused, so it is the state the shell most needs to
@@ -117,7 +118,7 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // volatile cells in place (never the buttons or rename input), so this is
     // safe while renaming; the pointer guard still skips the rare full rebuild
     // during an active press.
-    if (app.selected && app.ui.isEditorOpen() && !app.ui.isEditorBusy()) {
+    if (app.selected && app.ui.isEditorOpen() && !isEditorBusy(app)) {
       app.refreshEditor();
     }
     // A jingle on every star promotion (2★–5★), not just the TOWER win.
@@ -135,10 +136,10 @@ export function runFrame(app: GameApp, dtMs: number): void {
     // splash pauses the sim, so nothing is lost by waiting: these surface on the
     // next calm tick once the player dismisses it. (The update prompt already
     // self-guards on the splash via updateCoastClear.)
-    const splashUp = !!document.getElementById("splash");
+    const splashUp = isSplashUp();
     // Interactive emergency choice (fire rescue / bomb ransom).
     const pc = app.sim.pendingChoice;
-    if (pc && !app.shownChoice && !splashUp) {
+    if (pc && !hasBlockingModal(app) && !splashUp) {
       app.shownChoice = true;
       app.audio.sfx("error");
       app.ui.showEventChoice(pc.message, `$${pc.cost.toLocaleString()}`, (opt) => {

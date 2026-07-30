@@ -4,6 +4,7 @@ import { eventChoiceTemplate } from "./templates/eventChoice";
 import { updatePromptTemplate } from "./templates/updatePrompt";
 import { settingsTemplate } from "./templates/settings";
 import { helpTemplate } from "./templates/help";
+import { isSplashUp } from "../game/interactionState";
 import { compareModalTemplate } from "./templates/compare";
 import { savesTemplate } from "./templates/saves";
 import { newTowerTemplate } from "./templates/newTower";
@@ -275,7 +276,7 @@ export function showHelp(ui: UI): void {
   trackAppAction("help_open");
   // Replaying the intro is meaningless while the title screen is still up, so
   // disable that button there.
-  const onSplash = !!document.getElementById("splash");
+  const onSplash = isSplashUp();
   const version = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "dev";
   // Replay binds inline via @click. While the splash is up the button is
   // disabled, so a real browser suppresses the click, and onReplayOnboarding

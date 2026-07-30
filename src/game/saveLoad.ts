@@ -8,7 +8,7 @@ import { LegacyImportError, parseTDT } from "../storage/tdtImport";
 import type { ImportReport } from "../storage/tdtImport";
 import { shouldArm } from "../ui/Onboarding";
 import { gameplaySession } from "../analytics";
-import { CRASH_SCREEN_ID } from "../ui/crashScreen";
+import { isCrashed, isSplashUp } from "./interactionState";
 import type { UI } from "../ui/UI";
 
 /**
@@ -183,7 +183,7 @@ export class SaveLoad {
     // the autosave byte-for-byte — skipping the save loses nothing. That
     // invariant is load-bearing: never let anything mutate the sim while the
     // splash is up.
-    if (document.getElementById("splash")) return;
+    if (isSplashUp()) return;
     this.save(true);
   }
 
@@ -215,7 +215,7 @@ export class SaveLoad {
     // Behind the splash nothing needed flushing, but "your tower was saved"
     // would be a false claim (a first-timer has no tower at all), so the screen
     // words that case separately.
-    const behindSplash = !!document.getElementById("splash");
+    const behindSplash = isSplashUp();
     if (!behindSplash) {
       try {
         this.save(true);
@@ -302,7 +302,7 @@ export class SaveLoad {
       // A parallel loss may have already put the crash screen up (a flapping
       // GPU); the screen owns the session then, so stay quiet rather than
       // contradict it with a success toast.
-      if (document.getElementById(CRASH_SCREEN_ID)) return;
+      if (isCrashed()) return;
       if (this.deps.getSim() === simAtLoss) {
         // Leave a durable trace in the bulletin log (the old silent reload
         // erased all evidence; recovering must not repeat that mistake).
