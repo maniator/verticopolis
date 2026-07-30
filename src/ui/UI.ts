@@ -195,7 +195,12 @@ export class UI {
     if (tool.type === "build") {
       document.querySelector(`.pal-item[data-kind="${tool.kind}"]`)?.classList.add("active");
       const f = FACILITIES[tool.kind];
-      render(toolInfoTemplate(f, isCommercialKind(tool.kind)), this.el.toolInfo);
+      // The Floor tool lays a lobby on the ground floor (level 1), so surface the
+      // lobby price on its info card. See groundFloorStructureKind.
+      render(
+        toolInfoTemplate(f, isCommercialKind(tool.kind), tool.kind === "floor" ? FACILITIES.lobby.cost : undefined),
+        this.el.toolInfo,
+      );
     } else {
       document.querySelector(`.pal-item[data-tool="${tool.type}"]`)?.classList.add("active");
       render(tool.type === "bulldoze" ? BULLDOZE_TOOL_INFO : INSPECT_TOOL_INFO, this.el.toolInfo);

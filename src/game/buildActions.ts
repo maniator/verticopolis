@@ -6,6 +6,7 @@ import type { Picked } from "../render/excalibur/TowerEngine";
 import type { UI } from "../ui/UI";
 import type { AudioEngine } from "../audio/Audio";
 import { brushTiles, dragRunTiles, isOffLot, snapX } from "../ui/placement";
+import { groundFloorStructureKind } from "../engine/tower/towerTopology";
 import { gameplaySession, trackEconomyAction } from "../analytics";
 
 /**
@@ -113,6 +114,17 @@ export class BuildActions {
       }
     }
     if (placed > 0) gameplaySession.noteBuild(kind, floor, placed); // brush lays `placed` tiles
+    // Ground floor is lobby-only: the Floor tool on floor 1 auto-converts to a
+    // lobby (permanent, and pricier than a floor tile), so confirm what happened
+    // once per gesture. The preview already showed a lobby ghost and the lobby
+    // price; this is the belt-and-braces spoken confirmation. Keyed off the
+    // coercion helper so the rule has one source of truth.
+    if (placed > 0 && groundFloorStructureKind(kind, floor) !== kind) {
+      this.deps.ui.toast(
+        `The ground floor is a lobby, so a lobby ($${FACILITIES.lobby.cost.toLocaleString()}/tile) went here.`,
+        "info",
+      );
+    }
     this.paint = { tile, floor };
     if (placed === 0) {
       const alreadyAll = tiles.every((tx) => sim.tower.structureKindAt(floor, tx) === kind);

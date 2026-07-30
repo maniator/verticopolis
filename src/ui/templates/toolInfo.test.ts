@@ -37,6 +37,19 @@ describe("toolInfoTemplate rows", () => {
     expect(frag.textContent).not.toContain("Customers");
     expect(frag.querySelectorAll("div")).toHaveLength(2); // name + cost only
   });
+
+  it("adds the ground-floor lobby note when a lobby cost is passed (the Floor tool)", () => {
+    const floorTool = { name: "Floor", cost: 500, population: 0, description: "Structural floor space." };
+    const frag = renderToFragment(toolInfoTemplate(floorTool, false, 5000));
+    expect(frag.textContent).toContain("ground floor");
+    expect(frag.textContent).toContain(`$${(5000).toLocaleString()} per tile`);
+  });
+
+  it("omits the ground-floor note when no lobby cost is passed", () => {
+    const floorTool = { name: "Floor", cost: 500, population: 0, description: "Structural floor space." };
+    const frag = renderToFragment(toolInfoTemplate(floorTool, false));
+    expect(frag.textContent).not.toContain("ground floor");
+  });
 });
 
 describe("toolInfoTemplate escapes catalog copy as text", () => {

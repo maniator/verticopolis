@@ -1,4 +1,5 @@
 import { FACILITIES, GRID } from "../engine/facilities";
+import { groundFloorStructureKind } from "../engine/tower/towerTopology";
 import type { FacilityKind } from "../engine/types";
 
 /**
@@ -94,7 +95,10 @@ export type PlaceOutcome =
  *  "Not enough money." or "Floor already built here") and falls back to a
  *  generic can't-place line when the engine didn't say why. */
 export function announceForPlacement(placed: PlaceOutcome, kind: FacilityKind, floor: number): string {
-  const name = FACILITIES[kind].name;
+  // Ground floor is lobby-only: the Floor tool on floor 1 lays a lobby, so the
+  // spoken line must name a lobby too, matching the visual toast (a screen-reader
+  // user was otherwise told "Floor" for a lobby that was built).
+  const name = FACILITIES[groundFloorStructureKind(kind, floor)].name;
   return placed.what === "paint"
     ? placed.ok
       ? `Placed ${name} on floor ${floor}`

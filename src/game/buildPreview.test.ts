@@ -213,6 +213,49 @@ describe("updateBuildPreview", () => {
     expect(showInspector).not.toHaveBeenCalledWith(expect.anything());
   });
 
+  it("floor tool on the ground floor previews a LOBBY ghost (floor 1 is lobby-only)", () => {
+    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
+    sim.money = 10_000_000;
+    const { app, raw } = makeApp(sim, buildTool("floor"));
+    updateBuildPreview(app, 20, 1);
+    const preview = raw.engine.preview as { kind: string; floor: number };
+    expect(preview.kind).toBe("lobby"); // the Floor tool auto-converts on floor 1
+    expect(preview.floor).toBe(1);
+  });
+
+  it("the ground-floor ghost goes invalid when the whole brush of lobby tiles is unaffordable", () => {
+    const { sim } = fixture(); // lobby spans x=10..29 on floor 1
+    const { app, raw } = makeApp(sim, buildTool("floor"));
+    // Tile 30 sits at the lobby's edge, so the anchor tile alone IS affordable at
+    // the lobby price. But the 8-wide brush would lay ~4 empty tiles past the
+    // edge; a single-tile check would show green, the whole-brush guard must not.
+    sim.money = FACILITIES.lobby.cost; // enough for exactly one tile
+    updateBuildPreview(app, 30, 1);
+    const cheap = raw.engine.preview as { kind: string; valid: boolean };
+    expect(cheap.kind).toBe("lobby");
+    expect(cheap.valid).toBe(false); // red: the full strip is unaffordable
+    // Ample money: the same hover is valid.
+    sim.money = 10_000_000;
+    updateBuildPreview(app, 30, 1);
+    expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
+  });
+
+  it("counts the auto-bridge gap-fill in the ground-floor ghost affordability (detached click)", () => {
+    const { sim } = fixture(); // lobby spans x=10..29 on floor 1; autoBridge on (classic)
+    const { app, raw } = makeApp(sim, buildTool("floor"));
+    // Hover past the lobby edge so the placement auto-bridges the gap with extra
+    // lobby tiles. A naive per-tile estimate (8 * lobby cost = 40k) would greenlight
+    // at 40k, but the real cost including the bridge run is higher, so the ghost
+    // must be red rather than promise a run that only partial-builds.
+    sim.money = 40_000;
+    updateBuildPreview(app, 35, 1);
+    expect((raw.engine.preview as { valid: boolean }).valid).toBe(false);
+    // Ample money clears it.
+    sim.money = 1_000_000;
+    updateBuildPreview(app, 35, 1);
+    expect((raw.engine.preview as { valid: boolean }).valid).toBe(true);
+  });
+
   it("room (Classic): a valid cell previews valid with no reason and no refusal card", () => {
     const { sim } = fixture("classic");
     const { app, raw, showInspector } = makeApp(sim, buildTool("office"));
