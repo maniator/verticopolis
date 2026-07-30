@@ -1,8 +1,17 @@
 import type { GameApp } from "../main";
 import type { HostCommand } from "../platform/types";
 import { getPlatform } from "../platform";
-import { CRASH_SCREEN_ID } from "../ui/crashScreen";
-import { runSplashAction, hasLiveSplash } from "../ui/splashActions";
+import { runSplashAction } from "../ui/splashActions";
+import {
+  type InteractionState,
+  isCrashed,
+  isSplashUp,
+  readInteractionState,
+  changeKey,
+  availabilityKeyChanged,
+  commitAvailabilityKey,
+  resetAvailabilityKey,
+} from "./interactionState";
 
 /**
  * The shell-to-game half of the platform seam (`src/platform/types.ts`).
@@ -128,60 +137,6 @@ interface Refusal {
   speakable: boolean;
 }
 
-/**
- * Everything the guard needs to know, read ONCE.
- *
- * Read once because `availableCommands` asks the guard about all eight commands,
- * and asking the DOM inside the guard meant those reads happened eight times per
- * tick. Hoisting them also makes the decision below a pure function of a plain
- * object, which is what lets the guard be tested without a DOM at all.
- *
- * This is deliberately the same set of sources the interaction-state consolidation
- * (issue #716) is going to own. When that module lands it should replace the body
- * of `readInteractionState` and nothing else here needs to change.
- */
-interface InteractionState {
-  crashed: boolean;
-  splashUp: boolean;
-  /** A choice-bearing modal, read from the flags rather than inferred from the
-   *  element, because the implication is held in two other modules. */
-  blockingChoice: boolean;
-  dialogOpen: boolean;
-  editorBusy: boolean;
-}
-
-/** The crash check on its own, because everything else can be skipped once it is
- *  true and, more importantly, because it must not touch `app.ui`. See below. */
-function isCrashed(): boolean {
-  return !!document.getElementById(CRASH_SCREEN_ID);
-}
-
-function readInteractionState(app: GameApp): InteractionState {
-  return {
-    crashed: isCrashed(),
-    splashUp: hasLiveSplash(),
-    blockingChoice: app.shownChoice || app.shownUpdate,
-    dialogOpen: !!(document.getElementById("modal") as HTMLDialogElement | null)?.open,
-    // Guarded, because this is the one source that runs GAME code rather than
-    // reading a flag or an element. Hoisting the reads made this eager, where the
-    // old guard short-circuited on `crashed` and never reached `app.ui` at all, and
-    // the crash path is exactly where that matters: a UI-layer fault is the most
-    // likely reason the crash handler is running, and the crash handler now ticks
-    // availability. An exception here would escape before the crash was reported.
-    // `app.ui` itself may also be unset if the fault happened during construction.
-    editorBusy: safeEditorBusy(app),
-  };
-}
-
-function safeEditorBusy(app: GameApp): boolean {
-  try {
-    return app.ui?.isEditorBusy() ?? false;
-  } catch (err) {
-    console.warn("[platform] isEditorBusy threw; treating the editor as idle:", err);
-    return false;
-  }
-}
-
 /** Why a command was refused, or null when it may run. Pure, so the guard order is
  *  readable and testable on its own without touching a document. */
 function refusalForState(s: InteractionState, command: HostCommand): Refusal | null {
@@ -192,15 +147,11 @@ function refusalForState(s: InteractionState, command: HostCommand): Refusal | n
   if (s.crashed) {
     return { reason: "Not available right now", speakable: false };
   }
-  // `splashUp` comes from `hasLiveSplash()`, NOT from `getElementById("splash")`.
-  // The dispatch routes New Tower and Load Tower through the title screen's
-  // published actions, so if the guard asked the DOM instead there would be two
-  // answers to "is the title screen up" and nothing keeping them equal. In the
-  // disagreeing states both behaviors are wrong: with the element present but no
-  // actions published, `new-game` is allowed and then falls through to the in-game
-  // picker, which warns about abandoning a tower that does not exist; with actions
-  // published but the element gone, availability reports the full set while the
-  // dispatch still drives a torn-down overlay's closures.
+  // `splashUp` is `interactionState.isSplashUp()`, the ONE answer the dispatch
+  // reads too (it routes New Tower and Load Tower through the splash's own
+  // buttons only when `isSplashUp()`). Guard and dispatch reading one source is
+  // what stops them disagreeing about whether the title screen is up: the class
+  // of bug this refactor (#716) exists to remove.
   if (s.splashUp && !SPLASH_SAFE.has(command)) {
     return { reason: "Start or load a tower first", speakable: true };
   }
@@ -301,9 +252,20 @@ function dispatch(app: GameApp, command: HostCommand): void {
       // screen standing if the player backs out of the confirmation. Off it, the
       // same picker the toolbar's New Tower opens, including its fold-in abandon
       // warning: a menu item must not be a shortcut past a confirmation the
-      // button shows. `splashAction` reports whether it took the command, so
-      // there is one decision point rather than a second splash check here.
-      if (runSplashAction("new")) return;
+      // button shows. The splash decision is `isSplashUp()`, the SAME answer the
+      // availability guard reads, so guard and dispatch cannot disagree about
+      // whether the title screen is up; `runSplashAction` then runs the splash's
+      // own bound handler. Its boolean return is deliberately ignored (we return
+      // regardless), because `Onboarding` mounts the `#splash` element and
+      // publishes the action registry as one synchronous operation, and clears
+      // both together, so `isSplashUp()` true implies a live registry: the
+      // handler always runs, never a dead click. Falling through to the in-game
+      // picker on a miss would open the wrong dialog over the title screen, the
+      // exact thing #715's round-3 review removed.
+      if (isSplashUp()) {
+        runSplashAction("new");
+        return;
+      }
       app.ui.promptNewTower();
       return;
     case "save":
@@ -311,8 +273,12 @@ function dispatch(app: GameApp, command: HostCommand): void {
       return;
     case "open-saves":
       // The splash's Load Tower opens the load-only picker and routes a founder
-      // through the welcome; the in-game one is a different dialog.
-      if (runSplashAction("load")) return;
+      // through the welcome; the in-game one is a different dialog. Same shared
+      // `isSplashUp()` decision as New Tower above.
+      if (isSplashUp()) {
+        runSplashAction("load");
+        return;
+      }
       app.ui.cb.onShowSaves();
       return;
     case "undo":
@@ -357,10 +323,10 @@ export function availableCommands(app: GameApp): HostCommand[] {
   return [...HANDLED].filter((c) => refusalForState(state, c as HostCommand) === null) as HostCommand[];
 }
 
-/** The availability set as a comparable key, so the tick below can skip the
- *  cross-process call unless something actually changed. Mirrors the dirty-gate
- *  idiom the palette scan already uses (`UI.paletteScanKey`). */
-let lastAvailabilityKey: string | null = null;
+/** The push closure and the app it reads from. The availability dirty-gate
+ *  itself (`lastAvailabilityKey`) lives in `interactionState` now (AD-3, issue
+ *  #716): it is keyed over the five chrome sources this module no longer reads
+ *  directly, so its home moved with the reads. */
 let pushAvailability: ((commands: readonly HostCommand[]) => void) | null = null;
 /** The app the push closure reads from, so `tickHostCommands()` stays callable
  *  from any frame-loop or crash-path site without threading it through. */
@@ -381,20 +347,19 @@ let bound = false;
  * dialog is up) runs at FULL frame rate rather than at the 160 ms pump cadence.
  * That used to mean recomputing `refusalFor` per command, about 24 `getElementById`
  * calls plus 8 `isEditorBusy` calls per frame, while the comment claimed the dirty
- * gate made it "a no-op". It is now one `readInteractionState` per tick: two
- * element lookups (the crash card and the modal), two flag reads, and one
- * `isEditorBusy`, then eight pure comparisons. Two, not three: the splash source
- * became `hasLiveSplash()`, a module-variable check with no DOM access, in the
- * same round this note was written, and the note was not re-derived after it. The dirty gate still skips the cross-process call.
+ * gate made it "a no-op". It is now one `readInteractionState` per tick: three
+ * element lookups (the crash card, the splash, and the modal), two flag reads,
+ * and one `isEditorBusy`, then eight pure comparisons. The dirty gate still
+ * skips the cross-process call.
  */
 export function tickHostCommands(): void {
   if (!pushAvailability || !boundApp) return;
   try {
     const commands = availableCommands(boundApp);
-    const key = commands.join(",");
-    if (key === lastAvailabilityKey) return;
+    const key = changeKey(commands);
+    if (!availabilityKeyChanged(key)) return;
     pushAvailability(commands);
-    lastAvailabilityKey = key;
+    commitAvailabilityKey(key);
   } catch (err) {
     // A shell that throws on this must not take the frame loop with it. The key
     // is recorded only AFTER a successful push: marking it delivered first would
@@ -449,7 +414,7 @@ export function bindHostCommands(app: GameApp, platform = getPlatform()): void {
   }
   if (setter) {
     pushAvailability = (commands) => setter.call(platform, commands);
-    lastAvailabilityKey = null;
+    resetAvailabilityKey();
     // Best effort, then retried. If a shell's setter throws on this very first
     // call the opening state does not land, but `lastAvailabilityKey` stays null
     // (it only advances after a successful push), so the next pump tick about
@@ -459,10 +424,11 @@ export function bindHostCommands(app: GameApp, platform = getPlatform()): void {
   }
 }
 
-/** Test-only reset of the module's push state. */
+/** Test-only reset of the module's push state. The availability dirty-gate is
+ *  owned by `interactionState`, so clear it there too. */
 export function __resetHostCommandsForTest(): void {
   pushAvailability = null;
-  lastAvailabilityKey = null;
+  resetAvailabilityKey();
   boundApp = null;
   bound = false;
 }

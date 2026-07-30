@@ -17,9 +17,12 @@
  * publishes here when it mounts and clears when it tears down, both in the same
  * two places that own `splashEl`, so the registry cannot outlive the overlay.
  *
- * Nothing here reads the DOM. `runSplashAction` reports whether it took the
- * command, which is the one decision point callers need: false means no title
- * screen, so take the in-game path.
+ * Nothing here reads the DOM, and this module answers no state question of its
+ * own: "is the title screen up" is owned by `src/game/interactionState.ts`
+ * (issue #716), the single source both the host-command guard and its dispatch
+ * read. This is purely the ACTION registry. `runSplashAction` runs the bound
+ * handler and returns whether one was registered; a caller decides WHETHER to
+ * reach for it by asking `isSplashUp()` first.
  */
 
 /** The subset of `SplashHandlers` an outside affordance may run. Deliberately
@@ -51,10 +54,4 @@ export function runSplashAction(action: "new" | "load"): boolean {
   if (action === "new") live.onNewTower();
   else live.onLoadTower();
   return true;
-}
-
-/** Whether a title screen has published its actions. Exported for tests and for
- *  any caller that needs the question without running anything. */
-export function hasLiveSplash(): boolean {
-  return live !== null;
 }

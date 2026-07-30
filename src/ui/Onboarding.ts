@@ -2,6 +2,7 @@ import { html, nothing, render as litRender } from "lit-html";
 import type { Simulation } from "../engine/Simulation";
 import { splashTemplate, type SplashHandlers } from "./splashTemplate";
 import { setLiveSplashActions } from "./splashActions";
+import { isDialogOpen } from "../game/interactionState";
 
 /**
  * First-run experience — splash/title screen + a non-blocking "Getting Started"
@@ -299,7 +300,7 @@ export class OnboardingController {
       // keyboard handler uses. This became reachable once a returning player with
       // a save can SEE the splash (hasSave true), which is now every boot except
       // a post-update resume, and open one of those modals over it.
-      if ((document.getElementById("modal") as HTMLDialogElement | null)?.open) return;
+      if (isDialogOpen()) return;
       this.teardownSplash();
       o.onContinue();
     };
