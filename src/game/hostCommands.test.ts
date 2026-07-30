@@ -13,49 +13,54 @@ import { CRASH_SCREEN_ID } from "../ui/crashScreen";
 /**
  * The shell-to-game command seam (`src/platform/types.ts` `onHostCommand`).
  *
- * Two invariants carry the design and both are pinned here: every command lands
- * on the SAME call the in-game control makes (never a synthesized click, never
- * a duplicated code path), and the GAME decides whether a command may run, so a
- * shell never has to model splashes or dialogs. A browser session binds nothing
- * at all.
+ * Three invariants carry the design and all three are pinned here: every command
+ * lands on the SAME call the in-game control makes (never a synthesized click,
+ * never a duplicated path), the GAME decides whether a command may run, and the
+ * availability the shell is told must never disagree with what the dispatch
+ * would actually do. A browser session binds nothing at all.
  */
 
-type Spies = {
-  promptNewTower: ReturnType<typeof vi.fn>;
-  onSave: ReturnType<typeof vi.fn>;
-  onShowSaves: ReturnType<typeof vi.fn>;
-  showHelp: ReturnType<typeof vi.fn>;
-  showSettings: ReturnType<typeof vi.fn>;
-  showStats: ReturnType<typeof vi.fn>;
-  undo: ReturnType<typeof vi.fn>;
-  redo: ReturnType<typeof vi.fn>;
-  announce: ReturnType<typeof vi.fn>;
-  toast: ReturnType<typeof vi.fn>;
-};
+type Spies = Record<
+  | "promptNewTower"
+  | "onSave"
+  | "onShowSaves"
+  | "onShowStats"
+  | "onUndo"
+  | "onRedo"
+  | "showHelp"
+  | "showSettings"
+  | "sayVisibly"
+  | "isEditorBusy",
+  ReturnType<typeof vi.fn>
+>;
 
 function makeApp(): { app: GameApp; spies: Spies } {
   const spies: Spies = {
     promptNewTower: vi.fn(),
     onSave: vi.fn(),
     onShowSaves: vi.fn(),
+    onShowStats: vi.fn(),
+    onUndo: vi.fn(),
+    onRedo: vi.fn(),
     showHelp: vi.fn(),
     showSettings: vi.fn(),
-    showStats: vi.fn(),
-    undo: vi.fn(),
-    redo: vi.fn(),
-    announce: vi.fn(),
-    toast: vi.fn(),
+    sayVisibly: vi.fn(),
+    isEditorBusy: vi.fn(() => false),
   };
   const app = {
-    announce: spies.announce,
-    undo: spies.undo,
-    redo: spies.redo,
     ui: {
       promptNewTower: spies.promptNewTower,
       showHelp: spies.showHelp,
       showSettings: spies.showSettings,
-      toast: spies.toast,
-      cb: { onSave: spies.onSave, onShowSaves: spies.onShowSaves, onShowStats: spies.showStats },
+      sayVisibly: spies.sayVisibly,
+      isEditorBusy: spies.isEditorBusy,
+      cb: {
+        onSave: spies.onSave,
+        onShowSaves: spies.onShowSaves,
+        onShowStats: spies.onShowStats,
+        onUndo: spies.onUndo,
+        onRedo: spies.onRedo,
+      },
     },
   } as unknown as GameApp;
   return { app, spies };
@@ -63,18 +68,17 @@ function makeApp(): { app: GameApp; spies: Spies } {
 
 /** Every dispatch target, so a refusal case can assert that NOTHING ran rather
  *  than only checking the one command it sent. */
-function totalCalls(spies: Spies): number {
-  return (
-    spies.promptNewTower.mock.calls.length +
-    spies.onSave.mock.calls.length +
-    spies.onShowSaves.mock.calls.length +
-    spies.showHelp.mock.calls.length +
-    spies.showSettings.mock.calls.length +
-    spies.showStats.mock.calls.length +
-    spies.undo.mock.calls.length +
-    spies.redo.mock.calls.length
-  );
-}
+const TARGETS = [
+  "promptNewTower",
+  "onSave",
+  "onShowSaves",
+  "onShowStats",
+  "onUndo",
+  "onRedo",
+  "showHelp",
+  "showSettings",
+] as const;
+const totalCalls = (s: Spies) => TARGETS.reduce((n, k) => n + s[k].mock.calls.length, 0);
 
 const ALL_COMMANDS: HostCommand[] = [
   "new-game",
@@ -87,18 +91,24 @@ const ALL_COMMANDS: HostCommand[] = [
   "settings",
 ];
 
-function mountDom(): void {
+const mountDom = () => {
   document.body.innerHTML = `<dialog id="modal"></dialog>`;
-}
+};
 
-/** Open the shared modal the way the guard reads it, and assert the fixture
- *  actually took: a happy-dom quirk that left `.open` false would otherwise
- *  make every refusal assertion below pass vacuously. */
+/** Open the shared modal the way the guard reads it, and assert the fixture took:
+ *  a happy-dom quirk leaving `.open` false would make every refusal below pass
+ *  vacuously. */
 function openModal(): void {
   const dialog = document.getElementById("modal") as HTMLDialogElement;
   dialog.setAttribute("open", "");
   expect(dialog.open).toBe(true);
 }
+
+const basePort = (): PlatformPort => ({
+  isNativeWrapper: true,
+  saveFile: () => Promise.resolve(),
+  openExternal: () => {},
+});
 
 beforeEach(() => {
   mountDom();
@@ -112,123 +122,101 @@ afterEach(() => {
 });
 
 describe("runHostCommand: each command runs the control's own code path", () => {
-  it("new-game opens the same picker the toolbar's New Tower opens", () => {
+  it.each([
+    ["new-game", "promptNewTower"],
+    ["save", "onSave"],
+    ["open-saves", "onShowSaves"],
+    ["undo", "onUndo"],
+    ["redo", "onRedo"],
+    ["stats", "onShowStats"],
+    ["help", "showHelp"],
+    ["settings", "showSettings"],
+  ] as const)("%s dispatches to %s and nothing else", (command, target) => {
     const { app, spies } = makeApp();
-    runHostCommand(app, "new-game");
-    expect(spies.promptNewTower).toHaveBeenCalledOnce();
+    runHostCommand(app, command);
+    expect(spies[target]).toHaveBeenCalledOnce();
     expect(totalCalls(spies)).toBe(1);
   });
 
-  it("save runs the quick-save callback", () => {
-    const { app, spies } = makeApp();
-    runHostCommand(app, "save");
-    expect(spies.onSave).toHaveBeenCalledOnce();
-    expect(totalCalls(spies)).toBe(1);
-  });
-
-  it("open-saves opens the saves picker", () => {
-    const { app, spies } = makeApp();
-    runHostCommand(app, "open-saves");
-    expect(spies.onShowSaves).toHaveBeenCalledOnce();
-    expect(totalCalls(spies)).toBe(1);
-  });
-
-  it("help and settings open their dialogs", () => {
-    const { app, spies } = makeApp();
-    runHostCommand(app, "help");
-    runHostCommand(app, "settings");
-    expect(spies.showHelp).toHaveBeenCalledOnce();
-    expect(spies.showSettings).toHaveBeenCalledOnce();
-    expect(totalCalls(spies)).toBe(2);
-  });
-
-  it("undo and redo run the tower history, the same calls the keyboard makes", () => {
-    // Deliberately NOT the menu's own undo role: the shell registers no
-    // accelerator for these, so Ctrl+Z still reaches `bindKeys` untouched and
-    // keeps yielding to a focused rename field's native text undo.
+  it("undo and redo go through the callbacks the toolbar arrows use", () => {
+    // Not `app.undo()` directly. Every other command routes through `cb`, and the
+    // moment `onUndo` grows a guard or a tracking call, a direct call here would
+    // silently diverge from the button. Pinned by asserting the cb spies, which
+    // are the only undo path this fake app exposes.
     const { app, spies } = makeApp();
     runHostCommand(app, "undo");
     runHostCommand(app, "redo");
-    expect(spies.undo).toHaveBeenCalledOnce();
-    expect(spies.redo).toHaveBeenCalledOnce();
-    expect(totalCalls(spies)).toBe(2);
+    expect(spies.onUndo).toHaveBeenCalledOnce();
+    expect(spies.onRedo).toHaveBeenCalledOnce();
   });
 
-  it("stats opens the statistics dialog", () => {
-    const { app, spies } = makeApp();
-    runHostCommand(app, "stats");
-    expect(spies.showStats).toHaveBeenCalledOnce();
-    expect(totalCalls(spies)).toBe(1);
-  });
-
-  it("nothing is announced when a command runs", () => {
+  it("says nothing when a command runs", () => {
     const { app, spies } = makeApp();
     for (const command of ALL_COMMANDS) runHostCommand(app, command);
-    expect(spies.announce).not.toHaveBeenCalled();
+    expect(spies.sayVisibly).not.toHaveBeenCalled();
     expect(totalCalls(spies)).toBe(ALL_COMMANDS.length);
   });
 });
 
 describe("runHostCommand: the game owns availability, not the shell", () => {
-  it("refuses everything behind the crash screen, and says so", () => {
-    // The renderer is dead and the tower was already flushed; a Save from a menu
-    // would act on a stopped session. bindKeys guards keyboard input identically.
+  it("refuses everything behind the crash screen, and deliberately says nothing", () => {
+    // The card is a showModal() dialog, so the page behind it is inert and the
+    // toast rail paints under its backdrop. There is nowhere to put a notice, and
+    // the card itself is the message, so this path must not pretend to speak.
     const { app, spies } = makeApp();
     document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`);
     for (const command of ALL_COMMANDS) runHostCommand(app, command);
     expect(totalCalls(spies)).toBe(0);
-    expect(spies.announce).toHaveBeenCalledTimes(ALL_COMMANDS.length);
-    expect(spies.announce).toHaveBeenLastCalledWith("Not available right now");
+    expect(spies.sayVisibly).not.toHaveBeenCalled();
   });
 
   it("refuses only the tower-touching commands behind the splash", () => {
-    // The splash is a real screen with its own controls, so "the splash is up"
-    // is not by itself a reason to refuse. `save` would write the untouched
-    // boot tower over a real save; `new-game` and `open-saves` have
-    // splash-specific variants (suppressed abandon warning, founder welcome)
-    // that routing the in-game version from here would quietly bypass.
     const { app, spies } = makeApp();
     document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    for (const command of ["new-game", "save", "open-saves"] as const) runHostCommand(app, command);
+    for (const command of ["new-game", "save", "open-saves", "undo", "redo", "stats"] as const) {
+      runHostCommand(app, command);
+    }
     expect(totalCalls(spies)).toBe(0);
-    expect(spies.announce).toHaveBeenCalledTimes(3);
-    expect(spies.announce).toHaveBeenLastCalledWith("Start or load a tower first");
+    expect(spies.sayVisibly).toHaveBeenCalledTimes(6);
+    expect(spies.sayVisibly).toHaveBeenLastCalledWith("Start or load a tower first", "info");
   });
 
   it("lets Help and Settings through on the splash, because the screen offers them", () => {
-    // How to Play is a splash button in its own right. A menu whose Help does
-    // nothing on the first screen a player sees reads as a broken menu, and
-    // both of these open self-contained dialogs that touch no tower state.
     const { app, spies } = makeApp();
     document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
     runHostCommand(app, "help");
     runHostCommand(app, "settings");
     expect(spies.showHelp).toHaveBeenCalledOnce();
     expect(spies.showSettings).toHaveBeenCalledOnce();
-    expect(spies.announce).not.toHaveBeenCalled();
+    expect(spies.sayVisibly).not.toHaveBeenCalled();
   });
 
-  it("still refuses the splash-safe commands when a dialog is already open", () => {
-    // Splash-safe does not mean unconditional: a second dialog would displace
-    // the first.
-    const { app, spies } = makeApp();
-    document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    openModal();
-    runHostCommand(app, "help");
-    expect(spies.showHelp).not.toHaveBeenCalled();
-    expect(spies.announce).toHaveBeenCalledExactlyOnceWith("Close the open window first");
-  });
-
-  it("refuses everything while a dialog is open, and says so", () => {
-    // A menu can be reached with a dialog up, which no in-game button can: they
-    // sit behind it. A New Tower accepted behind the Saves picker is exactly the
-    // failure this guard exists for.
+  it("refuses everything while a dialog is open, and routes the line into it", () => {
+    // `sayVisibly` is the point: a <dialog> paints over the toast rail at any
+    // z-index, so a plain toast from here would be announced to nobody (GH #658).
     const { app, spies } = makeApp();
     openModal();
     for (const command of ALL_COMMANDS) runHostCommand(app, command);
     expect(totalCalls(spies)).toBe(0);
-    expect(spies.announce).toHaveBeenCalledTimes(ALL_COMMANDS.length);
-    expect(spies.announce).toHaveBeenLastCalledWith("Close the open window first");
+    expect(spies.sayVisibly).toHaveBeenCalledTimes(ALL_COMMANDS.length);
+    expect(spies.sayVisibly).toHaveBeenLastCalledWith("Close the open window first", "info");
+  });
+
+  it("refuses a dialog-opening command during a live editor press, but not save or undo", () => {
+    // The frame loop declines even a stats refresh while a press is in flight so
+    // the card cannot move under the pointer; opening a dialog out from under it
+    // is the louder version. Save, undo, and redo displace nothing.
+    const { app, spies } = makeApp();
+    spies.isEditorBusy.mockReturnValue(true);
+    for (const command of ["new-game", "open-saves", "stats", "help", "settings"] as const) {
+      runHostCommand(app, command);
+    }
+    expect(totalCalls(spies)).toBe(0);
+    expect(spies.sayVisibly).toHaveBeenCalledTimes(5);
+    runHostCommand(app, "save");
+    runHostCommand(app, "undo");
+    expect(spies.onSave).toHaveBeenCalledOnce();
+    expect(spies.onUndo).toHaveBeenCalledOnce();
   });
 
   it("runs again once the dialog closes", () => {
@@ -242,93 +230,99 @@ describe("runHostCommand: the game owns availability, not the shell", () => {
     runHostCommand(app, "save");
     expect(spies.onSave).toHaveBeenCalledOnce();
   });
-
-  it("a refusal is visible as well as announced", () => {
-    // Always-enabled menu items are the deliberate design (the shell sends
-    // intent, never permission), so a no-op the player cannot perceive is the
-    // single worst outcome of it. `announce` alone reaches only assistive
-    // technology, so a sighted player would see exactly the nothing they were
-    // promised they would not see.
-    const { app, spies } = makeApp();
-    document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    runHostCommand(app, "save");
-    expect(spies.announce).toHaveBeenCalledOnce();
-    expect(spies.toast).toHaveBeenCalledOnce();
-    expect(String(spies.toast.mock.calls[0][0]).length).toBeGreaterThan(0);
-    // Same wording on both surfaces, so a support report and a screen reader
-    // describe the same thing.
-    expect(spies.toast.mock.calls[0][0]).toBe(spies.announce.mock.calls[0][0]);
-  });
 });
 
 describe("runHostCommand: input from another repository is untrusted", () => {
   it("ignores a command outside the contract and tells the shell author", () => {
     const { app, spies } = makeApp();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    runHostCommand(app, "quit");
-    runHostCommand(app, "");
-    runHostCommand(app, "__proto__");
+    for (const bad of ["quit", "", "__proto__", "toString"]) runHostCommand(app, bad);
     expect(totalCalls(spies)).toBe(0);
-    expect(spies.announce).not.toHaveBeenCalled();
-    expect(warn).toHaveBeenCalledTimes(3);
+    expect(spies.sayVisibly).not.toHaveBeenCalled();
+    expect(warn).toHaveBeenCalledTimes(4);
   });
 
-  it("checks the command before the guards, so an unknown value is inert rather than announced", () => {
-    // An unknown command is a shell bug in every game state. Announcing "Not
-    // available yet" for it would send the shell author hunting the wrong thing.
+  it("checks the command before the guards, so an unknown value is inert rather than refused", () => {
     const { app, spies } = makeApp();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
     runHostCommand(app, "nonsense");
-    expect(spies.announce).not.toHaveBeenCalled();
+    expect(spies.sayVisibly).not.toHaveBeenCalled();
     expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("every handled command has a dispatch arm", () => {
+    // The exhaustiveness guard's runtime half. Adding a value to HostCommand and
+    // to HANDLED while forgetting the switch case would otherwise produce a menu
+    // item that is reported available, enabled by the shell, and silently does
+    // nothing, with typecheck and lint both green.
+    const { app, spies } = makeApp();
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    for (const command of availableCommands(app)) {
+      const before = totalCalls(spies);
+      runHostCommand(app, command);
+      expect(totalCalls(spies), `${command} reached no handler`).toBe(before + 1);
+    }
+    expect(warn).not.toHaveBeenCalled();
   });
 });
 
 describe("availability: the game tells the shell what to gray out", () => {
   it("reports every command in a normal in-game state", () => {
     const { app } = makeApp();
-    void app;
-    expect(availableCommands().sort()).toEqual([...ALL_COMMANDS].sort());
+    expect(availableCommands(app).sort()).toEqual([...ALL_COMMANDS].sort());
   });
 
   it("reports only the splash-safe commands on the splash", () => {
+    const { app } = makeApp();
     document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    expect(availableCommands().sort()).toEqual(["help", "settings"]);
+    expect(availableCommands(app).sort()).toEqual(["help", "settings"]);
   });
 
-  it("reports nothing behind the crash screen or an open dialog", () => {
+  it("reports nothing behind an open dialog or the crash screen", () => {
+    const { app } = makeApp();
     openModal();
-    expect(availableCommands()).toEqual([]);
+    expect(availableCommands(app)).toEqual([]);
     document.body.innerHTML = `<dialog id="${CRASH_SCREEN_ID}"></dialog>`;
-    expect(availableCommands()).toEqual([]);
+    expect(availableCommands(app)).toEqual([]);
   });
 
-  it("never reports a command the dispatch would refuse", () => {
-    // The two must be derived from one guard. If they drift, the shell offers an
-    // enabled item that is then refused, which is the exact confusion the
-    // graying-out exists to remove.
-    const { app, spies } = makeApp();
-    document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    for (const command of availableCommands()) {
-      spies.announce.mockClear();
-      runHostCommand(app, command);
-      expect(spies.announce, `${command} was reported available but refused`).not.toHaveBeenCalled();
+  it("never reports a command the dispatch would refuse, in any guarded state", () => {
+    // The two must derive from one guard. If they drift, the shell offers an
+    // enabled item that is then refused, which is the exact confusion the graying
+    // exists to remove.
+    const states: Array<[string, () => void]> = [
+      ["splash", () => document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>')],
+      ["open dialog", openModal],
+      ["crash screen", () => document.body.insertAdjacentHTML("beforeend", `<dialog id="${CRASH_SCREEN_ID}"></dialog>`)],
+    ];
+    for (const [label, enter] of states) {
+      mountDom();
+      const { app, spies } = makeApp();
+      enter();
+      for (const command of availableCommands(app)) {
+        spies.sayVisibly.mockClear();
+        const before = totalCalls(spies);
+        runHostCommand(app, command);
+        expect(spies.sayVisibly, `${command} reported available but refused during ${label}`).not.toHaveBeenCalled();
+        expect(totalCalls(spies), `${command} reported available but did nothing during ${label}`).toBe(before + 1);
+      }
     }
+  });
+
+  it("also reports correctly during a live editor press", () => {
+    const { app, spies } = makeApp();
+    spies.isEditorBusy.mockReturnValue(true);
+    expect(availableCommands(app).sort()).toEqual(["redo", "save", "undo"]);
   });
 
   it("pushes on bind and then only when the set actually changes", () => {
     const setCommandsAvailable = vi.fn();
     const { app } = makeApp();
     document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
-    bindHostCommands(app, {
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => {},
-      setCommandsAvailable,
-    });
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
     expect(setCommandsAvailable).toHaveBeenCalledOnce();
-    expect(setCommandsAvailable.mock.calls[0][0].sort()).toEqual(["help", "settings"]);
+    expect([...setCommandsAvailable.mock.calls[0][0]].sort()).toEqual(["help", "settings"]);
 
     // A tick with nothing changed must not cross the process boundary again:
     // this runs on the ~6 Hz pump, so an unguarded push would be constant IPC.
@@ -336,53 +330,50 @@ describe("availability: the game tells the shell what to gray out", () => {
     tickHostCommands();
     expect(setCommandsAvailable).toHaveBeenCalledOnce();
 
-    // Leaving the splash changes the set, so exactly one more push.
     document.getElementById("splash")?.remove();
     tickHostCommands();
     expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
-    expect(setCommandsAvailable.mock.calls[1][0].sort()).toEqual([...ALL_COMMANDS].sort());
+    expect([...setCommandsAvailable.mock.calls[1][0]].sort()).toEqual([...ALL_COMMANDS].sort());
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+  });
+
+  it("a failed push is retried rather than recorded as delivered", () => {
+    // The dirty gate must not be poisoned by a transient throw. Marking the key
+    // delivered before the push meant one failure left the shell showing a stale
+    // set for the rest of the session, because steady play never changes the set
+    // again to re-trigger a push.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    let failNext = true;
+    const setCommandsAvailable = vi.fn(() => {
+      if (failNext) {
+        failNext = false;
+        throw new Error("ipc gone");
+      }
+    });
+    const { app } = makeApp();
+    bindHostCommands(app, { ...basePort(), setCommandsAvailable });
+    expect(setCommandsAvailable).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalled();
+
+    // Same state, so a healthy dirty gate would skip. It must retry instead,
+    // because the previous push never landed.
+    tickHostCommands();
+    expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
+    // Now it succeeded, so the gate closes.
     tickHostCommands();
     expect(setCommandsAvailable).toHaveBeenCalledTimes(2);
   });
 
   it("does nothing at all without a shell that can gray items out", () => {
-    // Every browser session, and any shell that omits the optional member.
     const { app } = makeApp();
-    bindHostCommands(app, {
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => {},
-    });
-    expect(() => tickHostCommands()).not.toThrow();
-  });
-
-  it("a throwing shell cannot take the frame loop down with it", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const { app } = makeApp();
-    bindHostCommands(app, {
-      isNativeWrapper: true,
-      saveFile: () => Promise.resolve(),
-      openExternal: () => {},
-      setCommandsAvailable: () => {
-        throw new Error("ipc gone");
-      },
-    });
-    expect(warn).toHaveBeenCalled();
-    document.body.insertAdjacentHTML("beforeend", '<div id="splash"></div>');
+    bindHostCommands(app, basePort());
     expect(() => tickHostCommands()).not.toThrow();
   });
 });
 
 describe("bindHostCommands: inert in the browser, live in a shell", () => {
-  const basePort = (): PlatformPort => ({
-    isNativeWrapper: true,
-    saveFile: () => Promise.resolve(),
-    openExternal: () => {},
-  });
-
   it("binds nothing when the port has no command channel", () => {
-    // Every browser session, and any shell that drives nothing. The optional
-    // call must not throw on the three-member contract.
     const { app, spies } = makeApp();
     expect(() => bindHostCommands(app, basePort())).not.toThrow();
     expect(totalCalls(spies)).toBe(0);
@@ -396,15 +387,38 @@ describe("bindHostCommands: inert in the browser, live in a shell", () => {
     });
     bindHostCommands(app, { ...basePort(), onHostCommand });
     expect(onHostCommand).toHaveBeenCalledOnce();
-    expect(deliver).toBeTypeOf("function");
     deliver?.("help");
     expect(spies.showHelp).toHaveBeenCalledOnce();
   });
 
+  it("refuses a second bind, so no command can run twice", () => {
+    // The shell side registers an ipcRenderer listener per call with no removal
+    // path, so a second bind would mean two pickers, two saves, two undos.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { app } = makeApp();
+    const onHostCommand = vi.fn();
+    bindHostCommands(app, { ...basePort(), onHostCommand });
+    bindHostCommands(app, { ...basePort(), onHostCommand });
+    expect(onHostCommand).toHaveBeenCalledOnce();
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("survives a port whose member throws on read, instead of dying in boot", () => {
+    // `isPlatformPort` guards its own reads for this reason; this is the
+    // consumption side, which runs inside runBootFlow.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { app } = makeApp();
+    const trapped = {
+      ...basePort(),
+      onHostCommand: () => {
+        throw new Error("revoked");
+      },
+    };
+    expect(() => bindHostCommands(app, trapped)).not.toThrow();
+    expect(warn).toHaveBeenCalled();
+  });
+
   it("keeps a failure inside the game rather than throwing into the shell's IPC callback", () => {
-    // The handler runs on the far side of a process boundary, where nothing can
-    // catch it; an escaping throw would surface as an unhandled error in the
-    // shell's own event loop.
     const { app, spies } = makeApp();
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     spies.showHelp.mockImplementation(() => {

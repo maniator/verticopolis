@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "postbuild": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-wrapper-seam.ts browser",
+    "postbuild": "npm run verify:dist && node scripts/verify-wrapper-seam.ts browser",
     "preview": "vite preview --port 4173",
     "typecheck": "tsc --noEmit && tsc -p api/tsconfig.json",
     "watch": "tsc --watch",
@@ -28,7 +28,9 @@
     "screenshots": "vite build && RUN_SERVER=1 node scripts/screenshots.ts",
     "icons": "node scripts/gen-pwa-icons.mjs",
     "og-image": "node scripts/gen-og-image.mjs",
-    "build:desktop": "vite build --mode desktop && node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts && node scripts/verify-wrapper-seam.ts desktop"
+    "build:desktop": "vite build --mode desktop && npm run verify:dist && node scripts/verify-wrapper-seam.ts desktop",
+    "verify:dist": "node scripts/prerender-help.ts && node scripts/verify-precache.ts && node scripts/verify-game-handle.ts",
+    "build:native": "vite build --mode native && npm run verify:dist && node scripts/verify-wrapper-seam.ts native"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

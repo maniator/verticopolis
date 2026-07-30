@@ -16,7 +16,7 @@ import { reportCrashException } from "../analyticsErrors";
 import { bootCommonProps, platformLabel } from "../analyticsEnrichment";
 import { isStandalone } from "../pwaInstall";
 import { initInstallAffordance, splashInstallOffered, activateInstall } from "./installAffordance";
-import { bindHostCommands } from "./hostCommands";
+import { bindHostCommands, tickHostCommands } from "./hostCommands";
 import { IS_WRAPPED_BUILD } from "../platform";
 import { shouldWelcomeFounder } from "../founder";
 import { showTowerPicker } from "./appModals";
@@ -119,6 +119,13 @@ export function wireControllers(app: GameApp): void {
         getSim: () => app.sim,
         frameErrors: app.frameErrors,
       });
+      // Tell a wrapper shell that nothing can run now, so its menu grays out.
+      // Pushed from here because the frame loop is what normally publishes it
+      // and the frame loop has stopped: that is why this screen exists. Without
+      // this the desktop menu stays fully enabled behind the crash card, and a
+      // refusal cannot even be shown there (the card is a modal dialog, so the
+      // toast rail paints under its backdrop).
+      if (IS_WRAPPED_BUILD) tickHostCommands();
       // Then report the crash the moment its screen is shown (not just via the
       // next boot's reason), flattening the description plus build and tower
       // context. Sim reads are defensive: a crash is when sim state is least

@@ -45,6 +45,12 @@ export function runFrame(app: GameApp, dtMs: number): void {
   // player lose game-hours at high speed while it waits for their answer.
   if (app.shownChoice || app.shownUpdate) {
     app.accMinutes = 0;
+    // Push availability before bailing. A blocking dialog is the state in which
+    // EVERY host command is refused, so it is the state the shell most needs to
+    // hear about; returning first left the menu fully enabled exactly when
+    // nothing could run. Cheap: the dirty gate makes this a no-op after the
+    // first frame, and it does nothing at all without a wrapper shell.
+    if (IS_WRAPPED_BUILD) tickHostCommands();
     return;
   }
   const minutesPerSecond = SPEEDS[app.speed] ?? 0;

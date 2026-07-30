@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, afterEach } from "vitest";
+import { readFileSync } from "node:fs";
 import { resolvePlatform, getPlatform, isWrappedMode, IS_WRAPPED_BUILD } from "./index";
 import { browserPlatform } from "./browser";
 import type { PlatformPort } from "./types";
@@ -160,15 +161,42 @@ describe("isWrappedMode: the one predicate every wrapper gate shares", () => {
 });
 
 describe("IS_WRAPPED_BUILD: the build-time twin of the predicate", () => {
-  it("agrees with isWrappedMode for the mode this build actually is", () => {
-    // The constant duplicates the mode literals so Vite can fold it and Rollup
-    // can drop the wrapper-only modules from a browser bundle. That duplication
-    // is only safe while the two answers match, which is what this pins.
+  it("is false under the test runner, the same answer a browser build gets", () => {
+    expect(IS_WRAPPED_BUILD).toBe(false);
     expect(IS_WRAPPED_BUILD).toBe(isWrappedMode(import.meta.env.MODE));
   });
 
-  it("is false under the test runner, the same answer a browser build gets", () => {
-    expect(IS_WRAPPED_BUILD).toBe(false);
+  it("covers exactly the same modes as isWrappedMode, checked in the source", () => {
+    // Asserted against the SOURCE TEXT, and that is the whole point. Under vitest
+    // `import.meta.env.MODE` is "test", so comparing the constant to the
+    // predicate compares false to false and would stay green if someone dropped
+    // "native" from the literal expression, shipping a native bundle with the
+    // seam tree-shaken out and a menu that does nothing.
+    //
+    // The constant cannot call the predicate: Vite only folds a literal
+    // comparison, and Rollup will not inline a cross-module call to decide a
+    // branch is dead. So the duplication is forced, and this is what keeps it
+    // honest, the same technique the private shell uses on its sandboxed preload.
+    // A plain path from the repo root: under vitest `import.meta.url` is not a
+    // file: URL, so `new URL("./index.ts", import.meta.url)` cannot be read.
+    const source = readFileSync("src/platform/index.ts", "utf8");
+    expect(source, "the source file could not be read, so this test proves nothing").toContain("isWrappedMode");
+
+    const predicate = /export function isWrappedMode[^{]*\{\s*return ([^;]+);/.exec(source);
+    expect(predicate, "could not find isWrappedMode in the source").not.toBeNull();
+    const constant = /export const IS_WRAPPED_BUILD =([^;]+);/.exec(source);
+    expect(constant, "could not find IS_WRAPPED_BUILD in the source").not.toBeNull();
+
+    const modesIn = (text: string) => [...text.matchAll(/"([a-z-]+)"/g)].map((m) => m[1]).sort();
+    const predicateModes = modesIn(predicate![1]);
+    const constantModes = modesIn(constant![1]);
+
+    expect(predicateModes.length, "expected isWrappedMode to compare mode literals").toBeGreaterThan(0);
+    expect(constantModes).toEqual(predicateModes);
+    // And the constant must still be written as literal comparisons on
+    // `import.meta.env.MODE`, or Vite cannot fold it and the tree-shake silently
+    // stops working while every other test stays green.
+    expect(constant![1]).toContain("import.meta.env.MODE");
   });
 });
 
