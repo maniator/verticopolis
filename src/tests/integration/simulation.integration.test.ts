@@ -1007,19 +1007,19 @@ describe("Auto-floor bridge between modules", () => {
     expect(sim.build("floor", 2, x0 + 6).ok).toBe(true);
   });
 
-  it("bridges a floor tool on the GROUND, rescuing a placement that isn't yet connected", () => {
+  it("auto-converts a ground Floor-tool drop to a lobby and bridges it into the concourse", () => {
     const sim = newSeededGame(7); // starter floor-1 lobby spans [x0, x0+40)
     sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    // A floor tile right at the lobby's edge connects normally (adjacent to the
-    // lobby structure). A second floor five tiles further out is NOT adjacent to
-    // anything, but the bridge back to the first rescues it (ground-floor
-    // horizontal support), filling the gap with floor. A floor never stitches
-    // into the lobby itself (substrate mismatch), so the bridge stops at the
-    // first floor neighbor.
-    expect(sim.build("floor", 1, x0 + 40).ok).toBe(true); // touches the lobby edge
+    // Floor 1 is lobby-only, so the Floor tool lays a lobby. A drop at the lobby's
+    // edge extends it. A second drop five tiles further out is not adjacent to
+    // anything, but the lobby-to-lobby bridge rescues it (ground-floor horizontal
+    // support), filling the gap with LOBBY tiles (not bare floor), so the whole
+    // run is one continuous concourse. Plain-floor bridge rescue is still covered
+    // by the BASEMENT twin below, where plain floor is legal.
+    expect(sim.build("floor", 1, x0 + 40).ok).toBe(true); // extends the lobby edge
     expect(sim.build("floor", 1, x0 + 45).ok).toBe(true); // five-tile gap, rescued
-    for (let i = 41; i < 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("floor");
+    for (let i = 40; i <= 45; i++) expect(sim.tower.structureKindAt(1, x0 + i)).toBe("lobby");
   });
 
   it("bridges a floor tool in the BASEMENT, rescuing a detached tile the same as the ground", () => {
@@ -1262,12 +1262,69 @@ describe("Sky-lobby canon: player-triggered claim + lobby permanence", () => {
     expect(sim.build("floor", 15, x0).ok).toBe(true);
   });
 
-  it("does not fire on ground floor 1 (the concourse keeps its rules)", () => {
+  it("auto-converts the Floor tool to a lobby on ground floor 1 (lobby-only concourse)", () => {
     const sim = newSeededGame(7); // ground concourse pre-seeded with lobby
+    sim.money = 10_000_000;
     const x0 = Math.floor(GRID.width / 2) - 20;
-    // Floor 1 has a lobby (from newGame), but adding more plain floor tiles on
-    // it is still allowed, unlike a claimed sky-lobby floor.
+    // Floor 1 is UNCONDITIONALLY lobby-only in the 1994 game, unlike an UNCLAIMED
+    // sky-lobby floor (which still accepts plain floor above). The Floor tool on
+    // floor 1 therefore lays a LOBBY, not a bare floor tile, and is charged at the
+    // lobby price. x0+40 is the first empty tile past the starter lobby [x0, x0+40).
+    const before = sim.money;
     expect(sim.build("floor", 1, x0 + 40).ok).toBe(true);
+    expect(sim.tower.structureKindAt(1, x0 + 40)).toBe("lobby");
+    expect(before - sim.money).toBe(FACILITIES.lobby.cost); // lobby price, not floor's
+  });
+
+  it("builds nothing when a single ground lobby tile is unaffordable (degenerate partial-fill)", () => {
+    // Affordability is partial-fill like the Lobby tool: a drag lays what it can
+    // afford. The degenerate case is one tile the player cannot afford at the
+    // lobby price, which must build and charge nothing.
+    const sim = newSeededGame(7);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    sim.money = FACILITIES.lobby.cost - 1; // one dollar short of a single lobby tile
+    const before = sim.money;
+    const r = sim.build("floor", 1, x0 + 40);
+    expect(r.ok).toBe(false); // charged as a lobby, which we can't afford
+    expect(sim.tower.structureKindAt(1, x0 + 40)).toBeUndefined(); // nothing built
+    expect(sim.money).toBe(before); // nothing charged
+  });
+
+  it("founds an empty Classic tower via the Floor tool (auto-converts, no stranding)", () => {
+    const sim = Simulation.newGame(1, "classic"); // canon-zero: empty lot
+    expect(sim.tower.units.length).toBe(0);
+    const x0 = Math.floor(GRID.width / 2);
+    // A beginner reaches for the Floor tool first. On the empty ground line it
+    // auto-converts to a lobby, which satisfies the lobby-first founding rule, so
+    // the tower opens instead of the click being rejected as "not a lobby".
+    expect(sim.build("floor", 1, x0).ok).toBe(true);
+    expect(sim.tower.structureKindAt(1, x0)).toBe("lobby");
+    expect(sim.tower.units.length).toBe(1);
+  });
+
+  it("does not re-charge when the ground Floor tool hits an existing lobby tile (no-op)", () => {
+    const sim = newSeededGame(7); // starter lobby spans [x0, x0+40)
+    sim.money = 10_000_000;
+    const x0 = Math.floor(GRID.width / 2) - 20; // inside the starter lobby
+    expect(sim.tower.structureKindAt(1, x0)).toBe("lobby");
+    const before = sim.money;
+    const r = sim.build("floor", 1, x0); // Floor tool on a tile that is already a lobby
+    expect(r.ok).toBe(false); // structure already here: nothing to do
+    expect(sim.money).toBe(before); // and nothing charged
+    expect(sim.tower.structureKindAt(1, x0)).toBe("lobby");
+  });
+
+  it("does not migrate a pre-existing bare floor-1 tile on load (no save-format change)", () => {
+    const sim = newSeededGame(7);
+    const x0 = Math.floor(GRID.width / 2) - 20;
+    // The low-level Tower primitive is permissive, so a legacy save can carry a
+    // bare floor tile on floor 1. The auto-convert rule governs new PLAYER
+    // placement, not load, so a round-trip must preserve the floor tile rather
+    // than silently upgrade it to a lobby.
+    expect(sim.tower.place("floor", 1, x0 + 40).ok).toBe(true); // primitive, adjacent to lobby edge
+    expect(sim.tower.structureKindAt(1, x0 + 40)).toBe("floor");
+    const restored = Simulation.deserialize(sim.serialize());
+    expect(restored.tower.structureKindAt(1, x0 + 40)).toBe("floor"); // preserved, not migrated
   });
 
   it("refuses to bulldoze a lobby tile at any floor (1994 canon: lobbies are permanent)", () => {
