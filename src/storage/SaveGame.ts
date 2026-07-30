@@ -16,7 +16,9 @@ import {
   fromBase64,
   inflate,
   inflateCapped,
+  STORE_MAGIC,
   toBase64,
+  TOWER_FILE_MAGIC,
   TowerTooLargeError,
 } from "./saveCompression";
 
@@ -52,13 +54,6 @@ export const SLOT_COUNT = 3;
  */
 const UNREADABLE_KEY = "simtower-clone-unreadable";
 
-/**
- * Prefix marking a compressed localStorage value: this magic, then the
- * base64 of the DEFLATE-compressed JSON. A legacy uncompressed save is raw
- * JSON (starts with `{`), so the prefix check cleanly tells the two apart and
- * old saves keep loading — they re-write compressed on the next save.
- */
-const STORE_MAGIC = "VCZ1:";
 // Latest-start write token for same-tab async saves. A synchronous save clears
 // the token before it writes, so an older async compression can never commit
 // over a newer durable flush.
@@ -75,7 +70,6 @@ let latestAsyncSave: object | null = null;
  * import.
  */
 export const TOWER_FILE_EXT = ".vctower";
-const TOWER_FILE_MAGIC = "VCTOWER1";
 
 function readSlot(key: string): SerializedGame | null {
   const raw = localStorage.getItem(key);

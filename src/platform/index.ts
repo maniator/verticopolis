@@ -1,5 +1,6 @@
 import type { PlatformPort } from "./types";
 import { browserPlatform } from "./browser";
+import { isSaveStorePort } from "./saveStore";
 
 /** A wrapper injection is untrusted input: accept it only when it carries the
  *  full port surface, so a shell bug degrades to the browser path instead of
@@ -19,12 +20,17 @@ function isPlatformPort(value: unknown): value is PlatformPort {
   try {
     const port = value as Record<string, unknown>;
     const optionalFn = (v: unknown) => v === undefined || typeof v === "function";
+    // `saveStore` is an OBJECT rather than a function, so it gets its own
+    // optional check: absent is fine, present-but-malformed is not, on the same
+    // grounds as the function members (the game would throw on it at boot).
+    const optionalStore = (v: unknown) => v === undefined || isSaveStorePort(v);
     return (
       port.isNativeWrapper === true &&
       typeof port.saveFile === "function" &&
       typeof port.openExternal === "function" &&
       optionalFn(port.onHostCommand) &&
-      optionalFn(port.setCommandsAvailable)
+      optionalFn(port.setCommandsAvailable) &&
+      optionalStore(port.saveStore)
     );
   } catch {
     return false;
